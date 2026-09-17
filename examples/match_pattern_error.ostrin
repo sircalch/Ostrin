@@ -1,0 +1,27 @@
+enum Color {
+    Red(value: Int)
+    Blue
+}
+
+fn wrong_field(color: Color) -> Int {
+    match color {
+        Red(other) => other,
+        _ => 0,
+    }
+}
+
+fn wrong_type(color: Color) -> Int {
+    match color {
+        Red(value: true) => 1,
+        _ => 0,
+    }
+}
+
+fn bare_data_constructor(color: Color) -> Int {
+    match color {
+        Red => 1,
+        _ => 0,
+    }
+}
+
+fn main() -> Void {}

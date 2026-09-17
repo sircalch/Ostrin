@@ -1,0 +1,46 @@
+enum Shape {
+    Circle(radius: Quantity<Length>)
+    Rectangle(width: Quantity<Length>, height: Quantity<Length>)
+    Point
+}
+
+impl Shape {
+    fn describe(self) -> String {
+        match self {
+            Circle(radius) => "circulo de radio " + radius.to_string(),
+            Rectangle(width, height) => "rectangulo",
+            Point => "punto",
+        }
+    }
+}
+
+record Counter {
+    mut value: Int
+}
+
+impl Counter {
+    fn increment(mut self) -> Void {
+        self.value = self.value + 1
+    }
+}
+
+fn main() -> Void {
+    shapes = [Circle(radius: 2 m), Rectangle(width: 3 m, height: 4 m), Point]
+    for shape in shapes {
+        print(shape.describe())
+    }
+
+    mut c = Counter { value: 0 }
+    c.increment()
+    c.increment()
+    c.increment()
+    print(c.value)
+
+    n = 7
+    label = match n {
+        0 => "cero",
+        1 to 9 => "un digito",
+        _ => "grande",
+    }
+    print(label)
+}

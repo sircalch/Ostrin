@@ -1,0 +1,44 @@
+enum Maybe<T> {
+    Just(T)
+    Nothing
+}
+
+enum Outcome<T, E> {
+    Good(T)
+    Bad(E)
+}
+
+record Pair<T> {
+    first: T
+    second: T
+}
+
+fn unwrap_or<T>(value: Maybe<T>, fallback: T) -> T {
+    match value {
+        Just(item) => item,
+        Nothing => fallback,
+    }
+}
+
+fn describe(value: Maybe<Outcome<Int, String>>) -> String {
+    match value {
+        Just(Good(number)) => "good",
+        Just(Bad(message)) => message,
+        Nothing => "empty",
+    }
+}
+
+fn read_pair(pair: Pair<Int>) -> Int {
+    match pair {
+        Pair(first: value, second: _) => value,
+    }
+}
+
+fn main() -> Void {
+    print(unwrap_or(Just(9), 0))
+    print(unwrap_or(Nothing, 7))
+    print(describe(Just(Good(3))))
+    print(describe(Just(Bad("failed"))))
+    print(describe(Nothing))
+    print(read_pair(Pair { first: 4, second: 8 }))
+}

@@ -1,0 +1,13 @@
+trait Broken {
+    fn value(self) -> Int {
+        "not an integer"
+    }
+}
+
+record Thing {
+    marker: Int
+}
+
+impl Broken for Thing {}
+
+fn main() -> Void {}

@@ -1,0 +1,3 @@
+pub record ForeignType {
+    value: Int
+}

@@ -1,0 +1,12 @@
+[package]
+name = "ostrinc"
+version = "0.1.0"
+edition = "2021"
+description = "Compiler front-end for the Ostrin language"
+
+[[bin]]
+name = "ostrinc"
+path = "src/main.rs"
+
+[dependencies]
+toml = { version = "0.8", default-features = false, features = ["parse"] }

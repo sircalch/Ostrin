@@ -1,0 +1,107 @@
+{
+  "name": "Ostrin",
+  "scopeName": "source.ostrin",
+  "fileTypes": [
+    "ostrin"
+  ],
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#keywords" },
+    { "include": "#types" },
+    { "include": "#constructors" },
+    { "include": "#functions" },
+    { "include": "#operators" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.ostrin",
+          "match": "//.*$"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.ostrin",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            { "name": "constant.character.escape.ostrin", "match": "\\\\." }
+          ]
+        },
+        {
+          "name": "string.quoted.single.ostrin",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            { "name": "constant.character.escape.ostrin", "match": "\\\\." }
+          ]
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.unit.ostrin",
+          "match": "\\b[0-9]+(?:\\.[0-9]+)?\\s+(?:m|nm|km|cm|mm|s|ms|min|h|kg|g|mg|K|A|mol|mmol|cd|USD|EUR|bit|byte|L|C|atm|Pa)\\b"
+        },
+        {
+          "name": "constant.numeric.ostrin",
+          "match": "\\b(?:0[xX][0-9a-fA-F]+|[0-9]+(?:\\.[0-9]+)?)\\b"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.ostrin",
+          "match": "\\b(?:fn|record|enum|trait|impl|for|pub|import|as|if|else|match|loop|while|to|until|break|continue|return|spawn|spawn_scope|channel|try|catch|within|approximately|tolerance|mut)\\b"
+        },
+        {
+          "name": "constant.language.ostrin",
+          "match": "\\b(?:true|false|None|Some|Ok|Err|Less|Equal|Greater)\\b"
+        }
+      ]
+    },
+    "types": {
+      "patterns": [
+        {
+          "name": "support.type.ostrin",
+          "match": "\\b(?:Int|Float|Bool|Char|String|Void|List|Map|Set|Option|Result|Ordering|Quantity|Task|Channel|Dimension)\\b"
+        },
+        {
+          "name": "entity.name.type.ostrin",
+          "match": "\\b[A-Z][A-Za-z0-9_]*\\b"
+        }
+      ]
+    },
+    "constructors": {
+      "patterns": [
+        {
+          "name": "entity.name.function.constructor.ostrin",
+          "match": "\\b[A-Z][A-Za-z0-9_]*(?=\\s*\\()"
+        }
+      ]
+    },
+    "functions": {
+      "patterns": [
+        {
+          "name": "entity.name.function.ostrin",
+          "match": "\\b[a-z_][A-Za-z0-9_]*(?=\\s*\\()"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.ostrin",
+          "match": "(?:==|!=|<=|>=|\\+|-|\\*|/|<|>|=|\\.|\\^|:)"
+        }
+      ]
+    }
+  }
+}

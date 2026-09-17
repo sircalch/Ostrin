@@ -1,0 +1,78 @@
+{
+  "name": "ostrin-language-support",
+  "displayName": "Ostrin Language Support",
+  "description": "Syntax highlighting and compiler commands for the Ostrin programming language.",
+  "version": "0.1.0",
+  "publisher": "ostrin-project",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "keywords": [
+    "ostrin",
+    "language",
+    "units",
+    "concurrency",
+    "engineering"
+  ],
+  "icon": "images/ostrin-logo.png",
+  "main": "./extension.js",
+  "activationEvents": [
+    "onLanguage:ostrin",
+    "onCommand:ostrin.check",
+    "onCommand:ostrin.run"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "ostrin",
+        "aliases": [
+          "Ostrin",
+          "ostrin"
+        ],
+        "extensions": [
+          ".ostrin"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "ostrin",
+        "scopeName": "source.ostrin",
+        "path": "./syntaxes/ostrin.tmLanguage.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "ostrin.check",
+        "title": "Ostrin: Check Current File"
+      },
+      {
+        "command": "ostrin.run",
+        "title": "Ostrin: Run Current File"
+      }
+    ],
+    "configuration": {
+      "title": "Ostrin",
+      "properties": {
+        "ostrin.compilerPath": {
+          "type": "string",
+          "default": "ostrinc",
+          "description": "Path to the Ostrin compiler executable. Use 'ostrinc' when it is available on PATH."
+        },
+        "ostrin.checkOnSave": {
+          "type": "boolean",
+          "default": false,
+          "description": "Run the Ostrin compiler when an .ostrin file is saved."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "package": "vsce package"
+  }
+}

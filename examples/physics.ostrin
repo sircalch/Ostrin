@@ -1,0 +1,29 @@
+fn velocity(distance: Quantity<Length>, time: Quantity<Time>) -> Quantity<Length / Time> {
+    distance / time
+}
+
+fn double<D: Dimension>(x: Quantity<D>) -> Quantity<D> {
+    x * 2
+}
+
+fn main() -> Void {
+    a = 5 nm
+    b = 2 m
+    total = a + b
+    print(total)
+
+    v = velocity(10 m, 2 s)
+    print(v)
+
+    doubled = double(3 kg)
+    print(doubled)
+
+    ratio = b / a
+    print(ratio)
+
+    mut n = 0
+    for i in 1 to 5 {
+        n = n + i
+    }
+    print(n)
+}

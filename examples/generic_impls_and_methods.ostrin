@@ -1,0 +1,23 @@
+trait Mapper {
+    fn map<U>(self, value: U) -> U
+}
+
+record Box<T> {
+    value: T
+}
+
+impl<T> Mapper for Box<T> {
+    fn map<U>(self, value: U) -> U {
+        value
+    }
+}
+
+fn apply<T: Mapper, U>(container: T, value: U) -> U {
+    container.map<U>(value)
+}
+
+fn main() -> Void {
+    container = Box<Int> { value: 1 }
+    result = apply<Box<Int>, String>(container, "ok")
+    print(result)
+}

@@ -1,0 +1,26 @@
+record Fibonacci {
+    mut current: Int
+    mut next_value: Int
+    mut remaining: Int
+}
+
+impl Iterator<Int> for Fibonacci {
+    fn next(mut self) -> Option<Int> {
+        if self.remaining <= 0 {
+            None
+        } else {
+            value = self.current
+            self.current = self.next_value
+            self.next_value = value + self.next_value
+            self.remaining = self.remaining - 1
+            Some(value)
+        }
+    }
+}
+
+fn main() -> Void {
+    fib = Fibonacci { current: 0, next_value: 1, remaining: 10 }
+    for n in fib {
+        print(n)
+    }
+}

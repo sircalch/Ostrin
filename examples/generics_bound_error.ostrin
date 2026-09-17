@@ -1,0 +1,16 @@
+trait Comparable {
+    fn equals(self, other: Self) -> Bool
+}
+
+record Plain {
+    value: Int
+}
+
+fn same<T: Comparable>(a: T, b: T) -> Bool {
+    a.equals(b)
+}
+
+fn main() -> Void {
+    a = Plain { value: 1 }
+    print(same(a, a))
+}

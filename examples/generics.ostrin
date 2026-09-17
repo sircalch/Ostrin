@@ -1,0 +1,30 @@
+trait Comparable {
+    fn equals(self, other: Self) -> Bool
+}
+
+record Score {
+    value: Int
+}
+
+impl Comparable for Score {
+    fn equals(self, other: Self) -> Bool {
+        self.value == other.value
+    }
+}
+
+fn same<T: Comparable>(a: T, b: T) -> Bool {
+    a.equals(b)
+}
+
+fn first<T>(items: List<T>) -> T {
+    items[0]
+}
+
+fn main() -> Void {
+    a = Score { value: 7 }
+    b = Score { value: 7 }
+    c = Score { value: 9 }
+    print(same(a, b))
+    print(same(a, c))
+    print(first([7, 8, 9]))
+}

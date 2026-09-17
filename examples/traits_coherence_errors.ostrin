@@ -1,0 +1,41 @@
+trait Root {
+    fn root(self) -> Int
+}
+
+trait Middle: Root {
+    fn middle(self) -> Int
+}
+
+trait Leaf: Middle {
+    fn leaf(self) -> Int
+}
+
+trait Left {
+    fn shared(self) -> Int
+}
+
+trait Right {
+    fn shared(self) -> String
+}
+
+trait Combined: Left + Right {
+    fn combined(self) -> Int
+}
+
+record Value {
+    number: Int
+}
+
+impl Leaf for Value {
+    fn leaf(self) -> Int { self.number }
+}
+
+impl Left for Value {
+    fn shared(self) -> Int { self.number }
+}
+
+impl Right for Value {
+    fn shared(self) -> String { "right" }
+}
+
+fn main() -> Void {}

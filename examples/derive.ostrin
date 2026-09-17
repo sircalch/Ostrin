@@ -1,0 +1,16 @@
+record Point: Eq, Ord {
+    x: Int
+    y: Int
+}
+
+fn main() -> Void {
+    a = Point { x: 1, y: 2 }
+    b = Point { x: 1, y: 2 }
+    c = Point { x: 5, y: 0 }
+
+    print(a == b)
+    print(a == c)
+    print(a != c)
+    print(a < c)
+    print(c > a)
+}

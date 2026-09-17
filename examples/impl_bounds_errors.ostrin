@@ -1,0 +1,36 @@
+trait Comparable {
+    fn equals(self, other: Self) -> Bool
+}
+
+trait Label {
+    fn label(self) -> String
+}
+
+record Score {
+    value: Int
+}
+
+record Plain {
+    value: Int
+}
+
+record Box<T> {
+    value: T
+}
+
+impl Comparable for Score {
+    fn equals(self, other: Self) -> Bool {
+        self.value == other.value
+    }
+}
+
+impl<T: Comparable> Label for Box<T> {
+    fn label(self) -> String {
+        "comparable"
+    }
+}
+
+fn main() -> Void {
+    plain = Box<Plain> { value: Plain { value: 1 } }
+    print(plain.label())
+}

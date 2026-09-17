@@ -1,0 +1,18 @@
+trait NumericBox {
+    fn add(self, delta: Int) -> Int
+}
+
+record Box<T> {
+    value: T
+}
+
+impl NumericBox for Box<Int> {
+    fn add(self, delta: Int) -> Int {
+        self.value + delta
+    }
+}
+
+fn main() -> Void {
+    box = Box<Int> { value: 1 }
+    print(box.add("not an integer"))
+}

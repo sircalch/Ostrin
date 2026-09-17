@@ -1,0 +1,26 @@
+trait LengthLabel {
+    fn label(self) -> String
+}
+
+trait TimeLabel {
+    fn label(self) -> String
+}
+
+impl LengthLabel for Quantity<Length> {
+    fn label(self) -> String {
+        "length quantity"
+    }
+}
+
+impl TimeLabel for Quantity<Time> {
+    fn label(self) -> String {
+        "time quantity"
+    }
+}
+
+fn main() -> Void {
+    distance = 5 m
+    duration = 2 s
+    print(distance.label())
+    print(duration.label())
+}

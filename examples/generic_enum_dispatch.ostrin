@@ -1,0 +1,30 @@
+trait IntLabel {
+    fn label(self) -> String
+}
+
+trait StringLabel {
+    fn label(self) -> String
+}
+
+enum Boxed<T> {
+    Item(T)
+}
+
+impl IntLabel for Boxed<Int> {
+    fn label(self) -> String {
+        "integer enum"
+    }
+}
+
+impl StringLabel for Boxed<String> {
+    fn label(self) -> String {
+        "text enum"
+    }
+}
+
+fn main() -> Void {
+    int_item = Item<Int>(1)
+    string_item = Item<String>("x")
+    print(int_item.label())
+    print(string_item.label())
+}

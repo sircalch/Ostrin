@@ -1,0 +1,13 @@
+fn main() -> Void {
+    a = 5
+    b = 10
+    total = a
+        + b
+
+    x = 7
+    -x
+
+    result = items
+        .filter(is_valid)
+        .map(square)
+}

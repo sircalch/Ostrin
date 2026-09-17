@@ -1,0 +1,19 @@
+record Buffer {
+    mut value: Int
+}
+
+fn main() -> Void {
+    mut counter = 0
+    task = spawn {
+        counter = counter + 1
+    }
+
+    ch = channel<Int>()
+    mut buffer = Buffer { value: 5 }
+    ch.send(buffer)
+    process(buffer)
+}
+
+fn process(b: Buffer) -> Void {
+    print(b.value)
+}

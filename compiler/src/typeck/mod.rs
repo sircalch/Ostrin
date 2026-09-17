@@ -1,0 +1,2658 @@
+use std::collections::{HashMap, HashSet};
+
+use crate::ast::*;
+use crate::types::*;
+
+#[derive(Debug, Clone)]
+pub struct TypeError {
+    pub code: &'static str,
+    pub message: String,
+}
+
+#[derive(Clone)]
+struct FnSig {
+    params: Vec<Type>,
+    return_type: Type,
+    generics: Vec<GenericParam>,
+}
+
+#[derive(Clone)]
+struct ConcreteMethod {
+    generics: Vec<GenericParam>,
+    params: Vec<Param>,
+    return_type: Type,
+    owner: String,
+    impl_substitutions: HashMap<String, Ty>,
+}
+
+pub struct Checker {
+    functions: HashMap<String, FnSig>,
+    traits: HashMap<String, TraitDecl>,
+    implementations: Vec<ImplDecl>,
+    trait_impls: HashSet<(String, String)>,
+    type_origins: HashMap<String, Vec<String>>,
+    enum_variants: HashMap<String, Vec<String>>,
+    variant_owners: HashMap<String, String>,
+    variant_fields: HashMap<(String, String), Vec<Type>>,
+    variant_field_names: HashMap<(String, String), Vec<Option<String>>>,
+    enum_generics: HashMap<String, Vec<GenericParam>>,
+    record_fields: HashMap<String, Vec<(String, Type)>>,
+    record_generics: HashMap<String, Vec<GenericParam>>,
+    current_generic_bounds: HashMap<String, Vec<String>>,
+    errors: Vec<TypeError>,
+}
+
+type Scope = HashMap<String, (Ty, bool)>;
+
+const MAX_PATTERN_SHAPES: usize = 1024;
+
+impl Checker {
+    pub fn new() -> Self {
+        let mut enum_variants = HashMap::new();
+        let mut variant_owners = HashMap::new();
+        let mut variant_fields = HashMap::new();
+        let mut variant_field_names = HashMap::new();
+        let mut enum_generics = HashMap::new();
+        for (enum_name, variants) in [
+            ("Option", vec![("Some", vec![Type::Named("T".to_string(), vec![])]), ("None", vec![])]),
+            ("Result", vec![("Ok", vec![Type::Named("T".to_string(), vec![])]), ("Err", vec![Type::Named("E".to_string(), vec![])]),]),
+            ("Ordering", vec![("Less", vec![]), ("Equal", vec![]), ("Greater", vec![])]),
+        ] {
+            enum_variants.insert(enum_name.to_string(), variants.iter().map(|(name, _)| (*name).to_string()).collect());
+            enum_generics.insert(
+                enum_name.to_string(),
+                match enum_name {
+                    "Option" => vec![GenericParam { name: "T".to_string(), bounds: vec![] }],
+                    "Result" => vec![
+                        GenericParam { name: "T".to_string(), bounds: vec![] },
+                        GenericParam { name: "E".to_string(), bounds: vec![] },
+                    ],
+                    _ => Vec::new(),
+                },
+            );
+            for (variant_name, fields) in variants {
+                variant_owners.insert(variant_name.to_string(), enum_name.to_string());
+                variant_fields.insert((enum_name.to_string(), variant_name.to_string()), fields);
+                variant_field_names.insert(
+                    (enum_name.to_string(), variant_name.to_string()),
+                    vec![None; variant_fields[&(enum_name.to_string(), variant_name.to_string())].len()],
+                );
+            }
+        }
+        Checker {
+            functions: HashMap::new(),
+            traits: HashMap::new(),
+            implementations: Vec::new(),
+            trait_impls: HashSet::new(),
+            type_origins: HashMap::new(),
+            enum_variants,
+            variant_owners,
+            variant_fields,
+            variant_field_names,
+            enum_generics,
+            record_fields: HashMap::new(),
+            record_generics: HashMap::new(),
+            current_generic_bounds: HashMap::new(),
+            errors: Vec::new(),
+        }
+    }
+
+    pub fn check_program(mut self, items: &[Item]) -> Vec<TypeError> {
+        for item in items {
+            match item {
+                Item::Enum(e) => {
+                    self.type_origins.insert(e.name.clone(), e.module_path.clone());
+                    self.enum_generics.insert(e.name.clone(), e.generics.clone());
+                    self.enum_variants.insert(
+                        e.name.clone(),
+                        e.variants.iter().map(|v| v.name.clone()).collect(),
+                    );
+                    for variant in &e.variants {
+                        self.variant_owners.insert(variant.name.clone(), e.name.clone());
+                        self.variant_fields.insert(
+                            (e.name.clone(), variant.name.clone()),
+                            variant.fields.iter().map(|field| field.ty.clone()).collect(),
+                        );
+                        self.variant_field_names.insert(
+                            (e.name.clone(), variant.name.clone()),
+                            variant.fields.iter().map(|field| field.name.clone()).collect(),
+                        );
+                    }
+                }
+                Item::Record(record) => {
+                    self.type_origins.insert(record.name.clone(), record.module_path.clone());
+                    self.record_generics.insert(record.name.clone(), record.generics.clone());
+                    self.record_fields.insert(
+                        record.name.clone(),
+                        record
+                            .fields
+                            .iter()
+                            .map(|field| (field.name.clone(), field.ty.clone()))
+                            .collect(),
+                    );
+                }
+                Item::Trait(t) => {
+                    self.traits.insert(t.name.clone(), t.clone());
+                }
+                Item::Impl(im) => {
+                    self.implementations.push(im.clone());
+                    if let Some(trait_name) = &im.trait_name {
+                        if !self.trait_impls.insert((trait_name.clone(), im.type_name.clone())) {
+                            self.push(
+                                "E1054",
+                                format!("Duplicate implementation of '{}' for '{}'.", trait_name, im.type_name),
+                            );
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        for item in items {
+            if let Item::Trait(trait_decl) = item {
+                self.validate_trait_decl(trait_decl);
+            }
+        }
+        for item in items {
+            if let Item::Trait(trait_decl) = item {
+                self.check_trait_defaults(trait_decl);
+            }
+        }
+        for item in items {
+            if let Item::Impl(im) = item {
+                self.validate_impl(im);
+            }
+        }
+        for item in items {
+            if let Item::Function(f) = item {
+                if self.functions.contains_key(&f.name) {
+                    self.push("E1040", format!("Function '{}' is already defined.", f.name));
+                    continue;
+                }
+                self.functions.insert(
+                    f.name.clone(),
+                    FnSig {
+                        params: f.params.iter().map(|p| p.ty.clone()).collect(),
+                        return_type: f.return_type.clone(),
+                        generics: f.generics.clone(),
+                    },
+                );
+            }
+        }
+        for item in items {
+            match item {
+                Item::Function(f) => self.check_function(f),
+                Item::Impl(im) => {
+                    for method in &im.methods {
+                        self.check_impl_method(method, im);
+                    }
+                }
+                // Records e imports todavía no se verifican semánticamente de forma completa.
+                Item::Record(_) | Item::Enum(_) | Item::Import(_) | Item::Trait(_) => {}
+            }
+        }
+        self.errors
+    }
+
+    fn check_function(&mut self, f: &FunctionDecl) {
+        self.check_function_with_extra_bounds(f, &HashMap::new());
+    }
+
+    fn check_function_with_extra_bounds(
+        &mut self,
+        f: &FunctionDecl,
+        extra_bounds: &HashMap<String, Vec<String>>,
+    ) {
+        let previous_bounds = std::mem::take(&mut self.current_generic_bounds);
+        self.current_generic_bounds = f
+            .generics
+            .iter()
+            .map(|g| (g.name.clone(), g.bounds.clone()))
+            .collect();
+        self.current_generic_bounds.extend(extra_bounds.clone());
+        let mut scope: Scope = HashMap::new();
+        for p in &f.params {
+            scope.insert(p.name.clone(), (self.resolve_type_in_context(&p.ty), false));
+        }
+        let expected = self.resolve_type_in_context(&f.return_type);
+        let actual = self.check_block(&f.body, &mut scope);
+        if !compatible(&expected, &actual) {
+            self.push(
+                "E1041",
+                format!(
+                    "Function '{}' declared to return '{}' but its body evaluates to '{}'.",
+                    f.name,
+                    expected.describe(),
+                    actual.describe()
+                ),
+            );
+        }
+        self.current_generic_bounds = previous_bounds;
+    }
+
+    fn check_trait_defaults(&mut self, trait_decl: &TraitDecl) {
+        let mut self_bounds = vec![trait_decl.name.clone()];
+        let mut visiting = Vec::new();
+        let mut seen = HashSet::new();
+        collect_supertraits(
+            &trait_decl.name,
+            &self.traits,
+            &mut visiting,
+            &mut seen,
+            &mut self_bounds,
+        );
+        let extra_bounds = HashMap::from([("Self".to_string(), self_bounds)]);
+
+        for method in &trait_decl.methods {
+            let Some(body) = &method.default_body else { continue };
+            let mut generics = trait_decl.generics.clone();
+            generics.extend(method.generics.clone());
+            let function = FunctionDecl {
+                name: format!("{}.{}", trait_decl.name, method.name),
+                is_pub: false,
+                generics,
+                params: method.params.clone(),
+                return_type: method.return_type.clone(),
+                body: body.clone(),
+            };
+            self.check_function_with_extra_bounds(&function, &extra_bounds);
+        }
+    }
+
+    fn check_impl_method(&mut self, method: &FunctionDecl, implementation: &ImplDecl) {
+        let mut method = method.clone();
+        if !implementation.generics.is_empty() {
+            let mut generics = implementation.generics.clone();
+            generics.extend(method.generics);
+            method.generics = generics;
+        }
+        let owner = Type::Named(implementation.type_name.clone(), implementation.type_args.clone());
+        for param in &mut method.params {
+            replace_self_type_with_type(&mut param.ty, &owner);
+        }
+        replace_self_type_with_type(&mut method.return_type, &owner);
+        self.check_function(&method);
+    }
+
+    fn validate_impl(&mut self, implementation: &ImplDecl) {
+        self.validate_generic_bounds(&implementation.generics, "impl");
+        let Some(trait_name) = &implementation.trait_name else { return };
+        let trait_decl = self.traits.get(trait_name).cloned();
+        if trait_decl.is_none() && !is_builtin_trait(trait_name) {
+            self.push(
+                "E1054",
+                format!("Trait '{}' is not declared and is not a standard trait.", trait_name),
+            );
+            return;
+        }
+        if !self.impl_respects_coherence(implementation, trait_decl.as_ref()) {
+            self.push(
+                "E1056",
+                format!(
+                    "Implementation of '{}' for '{}' violates the orphan rule: either the trait or the type must be defined in this module.",
+                    trait_name, implementation.type_name
+                ),
+            );
+            return;
+        }
+        self.validate_impl_type_arguments(implementation, trait_decl.as_ref());
+        let Some(trait_decl) = trait_decl else {
+            return;
+        };
+        let trait_methods = trait_decl
+            .methods
+            .iter()
+            .map(|method| specialize_trait_method(method, &trait_decl.generics, &implementation.trait_args))
+            .collect::<Vec<_>>();
+
+        let mut supertraits = Vec::new();
+        let mut visiting = Vec::new();
+        let mut seen = HashSet::new();
+        collect_supertraits(trait_name, &self.traits, &mut visiting, &mut seen, &mut supertraits);
+        for supertrait in &supertraits {
+            if !self
+                .trait_impls
+                .contains(&(supertrait.clone(), implementation.type_name.clone()))
+            {
+                self.push(
+                    "E1050",
+                    format!(
+                        "Cannot implement '{}' for '{}': missing required supertrait '{}'.",
+                        trait_name, implementation.type_name, supertrait
+                    ),
+                );
+            }
+        }
+
+        for required in &trait_methods {
+            if required.default_body.is_none() && !implementation.methods.iter().any(|method| method.name == required.name) {
+                self.push(
+                    "E1055",
+                    format!(
+                        "Implementation of '{}' for '{}' is missing required method '{}'.",
+                        trait_name, implementation.type_name, required.name
+                    ),
+                );
+            }
+        }
+
+        for method in &implementation.methods {
+            if let Some(expected) = trait_methods.iter().find(|expected| expected.name == method.name) {
+                if !impl_method_signature_matches(expected, method, &implementation.type_name) {
+                    self.push(
+                        "E1054",
+                        format!(
+                            "Method '{}.{}' does not match the signature declared by trait '{}'.",
+                            implementation.type_name, method.name, trait_name
+                        ),
+                    );
+                }
+            }
+        }
+    }
+
+    fn validate_generic_bounds(&mut self, generics: &[GenericParam], owner: &str) {
+        for generic in generics {
+            for bound in &generic.bounds {
+                if bound != "Dimension" && !self.traits.contains_key(bound) && !is_builtin_trait(bound) {
+                    self.push(
+                        "E1054",
+                        format!(
+                            "Unknown trait bound '{}' on generic parameter '{}' in {}.",
+                            bound, generic.name, owner
+                        ),
+                    );
+                }
+            }
+        }
+    }
+
+    fn validate_trait_decl(&mut self, trait_decl: &TraitDecl) {
+        let mut seen_supertraits = HashSet::new();
+        for supertrait in &trait_decl.supertraits {
+            if !seen_supertraits.insert(supertrait.clone()) {
+                self.push(
+                    "E1057",
+                    format!(
+                        "Trait '{}' lists supertrait '{}' more than once.",
+                        trait_decl.name, supertrait
+                    ),
+                );
+            }
+            if !self.traits.contains_key(supertrait) && !is_builtin_trait(supertrait) {
+                self.push(
+                    "E1054",
+                    format!(
+                        "Trait '{}' extends unknown trait '{}'.",
+                        trait_decl.name, supertrait
+                    ),
+                );
+            }
+        }
+
+        let mut closure = Vec::new();
+        let mut visiting = Vec::new();
+        let mut seen = HashSet::new();
+        let has_cycle = collect_trait_closure(
+            &trait_decl.name,
+            &self.traits,
+            &mut visiting,
+            &mut seen,
+            &mut closure,
+        );
+        if has_cycle {
+            self.push(
+                "E1057",
+                format!("Trait inheritance cycle detected involving '{}'.", trait_decl.name),
+            );
+        }
+
+        let mut methods: HashMap<String, (TraitMethodSig, String)> = HashMap::new();
+        for source_name in closure {
+            let Some(source) = self.traits.get(&source_name).cloned() else { continue };
+            for method in source.methods {
+                if let Some((previous, previous_source)) = methods.get(&method.name) {
+                    if previous_source == &source_name {
+                        self.push(
+                            "E1057",
+                            format!(
+                                "Trait '{}' declares method '{}' more than once.",
+                                source_name, method.name
+                            ),
+                        );
+                    } else if !trait_method_signature_matches(previous, &method) {
+                        self.push(
+                            "E1057",
+                            format!(
+                                "Trait '{}' inherits incompatible declarations of method '{}' from '{}' and '{}'.",
+                                trait_decl.name, method.name, previous_source, source_name
+                            ),
+                        );
+                    }
+                } else {
+                    methods.insert(method.name.clone(), (method, source_name.clone()));
+                }
+            }
+        }
+    }
+
+    fn impl_respects_coherence(&self, implementation: &ImplDecl, trait_decl: Option<&TraitDecl>) -> bool {
+        let trait_is_local = trait_decl
+            .is_some_and(|decl| decl.module_path == implementation.module_path);
+        let type_is_local = self
+            .type_origins
+            .get(&implementation.type_name)
+            .is_some_and(|origin| origin == &implementation.module_path);
+        trait_is_local || type_is_local
+    }
+
+    fn validate_impl_type_arguments(
+        &mut self,
+        implementation: &ImplDecl,
+        trait_decl: Option<&TraitDecl>,
+    ) {
+        if let Some(trait_decl) = trait_decl {
+            if implementation.trait_args.len() != trait_decl.generics.len() {
+                self.push(
+                    "E1042",
+                    format!(
+                        "Trait '{}' expects {} type argument(s) in this impl, got {}.",
+                        implementation.trait_name.as_deref().unwrap_or("<unknown>"),
+                        trait_decl.generics.len(),
+                        implementation.trait_args.len()
+                    ),
+                );
+            }
+        }
+
+        let expected_type_arity = self
+            .record_generics
+            .get(&implementation.type_name)
+            .map(Vec::len)
+            .or_else(|| self.enum_generics.get(&implementation.type_name).map(Vec::len))
+            .or_else(|| builtin_generic_type_arity(&implementation.type_name));
+        match expected_type_arity {
+            Some(arity) if implementation.type_args.len() != arity => {
+                self.push(
+                    "E1042",
+                    format!(
+                        "Type '{}' expects {} type argument(s) in this impl, got {}.",
+                        implementation.type_name,
+                        arity,
+                        implementation.type_args.len()
+                    ),
+                );
+            }
+            None if !implementation.type_args.is_empty() => {
+                self.push(
+                    "E1042",
+                    format!(
+                        "Type '{}' is not a declared generic type and cannot receive impl type arguments.",
+                        implementation.type_name
+                    ),
+                );
+            }
+            _ => {}
+        }
+    }
+
+    fn check_block(&mut self, block: &Block, scope: &mut Scope) -> Ty {
+        for stmt in &block.stmts {
+            self.check_stmt(stmt, scope);
+        }
+        match &block.tail {
+            Some(e) => self.infer_expr(e, scope),
+            None => Ty::Void,
+        }
+    }
+
+    fn check_stmt(&mut self, stmt: &Stmt, scope: &mut Scope) {
+        match stmt {
+            Stmt::Binding { mut_, name, ty, value } => {
+                let value_ty = self.infer_expr(value, scope);
+                let final_ty = match ty {
+                    Some(t) => {
+                        let declared = self.resolve_type_in_context(t);
+                        if !compatible(&declared, &value_ty) {
+                            self.push(
+                                "E1041",
+                                format!(
+                                    "Cannot assign a value of type '{}' to '{}: {}'.",
+                                    value_ty.describe(),
+                                    name,
+                                    declared.describe()
+                                ),
+                            );
+                        }
+                        declared
+                    }
+                    None => value_ty,
+                };
+                scope.insert(name.clone(), (final_ty, *mut_));
+            }
+            Stmt::Assign { name, value } => {
+                let value_ty = self.infer_expr(value, scope);
+                match scope.get(name) {
+                    Some((_, false)) => {
+                        self.push(
+                            "E1001",
+                            format!(
+                                "Cannot reassign immutable binding '{name}'. Declare it as 'mut {name} = ...' if reassignment is intended."
+                            ),
+                        );
+                    }
+                    Some((_, true)) => {
+                        scope.insert(name.clone(), (value_ty, true));
+                    }
+                    None => {
+                        scope.insert(name.clone(), (value_ty, false));
+                    }
+                }
+            }
+            Stmt::Return(Some(e)) => { self.infer_expr(e, scope); }
+            Stmt::Return(None) | Stmt::Continue => {}
+            Stmt::Break(Some(e)) => { self.infer_expr(e, scope); }
+            Stmt::Break(None) => {}
+            Stmt::For { pattern, iter, body } => {
+                let elem_ty = self.infer_expr(iter, scope);
+                let mut inner = scope.clone();
+                inner.insert(pattern.clone(), (elem_ty, false));
+                self.check_block(body, &mut inner);
+            }
+            Stmt::While { cond, body } => {
+                self.infer_expr(cond, scope);
+                let mut inner = scope.clone();
+                self.check_block(body, &mut inner);
+            }
+            Stmt::FieldAssign { target, value } => {
+                self.infer_expr(target, scope);
+                self.infer_expr(value, scope);
+            }
+            Stmt::Expr(e) => { self.infer_expr(e, scope); }
+        }
+    }
+
+    fn infer_expr(&mut self, expr: &Expr, scope: &mut Scope) -> Ty {
+        match expr {
+            Expr::IntLiteral(_) => Ty::Int,
+            Expr::FloatLiteral(_) => Ty::Float,
+            Expr::StringLiteral(_) => Ty::String,
+            Expr::CharLiteral(_) => Ty::Char,
+            Expr::BoolLiteral(_) => Ty::Bool,
+            Expr::UnitLiteral(num, unit) => {
+                self.infer_expr(num, scope);
+                match resolve_unit_expr(unit) {
+                    Ok(dim) => Ty::Quantity(dim),
+                    Err(bad) => {
+                        self.push("E1010", format!("Unknown unit '{bad}' in '{unit}'."));
+                        Ty::Unknown
+                    }
+                }
+            }
+            Expr::Ident(name) => {
+                if let Some((ty, _)) = scope.get(name) {
+                    ty.clone()
+                } else if let Some(sig) = self.functions.get(name) {
+                    Ty::Fn(
+                        sig.params.iter().map(|ty| self.resolve_type_in_context(ty)).collect(),
+                        Box::new(self.resolve_type_in_context(&sig.return_type)),
+                    )
+                } else if let Some(enum_name) = self.variant_owners.get(name) {
+                    self.variant_type(enum_name, &[])
+                } else {
+                    Ty::Unknown
+                }
+            }
+            Expr::Unary(op, e) => {
+                let t = self.infer_expr(e, scope);
+                match op {
+                    UnaryOp::Not => Ty::Bool,
+                    UnaryOp::Neg => t,
+                }
+            }
+            Expr::Binary(op, l, r) => {
+                let lt = self.infer_expr(l, scope);
+                let rt = self.infer_expr(r, scope);
+                self.check_binary(*op, lt, rt)
+            }
+            Expr::Range(start, _kind, end, step) => {
+                let st = self.infer_expr(start, scope);
+                let et = self.infer_expr(end, scope);
+                if let Some(s) = step { self.infer_expr(s, scope); }
+                if let (Ty::Quantity(d1), Ty::Quantity(d2)) = (&st, &et) {
+                    if d1 != d2 {
+                        self.push(
+                            "E1024",
+                            format!(
+                                "Invalid dimensional operation. Range endpoints have different dimensions: {} vs {}.",
+                                dim_to_string(d1),
+                                dim_to_string(d2)
+                            ),
+                        );
+                    }
+                }
+                st
+            }
+            Expr::Call(callee, args) => self.check_call(callee, args, scope, None),
+            Expr::GenericCall(callee, type_args, args) => self.check_call(callee, args, scope, Some(type_args)),
+            Expr::FieldAccess(obj, _field) => { self.infer_expr(obj, scope); Ty::Unknown }
+            Expr::Index(obj, idx) => {
+                self.infer_expr(idx, scope);
+                match self.infer_expr(obj, scope) {
+                    Ty::List(t) => *t,
+                    _ => Ty::Unknown,
+                }
+            }
+            Expr::If(cond, then_block, else_block) => {
+                self.infer_expr(cond, scope);
+                let mut then_scope = scope.clone();
+                let then_ty = self.check_block(then_block, &mut then_scope);
+                match else_block {
+                    Some(b) => {
+                        let mut else_scope = scope.clone();
+                        let else_ty = self.check_block(b, &mut else_scope);
+                        if compatible(&then_ty, &else_ty) {
+                            if then_ty == Ty::Unknown { else_ty } else { then_ty }
+                        } else {
+                            self.push(
+                                "E1041",
+                                format!(
+                                    "'if' branches have different types: '{}' vs '{}'.",
+                                    then_ty.describe(),
+                                    else_ty.describe()
+                                ),
+                            );
+                            Ty::Unknown
+                        }
+                    }
+                    None => Ty::Void,
+                }
+            }
+            Expr::Block(b) => {
+                let mut inner = scope.clone();
+                self.check_block(b, &mut inner)
+            }
+            Expr::Lambda(params, body) => {
+                let mut inner = scope.clone();
+                for p in params {
+                    inner.insert(p.clone(), (Ty::Unknown, false));
+                }
+                let ret = self.check_block(body, &mut inner);
+                Ty::Fn(vec![Ty::Unknown; params.len()], Box::new(ret))
+            }
+            Expr::ListLiteral(items) => {
+                let mut elem = Ty::Unknown;
+                for it in items {
+                    let t = self.infer_expr(it, scope);
+                    if elem == Ty::Unknown { elem = t; }
+                }
+                Ty::List(Box::new(elem))
+            }
+            Expr::SetLiteral(items) => {
+                let mut elem = Ty::Unknown;
+                for it in items {
+                    let t = self.infer_expr(it, scope);
+                    if elem == Ty::Unknown { elem = t; }
+                }
+                Ty::Set(Box::new(elem))
+            }
+            Expr::MapLiteral(pairs) => {
+                let mut key = Ty::Unknown;
+                let mut value = Ty::Unknown;
+                for (k, v) in pairs {
+                    let kt = self.infer_expr(k, scope);
+                    let vt = self.infer_expr(v, scope);
+                    if key == Ty::Unknown { key = kt; }
+                    if value == Ty::Unknown { value = vt; }
+                }
+                Ty::Map(Box::new(key), Box::new(value))
+            }
+            Expr::Try(inner, catch) => {
+                let t = self.infer_expr(inner, scope);
+                if let Some(c) = catch { self.infer_expr(c, scope); }
+                t
+            }
+            Expr::Within(a, r) => {
+                self.infer_expr(a, scope);
+                self.infer_expr(r, scope);
+                Ty::Bool
+            }
+            Expr::Approximately(a, b, tol) => {
+                let ta = self.infer_expr(a, scope);
+                let tb = self.infer_expr(b, scope);
+                let tt = self.infer_expr(tol, scope);
+                for (x, y) in [(&ta, &tb), (&ta, &tt)] {
+                    if let (Ty::Quantity(d1), Ty::Quantity(d2)) = (x, y) {
+                        if d1 != d2 {
+                            self.push(
+                                "E1091",
+                                format!(
+                                    "'approximately'/'tolerance' dimension mismatch: {} vs {}.",
+                                    dim_to_string(d1),
+                                    dim_to_string(d2)
+                                ),
+                            );
+                        }
+                    }
+                }
+                Ty::Bool
+            }
+            Expr::As(expr, unit_expr) => {
+                self.infer_expr(expr, scope);
+                if let Expr::Ident(sym) = unit_expr.as_ref() {
+                    if let Some(dim) = unit_dimension(sym) {
+                        return Ty::Quantity(dim);
+                    }
+                }
+                Ty::Unknown
+            }
+            Expr::Loop(block) => {
+                let mut inner = scope.clone();
+                self.check_block(block, &mut inner);
+                Ty::Unknown
+            }
+            Expr::RecordLiteral(name, fields) => self.check_record_literal(name, fields, None, scope),
+            Expr::GenericRecordLiteral(name, type_args, fields) => {
+                self.check_record_literal(name, fields, Some(type_args), scope)
+            }
+            Expr::Match(scrutinee, arms) => {
+                let scrutinee_ty = self.infer_expr(scrutinee, scope);
+                self.check_match_exhaustiveness(&scrutinee_ty, arms);
+                let mut result = Ty::Unknown;
+                for arm in arms {
+                    self.check_pattern(&arm.pattern, &scrutinee_ty);
+                    let mut arm_scope = scope.clone();
+                    self.bind_pattern_vars_typed(&arm.pattern, &scrutinee_ty, &mut arm_scope);
+                    if let Some(g) = &arm.guard { self.infer_expr(g, &mut arm_scope); }
+                    let t = self.check_block(&arm.body, &mut arm_scope);
+                    if result == Ty::Unknown { result = t; }
+                }
+                result
+            }
+            Expr::Spawn(block) => {
+                let free = free_vars_in_block(block);
+                for name in &free {
+                    if let Some((_, true)) = scope.get(name) {
+                        self.push(
+                            "E1100",
+                            format!(
+                                "Cannot capture mutable binding '{name}' in 'spawn'.\nMutable state cannot be shared directly between tasks.\nSend it through a channel instead."
+                            ),
+                        );
+                    }
+                }
+                let mut inner = scope.clone();
+                self.check_block(block, &mut inner);
+                Ty::Unknown
+            }
+            Expr::SpawnScope(block) => {
+                let mut inner = scope.clone();
+                self.check_block(block, &mut inner)
+            }
+            Expr::Channel(_, capacity) => {
+                if let Some(c) = capacity { self.infer_expr(c, scope); }
+                Ty::Unknown
+            }
+        }
+    }
+
+    fn check_record_literal(
+        &mut self,
+        name: &str,
+        fields: &[(String, Expr)],
+        explicit_type_args: Option<&[Type]>,
+        scope: &mut Scope,
+    ) -> Ty {
+        let value_types: HashMap<String, Ty> = fields
+            .iter()
+            .map(|(field_name, value)| (field_name.clone(), self.infer_expr(value, scope)))
+            .collect();
+        let Some(generics) = self.record_generics.get(name).cloned() else {
+            return Ty::Named(name.to_string());
+        };
+        if generics.is_empty() {
+            if explicit_type_args.is_some() {
+                self.push(
+                    "E1042",
+                    format!("Record '{}' is not generic but received explicit type arguments.", name),
+                );
+            }
+            return Ty::Named(name.to_string());
+        }
+
+        let declared_fields = self.record_fields.get(name).cloned().unwrap_or_default();
+        let generic_names: HashSet<String> = generics.iter().map(|generic| generic.name.clone()).collect();
+        let mut type_subst = HashMap::new();
+        if let Some(explicit) = explicit_type_args {
+            if explicit.len() != generics.len() {
+                self.push(
+                    "E1042",
+                    format!(
+                        "Record '{}' expects {} explicit generic argument(s), got {}.",
+                        name,
+                        generics.len(),
+                        explicit.len()
+                    ),
+                );
+            }
+            for (generic, explicit_ty) in generics.iter().zip(explicit.iter()) {
+                type_subst.insert(generic.name.clone(), self.resolve_type_in_context(explicit_ty));
+            }
+        }
+        for (field_name, field_type) in declared_fields {
+            if let Some(value_type) = value_types.get(&field_name) {
+                if let Err(message) = unify_generic_type(&field_type, value_type, &generic_names, &mut type_subst) {
+                    let code = if explicit_type_args.is_some() { "E1042" } else { "E1041" };
+                    self.push(code, format!("Invalid value for field '{}.{}': {message}", name, field_name));
+                }
+            }
+        }
+        Ty::Applied(
+            name.to_string(),
+            generics
+                .iter()
+                .map(|generic| type_subst.get(&generic.name).cloned().unwrap_or(Ty::Unknown))
+                .collect(),
+        )
+    }
+
+    fn check_pattern(&mut self, pattern: &Pattern, expected: &Ty) -> bool {
+        match pattern {
+            Pattern::Wildcard => true,
+            Pattern::Ident(name) => {
+                if let Some(owner) = self.variant_owners.get(name) {
+                    let fields = self.variant_fields.get(&(owner.clone(), name.clone()));
+                    let belongs = matches!(
+                        expected,
+                        Ty::Named(type_name) | Ty::Applied(type_name, _) if type_name == owner
+                    )
+                        || *expected == Ty::Unknown;
+                    if !belongs {
+                        self.push(
+                            "E1061",
+                            format!("Variant '{}' does not belong to type '{}'.", name, expected.describe()),
+                        );
+                        return false;
+                    }
+                    if fields.is_some_and(|fields| !fields.is_empty()) {
+                        self.push(
+                            "E1061",
+                            format!("Variant '{}' carries data and must destructure its field(s).", name),
+                        );
+                        return false;
+                    }
+                }
+                true
+            }
+            Pattern::Literal(literal) => {
+                let literal_ty = pattern_literal_type(literal);
+                if !compatible(expected, &literal_ty) {
+                    self.push(
+                        "E1061",
+                        format!(
+                            "Pattern literal has type '{}', but the match value has type '{}'.",
+                            literal_ty.describe(),
+                            expected.describe()
+                        ),
+                    );
+                    return false;
+                }
+                true
+            }
+            Pattern::Range(start, _, end) => {
+                let start_ty = pattern_literal_type(start);
+                let end_ty = pattern_literal_type(end);
+                if !compatible(expected, &start_ty) || !compatible(expected, &end_ty) || !compatible(&start_ty, &end_ty) {
+                    self.push(
+                        "E1061",
+                        format!(
+                            "Range pattern types '{}' and '{}' do not match '{}'.",
+                            start_ty.describe(),
+                            end_ty.describe(),
+                            expected.describe()
+                        ),
+                    );
+                    return false;
+                }
+                true
+            }
+            Pattern::Variant(name, fields) => {
+                let Some((field_names, field_types)) = self.constructor_fields(expected, name) else {
+                    self.push(
+                        "E1061",
+                        format!("Pattern constructor '{}' does not match '{}'.", name, expected.describe()),
+                    );
+                    return false;
+                };
+                let indices = pattern_field_indices(&field_names, fields);
+                let mut valid = true;
+                if fields.len() != field_types.len() {
+                    self.push(
+                        "E1061",
+                        format!(
+                            "Pattern '{}' provides {} field(s), but the constructor has {}.",
+                            name,
+                            fields.len(),
+                            field_types.len()
+                        ),
+                    );
+                    valid = false;
+                }
+                for (index, (_, subpattern)) in fields.iter().enumerate() {
+                    let Some(field_index) = indices.get(index).and_then(|index| *index) else {
+                        self.push(
+                            "E1061",
+                            format!("Pattern field '{}' is not declared by constructor '{}'.", fields[index].0, name),
+                        );
+                        valid = false;
+                        continue;
+                    };
+                    if let Some(field_type) = field_types.get(field_index) {
+                        valid &= self.check_pattern(subpattern, field_type);
+                    }
+                }
+                valid
+            }
+        }
+    }
+
+    fn constructor_fields(&self, expected: &Ty, constructor: &str) -> Option<(Vec<Option<String>>, Vec<Ty>)> {
+        if let Some(owner) = self.variant_owners.get(constructor) {
+            let type_subst = match expected {
+                Ty::Named(type_name) if type_name == owner => HashMap::new(),
+                Ty::Applied(type_name, args) if type_name == owner => {
+                    generic_substitution(self.enum_generics.get(owner)?, args)
+                }
+                Ty::Unknown => HashMap::new(),
+                _ => return None,
+            };
+            let key = (owner.clone(), constructor.to_string());
+            return Some((
+                self.variant_field_names.get(&key).cloned().unwrap_or_default(),
+                self.variant_fields
+                    .get(&key)
+                    .cloned()
+                    .unwrap_or_default()
+                    .iter()
+                    .map(|ty| resolve_type_with_type_subst(ty, &type_subst, &HashMap::new()))
+                    .collect(),
+            ));
+        }
+        let type_subst = match expected {
+            Ty::Named(expected_name) if expected_name == constructor => HashMap::new(),
+            Ty::Applied(expected_name, args) if expected_name == constructor => {
+                generic_substitution(self.record_generics.get(constructor)?, args)
+            }
+            _ => return None,
+        };
+        let fields = self.record_fields.get(constructor)?;
+        Some((
+            fields.iter().map(|(name, _)| Some(name.clone())).collect(),
+            fields
+                .iter()
+                .map(|(_, ty)| resolve_type_with_type_subst(ty, &type_subst, &HashMap::new()))
+                .collect(),
+        ))
+    }
+
+    fn bind_pattern_vars_typed(&self, pattern: &Pattern, expected: &Ty, scope: &mut Scope) {
+        match pattern {
+            Pattern::Ident(name) => {
+                if !self.variant_owners.contains_key(name) {
+                    scope.insert(name.clone(), (expected.clone(), false));
+                }
+            }
+            Pattern::Variant(constructor, fields) => {
+                let Some((field_names, field_types)) = self.constructor_fields(expected, constructor) else { return };
+                let indices = pattern_field_indices(&field_names, fields);
+                for (index, (_, subpattern)) in fields.iter().enumerate() {
+                    let Some(field_index) = indices.get(index).and_then(|index| *index) else { continue };
+                    if let Some(field_type) = field_types.get(field_index) {
+                        self.bind_pattern_vars_typed(subpattern, field_type, scope);
+                    }
+                }
+            }
+            Pattern::Wildcard | Pattern::Literal(_) | Pattern::Range(..) => {}
+        }
+    }
+
+    fn check_binary(&mut self, op: BinOp, lt: Ty, rt: Ty) -> Ty {
+        use BinOp::*;
+        if lt == Ty::Unknown || rt == Ty::Unknown {
+            return match op {
+                Eq | NotEq | Lt | Gt | LtEq | GtEq | And | Or => Ty::Bool,
+                _ => Ty::Unknown,
+            };
+        }
+        if let (Ty::Named(left_name), Ty::Named(right_name)) = (&lt, &rt) {
+            if left_name == right_name {
+                let trait_name = match op {
+                    Add => Some("Add"),
+                    Sub => Some("Sub"),
+                    Mul => Some("Mul"),
+                    Div => Some("Div"),
+                    _ => None,
+                };
+                if trait_name.is_some_and(|name| {
+                    self.trait_impls.contains(&(name.to_string(), left_name.clone()))
+                }) {
+                    return Ty::Named(left_name.clone());
+                }
+            }
+        }
+        match op {
+            Add | Sub => match (&lt, &rt) {
+                (Ty::Quantity(d1), Ty::Quantity(d2)) => {
+                    if d1 == d2 {
+                        Ty::Quantity(d1.clone())
+                    } else {
+                        self.push(
+                            "E1024",
+                            format!(
+                                "Invalid dimensional operation. Cannot add/subtract {} and {}.",
+                                dim_to_string(d1),
+                                dim_to_string(d2)
+                            ),
+                        );
+                        Ty::Unknown
+                    }
+                }
+                (Ty::Quantity(_), t) | (t, Ty::Quantity(_)) if t.is_numeric_scalar() => {
+                    self.push(
+                        "E1025",
+                        "Cannot combine a Quantity with a plain scalar without an explicit unit ('as <unit>')."
+                            .to_string(),
+                    );
+                    Ty::Unknown
+                }
+                (Ty::String, Ty::String) => Ty::String,
+                (Ty::Float, _) | (_, Ty::Float) if lt.is_numeric_scalar() && rt.is_numeric_scalar() => Ty::Float,
+                (Ty::Int, Ty::Int) => Ty::Int,
+                _ => {
+                    self.push("E1041", format!("Cannot apply '+'/'-' to '{}' and '{}'.", lt.describe(), rt.describe()));
+                    Ty::Unknown
+                }
+            },
+            Mul | Div => match (&lt, &rt) {
+                (Ty::Quantity(d1), Ty::Quantity(d2)) => {
+                    let combined = if op == Mul { dim_mul(d1, d2) } else { dim_div(d1, d2) };
+                    if op == Div && dim_is_dimensionless(&combined) { Ty::Float } else { Ty::Quantity(combined) }
+                }
+                (Ty::Quantity(d), t) if t.is_numeric_scalar() => Ty::Quantity(d.clone()),
+                (t, Ty::Quantity(d)) if t.is_numeric_scalar() && op == Mul => Ty::Quantity(d.clone()),
+                (t, Ty::Quantity(d)) if t.is_numeric_scalar() && op == Div => Ty::Quantity(dim_pow(d, -1)),
+                (Ty::Int, Ty::Int) => Ty::Int,
+                (a, b) if a.is_numeric_scalar() && b.is_numeric_scalar() => Ty::Float,
+                _ => {
+                    self.push("E1041", format!("Cannot apply '*'//'/' to '{}' and '{}'.", lt.describe(), rt.describe()));
+                    Ty::Unknown
+                }
+            },
+            Eq | NotEq | Lt | Gt | LtEq | GtEq => {
+                if let (Ty::Quantity(d1), Ty::Quantity(d2)) = (&lt, &rt) {
+                    if d1 != d2 {
+                        self.push(
+                            "E1024",
+                            format!("Cannot compare {} and {}.", dim_to_string(d1), dim_to_string(d2)),
+                        );
+                    }
+                }
+                Ty::Bool
+            }
+            And | Or => Ty::Bool,
+        }
+    }
+
+    fn constructor_shapes(&self, expected: &Ty, constructor: &str, depth: usize) -> Vec<Pattern> {
+        let Some((field_names, field_types)) = self.constructor_fields(expected, constructor) else {
+            return Vec::new();
+        };
+        if field_types.is_empty() {
+            return vec![Pattern::Ident(constructor.to_string())];
+        }
+
+        let mut combinations: Vec<Vec<(String, Pattern)>> = vec![Vec::new()];
+        for (index, field_type) in field_types.iter().enumerate() {
+            let choices = self.type_shapes(field_type, depth.saturating_sub(1));
+            let choices = if choices.is_empty() { vec![Pattern::Wildcard] } else { choices };
+            let label = field_names
+                .get(index)
+                .and_then(|name| name.clone())
+                .unwrap_or_else(|| format!("@{index}"));
+            let mut next = Vec::new();
+            for combination in &combinations {
+                for choice in &choices {
+                    let mut extended = combination.clone();
+                    extended.push((label.clone(), choice.clone()));
+                    next.push(extended);
+                    if next.len() > MAX_PATTERN_SHAPES {
+                        return vec![Pattern::Wildcard];
+                    }
+                }
+            }
+            combinations = next;
+        }
+        combinations
+            .into_iter()
+            .map(|fields| Pattern::Variant(constructor.to_string(), fields))
+            .collect()
+    }
+
+    fn type_shapes(&self, expected: &Ty, depth: usize) -> Vec<Pattern> {
+        if depth == 0 {
+            return vec![Pattern::Wildcard];
+        }
+        let type_name = match expected {
+            Ty::Named(name) | Ty::Applied(name, _) => name,
+            _ => return vec![Pattern::Wildcard],
+        };
+        if let Some(variants) = self.enum_variants.get(type_name) {
+            let mut shapes = Vec::new();
+            for variant in variants {
+                shapes.extend(self.constructor_shapes(expected, variant, depth));
+                if shapes.len() > MAX_PATTERN_SHAPES {
+                    return vec![Pattern::Wildcard];
+                }
+            }
+            return shapes;
+        }
+        if self.record_fields.contains_key(type_name) {
+            return self.constructor_shapes(expected, type_name, depth);
+        }
+        vec![Pattern::Wildcard]
+    }
+
+    fn pattern_covers_shape(&self, expected: &Ty, pattern: &Pattern, shape: &Pattern) -> bool {
+        match pattern {
+            Pattern::Wildcard => true,
+            Pattern::Ident(name) => {
+                if self.variant_owners.contains_key(name) {
+                    matches!(shape, Pattern::Ident(shape_name) if shape_name == name)
+                } else {
+                    true
+                }
+            }
+            Pattern::Literal(_) | Pattern::Range(..) => false,
+            Pattern::Variant(name, fields) => {
+                let Some((field_names, field_types)) = self.constructor_fields(expected, name) else {
+                    return false;
+                };
+                if let Pattern::Ident(shape_name) = shape {
+                    return shape_name == name && field_types.is_empty() && fields.is_empty();
+                }
+                let Pattern::Variant(shape_name, shape_fields) = shape else { return false };
+                if shape_name != name || fields.len() != field_types.len() || shape_fields.len() != field_types.len() {
+                    return false;
+                }
+                let pattern_indices = pattern_field_indices(&field_names, fields);
+                let shape_indices = pattern_field_indices(&field_names, shape_fields);
+                for field_index in 0..field_types.len() {
+                    let pattern_position = pattern_indices.iter().position(|index| *index == Some(field_index));
+                    let shape_position = shape_indices.iter().position(|index| *index == Some(field_index));
+                    let (Some(pattern_position), Some(shape_position)) = (pattern_position, shape_position) else {
+                        return false;
+                    };
+                    if !self.pattern_covers_shape(
+                        &field_types[field_index],
+                        &fields[pattern_position].1,
+                        &shape_fields[shape_position].1,
+                    ) {
+                        return false;
+                    }
+                }
+                true
+            }
+        }
+    }
+
+    fn check_match_exhaustiveness(&mut self, scrutinee_ty: &Ty, arms: &[MatchArm]) {
+        let enum_name = match scrutinee_ty {
+            Ty::Named(enum_name) | Ty::Applied(enum_name, _) => enum_name,
+            _ => return,
+        };
+        let Some(variants) = self.enum_variants.get(enum_name).cloned() else { return };
+        let patterns: Vec<&Pattern> = arms
+            .iter()
+            .filter(|arm| arm.guard.is_none())
+            .map(|arm| &arm.pattern)
+            .collect();
+
+        let covered: HashSet<String> = variants
+            .iter()
+            .filter(|variant| {
+                let shapes = self.constructor_shapes(scrutinee_ty, variant, 6);
+                !shapes.is_empty()
+                    && shapes.iter().all(|shape| {
+                        patterns
+                            .iter()
+                            .any(|pattern| self.pattern_covers_shape(scrutinee_ty, pattern, shape))
+                    })
+            })
+            .cloned()
+            .collect();
+
+        let missing: Vec<&str> = variants
+            .iter()
+            .filter(|variant| !covered.contains(*variant))
+            .map(String::as_str)
+            .collect();
+        if missing.is_empty() { return; }
+
+        let (label, list) = if missing.len() == 1 {
+            ("Missing variant", format!("'{}'", missing[0]))
+        } else {
+            ("Missing variants", missing.iter().map(|v| format!("'{v}'")).collect::<Vec<_>>().join(", "))
+        };
+        self.push(
+            "E1060",
+            format!(
+                "Non-exhaustive match on '{enum_name}'.\n{label}: {list}.\nAdd a case for the missing variant(s), or use '_' to cover remaining variants explicitly."
+            ),
+        );
+    }
+
+    fn check_call(
+        &mut self,
+        callee: &Expr,
+        args: &[Arg],
+        scope: &mut Scope,
+        explicit_type_args: Option<&[Type]>,
+    ) -> Ty {
+        let arg_types: Vec<Ty> = args
+            .iter()
+            .map(|a| match a {
+                Arg::Positional(e) => self.infer_expr(e, scope),
+                Arg::Named(_, e) => self.infer_expr(e, scope),
+            })
+            .collect();
+
+        if let Expr::Ident(name) = callee {
+            if self.variant_owners.contains_key(name) {
+                return self.check_variant_constructor(name, &arg_types, explicit_type_args);
+            }
+            if let Some(sig) = self.functions.get(name) {
+                return self.check_function_call(&sig.clone(), &arg_types, explicit_type_args);
+            }
+        }
+
+        if let Expr::FieldAccess(receiver, method) = callee {
+            let receiver_ty = self.infer_expr(receiver, scope);
+            if collection_method_requires_mut(&receiver_ty, method) {
+                if let Expr::Ident(name) = receiver.as_ref() {
+                    if let Some((_, false)) = scope.get(name) {
+                        self.push(
+                            "E1053",
+                            format!(
+                                "Cannot call '{method}' (requires 'mut self') on immutable binding '{name}'.\nDeclare it as 'mut {name} = ...' to allow calling mutating methods."
+                            ),
+                        );
+                    }
+                }
+            }
+            if let Some(return_type) = self.check_generic_method_call(
+                &receiver_ty,
+                method,
+                &arg_types,
+                explicit_type_args,
+            ) {
+                return return_type;
+            }
+            if method == "to_string" {
+                // `to_string` is a core operation provided for every runtime
+                // value, including concrete user types and quantities.
+                return Ty::String;
+            }
+            if let Some(return_type) = self.check_concrete_method_call(
+                &receiver_ty,
+                method,
+                &arg_types,
+                explicit_type_args,
+            ) {
+                return return_type;
+            }
+            if self.is_concrete_user_type(&receiver_ty) {
+                self.push(
+                    "E1042",
+                    format!(
+                        "Type '{}' has no method '{}'.",
+                        receiver_ty.describe(),
+                        method
+                    ),
+                );
+                return Ty::Unknown;
+            }
+            if explicit_type_args.is_some() {
+                self.push(
+                    "E1042",
+                    "Explicit generic method arguments require a generic method available through the receiver's trait bound."
+                        .to_string(),
+                );
+            }
+            return collection_method_return_type(&receiver_ty, method);
+        }
+
+        if explicit_type_args.is_some() {
+            self.push(
+                "E1042",
+                "Explicit generic arguments require a named generic function."
+                    .to_string(),
+            );
+        }
+
+        let callee_ty = self.infer_expr(callee, scope);
+        match callee_ty {
+            Ty::Fn(_, ret) => *ret,
+            _ => Ty::Unknown,
+        }
+    }
+
+    fn variant_type(&self, enum_name: &str, type_args: &[Ty]) -> Ty {
+        let Some(generics) = self.enum_generics.get(enum_name) else {
+            return Ty::Named(enum_name.to_string());
+        };
+        if generics.is_empty() {
+            Ty::Named(enum_name.to_string())
+        } else {
+            let args = if type_args.is_empty() {
+                vec![Ty::Unknown; generics.len()]
+            } else {
+                type_args.to_vec()
+            };
+            Ty::Applied(enum_name.to_string(), args)
+        }
+    }
+
+    fn check_variant_constructor(
+        &mut self,
+        variant_name: &str,
+        arg_types: &[Ty],
+        explicit_type_args: Option<&[Type]>,
+    ) -> Ty {
+        let Some(enum_name) = self.variant_owners.get(variant_name).cloned() else {
+            return Ty::Unknown;
+        };
+        let field_types = self
+            .variant_fields
+            .get(&(enum_name.clone(), variant_name.to_string()))
+            .cloned()
+            .unwrap_or_default();
+        let generic_params = self.enum_generics.get(&enum_name).cloned().unwrap_or_default();
+        if field_types.len() != arg_types.len() {
+            self.push(
+                "E1061",
+                format!(
+                    "Constructor '{}' expects {} argument(s), got {}.",
+                    variant_name,
+                    field_types.len(),
+                    arg_types.len()
+                ),
+            );
+        }
+        let generic_names: HashSet<String> = generic_params.iter().map(|generic| generic.name.clone()).collect();
+        let mut type_subst = HashMap::new();
+        if let Some(explicit) = explicit_type_args {
+            if generic_params.is_empty() {
+                self.push(
+                    "E1042",
+                    format!("Constructor '{}' is not generic but received explicit type arguments.", variant_name),
+                );
+            } else {
+                if explicit.len() != generic_params.len() {
+                    self.push(
+                        "E1042",
+                        format!(
+                            "Constructor '{}' expects {} explicit generic argument(s), got {}.",
+                            variant_name,
+                            generic_params.len(),
+                            explicit.len()
+                        ),
+                    );
+                }
+                for (generic, explicit_ty) in generic_params.iter().zip(explicit.iter()) {
+                    type_subst.insert(generic.name.clone(), self.resolve_type_in_context(explicit_ty));
+                }
+            }
+        }
+        for (field_type, arg_type) in field_types.iter().zip(arg_types.iter()) {
+            if let Err(message) = unify_generic_type(field_type, arg_type, &generic_names, &mut type_subst) {
+                self.push("E1061", format!("Invalid argument for constructor '{}': {message}", variant_name));
+            }
+        }
+        let type_args: Vec<Ty> = generic_params
+            .iter()
+            .map(|generic| type_subst.get(&generic.name).cloned().unwrap_or(Ty::Unknown))
+            .collect();
+        self.variant_type(&enum_name, &type_args)
+    }
+
+    fn check_function_call(
+        &mut self,
+        sig: &FnSig,
+        arg_types: &[Ty],
+        explicit_type_args: Option<&[Type]>,
+    ) -> Ty {
+        let mut dim_subst: HashMap<String, Dimension> = HashMap::new();
+        let mut type_subst: HashMap<String, Ty> = HashMap::new();
+
+        if let Some(explicit) = explicit_type_args {
+            if sig.generics.is_empty() {
+                self.push(
+                    "E1042",
+                    "Explicit generic arguments were supplied to a non-generic function."
+                        .to_string(),
+                );
+            } else {
+                if explicit.len() != sig.generics.len() {
+                    self.push(
+                        "E1042",
+                        format!(
+                            "Function expects {} explicit generic argument(s), got {}.",
+                            sig.generics.len(),
+                            explicit.len()
+                        ),
+                    );
+                }
+                for (generic, explicit_ty) in sig.generics.iter().zip(explicit.iter()) {
+                    if generic.bounds.iter().any(|bound| bound == "Dimension") {
+                        dim_subst.insert(
+                            generic.name.clone(),
+                            resolve_dimension_with_subst(explicit_ty, &HashMap::new()),
+                        );
+                    } else {
+                        type_subst.insert(
+                            generic.name.clone(),
+                            self.resolve_type_in_context(explicit_ty),
+                        );
+                    }
+                }
+            }
+        }
+
+        for (param_ty, arg_ty) in sig.params.iter().zip(arg_types.iter()) {
+            if let (Type::Named(n, dim_args), Ty::Quantity(actual_dim)) = (param_ty, arg_ty) {
+                if n == "Quantity" && dim_args.len() == 1 {
+                    if let Type::Named(dim_name, empty) = &dim_args[0] {
+                        if empty.is_empty() && !is_known_base_dimension(dim_name) {
+                            if let Some(expected_dim) = dim_subst.get(dim_name) {
+                                if expected_dim != actual_dim {
+                                    self.push(
+                                        "E1042",
+                                        format!(
+                                            "Explicit dimension argument '{}' does not match the argument's dimension '{}'.",
+                                            dim_to_string(expected_dim),
+                                            dim_to_string(actual_dim)
+                                        ),
+                                    );
+                                }
+                            } else {
+                                dim_subst.insert(dim_name.clone(), actual_dim.clone());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if sig.generics.is_empty() {
+            return resolve_type_with_subst(&sig.return_type, &dim_subst);
+        }
+
+        let generic_names: HashSet<String> = sig
+            .generics
+            .iter()
+            .filter(|g| !g.bounds.iter().any(|bound| bound == "Dimension"))
+            .map(|g| g.name.clone())
+            .collect();
+        for (param_ty, arg_ty) in sig.params.iter().zip(arg_types.iter()) {
+            if let Err(message) = unify_generic_type(param_ty, arg_ty, &generic_names, &mut type_subst) {
+                self.push("E1042", message);
+            }
+        }
+
+        for generic in &sig.generics {
+            if generic.bounds.iter().any(|bound| bound == "Dimension") {
+                continue;
+            }
+            let Some(actual_ty) = type_subst.get(&generic.name) else {
+                self.push(
+                    "E1042",
+                    format!("Cannot infer generic parameter '{}'.", generic.name),
+                );
+                continue;
+            };
+            for bound in &generic.bounds {
+                if !self.type_satisfies_trait(actual_ty, bound) {
+                    self.push(
+                        "E1042",
+                        format!(
+                            "Type '{}' does not satisfy bound '{}' for generic parameter '{}'.",
+                            actual_ty.describe(),
+                            bound,
+                            generic.name
+                        ),
+                    );
+                }
+            }
+        }
+
+        resolve_type_with_type_subst(&sig.return_type, &type_subst, &dim_subst)
+    }
+
+    fn check_generic_method_call(
+        &mut self,
+        receiver_ty: &Ty,
+        method: &str,
+        arg_types: &[Ty],
+        explicit_type_args: Option<&[Type]>,
+    ) -> Option<Ty> {
+        let Ty::Generic(generic_name) = receiver_ty else { return None };
+        let bounds = self.current_generic_bounds.get(generic_name).cloned().unwrap_or_default();
+        let method_sig = bounds.iter().find_map(|bound| {
+            self.traits
+                .get(bound)
+                .and_then(|trait_decl| trait_decl.methods.iter().find(|m| m.name == method))
+                .cloned()
+        });
+        let Some(method_sig) = method_sig else {
+            self.push(
+                "E1042",
+                format!(
+                    "Generic type '{}' has no method '{}'; add a trait bound that provides it.",
+                    generic_name, method
+                ),
+            );
+            return Some(Ty::Unknown);
+        };
+
+        let method_generic_names: HashSet<String> = method_sig
+            .generics
+            .iter()
+            .map(|generic| generic.name.clone())
+            .collect();
+        let mut method_subst = HashMap::new();
+        match explicit_type_args {
+            Some(explicit) => {
+                if method_sig.generics.is_empty() {
+                    self.push(
+                        "E1042",
+                        format!("Method '{}' is not generic but received explicit type arguments.", method),
+                    );
+                } else {
+                    if explicit.len() != method_sig.generics.len() {
+                        self.push(
+                            "E1042",
+                            format!(
+                                "Method '{}' expects {} explicit generic argument(s), got {}.",
+                                method,
+                                method_sig.generics.len(),
+                                explicit.len()
+                            ),
+                        );
+                    }
+                    for (generic, explicit_ty) in method_sig.generics.iter().zip(explicit.iter()) {
+                        method_subst.insert(
+                            generic.name.clone(),
+                            self.resolve_type_in_context(explicit_ty),
+                        );
+                    }
+                }
+            }
+            None if !method_sig.generics.is_empty() => {
+                for (param, actual) in method_sig.params.iter().skip(1).zip(arg_types.iter()) {
+                    if let Err(message) = unify_generic_type(
+                        &param.ty,
+                        actual,
+                        &method_generic_names,
+                        &mut method_subst,
+                    ) {
+                        self.push("E1042", message);
+                    }
+                }
+                for generic in &method_sig.generics {
+                    if !method_subst.contains_key(&generic.name) {
+                        self.push(
+                            "E1042",
+                            format!("Cannot infer generic method parameter '{}'.", generic.name),
+                        );
+                    }
+                }
+            }
+            None => {}
+        }
+
+        for generic in &method_sig.generics {
+            let Some(actual_ty) = method_subst.get(&generic.name) else { continue };
+            for bound in &generic.bounds {
+                if !self.type_satisfies_trait(actual_ty, bound) {
+                    self.push(
+                        "E1042",
+                        format!(
+                            "Type '{}' does not satisfy bound '{}' for generic method parameter '{}'.",
+                            actual_ty.describe(),
+                            bound,
+                            generic.name
+                        ),
+                    );
+                }
+            }
+        }
+
+        let mut substitutions = method_subst;
+        substitutions.insert("Self".to_string(), receiver_ty.clone());
+
+        let expected_args = method_sig.params.iter().skip(1);
+        for (param, actual) in expected_args.zip(arg_types.iter()) {
+            let expected = resolve_type_with_type_subst(
+                &param.ty,
+                &substitutions,
+                &HashMap::new(),
+            );
+            if !compatible(&expected, actual) {
+                self.push(
+                    "E1042",
+                    format!(
+                        "Argument for '{}' expects '{}', got '{}'.",
+                        method,
+                        expected.describe(),
+                        actual.describe()
+                    ),
+                );
+            }
+        }
+        if method_sig.params.len().saturating_sub(1) != arg_types.len() {
+            self.push(
+                "E1042",
+                format!(
+                    "Method '{}' expects {} argument(s), got {}.",
+                    method,
+                    method_sig.params.len().saturating_sub(1),
+                    arg_types.len()
+                ),
+            );
+        }
+        Some(resolve_type_with_type_subst(
+            &method_sig.return_type,
+            &substitutions,
+            &HashMap::new(),
+        ))
+    }
+
+    fn check_concrete_method_call(
+        &mut self,
+        receiver_ty: &Ty,
+        method: &str,
+        arg_types: &[Ty],
+        explicit_type_args: Option<&[Type]>,
+    ) -> Option<Ty> {
+        let candidate = self.concrete_method_candidate(receiver_ty, method)?;
+        let method_generic_names: HashSet<String> = candidate
+            .generics
+            .iter()
+            .map(|generic| generic.name.clone())
+            .collect();
+        let mut method_substitutions = HashMap::new();
+
+        if let Some(explicit) = explicit_type_args {
+            if candidate.generics.is_empty() {
+                self.push(
+                    "E1042",
+                    format!("Method '{}' is not generic but received explicit type arguments.", method),
+                );
+            } else {
+                if explicit.len() != candidate.generics.len() {
+                    self.push(
+                        "E1042",
+                        format!(
+                            "Method '{}' expects {} explicit generic argument(s), got {}.",
+                            method,
+                            candidate.generics.len(),
+                            explicit.len()
+                        ),
+                    );
+                }
+                for (generic, explicit_ty) in candidate.generics.iter().zip(explicit.iter()) {
+                    method_substitutions.insert(
+                        generic.name.clone(),
+                        self.resolve_type_in_context(explicit_ty),
+                    );
+                }
+            }
+        } else if !candidate.generics.is_empty() {
+            for (param, actual) in candidate.params.iter().skip(1).zip(arg_types.iter()) {
+                let mut expected = param.ty.clone();
+                replace_self_type(&mut expected, &candidate.owner);
+                substitute_impl_type_parameters(&mut expected, &candidate.impl_substitutions);
+                if let Err(message) = unify_generic_type(
+                    &expected,
+                    actual,
+                    &method_generic_names,
+                    &mut method_substitutions,
+                ) {
+                    self.push("E1042", message);
+                }
+            }
+            for generic in &candidate.generics {
+                if !method_substitutions.contains_key(&generic.name) {
+                    self.push(
+                        "E1042",
+                        format!("Cannot infer generic method parameter '{}'.", generic.name),
+                    );
+                }
+            }
+        }
+
+        for generic in &candidate.generics {
+            let Some(actual_ty) = method_substitutions.get(&generic.name) else { continue };
+            for bound in &generic.bounds {
+                if !self.type_satisfies_trait(actual_ty, bound) {
+                    self.push(
+                        "E1042",
+                        format!(
+                            "Type '{}' does not satisfy bound '{}' for generic method parameter '{}'.",
+                            actual_ty.describe(),
+                            bound,
+                            generic.name
+                        ),
+                    );
+                }
+            }
+        }
+
+        let mut substitutions = candidate.impl_substitutions;
+        substitutions.extend(method_substitutions);
+        let expected_args: Vec<Ty> = candidate
+            .params
+            .iter()
+            .skip(1)
+            .map(|param| {
+                let mut expected = param.ty.clone();
+                replace_self_type(&mut expected, &candidate.owner);
+                substitute_impl_type_parameters(&mut expected, &substitutions);
+                resolve_type_with_type_subst(&expected, &substitutions, &HashMap::new())
+            })
+            .collect();
+
+        for (expected, actual) in expected_args.iter().zip(arg_types.iter()) {
+            if !compatible(expected, actual) {
+                self.push(
+                    "E1042",
+                    format!(
+                        "Argument for '{}' expects '{}', got '{}'.",
+                        method,
+                        expected.describe(),
+                        actual.describe()
+                    ),
+                );
+            }
+        }
+        if expected_args.len() != arg_types.len() {
+            self.push(
+                "E1042",
+                format!(
+                    "Method '{}' expects {} argument(s), got {}.",
+                    method,
+                    expected_args.len(),
+                    arg_types.len()
+                ),
+            );
+        }
+
+        let mut return_type = candidate.return_type;
+        replace_self_type(&mut return_type, &candidate.owner);
+        substitute_impl_type_parameters(&mut return_type, &substitutions);
+        Some(resolve_type_with_type_subst(
+            &return_type,
+            &substitutions,
+            &HashMap::new(),
+        ))
+    }
+
+    fn concrete_method_candidate(&self, receiver_ty: &Ty, method: &str) -> Option<ConcreteMethod> {
+        for implementation in &self.implementations {
+            let Some(impl_substitutions) = implementation_type_substitutions(receiver_ty, implementation) else {
+                continue;
+            };
+            if !self.implementation_bounds_satisfied(implementation, &impl_substitutions) {
+                continue;
+            }
+            if let Some(declared) = implementation.methods.iter().find(|candidate| candidate.name == method) {
+                return Some(ConcreteMethod {
+                    generics: declared.generics.clone(),
+                    params: declared.params.clone(),
+                    return_type: declared.return_type.clone(),
+                    owner: implementation.type_name.clone(),
+                    impl_substitutions,
+                });
+            }
+            if let Some(trait_name) = &implementation.trait_name {
+                if let Some(trait_decl) = self.traits.get(trait_name) {
+                    if let Some(declared) = trait_decl.methods.iter().find(|candidate| candidate.name == method) {
+                        let declared = specialize_trait_method(
+                            declared,
+                            &trait_decl.generics,
+                            &implementation.trait_args,
+                        );
+                        return Some(ConcreteMethod {
+                            generics: declared.generics.clone(),
+                            params: declared.params.clone(),
+                            return_type: declared.return_type.clone(),
+                            owner: implementation.type_name.clone(),
+                            impl_substitutions,
+                        });
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    fn implementation_bounds_satisfied(
+        &self,
+        implementation: &ImplDecl,
+        substitutions: &HashMap<String, Ty>,
+    ) -> bool {
+        implementation.generics.iter().all(|generic| {
+            let Some(actual_ty) = substitutions.get(&generic.name) else { return true };
+            generic
+                .bounds
+                .iter()
+                .all(|bound| self.type_satisfies_impl_bound(actual_ty, bound))
+        })
+    }
+
+    fn type_satisfies_impl_bound(&self, actual_ty: &Ty, bound: &str) -> bool {
+        if *actual_ty == Ty::Unknown {
+            return true;
+        }
+        if bound == "Dimension" {
+            return matches!(actual_ty, Ty::Named(name)
+                if is_dimension_name(name)
+                    || self
+                        .current_generic_bounds
+                        .get(name)
+                        .is_some_and(|bounds| bounds.iter().any(|candidate| candidate == "Dimension")));
+        }
+        self.type_satisfies_trait(actual_ty, bound)
+    }
+
+    fn is_concrete_user_type(&self, receiver_ty: &Ty) -> bool {
+        match receiver_ty {
+            Ty::Named(name) | Ty::Applied(name, _) => {
+                self.record_fields.contains_key(name) || self.enum_generics.contains_key(name)
+            }
+            Ty::Quantity(_) => true,
+            _ => false,
+        }
+    }
+
+    fn type_satisfies_trait(&self, actual_ty: &Ty, trait_name: &str) -> bool {
+        if let Ty::Generic(generic_name) = actual_ty {
+            return self
+                .current_generic_bounds
+                .get(generic_name)
+                .is_some_and(|bounds| bounds.iter().any(|bound| bound == trait_name));
+        }
+        if trait_name == "Dimension" {
+            return matches!(actual_ty, Ty::Named(name) if is_dimension_name(name));
+        }
+        self.implementations.iter().any(|implementation| {
+            implementation.trait_name.as_deref() == Some(trait_name)
+                && implementation_type_substitutions(actual_ty, implementation)
+                    .is_some_and(|substitutions| {
+                        self.implementation_bounds_satisfied(implementation, &substitutions)
+                    })
+        })
+    }
+
+    fn resolve_type_in_context(&self, ty: &Type) -> Ty {
+        match ty {
+            Type::Named(name, args)
+                if args.is_empty()
+                    && self.current_generic_bounds.contains_key(name)
+                    && !is_dimension_generic(name, &self.current_generic_bounds) =>
+            {
+                Ty::Generic(name.clone())
+            }
+            Type::Named(name, args) if name == "List" && args.len() == 1 => {
+                Ty::List(Box::new(self.resolve_type_in_context(&args[0])))
+            }
+            Type::Named(name, args) if name == "Quantity" && args.len() == 1 => {
+                Ty::Quantity(resolve_dimension_with_subst(&args[0], &HashMap::new()))
+            }
+            Type::Named(name, args) if name == "Map" && args.len() == 2 => Ty::Map(
+                Box::new(self.resolve_type_in_context(&args[0])),
+                Box::new(self.resolve_type_in_context(&args[1])),
+            ),
+            Type::Named(name, args) if name == "Set" && args.len() == 1 => {
+                Ty::Set(Box::new(self.resolve_type_in_context(&args[0])))
+            }
+            Type::Named(name, args) if !args.is_empty() => Ty::Applied(
+                name.clone(),
+                args.iter().map(|arg| self.resolve_type_in_context(arg)).collect(),
+            ),
+            Type::Fn(params, ret) => Ty::Fn(
+                params.iter().map(|param| self.resolve_type_in_context(param)).collect(),
+                Box::new(self.resolve_type_in_context(ret)),
+            ),
+            _ => resolve_type_with_subst(ty, &HashMap::new()),
+        }
+    }
+
+    fn push(&mut self, code: &'static str, message: String) {
+        self.errors.push(TypeError { code, message });
+    }
+}
+
+fn is_known_base_dimension(name: &str) -> bool {
+    matches!(
+        name,
+        "Length" | "Mass" | "Time" | "Temperature" | "ElectricCurrent" | "AmountOfSubstance" | "LuminousIntensity"
+            | "Currency" | "Information" | "Charge" | "Pressure"
+    )
+}
+
+fn is_dimension_name(name: &str) -> bool {
+    if name == "Dimensionless" || is_known_base_dimension(name) {
+        return true;
+    }
+    name.split('*').all(|part| {
+        let base = part.split_once('^').map_or(part, |(base, _)| base);
+        is_known_base_dimension(base)
+    })
+}
+
+fn resolve_type(ty: &Type) -> Ty {
+    resolve_type_with_subst(ty, &HashMap::new())
+}
+
+fn resolve_type_with_subst(ty: &Type, subst: &HashMap<String, Dimension>) -> Ty {
+    resolve_type_with_type_subst(ty, &HashMap::new(), subst)
+}
+
+fn resolve_type_with_type_subst(
+    ty: &Type,
+    type_subst: &HashMap<String, Ty>,
+    dim_subst: &HashMap<String, Dimension>,
+) -> Ty {
+    match ty {
+        Type::Named(name, args) => {
+            if args.is_empty() {
+                if let Some(resolved) = type_subst.get(name) {
+                    return resolved.clone();
+                }
+            }
+            match name.as_str() {
+            "Int" => Ty::Int,
+            "Float" => Ty::Float,
+            "Bool" => Ty::Bool,
+            "Char" => Ty::Char,
+            "String" => Ty::String,
+            "Void" => Ty::Void,
+            "Quantity" if args.len() == 1 => Ty::Quantity(resolve_dimension_with_subst(&args[0], dim_subst)),
+            "List" if args.len() == 1 => Ty::List(Box::new(resolve_type_with_type_subst(&args[0], type_subst, dim_subst))),
+            "Map" if args.len() == 2 => Ty::Map(
+                Box::new(resolve_type_with_type_subst(&args[0], type_subst, dim_subst)),
+                Box::new(resolve_type_with_type_subst(&args[1], type_subst, dim_subst)),
+            ),
+            "Set" if args.len() == 1 => Ty::Set(Box::new(resolve_type_with_type_subst(&args[0], type_subst, dim_subst))),
+            _ if !args.is_empty() => Ty::Applied(
+                name.clone(),
+                args.iter()
+                    .map(|arg| resolve_type_with_type_subst(arg, type_subst, dim_subst))
+                    .collect(),
+            ),
+            _ => Ty::Named(name.clone()),
+            }
+        }
+        Type::Fn(params, ret) => Ty::Fn(
+            params.iter().map(|t| resolve_type_with_type_subst(t, type_subst, dim_subst)).collect(),
+            Box::new(resolve_type_with_type_subst(ret, type_subst, dim_subst)),
+        ),
+        _ => Ty::Unknown,
+    }
+}
+
+fn is_dimension_generic(name: &str, bounds: &HashMap<String, Vec<String>>) -> bool {
+    bounds
+        .get(name)
+        .is_some_and(|generic_bounds| generic_bounds.iter().any(|bound| bound == "Dimension"))
+}
+
+fn generic_substitution(generics: &[GenericParam], args: &[Ty]) -> HashMap<String, Ty> {
+    generics
+        .iter()
+        .zip(args.iter())
+        .map(|(generic, arg)| (generic.name.clone(), arg.clone()))
+        .collect()
+}
+
+fn unify_generic_type(
+    param: &Type,
+    actual: &Ty,
+    generic_names: &HashSet<String>,
+    subst: &mut HashMap<String, Ty>,
+) -> Result<(), String> {
+    if *actual == Ty::Unknown {
+        return Ok(());
+    }
+    match param {
+        Type::Named(name, args) if args.is_empty() && generic_names.contains(name) => {
+            if let Some(previous) = subst.get(name) {
+                if compatible(previous, actual) || compatible(actual, previous) {
+                    return Ok(());
+                }
+                return Err(format!(
+                    "Generic parameter '{}' was inferred as both '{}' and '{}'.",
+                    name,
+                    previous.describe(),
+                    actual.describe()
+                ));
+            }
+            subst.insert(name.clone(), actual.clone());
+            Ok(())
+        }
+        Type::Named(name, args) if name == "List" && args.len() == 1 => match actual {
+            Ty::List(elem) => unify_generic_type(&args[0], elem, generic_names, subst),
+            _ => Err(format!("Expected '{}', got '{}'.", resolve_type(param).describe(), actual.describe())),
+        },
+        Type::Named(name, args) if name == "Map" && args.len() == 2 => match actual {
+            Ty::Map(key, value) => {
+                unify_generic_type(&args[0], key, generic_names, subst)?;
+                unify_generic_type(&args[1], value, generic_names, subst)
+            }
+            _ => Err(format!("Expected '{}', got '{}'.", resolve_type(param).describe(), actual.describe())),
+        },
+        Type::Named(name, args) if name == "Set" && args.len() == 1 => match actual {
+            Ty::Set(elem) => unify_generic_type(&args[0], elem, generic_names, subst),
+            _ => Err(format!("Expected '{}', got '{}'.", resolve_type(param).describe(), actual.describe())),
+        },
+        Type::Named(name, args) if name == "Quantity" && args.len() == 1 => {
+            if matches!(actual, Ty::Quantity(_)) {
+                Ok(())
+            } else {
+                Err(format!("Expected 'Quantity', got '{}'.", actual.describe()))
+            }
+        }
+        Type::Named(name, args) if !args.is_empty() => match actual {
+            Ty::Applied(actual_name, actual_args) if name == actual_name && args.len() == actual_args.len() => {
+                for (expected, actual) in args.iter().zip(actual_args) {
+                    unify_generic_type(expected, actual, generic_names, subst)?;
+                }
+                Ok(())
+            }
+            _ => Err(format!("Expected '{}', got '{}'.", resolve_type(param).describe(), actual.describe())),
+        },
+        Type::Named(_, _) => {
+            let expected = resolve_type(param);
+            if compatible(&expected, actual) {
+                Ok(())
+            } else {
+                Err(format!("Expected '{}', got '{}'.", expected.describe(), actual.describe()))
+            }
+        }
+        Type::Fn(params, ret) => match actual {
+            Ty::Fn(actual_params, actual_ret) if params.len() == actual_params.len() => {
+                for (expected, actual) in params.iter().zip(actual_params) {
+                    unify_generic_type(expected, actual, generic_names, subst)?;
+                }
+                unify_generic_type(ret, actual_ret, generic_names, subst)
+            }
+            _ => Err(format!("Expected function, got '{}'.", actual.describe())),
+        },
+        Type::Mul(_, _) | Type::Div(_, _) | Type::Pow(_, _) | Type::Dyn(_) => Ok(()),
+    }
+}
+
+fn collection_method_requires_mut(receiver_ty: &Ty, method: &str) -> bool {
+    match receiver_ty {
+        Ty::List(_) => matches!(method, "push" | "remove_at"),
+        Ty::Map(_, _) => matches!(method, "set" | "remove"),
+        Ty::Set(_) => matches!(method, "add" | "remove"),
+        _ => false,
+    }
+}
+
+fn collection_method_return_type(receiver_ty: &Ty, method: &str) -> Ty {
+    match (receiver_ty, method) {
+        (Ty::List(_), "length" | "count") => Ty::Int,
+        (Ty::List(_), "map" | "filter") => Ty::List(Box::new(Ty::Unknown)),
+        (Ty::List(elem), "remove_at") => (**elem).clone(),
+        (Ty::List(_), "push") => Ty::Void,
+        (Ty::List(_), "fold" | "find") => Ty::Unknown,
+        (Ty::List(_), "any" | "all") => Ty::Bool,
+        (Ty::Map(_, _), "count") => Ty::Int,
+        (Ty::Map(key, _), "keys") => Ty::List(Box::new((**key).clone())),
+        (Ty::Map(_, value), "values") => Ty::List(Box::new((**value).clone())),
+        // Both operations return Option<V>; Option is not yet represented as
+        // a distinct Ty in this prototype, so leave the result Unknown.
+        (Ty::Map(_, _), "get" | "remove") => Ty::Unknown,
+        (Ty::Map(_, _), "contains_key") => Ty::Bool,
+        (Ty::Map(_, _), "set") => Ty::Void,
+        (Ty::Set(_), "count") => Ty::Int,
+        (Ty::Set(_), "contains") => Ty::Bool,
+        (Ty::Set(_), "add" | "remove") => Ty::Void,
+        _ => Ty::Unknown,
+    }
+}
+
+fn pattern_literal_type(literal: &Expr) -> Ty {
+    match literal {
+        Expr::IntLiteral(_) => Ty::Int,
+        Expr::FloatLiteral(_) => Ty::Float,
+        Expr::StringLiteral(_) => Ty::String,
+        Expr::CharLiteral(_) => Ty::Char,
+        Expr::BoolLiteral(_) => Ty::Bool,
+        Expr::UnitLiteral(number, unit) => {
+            if matches!(number.as_ref(), Expr::IntLiteral(_) | Expr::FloatLiteral(_)) {
+                resolve_unit_expr(unit).map(Ty::Quantity).unwrap_or(Ty::Unknown)
+            } else {
+                Ty::Unknown
+            }
+        }
+        _ => Ty::Unknown,
+    }
+}
+
+fn pattern_field_indices(field_names: &[Option<String>], fields: &[(String, Pattern)]) -> Vec<Option<usize>> {
+    let all_named = field_names.iter().all(Option::is_some);
+    let mut used = HashSet::new();
+    fields
+        .iter()
+        .enumerate()
+        .map(|(position, (label, _))| {
+            let candidate = if let Some(index) = label.strip_prefix('@').and_then(|index| index.parse::<usize>().ok()) {
+                Some(index)
+            } else if let Some(index) = field_names
+                .iter()
+                .position(|name| name.as_deref() == Some(label.as_str()))
+            {
+                Some(index)
+            } else if !all_named {
+                Some(position)
+            } else {
+                None
+            };
+            candidate.filter(|index| *index < field_names.len() && used.insert(*index))
+        })
+        .collect()
+}
+
+fn resolve_dimension_with_subst(ty: &Type, subst: &HashMap<String, Dimension>) -> Dimension {
+    match ty {
+        Type::Named(name, _) => subst.get(name).cloned().unwrap_or_else(|| dim_single(name)),
+        Type::Mul(a, b) => dim_mul(&resolve_dimension_with_subst(a, subst), &resolve_dimension_with_subst(b, subst)),
+        Type::Div(a, b) => dim_div(&resolve_dimension_with_subst(a, subst), &resolve_dimension_with_subst(b, subst)),
+        Type::Pow(a, n) => dim_pow(&resolve_dimension_with_subst(a, subst), *n as i32),
+        _ => HashMap::new(),
+    }
+}
+
+/// Variables referenciadas dentro de un bloque de 'spawn' que no se declaran
+/// dentro de él mismo — necesario para el error E1100 (documento 09, §1.1):
+/// capturar un binding 'mut' del scope que lanzó la tarea está prohibido.
+/// Sobreaproxima deliberadamente el "bound" hacia adelante dentro de cada
+/// sub-scope (no es un análisis de flujo completo), suficiente para esta
+/// comprobación de seguridad.
+fn free_vars_in_block(block: &Block) -> HashSet<String> {
+    let mut free = HashSet::new();
+    walk_block(block, &HashSet::new(), &mut free);
+    free
+}
+
+fn walk_block(block: &Block, bound: &HashSet<String>, free: &mut HashSet<String>) {
+    let mut local = bound.clone();
+    for stmt in &block.stmts { walk_stmt(stmt, &mut local, free); }
+    if let Some(e) = &block.tail { walk_expr(e, &local, free); }
+}
+
+fn walk_stmt(stmt: &Stmt, bound: &mut HashSet<String>, free: &mut HashSet<String>) {
+    match stmt {
+        Stmt::Binding { name, value, .. } => { walk_expr(value, bound, free); bound.insert(name.clone()); }
+        Stmt::Assign { name, value } => {
+            walk_expr(value, bound, free);
+            if !bound.contains(name) { free.insert(name.clone()); }
+            bound.insert(name.clone());
+        }
+        Stmt::Return(Some(e)) | Stmt::Break(Some(e)) => walk_expr(e, bound, free),
+        Stmt::Return(None) | Stmt::Break(None) | Stmt::Continue => {}
+        Stmt::For { pattern, iter, body } => {
+            walk_expr(iter, bound, free);
+            let mut inner = bound.clone();
+            inner.insert(pattern.clone());
+            walk_block(body, &inner, free);
+        }
+        Stmt::While { cond, body } => { walk_expr(cond, bound, free); walk_block(body, bound, free); }
+        Stmt::FieldAssign { target, value } => { walk_expr(target, bound, free); walk_expr(value, bound, free); }
+        Stmt::Expr(e) => walk_expr(e, bound, free),
+    }
+}
+
+fn pattern_binds(pattern: &Pattern, out: &mut HashSet<String>) {
+    match pattern {
+        Pattern::Ident(name) => { out.insert(name.clone()); }
+        Pattern::Variant(_, fields) => { for (_, sub) in fields { pattern_binds(sub, out); } }
+        Pattern::Wildcard | Pattern::Literal(_) | Pattern::Range(..) => {}
+    }
+}
+
+fn collect_supertraits(
+    trait_name: &str,
+    traits: &HashMap<String, TraitDecl>,
+    visiting: &mut Vec<String>,
+    seen: &mut HashSet<String>,
+    out: &mut Vec<String>,
+) {
+    if visiting.iter().any(|name| name == trait_name) || !seen.insert(trait_name.to_string()) {
+        return;
+    }
+    visiting.push(trait_name.to_string());
+    if let Some(trait_decl) = traits.get(trait_name) {
+        for supertrait in &trait_decl.supertraits {
+            if !seen.contains(supertrait) {
+                out.push(supertrait.clone());
+                if traits.contains_key(supertrait) {
+                    collect_supertraits(supertrait, traits, visiting, seen, out);
+                } else {
+                    seen.insert(supertrait.clone());
+                }
+            }
+        }
+    }
+    visiting.pop();
+}
+
+fn collect_trait_closure(
+    trait_name: &str,
+    traits: &HashMap<String, TraitDecl>,
+    visiting: &mut Vec<String>,
+    seen: &mut HashSet<String>,
+    out: &mut Vec<String>,
+) -> bool {
+    if visiting.iter().any(|name| name == trait_name) {
+        return true;
+    }
+    if !seen.insert(trait_name.to_string()) {
+        return false;
+    }
+    visiting.push(trait_name.to_string());
+    out.push(trait_name.to_string());
+    let mut has_cycle = false;
+    if let Some(trait_decl) = traits.get(trait_name) {
+        for supertrait in &trait_decl.supertraits {
+            if traits.contains_key(supertrait) {
+                has_cycle |= collect_trait_closure(supertrait, traits, visiting, seen, out);
+            }
+        }
+    }
+    visiting.pop();
+    has_cycle
+}
+
+fn trait_method_signature_matches(expected: &TraitMethodSig, actual: &TraitMethodSig) -> bool {
+    expected.generics == actual.generics
+        && expected.params.len() == actual.params.len()
+        && expected.params.iter().zip(&actual.params).all(|(left, right)| {
+            left.name == right.name
+                && left.is_mut == right.is_mut
+                && left.ty == right.ty
+        })
+        && expected.return_type == actual.return_type
+}
+
+fn specialize_trait_method(
+    method: &TraitMethodSig,
+    trait_generics: &[GenericParam],
+    trait_args: &[Type],
+) -> TraitMethodSig {
+    let substitutions: HashMap<String, Type> = trait_generics
+        .iter()
+        .zip(trait_args.iter())
+        .map(|(generic, argument)| (generic.name.clone(), argument.clone()))
+        .collect();
+    let mut specialized = method.clone();
+    for param in &mut specialized.params {
+        replace_type_parameters(&mut param.ty, &substitutions);
+    }
+    replace_type_parameters(&mut specialized.return_type, &substitutions);
+    specialized
+}
+
+fn replace_type_parameters(ty: &mut Type, substitutions: &HashMap<String, Type>) {
+    match ty {
+        Type::Named(name, args) if args.is_empty() => {
+            if let Some(replacement) = substitutions.get(name) {
+                *ty = replacement.clone();
+            }
+        }
+        Type::Named(_, args) => {
+            for arg in args {
+                replace_type_parameters(arg, substitutions);
+            }
+        }
+        Type::Mul(left, right) | Type::Div(left, right) => {
+            replace_type_parameters(left, substitutions);
+            replace_type_parameters(right, substitutions);
+        }
+        Type::Pow(base, _) => replace_type_parameters(base, substitutions),
+        Type::Fn(params, return_type) => {
+            for param in params {
+                replace_type_parameters(param, substitutions);
+            }
+            replace_type_parameters(return_type, substitutions);
+        }
+        Type::Dyn(_) => {}
+    }
+}
+
+fn is_builtin_trait(name: &str) -> bool {
+    matches!(name, "Add" | "Sub" | "Mul" | "Div" | "Eq" | "Ord" | "Iterator" | "Printable" | "Default" | "Hash" | "Drop")
+}
+
+fn builtin_generic_type_arity(name: &str) -> Option<usize> {
+    match name {
+        "Quantity" | "List" | "Set" => Some(1),
+        "Map" => Some(2),
+        _ => None,
+    }
+}
+
+fn implementation_type_substitutions(
+    receiver_ty: &Ty,
+    implementation: &ImplDecl,
+) -> Option<HashMap<String, Ty>> {
+    let Some((receiver_name, receiver_args)) = type_parts_for_impl_matching(receiver_ty) else {
+        return None;
+    };
+    if receiver_name != implementation.type_name || receiver_args.len() != implementation.type_args.len() {
+        return None;
+    }
+    let generic_names: HashSet<String> = implementation
+        .generics
+        .iter()
+        .map(|generic| generic.name.clone())
+        .collect();
+    let mut substitutions = HashMap::new();
+    let matches = implementation
+        .type_args
+        .iter()
+        .zip(receiver_args.iter())
+        .all(|(pattern, actual)| impl_type_pattern_matches(pattern, actual, &generic_names, &mut substitutions));
+    matches.then_some(substitutions)
+}
+
+fn substitute_impl_type_parameters(ty: &mut Type, substitutions: &HashMap<String, Ty>) {
+    let type_substitutions: HashMap<String, Type> = substitutions
+        .iter()
+        .map(|(name, ty)| (name.clone(), type_from_ty(ty)))
+        .collect();
+    replace_type_parameters(ty, &type_substitutions);
+}
+
+fn type_from_ty(ty: &Ty) -> Type {
+    match ty {
+        Ty::Int => Type::Named("Int".to_string(), Vec::new()),
+        Ty::Float => Type::Named("Float".to_string(), Vec::new()),
+        Ty::Bool => Type::Named("Bool".to_string(), Vec::new()),
+        Ty::Char => Type::Named("Char".to_string(), Vec::new()),
+        Ty::String => Type::Named("String".to_string(), Vec::new()),
+        Ty::Void => Type::Named("Void".to_string(), Vec::new()),
+        Ty::Quantity(dimension) => Type::Named(
+            "Quantity".to_string(),
+            vec![Type::Named(dim_to_string(dimension), Vec::new())],
+        ),
+        Ty::List(element) => Type::Named("List".to_string(), vec![type_from_ty(element)]),
+        Ty::Map(key, value) => Type::Named(
+            "Map".to_string(),
+            vec![type_from_ty(key), type_from_ty(value)],
+        ),
+        Ty::Set(element) => Type::Named("Set".to_string(), vec![type_from_ty(element)]),
+        Ty::Named(name) => Type::Named(name.clone(), Vec::new()),
+        Ty::Applied(name, args) => Type::Named(
+            name.clone(),
+            args.iter().map(type_from_ty).collect(),
+        ),
+        Ty::Generic(name) => Type::Named(name.clone(), Vec::new()),
+        Ty::Fn(params, return_type) => Type::Fn(
+            params.iter().map(type_from_ty).collect(),
+            Box::new(type_from_ty(return_type)),
+        ),
+        Ty::Unknown => Type::Named("Unknown".to_string(), Vec::new()),
+    }
+}
+
+fn type_parts_for_impl_matching(ty: &Ty) -> Option<(String, Vec<Ty>)> {
+    match ty {
+        Ty::Named(name) => Some((name.clone(), Vec::new())),
+        Ty::Applied(name, args) => Some((name.clone(), args.clone())),
+        Ty::Quantity(dimension) => Some((
+            "Quantity".to_string(),
+            vec![Ty::Named(dim_to_string(dimension))],
+        )),
+        Ty::List(element) => Some(("List".to_string(), vec![*element.clone()])),
+        Ty::Map(key, value) => Some(("Map".to_string(), vec![*key.clone(), *value.clone()])),
+        Ty::Set(element) => Some(("Set".to_string(), vec![*element.clone()])),
+        _ => None,
+    }
+}
+
+fn impl_type_pattern_matches(
+    pattern: &Type,
+    actual: &Ty,
+    generic_names: &HashSet<String>,
+    substitutions: &mut HashMap<String, Ty>,
+) -> bool {
+    if *actual == Ty::Unknown {
+        return true;
+    }
+    match pattern {
+        Type::Named(name, args) if args.is_empty() && generic_names.contains(name) => {
+            match substitutions.get(name) {
+                Some(previous) => compatible(previous, actual),
+                None => {
+                    substitutions.insert(name.clone(), actual.clone());
+                    true
+                }
+            }
+        }
+        Type::Named(name, args) if name == "List" && args.len() == 1 => {
+            let Ty::List(element) = actual else { return false };
+            impl_type_pattern_matches(&args[0], element, generic_names, substitutions)
+        }
+        Type::Named(name, args) if name == "Map" && args.len() == 2 => {
+            let Ty::Map(key, value) = actual else { return false };
+            impl_type_pattern_matches(&args[0], key, generic_names, substitutions)
+                && impl_type_pattern_matches(&args[1], value, generic_names, substitutions)
+        }
+        Type::Named(name, args) if name == "Set" && args.len() == 1 => {
+            let Ty::Set(element) = actual else { return false };
+            impl_type_pattern_matches(&args[0], element, generic_names, substitutions)
+        }
+        Type::Named(name, args) if name == "Quantity" && args.len() == 1 => {
+            let Ty::Quantity(dimension) = actual else { return false };
+            let actual_dimension = Ty::Named(dim_to_string(dimension));
+            impl_type_pattern_matches(&args[0], &actual_dimension, generic_names, substitutions)
+        }
+        Type::Named(name, args) if !args.is_empty() => {
+            let Ty::Applied(actual_name, actual_args) = actual else { return false };
+            name == actual_name
+                && args.len() == actual_args.len()
+                && args.iter().zip(actual_args.iter()).all(|(pattern, actual)| {
+                    impl_type_pattern_matches(pattern, actual, generic_names, substitutions)
+                })
+        }
+        Type::Named(name, args) if args.is_empty() => {
+            compatible(&resolve_type(pattern), actual)
+        }
+        Type::Fn(params, return_type) => {
+            let Ty::Fn(actual_params, actual_return) = actual else { return false };
+            params.len() == actual_params.len()
+                && params.iter().zip(actual_params.iter()).all(|(pattern, actual)| {
+                    impl_type_pattern_matches(pattern, actual, generic_names, substitutions)
+                })
+                && impl_type_pattern_matches(return_type, actual_return, generic_names, substitutions)
+        }
+        _ => false,
+    }
+}
+
+fn impl_method_signature_matches(expected: &TraitMethodSig, actual: &FunctionDecl, owner: &str) -> bool {
+    if expected.generics != actual.generics || expected.params.len() != actual.params.len() {
+        return false;
+    }
+    for (expected_param, actual_param) in expected.params.iter().zip(&actual.params) {
+        if expected_param.name != actual_param.name || expected_param.is_mut != actual_param.is_mut {
+            return false;
+        }
+        if !signature_type_matches(&expected_param.ty, &actual_param.ty, owner) {
+            return false;
+        }
+    }
+    signature_type_matches(&expected.return_type, &actual.return_type, owner)
+}
+
+fn signature_type_matches(expected: &Type, actual: &Type, owner: &str) -> bool {
+    let mut expected = expected.clone();
+    let mut actual = actual.clone();
+    replace_self_type(&mut expected, owner);
+    replace_self_type(&mut actual, owner);
+    expected == actual
+}
+
+fn walk_expr(expr: &Expr, bound: &HashSet<String>, free: &mut HashSet<String>) {
+    match expr {
+        Expr::Ident(name) => { if !bound.contains(name) { free.insert(name.clone()); } }
+        Expr::Lambda(params, body) => {
+            let mut inner = bound.clone();
+            for p in params { inner.insert(p.clone()); }
+            walk_block(body, &inner, free);
+        }
+        Expr::Spawn(b) | Expr::SpawnScope(b) | Expr::Loop(b) | Expr::Block(b) => walk_block(b, bound, free),
+        Expr::If(c, t, e) => {
+            walk_expr(c, bound, free);
+            walk_block(t, bound, free);
+            if let Some(e) = e { walk_block(e, bound, free); }
+        }
+        Expr::Match(s, arms) => {
+            walk_expr(s, bound, free);
+            for arm in arms {
+                let mut inner = bound.clone();
+                pattern_binds(&arm.pattern, &mut inner);
+                if let Some(g) = &arm.guard { walk_expr(g, &inner, free); }
+                walk_block(&arm.body, &inner, free);
+            }
+        }
+        Expr::Binary(_, l, r) | Expr::Within(l, r) => { walk_expr(l, bound, free); walk_expr(r, bound, free); }
+        Expr::Unary(_, e) | Expr::As(e, _) | Expr::UnitLiteral(e, _) => walk_expr(e, bound, free),
+        Expr::Range(s, _, e, step) => {
+            walk_expr(s, bound, free);
+            walk_expr(e, bound, free);
+            if let Some(st) = step { walk_expr(st, bound, free); }
+        }
+        Expr::Call(callee, args) => {
+            walk_expr(callee, bound, free);
+            for a in args {
+                match a { Arg::Positional(e) | Arg::Named(_, e) => walk_expr(e, bound, free) }
+            }
+        }
+        Expr::GenericCall(callee, _, args) => {
+            walk_expr(callee, bound, free);
+            for a in args {
+                match a { Arg::Positional(e) | Arg::Named(_, e) => walk_expr(e, bound, free) }
+            }
+        }
+        Expr::FieldAccess(o, _) => walk_expr(o, bound, free),
+        Expr::Index(o, i) => { walk_expr(o, bound, free); walk_expr(i, bound, free); }
+        Expr::ListLiteral(items) | Expr::SetLiteral(items) => { for it in items { walk_expr(it, bound, free); } }
+        Expr::MapLiteral(pairs) => { for (k, v) in pairs { walk_expr(k, bound, free); walk_expr(v, bound, free); } }
+        Expr::Try(i, c) => { walk_expr(i, bound, free); if let Some(c) = c { walk_expr(c, bound, free); } }
+        Expr::Approximately(a, b, t) => { walk_expr(a, bound, free); walk_expr(b, bound, free); walk_expr(t, bound, free); }
+        Expr::RecordLiteral(_, fields) => { for (_, v) in fields { walk_expr(v, bound, free); } }
+        Expr::GenericRecordLiteral(_, _, fields) => { for (_, v) in fields { walk_expr(v, bound, free); } }
+        Expr::Channel(_, cap) => { if let Some(c) = cap { walk_expr(c, bound, free); } }
+        Expr::IntLiteral(_) | Expr::FloatLiteral(_) | Expr::StringLiteral(_) | Expr::CharLiteral(_) | Expr::BoolLiteral(_) => {}
+    }
+}
+
+fn compatible(expected: &Ty, actual: &Ty) -> bool {
+    if expected == &Ty::Unknown || actual == &Ty::Unknown {
+        return true;
+    }
+    match (expected, actual) {
+        (Ty::List(expected), Ty::List(actual)) | (Ty::Set(expected), Ty::Set(actual)) => {
+            compatible(expected, actual)
+        }
+        (Ty::Map(expected_key, expected_value), Ty::Map(actual_key, actual_value)) => {
+            compatible(expected_key, actual_key) && compatible(expected_value, actual_value)
+        }
+        (Ty::Applied(expected_name, expected_args), Ty::Applied(actual_name, actual_args)) => {
+            expected_name == actual_name
+                && expected_args.len() == actual_args.len()
+                && expected_args
+                    .iter()
+                    .zip(actual_args)
+                    .all(|(expected, actual)| compatible(expected, actual))
+        }
+        (Ty::Named(expected_name), Ty::Applied(actual_name, _))
+        | (Ty::Applied(actual_name, _), Ty::Named(expected_name)) => expected_name == actual_name,
+        (Ty::Fn(expected_params, expected_ret), Ty::Fn(actual_params, actual_ret)) => {
+            expected_params.len() == actual_params.len()
+                && expected_params
+                    .iter()
+                    .zip(actual_params)
+                    .all(|(expected, actual)| compatible(expected, actual))
+                && compatible(expected_ret, actual_ret)
+        }
+        _ => expected == actual,
+    }
+}
+
+fn replace_self_type(ty: &mut Type, owner: &str) {
+    match ty {
+        Type::Named(name, args) => {
+            if name == "Self" && args.is_empty() {
+                *name = owner.to_string();
+            } else {
+                for arg in args {
+                    replace_self_type(arg, owner);
+                }
+            }
+        }
+        Type::Mul(a, b) | Type::Div(a, b) => {
+            replace_self_type(a, owner);
+            replace_self_type(b, owner);
+        }
+        Type::Pow(a, _) => replace_self_type(a, owner),
+        Type::Fn(params, ret) => {
+            for param in params {
+                replace_self_type(param, owner);
+            }
+            replace_self_type(ret, owner);
+        }
+        Type::Dyn(_) => {}
+    }
+}
+
+fn replace_self_type_with_type(ty: &mut Type, owner: &Type) {
+    match ty {
+        Type::Named(name, args) if name == "Self" && args.is_empty() => {
+            *ty = owner.clone();
+        }
+        Type::Named(_, args) => {
+            for arg in args {
+                replace_self_type_with_type(arg, owner);
+            }
+        }
+        Type::Mul(left, right) | Type::Div(left, right) => {
+            replace_self_type_with_type(left, owner);
+            replace_self_type_with_type(right, owner);
+        }
+        Type::Pow(base, _) => replace_self_type_with_type(base, owner),
+        Type::Fn(params, return_type) => {
+            for param in params {
+                replace_self_type_with_type(param, owner);
+            }
+            replace_self_type_with_type(return_type, owner);
+        }
+        Type::Dyn(_) => {}
+    }
+}

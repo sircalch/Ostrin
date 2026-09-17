@@ -1,0 +1,23 @@
+fn broken_one(x Int) -> Int {
+    x + 1
+}
+
+fn good_one(x: Int) -> Int {
+    x * 2
+}
+
+record Broken {
+    name String
+}
+
+fn another_good(y: Int) -> Int {
+    y - 1
+}
+
+enum AlsoBroken {
+    Variant(
+}
+
+fn main() -> Void {
+    print(good_one(5))
+}

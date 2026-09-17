@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="100%" height="100%">
+  <!-- Corchetes genéricos -->
+  <path d="M 45,25 L 15,60 L 45,95" fill="none" stroke="#2563EB" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 75,25 L 105,60 L 75,95" fill="none" stroke="#2563EB" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Marcas de calibración / cantidades físicas -->
+  <line x1="45" y1="60" x2="75" y2="60" stroke="#F59E0B" stroke-width="4"/>
+  <line x1="52.5" y1="50" x2="52.5" y2="70" stroke="#F59E0B" stroke-width="4"/>
+  <line x1="60" y1="42" x2="60" y2="78" stroke="#F59E0B" stroke-width="4"/>
+  <line x1="67.5" y1="50" x2="67.5" y2="70" stroke="#F59E0B" stroke-width="4"/>
+</svg>

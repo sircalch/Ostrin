@@ -1,0 +1,14 @@
+import physics.units
+import physics.units as u
+import physics.units.{meters_to_km}
+
+fn main() -> Void {
+    k = units.to_kelvin(25.0)
+    print(k)
+
+    k2 = u.to_kelvin(0.0)
+    print(k2)
+
+    km = meters_to_km(5000.0)
+    print(km)
+}

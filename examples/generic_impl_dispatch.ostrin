@@ -1,0 +1,30 @@
+trait IntView {
+    fn label(self) -> String
+}
+
+trait StringView {
+    fn label(self) -> String
+}
+
+record Box<T> {
+    value: T
+}
+
+impl IntView for Box<Int> {
+    fn label(self) -> String {
+        "integer"
+    }
+}
+
+impl StringView for Box<String> {
+    fn label(self) -> String {
+        "text"
+    }
+}
+
+fn main() -> Void {
+    int_box = Box<Int> { value: 1 }
+    string_box = Box<String> { value: "x" }
+    print(int_box.label())
+    print(string_box.label())
+}

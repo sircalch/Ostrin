@@ -1,0 +1,18 @@
+fn double<D: Dimension>(x: Quantity<D>) -> Quantity<D> {
+    x * 2
+}
+
+fn main() -> Void {
+    a = 5 nm
+    b = 10 s
+    c = a + b
+
+    scalar = 3
+    d = a + scalar
+
+    count = 1
+    count = 2
+
+    doubled_time = double(b)
+    bad = a + doubled_time
+}

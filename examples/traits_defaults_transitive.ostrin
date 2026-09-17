@@ -1,0 +1,30 @@
+trait Root {
+    fn root(self) -> Int {
+        3
+    }
+}
+
+trait Middle: Root {
+    fn middle(self) -> Int {
+        self.root() + 2
+    }
+}
+
+trait Leaf: Middle {
+    fn leaf(self) -> Int {
+        self.middle() + 4
+    }
+}
+
+record Value {
+    marker: Int
+}
+
+impl Root for Value {}
+impl Middle for Value {}
+impl Leaf for Value {}
+
+fn main() -> Void {
+    value = Value { marker: 0 }
+    print(value.leaf())
+}

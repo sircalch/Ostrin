@@ -1,0 +1,36 @@
+trait Required {
+    fn needed(self) -> Int
+}
+
+trait Parent {
+    fn parent(self) -> Int
+}
+
+trait Child: Parent {
+    fn child(self) -> Int
+}
+
+trait Wrong {
+    fn value(self) -> Int
+}
+
+record Value {
+    number: Int
+}
+
+impl Required for Value {
+}
+
+impl Child for Value {
+    fn child(self) -> Int {
+        1
+    }
+}
+
+impl Wrong for Value {
+    fn value(self) -> String {
+        "wrong"
+    }
+}
+
+fn main() -> Void {}

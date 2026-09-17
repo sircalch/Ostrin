@@ -1,0 +1,7 @@
+pub trait ForeignTrait {
+    fn value(self) -> Int
+}
+
+pub record ForeignType {
+    value: Int
+}

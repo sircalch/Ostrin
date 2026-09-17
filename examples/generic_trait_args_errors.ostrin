@@ -1,0 +1,25 @@
+trait Convert<T> {
+    fn convert(self, value: T) -> T
+}
+
+record Good {
+    amount: Int
+}
+
+record Bad {
+    amount: Int
+}
+
+impl Convert<Int> for Good {
+    fn convert(self, value: Int) -> Int {
+        value + self.amount
+    }
+}
+
+impl Convert<Int> for Bad {
+    fn convert(self, value: String) -> String {
+        value
+    }
+}
+
+fn main() -> Void {}

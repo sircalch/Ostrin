@@ -1,0 +1,55 @@
+record Vector2 {
+    x: Float
+    y: Float
+}
+
+impl Add for Vector2 {
+    fn add(self, other: Self) -> Self {
+        Vector2 { x: self.x + other.x, y: self.y + other.y }
+    }
+}
+
+impl Eq for Vector2 {
+    fn equals(self, other: Self) -> Bool {
+        self.x == other.x and self.y == other.y
+    }
+}
+
+record Distance {
+    meters: Float
+}
+
+impl Eq for Distance {
+    fn equals(self, other: Self) -> Bool {
+        self.meters == other.meters
+    }
+}
+
+impl Ord for Distance {
+    fn compare(self, other: Self) -> Ordering {
+        if self.meters < other.meters {
+            Less
+        } else if self.meters > other.meters {
+            Greater
+        } else {
+            Equal
+        }
+    }
+}
+
+fn main() -> Void {
+    v1 = Vector2 { x: 1.0, y: 2.0 }
+    v2 = Vector2 { x: 3.0, y: 4.0 }
+    v3 = v1 + v2
+    print(v3)
+
+    same = Vector2 { x: 1.0, y: 2.0 }
+    print(v1 == same)
+    print(v1 == v2)
+
+    a = Distance { meters: 5.0 }
+    b = Distance { meters: 10.0 }
+    print(a < b)
+    print(a > b)
+    print(a == a)
+}

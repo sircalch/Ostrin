@@ -1,0 +1,35 @@
+trait Shape {
+    fn area(self) -> Float
+}
+
+record Circle {
+    radius: Float
+}
+
+record Square {
+    side: Float
+}
+
+impl Shape for Circle {
+    fn area(self) -> Float {
+        3.14159 * self.radius * self.radius
+    }
+}
+
+impl Shape for Square {
+    fn area(self) -> Float {
+        self.side * self.side
+    }
+}
+
+fn total_area(shapes: List<dyn Shape>) -> Float {
+    shapes.fold(0.0, fn(acc, s) { acc + s.area() })
+}
+
+fn main() -> Void {
+    shapes: List<dyn Shape> = [Circle { radius: 2.0 }, Square { side: 3.0 }, Circle { radius: 1.0 }]
+    for s in shapes {
+        print(s.area())
+    }
+    print(total_area(shapes))
+}

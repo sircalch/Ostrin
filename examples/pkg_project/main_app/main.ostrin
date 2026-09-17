@@ -1,0 +1,5 @@
+import local_utils.helpers
+
+fn main() -> Void {
+    print(helpers.greet("Ostrin"))
+}

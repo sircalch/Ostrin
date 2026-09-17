@@ -1,0 +1,10 @@
+fn main() -> Void {
+    mut numbers = [1, 2, 3]
+    alias = numbers
+    numbers.push(4)
+    removed = numbers.remove_at(1)
+    print(removed)
+    print(numbers)
+    print(alias)
+    print(numbers.length())
+}

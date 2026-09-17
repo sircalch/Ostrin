@@ -1,0 +1,11 @@
+import foreign.{ForeignType}
+
+trait LocalTrait {
+    fn value(self) -> Int
+}
+
+impl LocalTrait for ForeignType {
+    fn value(self) -> Int { 1 }
+}
+
+fn main() -> Void {}

@@ -1,0 +1,11 @@
+fn internal_helper() -> Int {
+    42
+}
+
+pub fn to_kelvin(celsius: Float) -> Float {
+    celsius + 273.15
+}
+
+pub fn meters_to_km(m: Float) -> Float {
+    m / 1000.0
+}

@@ -1,0 +1,27 @@
+trait Base {
+    fn base(self) -> Int
+}
+
+trait Derived: Base {
+    fn derived(self) -> Int {
+        self.base()
+    }
+}
+
+record Value {
+    number: Int
+}
+
+impl Base for Value {
+    fn base(self) -> Int {
+        self.number
+    }
+}
+
+impl Derived for Value {
+}
+
+fn main() -> Void {
+    value = Value { number: 7 }
+    print(value.derived())
+}

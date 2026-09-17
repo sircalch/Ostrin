@@ -1,0 +1,19 @@
+enum TrafficLight {
+    Red
+    Yellow
+    Green
+}
+
+fn label(light: TrafficLight) -> String {
+    match light {
+        Red => "red",
+        Yellow => "yellow",
+        Green => "green",
+    }
+}
+
+fn main() -> Void {
+    print(label(Red))
+    print(label(Yellow))
+    print(label(Green))
+}

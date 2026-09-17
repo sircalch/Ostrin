@@ -1,0 +1,3 @@
+fn internal_helper() -> Int {
+    42
+}

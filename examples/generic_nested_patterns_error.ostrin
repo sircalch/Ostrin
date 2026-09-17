@@ -1,0 +1,18 @@
+enum Maybe<T> {
+    Just(T)
+    Nothing
+}
+
+enum Outcome<T, E> {
+    Good(T)
+    Bad(E)
+}
+
+fn incomplete(value: Maybe<Outcome<Int, String>>) -> Int {
+    match value {
+        Just(Good(number)) => number,
+        Nothing => 0,
+    }
+}
+
+fn main() -> Void {}

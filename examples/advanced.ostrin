@@ -1,0 +1,26 @@
+fn double<D: Dimension>(x: Quantity<D>) -> Quantity<D> {
+    x * 2
+}
+
+fn average<D: Dimension>(values: List<Quantity<D>>) -> Quantity<D> {
+    sum(values) / values.length()
+}
+
+fn simulate(temperature: Quantity<Temperature>, pressure: Quantity<Pressure>, steps: Int = 100) -> Result<Trajectory, String> {
+    text = try read_file("config.toml") catch fn(e) { "IO error: " + e.message() }
+    concentration = 5 mmol/L
+
+    if concentration approximately 5 mmol/L tolerance 0.2 mmol/L {
+        print("dentro de tolerancia")
+    }
+
+    items = [1, 2, 3]
+    prices = ["apple": 1.5, "bread": 2.0]
+    seen = {1, 2, 3}
+
+    result = with_file("data.csv") { file ->
+        process(file)
+    }
+
+    Ok(result)
+}

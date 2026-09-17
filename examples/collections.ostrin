@@ -1,0 +1,35 @@
+fn main() -> Void {
+    prices = ["apple": 1.5, "bread": 2.0]
+    print(prices.get("apple"))
+    print(prices.contains_key("milk"))
+
+    mut inventory = Map<String, Int>()
+    inventory.set("apples", 10)
+    inventory.set("pears", 3)
+    inventory.set("apples", 12)
+    print(inventory.get("apples"))
+    print(inventory.count())
+
+    seen = {1, 2, 3, 2, 1}
+    print(seen.count())
+    print(seen.contains(2))
+    print(seen.contains(9))
+
+    mut visited = Set<Int>()
+    visited.add(5)
+    visited.add(5)
+    visited.add(7)
+    print(visited.count())
+
+    numbers = [1, 2, 3, 4, 5, 6]
+    doubled = numbers.map(fn(x) { x * 2 })
+    evens = numbers.filter(fn(x) { x == 2 or x == 4 or x == 6 })
+    total = numbers.fold(0, fn(acc, x) { acc + x })
+    found = numbers.find(fn(x) { x > 3 })
+    print(doubled)
+    print(evens)
+    print(total)
+    print(found)
+    print(numbers.any(fn(x) { x > 5 }))
+    print(numbers.all(fn(x) { x > 0 }))
+}

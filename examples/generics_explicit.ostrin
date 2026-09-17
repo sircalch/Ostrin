@@ -1,0 +1,37 @@
+fn identity<T>(value: T) -> T {
+    value
+}
+
+fn first<T>(items: List<T>) -> T {
+    items[0]
+}
+
+fn keep_unit<D: Dimension>(value: Quantity<D>) -> Quantity<D> {
+    value
+}
+
+trait Dimensional {
+    fn measure(self) -> Int
+}
+
+impl<D: Dimension> Dimensional for Quantity<D> {
+    fn measure(self) -> Int { 1 }
+}
+
+enum Maybe<T> {
+    Just(T)
+    Nothing
+}
+
+fn main() -> Void {
+    number = identity<Int>(7)
+    words = ["a", "b"]
+    word = first<String>(words)
+    wrapped = Just<String>(word)
+    distance = keep_unit<Length>(5 m)
+    print(number)
+    print(word)
+    print(wrapped)
+    print(distance)
+    print(distance.measure())
+}

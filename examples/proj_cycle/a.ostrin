@@ -1,0 +1,5 @@
+import b
+
+pub fn from_a() -> Int {
+    1
+}

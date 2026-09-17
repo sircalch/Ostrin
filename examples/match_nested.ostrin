@@ -1,0 +1,33 @@
+enum Inner {
+    Ready(Int)
+    Empty
+}
+
+enum Outer {
+    Wrapped(Inner)
+    None
+}
+
+record Point {
+    x: Int
+    y: Int
+}
+
+fn inspect(value: Outer) -> Int {
+    match value {
+        Wrapped(Ready(value)) => value,
+        _ => 0,
+    }
+}
+
+fn read_x(point: Point) -> Int {
+    match point {
+        Point(x: x, y: _) => x,
+    }
+}
+
+fn main() -> Void {
+    print(inspect(Wrapped(Ready(42))))
+    print(inspect(Wrapped(Empty)))
+    print(read_x(Point { x: 5, y: 9 }))
+}

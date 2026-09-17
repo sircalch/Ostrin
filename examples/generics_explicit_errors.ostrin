@@ -1,0 +1,34 @@
+trait Comparable {
+    fn equals(self, other: Self) -> Bool
+}
+
+trait Marker {
+    fn marker(self) -> Int
+}
+
+record Plain {
+    value: Int
+}
+
+record Container<T> {
+    value: T
+}
+
+fn identity<T>(value: T) -> T {
+    value
+}
+
+fn needs<T: Comparable>(value: T) -> T {
+    value
+}
+
+impl Marker for Container {
+    fn marker(self) -> Int { 1 }
+}
+
+fn main() -> Void {
+    wrong_count = identity<Int, String>(7)
+    wrong_type = identity<Int>("text")
+    plain = Plain { value: 1 }
+    missing_bound = needs<Plain>(plain)
+}

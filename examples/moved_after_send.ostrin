@@ -1,0 +1,14 @@
+record Buffer {
+    mut value: Int
+}
+
+fn process(b: Buffer) -> Void {
+    print(b.value)
+}
+
+fn main() -> Void {
+    ch = channel<Int>()
+    mut buffer = Buffer { value: 5 }
+    ch.send(buffer)
+    process(buffer)
+}

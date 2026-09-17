@@ -1,0 +1,15 @@
+# Rust build output
+/compiler/target/
+
+# Editor and operating-system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs and local reports
+*.log
+*.tmp
+
+# VS Code extension packaging output
+*.vsix
