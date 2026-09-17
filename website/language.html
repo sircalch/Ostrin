@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#080a10">
+    <meta name="description" content="Explore the design principles of the Ostrin programming language.">
+    <link rel="icon" href="assets/ostrin-logo.png">
+    <link rel="stylesheet" href="styles.css">
+    <script src="site.js" defer></script>
+    <title>The Ostrin language</title>
+  </head>
+  <body>
+    <header class="site-header"><a class="brand" href="index.html"><img src="assets/ostrin-logo.png" alt="" width="36" height="36"><span>OSTRIN</span></a><div class="header-right"><span class="version">prototype / 0.1</span><button class="menu-toggle" aria-label="Open navigation" aria-expanded="false"><span></span><span></span></button><nav class="site-nav" aria-label="Main navigation"><a href="language.html" aria-current="page">Language</a><a href="examples.html">Examples</a><a href="ecosystem.html">Ecosystem</a><a href="docs.html">Docs</a><a href="roadmap.html">Roadmap</a><a href="https://github.com/sircalch/Ostrin">GitHub ↗</a></nav></div></header>
+    <main>
+      <section class="page-hero shell"><p class="eyebrow">The language</p><h1>Make the domain<br><em>part of the program.</em></h1><p class="lede">Ostrin is being shaped around a simple idea: important meaning should be represented by the language itself, not left as a convention for every programmer to remember.</p><div class="page-meta"><span>design principles</span><span>static checking</span><span>readable syntax</span></div></section>
+      <div class="page-grid shell">
+        <aside class="side-nav"><p>On this page</p><a class="active" href="#quantities">Quantities</a><a href="#state">State</a><a href="#errors">Errors</a><a href="#abstractions">Abstractions</a><a href="#concurrency">Concurrency</a></aside>
+        <div class="prose">
+          <section id="quantities" class="prose-section"><p class="small-label">01 / Physical quantities</p><h2>Numbers are not the whole value.</h2><p>A quantity has a magnitude and a dimension. Ostrin keeps the relationship visible through the type system, so derived values can be checked at compile time.</p><div class="code-card"><div class="code-title">physics.ostrin</div><pre class="code"><code><span class="line"><span class="number">01</span><span class="kw">fn</span> velocity(distance: <span class="type">Quantity</span>&lt;<span class="type">Length</span>&gt;,</span>
+<span class="line"><span class="number">02</span>          time: <span class="type">Quantity</span>&lt;<span class="type">Time</span>&gt;) -&gt; <span class="type">Quantity</span>&lt;<span class="type">Length</span> / <span class="type">Time</span>&gt; {</span>
+<span class="line"><span class="number">03</span>    distance / time</span>
+<span class="line"><span class="number">04</span>}</span>
+<span class="line"><span class="number">05</span></span>
+<span class="line"><span class="number">06</span>speed = velocity(<span class="fn">10</span> m, <span class="fn">2</span> s)</span></code></pre></div><div class="callout"><strong>What this means:</strong> the result is not simply a floating-point number. It is a quantity whose dimension is <span class="inline-code">Length / Time</span>.</div></section>
+
+          <section id="state" class="prose-section"><p class="small-label">02 / Explicit state</p><h2>Mutation has a visible cost.</h2><p>Bindings are immutable by default. The <span class="inline-code">mut</span> marker gives changing state a clear place in the program and makes ownership decisions easier to inspect.</p><div class="code-card"><div class="code-title">state.ostrin</div><pre class="code"><code><span class="line"><span class="number">01</span>total = <span class="fn">0</span></span>
+<span class="line"><span class="number">02</span><span class="kw">mut</span> running_total = <span class="fn">0</span></span>
+<span class="line"><span class="number">03</span><span class="kw">for</span> value <span class="kw">in</span> values {</span>
+<span class="line"><span class="number">04</span>    running_total = running_total + value</span>
+<span class="line"><span class="number">05</span>}</span></code></pre></div></section>
+
+          <section id="errors" class="prose-section"><p class="small-label">03 / Failure as data</p><h2>Errors should have a shape.</h2><p><span class="inline-code">Option</span>, <span class="inline-code">Result</span> and pattern matching keep success and failure in the type model. The compiler can then make missing cases visible instead of letting them disappear into control flow.</p><div class="code-card"><div class="code-title">errors.ostrin</div><pre class="code"><code><span class="line"><span class="number">01</span><span class="kw">fn</span> load(id: <span class="type">Id</span>) -&gt; <span class="type">Result</span>&lt;<span class="type">Record</span>, <span class="type">LoadError</span>&gt; {</span>
+<span class="line"><span class="number">02</span>    <span class="kw">try</span> database.fetch(id)</span>
+<span class="line"><span class="number">03</span>}</span>
+<span class="line"><span class="number">04</span></span>
+<span class="line"><span class="number">05</span><span class="kw">match</span> load(id) {</span>
+<span class="line"><span class="number">06</span>    Ok(record) =&gt; print(record),</span>
+<span class="line"><span class="number">07</span>    Err(error) =&gt; report(error)</span>
+<span class="line"><span class="number">08</span>}</span></code></pre></div></section>
+
+          <section id="abstractions" class="prose-section"><p class="small-label">04 / Composable abstractions</p><h2>Traits, generics and modules.</h2><p>The language core includes records, enums, traits, generic functions, implementations and modules. These are the pieces that let a language move from examples to reusable software.</p><div class="feature-page-grid"><article class="feature-page-card"><span class="tag">traits</span><h3>Define shared behavior</h3><p>Nominal traits describe what a type can do and provide a stable surface for library design.</p></article><article class="feature-page-card"><span class="tag">generics</span><h3>Preserve type information</h3><p>Generic functions and bounds let abstractions stay precise without duplicating code.</p></article><article class="feature-page-card"><span class="tag">modules</span><h3>Organize a program</h3><p>Visibility and module boundaries make larger codebases easier to navigate and evolve.</p></article><article class="feature-page-card"><span class="tag">patterns</span><h3>Make cases explicit</h3><p>Enums and pattern matching give domain models a readable, checkable shape.</p></article></div></section>
+
+          <section id="concurrency" class="prose-section"><p class="small-label">05 / Concurrency direction</p><h2>Safe by default, explicit by design.</h2><p>Ostrin's concurrency model is being validated through channels, spawned tasks and immutable-by-default values. The current runtime is simulated; a real asynchronous runtime is planned work.</p><div class="code-card"><div class="code-title">concurrency.ostrin</div><pre class="code"><code><span class="line"><span class="number">01</span>channel = <span class="fn">channel</span>&lt;<span class="type">Int</span>&gt;()</span>
+<span class="line"><span class="number">02</span>producer = <span class="kw">spawn</span> {</span>
+<span class="line"><span class="number">03</span>    channel.send(<span class="fn">1</span>)</span>
+<span class="line"><span class="number">04</span>    channel.close()</span>
+<span class="line"><span class="number">05</span>}</span>
+<span class="line"><span class="number">06</span><span class="kw">for</span> value <span class="kw">in</span> channel { print(value) }</span></code></pre></div><div class="callout"><strong>Current status:</strong> the semantics and tests are present, while the production runtime and platform bindings remain on the roadmap.</div></section>
+        </div>
+      </div>
+    </main>
+    <footer class="site-footer shell"><a class="brand" href="index.html"><img src="assets/ostrin-logo.png" alt="" width="30" height="30"><span>OSTRIN</span></a><span>Design-validation prototype · MIT License</span><div class="footer-links"><a href="docs.html">Docs</a><a href="examples.html">Examples</a><a href="https://github.com/sircalch/Ostrin">GitHub ↗</a></div></footer>
+  </body>
+</html>

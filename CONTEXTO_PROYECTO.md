@@ -1051,3 +1051,45 @@ La extensión todavía no implementa LSP, autocompletado ni diagnósticos con
 rangos. Para eso el compilador deberá exponer ubicaciones de origen y salida
 estructurada; la primera extensión deja preparada la asociación y el flujo de
 comandos mientras se completa esa base semántica.
+
+---
+
+## 27. Sitio web multipágina y superficie pública — 2026-09-17
+
+La web pública de Ostrin evolucionó desde una landing de una sola página hacia
+un sitio estático multipágina publicado en GitHub Pages:
+
+- `index.html`: portada editorial con propuesta de valor, código de ejemplo,
+  métricas y entrada al ecosistema.
+- `language.html`: principios del lenguaje, cantidades físicas, estado,
+  errores, abstracciones y dirección de concurrencia.
+- `examples.html`: catálogo de 40 archivos `.ostrin`, filtros por categoría y
+  laboratorio visual con pestañas de ejemplos y botón de copiar.
+- `ecosystem.html`: compilador, intérprete, VS Code, documentación, runtime,
+  empaquetado nativo, WebAssembly y estado real de cada superficie.
+- `docs.html`: quick start, comandos de `ostrinc`, mapa de los 17 documentos de
+  diseño y guía inicial de VS Code.
+- `roadmap.html`: línea de tiempo pública que separa trabajo completado,
+  siguiente etapa y capacidades futuras.
+
+### Decisiones de diseño
+
+- La estética sigue una dirección editorial/técnica: tipografía grande,
+  reglas finas, paneles de código, contraste oscuro/papel y uso sobrio del
+  logo oficial.
+- La navegación funciona con HTML estático y tiene menú responsive para
+  pantallas pequeñas.
+- `site.js` proporciona menú móvil, filtros de ejemplos, pestañas del
+  laboratorio y copiado al portapapeles.
+- Las capacidades futuras —LSP, biblioteca estándar, ejecutables, backend
+  nativo, WebAssembly y registro de paquetes— aparecen como roadmap y no como
+  funcionalidades ya disponibles.
+
+### Verificación
+
+- Las páginas locales cargan correctamente: portada, lenguaje, ejemplos,
+  ecosistema, documentación, roadmap y 404.
+- No se encontraron enlaces relativos rotos en HTML ni referencias locales de
+  estilos/recursos faltantes.
+- `node --check website/site.js` pasa.
+- `cargo test` permanece en **47 pruebas exitosas**.
