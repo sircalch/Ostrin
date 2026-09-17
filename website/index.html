@@ -3,142 +3,167 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#070910">
-    <meta name="description" content="Ostrin — a programming language built from first principles.">
-    <meta property="og:title" content="Ostrin — built from first principles">
-    <meta property="og:description" content="Physical quantities, safe concurrency and readable syntax.">
+    <meta name="theme-color" content="#080a10">
+    <meta name="description" content="Ostrin is an experimental programming language for meaningful, typed software.">
+    <meta property="og:title" content="Ostrin — a language for meaningful software">
+    <meta property="og:description" content="Physical quantities, explicit mutation and a readable type system.">
     <meta property="og:type" content="website">
     <link rel="icon" href="assets/ostrin-logo.png">
     <link rel="stylesheet" href="styles.css">
-    <title>Ostrin — Built from first principles</title>
+    <title>Ostrin — a language for meaningful software</title>
   </head>
   <body>
     <header class="site-header">
       <a class="brand" href="#top" aria-label="Ostrin home">
-        <img src="assets/ostrin-logo.png" alt="" width="42" height="42">
+        <img src="assets/ostrin-logo.png" alt="" width="36" height="36">
         <span>OSTRIN</span>
       </a>
-      <nav>
-        <a href="#why">Why Ostrin</a>
-        <a href="#design">Design</a>
-        <a href="#status">Status</a>
-        <a class="nav-button" href="https://github.com/sircalch/Ostrin">GitHub</a>
-      </nav>
+      <div class="header-meta">
+        <span class="version">prototype / 0.1</span>
+        <nav aria-label="Main navigation">
+          <a href="#language">Language</a>
+          <a href="#status">Status</a>
+          <a href="https://github.com/sircalch/Ostrin">GitHub <span aria-hidden="true">↗</span></a>
+        </nav>
+      </div>
     </header>
 
     <main id="top">
       <section class="hero shell">
-        <div class="hero-copy">
-          <p class="eyebrow">A new language for meaningful software</p>
-          <h1>Built from<br><span>first principles.</span></h1>
-          <p class="hero-lede">
-            Ostrin is a readable, statically typed programming language with
-            physical quantities, explicit mutation and a safe-by-default
-            concurrency model.
+        <div class="hero-intro">
+          <p class="kicker"><span class="signal"></span> A programming language in the open</p>
+          <h1>A language for<br><em>meaningful</em> software.</h1>
+          <p class="hero-summary">
+            Ostrin makes units, state and intent visible in the code. It is being
+            designed from first principles and tested by a working Rust compiler.
           </p>
-          <div class="hero-actions">
-            <a class="button primary" href="https://github.com/sircalch/Ostrin/tree/main/docs/design">Read the design</a>
-            <a class="button secondary" href="https://github.com/sircalch/Ostrin">Explore the code</a>
+          <div class="hero-links">
+            <a class="text-link violet-link" href="https://github.com/sircalch/Ostrin/tree/main/docs/design">Read the design <span>↗</span></a>
+            <a class="text-link" href="https://github.com/sircalch/Ostrin#current-status">See the current status <span>↓</span></a>
           </div>
         </div>
-        <div class="hero-mark">
-          <div class="mark-glow"></div>
-          <img src="assets/ostrin-logo.png" alt="Ostrin geometric logo">
+        <div class="hero-specimen" aria-label="Ostrin code example">
+          <div class="specimen-topbar">
+            <span><i></i><i></i><i></i></span>
+            <span>example.ostrin</span>
+            <span class="specimen-state">checked</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line"><span class="line-number">01</span><span><b class="kw">fn</b> double&lt;D: <b class="type">Dimension</b>&gt;(</span></div>
+            <div class="code-line"><span class="line-number">02</span><span>&nbsp;&nbsp;value: <b class="type">Quantity</b>&lt;D&gt;</span></div>
+            <div class="code-line"><span class="line-number">03</span><span>) -&gt; <b class="type">Quantity</b>&lt;D&gt; {</span></div>
+            <div class="code-line"><span class="line-number">04</span><span>&nbsp;&nbsp;value * 2</span></div>
+            <div class="code-line"><span class="line-number">05</span><span>}</span></div>
+          </div>
+          <div class="specimen-note"><span class="check-mark">✓</span> The dimension stays in the type.</div>
         </div>
       </section>
 
-      <section id="why" class="section shell">
-        <p class="eyebrow">Why Ostrin?</p>
-        <h2>Make important meaning visible in the code.</h2>
-        <div class="feature-grid">
-          <article class="feature-card">
-            <span class="feature-number">01</span>
-            <h3>Physical quantities</h3>
-            <p>Units are part of the type system. Incompatible dimensions are rejected before a program runs.</p>
-            <pre><code>velocity = 10 m / 2 s</code></pre>
+      <section class="facts shell" aria-label="Project facts">
+        <div><strong>17</strong><span>design specifications</span></div>
+        <div><strong>47</strong><span>compiler tests passing</span></div>
+        <div><strong>Rust</strong><span>implementation language</span></div>
+        <div><strong>.ostrin</strong><span>source file extension</span></div>
+      </section>
+
+      <section id="language" class="section shell">
+        <div class="section-heading">
+          <p class="kicker">The language</p>
+          <h2>Three decisions<br>worth making explicit.</h2>
+        </div>
+        <div class="principles">
+          <article class="principle">
+            <span class="principle-index">01</span>
+            <div>
+              <h3>Dimensions are types</h3>
+              <p>Lengths, times and derived quantities are checked before execution. A meter is not just a number with a comment beside it.</p>
+            </div>
+            <code>5 m + 2 s → error</code>
           </article>
-          <article class="feature-card">
-            <span class="feature-number">02</span>
-            <h3>Safe concurrency</h3>
-            <p>Immutable values can be shared. Mutable state is explicit and crosses task boundaries through channels.</p>
-            <pre><code>task = spawn {
-    process(data)
-}</code></pre>
+          <article class="principle">
+            <span class="principle-index">02</span>
+            <div>
+              <h3>Mutation is visible</h3>
+              <p>Values are immutable by default. When state changes, the binding says so. That makes sharing and concurrency easier to reason about.</p>
+            </div>
+            <code>mut counter = 0</code>
           </article>
-          <article class="feature-card">
-            <span class="feature-number">03</span>
-            <h3>Readable syntax</h3>
-            <p>Expressions, pattern matching and words such as <code>and</code>, <code>or</code> and <code>try</code> keep intent clear.</p>
-            <pre><code>if temperature &gt; 300 K and
-   pressure &gt; 1 atm {
-    alert()
-}</code></pre>
+          <article class="principle">
+            <span class="principle-index">03</span>
+            <div>
+              <h3>Errors have a shape</h3>
+              <p><code>Option</code>, <code>Result</code> and exhaustive <code>match</code> keep failure states in the model instead of hiding them in control flow.</p>
+            </div>
+            <code>try parse(input)</code>
           </article>
         </div>
       </section>
 
-      <section id="design" class="section design-section">
-        <div class="shell design-layout">
-          <div>
-            <p class="eyebrow">Built from first principles</p>
-            <h2>A language designed in the open, validated by implementation.</h2>
+      <section class="example-section">
+        <div class="shell example-layout">
+          <div class="example-copy">
+            <p class="kicker">A small example</p>
+            <h2>The compiler should catch the expensive mistake.</h2>
+            <p>Ostrin is especially useful where values have meaning beyond their numeric representation: measurements, simulations, controls and domain models.</p>
+            <a class="text-link violet-link" href="https://github.com/sircalch/Ostrin/blob/main/examples/physics.ostrin">Open the working example <span>↗</span></a>
           </div>
-          <div class="timeline">
-            <div class="timeline-item"><strong>DESIGN</strong><span>17 specifications</span></div>
-            <div class="timeline-line"></div>
-            <div class="timeline-item"><strong>IMPLEMENTATION</strong><span>Rust compiler and interpreter</span></div>
-            <div class="timeline-line"></div>
-            <div class="timeline-item"><strong>VALIDATION</strong><span>47 automated tests</span></div>
-            <div class="timeline-line"></div>
-            <div class="timeline-item"><strong>ITERATION</strong><span>Design bugs discovered through code</span></div>
+          <div class="comparison">
+            <div class="comparison-row good">
+              <span class="comparison-label">valid</span>
+              <code>velocity = 10 m / 2 s</code>
+              <span class="comparison-result">Quantity&lt;Length/Time&gt;</span>
+            </div>
+            <div class="comparison-row bad">
+              <span class="comparison-label">rejected</span>
+              <code>distance + duration</code>
+              <span class="comparison-result">different dimensions</span>
+            </div>
           </div>
         </div>
       </section>
 
-      <section id="status" class="section shell">
-        <div class="status-heading">
-          <div>
-            <p class="eyebrow">Project status</p>
-            <h2>Early, serious and honest.</h2>
-          </div>
-          <span class="status-pill"><i></i> Design-validation prototype</span>
+      <section id="status" class="section shell status-section">
+        <div class="section-heading status-heading">
+          <p class="kicker">Where it stands</p>
+          <h2>Small today.<br>Built to grow.</h2>
         </div>
-        <div class="status-grid">
-          <div>
-            <h3>Implemented</h3>
+        <div class="status-columns">
+          <div class="status-column">
+            <h3><span class="status-dot done"></span>Working now</h3>
             <ul>
-              <li>Static type checking</li>
-              <li>Physical quantities</li>
-              <li>Traits and generics</li>
-              <li>Pattern matching</li>
-              <li>Modules and packages</li>
-              <li>Interpreter and examples</li>
+              <li>Lexer, parser and static checker</li>
+              <li>Quantities and unit conversion</li>
+              <li>Records, enums and pattern matching</li>
+              <li>Traits, generics and modules</li>
+              <li>Interpreter and test examples</li>
             </ul>
           </div>
-          <div>
-            <h3>In development</h3>
+          <div class="status-column">
+            <h3><span class="status-dot next"></span>Being built</h3>
             <ul>
-              <li>Full generic type checking</li>
-              <li>Standard library</li>
-              <li>Source-aware diagnostics</li>
+              <li>Source-aware compiler diagnostics</li>
+              <li>Standard library and real I/O</li>
               <li>VS Code language server</li>
-              <li>Native compiler backend</li>
-              <li>Real concurrency runtime</li>
+              <li>Executable packaging and native backend</li>
+              <li>Real task runtime and platform bindings</li>
             </ul>
           </div>
         </div>
       </section>
 
       <section class="closing shell">
-        <img src="assets/ostrin-logo.png" alt="Ostrin logo" width="96" height="96">
-        <h2>Give software a stronger vocabulary.</h2>
-        <a class="button primary" href="https://github.com/sircalch/Ostrin">Follow the project on GitHub</a>
+        <div class="closing-rule"></div>
+        <img src="assets/ostrin-logo.png" alt="Ostrin logo" width="74" height="74">
+        <p class="kicker">Follow the work</p>
+        <h2>Read the decisions.<br>Run the examples.</h2>
+        <a class="button" href="https://github.com/sircalch/Ostrin">Open the repository <span>↗</span></a>
       </section>
     </main>
 
     <footer class="site-footer shell">
-      <span>© 2026 Ostrin contributors</span>
-      <span>MIT License · <a href="https://github.com/sircalch/Ostrin">GitHub</a></span>
+      <a class="brand" href="#top"><img src="assets/ostrin-logo.png" alt="" width="30" height="30"><span>OSTRIN</span></a>
+      <span>Design-validation prototype · MIT License</span>
+      <a href="https://github.com/sircalch/Ostrin">GitHub ↗</a>
     </footer>
   </body>
 </html>
