@@ -1298,6 +1298,33 @@ impl<'a> Codegen<'a> {
         }
 
         let (iter_code, iter_ty) = self.gen_expr(iter)?;
+        // Iterator protocol: a record with a `next(mut self) -> Option<T>`
+        // method is polled until it returns `None`.
+        if let CType::Record(record_name) = &iter_ty {
+            let next = self.methods.get(record_name).and_then(|m| m.get("next")).map(|m| (m.c_name.clone(), m.return_type.clone()));
+            if let Some((c_name, CType::Option(elem_ty))) = next {
+                let iter_temp = self.next_temp();
+                let item_temp = self.next_temp();
+                let option_c = c_type_name(&CType::Option(elem_ty.clone()));
+                out.push_str(&format!("    {{
+        {} {iter_temp} = {iter_code};
+        for (;;) {{
+", c_type_name(&iter_ty)));
+                out.push_str(&format!("            {option_c} {item_temp} = {c_name}({iter_temp});
+            if (!{item_temp}.has) break;
+"));
+                out.push_str(&format!("            {} {pattern} = {item_temp}.value;
+", c_type_name(&elem_ty)));
+                self.push_scope();
+                self.define(pattern, *elem_ty);
+                self.gen_block_stmts(body, out)?;
+                self.pop_scope();
+                out.push_str("        }
+    }
+");
+                return Ok(());
+            }
+        }
         let CType::List(elem_ty) = iter_ty else {
             return Err("the native backend only supports 'for x in a to b' ranges or a List yet".to_string());
         };

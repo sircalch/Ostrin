@@ -3034,3 +3034,12 @@ pruebas**, sin warnings.
 - `newlines.ostrin` y `advanced.ostrin` no son programas ejecutables (referencian
   nombres inexistentes: son muestras de sintaxis), así que no se portan.
 - Ejemplo nuevo `native_builtins.ostrin`. Suite: **93 pruebas**, sin warnings.
+
+---
+
+## 83. Iteradores propios en el backend nativo — 2026-09-18
+
+- `for x in registro` donde el record tiene `next(mut self) -> Option<T>` se
+  compila a un bucle que llama a `next` hasta recibir `None` (protocolo del
+  intérprete). `fibonacci.ostrin` compila y coincide.
+- Queda fuera solo la concurrencia (canales/`spawn`). Suite: **93 pruebas**.

@@ -1550,6 +1550,7 @@ fn native_backend_generic_records_and_enums_match_the_interpreter() {
         "native_display.ostrin",
         "native_derive.ostrin",
         "native_named_args.ostrin",
+        "fibonacci.ostrin",
         "native_builtins.ostrin",
         "native_generic_methods.ostrin",
         "generic_impls_and_methods.ostrin",
