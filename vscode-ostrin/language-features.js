@@ -388,6 +388,7 @@ function identifierLocations(vscode, document, name) {
     const text = document.lineAt(line).text;
     for (const range of identifierRanges(text, name)) {
       locations.push({
+        file: document.uri.fsPath,
         line,
         start: range.start,
         location: new vscode.Location(
@@ -429,6 +430,33 @@ function bindingReferenceLocations(vscode, document, binding, bindings, semantic
     });
 }
 
+function semanticReferenceLocations(vscode, document, target, index) {
+  const sameName = index.symbols.filter((entry) => shortSymbolName(entry.name) === target.name);
+  // Without a module-qualified reference in the editor index, scanning every
+  // file would be unsafe when two modules export the same short name. Keep
+  // those ambiguous cases local until the module resolver exposes ownership.
+  if (sameName.length > 1) return identifierLocations(vscode, document, target.name);
+  const files = new Set([document.uri.fsPath]);
+  for (const entry of index.symbols) {
+    if (entry.file && sameFile(entry.file, document.uri.fsPath)) files.add(document.uri.fsPath);
+    else if (entry.file) files.add(entry.file);
+  }
+  if (files.size === 1 || !vscode.workspace?.openTextDocument) {
+    return identifierLocations(vscode, document, target.name);
+  }
+
+  return Promise.all([...files].map(async (file) => {
+    if (sameFile(file, document.uri.fsPath)) return document;
+    try {
+      return await vscode.workspace.openTextDocument(vscode.Uri.file(file));
+    } catch (_) {
+      return undefined;
+    }
+  })).then((documents) => documents
+    .filter(Boolean)
+    .flatMap((candidate) => identifierLocations(vscode, candidate, target.name)));
+}
+
 function renameTarget(vscode, document, position, index) {
   const token = wordAt(document, position);
   if (!token.word) return undefined;
@@ -451,19 +479,28 @@ function provideReferences(vscode, document, position, context, semanticIndex = 
   const index = normalizeSemanticIndex(semanticIndex);
   const target = renameTarget(vscode, document, position, index);
   if (!target) return undefined;
-  const entries = target.kind === 'binding'
-    ? bindingReferenceLocations(vscode, document, target.binding, index.bindings, index.symbols)
-    : identifierLocations(vscode, document, target.name);
-  const includeDeclaration = context?.includeDeclaration !== false;
-  const filtered = includeDeclaration
-    ? entries
-    : entries.filter((entry) => {
-      if (target.kind === 'binding') {
-        return !(entry.line + 1 === target.binding.line && entry.start + 1 === target.binding.column);
-      }
-      return !(entry.line + 1 === target.semantic.line);
-    });
-  return filtered.map((entry) => entry.location);
+  const resolveEntries = (entries) => {
+    const includeDeclaration = context?.includeDeclaration !== false;
+    const filtered = includeDeclaration
+      ? entries
+      : entries.filter((entry) => {
+        if (target.kind === 'binding') {
+          return !(sameFile(entry.file, target.binding.file || document.uri.fsPath)
+            && entry.line + 1 === target.binding.line
+            && entry.start + 1 === target.binding.column);
+        }
+        return !(sameFile(entry.file, target.semantic.file || document.uri.fsPath)
+          && entry.line + 1 === target.semantic.line);
+      });
+    return filtered.map((entry) => entry.location);
+  };
+  if (target.kind === 'binding') {
+    return resolveEntries(bindingReferenceLocations(vscode, document, target.binding, index.bindings, index.symbols));
+  }
+  const entries = semanticReferenceLocations(vscode, document, target, index);
+  return entries && typeof entries.then === 'function'
+    ? entries.then(resolveEntries)
+    : resolveEntries(entries);
 }
 
 function provideRenameEdits(vscode, document, position, newName, semanticIndex = []) {
@@ -474,10 +511,15 @@ function provideRenameEdits(vscode, document, position, newName, semanticIndex =
     { includeDeclaration: true },
     semanticIndex
   );
-  if (!references || !references.length || !vscode.WorkspaceEdit) return undefined;
-  const edit = new vscode.WorkspaceEdit();
-  for (const location of references) edit.replace(document.uri, location.range, newName);
-  return edit;
+  const createEdit = (locations) => {
+    if (!locations || !locations.length || !vscode.WorkspaceEdit) return undefined;
+    const edit = new vscode.WorkspaceEdit();
+    for (const location of locations) edit.replace(location.uri, location.range, newName);
+    return edit;
+  };
+  return references && typeof references.then === 'function'
+    ? references.then(createEdit)
+    : createEdit(references);
 }
 
 function provideDefinition(vscode, document, position, semanticIndex = []) {

@@ -7,6 +7,40 @@ const languageFeatures = require('./language-features');
 let diagnostics;
 const semanticIndex = new Map();
 
+function semanticIndexFor(document) {
+  const merged = { symbols: [], members: [], bindings: [] };
+  const seen = new Set();
+  const add = (kind, item) => {
+    if (!item) return;
+    const key = [
+      kind,
+      item.name,
+      item.owner,
+      item.file,
+      item.line,
+      item.column,
+      item.function,
+      item.scopeDepth
+    ].join('|');
+    if (seen.has(key)) return;
+    seen.add(key);
+    merged[kind].push(item);
+  };
+
+  // The compiler index is refreshed per document. Merge the indexes here so
+  // editor providers can resolve symbols in every currently opened Ostrin
+  // document without turning every completion request into a compiler run.
+  for (const index of semanticIndex.values()) {
+    for (const item of index.symbols || []) add('symbols', item);
+    for (const item of index.members || []) add('members', item);
+    for (const item of index.bindings || []) add('bindings', item);
+  }
+  if (!merged.symbols.length && !merged.members.length && !merged.bindings.length) {
+    return { symbols: [], members: [], bindings: [] };
+  }
+  return merged;
+}
+
 function compilerPath(document) {
   const configured = vscode.workspace.getConfiguration('ostrin').get('compilerPath', 'ostrinc');
   if (configured && configured !== 'ostrinc') return configured;
@@ -194,23 +228,23 @@ function activate(context) {
   const selector = { language: 'ostrin', scheme: 'file' };
   const completion = vscode.languages.registerCompletionItemProvider(
     selector,
-    { provideCompletionItems: (document, position) => languageFeatures.provideCompletionItems(vscode, semanticIndex.get(document.uri.toString()) || {}, document, position) },
+    { provideCompletionItems: (document, position) => languageFeatures.provideCompletionItems(vscode, semanticIndexFor(document), document, position) },
     '.', ':'
   );
   const hover = vscode.languages.registerHoverProvider(selector, {
-    provideHover: (document, position) => languageFeatures.provideHover(vscode, document, position, semanticIndex.get(document.uri.toString()) || {})
+    provideHover: (document, position) => languageFeatures.provideHover(vscode, document, position, semanticIndexFor(document))
   });
   const definitions = vscode.languages.registerDefinitionProvider(selector, {
-    provideDefinition: (document, position) => languageFeatures.provideDefinition(vscode, document, position, semanticIndex.get(document.uri.toString()) || {})
+    provideDefinition: (document, position) => languageFeatures.provideDefinition(vscode, document, position, semanticIndexFor(document))
   });
   const references = vscode.languages.registerReferenceProvider(selector, {
-    provideReferences: (document, position, context) => languageFeatures.provideReferences(vscode, document, position, context, semanticIndex.get(document.uri.toString()) || {})
+    provideReferences: (document, position, context) => languageFeatures.provideReferences(vscode, document, position, context, semanticIndexFor(document))
   });
   const rename = vscode.languages.registerRenameProvider(selector, {
-    provideRenameEdits: (document, position, newName) => languageFeatures.provideRenameEdits(vscode, document, position, newName, semanticIndex.get(document.uri.toString()) || {})
+    provideRenameEdits: (document, position, newName) => languageFeatures.provideRenameEdits(vscode, document, position, newName, semanticIndexFor(document))
   });
   const symbols = vscode.languages.registerDocumentSymbolProvider(selector, {
-    provideDocumentSymbols: (document) => languageFeatures.provideDocumentSymbols(vscode, document, semanticIndex.get(document.uri.toString()) || {})
+    provideDocumentSymbols: (document) => languageFeatures.provideDocumentSymbols(vscode, document, semanticIndexFor(document))
   });
   const check = vscode.commands.registerCommand('ostrin.check', async () => {
     const document = currentDocument();

@@ -2,7 +2,7 @@
   "name": "ostrin-language-support",
   "displayName": "Ostrin Language Support",
   "description": "Syntax highlighting and compiler commands for the Ostrin programming language.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publisher": "ostrin-project",
   "license": "SEE LICENSE IN LICENSE",
   "repository": {

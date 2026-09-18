@@ -2,6 +2,14 @@
 
 All notable changes to the Ostrin VS Code extension are documented here.
 
+## [0.1.2] - 2026-09-17
+
+- Extend reference search and rename to unique top-level symbols across the
+  workspace.
+- Load semantic symbol and member indexes together for editor navigation.
+- Keep ambiguous cross-module names local until module ownership is available.
+- Preserve declaration scope rules for local bindings.
+
 ## [0.1.1] - 2026-09-17
 
 - Add reference search for local bindings.

@@ -1704,3 +1704,40 @@ GitHub documenta que `linguist-language` solo puede clasificar nombres que
 existen en su catálogo; un nombre personalizado aún no entra en las
 estadísticas. Esta aclaración evita presentar una alteración cosmética como si
 fuera reconocimiento oficial del lenguaje.
+
+---
+
+## 50. Referencias entre archivos en el editor — 2026-09-17
+
+La extensión avanzó desde referencias únicamente locales hacia una primera
+resolución entre archivos del workspace. Al actualizar el índice semántico,
+`extension.js` combina ahora la salida de `ostrinc --symbols --json` y
+`ostrinc --members --json`, reúne los índices de los documentos Ostrin abiertos,
+y `language-features.js` puede abrir los archivos indexados para localizar usos
+de un símbolo top-level único.
+
+### Comportamiento seguro
+
+- Las variables locales siguen resolviéndose por función, profundidad de scope y
+  binding visible.
+- Los símbolos top-level con un nombre único dentro de los documentos
+  indexados pueden devolver referencias y renombrados en más de un archivo.
+- Si varios módulos exponen el mismo nombre corto, la extensión no adivina la
+  propiedad: mantiene la operación local hasta que el índice publique la
+  identidad completa del módulo.
+- Las ediciones de renombrado usan la URI real de cada archivo, por lo que no
+  se aplican accidentalmente al documento abierto cuando hay referencias
+  externas.
+
+### Entrega y verificación
+
+La extensión pasa a `0.1.2`. Se actualizaron README, changelog y la página de
+documentación con el nuevo nombre del paquete `.vsix`. Se verificaron el smoke
+test de JavaScript, la sintaxis de los dos archivos de la extensión, el
+empaquetado VSIX y las **66 pruebas** del compilador Rust.
+
+Este es todavía un índice semántico ligero de documentos abiertos, no un
+servidor LSP completo. El
+siguiente bloque técnico es resolver tipos a nivel de expresión para que
+diagnósticos, hover, completion y referencias compartan una misma fuente de
+verdad.

@@ -95,7 +95,7 @@ cd compiler
 cargo build
 cd ..\vscode-ostrin
 npx --yes @vscode/vsce package
-code --install-extension .\ostrin-language-support-0.1.1.vsix
+code --install-extension .\ostrin-language-support-0.1.2.vsix
 ```
 
 Once installed, VS Code detects `.ostrin` files automatically. The extension

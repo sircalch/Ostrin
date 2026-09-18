@@ -13,7 +13,8 @@ This is the first VS Code integration for Ostrin. It currently provides:
 - type-aware member completion for known local bindings and declared types;
 - hover documentation and an outline for top-level declarations;
 - basic definition navigation for indexed user declarations and members;
-- reference search and scoped rename for local bindings;
+- reference search for unique top-level symbols across the workspace;
+- scoped rename for local bindings and unique top-level symbols;
 - optional compiler checks on save.
 
 The extension calls the `ostrinc` executable configured in `ostrin.compilerPath`.
@@ -30,7 +31,7 @@ the repository root:
 ```powershell
 cd vscode-ostrin
 npx --yes @vscode/vsce package
-code --install-extension .\ostrin-language-support-0.1.1.vsix
+code --install-extension .\ostrin-language-support-0.1.2.vsix
 ```
 
 After restarting or reloading VS Code, opening any `.ostrin` file selects the
@@ -39,6 +40,7 @@ root with `cd compiler; cargo build` to enable diagnostics, hover data and
 type-aware completion without configuring a global `ostrinc` command.
 
 The compiler check command uses `ostrinc --check --json` internally. The
-current editor providers are intentionally lightweight. A full semantic
-language server with expression-level resolution, rename, formatting and
-debugging is future work.
+current editor providers are intentionally lightweight: cross-file navigation
+is conservative when two modules expose the same short name. A full semantic
+language server with expression-level resolution, formatting and debugging is
+future work.
