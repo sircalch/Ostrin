@@ -156,10 +156,10 @@ fn load_module_file(
     })?;
     let tokens = Lexer::new(&source)
         .tokenize()
-        .map_err(|e| ModuleDiagnostic::at(file_path, e.line, e.col, format!("lex error: {}", e.message)))?;
+        .map_err(|e| ModuleDiagnostic::at(file_path, e.line, e.col, format!("OSTRIN-E0002: lex error: {}", e.message)))?;
     let (items, parse_errors) = Parser::new(tokens).parse_program();
     for e in parse_errors {
-        errors.push(ModuleDiagnostic::at(file_path, e.line, e.col, format!("parse error: {}", e.message)));
+        errors.push(ModuleDiagnostic::at(file_path, e.line, e.col, format!("OSTRIN-E0001: parse error: {}", e.message)));
     }
 
     for item in &items {

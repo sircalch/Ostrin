@@ -141,9 +141,14 @@ fn real_main() -> ExitCode {
         Err(messages) => {
             for diagnostic in &messages {
                 if json {
+                    // A leading `OSTRIN-E####: ` is the stable code, not message text.
+                    let (code, message) = match diagnostic.message.split_once(": ") {
+                        Some((code, rest)) if code.starts_with("OSTRIN-E") => (Some(code), rest),
+                        _ => (None, diagnostic.message.as_str()),
+                    };
                     emit_json_diagnostic(
-                        None,
-                        &diagnostic.message,
+                        code,
+                        message,
                         diagnostic.file.as_deref().or(Some(path)),
                         diagnostic.line,
                         diagnostic.col,
@@ -383,14 +388,14 @@ fn check_stdin(source_file: &str, json: bool) -> ExitCode {
         Err(error) => {
             if json {
                 emit_json_diagnostic(
-                    None,
+                    Some("OSTRIN-E0002"),
                     &format!("lex error: {}", error.message),
                     Some(source_file),
                     Some(error.line),
                     Some(error.col),
                 );
             } else {
-                eprintln!("lex error at {}:{}: {}", error.line, error.col, error.message);
+                eprintln!("error OSTRIN-E0002: lex error at {}:{}: {}", error.line, error.col, error.message);
             }
             return ExitCode::FAILURE;
         }
@@ -400,14 +405,14 @@ fn check_stdin(source_file: &str, json: bool) -> ExitCode {
     for error in &parse_errors {
         if json {
             emit_json_diagnostic(
-                None,
+                Some("OSTRIN-E0001"),
                 &format!("parse error: {}", error.message),
                 Some(source_file),
                 Some(error.line),
                 Some(error.col),
             );
         } else {
-            eprintln!("parse error at {}:{}: {}", error.line, error.col, error.message);
+            eprintln!("error OSTRIN-E0001: parse error at {}:{}: {}", error.line, error.col, error.message);
         }
     }
 

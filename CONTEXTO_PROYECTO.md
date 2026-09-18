@@ -3060,3 +3060,28 @@ pruebas**, sin warnings.
 - `concurrency.ostrin` y el ejemplo nuevo `native_concurrency.ostrin` coinciden.
   Con esto el barrido de ejemplos ejecutables compila entero salvo lo anterior.
   Suite: **93 pruebas**, sin warnings.
+
+---
+
+## 85. Etapa 0 de la arquitectura: red de seguridad — 2026-09-18
+
+Primer paso del plan de `docs/ARQUITECTURA_Y_VISION.md`: antes de tocar la
+arquitectura, pruebas que detecten regresiones entre fases.
+
+- `compiler/tests/differential.rs` (nuevo, 3 pruebas):
+  1. **Diferencial intérprete↔nativo** sobre *todos* los `examples/*.ostrin`
+     (los nuevos entran solos). Solo se toleran listas explícitas y razonadas:
+     `KNOWN_NATIVE_GAPS` (debe fallar al compilar; si un hueco se cierra, la
+     prueba obliga a borrar la entrada), `KNOWN_OUTPUT_DIFFERENCES` y
+     `NOT_PROGRAMS`. Exige un mínimo de ejemplos comparados.
+  2. **Compile-fail**: todo `*_error(s).ostrin` debe rechazarse con un código
+     `OSTRIN-E….` estable.
+  3. **Fuzzing por mutación** determinista (xorshift; `OSTRIN_FUZZ_ROUNDS=N`
+     para más rondas) de lexer/parser/checker: ningún `panic`.
+- Hallazgo real: los errores de sintaxis no tenían código. Ahora los errores de
+  análisis llevan `OSTRIN-E0001` (sintaxis) y los léxicos `OSTRIN-E0002`, tanto
+  en texto como en el JSON de diagnósticos (también los de módulos).
+- CI (`.github/workflows/ci.yml`): matriz Ubuntu + Windows + macOS y
+  `OSTRIN_REQUIRE_CC=1`, para que la falta de compilador C haga fallar la
+  prueba diferencial en lugar de omitirla en silencio.
+- Suite: **96 pruebas** (93 + 3), sin warnings.

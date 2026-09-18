@@ -1,6 +1,6 @@
 # Ostrin — auditoría, mapa arquitectónico y arquitectura objetivo
 
-*Base: commit `aef27fc` (código idéntico a `90e525e`; 93 pruebas en verde). Este documento responde a las partes A–E del «Master Development Prompt». Todo lo que se afirma como existente se ha comprobado en el código; lo demás está marcado como **propuesta**.*
+*Base: commit `aef27fc` (código idéntico a `90e525e`; 93 pruebas en verde; la Etapa 0 posterior añade 3 más, ver §85 de CONTEXTO). Este documento responde a las partes A–E del «Master Development Prompt». Todo lo que se afirma como existente se ha comprobado en el código; lo demás está marcado como **propuesta**.*
 
 ---
 
@@ -137,7 +137,7 @@ Principios de migración (todos incrementales, sin reescrituras):
 
 ### Etapa 0 — Red de seguridad (antes de tocar arquitectura)
 1. Pruebas **diferenciales automáticas** intérprete↔nativo (todos los `examples/`), como test único parametrizado; hoy están repartidas.
-2. CI ampliado: Windows + Linux, con gcc, ejecutando también el backend nativo.
+2. CI ampliado: Windows + Linux + macOS con compilador C obligatorio (**hecho**, §85 de CONTEXTO).
 3. Harness de *compile‑fail* (ya existen ejemplos `*_errors.ostrin`; sistematizar con el código de error esperado).
 4. Fuzzing básico del lexer/parser (no debe hacer panic).
 
