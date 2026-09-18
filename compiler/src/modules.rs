@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::fs;
+use std::io;
 use std::path::{Path, PathBuf};
 
 use crate::ast::*;
@@ -44,11 +45,24 @@ pub fn load_project_with_deps(
     entry_path: &Path,
     deps: &HashMap<String, PathBuf>,
 ) -> Result<Vec<Item>, Vec<ModuleDiagnostic>> {
+    load_project(entry_path, deps, &HashMap::new())
+}
+
+/// Igual que `load_project_with_deps`, pero permite sustituir el contenido en
+/// disco de ciertos archivos por texto en memoria (`overrides`, indexado por
+/// ruta canónica). Lo usa el servidor LSP para resolver imports y workspace
+/// completo usando el buffer sin guardar del editor en vez del último archivo
+/// escrito a disco.
+pub fn load_project(
+    entry_path: &Path,
+    deps: &HashMap<String, PathBuf>,
+    overrides: &HashMap<PathBuf, String>,
+) -> Result<Vec<Item>, Vec<ModuleDiagnostic>> {
     let root = entry_path.parent().unwrap_or_else(|| Path::new(".")).to_path_buf();
     let mut cache: HashMap<Vec<String>, Module> = HashMap::new();
     let mut in_progress: Vec<Vec<String>> = Vec::new();
     let mut errors: Vec<ModuleDiagnostic> = Vec::new();
-    if let Err(e) = load_module_file(entry_path, &[], &root, deps, &mut cache, &mut in_progress, &mut errors) {
+    if let Err(e) = load_module_file(entry_path, &[], &root, deps, overrides, &mut cache, &mut in_progress, &mut errors) {
         errors.push(e);
     }
     if !errors.is_empty() {
@@ -100,11 +114,20 @@ fn file_path_of(module_path: &[String], root: &Path, deps: &HashMap<String, Path
     p
 }
 
+fn read_module_source(file_path: &Path, overrides: &HashMap<PathBuf, String>) -> io::Result<String> {
+    let canonical = fs::canonicalize(file_path).unwrap_or_else(|_| file_path.to_path_buf());
+    if let Some(text) = overrides.get(&canonical) {
+        return Ok(text.clone());
+    }
+    fs::read_to_string(file_path)
+}
+
 fn load_module_file(
     file_path: &Path,
     module_path: &[String],
     root: &Path,
     deps: &HashMap<String, PathBuf>,
+    overrides: &HashMap<PathBuf, String>,
     cache: &mut HashMap<Vec<String>, Module>,
     in_progress: &mut Vec<Vec<String>>,
     errors: &mut Vec<ModuleDiagnostic>,
@@ -123,7 +146,7 @@ fn load_module_file(
     }
     in_progress.push(module_path.to_vec());
 
-    let source = fs::read_to_string(file_path).map_err(|e| {
+    let source = read_module_source(file_path, overrides).map_err(|e| {
         ModuleDiagnostic::at(
             file_path,
             1,
@@ -143,7 +166,7 @@ fn load_module_file(
         if let Item::Import(imp) = item {
             if !cache.contains_key(&imp.path) {
                 let dep_file = file_path_of(&imp.path, root, deps);
-                load_module_file(&dep_file, &imp.path, root, deps, cache, in_progress, errors)?;
+                load_module_file(&dep_file, &imp.path, root, deps, overrides, cache, in_progress, errors)?;
             }
         }
     }

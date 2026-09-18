@@ -101,6 +101,49 @@ class OstrinLanguageClient {
     });
   }
 
+  static positionParams(document, position) {
+    return {
+      textDocument: { uri: document.uri.toString() },
+      position: { line: position.line, character: position.character }
+    };
+  }
+
+  hover(document, position) {
+    return this.sendRequest('textDocument/hover', OstrinLanguageClient.positionParams(document, position));
+  }
+
+  definition(document, position) {
+    return this.sendRequest('textDocument/definition', OstrinLanguageClient.positionParams(document, position));
+  }
+
+  completion(document, position) {
+    return this.sendRequest('textDocument/completion', OstrinLanguageClient.positionParams(document, position));
+  }
+
+  signatureHelp(document, position) {
+    return this.sendRequest('textDocument/signatureHelp', OstrinLanguageClient.positionParams(document, position));
+  }
+
+  references(document, position, context) {
+    return this.sendRequest('textDocument/references', {
+      ...OstrinLanguageClient.positionParams(document, position),
+      context: { includeDeclaration: context?.includeDeclaration !== false }
+    });
+  }
+
+  rename(document, position, newName) {
+    return this.sendRequest('textDocument/rename', {
+      ...OstrinLanguageClient.positionParams(document, position),
+      newName
+    });
+  }
+
+  semanticTokens(document) {
+    return this.sendRequest('textDocument/semanticTokens/full', {
+      textDocument: { uri: document.uri.toString() }
+    });
+  }
+
   stop() {
     if (!this.process) return Promise.resolve();
     if (!this.ready) {

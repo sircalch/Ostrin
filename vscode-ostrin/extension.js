@@ -13,6 +13,66 @@ const diagnosticGenerations = new Map();
 let languageServer;
 let languageServerReady = false;
 
+// Mirrors `TOKEN_TYPES` in compiler/src/lsp.rs — order matters, it is the
+// index the server's semantic token data encodes into every 5th integer.
+const SEMANTIC_TOKEN_TYPES = ['function', 'type', 'enum', 'enumMember', 'interface', 'property', 'method', 'variable'];
+const semanticTokensLegend = new vscode.SemanticTokensLegend(SEMANTIC_TOKEN_TYPES, []);
+
+function serverAvailable() {
+  return languageServerReady && languageServer;
+}
+
+function toRange(range) {
+  return new vscode.Range(range.start.line, range.start.character, range.end.line, range.end.character);
+}
+
+function toLocation(entry) {
+  return new vscode.Location(vscode.Uri.parse(entry.uri), toRange(entry.range));
+}
+
+// The server encodes completion/LSP CompletionItemKind (1-based, per the LSP
+// spec) while vscode.CompletionItemKind is 0-based; shift by one to convert.
+function toCompletionItem(entry) {
+  const item = new vscode.CompletionItem(entry.label, Math.max(0, (entry.kind || 6) - 1));
+  item.detail = entry.detail;
+  return item;
+}
+
+function toHover(result) {
+  if (!result || !result.contents) return undefined;
+  const markdown = new vscode.MarkdownString(result.contents.value || '');
+  return new vscode.Hover(markdown, result.range ? toRange(result.range) : undefined);
+}
+
+function toSignatureHelp(result) {
+  if (!result || !Array.isArray(result.signatures) || !result.signatures.length) return undefined;
+  const help = new vscode.SignatureHelp();
+  help.signatures = result.signatures.map((signature) => {
+    const info = new vscode.SignatureInformation(signature.label, signature.documentation);
+    info.parameters = (signature.parameters || []).map((parameter) => new vscode.ParameterInformation(parameter.label));
+    return info;
+  });
+  help.activeSignature = result.activeSignature || 0;
+  help.activeParameter = result.activeParameter || 0;
+  return help;
+}
+
+function toWorkspaceEdit(result) {
+  if (!result || !result.changes) return undefined;
+  const edit = new vscode.WorkspaceEdit();
+  for (const [uri, edits] of Object.entries(result.changes)) {
+    for (const change of edits) {
+      edit.replace(vscode.Uri.parse(uri), toRange(change.range), change.newText);
+    }
+  }
+  return edit;
+}
+
+function toSemanticTokens(result) {
+  const data = Array.isArray(result?.data) ? result.data : [];
+  return new vscode.SemanticTokens(new Uint32Array(data));
+}
+
 function samePath(left, right) {
   return left && right
     && left.replace(/\\/g, '/').toLowerCase() === right.replace(/\\/g, '/').toLowerCase();
@@ -388,26 +448,57 @@ function activate(context) {
   const selector = { language: 'ostrin', scheme: 'file' };
   const completion = vscode.languages.registerCompletionItemProvider(
     selector,
-    { provideCompletionItems: (document, position) => languageFeatures.provideCompletionItems(vscode, semanticIndexFor(document), document, position) },
+    {
+      provideCompletionItems: (document, position) => serverAvailable()
+        ? languageServer.completion(document, position).then((items) => (items || []).map(toCompletionItem))
+          .catch(() => languageFeatures.provideCompletionItems(vscode, semanticIndexFor(document), document, position))
+        : languageFeatures.provideCompletionItems(vscode, semanticIndexFor(document), document, position)
+    },
     '.', ':'
   );
   const signatureHelp = vscode.languages.registerSignatureHelpProvider(
     selector,
-    { provideSignatureHelp: (document, position) => languageFeatures.provideSignatureHelp(vscode, document, position, semanticIndexFor(document)) },
+    {
+      provideSignatureHelp: (document, position) => serverAvailable()
+        ? languageServer.signatureHelp(document, position).then(toSignatureHelp)
+          .catch(() => languageFeatures.provideSignatureHelp(vscode, document, position, semanticIndexFor(document)))
+        : languageFeatures.provideSignatureHelp(vscode, document, position, semanticIndexFor(document))
+    },
     '(', ','
   );
   const hover = vscode.languages.registerHoverProvider(selector, {
-    provideHover: (document, position) => languageFeatures.provideHover(vscode, document, position, semanticIndexFor(document))
+    provideHover: (document, position) => serverAvailable()
+      ? languageServer.hover(document, position).then(toHover)
+        .catch(() => languageFeatures.provideHover(vscode, document, position, semanticIndexFor(document)))
+      : languageFeatures.provideHover(vscode, document, position, semanticIndexFor(document))
   });
   const definitions = vscode.languages.registerDefinitionProvider(selector, {
-    provideDefinition: (document, position) => languageFeatures.provideDefinition(vscode, document, position, semanticIndexFor(document))
+    provideDefinition: (document, position) => serverAvailable()
+      ? languageServer.definition(document, position).then((locations) => (locations || []).map(toLocation))
+        .catch(() => languageFeatures.provideDefinition(vscode, document, position, semanticIndexFor(document)))
+      : languageFeatures.provideDefinition(vscode, document, position, semanticIndexFor(document))
   });
   const references = vscode.languages.registerReferenceProvider(selector, {
-    provideReferences: (document, position, context) => languageFeatures.provideReferences(vscode, document, position, context, semanticIndexFor(document))
+    provideReferences: (document, position, context) => serverAvailable()
+      ? languageServer.references(document, position, context).then((locations) => (locations || []).map(toLocation))
+        .catch(() => languageFeatures.provideReferences(vscode, document, position, context, semanticIndexFor(document)))
+      : languageFeatures.provideReferences(vscode, document, position, context, semanticIndexFor(document))
   });
   const rename = vscode.languages.registerRenameProvider(selector, {
-    provideRenameEdits: (document, position, newName) => languageFeatures.provideRenameEdits(vscode, document, position, newName, semanticIndexFor(document))
+    provideRenameEdits: (document, position, newName) => serverAvailable()
+      ? languageServer.rename(document, position, newName).then(toWorkspaceEdit)
+        .catch(() => languageFeatures.provideRenameEdits(vscode, document, position, newName, semanticIndexFor(document)))
+      : languageFeatures.provideRenameEdits(vscode, document, position, newName, semanticIndexFor(document))
   });
+  const semanticTokens = vscode.languages.registerDocumentSemanticTokensProvider(
+    selector,
+    {
+      provideDocumentSemanticTokens: (document) => serverAvailable()
+        ? languageServer.semanticTokens(document).then(toSemanticTokens).catch(() => new vscode.SemanticTokens(new Uint32Array()))
+        : new vscode.SemanticTokens(new Uint32Array())
+    },
+    semanticTokensLegend
+  );
   const symbols = vscode.languages.registerDocumentSymbolProvider(selector, {
     provideDocumentSymbols: (document) => languageFeatures.provideDocumentSymbols(vscode, document, semanticIndexFor(document))
   });
@@ -476,7 +567,7 @@ function activate(context) {
     }
   }
 
-  context.subscriptions.push(diagnostics, completion, signatureHelp, hover, definitions, references, rename, symbols, formatting, check, run, saveSubscription, changeSubscription, closeSubscription, openSubscription);
+  context.subscriptions.push(diagnostics, completion, signatureHelp, hover, definitions, references, rename, semanticTokens, symbols, formatting, check, run, saveSubscription, changeSubscription, closeSubscription, openSubscription);
 }
 
 function deactivate() {

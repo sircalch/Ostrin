@@ -2,6 +2,18 @@
 
 All notable changes to the Ostrin VS Code extension are documented here.
 
+## [0.3.0] - 2026-09-17
+
+- Resolve a document's imports (and any `ostrin.toml` dependencies) across
+  every open, possibly-unsaved buffer inside the persistent language server,
+  instead of analyzing each file in isolation.
+- Serve hover, go-to-definition, completion, signature help, find-references
+  and rename natively over the LSP protocol, backed by that workspace-wide
+  index; the compiler-backed client-side providers now only run as a fallback
+  when the server is unavailable.
+- Add semantic tokens (`textDocument/semanticTokens/full`) for functions,
+  types, enums, enum members, traits, fields, methods and local bindings.
+
 ## [0.2.0] - 2026-09-17
 
 - Add a persistent `ostrinc --lsp` backend over standard input/output.

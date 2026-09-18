@@ -2,8 +2,29 @@ use std::fs;
 use std::io::{Read, Write};
 use std::process::{Command, Output, Stdio};
 
+use serde_json::json;
+
 fn example_path(rel: &str) -> String {
     format!("{}/../examples/{}", env!("CARGO_MANIFEST_DIR"), rel)
+}
+
+/// Builds the same `file://` URI shape an editor would send for a real file
+/// on disk, percent-encoding the parts (like the space in this repo's own
+/// "Lenguaje nuevo" directory name) the way `lsp.rs`'s `path_to_uri` does.
+fn file_uri(rel: &str) -> String {
+    let path = fs::canonicalize(example_path(rel)).expect("example file must exist on disk");
+    let normalized = path.display().to_string().replace('\\', "/");
+    let mut out = String::from("file://");
+    if !normalized.starts_with('/') {
+        out.push('/');
+    }
+    for ch in normalized.chars() {
+        match ch {
+            'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_' | '.' | '~' | '/' | ':' => out.push(ch),
+            other => out.push_str(&format!("%{:02X}", other as u32)),
+        }
+    }
+    out
 }
 
 fn run(args: &[&str]) -> Output {
@@ -293,6 +314,121 @@ fn compiler_lsp_negotiates_and_publishes_diagnostics() {
     assert!(text.contains("\"id\":4") && text.contains("\"label\":\"main\""), "missing completion response: {text}");
     assert!(text.contains("\"id\":5") && text.contains("\"uri\":\"file:///C:/workspace/lsp.ostrin\""), "missing definition response: {text}");
     assert!(text.contains("\"diagnostics\":[]"), "didChange should clear diagnostics: {text}");
+}
+
+#[test]
+fn compiler_lsp_resolves_imports_across_open_documents() {
+    let main_uri = file_uri("proj1/main.ostrin");
+    let units_uri = file_uri("proj1/physics/units.ostrin");
+    let main_text = fs::read_to_string(example_path("proj1/main.ostrin")).unwrap();
+    let units_text = fs::read_to_string(example_path("proj1/physics/units.ostrin")).unwrap();
+
+    let initialize = json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}).to_string();
+    let open_units = json!({
+        "jsonrpc":"2.0","method":"textDocument/didOpen",
+        "params":{"textDocument":{"uri":units_uri,"languageId":"ostrin","version":1,"text":units_text}}
+    }).to_string();
+    let open_main = json!({
+        "jsonrpc":"2.0","method":"textDocument/didOpen",
+        "params":{"textDocument":{"uri":main_uri,"languageId":"ostrin","version":1,"text":main_text}}
+    }).to_string();
+    // `to_kelvin` is called as `units.to_kelvin(...)` on main.ostrin's line 5
+    // (0-based): "    k = units.to_kelvin(25.0)".
+    let hover = json!({
+        "jsonrpc":"2.0","id":2,"method":"textDocument/hover",
+        "params":{"textDocument":{"uri":main_uri},"position":{"line":5,"character":15}}
+    }).to_string();
+    let references = json!({
+        "jsonrpc":"2.0","id":3,"method":"textDocument/references",
+        "params":{"textDocument":{"uri":main_uri},"position":{"line":5,"character":15},"context":{"includeDeclaration":true}}
+    }).to_string();
+    let signature_help = json!({
+        "jsonrpc":"2.0","id":4,"method":"textDocument/signatureHelp",
+        "params":{"textDocument":{"uri":main_uri},"position":{"line":5,"character":25}}
+    }).to_string();
+    let semantic_tokens = json!({
+        "jsonrpc":"2.0","id":5,"method":"textDocument/semanticTokens/full",
+        "params":{"textDocument":{"uri":main_uri}}
+    }).to_string();
+    let rename = json!({
+        "jsonrpc":"2.0","id":6,"method":"textDocument/rename",
+        "params":{"textDocument":{"uri":main_uri},"position":{"line":5,"character":15},"newName":"to_kelvin_renamed"}
+    }).to_string();
+    // Break the import by editing units.ostrin in memory only (never written
+    // to disk): this must be visible immediately in main.ostrin's diagnostics,
+    // proving resolution uses the live buffer, not the file on disk.
+    let broken_units_text = units_text.replace("pub fn meters_to_km", "fn meters_to_km");
+    let break_units = json!({
+        "jsonrpc":"2.0","method":"textDocument/didChange",
+        "params":{"textDocument":{"uri":units_uri,"version":2},"contentChanges":[{"text":broken_units_text}]}
+    }).to_string();
+    let retouch_main = json!({
+        "jsonrpc":"2.0","method":"textDocument/didChange",
+        "params":{"textDocument":{"uri":main_uri,"version":2},"contentChanges":[{"text":main_text}]}
+    }).to_string();
+
+    let out = run_lsp(&[
+        &initialize,
+        r#"{"jsonrpc":"2.0","method":"initialized","params":{}}"#,
+        &open_units,
+        &open_main,
+        &hover,
+        &references,
+        &signature_help,
+        &semantic_tokens,
+        &rename,
+        &break_units,
+        &retouch_main,
+        r#"{"jsonrpc":"2.0","id":7,"method":"shutdown","params":null}"#,
+        r#"{"jsonrpc":"2.0","method":"exit","params":null}"#,
+    ]);
+    assert!(out.status.success(), "LSP exited unsuccessfully: {}", stderr(&out));
+    let text = stdout(&out);
+
+    assert!(
+        text.contains("\"id\":2") && text.contains("to_kelvin") && text.contains("Ostrin function"),
+        "hover should resolve a symbol declared in the imported file: {text}"
+    );
+    let references_reply = extract_result(&text, 3);
+    let reference_count = references_reply.matches("\"range\"").count();
+    assert!(
+        reference_count >= 3,
+        "references should span both the declaration and every call site across files: {references_reply}"
+    );
+    assert!(
+        references_reply.contains(&units_uri.replace('\\', "\\\\")) || references_reply.contains("units.ostrin"),
+        "references should include the declaration file: {references_reply}"
+    );
+
+    let signature_reply = extract_result(&text, 4);
+    assert!(
+        signature_reply.contains("celsius") && signature_reply.contains("Float"),
+        "signature help should describe to_kelvin's parameter: {signature_reply}"
+    );
+
+    let tokens_reply = extract_result(&text, 5);
+    assert!(tokens_reply.contains("\"data\":["), "semantic tokens should return a data array: {tokens_reply}");
+    assert_ne!(tokens_reply, "{\"data\":[]}", "semantic tokens should not be empty for a resolved file: {tokens_reply}");
+
+    let rename_reply = extract_result(&text, 6);
+    assert!(rename_reply.contains("\"changes\""), "rename should produce a workspace edit: {rename_reply}");
+    assert!(
+        rename_reply.contains("to_kelvin_renamed"),
+        "rename should carry the new name in the edit: {rename_reply}"
+    );
+
+    assert!(
+        text.contains("OSTRIN") || text.contains("private") || text.contains("not found") || text.contains("Error"),
+        "editing the imported file in memory should surface a diagnostic on the importer: {text}"
+    );
+}
+
+fn extract_result(stream: &str, id: u64) -> String {
+    let marker = format!("\"id\":{id},");
+    let start = stream.find(&marker).unwrap_or_else(|| panic!("no reply for id {id} in: {stream}"));
+    let tail = &stream[start..];
+    let end = tail.find("Content-Length").unwrap_or(tail.len());
+    tail[..end].to_string()
 }
 
 #[test]

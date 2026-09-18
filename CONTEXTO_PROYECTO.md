@@ -1944,3 +1944,78 @@ transporte LSP como trabajo inexistente.
 Todavía falta completar la resolución de workspace/imports dentro de la sesión,
 semantic tokens, referencias/rename por protocolo y debugging. Esa es la
 siguiente expansión grande del servidor.
+
+---
+
+## 58. Workspace real, referencias/rename y semantic tokens en el LSP — 2026-09-17
+
+Se cerró el pendiente que dejó la sección 57: el servidor ya no analiza cada
+documento en aislamiento.
+
+### Resolución de imports/workspace con buffers en memoria
+
+`modules::load_project` (nueva función; `load_project_with_deps` queda como
+envoltorio con overrides vacíos) acepta un mapa `HashMap<PathBuf, String>` de
+sustituciones. `lsp.rs` construye ese mapa a partir de **todos** los
+documentos abiertos (rutas canonicalizadas) y, cada vez que cualquiera de
+ellos cambia, vuelve a resolver el proyecto completo de ese documento —
+imports, cadena de `pub import`, dependencias de `ostrin.toml` — usando el
+texto no guardado de cualquier archivo abierto en vez del último guardado en
+disco. Un archivo que solo se importa (nunca se abre) sigue leyéndose de
+disco con normalidad. Los diagnósticos resultantes se agrupan por el archivo
+real al que pertenecen (`ModuleDiagnostic.file` / `TypeError.source_file`) y
+se publican con `textDocument/publishDiagnostics` en la pestaña que
+corresponde, no solo en la que se editó.
+
+El servidor mantiene `index: HashMap<ruta, FileCache>` (símbolos, miembros,
+bindings, expresiones) que se repuebla por archivo cada vez que una resolución
+lo toca, así que hover/completion/definition ahora buscan en **todo el
+proyecto conocido**, no solo en el documento activo.
+
+### Referencias, rename y signature help nativos por protocolo
+
+- `textDocument/references` y `textDocument/rename`: si la palabra bajo el
+  cursor es un binding local (aparece en `bindings` del archivo propio), la
+  búsqueda queda contenida a ese archivo; si es un símbolo global (función,
+  récord, campo, método...) se busca por texto en **todos los documentos
+  abiertos**. Es una búsqueda léxica con límites de palabra, no semántica —
+  limitación documentada, igual de honesta que las anteriores.
+- `textDocument/signatureHelp`: reconstruye la llamada activa escaneando hacia
+  atrás desde el cursor (profundidad de paréntesis, comas de nivel superior) y
+  arma las firmas a partir de `Symbol`/`MemberSymbol` ya indexados.
+- `textDocument/semanticTokens/full`: legend propio
+  (`function,type,enum,enumMember,interface,property,method,variable`);
+  etiqueta cada ocurrencia léxica de un nombre indexado con su tipo. También
+  es una aproximación léxica, no basada en el AST resuelto en esa posición.
+
+### Extensión de VS Code conectada de verdad
+
+Hasta ahora el servidor persistente solo alimentaba diagnósticos: hover,
+completion, definition, signature help, references y rename seguían corriendo
+100% del lado del cliente (invocando `ostrinc --symbols/--members/--types` por
+archivo). Se añadieron métodos (`hover`, `definition`, `completion`,
+`signatureHelp`, `references`, `rename`, `semanticTokens`) a
+`OstrinLanguageClient` en `lsp-client.js`, y cada proveedor en `extension.js`
+ahora intenta el servidor primero y solo cae al camino antiguo si el servidor
+no está listo o la petición falla. Se registró además un
+`DocumentSemanticTokensProvider` nuevo (no existía ninguno antes).
+
+### Pruebas
+
+Se añadió `compiler_lsp_resolves_imports_across_open_documents`, que abre
+`examples/proj1/main.ostrin` y `examples/proj1/physics/units.ostrin` como
+documentos separados, verifica hover/references/signatureHelp/semanticTokens/
+rename cruzando archivos, y luego edita `units.ostrin` en memoria (quitando un
+`pub`) para comprobar que el diagnóstico de símbolo privado aparece en
+`main.ostrin` sin tocar el disco — la prueba directa de que la resolución usa
+el buffer vivo. La suite del compilador pasa a **70 pruebas**; `cargo build`
+no deja warnings nuevos. La extensión pasa a `0.3.0` y se regeneró el VSIX.
+
+Limitaciones que quedan explícitas para el siguiente tramo: referencias/rename
+solo ven archivos que estén *abiertos* (no recorren el árbol de archivos del
+workspace en disco), y semantic tokens es léxico por nombre indexado, no por
+la posición resuelta del AST (puede sobre-etiquetar un identificador que
+coincide de nombre con un símbolo de otro alcance). El siguiente bloque
+grande sigue siendo, como ya se anotó antes, depuración (`debug adapter`) y,
+si se quiere cerrar del todo esta brecha, un recorrido de workspace en disco
+para referencias/rename fuera de los documentos abiertos.
