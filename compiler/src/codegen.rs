@@ -404,6 +404,8 @@ struct Codegen<'a> {
     expected: Option<CType>,
     /// Records/enums whose generated `ostrin_show_*` (used by `print`) is queued.
     show_queue: VecDeque<CType>,
+    /// Every top-level function by name, for named/default argument resolution.
+    function_decls: HashMap<String, &'a FunctionDecl>,
     /// `derive(Eq)`/`derive(Ord)` helpers queued: (is_compare, type).
     op_queue: VecDeque<(bool, CType)>,
     op_done: HashSet<(bool, String)>,
@@ -1920,6 +1922,14 @@ impl<'a> Codegen<'a> {
             self.register_list_types(&ty);
             return Ok((format!("(({}){{ .has = true, .value = {} }})", c_type_name(&ty), codes[0]), ty));
         }
+        let normalized;
+        let mut args = args;
+        if let Some(decl) = self.function_decls.get(name).copied() {
+            if let Some(list) = normalize_call_args(&decl.params, args, 0)? {
+                normalized = list;
+                args = &normalized;
+            }
+        }
         let hints = self.signatures.get(name).map(|(params, _)| params.clone()).unwrap_or_default();
         let (arg_codes, arg_types) = self.gen_args_hinted(args, &hints)?;
         if name == "print" {
@@ -2076,6 +2086,9 @@ impl<'a> Codegen<'a> {
                 };
                 let (param_types, return_type, c_name) =
                     (method.param_types.clone(), method.return_type.clone(), method.c_name.clone());
+                let decl = method.decl;
+                let normalized = normalize_call_args(&decl.params, args, 1)?;
+                let args = normalized.as_deref().unwrap_or(args);
                 let (arg_codes, arg_types) = self.gen_args_hinted(args, param_types.get(1..).unwrap_or(&[]))?;
                 if param_types.len() != arg_types.len() + 1 {
                     return Err(format!(
@@ -2424,6 +2437,46 @@ impl<'a> Codegen<'a> {
     }
 }
 
+/// Resolves named and defaulted arguments against `params` (skipping the
+/// first `skip` — a method's `self`), returning the arguments in positional
+/// order, or `None` when the call is already plain positional and complete.
+/// A default is evaluated at the call site, like the interpreter does.
+fn normalize_call_args(params: &[Param], args: &[Arg], skip: usize) -> Result<Option<Vec<Arg>>, String> {
+    let params = &params[skip.min(params.len())..];
+    if args.len() == params.len() && args.iter().all(|a| matches!(a, Arg::Positional(_))) {
+        return Ok(None);
+    }
+    let mut slots: Vec<Option<Expr>> = vec![None; params.len()];
+    let mut next = 0usize;
+    for arg in args {
+        match arg {
+            Arg::Positional(e) => {
+                if next >= params.len() {
+                    return Err("too many arguments in call".to_string());
+                }
+                slots[next] = Some(e.clone());
+                next += 1;
+            }
+            Arg::Named(name, e) => {
+                let Some(index) = params.iter().position(|p| &p.name == name) else {
+                    return Err(format!("no parameter named '{name}'"));
+                };
+                slots[index] = Some(e.clone());
+            }
+        }
+    }
+    slots
+        .into_iter()
+        .zip(params)
+        .map(|(slot, param)| {
+            slot.or_else(|| param.default.clone())
+                .map(Arg::Positional)
+                .ok_or_else(|| format!("missing argument for parameter '{}'", param.name))
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map(Some)
+}
+
 /// Matches a variant constructor's arguments to its declared fields:
 /// positional ones fill in declaration order, named ones go by field name.
 fn arrange_args<'e>(field_names: &[String], variant: &str, args: &'e [Arg]) -> Result<Vec<&'e Expr>, String> {
@@ -2592,6 +2645,7 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
         instance_variants: HashMap::new(),
         expected: None,
         show_queue: VecDeque::new(),
+        function_decls: functions.iter().map(|f| (f.name.clone(), *f)).collect(),
         op_queue: VecDeque::new(),
         op_done: HashSet::new(),
         derives: records.iter().map(|r| (r.name.clone(), r.derives.clone())).chain(enums.iter().map(|e| (e.name.clone(), e.derives.clone()))).chain(generic_derives).collect(),

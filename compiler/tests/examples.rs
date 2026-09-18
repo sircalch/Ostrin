@@ -1549,6 +1549,8 @@ fn native_backend_generic_records_and_enums_match_the_interpreter() {
         "generic_nested_patterns.ostrin",
         "native_display.ostrin",
         "native_derive.ostrin",
+        "native_named_args.ostrin",
+        "function_arguments.ostrin",
         "traits.ostrin",
     ] {
         let interpreted = run(&["--run", &example_path(file)]);

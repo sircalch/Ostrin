@@ -2940,3 +2940,16 @@ pruebas**, sin warnings.
   un `compare` escrito a mano compile. `traits.ostrin` compila y coincide.
 - Ejemplo nuevo `native_derive.ostrin`; el test que exigía rechazar operadores
   sobre records se eliminó. Sigue sin soporte: `==` sobre `List`/`Option`.
+
+---
+
+## 77. Argumentos nombrados y por defecto en el backend nativo — 2026-09-18
+
+- Las llamadas a funciones (genéricas o no) y a métodos resuelven argumentos
+  nombrados y valores por defecto antes de generar código
+  (`normalize_call_args`): los posicionales rellenan en orden, los nombrados por
+  parámetro y los que faltan toman su `default`, evaluado en el sitio de la
+  llamada como en el intérprete.
+- `function_arguments.ostrin` compila y coincide; ejemplo nuevo
+  `native_named_args.ostrin`. (El checker no admite defaults en métodos, solo
+  nombrados.) Suite: **93 pruebas**, sin warnings.

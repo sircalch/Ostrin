@@ -1,0 +1,30 @@
+record Counter {
+    mut n: Int
+}
+
+impl Counter {
+    fn bump(mut self, by: Int, times: Int) -> Int {
+        self.n = self.n + by * times
+        self.n
+    }
+}
+
+fn area(width: Int, height: Int = 2) -> Int {
+    width * height
+}
+
+fn label<T>(value: T, prefix: String = "#") -> String {
+    prefix
+}
+
+fn main() -> Void {
+    print(area(3))
+    print(area(height: 5, width: 4))
+    print(area(6, height: 7))
+    c = Counter { n: 0 }
+    print(c.bump(1, 1))
+    print(c.bump(times: 3, by: 1))
+    print(c.bump(2, times: 2))
+    print(label(1))
+    print(label(1, prefix: "@"))
+}
