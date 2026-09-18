@@ -2765,3 +2765,26 @@ tipo del acumulador, lo que permite acumular sobre valores `dyn`).
 Valores función de primera clase (guardar una lambda en una variable o pasarla
 a una función de usuario) y `find` (devuelve `Option<T>`, genérico) siguen
 solo en el intérprete. Suite: **89 pruebas**, sin warnings.
+
+---
+
+## 69. `Option<T>` en el backend nativo — 2026-09-18
+
+`Option` no es un `enum` declarado en el AST (el intérprete lo registra como
+incorporado), así que no podía pasar por el camino de enums de usuario. Se
+representa como `{ bool has; T value; }` por valor, monomorfizado por `T`
+(`Codegen::ensure_option`, misma cola perezosa que listas/genéricos).
+
+- `Some(x)` infiere `T` del argumento. Un `None` desnudo no lleva `T`: tiene el
+  tipo interno `CType::NoneLit` y `coerce` lo convierte a `Option<T>` cuando
+  encuentra el tipo esperado (retorno, binding con tipo, argumento, o el otro
+  brazo de un `if`/`match`). En `match` se difiere la coerción de cada brazo
+  hasta conocer el primer tipo que no sea `None`.
+- Patrones `Some(v)` / `Some(_)` / `None`; métodos `is_some`, `is_none`,
+  `unwrap`, `unwrap_or`; y `List.find(lambda)`, que era lo que bloqueaba los
+  combinadores.
+- Arreglo de paso: un `match` cuyos brazos son todos `Void` (usado por efecto)
+  declaraba una variable `void`; ahora no genera variable de resultado.
+
+Fuera de alcance: `Result<T,E>`, `?`/`try`, `print` de un Option. Suite: **90
+pruebas**, sin warnings.

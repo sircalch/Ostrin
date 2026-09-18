@@ -75,6 +75,14 @@ enum CType {
     /// must see each other's `push`). Monomorphized per element type the
     /// same way a generic function is: see `Codegen::ensure_list`.
     List(Box<CType>),
+    /// `Option<T>`: a by-value `{ bool has; T value; }`, monomorphized per
+    /// `T` (see `Codegen::ensure_option`). Option isn't a declared enum in
+    /// the AST (the interpreter registers it as built-in), so it can't go
+    /// through the user-enum path.
+    Option(Box<CType>),
+    /// The type of a bare `None`, which by itself carries no `T`: it only
+    /// becomes a concrete `Option<T>` when `coerce` meets an expected type.
+    NoneLit,
 }
 
 fn c_type_name(ty: &CType) -> String {
@@ -88,6 +96,8 @@ fn c_type_name(ty: &CType) -> String {
         CType::Enum(name) => name.clone(),
         CType::DynTrait(name) => format!("{name}_Dyn"),
         CType::List(elem) => format!("{}*", list_struct_name(elem)),
+        CType::Option(inner) => format!("Option_{}", mangle_ctype(inner)),
+        CType::NoneLit => "int".to_string(),
     }
 }
 
@@ -121,6 +131,7 @@ fn map_type(ty: &Type, types: &NamedTypes) -> Result<CType, String> {
             other if types.enums.contains(other) => Ok(CType::Enum(other.to_string())),
             _ => Err(format!("type '{}' is not supported by the native backend yet", type_to_string(ty))),
         },
+        Type::Named(name, args) if name == "Option" && args.len() == 1 => Ok(CType::Option(Box::new(map_type(&args[0], types)?))),
         Type::Named(name, args) if name == "List" && args.len() == 1 => Ok(CType::List(Box::new(map_type(&args[0], types)?))),
         Type::Dyn(traits) => {
             if traits.len() != 1 {
@@ -278,6 +289,8 @@ struct Codegen<'a> {
     /// and helper functions instead of generating them again.
     list_instantiations: HashMap<String, CType>,
     pending_lists: VecDeque<CType>,
+    option_instantiations: HashSet<String>,
+    pending_options: VecDeque<CType>,
     record_names: HashSet<String>,
     enum_names: HashSet<String>,
     scopes: Vec<HashMap<String, CType>>,
@@ -306,6 +319,8 @@ fn mangle_ctype(ty: &CType) -> String {
         CType::Void => "Void".to_string(),
         CType::Record(name) | CType::Enum(name) | CType::DynTrait(name) => name.clone(),
         CType::List(elem) => format!("List_{}", mangle_ctype(elem)),
+        CType::Option(inner) => format!("Option_{}", mangle_ctype(inner)),
+        CType::NoneLit => "None".to_string(),
     }
 }
 
@@ -322,6 +337,10 @@ impl<'a> Codegen<'a> {
     fn coerce(&mut self, code: &str, from: &CType, to: &CType) -> Result<String, String> {
         if from == to {
             return Ok(code.to_string());
+        }
+        if let (CType::NoneLit, CType::Option(inner)) = (from, to) {
+            self.register_list_types(to);
+            return Ok(format!("(({}){{ .has = false }})", c_type_name(&CType::Option(inner.clone()))));
         }
         let (CType::Record(record_name), CType::DynTrait(trait_name)) = (from, to) else {
             return Err(format!("cannot use a value of type '{}' where '{}' was expected", c_type_name(from), c_type_name(to)));
@@ -366,7 +385,19 @@ impl<'a> Codegen<'a> {
     /// a signature-only `List<T>` (never itself constructed, just forwarded
     /// from a parameter to a return value, say) still gets its struct and
     /// helpers queued, so its type actually exists in the generated C.
+    fn ensure_option(&mut self, inner: &CType) -> String {
+        let name = format!("Option_{}", mangle_ctype(inner));
+        if self.option_instantiations.insert(name.clone()) {
+            self.pending_options.push_back(inner.clone());
+        }
+        name
+    }
+
     fn register_list_types(&mut self, ty: &CType) {
+        if let CType::Option(inner) = ty {
+            self.register_list_types(inner);
+            self.ensure_option(inner);
+        }
         if let CType::List(elem) = ty {
             self.register_list_types(elem);
             self.ensure_list(elem);
@@ -650,6 +681,9 @@ impl<'a> Codegen<'a> {
                         CType::Enum(variant.enum_name),
                     ));
                 }
+                if name == "None" {
+                    return Ok(("0".to_string(), CType::NoneLit));
+                }
                 Err(format!("internal error: no type recorded for '{name}' in the native backend"))
             }
             Expr::Unary(op, inner) => {
@@ -679,7 +713,12 @@ impl<'a> Codegen<'a> {
                     Some(b) => self.gen_block_expr(b)?,
                     None => ("({ (void)0; })".to_string(), CType::Void),
                 };
-                let result_ty = if then_ty == CType::Void || else_ty == CType::Void { CType::Void } else { then_ty };
+                if then_ty == CType::Void || else_ty == CType::Void {
+                    return Ok((format!("({cond_code} ? {then_code} : {else_code})"), CType::Void));
+                }
+                let result_ty = if then_ty == CType::NoneLit { else_ty.clone() } else { then_ty.clone() };
+                let then_code = self.coerce(&then_code, &then_ty, &result_ty)?;
+                let else_code = self.coerce(&else_code, &else_ty, &result_ty)?;
                 Ok((format!("({cond_code} ? {then_code} : {else_code})"), result_ty))
             }
             Expr::Block(b) => self.gen_block_expr(b),
@@ -772,6 +811,7 @@ impl<'a> Codegen<'a> {
         let result_var = self.next_temp();
 
         let mut arm_blocks = String::new();
+        let mut arm_bodies: Vec<(String, CType)> = Vec::new();
         let mut result_ty: Option<CType> = None;
         for arm in arms {
             self.push_scope();
@@ -801,7 +841,13 @@ impl<'a> Codegen<'a> {
             };
             self.pop_scope();
             let (body_code, body_ty) = body;
-            if result_ty.is_none() {
+            // A bare `None` arm has no `T` of its own: remember every arm's
+            // body and coerce them all once the real result type is known
+            // (the first arm that isn't a bare `None`).
+            let placeholder = format!("@@ARM{}@@", arm_bodies.len());
+            arm_bodies.push((body_code, body_ty.clone()));
+            let body_code = placeholder;
+            if result_ty.is_none() || (result_ty == Some(CType::NoneLit) && body_ty != CType::NoneLit) {
                 result_ty = Some(body_ty);
             }
             // `condition` only ever covers the structural check (tag,
@@ -818,17 +864,27 @@ impl<'a> Codegen<'a> {
             arm_blocks.push_str(&format!("if ({condition}) {{ {bindings} {guarded_commit} }} "));
         }
         let result_ty = result_ty.expect("checked arms.is_empty() above");
+        for (index, (code, ty)) in arm_bodies.into_iter().enumerate() {
+            let coerced = self.coerce(&code, &ty, &result_ty)?;
+            arm_blocks = arm_blocks.replace(&format!("@@ARM{index}@@"), &coerced);
+        }
 
+        // A match used for effect (every arm Void) has no value to store.
+        let is_void = result_ty == CType::Void;
+        let (result_decl, arm_blocks, yielded) = if is_void {
+            (String::new(), arm_blocks.replace(&format!("{result_var} = "), ""), "(void)0".to_string())
+        } else {
+            (format!("{} {result_var};", c_type_name(&result_ty)), arm_blocks, result_var.clone())
+        };
         let body = format!(
             "{scrut_ty} {scrutinee_var} = {scrutinee_code}; \
              int {matched_var} = 0; \
-             {result_ty_c} {result_var}; \
+             {result_decl} \
              {arm_blocks} \
              if (!{matched_var}) {{ fprintf(stderr, \"ostrin: non-exhaustive match at runtime\\n\"); abort(); }}",
             scrut_ty = c_type_name(&scrutinee_ty),
-            result_ty_c = c_type_name(&result_ty),
         );
-        Ok((format!("({{ {body} {result_var}; }})"), result_ty))
+        Ok((format!("({{ {body} {yielded}; }})"), result_ty))
     }
 
     /// Appends this pattern's match condition to `condition` and any field
@@ -846,6 +902,23 @@ impl<'a> Codegen<'a> {
     ) -> Result<(), String> {
         match pattern {
             Pattern::Wildcard => Ok(()),
+            Pattern::Ident(name) if name == "None" && matches!(scrutinee_ty, CType::Option(_)) => {
+                condition.push_str(&format!(" && (!{scrutinee_var}.has)"));
+                Ok(())
+            }
+            Pattern::Variant(name, fields) if name == "Some" && matches!(scrutinee_ty, CType::Option(_)) => {
+                let CType::Option(inner) = scrutinee_ty else { unreachable!() };
+                condition.push_str(&format!(" && ({scrutinee_var}.has)"));
+                match fields.as_slice() {
+                    [(_, Pattern::Ident(b))] => {
+                        bindings.push_str(&format!("{} {} = {}.value; ", c_type_name(inner), b, scrutinee_var));
+                        self.define(b, (**inner).clone());
+                        Ok(())
+                    }
+                    [(_, Pattern::Wildcard)] => Ok(()),
+                    _ => Err("only 'Some(name)' / 'Some(_)' patterns are supported by the native backend yet".to_string()),
+                }
+            }
             Pattern::Ident(name) => {
                 bindings.push_str(&format!("{} {} = {}; ", c_type_name(scrutinee_ty), name, scrutinee_var));
                 self.define(name, scrutinee_ty.clone());
@@ -921,8 +994,8 @@ impl<'a> Codegen<'a> {
     fn gen_binary(&mut self, op: BinOp, l: &Expr, r: &Expr) -> Result<(String, CType), String> {
         let (lc, lt) = self.gen_expr(l)?;
         let (rc, rt) = self.gen_expr(r)?;
-        if matches!(lt, CType::Record(_) | CType::Enum(_) | CType::DynTrait(_) | CType::List(_))
-            || matches!(rt, CType::Record(_) | CType::Enum(_) | CType::DynTrait(_) | CType::List(_))
+        if matches!(lt, CType::Record(_) | CType::Enum(_) | CType::DynTrait(_) | CType::List(_) | CType::Option(_) | CType::NoneLit)
+            || matches!(rt, CType::Record(_) | CType::Enum(_) | CType::DynTrait(_) | CType::List(_) | CType::Option(_) | CType::NoneLit)
         {
             // C has no `==`/`<`/etc. on struct values at all (a compile
             // error, not just the wrong answer) — but even where a raw `==`
@@ -992,6 +1065,12 @@ impl<'a> Codegen<'a> {
         if let Some(variant) = self.variants.get(name).cloned() {
             let arg_codes = self.gen_variant_args(&variant, args)?;
             return self.gen_variant_construct(&variant, &arg_codes);
+        }
+        if name == "Some" && args.len() == 1 {
+            let (codes, types) = self.gen_args(args)?;
+            let ty = CType::Option(Box::new(types[0].clone()));
+            self.register_list_types(&ty);
+            return Ok((format!("(({}){{ .has = true, .value = {} }})", c_type_name(&ty), codes[0]), ty));
         }
         let (arg_codes, arg_types) = self.gen_args(args)?;
         if name == "print" {
@@ -1169,10 +1248,32 @@ impl<'a> Codegen<'a> {
                 let call = format!("({{ {trait_name}_Dyn {temp} = {obj_code}; {temp}.vtable->{method_name}({call_args}); }})");
                 Ok((call, return_type))
             }
+            CType::Option(inner) => {
+                let inner = (**inner).clone();
+                let (arg_codes, arg_types) = self.gen_args(args)?;
+                let temp = self.next_temp();
+                let oc = c_type_name(&obj_ty);
+                match method_name {
+                    "is_some" => Ok((format!("({{ {oc} {temp} = {obj_code}; {temp}.has; }})"), CType::Bool)),
+                    "is_none" => Ok((format!("({{ {oc} {temp} = {obj_code}; !{temp}.has; }})"), CType::Bool)),
+                    "unwrap" => Ok((
+                        format!("({{ {oc} {temp} = {obj_code}; if (!{temp}.has) {{ fprintf(stderr, \"ostrin: unwrap on None\\n\"); exit(1); }} {temp}.value; }})"),
+                        inner,
+                    )),
+                    "unwrap_or" => {
+                        if arg_codes.len() != 1 {
+                            return Err("'unwrap_or' expects one argument".to_string());
+                        }
+                        let d = self.coerce(&arg_codes[0], &arg_types[0], &inner)?;
+                        Ok((format!("({{ {oc} {temp} = {obj_code}; {temp}.has ? {temp}.value : ({d}); }})"), inner))
+                    }
+                    other => Err(format!("Option has no method '{other}' the native backend supports yet")),
+                }
+            }
             CType::List(elem_ty) => {
                 let elem_ty = (**elem_ty).clone();
                 let struct_name = self.ensure_list(&elem_ty);
-                if matches!(method_name, "map" | "filter" | "fold" | "any" | "all") {
+                if matches!(method_name, "map" | "filter" | "fold" | "any" | "all" | "find") {
                     return self.gen_list_combinator(&obj_code, &elem_ty, method_name, args);
                 }
                 let (arg_codes, arg_types) = self.gen_args(args)?;
@@ -1306,6 +1407,18 @@ impl<'a> Codegen<'a> {
                             CType::List(Box::new(elem_ty.clone())),
                         ))
                     }
+                    "find" => {
+                        let r = self.next_temp();
+                        let oty = CType::Option(Box::new(elem_ty.clone()));
+                        self.register_list_types(&oty);
+                        let oc = c_type_name(&oty);
+                        Ok((
+                            format!(
+                                "({{ {head} {oc} {r} = ({oc}){{ .has = false }}; {loop_head} {{ {bind} if ({body_code}) {{ {r}.has = true; {r}.value = {el}; break; }} }} {r}; }})"
+                            ),
+                            oty,
+                        ))
+                    }
                     "any" | "all" => {
                         let r = self.next_temp();
                         let (init, test, set) = if method == "any" {
@@ -1340,6 +1453,7 @@ impl<'a> Codegen<'a> {
             CType::Enum(name) => return Err(format!("cannot 'print' an enum value yet ('{name}' has no generated Display)")),
             CType::DynTrait(name) => return Err(format!("cannot 'print' a 'dyn {name}' value")),
             CType::List(elem) => return Err(format!("cannot 'print' a List<{}> value yet", c_type_name(elem))),
+            CType::Option(_) | CType::NoneLit => return Err("cannot 'print' an Option value yet".to_string()),
         };
         Ok((format!("printf(\"{spec}\", {value})"), CType::Void))
     }
@@ -1455,6 +1569,8 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
         pending_vtables: VecDeque::new(),
         list_instantiations: HashMap::new(),
         pending_lists: VecDeque::new(),
+        option_instantiations: HashSet::new(),
+        pending_options: VecDeque::new(),
         record_names: record_names.clone(),
         enum_names: enum_names.clone(),
         scopes: vec![HashMap::new()],
@@ -1685,9 +1801,14 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
     let mut thunk_prototypes: Vec<String> = Vec::new();
     let mut vtable_defs: Vec<String> = Vec::new();
     let mut list_type_decls = String::new();
+    let mut option_inners: Vec<CType> = Vec::new();
     let mut list_helper_prototypes: Vec<String> = Vec::new();
     loop {
         let mut progressed = false;
+        while let Some(inner) = codegen.pending_options.pop_front() {
+            progressed = true;
+            option_inners.push(inner);
+        }
         while let Some(elem_ty) = codegen.pending_lists.pop_front() {
             progressed = true;
             let struct_name = list_struct_name(&elem_ty);
@@ -1794,6 +1915,12 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
     // by this point), a `List`'s element type is only known once the drain
     // loop above has finished discovering it from actual usage.
     out.push_str(&list_type_decls);
+    for inner in std::mem::take(&mut option_inners) {
+        let name = format!("Option_{}", mangle_ctype(&inner));
+        out.push_str(&format!("typedef struct {{ bool has; {} value; }} {name};
+
+", c_type_name(&inner)));
+    }
 
     for f in &functions {
         if f.generics.is_empty() {

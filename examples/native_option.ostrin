@@ -1,0 +1,35 @@
+fn first_even(numbers: List<Int>) -> Option<Int> {
+    numbers.find(fn(n) { n > 1 and n < 100 and n > 3 })
+}
+
+fn safe_div(a: Int, b: Int) -> Option<Int> {
+    if b == 0 {
+        None
+    } else {
+        Some(a / b)
+    }
+}
+
+fn describe(o: Option<Int>) -> String {
+    match o {
+        Some(v) => "value",
+        None => "nothing",
+    }
+}
+
+fn main() -> Void {
+    print(describe(safe_div(10, 2)))
+    print(describe(safe_div(1, 0)))
+    x = safe_div(9, 3)
+    print(x.is_some())
+    print(x.unwrap())
+    print(safe_div(1, 0).unwrap_or(-1))
+    found = first_even([1, 2, 5, 8])
+    print(found.unwrap())
+    missing = first_even([1, 2])
+    print(missing.is_none())
+    match found {
+        Some(n) => print(n + 1),
+        None => print(0),
+    }
+}

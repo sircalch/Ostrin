@@ -981,6 +981,24 @@ fn native_backend_compiles_the_original_dyn_trait_example() {
 }
 
 #[test]
+fn native_backend_compiles_and_runs_option() {
+    // Some/None (a bare `None` typed by return position, `if` arms and call
+    // arguments), match on Option, is_some/unwrap/unwrap_or, and List.find.
+    let exe = temp_artifact("option.exe");
+    let compile = run(&["--compile", "--out", &exe, &example_path("native_option.ostrin")]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+    let run_output = Command::new(&exe).output().unwrap();
+    let _ = fs::remove_file(&exe);
+    assert_eq!(
+        String::from_utf8_lossy(&run_output.stdout).replace("\r\n", "\n"),
+        "value\nnothing\ntrue\n3\n-1\n5\ntrue\n6\n"
+    );
+}
+
+#[test]
 fn native_backend_monomorphizes_one_list_struct_per_element_type() {
     let out = run(&["--emit-c", &example_path("native_lists.ostrin")]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
