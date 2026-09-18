@@ -161,11 +161,15 @@ fn annotate_source_files(items: &mut [Item], file_path: &Path) {
     for item in items {
         match item {
             Item::Function(function) => function.source_file = source_file.clone(),
+            Item::Record(record) => record.source_file = source_file.clone(),
+            Item::Enum(enum_decl) => enum_decl.source_file = source_file.clone(),
             Item::Impl(implementation) => {
+                implementation.source_file = source_file.clone();
                 for method in &mut implementation.methods {
                     method.source_file = source_file.clone();
                 }
             }
+            Item::Trait(trait_decl) => trait_decl.source_file = source_file.clone(),
             _ => {}
         }
     }

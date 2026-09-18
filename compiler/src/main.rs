@@ -4,6 +4,7 @@ mod lexer;
 mod modules;
 mod package;
 mod parser;
+mod symbols;
 mod typeck;
 mod types;
 
@@ -16,6 +17,7 @@ fn main() -> ExitCode {
     let args: Vec<String> = env::args().collect();
     let tokens_only = args.iter().any(|a| a == "--tokens");
     let ast_only = args.iter().any(|a| a == "--ast");
+    let symbols_only = args.iter().any(|a| a == "--symbols");
     let run = args.iter().any(|a| a == "--run");
     let json = args.iter().any(|a| a == "--json");
     let help = args.iter().any(|a| a == "--help" || a == "-h");
@@ -31,7 +33,7 @@ fn main() -> ExitCode {
     }
 
     let Some(path) = args.iter().skip(1).find(|a| !a.starts_with("--")) else {
-        eprintln!("usage: ostrinc [--check|--ast|--tokens|--run] [--json] <entry_file.ostrin>");
+        eprintln!("usage: ostrinc [--check|--ast|--tokens|--symbols|--run] [--json] <entry_file.ostrin>");
         return ExitCode::FAILURE;
     };
 
@@ -115,6 +117,20 @@ fn main() -> ExitCode {
         return ExitCode::SUCCESS;
     }
 
+    if symbols_only {
+        for symbol in symbols::collect(&items) {
+            if json {
+                emit_json_symbol(&symbol, path);
+            } else {
+                println!(
+                    "{}:{} {} {}",
+                    symbol.span.line, symbol.span.col, symbol.kind, symbol.detail
+                );
+            }
+        }
+        return ExitCode::SUCCESS;
+    }
+
     let errors = typeck::Checker::new().check_program(&items);
     if !errors.is_empty() {
         for e in &errors {
@@ -162,6 +178,7 @@ fn print_help() {
     println!("  --run         Type-check and run the entry file");
     println!("  --ast         Print the parsed AST");
     println!("  --tokens      Print lexer tokens");
+    println!("  --symbols     Print source symbols and signatures");
     println!("  --json        Emit machine-readable diagnostics as JSON Lines");
     println!("  -h, --help    Print this help");
     println!("  -V, --version Print the compiler version");
@@ -185,6 +202,19 @@ fn emit_json_diagnostic(
         file,
         line,
         col
+    );
+}
+
+fn emit_json_symbol(symbol: &symbols::Symbol, fallback_file: &str) {
+    let file = symbol.source_file.as_deref().unwrap_or(fallback_file);
+    println!(
+        "{{\"kind\":{},\"name\":{},\"detail\":{},\"file\":{},\"line\":{},\"column\":{}}}",
+        json_string(symbol.kind),
+        json_string(&symbol.name),
+        json_string(&symbol.detail),
+        json_string(file),
+        symbol.span.line,
+        symbol.span.col
     );
 }
 

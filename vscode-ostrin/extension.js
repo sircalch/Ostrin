@@ -4,6 +4,7 @@ const path = require('path');
 const languageFeatures = require('./language-features');
 
 let diagnostics;
+const semanticIndex = new Map();
 
 function compilerPath() {
   return vscode.workspace.getConfiguration('ostrin').get('compilerPath', 'ostrinc');
@@ -55,6 +56,45 @@ function consumeDiagnosticLine(document, line, output) {
     // Keep non-JSON compiler output visible for forward compatibility.
   }
   output.appendLine(line);
+}
+
+function refreshSemanticIndex(document) {
+  if (document.isUntitled) return;
+  const cwd = vscode.workspace.getWorkspaceFolder(document.uri)?.uri.fsPath
+    ?? path.dirname(document.uri.fsPath);
+  const child = childProcess.spawn(compilerPath(), ['--symbols', '--json', document.uri.fsPath], {
+    cwd,
+    windowsHide: true,
+    shell: false
+  });
+  child.on('error', () => {
+    // The normal compiler check reports startup failures to the user. The
+    // background symbol index must stay silent when the compiler is absent.
+  });
+  let buffer = '';
+  const found = [];
+  child.stdout.on('data', (data) => {
+    buffer += data.toString();
+    const lines = buffer.split(/\r?\n/);
+    buffer = lines.pop() || '';
+    for (const line of lines) {
+      try {
+        const item = JSON.parse(line);
+        if (item && item.name && item.kind) found.push(item);
+      } catch (_) {
+        // Ignore incomplete or diagnostic output from an older compiler.
+      }
+    }
+  });
+  child.on('close', (code) => {
+    if (buffer.trim()) {
+      try {
+        const item = JSON.parse(buffer);
+        if (item && item.name && item.kind) found.push(item);
+      } catch (_) {}
+    }
+    if (code === 0) semanticIndex.set(document.uri.toString(), found);
+  });
 }
 
 async function runCompiler(document, run, notify = true) {
@@ -114,14 +154,14 @@ function activate(context) {
   const selector = { language: 'ostrin', scheme: 'file' };
   const completion = vscode.languages.registerCompletionItemProvider(
     selector,
-    { provideCompletionItems: () => languageFeatures.provideCompletionItems(vscode) },
+    { provideCompletionItems: (document) => languageFeatures.provideCompletionItems(vscode, semanticIndex.get(document.uri.toString()) || []) },
     '.', ':'
   );
   const hover = vscode.languages.registerHoverProvider(selector, {
-    provideHover: (document, position) => languageFeatures.provideHover(vscode, document, position)
+    provideHover: (document, position) => languageFeatures.provideHover(vscode, document, position, semanticIndex.get(document.uri.toString()) || [])
   });
   const symbols = vscode.languages.registerDocumentSymbolProvider(selector, {
-    provideDocumentSymbols: (document) => languageFeatures.provideDocumentSymbols(vscode, document)
+    provideDocumentSymbols: (document) => languageFeatures.provideDocumentSymbols(vscode, document, semanticIndex.get(document.uri.toString()) || [])
   });
   const check = vscode.commands.registerCommand('ostrin.check', async () => {
     const document = currentDocument();
@@ -138,9 +178,17 @@ function activate(context) {
     if (enabled && document.languageId === 'ostrin') {
       await runCompiler(document, false, false);
     }
+    if (document.languageId === 'ostrin') refreshSemanticIndex(document);
   });
 
-  context.subscriptions.push(diagnostics, completion, hover, symbols, check, run, saveSubscription);
+  const openSubscription = vscode.workspace.onDidOpenTextDocument((document) => {
+    if (document.languageId === 'ostrin') refreshSemanticIndex(document);
+  });
+  for (const editor of vscode.window.visibleTextEditors) {
+    if (editor.document.languageId === 'ostrin') refreshSemanticIndex(editor.document);
+  }
+
+  context.subscriptions.push(diagnostics, completion, hover, symbols, check, run, saveSubscription, openSubscription);
 }
 
 function deactivate() {}

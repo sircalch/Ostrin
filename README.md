@@ -24,7 +24,7 @@ Ostrin is not yet a production compiler. The current implementation includes a
 lexer, parser, static checker, interpreter, modules, packages, collections,
 traits, pattern matching, quantities and a simulated concurrency model.
 
-The compiler suite currently passes **63 integration tests**. Function calls
+The compiler suite currently passes **64 integration tests**. Function calls
 support named/default arguments, collection lookups preserve `Option<T>`, and
 record fields are checked statically. The CLI also exposes JSON Lines
 diagnostics with source locations for editor integrations. The runtime is
@@ -47,6 +47,7 @@ The compiler currently supports:
 ostrinc file.ostrin             # type-check
 ostrinc --check file.ostrin     # explicit type-check
 ostrinc --json --check file.ostrin # diagnostics for tools and editors
+ostrinc --symbols --json file.ostrin # symbols/signatures for editors
 ostrinc --run file.ostrin       # type-check and run
 ostrinc --ast file.ostrin       # print the AST
 ostrinc --tokens file.ostrin   # print lexer tokens

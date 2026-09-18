@@ -60,6 +60,8 @@ pub struct RecordDecl {
     pub generics: Vec<GenericParam>,
     pub derives: Vec<String>,
     pub fields: Vec<FieldDecl>,
+    pub span: Span,
+    pub source_file: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -82,6 +84,8 @@ pub struct EnumDecl {
     pub generics: Vec<GenericParam>,
     pub derives: Vec<String>,
     pub variants: Vec<VariantDecl>,
+    pub span: Span,
+    pub source_file: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -93,6 +97,8 @@ pub struct ImplDecl {
     pub type_args: Vec<Type>,
     pub module_path: Vec<String>,
     pub methods: Vec<FunctionDecl>,
+    pub span: Span,
+    pub source_file: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -112,6 +118,8 @@ pub struct TraitDecl {
     pub generics: Vec<GenericParam>,
     pub supertraits: Vec<String>,
     pub methods: Vec<TraitMethodSig>,
+    pub span: Span,
+    pub source_file: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

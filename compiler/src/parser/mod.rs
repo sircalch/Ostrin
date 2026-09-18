@@ -87,6 +87,7 @@ impl Parser {
     }
 
     fn parse_trait(&mut self, is_pub: bool) -> PResult<TraitDecl> {
+        let span = self.current_span();
         self.expect(&TokenKind::Trait)?;
         let name = self.expect_ident()?;
         let generics = if self.check(&TokenKind::Lt) { self.parse_generic_params()? } else { Vec::new() };
@@ -112,7 +113,7 @@ impl Parser {
             methods.push(TraitMethodSig { name: mname, generics: mgenerics, params, return_type, default_body });
         }
         self.expect(&TokenKind::RBrace)?;
-        Ok(TraitDecl { name, module_path: Vec::new(), is_pub, generics, supertraits, methods })
+        Ok(TraitDecl { name, module_path: Vec::new(), is_pub, generics, supertraits, methods, span, source_file: None })
     }
 
     fn parse_import(&mut self, is_pub: bool) -> PResult<ImportDecl> {
@@ -149,6 +150,7 @@ impl Parser {
     }
 
     fn parse_record(&mut self, is_pub: bool) -> PResult<RecordDecl> {
+        let span = self.current_span();
         self.expect(&TokenKind::Record)?;
         let name = self.expect_ident()?;
         let generics = if self.check(&TokenKind::Lt) { self.parse_generic_params()? } else { Vec::new() };
@@ -165,10 +167,11 @@ impl Parser {
             fields.push(FieldDecl { name: fname, is_pub: field_pub, is_mut: field_mut, ty, default });
         }
         self.expect(&TokenKind::RBrace)?;
-        Ok(RecordDecl { name, module_path: Vec::new(), is_pub, generics, derives, fields })
+        Ok(RecordDecl { name, module_path: Vec::new(), is_pub, generics, derives, fields, span, source_file: None })
     }
 
     fn parse_enum(&mut self, is_pub: bool) -> PResult<EnumDecl> {
+        let span = self.current_span();
         self.expect(&TokenKind::Enum)?;
         let name = self.expect_ident()?;
         let generics = if self.check(&TokenKind::Lt) { self.parse_generic_params()? } else { Vec::new() };
@@ -196,10 +199,11 @@ impl Parser {
             variants.push(VariantDecl { name: vname, fields });
         }
         self.expect(&TokenKind::RBrace)?;
-        Ok(EnumDecl { name, module_path: Vec::new(), is_pub, generics, derives, variants })
+        Ok(EnumDecl { name, module_path: Vec::new(), is_pub, generics, derives, variants, span, source_file: None })
     }
 
     fn parse_impl(&mut self) -> PResult<ImplDecl> {
+        let span = self.current_span();
         self.expect(&TokenKind::Impl)?;
         let generics = if self.check(&TokenKind::Lt) { self.parse_generic_params()? } else { Vec::new() };
         let first = self.expect_ident()?;
@@ -217,7 +221,7 @@ impl Parser {
             methods.push(self.parse_function(false)?);
         }
         self.expect(&TokenKind::RBrace)?;
-        Ok(ImplDecl { generics, trait_name, trait_args, type_name, type_args, module_path: Vec::new(), methods })
+        Ok(ImplDecl { generics, trait_name, trait_args, type_name, type_args, module_path: Vec::new(), methods, span, source_file: None })
     }
 
     fn parse_function(&mut self, is_pub: bool) -> PResult<FunctionDecl> {

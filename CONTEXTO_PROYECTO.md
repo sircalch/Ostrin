@@ -21,7 +21,7 @@ El objetivo explícito (dicho por el usuario al principio de la sesión): que Os
 
 - **17 documentos de diseño** completos y revisados (tres pasadas de consistencia formales), cubriendo el núcleo entero del lenguaje.
 - **Un compilador/intérprete real en Rust** (~4000+ líneas), en `compiler/`, que compila con `cargo build` y corre con `cargo run -- <flags> archivo.ostrin`.
-- **63 pruebas automatizadas** (`cargo test`) que verifican comportamiento exacto (no solo "no truena") sobre las piezas centrales del lenguaje.
+- **64 pruebas automatizadas** (`cargo test`) que verifican comportamiento exacto (no solo "no truena") sobre las piezas centrales del lenguaje.
 - **68 programas/archivos de ejemplo reales** en `examples/`, incluidos varios proyectos multi-archivo.
 - Sigue siendo un **prototipo de validación de diseño**, no un lenguaje listo para producción: es un intérprete que recorre el AST (no genera código máquina), sin paralelismo real de sistema operativo, con una stdlib inicial de E/S, sin LSP/herramientas de editor.
 
@@ -75,7 +75,7 @@ compiler/
 │   ├── modules.rs            — carga multi-archivo: descubrimiento, ciclos (E1081), visibilidad (E1080), reescritura de AST (mangling de nombres cruzando módulos)
 │   └── package.rs            — ostrin.toml, dependencias `path` (funcionan) y `git` (reconocidas, rechazadas explícitamente sin red)
 └── tests/
-    └── examples.rs           — 63 pruebas de integración (invocan el binario compilado, comparan stdout/stderr exacto)
+    └── examples.rs           — 64 pruebas de integración (invocan el binario compilado, comparan stdout/stderr exacto)
 ```
 
 ### Cómo correrlo
@@ -83,7 +83,7 @@ compiler/
 ```bash
 cd compiler
 cargo build
-cargo test                                    # 63 pruebas, deben pasar todas
+cargo test                                    # 64 pruebas, deben pasar todas
 ./target/debug/ostrinc archivo.ostrin         # solo verifica tipos
 ./target/debug/ostrinc --run archivo.ostrin   # verifica y ejecuta
 ./target/debug/ostrinc --ast archivo.ostrin   # imprime el AST
@@ -106,7 +106,7 @@ En Windows, si `cargo`/`rustc` no están en el PATH de la sesión: `$env:Path +=
 
 ## 5. Qué está probado (y cómo verificarlo)
 
-`compiler/tests/examples.rs` tiene 63 pruebas. Cubren, con valores exactos esperados (no solo "no falla"):
+`compiler/tests/examples.rs` tiene 64 pruebas. Cubren, con valores exactos esperados (no solo "no falla"):
 
 - Aritmética de `Quantity<D>` con conversión de unidades real (`5 nm + 2 m`, `velocity(10 m, 2 s)`, cancelación dimensional `2m/5nm = 400000000`).
 - Los 4 errores deliberados de dimensión/mutabilidad (`E1024`, `E1025`, `E1001`) en un mismo archivo.
@@ -1277,5 +1277,8 @@ registra proveedores nativos de VS Code para:
   `impl`.
 
 Esta capa es deliberadamente sintáctica y no pretende simular un LSP semántico.
-El siguiente paso de tooling es exponer símbolos, tipos y firmas desde el
-checker para ofrecer completado y navegación conscientes del programa.
+El compilador ya expone un índice JSON de símbolos y firmas mediante
+`ostrinc --symbols --json`. La extensión lo consulta en segundo plano para
+completar y construir el outline con declaraciones reales del proyecto. El
+siguiente paso es hacer que ese índice sea plenamente consciente de tipos desde
+el checker.

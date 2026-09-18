@@ -56,7 +56,40 @@ function wordAt(document, position) {
   return { word: line.slice(start, end), start, end };
 }
 
-function provideCompletionItems(vscode) {
+function shortSymbolName(name) {
+  return name.split(/::|\./).pop();
+}
+
+function sameFile(left, right) {
+  return left && right && left.replace(/\\/g, '/').toLowerCase() === right.replace(/\\/g, '/').toLowerCase();
+}
+
+function semanticCompletionItems(vscode, semanticSymbols) {
+  const items = [];
+  const known = new Set(symbols.keys());
+  const kinds = {
+    function: vscode.CompletionItemKind.Function,
+    record: vscode.CompletionItemKind.Struct,
+    enum: vscode.CompletionItemKind.Enum,
+    trait: vscode.CompletionItemKind.Interface,
+    method: vscode.CompletionItemKind.Method,
+    field: vscode.CompletionItemKind.Field,
+    enumMember: vscode.CompletionItemKind.EnumMember,
+    implementation: vscode.CompletionItemKind.Class
+  };
+  for (const entry of semanticSymbols) {
+    const name = shortSymbolName(entry.name);
+    if (!name || known.has(name)) continue;
+    known.add(name);
+    const item = new vscode.CompletionItem(name, kinds[entry.kind] || vscode.CompletionItemKind.Value);
+    item.detail = entry.detail || `Ostrin ${entry.kind || 'symbol'}`;
+    if (entry.detail) item.documentation = new vscode.MarkdownString(`\`${entry.detail}\``);
+    items.push(item);
+  }
+  return items;
+}
+
+function provideCompletionItems(vscode, semanticSymbols = []) {
   const items = [];
   for (const keyword of keywords) {
     const item = new vscode.CompletionItem(keyword, vscode.CompletionItemKind.Keyword);
@@ -69,12 +102,15 @@ function provideCompletionItems(vscode) {
     item.documentation = new vscode.MarkdownString(`\`${signature}\``);
     items.push(item);
   }
-  return items;
+  return items.concat(semanticCompletionItems(vscode, semanticSymbols));
 }
 
-function provideHover(vscode, document, position) {
+function provideHover(vscode, document, position, semanticSymbols = []) {
   const token = wordAt(document, position);
-  const markdown = markdownFor(token.word);
+  const semantic = semanticSymbols.find((entry) => shortSymbolName(entry.name) === token.word);
+  const markdown = semantic
+    ? `**Ostrin ${semantic.kind || 'symbol'}**\n\n\`${semantic.detail || semantic.name}\``
+    : markdownFor(token.word);
   if (!markdown) return undefined;
   const range = new vscode.Range(
     new vscode.Position(position.line, token.start),
@@ -83,7 +119,42 @@ function provideHover(vscode, document, position) {
   return new vscode.Hover(new vscode.MarkdownString(markdown), range);
 }
 
-function provideDocumentSymbols(vscode, document) {
+function provideDocumentSymbols(vscode, document, semanticSymbols = []) {
+  const topLevelKinds = new Set(['function', 'record', 'enum', 'trait', 'implementation']);
+  const local = semanticSymbols.filter((entry) =>
+    topLevelKinds.has(entry.kind) && (!entry.file || sameFile(entry.file, document.uri.fsPath))
+  );
+  if (local.length) {
+    const kinds = {
+      function: vscode.SymbolKind.Function,
+      record: vscode.SymbolKind.Struct,
+      enum: vscode.SymbolKind.Enum,
+      trait: vscode.SymbolKind.Interface,
+      implementation: vscode.SymbolKind.Class
+    };
+    return local.map((entry) => {
+      const line = Math.max(0, (entry.line || 1) - 1);
+      const text = line < document.lineCount ? document.lineAt(line).text : '';
+      const name = shortSymbolName(entry.name);
+      const start = Math.max(0, text.indexOf(name));
+      const range = new vscode.Range(
+        new vscode.Position(line, 0),
+        new vscode.Position(line, text.length)
+      );
+      const selectionRange = new vscode.Range(
+        new vscode.Position(line, start),
+        new vscode.Position(line, start + name.length)
+      );
+      return new vscode.DocumentSymbol(
+        name,
+        entry.detail || entry.kind,
+        kinds[entry.kind] || vscode.SymbolKind.Namespace,
+        range,
+        selectionRange
+      );
+    });
+  }
+
   const result = [];
   const declaration = /^\s*(?:pub\s+)?(fn|record|enum|trait|impl)\s+([A-Za-z_][A-Za-z0-9_]*)/;
   for (let line = 0; line < document.lineCount; line += 1) {
