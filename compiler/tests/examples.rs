@@ -671,6 +671,89 @@ fn compiler_dap_stops_on_entry_steps_and_disconnects_cleanly() {
     assert_eq!(events("terminated").len(), 1);
 }
 
+/// Path for a temporary native artifact, unique per test process so parallel
+/// `cargo test` runs never collide.
+fn temp_artifact(name: &str) -> String {
+    std::env::temp_dir()
+        .join(format!("ostrin_native_test_{}_{name}", std::process::id()))
+        .display()
+        .to_string()
+}
+
+/// True when `--compile` failed only because no GNU-compatible C compiler is
+/// installed — a real, environment-dependent condition (this suite can't
+/// require every machine it runs on to have gcc/clang), not a codegen bug.
+fn skip_if_no_c_compiler(compile: &Output) -> bool {
+    if !compile.status.success() && stderr(compile).contains("no GNU-compatible C compiler found") {
+        eprintln!("skipping: no GNU-compatible C compiler available on this machine");
+        true
+    } else {
+        false
+    }
+}
+
+#[test]
+fn native_backend_compiles_and_runs_fibonacci() {
+    let exe = temp_artifact("fibonacci.exe");
+    let compile = run(&["--compile", "--out", &exe, &example_path("native_fibonacci.ostrin")]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+    assert!(stdout(&compile).contains("compiled:"), "expected a confirmation message: {}", stdout(&compile));
+
+    let run_output = Command::new(&exe).output().unwrap_or_else(|e| panic!("failed to run compiled binary '{exe}': {e}"));
+    let _ = fs::remove_file(&exe);
+    assert!(run_output.status.success(), "compiled binary exited unsuccessfully");
+    // The MinGW C runtime's stdout is opened in text mode, so it rewrites
+    // "\n" to "\r\n" on Windows; normalize before comparing.
+    assert_eq!(
+        String::from_utf8_lossy(&run_output.stdout).replace("\r\n", "\n"),
+        "0\n1\n1\n2\n3\n5\n8\n13\n21\n34\n",
+        "native binary should print the same Fibonacci sequence the interpreter does"
+    );
+}
+
+#[test]
+fn native_backend_compiles_and_runs_strings_and_booleans() {
+    let exe = temp_artifact("strings.exe");
+    let compile = run(&["--compile", "--out", &exe, &example_path("native_strings.ostrin")]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+
+    let run_output = Command::new(&exe).output().unwrap_or_else(|e| panic!("failed to run compiled binary '{exe}': {e}"));
+    let _ = fs::remove_file(&exe);
+    assert!(run_output.status.success(), "compiled binary exited unsuccessfully");
+    assert_eq!(
+        String::from_utf8_lossy(&run_output.stdout).replace("\r\n", "\n"),
+        "Hello, Ostrin\nHello, Ostrin\nHello, Ostrin\ntrue\nfalse\n",
+        "native binary should exercise String concatenation, while-loops and Bool printing correctly"
+    );
+}
+
+#[test]
+fn native_backend_emit_c_writes_readable_c_source() {
+    let out = run(&["--emit-c", &example_path("native_fibonacci.ostrin")]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let source = stdout(&out);
+    assert!(source.contains("#include <stdint.h>"));
+    assert!(source.contains("int64_t fib(int64_t n)"));
+    assert!(source.contains("int main(void)"), "the generated file must supply its own C main: {source}");
+}
+
+#[test]
+fn native_backend_rejects_constructs_it_does_not_support_yet() {
+    // `shapes.ostrin` uses records/traits, which only the interpreter runs;
+    // the native backend must fail with a clear message pointing back at
+    // `--run`, not silently emit something wrong.
+    let out = run(&["--emit-c", &example_path("shapes.ostrin")]);
+    assert!(!out.status.success(), "the native backend should refuse a program it can't fully compile");
+    let error = stderr(&out);
+    assert!(error.contains("--run"), "the error should point users back at the interpreter: {error}");
+}
+
 #[test]
 fn cli_exposes_help_and_version() {
     let version = run(&["--version"]);

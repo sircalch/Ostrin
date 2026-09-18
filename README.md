@@ -44,13 +44,22 @@ Ostrin is not yet a production compiler. The current implementation includes a
 lexer, parser, static checker, interpreter, modules, packages, collections,
 traits, pattern matching, quantities and a simulated concurrency model.
 
-The compiler suite currently passes **67 integration tests**. Function calls
+The compiler suite currently passes **77 integration tests**. Function calls
 support named/default arguments, collection lookups preserve `Option<T>`, and
 record fields are checked statically. The CLI also exposes JSON Lines
 diagnostics with source locations for editor integrations, plus a compiler
 index of type members, local bindings and inferred expression types for editor
-tooling. The runtime is still synchronous, the standard library is small, and native code generation,
-full LSP support and production I/O are planned work.
+tooling. A persistent language server (`--lsp`) resolves a document's real
+import graph across unsaved buffers and serves hover, completion, references,
+rename, signature help and semantic tokens over the protocol; a debug adapter
+(`--dap`) gives real breakpoints, stepping, a call stack and variable
+inspection on top of the same interpreter. A first native backend (`--emit-c`/
+`--compile`) transpiles a real subset of the language — plain functions over
+`Int`/`Float`/`Bool`/`String`, recursion, `if`/`while`/`for <range>` — to C and
+compiles it to a native executable; everything else (records, enums, traits,
+generics, dimensional `Quantity`, closures, collections, pattern matching)
+still only runs through the interpreter. The runtime is still synchronous and
+the standard library is small.
 
 ## Quick start
 
@@ -73,9 +82,12 @@ ostrinc --members --json file.ostrin # type members/bindings for editors
 ostrinc --types --json file.ostrin   # inferred expression types for editors
 ostrinc --stdin --check --json --file file.ostrin # check unsaved editor text
 ostrinc --lsp                     # language server over stdio
+ostrinc --dap                     # debug adapter over stdio
 ostrinc --run file.ostrin       # type-check and run
 ostrinc --ast file.ostrin       # print the AST
 ostrinc --tokens file.ostrin   # print lexer tokens
+ostrinc --emit-c file.ostrin       # transpile a supported subset to C
+ostrinc --compile file.ostrin      # transpile and compile to a native executable
 ```
 
 ## Visual Studio Code
@@ -89,10 +101,13 @@ diagnostics, hover documentation, definition navigation, reference search,
 scoped rename, precise inferred expression hover, document formatting, persistent semantic indexing and an outline for
 top-level declarations. Enable
 `ostrin.checkOnSave` to check automatically after saving.
-The first stdio LSP backend is now active for document lifecycle events and
-diagnostics, with hover, completion and definition requests implemented in the
-server. Full workspace resolution, semantic tokens and debugging remain future
-work.
+The persistent stdio LSP backend resolves a document's real import graph
+(including unsaved buffers and `ostrin.toml` dependencies) and serves hover,
+completion, definition, signature help, references, rename and semantic
+tokens natively; the extension's own compiler-backed providers only run as a
+fallback when the server isn't available. A debug adapter (`ostrin` debug
+type) launches `ostrinc --dap` for real breakpoints, stepping, a call stack
+and variable inspection.
 
 To install the current extension locally, build the compiler and package the
 extension:

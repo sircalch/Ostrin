@@ -1,0 +1,13 @@
+fn greet(name: String) -> String {
+    "Hello, " + name
+}
+
+fn main() -> Void {
+    mut count = 0
+    while count < 3 {
+        print(greet("Ostrin"))
+        count = count + 1
+    }
+    print(true)
+    print(false)
+}

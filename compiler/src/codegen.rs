@@ -1,0 +1,456 @@
+//! A real, honest first native backend: `ostrinc --emit-c`/`--compile`
+//! transpile a *subset* of Ostrin to C and hand it to the system's C
+//! compiler. This is not the whole language — records, enums, traits,
+//! generics, dimensional `Quantity`, closures, collections and pattern
+//! matching all still only run through the interpreter (`--run`). What is
+//! supported is real: plain functions over `Int`/`Float`/`Bool`/`String`,
+//! recursion, `if`/`while`/`for <range>`, and the usual operators, compiled
+//! all the way to a native executable — not reinterpreted, not simulated.
+//!
+//! The codegen does its own tiny, local type inference (see `CType`) rather
+//! than reusing `typeck::Ty` directly: by the time this runs, the program
+//! has already passed the real type checker, so this pass only needs to
+//! know which concrete primitive each expression is (to pick a C type and a
+//! `printf` conversion), not to validate anything.
+//!
+//! Nested `if`/blocks used *as expressions* (e.g. `x = if c { a } else { b }`)
+//! are compiled using GNU statement expressions (`({ ... })`), which is why
+//! `find_c_compiler` looks for gcc/clang rather than accepting any C89
+//! compiler — this is a deliberate, documented trade-off to keep the
+//! transpiler itself simple.
+
+use std::collections::HashMap;
+
+use crate::ast::*;
+use crate::symbols::type_to_string;
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum CType {
+    Int,
+    Float,
+    Bool,
+    Str,
+    Void,
+}
+
+fn c_type_name(ty: CType) -> &'static str {
+    match ty {
+        CType::Int => "int64_t",
+        CType::Float => "double",
+        CType::Bool => "bool",
+        CType::Str => "const char*",
+        CType::Void => "void",
+    }
+}
+
+fn map_type(ty: &Type) -> Result<CType, String> {
+    match ty {
+        Type::Named(name, args) if args.is_empty() => match name.as_str() {
+            "Int" => Ok(CType::Int),
+            "Float" => Ok(CType::Float),
+            "Bool" => Ok(CType::Bool),
+            "String" => Ok(CType::Str),
+            "Void" => Ok(CType::Void),
+            _ => Err(format!("type '{}' is not supported by the native backend yet", type_to_string(ty))),
+        },
+        _ => Err(format!("type '{}' is not supported by the native backend yet", type_to_string(ty))),
+    }
+}
+
+fn c_function_name(name: &str) -> String {
+    // The generated file supplies its own `main`, so the user's `main`
+    // (which returns Void, not `int`, and takes no argv/argc) is renamed.
+    if name == "main" { "ostrin_main".to_string() } else { name.to_string() }
+}
+
+const PRELUDE: &str = "#include <stdint.h>\n\
+#include <stdbool.h>\n\
+#include <stdio.h>\n\
+#include <stdlib.h>\n\
+#include <string.h>\n\
+\n\
+static char* ostrin_str_concat(const char* a, const char* b) {\n\
+    size_t len = strlen(a) + strlen(b) + 1;\n\
+    char* out = (char*)malloc(len);\n\
+    if (!out) { fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); }\n\
+    snprintf(out, len, \"%s%s\", a, b);\n\
+    return out;\n\
+}\n\
+\n";
+
+struct Codegen {
+    signatures: HashMap<String, (Vec<CType>, CType)>,
+    scopes: Vec<HashMap<String, CType>>,
+}
+
+impl Codegen {
+    fn push_scope(&mut self) {
+        self.scopes.push(HashMap::new());
+    }
+
+    fn pop_scope(&mut self) {
+        self.scopes.pop();
+    }
+
+    fn define(&mut self, name: &str, ty: CType) {
+        self.scopes.last_mut().expect("codegen scope stack must never be empty").insert(name.to_string(), ty);
+    }
+
+    fn lookup(&self, name: &str) -> Option<CType> {
+        self.scopes.iter().rev().find_map(|scope| scope.get(name).copied())
+    }
+
+    fn gen_function_body(&mut self, f: &FunctionDecl, return_type: CType, out: &mut String) -> Result<(), String> {
+        self.push_scope();
+        for param in &f.params {
+            self.define(&param.name, map_type(&param.ty)?);
+        }
+        for stmt in &f.body.stmts {
+            self.gen_stmt(&stmt.stmt, out)?;
+        }
+        match &f.body.tail {
+            Some(e) => {
+                let (code, _) = self.gen_expr(e)?;
+                if return_type == CType::Void {
+                    out.push_str(&format!("    {code};\n    return;\n"));
+                } else {
+                    out.push_str(&format!("    return {code};\n"));
+                }
+            }
+            None => out.push_str("    return;\n"),
+        }
+        self.pop_scope();
+        Ok(())
+    }
+
+    /// Emits a block's statements followed by its tail expression (if any)
+    /// as a plain, value-discarding expression statement. Used for
+    /// `if`/`while`/`for` bodies, which never need that value — only a
+    /// function's own top-level body (`gen_function_body`) turns a tail into
+    /// a `return`, and only `gen_block_expr` keeps the tail's value around
+    /// for a block used in expression position.
+    fn gen_block_stmts(&mut self, block: &Block, out: &mut String) -> Result<(), String> {
+        for stmt in &block.stmts {
+            self.gen_stmt(&stmt.stmt, out)?;
+        }
+        if let Some(e) = &block.tail {
+            let (code, _) = self.gen_expr(e)?;
+            out.push_str(&format!("    {code};\n"));
+        }
+        Ok(())
+    }
+
+    fn gen_block_expr(&mut self, block: &Block) -> Result<(String, CType), String> {
+        let mut body = String::new();
+        self.push_scope();
+        for stmt in &block.stmts {
+            self.gen_stmt(&stmt.stmt, &mut body)?;
+        }
+        let (tail_code, tail_ty) = match &block.tail {
+            Some(e) => self.gen_expr(e)?,
+            None => ("(void)0".to_string(), CType::Void),
+        };
+        self.pop_scope();
+        Ok((format!("({{ {body} {tail_code}; }})"), tail_ty))
+    }
+
+    fn gen_stmt(&mut self, stmt: &Stmt, out: &mut String) -> Result<(), String> {
+        match stmt {
+            Stmt::Binding { name, value, .. } => {
+                let (code, ty) = self.gen_expr(value)?;
+                self.define(name, ty);
+                out.push_str(&format!("    {} {} = {};\n", c_type_name(ty), name, code));
+            }
+            Stmt::Assign { name, value } => {
+                let (code, _) = self.gen_expr(value)?;
+                out.push_str(&format!("    {name} = {code};\n"));
+            }
+            Stmt::Return(value) => match value {
+                Some(e) => {
+                    let (code, _) = self.gen_expr(e)?;
+                    out.push_str(&format!("    return {code};\n"));
+                }
+                None => out.push_str("    return;\n"),
+            },
+            Stmt::Break(value) => {
+                if value.is_some() {
+                    return Err("'break' with a value isn't supported by the native backend yet".to_string());
+                }
+                out.push_str("    break;\n");
+            }
+            Stmt::Continue => out.push_str("    continue;\n"),
+            Stmt::While { cond, body } => {
+                let (cond_code, _) = self.gen_expr(cond)?;
+                out.push_str(&format!("    while ({cond_code}) {{\n"));
+                self.push_scope();
+                self.gen_block_stmts(body, out)?;
+                self.pop_scope();
+                out.push_str("    }\n");
+            }
+            Stmt::For { pattern, iter, body } => self.gen_for(pattern, iter, body, out)?,
+            Stmt::FieldAssign { .. } => {
+                return Err("records aren't supported by the native backend yet".to_string());
+            }
+            Stmt::Expr(e) => {
+                if let Expr::If(cond, then_b, else_b) = e.unlocated() {
+                    let (cond_code, _) = self.gen_expr(cond)?;
+                    out.push_str(&format!("    if ({cond_code}) {{\n"));
+                    self.push_scope();
+                    self.gen_block_stmts(then_b, out)?;
+                    self.pop_scope();
+                    out.push_str("    }\n");
+                    if let Some(else_b) = else_b {
+                        out.push_str("    else {\n");
+                        self.push_scope();
+                        self.gen_block_stmts(else_b, out)?;
+                        self.pop_scope();
+                        out.push_str("    }\n");
+                    }
+                } else {
+                    let (code, _) = self.gen_expr(e)?;
+                    out.push_str(&format!("    {code};\n"));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn gen_for(&mut self, pattern: &str, iter: &Expr, body: &Block, out: &mut String) -> Result<(), String> {
+        let Expr::Range(start, kind, end, step) = iter.unlocated() else {
+            return Err("the native backend only supports 'for x in a to b' / 'a until b' ranges yet".to_string());
+        };
+        if step.is_some() {
+            return Err("stepped ranges aren't supported by the native backend yet".to_string());
+        }
+        let (start_code, start_ty) = self.gen_expr(start)?;
+        let (end_code, _) = self.gen_expr(end)?;
+        if start_ty != CType::Int {
+            return Err("the native backend only supports Int ranges in 'for' yet".to_string());
+        }
+        let cmp = match kind {
+            RangeKind::To => "<=",
+            RangeKind::Until => "<",
+        };
+        out.push_str(&format!("    for (int64_t {pattern} = {start_code}; {pattern} {cmp} {end_code}; {pattern}++) {{\n"));
+        self.push_scope();
+        self.define(pattern, CType::Int);
+        self.gen_block_stmts(body, out)?;
+        self.pop_scope();
+        out.push_str("    }\n");
+        Ok(())
+    }
+
+    fn gen_expr(&mut self, expr: &Expr) -> Result<(String, CType), String> {
+        match expr.unlocated() {
+            Expr::IntLiteral(v) => Ok((format!("INT64_C({v})"), CType::Int)),
+            Expr::FloatLiteral(v) => Ok((format!("{v}"), CType::Float)),
+            Expr::BoolLiteral(v) => Ok((if *v { "true".to_string() } else { "false".to_string() }, CType::Bool)),
+            Expr::StringLiteral(s) => Ok((c_string_literal(s), CType::Str)),
+            Expr::Ident(name) => {
+                let ty = self
+                    .lookup(name)
+                    .ok_or_else(|| format!("internal error: no type recorded for '{name}' in the native backend"))?;
+                Ok((name.clone(), ty))
+            }
+            Expr::Unary(op, inner) => {
+                let (code, ty) = self.gen_expr(inner)?;
+                match op {
+                    UnaryOp::Neg => Ok((format!("(-{code})"), ty)),
+                    UnaryOp::Not => Ok((format!("(!{code})"), CType::Bool)),
+                }
+            }
+            Expr::Binary(op, l, r) => self.gen_binary(*op, l, r),
+            Expr::Call(callee, args) => self.gen_call(callee, args),
+            Expr::If(cond, then_b, else_b) => {
+                let (cond_code, _) = self.gen_expr(cond)?;
+                let (then_code, then_ty) = self.gen_block_expr(then_b)?;
+                let (else_code, else_ty) = match else_b {
+                    Some(b) => self.gen_block_expr(b)?,
+                    None => ("({ (void)0; })".to_string(), CType::Void),
+                };
+                let result_ty = if then_ty == CType::Void || else_ty == CType::Void { CType::Void } else { then_ty };
+                Ok((format!("({cond_code} ? {then_code} : {else_code})"), result_ty))
+            }
+            Expr::Block(b) => self.gen_block_expr(b),
+            other => Err(format!("this expression isn't supported by the native backend yet: {other:?}")),
+        }
+    }
+
+    fn gen_binary(&mut self, op: BinOp, l: &Expr, r: &Expr) -> Result<(String, CType), String> {
+        let (lc, lt) = self.gen_expr(l)?;
+        let (rc, rt) = self.gen_expr(r)?;
+        if lt == CType::Str || rt == CType::Str {
+            return match op {
+                BinOp::Add if lt == CType::Str && rt == CType::Str => Ok((format!("ostrin_str_concat({lc}, {rc})"), CType::Str)),
+                BinOp::Eq if lt == CType::Str && rt == CType::Str => Ok((format!("(strcmp({lc}, {rc}) == 0)"), CType::Bool)),
+                BinOp::NotEq if lt == CType::Str && rt == CType::Str => Ok((format!("(strcmp({lc}, {rc}) != 0)"), CType::Bool)),
+                _ => Err("this operator isn't supported for String by the native backend yet".to_string()),
+            };
+        }
+        let c_op = match op {
+            BinOp::Add => "+",
+            BinOp::Sub => "-",
+            BinOp::Mul => "*",
+            BinOp::Div => "/",
+            BinOp::Eq => "==",
+            BinOp::NotEq => "!=",
+            BinOp::Lt => "<",
+            BinOp::Gt => ">",
+            BinOp::LtEq => "<=",
+            BinOp::GtEq => ">=",
+            BinOp::And => "&&",
+            BinOp::Or => "||",
+        };
+        let result_ty = match op {
+            BinOp::Eq | BinOp::NotEq | BinOp::Lt | BinOp::Gt | BinOp::LtEq | BinOp::GtEq | BinOp::And | BinOp::Or => CType::Bool,
+            // Arithmetic: the type checker already unified both operands, so
+            // either side's type is the result.
+            _ => lt,
+        };
+        Ok((format!("({lc} {c_op} {rc})"), result_ty))
+    }
+
+    fn gen_call(&mut self, callee: &Expr, args: &[Arg]) -> Result<(String, CType), String> {
+        let Expr::Ident(name) = callee.unlocated() else {
+            return Err("only direct calls to a named function are supported by the native backend yet".to_string());
+        };
+        let mut arg_codes = Vec::new();
+        let mut arg_types = Vec::new();
+        for arg in args {
+            let expr = match arg {
+                Arg::Positional(e) => e,
+                Arg::Named(_, _) => return Err("named arguments aren't supported by the native backend yet".to_string()),
+            };
+            let (code, ty) = self.gen_expr(expr)?;
+            arg_codes.push(code);
+            arg_types.push(ty);
+        }
+        if name == "print" {
+            return self.gen_print(&arg_codes, &arg_types);
+        }
+        let Some((param_types, return_type)) = self.signatures.get(name).cloned() else {
+            return Err(format!("unknown function '{name}' (the native backend only sees other top-level 'fn' declarations)"));
+        };
+        if param_types.len() != arg_codes.len() {
+            return Err(format!("function '{name}' expects {} argument(s), got {}", param_types.len(), arg_codes.len()));
+        }
+        Ok((format!("{}({})", c_function_name(name), arg_codes.join(", ")), return_type))
+    }
+
+    fn gen_print(&self, arg_codes: &[String], arg_types: &[CType]) -> Result<(String, CType), String> {
+        if arg_codes.len() != 1 {
+            return Err("'print' expects exactly one argument".to_string());
+        }
+        let (spec, value) = match arg_types[0] {
+            CType::Int => ("%lld\\n", format!("(long long)({})", arg_codes[0])),
+            CType::Float => ("%g\\n", arg_codes[0].clone()),
+            CType::Bool => ("%s\\n", format!("(({}) ? \"true\" : \"false\")", arg_codes[0])),
+            CType::Str => ("%s\\n", arg_codes[0].clone()),
+            CType::Void => return Err("cannot 'print' a Void value".to_string()),
+        };
+        Ok((format!("printf(\"{spec}\", {value})"), CType::Void))
+    }
+}
+
+fn c_string_literal(s: &str) -> String {
+    let mut out = String::from("\"");
+    for ch in s.chars() {
+        match ch {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if (c as u32) < 0x20 => out.push_str(&format!("\\x{:02x}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+    out
+}
+
+fn item_name(item: &Item) -> String {
+    match item {
+        Item::Function(f) => format!("fn {}", f.name),
+        Item::Record(r) => format!("record {}", r.name),
+        Item::Enum(e) => format!("enum {}", e.name),
+        Item::Impl(i) => format!("impl for {}", i.type_name),
+        Item::Trait(t) => format!("trait {}", t.name),
+        Item::Import(_) => "import".to_string(),
+    }
+}
+
+/// Transpiles an already type-checked program to C. Only plain top-level
+/// functions are accepted — any `record`/`enum`/`impl`/`trait` makes this
+/// return a clear error naming the construct, rather than silently ignoring
+/// it or emitting something incorrect.
+pub fn generate(items: &[Item]) -> Result<String, String> {
+    let mut functions = Vec::new();
+    for item in items {
+        match item {
+            Item::Function(f) => functions.push(f),
+            Item::Import(_) => {}
+            other => {
+                return Err(format!(
+                    "the native backend ('--emit-c'/'--compile') only supports plain functions yet — '{}' needs the interpreter ('--run') for now",
+                    item_name(other)
+                ));
+            }
+        }
+    }
+
+    let mut codegen = Codegen { signatures: HashMap::new(), scopes: vec![HashMap::new()] };
+    for f in &functions {
+        if !f.generics.is_empty() {
+            return Err(format!("function '{}' is generic; the native backend doesn't support generics yet", f.name));
+        }
+        let param_types = f.params.iter().map(|p| map_type(&p.ty)).collect::<Result<Vec<_>, _>>()?;
+        let return_type = map_type(&f.return_type)?;
+        codegen.signatures.insert(f.name.clone(), (param_types, return_type));
+    }
+    if !codegen.signatures.contains_key("main") {
+        return Err("no 'main' function found".to_string());
+    }
+
+    let mut out = String::from(PRELUDE);
+    for f in &functions {
+        let (param_types, return_type) = codegen.signatures.get(&f.name).cloned().unwrap();
+        let params = if f.params.is_empty() {
+            "void".to_string()
+        } else {
+            f.params
+                .iter()
+                .zip(&param_types)
+                .map(|(p, ty)| format!("{} {}", c_type_name(*ty), p.name))
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        out.push_str(&format!("{} {}({}) {{\n", c_type_name(return_type), c_function_name(&f.name), params));
+        codegen.gen_function_body(f, return_type, &mut out)?;
+        out.push_str("}\n\n");
+    }
+    out.push_str("int main(void) {\n    ostrin_main();\n    return 0;\n}\n");
+    Ok(out)
+}
+
+/// Finds a GNU-C-compatible compiler to hand the generated source to.
+/// `OSTRIN_CC` overrides the search; otherwise `cc`, `gcc` and `clang` are
+/// tried in that order (the generated code leans on GNU statement
+/// expressions, so a plain C89-only compiler — notably MSVC's `cl` — will
+/// not work here).
+pub fn find_c_compiler() -> Option<String> {
+    if let Ok(cc) = std::env::var("OSTRIN_CC") {
+        return Some(cc);
+    }
+    for candidate in ["cc", "gcc", "clang"] {
+        let works = std::process::Command::new(candidate)
+            .arg("--version")
+            .output()
+            .map(|output| output.status.success())
+            .unwrap_or(false);
+        if works {
+            return Some(candidate.to_string());
+        }
+    }
+    None
+}

@@ -2140,3 +2140,110 @@ regenerado.
 
 Con debug y LSP completos, el único frente grande realmente sin empezar en
 todo el proyecto es el backend de compilación real (LLVM u otro).
+
+---
+
+## 61. Primer backend de compilación real: `ostrinc --emit-c` / `--compile` — 2026-09-17
+
+Se preguntó al usuario qué enfoque tomar para el backend de compilación real:
+LLVM (vía `inkwell`), transpilar a Rust, o transpilar a C. Se eligió **C**,
+por ser el camino con menos fricción de dependencias (el sistema ya tenía
+`gcc` de MinGW disponible) y el más fácil de inspeccionar/depurar cuando algo
+sale mal — el mismo criterio que llevó a preferir TOML sobre un formato propio
+para `ostrin.toml`, o simulación sobre hilos reales para concurrencia:
+resolver primero el problema con la herramienta más simple que sea honesta
+sobre sus límites.
+
+### Alcance real, no fingido
+
+Igual que el primer LSP (sección 57) o el primer DAP (sección 60) no
+pretendieron cubrir todo el protocolo desde el día uno, este backend no
+pretende compilar todo Ostrin. Lo que compila de verdad, a un ejecutable
+nativo, sin pasar por el intérprete: funciones simples sobre
+`Int`/`Float`/`Bool`/`String`, recursión, `if`/`while`/`for <rango>`,
+operadores aritméticos/de comparación/lógicos, concatenación e igualdad de
+`String`. Lo que NO compila — y falla con un mensaje explícito señalando de
+vuelta al intérprete, no en silencio ni con un resultado incorrecto —:
+records, enums, traits, genéricos, `Quantity`/unidades, closures,
+colecciones, pattern matching, `spawn`/canales.
+
+### Cómo se resolvió representar `if`/bloques como expresión sin generar
+código incorrecto
+
+Ostrin, como Rust, permite que un bloque termine en una expresión sin `;` que
+se convierte en su valor (`if cond { a } else { b }` es una expresión válida
+en cualquier posición). C no tiene eso. En vez de reescribir el AST para
+eliminar esa forma (lo que habría exigido duplicar cada bloque o introducir
+variables temporales por todas partes), el generador usa **expresiones de
+sentencias de GNU** (`({ ...; valor; })`), soportadas por gcc y clang aunque
+no por MSVC — de ahí que `find_c_compiler` busque específicamente
+`cc`/`gcc`/`clang`, nunca `cl`. Cuando un `if` se usa como sentencia pura (el
+caso más común, sin capturar su valor) el generador emite un `if`/`else` de C
+normal en vez de la forma de expresión, para que el código generado sea
+legible en el caso típico.
+
+### El bug real que salió al probarlo contra un ejemplo existente
+
+Al generar código para `for n in fib { print(n) }` real, hubo que redescubrir
+(otra vez) la misma trampa que ya había mordido al DAP en la sección 60:
+`print(n)`, al ser la única línea del cuerpo, se parsea como la expresión
+`tail` del bloque, no como una sentencia. El primer intento de generar el
+cuerpo de un `for`/`while` solo recorría `block.stmts` e ignoraba `tail`,
+así que un bucle de una sola línea compilaba a un cuerpo vacío. Corregido en
+`gen_block_stmts`, que ahora también emite el `tail` (descartando su valor,
+ya que en posición de sentencia no se necesita).
+
+### Inferencia de tipos propia, deliberadamente separada de `typeck`
+
+El generador no reutiliza `typeck::Ty` — hace su propia inferencia mínima
+(`CType`: `Int`/`Float`/`Bool`/`Str`/`Void`) porque para cuando corre, el
+programa **ya pasó** el verificador de tipos real; no necesita validar nada,
+solo necesita saber qué tipo primitivo concreto tiene cada expresión para
+elegir el tipo de C correcto y el especificador de `printf` adecuado
+(`print` no tiene una forma sintáctica con formato en Ostrin — el generador
+elige `%lld`/`%g`/`%s` según el tipo estático de su único argumento).
+
+### CLI
+
+- `ostrinc --emit-c file.ostrin` imprime el C generado a stdout (o a
+  `--out ruta` si se da);
+- `ostrinc --compile file.ostrin [--out ruta]` genera el C a un archivo
+  temporal, invoca `$OSTRIN_CC` o el primero que funcione entre
+  `cc`/`gcc`/`clang`, y produce un ejecutable nativo real (por defecto junto
+  al archivo fuente, con el mismo nombre base).
+- Se corrigió de paso un bug de parseo de argumentos preexistente: la
+  detección del archivo de entrada tomaba el primer argumento sin `--` como
+  ruta, así que `--out valor` colocado antes del archivo `.ostrin` hacía que
+  `valor` se confundiera con la ruta de entrada. Ahora se reconocen
+  explícitamente `--file`/`--out` como flags que consumen el siguiente
+  argumento.
+
+### Pruebas
+
+`examples/native_fibonacci.ostrin` (recursión + `for` + `if`-expresión) y
+`examples/native_strings.ostrin` (concatenación de `String`, `while`, `Bool`)
+se compilan de verdad con `--compile` y el binario resultante se ejecuta como
+proceso aparte, comparando su `stdout` byte a byte (normalizando `\r\n` de
+Windows) contra la secuencia esperada — no se compara contra el intérprete,
+se verifica el resultado real del binario nativo. Un tercer test confirma que
+`--emit-c` sobre un programa con `enum`/`impl` (`shapes.ostrin`) falla con un
+mensaje que menciona `--run`. Los dos tests que invocan un compilador de C de
+verdad se saltan con un aviso (no fallan) si la máquina no tiene
+`gcc`/`clang`/`cc`, para no romper la suite en un entorno sin toolchain de C.
+Suite del compilador: **77 pruebas**, sin warnings nuevos.
+
+### Limitaciones explícitas
+
+Sin manejo de memoria real (`String` nunca se libera — aceptable para
+programas cortos, no para uno de larga duración); sin `break`/`continue` con
+valor; sin rangos con paso (`a to b by n`); solo llamadas directas a
+funciones nombradas (no valores de función); un solo argumento en `print`.
+Documentado explícitamente, en el mismo espíritu que el resto del proyecto:
+mejor un subconjunto pequeño que funciona de verdad y dice claramente qué le
+falta, que fingir cobertura completa.
+
+Con esto, los tres frentes grandes que quedaban (LSP completo, depurador,
+backend de compilación real) tienen al menos una primera versión real y
+probada. Lo que sigue, si se quiere seguir creciendo el backend nativo, es
+ampliar el subconjunto soportado (records simples primero, probablemente,
+ya que no requieren dispatch dinámico).

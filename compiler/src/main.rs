@@ -1,4 +1,5 @@
 mod ast;
+mod codegen;
 mod dap;
 mod interpreter;
 mod lexer;
@@ -54,7 +55,19 @@ fn main() -> ExitCode {
         return check_stdin(&source_file, json);
     }
 
-    let Some(path) = args.iter().skip(1).find(|a| !a.starts_with("--")) else {
+    let value_flags = ["--file", "--out"];
+    let mut skip_next = false;
+    let Some(path) = args.iter().skip(1).find(|a| {
+        if skip_next {
+            skip_next = false;
+            return false;
+        }
+        if value_flags.contains(&a.as_str()) {
+            skip_next = true;
+            return false;
+        }
+        !a.starts_with("--")
+    }) else {
         eprintln!("usage: ostrinc [--check|--ast|--tokens|--symbols|--members|--types|--run] [--json] <entry_file.ostrin>");
         return ExitCode::FAILURE;
     };
@@ -215,6 +228,12 @@ fn main() -> ExitCode {
         return ExitCode::FAILURE;
     }
 
+    let emit_c = args.iter().any(|a| a == "--emit-c");
+    let compile_native = args.iter().any(|a| a == "--compile");
+    if emit_c || compile_native {
+        return run_codegen(&items, entry_path, path, &args, emit_c, json);
+    }
+
     if !run {
         println!("OK — no se encontraron errores de tipo ({} elemento(s)).", items.len());
         return ExitCode::SUCCESS;
@@ -228,6 +247,78 @@ fn main() -> ExitCode {
             } else {
                 eprintln!("runtime error: {msg}");
             }
+            ExitCode::FAILURE
+        }
+    }
+}
+
+/// Handles `--emit-c` and `--compile` once the program has already
+/// type-checked cleanly. `--emit-c` just writes the generated C (to `--out`
+/// or stdout); `--compile` additionally hands that source to whatever C
+/// compiler `codegen::find_c_compiler` finds, producing a real native
+/// executable.
+fn run_codegen(items: &[ast::Item], entry_path: &Path, display_path: &str, args: &[String], emit_c: bool, json: bool) -> ExitCode {
+    let source = match codegen::generate(items) {
+        Ok(source) => source,
+        Err(message) => {
+            if json {
+                emit_json_diagnostic(None, &message, Some(display_path), None, None);
+            } else {
+                eprintln!("error: {message}");
+            }
+            return ExitCode::FAILURE;
+        }
+    };
+
+    if emit_c {
+        return match argument_value(args, "--out") {
+            Some(out_path) => match fs::write(&out_path, &source) {
+                Ok(()) => ExitCode::SUCCESS,
+                Err(e) => {
+                    eprintln!("error: could not write '{out_path}': {e}");
+                    ExitCode::FAILURE
+                }
+            },
+            None => {
+                print!("{source}");
+                ExitCode::SUCCESS
+            }
+        };
+    }
+
+    let Some(compiler) = codegen::find_c_compiler() else {
+        eprintln!("error: no GNU-compatible C compiler found (checked $OSTRIN_CC, cc, gcc, clang)");
+        return ExitCode::FAILURE;
+    };
+    let output_path = argument_value(args, "--out").unwrap_or_else(|| {
+        let stem = entry_path.file_stem().and_then(|s| s.to_str()).unwrap_or("a");
+        let dir = entry_path.parent().unwrap_or_else(|| Path::new("."));
+        let exe_name = if cfg!(windows) { format!("{stem}.exe") } else { stem.to_string() };
+        dir.join(exe_name).display().to_string()
+    });
+    let c_path = env::temp_dir().join(format!("ostrin_codegen_{}.c", std::process::id()));
+    if let Err(e) = fs::write(&c_path, &source) {
+        eprintln!("error: could not write temporary C source: {e}");
+        return ExitCode::FAILURE;
+    }
+    let status = std::process::Command::new(&compiler)
+        .arg(&c_path)
+        .arg("-o")
+        .arg(&output_path)
+        .arg("-O2")
+        .status();
+    let _ = fs::remove_file(&c_path);
+    match status {
+        Ok(status) if status.success() => {
+            println!("compiled: {output_path}");
+            ExitCode::SUCCESS
+        }
+        Ok(status) => {
+            eprintln!("error: '{compiler}' exited with {status}");
+            ExitCode::FAILURE
+        }
+        Err(e) => {
+            eprintln!("error: could not run '{compiler}': {e}");
             ExitCode::FAILURE
         }
     }
@@ -250,6 +341,9 @@ fn print_help() {
     println!("  --file PATH   Associate stdin source with a source path");
     println!("  --lsp         Run the language server over stdio");
     println!("  --dap         Run the debug adapter over stdio");
+    println!("  --emit-c      Transpile to C (a supported subset only; see docs) instead of running");
+    println!("  --compile     Transpile to C and compile it to a native executable");
+    println!("  --out PATH    Output path for --emit-c/--compile (defaults: stdout / <entry>.exe next to the source)");
     println!("  --json        Emit machine-readable diagnostics as JSON Lines");
     println!("  -h, --help    Print this help");
     println!("  -V, --version Print the compiler version");
