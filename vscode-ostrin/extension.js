@@ -3,10 +3,15 @@ const childProcess = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const languageFeatures = require('./language-features');
+const { OstrinLanguageClient } = require('./lsp-client');
 
 let diagnostics;
 const semanticIndex = new Map();
 const semanticGenerations = new Map();
+const diagnosticTimers = new Map();
+const diagnosticGenerations = new Map();
+let languageServer;
+let languageServerReady = false;
 
 function samePath(left, right) {
   return left && right
@@ -24,6 +29,20 @@ function invalidateSemanticIndex(document) {
   semanticGenerations.set(key, generation);
   semanticIndex.delete(key);
   return { key, generation };
+}
+
+function nextDiagnosticGeneration(document) {
+  const key = document.uri.toString();
+  const generation = (diagnosticGenerations.get(key) || 0) + 1;
+  diagnosticGenerations.set(key, generation);
+  return { key, generation };
+}
+
+function cancelScheduledDiagnostics(document) {
+  const key = document.uri.toString();
+  const timer = diagnosticTimers.get(key);
+  if (timer) clearTimeout(timer);
+  diagnosticTimers.delete(key);
 }
 
 function semanticIndexFor(document) {
@@ -99,6 +118,31 @@ function currentDocument() {
 function diagnosticUri(document, file) {
   if (!file) return document.uri;
   return vscode.Uri.file(path.resolve(file));
+}
+
+function setLanguageServerDiagnostics(params) {
+  if (!params || !params.uri || !diagnostics) return;
+  const uri = vscode.Uri.parse(params.uri);
+  const values = (params.diagnostics || []).map((item) => {
+    const start = item.range?.start || { line: 0, character: 0 };
+    const end = item.range?.end || { line: start.line, character: start.character + 1 };
+    const diagnostic = new vscode.Diagnostic(
+      new vscode.Range(
+        new vscode.Position(Math.max(0, start.line), Math.max(0, start.character)),
+        new vscode.Position(Math.max(0, end.line), Math.max(0, end.character))
+      ),
+      item.message || 'Ostrin compiler error.',
+      item.severity === 2
+        ? vscode.DiagnosticSeverity.Warning
+        : item.severity === 3
+          ? vscode.DiagnosticSeverity.Information
+          : vscode.DiagnosticSeverity.Error
+    );
+    if (item.code !== undefined && item.code !== null) diagnostic.code = item.code;
+    diagnostic.source = item.source || 'ostrinc';
+    return diagnostic;
+  });
+  diagnostics.set(uri, values);
 }
 
 function addDiagnostic(document, item) {
@@ -212,7 +256,10 @@ async function runCompiler(document, run, notify = true) {
   const cwd = vscode.workspace.getWorkspaceFolder(document.uri)?.uri.fsPath
     ?? path.dirname(document.uri.fsPath);
   const executable = compilerPath(document);
-  if (!run) diagnostics.delete(document.uri);
+  if (!run) {
+    nextDiagnosticGeneration(document);
+    diagnostics.delete(document.uri);
+  }
   const args = run ? ['--run', document.uri.fsPath] : ['--check', '--json', document.uri.fsPath];
   const output = vscode.window.createOutputChannel('Ostrin');
   const display = [executable, ...args].map((value) => JSON.stringify(value)).join(' ');
@@ -247,6 +294,91 @@ async function runCompiler(document, run, notify = true) {
       if (notify) vscode.window.showInformationMessage(run ? 'Ostrin program finished successfully.' : 'Ostrin check passed.');
     } else if (code !== null) {
       if (notify) vscode.window.showErrorMessage(`Ostrin ${run ? 'run' : 'check'} failed with exit code ${code}.`);
+    }
+  });
+}
+
+function runCompilerSnapshot(document) {
+  if (!document || !diagnostics) return;
+  const { key, generation } = nextDiagnosticGeneration(document);
+  const cwd = workspaceRootFor(document);
+  const executable = compilerPath(document);
+  const sourceFile = document.uri.fsPath || '<untitled>.ostrin';
+  const child = childProcess.spawn(
+    executable,
+    ['--stdin', '--check', '--json', '--file', sourceFile],
+    { cwd, windowsHide: true, shell: false }
+  );
+  let buffer = '';
+  const errors = [];
+  const consume = (line) => {
+    if (!line.trim()) return;
+    try {
+      const item = JSON.parse(line);
+      if (item && item.severity === 'error') errors.push(item);
+    } catch (_) {
+      // Background diagnostics remain silent when an older compiler writes text.
+    }
+  };
+  child.stdout.on('data', (data) => {
+    buffer += data.toString();
+    const lines = buffer.split(/\r?\n/);
+    buffer = lines.pop() || '';
+    for (const line of lines) consume(line);
+  });
+  child.on('error', () => {
+    // The explicit Check command remains responsible for reporting startup failures.
+  });
+  child.on('close', () => {
+    if (buffer.trim()) consume(buffer);
+    if (diagnosticGenerations.get(key) !== generation) return;
+    diagnostics.delete(document.uri);
+    for (const item of errors) addDiagnostic(document, item);
+  });
+  if (child.stdin) {
+    child.stdin.write(document.getText());
+    child.stdin.end();
+  }
+}
+
+function scheduleDiagnostics(document) {
+  if (document.isUntitled || languageServerReady) return;
+  cancelScheduledDiagnostics(document);
+  const configured = vscode.workspace.getConfiguration('ostrin').get('diagnosticsDebounceMs', 400);
+  const delay = Math.max(100, Math.min(2000, Number(configured) || 400));
+  diagnostics.delete(document.uri);
+  const timer = setTimeout(() => {
+    diagnosticTimers.delete(document.uri.toString());
+    runCompilerSnapshot(document);
+  }, delay);
+  diagnosticTimers.set(document.uri.toString(), timer);
+}
+
+function startLanguageServer(document) {
+  if (languageServer || !document || document.isUntitled) return;
+  const cwd = workspaceRootFor(document);
+  const client = new OstrinLanguageClient(
+    compilerPath(document),
+    cwd,
+    vscode.Uri.file(cwd).toString(),
+    setLanguageServerDiagnostics,
+    () => {}
+  );
+  languageServer = client;
+  client.start().then(() => {
+    if (languageServer !== client) return;
+    languageServerReady = true;
+    for (const openDocument of vscode.workspace.textDocuments) {
+      if (openDocument.languageId !== 'ostrin' || openDocument.isUntitled) continue;
+      cancelScheduledDiagnostics(openDocument);
+      nextDiagnosticGeneration(openDocument);
+      diagnostics.delete(openDocument.uri);
+      client.didOpen(openDocument);
+    }
+  }).catch(() => {
+    if (languageServer === client) {
+      languageServer = undefined;
+      languageServerReady = false;
     }
   });
 }
@@ -293,29 +425,65 @@ function activate(context) {
   });
 
   const saveSubscription = vscode.workspace.onDidSaveTextDocument(async (document) => {
+    if (document.languageId === 'ostrin') {
+      startLanguageServer(document);
+      cancelScheduledDiagnostics(document);
+    }
     const enabled = vscode.workspace.getConfiguration('ostrin').get('checkOnSave', false);
     if (enabled && document.languageId === 'ostrin') {
       await runCompiler(document, false, false);
+    } else if (document.languageId === 'ostrin' && languageServerReady) {
+      languageServer.didSave(document);
+    } else if (document.languageId === 'ostrin'
+      && vscode.workspace.getConfiguration('ostrin').get('diagnosticsOnType', true)) {
+      runCompilerSnapshot(document);
     }
     if (document.languageId === 'ostrin') refreshSemanticIndex(document);
   });
   const changeSubscription = vscode.workspace.onDidChangeTextDocument((event) => {
-    if (event.document.languageId === 'ostrin') invalidateSemanticIndex(event.document);
+    if (event.document.languageId !== 'ostrin') return;
+    invalidateSemanticIndex(event.document);
+    startLanguageServer(event.document);
+    if (languageServerReady) {
+      languageServer.didChange(event.document);
+    } else if (vscode.workspace.getConfiguration('ostrin').get('diagnosticsOnType', true)) {
+      scheduleDiagnostics(event.document);
+    }
   });
   const closeSubscription = vscode.workspace.onDidCloseTextDocument((document) => {
-    if (document.languageId === 'ostrin') invalidateSemanticIndex(document);
+    if (document.languageId !== 'ostrin') return;
+    cancelScheduledDiagnostics(document);
+    if (languageServerReady) languageServer.didClose(document);
+    nextDiagnosticGeneration(document);
+    diagnostics.delete(document.uri);
+    invalidateSemanticIndex(document);
   });
 
   const openSubscription = vscode.workspace.onDidOpenTextDocument((document) => {
-    if (document.languageId === 'ostrin') refreshSemanticIndex(document);
+    if (document.languageId !== 'ostrin') return;
+    startLanguageServer(document);
+    refreshSemanticIndex(document);
+    if (!languageServerReady && vscode.workspace.getConfiguration('ostrin').get('diagnosticsOnType', true)) {
+      scheduleDiagnostics(document);
+    }
   });
   for (const editor of vscode.window.visibleTextEditors) {
-    if (editor.document.languageId === 'ostrin') refreshSemanticIndex(editor.document);
+    if (editor.document.languageId !== 'ostrin') continue;
+    startLanguageServer(editor.document);
+    refreshSemanticIndex(editor.document);
+    if (!languageServerReady && vscode.workspace.getConfiguration('ostrin').get('diagnosticsOnType', true)) {
+      scheduleDiagnostics(editor.document);
+    }
   }
 
   context.subscriptions.push(diagnostics, completion, signatureHelp, hover, definitions, references, rename, symbols, formatting, check, run, saveSubscription, changeSubscription, closeSubscription, openSubscription);
 }
 
-function deactivate() {}
+function deactivate() {
+  const client = languageServer;
+  languageServer = undefined;
+  languageServerReady = false;
+  return client ? client.stop() : undefined;
+}
 
 module.exports = { activate, deactivate };

@@ -1,6 +1,7 @@
 mod ast;
 mod interpreter;
 mod lexer;
+mod lsp;
 mod modules;
 mod package;
 mod parser;
@@ -10,6 +11,7 @@ mod types;
 
 use std::env;
 use std::fs;
+use std::io::{self, Read};
 use std::path::Path;
 use std::process::ExitCode;
 
@@ -20,6 +22,8 @@ fn main() -> ExitCode {
     let symbols_only = args.iter().any(|a| a == "--symbols");
     let members_only = args.iter().any(|a| a == "--members");
     let types_only = args.iter().any(|a| a == "--types");
+    let stdin_source = args.iter().any(|a| a == "--stdin");
+    let lsp_server = args.iter().any(|a| a == "--lsp");
     let run = args.iter().any(|a| a == "--run");
     let json = args.iter().any(|a| a == "--json");
     let help = args.iter().any(|a| a == "--help" || a == "-h");
@@ -32,6 +36,15 @@ fn main() -> ExitCode {
     if version {
         println!("ostrinc 0.1.0");
         return ExitCode::SUCCESS;
+    }
+
+    if lsp_server {
+        return lsp::run();
+    }
+
+    if stdin_source {
+        let source_file = argument_value(&args, "--file").unwrap_or_else(|| "<stdin>".to_string());
+        return check_stdin(&source_file, json);
     }
 
     let Some(path) = args.iter().skip(1).find(|a| !a.starts_with("--")) else {
@@ -226,9 +239,91 @@ fn print_help() {
     println!("  --symbols     Print source symbols and signatures");
     println!("  --members     Print type members and local bindings for editor tools");
     println!("  --types       Print inferred expression types for editor tools");
+    println!("  --stdin       Read source from stdin for editor integrations");
+    println!("  --file PATH   Associate stdin source with a source path");
+    println!("  --lsp         Run the language server over stdio");
     println!("  --json        Emit machine-readable diagnostics as JSON Lines");
     println!("  -h, --help    Print this help");
     println!("  -V, --version Print the compiler version");
+}
+
+fn argument_value(args: &[String], flag: &str) -> Option<String> {
+    args.windows(2)
+        .find(|pair| pair[0] == flag)
+        .map(|pair| pair[1].clone())
+}
+
+fn check_stdin(source_file: &str, json: bool) -> ExitCode {
+    let mut source = String::new();
+    if let Err(error) = io::stdin().read_to_string(&mut source) {
+        if json {
+            emit_json_diagnostic(None, &format!("could not read stdin: {error}"), Some(source_file), None, None);
+        } else {
+            eprintln!("could not read stdin: {error}");
+        }
+        return ExitCode::FAILURE;
+    }
+
+    let tokens = match lexer::Lexer::new(&source).tokenize() {
+        Ok(tokens) => tokens,
+        Err(error) => {
+            if json {
+                emit_json_diagnostic(
+                    None,
+                    &format!("lex error: {}", error.message),
+                    Some(source_file),
+                    Some(error.line),
+                    Some(error.col),
+                );
+            } else {
+                eprintln!("lex error at {}:{}: {}", error.line, error.col, error.message);
+            }
+            return ExitCode::FAILURE;
+        }
+    };
+
+    let (items, parse_errors) = parser::Parser::new(tokens).parse_program();
+    for error in &parse_errors {
+        if json {
+            emit_json_diagnostic(
+                None,
+                &format!("parse error: {}", error.message),
+                Some(source_file),
+                Some(error.line),
+                Some(error.col),
+            );
+        } else {
+            eprintln!("parse error at {}:{}: {}", error.line, error.col, error.message);
+        }
+    }
+
+    let errors = typeck::Checker::new().check_program(&items);
+    for error in &errors {
+        if json {
+            emit_json_diagnostic(
+                Some(error.code),
+                &error.message,
+                error.source_file.as_deref().or(Some(source_file)),
+                error.span.map(|span| span.line),
+                error.span.map(|span| span.col),
+            );
+        } else {
+            eprintln!("error OSTRIN-{}: {}", error.code, error.message);
+        }
+    }
+
+    let total_errors = parse_errors.len() + errors.len();
+    if total_errors == 0 {
+        if !json {
+            println!("OK — no se encontraron errores de tipo.");
+        }
+        ExitCode::SUCCESS
+    } else {
+        if !json {
+            eprintln!("\n{} error(es)", total_errors);
+        }
+        ExitCode::FAILURE
+    }
 }
 
 fn emit_json_diagnostic(

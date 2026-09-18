@@ -2,6 +2,20 @@
 
 All notable changes to the Ostrin VS Code extension are documented here.
 
+## [0.2.0] - 2026-09-17
+
+- Add a persistent `ostrinc --lsp` backend over standard input/output.
+- Connect VS Code document lifecycle events to the LSP server.
+- Consume `textDocument/publishDiagnostics` with exact LSP ranges.
+- Keep direct compiler-backed providers and stdin diagnostics as a fallback.
+
+## [0.1.8] - 2026-09-17
+
+- Check unsaved Ostrin documents through the compiler's stdin mode.
+- Add debounced live diagnostics while editing.
+- Discard diagnostics from older document generations after rapid edits.
+- Add `ostrin.diagnosticsOnType` and `ostrin.diagnosticsDebounceMs` settings.
+
 ## [0.1.7] - 2026-09-17
 
 - Add signature help for Ostrin functions and methods.

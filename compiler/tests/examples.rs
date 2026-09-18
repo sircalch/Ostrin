@@ -1,5 +1,6 @@
 use std::fs;
-use std::process::{Command, Output};
+use std::io::{Read, Write};
+use std::process::{Command, Output, Stdio};
 
 fn example_path(rel: &str) -> String {
     format!("{}/../examples/{}", env!("CARGO_MANIFEST_DIR"), rel)
@@ -10,6 +11,56 @@ fn run(args: &[&str]) -> Output {
         .args(args)
         .output()
         .expect("failed to run ostrinc")
+}
+
+fn run_stdin(args: &[&str], source: &str) -> Output {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_ostrinc"))
+        .args(args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("failed to run ostrinc with stdin");
+    child
+        .stdin
+        .take()
+        .expect("missing stdin pipe")
+        .write_all(source.as_bytes())
+        .expect("failed to write source to ostrinc");
+    child.wait_with_output().expect("failed to collect ostrinc output")
+}
+
+fn lsp_frame(body: &str) -> Vec<u8> {
+    format!("Content-Length: {}\r\n\r\n{}", body.len(), body).into_bytes()
+}
+
+fn run_lsp(messages: &[&str]) -> Output {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_ostrinc"))
+        .arg("--lsp")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("failed to run ostrinc LSP");
+    {
+        let mut stdin = child.stdin.take().expect("missing LSP stdin pipe");
+        for message in messages {
+            stdin.write_all(&lsp_frame(message)).expect("failed to write LSP message");
+        }
+    }
+    let mut output = Vec::new();
+    child
+        .stdout
+        .take()
+        .expect("missing LSP stdout pipe")
+        .read_to_end(&mut output)
+        .expect("failed to read LSP output");
+    let status = child.wait().expect("failed to wait for LSP");
+    Output {
+        status,
+        stdout: output,
+        stderr: Vec::new(),
+    }
 }
 
 fn stdout(out: &Output) -> String {
@@ -194,6 +245,54 @@ fn json_diagnostics_are_editor_friendly_and_keep_source_locations() {
     assert!(text.contains("\"message\":\"Type 'Score' has no field 'missing'.\""));
     assert!(text.contains("\"line\":8"));
     assert!(text.contains("\"column\":5"));
+}
+
+#[test]
+fn compiler_checks_unsaved_stdin_source_for_editor_integrations() {
+    let source = "fn main() -> Void {\n    if 1 {\n        print(\"bad\")\n    }\n}\n";
+    let out = run_stdin(&[
+        "--stdin",
+        "--check",
+        "--json",
+        "--file",
+        "C:/workspace/unsaved.ostrin",
+    ], source);
+    assert!(!out.status.success());
+    let text = stdout(&out);
+    assert!(text.contains("\"severity\":\"error\""), "missing JSON diagnostic: {text}");
+    assert!(text.contains("C:/workspace/unsaved.ostrin"), "missing source path: {text}");
+
+    let valid = run_stdin(
+        &["--stdin", "--check", "--json", "--file", "C:/workspace/unsaved.ostrin"],
+        "fn main() -> Void {\n    print(\"ok\")\n}\n",
+    );
+    assert!(valid.status.success(), "stderr: {}", stderr(&valid));
+    assert!(stdout(&valid).is_empty(), "JSON success should be silent: {}", stdout(&valid));
+}
+
+#[test]
+fn compiler_lsp_negotiates_and_publishes_diagnostics() {
+    let out = run_lsp(&[
+        r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}"#,
+        r#"{"jsonrpc":"2.0","method":"initialized","params":{}}"#,
+        r##"{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///C:/workspace/lsp.ostrin","languageId":"ostrin","version":1,"text":"fn main() -> Void {\n    if 1 {\n        print(\"bad\")\n    }\n}\n"}}}"##,
+        r#"{"jsonrpc":"2.0","id":3,"method":"textDocument/hover","params":{"textDocument":{"uri":"file:///C:/workspace/lsp.ostrin"},"position":{"line":0,"character":4}}}"#,
+        r#"{"jsonrpc":"2.0","id":4,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///C:/workspace/lsp.ostrin"},"position":{"line":0,"character":4}}}"#,
+        r#"{"jsonrpc":"2.0","id":5,"method":"textDocument/definition","params":{"textDocument":{"uri":"file:///C:/workspace/lsp.ostrin"},"position":{"line":0,"character":4}}}"#,
+        r##"{"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":"file:///C:/workspace/lsp.ostrin","version":2},"contentChanges":[{"text":"fn main() -> Void {\n    print(\"ok\")\n}\n"}]}}"##,
+        r#"{"jsonrpc":"2.0","id":2,"method":"shutdown","params":null}"#,
+        r#"{"jsonrpc":"2.0","method":"exit","params":null}"#,
+    ]);
+    assert!(out.status.success(), "LSP exited unsuccessfully");
+    let text = stdout(&out);
+    assert!(text.contains("\"hoverProvider\":true"), "missing initialize capabilities: {text}");
+    assert!(text.contains("textDocument/publishDiagnostics"), "missing diagnostics notification: {text}");
+    assert!(text.contains("OSTRIN-E1041"), "missing type diagnostic: {text}");
+    assert!(text.contains("\"line\":1"), "missing zero-based diagnostic range: {text}");
+    assert!(text.contains("\"id\":3") && text.contains("Ostrin function"), "missing hover response: {text}");
+    assert!(text.contains("\"id\":4") && text.contains("\"label\":\"main\""), "missing completion response: {text}");
+    assert!(text.contains("\"id\":5") && text.contains("\"uri\":\"file:///C:/workspace/lsp.ostrin\""), "missing definition response: {text}");
+    assert!(text.contains("\"diagnostics\":[]"), "didChange should clear diagnostics: {text}");
 }
 
 #[test]

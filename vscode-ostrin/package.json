@@ -2,7 +2,7 @@
   "name": "ostrin-language-support",
   "displayName": "Ostrin Language Support",
   "description": "Syntax highlighting and compiler commands for the Ostrin programming language.",
-  "version": "0.1.7",
+  "version": "0.2.0",
   "publisher": "ostrin-project",
   "license": "SEE LICENSE IN LICENSE",
   "repository": {
@@ -85,6 +85,18 @@
           "type": "boolean",
           "default": false,
           "description": "Run the Ostrin compiler when an .ostrin file is saved."
+        },
+        "ostrin.diagnosticsOnType": {
+          "type": "boolean",
+          "default": true,
+          "description": "Check the current Ostrin document while it is being edited without saving it."
+        },
+        "ostrin.diagnosticsDebounceMs": {
+          "type": "integer",
+          "default": 400,
+          "minimum": 100,
+          "maximum": 2000,
+          "description": "Delay in milliseconds before checking an edited Ostrin document."
         }
       }
     }

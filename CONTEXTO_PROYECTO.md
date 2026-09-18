@@ -55,15 +55,16 @@ Cada uno tiene una sección "Decisiones de fondo ya cerradas" al principio y "Pr
 
 ---
 
-## 4. El compilador (`compiler/`, Rust, sin dependencias salvo `toml`)
+## 4. El compilador (`compiler/`, Rust, con `toml` y `serde_json`)
 
 Proyecto Cargo normal: `cd compiler && cargo build`, binario `ostrinc`.
 
 ```
 compiler/
-├── Cargo.toml              (una sola dependencia externa: `toml`, para ostrin.toml)
+├── Cargo.toml              (`toml` para ostrin.toml y `serde_json` para LSP)
 ├── src/
-│   ├── main.rs              — CLI: --check, --tokens, --ast, --run, --json, --symbols, --members, --types, --help, --version
+│   ├── main.rs              — CLI: --check, --tokens, --ast, --run, --json, --symbols, --members, --types, --stdin, --lsp, --help, --version
+│   ├── lsp.rs               — servidor JSON-RPC sobre stdio: lifecycle, diagnósticos, hover, completion y definición
 │   ├── lexer/
 │   │   ├── mod.rs           — tokenizador, trackea saltos de línea (newline_before) por token
 │   │   └── token.rs         — TokenKind, tabla de palabras reservadas
@@ -75,7 +76,7 @@ compiler/
 │   ├── modules.rs            — carga multi-archivo: descubrimiento, ciclos (E1081), visibilidad (E1080), reescritura de AST (mangling de nombres cruzando módulos)
 │   └── package.rs            — ostrin.toml, dependencias `path` (funcionan) y `git` (reconocidas, rechazadas explícitamente sin red)
 └── tests/
-    └── examples.rs           — 67 pruebas de integración (invocan el binario compilado, comparan stdout/stderr exacto)
+    └── examples.rs           — 69 pruebas de integración (invocan el binario compilado, comparan CLI y protocolo LSP)
 ```
 
 ### Cómo correrlo
@@ -92,6 +93,8 @@ cargo test                                    # 67 pruebas, deben pasar todas
 ./target/debug/ostrinc --symbols --json archivo.ostrin # símbolos y firmas
 ./target/debug/ostrinc --members --json archivo.ostrin # miembros por tipo y bindings locales
 ./target/debug/ostrinc --types --json archivo.ostrin # tipos inferidos de expresiones
+./target/debug/ostrinc --stdin --check --json --file archivo.ostrin # buffer no guardado
+./target/debug/ostrinc --lsp                    # servidor LSP sobre stdio
 ```
 
 En Windows, si `cargo`/`rustc` no están en el PATH de la sesión: `$env:Path += ";$env:USERPROFILE\.cargo\bin"` (rustup se instaló vía `winget install Rustlang.Rustup` durante esta sesión).
@@ -109,7 +112,7 @@ En Windows, si `cargo`/`rustc` no están en el PATH de la sesión: `$env:Path +=
 
 ## 5. Qué está probado (y cómo verificarlo)
 
-`compiler/tests/examples.rs` tiene 65 pruebas. Cubren, con valores exactos esperados (no solo "no falla"):
+`compiler/tests/examples.rs` tiene 69 pruebas. Cubren, con valores exactos esperados (no solo "no falla"):
 
 - Aritmética de `Quantity<D>` con conversión de unidades real (`5 nm + 2 m`, `velocity(10 m, 2 s)`, cancelación dimensional `2m/5nm = 400000000`).
 - Los 4 errores deliberados de dimensión/mutabilidad (`E1024`, `E1025`, `E1001`) en un mismo archivo.
@@ -1866,3 +1869,78 @@ se actualizaron README, changelog, roadmap y la web.
 Este paso sigue siendo una integración directa con VS Code, no un servidor LSP
 independiente. El siguiente bloque grande continúa siendo extraer un servicio
 semántico persistente con protocolo LSP y después conectar depuración.
+
+---
+
+## 56. Diagnósticos en tiempo real sobre texto no guardado — 2026-09-17
+
+El compilador ahora acepta una fuente por entrada estándar:
+
+```text
+ostrinc --stdin --check --json --file archivo.ostrin
+```
+
+El modo conserva el mismo lexer, parser, recuperación de errores y checker que
+la ruta normal de archivos. `--file` solo asocia la fuente temporal con una
+ubicación para que los diagnósticos mantengan su archivo, línea y columna; no
+escribe ese contenido en disco. El JSON permanece silencioso cuando la fuente
+es válida, lo que permite consumirlo como proceso hijo desde un editor.
+
+La extensión de VS Code conecta esa entrada con un ciclo de diagnóstico en
+tiempo real:
+
+- cada edición de un `.ostrin` programa una comprobación con debounce;
+- el contenido actual se envía por `stdin`, sin guardar automáticamente el
+  documento;
+- los diagnósticos viejos se limpian mientras llega el nuevo resultado;
+- cada documento tiene una generación de diagnóstico y los procesos tardíos
+  se descartan, evitando que una edición antigua sobrescriba la actual;
+- al cerrar un documento se cancela el temporizador y se invalidan sus
+  resultados pendientes;
+- `ostrin.diagnosticsOnType` permite desactivar la comprobación y
+  `ostrin.diagnosticsDebounceMs` permite ajustar el retraso entre 100 y 2000 ms.
+
+Se añadió una prueba de integración del modo `stdin`; la suite del compilador
+pasa a **68 pruebas**. La extensión pasa a `0.1.8` y se regeneró el VSIX. Este
+es el primer paso de un servicio semántico que puede trabajar con buffers en
+memoria; el siguiente tramo será reutilizar esta sesión para un servidor LSP
+con `initialize`, `didOpen`, `didChange`, `publishDiagnostics`, hover y
+completion por el protocolo estándar.
+
+---
+
+## 57. Primer backend LSP persistente — 2026-09-17
+
+El compilador incorpora `ostrinc --lsp`, un servidor JSON-RPC sobre `stdio`
+con framing `Content-Length`. No es una simulación de documentación: mantiene
+documentos abiertos en memoria y ejecuta el mismo lexer, parser y checker que
+la CLI.
+
+### Protocolo implementado
+
+- `initialize` / `initialized` con capacidades declaradas;
+- `shutdown` / `exit`;
+- `textDocument/didOpen`, `didChange`, `didSave` y `didClose`;
+- `textDocument/publishDiagnostics` con códigos Ostrin y rangos LSP cero-based;
+- `textDocument/hover` para miembros, bindings, símbolos y expresiones
+  inferidas;
+- `textDocument/completion` para símbolos, miembros y bindings;
+- `textDocument/definition` para declaraciones indexadas.
+
+La extensión incluye `lsp-client.js`, un cliente stdio sin dependencia de un
+servidor externo. Al abrir un documento disponible, inicia un proceso
+persistente de `ostrinc --lsp`, envía los cambios completos del buffer y
+consume las notificaciones de diagnósticos. Mientras el servidor se inicia o
+si el ejecutable no está disponible, conserva el modo `--stdin` con debounce
+como respaldo. Los proveedores directos de VS Code siguen activos para evitar
+regresiones mientras la semántica se migra al protocolo estándar.
+
+La prueba de integración abre una sesión LSP completa, negocia capacidades y
+verifica que un error de tipo llegue como `publishDiagnostics` con el rango
+correcto. La suite del compilador pasa a **69 pruebas**. La extensión pasa a
+`0.2.0`, se incluye el nuevo cliente en el VSIX y la web deja de presentar el
+transporte LSP como trabajo inexistente.
+
+Todavía falta completar la resolución de workspace/imports dentro de la sesión,
+semantic tokens, referencias/rename por protocolo y debugging. Esa es la
+siguiente expansión grande del servidor.

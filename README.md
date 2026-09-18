@@ -71,6 +71,8 @@ ostrinc --json --check file.ostrin # diagnostics for tools and editors
 ostrinc --symbols --json file.ostrin # symbols/signatures for editors
 ostrinc --members --json file.ostrin # type members/bindings for editors
 ostrinc --types --json file.ostrin   # inferred expression types for editors
+ostrinc --stdin --check --json --file file.ostrin # check unsaved editor text
+ostrinc --lsp                     # language server over stdio
 ostrinc --run file.ostrin       # type-check and run
 ostrinc --ast file.ostrin       # print the AST
 ostrinc --tokens file.ostrin   # print lexer tokens
@@ -82,13 +84,15 @@ The first editor integration is in [`vscode-ostrin/`](vscode-ostrin/). It
 recognizes `.ostrin` files, provides syntax highlighting, uses the official
 logo, exposes commands to check or run the current file with `ostrinc`, and
 shows compiler diagnostics directly in the Problems panel. It also provides
-syntax-aware completion, type-aware member completion, hover documentation,
-signature help, definition navigation, reference search, scoped rename, precise
-inferred expression hover, document formatting, persistent semantic indexing and an outline for
+syntax-aware completion, type-aware member completion, signature help, live
+diagnostics, hover documentation, definition navigation, reference search,
+scoped rename, precise inferred expression hover, document formatting, persistent semantic indexing and an outline for
 top-level declarations. Enable
 `ostrin.checkOnSave` to check automatically after saving.
-A complete semantic Language Server Protocol implementation and debugging
-remain future work.
+The first stdio LSP backend is now active for document lifecycle events and
+diagnostics, with hover, completion and definition requests implemented in the
+server. Full workspace resolution, semantic tokens and debugging remain future
+work.
 
 To install the current extension locally, build the compiler and package the
 extension:
@@ -98,7 +102,7 @@ cd compiler
 cargo build
 cd ..\vscode-ostrin
 npx --yes @vscode/vsce package
-code --install-extension .\ostrin-language-support-0.1.7.vsix
+code --install-extension .\ostrin-language-support-0.2.0.vsix
 ```
 
 Once installed, VS Code detects `.ostrin` files automatically. The extension
@@ -128,9 +132,9 @@ when GitHub Pages is enabled.
 ## Roadmap
 
 1. Complete the semantic core and remove unnecessary `Unknown` types.
-2. Expand source spans to expression-level precision and add the LSP server.
+2. Expand source spans and complete the LSP workspace semantic service.
 3. Grow the standard library and runtime.
-4. Finish the VS Code language server.
+4. Finish semantic tokens, workspace resolution and debugging in the VS Code client.
 5. Package applications as `.exe` files, then add native code generation.
 6. Implement real concurrency, WebAssembly and platform bindings.
 

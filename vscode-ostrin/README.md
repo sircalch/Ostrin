@@ -9,6 +9,8 @@ This is the first VS Code integration for Ostrin. It currently provides:
 - `Ostrin: Check Current File`;
 - `Ostrin: Run Current File`;
 - compiler errors in the VS Code Problems panel, with line and column when available;
+- debounced diagnostics for unsaved text while editing;
+- a persistent Ostrin language server connected over stdio;
 - keyword, type, unit and standard-library completion;
 - type-aware member completion for known local bindings and declared types;
 - signature help for functions and methods, including the active argument;
@@ -35,7 +37,7 @@ the repository root:
 ```powershell
 cd vscode-ostrin
 npx --yes @vscode/vsce package
-code --install-extension .\ostrin-language-support-0.1.7.vsix
+code --install-extension .\ostrin-language-support-0.2.0.vsix
 ```
 
 After restarting or reloading VS Code, opening any `.ostrin` file selects the
@@ -49,5 +51,10 @@ expression hover. The cache is invalidated while a document is dirty and
 rebuilt after saving. The current editor providers are intentionally lightweight:
 cross-file navigation is conservative when two modules expose the same short
 name. Signature help is driven by the same compiler-produced signatures used by
-completion and hover. A full semantic language server with persistent state and
-debugging is future work.
+completion and hover. Unsaved diagnostics use `ostrinc --stdin`, so editing does
+not write a document to disk just to check it. The extension now starts
+`ostrinc --lsp` when the compiler is available and sends document lifecycle
+events over stdio; the stdin checker remains a fallback. Set
+`ostrin.diagnosticsOnType` to `false` to disable fallback checks or tune
+`ostrin.diagnosticsDebounceMs`. Semantic tokens, full workspace resolution and
+debugging remain future work.
