@@ -123,6 +123,7 @@ enviar un *record* por un canal (no hay equivalente del chequeo E1101), `for` so
 | Paquetes | Diseño y lockfile básicos; sin registro remoto (decisión: **no** añadir red automática al compilador) |
 | Rendimiento del intérprete | Tree‑walking simple; sin optimizaciones |
 | `newlines.ostrin`, `advanced.ostrin` | Son muestras de sintaxis, no programas ejecutables |
+| CI | Existe (`cargo test` en Ubuntu); falta Windows/macOS y validar el backend nativo |
 | Distribución | Sin instalador ni binarios publicados; `.exe` de aplicación pendiente |
 
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
