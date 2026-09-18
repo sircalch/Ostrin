@@ -1560,6 +1560,7 @@ fn native_backend_generic_records_and_enums_match_the_interpreter() {
         "generic_impl_dispatch.ostrin",
         "generic_enum_dispatch.ostrin",
         "generic_nested_patterns.ostrin",
+        "native_display.ostrin",
     ] {
         let interpreted = run(&["--run", &example_path(file)]);
         assert!(interpreted.status.success(), "interpreter failed on {file}: {}", stderr(&interpreted));

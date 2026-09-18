@@ -1,0 +1,15 @@
+enum Shape {
+    Circle(radius: Float)
+    Rect(Int, Int)
+    Dot
+}
+record P {
+    x: Int
+    name: String
+}
+fn main() -> Void {
+    print(Circle(radius: 1.5))
+    print(Rect(2, 3))
+    print(Dot)
+    print(P { x: 1, name: "a" })
+}

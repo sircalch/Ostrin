@@ -2916,3 +2916,13 @@ pruebas**, sin warnings.
   records; los `List_*` se declaran (typedef) antes de los records.
 - Sigue fuera: métodos genéricos (`fn map<U>`), `print` de un enum, y el resto
   de la lista del apartado 73. Suite: **94 pruebas**, sin warnings.
+
+---
+
+## 75. `print` de records y enums en el backend nativo — 2026-09-18
+
+- `print` de un record/enum (incluidas instancias genéricas y valores anidados)
+  usa un `ostrin_show_<Nombre>` generado bajo demanda, con el mismo formato que
+  el intérprete: `Circle(radius: 1.5)`, `Rect(2, 3)`, `Dot`, `P { x: 1, name: a }`.
+- Sigue sin poder imprimirse `List`/`Option`/`Result`. Ejemplo nuevo
+  `native_display.ostrin`. Suite: **94 pruebas**, sin warnings.

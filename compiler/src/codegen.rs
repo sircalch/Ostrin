@@ -402,6 +402,9 @@ struct Codegen<'a> {
     /// The type the enclosing context expects the next expression to have;
     /// consumed by `gen_expr` and used to complete generic literals.
     expected: Option<CType>,
+    /// Records/enums whose generated `ostrin_show_*` (used by `print`) is queued.
+    show_queue: VecDeque<CType>,
+    show_done: HashSet<String>,
     record_names: HashSet<String>,
     enum_names: HashSet<String>,
     scopes: Vec<HashMap<String, CType>>,
@@ -2186,7 +2189,73 @@ impl<'a> Codegen<'a> {
         }
     }
 
-    fn gen_print(&self, arg_codes: &[String], arg_types: &[CType]) -> Result<(String, CType), String> {
+    /// A C expression (`const char*`) rendering `code` the way `print` does.
+    /// Records and enums go through a generated `ostrin_show_<Name>`.
+    fn show_expr(&mut self, code: &str, ty: &CType) -> Result<String, String> {
+        match ty {
+            CType::Int => Ok(format!("ostrin_int_to_string({code})")),
+            CType::Float => Ok(format!("ostrin_float_to_string({code})")),
+            CType::Bool => Ok(format!("(({code}) ? \"true\" : \"false\")")),
+            CType::Str => Ok(code.to_string()),
+            CType::Quantity(_) => Ok(format!("ostrin_qty_to_string({code})")),
+            CType::Record(name) | CType::Enum(name) => {
+                if self.show_done.insert(name.clone()) {
+                    self.show_queue.push_back(ty.clone());
+                }
+                Ok(format!("ostrin_show_{name}({code})"))
+            }
+            other => Err(format!("cannot 'print' a value of type '{}' yet", c_type_name(other))),
+        }
+    }
+
+    /// Body of `ostrin_show_<name>`: `Circle(radius: 1.5)`, `Rect(2, 3)`,
+    /// `P { x: 1, name: a }` — the interpreter's own display format.
+    fn gen_show_body(&mut self, ty: &CType) -> Result<String, String> {
+        let mut out = String::new();
+        match ty {
+            CType::Enum(name) => {
+                let variants: Vec<VariantInfo> = match self.instance_variants.get(name) {
+                    Some(vs) => vs.clone(),
+                    None => self.variants.values().filter(|v| &v.enum_name == name).cloned().collect(),
+                };
+                for v in variants {
+                    out.push_str(&format!("    if (v.tag == {}) {{\n        const char* s = {};\n", v.tag, c_string_literal(&if v.fields.is_empty() { v.name.clone() } else { format!("{}(", v.name) })));
+                    for (i, (field_name, field_ty)) in v.fields.iter().enumerate() {
+                        if i > 0 {
+                            out.push_str("        s = ostrin_str_concat(s, \", \");\n");
+                        }
+                        if *field_name != format!("f{i}") {
+                            out.push_str(&format!("        s = ostrin_str_concat(s, {});\n", c_string_literal(&format!("{field_name}: "))));
+                        }
+                        let shown = self.show_expr(&format!("v.data.{}.{field_name}", v.name), field_ty)?;
+                        out.push_str(&format!("        s = ostrin_str_concat(s, {shown});\n"));
+                    }
+                    if !v.fields.is_empty() {
+                        out.push_str("        s = ostrin_str_concat(s, \")\");\n");
+                    }
+                    out.push_str("        return s;\n    }\n");
+                }
+                out.push_str("    return \"?\";\n");
+            }
+            CType::Record(name) => {
+                let base = self.instance_info.get(name).map(|(b, _)| b.clone()).unwrap_or_else(|| name.clone());
+                out.push_str(&format!("    const char* s = {};\n", c_string_literal(&format!("{base} {{ "))));
+                for (i, (field_name, field_ty)) in self.record_fields(name).to_vec().iter().enumerate() {
+                    if i > 0 {
+                        out.push_str("    s = ostrin_str_concat(s, \", \");\n");
+                    }
+                    out.push_str(&format!("    s = ostrin_str_concat(s, {});\n", c_string_literal(&format!("{field_name}: "))));
+                    let shown = self.show_expr(&format!("v->{field_name}"), field_ty)?;
+                    out.push_str(&format!("    s = ostrin_str_concat(s, {shown});\n"));
+                }
+                out.push_str("    return ostrin_str_concat(s, \" }\");\n");
+            }
+            _ => unreachable!("only records and enums are queued"),
+        }
+        Ok(out)
+    }
+
+    fn gen_print(&mut self, arg_codes: &[String], arg_types: &[CType]) -> Result<(String, CType), String> {
         if arg_codes.len() != 1 {
             return Err("'print' expects exactly one argument".to_string());
         }
@@ -2196,8 +2265,10 @@ impl<'a> Codegen<'a> {
             CType::Bool => ("%s\\n", format!("(({}) ? \"true\" : \"false\")", arg_codes[0])),
             CType::Str => ("%s\\n", arg_codes[0].clone()),
             CType::Void => return Err("cannot 'print' a Void value".to_string()),
-            CType::Record(name) => return Err(format!("cannot 'print' a record value ('{name}' has no derived Display)")),
-            CType::Enum(name) => return Err(format!("cannot 'print' an enum value yet ('{name}' has no generated Display)")),
+            CType::Record(_) | CType::Enum(_) => {
+                let shown = self.show_expr(&arg_codes[0], &arg_types[0].clone())?;
+                ("%s\\n", shown)
+            }
             CType::DynTrait(name) => return Err(format!("cannot 'print' a 'dyn {name}' value")),
             CType::List(elem) => return Err(format!("cannot 'print' a List<{}> value yet", c_type_name(elem))),
             CType::Quantity(_) => return Ok((format!("ostrin_print_qty({})", arg_codes[0]), CType::Void)),
@@ -2355,6 +2426,8 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
         instance_order: Vec::new(),
         instance_variants: HashMap::new(),
         expected: None,
+        show_queue: VecDeque::new(),
+        show_done: HashSet::new(),
         record_names: record_names.clone(),
         enum_names: enum_names.clone(),
         scopes: vec![HashMap::new()],
@@ -2600,6 +2673,17 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
                 list_helper_prototypes.push(format!("{signature};"));
                 bodies.push((signature, body));
             }
+        }
+        while let Some(ty) = codegen.show_queue.pop_front() {
+            progressed = true;
+            let name = match &ty {
+                CType::Record(n) | CType::Enum(n) => n.clone(),
+                _ => unreachable!(),
+            };
+            let signature = format!("static const char* ostrin_show_{name}({} v)", c_type_name(&ty));
+            let body = codegen.gen_show_body(&ty)?;
+            list_helper_prototypes.push(format!("{signature};"));
+            bodies.push((signature, body));
         }
         while let Some(job) = codegen.pending.pop_front() {
             progressed = true;
