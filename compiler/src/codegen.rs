@@ -414,6 +414,8 @@ struct Codegen<'a> {
     expected: Option<CType>,
     /// Records/enums whose generated `ostrin_show_*` (used by `print`) is queued.
     show_queue: VecDeque<CType>,
+    /// Trait name -> its default-bodied methods, as function declarations.
+    trait_defaults: HashMap<String, Vec<&'a FunctionDecl>>,
     pending_colls: VecDeque<CType>,
     coll_done: HashSet<String>,
     /// Every top-level function by name, for named/default argument resolution.
@@ -489,6 +491,20 @@ impl<'a> Codegen<'a> {
         }
     }
 
+    /// An `impl`'s own methods plus the default methods of its trait that it
+    /// doesn't override.
+    fn impl_method_list(&self, im: &'a ImplDecl) -> Vec<&'a FunctionDecl> {
+        let mut methods: Vec<&'a FunctionDecl> = im.methods.iter().collect();
+        if let Some(defaults) = im.trait_name.as_ref().and_then(|t| self.trait_defaults.get(t)) {
+            for d in defaults {
+                if !im.methods.iter().any(|m| m.name == d.name) {
+                    methods.push(d);
+                }
+            }
+        }
+        methods
+    }
+
     fn register_instance(&mut self, base: &str, args: &[CType]) -> Result<(), String> {
         let mangled = instance_name(base, args);
         if !self.instances_done.insert(mangled.clone()) {
@@ -559,7 +575,7 @@ impl<'a> Codegen<'a> {
                 continue;
             }
             binds.insert("Self".to_string(), self_ty.clone());
-            for method in &im.methods {
+            for method in self.impl_method_list(im) {
                 if !method.generics.is_empty() {
                     continue;
                 }
@@ -2774,6 +2790,30 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
             generic_variant_owner.insert(variant.name.clone(), name.clone());
         }
     }
+    // A trait's default-bodied methods become ordinary function declarations,
+    // compiled once per `impl` that doesn't override them.
+    let default_decls: HashMap<String, Vec<FunctionDecl>> = traits
+        .iter()
+        .map(|t| {
+            let decls = t
+                .methods
+                .iter()
+                .filter_map(|m| {
+                    m.default_body.as_ref().map(|body| FunctionDecl {
+                        name: m.name.clone(),
+                        is_pub: true,
+                        generics: m.generics.clone(),
+                        params: m.params.clone(),
+                        return_type: m.return_type.clone(),
+                        body: body.clone(),
+                        span: t.span,
+                        source_file: None,
+                    })
+                })
+                .collect();
+            (t.name.clone(), decls)
+        })
+        .collect();
     let generic_derives: Vec<(String, Vec<String>)> = generic_records
         .values()
         .map(|r| (r.name.clone(), r.derives.clone()))
@@ -2834,6 +2874,7 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
         instance_variants: HashMap::new(),
         expected: None,
         show_queue: VecDeque::new(),
+        trait_defaults: default_decls.iter().map(|(t, ds)| (t.clone(), ds.iter().collect())).collect(),
         pending_colls: VecDeque::new(),
         coll_done: HashSet::new(),
         function_decls: functions.iter().map(|f| (f.name.clone(), *f)).collect(),
@@ -2934,7 +2975,7 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
         } else {
             continue;
         };
-        for method in &im.methods {
+        for method in codegen.impl_method_list(im) {
             if !method.generics.is_empty() {
                 continue;
             }

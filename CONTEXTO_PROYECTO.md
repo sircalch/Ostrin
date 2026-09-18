@@ -2970,3 +2970,19 @@ pruebas**, sin warnings.
   (`[1, 2]`, `Some(4)`, `[a: 1]`, `{a}`). Siguen sin imprimirse los `Result`.
 - `collections.ostrin` compila y coincide; el test de rechazo ahora usa
   `concurrency.ostrin` (canales). Suite: **93 pruebas**, sin warnings.
+
+---
+
+## 79. Métodos por defecto de traits en el backend nativo — 2026-09-18
+
+- El cuerpo por defecto de un método de trait se convierte en una
+  `FunctionDecl` y se compila una vez por cada `impl` que no lo sobrescribe
+  (`impl_method_list`), tanto en tipos normales como en instancias genéricas
+  (`impl Named for Box<Int>`). También quedan disponibles a través de `dyn Trait`.
+- `traits_defaults*.ostrin` compilan y coinciden; ejemplo nuevo
+  `native_trait_defaults.ostrin`.
+- Aclaración: ni `Map` ni `Set` se pueden recorrer con `for` en el lenguaje
+  (el intérprete responde «is not iterable»), así que no hay nada que portar.
+- Pendiente en el barrido: canales/`spawn`, iteradores propios, métodos
+  genéricos, `impl` sobre `Quantity<D>`, lambdas sobre `Option`/`Result`
+  (`option_result.ostrin`), `read_file` y compañía. Suite: **93 pruebas**.

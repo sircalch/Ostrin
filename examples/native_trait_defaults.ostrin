@@ -1,0 +1,52 @@
+trait Named {
+    fn name(self) -> String
+    fn greeting(self) -> String {
+        "hello " + self.name()
+    }
+    fn shout(self) -> String {
+        "HEY"
+    }
+}
+
+record Dog {
+    label: String
+}
+
+record Cat {
+    label: String
+}
+
+record Box<T> {
+    item: T
+}
+
+impl Named for Dog {
+    fn name(self) -> String {
+        self.label
+    }
+}
+
+impl Named for Cat {
+    fn name(self) -> String {
+        self.label
+    }
+    fn shout(self) -> String {
+        "meow"
+    }
+}
+
+impl Named for Box<Int> {
+    fn name(self) -> String {
+        "int box"
+    }
+}
+
+fn describe(n: dyn Named) -> String {
+    n.greeting() + "/" + n.shout()
+}
+
+fn main() -> Void {
+    print(describe(Dog { label: "rex" }))
+    print(describe(Cat { label: "tom" }))
+    print(Box<Int> { item: 1 }.greeting())
+}
