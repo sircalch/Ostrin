@@ -246,6 +246,18 @@ static void ostrin_fmt_double(double v, char* buf, size_t n) {\n\
     }\n\
 }\n\
 \n\
+static const char* ostrin_int_to_string(int64_t v) {\n\
+    char* out = (char*)malloc(32);\n\
+    snprintf(out, 32, \"%lld\", (long long)v);\n\
+    return out;\n\
+}\n\
+\n\
+static const char* ostrin_float_to_string(double v) {\n\
+    char* out = (char*)malloc(64);\n\
+    ostrin_fmt_double(v, out, 64);\n\
+    return out;\n\
+}\n\
+\n\
 static void ostrin_print_float(double v) {\n\
     char buf[64];\n\
     ostrin_fmt_double(v, buf, sizeof buf);\n\
@@ -264,13 +276,13 @@ static char* ostrin_str_concat(const char* a, const char* b) {\n\
 /// A method resolved at codegen time — always to exactly one concrete
 /// implementation, since this backend has no `dyn Trait`/generics for a call
 /// site to actually be ambiguous about. `param_types` includes `self` as its
-/// first entry, already resolved from `Self` to `Record(self_record)`.
+/// first entry, already resolved from `Self` to `Record(..)`/`Enum(..)` (methods work on both).
 struct MethodInfo<'a> {
     decl: &'a FunctionDecl,
     param_types: Vec<CType>,
     return_type: CType,
     c_name: String,
-    self_record: String,
+    self_ty: CType,
 }
 
 /// A variant resolved at codegen time: which enum it belongs to, its `switch`
@@ -1473,8 +1485,24 @@ impl<'a> Codegen<'a> {
 
     fn gen_method_call(&mut self, obj: &Expr, method_name: &str, args: &[Arg]) -> Result<(String, CType), String> {
         let (obj_code, obj_ty) = self.gen_expr(obj)?;
+        // `to_string()` exists on every scalar in the interpreter
+        // (`receiver.to_string()` in `eval_call`); records/enums aren't
+        // covered (their printed form needs a generated Display).
+        if method_name == "to_string" && args.is_empty() {
+            let text = match &obj_ty {
+                CType::Int => Some(format!("ostrin_int_to_string({obj_code})")),
+                CType::Float => Some(format!("ostrin_float_to_string({obj_code})")),
+                CType::Bool => Some(format!("(({obj_code}) ? \"true\" : \"false\")")),
+                CType::Str => Some(obj_code.clone()),
+                CType::Quantity(_) => Some(format!("ostrin_qty_to_string({obj_code})")),
+                _ => None,
+            };
+            if let Some(text) = text {
+                return Ok((text, CType::Str));
+            }
+        }
         match &obj_ty {
-            CType::Record(record_name) => {
+            CType::Record(record_name) | CType::Enum(record_name) => {
                 let Some(method) = self.methods.get(record_name).and_then(|methods| methods.get(method_name)) else {
                     return Err(format!(
                         "record '{record_name}' has no method '{method_name}' the native backend can compile \
@@ -1992,14 +2020,21 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
     // else is left out of the method table rather than rejected outright
     // (see the doc comment above).
     for im in &impls {
-        if !im.generics.is_empty() || !record_names.contains(&im.type_name) {
+        if !im.generics.is_empty() {
             continue;
         }
+        let self_ty = if record_names.contains(&im.type_name) {
+            CType::Record(im.type_name.clone())
+        } else if enum_names.contains(&im.type_name) {
+            CType::Enum(im.type_name.clone())
+        } else {
+            continue;
+        };
         for method in &im.methods {
             if !method.generics.is_empty() {
                 continue;
             }
-            let self_subst: HashMap<String, CType> = HashMap::from([("Self".to_string(), CType::Record(im.type_name.clone()))]);
+            let self_subst: HashMap<String, CType> = HashMap::from([("Self".to_string(), self_ty.clone())]);
             let param_types: Result<Vec<CType>, String> =
                 method.params.iter().map(|p| map_type_with_subst(&p.ty, &codegen.named_types(), &self_subst)).collect();
             let Ok(param_types) = param_types else { continue };
@@ -2012,7 +2047,7 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
                 param_types,
                 return_type,
                 c_name: format!("{}__{}", im.type_name, method.name),
-                self_record: im.type_name.clone(),
+                self_ty: self_ty.clone(),
             };
             codegen.methods.entry(im.type_name.clone()).or_default().insert(method.name.clone(), info);
         }
@@ -2110,16 +2145,16 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
     // Collected into a plain list first (one pass) so the mutable borrow
     // `gen_callable_body` needs doesn't fight the immutable one still
     // holding `info`/`decl` from `codegen.methods`.
-    let method_infos: Vec<(String, Vec<CType>, CType, String, &FunctionDecl)> = codegen
+    let method_infos: Vec<(CType, Vec<CType>, CType, String, &FunctionDecl)> = codegen
         .methods
         .values()
         .flat_map(|methods| methods.values())
-        .map(|info| (info.self_record.clone(), info.param_types.clone(), info.return_type.clone(), info.c_name.clone(), info.decl))
+        .map(|info| (info.self_ty.clone(), info.param_types.clone(), info.return_type.clone(), info.c_name.clone(), info.decl))
         .collect();
-    for (self_record, param_types, return_type, c_name, decl) in method_infos {
+    for (self_ty, param_types, return_type, c_name, decl) in method_infos {
         let params = render_params(&param_types, &decl.params);
         let signature = format!("{} {}({})", c_type_name(&return_type), c_name, params);
-        let self_subst: HashMap<String, CType> = HashMap::from([("Self".to_string(), CType::Record(self_record))]);
+        let self_subst: HashMap<String, CType> = HashMap::from([("Self".to_string(), self_ty)]);
         let mut body = String::new();
         codegen.gen_callable_body(&decl.params, &decl.body, &return_type, &self_subst, &mut body)?;
         bodies.push((signature, body));

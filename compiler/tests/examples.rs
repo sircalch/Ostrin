@@ -745,13 +745,13 @@ fn native_backend_emit_c_writes_readable_c_source() {
 
 #[test]
 fn native_backend_rejects_constructs_it_does_not_support_yet() {
-    // `shapes.ostrin` puts an `impl` (with methods) on an *enum*: the native
-    // backend only resolves methods on records and `dyn Trait`, so it must
-    // fail with a clear message rather than silently emit something wrong.
-    let out = run(&["--emit-c", &example_path("shapes.ostrin")]);
+    // `collections.ostrin` uses Map/Set literals, which the native backend
+    // has no representation for: it must fail with a clear message rather
+    // than silently emit something wrong.
+    let out = run(&["--emit-c", &example_path("collections.ostrin")]);
     assert!(!out.status.success(), "the native backend should refuse a program it can't fully compile");
     let error = stderr(&out);
-    assert!(error.contains("method calls are only supported"), "unexpected error: {error}");
+    assert!(error.contains("isn't supported by the native backend"), "unexpected error: {error}");
 }
 
 #[test]
@@ -1045,8 +1045,9 @@ fn native_backend_quantities_match_the_interpreter() {
     // interpreter): mixed-unit addition, dimensionless division returning a
     // Float, a generic `<D: Dimension>` function, compound units built at
     // runtime (`m/s`, `kg*m/s*m/s`), comparisons across units, `as`,
-    // `within`, `approximately`, unary minus and scalar/Quantity math.
-    for file in ["physics.ostrin", "native_units.ostrin"] {
+    // `within`, `approximately`, unary minus and scalar/Quantity math, plus
+    // `shapes.ostrin`: an `impl` on an enum, a list of enums and `to_string()`.
+    for file in ["physics.ostrin", "native_units.ostrin", "shapes.ostrin"] {
         let interpreted = run(&["--run", &example_path(file)]);
         assert!(interpreted.status.success(), "interpreter failed on {file}: {}", stderr(&interpreted));
         let expected = stdout(&interpreted).replace("\r\n", "\n");

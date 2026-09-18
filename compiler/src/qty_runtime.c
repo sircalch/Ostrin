@@ -81,3 +81,9 @@ static void ostrin_print_qty(Qty q) {
     printf("%s %s\n", buf, q.u);
 }
 
+static const char* ostrin_qty_to_string(Qty q) {
+    char buf[64];
+    ostrin_fmt_double(q.v, buf, sizeof buf);
+    return ostrin_unit_cat(ostrin_unit_cat(buf, " ", ""), q.u, "");
+}
+

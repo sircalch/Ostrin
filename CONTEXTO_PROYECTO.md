@@ -2868,3 +2868,25 @@ tipo estático, la unidad es una cadena en tiempo de ejecución.**
 Con esto `physics.ostrin` compila y coincide. `shapes.ostrin` avanza mucho más
 y ahora se detiene en métodos sobre **enums** (`impl Shape`), que el backend
 solo resuelve en records y `dyn Trait`. Suite: **93 pruebas**, sin warnings.
+
+---
+
+## 73. Métodos sobre enums y `to_string()` en el backend nativo — 2026-09-18
+
+- La tabla de métodos ya no asume record: `MethodInfo.self_ty` es un `CType`
+  (`Record` o `Enum`), y `Self` se sustituye por él. Un receptor enum se pasa
+  **por valor** (los enums son tipos valor), un record por puntero; el resto del
+  despacho estático es idéntico.
+- `.to_string()` sobre `Int`/`Float`/`Bool`/`String`/`Quantity` (helpers en C;
+  mismo formato de float que `print`). Records/enums no (necesitarían un Display
+  generado).
+- Con esto `shapes.ostrin` (enum + `impl` + lista de enums + `Quantity` +
+  `to_string`) compila y coincide con el intérprete.
+
+### Estado: barrido de los ejemplos con `--compile`
+Los que aún fallan en nativo por falta de soporte (no por errores de tipo):
+records/enums **genéricos** (`Box<T>`, `Maybe<T>`), operadores por `derive`
+(`==`/`<` sobre records), **argumentos nombrados** en llamadas normales, `Map`/
+`Set`, canales/`spawn`, iteradores propios (`impl Iterator`), inferencia de un
+`T` que solo aparece en el retorno, e `imprimir` de una `List`. Suite: **93
+pruebas**, sin warnings.
