@@ -1,0 +1,30 @@
+fn worker(jobs: Channel<Int>, results: Channel<String>) -> Void {
+    for job in jobs {
+        results.send("job " + job.to_string())
+    }
+    results.close()
+}
+
+fn main() -> Void {
+    jobs = channel<Int>()
+    results = channel<String>()
+    jobs.send(1)
+    jobs.send(2)
+    jobs.close()
+
+    t = spawn {
+        worker(jobs, results)
+    }
+    t.join()
+
+    print(results.receive())
+    for r in results {
+        print(r)
+    }
+    print(results.receive())
+
+    label = spawn {
+        "done"
+    }
+    print(label.join())
+}

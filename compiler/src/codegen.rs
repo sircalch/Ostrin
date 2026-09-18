@@ -106,6 +106,11 @@ enum CType {
     /// arrays searched linearly (like the interpreter's `Vec` state).
     Map(Box<CType>, Box<CType>),
     Set(Box<CType>),
+    /// `channel<T>()`: a FIFO queue in the heap, by reference. `spawn` runs
+    /// synchronously, exactly like the interpreter, so no locking is needed.
+    Channel(Box<CType>),
+    /// A finished `spawn` block's result (by value); `join()` reads it.
+    Task(Box<CType>),
 }
 
 /// A struct-field spelling of a type: `Void` (a `Result<Void, E>`'s value) becomes a placeholder `char`.
@@ -124,7 +129,8 @@ fn c_type_name(ty: &CType) -> String {
         CType::Enum(name) => name.clone(),
         CType::DynTrait(name) => format!("{name}_Dyn"),
         CType::List(elem) => format!("{}*", list_struct_name(elem)),
-        CType::Map(..) | CType::Set(_) => format!("{}*", mangle_ctype(ty)),
+        CType::Map(..) | CType::Set(_) | CType::Channel(_) => format!("{}*", mangle_ctype(ty)),
+        CType::Task(_) => mangle_ctype(ty),
         CType::Option(inner) => format!("Option_{}", mangle_ctype(inner)),
         CType::NoneLit | CType::OkLit(_) | CType::ErrLit(_) | CType::GenLit(..) => "int".to_string(),
         CType::Quantity(_) => "Qty".to_string(),
@@ -213,6 +219,8 @@ fn map_type_with_subst(ty: &Type, types: &NamedTypes, subst: &HashMap<String, CT
             Box::new(map_type_with_subst(&args[0], types, subst)?),
             Box::new(map_type_with_subst(&args[1], types, subst)?),
         )),
+        Type::Named(name, args) if name == "Channel" && args.len() == 1 => Ok(CType::Channel(Box::new(map_type_with_subst(&args[0], types, subst)?))),
+        Type::Named(name, args) if name == "Task" && args.len() == 1 => Ok(CType::Task(Box::new(map_type_with_subst(&args[0], types, subst)?))),
         Type::Named(name, args) if name == "Set" && args.len() == 1 => Ok(CType::Set(Box::new(map_type_with_subst(&args[0], types, subst)?))),
         Type::Named(name, args) if name == "List" && args.len() == 1 => {
             Ok(CType::List(Box::new(map_type_with_subst(&args[0], types, subst)?)))
@@ -477,6 +485,8 @@ fn mangle_ctype(ty: &CType) -> String {
         CType::List(elem) => format!("List_{}", mangle_ctype(elem)),
         CType::Map(k, v) => format!("Map_{}_{}", mangle_ctype(k), mangle_ctype(v)),
         CType::Set(t) => format!("Set_{}", mangle_ctype(t)),
+        CType::Channel(t) => format!("Channel_{}", mangle_ctype(t)),
+        CType::Task(t) => format!("Task_{}", mangle_ctype(t)),
         CType::Option(inner) => format!("Option_{}", mangle_ctype(inner)),
         CType::NoneLit => "None".to_string(),
         CType::GenLit(base, variant) => format!("Lit_{base}_{variant}"),
@@ -1003,6 +1013,15 @@ impl<'a> Codegen<'a> {
                 self.pending_colls.push_back(ty.clone());
             }
         }
+        if let CType::Channel(t) | CType::Task(t) = ty {
+            self.register_list_types(t);
+            if matches!(ty, CType::Channel(_)) {
+                self.ensure_option(t);
+            }
+            if self.coll_done.insert(mangle_ctype(ty)) {
+                self.pending_colls.push_back(ty.clone());
+            }
+        }
         if let CType::Set(t) = ty {
             self.register_list_types(t);
             if self.coll_done.insert(mangle_ctype(ty)) {
@@ -1298,6 +1317,17 @@ impl<'a> Codegen<'a> {
         }
 
         let (iter_code, iter_ty) = self.gen_expr(iter)?;
+        if let CType::Channel(elem_ty) = &iter_ty {
+            let ch = self.next_temp();
+            out.push_str(&format!("    {{\n        {} {ch} = {iter_code};\n", c_type_name(&iter_ty)));
+            out.push_str(&format!("        while ({ch}->head < {ch}->length) {{\n            {} {pattern} = {ch}->items[{ch}->head++];\n", c_type_name(elem_ty)));
+            self.push_scope();
+            self.define(pattern, (**elem_ty).clone());
+            self.gen_block_stmts(body, out)?;
+            self.pop_scope();
+            out.push_str("        }\n    }\n");
+            return Ok(());
+        }
         // Iterator protocol: a record with a `next(mut self) -> Option<T>`
         // method is polled until it returns `None`.
         if let CType::Record(record_name) = &iter_ty {
@@ -1438,6 +1468,24 @@ impl<'a> Codegen<'a> {
             Expr::Block(b) => self.gen_block_expr(b),
             Expr::Match(scrutinee, arms) => self.gen_match(scrutinee, arms),
             Expr::ListLiteral(items) => self.gen_list_literal(items, None),
+            Expr::Spawn(block) => {
+                let (code, ty) = self.gen_block_expr(block)?;
+                let task_ty = CType::Task(Box::new(ty.clone()));
+                self.register_list_types(&task_ty);
+                let name = c_type_name(&task_ty);
+                let temp = self.next_temp();
+                Ok(if ty == CType::Void {
+                    (format!("({{ {code}; ({name}){{ 0 }}; }})"), task_ty)
+                } else {
+                    (format!("({{ {} {temp} = {code}; ({name}){{ {temp} }}; }})", c_type_name(&ty)), task_ty)
+                })
+            }
+            Expr::SpawnScope(block) => self.gen_block_expr(block),
+            Expr::Channel(elem, _) => {
+                let ty = CType::Channel(Box::new(self.resolve_type(elem)?));
+                self.register_list_types(&ty);
+                Ok((format!("{}_new()", mangle_ctype(&ty)), ty))
+            }
             Expr::EmptyCollection(name, types) => {
                 let ty = match (name.as_str(), types.as_slice()) {
                     ("Map", [k, v]) => CType::Map(Box::new(self.resolve_type(k)?), Box::new(self.resolve_type(v)?)),
@@ -2547,6 +2595,33 @@ impl<'a> Codegen<'a> {
                     other => Err(format!("Map has no method '{other}' the native backend supports yet")),
                 }
             }
+            CType::Task(t) => {
+                if method_name != "join" || !args.is_empty() {
+                    return Err(format!("Task has no method '{method_name}' the native backend supports"));
+                }
+                if **t == CType::Void {
+                    Ok((format!("({{ (void)({obj_code}); (void)0; }})"), CType::Void))
+                } else {
+                    Ok((format!("({obj_code}).value"), (**t).clone()))
+                }
+            }
+            CType::Channel(t) => {
+                let t = (**t).clone();
+                let name = mangle_ctype(&obj_ty);
+                let (codes, types) = self.gen_args_hinted(args, &[t.clone()])?;
+                match method_name {
+                    "send" if codes.len() == 1 => {
+                        if matches!(t, CType::Record(_)) {
+                            return Err("sending a record through a channel isn't supported by the native backend: the interpreter's 'moved after send' check (E1101) has no native equivalent yet".to_string());
+                        }
+                        let item = self.coerce(&codes[0], &types[0], &t)?;
+                        Ok((format!("{name}_send({obj_code}, {item})"), CType::Void))
+                    }
+                    "receive" if codes.is_empty() => Ok((format!("{name}_receive({obj_code})"), CType::Option(Box::new(t)))),
+                    "close" if codes.is_empty() => Ok((format!("({obj_code})->closed = true"), CType::Void)),
+                    other => Err(format!("Channel has no method '{other}' the native backend supports yet")),
+                }
+            }
             CType::Set(t) => {
                 let t = (**t).clone();
                 let name = mangle_ctype(&obj_ty);
@@ -3010,6 +3085,7 @@ impl<'a> Codegen<'a> {
             }
             CType::Quantity(_) => return Ok((format!("ostrin_print_qty({})", arg_codes[0]), CType::Void)),
             CType::GenLit(..) => return Err("cannot infer the enum instance to print here".to_string()),
+            CType::Channel(_) | CType::Task(_) => return Err("cannot 'print' a Task or Channel value".to_string()),
             CType::NoneLit | CType::OkLit(_) | CType::ErrLit(_) => {
                 return Err("cannot 'print' a bare None/Ok/Err literal; its type can't be inferred here".to_string())
             }
@@ -3531,6 +3607,18 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
                     funcs.push((format!("static {opt} {name}_remove({name}* m, {kc} key)"), format!("    {opt} r;\n    memset(&r, 0, sizeof r);\n    int64_t i = {name}_find(m, key);\n    if (i < 0) return r;\n    r.has = true;\n    r.value = m->vals[i];\n    for (int64_t j = i; j < m->length - 1; j++) {{ m->keys[j] = m->keys[j + 1]; m->vals[j] = m->vals[j + 1]; }}\n    m->length = m->length - 1;\n    return r;\n")));
                     funcs.push((format!("static {list_k} {name}_keys({name}* m)"), format!("    return {lk}_new_from_array(m->keys, m->length);\n")));
                     funcs.push((format!("static {list_v} {name}_values({name}* m)"), format!("    return {lv}_new_from_array(m->vals, m->length);\n")));
+                }
+                CType::Task(t) => {
+                    list_type_decls.push_str(&format!("struct {name} {{\n    {} value;\n}};\n\n", field_c_type(t)));
+                }
+                CType::Channel(t) => {
+                    let tc = c_type_name(t);
+                    let opt = c_type_name(&CType::Option(t.clone()));
+                    list_type_decls.push_str(&format!("struct {name} {{\n    {tc}* items;\n    int64_t head;\n    int64_t length;\n    int64_t capacity;\n    bool closed;\n}};\n\n"));
+                    funcs.push((format!("static {name}* {name}_new(void)"), format!("    {name}* c = ({name}*)calloc(1, sizeof({name}));\n    if (!c) {{ fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); }}\n    return c;\n")));
+                    funcs.push((format!("static void {name}_send({name}* c, {tc} item)"), format!(
+                        "    if (c->length >= c->capacity) {{\n        c->capacity = c->capacity == 0 ? 4 : c->capacity * 2;\n        c->items = ({tc}*)realloc(c->items, sizeof({tc}) * (size_t)c->capacity);\n        if (!c->items) {{ fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); }}\n    }}\n    c->items[c->length] = item;\n    c->length = c->length + 1;\n")));
+                    funcs.push((format!("static {opt} {name}_receive({name}* c)"), format!("    {opt} r;\n    memset(&r, 0, sizeof r);\n    if (c->head < c->length) {{ r.has = true; r.value = c->items[c->head++]; }}\n    return r;\n")));
                 }
                 CType::Set(t) => {
                     let tc = c_type_name(t);

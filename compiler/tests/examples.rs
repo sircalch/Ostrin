@@ -745,10 +745,11 @@ fn native_backend_emit_c_writes_readable_c_source() {
 
 #[test]
 fn native_backend_rejects_constructs_it_does_not_support_yet() {
-    // `concurrency.ostrin` uses channels, which the native backend has no
-    // representation for: it must fail with a clear message rather than
-    // silently emit something wrong.
-    let out = run(&["--emit-c", &example_path("concurrency.ostrin")]);
+    // `moved_after_send.ostrin` sends a record through a channel, whose
+    // "moved after send" runtime check the native backend can't reproduce:
+    // it must refuse with a clear message rather than silently run the
+    // program the interpreter rejects.
+    let out = run(&["--emit-c", &example_path("moved_after_send.ostrin")]);
     assert!(!out.status.success(), "the native backend should refuse a program it can't fully compile");
     let error = stderr(&out);
     assert!(error.contains("isn't supported by the native backend"), "unexpected error: {error}");
@@ -1550,6 +1551,8 @@ fn native_backend_generic_records_and_enums_match_the_interpreter() {
         "native_display.ostrin",
         "native_derive.ostrin",
         "native_named_args.ostrin",
+        "native_concurrency.ostrin",
+        "concurrency.ostrin",
         "fibonacci.ostrin",
         "native_builtins.ostrin",
         "native_generic_methods.ostrin",

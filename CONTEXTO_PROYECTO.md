@@ -3043,3 +3043,20 @@ pruebas**, sin warnings.
   compila a un bucle que llama a `next` hasta recibir `None` (protocolo del
   intérprete). `fibonacci.ostrin` compila y coincide.
 - Queda fuera solo la concurrencia (canales/`spawn`). Suite: **93 pruebas**.
+
+---
+
+## 84. Canales, `spawn` y `join` en el backend nativo — 2026-09-18
+
+- Mismo modelo que el intérprete: `spawn { .. }` se ejecuta de inmediato y de
+  forma síncrona; su resultado queda en un `Task_T` (por valor) que `join()`
+  devuelve. `channel<T>()` es una cola FIFO en el heap con `send`, `receive`
+  (→ `Option<T>`), `close` y `for x in canal` (consume hasta vaciar).
+  No hay hilos ni bloqueos, así que la salida coincide con el intérprete.
+- Enviar un **record** por un canal se rechaza en la compilación: el
+  intérprete comprueba en ejecución que un record enviado no se reutilice
+  (E1101, `moved_after_send.ostrin`) y el nativo no tiene ese análisis; se
+  prefiere un error claro a ejecutar un programa que el intérprete rechaza.
+- `concurrency.ostrin` y el ejemplo nuevo `native_concurrency.ostrin` coinciden.
+  Con esto el barrido de ejemplos ejecutables compila entero salvo lo anterior.
+  Suite: **93 pruebas**, sin warnings.

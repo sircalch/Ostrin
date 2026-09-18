@@ -73,9 +73,12 @@ need no closure object); the project's own `dyn_trait.ostrin` compiles and
 runs natively, as do `Option<T>` and `Result<T, E>` (Some/None/Ok/Err,
 match, `try`, `find`). Dimensional `Quantity` compiles too (dimension
 checked statically, unit carried at runtime exactly as in the interpreter).
-Methods work on enums as well as records, and `to_string()` on scalars and
-quantities. Generic records and enums are monomorphized like generic functions; `Map`/`Set`, channels, named arguments and
-first-class function values still only run through the interpreter. The runtime is still
+Methods (including generic ones and trait defaults) work on records, enums and
+quantities; generic records/enums, `Map`/`Set`, operators and `derive`, named
+and default arguments, custom iterators, `Option`/`Result` combinators, the
+built-in file/parse functions and synchronous `spawn`/channels all compile too.
+Only a few things still run solely through the interpreter (first-class
+function values, sending a record through a channel). The runtime is still
 synchronous and the standard library is small.
 
 ## Quick start
