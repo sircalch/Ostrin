@@ -243,12 +243,27 @@ fn emit_json_symbol(symbol: &symbols::Symbol, fallback_file: &str) {
 }
 
 fn emit_json_member(member: &symbols::MemberSymbol) {
+    let result_type = member
+        .result_type
+        .as_deref()
+        .map_or_else(|| "null".to_string(), json_string);
+    let owner_generics = format!(
+        "[{}]",
+        member
+            .owner_generics
+            .iter()
+            .map(|generic| json_string(generic))
+            .collect::<Vec<_>>()
+            .join(",")
+    );
     println!(
-        "{{\"kind\":\"member\",\"memberKind\":{},\"owner\":{},\"name\":{},\"detail\":{}}}",
+        "{{\"kind\":\"member\",\"memberKind\":{},\"owner\":{},\"name\":{},\"detail\":{},\"resultType\":{},\"ownerGenerics\":{}}}",
         json_string(member.kind),
         json_string(&member.owner),
         json_string(&member.name),
-        json_string(&member.detail)
+        json_string(&member.detail),
+        result_type,
+        owner_generics
     );
 }
 

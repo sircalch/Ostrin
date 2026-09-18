@@ -112,16 +112,91 @@ function memberAccessAt(document, position) {
   const token = wordAt(document, position);
   const line = document.lineAt(position.line).text;
   const prefix = line.slice(0, token.start);
-  const match = prefix.match(/([A-Za-z_][A-Za-z0-9_]*)\.\s*$/);
-  return match ? { receiver: match[1], token } : undefined;
+  const dot = prefix.lastIndexOf('.');
+  if (dot < 0) return undefined;
+  const receiverExpression = prefix.slice(0, dot).trim();
+  if (!receiverExpression || !/[A-Za-z0-9_)\]]$/.test(receiverExpression)) return undefined;
+  return { receiverExpression, token };
 }
 
-function receiverOwner(document, position, bindings, semanticSymbols) {
-  const access = memberAccessAt(document, position);
-  if (!access) return undefined;
+function splitMemberChain(expression) {
+  const parts = [];
+  let current = '';
+  let parentheses = 0;
+  let brackets = 0;
+  let braces = 0;
+  for (const character of expression) {
+    if (character === '.' && parentheses === 0 && brackets === 0 && braces === 0) {
+      if (current.trim()) parts.push(current.trim());
+      current = '';
+      continue;
+    }
+    current += character;
+    if (character === '(') parentheses += 1;
+    else if (character === ')') parentheses = Math.max(0, parentheses - 1);
+    else if (character === '[') brackets += 1;
+    else if (character === ']') brackets = Math.max(0, brackets - 1);
+    else if (character === '{') braces += 1;
+    else if (character === '}') braces = Math.max(0, braces - 1);
+  }
+  if (current.trim()) parts.push(current.trim());
+  return parts
+    .map((part) => part.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*(?:\(([\s\S]*)\))?$/))
+    .filter(Boolean)
+    .map((match) => ({ name: match[1], call: match[2] !== undefined }));
+}
+
+function parseGenericArgs(typeName) {
+  const open = String(typeName || '').indexOf('<');
+  if (open < 0 || !String(typeName).endsWith('>')) return [];
+  const inner = String(typeName).slice(open + 1, -1);
+  const args = [];
+  let current = '';
+  let depth = 0;
+  for (const character of inner) {
+    if (character === '<') depth += 1;
+    else if (character === '>') depth = Math.max(0, depth - 1);
+    if (character === ',' && depth === 0) {
+      args.push(current.trim());
+      current = '';
+    } else {
+      current += character;
+    }
+  }
+  if (current.trim()) args.push(current.trim());
+  return args;
+}
+
+function substituteType(typeName, replacements) {
+  let result = String(typeName || '');
+  for (const [name, value] of Object.entries(replacements)) {
+    result = result.replace(new RegExp(`\\b${name}\\b`, 'g'), value);
+  }
+  return result;
+}
+
+function memberResultType(member, receiverType) {
+  if (!member || !member.resultType) return undefined;
+  const args = parseGenericArgs(receiverType);
+  const genericNames = Array.isArray(member.ownerGenerics) ? member.ownerGenerics : [];
+  const replacements = { Self: baseType(receiverType) || '' };
+  genericNames.forEach((name, index) => {
+    if (args[index]) replacements[name] = args[index];
+  });
+  return substituteType(member.resultType, replacements);
+}
+
+function symbolReturnType(symbol) {
+  if (!symbol) return undefined;
+  if (symbol.returnType) return symbol.returnType;
+  const match = String(symbol.detail || '').match(/->\s*(.+)$/);
+  return match ? match[1].trim() : undefined;
+}
+
+function visibleBinding(name, document, position, bindings, semanticSymbols) {
   const activeFunction = currentFunctionName(document, position, semanticSymbols);
   let candidates = bindings
-    .filter((entry) => entry.name === access.receiver)
+    .filter((entry) => entry.name === name)
     .filter((entry) => !entry.file || sameFile(entry.file, document.uri.fsPath))
     .filter((entry) => !entry.line || entry.line <= position.line + 1)
     .filter((entry) => !entry.scopeDepth || entry.scopeDepth <= currentBraceDepth(document, position))
@@ -131,7 +206,35 @@ function receiverOwner(document, position, bindings, semanticSymbols) {
   if (activeFunction) {
     candidates = candidates.filter((entry) => entry.function === activeFunction);
   }
-  return baseType(candidates[0]?.type) || access.receiver;
+  return candidates[0];
+}
+
+function resolveReceiverType(document, position, index) {
+  const access = memberAccessAt(document, position);
+  if (!access) return undefined;
+  const chain = splitMemberChain(access.receiverExpression);
+  if (!chain.length) return undefined;
+  const first = chain.shift();
+  const binding = visibleBinding(first.name, document, position, index.bindings, index.symbols);
+  const symbol = index.symbols.find((entry) =>
+    (entry.kind === 'function' || entry.kind === 'method') && shortSymbolName(entry.name) === first.name
+  );
+  let currentType = binding?.type || symbolReturnType(symbol) || first.name;
+  for (const segment of chain) {
+    const owner = baseType(currentType);
+    const member = index.members.find((entry) => entry.owner === owner && entry.name === segment.name);
+    if (!member) return undefined;
+    currentType = memberResultType(member, currentType);
+    if (!currentType) return undefined;
+  }
+  return currentType;
+}
+
+function receiverOwner(document, position, index) {
+  const access = memberAccessAt(document, position);
+  if (!access) return undefined;
+  return baseType(resolveReceiverType(document, position, index))
+    || baseType(access.receiverExpression);
 }
 
 function semanticCompletionItems(vscode, semanticSymbols) {
@@ -181,7 +284,7 @@ function memberCompletionItems(vscode, members, owner) {
 function provideCompletionItems(vscode, semanticIndex = [], document, position) {
   const index = normalizeSemanticIndex(semanticIndex);
   if (document && position) {
-    const owner = receiverOwner(document, position, index.bindings, index.symbols);
+    const owner = receiverOwner(document, position, index);
     if (owner) return memberCompletionItems(vscode, index.members, owner);
   }
   const items = [];
@@ -203,19 +306,9 @@ function provideHover(vscode, document, position, semanticIndex = []) {
   const index = normalizeSemanticIndex(semanticIndex);
   const token = wordAt(document, position);
   const access = memberAccessAt(document, position);
-  const owner = access && receiverOwner(document, position, index.bindings, index.symbols);
-  const activeFunction = currentFunctionName(document, position, index.symbols);
+  const owner = access && receiverOwner(document, position, index);
   const member = owner && index.members.find((entry) => entry.owner === owner && entry.name === token.word);
-  let bindingCandidates = index.bindings
-    .filter((entry) => entry.name === token.word)
-    .filter((entry) => !entry.file || sameFile(entry.file, document.uri.fsPath))
-    .filter((entry) => !entry.line || entry.line <= position.line + 1)
-    .filter((entry) => !entry.scopeDepth || entry.scopeDepth <= currentBraceDepth(document, position))
-    .sort((left, right) =>
-      (right.scopeDepth || 0) - (left.scopeDepth || 0) || (right.line || 0) - (left.line || 0)
-    );
-  if (activeFunction) bindingCandidates = bindingCandidates.filter((entry) => entry.function === activeFunction);
-  const binding = bindingCandidates[0];
+  const binding = visibleBinding(token.word, document, position, index.bindings, index.symbols);
   const semantic = index.symbols.find((entry) => shortSymbolName(entry.name) === token.word);
   const markdown = member
     ? `**Ostrin ${member.kind || 'member'}**\n\n\`${member.owner}.${member.name}: ${member.detail || ''}\``

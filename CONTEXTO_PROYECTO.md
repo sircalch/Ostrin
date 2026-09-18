@@ -1411,3 +1411,48 @@ de `Map`. La suite continúa en **65 pruebas exitosas**.
 La resolución sigue siendo deliberadamente ligera: el cálculo de llaves del
 proveedor es una aproximación para archivos incompletos y todavía no modela
 shadowing exacto, scopes por expresión ni cadenas de miembros.
+
+---
+
+## 40. Resolución de cadenas de miembros en el editor — 2026-09-17
+
+El completado dejó de limitarse a `binding.`. El índice ahora conserva el tipo
+de resultado de cada campo y método, y el proveedor puede avanzar por una
+cadena de acceso para encontrar el tipo del siguiente receptor.
+
+### Cambios realizados
+
+- `MemberSymbol` conserva `result_type` y los parámetros genéricos del tipo
+  propietario; el JSON los publica como `resultType` y `ownerGenerics`.
+- Se añadieron metadatos para los miembros de `record`, `trait`, `impl` y para
+  las colecciones y contenedores del núcleo (`List.map` devuelve `List<U>`,
+  `Map.get` devuelve `Option<V>`, etc.).
+- El proveedor de VS Code separa cadenas respetando paréntesis, corchetes y
+  llaves, por lo que puede resolver accesos como:
+
+  ```ostrin
+  user.address.
+  numbers.map(fn(x) { x * 2 }).
+  ```
+
+- Se sustituyen los argumentos conocidos (`List<Int>` convierte `T` en
+  `Int`) antes de buscar los miembros del siguiente tipo.
+- También se reconoce una función inicial con firma conocida, de modo que una
+  cadena que comienza por `make_user().address.` puede usar el retorno de
+  `make_user` cuando el índice lo conoce.
+
+### Límite actual
+
+La inferencia del editor sigue siendo intencionalmente conservadora: no ejecuta
+el checker completo sobre cada expresión ni infiere los genéricos `U` de una
+lambda. Cuando el tipo de retorno no puede resolverse, la cadena termina en el
+último tipo conocido. La siguiente mejora natural será publicar tipos de
+expresiones directamente desde el checker y soportar navegación a la
+declaración del miembro.
+
+### Verificación
+
+La suite permanece en **65 pruebas exitosas**; se ampliaron las comprobaciones
+del índice para validar `resultType` en miembros de colecciones y de un record.
+También pasó el smoke test de VS Code para `numbers.map(...).` y los chequeos
+de sintaxis JavaScript.

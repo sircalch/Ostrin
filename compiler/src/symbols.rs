@@ -12,9 +12,11 @@ pub struct Symbol {
 #[derive(Debug, Clone)]
 pub struct MemberSymbol {
     pub owner: String,
+    pub owner_generics: Vec<String>,
     pub kind: &'static str,
     pub name: String,
     pub detail: String,
+    pub result_type: Option<String>,
 }
 
 pub fn collect(items: &[Item]) -> Vec<Symbol> {
@@ -115,9 +117,11 @@ pub fn collect_members(items: &[Item]) -> Vec<MemberSymbol> {
                 for field in &record.fields {
                     members.push(MemberSymbol {
                         owner: record.name.clone(),
+                        owner_generics: record.generics.iter().map(|generic| generic.name.clone()).collect(),
                         kind: "field",
                         name: field.name.clone(),
                         detail: format!("{}: {}", field.name, type_to_string(&field.ty)),
+                        result_type: Some(type_to_string(&field.ty)),
                     });
                 }
             }
@@ -125,9 +129,11 @@ pub fn collect_members(items: &[Item]) -> Vec<MemberSymbol> {
                 for variant in &enum_decl.variants {
                     members.push(MemberSymbol {
                         owner: enum_decl.name.clone(),
+                        owner_generics: enum_decl.generics.iter().map(|generic| generic.name.clone()).collect(),
                         kind: "enumMember",
                         name: variant.name.clone(),
                         detail: format!("{}::{}", enum_decl.name, variant.name),
+                        result_type: None,
                     });
                 }
             }
@@ -135,6 +141,7 @@ pub fn collect_members(items: &[Item]) -> Vec<MemberSymbol> {
                 for method in &trait_decl.methods {
                     members.push(MemberSymbol {
                         owner: trait_decl.name.clone(),
+                        owner_generics: trait_decl.generics.iter().map(|generic| generic.name.clone()).collect(),
                         kind: "method",
                         name: method.name.clone(),
                         detail: method_signature(
@@ -143,6 +150,7 @@ pub fn collect_members(items: &[Item]) -> Vec<MemberSymbol> {
                             &method.params,
                             &method.return_type,
                         ),
+                        result_type: Some(type_to_string(&method.return_type)),
                     });
                 }
             }
@@ -150,6 +158,7 @@ pub fn collect_members(items: &[Item]) -> Vec<MemberSymbol> {
                 for method in &implementation.methods {
                     members.push(MemberSymbol {
                         owner: implementation.type_name.clone(),
+                        owner_generics: implementation.generics.iter().map(|generic| generic.name.clone()).collect(),
                         kind: "method",
                         name: method.name.clone(),
                         detail: method_signature(
@@ -158,6 +167,7 @@ pub fn collect_members(items: &[Item]) -> Vec<MemberSymbol> {
                             &method.params,
                             &method.return_type,
                         ),
+                        result_type: Some(type_to_string(&method.return_type)),
                     });
                 }
             }
@@ -168,55 +178,57 @@ pub fn collect_members(items: &[Item]) -> Vec<MemberSymbol> {
 }
 
 fn core_members() -> Vec<MemberSymbol> {
-    let definitions: &[(&str, &str, &str)] = &[
-        ("List", "length", "length() -> Int"),
-        ("List", "count", "count() -> Int"),
-        ("List", "push", "push(value: T) -> Void"),
-        ("List", "remove_at", "remove_at(index: Int) -> T"),
-        ("List", "map", "map(transform: fn(T) -> U) -> List<U>"),
-        ("List", "filter", "filter(predicate: fn(T) -> Bool) -> List<T>"),
-        ("List", "fold", "fold(initial: U, combine: fn(U, T) -> U) -> U"),
-        ("List", "find", "find(predicate: fn(T) -> Bool) -> Option<T>"),
-        ("List", "any", "any(predicate: fn(T) -> Bool) -> Bool"),
-        ("List", "all", "all(predicate: fn(T) -> Bool) -> Bool"),
-        ("Map", "count", "count() -> Int"),
-        ("Map", "keys", "keys() -> List<K>"),
-        ("Map", "values", "values() -> List<V>"),
-        ("Map", "get", "get(key: K) -> Option<V>"),
-        ("Map", "remove", "remove(key: K) -> Option<V>"),
-        ("Map", "contains_key", "contains_key(key: K) -> Bool"),
-        ("Map", "set", "set(key: K, value: V) -> Void"),
-        ("Set", "count", "count() -> Int"),
-        ("Set", "contains", "contains(value: T) -> Bool"),
-        ("Set", "add", "add(value: T) -> Void"),
-        ("Set", "remove", "remove(value: T) -> Void"),
-        ("Option", "is_some", "is_some() -> Bool"),
-        ("Option", "is_none", "is_none() -> Bool"),
-        ("Option", "unwrap", "unwrap() -> T"),
-        ("Option", "unwrap_or", "unwrap_or(default: T) -> T"),
-        ("Option", "ok_or", "ok_or(error: E) -> Result<T, E>"),
-        ("Option", "map", "map(transform: fn(T) -> U) -> Option<U>"),
-        ("Option", "then", "then(transform: fn(T) -> Option<U>) -> Option<U>"),
-        ("Result", "is_ok", "is_ok() -> Bool"),
-        ("Result", "is_err", "is_err() -> Bool"),
-        ("Result", "unwrap", "unwrap() -> T"),
-        ("Result", "unwrap_or", "unwrap_or(default: T) -> T"),
-        ("Result", "ok", "ok() -> Option<T>"),
-        ("Result", "map", "map(transform: fn(T) -> U) -> Result<U, E>"),
-        ("Result", "map_err", "map_err(transform: fn(E) -> F) -> Result<T, F>"),
-        ("Result", "then", "then(transform: fn(T) -> Result<U, E>) -> Result<U, E>"),
-        ("Task", "join", "join() -> T"),
-        ("Channel", "send", "send(value: T) -> Void"),
-        ("Channel", "receive", "receive() -> Option<T>"),
-        ("Channel", "close", "close() -> Void"),
+    let definitions: &[(&str, &str, &str, &str, &[&str])] = &[
+        ("List", "length", "length() -> Int", "Int", &["T"]),
+        ("List", "count", "count() -> Int", "Int", &["T"]),
+        ("List", "push", "push(value: T) -> Void", "Void", &["T"]),
+        ("List", "remove_at", "remove_at(index: Int) -> T", "T", &["T"]),
+        ("List", "map", "map(transform: fn(T) -> U) -> List<U>", "List<U>", &["T"]),
+        ("List", "filter", "filter(predicate: fn(T) -> Bool) -> List<T>", "List<T>", &["T"]),
+        ("List", "fold", "fold(initial: U, combine: fn(U, T) -> U) -> U", "U", &["T"]),
+        ("List", "find", "find(predicate: fn(T) -> Bool) -> Option<T>", "Option<T>", &["T"]),
+        ("List", "any", "any(predicate: fn(T) -> Bool) -> Bool", "Bool", &["T"]),
+        ("List", "all", "all(predicate: fn(T) -> Bool) -> Bool", "Bool", &["T"]),
+        ("Map", "count", "count() -> Int", "Int", &["K", "V"]),
+        ("Map", "keys", "keys() -> List<K>", "List<K>", &["K", "V"]),
+        ("Map", "values", "values() -> List<V>", "List<V>", &["K", "V"]),
+        ("Map", "get", "get(key: K) -> Option<V>", "Option<V>", &["K", "V"]),
+        ("Map", "remove", "remove(key: K) -> Option<V>", "Option<V>", &["K", "V"]),
+        ("Map", "contains_key", "contains_key(key: K) -> Bool", "Bool", &["K", "V"]),
+        ("Map", "set", "set(key: K, value: V) -> Void", "Void", &["K", "V"]),
+        ("Set", "count", "count() -> Int", "Int", &["T"]),
+        ("Set", "contains", "contains(value: T) -> Bool", "Bool", &["T"]),
+        ("Set", "add", "add(value: T) -> Void", "Void", &["T"]),
+        ("Set", "remove", "remove(value: T) -> Void", "Void", &["T"]),
+        ("Option", "is_some", "is_some() -> Bool", "Bool", &["T"]),
+        ("Option", "is_none", "is_none() -> Bool", "Bool", &["T"]),
+        ("Option", "unwrap", "unwrap() -> T", "T", &["T"]),
+        ("Option", "unwrap_or", "unwrap_or(default: T) -> T", "T", &["T"]),
+        ("Option", "ok_or", "ok_or(error: E) -> Result<T, E>", "Result<T, E>", &["T"]),
+        ("Option", "map", "map(transform: fn(T) -> U) -> Option<U>", "Option<U>", &["T"]),
+        ("Option", "then", "then(transform: fn(T) -> Option<U>) -> Option<U>", "Option<U>", &["T"]),
+        ("Result", "is_ok", "is_ok() -> Bool", "Bool", &["T", "E"]),
+        ("Result", "is_err", "is_err() -> Bool", "Bool", &["T", "E"]),
+        ("Result", "unwrap", "unwrap() -> T", "T", &["T", "E"]),
+        ("Result", "unwrap_or", "unwrap_or(default: T) -> T", "T", &["T", "E"]),
+        ("Result", "ok", "ok() -> Option<T>", "Option<T>", &["T", "E"]),
+        ("Result", "map", "map(transform: fn(T) -> U) -> Result<U, E>", "Result<U, E>", &["T", "E"]),
+        ("Result", "map_err", "map_err(transform: fn(E) -> F) -> Result<T, F>", "Result<T, F>", &["T", "E"]),
+        ("Result", "then", "then(transform: fn(T) -> Result<U, E>) -> Result<U, E>", "Result<U, E>", &["T", "E"]),
+        ("Task", "join", "join() -> T", "T", &["T"]),
+        ("Channel", "send", "send(value: T) -> Void", "Void", &["T"]),
+        ("Channel", "receive", "receive() -> Option<T>", "Option<T>", &["T"]),
+        ("Channel", "close", "close() -> Void", "Void", &["T"]),
     ];
     definitions
         .iter()
-        .map(|(owner, name, detail)| MemberSymbol {
+        .map(|(owner, name, detail, result_type, generics)| MemberSymbol {
             owner: (*owner).to_string(),
+            owner_generics: generics.iter().map(|generic| (*generic).to_string()).collect(),
             kind: "method",
             name: (*name).to_string(),
             detail: (*detail).to_string(),
+            result_type: Some((*result_type).to_string()),
         })
         .collect()
 }

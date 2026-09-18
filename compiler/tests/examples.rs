@@ -228,6 +228,8 @@ fn compiler_exports_type_members_and_local_bindings_for_editor_tools() {
     assert!(generics.status.success(), "stderr: {}", stderr(&generics));
     let generics_text = stdout(&generics);
     assert!(generics_text.contains("\"name\":\"a\",\"type\":\"Score\",\"function\":\"main\",\"scopeDepth\":1"));
+    assert!(generics_text.contains("\"owner\":\"Score\",\"name\":\"value\""));
+    assert!(generics_text.contains("\"resultType\":\"Int\""));
 }
 
 #[test]
