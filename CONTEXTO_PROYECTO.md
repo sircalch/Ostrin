@@ -2247,3 +2247,81 @@ backend de compilación real) tienen al menos una primera versión real y
 probada. Lo que sigue, si se quiere seguir creciendo el backend nativo, es
 ampliar el subconjunto soportado (records simples primero, probablemente,
 ya que no requieren dispatch dinámico).
+
+---
+
+## 62. Records reales en el backend nativo — 2026-09-17
+
+Se siguió la recomendación que cerraba la sección 61: el backend de C ahora
+compila `record` de verdad — sin `impl`/métodos todavía, que es justo el
+límite que no requiere resolver dispatch dinámico.
+
+### Cómo se preservó la identidad por referencia sin copiar el modelo del intérprete
+
+El intérprete representa `Record` como `Rc<RefCell<Vec<(String, Value)>>>`
+precisamente porque dos bindings que apuntan al mismo record deben ver la
+mutación del otro (documento 11). El backend de C reproduce esa semántica de
+la única forma que tiene sentido sin un GC: cada record es **siempre** un
+puntero a memoria reservada con `malloc` — nunca una copia por valor, nunca
+un `struct` en la pila. `Point* p = ...; Point* p2 = p; p2.x = ...` en Ostrin
+se traduce a asignaciones de puntero en C, así que `p` y `p2` siguen viendo
+el mismo bloque de memoria, igual que en el intérprete. Nada libera esa
+memoria — aceptable para los programas cortos que este backend apunta a
+compilar, documentado explícitamente como límite, no como descuido.
+
+Para que dos records puedan referenciarse entre sí como campos (o incluso
+formar un ciclo) sin pelear con el orden de declaración de C, primero se
+emiten TODOS los `typedef struct X X;` como declaraciones adelantadas, y
+recién después los cuerpos `struct X { ... };` completos — un puntero a un
+tipo incompleto es válido en C, así que el orden de los cuerpos entre sí deja
+de importar.
+
+### Un bug real, otra vez por la misma causa de fondo
+
+Al probar contra un programa con records anidados apareció un tercer caso de
+la misma familia de bugs que ya había mordido al DAP (sección 60) y a este
+mismo backend (sección 61): Ostrin no tiene palabra clave `let` — `nombre =
+valor` sin `mut` se parsea **siempre** como `Stmt::Assign`, sin importar si
+`nombre` es una variable nueva o una ya existente; es el intérprete quien
+decide en tiempo de ejecución cuál de las dos cosas es, mirando si el entorno
+ya conoce ese nombre (`Env::assign`, con caída a `define` si no existe). El
+generador de C asumía que `Stmt::Assign` siempre reasignaba una variable C ya
+declarada, así que `linea = punto` como primer uso de `linea` fallaba con
+"no type recorded for 'linea'". Corregido replicando la misma regla que ya
+usa el intérprete: si `self.lookup(nombre)` no encuentra nada, se declara una
+variable de C nueva en vez de asumir que ya existe.
+
+### Qué rechaza, y por qué el rechazo importa tanto como lo que sí compila
+
+Un `impl` que existe en el programa pero cuyos métodos nadie llama se
+**ignora** silenciosamente (no se traduce, pero tampoco hace fallar la
+compilación) — porque una llamada real a un método (`valor.metodo(...)`) ya
+falla por su cuenta en `gen_call`, que solo acepta un nombre de función
+suelto como callee. Lo que si se rechaza explícitamente es cualquier
+operador (`+`, `==`, etc.) aplicado a dos records: sin eso, el generador
+habría emitido `==` de C sobre los punteros (comparación de identidad) en
+vez de la igualdad estructural que pide `derive(Eq)`/`impl Eq` — un bug de
+corrección silencioso, no solo una limitación. Se prefirió fallar con un
+mensaje claro ("operators on records aren't supported yet") antes que
+compilar algo que se ve bien pero da resultados distintos a los del
+intérprete.
+
+### Pruebas
+
+`examples/native_records.ostrin` (dos records, uno anidado dentro del otro,
+mutación de un campo `mut` a través de su binding, un record pasado por
+identidad a otra función) se compila y ejecuta de verdad, comparando su
+salida byte a byte tanto contra lo esperado como — ya verificado a mano —
+contra la salida del intérprete para el mismo programa. Un segundo test
+reutiliza `examples/traits.ostrin` (que ya existía, con `impl Add`/`impl Eq`
+sobre `Vector2`) para confirmar que el backend nativo rechaza el operador
+`+`/`==` sobre records en vez de compilarlo mal. Suite del compilador:
+**79 pruebas**, sin warnings nuevos.
+
+Frontera actual del backend nativo: funciones y records simples (sin
+genéricos, sin `impl`) sobre `Int`/`Float`/`Bool`/`String`, con recursión,
+`if`/`while`/`for <rango>` y los operadores usuales. Todo lo que necesite
+despacho dinámico (traits, `impl`, operadores sobre tipos definidos por el
+usuario) sigue siendo terreno exclusivo del intérprete — ampliarlo más allá
+de eso es un proyecto en sí mismo, no una extensión trivial de lo que ya
+existe.

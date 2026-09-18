@@ -1,16 +1,18 @@
 //! A real, honest first native backend: `ostrinc --emit-c`/`--compile`
 //! transpile a *subset* of Ostrin to C and hand it to the system's C
-//! compiler. This is not the whole language — records, enums, traits,
-//! generics, dimensional `Quantity`, closures, collections and pattern
-//! matching all still only run through the interpreter (`--run`). What is
-//! supported is real: plain functions over `Int`/`Float`/`Bool`/`String`,
+//! compiler. This is not the whole language — enums, traits, generics,
+//! dimensional `Quantity`, closures, collections and pattern matching all
+//! still only run through the interpreter (`--run`). What is supported is
+//! real: plain functions over `Int`/`Float`/`Bool`/`String`, plain records
+//! (fields only, no `impl` methods — a method call fails with a clear error
+//! since `gen_call` only accepts a bare function name as its callee),
 //! recursion, `if`/`while`/`for <range>`, and the usual operators, compiled
 //! all the way to a native executable — not reinterpreted, not simulated.
 //!
 //! The codegen does its own tiny, local type inference (see `CType`) rather
 //! than reusing `typeck::Ty` directly: by the time this runs, the program
 //! has already passed the real type checker, so this pass only needs to
-//! know which concrete primitive each expression is (to pick a C type and a
+//! know which concrete type each expression is (to pick a C type and a
 //! `printf` conversion), not to validate anything.
 //!
 //! Nested `if`/blocks used *as expressions* (e.g. `x = if c { a } else { b }`)
@@ -18,32 +20,42 @@
 //! `find_c_compiler` looks for gcc/clang rather than accepting any C89
 //! compiler — this is a deliberate, documented trade-off to keep the
 //! transpiler itself simple.
+//!
+//! Records are always heap-allocated and referred to through a pointer,
+//! never copied by value, to match the interpreter's `Rc<RefCell<...>>`
+//! identity semantics (two bindings that alias the same record must see
+//! each other's field writes — see `Value::Record` in `interpreter/mod.rs`).
+//! Nothing here ever frees that memory: for the short-lived programs this
+//! backend targets that is an acceptable, documented trade-off, not an
+//! oversight.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::ast::*;
 use crate::symbols::type_to_string;
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 enum CType {
     Int,
     Float,
     Bool,
     Str,
     Void,
+    Record(String),
 }
 
-fn c_type_name(ty: CType) -> &'static str {
+fn c_type_name(ty: &CType) -> String {
     match ty {
-        CType::Int => "int64_t",
-        CType::Float => "double",
-        CType::Bool => "bool",
-        CType::Str => "const char*",
-        CType::Void => "void",
+        CType::Int => "int64_t".to_string(),
+        CType::Float => "double".to_string(),
+        CType::Bool => "bool".to_string(),
+        CType::Str => "const char*".to_string(),
+        CType::Void => "void".to_string(),
+        CType::Record(name) => format!("{name}*"),
     }
 }
 
-fn map_type(ty: &Type) -> Result<CType, String> {
+fn map_type(ty: &Type, record_names: &HashSet<String>) -> Result<CType, String> {
     match ty {
         Type::Named(name, args) if args.is_empty() => match name.as_str() {
             "Int" => Ok(CType::Int),
@@ -51,6 +63,7 @@ fn map_type(ty: &Type) -> Result<CType, String> {
             "Bool" => Ok(CType::Bool),
             "String" => Ok(CType::Str),
             "Void" => Ok(CType::Void),
+            other if record_names.contains(other) => Ok(CType::Record(other.to_string())),
             _ => Err(format!("type '{}' is not supported by the native backend yet", type_to_string(ty))),
         },
         _ => Err(format!("type '{}' is not supported by the native backend yet", type_to_string(ty))),
@@ -80,7 +93,14 @@ static char* ostrin_str_concat(const char* a, const char* b) {\n\
 
 struct Codegen {
     signatures: HashMap<String, (Vec<CType>, CType)>,
+    /// Record name -> its fields in declaration order. Every field type is
+    /// itself already a resolved `CType` (including nested `Record(name)`
+    /// references to other records — always valid as a pointer field even
+    /// before that other record's own body has been emitted).
+    records: HashMap<String, Vec<(String, CType)>>,
+    record_names: HashSet<String>,
     scopes: Vec<HashMap<String, CType>>,
+    temp_counter: usize,
 }
 
 impl Codegen {
@@ -97,13 +117,28 @@ impl Codegen {
     }
 
     fn lookup(&self, name: &str) -> Option<CType> {
-        self.scopes.iter().rev().find_map(|scope| scope.get(name).copied())
+        self.scopes.iter().rev().find_map(|scope| scope.get(name).cloned())
     }
 
-    fn gen_function_body(&mut self, f: &FunctionDecl, return_type: CType, out: &mut String) -> Result<(), String> {
+    fn next_temp(&mut self) -> String {
+        let name = format!("__ostrin_tmp{}", self.temp_counter);
+        self.temp_counter += 1;
+        name
+    }
+
+    fn record_fields(&self, record_name: &str) -> &[(String, CType)] {
+        self.records.get(record_name).map(Vec::as_slice).unwrap_or(&[])
+    }
+
+    fn field_type(&self, record_name: &str, field_name: &str) -> Option<CType> {
+        self.record_fields(record_name).iter().find(|(name, _)| name == field_name).map(|(_, ty)| ty.clone())
+    }
+
+    fn gen_function_body(&mut self, f: &FunctionDecl, return_type: &CType, out: &mut String) -> Result<(), String> {
         self.push_scope();
         for param in &f.params {
-            self.define(&param.name, map_type(&param.ty)?);
+            let ty = map_type(&param.ty, &self.record_names)?;
+            self.define(&param.name, ty);
         }
         for stmt in &f.body.stmts {
             self.gen_stmt(&stmt.stmt, out)?;
@@ -111,7 +146,7 @@ impl Codegen {
         match &f.body.tail {
             Some(e) => {
                 let (code, _) = self.gen_expr(e)?;
-                if return_type == CType::Void {
+                if *return_type == CType::Void {
                     out.push_str(&format!("    {code};\n    return;\n"));
                 } else {
                     out.push_str(&format!("    return {code};\n"));
@@ -158,12 +193,24 @@ impl Codegen {
         match stmt {
             Stmt::Binding { name, value, .. } => {
                 let (code, ty) = self.gen_expr(value)?;
+                out.push_str(&format!("    {} {} = {};\n", c_type_name(&ty), name, code));
                 self.define(name, ty);
-                out.push_str(&format!("    {} {} = {};\n", c_type_name(ty), name, code));
             }
             Stmt::Assign { name, value } => {
-                let (code, _) = self.gen_expr(value)?;
-                out.push_str(&format!("    {name} = {code};\n"));
+                let (code, ty) = self.gen_expr(value)?;
+                // Ostrin has no `let` keyword: `name = value` without `mut`
+                // parses as `Stmt::Assign` whether `name` already exists
+                // (a plain reassignment) or not (an implicit new immutable
+                // binding — see `Env::assign`'s fallback in the interpreter).
+                // The parser can't tell the two apart without scope
+                // tracking, so this backend re-derives it the same way the
+                // interpreter does, from whether `name` is already in scope.
+                if self.lookup(name).is_some() {
+                    out.push_str(&format!("    {name} = {code};\n"));
+                } else {
+                    out.push_str(&format!("    {} {} = {};\n", c_type_name(&ty), name, code));
+                    self.define(name, ty);
+                }
             }
             Stmt::Return(value) => match value {
                 Some(e) => {
@@ -188,8 +235,19 @@ impl Codegen {
                 out.push_str("    }\n");
             }
             Stmt::For { pattern, iter, body } => self.gen_for(pattern, iter, body, out)?,
-            Stmt::FieldAssign { .. } => {
-                return Err("records aren't supported by the native backend yet".to_string());
+            Stmt::FieldAssign { target, value } => {
+                let Expr::FieldAccess(obj, field_name) = target.unlocated() else {
+                    return Err("only 'record.field = value' assignments are supported by the native backend yet".to_string());
+                };
+                let (obj_code, obj_ty) = self.gen_expr(obj)?;
+                let CType::Record(record_name) = &obj_ty else {
+                    return Err("field assignment is only supported on records by the native backend yet".to_string());
+                };
+                if self.field_type(record_name, field_name).is_none() {
+                    return Err(format!("record '{record_name}' has no field '{field_name}'"));
+                }
+                let (value_code, _) = self.gen_expr(value)?;
+                out.push_str(&format!("    {obj_code}->{field_name} = {value_code};\n"));
             }
             Stmt::Expr(e) => {
                 if let Expr::If(cond, then_b, else_b) = e.unlocated() {
@@ -261,6 +319,17 @@ impl Codegen {
             }
             Expr::Binary(op, l, r) => self.gen_binary(*op, l, r),
             Expr::Call(callee, args) => self.gen_call(callee, args),
+            Expr::FieldAccess(obj, field_name) => {
+                let (obj_code, obj_ty) = self.gen_expr(obj)?;
+                let CType::Record(record_name) = &obj_ty else {
+                    return Err("field access is only supported on records by the native backend yet (no method calls)".to_string());
+                };
+                let field_ty = self
+                    .field_type(record_name, field_name)
+                    .ok_or_else(|| format!("record '{record_name}' has no field '{field_name}'"))?;
+                Ok((format!("{obj_code}->{field_name}"), field_ty))
+            }
+            Expr::RecordLiteral(name, fields) => self.gen_record_literal(name, fields),
             Expr::If(cond, then_b, else_b) => {
                 let (cond_code, _) = self.gen_expr(cond)?;
                 let (then_code, then_ty) = self.gen_block_expr(then_b)?;
@@ -276,9 +345,31 @@ impl Codegen {
         }
     }
 
+    fn gen_record_literal(&mut self, name: &str, fields: &[(String, Expr)]) -> Result<(String, CType), String> {
+        if !self.records.contains_key(name) {
+            return Err(format!("unknown record type '{name}'"));
+        }
+        let temp = self.next_temp();
+        let mut body = format!(
+            "{name}* {temp} = ({name}*)malloc(sizeof({name})); \
+             if (!{temp}) {{ fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); }} "
+        );
+        for (field_name, value_expr) in fields {
+            if self.field_type(name, field_name).is_none() {
+                return Err(format!("record '{name}' has no field '{field_name}'"));
+            }
+            let (value_code, _) = self.gen_expr(value_expr)?;
+            body.push_str(&format!("{temp}->{field_name} = {value_code}; "));
+        }
+        Ok((format!("({{ {body} {temp}; }})"), CType::Record(name.to_string())))
+    }
+
     fn gen_binary(&mut self, op: BinOp, l: &Expr, r: &Expr) -> Result<(String, CType), String> {
         let (lc, lt) = self.gen_expr(l)?;
         let (rc, rt) = self.gen_expr(r)?;
+        if matches!(lt, CType::Record(_)) || matches!(rt, CType::Record(_)) {
+            return Err("operators on records aren't supported by the native backend yet (no derive(Eq/Ord) dispatch)".to_string());
+        }
         if lt == CType::Str || rt == CType::Str {
             return match op {
                 BinOp::Add if lt == CType::Str && rt == CType::Str => Ok((format!("ostrin_str_concat({lc}, {rc})"), CType::Str)),
@@ -312,7 +403,7 @@ impl Codegen {
 
     fn gen_call(&mut self, callee: &Expr, args: &[Arg]) -> Result<(String, CType), String> {
         let Expr::Ident(name) = callee.unlocated() else {
-            return Err("only direct calls to a named function are supported by the native backend yet".to_string());
+            return Err("only direct calls to a named function are supported by the native backend yet (no method calls)".to_string());
         };
         let mut arg_codes = Vec::new();
         let mut arg_types = Vec::new();
@@ -341,12 +432,13 @@ impl Codegen {
         if arg_codes.len() != 1 {
             return Err("'print' expects exactly one argument".to_string());
         }
-        let (spec, value) = match arg_types[0] {
+        let (spec, value) = match &arg_types[0] {
             CType::Int => ("%lld\\n", format!("(long long)({})", arg_codes[0])),
             CType::Float => ("%g\\n", arg_codes[0].clone()),
             CType::Bool => ("%s\\n", format!("(({}) ? \"true\" : \"false\")", arg_codes[0])),
             CType::Str => ("%s\\n", arg_codes[0].clone()),
             CType::Void => return Err("cannot 'print' a Void value".to_string()),
+            CType::Record(name) => return Err(format!("cannot 'print' a record value ('{name}' has no derived Display)")),
         };
         Ok((format!("printf(\"{spec}\", {value})"), CType::Void))
     }
@@ -380,32 +472,55 @@ fn item_name(item: &Item) -> String {
     }
 }
 
-/// Transpiles an already type-checked program to C. Only plain top-level
-/// functions are accepted — any `record`/`enum`/`impl`/`trait` makes this
+/// Transpiles an already type-checked program to C. Top-level functions and
+/// plain (non-generic) records are supported; `enum`/`trait` make this
 /// return a clear error naming the construct, rather than silently ignoring
-/// it or emitting something incorrect.
+/// it or emitting something incorrect. An `impl` block is silently skipped —
+/// not translated — since nothing calls a method through it yet: any actual
+/// method call (`value.method(...)`) fails on its own in `gen_call`, because
+/// only a bare function name is accepted as a call's callee.
 pub fn generate(items: &[Item]) -> Result<String, String> {
     let mut functions = Vec::new();
+    let mut records = Vec::new();
     for item in items {
         match item {
             Item::Function(f) => functions.push(f),
-            Item::Import(_) => {}
-            other => {
+            Item::Record(r) => records.push(r),
+            Item::Import(_) | Item::Impl(_) => {}
+            other @ (Item::Enum(_) | Item::Trait(_)) => {
                 return Err(format!(
-                    "the native backend ('--emit-c'/'--compile') only supports plain functions yet — '{}' needs the interpreter ('--run') for now",
+                    "the native backend ('--emit-c'/'--compile') doesn't support '{}' yet — it needs the interpreter ('--run') for now",
                     item_name(other)
                 ));
             }
         }
     }
 
-    let mut codegen = Codegen { signatures: HashMap::new(), scopes: vec![HashMap::new()] };
+    let record_names: HashSet<String> = records.iter().map(|r| r.name.clone()).collect();
+    let mut codegen = Codegen {
+        signatures: HashMap::new(),
+        records: HashMap::new(),
+        record_names: record_names.clone(),
+        scopes: vec![HashMap::new()],
+        temp_counter: 0,
+    };
+    for r in &records {
+        if !r.generics.is_empty() {
+            return Err(format!("record '{}' is generic; the native backend doesn't support generics yet", r.name));
+        }
+        let fields = r
+            .fields
+            .iter()
+            .map(|field| map_type(&field.ty, &record_names).map(|ty| (field.name.clone(), ty)))
+            .collect::<Result<Vec<_>, _>>()?;
+        codegen.records.insert(r.name.clone(), fields);
+    }
     for f in &functions {
         if !f.generics.is_empty() {
             return Err(format!("function '{}' is generic; the native backend doesn't support generics yet", f.name));
         }
-        let param_types = f.params.iter().map(|p| map_type(&p.ty)).collect::<Result<Vec<_>, _>>()?;
-        let return_type = map_type(&f.return_type)?;
+        let param_types = f.params.iter().map(|p| map_type(&p.ty, &record_names)).collect::<Result<Vec<_>, _>>()?;
+        let return_type = map_type(&f.return_type, &record_names)?;
         codegen.signatures.insert(f.name.clone(), (param_types, return_type));
     }
     if !codegen.signatures.contains_key("main") {
@@ -413,6 +528,25 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
     }
 
     let mut out = String::from(PRELUDE);
+    // Forward-declare every record as an opaque typedef first: since a
+    // record is always used as a pointer, its fields never need the other
+    // record's full body to be visible yet, only the typedef name to exist —
+    // which sidesteps ordering entirely, including two records that
+    // reference each other.
+    for r in &records {
+        out.push_str(&format!("typedef struct {0} {0};\n", r.name));
+    }
+    if !records.is_empty() {
+        out.push('\n');
+    }
+    for r in &records {
+        out.push_str(&format!("struct {} {{\n", r.name));
+        for (field_name, field_ty) in &codegen.records[&r.name] {
+            out.push_str(&format!("    {} {};\n", c_type_name(field_ty), field_name));
+        }
+        out.push_str("};\n\n");
+    }
+
     for f in &functions {
         let (param_types, return_type) = codegen.signatures.get(&f.name).cloned().unwrap();
         let params = if f.params.is_empty() {
@@ -421,12 +555,12 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
             f.params
                 .iter()
                 .zip(&param_types)
-                .map(|(p, ty)| format!("{} {}", c_type_name(*ty), p.name))
+                .map(|(p, ty)| format!("{} {}", c_type_name(ty), p.name))
                 .collect::<Vec<_>>()
                 .join(", ")
         };
-        out.push_str(&format!("{} {}({}) {{\n", c_type_name(return_type), c_function_name(&f.name), params));
-        codegen.gen_function_body(f, return_type, &mut out)?;
+        out.push_str(&format!("{} {}({}) {{\n", c_type_name(&return_type), c_function_name(&f.name), params));
+        codegen.gen_function_body(f, &return_type, &mut out)?;
         out.push_str("}\n\n");
     }
     out.push_str("int main(void) {\n    ostrin_main();\n    return 0;\n}\n");

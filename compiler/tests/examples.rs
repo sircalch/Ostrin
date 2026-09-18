@@ -755,6 +755,41 @@ fn native_backend_rejects_constructs_it_does_not_support_yet() {
 }
 
 #[test]
+fn native_backend_compiles_and_runs_records() {
+    // Nested, heap-allocated records with a `mut` field mutated through its
+    // binding, a record passed by identity into another function, and a
+    // record literal nesting another record literal as one of its fields.
+    let exe = temp_artifact("records.exe");
+    let compile = run(&["--compile", "--out", &exe, &example_path("native_records.ostrin")]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+
+    let run_output = Command::new(&exe).output().unwrap_or_else(|e| panic!("failed to run compiled binary '{exe}': {e}"));
+    let _ = fs::remove_file(&exe);
+    assert!(run_output.status.success(), "compiled binary exited unsuccessfully");
+    assert_eq!(
+        String::from_utf8_lossy(&run_output.stdout).replace("\r\n", "\n"),
+        "11\n2\n13\n",
+        "native binary should match the interpreter's output for the same program"
+    );
+}
+
+#[test]
+fn native_backend_rejects_operators_on_records() {
+    // `traits.ostrin` dispatches `+`/`==` on `Vector2` through `impl Add`/
+    // `impl Eq` — the native backend has no trait dispatch, so it must
+    // refuse rather than silently compiling `+`/`==` as raw pointer
+    // arithmetic/identity comparison (which would be a real correctness
+    // bug, not just a missing feature).
+    let out = run(&["--emit-c", &example_path("traits.ostrin")]);
+    assert!(!out.status.success(), "the native backend should refuse operators on records without trait dispatch");
+    let error = stderr(&out);
+    assert!(error.contains("operators on records"), "unexpected error: {error}");
+}
+
+#[test]
 fn cli_exposes_help_and_version() {
     let version = run(&["--version"]);
     assert!(version.status.success());

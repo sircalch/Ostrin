@@ -44,7 +44,7 @@ Ostrin is not yet a production compiler. The current implementation includes a
 lexer, parser, static checker, interpreter, modules, packages, collections,
 traits, pattern matching, quantities and a simulated concurrency model.
 
-The compiler suite currently passes **77 integration tests**. Function calls
+The compiler suite currently passes **79 integration tests**. Function calls
 support named/default arguments, collection lookups preserve `Option<T>`, and
 record fields are checked statically. The CLI also exposes JSON Lines
 diagnostics with source locations for editor integrations, plus a compiler
@@ -54,11 +54,13 @@ import graph across unsaved buffers and serves hover, completion, references,
 rename, signature help and semantic tokens over the protocol; a debug adapter
 (`--dap`) gives real breakpoints, stepping, a call stack and variable
 inspection on top of the same interpreter. A first native backend (`--emit-c`/
-`--compile`) transpiles a real subset of the language — plain functions over
+`--compile`) transpiles a real subset of the language — plain functions and
+plain records (fields only, no `impl` methods yet) over
 `Int`/`Float`/`Bool`/`String`, recursion, `if`/`while`/`for <range>` — to C and
-compiles it to a native executable; everything else (records, enums, traits,
-generics, dimensional `Quantity`, closures, collections, pattern matching)
-still only runs through the interpreter. The runtime is still synchronous and
+compiles it to a native executable; everything else (enums, traits, generics,
+dimensional `Quantity`, closures, collections, pattern matching, and any
+operator or method dispatched through `impl`) still only runs through the
+interpreter. The runtime is still synchronous and
 the standard library is small.
 
 ## Quick start
