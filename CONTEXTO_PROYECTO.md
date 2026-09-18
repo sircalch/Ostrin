@@ -1617,3 +1617,7 @@ formateo y depuración.
 El paquete local se verificó con `npx --yes @vscode/vsce package` y genera
 `vscode-ostrin/ostrin-language-support-0.1.0.vsix` con el logo, gramática,
 configuración, proveedores y comandos de Ostrin incluidos.
+
+Los metadatos del paquete también quedaron preparados para Marketplace:
+publisher `ostrin-project`, licencia explícita, repositorio, página de inicio,
+issues, banner oscuro, precio gratuito, changelog y soporte.

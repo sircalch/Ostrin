@@ -4,12 +4,15 @@
   "description": "Syntax highlighting and compiler commands for the Ostrin programming language.",
   "version": "0.1.0",
   "publisher": "ostrin-project",
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
   "repository": {
     "type": "git",
     "url": "https://github.com/sircalch/Ostrin.git"
   },
   "homepage": "https://sircalch.github.io/Ostrin/",
+  "bugs": {
+    "url": "https://github.com/sircalch/Ostrin/issues"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -23,6 +26,11 @@
     "concurrency",
     "engineering"
   ],
+  "galleryBanner": {
+    "color": "#0b0d15",
+    "theme": "dark"
+  },
+  "pricing": "Free",
   "icon": "images/ostrin-logo.png",
   "main": "./extension.js",
   "activationEvents": [
