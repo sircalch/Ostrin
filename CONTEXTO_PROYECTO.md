@@ -63,7 +63,7 @@ Proyecto Cargo normal: `cd compiler && cargo build`, binario `ostrinc`.
 compiler/
 ├── Cargo.toml              (una sola dependencia externa: `toml`, para ostrin.toml)
 ├── src/
-│   ├── main.rs              — CLI: --check, --tokens, --ast, --run, --json, --symbols, --members, --help, --version
+│   ├── main.rs              — CLI: --check, --tokens, --ast, --run, --json, --symbols, --members, --types, --help, --version
 │   ├── lexer/
 │   │   ├── mod.rs           — tokenizador, trackea saltos de línea (newline_before) por token
 │   │   └── token.rs         — TokenKind, tabla de palabras reservadas
@@ -75,7 +75,7 @@ compiler/
 │   ├── modules.rs            — carga multi-archivo: descubrimiento, ciclos (E1081), visibilidad (E1080), reescritura de AST (mangling de nombres cruzando módulos)
 │   └── package.rs            — ostrin.toml, dependencias `path` (funcionan) y `git` (reconocidas, rechazadas explícitamente sin red)
 └── tests/
-    └── examples.rs           — 65 pruebas de integración (invocan el binario compilado, comparan stdout/stderr exacto)
+    └── examples.rs           — 67 pruebas de integración (invocan el binario compilado, comparan stdout/stderr exacto)
 ```
 
 ### Cómo correrlo
@@ -83,7 +83,7 @@ compiler/
 ```bash
 cd compiler
 cargo build
-cargo test                                    # 65 pruebas, deben pasar todas
+cargo test                                    # 67 pruebas, deben pasar todas
 ./target/debug/ostrinc archivo.ostrin         # solo verifica tipos
 ./target/debug/ostrinc --run archivo.ostrin   # verifica y ejecuta
 ./target/debug/ostrinc --ast archivo.ostrin   # imprime el AST
@@ -91,6 +91,7 @@ cargo test                                    # 65 pruebas, deben pasar todas
 ./target/debug/ostrinc --check --json archivo.ostrin # JSON Lines para editores
 ./target/debug/ostrinc --symbols --json archivo.ostrin # símbolos y firmas
 ./target/debug/ostrinc --members --json archivo.ostrin # miembros por tipo y bindings locales
+./target/debug/ostrinc --types --json archivo.ostrin # tipos inferidos de expresiones
 ```
 
 En Windows, si `cargo`/`rustc` no están en el PATH de la sesión: `$env:Path += ";$env:USERPROFILE\.cargo\bin"` (rustup se instaló vía `winget install Rustlang.Rustup` durante esta sesión).
@@ -1737,7 +1738,50 @@ test de JavaScript, la sintaxis de los dos archivos de la extensión, el
 empaquetado VSIX y las **66 pruebas** del compilador Rust.
 
 Este es todavía un índice semántico ligero de documentos abiertos, no un
-servidor LSP completo. El
-siguiente bloque técnico es resolver tipos a nivel de expresión para que
-diagnósticos, hover, completion y referencias compartan una misma fuente de
-verdad.
+servidor LSP completo. El siguiente bloque técnico es persistir la resolución
+de tipos a nivel de expresión y convertirla en un servicio LSP completo para
+que diagnósticos, hover, completion y referencias compartan una misma fuente
+de verdad.
+
+---
+
+## 51. Tipos de expresiones para herramientas del editor — 2026-09-17
+
+Se cerró la primera parte de esa siguiente capa. El AST ahora conserva una
+envoltura `Expr::Located` alrededor de las expresiones que nacen del parser.
+La envoltura no cambia la semántica: el checker y el intérprete la atraviesan,
+pero conserva la línea y columna iniciales para diagnósticos y herramientas.
+
+### Salida del compilador
+
+Se añadió `ostrinc --types --json`. Cada línea publica un registro con:
+
+- `kind: "expression"`;
+- tipo inferido renderizado (`Int`, `Option<Int>`, `Result<Int, String>`, etc.);
+- función contenedora;
+- archivo, línea y columna de origen.
+
+Los errores del checker siguen saliendo por `--check --json`; la nueva salida es
+metadata semántica independiente para que un editor pueda continuar mostrando
+tipos aun durante una edición incompleta.
+
+### Integración en VS Code
+
+El índice de la extensión combina ahora símbolos, miembros, bindings y tipos de
+expresiones. El hover conserva la prioridad de miembros, bindings y símbolos;
+cuando el cursor no coincide con uno de ellos puede mostrar el tipo inferido de
+la expresión más cercana en esa línea.
+
+La extensión pasa a la versión `0.1.3`; README, changelog, instrucciones de
+instalación y la página pública usan el nuevo nombre del paquete `.vsix`.
+
+### Compatibilidad y verificación
+
+Se añadió `Expr::unlocated()` para que módulos, checker, intérprete y análisis
+de variables mantengan sus decisiones existentes. Pasan **67 pruebas** del
+compilador, el smoke test de VS Code y la comprobación sintáctica de la
+extensión.
+
+La precisión actual es la posición inicial de cada expresión, no todavía un
+rango completo de inicio-fin. El siguiente refinamiento será persistir este
+índice como un servicio LSP y añadir formatter y debugging.

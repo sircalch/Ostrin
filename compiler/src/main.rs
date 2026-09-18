@@ -19,6 +19,7 @@ fn main() -> ExitCode {
     let ast_only = args.iter().any(|a| a == "--ast");
     let symbols_only = args.iter().any(|a| a == "--symbols");
     let members_only = args.iter().any(|a| a == "--members");
+    let types_only = args.iter().any(|a| a == "--types");
     let run = args.iter().any(|a| a == "--run");
     let json = args.iter().any(|a| a == "--json");
     let help = args.iter().any(|a| a == "--help" || a == "-h");
@@ -34,7 +35,7 @@ fn main() -> ExitCode {
     }
 
     let Some(path) = args.iter().skip(1).find(|a| !a.starts_with("--")) else {
-        eprintln!("usage: ostrinc [--check|--ast|--tokens|--symbols|--members|--run] [--json] <entry_file.ostrin>");
+        eprintln!("usage: ostrinc [--check|--ast|--tokens|--symbols|--members|--types|--run] [--json] <entry_file.ostrin>");
         return ExitCode::FAILURE;
     };
 
@@ -140,6 +141,27 @@ fn main() -> ExitCode {
         return ExitCode::SUCCESS;
     }
 
+    if types_only {
+        let (_errors, _bindings, expressions) =
+            typeck::Checker::new().check_program_with_editor_data(&items);
+        for expression in expressions {
+            let file = expression.source_file.as_deref().unwrap_or(path);
+            if json {
+                emit_json_expression(&expression, file);
+            } else {
+                println!(
+                    "{}:{}:{} {} -> {}",
+                    file,
+                    expression.span.line,
+                    expression.span.col,
+                    expression.function,
+                    expression.type_name
+                );
+            }
+        }
+        return ExitCode::SUCCESS;
+    }
+
     if symbols_only {
         for symbol in symbols::collect(&items) {
             if json {
@@ -203,6 +225,7 @@ fn print_help() {
     println!("  --tokens      Print lexer tokens");
     println!("  --symbols     Print source symbols and signatures");
     println!("  --members     Print type members and local bindings for editor tools");
+    println!("  --types       Print inferred expression types for editor tools");
     println!("  --json        Emit machine-readable diagnostics as JSON Lines");
     println!("  -h, --help    Print this help");
     println!("  -V, --version Print the compiler version");
@@ -291,6 +314,18 @@ fn emit_json_binding(binding: &typeck::EditorBinding, fallback_file: &str) {
         json_string(file),
         binding.span.line,
         binding.span.col
+    );
+}
+
+fn emit_json_expression(expression: &typeck::EditorExpression, fallback_file: &str) {
+    let file = expression.source_file.as_deref().unwrap_or(fallback_file);
+    println!(
+        "{{\"kind\":\"expression\",\"type\":{},\"function\":{},\"file\":{},\"line\":{},\"column\":{}}}",
+        json_string(&expression.type_name),
+        json_string(&expression.function),
+        json_string(file),
+        expression.span.line,
+        expression.span.col
     );
 }
 

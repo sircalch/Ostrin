@@ -99,7 +99,8 @@ function normalizeSemanticIndex(index) {
   return {
     symbols: Array.isArray(source.symbols) ? source.symbols : [],
     members: Array.isArray(source.members) ? source.members : [],
-    bindings: Array.isArray(source.bindings) ? source.bindings : []
+    bindings: Array.isArray(source.bindings) ? source.bindings : [],
+    expressions: Array.isArray(source.expressions) ? source.expressions : []
   };
 }
 
@@ -326,12 +327,18 @@ function provideHover(vscode, document, position, semanticIndex = []) {
   const detail = member && resolvedMemberDetail(member, receiverType);
   const binding = visibleBinding(token.word, document, position, index.bindings, index.symbols);
   const semantic = index.symbols.find((entry) => shortSymbolName(entry.name) === token.word);
+  const expression = index.expressions
+    .filter((entry) => (!entry.file || sameFile(entry.file, document.uri.fsPath)) && entry.line === position.line + 1)
+    .filter((entry) => (entry.column || 1) <= position.character + 1)
+    .sort((left, right) => (right.column || 1) - (left.column || 1))[0];
   const markdown = member
     ? `**Ostrin ${member.kind || 'member'}**\n\n\`${member.owner}.${member.name}: ${detail || ''}\`${resolvedResult ? `\n\nReturns \`${resolvedResult}\`` : ''}`
     : binding
       ? `**Ostrin local binding**\n\n\`${binding.name}: ${binding.type}\``
       : semantic
     ? `**Ostrin ${semantic.kind || 'symbol'}**\n\n\`${semantic.detail || semantic.name}\``
+    : expression
+      ? `**Ostrin inferred expression**\n\n\`${expression.type || '?'}\``
     : markdownFor(token.word);
   if (!markdown) return undefined;
   const range = new vscode.Range(

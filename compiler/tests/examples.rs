@@ -208,6 +208,7 @@ fn cli_exposes_help_and_version() {
     assert!(stdout(&help).contains("--check"));
     assert!(stdout(&help).contains("--symbols"));
     assert!(stdout(&help).contains("--members"));
+    assert!(stdout(&help).contains("--types"));
 }
 
 #[test]
@@ -246,6 +247,17 @@ fn compiler_exports_type_members_and_local_bindings_for_editor_tools() {
     assert!(generics_text.contains("\"owner\":\"Score\",\"name\":\"value\""));
     assert!(generics_text.contains("\"resultType\":\"Int\""));
     assert!(generics_text.contains("\"line\":5,\"column\":1"));
+}
+
+#[test]
+fn compiler_exports_inferred_expression_types_for_editor_tools() {
+    let out = run(&["--types", "--json", &example_path("option_result_types.ostrin")]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let text = stdout(&out);
+    assert!(text.contains("\"kind\":\"expression\""));
+    assert!(text.contains("\"type\":\"Option<Int>\""));
+    assert!(text.contains("\"type\":\"Result<Int, String>\""));
+    assert!(text.contains("\"line\":2,\"column\":13"));
 }
 
 #[test]

@@ -344,6 +344,7 @@ fn rewrite_stmt(stmt: &mut Stmt, ctx: &RewriteCtx) -> Result<(), String> {
 
 fn rewrite_expr(expr: &mut Expr, ctx: &RewriteCtx) -> Result<(), String> {
     match expr {
+        Expr::Located(inner, _) => rewrite_expr(inner, ctx),
         Expr::FieldAccess(obj, member) => {
             if let Expr::Ident(alias) = obj.as_ref() {
                 if let Some(target_path) = ctx.alias_map.get(alias) {

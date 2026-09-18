@@ -8,7 +8,7 @@ let diagnostics;
 const semanticIndex = new Map();
 
 function semanticIndexFor(document) {
-  const merged = { symbols: [], members: [], bindings: [] };
+  const merged = { symbols: [], members: [], bindings: [], expressions: [] };
   const seen = new Set();
   const add = (kind, item) => {
     if (!item) return;
@@ -20,7 +20,8 @@ function semanticIndexFor(document) {
       item.line,
       item.column,
       item.function,
-      item.scopeDepth
+      item.scopeDepth,
+      item.type
     ].join('|');
     if (seen.has(key)) return;
     seen.add(key);
@@ -34,9 +35,10 @@ function semanticIndexFor(document) {
     for (const item of index.symbols || []) add('symbols', item);
     for (const item of index.members || []) add('members', item);
     for (const item of index.bindings || []) add('bindings', item);
+    for (const item of index.expressions || []) add('expressions', item);
   }
-  if (!merged.symbols.length && !merged.members.length && !merged.bindings.length) {
-    return { symbols: [], members: [], bindings: [] };
+  if (!merged.symbols.length && !merged.members.length && !merged.bindings.length && !merged.expressions.length) {
+    return { symbols: [], members: [], bindings: [], expressions: [] };
   }
   return merged;
 }
@@ -114,20 +116,21 @@ function refreshSemanticIndex(document) {
   if (document.isUntitled) return;
   const cwd = vscode.workspace.getWorkspaceFolder(document.uri)?.uri.fsPath
     ?? path.dirname(document.uri.fsPath);
-  const found = { symbols: [], members: [], bindings: [] };
+  const found = { symbols: [], members: [], bindings: [], expressions: [] };
   const addSemanticItem = (item) => {
-    if (!item || !item.name) return;
+    if (!item || (!item.name && item.kind !== 'expression')) return;
     if (item.kind === 'member') found.members.push({ ...item, kind: item.memberKind || 'method' });
     else if (item.kind === 'binding') found.bindings.push(item);
+    else if (item.kind === 'expression') found.expressions.push(item);
     else if (item.kind) found.symbols.push(item);
   };
-  let pending = 2;
+  let pending = 3;
   let successful = true;
   const finish = () => {
     pending -= 1;
     if (pending === 0 && successful) semanticIndex.set(document.uri.toString(), found);
   };
-  for (const mode of ['members', 'symbols']) {
+  for (const mode of ['members', 'symbols', 'types']) {
     const child = childProcess.spawn(compilerPath(document), [`--${mode}`, '--json', document.uri.fsPath], {
       cwd,
       windowsHide: true,

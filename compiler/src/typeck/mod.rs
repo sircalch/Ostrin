@@ -21,6 +21,14 @@ pub struct EditorBinding {
     pub source_file: Option<String>,
 }
 
+#[derive(Debug, Clone)]
+pub struct EditorExpression {
+    pub type_name: String,
+    pub function: String,
+    pub span: Span,
+    pub source_file: Option<String>,
+}
+
 #[derive(Clone)]
 struct FnSig {
     params: Vec<Param>,
@@ -58,6 +66,7 @@ pub struct Checker {
     current_function_name: Option<String>,
     editor_scope_depth: usize,
     editor_bindings: Vec<EditorBinding>,
+    editor_expressions: Vec<EditorExpression>,
     errors: Vec<TypeError>,
 }
 
@@ -119,6 +128,7 @@ impl Checker {
             current_function_name: None,
             editor_scope_depth: 0,
             editor_bindings: Vec::new(),
+            editor_expressions: Vec::new(),
             errors: Vec::new(),
         }
     }
@@ -127,7 +137,15 @@ impl Checker {
         self.check_program_with_bindings(items).0
     }
 
-    pub fn check_program_with_bindings(mut self, items: &[Item]) -> (Vec<TypeError>, Vec<EditorBinding>) {
+    pub fn check_program_with_bindings(self, items: &[Item]) -> (Vec<TypeError>, Vec<EditorBinding>) {
+        let (errors, bindings, _) = self.check_program_with_editor_data(items);
+        (errors, bindings)
+    }
+
+    pub fn check_program_with_editor_data(
+        mut self,
+        items: &[Item],
+    ) -> (Vec<TypeError>, Vec<EditorBinding>, Vec<EditorExpression>) {
         for item in items {
             match item {
                 Item::Enum(e) => {
@@ -229,7 +247,7 @@ impl Checker {
                 Item::Record(_) | Item::Enum(_) | Item::Import(_) | Item::Trait(_) => {}
             }
         }
-        (self.errors, self.editor_bindings)
+        (self.errors, self.editor_bindings, self.editor_expressions)
     }
 
     fn check_function(&mut self, f: &FunctionDecl) {
@@ -731,6 +749,19 @@ impl Checker {
 
     fn infer_expr(&mut self, expr: &Expr, scope: &mut Scope) -> Ty {
         match expr {
+            Expr::Located(inner, span) => {
+                let previous_span = self.current_span;
+                self.current_span = Some(*span);
+                let ty = self.infer_expr(inner, scope);
+                self.current_span = previous_span;
+                self.editor_expressions.push(EditorExpression {
+                    type_name: ty.describe(),
+                    function: self.current_function_name.clone().unwrap_or_default(),
+                    span: *span,
+                    source_file: self.current_source_file.clone(),
+                });
+                ty
+            }
             Expr::IntLiteral(_) => Ty::Int,
             Expr::FloatLiteral(_) => Ty::Float,
             Expr::StringLiteral(_) => Ty::String,
@@ -1575,7 +1606,7 @@ impl Checker {
         expected: Option<&Ty>,
         scope: &mut Scope,
     ) -> Ty {
-        if let (Expr::Lambda(params, body), Some(Ty::Fn(expected_params, _))) = (expr, expected) {
+        if let (Expr::Lambda(params, body), Some(Ty::Fn(expected_params, _))) = (expr.unlocated(), expected) {
             return self.infer_lambda(params, body, Some(expected_params), scope);
         }
         self.infer_expr(expr, scope)
@@ -1614,7 +1645,7 @@ impl Checker {
         // For example, `numbers.map(fn(x) { x * 2 })` should type `x` as the
         // element type of `numbers`, instead of degrading the whole expression
         // to `List<?>` because the lambda was initially inferred in isolation.
-        let member_receiver = if let Expr::FieldAccess(receiver, method) = callee {
+        let member_receiver = if let Expr::FieldAccess(receiver, method) = callee.unlocated() {
             Some((self.infer_expr(receiver, scope), method.as_str()))
         } else {
             None
@@ -1633,7 +1664,7 @@ impl Checker {
             arg_types.push(self.infer_expr_with_expected(expr, expected.as_ref(), scope));
         }
 
-        if let Expr::Ident(name) = callee {
+        if let Expr::Ident(name) = callee.unlocated() {
             if let Some(return_type) = check_builtin_call(name, &arg_types, &mut self.errors) {
                 return return_type;
             }
@@ -1645,7 +1676,7 @@ impl Checker {
             }
         }
 
-        if let Expr::FieldAccess(receiver, method) = callee {
+        if let Expr::FieldAccess(receiver, method) = callee.unlocated() {
             let receiver_ty = member_receiver
                 .as_ref()
                 .map(|(receiver_ty, _)| receiver_ty.clone())
@@ -2592,7 +2623,7 @@ fn record_type_name(ty: &Ty) -> Option<&str> {
 }
 
 fn root_binding_name(expr: &Expr) -> Option<&str> {
-    match expr {
+    match expr.unlocated() {
         Expr::Ident(name) => Some(name),
         Expr::FieldAccess(receiver, _) | Expr::Index(receiver, _) => root_binding_name(receiver),
         _ => None,
@@ -2991,14 +3022,14 @@ fn collection_method_return_type(receiver_ty: &Ty, method: &str, arg_types: &[Ty
 }
 
 fn pattern_literal_type(literal: &Expr) -> Ty {
-    match literal {
+    match literal.unlocated() {
         Expr::IntLiteral(_) => Ty::Int,
         Expr::FloatLiteral(_) => Ty::Float,
         Expr::StringLiteral(_) => Ty::String,
         Expr::CharLiteral(_) => Ty::Char,
         Expr::BoolLiteral(_) => Ty::Bool,
         Expr::UnitLiteral(number, unit) => {
-            if matches!(number.as_ref(), Expr::IntLiteral(_) | Expr::FloatLiteral(_)) {
+            if matches!(number.unlocated(), Expr::IntLiteral(_) | Expr::FloatLiteral(_)) {
                 resolve_unit_expr(unit).map(Ty::Quantity).unwrap_or(Ty::Unknown)
             } else {
                 Ty::Unknown
@@ -3375,6 +3406,7 @@ fn signature_type_matches(expected: &Type, actual: &Type, owner: &str) -> bool {
 
 fn walk_expr(expr: &Expr, bound: &HashSet<String>, free: &mut HashSet<String>) {
     match expr {
+        Expr::Located(inner, _) => walk_expr(inner, bound, free),
         Expr::Ident(name) => { if !bound.contains(name) { free.insert(name.clone()); } }
         Expr::Lambda(params, body) => {
             let mut inner = bound.clone();

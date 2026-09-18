@@ -429,7 +429,7 @@ impl Parser {
         {
             let checkpoint = self.pos;
             if let Ok(target) = self.parse_postfix() {
-                if self.check(&TokenKind::Eq) && matches!(target, Expr::FieldAccess(..) | Expr::Index(..)) {
+                if self.check(&TokenKind::Eq) && is_assignable_target(&target) {
                     self.advance();
                     let value = self.parse_expr()?;
                     return Ok(self.located(Stmt::FieldAssign { target, value }, span));
@@ -442,7 +442,8 @@ impl Parser {
     }
 
     pub fn parse_expr(&mut self) -> PResult<Expr> {
-        self.parse_or()
+        let span = self.current_span();
+        Ok(Expr::Located(Box::new(self.parse_or()?), span))
     }
 
     fn parse_or(&mut self) -> PResult<Expr> {
@@ -1034,5 +1035,13 @@ impl Parser {
     fn error(&self, message: &str) -> ParseError {
         let tok = self.peek();
         ParseError { message: message.to_string(), line: tok.line, col: tok.col }
+    }
+}
+
+fn is_assignable_target(expr: &Expr) -> bool {
+    match expr {
+        Expr::Located(inner, _) => is_assignable_target(inner),
+        Expr::FieldAccess(..) | Expr::Index(..) => true,
+        _ => false,
     }
 }

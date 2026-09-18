@@ -120,6 +120,25 @@ const hover = features.provideHover(vscode, hoverDocument, new Position(1, 11), 
 assert(hover, 'push should have hover information');
 assert(hover.contents.value.includes('push(value: Int) -> Void'));
 
+const expressionHoverDocument = {
+  uri: { fsPath: 'C:/project/types.ostrin' },
+  lineAt: (line) => ({ text: ['fn main() {', '  1 + 2', '}'][line] }),
+  lineCount: 3
+};
+const expressionHover = features.provideHover(
+  vscode,
+  expressionHoverDocument,
+  new Position(1, 3),
+  {
+    symbols: [],
+    bindings: [],
+    members: [],
+    expressions: [{ type: 'Int', file: 'C:/project/types.ostrin', line: 2, column: 3 }]
+  }
+);
+assert(expressionHover, 'inferred expression should have hover information');
+assert(expressionHover.contents.value.includes('Int'));
+
 const referenceLines = [
   'fn main() {',
   '  numbers = [1, 2]',

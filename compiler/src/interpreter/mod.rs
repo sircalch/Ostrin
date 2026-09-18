@@ -700,7 +700,7 @@ impl Interpreter {
             }
             Stmt::Continue => Err(RuntimeError::Continue),
             Stmt::For { pattern, iter, body } => {
-                if matches!(iter, Expr::Range(..)) {
+                if matches!(iter.unlocated(), Expr::Range(..)) {
                     let items = self.eval_iterable(iter, env)?;
                     for item in items {
                         let loop_env = env.child();
@@ -790,7 +790,7 @@ impl Interpreter {
             }
             Stmt::FieldAssign { target, value } => {
                 let v = self.eval_expr(value, env)?;
-                match target {
+                match target.unlocated() {
                     Expr::FieldAccess(obj, field) => match self.eval_expr(obj, env)? {
                         Value::Record(_, data) => {
                             fields_set(&mut data.borrow_mut(), field, v);
@@ -806,7 +806,7 @@ impl Interpreter {
     }
 
     fn eval_iterable(&mut self, expr: &Expr, env: &Env) -> Result<Vec<Value>, RuntimeError> {
-        match expr {
+        match expr.unlocated() {
             Expr::Range(start, kind, end, step) => {
                 let sv = self.eval_expr(start, env)?;
                 let ev = self.eval_expr(end, env)?;
@@ -840,6 +840,7 @@ impl Interpreter {
 
     fn eval_expr(&mut self, expr: &Expr, env: &Env) -> EvalResult {
         match expr {
+            Expr::Located(inner, _) => self.eval_expr(inner, env),
             Expr::IntLiteral(n) => Ok(Value::Int(*n)),
             Expr::FloatLiteral(n) => Ok(Value::Float(*n)),
             Expr::StringLiteral(s) => Ok(Value::String(s.clone())),
@@ -992,7 +993,7 @@ impl Interpreter {
             }
             Expr::Within(a, r) => {
                 let av = self.eval_expr(a, env)?;
-                if let Expr::Range(start, kind, end, _) = r.as_ref() {
+                if let Expr::Range(start, kind, end, _) = r.as_ref().unlocated() {
                     let sv = self.eval_expr(start, env)?;
                     let ev = self.eval_expr(end, env)?;
                     let a_f = as_f64(&av)?;
@@ -1015,7 +1016,7 @@ impl Interpreter {
             }
             Expr::As(e, unit_expr) => {
                 let v = as_f64(&self.eval_expr(e, env)?)?;
-                if let Expr::Ident(sym) = unit_expr.as_ref() {
+                if let Expr::Ident(sym) = unit_expr.as_ref().unlocated() {
                     let dim = resolve_unit_expr(sym).map_err(|u| RuntimeError::Error(format!("unknown unit '{u}'")))?;
                     Ok(Value::Quantity(v, dim, sym.clone()))
                 } else {
@@ -1225,7 +1226,7 @@ impl Interpreter {
                 return self.call_user_function_with_args(&f, args, env.clone());
             }
         }
-        if let Expr::FieldAccess(obj, method) = callee {
+        if let Expr::FieldAccess(obj, method) = callee.unlocated() {
             let receiver = self.eval_expr(obj, env)?;
             if method == "to_string" {
                 return Ok(Value::String(receiver.to_string()));

@@ -217,6 +217,9 @@ pub enum RangeKind {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
+    /// Preserves the source position of an expression for diagnostics and
+    /// editor tooling. The wrapped expression remains semantically unchanged.
+    Located(Box<Expr>, Span),
     IntLiteral(i64),
     FloatLiteral(f64),
     StringLiteral(String),
@@ -248,4 +251,16 @@ pub enum Expr {
     Spawn(Block),
     SpawnScope(Block),
     Channel(Type, Option<Box<Expr>>),
+}
+
+impl Expr {
+    /// Returns the semantic expression after removing source-location
+    /// wrappers. This keeps older compiler/runtime logic independent from the
+    /// metadata used by diagnostics and editor tooling.
+    pub fn unlocated(&self) -> &Expr {
+        match self {
+            Expr::Located(inner, _) => inner.unlocated(),
+            other => other,
+        }
+    }
 }
