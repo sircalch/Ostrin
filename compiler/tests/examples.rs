@@ -230,6 +230,7 @@ fn compiler_exports_type_members_and_local_bindings_for_editor_tools() {
     assert!(generics_text.contains("\"name\":\"a\",\"type\":\"Score\",\"function\":\"main\",\"scopeDepth\":1"));
     assert!(generics_text.contains("\"owner\":\"Score\",\"name\":\"value\""));
     assert!(generics_text.contains("\"resultType\":\"Int\""));
+    assert!(generics_text.contains("\"line\":5,\"column\":1"));
 }
 
 #[test]

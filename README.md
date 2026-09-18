@@ -61,9 +61,9 @@ The first editor integration is in [`vscode-ostrin/`](vscode-ostrin/). It
 recognizes `.ostrin` files, provides syntax highlighting, uses the official
 logo, exposes commands to check or run the current file with `ostrinc`, and
 shows compiler diagnostics directly in the Problems panel. It also provides
-syntax-aware completion, type-aware member completion, hover documentation and
-an outline for top-level declarations. Enable `ostrin.checkOnSave` to check
-automatically after saving.
+syntax-aware completion, type-aware member completion, hover documentation,
+definition navigation and an outline for top-level declarations. Enable
+`ostrin.checkOnSave` to check automatically after saving.
 A complete semantic Language Server Protocol implementation and debugging
 remain future work.
 

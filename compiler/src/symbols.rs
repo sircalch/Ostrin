@@ -17,6 +17,8 @@ pub struct MemberSymbol {
     pub name: String,
     pub detail: String,
     pub result_type: Option<String>,
+    pub span: Option<Span>,
+    pub source_file: Option<String>,
 }
 
 pub fn collect(items: &[Item]) -> Vec<Symbol> {
@@ -122,6 +124,8 @@ pub fn collect_members(items: &[Item]) -> Vec<MemberSymbol> {
                         name: field.name.clone(),
                         detail: format!("{}: {}", field.name, type_to_string(&field.ty)),
                         result_type: Some(type_to_string(&field.ty)),
+                        span: Some(record.span),
+                        source_file: record.source_file.clone(),
                     });
                 }
             }
@@ -134,6 +138,8 @@ pub fn collect_members(items: &[Item]) -> Vec<MemberSymbol> {
                         name: variant.name.clone(),
                         detail: format!("{}::{}", enum_decl.name, variant.name),
                         result_type: None,
+                        span: Some(enum_decl.span),
+                        source_file: enum_decl.source_file.clone(),
                     });
                 }
             }
@@ -151,6 +157,8 @@ pub fn collect_members(items: &[Item]) -> Vec<MemberSymbol> {
                             &method.return_type,
                         ),
                         result_type: Some(type_to_string(&method.return_type)),
+                        span: Some(trait_decl.span),
+                        source_file: trait_decl.source_file.clone(),
                     });
                 }
             }
@@ -168,6 +176,8 @@ pub fn collect_members(items: &[Item]) -> Vec<MemberSymbol> {
                             &method.return_type,
                         ),
                         result_type: Some(type_to_string(&method.return_type)),
+                        span: Some(method.span),
+                        source_file: method.source_file.clone().or_else(|| implementation.source_file.clone()),
                     });
                 }
             }
@@ -229,6 +239,8 @@ fn core_members() -> Vec<MemberSymbol> {
             name: (*name).to_string(),
             detail: (*detail).to_string(),
             result_type: Some((*result_type).to_string()),
+            span: None,
+            source_file: None,
         })
         .collect()
 }

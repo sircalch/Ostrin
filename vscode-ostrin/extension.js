@@ -166,6 +166,9 @@ function activate(context) {
   const hover = vscode.languages.registerHoverProvider(selector, {
     provideHover: (document, position) => languageFeatures.provideHover(vscode, document, position, semanticIndex.get(document.uri.toString()) || {})
   });
+  const definitions = vscode.languages.registerDefinitionProvider(selector, {
+    provideDefinition: (document, position) => languageFeatures.provideDefinition(vscode, document, position, semanticIndex.get(document.uri.toString()) || {})
+  });
   const symbols = vscode.languages.registerDocumentSymbolProvider(selector, {
     provideDocumentSymbols: (document) => languageFeatures.provideDocumentSymbols(vscode, document, semanticIndex.get(document.uri.toString()) || {})
   });
@@ -194,7 +197,7 @@ function activate(context) {
     if (editor.document.languageId === 'ostrin') refreshSemanticIndex(editor.document);
   }
 
-  context.subscriptions.push(diagnostics, completion, hover, symbols, check, run, saveSubscription, openSubscription);
+  context.subscriptions.push(diagnostics, completion, hover, definitions, symbols, check, run, saveSubscription, openSubscription);
 }
 
 function deactivate() {}

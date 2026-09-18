@@ -308,10 +308,12 @@ function provideHover(vscode, document, position, semanticIndex = []) {
   const access = memberAccessAt(document, position);
   const owner = access && receiverOwner(document, position, index);
   const member = owner && index.members.find((entry) => entry.owner === owner && entry.name === token.word);
+  const receiverType = member && resolveReceiverType(document, position, index);
+  const resolvedResult = member && memberResultType(member, receiverType);
   const binding = visibleBinding(token.word, document, position, index.bindings, index.symbols);
   const semantic = index.symbols.find((entry) => shortSymbolName(entry.name) === token.word);
   const markdown = member
-    ? `**Ostrin ${member.kind || 'member'}**\n\n\`${member.owner}.${member.name}: ${member.detail || ''}\``
+    ? `**Ostrin ${member.kind || 'member'}**\n\n\`${member.owner}.${member.name}: ${member.detail || ''}\`${resolvedResult ? `\n\nReturns \`${resolvedResult}\`` : ''}`
     : binding
       ? `**Ostrin local binding**\n\n\`${binding.name}: ${binding.type}\``
       : semantic
@@ -323,6 +325,34 @@ function provideHover(vscode, document, position, semanticIndex = []) {
     new vscode.Position(position.line, token.end)
   );
   return new vscode.Hover(new vscode.MarkdownString(markdown), range);
+}
+
+function locationForEntry(vscode, entry) {
+  if (!entry || !entry.file || !entry.line) return undefined;
+  return new vscode.Location(
+    vscode.Uri.file(entry.file),
+    new vscode.Position(Math.max(0, entry.line - 1), Math.max(0, (entry.column || 1) - 1))
+  );
+}
+
+function provideDefinition(vscode, document, position, semanticIndex = []) {
+  const index = normalizeSemanticIndex(semanticIndex);
+  const token = wordAt(document, position);
+  const access = memberAccessAt(document, position);
+  const owner = access && receiverOwner(document, position, index);
+  const member = owner && index.members.find((entry) => entry.owner === owner && entry.name === token.word);
+  const memberLocation = locationForEntry(vscode, member);
+  if (memberLocation) return [memberLocation];
+
+  const binding = visibleBinding(token.word, document, position, index.bindings, index.symbols);
+  const bindingLocation = locationForEntry(vscode, binding);
+  if (bindingLocation) return [bindingLocation];
+
+  const semantic = index.symbols.find((entry) =>
+    shortSymbolName(entry.name) === token.word && (!entry.file || sameFile(entry.file, document.uri.fsPath))
+  );
+  const semanticLocation = locationForEntry(vscode, semantic);
+  return semanticLocation ? [semanticLocation] : undefined;
 }
 
 function provideDocumentSymbols(vscode, document, semanticIndex = []) {
@@ -392,5 +422,6 @@ function provideDocumentSymbols(vscode, document, semanticIndex = []) {
 module.exports = {
   provideCompletionItems,
   provideHover,
+  provideDefinition,
   provideDocumentSymbols
 };

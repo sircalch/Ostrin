@@ -256,14 +256,27 @@ fn emit_json_member(member: &symbols::MemberSymbol) {
             .collect::<Vec<_>>()
             .join(",")
     );
+    let file = member
+        .source_file
+        .as_deref()
+        .map_or_else(|| "null".to_string(), json_string);
+    let line = member
+        .span
+        .map_or_else(|| "null".to_string(), |span| span.line.to_string());
+    let column = member
+        .span
+        .map_or_else(|| "null".to_string(), |span| span.col.to_string());
     println!(
-        "{{\"kind\":\"member\",\"memberKind\":{},\"owner\":{},\"name\":{},\"detail\":{},\"resultType\":{},\"ownerGenerics\":{}}}",
+        "{{\"kind\":\"member\",\"memberKind\":{},\"owner\":{},\"name\":{},\"detail\":{},\"resultType\":{},\"ownerGenerics\":{},\"file\":{},\"line\":{},\"column\":{}}}",
         json_string(member.kind),
         json_string(&member.owner),
         json_string(&member.name),
         json_string(&member.detail),
         result_type,
-        owner_generics
+        owner_generics,
+        file,
+        line,
+        column
     );
 }
 

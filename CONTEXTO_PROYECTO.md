@@ -1473,3 +1473,34 @@ extensión.
 
 Los deploys históricos no se eliminan, pero los siguientes avances del
 compilador ya no generarán deploys de Pages innecesarios.
+
+---
+
+## 42. Navegación básica a definiciones desde VS Code — 2026-09-17
+
+Se cerró otro tramo del ciclo semántico del editor: los miembros declarados
+por el usuario ya conservan ubicación de origen y VS Code puede abrir esa
+declaración desde el acceso correspondiente.
+
+### Cambios realizados
+
+- `MemberSymbol` conserva `span` y `source_file`; el comando
+  `ostrinc --members --json` publica `file`, `line` y `column` junto con
+  `resultType` y `ownerGenerics`.
+- Campos de `record`, variantes de `enum`, métodos de `trait` y métodos de
+  `impl` quedan indexados con la ubicación de su declaración. Los miembros
+  internos (`List`, `Map`, `Option`, etc.) no inventan una ubicación porque no
+  proceden de un archivo de usuario.
+- La extensión registra `DefinitionProvider` y resuelve miembros de accesos
+  directos o encadenados; también permite saltar a un binding local o a una
+  declaración top-level indexada.
+- El hover muestra el tipo de retorno resuelto cuando los argumentos genéricos
+  del receptor son conocidos.
+- README, documentación web y estado del ecosistema fueron actualizados.
+
+### Límite actual
+
+La ubicación de un campo o variante apunta por ahora al span del `record` o
+`enum` propietario porque esos nodos todavía no conservan spans individuales.
+La siguiente mejora puede añadir posiciones precisas por miembro y navegación
+semántica completa para expresiones, rename y referencias múltiples.
