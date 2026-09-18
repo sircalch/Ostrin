@@ -2564,3 +2564,90 @@ en tiempo de ejecución de una forma que la monomorfización, por diseño, no
 cubre: un `dyn Trait` no sabe su tipo concreto en tiempo de compilación, así
 que necesitaría una vtable real — el primer mecanismo de despacho dinámico
 que este backend tendría que construir desde cero.
+
+---
+
+## 66. `dyn Trait` real (vtables) en el backend nativo — 2026-09-17
+
+Antes de empezar se descubrió algo que cambiaba el plan: el propio ejemplo
+del proyecto (`dyn_trait.ostrin`) usa `dyn Shape` casi siempre metido dentro
+de `List<dyn Shape>`, con `.fold()` y una lambda — nada de eso existe en el
+backend nativo (colecciones y closures nunca se implementaron ahí). Se le
+puso esto al usuario antes de tocar código: cubrir `dyn Trait` suelto
+(variables/parámetros/retornos, sin listas) es factible ahora; cubrir el
+caso idiomático real es un proyecto bastante más grande todavía, porque
+depende de construir `List` primero. Se eligió lo primero.
+
+### El único lugar de todo el backend donde algo se resuelve en tiempo de ejecución
+
+Todo lo anterior — records, métodos, enums, genéricos — se resolvía
+enteramente en tiempo de compilación, sin excepción. `dyn Trait` es
+estructuralmente distinto: su tipo concreto está borrado a propósito, así
+que no hay forma de evitar una tabla de punteros a función real. Se
+representa como un puntero gordo:
+
+```c
+typedef struct { RetTy (*metodo)(void*, Args...); ... } Trait_VTable;
+typedef struct { void* self; const Trait_VTable* vtable; } Trait_Dyn;
+```
+
+Para cada record que implementa el trait, se genera una "thunk" (una
+función puente que solo hace el cast de `void*` al tipo concreto y llama al
+método real ya compilado) y una instancia estática de la vtable apuntando a
+esas thunks. Convertir un record concreto a `dyn Trait` ("boxing") es
+literalmente construir ese struct: `{ .self = (void*)puntero, .vtable =
+&Trait__Record__vtable }`.
+
+### "Object safety" gratis, sin escribirla como regla aparte
+
+Un método de trait es válido para despacho dinámico solo si `Self` no
+aparece en ningún lado salvo como el receptor `self` exacto (la misma regla
+que usa Rust para decidir si un trait es "object safe"). No hizo falta
+escribir esa comprobación como código separado: la tabla de firmas
+abstractas del trait se construye llamando a `map_type` (no
+`map_type_with_subst`) sobre cada parámetro — como `map_type` no sabe nada
+de `Self`, cualquier método cuya firma mencione `Self` en otro lugar que no
+sea el receptor simplemente **falla al mapearse** y se descarta de la
+tabla, en vez de intentar despachar algo que no tendría sentido (dos
+instancias de tipos concretos distintos combinadas a través de un
+`Self` compartido).
+
+### Igual que con los genéricos: se descubre bajo demanda, se cachea
+
+Igual que una instanciación genérica, una vtable de (trait, record) solo se
+genera la primera vez que `coerce()` necesita convertir ese record
+concreto a ese trait — no para cada combinación posible de antemano. Un
+`HashSet` de pares ya vistos evita duplicar la vtable si el mismo record se
+convierte al mismo trait dos veces en el programa.
+
+### El bug real que salió al probarlo
+
+Las vtables se generaban correctamente, pero al principio se emitían
+**después** de todos los cuerpos de función — igual que se había hecho con
+las instanciaciones genéricas. El problema: una instancia de vtable
+(`static const Trait_VTable Trait__Record__vtable = {...};`) no es solo una
+declaración de función (que puede ir después, con un prototipo antes) — es
+una definición completa de una variable, y C no tiene forma de
+"prometerla" antes con un prototipo. Como `ostrin_main` suele ser el primer
+lugar donde algo se convierte a `dyn Trait`, su cuerpo (emitido antes)
+terminaba usando una vtable que aún no existía en el archivo — error de
+compilación de C real. Se corrigió moviendo la emisión de las instancias de
+vtable a justo después de los prototipos de las thunks (que sí pueden
+preceder su propio cuerpo), y antes de cualquier cuerpo de función.
+
+### Pruebas
+
+`examples/native_dyn_trait.ostrin`: un trait con dos métodos, dos records
+que lo implementan, una función que recibe `dyn Shape` como parámetro
+(cajeando dos records distintos en dos llamadas), y un binding con tipo
+explícito `dyn Shape`. Se compiló y ejecutó de verdad, comparando contra la
+salida ya verificada del intérprete. Un segundo test confirma que cajear el
+mismo record al mismo trait dos veces no duplica su vtable. Suite del
+compilador: **85 pruebas**, sin warnings nuevos.
+
+Frontera actual del backend nativo: funciones (incluidas genéricas),
+records con métodos, enums con match, y valores `dyn Trait` sueltos — todo
+resuelto en tiempo de compilación excepto la única llamada a través de una
+vtable. Lo que sigue, si alguna vez se quiere cerrar la brecha real de
+`dyn_trait.ostrin`, es construir `List`/colecciones — un proyecto aparte,
+no una extensión de lo que ya existe.

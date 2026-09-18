@@ -1,16 +1,19 @@
 //! A real, honest native backend: `ostrinc --emit-c`/`--compile` transpile a
 //! *subset* of Ostrin to C and hand it to the system's C compiler. This is
-//! not the whole language — `dyn Trait`, trait-object dispatch, dimensional
-//! `Quantity`, closures, collections, and any operator/method that would
-//! genuinely need to resolve something at *runtime* rather than at compile
-//! time still only run through the interpreter (`--run`). What is
+//! not the whole language — dimensional `Quantity`, closures, and
+//! collections (`List<T>` and friends) still only run through the
+//! interpreter (`--run`), and `dyn Trait` support stops at a standalone
+//! value: `List<dyn Trait>` isn't reachable without `List` itself. What is
 //! supported, all the way to a native executable — not reinterpreted, not
 //! simulated: plain functions (including generic ones, monomorphized per
 //! concrete instantiation — see `PendingInstance`), plain records with
-//! their non-generic `impl` methods (resolved statically: with no `dyn
-//! Trait` anywhere here, a call site always knows the receiver's concrete
-//! type), plain enums with `match`, over `Int`/`Float`/`Bool`/`String`,
-//! recursion, `if`/`while`/`for <range>`, and the usual operators.
+//! their non-generic `impl` methods (resolved statically — a call site
+//! always knows the receiver's concrete record type), plain enums with
+//! `match`, and standalone `dyn Trait` values (the one place in this whole
+//! backend where a call is actually resolved through a real vtable at
+//! *runtime* — see `CType::DynTrait` and `PendingVTable`) — over
+//! `Int`/`Float`/`Bool`/`String`, recursion, `if`/`while`/`for <range>`,
+//! and the usual operators.
 //!
 //! The codegen does its own tiny, local type inference (see `CType`) rather
 //! than reusing `typeck::Ty` directly: by the time this runs, the program
@@ -55,6 +58,14 @@ enum CType {
     /// and is deep-cloned on assignment, so it behaves like a value type,
     /// not a shared reference — see the module doc comment.
     Enum(String),
+    /// A `dyn Trait` value: a fat pointer (`{ void* self; const
+    /// TraitName_VTable* vtable; }`) — the one place in this whole backend
+    /// where a call is actually resolved at *runtime*, through a function
+    /// pointer, rather than known outright at compile time. Everything else
+    /// (records' methods, generic instantiations) gets away with static
+    /// resolution; a `dyn` value's whole reason to exist is that its
+    /// concrete type is erased, so there is no way around a vtable here.
+    DynTrait(String),
 }
 
 fn c_type_name(ty: &CType) -> String {
@@ -66,16 +77,18 @@ fn c_type_name(ty: &CType) -> String {
         CType::Void => "void".to_string(),
         CType::Record(name) => format!("{name}*"),
         CType::Enum(name) => name.clone(),
+        CType::DynTrait(name) => format!("{name}_Dyn"),
     }
 }
 
-/// Names of every plain record/enum this backend has agreed to represent —
-/// just enough to resolve a bare type name to the right `CType` variant.
-/// Field/method type-checking already happened in `typeck`; this only picks
-/// which concrete C shape a name maps to.
+/// Names of every plain record/enum/trait this backend has agreed to
+/// represent — just enough to resolve a bare type name to the right `CType`
+/// variant. Field/method type-checking already happened in `typeck`; this
+/// only picks which concrete C shape a name maps to.
 struct NamedTypes<'a> {
     records: &'a HashSet<String>,
     enums: &'a HashSet<String>,
+    traits: &'a HashSet<String>,
 }
 
 fn map_type(ty: &Type, types: &NamedTypes) -> Result<CType, String> {
@@ -90,6 +103,19 @@ fn map_type(ty: &Type, types: &NamedTypes) -> Result<CType, String> {
             other if types.enums.contains(other) => Ok(CType::Enum(other.to_string())),
             _ => Err(format!("type '{}' is not supported by the native backend yet", type_to_string(ty))),
         },
+        Type::Dyn(traits) => {
+            if traits.len() != 1 {
+                return Err("'dyn A + B' (more than one trait) isn't supported by the native backend yet".to_string());
+            }
+            if types.traits.contains(&traits[0]) {
+                Ok(CType::DynTrait(traits[0].clone()))
+            } else {
+                Err(format!(
+                    "'dyn {}' isn't supported by the native backend yet (the trait itself, or one of its methods, uses something this backend can't represent)",
+                    traits[0]
+                ))
+            }
+        }
         _ => Err(format!("type '{}' is not supported by the native backend yet", type_to_string(ty))),
     }
 }
@@ -202,10 +228,36 @@ struct Codegen<'a> {
     /// own `variant_to_enum` map: bare variant names are unique across the
     /// whole program, never qualified by their enum.
     variants: HashMap<String, VariantInfo>,
+    /// Trait name -> method name -> its *abstract* signature (param types
+    /// excluding the receiver, and return type — `Self` never resolved to
+    /// anything concrete here, since a trait's own declaration doesn't know
+    /// which record will eventually implement it). A method is present only
+    /// if `Self` never appears anywhere but as the exact `self` receiver:
+    /// `map_type` fails on a bare `Self` name (it isn't in `subst`), so a
+    /// signature like `fn combine(self, other: Self) -> Self` is silently
+    /// left out — the same "object safety" rule Rust enforces for `dyn
+    /// Trait`, arrived at for free rather than checked explicitly.
+    trait_methods: HashMap<String, HashMap<String, (Vec<CType>, CType)>>,
+    trait_names: HashSet<String>,
+    /// (trait, record) pairs whose vtable has already been queued or
+    /// emitted, so boxing the same record into the same `dyn Trait` twice
+    /// reuses one vtable instead of duplicating it.
+    vtables_emitted: HashSet<(String, String)>,
+    pending_vtables: VecDeque<PendingVTable>,
     record_names: HashSet<String>,
     enum_names: HashSet<String>,
     scopes: Vec<HashMap<String, CType>>,
     temp_counter: usize,
+}
+
+/// A `dyn Trait` boxing site the first `coerce()` call for this exact
+/// (trait, record) pair discovered — queued the same way a generic
+/// instantiation is (see `PendingInstance`), and for the same reason: it's
+/// only known to be needed once a record is actually seen being boxed into
+/// that trait, not upfront.
+struct PendingVTable {
+    trait_name: String,
+    record_name: String,
 }
 
 /// Every `CType` this backend knows, spelled as a valid piece of a C
@@ -218,13 +270,44 @@ fn mangle_ctype(ty: &CType) -> String {
         CType::Bool => "Bool".to_string(),
         CType::Str => "String".to_string(),
         CType::Void => "Void".to_string(),
-        CType::Record(name) | CType::Enum(name) => name.clone(),
+        CType::Record(name) | CType::Enum(name) | CType::DynTrait(name) => name.clone(),
     }
 }
 
 impl<'a> Codegen<'a> {
     fn named_types(&self) -> NamedTypes<'_> {
-        NamedTypes { records: &self.record_names, enums: &self.enum_names }
+        NamedTypes { records: &self.record_names, enums: &self.enum_names, traits: &self.trait_names }
+    }
+
+    /// Converts a value from `from` to `to` where they differ — today the
+    /// only conversion this backend ever needs is boxing a concrete record
+    /// into a `dyn Trait` it implements, at a function call argument, a
+    /// `return`/tail value, or an explicitly-typed binding. Queues that
+    /// pair's vtable (see `PendingVTable`) the first time it's needed.
+    fn coerce(&mut self, code: &str, from: &CType, to: &CType) -> Result<String, String> {
+        if from == to {
+            return Ok(code.to_string());
+        }
+        let (CType::Record(record_name), CType::DynTrait(trait_name)) = (from, to) else {
+            return Err(format!("cannot use a value of type '{}' where '{}' was expected", c_type_name(from), c_type_name(to)));
+        };
+        let Some(trait_method_names) = self.trait_methods.get(trait_name).map(|methods| methods.keys().cloned().collect::<Vec<_>>()) else {
+            return Err(format!("unknown trait '{trait_name}'"));
+        };
+        let implements = trait_method_names
+            .iter()
+            .all(|method_name| self.methods.get(record_name).is_some_and(|methods| methods.contains_key(method_name)));
+        if !implements {
+            return Err(format!(
+                "record '{record_name}' doesn't implement all of trait '{trait_name}''s methods \
+                 (or the native backend couldn't compile one of them)"
+            ));
+        }
+        let key = (trait_name.clone(), record_name.clone());
+        if self.vtables_emitted.insert(key) {
+            self.pending_vtables.push_back(PendingVTable { trait_name: trait_name.clone(), record_name: record_name.clone() });
+        }
+        Ok(format!("(({trait_name}_Dyn){{ .self = (void*)({code}), .vtable = &{trait_name}__{record_name}__vtable }})"))
     }
 }
 
@@ -284,10 +367,11 @@ impl<'a> Codegen<'a> {
         }
         match &body.tail {
             Some(e) => {
-                let (code, _) = self.gen_expr(e)?;
+                let (code, ty) = self.gen_expr(e)?;
                 if *return_type == CType::Void {
                     out.push_str(&format!("    {code};\n    return;\n"));
                 } else {
+                    let code = self.coerce(&code, &ty, return_type)?;
                     out.push_str(&format!("    return {code};\n"));
                 }
             }
@@ -330,10 +414,21 @@ impl<'a> Codegen<'a> {
 
     fn gen_stmt(&mut self, stmt: &Stmt, out: &mut String) -> Result<(), String> {
         match stmt {
-            Stmt::Binding { name, value, .. } => {
-                let (code, ty) = self.gen_expr(value)?;
-                out.push_str(&format!("    {} {} = {};\n", c_type_name(&ty), name, code));
-                self.define(name, ty);
+            Stmt::Binding { name, ty: declared, value, .. } => {
+                let (code, actual_ty) = self.gen_expr(value)?;
+                // An explicit `name: dyn Trait = ConcreteRecord { ... }`
+                // needs boxing right here — with no annotation, `ty` is
+                // just whatever the value already produced.
+                let (final_ty, code) = match declared {
+                    Some(declared_ty) => {
+                        let declared_ctype = map_type(declared_ty, &self.named_types())?;
+                        let coerced = self.coerce(&code, &actual_ty, &declared_ctype)?;
+                        (declared_ctype, coerced)
+                    }
+                    None => (actual_ty, code),
+                };
+                out.push_str(&format!("    {} {} = {};\n", c_type_name(&final_ty), name, code));
+                self.define(name, final_ty);
             }
             Stmt::Assign { name, value } => {
                 let (code, ty) = self.gen_expr(value)?;
@@ -684,13 +779,16 @@ impl<'a> Codegen<'a> {
     fn gen_binary(&mut self, op: BinOp, l: &Expr, r: &Expr) -> Result<(String, CType), String> {
         let (lc, lt) = self.gen_expr(l)?;
         let (rc, rt) = self.gen_expr(r)?;
-        if matches!(lt, CType::Record(_) | CType::Enum(_)) || matches!(rt, CType::Record(_) | CType::Enum(_)) {
+        if matches!(lt, CType::Record(_) | CType::Enum(_) | CType::DynTrait(_)) || matches!(rt, CType::Record(_) | CType::Enum(_) | CType::DynTrait(_)) {
             // C has no `==`/`<`/etc. on struct values at all (a compile
             // error, not just the wrong answer) — but even where a raw `==`
             // on two records *would* compile (comparing their pointers), it
             // would silently mean identity, not the structural
             // `derive(Eq)`/`impl Eq` comparison Ostrin actually defines.
-            return Err("operators on records/enums aren't supported by the native backend yet (no derive(Eq/Ord) dispatch)".to_string());
+            return Err(
+                "operators on records/enums/'dyn Trait' values aren't supported by the native backend yet (no derive(Eq/Ord) dispatch)"
+                    .to_string(),
+            );
         }
         if lt == CType::Str || rt == CType::Str {
             return match op {
@@ -764,7 +862,15 @@ impl<'a> Codegen<'a> {
         if param_types.len() != arg_codes.len() {
             return Err(format!("function '{name}' expects {} argument(s), got {}", param_types.len(), arg_codes.len()));
         }
-        Ok((format!("{}({})", c_function_name(name), arg_codes.join(", ")), return_type))
+        let coerced_codes = self.coerce_args(&arg_codes, &arg_types, &param_types)?;
+        Ok((format!("{}({})", c_function_name(name), coerced_codes.join(", ")), return_type))
+    }
+
+    /// Boxes each argument whose declared parameter type differs from what
+    /// it actually evaluated to (in practice, only ever a record being
+    /// boxed into a `dyn Trait` parameter — see `coerce`).
+    fn coerce_args(&mut self, arg_codes: &[String], arg_types: &[CType], param_types: &[CType]) -> Result<Vec<String>, String> {
+        arg_codes.iter().zip(arg_types.iter().zip(param_types.iter())).map(|(code, (from, to))| self.coerce(code, from, to)).collect()
     }
 
     /// Infers `<T, U, ...>` from the concrete types of the arguments at this
@@ -866,27 +972,58 @@ impl<'a> Codegen<'a> {
 
     fn gen_method_call(&mut self, obj: &Expr, method_name: &str, args: &[Arg]) -> Result<(String, CType), String> {
         let (obj_code, obj_ty) = self.gen_expr(obj)?;
-        let CType::Record(record_name) = &obj_ty else {
-            return Err("method calls are only supported on records by the native backend yet".to_string());
-        };
-        let Some(method) = self.methods.get(record_name).and_then(|methods| methods.get(method_name)) else {
-            return Err(format!(
-                "record '{record_name}' has no method '{method_name}' the native backend can compile \
-                 (generic methods and methods on unsupported types aren't supported yet)"
-            ));
-        };
-        let (param_types, return_type, c_name) = (method.param_types.clone(), method.return_type.clone(), method.c_name.clone());
-        let (arg_codes, arg_types) = self.gen_args(args)?;
-        if param_types.len() != arg_types.len() + 1 {
-            return Err(format!(
-                "method '{record_name}.{method_name}' expects {} argument(s), got {}",
-                param_types.len() - 1,
-                arg_types.len()
-            ));
+        match &obj_ty {
+            CType::Record(record_name) => {
+                let Some(method) = self.methods.get(record_name).and_then(|methods| methods.get(method_name)) else {
+                    return Err(format!(
+                        "record '{record_name}' has no method '{method_name}' the native backend can compile \
+                         (generic methods and methods on unsupported types aren't supported yet)"
+                    ));
+                };
+                let (param_types, return_type, c_name) =
+                    (method.param_types.clone(), method.return_type.clone(), method.c_name.clone());
+                let (arg_codes, arg_types) = self.gen_args(args)?;
+                if param_types.len() != arg_types.len() + 1 {
+                    return Err(format!(
+                        "method '{record_name}.{method_name}' expects {} argument(s), got {}",
+                        param_types.len() - 1,
+                        arg_types.len()
+                    ));
+                }
+                let coerced = self.coerce_args(&arg_codes, &arg_types, &param_types[1..])?;
+                let mut all_args = vec![obj_code];
+                all_args.extend(coerced);
+                Ok((format!("{c_name}({})", all_args.join(", ")), return_type))
+            }
+            CType::DynTrait(trait_name) => {
+                let Some((param_types, return_type)) = self.trait_methods.get(trait_name).and_then(|m| m.get(method_name)).cloned()
+                else {
+                    return Err(format!("trait '{trait_name}' has no method '{method_name}' the native backend can dispatch through 'dyn'"));
+                };
+                let (arg_codes, arg_types) = self.gen_args(args)?;
+                if param_types.len() != arg_types.len() {
+                    return Err(format!(
+                        "method '{trait_name}.{method_name}' expects {} argument(s), got {}",
+                        param_types.len(),
+                        arg_types.len()
+                    ));
+                }
+                let coerced = self.coerce_args(&arg_codes, &arg_types, &param_types)?;
+                // The receiver expression is only evaluated once, into a
+                // temporary: it may not be a bare variable (e.g. a freshly
+                // boxed record literal), and both `.self` and `.vtable` are
+                // needed from it.
+                let temp = self.next_temp();
+                let call_args = if coerced.is_empty() {
+                    format!("{temp}.self")
+                } else {
+                    format!("{temp}.self, {}", coerced.join(", "))
+                };
+                let call = format!("({{ {trait_name}_Dyn {temp} = {obj_code}; {temp}.vtable->{method_name}({call_args}); }})");
+                Ok((call, return_type))
+            }
+            _ => Err("method calls are only supported on records or 'dyn Trait' values by the native backend yet".to_string()),
         }
-        let mut all_args = vec![obj_code];
-        all_args.extend(arg_codes);
-        Ok((format!("{c_name}({})", all_args.join(", ")), return_type))
     }
 
     fn gen_print(&self, arg_codes: &[String], arg_types: &[CType]) -> Result<(String, CType), String> {
@@ -901,6 +1038,7 @@ impl<'a> Codegen<'a> {
             CType::Void => return Err("cannot 'print' a Void value".to_string()),
             CType::Record(name) => return Err(format!("cannot 'print' a record value ('{name}' has no derived Display)")),
             CType::Enum(name) => return Err(format!("cannot 'print' an enum value yet ('{name}' has no generated Display)")),
+            CType::DynTrait(name) => return Err(format!("cannot 'print' a 'dyn {name}' value")),
         };
         Ok((format!("printf(\"{spec}\", {value})"), CType::Void))
     }
@@ -967,33 +1105,40 @@ fn c_string_literal(s: &str) -> String {
 
 /// Transpiles an already type-checked program to C. Top-level functions
 /// (generic ones monomorphized per call site — see `PendingInstance`),
-/// plain (non-generic) records with their non-generic `impl` methods (no
-/// dynamic dispatch is needed: with no `dyn Trait` anywhere in this
-/// backend, a record's concrete method is always known at the call site),
-/// and plain (non-generic) enums with `match` are all supported. `trait`
-/// declarations carry no runtime representation of their own and are
-/// simply skipped, like `import`. A generic *method*, a generic *record* or
-/// *enum*, or an `impl` for a type this backend doesn't otherwise compile,
-/// is left out of its respective table rather than rejecting the whole
-/// program up front — only an actual, unsupported use (a call, a match
-/// arm) fails on its own.
+/// plain (non-generic) records with their non-generic `impl` methods
+/// (resolved statically — a record method call always knows its concrete
+/// target), plain (non-generic) enums with `match`, and standalone `dyn
+/// Trait` values (dispatched through a real vtable — see `PendingVTable`)
+/// are all supported. A non-generic trait whose methods are all "object
+/// safe" (`Self` never appears anywhere but as the exact `self` receiver —
+/// checked implicitly, not as a separate pass: see the `trait_methods`
+/// field doc comment) gets a vtable/fat-pointer type declared eagerly;
+/// nothing about a trait forces the whole program to be rejected on its
+/// own. A generic *method*, a generic *record* or *enum*, a trait method
+/// that isn't object-safe, or an `impl` for a type this backend doesn't
+/// otherwise compile, is left out of its respective table rather than
+/// rejecting the whole program up front — only an actual, unsupported use
+/// (a call, a match arm, a boxing site) fails on its own.
 pub fn generate(items: &[Item]) -> Result<String, String> {
     let mut functions = Vec::new();
     let mut records = Vec::new();
     let mut enums = Vec::new();
     let mut impls = Vec::new();
+    let mut traits = Vec::new();
     for item in items {
         match item {
             Item::Function(f) => functions.push(f),
             Item::Record(r) => records.push(r),
             Item::Enum(e) => enums.push(e),
             Item::Impl(im) => impls.push(im),
-            Item::Import(_) | Item::Trait(_) => {}
+            Item::Trait(t) => traits.push(t),
+            Item::Import(_) => {}
         }
     }
 
     let record_names: HashSet<String> = records.iter().map(|r| r.name.clone()).collect();
     let enum_names: HashSet<String> = enums.iter().map(|e| e.name.clone()).collect();
+    let trait_names: HashSet<String> = traits.iter().map(|t| t.name.clone()).collect();
     let mut codegen = Codegen {
         signatures: HashMap::new(),
         generic_functions: HashMap::new(),
@@ -1002,11 +1147,40 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
         records: HashMap::new(),
         methods: HashMap::new(),
         variants: HashMap::new(),
+        trait_methods: HashMap::new(),
+        trait_names,
+        vtables_emitted: HashSet::new(),
+        pending_vtables: VecDeque::new(),
         record_names: record_names.clone(),
         enum_names: enum_names.clone(),
         scopes: vec![HashMap::new()],
         temp_counter: 0,
     };
+    // A trait method is only ever object-safe here if `Self` never appears
+    // anywhere but as the exact `self` receiver — see the field doc comment
+    // on `trait_methods`. Generic traits/methods are skipped entirely (a
+    // `dyn` value has no type parameters of its own to carry).
+    for t in &traits {
+        if !t.generics.is_empty() {
+            continue;
+        }
+        let mut methods = HashMap::new();
+        for method in &t.methods {
+            if !method.generics.is_empty() {
+                continue;
+            }
+            let Some((receiver, rest)) = method.params.split_first() else { continue };
+            if receiver.name != "self" {
+                continue;
+            }
+            let Ok(param_types) = rest.iter().map(|p| map_type(&p.ty, &codegen.named_types())).collect::<Result<Vec<_>, _>>() else {
+                continue;
+            };
+            let Ok(return_type) = map_type(&method.return_type, &codegen.named_types()) else { continue };
+            methods.insert(method.name.clone(), (param_types, return_type));
+        }
+        codegen.trait_methods.insert(t.name.clone(), methods);
+    }
     for r in &records {
         if !r.generics.is_empty() {
             return Err(format!("record '{}' is generic; the native backend doesn't support generics yet", r.name));
@@ -1134,6 +1308,20 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
         out.push_str("};\n\n");
     }
 
+    // Every trait's vtable and fat-pointer types are declared eagerly (they
+    // are cheap, and needed to even *state* a `dyn Trait` parameter's type);
+    // only the actual vtable *instances* for a given (trait, record) pair
+    // are lazy — see `PendingVTable` and the drain loop below.
+    for (trait_name, methods) in &codegen.trait_methods {
+        out.push_str(&format!("typedef struct {{\n"));
+        for (method_name, (param_types, return_type)) in methods {
+            let params = std::iter::once("void*".to_string()).chain(param_types.iter().map(c_type_name)).collect::<Vec<_>>().join(", ");
+            out.push_str(&format!("    {} (*{})({});\n", c_type_name(return_type), method_name, params));
+        }
+        out.push_str(&format!("}} {trait_name}_VTable;\n\n"));
+        out.push_str(&format!("typedef struct {{ void* self; const {trait_name}_VTable* vtable; }} {trait_name}_Dyn;\n\n"));
+    }
+
     // Bodies are generated *before* any prototype is written out, because a
     // generic function's instantiations aren't known until something is
     // actually seen calling them — which only happens while generating a
@@ -1172,12 +1360,52 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
         codegen.gen_callable_body(&decl.params, &decl.body, &return_type, &self_subst, &mut body)?;
         bodies.push((signature, body));
     }
-    while let Some(job) = codegen.pending.pop_front() {
-        let params = render_params(&job.param_types, &job.decl.params);
-        let signature = format!("{} {}({})", c_type_name(&job.return_type), job.c_name, params);
-        let mut body = String::new();
-        codegen.gen_callable_body(&job.decl.params, &job.decl.body, &job.return_type, &job.subst, &mut body)?;
-        bodies.push((signature, body));
+    // A generic instantiation's body can call another generic function (or
+    // box a record into a `dyn Trait`) for the first time, and a `dyn`
+    // boxing needs no further discovery of its own (a thunk's body is just
+    // a one-line forwarding call) — but draining both queues in a loop,
+    // rather than assuming one pass each suffices, costs nothing and keeps
+    // that ordering assumption from ever mattering.
+    let mut thunk_prototypes: Vec<String> = Vec::new();
+    let mut vtable_defs: Vec<String> = Vec::new();
+    loop {
+        let mut progressed = false;
+        while let Some(job) = codegen.pending.pop_front() {
+            progressed = true;
+            let params = render_params(&job.param_types, &job.decl.params);
+            let signature = format!("{} {}({})", c_type_name(&job.return_type), job.c_name, params);
+            let mut body = String::new();
+            codegen.gen_callable_body(&job.decl.params, &job.decl.body, &job.return_type, &job.subst, &mut body)?;
+            bodies.push((signature, body));
+        }
+        while let Some(PendingVTable { trait_name, record_name }) = codegen.pending_vtables.pop_front() {
+            progressed = true;
+            let trait_method_sigs = codegen.trait_methods[&trait_name].clone();
+            let mut entries = Vec::new();
+            for (method_name, (param_types, return_type)) in &trait_method_sigs {
+                let record_method_c_name = codegen.methods[&record_name][method_name].c_name.clone();
+                let thunk_name = format!("{trait_name}__{record_name}__{method_name}");
+                let param_list = std::iter::once("void* self".to_string())
+                    .chain(param_types.iter().enumerate().map(|(index, ty)| format!("{} arg{index}", c_type_name(ty))))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                let signature = format!("static {} {thunk_name}({param_list})", c_type_name(return_type));
+                let call_args = std::iter::once(format!("({record_name}*)self"))
+                    .chain((0..param_types.len()).map(|index| format!("arg{index}")))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                thunk_prototypes.push(format!("{signature};"));
+                bodies.push((signature, format!("    return {record_method_c_name}({call_args});\n")));
+                entries.push(format!(".{method_name} = {thunk_name}"));
+            }
+            vtable_defs.push(format!(
+                "static const {trait_name}_VTable {trait_name}__{record_name}__vtable = {{ {} }};",
+                entries.join(", ")
+            ));
+        }
+        if !progressed {
+            break;
+        }
     }
 
     for f in &functions {
@@ -1196,7 +1424,20 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
     for (c_name, (param_types, return_type)) in &codegen.instantiations {
         out.push_str(&format!("{} {}({});\n", c_type_name(return_type), c_name, render_params_by_type(param_types)));
     }
+    for prototype in &thunk_prototypes {
+        out.push_str(prototype);
+        out.push('\n');
+    }
     out.push('\n');
+    // Vtable instances must be fully defined — not just declared — before
+    // any function body that references one by name (`ostrin_main` itself
+    // is often the very first place a record gets boxed), so they're
+    // written out here, right after every thunk's prototype exists, rather
+    // than alongside the function bodies that come next.
+    for vtable_def in &vtable_defs {
+        out.push_str(vtable_def);
+        out.push_str("\n\n");
+    }
 
     for (signature, body) in bodies {
         out.push_str(&format!("{signature} {{\n{body}}}\n\n"));

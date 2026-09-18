@@ -44,7 +44,7 @@ Ostrin is not yet a production compiler. The current implementation includes a
 lexer, parser, static checker, interpreter, modules, packages, collections,
 traits, pattern matching, quantities and a simulated concurrency model.
 
-The compiler suite currently passes **83 integration tests**. Function calls
+The compiler suite currently passes **85 integration tests**. Function calls
 support named/default arguments, collection lookups preserve `Option<T>`, and
 record fields are checked statically. The CLI also exposes JSON Lines
 diagnostics with source locations for editor integrations, plus a compiler
@@ -60,13 +60,15 @@ per concrete instantiation the way C++/Rust templates are, with a fresh C
 function generated the first time a given (function, concrete types) pair is
 called and reused after that — plain records (heap-allocated, always by
 reference, to match the interpreter's identity semantics) with their
-non-generic `impl` methods (resolved statically at compile time), and plain
+non-generic `impl` methods (resolved statically at compile time), plain
 non-generic enums with `match` (compiled to a tagged union and a sequence of
-`if`s) — over `Int`/`Float`/`Bool`/`String`, recursion, `if`/`while`/
-`for <range>`. `dyn Trait` and trait-object dispatch, dimensional `Quantity`,
-closures, and collections still only run through the interpreter — nothing
-in this backend resolves anything at runtime, only at compile time, so
-whatever would require that stays with the interpreter. The runtime is still
+`if`s), and standalone `dyn Trait` values (a real vtable, the one place in
+this backend anything is actually resolved at runtime rather than compile
+time) — over `Int`/`Float`/`Bool`/`String`, recursion, `if`/`while`/
+`for <range>`. Dimensional `Quantity`, closures, and collections (`List<T>`
+and friends) still only run through the interpreter, and `dyn Trait` support
+stops at a standalone value — `List<dyn Trait>` isn't reachable without
+`List` itself. The runtime is still
 synchronous and the standard library is small.
 
 ## Quick start

@@ -1,0 +1,45 @@
+trait Shape {
+    fn area(self) -> Float
+    fn scale(self, factor: Float) -> Float
+}
+
+record Circle {
+    radius: Float
+}
+
+record Square {
+    side: Float
+}
+
+impl Shape for Circle {
+    fn area(self) -> Float {
+        3.0 * self.radius * self.radius
+    }
+
+    fn scale(self, factor: Float) -> Float {
+        self.radius * factor
+    }
+}
+
+impl Shape for Square {
+    fn area(self) -> Float {
+        self.side * self.side
+    }
+
+    fn scale(self, factor: Float) -> Float {
+        self.side * factor
+    }
+}
+
+fn describe(shape: dyn Shape) -> Float {
+    shape.area()
+}
+
+fn main() -> Void {
+    print(describe(Circle { radius: 2.0 }))
+    print(describe(Square { side: 3.0 }))
+
+    boxed: dyn Shape = Circle { radius: 1.0 }
+    print(boxed.area())
+    print(boxed.scale(4.0))
+}

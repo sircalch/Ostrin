@@ -880,6 +880,44 @@ fn native_backend_emits_one_c_function_per_concrete_instantiation() {
 }
 
 #[test]
+fn native_backend_compiles_and_runs_dyn_trait() {
+    // A standalone `dyn Shape` (no `List`, which the native backend doesn't
+    // support at all): a function parameter typed `dyn Shape` boxing two
+    // different concrete records at two call sites, an explicitly-typed
+    // `dyn Shape` binding, and a second trait method (`scale`) called
+    // through the same dyn value — exercising the vtable dispatch itself,
+    // not just a single trivial method.
+    let exe = temp_artifact("dyn_trait.exe");
+    let compile = run(&["--compile", "--out", &exe, &example_path("native_dyn_trait.ostrin")]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+
+    let run_output = Command::new(&exe).output().unwrap_or_else(|e| panic!("failed to run compiled binary '{exe}': {e}"));
+    let _ = fs::remove_file(&exe);
+    assert!(run_output.status.success(), "compiled binary exited unsuccessfully");
+    assert_eq!(
+        String::from_utf8_lossy(&run_output.stdout).replace("\r\n", "\n"),
+        "12\n9\n3\n4\n",
+        "native binary should match the interpreter's output for the same program"
+    );
+}
+
+#[test]
+fn native_backend_dedups_vtables_across_repeated_boxing() {
+    // `Circle` is boxed into `dyn Shape` twice in native_dyn_trait.ostrin
+    // (once via describe(), once via the explicit `boxed: dyn Shape =`
+    // binding); its vtable must be emitted exactly once, not duplicated
+    // (which would be a C "redefinition" compile error, not just wasteful).
+    let out = run(&["--emit-c", &example_path("native_dyn_trait.ostrin")]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let source = stdout(&out);
+    assert_eq!(source.matches("Shape__Circle__vtable = {").count(), 1, "Circle's vtable should be emitted once: {source}");
+    assert_eq!(source.matches("Shape__Square__vtable = {").count(), 1, "Square's vtable should be emitted once: {source}");
+}
+
+#[test]
 fn cli_exposes_help_and_version() {
     let version = run(&["--version"]);
     assert!(version.status.success());
