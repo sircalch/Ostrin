@@ -2986,3 +2986,17 @@ pruebas**, sin warnings.
 - Pendiente en el barrido: canales/`spawn`, iteradores propios, métodos
   genéricos, `impl` sobre `Quantity<D>`, lambdas sobre `Option`/`Result`
   (`option_result.ostrin`), `read_file` y compañía. Suite: **93 pruebas**.
+
+---
+
+## 80. Combinadores de `Option`/`Result` y `print` de `Result` en el nativo — 2026-09-18
+
+- Con lambdas expandidas en línea (como en las listas): `Option.map/then/ok_or`
+  y `Result.map/map_err/then/ok`. Tipos explícitos: `None<Int>()`,
+  `Ok<T, E>(x)`, `Err<T, E>(e)`.
+- `print` de `Result` (`Ok(4)`, `Err(bad)`).
+- Un `Ok(x)`/`Err(e)`/`None` ligado a un nombre sin anotación solo conoce la
+  mitad de su tipo; la mitad desconocida se rellena con un `Int` de relleno
+  (`settle_literal`), que un programa que pasó el checker nunca observa.
+- `option_result*.ostrin` y `try_result.ostrin` compilan y coinciden.
+  Suite: **93 pruebas**, sin warnings.
