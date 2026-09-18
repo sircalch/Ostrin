@@ -270,11 +270,14 @@ De mayor a menor precedencia (documento 08, §6, ya corregida tras la segunda re
 | Código | Origen | Significado |
 |---|---|---|
 | E1001 | 01 | Reasignar un binding inmutable |
+| E1002 | 01 | Asignar a un campo inmutable o a través de un binding inmutable |
 | E1010 | 01 | Unidad desconocida |
 | E1024 | 01 | Operación dimensional inválida (sumar dimensiones distintas) |
 | E1025 | 01 | Falta unidad explícita al combinar escalar con `Quantity` |
 | E1040 | 02 | Sobrecarga de función no soportada |
+| E1041 | 01 / 02 | Tipo de retorno, binding, campo o asignación incompatible |
 | E1042 | 02 / 03 | Argumento genérico incompatible o que incumple un trait bound |
+| E1043 | 01 | Acceso a un campo inexistente |
 | E1050 | 12 | `impl` de un trait sin su supertrait implementado |
 | E1051 | 12 | `derive` sobre un tipo con un campo que no cumple el trait |
 | E1052 | 12 | `derive` y `impl` manual compitiendo por el mismo trait |

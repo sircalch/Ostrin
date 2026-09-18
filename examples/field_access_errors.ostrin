@@ -1,0 +1,10 @@
+record Score {
+    value: Int
+}
+
+fn main() -> Void {
+    score = Score { value: 7 }
+    print(score.value + 1)
+    print(score.missing)
+    score.value = "not an integer"
+}

@@ -1,0 +1,25 @@
+fn wrong_return() -> Int {
+    return "bad"
+}
+
+fn missing_return() -> Int {
+    return
+}
+
+fn invalid_default(value: Int = "bad") -> Void {
+    print(value)
+}
+
+fn main() -> Void {
+    if 1 {
+        print("not a condition")
+    }
+
+    while "loop" {
+        break
+    }
+
+    true and 1
+    wrong_return()
+    missing_return()
+}

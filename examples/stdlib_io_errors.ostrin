@@ -1,0 +1,5 @@
+fn main() -> Void {
+    print(read_file(1))
+    print(write_file("target/unused.txt", 2))
+    print(parse_int(true))
+}

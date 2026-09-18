@@ -1,0 +1,13 @@
+fn needs_int(value: Int) -> Void {
+    print(value)
+}
+
+fn main() -> Void {
+    ch = channel<Int>()
+    ch.send("wrong")
+    maybe = ch.receive()
+    needs_int(maybe)
+
+    task = spawn { "done" }
+    needs_int(task.join())
+}

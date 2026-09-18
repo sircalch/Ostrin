@@ -24,9 +24,11 @@ Ostrin is not yet a production compiler. The current implementation includes a
 lexer, parser, static checker, interpreter, modules, packages, collections,
 traits, pattern matching, quantities and a simulated concurrency model.
 
-The compiler suite currently passes **47 integration tests**. The runtime is
-still synchronous, the standard library is small, and native code generation,
-full LSP support and production I/O are planned work.
+The compiler suite currently passes **61 integration tests**. Function calls
+support named/default arguments, collection lookups preserve `Option<T>`, and
+record fields are checked statically. The runtime is still synchronous, the
+standard library is small, and native code generation, full LSP support and
+production I/O are planned work.
 
 ## Quick start
 

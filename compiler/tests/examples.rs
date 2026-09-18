@@ -1,3 +1,4 @@
+use std::fs;
 use std::process::{Command, Output};
 
 fn example_path(rel: &str) -> String {
@@ -24,6 +25,150 @@ fn hello_type_checks_ok() {
     let out = run(&[&example_path("hello.ostrin")]);
     assert!(out.status.success());
     assert!(stdout(&out).contains("OK"));
+}
+
+#[test]
+fn record_fields_are_checked_and_generic_fields_are_substituted() {
+    let out = run(&["--run", &example_path("field_access.ostrin")]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    assert_eq!(stdout(&out).lines().collect::<Vec<_>>(), ["9", "seven"]);
+}
+
+#[test]
+fn invalid_record_field_access_and_assignment_are_rejected() {
+    let out = run(&[&example_path("field_access_errors.ostrin")]);
+    assert!(!out.status.success());
+    let err = stderr(&out);
+    assert!(err.contains("E1043"), "missing field diagnostic: {err}");
+    assert!(err.contains("missing"), "missing field name: {err}");
+    assert!(err.contains("E1041"), "missing field assignment diagnostic: {err}");
+    assert!(err.contains("String") && err.contains("Int"), "missing field types: {err}");
+}
+
+#[test]
+fn named_and_default_function_arguments_work() {
+    let out = run(&["--run", &example_path("function_arguments.ostrin")]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    assert_eq!(stdout(&out).lines().collect::<Vec<_>>(), ["Ostrin!", "Ostrin?"]);
+}
+
+#[test]
+fn function_argument_count_names_and_types_are_checked() {
+    let out = run(&[&example_path("function_argument_errors.ostrin")]);
+    assert!(!out.status.success());
+    let err = stderr(&out);
+    assert!(err.contains("E1041"), "missing argument diagnostic: {err}");
+    assert!(err.contains("Missing required argument 'value'"), "missing arity diagnostic: {err}");
+    assert!(err.contains("String") && err.contains("Int"), "missing argument types: {err}");
+    assert!(err.contains("no parameter named 'extra'"), "missing named argument diagnostic: {err}");
+    assert!(err.contains("Positional arguments must come before named arguments"), "missing ordering diagnostic: {err}");
+}
+
+#[test]
+fn collection_lookup_results_are_option_types() {
+    let out = run(&[&example_path("collection_types_errors.ostrin")]);
+    assert!(!out.status.success());
+    let err = stderr(&out);
+    assert!(err.contains("E1041"), "missing Option argument diagnostic: {err}");
+    assert!(err.contains("Option<Int>"), "collection lookup did not preserve Option<Int>: {err}");
+}
+
+#[test]
+fn task_channel_and_iterator_types_are_checked() {
+    let out = run(&[&example_path("concurrency_types_errors.ostrin")]);
+    assert!(!out.status.success());
+    let err = stderr(&out);
+    assert!(err.contains("E1041"), "missing concurrency type diagnostic: {err}");
+    assert!(err.contains("Method 'send' expects 'Int', got 'String'"), "missing channel send diagnostic: {err}");
+    assert!(err.contains("Option<Int>"), "missing channel receive type: {err}");
+    assert!(err.contains("String"), "missing task join type: {err}");
+}
+
+#[test]
+fn collection_method_arguments_are_checked() {
+    let out = run(&[&example_path("collection_argument_errors.ostrin")]);
+    assert!(!out.status.success());
+    let err = stderr(&out);
+    assert!(err.contains("E1041"), "missing collection argument diagnostic: {err}");
+    assert!(err.contains("push") && err.contains("expects 'Int'") && err.contains("String"), "missing List argument types: {err}");
+    assert!(err.contains("get") && err.contains("expects 'String'") && err.contains("Int"), "missing Map key type: {err}");
+    assert!(err.contains("add") && err.contains("expects 'Int'"), "missing Set element type: {err}");
+}
+
+#[test]
+fn control_flow_conditions_and_explicit_returns_are_checked() {
+    let out = run(&[&example_path("control_type_errors.ostrin")]);
+    assert!(!out.status.success());
+    let err = stderr(&out);
+    assert!(err.contains("If condition expects 'Bool', got 'Int'"), "missing if condition diagnostic: {err}");
+    assert!(err.contains("While condition expects 'Bool', got 'String'"), "missing while condition diagnostic: {err}");
+    assert!(err.contains("Logical operators expect 'Bool' operands"), "missing logical operand diagnostic: {err}");
+    assert!(err.contains("Return expression expects 'Int', got 'String'"), "missing return type diagnostic: {err}");
+    assert!(err.contains("Empty return expects function return type 'Void'"), "missing empty return diagnostic: {err}");
+    assert!(err.contains("Default value for 'value' expects 'Int', got 'String'"), "missing default value diagnostic: {err}");
+}
+
+#[test]
+fn option_and_result_methods_run() {
+    let out = run(&["--run", &example_path("option_result.ostrin")]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    assert_eq!(
+        stdout(&out).lines().collect::<Vec<_>>(),
+        [
+            "true", "Some(5)", "Some(5)", "4", "Ok(4)", "true", "9",
+            "Err(missing)", "true", "Ok(8)", "Some(7)", "true", "Err(bad!)", "None"
+        ]
+    );
+}
+
+#[test]
+fn option_and_result_method_arguments_are_checked() {
+    let out = run(&[&example_path("option_result_errors.ostrin")]);
+    assert!(!out.status.success());
+    let err = stderr(&out);
+    assert!(err.contains("E1041"), "missing Option/Result diagnostic: {err}");
+    assert!(err.contains("unwrap_or") && err.contains("expects 'Int'") && err.contains("String"), "missing unwrap_or type diagnostic: {err}");
+    assert!(err.contains("map") && err.contains("fn(Int)"), "missing map callback-shape diagnostic: {err}");
+}
+
+#[test]
+fn try_unwraps_and_propagates_option_and_result() {
+    let out = run(&["--run", &example_path("try_result.ostrin")]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    assert_eq!(
+        stdout(&out).lines().collect::<Vec<_>>(),
+        ["Ok(4)", "Err(converted: bad)", "Some(10)", "None"]
+    );
+}
+
+#[test]
+fn try_requires_a_matching_enclosing_result_type() {
+    let out = run(&[&example_path("try_errors.ostrin")]);
+    assert!(!out.status.success());
+    let err = stderr(&out);
+    assert!(err.contains("E1041"), "missing try diagnostic: {err}");
+    assert!(err.contains("enclosing Option/Result"), "missing container mismatch: {err}");
+    assert!(err.contains("propagates error type") && err.contains("String") && err.contains("Int"), "missing error propagation mismatch: {err}");
+    assert!(err.contains("try catch") && err.contains("fn(String)"), "missing catch signature mismatch: {err}");
+}
+
+#[test]
+fn standard_library_file_io_and_parsing_work() {
+    let out = run(&["--run", &example_path("stdlib_io.ostrin")]);
+    let _ = fs::remove_file("target/ostrin-stdlib-test.txt");
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    assert_eq!(stdout(&out).lines().collect::<Vec<_>>(), ["true", "42", "hello from Ostrin"]);
+}
+
+#[test]
+fn standard_library_arguments_are_checked() {
+    let out = run(&[&example_path("stdlib_io_errors.ostrin")]);
+    assert!(!out.status.success());
+    let err = stderr(&out);
+    assert!(err.contains("E1041"), "missing standard library diagnostic: {err}");
+    assert!(err.contains("read_file") && err.contains("String") && err.contains("Int"), "missing read_file type diagnostic: {err}");
+    assert!(err.contains("write_file") && err.contains("String") && err.contains("Int"), "missing write_file type diagnostic: {err}");
+    assert!(err.contains("parse_int") && err.contains("Bool"), "missing parse_int type diagnostic: {err}");
 }
 
 #[test]

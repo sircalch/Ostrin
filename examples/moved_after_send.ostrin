@@ -7,7 +7,7 @@ fn process(b: Buffer) -> Void {
 }
 
 fn main() -> Void {
-    ch = channel<Int>()
+    ch = channel<Buffer>()
     mut buffer = Buffer { value: 5 }
     ch.send(buffer)
     process(buffer)

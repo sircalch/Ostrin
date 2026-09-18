@@ -1,0 +1,10 @@
+fn needs_int(value: Int) -> Void {
+    print(value)
+}
+
+fn main() -> Void {
+    needs_int()
+    needs_int("wrong")
+    needs_int(extra: 1)
+    needs_int(value: 1, 2)
+}

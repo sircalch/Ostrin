@@ -1,0 +1,34 @@
+fn succeed() -> Result<Int, String> {
+    Ok(4)
+}
+
+fn fail() -> Result<Int, String> {
+    Err("bad")
+}
+
+fn propagate() -> Result<Int, String> {
+    value = try succeed()
+    Ok(value)
+}
+
+fn transform() -> Result<Int, String> {
+    value = try fail() catch fn(e) { "converted: " + e }
+    Ok(value)
+}
+
+fn option_some() -> Option<Int> {
+    value = try Some(9)
+    Some(value + 1)
+}
+
+fn option_none() -> Option<Int> {
+    value = try None<Int>()
+    Some(value + 1)
+}
+
+fn main() -> Void {
+    print(propagate())
+    print(transform())
+    print(option_some())
+    print(option_none())
+}

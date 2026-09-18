@@ -1,0 +1,11 @@
+fn main() -> Void {
+    mut numbers = [1, 2, 3]
+    numbers.push("wrong")
+    numbers.remove_at("wrong")
+
+    prices = ["apple": 5]
+    prices.get(1)
+
+    mut seen = {1, 2}
+    seen.add("wrong")
+}

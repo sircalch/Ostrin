@@ -11,7 +11,7 @@ pub struct TypeError {
 
 #[derive(Clone)]
 struct FnSig {
-    params: Vec<Type>,
+    params: Vec<Param>,
     return_type: Type,
     generics: Vec<GenericParam>,
 }
@@ -37,8 +37,10 @@ pub struct Checker {
     variant_field_names: HashMap<(String, String), Vec<Option<String>>>,
     enum_generics: HashMap<String, Vec<GenericParam>>,
     record_fields: HashMap<String, Vec<(String, Type)>>,
+    record_field_mutability: HashMap<String, HashMap<String, bool>>,
     record_generics: HashMap<String, Vec<GenericParam>>,
     current_generic_bounds: HashMap<String, Vec<String>>,
+    current_return_type: Option<Ty>,
     errors: Vec<TypeError>,
 }
 
@@ -91,8 +93,10 @@ impl Checker {
             variant_field_names,
             enum_generics,
             record_fields: HashMap::new(),
+            record_field_mutability: HashMap::new(),
             record_generics: HashMap::new(),
             current_generic_bounds: HashMap::new(),
+            current_return_type: None,
             errors: Vec::new(),
         }
     }
@@ -128,6 +132,14 @@ impl Checker {
                             .fields
                             .iter()
                             .map(|field| (field.name.clone(), field.ty.clone()))
+                            .collect(),
+                    );
+                    self.record_field_mutability.insert(
+                        record.name.clone(),
+                        record
+                            .fields
+                            .iter()
+                            .map(|field| (field.name.clone(), field.is_mut))
                             .collect(),
                     );
                 }
@@ -172,7 +184,7 @@ impl Checker {
                 self.functions.insert(
                     f.name.clone(),
                     FnSig {
-                        params: f.params.iter().map(|p| p.ty.clone()).collect(),
+                        params: f.params.clone(),
                         return_type: f.return_type.clone(),
                         generics: f.generics.clone(),
                     },
@@ -212,9 +224,26 @@ impl Checker {
         self.current_generic_bounds.extend(extra_bounds.clone());
         let mut scope: Scope = HashMap::new();
         for p in &f.params {
-            scope.insert(p.name.clone(), (self.resolve_type_in_context(&p.ty), false));
+            scope.insert(p.name.clone(), (self.resolve_type_in_context(&p.ty), p.is_mut));
         }
         let expected = self.resolve_type_in_context(&f.return_type);
+        for param in &f.params {
+            let Some(default) = &param.default else { continue };
+            let actual = self.infer_expr(default, &mut scope);
+            let declared = self.resolve_type_in_context(&param.ty);
+            if !matches!(declared, Ty::Generic(_)) && !compatible(&declared, &actual) {
+                self.push(
+                    "E1041",
+                    format!(
+                        "Default value for '{}' expects '{}', got '{}'.",
+                        param.name,
+                        declared.describe(),
+                        actual.describe()
+                    ),
+                );
+            }
+        }
+        let previous_return_type = self.current_return_type.replace(expected.clone());
         let actual = self.check_block(&f.body, &mut scope);
         if !compatible(&expected, &actual) {
             self.push(
@@ -227,6 +256,7 @@ impl Checker {
                 ),
             );
         }
+        self.current_return_type = previous_return_type;
         self.current_generic_bounds = previous_bounds;
     }
 
@@ -549,24 +579,71 @@ impl Checker {
                     }
                 }
             }
-            Stmt::Return(Some(e)) => { self.infer_expr(e, scope); }
-            Stmt::Return(None) | Stmt::Continue => {}
+            Stmt::Return(Some(e)) => {
+                let actual = self.infer_expr(e, scope);
+                if let Some(expected) = &self.current_return_type {
+                    if !compatible(expected, &actual) {
+                        self.push(
+                            "E1041",
+                            format!(
+                                "Return expression expects '{}', got '{}'.",
+                                expected.describe(),
+                                actual.describe()
+                            ),
+                        );
+                    }
+                }
+            }
+            Stmt::Return(None) => {
+                if let Some(expected) = &self.current_return_type {
+                    if *expected != Ty::Void {
+                        self.push(
+                            "E1041",
+                            format!(
+                                "Empty return expects function return type 'Void', got '{}'.",
+                                expected.describe()
+                            ),
+                        );
+                    }
+                }
+            }
+            Stmt::Continue => {}
             Stmt::Break(Some(e)) => { self.infer_expr(e, scope); }
             Stmt::Break(None) => {}
             Stmt::For { pattern, iter, body } => {
-                let elem_ty = self.infer_expr(iter, scope);
+                let iter_ty = self.infer_expr(iter, scope);
+                let elem_ty = iterator_element_type(&iter_ty).unwrap_or(iter_ty);
                 let mut inner = scope.clone();
                 inner.insert(pattern.clone(), (elem_ty, false));
                 self.check_block(body, &mut inner);
             }
             Stmt::While { cond, body } => {
-                self.infer_expr(cond, scope);
+                let cond_ty = self.infer_expr(cond, scope);
+                if !compatible(&Ty::Bool, &cond_ty) {
+                    self.push(
+                        "E1041",
+                        format!("While condition expects 'Bool', got '{}'.", cond_ty.describe()),
+                    );
+                }
                 let mut inner = scope.clone();
                 self.check_block(body, &mut inner);
             }
             Stmt::FieldAssign { target, value } => {
-                self.infer_expr(target, scope);
-                self.infer_expr(value, scope);
+                let target_ty = self.infer_expr(target, scope);
+                let value_ty = self.infer_expr(value, scope);
+                if let Expr::FieldAccess(receiver, field) = target {
+                    self.check_field_assignment_target(receiver, field, &target_ty, scope);
+                }
+                if !compatible(&target_ty, &value_ty) {
+                    self.push(
+                        "E1041",
+                        format!(
+                            "Cannot assign a value of type '{}' to field target of type '{}'.",
+                            value_ty.describe(),
+                            target_ty.describe()
+                        ),
+                    );
+                }
             }
             Stmt::Expr(e) => { self.infer_expr(e, scope); }
         }
@@ -594,7 +671,10 @@ impl Checker {
                     ty.clone()
                 } else if let Some(sig) = self.functions.get(name) {
                     Ty::Fn(
-                        sig.params.iter().map(|ty| self.resolve_type_in_context(ty)).collect(),
+                        sig.params
+                            .iter()
+                            .map(|param| self.resolve_type_in_context(&param.ty))
+                            .collect(),
                         Box::new(self.resolve_type_in_context(&sig.return_type)),
                     )
                 } else if let Some(enum_name) = self.variant_owners.get(name) {
@@ -635,7 +715,24 @@ impl Checker {
             }
             Expr::Call(callee, args) => self.check_call(callee, args, scope, None),
             Expr::GenericCall(callee, type_args, args) => self.check_call(callee, args, scope, Some(type_args)),
-            Expr::FieldAccess(obj, _field) => { self.infer_expr(obj, scope); Ty::Unknown }
+            Expr::FieldAccess(obj, field) => {
+                let receiver_ty = self.infer_expr(obj, scope);
+                if let Some(field_ty) = self.record_field_type(&receiver_ty, field) {
+                    field_ty
+                } else {
+                    if self.is_concrete_user_type(&receiver_ty) {
+                        self.push(
+                            "E1043",
+                            format!(
+                                "Type '{}' has no field '{}'.",
+                                receiver_ty.describe(),
+                                field
+                            ),
+                        );
+                    }
+                    Ty::Unknown
+                }
+            }
             Expr::Index(obj, idx) => {
                 self.infer_expr(idx, scope);
                 match self.infer_expr(obj, scope) {
@@ -644,7 +741,13 @@ impl Checker {
                 }
             }
             Expr::If(cond, then_block, else_block) => {
-                self.infer_expr(cond, scope);
+                let cond_ty = self.infer_expr(cond, scope);
+                if !compatible(&Ty::Bool, &cond_ty) {
+                    self.push(
+                        "E1041",
+                        format!("If condition expects 'Bool', got '{}'.", cond_ty.describe()),
+                    );
+                }
                 let mut then_scope = scope.clone();
                 let then_ty = self.check_block(then_block, &mut then_scope);
                 match else_block {
@@ -677,7 +780,9 @@ impl Checker {
                 for p in params {
                     inner.insert(p.clone(), (Ty::Unknown, false));
                 }
+                let previous_return_type = self.current_return_type.take();
                 let ret = self.check_block(body, &mut inner);
+                self.current_return_type = previous_return_type;
                 Ty::Fn(vec![Ty::Unknown; params.len()], Box::new(ret))
             }
             Expr::ListLiteral(items) => {
@@ -708,9 +813,75 @@ impl Checker {
                 Ty::Map(Box::new(key), Box::new(value))
             }
             Expr::Try(inner, catch) => {
-                let t = self.infer_expr(inner, scope);
-                if let Some(c) = catch { self.infer_expr(c, scope); }
-                t
+                let inner_ty = self.infer_expr(inner, scope);
+                if inner_ty == Ty::Unknown {
+                    if let Some(c) = catch { self.infer_expr(c, scope); }
+                    return Ty::Unknown;
+                }
+                let Some(enclosing_return) = self.current_return_type.clone() else {
+                    self.push(
+                        "E1041",
+                        "'try' can only be used inside a function returning Option or Result.".to_string(),
+                    );
+                    if let Some(c) = catch { self.infer_expr(c, scope); }
+                    return Ty::Unknown;
+                };
+                match (&inner_ty, &enclosing_return) {
+                    (Ty::Applied(name, args), Ty::Applied(expected_name, expected_args))
+                        if name == "Option" && expected_name == "Option" && args.len() == 1 && expected_args.len() == 1 =>
+                    {
+                        if catch.is_some() {
+                            self.push(
+                                "E1041",
+                                "Option 'try' does not accept 'catch'; handle absence with Option methods instead.".to_string(),
+                            );
+                        }
+                        args[0].clone()
+                    }
+                    (Ty::Applied(name, args), Ty::Applied(expected_name, expected_args))
+                        if name == "Result" && expected_name == "Result" && args.len() == 2 && expected_args.len() == 2 =>
+                    {
+                        if catch.is_none() && !compatible(&expected_args[1], &args[1]) {
+                            self.push(
+                                "E1041",
+                                format!(
+                                    "'try' propagates error type '{}', but the enclosing function returns '{}'.",
+                                    args[1].describe(),
+                                    expected_args[1].describe()
+                                ),
+                            );
+                        }
+                        if let Some(catch_expr) = catch {
+                            let catch_ty = self.infer_expr(catch_expr, scope);
+                            let expected_catch = Ty::Fn(
+                                vec![args[1].clone()],
+                                Box::new(expected_args[1].clone()),
+                            );
+                            if !compatible(&expected_catch, &catch_ty) {
+                                self.push(
+                                    "E1041",
+                                    format!(
+                                        "'try catch' expects '{}', got '{}'.",
+                                        expected_catch.describe(),
+                                        catch_ty.describe()
+                                    ),
+                                );
+                            }
+                        }
+                        args[0].clone()
+                    }
+                    _ => {
+                        if let Some(c) = catch { self.infer_expr(c, scope); }
+                        self.push(
+                            "E1041",
+                            format!(
+                                "'try' expects a result compatible with the enclosing Option/Result return type, got '{}'.",
+                                inner_ty.describe()
+                            ),
+                        );
+                        Ty::Unknown
+                    }
+                }
             }
             Expr::Within(a, r) => {
                 self.infer_expr(a, scope);
@@ -782,16 +953,19 @@ impl Checker {
                     }
                 }
                 let mut inner = scope.clone();
-                self.check_block(block, &mut inner);
-                Ty::Unknown
+                let result_ty = self.check_block(block, &mut inner);
+                Ty::Applied("Task".to_string(), vec![result_ty])
             }
             Expr::SpawnScope(block) => {
                 let mut inner = scope.clone();
                 self.check_block(block, &mut inner)
             }
-            Expr::Channel(_, capacity) => {
+            Expr::Channel(element_type, capacity) => {
                 if let Some(c) = capacity { self.infer_expr(c, scope); }
-                Ty::Unknown
+                Ty::Applied(
+                    "Channel".to_string(),
+                    vec![self.resolve_type_in_context(element_type)],
+                )
             }
         }
     }
@@ -854,6 +1028,65 @@ impl Checker {
                 .map(|generic| type_subst.get(&generic.name).cloned().unwrap_or(Ty::Unknown))
                 .collect(),
         )
+    }
+
+    fn record_field_type(&self, receiver_ty: &Ty, field: &str) -> Option<Ty> {
+        let (record_name, type_args) = match receiver_ty {
+            Ty::Named(name) => (name, &[][..]),
+            Ty::Applied(name, args) => (name, args.as_slice()),
+            _ => return None,
+        };
+        let declared_fields = self.record_fields.get(record_name)?;
+        let generic_subst = self
+            .record_generics
+            .get(record_name)
+            .map(|generics| generic_substitution(generics, type_args))
+            .unwrap_or_default();
+        let (_, declared_type) = declared_fields.iter().find(|(name, _)| name == field)?;
+        Some(resolve_type_with_type_subst(
+            declared_type,
+            &generic_subst,
+            &HashMap::new(),
+        ))
+    }
+
+    fn check_field_assignment_target(
+        &mut self,
+        receiver: &Expr,
+        field: &str,
+        target_ty: &Ty,
+        scope: &Scope,
+    ) {
+        let receiver_ty = self.infer_expr(receiver, &mut scope.clone());
+        let Some(record_name) = record_type_name(&receiver_ty) else { return };
+        let Some(fields) = self.record_field_mutability.get(record_name) else { return };
+        if !fields.get(field).copied().unwrap_or(false) {
+            self.push(
+                "E1002",
+                format!(
+                    "Cannot assign to immutable field '{}.{}'. Declare the field with 'mut'.",
+                    record_name, field
+                ),
+            );
+        }
+
+        if let Some(binding) = root_binding_name(receiver) {
+            if let Some((_, is_mut)) = scope.get(binding) {
+                if !is_mut {
+                    self.push(
+                        "E1001",
+                        format!(
+                            "Cannot assign field '{}' through immutable binding '{}'. Declare it as 'mut {} = ...'.",
+                            field, binding, binding
+                        ),
+                    );
+                }
+            }
+        }
+
+        if *target_ty == Ty::Unknown {
+            return;
+        }
     }
 
     fn check_pattern(&mut self, pattern: &Pattern, expected: &Ty) -> bool {
@@ -1099,7 +1332,19 @@ impl Checker {
                 }
                 Ty::Bool
             }
-            And | Or => Ty::Bool,
+            And | Or => {
+                if !compatible(&Ty::Bool, &lt) || !compatible(&Ty::Bool, &rt) {
+                    self.push(
+                        "E1041",
+                        format!(
+                            "Logical operators expect 'Bool' operands, got '{}' and '{}'.",
+                            lt.describe(),
+                            rt.describe()
+                        ),
+                    );
+                }
+                Ty::Bool
+            }
         }
     }
 
@@ -1267,11 +1512,14 @@ impl Checker {
             .collect();
 
         if let Expr::Ident(name) = callee {
+            if let Some(return_type) = check_builtin_call(name, &arg_types, &mut self.errors) {
+                return return_type;
+            }
             if self.variant_owners.contains_key(name) {
                 return self.check_variant_constructor(name, &arg_types, explicit_type_args);
             }
             if let Some(sig) = self.functions.get(name) {
-                return self.check_function_call(&sig.clone(), &arg_types, explicit_type_args);
+                return self.check_function_call(&sig.clone(), args, &arg_types, explicit_type_args);
             }
         }
 
@@ -1310,6 +1558,15 @@ impl Checker {
             ) {
                 return return_type;
             }
+            if let Some(return_type) = check_concurrency_method(&receiver_ty, method, &arg_types, &mut self.errors) {
+                return return_type;
+            }
+            if let Some(return_type) = check_option_result_method(&receiver_ty, method, &arg_types, &mut self.errors) {
+                return return_type;
+            }
+            if let Some(return_type) = check_collection_method(&receiver_ty, method, &arg_types, &mut self.errors) {
+                return return_type;
+            }
             if self.is_concrete_user_type(&receiver_ty) {
                 self.push(
                     "E1042",
@@ -1328,7 +1585,7 @@ impl Checker {
                         .to_string(),
                 );
             }
-            return collection_method_return_type(&receiver_ty, method);
+            return collection_method_return_type(&receiver_ty, method, &arg_types);
         }
 
         if explicit_type_args.is_some() {
@@ -1425,12 +1682,80 @@ impl Checker {
         self.variant_type(&enum_name, &type_args)
     }
 
+    fn bind_function_arguments(
+        &mut self,
+        sig: &FnSig,
+        args: &[Arg],
+        arg_types: &[Ty],
+    ) -> Vec<Option<Ty>> {
+        let mut bound = vec![None; sig.params.len()];
+        let mut next_positional = 0usize;
+        let mut saw_named = false;
+
+        for (arg, arg_ty) in args.iter().zip(arg_types.iter()) {
+            match arg {
+                Arg::Positional(_) => {
+                    if saw_named {
+                        self.push(
+                            "E1041",
+                            "Positional arguments must come before named arguments.".to_string(),
+                        );
+                        continue;
+                    }
+                    if next_positional >= sig.params.len() {
+                        self.push(
+                            "E1041",
+                            format!(
+                                "Function expects at most {} argument(s), got {}.",
+                                sig.params.len(),
+                                args.len()
+                            ),
+                        );
+                        continue;
+                    }
+                    bound[next_positional] = Some(arg_ty.clone());
+                    next_positional += 1;
+                }
+                Arg::Named(name, _) => {
+                    saw_named = true;
+                    let Some(index) = sig.params.iter().position(|param| param.name == *name) else {
+                        self.push(
+                            "E1041",
+                            format!("Function has no parameter named '{}'.", name),
+                        );
+                        continue;
+                    };
+                    if bound[index].is_some() {
+                        self.push(
+                            "E1041",
+                            format!("Parameter '{}' was supplied more than once.", name),
+                        );
+                        continue;
+                    }
+                    bound[index] = Some(arg_ty.clone());
+                }
+            }
+        }
+
+        for (index, param) in sig.params.iter().enumerate() {
+            if bound[index].is_none() && param.default.is_none() {
+                self.push(
+                    "E1041",
+                    format!("Missing required argument '{}'.", param.name),
+                );
+            }
+        }
+        bound
+    }
+
     fn check_function_call(
         &mut self,
         sig: &FnSig,
+        args: &[Arg],
         arg_types: &[Ty],
         explicit_type_args: Option<&[Type]>,
     ) -> Ty {
+        let bound_args = self.bind_function_arguments(sig, args, arg_types);
         let mut dim_subst: HashMap<String, Dimension> = HashMap::new();
         let mut type_subst: HashMap<String, Ty> = HashMap::new();
 
@@ -1468,8 +1793,9 @@ impl Checker {
             }
         }
 
-        for (param_ty, arg_ty) in sig.params.iter().zip(arg_types.iter()) {
-            if let (Type::Named(n, dim_args), Ty::Quantity(actual_dim)) = (param_ty, arg_ty) {
+        for (param, arg_ty) in sig.params.iter().zip(bound_args.iter()) {
+            let Some(arg_ty) = arg_ty else { continue };
+            if let (Type::Named(n, dim_args), Ty::Quantity(actual_dim)) = (&param.ty, arg_ty) {
                 if n == "Quantity" && dim_args.len() == 1 {
                     if let Type::Named(dim_name, empty) = &dim_args[0] {
                         if empty.is_empty() && !is_known_base_dimension(dim_name) {
@@ -1494,6 +1820,21 @@ impl Checker {
         }
 
         if sig.generics.is_empty() {
+            for (param, arg_ty) in sig.params.iter().zip(bound_args.iter()) {
+                let Some(arg_ty) = arg_ty else { continue };
+                let expected = resolve_type_with_subst(&param.ty, &dim_subst);
+                if !compatible(&expected, arg_ty) {
+                    self.push(
+                        "E1041",
+                        format!(
+                            "Argument '{}' expects '{}', got '{}'.",
+                            param.name,
+                            expected.describe(),
+                            arg_ty.describe()
+                        ),
+                    );
+                }
+            }
             return resolve_type_with_subst(&sig.return_type, &dim_subst);
         }
 
@@ -1503,8 +1844,9 @@ impl Checker {
             .filter(|g| !g.bounds.iter().any(|bound| bound == "Dimension"))
             .map(|g| g.name.clone())
             .collect();
-        for (param_ty, arg_ty) in sig.params.iter().zip(arg_types.iter()) {
-            if let Err(message) = unify_generic_type(param_ty, arg_ty, &generic_names, &mut type_subst) {
+        for (param, arg_ty) in sig.params.iter().zip(bound_args.iter()) {
+            let Some(arg_ty) = arg_ty else { continue };
+            if let Err(message) = unify_generic_type(&param.ty, arg_ty, &generic_names, &mut type_subst) {
                 self.push("E1042", message);
             }
         }
@@ -2112,20 +2454,338 @@ fn collection_method_requires_mut(receiver_ty: &Ty, method: &str) -> bool {
     }
 }
 
-fn collection_method_return_type(receiver_ty: &Ty, method: &str) -> Ty {
+fn record_type_name(ty: &Ty) -> Option<&str> {
+    match ty {
+        Ty::Named(name) | Ty::Applied(name, _) => Some(name),
+        _ => None,
+    }
+}
+
+fn root_binding_name(expr: &Expr) -> Option<&str> {
+    match expr {
+        Expr::Ident(name) => Some(name),
+        Expr::FieldAccess(receiver, _) | Expr::Index(receiver, _) => root_binding_name(receiver),
+        _ => None,
+    }
+}
+
+fn iterator_element_type(ty: &Ty) -> Option<Ty> {
+    match ty {
+        Ty::List(element) | Ty::Set(element) => Some((**element).clone()),
+        Ty::Applied(name, args) if name == "Channel" && args.len() == 1 => Some(args[0].clone()),
+        _ => None,
+    }
+}
+
+fn check_concurrency_method(
+    receiver_ty: &Ty,
+    method: &str,
+    arg_types: &[Ty],
+    errors: &mut Vec<TypeError>,
+) -> Option<Ty> {
+    let Ty::Applied(type_name, type_args) = receiver_ty else { return None };
+    let Some(element_type) = type_args.first().cloned() else { return None };
+
+    let expected_count = match (type_name.as_str(), method) {
+        ("Task", "join") | ("Channel", "receive") | ("Channel", "close") => Some(0),
+        ("Channel", "send") => Some(1),
+        _ => None,
+    }?;
+    if arg_types.len() != expected_count {
+        errors.push(TypeError {
+            code: "E1041",
+            message: format!(
+                "Method '{}' expects {} argument(s), got {}.",
+                method,
+                expected_count,
+                arg_types.len()
+            ),
+        });
+        return Some(Ty::Unknown);
+    }
+
+    match (type_name.as_str(), method) {
+        ("Task", "join") => Some(element_type),
+        ("Channel", "receive") => Some(Ty::Applied(
+            "Option".to_string(),
+            vec![element_type],
+        )),
+        ("Channel", "close") => Some(Ty::Void),
+        ("Channel", "send") => {
+            if !compatible(&element_type, &arg_types[0]) {
+                errors.push(TypeError {
+                    code: "E1041",
+                    message: format!(
+                        "Method 'send' expects '{}', got '{}'.",
+                        element_type.describe(),
+                        arg_types[0].describe()
+                    ),
+                });
+            }
+            Some(Ty::Void)
+        }
+        _ => None,
+    }
+}
+
+fn check_collection_method(
+    receiver_ty: &Ty,
+    method: &str,
+    arg_types: &[Ty],
+    errors: &mut Vec<TypeError>,
+) -> Option<Ty> {
+    let expected_args = match (receiver_ty, method) {
+        (Ty::List(_), "length" | "count") => Some(Vec::new()),
+        (Ty::List(element), "push") => Some(vec![(**element).clone()]),
+        (Ty::List(_), "remove_at") => Some(vec![Ty::Int]),
+        (Ty::List(element), "map") => Some(vec![Ty::Fn(
+            vec![(**element).clone()],
+            Box::new(Ty::Unknown),
+        )]),
+        (Ty::List(element), "filter" | "find" | "any" | "all") => {
+            Some(vec![Ty::Fn(vec![(**element).clone()], Box::new(Ty::Bool))])
+        }
+        (Ty::List(element), "fold") => Some(vec![
+            Ty::Unknown,
+            Ty::Fn(vec![(**element).clone(), Ty::Unknown], Box::new(Ty::Unknown)),
+        ]),
+        (Ty::Map(_, _), "count") => Some(Vec::new()),
+        (Ty::Map(key, _), "keys" | "contains_key") => {
+            if method == "keys" {
+                Some(Vec::new())
+            } else {
+                Some(vec![(**key).clone()])
+            }
+        }
+        (Ty::Map(_, _), "values") => Some(Vec::new()),
+        (Ty::Map(key, _), "get" | "remove") => Some(vec![(**key).clone()]),
+        (Ty::Map(key, value), "set") => Some(vec![(**key).clone(), (**value).clone()]),
+        (Ty::Set(_), "count") => Some(Vec::new()),
+        (Ty::Set(element), "contains" | "add" | "remove") => Some(vec![(**element).clone()]),
+        _ => None,
+    }?;
+
+    if expected_args.len() != arg_types.len() {
+        errors.push(TypeError {
+            code: "E1041",
+            message: format!(
+                "Method '{}' expects {} argument(s), got {}.",
+                method,
+                expected_args.len(),
+                arg_types.len()
+            ),
+        });
+        return Some(Ty::Unknown);
+    }
+    for (index, (expected, actual)) in expected_args.iter().zip(arg_types.iter()).enumerate() {
+        if !compatible(expected, actual) {
+            errors.push(TypeError {
+                code: "E1041",
+                message: format!(
+                    "Method '{}' argument #{} expects '{}', got '{}'.",
+                    method,
+                    index + 1,
+                    expected.describe(),
+                    actual.describe()
+                ),
+            });
+        }
+    }
+    Some(collection_method_return_type(receiver_ty, method, arg_types))
+}
+
+fn check_option_result_method(
+    receiver_ty: &Ty,
+    method: &str,
+    arg_types: &[Ty],
+    errors: &mut Vec<TypeError>,
+) -> Option<Ty> {
+    let Ty::Applied(type_name, type_args) = receiver_ty else { return None };
+    let (value_type, error_type) = match type_name.as_str() {
+        "Option" if type_args.len() == 1 => (type_args[0].clone(), None),
+        "Result" if type_args.len() == 2 => (type_args[0].clone(), Some(type_args[1].clone())),
+        _ => return None,
+    };
+
+    let (expected_args, return_type) = match (type_name.as_str(), method) {
+        ("Option", "is_some" | "is_none") => (Vec::new(), Ty::Bool),
+        ("Option", "unwrap") => (Vec::new(), value_type.clone()),
+        ("Option", "unwrap_or") => (vec![value_type.clone()], value_type.clone()),
+        ("Option", "ok_or") => {
+            let error = arg_types.first().cloned().unwrap_or(Ty::Unknown);
+            (vec![Ty::Unknown], Ty::Applied("Result".to_string(), vec![value_type.clone(), error]))
+        }
+        ("Option", "map") => {
+            let return_type = function_return_type(arg_types.first()).unwrap_or(Ty::Unknown);
+            (
+                vec![Ty::Fn(vec![value_type.clone()], Box::new(Ty::Unknown))],
+                Ty::Applied("Option".to_string(), vec![return_type]),
+            )
+        }
+        ("Option", "then") => (
+            vec![Ty::Fn(
+                vec![value_type.clone()],
+                Box::new(Ty::Applied("Option".to_string(), vec![Ty::Unknown])),
+            )],
+            function_return_type(arg_types.first())
+                .unwrap_or_else(|| Ty::Applied("Option".to_string(), vec![Ty::Unknown])),
+        ),
+        ("Result", "is_ok" | "is_err") => (Vec::new(), Ty::Bool),
+        ("Result", "unwrap") => (Vec::new(), value_type.clone()),
+        ("Result", "unwrap_or") => (vec![value_type.clone()], value_type.clone()),
+        ("Result", "ok") => (
+            Vec::new(),
+            Ty::Applied("Option".to_string(), vec![value_type.clone()]),
+        ),
+        ("Result", "map") => {
+            let return_type = function_return_type(arg_types.first()).unwrap_or(Ty::Unknown);
+            (
+                vec![Ty::Fn(vec![value_type.clone()], Box::new(Ty::Unknown))],
+                Ty::Applied(
+                    "Result".to_string(),
+                    vec![return_type, error_type.clone().unwrap_or(Ty::Unknown)],
+                ),
+            )
+        }
+        ("Result", "map_err") => {
+            let return_type = function_return_type(arg_types.first()).unwrap_or(Ty::Unknown);
+            (
+                vec![Ty::Fn(
+                    vec![error_type.clone().unwrap_or(Ty::Unknown)],
+                    Box::new(Ty::Unknown),
+                )],
+                Ty::Applied("Result".to_string(), vec![value_type.clone(), return_type]),
+            )
+        }
+        ("Result", "then") => (
+            vec![Ty::Fn(
+                vec![value_type.clone()],
+                Box::new(Ty::Applied(
+                    "Result".to_string(),
+                    vec![Ty::Unknown, error_type.clone().unwrap_or(Ty::Unknown)],
+                )),
+            )],
+            function_return_type(arg_types.first()).unwrap_or_else(|| {
+                Ty::Applied(
+                    "Result".to_string(),
+                    vec![Ty::Unknown, error_type.clone().unwrap_or(Ty::Unknown)],
+                )
+            }),
+        ),
+        _ => return None,
+    };
+
+    if expected_args.len() != arg_types.len() {
+        errors.push(TypeError {
+            code: "E1041",
+            message: format!(
+                "Method '{}' expects {} argument(s), got {}.",
+                method,
+                expected_args.len(),
+                arg_types.len()
+            ),
+        });
+        return Some(Ty::Unknown);
+    }
+    for (index, (expected, actual)) in expected_args.iter().zip(arg_types.iter()).enumerate() {
+        if !compatible(expected, actual) {
+            errors.push(TypeError {
+                code: "E1041",
+                message: format!(
+                    "Method '{}' argument #{} expects '{}', got '{}'.",
+                    method,
+                    index + 1,
+                    expected.describe(),
+                    actual.describe()
+                ),
+            });
+        }
+    }
+    Some(return_type)
+}
+
+fn function_return_type(ty: Option<&Ty>) -> Option<Ty> {
+    match ty {
+        Some(Ty::Fn(_, return_type)) => Some((**return_type).clone()),
+        _ => None,
+    }
+}
+
+fn check_builtin_call(name: &str, arg_types: &[Ty], errors: &mut Vec<TypeError>) -> Option<Ty> {
+    let expected_args = match name {
+        "print" => vec![Ty::Unknown],
+        "sum" => vec![Ty::List(Box::new(Ty::Unknown))],
+        "read_file" | "parse_int" => vec![Ty::String],
+        "write_file" => vec![Ty::String, Ty::String],
+        "panic" => vec![Ty::String],
+        _ => return None,
+    };
+    if expected_args.len() != arg_types.len() {
+        errors.push(TypeError {
+            code: "E1041",
+            message: format!(
+                "Builtin '{}' expects {} argument(s), got {}.",
+                name,
+                expected_args.len(),
+                arg_types.len()
+            ),
+        });
+        return Some(Ty::Unknown);
+    }
+    for (index, (expected, actual)) in expected_args.iter().zip(arg_types.iter()).enumerate() {
+        if !compatible(expected, actual) {
+            errors.push(TypeError {
+                code: "E1041",
+                message: format!(
+                    "Builtin '{}' argument #{} expects '{}', got '{}'.",
+                    name,
+                    index + 1,
+                    expected.describe(),
+                    actual.describe()
+                ),
+            });
+        }
+    }
+    match name {
+        "print" | "panic" => Some(Ty::Void),
+        "read_file" | "write_file" => Some(Ty::Applied(
+            "Result".to_string(),
+            vec![
+                if name == "read_file" { Ty::String } else { Ty::Void },
+                Ty::String,
+            ],
+        )),
+        "parse_int" => Some(Ty::Applied(
+            "Result".to_string(),
+            vec![Ty::Int, Ty::String],
+        )),
+        "sum" => match &arg_types[0] {
+            Ty::List(element) => Some((**element).clone()),
+            _ => Some(Ty::Unknown),
+        },
+        _ => None,
+    }
+}
+
+fn collection_method_return_type(receiver_ty: &Ty, method: &str, arg_types: &[Ty]) -> Ty {
     match (receiver_ty, method) {
         (Ty::List(_), "length" | "count") => Ty::Int,
-        (Ty::List(_), "map" | "filter") => Ty::List(Box::new(Ty::Unknown)),
+        (Ty::List(_), "map") => match arg_types.first() {
+            Some(Ty::Fn(_, return_type)) => Ty::List(return_type.clone()),
+            _ => Ty::List(Box::new(Ty::Unknown)),
+        },
+        (Ty::List(elem), "filter") => Ty::List(elem.clone()),
         (Ty::List(elem), "remove_at") => (**elem).clone(),
         (Ty::List(_), "push") => Ty::Void,
-        (Ty::List(_), "fold" | "find") => Ty::Unknown,
+        (Ty::List(_), "fold") => arg_types.first().cloned().unwrap_or(Ty::Unknown),
+        (Ty::List(elem), "find") => Ty::Applied("Option".to_string(), vec![(**elem).clone()]),
         (Ty::List(_), "any" | "all") => Ty::Bool,
         (Ty::Map(_, _), "count") => Ty::Int,
         (Ty::Map(key, _), "keys") => Ty::List(Box::new((**key).clone())),
         (Ty::Map(_, value), "values") => Ty::List(Box::new((**value).clone())),
-        // Both operations return Option<V>; Option is not yet represented as
-        // a distinct Ty in this prototype, so leave the result Unknown.
-        (Ty::Map(_, _), "get" | "remove") => Ty::Unknown,
+        (Ty::Map(_, value), "get" | "remove") => {
+            Ty::Applied("Option".to_string(), vec![(**value).clone()])
+        }
         (Ty::Map(_, _), "contains_key") => Ty::Bool,
         (Ty::Map(_, _), "set") => Ty::Void,
         (Ty::Set(_), "count") => Ty::Int,

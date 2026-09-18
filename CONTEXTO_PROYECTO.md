@@ -21,9 +21,9 @@ El objetivo explícito (dicho por el usuario al principio de la sesión): que Os
 
 - **17 documentos de diseño** completos y revisados (tres pasadas de consistencia formales), cubriendo el núcleo entero del lenguaje.
 - **Un compilador/intérprete real en Rust** (~4000+ líneas), en `compiler/`, que compila con `cargo build` y corre con `cargo run -- <flags> archivo.ostrin`.
-- **44 pruebas automatizadas** (`cargo test`) que verifican comportamiento exacto (no solo "no truena") sobre las piezas centrales del lenguaje.
-- **~51 programas/archivos de ejemplo reales** en `examples/`, incluidos varios proyectos multi-archivo.
-- Sigue siendo un **prototipo de validación de diseño**, no un lenguaje listo para producción: es un intérprete que recorre el AST (no genera código máquina), sin paralelismo real de sistema operativo, sin stdlib de E/S, sin LSP/herramientas de editor.
+- **61 pruebas automatizadas** (`cargo test`) que verifican comportamiento exacto (no solo "no truena") sobre las piezas centrales del lenguaje.
+- **68 programas/archivos de ejemplo reales** en `examples/`, incluidos varios proyectos multi-archivo.
+- Sigue siendo un **prototipo de validación de diseño**, no un lenguaje listo para producción: es un intérprete que recorre el AST (no genera código máquina), sin paralelismo real de sistema operativo, con una stdlib inicial de E/S, sin LSP/herramientas de editor.
 
 **Lo más importante que hay que entender**: cada decisión de diseño de los 17 documentos fue *implementada y probada con un programa real*, no solo escrita en el papel. Varias veces, construir el compilador encontró bugs de diseño que ninguna revisión de texto había visto (ver sección 6).
 
@@ -75,7 +75,7 @@ compiler/
 │   ├── modules.rs            — carga multi-archivo: descubrimiento, ciclos (E1081), visibilidad (E1080), reescritura de AST (mangling de nombres cruzando módulos)
 │   └── package.rs            — ostrin.toml, dependencias `path` (funcionan) y `git` (reconocidas, rechazadas explícitamente sin red)
 └── tests/
-    └── examples.rs           — 44 pruebas de integración (invocan el binario compilado, comparan stdout/stderr exacto)
+    └── examples.rs           — 61 pruebas de integración (invocan el binario compilado, comparan stdout/stderr exacto)
 ```
 
 ### Cómo correrlo
@@ -83,7 +83,7 @@ compiler/
 ```bash
 cd compiler
 cargo build
-cargo test                                    # 44 pruebas, deben pasar todas
+cargo test                                    # 61 pruebas, deben pasar todas
 ./target/debug/ostrinc archivo.ostrin         # solo verifica tipos
 ./target/debug/ostrinc --run archivo.ostrin   # verifica y ejecuta
 ./target/debug/ostrinc --ast archivo.ostrin   # imprime el AST
@@ -105,7 +105,7 @@ En Windows, si `cargo`/`rustc` no están en el PATH de la sesión: `$env:Path +=
 
 ## 5. Qué está probado (y cómo verificarlo)
 
-`compiler/tests/examples.rs` tiene 44 pruebas. Cubren, con valores exactos esperados (no solo "no falla"):
+`compiler/tests/examples.rs` tiene 61 pruebas. Cubren, con valores exactos esperados (no solo "no falla"):
 
 - Aritmética de `Quantity<D>` con conversión de unidades real (`5 nm + 2 m`, `velocity(10 m, 2 s)`, cancelación dimensional `2m/5nm = 400000000`).
 - Los 4 errores deliberados de dimensión/mutabilidad (`E1024`, `E1025`, `E1001`) en un mismo archivo.
@@ -1063,7 +1063,7 @@ un sitio estático multipágina publicado en GitHub Pages:
   métricas y entrada al ecosistema.
 - `language.html`: principios del lenguaje, cantidades físicas, estado,
   errores, abstracciones y dirección de concurrencia.
-- `examples.html`: catálogo de 40 archivos `.ostrin`, filtros por categoría y
+- `examples.html`: catálogo de 68 archivos `.ostrin`, filtros por categoría y
   laboratorio visual con pestañas de ejemplos y botón de copiar.
 - `ecosystem.html`: compilador, intérprete, VS Code, documentación, runtime,
   empaquetado nativo, WebAssembly y estado real de cada superficie.
@@ -1092,4 +1092,149 @@ un sitio estático multipágina publicado en GitHub Pages:
 - No se encontraron enlaces relativos rotos en HTML ni referencias locales de
   estilos/recursos faltantes.
 - `node --check website/site.js` pasa.
-- `cargo test` permanece en **47 pruebas exitosas**.
+- `cargo test` permanece en **49 pruebas exitosas**.
+
+---
+
+## 28. Acceso estático a campos de records — 2026-09-17
+
+Se cerró uno de los caminos más visibles de `Unknown` en el checker: los
+accesos a campos de records.
+
+- `p.value` ahora devuelve el tipo declarado del campo en lugar de degradar a
+  `Unknown`.
+- Los records genéricos sustituyen sus parámetros al acceder a un campo; por
+  ejemplo, `Score<Int> { ... }.value` se verifica como `Int`.
+- Las asignaciones de campos comparan el tipo del valor con el tipo declarado y
+  reutilizan `E1041` para incompatibilidades.
+- Las asignaciones directas respetan la mutabilidad declarada en el campo y en
+  el binding receptor; `mut self` también se conserva al construir el scope de
+  un método.
+- Un campo inexistente en un tipo de usuario produce `E1043`.
+- Se añadieron `field_access.ostrin` y `field_access_errors.ostrin`, junto con
+  dos pruebas de integración.
+
+La siguiente mejora relacionada será comprobar las llamadas a funciones y los
+tipos de retorno de las colecciones, sin degradar innecesariamente a
+`Unknown`.
+
+---
+
+## 29. Llamadas con nombre/default y resultados de colecciones — 2026-09-17
+
+Se cerró otro hueco entre el diseño y la implementación del núcleo:
+
+- `FnSig` conserva ahora nombres, tipos y valores por defecto de los
+  parámetros.
+- El checker valida cantidad, nombres, duplicados, orden de argumentos y
+  compatibilidad de tipos en llamadas a funciones.
+- Las llamadas genéricas siguen unificando sus argumentos ya asociados al
+  parámetro correcto.
+- El intérprete aplica argumentos nombrados y evalúa valores por defecto al
+  invocar funciones de usuario.
+- `List.find`, `Map.get` y `Map.remove` devuelven `Option<T>` en el checker;
+  `List.map`, `filter` y `fold` conservan o propagan el tipo que pueden
+  conocer estáticamente.
+- Se añadieron `function_arguments.ostrin`,
+  `function_argument_errors.ostrin` y `collection_types_errors.ostrin`, más
+  tres pruebas de integración.
+
+### Verificación
+
+`cargo test --quiet` pasa con **53 pruebas exitosas**. La comprobación de
+formato global ya tenía diferencias preexistentes en archivos no tocados; no
+se aplicó un formateo masivo para evitar mezclar cambios ajenos a esta etapa.
+
+---
+
+## 30. Tipos y argumentos de colecciones — 2026-09-17
+
+La validación estática de las colecciones dejó de limitarse al tipo de retorno:
+
+- `List`, `Map` y `Set` comprueban la cantidad de argumentos de sus métodos.
+- `push`, `remove_at`, `get`, `set`, `contains`, `add`, `remove` y métodos
+  relacionados comparan elementos, claves, valores e índices con sus tipos
+  declarados.
+- Las funciones de orden superior reciben una forma estática mínima (`fn` con
+  la aridad esperada) sin perder la inferencia del tipo de retorno disponible.
+- Se añadió `collection_argument_errors.ostrin` y una prueba de integración.
+
+La suite queda en **54 pruebas exitosas**. El siguiente bloque prioritario del
+checker será validar contextos booleanos, retornos explícitos y expresiones de
+control que todavía pueden degradar a `Unknown`.
+
+---
+
+## 31. Contextos booleanos y retornos explícitos — 2026-09-17
+
+El checker ahora usa el contexto semántico de control y de retorno:
+
+- `if` y `while` exigen una condición compatible con `Bool`.
+- `and` y `or` rechazan operandos que no sean booleanos.
+- `return expr` compara la expresión con el tipo de retorno declarado.
+- `return` vacío solo es válido en funciones que devuelven `Void`.
+- Los valores por defecto de los parámetros se comprueban contra el tipo de
+  la firma.
+- Las lambdas suspenden temporalmente el contexto de retorno de la función que
+  las contiene para que sus retornos se comprueben en su propio bloque.
+- Se añadió `control_type_errors.ostrin` y una prueba de integración.
+
+La suite pasa con **55 pruebas exitosas**.
+
+---
+
+## 32. `Option<T>` y `Result<T, E>` utilizables — 2026-09-17
+
+El modelo de resultados explícitos dejó de ser solo una representación interna:
+
+- `Option` soporta `is_some`, `is_none`, `unwrap`, `unwrap_or`, `ok_or`,
+  `map` y `then` en el checker y el intérprete.
+- `Result` soporta `is_ok`, `is_err`, `unwrap`, `unwrap_or`, `ok`, `map`,
+  `map_err` y `then`.
+- Las operaciones conservan los parámetros genéricos en sus tipos de retorno,
+  por ejemplo `Map.get`/`List.find` producen `Option<T>` y `Option.ok_or(E)`
+  produce `Result<T, E>`.
+- Se validan aridad y formas mínimas de las funciones callback.
+- Se añadieron `option_result.ostrin` y `option_result_errors.ostrin`, junto
+  con dos pruebas de integración ejecutables.
+
+La suite queda en **57 pruebas exitosas**.
+
+---
+
+## 33. Propagación explícita con `try` — 2026-09-17
+
+`try` ahora conecta la semántica estática con el runtime:
+
+- `try Some(value)` desempaqueta el valor y `try None` retorna `None` de la
+  función contenedora.
+- `try Ok(value)` desempaqueta el valor y `try Err(error)` retorna el error de
+  la función contenedora.
+- `try expr catch fn(error) { ... }` transforma explícitamente el error antes
+  de propagarlo como `Err`.
+- El checker exige que el contenedor exterior sea el mismo (`Option` con
+  `Option`, `Result` con `Result`) y comprueba el tipo de error propagado o del
+  callback `catch`.
+- Se añadieron `try_result.ostrin` y `try_errors.ostrin`, además de dos pruebas
+  de integración ejecutables.
+
+La suite pasa con **59 pruebas exitosas**.
+
+---
+
+## 34. Biblioteca estándar mínima: archivos y parsing — 2026-09-17
+
+Se añadió una primera superficie real de biblioteca estándar al intérprete:
+
+- `read_file(path: String) -> Result<String, String>` lee texto UTF-8.
+- `write_file(path: String, contents: String) -> Result<Void, String>`
+  escribe texto y conserva los fallos como `Err`.
+- `parse_int(text: String) -> Result<Int, String>` convierte entradas sin
+  lanzar un error de ejecución para datos inválidos.
+- `panic(message: String)` conserva un escape explícito para bugs del programa.
+- El checker conoce estas firmas y rechaza argumentos incompatibles antes de
+  ejecutar.
+- Se añadieron `stdlib_io.ostrin` y `stdlib_io_errors.ostrin`, con dos pruebas
+  de integración. La prueba elimina su archivo temporal al terminar.
+
+La suite queda en **61 pruebas exitosas**.

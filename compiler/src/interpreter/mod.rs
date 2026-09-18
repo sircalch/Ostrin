@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt;
+use std::fs;
 use std::rc::Rc;
 
 use crate::ast::*;
@@ -592,6 +593,78 @@ impl Interpreter {
         }
     }
 
+    fn call_user_function_with_args(
+        &mut self,
+        f: &FunctionDecl,
+        args: &[Arg],
+        closure_env: Env,
+    ) -> EvalResult {
+        let mut values: Vec<Option<Value>> = (0..f.params.len()).map(|_| None).collect();
+        let mut next_positional = 0usize;
+        let mut saw_named = false;
+
+        for arg in args {
+            match arg {
+                Arg::Positional(_) => {
+                    if saw_named {
+                        return Err(RuntimeError::Error(
+                            "positional arguments must come before named arguments".to_string(),
+                        ));
+                    }
+                    if next_positional >= f.params.len() {
+                        return Err(RuntimeError::Error(format!(
+                            "function '{}' expects at most {} argument(s), got {}",
+                            f.name,
+                            f.params.len(),
+                            args.len()
+                        )));
+                    }
+                    values[next_positional] = Some(self.eval_arg(arg, &closure_env)?);
+                    next_positional += 1;
+                }
+                Arg::Named(name, _) => {
+                    saw_named = true;
+                    let Some(index) = f.params.iter().position(|param| param.name == *name) else {
+                        return Err(RuntimeError::Error(format!(
+                            "function '{}' has no parameter named '{}'",
+                            f.name, name
+                        )));
+                    };
+                    if values[index].is_some() {
+                        return Err(RuntimeError::Error(format!(
+                            "parameter '{}' was supplied more than once",
+                            name
+                        )));
+                    }
+                    values[index] = Some(self.eval_arg(arg, &closure_env)?);
+                }
+            }
+        }
+
+        let call_env = closure_env.child();
+        for (index, param) in f.params.iter().enumerate() {
+            let value = match values[index].take() {
+                Some(value) => value,
+                None => match &param.default {
+                    Some(default) => self.eval_expr(default, &call_env)?,
+                    None => {
+                        return Err(RuntimeError::Error(format!(
+                            "missing required argument '{}' when calling '{}'",
+                            param.name, f.name
+                        )));
+                    }
+                },
+            };
+            call_env.define(&param.name, value);
+        }
+
+        match self.eval_block(&f.body, &call_env) {
+            Ok(v) => Ok(v),
+            Err(RuntimeError::Return(v)) => Ok(v),
+            other => other,
+        }
+    }
+
     fn eval_block(&mut self, block: &Block, env: &Env) -> EvalResult {
         let inner = env.child();
         for stmt in &block.stmts {
@@ -875,7 +948,46 @@ impl Interpreter {
                 }
                 Ok(Value::Map(Rc::new(RefCell::new(values))))
             }
-            Expr::Try(inner, _catch) => self.eval_expr(inner, env),
+            Expr::Try(inner, catch) => {
+                let value = self.eval_expr(inner, env)?;
+                match value {
+                    Value::EnumInstance(enum_name, variant, fields, type_args)
+                        if enum_name == "Option" =>
+                    {
+                        match variant.as_str() {
+                            "Some" => Ok(fields.get("0").cloned().unwrap_or(Value::Void)),
+                            "None" => Err(RuntimeError::Return(Value::EnumInstance(
+                                enum_name,
+                                variant,
+                                fields,
+                                type_args,
+                            ))),
+                            _ => Err(RuntimeError::Error("invalid Option variant".to_string())),
+                        }
+                    }
+                    Value::EnumInstance(enum_name, variant, fields, _type_args)
+                        if enum_name == "Result" =>
+                    {
+                        match variant.as_str() {
+                            "Ok" => Ok(fields.get("0").cloned().unwrap_or(Value::Void)),
+                            "Err" => {
+                                let error = fields.get("0").cloned().unwrap_or(Value::Void);
+                                let propagated = if let Some(catch_expr) = catch {
+                                    let handler = self.eval_expr(catch_expr, env)?;
+                                    self.call_callable(handler, vec![error], env)?
+                                } else {
+                                    error
+                                };
+                                Err(RuntimeError::Return(err_value(propagated)))
+                            }
+                            _ => Err(RuntimeError::Error("invalid Result variant".to_string())),
+                        }
+                    }
+                    other => Err(RuntimeError::Error(format!(
+                        "'try' expects Option or Result, got '{other}'"
+                    ))),
+                }
+            }
             Expr::Within(a, r) => {
                 let av = self.eval_expr(a, env)?;
                 if let Expr::Range(start, kind, end, _) = r.as_ref() {
@@ -1065,15 +1177,50 @@ impl Interpreter {
                         other => Err(RuntimeError::Error(format!("'sum' expects a List, got '{other}'"))),
                     };
                 }
+                "read_file" => {
+                    let path = self.eval_arg(&args[0], env)?;
+                    let Value::String(path) = path else {
+                        return Err(RuntimeError::Error("'read_file' expects a String path".to_string()));
+                    };
+                    return Ok(match fs::read_to_string(&path) {
+                        Ok(contents) => ok_value(Value::String(contents)),
+                        Err(error) => err_value(Value::String(error.to_string())),
+                    });
+                }
+                "write_file" => {
+                    let path = self.eval_arg(&args[0], env)?;
+                    let contents = self.eval_arg(&args[1], env)?;
+                    let (Value::String(path), Value::String(contents)) = (path, contents) else {
+                        return Err(RuntimeError::Error(
+                            "'write_file' expects a String path and String contents".to_string(),
+                        ));
+                    };
+                    return Ok(match fs::write(&path, contents) {
+                        Ok(()) => ok_value(Value::Void),
+                        Err(error) => err_value(Value::String(error.to_string())),
+                    });
+                }
+                "parse_int" => {
+                    let text = self.eval_arg(&args[0], env)?;
+                    let Value::String(text) = text else {
+                        return Err(RuntimeError::Error("'parse_int' expects a String".to_string()));
+                    };
+                    return Ok(match text.parse::<i64>() {
+                        Ok(value) => ok_value(Value::Int(value)),
+                        Err(error) => err_value(Value::String(error.to_string())),
+                    });
+                }
+                "panic" => {
+                    let message = self.eval_arg(&args[0], env)?;
+                    return Err(RuntimeError::Error(format!("panic: {message}")));
+                }
                 _ => {}
             }
             if let Some(enum_name) = self.variant_to_enum.get(name).cloned() {
                 return self.construct_variant(&enum_name, name, args, env, explicit_type_args);
             }
             if let Some(f) = self.functions.get(name).cloned() {
-                let mut values = Vec::with_capacity(args.len());
-                for a in args { values.push(self.eval_arg(a, env)?); }
-                return self.call_user_function(&f, values, env.clone());
+                return self.call_user_function_with_args(&f, args, env.clone());
             }
         }
         if let Expr::FieldAccess(obj, method) = callee {
@@ -1238,6 +1385,94 @@ impl Interpreter {
                         return Ok(Value::Void);
                     }
                     _ => {}
+                }
+            }
+            if let Value::EnumInstance(enum_name, variant, fields, _) = &receiver {
+                if enum_name == "Option" {
+                    match method.as_str() {
+                        "is_some" => return Ok(Value::Bool(variant == "Some")),
+                        "is_none" => return Ok(Value::Bool(variant == "None")),
+                        "unwrap" => {
+                            return fields.get("0").cloned().ok_or_else(|| {
+                                RuntimeError::Error("called Option.unwrap() on None".to_string())
+                            });
+                        }
+                        "unwrap_or" => {
+                            return match fields.get("0").cloned() {
+                                Some(value) => Ok(value),
+                                None => self.eval_arg(&args[0], env),
+                            };
+                        }
+                        "ok_or" => {
+                            return match fields.get("0").cloned() {
+                                Some(value) => Ok(ok_value(value)),
+                                None => Ok(err_value(self.eval_arg(&args[0], env)?)),
+                            };
+                        }
+                        "map" => {
+                            if let Some(value) = fields.get("0").cloned() {
+                                let f = self.eval_arg(&args[0], env)?;
+                                return Ok(some_value(self.call_callable(f, vec![value], env)?));
+                            }
+                            return Ok(none_value());
+                        }
+                        "then" => {
+                            if let Some(value) = fields.get("0").cloned() {
+                                let f = self.eval_arg(&args[0], env)?;
+                                return self.call_callable(f, vec![value], env);
+                            }
+                            return Ok(none_value());
+                        }
+                        _ => {}
+                    }
+                }
+                if enum_name == "Result" {
+                    match method.as_str() {
+                        "is_ok" => return Ok(Value::Bool(variant == "Ok")),
+                        "is_err" => return Ok(Value::Bool(variant == "Err")),
+                        "unwrap" => {
+                            return fields.get("0").cloned().ok_or_else(|| {
+                                RuntimeError::Error("called Result.unwrap() on Err".to_string())
+                            });
+                        }
+                        "unwrap_or" => {
+                            return match variant.as_str() {
+                                "Ok" => Ok(fields.get("0").cloned().unwrap_or(Value::Void)),
+                                _ => self.eval_arg(&args[0], env),
+                            };
+                        }
+                        "ok" => {
+                            return match variant.as_str() {
+                                "Ok" => Ok(some_value(fields.get("0").cloned().unwrap_or(Value::Void))),
+                                _ => Ok(none_value()),
+                            };
+                        }
+                        "map" => {
+                            if variant == "Ok" {
+                                let f = self.eval_arg(&args[0], env)?;
+                                let value = fields.get("0").cloned().unwrap_or(Value::Void);
+                                return Ok(ok_value(self.call_callable(f, vec![value], env)?));
+                            }
+                            return Ok(receiver.clone());
+                        }
+                        "map_err" => {
+                            if variant == "Err" {
+                                let f = self.eval_arg(&args[0], env)?;
+                                let error = fields.get("0").cloned().unwrap_or(Value::Void);
+                                return Ok(err_value(self.call_callable(f, vec![error], env)?));
+                            }
+                            return Ok(receiver.clone());
+                        }
+                        "then" => {
+                            if variant == "Ok" {
+                                let f = self.eval_arg(&args[0], env)?;
+                                let value = fields.get("0").cloned().unwrap_or(Value::Void);
+                                return self.call_callable(f, vec![value], env);
+                            }
+                            return Ok(receiver.clone());
+                        }
+                        _ => {}
+                    }
                 }
             }
             if let Value::Task(result) = &receiver {
@@ -1518,6 +1753,14 @@ fn some_value(v: Value) -> Value {
 
 fn none_value() -> Value {
     Value::EnumInstance("Option".to_string(), "None".to_string(), HashMap::new(), Vec::new())
+}
+
+fn ok_value(v: Value) -> Value {
+    Value::EnumInstance("Result".to_string(), "Ok".to_string(), HashMap::from([("0".to_string(), v)]), Vec::new())
+}
+
+fn err_value(v: Value) -> Value {
+    Value::EnumInstance("Result".to_string(), "Err".to_string(), HashMap::from([("0".to_string(), v)]), Vec::new())
 }
 
 fn sum_values(items: &[Value]) -> EvalResult {

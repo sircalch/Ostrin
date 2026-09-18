@@ -1,0 +1,23 @@
+fn main() -> Void {
+    maybe = Some(4)
+    print(maybe.is_some())
+    print(maybe.map(fn(x) { x + 1 }))
+    print(maybe.then(fn(x) { Some(x + 1) }))
+    print(maybe.unwrap_or(0))
+    print(maybe.ok_or("missing"))
+
+    missing = None<Int>()
+    print(missing.is_none())
+    print(missing.unwrap_or(9))
+    print(missing.ok_or("missing"))
+
+    success = Ok(7)
+    print(success.is_ok())
+    print(success.map(fn(x) { x + 1 }))
+    print(success.ok())
+
+    failure = Err<Int, String>("bad")
+    print(failure.is_err())
+    print(failure.map_err(fn(e) { e + "!" }))
+    print(failure.ok())
+}

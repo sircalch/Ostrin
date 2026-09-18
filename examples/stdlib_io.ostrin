@@ -1,0 +1,11 @@
+fn main() -> Void {
+    source = read_file("../examples/hello.ostrin")
+    print(source.is_ok())
+
+    number = parse_int("42")
+    print(number.unwrap())
+
+    write_file("target/ostrin-stdlib-test.txt", "hello from Ostrin")
+    loaded = read_file("target/ostrin-stdlib-test.txt")
+    print(loaded.unwrap())
+}

@@ -1,0 +1,11 @@
+record Score<T> {
+    mut value: T
+    label: String
+}
+
+fn main() -> Void {
+    mut score = Score<Int> { value: 7, label: "seven" }
+    score.value = 9
+    print(score.value)
+    print(score.label)
+}

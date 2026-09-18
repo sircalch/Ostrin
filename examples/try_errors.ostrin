@@ -1,0 +1,22 @@
+fn fail() -> Result<Int, String> {
+    Err("bad")
+}
+
+fn wrong_container() -> Option<Int> {
+    value = try fail()
+    Some(value)
+}
+
+fn wrong_error() -> Result<Int, Int> {
+    value = try fail()
+    Ok(value)
+}
+
+fn wrong_catch() -> Result<Int, String> {
+    value = try fail() catch fn(e) { 1 }
+    Ok(value)
+}
+
+fn main() -> Void {
+    print(wrong_container())
+}

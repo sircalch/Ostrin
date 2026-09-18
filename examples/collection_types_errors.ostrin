@@ -1,0 +1,13 @@
+fn needs_int(value: Int) -> Void {
+    print(value)
+}
+
+fn main() -> Void {
+    numbers = [1, 2, 3]
+    found = numbers.find(fn(x) { x > 1 })
+    needs_int(found)
+
+    prices = ["apple": 5]
+    maybe_price = prices.get("apple")
+    needs_int(maybe_price)
+}

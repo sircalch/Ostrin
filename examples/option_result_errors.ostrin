@@ -1,0 +1,9 @@
+fn needs_int(value: Int) -> Void {
+    print(value)
+}
+
+fn main() -> Void {
+    maybe = Some(1)
+    needs_int(maybe.unwrap_or("wrong"))
+    print(maybe.map(fn(x, y) { x }))
+}

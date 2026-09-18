@@ -1,0 +1,8 @@
+fn greet(name: String, punctuation: String = "!") -> Void {
+    print(name + punctuation)
+}
+
+fn main() -> Void {
+    greet(name: "Ostrin")
+    greet("Ostrin", punctuation: "?")
+}
