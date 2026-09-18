@@ -2249,8 +2249,17 @@ fn eval_binary_builtin(op: BinOp, lv: Value, rv: Value) -> EvalResult {
                 let s = as_f64(scalar)?;
                 Ok(Value::Quantity(s / a, dim_pow(d, -1), format!("1/{u}")))
             }
+            // `Int / Int` is integer division (truncating), matching the type
+            // checker, which types it `Int` — the runtime used to return a
+            // `Float` here, contradicting the static type.
             (Value::Int(a), Value::Int(b)) => {
-                Ok(if op == Mul { Value::Int(a * b) } else { Value::Float(*a as f64 / *b as f64) })
+                if op == Mul {
+                    Ok(Value::Int(a * b))
+                } else if *b == 0 {
+                    Err(RuntimeError::Error("division by zero".to_string()))
+                } else {
+                    Ok(Value::Int(a.wrapping_div(*b)))
+                }
             }
             _ => {
                 let a = as_f64(&lv)?;

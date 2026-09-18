@@ -2817,3 +2817,24 @@ pruebas**, sin warnings.
    pila de 512 MiB.
 
 Suite: **91 pruebas**, sin warnings.
+
+---
+
+## 71. `Int / Int` es división entera — 2026-09-18
+
+Al preparar `Quantity` para el backend nativo apareció un bug de solidez: el
+verificador de tipos infería `Int / Int` como `Int`, pero el intérprete
+devolvía `Float` (`7 / 2` -> `3.5`) y el backend nativo truncaba (`3`). Se le
+preguntó al usuario cuál era la semántica correcta; eligió división entera
+(coincide con el tipo ya inferido y con el doc 01, que solo protege de
+"sorpresas de división entera" a `Quantity`). Cambios: el intérprete trunca y
+da error claro ante división por cero; el backend nativo usa `ostrin_idiv`
+(mismo error en vez de un SIGFPE). Test de regresión con ambos backends.
+
+### Sobre `Quantity` en el backend nativo (no implementado aún)
+El intérprete lleva la unidad como cadena en tiempo de ejecución
+(`5 nm + 2 m` imprime `2000000004.9999998 nm`; `10 m / 2 s` imprime `5 m/s`).
+En nativo la unidad tendría que conocerse estáticamente, pero un parámetro
+`Quantity<Length>` no fija la unidad (puede llegar `m` o `km`), así que habría
+que monomorfizar funciones por unidad de argumento e inferir el tipo de retorno
+generando el cuerpo — un diseño propio, no una extensión menor.

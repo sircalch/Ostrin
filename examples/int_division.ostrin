@@ -1,0 +1,6 @@
+fn main() -> Void {
+    print(7 / 2)
+    x: Int = 7
+    y = x / 2
+    print(y)
+}

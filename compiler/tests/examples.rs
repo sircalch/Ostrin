@@ -1025,6 +1025,23 @@ fn native_backend_compiles_and_runs_result_and_try() {
 }
 
 #[test]
+fn int_division_truncates_in_both_backends() {
+    // The type checker types `Int / Int` as `Int`; the interpreter used to
+    // return a Float (7 / 2 -> 3.5), contradicting it.
+    let interpreted = run(&["--run", &example_path("int_division.ostrin")]);
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), "3\n3\n");
+
+    let exe = temp_artifact("int_division.exe");
+    let compile = run(&["--compile", "--out", &exe, &example_path("int_division.ostrin")]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    let native = Command::new(&exe).output().unwrap();
+    let _ = fs::remove_file(&exe);
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), "3\n3\n");
+}
+
+#[test]
 fn native_backend_monomorphizes_one_list_struct_per_element_type() {
     let out = run(&["--emit-c", &example_path("native_lists.ostrin")]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));

@@ -192,6 +192,11 @@ const PRELUDE: &str = "#include <stdint.h>\n\
 #include <stdlib.h>\n\
 #include <string.h>\n\
 \n\
+static int64_t ostrin_idiv(int64_t a, int64_t b) {\n\
+    if (b == 0) { fprintf(stderr, \"runtime error: division by zero\\n\"); exit(1); }\n\
+    return a / b;\n\
+}\n\
+\n\
 static void ostrin_print_float(double v) {\n\
     char buf[64];\n\
     for (int prec = 1; prec <= 17; prec++) {\n\
@@ -1138,8 +1143,11 @@ impl<'a> Codegen<'a> {
             BinOp::Eq | BinOp::NotEq | BinOp::Lt | BinOp::Gt | BinOp::LtEq | BinOp::GtEq | BinOp::And | BinOp::Or => CType::Bool,
             // Arithmetic: the type checker already unified both operands, so
             // either side's type is the result.
-            _ => lt,
+            _ => lt.clone(),
         };
+        if op == BinOp::Div && lt == CType::Int && rt == CType::Int {
+            return Ok((format!("ostrin_idiv({lc}, {rc})"), CType::Int));
+        }
         Ok((format!("({lc} {c_op} {rc})"), result_ty))
     }
 
