@@ -2051,3 +2051,92 @@ pendiente en el plan de continuación es el mismo de siempre: un backend de
 compilación real (LLVM u otro) es la pieza más grande sin empezar; para
 herramientas de editor, lo siguiente sería un debug adapter (DAP) — hasta
 ahora nunca se ha tocado ese terreno.
+
+---
+
+## 60. Depurador real: `ostrinc --dap` — 2026-09-17
+
+Se le preguntó al usuario cuál de los dos frentes grandes pendientes atacar
+(backend de compilación real vs. debug adapter) y se eligió depuración, por
+seguir el mismo arco de las últimas sesiones (herramientas de editor) sin
+comprometerse todavía a un proyecto del tamaño de un backend LLVM.
+
+### Cómo se resolvió pausar un intérprete síncrono sin hilos
+
+El intérprete es un tree-walking interpreter de un solo hilo, y sus valores
+(`Rc<RefCell<...>>`) no son `Send` — mover la ejecución a un hilo de SO
+aparte (para que otro hilo maneje el protocolo DAP mientras el programa
+corre) habría exigido el mismo refactor a `Arc<Mutex<>>` que ya se descartó
+para concurrencia real (documento 10, sección "Problem Solving" de sesiones
+anteriores). En vez de eso, pausar significa literalmente **no volver**: el
+propio hilo que está ejecutando el programa del usuario, al llegar a un punto
+de pausa, entra en un bucle bloqueante que lee mensajes DAP de stdin y los
+responde directamente con el estado vivo del intérprete (call stack, entornos)
+hasta que llega `continue`/`next`/`stepIn`/`stepOut`/`disconnect`. No hay
+hilos, ni corutinas, ni un rediseño del evaluador a máquina de estados — la
+propia pila de llamadas de Rust (la recursión de `eval_block`/`eval_expr`) es
+la pila de la sesión de depuración.
+
+### Lo que se añadió
+
+- `compiler/src/protocol.rs`: el framing `Content-Length` que ya usaba
+  `lsp.rs` se extrajo a un módulo compartido (también lo usa `dap.rs` y el
+  propio bucle de pausa del intérprete).
+- `compiler/src/interpreter/mod.rs`: nuevo `CallFrame` (nombre, archivo,
+  línea, entorno base y entorno actual) empujado/sacado solo en límites
+  reales de llamada a función; `Debugger` (breakpoints por archivo,
+  modo de paso, transporte stdio); `RuntimeError::Terminated` para
+  desenrollar limpio ante `disconnect`/`terminate`. El punto de enganche es
+  `eval_block`: antes de cada sentencia (y también antes de evaluar la
+  expresión final de un bloque sin sentencia final explícita — el caso de
+  `for n in fib { print(n) }`, donde `print(n)` se parsea como `tail`, no
+  como sentencia, y sin este segundo enganche el breakpoint nunca se
+  disparaba) se decide si hay que pausar. `print()` redirige su salida a un
+  evento `output` de DAP en vez de `stdout` real mientras hay un depurador
+  conectado.
+- `compiler/src/dap.rs`: maneja el protocolo previo al lanzamiento
+  (`initialize`, `launch`, `setBreakpoints`, `configurationDone`), carga y
+  tipa el proyecto exactamente igual que `--run`, y entrega la sesión al
+  intérprete.
+- Soportado por protocolo: breakpoints por línea, `stopOnEntry`, `continue`,
+  `next` (step over), `stepIn`, `stepOut`, `pause`, `threads`, `stackTrace`,
+  `scopes`, `variables` (variables locales alcanzables desde el entorno del
+  frame, con `push`/`derive` incluidos porque son valores reales), `evaluate`
+  (ejecuta la expresión con el parser/evaluador real del lenguaje contra el
+  entorno vivo del frame pausado — no un mini-lenguaje aparte), `disconnect`/
+  `terminate`.
+- Extensión VS Code: tipo de depurador `ostrin` registrado
+  (`registerDebugAdapterDescriptorFactory` lanza `ostrinc --dap` como
+  proceso hijo, igual que ya se hacía para `--lsp`), un
+  `DebugConfigurationProvider` que por defecto depura el archivo activo, y
+  un snippet de `launch.json` ("Ostrin: Debug current file").
+
+### Limitaciones documentadas
+
+Los breakpoints solo se pueden fijar antes de lanzar o mientras el programa
+está pausado (no hay forma de recibirlos mientras el programa corre entre
+breakpoints, porque el hilo no está leyendo stdin en ese momento — limitación
+compartida con muchos adaptadores de referencia simples). Las funciones
+lambda (`call_callable`) no empujan su propio `CallFrame`: sus sentencias se
+atribuyen al frame nombrado que las llamó. `evaluate` solo puede referirse a
+variables visibles en el frame activo, no puede llamar a funciones con
+efectos secundarios sobre el "programa real" de forma distinta a como el
+propio programa ya las llamaría (no hay sandboxing especial, es el mismo
+evaluador).
+
+### Pruebas
+
+Dos pruebas de integración nuevas sobre el proceso `ostrinc --dap` real (no
+mocks): `compiler_dap_hits_breakpoints_and_reports_locals` pone un breakpoint
+en la única línea del cuerpo de un `for` (`examples/fibonacci.ostrin`),
+verifica que se dispara exactamente 10 veces, que `stackTrace`/`variables`
+exponen `n` y `fib`, que `evaluate("n")` en la primera parada da `"0"`, y que
+la secuencia completa de `print()` llega como eventos `output` en el orden
+correcto antes de `terminated`/`exited`. `compiler_dap_stops_on_entry_steps_and_disconnects_cleanly`
+prueba `stopOnEntry`, un `next` que avanza exactamente una sentencia, y que
+`disconnect` corta el programa antes de que imprima nada. Suite del
+compilador: **73 pruebas**, sin warnings nuevos. Extensión → `0.4.0`, VSIX
+regenerado.
+
+Con debug y LSP completos, el único frente grande realmente sin empezar en
+todo el proyecto es el backend de compilación real (LLVM u otro).

@@ -1,10 +1,12 @@
 mod ast;
+mod dap;
 mod interpreter;
 mod lexer;
 mod lsp;
 mod modules;
 mod package;
 mod parser;
+mod protocol;
 mod symbols;
 mod typeck;
 mod types;
@@ -24,6 +26,7 @@ fn main() -> ExitCode {
     let types_only = args.iter().any(|a| a == "--types");
     let stdin_source = args.iter().any(|a| a == "--stdin");
     let lsp_server = args.iter().any(|a| a == "--lsp");
+    let dap_server = args.iter().any(|a| a == "--dap");
     let run = args.iter().any(|a| a == "--run");
     let json = args.iter().any(|a| a == "--json");
     let help = args.iter().any(|a| a == "--help" || a == "-h");
@@ -40,6 +43,10 @@ fn main() -> ExitCode {
 
     if lsp_server {
         return lsp::run();
+    }
+
+    if dap_server {
+        return dap::run();
     }
 
     if stdin_source {
@@ -242,6 +249,7 @@ fn print_help() {
     println!("  --stdin       Read source from stdin for editor integrations");
     println!("  --file PATH   Associate stdin source with a source path");
     println!("  --lsp         Run the language server over stdio");
+    println!("  --dap         Run the debug adapter over stdio");
     println!("  --json        Emit machine-readable diagnostics as JSON Lines");
     println!("  -h, --help    Print this help");
     println!("  -V, --version Print the compiler version");

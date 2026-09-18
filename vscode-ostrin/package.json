@@ -2,7 +2,7 @@
   "name": "ostrin-language-support",
   "displayName": "Ostrin Language Support",
   "description": "Syntax highlighting and compiler commands for the Ostrin programming language.",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "publisher": "ostrin-project",
   "license": "SEE LICENSE IN LICENSE",
   "repository": {
@@ -36,7 +36,9 @@
   "activationEvents": [
     "onLanguage:ostrin",
     "onCommand:ostrin.check",
-    "onCommand:ostrin.run"
+    "onCommand:ostrin.run",
+    "onDebugResolve:ostrin",
+    "onDebugDynamicConfigurations:ostrin"
   ],
   "contributes": {
     "languages": [
@@ -71,6 +73,61 @@
       {
         "command": "ostrin.run",
         "title": "Ostrin: Run Current File"
+      }
+    ],
+    "breakpoints": [
+      {
+        "language": "ostrin"
+      }
+    ],
+    "debuggers": [
+      {
+        "type": "ostrin",
+        "label": "Ostrin Debug",
+        "languages": [
+          "ostrin"
+        ],
+        "configurationAttributes": {
+          "launch": {
+            "required": [
+              "program"
+            ],
+            "properties": {
+              "program": {
+                "type": "string",
+                "description": "The .ostrin entry file to run and debug.",
+                "default": "${file}"
+              },
+              "stopOnEntry": {
+                "type": "boolean",
+                "description": "Pause before the first statement of 'main' runs.",
+                "default": true
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "ostrin",
+            "request": "launch",
+            "name": "Debug current Ostrin file",
+            "program": "${file}",
+            "stopOnEntry": true
+          }
+        ],
+        "configurationSnippets": [
+          {
+            "label": "Ostrin: Debug current file",
+            "description": "Launch and debug the Ostrin file open in the active editor.",
+            "body": {
+              "type": "ostrin",
+              "request": "launch",
+              "name": "Debug current Ostrin file",
+              "program": "^\"\\${file}\"",
+              "stopOnEntry": true
+            }
+          }
+        ]
       }
     ],
     "configuration": {

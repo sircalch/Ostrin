@@ -2,9 +2,13 @@ use std::cell::RefCell;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt;
 use std::fs;
+use std::io::{BufRead, Write};
 use std::rc::Rc;
 
+use serde_json::{json, Value as JsonValue};
+
 use crate::ast::*;
+use crate::protocol;
 use crate::types::{dim_div, dim_is_dimensionless, dim_mul, dim_pow, dim_to_string, resolve_unit_expr, Dimension};
 
 #[derive(Clone)]
@@ -138,6 +142,9 @@ pub enum RuntimeError {
     Return(Value),
     Break(Option<Value>),
     Continue,
+    /// Unwinds the whole program when a connected debugger sends
+    /// `disconnect`/`terminate` while execution is paused (see `dap.rs`).
+    Terminated,
 }
 
 pub type EvalResult = Result<Value, RuntimeError>;
@@ -190,6 +197,129 @@ impl Env {
     }
 }
 
+/// One entry in the call stack the debugger reports through
+/// `stackTrace`/`scopes`/`variables`. Pushed and popped only at real function
+/// call boundaries (`call_user_function*`, closure calls); a nested block
+/// (`if`/`while`/`for`/`match`/`spawn`) just updates `current_env`/`line` on
+/// the frame that is already on top, since none of those introduce a new
+/// logical stack frame.
+struct CallFrame {
+    name: String,
+    file: Option<String>,
+    line: usize,
+    /// The environment `call_user_function` created for this call (holding
+    /// its parameters). `variables` walks from `current_env` up to and
+    /// including this one, then stops — showing only this frame's locals,
+    /// not whatever lexically encloses it.
+    base_env: Env,
+    current_env: Env,
+}
+
+#[derive(PartialEq)]
+enum StepMode {
+    None,
+    Into,
+    /// Also covers step-out: both just mean "run until the call stack is at
+    /// or shallower than `step_depth`", they only differ in what `step_depth`
+    /// was set to when the request came in.
+    UntilDepth,
+}
+
+/// Debug Adapter Protocol session state, owned by the `Interpreter` while a
+/// program runs under `ostrinc --dap` (see `dap.rs`). Reading/writing this
+/// struct's transport happens entirely within `interpreter/mod.rs` because
+/// answering `stackTrace`/`variables`/`evaluate` needs direct access to the
+/// interpreter's live state at the exact moment execution is paused — there
+/// is no separate thread or coroutine involved, pausing just means "block on
+/// a read from stdin instead of returning", using the interpreter's own
+/// existing call stack as the only stack that matters.
+pub struct Debugger {
+    reader: Box<dyn BufRead>,
+    writer: Box<dyn Write>,
+    breakpoints: HashMap<String, HashSet<usize>>,
+    seq: i64,
+    pending_entry_stop: bool,
+    step: StepMode,
+    step_depth: usize,
+}
+
+impl Debugger {
+    pub fn new(
+        reader: Box<dyn BufRead>,
+        writer: Box<dyn Write>,
+        breakpoints: HashMap<String, HashSet<usize>>,
+        stop_on_entry: bool,
+    ) -> Self {
+        Debugger {
+            reader,
+            writer,
+            breakpoints,
+            seq: 0,
+            pending_entry_stop: stop_on_entry,
+            step: StepMode::None,
+            step_depth: 0,
+        }
+    }
+
+    pub fn set_breakpoints(&mut self, file: String, lines: HashSet<usize>) {
+        self.breakpoints.insert(file, lines);
+    }
+
+    fn next_seq(&mut self) -> i64 {
+        self.seq += 1;
+        self.seq
+    }
+
+    pub fn send_event(&mut self, event: &str, body: JsonValue) {
+        let seq = self.next_seq();
+        let _ = protocol::write_message(
+            &mut *self.writer,
+            &json!({ "seq": seq, "type": "event", "event": event, "body": body }),
+        );
+    }
+
+    pub fn send_output(&mut self, text: &str) {
+        self.send_event("output", json!({ "category": "stdout", "output": text }));
+    }
+
+    fn send_response(&mut self, request_seq: i64, command: &str, body: JsonValue) {
+        let seq = self.next_seq();
+        let _ = protocol::write_message(
+            &mut *self.writer,
+            &json!({
+                "seq": seq, "type": "response", "request_seq": request_seq,
+                "success": true, "command": command, "body": body
+            }),
+        );
+    }
+}
+
+fn dap_scopes(arguments: &JsonValue) -> JsonValue {
+    let frame_id = arguments.get("frameId").and_then(JsonValue::as_i64).unwrap_or(0);
+    json!({ "scopes": [{ "name": "Locals", "variablesReference": frame_id + 1, "expensive": false }] })
+}
+
+fn dap_set_breakpoints(dbg: &mut Debugger, arguments: &JsonValue) -> JsonValue {
+    let path = arguments
+        .get("source")
+        .and_then(|source| source.get("path"))
+        .and_then(JsonValue::as_str)
+        .map(|path| std::fs::canonicalize(path).map(|p| p.display().to_string()).unwrap_or_else(|_| path.to_string()))
+        .unwrap_or_default();
+    let requested = arguments.get("breakpoints").and_then(JsonValue::as_array).cloned().unwrap_or_default();
+    let lines: HashSet<usize> = requested
+        .iter()
+        .filter_map(|entry| entry.get("line").and_then(JsonValue::as_u64))
+        .map(|line| line as usize)
+        .collect();
+    dbg.set_breakpoints(path, lines);
+    let verified: Vec<JsonValue> = requested
+        .iter()
+        .map(|entry| json!({ "verified": true, "line": entry.get("line").cloned().unwrap_or(JsonValue::Null) }))
+        .collect();
+    json!({ "breakpoints": verified })
+}
+
 pub struct Interpreter {
     functions: HashMap<String, Rc<FunctionDecl>>,
     records: HashMap<String, RecordDecl>,
@@ -200,6 +330,9 @@ pub struct Interpreter {
     derives: HashMap<String, Vec<String>>,
     runtime_record_type_args: HashMap<usize, Vec<Type>>,
     moved: HashSet<usize>,
+    call_stack: Vec<CallFrame>,
+    debugger: Option<Debugger>,
+    terminated: bool,
 }
 
 impl Interpreter {
@@ -264,7 +397,26 @@ impl Interpreter {
             derives,
             runtime_record_type_args: HashMap::new(),
             moved: HashSet::new(),
+            call_stack: Vec::new(),
+            debugger: None,
+            terminated: false,
         }
+    }
+
+    /// Attaches a debugger before `run_main` executes; every statement
+    /// boundary will now check breakpoints/step state and, when this
+    /// program's own `print()` runs, its output is relayed as a DAP `output`
+    /// event instead of going straight to the real stdout (see `dap.rs`).
+    pub fn attach_debugger(&mut self, debugger: Debugger) {
+        self.debugger = Some(debugger);
+    }
+
+    /// Reclaims the debugger transport after `run_main` returns, so the
+    /// caller (`dap.rs`) can send the final `exited`/`terminated` events over
+    /// the same stdio stream. `None` only when a pause loop's stdin read
+    /// failed outright (client vanished without a clean `disconnect`).
+    pub fn take_debugger(&mut self) -> Option<Debugger> {
+        self.debugger.take()
     }
 
     fn has_derive(&self, type_name: &str, trait_name: &str) -> bool {
@@ -580,7 +732,30 @@ impl Interpreter {
             Err(RuntimeError::Return(v)) => Ok(v),
             Err(RuntimeError::Break(_)) => Err("'break' outside a loop".to_string()),
             Err(RuntimeError::Continue) => Err("'continue' outside a loop".to_string()),
+            Err(RuntimeError::Terminated) => Err("debug session terminated".to_string()),
         }
+    }
+
+    /// Pushes/pops the `CallFrame` a debugger session reports through
+    /// `stackTrace`, wrapping the `Return`-unwinding both call paths below
+    /// already needed. Not used by `call_callable` (lambdas don't carry a
+    /// declared name/source span worth showing as their own frame; their
+    /// statements are attributed to whichever named frame called them).
+    fn run_function_body(&mut self, f: &FunctionDecl, call_env: &Env) -> EvalResult {
+        self.call_stack.push(CallFrame {
+            name: f.name.clone(),
+            file: f.source_file.clone(),
+            line: f.span.line,
+            base_env: call_env.clone(),
+            current_env: call_env.clone(),
+        });
+        let result = match self.eval_block(&f.body, call_env) {
+            Ok(v) => Ok(v),
+            Err(RuntimeError::Return(v)) => Ok(v),
+            other => other,
+        };
+        self.call_stack.pop();
+        result
     }
 
     fn call_user_function(&mut self, f: &FunctionDecl, args: Vec<Value>, closure_env: Env) -> EvalResult {
@@ -588,11 +763,7 @@ impl Interpreter {
         for (param, arg) in f.params.iter().zip(args.into_iter()) {
             call_env.define(&param.name, arg);
         }
-        match self.eval_block(&f.body, &call_env) {
-            Ok(v) => Ok(v),
-            Err(RuntimeError::Return(v)) => Ok(v),
-            other => other,
-        }
+        self.run_function_body(f, &call_env)
     }
 
     fn call_user_function_with_args(
@@ -660,21 +831,246 @@ impl Interpreter {
             call_env.define(&param.name, value);
         }
 
-        match self.eval_block(&f.body, &call_env) {
-            Ok(v) => Ok(v),
-            Err(RuntimeError::Return(v)) => Ok(v),
-            other => other,
-        }
+        self.run_function_body(f, &call_env)
     }
 
     fn eval_block(&mut self, block: &Block, env: &Env) -> EvalResult {
         let inner = env.child();
         for stmt in &block.stmts {
+            self.before_statement(&inner, stmt.span.line)?;
             self.eval_stmt(&stmt.stmt, &inner)?;
         }
         match &block.tail {
-            Some(e) => self.eval_expr(e, &inner),
+            Some(e) => {
+                // A block's last expression (no trailing statement after it)
+                // is parsed as `tail`, not pushed onto `stmts` — without this,
+                // a breakpoint on e.g. the single-line body of a `for` loop
+                // would never fire. `parse_expr` always wraps its result in
+                // `Expr::Located`, so the source line is right here.
+                if let Expr::Located(_, range) = e.as_ref() {
+                    self.before_statement(&inner, range.start.line)?;
+                }
+                self.eval_expr(e, &inner)
+            }
             None => Ok(Value::Void),
+        }
+    }
+
+    /// Runs right before every statement executes: keeps the top call frame's
+    /// reported line/scope current for the debugger, and — only when a
+    /// debugger is attached — checks whether this is a breakpoint or the
+    /// target of an in-flight step request and, if so, blocks until the
+    /// debugger sends a command that lets execution continue.
+    fn before_statement(&mut self, env: &Env, line: usize) -> Result<(), RuntimeError> {
+        if let Some(frame) = self.call_stack.last_mut() {
+            frame.line = line;
+            frame.current_env = env.clone();
+        }
+        if self.debugger.is_some() {
+            self.maybe_pause(line);
+        }
+        if self.terminated {
+            return Err(RuntimeError::Terminated);
+        }
+        Ok(())
+    }
+
+    fn maybe_pause(&mut self, line: usize) {
+        let reason = {
+            let Some(dbg) = self.debugger.as_ref() else { return };
+            if dbg.pending_entry_stop {
+                Some("entry")
+            } else if self
+                .call_stack
+                .last()
+                .and_then(|frame| frame.file.as_deref())
+                .is_some_and(|file| dbg.breakpoints.get(file).is_some_and(|lines| lines.contains(&line)))
+            {
+                Some("breakpoint")
+            } else {
+                let depth = self.call_stack.len();
+                match dbg.step {
+                    StepMode::Into => Some("step"),
+                    StepMode::UntilDepth if depth <= dbg.step_depth => Some("step"),
+                    _ => None,
+                }
+            }
+        };
+        if let Some(reason) = reason {
+            self.enter_pause(reason);
+        }
+    }
+
+    /// Hands control to the debugger: sends `stopped`, then blocks reading
+    /// DAP requests from stdin and answering them directly from the live
+    /// interpreter state until a `continue`/step/`disconnect` command tells
+    /// it to let this statement actually run.
+    fn enter_pause(&mut self, reason: &str) {
+        let Some(mut dbg) = self.debugger.take() else { return };
+        dbg.pending_entry_stop = false;
+        dbg.step = StepMode::None;
+        dbg.send_event(
+            "stopped",
+            json!({ "reason": reason, "threadId": 1, "allThreadsStopped": true }),
+        );
+        loop {
+            let message = match protocol::read_message(&mut *dbg.reader) {
+                Ok(Some(bytes)) => bytes,
+                _ => {
+                    // stdin closed without a clean `disconnect` — stop the
+                    // program the same way an explicit disconnect would.
+                    self.terminated = true;
+                    return;
+                }
+            };
+            let Ok(value) = serde_json::from_slice::<JsonValue>(&message) else { continue };
+            let command = value.get("command").and_then(JsonValue::as_str).unwrap_or_default().to_string();
+            let request_seq = value.get("seq").and_then(JsonValue::as_i64).unwrap_or(0);
+            let arguments = value.get("arguments").cloned().unwrap_or(JsonValue::Null);
+            match command.as_str() {
+                "threads" => dbg.send_response(request_seq, &command, json!({ "threads": [{ "id": 1, "name": "main" }] })),
+                "stackTrace" => {
+                    let body = self.dap_stack_trace();
+                    dbg.send_response(request_seq, &command, body);
+                }
+                "scopes" => {
+                    let body = dap_scopes(&arguments);
+                    dbg.send_response(request_seq, &command, body);
+                }
+                "variables" => {
+                    let body = self.dap_variables(&arguments);
+                    dbg.send_response(request_seq, &command, body);
+                }
+                "evaluate" => {
+                    let body = self.dap_evaluate(&arguments);
+                    dbg.send_response(request_seq, &command, body);
+                }
+                "setBreakpoints" => {
+                    let body = dap_set_breakpoints(&mut dbg, &arguments);
+                    dbg.send_response(request_seq, &command, body);
+                }
+                "continue" => {
+                    dbg.step = StepMode::None;
+                    dbg.send_response(request_seq, &command, json!({ "allThreadsContinued": true }));
+                    self.debugger = Some(dbg);
+                    return;
+                }
+                "next" => {
+                    dbg.step = StepMode::UntilDepth;
+                    dbg.step_depth = self.call_stack.len();
+                    dbg.send_response(request_seq, &command, json!({}));
+                    self.debugger = Some(dbg);
+                    return;
+                }
+                "stepIn" => {
+                    dbg.step = StepMode::Into;
+                    dbg.send_response(request_seq, &command, json!({}));
+                    self.debugger = Some(dbg);
+                    return;
+                }
+                "stepOut" => {
+                    dbg.step = StepMode::UntilDepth;
+                    dbg.step_depth = self.call_stack.len().saturating_sub(1);
+                    dbg.send_response(request_seq, &command, json!({}));
+                    self.debugger = Some(dbg);
+                    return;
+                }
+                "pause" => dbg.send_response(request_seq, &command, json!({})),
+                "disconnect" | "terminate" => {
+                    dbg.send_response(request_seq, &command, json!({}));
+                    self.terminated = true;
+                    self.debugger = Some(dbg);
+                    return;
+                }
+                _ => dbg.send_response(request_seq, &command, json!({})),
+            }
+        }
+    }
+
+    fn dap_stack_trace(&self) -> JsonValue {
+        let frames: Vec<JsonValue> = self
+            .call_stack
+            .iter()
+            .enumerate()
+            .rev()
+            .map(|(id, frame)| {
+                json!({
+                    "id": id,
+                    "name": frame.name,
+                    "line": frame.line,
+                    "column": 1,
+                    "source": frame.file.as_ref().map(|file| json!({
+                        "path": file,
+                        "name": std::path::Path::new(file).file_name().and_then(|n| n.to_str()).unwrap_or(file)
+                    }))
+                })
+            })
+            .collect();
+        json!({ "stackFrames": frames, "totalFrames": frames.len() })
+    }
+
+    fn dap_variables(&self, arguments: &JsonValue) -> JsonValue {
+        let reference = arguments.get("variablesReference").and_then(JsonValue::as_i64).unwrap_or(0);
+        let frame_id = reference.saturating_sub(1).max(0) as usize;
+        let Some(frame) = self.call_stack.get(frame_id) else {
+            return json!({ "variables": [] });
+        };
+        let base_ptr = Rc::as_ptr(&frame.base_env.0) as usize;
+        let mut seen = HashSet::new();
+        let mut variables = Vec::new();
+        let mut current = Some(frame.current_env.clone());
+        while let Some(env) = current {
+            let is_base = Rc::as_ptr(&env.0) as usize == base_ptr;
+            let parent = {
+                let borrowed = env.0.borrow();
+                for (name, value) in &borrowed.vars {
+                    if seen.insert(name.clone()) {
+                        variables.push((name.clone(), format!("{value}")));
+                    }
+                }
+                borrowed.parent.clone()
+            };
+            if is_base {
+                break;
+            }
+            current = parent;
+        }
+        variables.sort_by(|a, b| a.0.cmp(&b.0));
+        let variables: Vec<JsonValue> = variables
+            .into_iter()
+            .map(|(name, value)| json!({ "name": name, "value": value, "variablesReference": 0 }))
+            .collect();
+        json!({ "variables": variables })
+    }
+
+    /// Evaluates a watch/REPL expression against the paused frame's live
+    /// environment — the same parser and evaluator the program itself runs
+    /// on, not a separate mini-language. `self.debugger` is `None` for the
+    /// duration of this call (it lives in `enter_pause`'s local `dbg`
+    /// instead), so a breakpoint can't recursively trigger while evaluating
+    /// a watch expression.
+    fn dap_evaluate(&mut self, arguments: &JsonValue) -> JsonValue {
+        let expression = arguments.get("expression").and_then(JsonValue::as_str).unwrap_or_default();
+        let frame_id = arguments.get("frameId").and_then(JsonValue::as_i64);
+        let env = match frame_id {
+            Some(id) => self.call_stack.get(id as usize).map(|frame| frame.current_env.clone()),
+            None => self.call_stack.last().map(|frame| frame.current_env.clone()),
+        };
+        let Some(env) = env else {
+            return json!({ "result": "<no active frame>", "variablesReference": 0 });
+        };
+        let tokens = match crate::lexer::Lexer::new(expression).tokenize() {
+            Ok(tokens) => tokens,
+            Err(error) => return json!({ "result": format!("lex error: {}", error.message), "variablesReference": 0 }),
+        };
+        let expr = match crate::parser::Parser::new(tokens).parse_expr() {
+            Ok(expr) => expr,
+            Err(error) => return json!({ "result": format!("parse error: {}", error.message), "variablesReference": 0 }),
+        };
+        match self.eval_expr(&expr, &env) {
+            Ok(value) => json!({ "result": format!("{value}"), "variablesReference": 0 }),
+            Err(RuntimeError::Error(message)) => json!({ "result": format!("error: {message}"), "variablesReference": 0 }),
+            Err(_) => json!({ "result": "error: control flow escaped the expression", "variablesReference": 0 }),
         }
     }
 
@@ -1170,7 +1566,10 @@ impl Interpreter {
             match name.as_str() {
                 "print" => {
                     let v = self.eval_arg(&args[0], env)?;
-                    println!("{v}");
+                    match &mut self.debugger {
+                        Some(dbg) => dbg.send_output(&format!("{v}\n")),
+                        None => println!("{v}"),
+                    }
                     return Ok(Value::Void);
                 }
                 "sum" => {

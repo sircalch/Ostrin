@@ -84,6 +84,31 @@ fn run_lsp(messages: &[&str]) -> Output {
     }
 }
 
+fn run_dap(messages: &[String]) -> Output {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_ostrinc"))
+        .arg("--dap")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("failed to run ostrinc DAP");
+    {
+        let mut stdin = child.stdin.take().expect("missing DAP stdin pipe");
+        for message in messages {
+            stdin.write_all(&lsp_frame(message)).expect("failed to write DAP message");
+        }
+    }
+    let mut output = Vec::new();
+    child
+        .stdout
+        .take()
+        .expect("missing DAP stdout pipe")
+        .read_to_end(&mut output)
+        .expect("failed to read DAP output");
+    let status = child.wait().expect("failed to wait for DAP");
+    Output { status, stdout: output, stderr: Vec::new() }
+}
+
 fn stdout(out: &Output) -> String {
     String::from_utf8_lossy(&out.stdout).to_string()
 }
@@ -485,6 +510,165 @@ fn extract_result(stream: &str, id: u64) -> String {
     let tail = &stream[start..];
     let end = tail.find("Content-Length").unwrap_or(tail.len());
     tail[..end].to_string()
+}
+
+/// Splits raw DAP/LSP stdout back into individual JSON messages, using the
+/// `Content-Length` framing byte-for-byte instead of text search — the
+/// bodies below contain nested objects, so scanning for substrings like
+/// `"request_seq":N` can't reliably find a message's own boundaries.
+fn parse_framed_messages(out: &Output) -> Vec<serde_json::Value> {
+    let bytes = &out.stdout;
+    let mut offset = 0usize;
+    let mut messages = Vec::new();
+    while offset < bytes.len() {
+        let header_end = match bytes[offset..].windows(4).position(|w| w == b"\r\n\r\n") {
+            Some(pos) => offset + pos,
+            None => break,
+        };
+        let header = String::from_utf8_lossy(&bytes[offset..header_end]);
+        let length: usize = header
+            .lines()
+            .find_map(|line| line.strip_prefix("Content-Length:").map(|value| value.trim().parse().unwrap()))
+            .expect("frame missing Content-Length");
+        let body_start = header_end + 4;
+        let body = &bytes[body_start..body_start + length];
+        messages.push(serde_json::from_slice(body).expect("frame body must be valid JSON"));
+        offset = body_start + length;
+    }
+    messages
+}
+
+#[test]
+fn compiler_dap_hits_breakpoints_and_reports_locals() {
+    // `examples/fibonacci.ostrin` loops 10 times over `print(n)` at line 24;
+    // a breakpoint there should pause once per iteration, with `n` and `fib`
+    // (defined earlier in the same function) both visible as locals.
+    let program = example_path("fibonacci.ostrin");
+    let mut seq = 0u64;
+    let mut next = |value: serde_json::Value| -> String {
+        seq += 1;
+        let mut object = value.as_object().cloned().unwrap();
+        object.insert("seq".to_string(), json!(seq));
+        object.insert("type".to_string(), json!("request"));
+        json!(object).to_string()
+    };
+
+    let mut messages = vec![
+        next(json!({"command":"initialize","arguments":{}})),
+        next(json!({"command":"launch","arguments":{"program":program,"stopOnEntry":false}})),
+        next(json!({
+            "command":"setBreakpoints",
+            "arguments":{"source":{"path":program},"breakpoints":[{"line":24}]}
+        })),
+        next(json!({"command":"configurationDone","arguments":{}})),
+    ];
+    // The loop runs exactly 10 times; inspect the first stop in full, then
+    // just keep continuing through the remaining nine.
+    messages.push(next(json!({"command":"stackTrace","arguments":{"threadId":1}})));
+    messages.push(next(json!({"command":"scopes","arguments":{"frameId":0}})));
+    messages.push(next(json!({"command":"variables","arguments":{"variablesReference":1}})));
+    messages.push(next(json!({"command":"evaluate","arguments":{"expression":"n","frameId":0}})));
+    for _ in 0..10 {
+        messages.push(next(json!({"command":"continue","arguments":{"threadId":1}})));
+    }
+
+    let out = run_dap(&messages);
+    assert!(out.status.success(), "DAP session exited unsuccessfully: {}", stderr(&out));
+    let received = parse_framed_messages(&out);
+
+    let events = |name: &str| -> Vec<&serde_json::Value> {
+        received.iter().filter(|m| m["type"] == "event" && m["event"] == name).collect()
+    };
+    let response = |request_seq: u64| -> &serde_json::Value {
+        received
+            .iter()
+            .find(|m| m["type"] == "response" && m["request_seq"] == request_seq)
+            .unwrap_or_else(|| panic!("no response for request_seq {request_seq} in: {received:#?}"))
+    };
+
+    assert_eq!(events("initialized").len(), 1, "expected exactly one initialized event: {received:#?}");
+    let stopped = events("stopped");
+    assert_eq!(stopped.len(), 10, "the breakpoint on line 24 should be hit once per loop iteration: {received:#?}");
+    assert!(stopped.iter().all(|event| event["body"]["reason"] == "breakpoint"));
+
+    let stack_trace = &response(5)["body"];
+    let top_frame = &stack_trace["stackFrames"][0];
+    assert_eq!(top_frame["name"], "main");
+    assert_eq!(top_frame["line"], 24);
+
+    let variables = response(7)["body"]["variables"].as_array().expect("variables body");
+    let names: Vec<&str> = variables.iter().filter_map(|v| v["name"].as_str()).collect();
+    assert!(names.contains(&"n"), "locals should include the loop variable: {names:?}");
+    assert!(names.contains(&"fib"), "locals should include a variable from an outer statement in the same function: {names:?}");
+
+    assert_eq!(response(8)["body"]["result"], "0", "evaluating 'n' on the first iteration should be 0");
+
+    let output_text: String = events("output").iter().filter_map(|event| event["body"]["output"].as_str()).collect();
+    // Fibonacci(10) starting at 0,1: 0 1 1 2 3 5 8 13 21 34.
+    assert_eq!(output_text, "0\n1\n1\n2\n3\n5\n8\n13\n21\n34\n", "unexpected printed sequence");
+
+    assert_eq!(events("terminated").len(), 1, "expected a terminated event: {received:#?}");
+    let exited = events("exited");
+    assert_eq!(exited.len(), 1, "expected an exited event: {received:#?}");
+    assert_eq!(exited[0]["body"]["exitCode"], 0, "program should exit cleanly");
+}
+
+#[test]
+fn compiler_dap_stops_on_entry_steps_and_disconnects_cleanly() {
+    // No breakpoints at all here — `stopOnEntry` should pause before the
+    // very first statement of `main` runs, `next` should move exactly one
+    // statement without touching anything inside a nested block, and
+    // `disconnect` mid-run should stop the program before it reaches any of
+    // its `print()` calls (all of which come later, inside the `for` loop).
+    let program = example_path("hello.ostrin");
+    let mut seq = 0u64;
+    let mut next_msg = |value: serde_json::Value| -> String {
+        seq += 1;
+        let mut object = value.as_object().cloned().unwrap();
+        object.insert("seq".to_string(), json!(seq));
+        object.insert("type".to_string(), json!("request"));
+        json!(object).to_string()
+    };
+
+    let messages = vec![
+        next_msg(json!({"command":"initialize","arguments":{}})),
+        next_msg(json!({"command":"launch","arguments":{"program":program,"stopOnEntry":true}})),
+        next_msg(json!({"command":"configurationDone","arguments":{}})),
+        next_msg(json!({"command":"stackTrace","arguments":{"threadId":1}})),
+        next_msg(json!({"command":"next","arguments":{"threadId":1}})),
+        next_msg(json!({"command":"stackTrace","arguments":{"threadId":1}})),
+        next_msg(json!({"command":"disconnect","arguments":{}})),
+    ];
+
+    let out = run_dap(&messages);
+    let received = parse_framed_messages(&out);
+    let events = |name: &str| -> Vec<&serde_json::Value> {
+        received.iter().filter(|m| m["type"] == "event" && m["event"] == name).collect()
+    };
+    let response = |request_seq: u64| -> &serde_json::Value {
+        received
+            .iter()
+            .find(|m| m["type"] == "response" && m["request_seq"] == request_seq)
+            .unwrap_or_else(|| panic!("no response for request_seq {request_seq} in: {received:#?}"))
+    };
+
+    let stopped = events("stopped");
+    assert_eq!(stopped.len(), 2, "expected an entry stop and a step stop: {received:#?}");
+    assert_eq!(stopped[0]["body"]["reason"], "entry");
+    assert_eq!(stopped[1]["body"]["reason"], "step");
+
+    let first_line = response(4)["body"]["stackFrames"][0]["line"].as_i64().unwrap();
+    let second_line = response(6)["body"]["stackFrames"][0]["line"].as_i64().unwrap();
+    assert_eq!(first_line, 8, "stopOnEntry should land on main's first statement");
+    assert_eq!(second_line, 9, "'next' should move exactly one statement forward in the same frame");
+
+    // Disconnecting here happens before the loop that calls print() ever
+    // runs, so the only 'output' event should be the interpreter reporting
+    // its own termination, not anything the Ostrin program printed.
+    let output = events("output");
+    assert_eq!(output.len(), 1, "no Ostrin print() should have run yet: {received:#?}");
+    assert!(output[0]["body"]["output"].as_str().unwrap().contains("terminated"));
+    assert_eq!(events("terminated").len(), 1);
 }
 
 #[test]

@@ -515,6 +515,35 @@ function activate(context) {
     if (document) await runCompiler(document, true);
   });
 
+  // The debug adapter is just `ostrinc --dap` talking the Debug Adapter
+  // Protocol over its own stdio — same idea as the persistent LSP server,
+  // a separate process per debug session rather than a shared one, since
+  // DAP sessions are inherently one-at-a-time per launch.
+  const debugConfigProvider = vscode.debug.registerDebugConfigurationProvider('ostrin', {
+    resolveDebugConfiguration: (folder, config) => {
+      if (!config.type && !config.request) {
+        const document = currentDocument();
+        if (!document || document.languageId !== 'ostrin') return undefined;
+        config.type = 'ostrin';
+        config.name = 'Debug current Ostrin file';
+        config.request = 'launch';
+        config.program = document.uri.fsPath;
+        config.stopOnEntry = true;
+      }
+      if (!config.program) {
+        const document = currentDocument();
+        config.program = document ? document.uri.fsPath : undefined;
+      }
+      return config.program ? config : undefined;
+    }
+  });
+  const debugAdapterFactory = vscode.debug.registerDebugAdapterDescriptorFactory('ostrin', {
+    createDebugAdapterDescriptor: (session) => {
+      const pseudoDocument = { uri: session.workspaceFolder ? session.workspaceFolder.uri : vscode.Uri.file(session.configuration.program) };
+      return new vscode.DebugAdapterExecutable(compilerPath(pseudoDocument), ['--dap']);
+    }
+  });
+
   const saveSubscription = vscode.workspace.onDidSaveTextDocument(async (document) => {
     if (document.languageId === 'ostrin') {
       startLanguageServer(document);
@@ -567,7 +596,7 @@ function activate(context) {
     }
   }
 
-  context.subscriptions.push(diagnostics, completion, signatureHelp, hover, definitions, references, rename, semanticTokens, symbols, formatting, check, run, saveSubscription, changeSubscription, closeSubscription, openSubscription);
+  context.subscriptions.push(diagnostics, completion, signatureHelp, hover, definitions, references, rename, semanticTokens, symbols, formatting, check, run, debugConfigProvider, debugAdapterFactory, saveSubscription, changeSubscription, closeSubscription, openSubscription);
 }
 
 function deactivate() {

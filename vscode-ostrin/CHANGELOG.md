@@ -2,6 +2,16 @@
 
 All notable changes to the Ostrin VS Code extension are documented here.
 
+## [0.4.0] - 2026-09-17
+
+- Add a real debugger: `ostrinc --dap` runs the same tree-walking
+  interpreter under the Debug Adapter Protocol, with actual breakpoints,
+  step over/into/out, a call stack, local variables and expression
+  evaluation — not a "run and show output" simulation.
+- Register an `ostrin` debug type, a debug configuration provider (defaults
+  to debugging the file open in the active editor) and a launch snippet
+  ("Ostrin: Debug current file").
+
 ## [0.3.1] - 2026-09-17
 
 - Find-references and rename in the language server now also scan every

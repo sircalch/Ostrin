@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::io::{self, BufRead, BufReader, BufWriter, Read, Write};
+use std::io::{self, BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -8,6 +8,7 @@ use serde_json::{json, Value};
 use crate::ast::Span;
 use crate::modules;
 use crate::package;
+use crate::protocol::{read_message, write_message};
 use crate::symbols::{self, MemberSymbol, Symbol};
 use crate::typeck::{Checker, EditorBinding, EditorExpression};
 
@@ -80,47 +81,6 @@ pub fn run() -> ExitCode {
     }
 
     ExitCode::SUCCESS
-}
-
-fn read_message<R: BufRead + Read>(reader: &mut R) -> io::Result<Option<Vec<u8>>> {
-    let mut content_length = None;
-    loop {
-        let mut header = String::new();
-        if reader.read_line(&mut header)? == 0 {
-            return Ok(None);
-        }
-        let trimmed = header.trim();
-        if trimmed.is_empty() {
-            break;
-        }
-        if let Some((name, value)) = trimmed.split_once(':') {
-            if name.eq_ignore_ascii_case("Content-Length") {
-                content_length = Some(value.trim().parse::<usize>().map_err(|error| {
-                    io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!("invalid Content-Length: {error}"),
-                    )
-                })?);
-            }
-        }
-    }
-    let length = content_length.ok_or_else(|| {
-        io::Error::new(
-            io::ErrorKind::InvalidData,
-            "LSP message has no Content-Length header",
-        )
-    })?;
-    let mut body = vec![0_u8; length];
-    reader.read_exact(&mut body)?;
-    Ok(Some(body))
-}
-
-fn write_message<W: Write>(writer: &mut W, value: &Value) -> io::Result<()> {
-    let body = serde_json::to_vec(value)
-        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error.to_string()))?;
-    write!(writer, "Content-Length: {}\r\n\r\n", body.len())?;
-    writer.write_all(&body)?;
-    writer.flush()
 }
 
 fn respond<W: Write>(writer: &mut W, id: Value, result: Value) -> io::Result<()> {
