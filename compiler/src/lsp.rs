@@ -49,6 +49,7 @@ struct WorkspaceResult {
 struct Server {
     documents: HashMap<String, String>,
     index: HashMap<String, FileCache>,
+    root: Option<PathBuf>,
 }
 
 pub fn run() -> ExitCode {
@@ -159,6 +160,16 @@ fn handle_message<W: Write>(
 
     match method {
         "initialize" => {
+            server.root = params
+                .get("rootUri")
+                .and_then(Value::as_str)
+                .and_then(uri_to_path)
+                .or_else(|| {
+                    params
+                        .get("rootPath")
+                        .and_then(Value::as_str)
+                        .map(PathBuf::from)
+                });
             if let Some(id) = request_id {
                 respond(
                     writer,
@@ -368,6 +379,60 @@ fn analyze_and_publish<W: Write>(server: &mut Server, uri: &str, writer: &mut W)
 
     regroup_into_index(&entry_key, result, &mut server.index);
     Ok(())
+}
+
+/// Every `.ostrin` file the server can see for a project-wide, text-based
+/// search: every open buffer (its live, possibly-unsaved text) plus every
+/// `.ostrin` file on disk under the workspace root that isn't currently open
+/// (read fresh from disk, since nothing overrides it). Used by
+/// references/rename so they aren't limited to documents the editor happens
+/// to have open.
+fn workspace_files(server: &Server) -> Vec<(String, String)> {
+    let mut files: HashMap<String, String> = HashMap::new();
+    let mut open_paths: std::collections::HashSet<PathBuf> = std::collections::HashSet::new();
+    for (uri, text) in &server.documents {
+        files.insert(uri.clone(), text.clone());
+        if let Some(path) = uri_to_path(uri) {
+            open_paths.insert(std::fs::canonicalize(&path).unwrap_or(path));
+        }
+    }
+    if let Some(root) = &server.root {
+        for path in walk_ostrin_files(root) {
+            let canonical = std::fs::canonicalize(&path).unwrap_or_else(|_| path.clone());
+            if open_paths.contains(&canonical) {
+                continue;
+            }
+            if let Ok(text) = std::fs::read_to_string(&path) {
+                files.insert(path_to_uri(&path), text);
+            }
+        }
+    }
+    files.into_iter().collect()
+}
+
+/// Depth-limited recursive walk collecting `.ostrin` files, skipping the
+/// directories a Rust/Ostrin project never wants scanned (VCS metadata,
+/// dependency/build output). Best-effort: unreadable directories are
+/// silently skipped rather than failing the whole request.
+fn walk_ostrin_files(root: &Path) -> Vec<PathBuf> {
+    const SKIP_DIRS: &[&str] = &[".git", "target", "node_modules", ".vscode"];
+    let mut files = Vec::new();
+    let mut stack = vec![root.to_path_buf()];
+    while let Some(dir) = stack.pop() {
+        let Ok(entries) = std::fs::read_dir(&dir) else { continue };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                let name = path.file_name().and_then(|n| n.to_str()).unwrap_or_default();
+                if !SKIP_DIRS.contains(&name) {
+                    stack.push(path);
+                }
+            } else if path.extension().and_then(|ext| ext.to_str()) == Some("ostrin") {
+                files.push(path);
+            }
+        }
+    }
+    files
 }
 
 fn build_overrides(server: &Server) -> HashMap<PathBuf, String> {
@@ -816,9 +881,9 @@ fn references(server: &Server, uri: &str, text: &str, position: Option<&Value>) 
             locations.push(location_range_json(uri, found_line, start, end));
         }
     } else {
-        for (doc_uri, doc_text) in &server.documents {
-            for (found_line, start, end) in find_word_occurrences(doc_text, &word) {
-                locations.push(location_range_json(doc_uri, found_line, start, end));
+        for (doc_uri, doc_text) in workspace_files(server) {
+            for (found_line, start, end) in find_word_occurrences(&doc_text, &word) {
+                locations.push(location_range_json(&doc_uri, found_line, start, end));
             }
         }
     }
@@ -849,9 +914,9 @@ fn rename(server: &Server, uri: &str, text: &str, position: Option<&Value>, new_
             record(uri, found_line, start, end);
         }
     } else {
-        for (doc_uri, doc_text) in &server.documents {
-            for (found_line, start, end) in find_word_occurrences(doc_text, &word) {
-                record(doc_uri, found_line, start, end);
+        for (doc_uri, doc_text) in workspace_files(server) {
+            for (found_line, start, end) in find_word_occurrences(&doc_text, &word) {
+                record(&doc_uri, found_line, start, end);
             }
         }
     }

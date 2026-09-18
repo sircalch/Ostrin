@@ -2019,3 +2019,35 @@ coincide de nombre con un símbolo de otro alcance). El siguiente bloque
 grande sigue siendo, como ya se anotó antes, depuración (`debug adapter`) y,
 si se quiere cerrar del todo esta brecha, un recorrido de workspace en disco
 para referencias/rename fuera de los documentos abiertos.
+
+---
+
+## 59. Referencias/rename recorren el workspace en disco, no solo lo abierto — 2026-09-17
+
+Cerró la limitación que quedó anotada al final de la sección 58: hasta ahora
+`textDocument/references` y `textDocument/rename` solo veían texto de
+documentos que el editor tuviera efectivamente abiertos.
+
+`lsp.rs` guarda ahora `Server.root`, tomado de `rootUri` (o `rootPath`) en el
+mensaje `initialize` — el cliente ya lo enviaba desde que existe el servidor
+persistente, así que no hizo falta tocar `lsp-client.js`. `workspace_files()`
+combina los documentos abiertos (su texto en memoria, siempre con prioridad)
+con un recorrido recursivo (`walk_ostrin_files`, con límites sensatos:
+ignora `.git`, `target`, `node_modules`, `.vscode`) de todo `.ostrin` bajo esa
+raíz, leyendo del disco cualquier archivo que no esté abierto. Referencias y
+rename usan esa lista en vez de `server.documents` para la búsqueda de
+símbolos globales; los bindings locales siguen restringidos al archivo propio,
+sin cambios.
+
+Nueva prueba `compiler_lsp_finds_references_in_unopened_workspace_files`:
+inicializa con `rootUri` apuntando a `examples/proj1`, abre solo `main.ostrin`
+(nunca `physics/units.ostrin`) y comprueba que tanto `references` como
+`rename` sobre `to_kelvin` incluyen la declaración leída directamente de
+`units.ostrin` desde disco. Suite del compilador: **71 pruebas**, sin
+warnings. Extensión → `0.3.1`, VSIX regenerado.
+
+Con esto la brecha de la sección 57 queda cerrada por completo. Lo que sigue
+pendiente en el plan de continuación es el mismo de siempre: un backend de
+compilación real (LLVM u otro) es la pieza más grande sin empezar; para
+herramientas de editor, lo siguiente sería un debug adapter (DAP) — hasta
+ahora nunca se ha tocado ese terreno.

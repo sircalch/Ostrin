@@ -423,6 +423,62 @@ fn compiler_lsp_resolves_imports_across_open_documents() {
     );
 }
 
+#[test]
+fn compiler_lsp_finds_references_in_unopened_workspace_files() {
+    let root_uri = file_uri("proj1");
+    let main_uri = file_uri("proj1/main.ostrin");
+    let main_text = fs::read_to_string(example_path("proj1/main.ostrin")).unwrap();
+
+    // `physics/units.ostrin` is never opened here — the server must read it
+    // straight from disk (via the workspace root from `initialize`) to find
+    // `to_kelvin`'s declaration for a references/rename request.
+    let initialize = json!({
+        "jsonrpc":"2.0","id":1,"method":"initialize",
+        "params":{"rootUri":root_uri}
+    }).to_string();
+    let open_main = json!({
+        "jsonrpc":"2.0","method":"textDocument/didOpen",
+        "params":{"textDocument":{"uri":main_uri,"languageId":"ostrin","version":1,"text":main_text}}
+    }).to_string();
+    let references = json!({
+        "jsonrpc":"2.0","id":2,"method":"textDocument/references",
+        "params":{"textDocument":{"uri":main_uri},"position":{"line":5,"character":15},"context":{"includeDeclaration":true}}
+    }).to_string();
+    let rename = json!({
+        "jsonrpc":"2.0","id":3,"method":"textDocument/rename",
+        "params":{"textDocument":{"uri":main_uri},"position":{"line":5,"character":15},"newName":"to_kelvin_renamed"}
+    }).to_string();
+
+    let out = run_lsp(&[
+        &initialize,
+        r#"{"jsonrpc":"2.0","method":"initialized","params":{}}"#,
+        &open_main,
+        &references,
+        &rename,
+        r#"{"jsonrpc":"2.0","id":4,"method":"shutdown","params":null}"#,
+        r#"{"jsonrpc":"2.0","method":"exit","params":null}"#,
+    ]);
+    assert!(out.status.success(), "LSP exited unsuccessfully: {}", stderr(&out));
+    let text = stdout(&out);
+
+    let references_reply = extract_result(&text, 2);
+    let reference_count = references_reply.matches("\"range\"").count();
+    assert!(
+        reference_count >= 3,
+        "references should include occurrences from the never-opened units.ostrin: {references_reply}"
+    );
+    assert!(
+        references_reply.contains("units.ostrin"),
+        "references should point into the on-disk file that was never opened: {references_reply}"
+    );
+
+    let rename_reply = extract_result(&text, 3);
+    assert!(
+        rename_reply.contains("units.ostrin"),
+        "rename should also produce an edit for the on-disk declaration file: {rename_reply}"
+    );
+}
+
 fn extract_result(stream: &str, id: u64) -> String {
     let marker = format!("\"id\":{id},");
     let start = stream.find(&marker).unwrap_or_else(|| panic!("no reply for id {id} in: {stream}"));

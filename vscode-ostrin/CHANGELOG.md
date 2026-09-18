@@ -2,6 +2,12 @@
 
 All notable changes to the Ostrin VS Code extension are documented here.
 
+## [0.3.1] - 2026-09-17
+
+- Find-references and rename in the language server now also scan every
+  `.ostrin` file under the workspace root, not only the documents currently
+  open in the editor.
+
 ## [0.3.0] - 2026-09-17
 
 - Resolve a document's imports (and any `ostrin.toml` dependencies) across
