@@ -777,19 +777,6 @@ fn native_backend_compiles_and_runs_records() {
 }
 
 #[test]
-fn native_backend_rejects_operators_on_records() {
-    // `traits.ostrin` dispatches `+`/`==` on `Vector2` through `impl Add`/
-    // `impl Eq` — the native backend has no trait dispatch, so it must
-    // refuse rather than silently compiling `+`/`==` as raw pointer
-    // arithmetic/identity comparison (which would be a real correctness
-    // bug, not just a missing feature).
-    let out = run(&["--emit-c", &example_path("traits.ostrin")]);
-    assert!(!out.status.success(), "the native backend should refuse operators on records without trait dispatch");
-    let error = stderr(&out);
-    assert!(error.contains("operators on records"), "unexpected error: {error}");
-}
-
-#[test]
 fn native_backend_compiles_and_runs_record_methods() {
     // Static (compile-time-resolved) method dispatch: `Counter.increment`
     // mutates through a `mut self` receiver shared via the record's
@@ -1561,6 +1548,8 @@ fn native_backend_generic_records_and_enums_match_the_interpreter() {
         "generic_enum_dispatch.ostrin",
         "generic_nested_patterns.ostrin",
         "native_display.ostrin",
+        "native_derive.ostrin",
+        "traits.ostrin",
     ] {
         let interpreted = run(&["--run", &example_path(file)]);
         assert!(interpreted.status.success(), "interpreter failed on {file}: {}", stderr(&interpreted));

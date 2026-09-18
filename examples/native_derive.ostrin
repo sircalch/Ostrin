@@ -1,0 +1,33 @@
+record Version: Eq, Ord {
+    major: Int
+    minor: Int
+    tag: String
+}
+
+enum Color: Eq {
+    Red
+    Custom(Int, Int)
+}
+
+record Tagged: Eq {
+    color: Color
+    label: String
+}
+
+fn main() -> Void {
+    a = Version { major: 1, minor: 2, tag: "x" }
+    b = Version { major: 1, minor: 3, tag: "a" }
+    c = Version { major: 1, minor: 2, tag: "x" }
+    print(a == c)
+    print(a != b)
+    print(a < b)
+    print(b <= a)
+    print(a >= c)
+    print(Red == Red)
+    print(Custom(1, 2) == Custom(1, 2))
+    print(Custom(1, 2) != Custom(1, 3))
+    print(Red == Custom(0, 0))
+    t = Tagged { color: Custom(4, 5), label: "l" }
+    u = Tagged { color: Custom(4, 5), label: "l" }
+    print(t == u)
+}

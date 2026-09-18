@@ -2915,7 +2915,7 @@ pruebas**, sin warnings.
 - Orden de emisión en C: typedefs de todo, cuerpos de enums, cuerpos de
   records; los `List_*` se declaran (typedef) antes de los records.
 - Sigue fuera: métodos genéricos (`fn map<U>`), `print` de un enum, y el resto
-  de la lista del apartado 73. Suite: **94 pruebas**, sin warnings.
+  de la lista del apartado 73. Suite: **93 pruebas**, sin warnings.
 
 ---
 
@@ -2925,4 +2925,18 @@ pruebas**, sin warnings.
   usa un `ostrin_show_<Nombre>` generado bajo demanda, con el mismo formato que
   el intérprete: `Circle(radius: 1.5)`, `Rect(2, 3)`, `Dot`, `P { x: 1, name: a }`.
 - Sigue sin poder imprimirse `List`/`Option`/`Result`. Ejemplo nuevo
-  `native_display.ostrin`. Suite: **94 pruebas**, sin warnings.
+  `native_display.ostrin`. Suite: **93 pruebas**, sin warnings.
+
+---
+
+## 76. Operadores sobre records y enums en el backend nativo — 2026-09-18
+
+- Mismo orden que `eval_binary` del intérprete: primero el método del usuario
+  (`impl Add/Sub/Mul/Div` → `add`…, `impl Eq` → `equals`, `impl Ord` → `compare`),
+  luego `derive(Eq)` (estructural, campo a campo; enums: variante y campos) y
+  `derive(Ord)` (lexicográfico, solo records). Se generan `ostrin_eq_*`/
+  `ostrin_cmp_*` bajo demanda; `!=` niega `==`.
+- `Ordering` (`Less/Equal/Greater`) es ahora un enum real del backend, para que
+  un `compare` escrito a mano compile. `traits.ostrin` compila y coincide.
+- Ejemplo nuevo `native_derive.ostrin`; el test que exigía rechazar operadores
+  sobre records se eliminó. Sigue sin soporte: `==` sobre `List`/`Option`.

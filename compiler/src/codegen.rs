@@ -404,6 +404,10 @@ struct Codegen<'a> {
     expected: Option<CType>,
     /// Records/enums whose generated `ostrin_show_*` (used by `print`) is queued.
     show_queue: VecDeque<CType>,
+    /// `derive(Eq)`/`derive(Ord)` helpers queued: (is_compare, type).
+    op_queue: VecDeque<(bool, CType)>,
+    op_done: HashSet<(bool, String)>,
+    derives: HashMap<String, Vec<String>>,
     show_done: HashSet<String>,
     record_names: HashSet<String>,
     enum_names: HashSet<String>,
@@ -1607,11 +1611,150 @@ impl<'a> Codegen<'a> {
         (base == name).then(|| record_name.clone())
     }
 
+    fn has_derive(&self, type_name: &str, trait_name: &str) -> bool {
+        let base = self.instance_info.get(type_name).map(|(b, _)| b.as_str()).unwrap_or(type_name);
+        self.derives.get(base).is_some_and(|d| d.iter().any(|t| t == trait_name))
+    }
+
+    /// `==`/`<`/`+`... on a record or enum, dispatched like the interpreter's
+    /// `eval_binary`: the user's `impl Add`/`impl Eq` method first, then
+    /// `derive(Eq)`/`derive(Ord)`. (A hand-written `impl Ord` returns the
+    /// built-in `Ordering`, which this backend doesn't represent yet.)
+    fn gen_user_operator(&mut self, op: BinOp, lc: &str, lt: &CType, rc: &str, rt: &CType) -> Result<(String, CType), String> {
+        let (CType::Record(name) | CType::Enum(name)) = lt else { unreachable!() };
+        let method_name = match op {
+            BinOp::Add => Some("add"),
+            BinOp::Sub => Some("sub"),
+            BinOp::Mul => Some("mul"),
+            BinOp::Div => Some("div"),
+            BinOp::Eq | BinOp::NotEq => Some("equals"),
+            _ => None,
+        };
+        if let Some(method_name) = method_name {
+            if let Some(info) = self.methods.get(name).and_then(|m| m.get(method_name)) {
+                let (c_name, param_types, return_type) = (info.c_name.clone(), info.param_types.clone(), info.return_type.clone());
+                let arg = self.coerce(rc, rt, param_types.get(1).unwrap_or(rt))?;
+                let call = format!("{c_name}({lc}, {arg})");
+                return Ok(if op == BinOp::NotEq { (format!("(!{call})"), CType::Bool) } else { (call, return_type) });
+            }
+        }
+        if matches!(op, BinOp::Lt | BinOp::Gt | BinOp::LtEq | BinOp::GtEq) {
+            if let Some(info) = self.methods.get(name).and_then(|m| m.get("compare")) {
+                let (c_name, param_types) = (info.c_name.clone(), info.param_types.clone());
+                let arg = self.coerce(rc, rt, param_types.get(1).unwrap_or(rt))?;
+                let test = match op {
+                    BinOp::Lt => "== 0",
+                    BinOp::Gt => "== 2",
+                    BinOp::LtEq => "!= 2",
+                    _ => "!= 0",
+                };
+                return Ok((format!("({c_name}({lc}, {arg}).tag {test})"), CType::Bool));
+            }
+        }
+        match op {
+            BinOp::Eq | BinOp::NotEq if self.has_derive(name, "Eq") => {
+                let eq = self.eq_expr(lc, rc, lt)?;
+                Ok((if op == BinOp::Eq { eq } else { format!("(!{eq})") }, CType::Bool))
+            }
+            BinOp::Lt | BinOp::Gt | BinOp::LtEq | BinOp::GtEq if self.has_derive(name, "Ord") && matches!(lt, CType::Record(_)) => {
+                let cmp = self.cmp_expr(lc, rc, lt)?;
+                let c_op = match op {
+                    BinOp::Lt => "<",
+                    BinOp::Gt => ">",
+                    BinOp::LtEq => "<=",
+                    _ => ">=",
+                };
+                Ok((format!("({cmp} {c_op} 0)"), CType::Bool))
+            }
+            _ => Err(format!("'{name}' doesn't implement the trait needed for this operator (in a form the native backend supports)")),
+        }
+    }
+
+    /// A C boolean expression for `a == b` under the interpreter's rules.
+    fn eq_expr(&mut self, a: &str, b: &str, ty: &CType) -> Result<String, String> {
+        match ty {
+            CType::Int | CType::Float | CType::Bool => Ok(format!("(({a}) == ({b}))")),
+            CType::Str => Ok(format!("(strcmp({a}, {b}) == 0)")),
+            CType::Quantity(_) => Ok(format!("(ostrin_qty_cmp({a}, {b}) == 0)")),
+            CType::Record(n) | CType::Enum(n) => {
+                if let Some(info) = self.methods.get(n).and_then(|m| m.get("equals")) {
+                    return Ok(format!("{}({a}, {b})", info.c_name));
+                }
+                if !self.has_derive(n, "Eq") {
+                    return Err(format!("'{n}' has no 'equals' method or derive(Eq) for '=='"));
+                }
+                if self.op_done.insert((false, n.clone())) {
+                    self.op_queue.push_back((false, ty.clone()));
+                }
+                Ok(format!("ostrin_eq_{n}({a}, {b})"))
+            }
+            other => Err(format!("cannot compare values of type '{}' with '==' yet", c_type_name(other))),
+        }
+    }
+
+    /// A C `int` expression: negative, zero or positive, like `compare`.
+    fn cmp_expr(&mut self, a: &str, b: &str, ty: &CType) -> Result<String, String> {
+        match ty {
+            CType::Int | CType::Float | CType::Bool => Ok(format!("((({a}) < ({b})) ? -1 : ((({a}) > ({b})) ? 1 : 0))")),
+            CType::Str => Ok(format!("strcmp({a}, {b})")),
+            CType::Quantity(_) => Ok(format!("ostrin_qty_cmp({a}, {b})")),
+            CType::Record(n) if self.has_derive(n, "Ord") => {
+                if self.op_done.insert((true, n.clone())) {
+                    self.op_queue.push_back((true, ty.clone()));
+                }
+                Ok(format!("ostrin_cmp_{n}({a}, {b})"))
+            }
+            other => Err(format!("cannot order values of type '{}' (needs a record with derive(Ord))", c_type_name(other))),
+        }
+    }
+
+    /// Body of a generated `ostrin_eq_<T>` / `ostrin_cmp_<T>` helper.
+    fn gen_op_body(&mut self, is_compare: bool, ty: &CType) -> Result<String, String> {
+        let mut out = String::new();
+        match (is_compare, ty) {
+            (false, CType::Record(n)) => {
+                let mut terms = Vec::new();
+                for (f, fty) in self.record_fields(n).to_vec() {
+                    terms.push(self.eq_expr(&format!("a->{f}"), &format!("b->{f}"), &fty)?);
+                }
+                out.push_str(&format!("    return {};\n", if terms.is_empty() { "true".to_string() } else { terms.join(" && ") }));
+            }
+            (false, CType::Enum(n)) => {
+                let variants: Vec<VariantInfo> = match self.instance_variants.get(n) {
+                    Some(vs) => vs.clone(),
+                    None => self.variants.values().filter(|v| &v.enum_name == n).cloned().collect(),
+                };
+                out.push_str("    if (a.tag != b.tag) return false;\n");
+                for v in variants.iter().filter(|v| !v.fields.is_empty()) {
+                    let mut terms = Vec::new();
+                    for (f, fty) in &v.fields {
+                        terms.push(self.eq_expr(&format!("a.data.{}.{f}", v.name), &format!("b.data.{}.{f}", v.name), fty)?);
+                    }
+                    out.push_str(&format!("    if (a.tag == {}) return {};\n", v.tag, terms.join(" && ")));
+                }
+                out.push_str("    return true;\n");
+            }
+            (true, CType::Record(n)) => {
+                out.push_str("    int c;\n");
+                for (f, fty) in self.record_fields(n).to_vec() {
+                    let cmp = self.cmp_expr(&format!("a->{f}"), &format!("b->{f}"), &fty)?;
+                    out.push_str(&format!("    c = {cmp};\n    if (c != 0) return c;\n"));
+                }
+                out.push_str("    return 0;\n");
+            }
+            _ => unreachable!("only records and enums are queued"),
+        }
+        Ok(out)
+    }
+
     fn gen_binary(&mut self, op: BinOp, l: &Expr, r: &Expr) -> Result<(String, CType), String> {
         let (lc, lt) = self.gen_expr(l)?;
         let (rc, rt) = self.gen_expr(r)?;
         if matches!(lt, CType::Quantity(_)) || matches!(rt, CType::Quantity(_)) {
             return self.gen_quantity_binary(op, &lc, &lt, &rc, &rt);
+        }
+        if matches!(lt, CType::Record(_) | CType::Enum(_)) && !matches!(op, BinOp::And | BinOp::Or) {
+            return self.gen_user_operator(op, &lc, &lt, &rc, &rt);
         }
         if matches!(lt, CType::Record(_) | CType::Enum(_) | CType::DynTrait(_) | CType::List(_) | CType::Option(_) | CType::NoneLit | CType::Result(..) | CType::OkLit(_) | CType::ErrLit(_))
             || matches!(rt, CType::Record(_) | CType::Enum(_) | CType::DynTrait(_) | CType::List(_) | CType::Option(_) | CType::NoneLit | CType::Result(..) | CType::OkLit(_) | CType::ErrLit(_))
@@ -2389,9 +2532,31 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
             generic_variant_owner.insert(variant.name.clone(), name.clone());
         }
     }
+    let generic_derives: Vec<(String, Vec<String>)> = generic_records
+        .values()
+        .map(|r| (r.name.clone(), r.derives.clone()))
+        .chain(generic_enums.values().map(|e| (e.name.clone(), e.derives.clone())))
+        .collect();
     let generic_impls: Vec<&ImplDecl> = impls.iter().filter(|im| generic_arity.contains_key(&im.type_name)).copied().collect();
     let records: Vec<&RecordDecl> = records.into_iter().filter(|r| r.generics.is_empty()).collect();
     let enums: Vec<&EnumDecl> = enums.into_iter().filter(|e| e.generics.is_empty()).collect();
+    // `Ordering` is built into the language (the interpreter registers it
+    // itself), so it isn't among `items` — a hand-written `impl Ord`'s
+    // `compare` needs it as a real enum.
+    let ordering_decl = EnumDecl {
+        name: "Ordering".to_string(),
+        module_path: Vec::new(),
+        is_pub: true,
+        generics: Vec::new(),
+        derives: Vec::new(),
+        variants: ["Less", "Equal", "Greater"].iter().map(|n| VariantDecl { name: n.to_string(), fields: Vec::new() }).collect(),
+        span: Span::default(),
+        source_file: None,
+    };
+    let mut enums = enums;
+    if !enums.iter().any(|e| e.name == "Ordering") {
+        enums.push(&ordering_decl);
+    }
     let record_names: HashSet<String> = records.iter().map(|r| r.name.clone()).collect();
     let enum_names: HashSet<String> = enums.iter().map(|e| e.name.clone()).collect();
     let trait_names: HashSet<String> = traits.iter().map(|t| t.name.clone()).collect();
@@ -2427,6 +2592,9 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
         instance_variants: HashMap::new(),
         expected: None,
         show_queue: VecDeque::new(),
+        op_queue: VecDeque::new(),
+        op_done: HashSet::new(),
+        derives: records.iter().map(|r| (r.name.clone(), r.derives.clone())).chain(enums.iter().map(|e| (e.name.clone(), e.derives.clone()))).chain(generic_derives).collect(),
         show_done: HashSet::new(),
         record_names: record_names.clone(),
         enum_names: enum_names.clone(),
@@ -2673,6 +2841,19 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
                 list_helper_prototypes.push(format!("{signature};"));
                 bodies.push((signature, body));
             }
+        }
+        while let Some((is_compare, ty)) = codegen.op_queue.pop_front() {
+            progressed = true;
+            let name = match &ty {
+                CType::Record(n) | CType::Enum(n) => n.clone(),
+                _ => unreachable!(),
+            };
+            let (prefix, ret) = if is_compare { ("cmp", "int") } else { ("eq", "bool") };
+            let c = c_type_name(&ty);
+            let signature = format!("static {ret} ostrin_{prefix}_{name}({c} a, {c} b)");
+            let body = codegen.gen_op_body(is_compare, &ty)?;
+            list_helper_prototypes.push(format!("{signature};"));
+            bodies.push((signature, body));
         }
         while let Some(ty) = codegen.show_queue.pop_front() {
             progressed = true;
