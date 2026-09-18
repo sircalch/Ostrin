@@ -43,6 +43,7 @@
 //! `Value::EnumInstance` is itself deep-cloned on assignment in the
 //! interpreter, i.e. already a value type there.
 
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::ast::*;
@@ -97,6 +98,10 @@ enum CType {
     /// `NoneLit`, `coerce` completes it once an expected type is known.
     OkLit(Box<CType>),
     ErrLit(Box<CType>),
+    /// A bare variant of a generic enum (`Nothing`) with no payload to infer
+    /// `T` from: (enum base name, variant name). `coerce` completes it once
+    /// the expected instance is known.
+    GenLit(String, String),
 }
 
 fn c_type_name(ty: &CType) -> String {
@@ -111,7 +116,7 @@ fn c_type_name(ty: &CType) -> String {
         CType::DynTrait(name) => format!("{name}_Dyn"),
         CType::List(elem) => format!("{}*", list_struct_name(elem)),
         CType::Option(inner) => format!("Option_{}", mangle_ctype(inner)),
-        CType::NoneLit | CType::OkLit(_) | CType::ErrLit(_) => "int".to_string(),
+        CType::NoneLit | CType::OkLit(_) | CType::ErrLit(_) | CType::GenLit(..) => "int".to_string(),
         CType::Quantity(_) => "Qty".to_string(),
         CType::Result(t, e) => format!("Result_{}_{}", mangle_ctype(t), mangle_ctype(e)),
     }
@@ -133,6 +138,17 @@ struct NamedTypes<'a> {
     records: &'a HashSet<String>,
     enums: &'a HashSet<String>,
     traits: &'a HashSet<String>,
+    /// Generic record/enum name -> (is_enum, number of type parameters).
+    generics: &'a HashMap<String, (bool, usize)>,
+    /// Every concrete instantiation (`Score<Int>`) `map_type` resolves is
+    /// logged here — it has no `&mut self` — and registered by
+    /// `Codegen::flush_instances`.
+    seen: &'a RefCell<Vec<(String, Vec<CType>)>>,
+}
+
+/// The mangled name of one instantiation of a generic record/enum.
+fn instance_name(base: &str, args: &[CType]) -> String {
+    format!("{base}__{}", args.iter().map(mangle_ctype).collect::<Vec<_>>().join("_"))
 }
 
 /// Resolves a dimension expression (`Length`, `Length / Time`, `D`, ...) the
@@ -148,8 +164,24 @@ fn resolve_dimension(ty: &Type, subst: &HashMap<String, Dimension>) -> Dimension
 }
 
 fn map_type(ty: &Type, types: &NamedTypes) -> Result<CType, String> {
+    map_type_with_subst(ty, types, &HashMap::new())
+}
+
+/// Resolves a type, taking any name found in `subst` first. Used for two
+/// distinct things that turn out to be the same mechanism: a method's
+/// `self`/`Self` and a generic's own type parameters (a monomorphized
+/// function, or a generic record/enum's instantiation). Either way, every
+/// name in `subst` is already a concrete `CType` by the time this runs.
+fn map_type_with_subst(ty: &Type, types: &NamedTypes, subst: &HashMap<String, CType>) -> Result<CType, String> {
     match ty {
-        Type::Named(name, args) if name == "Quantity" && args.len() == 1 => Ok(CType::Quantity(resolve_dimension(&args[0], &HashMap::new()))),
+        Type::Named(name, args) if name == "Quantity" && args.len() == 1 => {
+            let dims: HashMap<String, Dimension> = subst
+                .iter()
+                .filter_map(|(k, v)| if let CType::Quantity(d) = v { Some((k.clone(), d.clone())) } else { None })
+                .collect();
+            Ok(CType::Quantity(resolve_dimension(&args[0], &dims)))
+        }
+        Type::Named(name, args) if args.is_empty() && subst.contains_key(name) => Ok(subst[name].clone()),
         Type::Named(name, args) if args.is_empty() => match name.as_str() {
             "Int" => Ok(CType::Int),
             "Float" => Ok(CType::Float),
@@ -160,11 +192,23 @@ fn map_type(ty: &Type, types: &NamedTypes) -> Result<CType, String> {
             other if types.enums.contains(other) => Ok(CType::Enum(other.to_string())),
             _ => Err(format!("type '{}' is not supported by the native backend yet", type_to_string(ty))),
         },
-        Type::Named(name, args) if name == "Result" && args.len() == 2 => {
-            Ok(CType::Result(Box::new(map_type(&args[0], types)?), Box::new(map_type(&args[1], types)?)))
+        Type::Named(name, args) if name == "Result" && args.len() == 2 => Ok(CType::Result(
+            Box::new(map_type_with_subst(&args[0], types, subst)?),
+            Box::new(map_type_with_subst(&args[1], types, subst)?),
+        )),
+        Type::Named(name, args) if name == "Option" && args.len() == 1 => {
+            Ok(CType::Option(Box::new(map_type_with_subst(&args[0], types, subst)?)))
         }
-        Type::Named(name, args) if name == "Option" && args.len() == 1 => Ok(CType::Option(Box::new(map_type(&args[0], types)?))),
-        Type::Named(name, args) if name == "List" && args.len() == 1 => Ok(CType::List(Box::new(map_type(&args[0], types)?))),
+        Type::Named(name, args) if name == "List" && args.len() == 1 => {
+            Ok(CType::List(Box::new(map_type_with_subst(&args[0], types, subst)?)))
+        }
+        Type::Named(name, args) if types.generics.get(name).is_some_and(|(_, arity)| *arity == args.len()) => {
+            let (is_enum, _) = types.generics[name];
+            let concrete = args.iter().map(|a| map_type_with_subst(a, types, subst)).collect::<Result<Vec<_>, _>>()?;
+            let mangled = instance_name(name, &concrete);
+            types.seen.borrow_mut().push((name.clone(), concrete));
+            Ok(if is_enum { CType::Enum(mangled) } else { CType::Record(mangled) })
+        }
         Type::Dyn(traits) => {
             if traits.len() != 1 {
                 return Err("'dyn A + B' (more than one trait) isn't supported by the native backend yet".to_string());
@@ -180,35 +224,6 @@ fn map_type(ty: &Type, types: &NamedTypes) -> Result<CType, String> {
         }
         _ => Err(format!("type '{}' is not supported by the native backend yet", type_to_string(ty))),
     }
-}
-
-/// Like `map_type`, but resolves a name found in `subst` before anything
-/// else. Used for two distinct things that turn out to be the same
-/// mechanism: a method's `self`/`Self` (`subst` holds just `"Self" ->
-/// Record(...)`), and a monomorphized generic function's own type
-/// parameters (`subst` holds one entry per `<T, U, ...>`, inferred at the
-/// call site — see `infer_generic_substitutions`). Either way, there is no
-/// dynamic dispatch or runtime type information anywhere in this backend:
-/// every name in `subst` is already a concrete `CType` by the time this
-/// runs, known once and for all at compile time.
-fn map_type_with_subst(ty: &Type, types: &NamedTypes, subst: &HashMap<String, CType>) -> Result<CType, String> {
-    if let Type::Named(name, args) = ty {
-        if name == "Quantity" && args.len() == 1 {
-            let dims: HashMap<String, Dimension> = subst
-                .iter()
-                .filter_map(|(k, v)| if let CType::Quantity(d) = v { Some((k.clone(), d.clone())) } else { None })
-                .collect();
-            return Ok(CType::Quantity(resolve_dimension(&args[0], &dims)));
-        }
-    }
-    if let Type::Named(name, args) = ty {
-        if args.is_empty() {
-            if let Some(concrete) = subst.get(name) {
-                return Ok(concrete.clone());
-            }
-        }
-    }
-    map_type(ty, types)
 }
 
 fn c_function_name(name: &str) -> String {
@@ -368,6 +383,25 @@ struct Codegen<'a> {
     pending_results: VecDeque<(CType, CType)>,
     current_return: Vec<CType>,
     lambda_depth: usize,
+    /// Generic records/enums (`Score<T>`, `Maybe<T>`): only their concrete
+    /// instantiations, discovered on demand, are ever emitted.
+    generic_records: HashMap<String, &'a RecordDecl>,
+    generic_enums: HashMap<String, &'a EnumDecl>,
+    generic_arity: HashMap<String, (bool, usize)>,
+    generic_impls: Vec<&'a ImplDecl>,
+    /// Variant name -> the generic enum declaring it.
+    generic_variant_owner: HashMap<String, String>,
+    seen_instances: RefCell<Vec<(String, Vec<CType>)>>,
+    instances_done: HashSet<String>,
+    /// Mangled instance name -> (generic base name, concrete type arguments).
+    instance_info: HashMap<String, (String, Vec<CType>)>,
+    /// Instances in discovery order (arguments always precede the instance
+    /// that contains them): (is_enum, mangled name).
+    instance_order: Vec<(bool, String)>,
+    instance_variants: HashMap<String, Vec<VariantInfo>>,
+    /// The type the enclosing context expects the next expression to have;
+    /// consumed by `gen_expr` and used to complete generic literals.
+    expected: Option<CType>,
     record_names: HashSet<String>,
     enum_names: HashSet<String>,
     scopes: Vec<HashMap<String, CType>>,
@@ -398,6 +432,7 @@ fn mangle_ctype(ty: &CType) -> String {
         CType::List(elem) => format!("List_{}", mangle_ctype(elem)),
         CType::Option(inner) => format!("Option_{}", mangle_ctype(inner)),
         CType::NoneLit => "None".to_string(),
+        CType::GenLit(base, variant) => format!("Lit_{base}_{variant}"),
         CType::Quantity(d) => format!("Q_{}", dim_to_string(d).chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '_' }).collect::<String>()),
         CType::OkLit(t) => format!("Ok_{}", mangle_ctype(t)),
         CType::ErrLit(t) => format!("Err_{}", mangle_ctype(t)),
@@ -407,7 +442,312 @@ fn mangle_ctype(ty: &CType) -> String {
 
 impl<'a> Codegen<'a> {
     fn named_types(&self) -> NamedTypes<'_> {
-        NamedTypes { records: &self.record_names, enums: &self.enum_names, traits: &self.trait_names }
+        NamedTypes {
+            records: &self.record_names,
+            enums: &self.enum_names,
+            traits: &self.trait_names,
+            generics: &self.generic_arity,
+            seen: &self.seen_instances,
+        }
+    }
+
+    /// Registers every generic instantiation `map_type` has logged since the
+    /// last call: its fields/variants, and the methods of every `impl` that
+    /// applies to it (queued like any other monomorphized function).
+    fn flush_instances(&mut self) -> Result<(), String> {
+        loop {
+            let batch: Vec<(String, Vec<CType>)> = self.seen_instances.borrow_mut().drain(..).collect();
+            if batch.is_empty() {
+                return Ok(());
+            }
+            for (base, args) in batch {
+                self.register_instance(&base, &args)?;
+            }
+        }
+    }
+
+    fn register_instance(&mut self, base: &str, args: &[CType]) -> Result<(), String> {
+        let mangled = instance_name(base, args);
+        if !self.instances_done.insert(mangled.clone()) {
+            return Ok(());
+        }
+        self.instance_info.insert(mangled.clone(), (base.to_string(), args.to_vec()));
+        let (is_enum, _) = self.generic_arity[base];
+        let generics: Vec<String> = if is_enum {
+            self.generic_enums[base].generics.iter().map(|g| g.name.clone()).collect()
+        } else {
+            self.generic_records[base].generics.iter().map(|g| g.name.clone()).collect()
+        };
+        let subst: HashMap<String, CType> = generics.iter().cloned().zip(args.iter().cloned()).collect();
+        let self_ty;
+        if is_enum {
+            let decl = self.generic_enums[base];
+            let mut infos = Vec::new();
+            for (tag, variant) in decl.variants.iter().enumerate() {
+                let mut fields = Vec::new();
+                for (index, field) in variant.fields.iter().enumerate() {
+                    let field_name = field.name.clone().unwrap_or_else(|| format!("f{index}"));
+                    let ty = map_type_with_subst(&field.ty, &self.named_types(), &subst)?;
+                    self.register_list_types(&ty);
+                    fields.push((field_name, ty));
+                }
+                infos.push(VariantInfo { enum_name: mangled.clone(), name: variant.name.clone(), tag, fields });
+            }
+            self.instance_variants.insert(mangled.clone(), infos);
+            self.enum_names.insert(mangled.clone());
+            self_ty = CType::Enum(mangled.clone());
+        } else {
+            let decl = self.generic_records[base];
+            let mut fields = Vec::new();
+            for field in &decl.fields {
+                let ty = map_type_with_subst(&field.ty, &self.named_types(), &subst)?;
+                self.register_list_types(&ty);
+                fields.push((field.name.clone(), ty));
+            }
+            self.records.insert(mangled.clone(), fields);
+            self.record_names.insert(mangled.clone());
+            self_ty = CType::Record(mangled.clone());
+        }
+        self.instance_order.push((is_enum, mangled.clone()));
+
+        let impls: Vec<&'a ImplDecl> = self.generic_impls.iter().copied().filter(|im| im.type_name == base).collect();
+        for im in impls {
+            if im.type_args.len() != args.len() {
+                continue;
+            }
+            let impl_generics: Vec<&str> = im.generics.iter().map(|g| g.name.as_str()).collect();
+            let mut binds: HashMap<String, CType> = HashMap::new();
+            let mut matches = true;
+            for (ty, arg) in im.type_args.iter().zip(args) {
+                match ty {
+                    Type::Named(n, a) if a.is_empty() && impl_generics.contains(&n.as_str()) => {
+                        if binds.get(n).is_some_and(|prev| prev != arg) {
+                            matches = false;
+                        }
+                        binds.insert(n.clone(), arg.clone());
+                    }
+                    other => match map_type(other, &self.named_types()) {
+                        Ok(concrete) if &concrete == arg => {}
+                        _ => matches = false,
+                    },
+                }
+            }
+            if !matches {
+                continue;
+            }
+            binds.insert("Self".to_string(), self_ty.clone());
+            for method in &im.methods {
+                if !method.generics.is_empty() {
+                    continue;
+                }
+                let param_types: Result<Vec<CType>, String> =
+                    method.params.iter().map(|p| map_type_with_subst(&p.ty, &self.named_types(), &binds)).collect();
+                let Ok(param_types) = param_types else { continue };
+                let Ok(return_type) = map_type_with_subst(&method.return_type, &self.named_types(), &binds) else { continue };
+                for ty in param_types.iter().chain(std::iter::once(&return_type)) {
+                    self.register_list_types(ty);
+                }
+                let c_name = format!("{mangled}__{}", method.name);
+                self.methods.entry(mangled.clone()).or_default().insert(
+                    method.name.clone(),
+                    MethodInfo {
+                        decl: method,
+                        param_types: param_types.clone(),
+                        return_type: return_type.clone(),
+                        c_name: c_name.clone(),
+                        self_ty: self_ty.clone(),
+                    },
+                );
+                self.pending.push_back(PendingInstance { c_name, decl: method, subst: binds.clone(), param_types, return_type });
+            }
+        }
+        Ok(())
+    }
+
+
+    /// Infers `<T, U, ...>` from an explicit `<...>` list and/or the concrete
+    /// types of the arguments at this call site — never from the return
+    /// type, which this backend can't know ahead of time.
+    fn infer_generic_substitutions(&self, decl: &FunctionDecl, explicit: Option<&[Type]>, arg_types: &[CType]) -> Result<HashMap<String, CType>, String> {
+        let generic_names: Vec<String> = decl.generics.iter().map(|g| g.name.clone()).collect();
+        let mut subst: HashMap<String, CType> = HashMap::new();
+        if let Some(types) = explicit {
+            for (generic, ty) in decl.generics.iter().zip(types) {
+                let concrete = match map_type(ty, &self.named_types()) {
+                    Ok(concrete) => concrete,
+                    Err(error) if generic.bounds.iter().any(|b| b == "Dimension") => {
+                        let _ = error;
+                        CType::Quantity(resolve_dimension(ty, &HashMap::new()))
+                    }
+                    Err(error) => return Err(error),
+                };
+                subst.insert(generic.name.clone(), concrete);
+            }
+        }
+        for (param, arg_ty) in decl.params.iter().zip(arg_types) {
+            self.bind_type(&param.ty, arg_ty, &generic_names, &mut subst, &decl.name)?;
+        }
+        for generic in &decl.generics {
+            if !subst.contains_key(&generic.name) {
+                return Err(format!(
+                    "cannot infer generic parameter '{}' of function '{}' from its arguments (only used in the return type, \
+                     or bound only by a literal like 'None'; write it explicitly, e.g. '{}<Int>(...)')",
+                    generic.name, decl.name, decl.name
+                ));
+            }
+        }
+        Ok(subst)
+    }
+
+    /// The instantiation `base<args...>` as a `CType`, registered right away.
+    fn instance_type(&mut self, base: &str, args: Vec<CType>) -> Result<CType, String> {
+        let (is_enum, _) = self.generic_arity[base];
+        let mangled = instance_name(base, &args);
+        self.seen_instances.borrow_mut().push((base.to_string(), args));
+        self.flush_instances()?;
+        Ok(if is_enum { CType::Enum(mangled) } else { CType::Record(mangled) })
+    }
+
+    /// Binds the type parameters in `generics` by walking a declared type
+    /// against the concrete type an expression actually produced.
+    fn bind_type(&self, ty: &Type, actual: &CType, generics: &[String], subst: &mut HashMap<String, CType>, owner: &str) -> Result<(), String> {
+        if matches!(actual, CType::NoneLit | CType::OkLit(_) | CType::ErrLit(_) | CType::GenLit(..)) {
+            return Ok(());
+        }
+        match (ty, actual) {
+            (Type::Named(q, qargs), CType::Quantity(_)) if q == "Quantity" && qargs.len() == 1 => {
+                if let Type::Named(d, dargs) = &qargs[0] {
+                    if dargs.is_empty() && generics.contains(d) {
+                        subst.entry(d.clone()).or_insert_with(|| actual.clone());
+                    }
+                }
+                Ok(())
+            }
+            (Type::Named(name, args), _) if args.is_empty() && generics.contains(name) => match subst.get(name) {
+                Some(existing) if existing != actual => Err(format!(
+                    "generic parameter '{name}' of '{owner}' would need to be both '{}' and '{}' for these arguments",
+                    mangle_ctype(existing),
+                    mangle_ctype(actual)
+                )),
+                Some(_) => Ok(()),
+                None => {
+                    subst.insert(name.clone(), actual.clone());
+                    Ok(())
+                }
+            },
+            (Type::Named(n, args), CType::List(elem)) if n == "List" && args.len() == 1 => self.bind_type(&args[0], elem, generics, subst, owner),
+            (Type::Named(n, args), CType::Option(inner)) if n == "Option" && args.len() == 1 => self.bind_type(&args[0], inner, generics, subst, owner),
+            (Type::Named(n, args), CType::Result(ok, err)) if n == "Result" && args.len() == 2 => {
+                self.bind_type(&args[0], ok, generics, subst, owner)?;
+                self.bind_type(&args[1], err, generics, subst, owner)
+            }
+            (Type::Named(n, args), CType::Record(inst) | CType::Enum(inst)) => {
+                if let Some((base, inst_args)) = self.instance_info.get(inst) {
+                    if base == n && inst_args.len() == args.len() {
+                        for (a, c) in args.iter().zip(inst_args) {
+                            self.bind_type(a, c, generics, subst, owner)?;
+                        }
+                    }
+                }
+                Ok(())
+            }
+            _ => Ok(()),
+        }
+    }
+
+    /// The type arguments already known for a generic record/enum: an
+    /// explicit `<...>` list, else the expected type's own arguments.
+    fn seed_instance_subst(&self, base: &str, generics: &[String], explicit: Option<&[Type]>, hint: Option<&CType>) -> Result<HashMap<String, CType>, String> {
+        let mut subst = HashMap::new();
+        if let Some(types) = explicit {
+            for (g, t) in generics.iter().zip(types) {
+                subst.insert(g.clone(), map_type(t, &self.named_types())?);
+            }
+        } else if let Some(CType::Enum(inst) | CType::Record(inst)) = hint {
+            if let Some((b, inst_args)) = self.instance_info.get(inst) {
+                if b == base {
+                    for (g, a) in generics.iter().zip(inst_args) {
+                        subst.insert(g.clone(), a.clone());
+                    }
+                }
+            }
+        }
+        Ok(subst)
+    }
+
+    /// `Just(9)`, `Item<Int>(1)`, bare `Nothing`: a generic enum's variant.
+    fn gen_generic_variant(&mut self, name: &str, explicit: Option<&[Type]>, args: &[Arg], hint: Option<CType>) -> Result<(String, CType), String> {
+        self.flush_instances()?;
+        let base = self.generic_variant_owner[name].clone();
+        let decl: &'a EnumDecl = self.generic_enums[&base];
+        let generics: Vec<String> = decl.generics.iter().map(|g| g.name.clone()).collect();
+        let variant_decl = decl.variants.iter().find(|v| v.name == name).expect("variant owner");
+        let field_names: Vec<String> =
+            variant_decl.fields.iter().enumerate().map(|(i, f)| f.name.clone().unwrap_or_else(|| format!("f{i}"))).collect();
+        let exprs = arrange_args(&field_names, name, args)?;
+        let mut subst = self.seed_instance_subst(&base, &generics, explicit, hint.as_ref())?;
+        let mut values: Vec<(String, CType)> = Vec::new();
+        for (field, expr) in variant_decl.fields.iter().zip(&exprs) {
+            let field_hint = map_type_with_subst(&field.ty, &self.named_types(), &subst).ok();
+            let (code, ty) = self.gen_expr_hint(expr, field_hint)?;
+            self.bind_type(&field.ty, &ty, &generics, &mut subst, &base)?;
+            values.push((code, ty));
+        }
+        if generics.iter().any(|g| !subst.contains_key(g)) {
+            if args.is_empty() {
+                return Ok(("0".to_string(), CType::GenLit(base, name.to_string())));
+            }
+            return Err(format!("cannot infer the type parameters of '{name}' here; annotate it (e.g. '{name}<Int>(...)')"));
+        }
+        let inst_args: Vec<CType> = generics.iter().map(|g| subst[g].clone()).collect();
+        let CType::Enum(inst) = self.instance_type(&base, inst_args)? else { unreachable!() };
+        let info = self.instance_variants[&inst].iter().find(|v| v.name == name).cloned().expect("variant registered");
+        let mut codes = Vec::new();
+        for ((code, ty), (_, field_ty)) in values.iter().zip(&info.fields) {
+            codes.push(self.coerce(code, ty, field_ty)?);
+        }
+        self.gen_variant_construct(&info, &codes)
+    }
+
+    /// `Pair { first: 4, second: 8 }` / `Score<Int> { ... }`.
+    fn gen_generic_record_literal(&mut self, base: &str, explicit: Option<&[Type]>, fields: &[(String, Expr)], hint: Option<CType>) -> Result<(String, CType), String> {
+        self.flush_instances()?;
+        let decl: &'a RecordDecl = self.generic_records[base];
+        let generics: Vec<String> = decl.generics.iter().map(|g| g.name.clone()).collect();
+        let mut subst = self.seed_instance_subst(base, &generics, explicit, hint.as_ref())?;
+        let mut values: Vec<(String, String, CType)> = Vec::new();
+        for (field_name, expr) in fields {
+            let Some(field) = decl.fields.iter().find(|f| &f.name == field_name) else {
+                return Err(format!("record '{base}' has no field '{field_name}'"));
+            };
+            let field_hint = map_type_with_subst(&field.ty, &self.named_types(), &subst).ok();
+            let (code, ty) = self.gen_expr_hint(expr, field_hint)?;
+            self.bind_type(&field.ty, &ty, &generics, &mut subst, base)?;
+            values.push((field_name.clone(), code, ty));
+        }
+        if let Some(missing) = generics.iter().find(|g| !subst.contains_key(*g)) {
+            return Err(format!("cannot infer type parameter '{missing}' of record '{base}' here; write '{base}<...> {{ ... }}'"));
+        }
+        let inst_args: Vec<CType> = generics.iter().map(|g| subst[g].clone()).collect();
+        let CType::Record(inst) = self.instance_type(base, inst_args)? else { unreachable!() };
+        let temp = self.next_temp();
+        let mut body = format!(
+            "{inst}* {temp} = ({inst}*)malloc(sizeof({inst})); \
+             if (!{temp}) {{ fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); }} "
+        );
+        for (field_name, code, ty) in values {
+            let field_ty = self.field_type(&inst, &field_name).expect("field checked above");
+            let code = self.coerce(&code, &ty, &field_ty)?;
+            body.push_str(&format!("{temp}->{field_name} = {code}; "));
+        }
+        Ok((format!("({{ {body} {temp}; }})"), CType::Record(inst)))
+    }
+
+    fn gen_expr_hint(&mut self, expr: &Expr, hint: Option<CType>) -> Result<(String, CType), String> {
+        self.expected = hint;
+        let result = self.gen_expr(expr);
+        self.expected = None;
+        result
     }
 
     /// Converts a value from `from` to `to` where they differ — today the
@@ -430,6 +770,14 @@ impl<'a> Codegen<'a> {
         if let (CType::ErrLit(_), CType::Result(..)) = (from, to) {
             self.register_list_types(to);
             return Ok(format!("(({}){{ .ok = false, .error = {code} }})", c_type_name(to)));
+        }
+        if let (CType::GenLit(base, variant), CType::Enum(inst)) = (from, to) {
+            self.flush_instances()?;
+            if self.instance_info.get(inst).is_some_and(|(b, _)| b == base) {
+                if let Some(info) = self.instance_variants.get(inst).and_then(|vs| vs.iter().find(|v| &v.name == variant)) {
+                    return Ok(format!("(({inst}){{ .tag = {} }})", info.tag));
+                }
+            }
         }
         let (CType::Record(record_name), CType::DynTrait(trait_name)) = (from, to) else {
             return Err(format!("cannot use a value of type '{}' where '{}' was expected", c_type_name(from), c_type_name(to)));
@@ -558,12 +906,13 @@ impl<'a> Codegen<'a> {
             let ty = map_type_with_subst(&param.ty, &self.named_types(), subst)?;
             self.define(&param.name, ty);
         }
+        self.flush_instances()?;
         for stmt in &body.stmts {
             self.gen_stmt(&stmt.stmt, out)?;
         }
         match &body.tail {
             Some(e) => {
-                let (code, ty) = self.gen_expr(e)?;
+                let (code, ty) = self.gen_expr_hint(e, Some(return_type.clone()))?;
                 if *return_type == CType::Void {
                     out.push_str(&format!("    {code};\n    return;\n"));
                 } else {
@@ -624,7 +973,10 @@ impl<'a> Codegen<'a> {
                 };
                 let (code, actual_ty) = match (&expected_elem, value.unlocated()) {
                     (Some(elem), Expr::ListLiteral(items)) => self.gen_list_literal(items, Some(elem))?,
-                    _ => self.gen_expr(value)?,
+                    _ => {
+                        let hint = declared.as_ref().and_then(|t| map_type(t, &self.named_types()).ok());
+                        self.gen_expr_hint(value, hint)?
+                    }
                 };
                 // An explicit `name: dyn Trait = ConcreteRecord { ... }`
                 // needs boxing right here — with no annotation, `ty` is
@@ -642,7 +994,12 @@ impl<'a> Codegen<'a> {
                 self.define(name, final_ty);
             }
             Stmt::Assign { name, value } => {
-                let (code, ty) = self.gen_expr(value)?;
+                let existing = self.lookup(name);
+                let (code, ty) = self.gen_expr_hint(value, existing.clone())?;
+                let (code, ty) = match existing {
+                    Some(existing_ty) => (self.coerce(&code, &ty, &existing_ty)?, existing_ty),
+                    None => (code, ty),
+                };
                 // Ostrin has no `let` keyword: `name = value` without `mut`
                 // parses as `Stmt::Assign` whether `name` already exists
                 // (a plain reassignment) or not (an implicit new immutable
@@ -659,7 +1016,8 @@ impl<'a> Codegen<'a> {
             }
             Stmt::Return(value) => match value {
                 Some(e) => {
-                    let (code, ty) = self.gen_expr(e)?;
+                    let hint = self.current_return.last().cloned();
+                    let (code, ty) = self.gen_expr_hint(e, hint)?;
                     let code = match self.current_return.last().cloned() {
                         Some(expected) => self.coerce(&code, &ty, &expected)?,
                         None => code,
@@ -695,7 +1053,9 @@ impl<'a> Codegen<'a> {
                 if self.field_type(record_name, field_name).is_none() {
                     return Err(format!("record '{record_name}' has no field '{field_name}'"));
                 }
-                let (value_code, _) = self.gen_expr(value)?;
+                let field_ty = self.field_type(record_name, field_name).expect("checked above");
+                let (value_code, value_ty) = self.gen_expr_hint(value, Some(field_ty.clone()))?;
+                let value_code = self.coerce(&value_code, &value_ty, &field_ty)?;
                 out.push_str(&format!("    {obj_code}->{field_name} = {value_code};\n"));
             }
             Stmt::Expr(e) => {
@@ -766,7 +1126,17 @@ impl<'a> Codegen<'a> {
         Ok(())
     }
 
+    /// Every expression is generated through here so that any generic
+    /// instantiation its type mentions is registered before a parent looks
+    /// up its fields, variants or methods.
     fn gen_expr(&mut self, expr: &Expr) -> Result<(String, CType), String> {
+        let hint = self.expected.take();
+        let result = self.gen_expr_inner(expr, hint)?;
+        self.flush_instances()?;
+        Ok(result)
+    }
+
+    fn gen_expr_inner(&mut self, expr: &Expr, hint: Option<CType>) -> Result<(String, CType), String> {
         match expr.unlocated() {
             Expr::IntLiteral(v) => Ok((format!("INT64_C({v})"), CType::Int)),
             Expr::FloatLiteral(v) => Ok((format!("{v}"), CType::Float)),
@@ -779,6 +1149,9 @@ impl<'a> Codegen<'a> {
                 // A unit variant (`None`, or any fieldless variant of a
                 // user enum) reads as a bare identifier, never a call — see
                 // `Expr::Ident` in `eval_expr`, `interpreter/mod.rs`.
+                if self.generic_variant_owner.contains_key(name) {
+                    return self.gen_generic_variant(name, None, &[], hint);
+                }
                 if let Some(variant) = self.variants.get(name).cloned() {
                     if !variant.fields.is_empty() {
                         return Err(format!("variant '{name}' has fields; construct it as '{name}(...)'"));
@@ -805,7 +1178,15 @@ impl<'a> Codegen<'a> {
                 }
             }
             Expr::Binary(op, l, r) => self.gen_binary(*op, l, r),
-            Expr::Call(callee, args) => self.gen_call(callee, args),
+            Expr::Call(callee, args) => self.gen_call(callee, None, args, hint),
+            Expr::GenericCall(callee, type_args, args) => self.gen_call(callee, Some(type_args), args, hint),
+            Expr::GenericRecordLiteral(name, type_args, fields) => {
+                if self.generic_records.contains_key(name) {
+                    self.gen_generic_record_literal(name, Some(type_args), fields, hint)
+                } else {
+                    Err(format!("'{name}' isn't a generic record the native backend can compile"))
+                }
+            }
             Expr::FieldAccess(obj, field_name) => {
                 let (obj_code, obj_ty) = self.gen_expr(obj)?;
                 let CType::Record(record_name) = &obj_ty else {
@@ -815,6 +1196,9 @@ impl<'a> Codegen<'a> {
                     .field_type(record_name, field_name)
                     .ok_or_else(|| format!("record '{record_name}' has no field '{field_name}'"))?;
                 Ok((format!("{obj_code}->{field_name}"), field_ty))
+            }
+            Expr::RecordLiteral(name, fields) if self.generic_records.contains_key(name) => {
+                self.gen_generic_record_literal(name, None, fields, hint)
             }
             Expr::RecordLiteral(name, fields) => self.gen_record_literal(name, fields),
             Expr::If(cond, then_b, else_b) => {
@@ -978,7 +1362,9 @@ impl<'a> Codegen<'a> {
             if self.field_type(name, field_name).is_none() {
                 return Err(format!("record '{name}' has no field '{field_name}'"));
             }
-            let (value_code, _) = self.gen_expr(value_expr)?;
+            let field_ty = self.field_type(name, field_name).expect("checked above");
+            let (value_code, value_ty) = self.gen_expr_hint(value_expr, Some(field_ty.clone()))?;
+            let value_code = self.coerce(&value_code, &value_ty, &field_ty)?;
             body.push_str(&format!("{temp}->{field_name} = {value_code}; "));
         }
         Ok((format!("({{ {body} {temp}; }})"), CType::Record(name.to_string())))
@@ -1126,6 +1512,23 @@ impl<'a> Codegen<'a> {
                     _ => Err("only 'Some(name)' / 'Some(_)' patterns are supported by the native backend yet".to_string()),
                 }
             }
+            Pattern::Ident(name) if self.variant_for_pattern(name, scrutinee_ty).is_some_and(|v| v.fields.is_empty()) => {
+                let variant = self.variant_for_pattern(name, scrutinee_ty).expect("checked by the guard");
+                condition.push_str(&format!(" && ({scrutinee_var}.tag == {})", variant.tag));
+                Ok(())
+            }
+            Pattern::Variant(name, fields) if self.record_pattern_target(name, scrutinee_ty).is_some() => {
+                let record_name = self.record_pattern_target(name, scrutinee_ty).expect("checked by the guard");
+                let declared = self.record_fields(&record_name).to_vec();
+                for (position, (field_name, sub_pattern)) in fields.iter().enumerate() {
+                    let resolved = declared.iter().find(|(n, _)| n == field_name).or_else(|| declared.get(position)).cloned();
+                    let Some((actual_name, field_ty)) = resolved else {
+                        return Err(format!("record '{name}' has no field matching '{field_name}'"));
+                    };
+                    self.gen_pattern(sub_pattern, &format!("{scrutinee_var}->{actual_name}"), &field_ty, condition, bindings)?;
+                }
+                Ok(())
+            }
             Pattern::Ident(name) => {
                 bindings.push_str(&format!("{} {} = {}; ", c_type_name(scrutinee_ty), name, scrutinee_var));
                 self.define(name, scrutinee_ty.clone());
@@ -1152,7 +1555,7 @@ impl<'a> Codegen<'a> {
                 Ok(())
             }
             Pattern::Variant(name, fields) => {
-                let Some(variant) = self.variants.get(name).cloned() else {
+                let Some(variant) = self.variant_for_pattern(name, scrutinee_ty) else {
                     return Err(format!("unknown variant '{name}' in a match pattern"));
                 };
                 condition.push_str(&format!(" && ({scrutinee_var}.tag == {})", variant.tag));
@@ -1173,29 +1576,32 @@ impl<'a> Codegen<'a> {
                     let Some((actual_field_name, field_ty)) = resolved else {
                         return Err(format!("variant '{name}' has no field matching '{field_name}'"));
                     };
-                    match sub_pattern {
-                        Pattern::Wildcard => {}
-                        Pattern::Ident(binding_name) => {
-                            bindings.push_str(&format!(
-                                "{} {} = {}.data.{}.{}; ",
-                                c_type_name(&field_ty),
-                                binding_name,
-                                scrutinee_var,
-                                variant.name,
-                                actual_field_name
-                            ));
-                            self.define(binding_name, field_ty);
-                        }
-                        _ => {
-                            return Err(
-                                "nested patterns inside a variant's fields aren't supported by the native backend yet".to_string()
-                            );
-                        }
-                    }
+                    let field_path = format!("{scrutinee_var}.data.{}.{actual_field_name}", variant.name);
+                    self.gen_pattern(sub_pattern, &field_path, &field_ty, condition, bindings)?;
                 }
                 Ok(())
             }
         }
+    }
+
+    /// The variant a pattern's name refers to: for a generic enum's
+    /// instance, that instance's own variants; otherwise the flat table.
+    fn variant_for_pattern(&self, name: &str, scrutinee_ty: &CType) -> Option<VariantInfo> {
+        if let CType::Enum(enum_name) = scrutinee_ty {
+            if let Some(variants) = self.instance_variants.get(enum_name) {
+                return variants.iter().find(|v| v.name == name).cloned();
+            }
+            return self.variants.get(name).filter(|v| &v.enum_name == enum_name).cloned();
+        }
+        None
+    }
+
+    /// `Pair(first: x, second: _)` destructures a record: returns the record
+    /// type name if `name` is the scrutinee record's own (or its generic base's) name.
+    fn record_pattern_target(&self, name: &str, scrutinee_ty: &CType) -> Option<String> {
+        let CType::Record(record_name) = scrutinee_ty else { return None };
+        let base = self.instance_info.get(record_name).map(|(b, _)| b.as_str()).unwrap_or(record_name.as_str());
+        (base == name).then(|| record_name.clone())
     }
 
     fn gen_binary(&mut self, op: BinOp, l: &Expr, r: &Expr) -> Result<(String, CType), String> {
@@ -1320,30 +1726,39 @@ impl<'a> Codegen<'a> {
         }
     }
 
-    fn gen_call(&mut self, callee: &Expr, args: &[Arg]) -> Result<(String, CType), String> {
+    fn gen_call(&mut self, callee: &Expr, type_args: Option<&[Type]>, args: &[Arg], hint: Option<CType>) -> Result<(String, CType), String> {
         match callee.unlocated() {
-            Expr::Ident(name) => self.gen_function_call(name, args),
+            Expr::Ident(name) => self.gen_function_call(name, type_args, args, hint),
             Expr::FieldAccess(obj, method_name) => self.gen_method_call(obj, method_name, args),
             _ => Err("only a direct function call or 'record.method(...)' is supported by the native backend yet".to_string()),
         }
     }
 
     fn gen_args(&mut self, args: &[Arg]) -> Result<(Vec<String>, Vec<CType>), String> {
+        self.gen_args_hinted(args, &[])
+    }
+
+    /// Like `gen_args`, but each argument is generated knowing the type its
+    /// parameter expects (see `Codegen::expected`).
+    fn gen_args_hinted(&mut self, args: &[Arg], hints: &[CType]) -> Result<(Vec<String>, Vec<CType>), String> {
         let mut codes = Vec::new();
         let mut types = Vec::new();
-        for arg in args {
+        for (index, arg) in args.iter().enumerate() {
             let expr = match arg {
                 Arg::Positional(e) => e,
                 Arg::Named(_, _) => return Err("named arguments aren't supported by the native backend yet".to_string()),
             };
-            let (code, ty) = self.gen_expr(expr)?;
+            let (code, ty) = self.gen_expr_hint(expr, hints.get(index).cloned())?;
             codes.push(code);
             types.push(ty);
         }
         Ok((codes, types))
     }
 
-    fn gen_function_call(&mut self, name: &str, args: &[Arg]) -> Result<(String, CType), String> {
+    fn gen_function_call(&mut self, name: &str, type_args: Option<&[Type]>, args: &[Arg], hint: Option<CType>) -> Result<(String, CType), String> {
+        if self.generic_variant_owner.contains_key(name) {
+            return self.gen_generic_variant(name, type_args, args, hint);
+        }
         if let Some(variant) = self.variants.get(name).cloned() {
             let arg_codes = self.gen_variant_args(&variant, args)?;
             return self.gen_variant_construct(&variant, &arg_codes);
@@ -1359,12 +1774,13 @@ impl<'a> Codegen<'a> {
             self.register_list_types(&ty);
             return Ok((format!("(({}){{ .has = true, .value = {} }})", c_type_name(&ty), codes[0]), ty));
         }
-        let (arg_codes, arg_types) = self.gen_args(args)?;
+        let hints = self.signatures.get(name).map(|(params, _)| params.clone()).unwrap_or_default();
+        let (arg_codes, arg_types) = self.gen_args_hinted(args, &hints)?;
         if name == "print" {
             return self.gen_print(&arg_codes, &arg_types);
         }
         if let Some(decl) = self.generic_functions.get(name).copied() {
-            return self.gen_generic_call(decl, &arg_codes, &arg_types);
+            return self.gen_generic_call(decl, type_args, &arg_codes, &arg_types);
         }
         let Some((param_types, return_type)) = self.signatures.get(name).cloned() else {
             return Err(format!("unknown function '{name}' (the native backend only sees other top-level 'fn' declarations)"));
@@ -1389,11 +1805,11 @@ impl<'a> Codegen<'a> {
     /// `typeck`, which already proved this call sound). Monomorphizes on
     /// first use of a given (function, concrete types) pair and reuses the
     /// same C function for later calls with the same types.
-    fn gen_generic_call(&mut self, decl: &'a FunctionDecl, arg_codes: &[String], arg_types: &[CType]) -> Result<(String, CType), String> {
+    fn gen_generic_call(&mut self, decl: &'a FunctionDecl, type_args: Option<&[Type]>, arg_codes: &[String], arg_types: &[CType]) -> Result<(String, CType), String> {
         if decl.params.len() != arg_codes.len() {
             return Err(format!("function '{}' expects {} argument(s), got {}", decl.name, decl.params.len(), arg_codes.len()));
         }
-        let subst = infer_generic_substitutions(decl, arg_types)?;
+        let subst = self.infer_generic_substitutions(decl, type_args, arg_types)?;
         let mangled_suffix: Vec<String> =
             decl.generics.iter().map(|g| mangle_ctype(subst.get(&g.name).expect("checked by infer_generic_substitutions"))).collect();
         let c_name = format!("{}__{}", decl.name, mangled_suffix.join("_"));
@@ -1401,8 +1817,9 @@ impl<'a> Codegen<'a> {
         // `decl.params.len() == arg_codes.len()` was already checked above,
         // and every instantiation's param count always equals that, so a
         // cache hit needs no further arity check.
-        if let Some((_, return_type)) = self.instantiations.get(&c_name).cloned() {
-            return Ok((format!("{c_name}({})", arg_codes.join(", ")), return_type));
+        if let Some((param_types, return_type)) = self.instantiations.get(&c_name).cloned() {
+            let coerced = self.coerce_args(arg_codes, arg_types, &param_types)?;
+            return Ok((format!("{c_name}({})", coerced.join(", ")), return_type));
         }
 
         let types = self.named_types();
@@ -1411,9 +1828,11 @@ impl<'a> Codegen<'a> {
         for ty in param_types.iter().chain(std::iter::once(&return_type)) {
             self.register_list_types(ty);
         }
+        self.flush_instances()?;
         self.instantiations.insert(c_name.clone(), (param_types.clone(), return_type.clone()));
+        let coerced = self.coerce_args(arg_codes, arg_types, &param_types)?;
         self.pending.push_back(PendingInstance { c_name: c_name.clone(), decl, subst, param_types, return_type: return_type.clone() });
-        Ok((format!("{c_name}({})", arg_codes.join(", ")), return_type))
+        Ok((format!("{c_name}({})", coerced.join(", ")), return_type))
     }
 
     /// Resolves a variant constructor's arguments to its declared fields —
@@ -1511,7 +1930,7 @@ impl<'a> Codegen<'a> {
                 };
                 let (param_types, return_type, c_name) =
                     (method.param_types.clone(), method.return_type.clone(), method.c_name.clone());
-                let (arg_codes, arg_types) = self.gen_args(args)?;
+                let (arg_codes, arg_types) = self.gen_args_hinted(args, param_types.get(1..).unwrap_or(&[]))?;
                 if param_types.len() != arg_types.len() + 1 {
                     return Err(format!(
                         "method '{record_name}.{method_name}' expects {} argument(s), got {}",
@@ -1782,6 +2201,7 @@ impl<'a> Codegen<'a> {
             CType::DynTrait(name) => return Err(format!("cannot 'print' a 'dyn {name}' value")),
             CType::List(elem) => return Err(format!("cannot 'print' a List<{}> value yet", c_type_name(elem))),
             CType::Quantity(_) => return Ok((format!("ostrin_print_qty({})", arg_codes[0]), CType::Void)),
+            CType::GenLit(..) => return Err("cannot infer the enum instance to print here".to_string()),
             CType::Option(_) | CType::NoneLit | CType::Result(..) | CType::OkLit(_) | CType::ErrLit(_) => {
                 return Err("cannot 'print' an Option/Result value yet".to_string())
             }
@@ -1790,59 +2210,33 @@ impl<'a> Codegen<'a> {
     }
 }
 
-/// Infers a generic function's `<T, U, ...>` bindings purely from its
-/// parameters' concrete argument types at one call site — the return type
-/// is never consulted, since nothing upstream of this call is expecting a
-/// particular result type to unify against (that already happened, in
-/// `typeck`, before this backend ever runs). A generic parameter used only
-/// in the return type (or nested inside another generic type, e.g. a
-/// hypothetical `List<T>` parameter — collections aren't supported at all
-/// here) can't be inferred this way and is reported clearly rather than
-/// silently guessed.
-fn infer_generic_substitutions(decl: &FunctionDecl, arg_types: &[CType]) -> Result<HashMap<String, CType>, String> {
-    let generic_names: HashSet<&str> = decl.generics.iter().map(|g| g.name.as_str()).collect();
-    let mut subst: HashMap<String, CType> = HashMap::new();
-    for (param, arg_ty) in decl.params.iter().zip(arg_types) {
-        // `Quantity<D>`: `D` stands for the dimension of the argument's
-        // Quantity (recorded as a `CType::Quantity` so it can be threaded
-        // through `subst` like any other type parameter).
-        if let (Type::Named(q, qargs), CType::Quantity(_)) = (&param.ty, arg_ty) {
-            if q == "Quantity" && qargs.len() == 1 {
-                if let Type::Named(d, dargs) = &qargs[0] {
-                    if dargs.is_empty() && generic_names.contains(d.as_str()) {
-                        subst.entry(d.clone()).or_insert_with(|| arg_ty.clone());
-                        continue;
-                    }
+/// Matches a variant constructor's arguments to its declared fields:
+/// positional ones fill in declaration order, named ones go by field name.
+fn arrange_args<'e>(field_names: &[String], variant: &str, args: &'e [Arg]) -> Result<Vec<&'e Expr>, String> {
+    let mut slots: Vec<Option<&'e Expr>> = vec![None; field_names.len()];
+    let mut next_positional = 0usize;
+    for arg in args {
+        match arg {
+            Arg::Positional(expr) => {
+                if next_positional >= field_names.len() {
+                    return Err(format!("variant '{variant}' expects {} argument(s), got more", field_names.len()));
                 }
+                slots[next_positional] = Some(expr);
+                next_positional += 1;
             }
-        }
-        if let Type::Named(name, args) = &param.ty {
-            if args.is_empty() && generic_names.contains(name.as_str()) {
-                if let Some(existing) = subst.get(name) {
-                    if existing != arg_ty {
-                        return Err(format!(
-                            "generic parameter '{name}' of function '{}' would need to be both '{}' and '{}' for these arguments",
-                            decl.name,
-                            mangle_ctype(existing),
-                            mangle_ctype(arg_ty)
-                        ));
-                    }
-                } else {
-                    subst.insert(name.clone(), arg_ty.clone());
-                }
+            Arg::Named(field_name, expr) => {
+                let Some(index) = field_names.iter().position(|n| n == field_name) else {
+                    return Err(format!("variant '{variant}' has no field '{field_name}'"));
+                };
+                slots[index] = Some(expr);
             }
         }
     }
-    for generic in &decl.generics {
-        if !subst.contains_key(&generic.name) {
-            return Err(format!(
-                "cannot infer generic parameter '{}' of function '{}' from its arguments (only used in the return type, \
-                 or nested inside another type — neither is supported by the native backend yet)",
-                generic.name, decl.name
-            ));
-        }
-    }
-    Ok(subst)
+    slots
+        .into_iter()
+        .enumerate()
+        .map(|(index, slot)| slot.ok_or_else(|| format!("variant '{variant}' is missing argument for field '{}'", field_names[index])))
+        .collect()
 }
 
 /// The common type of two branch results, completing partial literals
@@ -1851,6 +2245,7 @@ fn unify_types(a: &CType, b: &CType) -> CType {
     match (a, b) {
         (x, y) if x == y => x.clone(),
         (CType::NoneLit, other) | (other, CType::NoneLit) => other.clone(),
+        (CType::GenLit(..), other) | (other, CType::GenLit(..)) => other.clone(),
         (CType::OkLit(t), CType::ErrLit(e)) | (CType::ErrLit(e), CType::OkLit(t)) => CType::Result(t.clone(), e.clone()),
         (CType::OkLit(_) | CType::ErrLit(_), r @ CType::Result(..)) | (r @ CType::Result(..), CType::OkLit(_) | CType::ErrLit(_)) => r.clone(),
         _ => a.clone(),
@@ -1908,6 +2303,24 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
         }
     }
 
+    // Generic records/enums never get a C type of their own: only their
+    // concrete instantiations do (see `Codegen::register_instance`).
+    let generic_records: HashMap<String, &RecordDecl> = records.iter().filter(|r| !r.generics.is_empty()).map(|r| (r.name.clone(), *r)).collect();
+    let generic_enums: HashMap<String, &EnumDecl> = enums.iter().filter(|e| !e.generics.is_empty()).map(|e| (e.name.clone(), *e)).collect();
+    let mut generic_arity: HashMap<String, (bool, usize)> = HashMap::new();
+    for (name, r) in &generic_records {
+        generic_arity.insert(name.clone(), (false, r.generics.len()));
+    }
+    let mut generic_variant_owner: HashMap<String, String> = HashMap::new();
+    for (name, e) in &generic_enums {
+        generic_arity.insert(name.clone(), (true, e.generics.len()));
+        for variant in &e.variants {
+            generic_variant_owner.insert(variant.name.clone(), name.clone());
+        }
+    }
+    let generic_impls: Vec<&ImplDecl> = impls.iter().filter(|im| generic_arity.contains_key(&im.type_name)).copied().collect();
+    let records: Vec<&RecordDecl> = records.into_iter().filter(|r| r.generics.is_empty()).collect();
+    let enums: Vec<&EnumDecl> = enums.into_iter().filter(|e| e.generics.is_empty()).collect();
     let record_names: HashSet<String> = records.iter().map(|r| r.name.clone()).collect();
     let enum_names: HashSet<String> = enums.iter().map(|e| e.name.clone()).collect();
     let trait_names: HashSet<String> = traits.iter().map(|t| t.name.clone()).collect();
@@ -1931,6 +2344,17 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
         pending_results: VecDeque::new(),
         current_return: Vec::new(),
         lambda_depth: 0,
+        generic_records,
+        generic_enums,
+        generic_arity,
+        generic_impls,
+        generic_variant_owner,
+        seen_instances: RefCell::new(Vec::new()),
+        instances_done: HashSet::new(),
+        instance_info: HashMap::new(),
+        instance_order: Vec::new(),
+        instance_variants: HashMap::new(),
+        expected: None,
         record_names: record_names.clone(),
         enum_names: enum_names.clone(),
         scopes: vec![HashMap::new()],
@@ -1962,9 +2386,6 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
         codegen.trait_methods.insert(t.name.clone(), methods);
     }
     for r in &records {
-        if !r.generics.is_empty() {
-            return Err(format!("record '{}' is generic; the native backend doesn't support generics yet", r.name));
-        }
         let fields = r
             .fields
             .iter()
@@ -1976,9 +2397,6 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
         codegen.records.insert(r.name.clone(), fields);
     }
     for e in &enums {
-        if !e.generics.is_empty() {
-            return Err(format!("enum '{}' is generic; the native backend doesn't support generics yet", e.name));
-        }
         for (tag, variant) in e.variants.iter().enumerate() {
             let fields = variant
                 .fields
@@ -2053,74 +2471,10 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
         }
     }
 
+    codegen.flush_instances()?;
+
     let mut out = String::from(PRELUDE);
-    // Forward-declare every record as an opaque typedef first: since a
-    // record is always used as a pointer, its fields never need the other
-    // record's full body to be visible yet, only the typedef name to exist —
-    // which sidesteps ordering entirely, including two records that
-    // reference each other.
-    for r in &records {
-        out.push_str(&format!("typedef struct {0} {0};\n", r.name));
-    }
-    if !records.is_empty() {
-        out.push('\n');
-    }
-    for r in &records {
-        out.push_str(&format!("struct {} {{\n", r.name));
-        for (field_name, field_ty) in &codegen.records[&r.name] {
-            out.push_str(&format!("    {} {};\n", c_type_name(field_ty), field_name));
-        }
-        out.push_str("};\n\n");
-    }
-
-    // Enums are tagged unions passed by value (never by pointer, see the
-    // module doc comment), so — unlike records — an enum containing another
-    // enum as a direct field genuinely needs that other enum's *complete*
-    // body already emitted; declared in source order is good enough for
-    // every case except that one, which is left as a known, undocumented-
-    // in-code gap (it would surface as an opaque C compiler error, not a
-    // silently wrong program).
-    for e in &enums {
-        out.push_str(&format!("typedef struct {0} {0};\n", e.name));
-    }
-    if !enums.is_empty() {
-        out.push('\n');
-    }
-    for e in &enums {
-        out.push_str(&format!("struct {} {{\n    int tag;\n", e.name));
-        let has_fields = e.variants.iter().any(|variant| !variant.fields.is_empty());
-        if has_fields {
-            out.push_str("    union {\n");
-            for variant in &e.variants {
-                let info = &codegen.variants[&variant.name];
-                if info.fields.is_empty() {
-                    continue;
-                }
-                out.push_str(&format!("        struct {{\n"));
-                for (field_name, field_ty) in &info.fields {
-                    out.push_str(&format!("            {} {};\n", c_type_name(field_ty), field_name));
-                }
-                out.push_str(&format!("        }} {};\n", variant.name));
-            }
-            out.push_str("    } data;\n");
-        }
-        out.push_str("};\n\n");
-    }
-
-    // Every trait's vtable and fat-pointer types are declared eagerly (they
-    // are cheap, and needed to even *state* a `dyn Trait` parameter's type);
-    // only the actual vtable *instances* for a given (trait, record) pair
-    // are lazy — see `PendingVTable` and the drain loop below.
-    for (trait_name, methods) in &codegen.trait_methods {
-        out.push_str(&format!("typedef struct {{\n"));
-        for (method_name, (param_types, return_type)) in methods {
-            let params = std::iter::once("void*".to_string()).chain(param_types.iter().map(c_type_name)).collect::<Vec<_>>().join(", ");
-            out.push_str(&format!("    {} (*{})({});\n", c_type_name(return_type), method_name, params));
-        }
-        out.push_str(&format!("}} {trait_name}_VTable;\n\n"));
-        out.push_str(&format!("typedef struct {{ void* self; const {trait_name}_VTable* vtable; }} {trait_name}_Dyn;\n\n"));
-    }
-
+    let _ = &mut out;
     // Bodies are generated *before* any prototype is written out, because a
     // generic function's instantiations aren't known until something is
     // actually seen calling them — which only happens while generating a
@@ -2149,6 +2503,9 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
         .methods
         .values()
         .flat_map(|methods| methods.values())
+        // Methods of a generic instance were already queued for generation
+        // (in `pending`) when the instance was registered.
+        .filter(|info| !matches!(&info.self_ty, CType::Record(n) | CType::Enum(n) if codegen.instance_info.contains_key(n)))
         .map(|info| (info.self_ty.clone(), info.param_types.clone(), info.return_type.clone(), info.c_name.clone(), info.decl))
         .collect();
     for (self_ty, param_types, return_type, c_name, decl) in method_infos {
@@ -2168,6 +2525,7 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
     let mut thunk_prototypes: Vec<String> = Vec::new();
     let mut vtable_defs: Vec<String> = Vec::new();
     let mut list_type_decls = String::new();
+    let mut list_typedefs = String::new();
     let mut option_inners: Vec<CType> = Vec::new();
     let mut result_pairs: Vec<(CType, CType)> = Vec::new();
     let mut list_helper_prototypes: Vec<String> = Vec::new();
@@ -2185,9 +2543,9 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
             progressed = true;
             let struct_name = list_struct_name(&elem_ty);
             let elem_c = c_type_name(&elem_ty);
+            list_typedefs.push_str(&format!("typedef struct {struct_name} {struct_name};\n"));
             list_type_decls.push_str(&format!(
-                "typedef struct {struct_name} {struct_name};\n\
-                 struct {struct_name} {{\n    {elem_c}* items;\n    int64_t length;\n    int64_t capacity;\n}};\n\n"
+                "struct {struct_name} {{\n    {elem_c}* items;\n    int64_t length;\n    int64_t capacity;\n}};\n\n"
             ));
 
             let new_sig = format!("static {struct_name}* {struct_name}_new_from_array({elem_c}* src_items, int64_t count)");
@@ -2279,6 +2637,82 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
         if !progressed {
             break;
         }
+    }
+
+    // Every type declaration is written out here, after the drain loop, so
+    // generic instantiations (only discovered from actual usage) are all
+    // known. A record is only ever used as a pointer, so its typedef alone
+    // suffices to sidestep ordering (including records referencing each
+    // other); an enum is a by-value tagged union, so its full body must
+    // precede anything embedding it by value — enums first (a generic
+    // instance always comes after the instances its own arguments name),
+    // then records.
+    for r in &records {
+        out.push_str(&format!("typedef struct {0} {0};\n", r.name));
+    }
+    for e in &enums {
+        out.push_str(&format!("typedef struct {0} {0};\n", e.name));
+    }
+    for (_, name) in &codegen.instance_order {
+        out.push_str(&format!("typedef struct {0} {0};\n", name));
+    }
+    out.push_str(&list_typedefs);
+    out.push('\n');
+    let emit_enum = |out: &mut String, name: &str, variants: &[VariantInfo]| {
+        out.push_str(&format!("struct {name} {{\n    int tag;\n"));
+        if variants.iter().any(|variant| !variant.fields.is_empty()) {
+            out.push_str("    union {\n");
+            for info in variants {
+                if info.fields.is_empty() {
+                    continue;
+                }
+                out.push_str("        struct {\n");
+                for (field_name, field_ty) in &info.fields {
+                    out.push_str(&format!("            {} {};\n", c_type_name(field_ty), field_name));
+                }
+                out.push_str(&format!("        }} {};\n", info.name));
+            }
+            out.push_str("    } data;\n");
+        }
+        out.push_str("};\n\n");
+    };
+    for e in &enums {
+        let variants: Vec<VariantInfo> = e.variants.iter().map(|v| codegen.variants[&v.name].clone()).collect();
+        emit_enum(&mut out, &e.name, &variants);
+    }
+    for (is_enum, name) in &codegen.instance_order {
+        if *is_enum {
+            emit_enum(&mut out, name, &codegen.instance_variants[name]);
+        }
+    }
+    let emit_record = |out: &mut String, name: &str, fields: &[(String, CType)]| {
+        out.push_str(&format!("struct {name} {{\n"));
+        for (field_name, field_ty) in fields {
+            out.push_str(&format!("    {} {};\n", c_type_name(field_ty), field_name));
+        }
+        out.push_str("};\n\n");
+    };
+    for r in &records {
+        emit_record(&mut out, &r.name, &codegen.records[&r.name]);
+    }
+    for (is_enum, name) in &codegen.instance_order {
+        if !*is_enum {
+            emit_record(&mut out, name, &codegen.records[name]);
+        }
+    }
+
+    // Every trait's vtable and fat-pointer types are declared eagerly (they
+    // are cheap, and needed to even *state* a `dyn Trait` parameter's type);
+    // only the actual vtable *instances* for a given (trait, record) pair
+    // are lazy — see `PendingVTable` and the drain loop above.
+    for (trait_name, methods) in &codegen.trait_methods {
+        out.push_str("typedef struct {\n");
+        for (method_name, (param_types, return_type)) in methods {
+            let params = std::iter::once("void*".to_string()).chain(param_types.iter().map(c_type_name)).collect::<Vec<_>>().join(", ");
+            out.push_str(&format!("    {} (*{})({});\n", c_type_name(return_type), method_name, params));
+        }
+        out.push_str(&format!("}} {trait_name}_VTable;\n\n"));
+        out.push_str(&format!("typedef struct {{ void* self; const {trait_name}_VTable* vtable; }} {trait_name}_Dyn;\n\n"));
     }
 
     // Every `List` struct is declared here, right before the prototype

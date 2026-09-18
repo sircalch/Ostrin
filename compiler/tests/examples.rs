@@ -1546,3 +1546,33 @@ fn git_dependency_fails_clearly_without_network_access() {
     let err = stderr(&out);
     assert!(err.contains("does not fetch git dependencies automatically"), "unexpected message: {err}");
 }
+
+#[test]
+fn native_backend_generic_records_and_enums_match_the_interpreter() {
+    // Generic records/enums are monomorphized per concrete instantiation:
+    // field access, generic + specialized `impl`s (including trait impls
+    // for `Box<Int>` vs `Box<String>`), nested variant/record patterns,
+    // explicit and inferred type arguments, and a bare `Nothing` completed
+    // from the expected type.
+    for file in [
+        "native_generic_types.ostrin",
+        "field_access.ostrin",
+        "generic_impl_dispatch.ostrin",
+        "generic_enum_dispatch.ostrin",
+        "generic_nested_patterns.ostrin",
+    ] {
+        let interpreted = run(&["--run", &example_path(file)]);
+        assert!(interpreted.status.success(), "interpreter failed on {file}: {}", stderr(&interpreted));
+        let expected = stdout(&interpreted).replace("\r\n", "\n");
+
+        let exe = temp_artifact(&format!("{file}.exe"));
+        let compile = run(&["--compile", "--out", &exe, &example_path(file)]);
+        if skip_if_no_c_compiler(&compile) {
+            return;
+        }
+        assert!(compile.status.success(), "compile failed for {file}: {}", stderr(&compile));
+        let native = Command::new(&exe).output().unwrap();
+        let _ = fs::remove_file(&exe);
+        assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected, "output mismatch for {file}");
+    }
+}

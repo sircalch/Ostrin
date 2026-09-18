@@ -2890,3 +2890,29 @@ records/enums **genéricos** (`Box<T>`, `Maybe<T>`), operadores por `derive`
 `Set`, canales/`spawn`, iteradores propios (`impl Iterator`), inferencia de un
 `T` que solo aparece en el retorno, e `imprimir` de una `List`. Suite: **93
 pruebas**, sin warnings.
+
+---
+
+## 74. Records y enums genéricos en el backend nativo — 2026-09-18
+
+- Un record/enum genérico no tiene tipo C propio: cada instanciación concreta
+  (`Score<Int>`, `Maybe<Outcome<Int, String>>`) se **monomorfiza** a un tipo con
+  nombre mangleado (`Score__Int`) que se registra bajo demanda. `map_type` (sin
+  `&mut self`) las anota en un `RefCell`; `flush_instances` las registra (campos,
+  variantes y los métodos de todo `impl` aplicable: `impl<T> Box<T>` genérico o
+  `impl Trait for Box<Int>` especializado) y se invoca tras cada expresión.
+- `map_type` ahora sustituye parámetros de forma recursiva, así que
+  `List<T>`, `Option<T>`, `Result<T,E>` y `Pair<A,B>` funcionan dentro de
+  funciones genéricas; la inferencia de `T` es estructural (`bind_type`).
+- Inferencia bidireccional mínima: `Codegen.expected` lleva el tipo esperado
+  (argumentos de funciones/métodos, campos, `return`/cola, anotaciones,
+  asignaciones) para completar `Just(Good(3))`, `Pair { .. }` y un `Nothing`
+  suelto (`CType::GenLit`, como `NoneLit` para Option). Se admiten tipos
+  explícitos: `Item<Int>(1)`, `Score<Int> { .. }`, `identity<Int>(7)`.
+- Patrones: variantes anidadas (`Just(Good(n))`), destructuración de records
+  (`Pair(first: v, second: _)`) y variantes sin campos escritas como
+  `Pattern::Ident`.
+- Orden de emisión en C: typedefs de todo, cuerpos de enums, cuerpos de
+  records; los `List_*` se declaran (typedef) antes de los records.
+- Sigue fuera: métodos genéricos (`fn map<U>`), `print` de un enum, y el resto
+  de la lista del apartado 73. Suite: **94 pruebas**, sin warnings.

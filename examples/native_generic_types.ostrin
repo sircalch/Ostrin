@@ -1,0 +1,65 @@
+record Pair<A, B> {
+    first: A
+    second: B
+}
+
+impl<A, B> Pair<A, B> {
+    fn first_value(self) -> A {
+        self.first
+    }
+}
+
+enum Maybe<T> {
+    Just(T)
+    Nothing
+}
+
+impl<T> Maybe<T> {
+    fn is_just(self) -> Bool {
+        match self {
+            Just(item) => true,
+            Nothing => false,
+        }
+    }
+}
+
+record Holder {
+    mut slot: Maybe<Int>
+    pairs: List<Pair<Int, String>>
+}
+
+fn wrap<T>(value: T) -> Maybe<T> {
+    Just(value)
+}
+
+fn get_or<T>(value: Maybe<T>, fallback: T) -> T {
+    match value {
+        Just(item) => item,
+        Nothing => fallback,
+    }
+}
+
+fn swap<A, B>(p: Pair<A, B>) -> Pair<B, A> {
+    Pair { first: p.second, second: p.first }
+}
+
+fn main() -> Void {
+    p = Pair { first: 1, second: "one" }
+    q = swap(p)
+    print(q.first)
+    print(q.second)
+    print(p.first_value())
+    print(wrap(5).is_just())
+    print(get_or(wrap("hi"), "none"))
+    print(get_or(Nothing, 3))
+    mut h = Holder { slot: Just(4), pairs: [Pair { first: 1, second: "a" }, Pair { first: 2, second: "b" }] }
+    print(get_or(h.slot, 0))
+    print(h.pairs[1].second)
+    h.slot = Nothing
+    print(get_or(h.slot, 99))
+    for pair in h.pairs {
+        print(pair.first)
+    }
+    n: Maybe<Float> = Nothing
+    print(get_or(n, 1.5))
+}
