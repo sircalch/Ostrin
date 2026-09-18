@@ -1803,3 +1803,23 @@ una edición de documento completa solo cuando el texto cambia, por lo que
 La prueba de VS Code cubre tanto el texto formateado como la edición que
 recibiría el editor. La extensión pasa a `0.1.4`; el siguiente bloque de
 herramientas será persistir el estado semántico como un LSP y añadir debugging.
+
+---
+
+## 53. Ciclo de vida del índice semántico — 2026-09-17
+
+La extensión dejó de tratar el índice semántico como datos permanentes sin
+invalidación. Cada documento tiene ahora una generación de índice:
+
+- al editar un archivo `.ostrin`, se elimina inmediatamente su información
+  anterior para no mostrar tipos o referencias obsoletos;
+- al guardar, se ejecutan de nuevo `--members`, `--symbols` y `--types`;
+- si una compilación anterior termina después de una nueva, su resultado se
+  descarta por generación y no puede sobrescribir el estado reciente;
+- al cerrar el documento, su índice se elimina;
+- los índices se combinan únicamente dentro del mismo workspace raíz.
+
+Esto mantiene persistencia durante la sesión sin fingir que ya existe un LSP
+completo. La extensión pasa a `0.1.5`. Se verificaron el smoke test de VS Code,
+la sintaxis JavaScript y las **67 pruebas** del compilador; el siguiente bloque
+grande es el protocolo LSP completo y debugging.

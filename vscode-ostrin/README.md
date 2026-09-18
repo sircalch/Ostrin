@@ -14,6 +14,7 @@ This is the first VS Code integration for Ostrin. It currently provides:
 - hover documentation and an outline for top-level declarations;
 - inferred expression types in hover when the compiler can resolve them;
 - conservative `Format Document` support for Ostrin blocks;
+- workspace-scoped semantic caching that invalidates while editing;
 - basic definition navigation for indexed user declarations and members;
 - reference search for unique top-level symbols across the workspace;
 - scoped rename for local bindings and unique top-level symbols;
@@ -33,7 +34,7 @@ the repository root:
 ```powershell
 cd vscode-ostrin
 npx --yes @vscode/vsce package
-code --install-extension .\ostrin-language-support-0.1.4.vsix
+code --install-extension .\ostrin-language-support-0.1.5.vsix
 ```
 
 After restarting or reloading VS Code, opening any `.ostrin` file selects the
@@ -43,7 +44,8 @@ type-aware completion without configuring a global `ostrinc` command.
 
 The compiler check command uses `ostrinc --check --json` internally, while the
 background semantic index also consumes `ostrinc --types --json` for inferred
-expression hover. The current editor providers are intentionally lightweight:
+expression hover. The cache is invalidated while a document is dirty and
+rebuilt after saving. The current editor providers are intentionally lightweight:
 cross-file navigation is conservative when two modules expose the same short
 name. A full semantic language server with persistent state, formatting and
 debugging is future work.

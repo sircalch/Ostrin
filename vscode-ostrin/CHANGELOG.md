@@ -2,6 +2,12 @@
 
 All notable changes to the Ostrin VS Code extension are documented here.
 
+## [0.1.5] - 2026-09-17
+
+- Add workspace-scoped semantic cache lifecycle management.
+- Invalidate stale semantic data while a document is being edited.
+- Ignore out-of-order compiler results and clear indexes when documents close.
+
 ## [0.1.4] - 2026-09-17
 
 - Add conservative document formatting for Ostrin blocks and indentation.

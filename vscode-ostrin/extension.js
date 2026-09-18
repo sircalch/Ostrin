@@ -6,6 +6,25 @@ const languageFeatures = require('./language-features');
 
 let diagnostics;
 const semanticIndex = new Map();
+const semanticGenerations = new Map();
+
+function samePath(left, right) {
+  return left && right
+    && left.replace(/\\/g, '/').toLowerCase() === right.replace(/\\/g, '/').toLowerCase();
+}
+
+function workspaceRootFor(document) {
+  return vscode.workspace.getWorkspaceFolder(document.uri)?.uri.fsPath
+    ?? path.dirname(document.uri.fsPath);
+}
+
+function invalidateSemanticIndex(document) {
+  const key = document.uri.toString();
+  const generation = (semanticGenerations.get(key) || 0) + 1;
+  semanticGenerations.set(key, generation);
+  semanticIndex.delete(key);
+  return { key, generation };
+}
 
 function semanticIndexFor(document) {
   const merged = { symbols: [], members: [], bindings: [], expressions: [] };
@@ -31,7 +50,9 @@ function semanticIndexFor(document) {
   // The compiler index is refreshed per document. Merge the indexes here so
   // editor providers can resolve symbols in every currently opened Ostrin
   // document without turning every completion request into a compiler run.
+  const targetRoot = workspaceRootFor(document);
   for (const index of semanticIndex.values()) {
+    if (targetRoot && index.workspaceRoot && !samePath(targetRoot, index.workspaceRoot)) continue;
     for (const item of index.symbols || []) add('symbols', item);
     for (const item of index.members || []) add('members', item);
     for (const item of index.bindings || []) add('bindings', item);
@@ -114,9 +135,9 @@ function consumeDiagnosticLine(document, line, output) {
 
 function refreshSemanticIndex(document) {
   if (document.isUntitled) return;
-  const cwd = vscode.workspace.getWorkspaceFolder(document.uri)?.uri.fsPath
-    ?? path.dirname(document.uri.fsPath);
-  const found = { symbols: [], members: [], bindings: [], expressions: [] };
+  const { key, generation } = invalidateSemanticIndex(document);
+  const cwd = workspaceRootFor(document);
+  const found = { symbols: [], members: [], bindings: [], expressions: [], workspaceRoot: cwd };
   const addSemanticItem = (item) => {
     if (!item || (!item.name && item.kind !== 'expression')) return;
     if (item.kind === 'member') found.members.push({ ...item, kind: item.memberKind || 'method' });
@@ -128,7 +149,9 @@ function refreshSemanticIndex(document) {
   let successful = true;
   const finish = () => {
     pending -= 1;
-    if (pending === 0 && successful) semanticIndex.set(document.uri.toString(), found);
+    if (pending === 0 && successful && semanticGenerations.get(key) === generation) {
+      semanticIndex.set(key, found);
+    }
   };
   for (const mode of ['members', 'symbols', 'types']) {
     const child = childProcess.spawn(compilerPath(document), [`--${mode}`, '--json', document.uri.fsPath], {
@@ -269,6 +292,12 @@ function activate(context) {
     }
     if (document.languageId === 'ostrin') refreshSemanticIndex(document);
   });
+  const changeSubscription = vscode.workspace.onDidChangeTextDocument((event) => {
+    if (event.document.languageId === 'ostrin') invalidateSemanticIndex(event.document);
+  });
+  const closeSubscription = vscode.workspace.onDidCloseTextDocument((document) => {
+    if (document.languageId === 'ostrin') invalidateSemanticIndex(document);
+  });
 
   const openSubscription = vscode.workspace.onDidOpenTextDocument((document) => {
     if (document.languageId === 'ostrin') refreshSemanticIndex(document);
@@ -277,7 +306,7 @@ function activate(context) {
     if (editor.document.languageId === 'ostrin') refreshSemanticIndex(editor.document);
   }
 
-  context.subscriptions.push(diagnostics, completion, hover, definitions, references, rename, symbols, formatting, check, run, saveSubscription, openSubscription);
+  context.subscriptions.push(diagnostics, completion, hover, definitions, references, rename, symbols, formatting, check, run, saveSubscription, changeSubscription, closeSubscription, openSubscription);
 }
 
 function deactivate() {}
