@@ -1,0 +1,43 @@
+record Counter {
+    mut value: Int
+}
+
+impl Counter {
+    fn increment(mut self, amount: Int) -> Void {
+        self.value = self.value + amount
+    }
+
+    fn get(self) -> Int {
+        self.value
+    }
+}
+
+record Point {
+    x: Int
+    y: Int
+}
+
+impl Point {
+    fn manhattan_distance(self, other: Point) -> Int {
+        abs_diff(self.x, other.x) + abs_diff(self.y, other.y)
+    }
+}
+
+fn abs_diff(a: Int, b: Int) -> Int {
+    if a > b {
+        a - b
+    } else {
+        b - a
+    }
+}
+
+fn main() -> Void {
+    counter = Counter { value: 0 }
+    counter.increment(3)
+    counter.increment(4)
+    print(counter.get())
+
+    a = Point { x: 0, y: 0 }
+    b = Point { x: 3, y: 4 }
+    print(a.manhattan_distance(b))
+}

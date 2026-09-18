@@ -2325,3 +2325,70 @@ despacho dinámico (traits, `impl`, operadores sobre tipos definidos por el
 usuario) sigue siendo terreno exclusivo del intérprete — ampliarlo más allá
 de eso es un proyecto en sí mismo, no una extensión trivial de lo que ya
 existe.
+
+---
+
+## 63. Métodos de `impl` en el backend nativo — 2026-09-17
+
+Se continuó el mismo camino: la sección 62 dejó `record` sin métodos porque
+"no requieren dispatch dinámico" era el límite natural; esta sección mueve
+ese límite un paso más, a métodos que **tampoco** lo requieren.
+
+### Por qué un método de `impl` no necesita ninguna forma de dispatch aquí
+
+En Rust, una vtable existe para resolver en tiempo de ejecución CUÁL
+implementación concreta corresponde a un `dyn Trait` cuyo tipo real no se
+conoce en tiempo de compilación. Este backend no tiene `dyn Trait` ni
+genéricos en ningún punto — así que el tipo concreto del receptor de
+`valor.metodo(...)` (un `Record(nombre)`) **siempre** se conoce en el punto
+de la llamada, sea el método de un `impl` inherente o de un `impl Trait for
+Tipo`. Por eso no hizo falta ninguna infraestructura de despacho: cada
+combinación (record, nombre de método) se resuelve una sola vez, durante la
+generación, a un nombre de función de C único (`Record__metodo`), y la
+llamada se convierte simplemente en pasar el puntero del receptor como
+primer argumento — ni siquiera hace falta que el programa haya usado
+`derive`/`impl Trait` en vez de un `impl` inherente, es exactamente la misma
+mecánica en ambos casos.
+
+`self`/`mut self` se resuelven como cualquier otro parámetro, salvo que su
+tipo declarado es literalmente `Self` (así lo produce el parser — ver
+`parser/mod.rs`, línea ~283), que se traduce al record concreto que está
+implementando el método (`map_method_type`). El propio identificador `self`
+dentro del cuerpo no necesitó ningún caso especial: es sólo un parámetro más
+con ese nombre.
+
+### Qué queda deliberadamente fuera, y por qué no rompe nada
+
+Un `impl` cuyo método nadie llama, o un método genérico, o un `impl` sobre
+un tipo que el backend no representa (un `enum`, por ejemplo) simplemente
+queda fuera de la tabla de métodos — no se rechaza el programa completo por
+eso. Solo si el programa **de verdad llama** a ese método, `gen_call` falla
+con un mensaje que nombra el record y el método. Este diseño evita el
+problema que tenía la primera versión (sección 61): rechazar cualquier
+`impl` presente en el archivo, aunque nada lo usara, habría hecho fallar
+programas perfectamente compilables solo porque declaraban de más.
+
+También se resolvió un problema de orden que no había aparecido todavía:
+Ostrin permite llamar a una función declarada más abajo en el archivo (o que
+dos métodos se llamen mutuamente), pero C exige una declaración previa. Se
+solucionó emitiendo **prototipos** de todas las funciones y métodos antes de
+cualquier cuerpo — nunca hizo falta ordenar el grafo de llamadas.
+
+### Pruebas
+
+`examples/native_methods.ostrin` combina un `Counter` con un método
+`mut self` que muta un campo compartido por identidad (`counter.increment`
+llamado dos veces sobre el mismo puntero) y un `Point` cuyo método llama a
+una función libre declarada más abajo en el archivo — ambos casos ejercitan
+directamente las dos piezas nuevas (mutación a través de `self` y
+prototipos de reordenamiento). Se compiló y ejecutó de verdad, comparando
+contra la salida ya verificada del intérprete. Suite del compilador:
+**80 pruebas**, sin warnings nuevos.
+
+Frontera actual del backend nativo: funciones, records y sus métodos no
+genéricos (inherentes o de trait, da igual — ninguno necesita dispatch),
+sobre `Int`/`Float`/`Bool`/`String`. Lo único que de verdad falta para que
+esta frontera se vuelva un proyecto distinto (no una extensión más) es todo
+lo que exige resolver algo en tiempo de ejecución: `dyn Trait`, genéricos
+reales, y operadores sobre tipos de usuario (que si necesitan resolver cuál
+`impl` aplica, a diferencia de una llamada nombrada `.metodo()`).

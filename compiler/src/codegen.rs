@@ -70,6 +70,18 @@ fn map_type(ty: &Type, record_names: &HashSet<String>) -> Result<CType, String> 
     }
 }
 
+/// Like `map_type`, but resolves a method's `self`/`Self` to the record it
+/// is implemented for. There is no dynamic dispatch anywhere in this
+/// backend (no `dyn Trait`, no generics), so a call site always knows the
+/// receiver's concrete record at compile time — `Self` is just a name for
+/// it, nothing more.
+fn map_method_type(ty: &Type, self_record: &str, record_names: &HashSet<String>) -> Result<CType, String> {
+    if matches!(ty, Type::Named(name, args) if name == "Self" && args.is_empty()) {
+        return Ok(CType::Record(self_record.to_string()));
+    }
+    map_type(ty, record_names)
+}
+
 fn c_function_name(name: &str) -> String {
     // The generated file supplies its own `main`, so the user's `main`
     // (which returns Void, not `int`, and takes no argv/argc) is renamed.
@@ -91,19 +103,38 @@ static char* ostrin_str_concat(const char* a, const char* b) {\n\
 }\n\
 \n";
 
-struct Codegen {
+/// A method resolved at codegen time — always to exactly one concrete
+/// implementation, since this backend has no `dyn Trait`/generics for a call
+/// site to actually be ambiguous about. `param_types` includes `self` as its
+/// first entry, already resolved from `Self` to `Record(self_record)`.
+struct MethodInfo<'a> {
+    decl: &'a FunctionDecl,
+    param_types: Vec<CType>,
+    return_type: CType,
+    c_name: String,
+    self_record: String,
+}
+
+struct Codegen<'a> {
     signatures: HashMap<String, (Vec<CType>, CType)>,
     /// Record name -> its fields in declaration order. Every field type is
     /// itself already a resolved `CType` (including nested `Record(name)`
     /// references to other records — always valid as a pointer field even
     /// before that other record's own body has been emitted).
     records: HashMap<String, Vec<(String, CType)>>,
+    /// Record name -> method name -> its resolved signature and body. Only
+    /// ever holds inherent/trait methods on a record with no generics on
+    /// either the `impl` block or the method itself; anything else (a
+    /// generic method, an `impl` for a type this backend doesn't compile)
+    /// is simply absent, so calling it fails with "no method" rather than
+    /// miscompiling.
+    methods: HashMap<String, HashMap<String, MethodInfo<'a>>>,
     record_names: HashSet<String>,
     scopes: Vec<HashMap<String, CType>>,
     temp_counter: usize,
 }
 
-impl Codegen {
+impl<'a> Codegen<'a> {
     fn push_scope(&mut self) {
         self.scopes.push(HashMap::new());
     }
@@ -135,15 +166,33 @@ impl Codegen {
     }
 
     fn gen_function_body(&mut self, f: &FunctionDecl, return_type: &CType, out: &mut String) -> Result<(), String> {
+        self.gen_callable_body(&f.params, &f.body, return_type, None, out)
+    }
+
+    /// Shared by top-level functions and methods. `self_record` is `Some`
+    /// only for a method body, so its `self`/`Self` params resolve to that
+    /// record instead of going through the ordinary (`Self`-ignorant)
+    /// `map_type`.
+    fn gen_callable_body(
+        &mut self,
+        params: &[Param],
+        body: &Block,
+        return_type: &CType,
+        self_record: Option<&str>,
+        out: &mut String,
+    ) -> Result<(), String> {
         self.push_scope();
-        for param in &f.params {
-            let ty = map_type(&param.ty, &self.record_names)?;
+        for param in params {
+            let ty = match self_record {
+                Some(record_name) => map_method_type(&param.ty, record_name, &self.record_names)?,
+                None => map_type(&param.ty, &self.record_names)?,
+            };
             self.define(&param.name, ty);
         }
-        for stmt in &f.body.stmts {
+        for stmt in &body.stmts {
             self.gen_stmt(&stmt.stmt, out)?;
         }
-        match &f.body.tail {
+        match &body.tail {
             Some(e) => {
                 let (code, _) = self.gen_expr(e)?;
                 if *return_type == CType::Void {
@@ -402,20 +451,30 @@ impl Codegen {
     }
 
     fn gen_call(&mut self, callee: &Expr, args: &[Arg]) -> Result<(String, CType), String> {
-        let Expr::Ident(name) = callee.unlocated() else {
-            return Err("only direct calls to a named function are supported by the native backend yet (no method calls)".to_string());
-        };
-        let mut arg_codes = Vec::new();
-        let mut arg_types = Vec::new();
+        match callee.unlocated() {
+            Expr::Ident(name) => self.gen_function_call(name, args),
+            Expr::FieldAccess(obj, method_name) => self.gen_method_call(obj, method_name, args),
+            _ => Err("only a direct function call or 'record.method(...)' is supported by the native backend yet".to_string()),
+        }
+    }
+
+    fn gen_args(&mut self, args: &[Arg]) -> Result<(Vec<String>, Vec<CType>), String> {
+        let mut codes = Vec::new();
+        let mut types = Vec::new();
         for arg in args {
             let expr = match arg {
                 Arg::Positional(e) => e,
                 Arg::Named(_, _) => return Err("named arguments aren't supported by the native backend yet".to_string()),
             };
             let (code, ty) = self.gen_expr(expr)?;
-            arg_codes.push(code);
-            arg_types.push(ty);
+            codes.push(code);
+            types.push(ty);
         }
+        Ok((codes, types))
+    }
+
+    fn gen_function_call(&mut self, name: &str, args: &[Arg]) -> Result<(String, CType), String> {
+        let (arg_codes, arg_types) = self.gen_args(args)?;
         if name == "print" {
             return self.gen_print(&arg_codes, &arg_types);
         }
@@ -426,6 +485,31 @@ impl Codegen {
             return Err(format!("function '{name}' expects {} argument(s), got {}", param_types.len(), arg_codes.len()));
         }
         Ok((format!("{}({})", c_function_name(name), arg_codes.join(", ")), return_type))
+    }
+
+    fn gen_method_call(&mut self, obj: &Expr, method_name: &str, args: &[Arg]) -> Result<(String, CType), String> {
+        let (obj_code, obj_ty) = self.gen_expr(obj)?;
+        let CType::Record(record_name) = &obj_ty else {
+            return Err("method calls are only supported on records by the native backend yet".to_string());
+        };
+        let Some(method) = self.methods.get(record_name).and_then(|methods| methods.get(method_name)) else {
+            return Err(format!(
+                "record '{record_name}' has no method '{method_name}' the native backend can compile \
+                 (generic methods and methods on unsupported types aren't supported yet)"
+            ));
+        };
+        let (param_types, return_type, c_name) = (method.param_types.clone(), method.return_type.clone(), method.c_name.clone());
+        let (arg_codes, arg_types) = self.gen_args(args)?;
+        if param_types.len() != arg_types.len() + 1 {
+            return Err(format!(
+                "method '{record_name}.{method_name}' expects {} argument(s), got {}",
+                param_types.len() - 1,
+                arg_types.len()
+            ));
+        }
+        let mut all_args = vec![obj_code];
+        all_args.extend(arg_codes);
+        Ok((format!("{c_name}({})", all_args.join(", ")), return_type))
     }
 
     fn gen_print(&self, arg_codes: &[String], arg_types: &[CType]) -> Result<(String, CType), String> {
@@ -473,20 +557,26 @@ fn item_name(item: &Item) -> String {
 }
 
 /// Transpiles an already type-checked program to C. Top-level functions and
-/// plain (non-generic) records are supported; `enum`/`trait` make this
-/// return a clear error naming the construct, rather than silently ignoring
-/// it or emitting something incorrect. An `impl` block is silently skipped —
-/// not translated — since nothing calls a method through it yet: any actual
-/// method call (`value.method(...)`) fails on its own in `gen_call`, because
-/// only a bare function name is accepted as a call's callee.
+/// plain (non-generic) records are supported, including non-generic
+/// inherent/trait methods on those records (no dynamic dispatch is needed:
+/// with no `dyn Trait` and no generics anywhere in this backend, a record's
+/// concrete method is always known at the call site). `enum`/`trait` make
+/// this return a clear error naming the construct, rather than silently
+/// ignoring it or emitting something incorrect. A generic method, or a
+/// method on a type this backend doesn't otherwise compile, is simply left
+/// out of the method table — calling it fails on its own in `gen_call`
+/// ("no method"), rather than this function rejecting the whole program
+/// up front for an `impl` block nothing may even use.
 pub fn generate(items: &[Item]) -> Result<String, String> {
     let mut functions = Vec::new();
     let mut records = Vec::new();
+    let mut impls = Vec::new();
     for item in items {
         match item {
             Item::Function(f) => functions.push(f),
             Item::Record(r) => records.push(r),
-            Item::Import(_) | Item::Impl(_) => {}
+            Item::Impl(im) => impls.push(im),
+            Item::Import(_) => {}
             other @ (Item::Enum(_) | Item::Trait(_)) => {
                 return Err(format!(
                     "the native backend ('--emit-c'/'--compile') doesn't support '{}' yet — it needs the interpreter ('--run') for now",
@@ -500,6 +590,7 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
     let mut codegen = Codegen {
         signatures: HashMap::new(),
         records: HashMap::new(),
+        methods: HashMap::new(),
         record_names: record_names.clone(),
         scopes: vec![HashMap::new()],
         temp_counter: 0,
@@ -527,6 +618,33 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
         return Err("no 'main' function found".to_string());
     }
 
+    // Only a non-generic `impl` block over a record this backend already
+    // knows how to represent can have any of its methods compiled; anything
+    // else is left out of the method table rather than rejected outright
+    // (see the doc comment above).
+    for im in &impls {
+        if !im.generics.is_empty() || !record_names.contains(&im.type_name) {
+            continue;
+        }
+        for method in &im.methods {
+            if !method.generics.is_empty() {
+                continue;
+            }
+            let param_types: Result<Vec<CType>, String> =
+                method.params.iter().map(|p| map_method_type(&p.ty, &im.type_name, &record_names)).collect();
+            let Ok(param_types) = param_types else { continue };
+            let Ok(return_type) = map_method_type(&method.return_type, &im.type_name, &record_names) else { continue };
+            let info = MethodInfo {
+                decl: method,
+                param_types,
+                return_type,
+                c_name: format!("{}__{}", im.type_name, method.name),
+                self_record: im.type_name.clone(),
+            };
+            codegen.methods.entry(im.type_name.clone()).or_default().insert(method.name.clone(), info);
+        }
+    }
+
     let mut out = String::from(PRELUDE);
     // Forward-declare every record as an opaque typedef first: since a
     // record is always used as a pointer, its fields never need the other
@@ -547,24 +665,56 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
         out.push_str("};\n\n");
     }
 
+    // Prototypes for everything before any body: Ostrin doesn't require
+    // declaration-before-use (a function may call one written later in the
+    // file, and two methods may call each other both ways), but plain C
+    // does — this sidesteps ordering entirely instead of trying to
+    // topologically sort call graphs.
     for f in &functions {
         let (param_types, return_type) = codegen.signatures.get(&f.name).cloned().unwrap();
-        let params = if f.params.is_empty() {
-            "void".to_string()
-        } else {
-            f.params
-                .iter()
-                .zip(&param_types)
-                .map(|(p, ty)| format!("{} {}", c_type_name(ty), p.name))
-                .collect::<Vec<_>>()
-                .join(", ")
-        };
+        let params = render_params(&param_types, &f.params);
+        out.push_str(&format!("{} {}({});\n", c_type_name(&return_type), c_function_name(&f.name), params));
+    }
+    for methods in codegen.methods.values() {
+        for info in methods.values() {
+            let params = render_params(&info.param_types, &info.decl.params);
+            out.push_str(&format!("{} {}({});\n", c_type_name(&info.return_type), info.c_name, params));
+        }
+    }
+    out.push('\n');
+
+    for f in &functions {
+        let (param_types, return_type) = codegen.signatures.get(&f.name).cloned().unwrap();
+        let params = render_params(&param_types, &f.params);
         out.push_str(&format!("{} {}({}) {{\n", c_type_name(&return_type), c_function_name(&f.name), params));
         codegen.gen_function_body(f, &return_type, &mut out)?;
         out.push_str("}\n\n");
     }
+    // Collected into a plain list first (one pass) so the mutable borrow
+    // `gen_callable_body` needs doesn't fight the immutable one still
+    // holding `info`/`decl` from `codegen.methods`.
+    let method_bodies: Vec<(String, Vec<CType>, CType, String, &FunctionDecl)> = codegen
+        .methods
+        .values()
+        .flat_map(|methods| methods.values())
+        .map(|info| (info.self_record.clone(), info.param_types.clone(), info.return_type.clone(), info.c_name.clone(), info.decl))
+        .collect();
+    for (self_record, param_types, return_type, c_name, decl) in method_bodies {
+        let params = render_params(&param_types, &decl.params);
+        out.push_str(&format!("{} {}({}) {{\n", c_type_name(&return_type), c_name, params));
+        codegen.gen_callable_body(&decl.params, &decl.body, &return_type, Some(&self_record), &mut out)?;
+        out.push_str("}\n\n");
+    }
     out.push_str("int main(void) {\n    ostrin_main();\n    return 0;\n}\n");
     Ok(out)
+}
+
+fn render_params(types: &[CType], params: &[Param]) -> String {
+    if params.is_empty() {
+        "void".to_string()
+    } else {
+        types.iter().zip(params).map(|(ty, p)| format!("{} {}", c_type_name(ty), p.name)).collect::<Vec<_>>().join(", ")
+    }
 }
 
 /// Finds a GNU-C-compatible compiler to hand the generated source to.

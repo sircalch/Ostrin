@@ -790,6 +790,29 @@ fn native_backend_rejects_operators_on_records() {
 }
 
 #[test]
+fn native_backend_compiles_and_runs_record_methods() {
+    // Static (compile-time-resolved) method dispatch: `Counter.increment`
+    // mutates through a `mut self` receiver shared via the record's
+    // pointer identity, and `Point.manhattan_distance` calls a plain
+    // top-level function from inside a method body.
+    let exe = temp_artifact("methods.exe");
+    let compile = run(&["--compile", "--out", &exe, &example_path("native_methods.ostrin")]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+
+    let run_output = Command::new(&exe).output().unwrap_or_else(|e| panic!("failed to run compiled binary '{exe}': {e}"));
+    let _ = fs::remove_file(&exe);
+    assert!(run_output.status.success(), "compiled binary exited unsuccessfully");
+    assert_eq!(
+        String::from_utf8_lossy(&run_output.stdout).replace("\r\n", "\n"),
+        "7\n7\n",
+        "native binary should match the interpreter's output for the same program"
+    );
+}
+
+#[test]
 fn cli_exposes_help_and_version() {
     let version = run(&["--version"]);
     assert!(version.status.success());
