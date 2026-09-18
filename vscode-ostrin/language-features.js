@@ -175,14 +175,25 @@ function substituteType(typeName, replacements) {
   return result;
 }
 
-function memberResultType(member, receiverType) {
-  if (!member || !member.resultType) return undefined;
+function memberReplacements(member, receiverType) {
+  if (!member || !receiverType) return {};
   const args = parseGenericArgs(receiverType);
   const genericNames = Array.isArray(member.ownerGenerics) ? member.ownerGenerics : [];
   const replacements = { Self: baseType(receiverType) || '' };
   genericNames.forEach((name, index) => {
     if (args[index]) replacements[name] = args[index];
   });
+  return replacements;
+}
+
+function resolvedMemberDetail(member, receiverType) {
+  if (!member) return undefined;
+  return substituteType(member.detail, memberReplacements(member, receiverType));
+}
+
+function memberResultType(member, receiverType) {
+  if (!member || !member.resultType) return undefined;
+  const replacements = memberReplacements(member, receiverType);
   return substituteType(member.resultType, replacements);
 }
 
@@ -262,7 +273,7 @@ function semanticCompletionItems(vscode, semanticSymbols) {
   return items;
 }
 
-function memberCompletionItems(vscode, members, owner) {
+function memberCompletionItems(vscode, members, owner, receiverType) {
   const items = [];
   const known = new Set();
   const kinds = {
@@ -274,8 +285,9 @@ function memberCompletionItems(vscode, members, owner) {
     if (entry.owner !== owner || !entry.name || known.has(entry.name)) continue;
     known.add(entry.name);
     const item = new vscode.CompletionItem(entry.name, kinds[entry.kind] || vscode.CompletionItemKind.Value);
-    item.detail = entry.detail || `Ostrin ${entry.kind || 'member'}`;
-    if (entry.detail) item.documentation = new vscode.MarkdownString(`\`${entry.detail}\``);
+    const detail = resolvedMemberDetail(entry, receiverType);
+    item.detail = detail || `Ostrin ${entry.kind || 'member'}`;
+    if (detail) item.documentation = new vscode.MarkdownString(`\`${detail}\``);
     items.push(item);
   }
   return items;
@@ -285,7 +297,8 @@ function provideCompletionItems(vscode, semanticIndex = [], document, position) 
   const index = normalizeSemanticIndex(semanticIndex);
   if (document && position) {
     const owner = receiverOwner(document, position, index);
-    if (owner) return memberCompletionItems(vscode, index.members, owner);
+    const receiverType = owner && resolveReceiverType(document, position, index);
+    if (owner) return memberCompletionItems(vscode, index.members, owner, receiverType);
   }
   const items = [];
   for (const keyword of keywords) {
@@ -310,10 +323,11 @@ function provideHover(vscode, document, position, semanticIndex = []) {
   const member = owner && index.members.find((entry) => entry.owner === owner && entry.name === token.word);
   const receiverType = member && resolveReceiverType(document, position, index);
   const resolvedResult = member && memberResultType(member, receiverType);
+  const detail = member && resolvedMemberDetail(member, receiverType);
   const binding = visibleBinding(token.word, document, position, index.bindings, index.symbols);
   const semantic = index.symbols.find((entry) => shortSymbolName(entry.name) === token.word);
   const markdown = member
-    ? `**Ostrin ${member.kind || 'member'}**\n\n\`${member.owner}.${member.name}: ${member.detail || ''}\`${resolvedResult ? `\n\nReturns \`${resolvedResult}\`` : ''}`
+    ? `**Ostrin ${member.kind || 'member'}**\n\n\`${member.owner}.${member.name}: ${detail || ''}\`${resolvedResult ? `\n\nReturns \`${resolvedResult}\`` : ''}`
     : binding
       ? `**Ostrin local binding**\n\n\`${binding.name}: ${binding.type}\``
       : semantic

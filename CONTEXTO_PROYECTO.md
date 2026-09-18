@@ -1504,3 +1504,24 @@ La ubicación de un campo o variante apunta por ahora al span del `record` o
 `enum` propietario porque esos nodos todavía no conservan spans individuales.
 La siguiente mejora puede añadir posiciones precisas por miembro y navegación
 semántica completa para expresiones, rename y referencias múltiples.
+
+---
+
+## 43. Sustitución de genéricos en hover y autocompletado — 2026-09-17
+
+El editor ya no muestra únicamente la firma genérica declarada. Cuando conoce
+el tipo del receptor, sustituye sus argumentos en la firma presentada:
+
+- `List<Int>.push` aparece como `push(value: Int) -> Void`.
+- `Map<String, Int>.get` puede mostrar `get(key: String) -> Option<Int>`.
+- Los campos de `record<T>` aplican la misma sustitución cuando el binding
+  tiene un tipo aplicado.
+
+La lógica reutiliza `ownerGenerics`, `resultType` y los mismos reemplazos que ya
+usa la resolución de cadenas, por lo que hover y completion no pueden divergir
+en la forma de resolver el receptor.
+
+Se añadió `vscode-ostrin/test-language-features.js` y el script `npm test` de
+la extensión. La prueba verifica la firma sustituida de `List<Int>` en
+autocompletado y hover. El siguiente paso queda en firmas más precisas para
+genéricos de lambdas (`U`) y en referencias múltiples para navegación.
