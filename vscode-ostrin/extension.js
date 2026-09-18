@@ -1,6 +1,7 @@
 const vscode = require('vscode');
 const childProcess = require('child_process');
 const path = require('path');
+const languageFeatures = require('./language-features');
 
 let diagnostics;
 
@@ -110,6 +111,18 @@ async function runCompiler(document, run, notify = true) {
 
 function activate(context) {
   diagnostics = vscode.languages.createDiagnosticCollection('ostrin');
+  const selector = { language: 'ostrin', scheme: 'file' };
+  const completion = vscode.languages.registerCompletionItemProvider(
+    selector,
+    { provideCompletionItems: () => languageFeatures.provideCompletionItems(vscode) },
+    '.', ':'
+  );
+  const hover = vscode.languages.registerHoverProvider(selector, {
+    provideHover: (document, position) => languageFeatures.provideHover(vscode, document, position)
+  });
+  const symbols = vscode.languages.registerDocumentSymbolProvider(selector, {
+    provideDocumentSymbols: (document) => languageFeatures.provideDocumentSymbols(vscode, document)
+  });
   const check = vscode.commands.registerCommand('ostrin.check', async () => {
     const document = currentDocument();
     if (document) await runCompiler(document, false, true);
@@ -127,7 +140,7 @@ function activate(context) {
     }
   });
 
-  context.subscriptions.push(diagnostics, check, run, saveSubscription);
+  context.subscriptions.push(diagnostics, completion, hover, symbols, check, run, saveSubscription);
 }
 
 function deactivate() {}

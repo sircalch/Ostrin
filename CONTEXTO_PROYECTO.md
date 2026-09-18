@@ -1262,3 +1262,20 @@ levantar un servidor LSP completo.
 
 Se añadieron dos pruebas de integración para el protocolo JSON y la interfaz
 CLI. La suite queda en **63 pruebas exitosas**.
+
+---
+
+## 36. Primera capa de lenguaje en VS Code — 2026-09-17
+
+La extensión dejó de limitarse a colorear texto y ejecutar comandos. Ahora
+registra proveedores nativos de VS Code para:
+
+- autocompletar palabras reservadas, tipos núcleo, unidades y funciones de la
+  biblioteca estándar;
+- mostrar documentación contextual con hover;
+- construir el outline del archivo para `fn`, `record`, `enum`, `trait` e
+  `impl`.
+
+Esta capa es deliberadamente sintáctica y no pretende simular un LSP semántico.
+El siguiente paso de tooling es exponer símbolos, tipos y firmas desde el
+checker para ofrecer completado y navegación conscientes del programa.

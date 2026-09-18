@@ -9,12 +9,15 @@ This is the first VS Code integration for Ostrin. It currently provides:
 - `Ostrin: Check Current File`;
 - `Ostrin: Run Current File`;
 - compiler errors in the VS Code Problems panel, with line and column when available;
+- keyword, type, unit and standard-library completion;
+- hover documentation and an outline for top-level declarations;
 - optional compiler checks on save.
 
 The extension calls the `ostrinc` executable configured in `ostrin.compilerPath`.
 The default assumes that `ostrinc` is available on `PATH`. During development,
 set the full path to the compiler binary in VS Code settings.
 
-The compiler check command uses `ostrinc --check --json` internally. The full
-language server, type-aware completion, hover information, navigation,
-formatting and debugging are future work.
+The compiler check command uses `ostrinc --check --json` internally. The
+current editor providers are intentionally lightweight and syntax-aware. A
+full semantic language server with type-aware completion, navigation,
+formatting and debugging is future work.

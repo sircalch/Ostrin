@@ -57,10 +57,11 @@ ostrinc --tokens file.ostrin   # print lexer tokens
 The first editor integration is in [`vscode-ostrin/`](vscode-ostrin/). It
 recognizes `.ostrin` files, provides syntax highlighting, uses the official
 logo, exposes commands to check or run the current file with `ostrinc`, and
-shows compiler diagnostics directly in the Problems panel. Enable
-`ostrin.checkOnSave` to check automatically after saving. A complete Language
-Server Protocol implementation, type-aware completion and debugging remain
-future work.
+shows compiler diagnostics directly in the Problems panel. It also provides
+syntax-aware completion, hover documentation and an outline for top-level
+declarations. Enable `ostrin.checkOnSave` to check automatically after saving.
+A complete semantic Language Server Protocol implementation and debugging
+remain future work.
 
 ## Documentation
 
