@@ -1456,3 +1456,20 @@ La suite permanece en **65 pruebas exitosas**; se ampliaron las comprobaciones
 del índice para validar `resultType` en miembros de colecciones y de un record.
 También pasó el smoke test de VS Code para `numbers.map(...).` y los chequeos
 de sintaxis JavaScript.
+
+---
+
+## 41. Deploys de Pages separados del CI — 2026-09-17
+
+Se revisó la cantidad de ejecuciones de GitHub Actions. No era necesario
+publicar GitHub Pages después de cada cambio del compilador: `pages.yml` estaba
+escuchando cualquier `push` a `main`, aunque solo se modificara Rust o la
+extensión.
+
+- `ci.yml` conserva la validación en cada `push` a `main` y cada pull request.
+- `pages.yml` ahora se activa automáticamente solo cuando cambia `website/**`
+  o el propio workflow de Pages.
+- `workflow_dispatch` se mantiene para publicar manualmente cuando haga falta.
+
+Los deploys históricos no se eliminan, pero los siguientes avances del
+compilador ya no generarán deploys de Pages innecesarios.
