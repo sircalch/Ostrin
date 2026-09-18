@@ -134,6 +134,18 @@ pub enum Ty {
     Unknown,
 }
 
+/// True when a type is `Unknown` or mentions `Unknown` anywhere inside it.
+pub fn ty_contains_unknown(ty: &Ty) -> bool {
+    match ty {
+        Ty::Unknown => true,
+        Ty::List(t) | Ty::Set(t) => ty_contains_unknown(t),
+        Ty::Map(k, v) => ty_contains_unknown(k) || ty_contains_unknown(v),
+        Ty::Applied(_, args) => args.iter().any(ty_contains_unknown),
+        Ty::Fn(params, ret) => params.iter().any(ty_contains_unknown) || ty_contains_unknown(ret),
+        _ => false,
+    }
+}
+
 impl Ty {
     pub fn is_numeric_scalar(&self) -> bool {
         matches!(self, Ty::Int | Ty::Float)

@@ -30,6 +30,26 @@ pub struct EditorExpression {
     pub source_file: Option<String>,
 }
 
+/// Identifies an expression node across the whole program: the file it was
+/// parsed from plus its exact source range. (The parser wraps each expression
+/// exactly once in `Expr::Located`, so this is unique per node.)
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ExprKey {
+    pub file: Option<String>,
+    pub start: Span,
+    pub end: Span,
+}
+
+/// Everything the checker learned, in structured form: the foundation for a
+/// typed AST/HIR that backends can consume instead of re-inferring types.
+pub struct TypedProgram {
+    pub errors: Vec<TypeError>,
+    /// The type of every located expression. Generic bodies are checked once,
+    /// so their expressions carry `Ty::Generic` types; a type the checker
+    /// could not determine is `Ty::Unknown`.
+    pub expr_types: HashMap<ExprKey, Ty>,
+}
+
 #[derive(Clone)]
 struct FnSig {
     params: Vec<Param>,
@@ -68,6 +88,7 @@ pub struct Checker {
     editor_scope_depth: usize,
     editor_bindings: Vec<EditorBinding>,
     editor_expressions: Vec<EditorExpression>,
+    expr_types: HashMap<ExprKey, Ty>,
     errors: Vec<TypeError>,
 }
 
@@ -130,6 +151,7 @@ impl Checker {
             editor_scope_depth: 0,
             editor_bindings: Vec::new(),
             editor_expressions: Vec::new(),
+            expr_types: HashMap::new(),
             errors: Vec::new(),
         }
     }
@@ -144,9 +166,23 @@ impl Checker {
     }
 
     pub fn check_program_with_editor_data(
-        mut self,
+        self,
         items: &[Item],
     ) -> (Vec<TypeError>, Vec<EditorBinding>, Vec<EditorExpression>) {
+        let (errors, bindings, expressions, _) = self.check_all(items);
+        (errors, bindings, expressions)
+    }
+
+    /// Like `check_program`, but also returns the type of every expression.
+    pub fn check_program_typed(self, items: &[Item]) -> TypedProgram {
+        let (errors, _, _, expr_types) = self.check_all(items);
+        TypedProgram { errors, expr_types }
+    }
+
+    fn check_all(
+        mut self,
+        items: &[Item],
+    ) -> (Vec<TypeError>, Vec<EditorBinding>, Vec<EditorExpression>, HashMap<ExprKey, Ty>) {
         for item in items {
             match item {
                 Item::Enum(e) => {
@@ -248,7 +284,7 @@ impl Checker {
                 Item::Record(_) | Item::Enum(_) | Item::Import(_) | Item::Trait(_) => {}
             }
         }
-        (self.errors, self.editor_bindings, self.editor_expressions)
+        (self.errors, self.editor_bindings, self.editor_expressions, self.expr_types)
     }
 
     fn check_function(&mut self, f: &FunctionDecl) {
@@ -755,6 +791,13 @@ impl Checker {
                 self.current_span = Some(range.start);
                 let ty = self.infer_expr(inner, scope);
                 self.current_span = previous_span;
+                // A body can be inferred more than once (a lambda is first
+                // checked in isolation); never let a later `Unknown` erase a
+                // type that was already determined.
+                let key = ExprKey { file: self.current_source_file.clone(), start: range.start, end: range.end };
+                if ty != Ty::Unknown || !self.expr_types.contains_key(&key) {
+                    self.expr_types.insert(key, ty.clone());
+                }
                 self.editor_expressions.push(EditorExpression {
                     type_name: ty.describe(),
                     function: self.current_function_name.clone().unwrap_or_default(),
@@ -907,8 +950,10 @@ impl Checker {
                 }
                 Ty::Set(Box::new(elem))
             }
-            Expr::EmptyCollection(name, _) => {
-                if name == "Map" { Ty::Map(Box::new(Ty::Unknown), Box::new(Ty::Unknown)) } else { Ty::Set(Box::new(Ty::Unknown)) }
+            Expr::EmptyCollection(name, type_args) => {
+                // The written type arguments are the collection's real type.
+                let arg = |index: usize| type_args.get(index).map_or(Ty::Unknown, |t| self.resolve_type_in_context(t));
+                if name == "Map" { Ty::Map(Box::new(arg(0)), Box::new(arg(1))) } else { Ty::Set(Box::new(arg(0))) }
             }
             Expr::MapLiteral(pairs) => {
                 let mut key = Ty::Unknown;

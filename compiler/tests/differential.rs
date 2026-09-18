@@ -216,3 +216,29 @@ fn mutated_sources_never_crash_the_front_end() {
     let _ = fs::remove_dir_all(&dir);
     assert!(crashes.is_empty(), "the front end crashed on mutated input:\n  {}", crashes.join("\n  "));
 }
+
+/// Ratchet for the checker's typed-expression table (Stage 1 of the
+/// architecture plan): across every example that type-checks, the number of
+/// expressions whose type the checker could not determine must never grow.
+/// When you close a gap, lower `MAX_UNKNOWN_EXPRESSIONS` to the new value.
+#[test]
+fn typed_expression_table_does_not_regress() {
+    const MAX_UNKNOWN_EXPRESSIONS: usize = 46;
+    let (mut total, mut unknown) = (0usize, 0usize);
+    for path in examples() {
+        let file = path.to_string_lossy().to_string();
+        if !ostrinc(&["--check", &file]).status.success() {
+            continue;
+        }
+        let report = text(&ostrinc(&["--typed-report", &file]).stdout);
+        for line in report.lines() {
+            if let Some(n) = line.strip_prefix("expressions: ") {
+                total += n.trim().parse::<usize>().unwrap();
+            } else if let Some(n) = line.strip_prefix("unknown: ") {
+                unknown += n.trim().parse::<usize>().unwrap();
+            }
+        }
+    }
+    assert!(total > 1000, "typed report covered only {total} expressions");
+    assert!(unknown <= MAX_UNKNOWN_EXPRESSIONS, "{unknown} of {total} expressions have an unknown type (limit {MAX_UNKNOWN_EXPRESSIONS})");
+}

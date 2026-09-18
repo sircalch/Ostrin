@@ -37,7 +37,7 @@ pub struct FunctionDecl {
 /// Posición de origen conservada en el AST para que las herramientas puedan
 /// señalar el lugar donde nació un diagnóstico. Las posiciones son 1-based,
 /// igual que las que ya expone el lexer.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct Span {
     pub line: usize,
     pub col: usize,

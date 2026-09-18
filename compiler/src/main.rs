@@ -37,6 +37,7 @@ fn real_main() -> ExitCode {
     let symbols_only = args.iter().any(|a| a == "--symbols");
     let members_only = args.iter().any(|a| a == "--members");
     let types_only = args.iter().any(|a| a == "--types");
+    let typed_report = args.iter().any(|a| a == "--typed-report");
     let stdin_source = args.iter().any(|a| a == "--stdin");
     let lsp_server = args.iter().any(|a| a == "--lsp");
     let dap_server = args.iter().any(|a| a == "--dap");
@@ -187,6 +188,27 @@ fn real_main() -> ExitCode {
                     binding.name, binding.type_name, binding.span.line, binding.span.col
                 );
             }
+        }
+        return ExitCode::SUCCESS;
+    }
+
+    if typed_report {
+        // Audit of the checker's typed-expression table: how many expressions
+        // have a fully determined type, and where the checker gave up.
+        let typed = typeck::Checker::new().check_program_typed(&items);
+        let total = typed.expr_types.len();
+        let mut unknown: Vec<(String, usize, usize)> = typed
+            .expr_types
+            .iter()
+            .filter(|(_, ty)| types::ty_contains_unknown(ty))
+            .map(|(key, _)| (key.file.clone().unwrap_or_else(|| path.to_string()), key.start.line, key.start.col))
+            .collect();
+        unknown.sort();
+        println!("expressions: {total}");
+        println!("errors: {}", typed.errors.len());
+        println!("unknown: {}", unknown.len());
+        for (file, line, col) in &unknown {
+            println!("  {file}:{line}:{col}");
         }
         return ExitCode::SUCCESS;
     }

@@ -3085,3 +3085,27 @@ arquitectura, pruebas que detecten regresiones entre fases.
   `OSTRIN_REQUIRE_CC=1`, para que la falta de compilador C haga fallar la
   prueba diferencial en lugar de omitirla en silencio.
 - Suite: **96 pruebas** (93 + 3), sin warnings.
+
+---
+
+## 86. Etapa 1: tabla de tipos por expresión — 2026-09-18
+
+- El checker ahora conserva, además de los errores, el **`Ty` real de cada
+  expresión** (`TypedProgram.expr_types`, clave `ExprKey { archivo, inicio, fin }`;
+  el parser envuelve cada expresión exactamente una vez en `Expr::Located`, así
+  que la clave es única sin tocar el AST). Un `Unknown` posterior nunca borra un
+  tipo ya determinado (los lambdas se infieren dos veces). Es la base del futuro
+  HIR: el backend podrá leer tipos en vez de reinferirlos.
+- `ostrinc --typed-report archivo.ostrin`: nº de expresiones, nº con tipo
+  desconocido y su ubicación. Auditoría inicial: **1 382 expresiones en los
+  ejemplos válidos, 46 desconocidas (3,3 %)**.
+- Arreglo encontrado por la auditoría: `Map<K,V>()`/`Set<T>()` se tipaban con
+  `Unknown`; ahora usan los tipos escritos.
+- Test-de trinquete (`typed_expression_table_does_not_regress`): el número de
+  desconocidas no puede subir (límite 46; bajarlo al cerrar huecos). Causas que
+  quedan: `None`/`Ok(x)`/`Err(e)` sin contexto esperado, elementos `dyn Trait`,
+  y sus derivados.
+- Decisión: no se añadió un `NodeId` al AST; la clave por rango cubre el
+  objetivo con un cambio mucho menos invasivo. Se revisará si hiciera falta
+  para nodos sin `Located` (patrones, declaraciones).
+- Suite: **97 pruebas**, sin warnings.
