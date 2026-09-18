@@ -3019,3 +3019,18 @@ pruebas**, sin warnings.
 - `generic_impls_and_methods`, `generics_explicit` y `quantity_impl_dispatch`
   compilan y coinciden; ejemplo nuevo `native_generic_methods.ostrin`.
   Suite: **93 pruebas**, sin warnings.
+
+---
+
+## 82. Funciones incorporadas en el backend nativo — 2026-09-18
+
+- `read_file`, `write_file`, `parse_int` (mismos mensajes de error que Rust:
+  «invalid digit found in string», «cannot parse integer from empty string»,
+  «number too large…»), `sum` (Int/Float/Quantity) y `panic`.
+  `Result<Void, String>` usa un `char` de relleno para su campo de valor.
+- Los mensajes de error del sistema de `read_file`/`write_file` vienen de
+  `strerror`, así que difieren del texto de Rust/Windows (`stdlib_io.ostrin`
+  compila, pero su salida de error no es idéntica byte a byte).
+- `newlines.ostrin` y `advanced.ostrin` no son programas ejecutables (referencian
+  nombres inexistentes: son muestras de sintaxis), así que no se portan.
+- Ejemplo nuevo `native_builtins.ostrin`. Suite: **93 pruebas**, sin warnings.

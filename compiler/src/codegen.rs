@@ -108,6 +108,11 @@ enum CType {
     Set(Box<CType>),
 }
 
+/// A struct-field spelling of a type: `Void` (a `Result<Void, E>`'s value) becomes a placeholder `char`.
+fn field_c_type(ty: &CType) -> String {
+    if *ty == CType::Void { "char".to_string() } else { c_type_name(ty) }
+}
+
 fn c_type_name(ty: &CType) -> String {
     match ty {
         CType::Int => "int64_t".to_string(),
@@ -251,6 +256,7 @@ const PRELUDE: &str = "#include <stdint.h>\n\
 #include <stdio.h>\n\
 #include <stdlib.h>\n\
 #include <string.h>\n\
+#include <errno.h>\n\
 \n\
 static int64_t ostrin_idiv(int64_t a, int64_t b) {\n\
     if (b == 0) { fprintf(stderr, \"runtime error: division by zero\\n\"); exit(1); }\n\
@@ -2205,6 +2211,11 @@ impl<'a> Codegen<'a> {
         if name == "print" {
             return self.gen_print(&arg_codes, &arg_types);
         }
+        if !self.function_decls.contains_key(name) {
+            if let Some(result) = self.gen_builtin(name, &arg_codes, &arg_types)? {
+                return Ok(result);
+            }
+        }
         if let Some(decl) = self.generic_functions.get(name).copied() {
             return self.gen_generic_call(decl, type_args, &arg_codes, &arg_types);
         }
@@ -2858,6 +2869,97 @@ impl<'a> Codegen<'a> {
             _ => unreachable!("only records and enums are queued"),
         }
         Ok(out)
+    }
+
+    /// The interpreter's built-in functions beyond `print`: `read_file`,
+    /// `write_file`, `parse_int`, `sum` and `panic`.
+    fn gen_builtin(&mut self, name: &str, codes: &[String], types: &[CType]) -> Result<Option<(String, CType)>, String> {
+        let arity = match name {
+            "read_file" | "parse_int" | "sum" | "panic" => 1,
+            "write_file" => 2,
+            _ => return Ok(None),
+        };
+        if codes.len() != arity {
+            return Err(format!("'{name}' expects {arity} argument(s), got {}", codes.len()));
+        }
+        let (r, a, b, c) = (self.next_temp(), self.next_temp(), self.next_temp(), self.next_temp());
+        match name {
+            "read_file" => {
+                let ty = CType::Result(Box::new(CType::Str), Box::new(CType::Str));
+                self.register_list_types(&ty);
+                Ok(Some((
+                    format!(
+                        "({{ Result_String_String {r}; memset(&{r}, 0, sizeof {r}); FILE* {a} = fopen({p}, \"rb\"); \
+                         if (!{a}) {{ {r}.error = strerror(errno); }} else {{ \
+                         fseek({a}, 0, SEEK_END); long {b} = ftell({a}); fseek({a}, 0, SEEK_SET); \
+                         char* {c} = (char*)malloc((size_t){b} + 1); \
+                         if (!{c}) {{ fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); }} \
+                         size_t {r}_n = fread({c}, 1, (size_t){b}, {a}); {c}[{r}_n] = 0; fclose({a}); \
+                         {r}.ok = true; {r}.value = {c}; }} {r}; }})",
+                        p = codes[0]
+                    ),
+                    ty,
+                )))
+            }
+            "write_file" => {
+                let ty = CType::Result(Box::new(CType::Void), Box::new(CType::Str));
+                self.register_list_types(&ty);
+                Ok(Some((
+                    format!(
+                        "({{ Result_Void_String {r}; memset(&{r}, 0, sizeof {r}); FILE* {a} = fopen({p}, \"wb\"); \
+                         if (!{a}) {{ {r}.error = strerror(errno); }} else {{ fputs({t}, {a}); fclose({a}); {r}.ok = true; }} {r}; }})",
+                        p = codes[0],
+                        t = codes[1]
+                    ),
+                    ty,
+                )))
+            }
+            "parse_int" => {
+                let ty = CType::Result(Box::new(CType::Int), Box::new(CType::Str));
+                self.register_list_types(&ty);
+                Ok(Some((
+                    format!(
+                        "({{ Result_Int_String {r}; memset(&{r}, 0, sizeof {r}); const char* {a} = {t}; \
+                         if (*{a} == 0) {{ {r}.error = \"cannot parse integer from empty string\"; }} \
+                         else if (*{a} == ' ' || (*{a} >= 9 && *{a} <= 13)) {{ {r}.error = \"invalid digit found in string\"; }} \
+                         else {{ char* {b}; errno = 0; long long {c} = strtoll({a}, &{b}, 10); \
+                         if (errno == ERANGE) {{ {r}.error = {c} < 0 ? \"number too small to fit in target type\" : \"number too large to fit in target type\"; }} \
+                         else if (*{b} != 0 || {b} == {a}) {{ {r}.error = \"invalid digit found in string\"; }} \
+                         else {{ {r}.ok = true; {r}.value = (int64_t){c}; }} }} {r}; }})",
+                        t = codes[0]
+                    ),
+                    ty,
+                )))
+            }
+            "panic" => Ok(Some((
+                format!("({{ fprintf(stderr, \"runtime error: panic: %s\\n\", {}); exit(1); }})", codes[0]),
+                CType::Void,
+            ))),
+            "sum" => {
+                let CType::List(elem) = &types[0] else { return Err("'sum' expects a List".to_string()) };
+                let struct_name = self.ensure_list(elem);
+                let list = format!("{struct_name}* {r} = {};", codes[0]);
+                match &**elem {
+                    CType::Int => Ok(Some((
+                        format!("({{ {list} int64_t {a} = 0; for (int64_t {b} = 0; {b} < {r}->length; {b}++) {{ {a} += {r}->items[{b}]; }} {a}; }})"),
+                        CType::Int,
+                    ))),
+                    CType::Float => Ok(Some((
+                        format!("({{ {list} double {a} = 0.0; for (int64_t {b} = 0; {b} < {r}->length; {b}++) {{ {a} += {r}->items[{b}]; }} {a}; }})"),
+                        CType::Float,
+                    ))),
+                    CType::Quantity(d) => Ok(Some((
+                        format!(
+                            "({{ {list} if ({r}->length == 0) {{ fprintf(stderr, \"runtime error: sum of an empty list of quantities\\n\"); exit(1); }} \
+                             Qty {a} = {r}->items[0]; for (int64_t {b} = 1; {b} < {r}->length; {b}++) {{ {a} = ostrin_qty_add({a}, {r}->items[{b}]); }} {a}; }})"
+                        ),
+                        CType::Quantity(d.clone()),
+                    ))),
+                    other => Err(format!("'sum' isn't supported on List<{}> by the native backend", c_type_name(other))),
+                }
+            }
+            _ => unreachable!(),
+        }
     }
 
     fn gen_print(&mut self, arg_codes: &[String], arg_types: &[CType]) -> Result<(String, CType), String> {
@@ -3554,7 +3656,7 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
         let name = format!("Result_{}_{}", mangle_ctype(&ok), mangle_ctype(&err));
         out.push_str(&format!("typedef struct {{ bool ok; {} value; {} error; }} {name};
 
-", c_type_name(&ok), c_type_name(&err)));
+", field_c_type(&ok), field_c_type(&err)));
     }
     for inner in std::mem::take(&mut option_inners) {
         let name = format!("Option_{}", mangle_ctype(&inner));

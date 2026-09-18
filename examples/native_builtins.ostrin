@@ -1,0 +1,18 @@
+fn main() -> Void {
+    missing = read_file("no/such/file.txt")
+    print(missing.is_ok())
+
+    print(parse_int("42").unwrap())
+    print(parse_int("-7"))
+    print(parse_int("abc"))
+    print(parse_int(""))
+    print(parse_int("99999999999999999999"))
+
+    write_file("target/ostrin-native-builtins.txt", "hello from Ostrin")
+    loaded = read_file("target/ostrin-native-builtins.txt")
+    print(loaded.unwrap())
+
+    print(sum([1, 2, 3, 4]))
+    print(sum([1.5, 2.5]))
+    print(sum([2 m, 3 m]))
+}
