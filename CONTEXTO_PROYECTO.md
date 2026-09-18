@@ -1643,3 +1643,38 @@ Se añadió una identidad visual específica para los archivos Ostrin.
 Al reinstalar el `.vsix` actualizado y recargar VS Code, los archivos
 `.ostrin` deben mostrar el símbolo de Ostrin en el Explorador, pestañas y
 listas de archivos compatibles con iconos de lenguaje.
+
+---
+
+## 48. Referencias y renombrado con scope en VS Code — 2026-09-17
+
+La extensión ganó una primera capa de navegación semántica sobre nombres
+locales. Ya no se limita a saltar a una declaración: puede localizar todos
+los usos de un binding y preparar un renombrado que respete la función y el
+scope visible.
+
+### Cambios realizados
+
+- Se registró `ReferenceProvider` para `Shift+F12` / Find All References.
+- Se registró `RenameProvider` para `F2` sobre bindings locales.
+- El indexado distingue los símbolos top-level de los miembros y ahora carga
+  ambos índices desde `ostrinc --symbols --json` y `ostrinc --members --json`.
+- La búsqueda ignora cadenas y comentarios de una línea para no modificar
+  texto que solo coincide accidentalmente con el nombre.
+- El renombrado usa la resolución de binding visible y `scopeDepth`, evitando
+  renombrar una variable externa cuando existe otra con el mismo nombre en un
+  scope interior.
+- La extensión pasó a la versión `0.1.1`; README, changelog y web reflejan la
+  nueva superficie.
+
+### Límite actual
+
+Esta primera implementación trabaja sobre el archivo abierto y bindings
+indexados por el compilador. El siguiente salto será resolver referencias
+entre módulos y expresiones completas con un índice persistente tipo LSP.
+
+### Verificación
+
+El smoke test de VS Code verifica tres referencias y tres reemplazos para un
+binding local. También pasan la sintaxis JavaScript y las **66 pruebas** del
+compilador.

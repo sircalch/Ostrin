@@ -62,7 +62,7 @@ recognizes `.ostrin` files, provides syntax highlighting, uses the official
 logo, exposes commands to check or run the current file with `ostrinc`, and
 shows compiler diagnostics directly in the Problems panel. It also provides
 syntax-aware completion, type-aware member completion, hover documentation,
-definition navigation and an outline for top-level declarations. Enable
+definition navigation, reference search, scoped rename and an outline for top-level declarations. Enable
 `ostrin.checkOnSave` to check automatically after saving.
 A complete semantic Language Server Protocol implementation and debugging
 remain future work.
@@ -75,7 +75,7 @@ cd compiler
 cargo build
 cd ..\vscode-ostrin
 npx --yes @vscode/vsce package
-code --install-extension .\ostrin-language-support-0.1.0.vsix
+code --install-extension .\ostrin-language-support-0.1.1.vsix
 ```
 
 Once installed, VS Code detects `.ostrin` files automatically. The extension

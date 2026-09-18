@@ -349,6 +349,137 @@ function locationForEntry(vscode, entry) {
   );
 }
 
+function identifierRanges(text, name) {
+  const ranges = [];
+  let index = 0;
+  let quote;
+  while (index < text.length) {
+    const character = text[index];
+    if (quote) {
+      if (character === '\\') {
+        index += 2;
+        continue;
+      }
+      if (character === quote) quote = undefined;
+      index += 1;
+      continue;
+    }
+    if (character === '/' && text[index + 1] === '/') break;
+    if (character === '"' || character === "'") {
+      quote = character;
+      index += 1;
+      continue;
+    }
+    if (/[A-Za-z_]/.test(character)) {
+      let end = index + 1;
+      while (end < text.length && /[A-Za-z0-9_]/.test(text[end])) end += 1;
+      if (text.slice(index, end) === name) ranges.push({ start: index, end });
+      index = end;
+      continue;
+    }
+    index += 1;
+  }
+  return ranges;
+}
+
+function identifierLocations(vscode, document, name) {
+  const locations = [];
+  for (let line = 0; line < document.lineCount; line += 1) {
+    const text = document.lineAt(line).text;
+    for (const range of identifierRanges(text, name)) {
+      locations.push({
+        line,
+        start: range.start,
+        location: new vscode.Location(
+          document.uri,
+          new vscode.Range(
+            new vscode.Position(line, range.start),
+            new vscode.Position(line, range.end)
+          )
+        )
+      });
+    }
+  }
+  return locations;
+}
+
+function bindingIdentity(left, right) {
+  return left && right
+    && left.name === right.name
+    && left.function === right.function
+    && left.line === right.line
+    && left.column === right.column;
+}
+
+function bindingReferenceLocations(vscode, document, binding, bindings, semanticSymbols) {
+  return identifierLocations(vscode, document, binding.name)
+    .filter((entry) => entry.line + 1 >= (binding.line || 1))
+    .filter((entry) => {
+      const position = new vscode.Position(entry.line, entry.start);
+      return currentFunctionName(document, position, semanticSymbols) === binding.function;
+    })
+    .filter((entry) => {
+      const position = new vscode.Position(entry.line, entry.start);
+      return currentBraceDepth(document, position) >= (binding.scopeDepth || 0);
+    })
+    .filter((entry) => {
+      const position = new vscode.Position(entry.line, entry.start);
+      const visible = visibleBinding(binding.name, document, position, bindings, semanticSymbols);
+      return bindingIdentity(visible, binding);
+    });
+}
+
+function renameTarget(vscode, document, position, index) {
+  const token = wordAt(document, position);
+  if (!token.word) return undefined;
+  const access = memberAccessAt(document, position);
+  const owner = access && receiverOwner(document, position, index);
+  const member = owner && index.members.find((entry) => entry.owner === owner && entry.name === token.word);
+  if (member) return undefined;
+
+  const binding = visibleBinding(token.word, document, position, index.bindings, index.symbols);
+  if (binding) return { kind: 'binding', name: token.word, binding };
+
+  const semantic = index.symbols.find((entry) =>
+    shortSymbolName(entry.name) === token.word
+      && (!entry.file || sameFile(entry.file, document.uri.fsPath))
+  );
+  return semantic ? { kind: 'symbol', name: token.word, semantic } : undefined;
+}
+
+function provideReferences(vscode, document, position, context, semanticIndex = []) {
+  const index = normalizeSemanticIndex(semanticIndex);
+  const target = renameTarget(vscode, document, position, index);
+  if (!target) return undefined;
+  const entries = target.kind === 'binding'
+    ? bindingReferenceLocations(vscode, document, target.binding, index.bindings, index.symbols)
+    : identifierLocations(vscode, document, target.name);
+  const includeDeclaration = context?.includeDeclaration !== false;
+  const filtered = includeDeclaration
+    ? entries
+    : entries.filter((entry) => {
+      if (target.kind === 'binding') {
+        return !(entry.line + 1 === target.binding.line && entry.start + 1 === target.binding.column);
+      }
+      return !(entry.line + 1 === target.semantic.line);
+    });
+  return filtered.map((entry) => entry.location);
+}
+
+function provideRenameEdits(vscode, document, position, newName, semanticIndex = []) {
+  const references = provideReferences(
+    vscode,
+    document,
+    position,
+    { includeDeclaration: true },
+    semanticIndex
+  );
+  if (!references || !references.length || !vscode.WorkspaceEdit) return undefined;
+  const edit = new vscode.WorkspaceEdit();
+  for (const location of references) edit.replace(document.uri, location.range, newName);
+  return edit;
+}
+
 function provideDefinition(vscode, document, position, semanticIndex = []) {
   const index = normalizeSemanticIndex(semanticIndex);
   const token = wordAt(document, position);
@@ -437,5 +568,7 @@ module.exports = {
   provideCompletionItems,
   provideHover,
   provideDefinition,
+  provideReferences,
+  provideRenameEdits,
   provideDocumentSymbols
 };

@@ -80,16 +80,6 @@ function refreshSemanticIndex(document) {
   if (document.isUntitled) return;
   const cwd = vscode.workspace.getWorkspaceFolder(document.uri)?.uri.fsPath
     ?? path.dirname(document.uri.fsPath);
-  const child = childProcess.spawn(compilerPath(document), ['--members', '--json', document.uri.fsPath], {
-    cwd,
-    windowsHide: true,
-    shell: false
-  });
-  child.on('error', () => {
-    // The normal compiler check reports startup failures to the user. The
-    // background symbol index must stay silent when the compiler is absent.
-  });
-  let buffer = '';
   const found = { symbols: [], members: [], bindings: [] };
   const addSemanticItem = (item) => {
     if (!item || !item.name) return;
@@ -97,28 +87,54 @@ function refreshSemanticIndex(document) {
     else if (item.kind === 'binding') found.bindings.push(item);
     else if (item.kind) found.symbols.push(item);
   };
-  child.stdout.on('data', (data) => {
-    buffer += data.toString();
-    const lines = buffer.split(/\r?\n/);
-    buffer = lines.pop() || '';
-    for (const line of lines) {
-      try {
-        const item = JSON.parse(line);
-        addSemanticItem(item);
-      } catch (_) {
-        // Ignore incomplete or diagnostic output from an older compiler.
+  let pending = 2;
+  let successful = true;
+  const finish = () => {
+    pending -= 1;
+    if (pending === 0 && successful) semanticIndex.set(document.uri.toString(), found);
+  };
+  for (const mode of ['members', 'symbols']) {
+    const child = childProcess.spawn(compilerPath(document), [`--${mode}`, '--json', document.uri.fsPath], {
+      cwd,
+      windowsHide: true,
+      shell: false
+    });
+    let buffer = '';
+    let settled = false;
+    const settle = (ok) => {
+      if (settled) return;
+      settled = true;
+      if (!ok) successful = false;
+      finish();
+    };
+    child.on('error', () => {
+      // The normal compiler check reports startup failures to the user. The
+      // background symbol index must stay silent when the compiler is absent.
+      settle(false);
+    });
+    child.stdout.on('data', (data) => {
+      buffer += data.toString();
+      const lines = buffer.split(/\r?\n/);
+      buffer = lines.pop() || '';
+      for (const line of lines) {
+        try {
+          const item = JSON.parse(line);
+          addSemanticItem(item);
+        } catch (_) {
+          // Ignore incomplete or diagnostic output from an older compiler.
+        }
       }
-    }
-  });
-  child.on('close', (code) => {
-    if (buffer.trim()) {
-      try {
-        const item = JSON.parse(buffer);
-        addSemanticItem(item);
-      } catch (_) {}
-    }
-    if (code === 0) semanticIndex.set(document.uri.toString(), found);
-  });
+    });
+    child.on('close', (code) => {
+      if (buffer.trim()) {
+        try {
+          const item = JSON.parse(buffer);
+          addSemanticItem(item);
+        } catch (_) {}
+      }
+      settle(code === 0);
+    });
+  }
 }
 
 async function runCompiler(document, run, notify = true) {
@@ -187,6 +203,12 @@ function activate(context) {
   const definitions = vscode.languages.registerDefinitionProvider(selector, {
     provideDefinition: (document, position) => languageFeatures.provideDefinition(vscode, document, position, semanticIndex.get(document.uri.toString()) || {})
   });
+  const references = vscode.languages.registerReferenceProvider(selector, {
+    provideReferences: (document, position, context) => languageFeatures.provideReferences(vscode, document, position, context, semanticIndex.get(document.uri.toString()) || {})
+  });
+  const rename = vscode.languages.registerRenameProvider(selector, {
+    provideRenameEdits: (document, position, newName) => languageFeatures.provideRenameEdits(vscode, document, position, newName, semanticIndex.get(document.uri.toString()) || {})
+  });
   const symbols = vscode.languages.registerDocumentSymbolProvider(selector, {
     provideDocumentSymbols: (document) => languageFeatures.provideDocumentSymbols(vscode, document, semanticIndex.get(document.uri.toString()) || {})
   });
@@ -215,7 +237,7 @@ function activate(context) {
     if (editor.document.languageId === 'ostrin') refreshSemanticIndex(editor.document);
   }
 
-  context.subscriptions.push(diagnostics, completion, hover, definitions, symbols, check, run, saveSubscription, openSubscription);
+  context.subscriptions.push(diagnostics, completion, hover, definitions, references, rename, symbols, check, run, saveSubscription, openSubscription);
 }
 
 function deactivate() {}

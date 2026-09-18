@@ -35,12 +35,31 @@ class Hover {
   }
 }
 
+class Location {
+  constructor(uri, range) {
+    this.uri = uri;
+    this.range = range;
+  }
+}
+
+class WorkspaceEdit {
+  constructor() {
+    this.entries = [];
+  }
+
+  replace(uri, range, newText) {
+    this.entries.push({ uri, range, newText });
+  }
+}
+
 const vscode = {
   CompletionItem,
   MarkdownString,
   Position,
   Range,
   Hover,
+  Location,
+  WorkspaceEdit,
   CompletionItemKind: {
     Method: 'method',
     Field: 'field',
@@ -100,5 +119,48 @@ const hoverDocument = {
 const hover = features.provideHover(vscode, hoverDocument, new Position(1, 11), index);
 assert(hover, 'push should have hover information');
 assert(hover.contents.value.includes('push(value: Int) -> Void'));
+
+const referenceLines = [
+  'fn main() {',
+  '  numbers = [1, 2]',
+  '  print(numbers)',
+  '  numbers.push(3)',
+  '}'
+];
+const referenceDocument = {
+  uri: { fsPath: 'C:/project/references.ostrin' },
+  lineAt: (line) => ({ text: referenceLines[line] }),
+  lineCount: referenceLines.length
+};
+const referenceIndex = {
+  symbols: [],
+  bindings: [{
+    name: 'numbers',
+    type: 'List<Int>',
+    function: 'main',
+    scopeDepth: 1,
+    file: 'C:/project/references.ostrin',
+    line: 2,
+    column: 3
+  }],
+  members: []
+};
+const references = features.provideReferences(
+  vscode,
+  referenceDocument,
+  new Position(1, 5),
+  { includeDeclaration: true },
+  referenceIndex
+);
+assert.strictEqual(references.length, 3, 'all local binding references should be found');
+const rename = features.provideRenameEdits(
+  vscode,
+  referenceDocument,
+  new Position(1, 5),
+  'values',
+  referenceIndex
+);
+assert(rename, 'rename should produce a workspace edit');
+assert.strictEqual(rename.entries.length, 3, 'rename should edit every local binding reference');
 
 console.log('Ostrin language feature tests passed');
