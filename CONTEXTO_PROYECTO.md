@@ -1282,3 +1282,28 @@ El compilador ya expone un índice JSON de símbolos y firmas mediante
 completar y construir el outline con declaraciones reales del proyecto. El
 siguiente paso es hacer que ese índice sea plenamente consciente de tipos desde
 el checker.
+
+---
+
+## 37. Índice de símbolos del compilador para tooling — 2026-09-17
+
+Se conectó la capa de editor con datos producidos por Ostrin, en vez de
+mantener todas las declaraciones de usuario como una lista fija en JavaScript.
+El cambio incluye:
+
+- spans de origen para `record`, `enum`, `trait` e `impl`, además de los que ya
+  tenían las funciones;
+- archivo de origen conservado en las declaraciones cargadas por módulos;
+- nuevo módulo `compiler/src/symbols.rs`, que construye un índice de funciones,
+  records, enums, variantes, campos, traits, implementaciones y métodos;
+- firmas renderizadas con genéricos, tipos compuestos y valores por defecto;
+- nuevo comando `ostrinc --symbols --json archivo.ostrin`, con un objeto JSON
+  por símbolo (`kind`, `name`, `detail`, `file`, `line`, `column`);
+- la extensión consulta ese índice en segundo plano al abrir o guardar un
+  archivo y lo usa para completar, mostrar hover y construir el outline local.
+
+La decisión importante es mantener dos niveles claros: el índice actual es
+consciente de las declaraciones y firmas del AST, mientras que el completado
+dependiente del tipo de una expresión (`valor.metodo`) queda pendiente de
+exponer resultados del checker. Se añadió una prueba de integración para la
+salida de símbolos y la suite queda en **64 pruebas exitosas**.
