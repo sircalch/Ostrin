@@ -30,6 +30,17 @@ pub struct FunctionDecl {
     pub params: Vec<Param>,
     pub return_type: Type,
     pub body: Block,
+    pub span: Span,
+    pub source_file: Option<String>,
+}
+
+/// Posición de origen conservada en el AST para que las herramientas puedan
+/// señalar el lugar donde nació un diagnóstico. Las posiciones son 1-based,
+/// igual que las que ya expone el lexer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Span {
+    pub line: usize,
+    pub col: usize,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -123,8 +134,14 @@ pub enum Item {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Block {
-    pub stmts: Vec<Stmt>,
+    pub stmts: Vec<LocatedStmt>,
     pub tail: Option<Box<Expr>>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct LocatedStmt {
+    pub stmt: Stmt,
+    pub span: Span,
 }
 
 #[derive(Debug, Clone, PartialEq)]

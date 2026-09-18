@@ -446,6 +446,8 @@ impl Interpreter {
                 params: default.params.clone(),
                 return_type: default.return_type.clone(),
                 body: body.clone(),
+                span: Span::default(),
+                source_file: None,
             }));
         }
         None
@@ -668,7 +670,7 @@ impl Interpreter {
     fn eval_block(&mut self, block: &Block, env: &Env) -> EvalResult {
         let inner = env.child();
         for stmt in &block.stmts {
-            self.eval_stmt(stmt, &inner)?;
+            self.eval_stmt(&stmt.stmt, &inner)?;
         }
         match &block.tail {
             Some(e) => self.eval_expr(e, &inner),

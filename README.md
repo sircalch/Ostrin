@@ -24,11 +24,12 @@ Ostrin is not yet a production compiler. The current implementation includes a
 lexer, parser, static checker, interpreter, modules, packages, collections,
 traits, pattern matching, quantities and a simulated concurrency model.
 
-The compiler suite currently passes **61 integration tests**. Function calls
+The compiler suite currently passes **63 integration tests**. Function calls
 support named/default arguments, collection lookups preserve `Option<T>`, and
-record fields are checked statically. The runtime is still synchronous, the
-standard library is small, and native code generation, full LSP support and
-production I/O are planned work.
+record fields are checked statically. The CLI also exposes JSON Lines
+diagnostics with source locations for editor integrations. The runtime is
+still synchronous, the standard library is small, and native code generation,
+full LSP support and production I/O are planned work.
 
 ## Quick start
 
@@ -44,6 +45,8 @@ The compiler currently supports:
 
 ```text
 ostrinc file.ostrin             # type-check
+ostrinc --check file.ostrin     # explicit type-check
+ostrinc --json --check file.ostrin # diagnostics for tools and editors
 ostrinc --run file.ostrin       # type-check and run
 ostrinc --ast file.ostrin       # print the AST
 ostrinc --tokens file.ostrin   # print lexer tokens
@@ -53,9 +56,11 @@ ostrinc --tokens file.ostrin   # print lexer tokens
 
 The first editor integration is in [`vscode-ostrin/`](vscode-ostrin/). It
 recognizes `.ostrin` files, provides syntax highlighting, uses the official
-logo and exposes commands to check or run the current file with `ostrinc`.
-Language Server Protocol features, type-aware completion and debugging will be
-added as the compiler begins exposing structured source diagnostics.
+logo, exposes commands to check or run the current file with `ostrinc`, and
+shows compiler diagnostics directly in the Problems panel. Enable
+`ostrin.checkOnSave` to check automatically after saving. A complete Language
+Server Protocol implementation, type-aware completion and debugging remain
+future work.
 
 ## Documentation
 
@@ -79,7 +84,7 @@ when GitHub Pages is enabled.
 ## Roadmap
 
 1. Complete the semantic core and remove unnecessary `Unknown` types.
-2. Add source spans and structured diagnostics.
+2. Expand source spans to expression-level precision and add the LSP server.
 3. Grow the standard library and runtime.
 4. Finish the VS Code language server.
 5. Package applications as `.exe` files, then add native code generation.

@@ -21,7 +21,7 @@ El objetivo explícito (dicho por el usuario al principio de la sesión): que Os
 
 - **17 documentos de diseño** completos y revisados (tres pasadas de consistencia formales), cubriendo el núcleo entero del lenguaje.
 - **Un compilador/intérprete real en Rust** (~4000+ líneas), en `compiler/`, que compila con `cargo build` y corre con `cargo run -- <flags> archivo.ostrin`.
-- **61 pruebas automatizadas** (`cargo test`) que verifican comportamiento exacto (no solo "no truena") sobre las piezas centrales del lenguaje.
+- **63 pruebas automatizadas** (`cargo test`) que verifican comportamiento exacto (no solo "no truena") sobre las piezas centrales del lenguaje.
 - **68 programas/archivos de ejemplo reales** en `examples/`, incluidos varios proyectos multi-archivo.
 - Sigue siendo un **prototipo de validación de diseño**, no un lenguaje listo para producción: es un intérprete que recorre el AST (no genera código máquina), sin paralelismo real de sistema operativo, con una stdlib inicial de E/S, sin LSP/herramientas de editor.
 
@@ -63,7 +63,7 @@ Proyecto Cargo normal: `cd compiler && cargo build`, binario `ostrinc`.
 compiler/
 ├── Cargo.toml              (una sola dependencia externa: `toml`, para ostrin.toml)
 ├── src/
-│   ├── main.rs              — CLI: --tokens, --ast, --run (o nada = solo type-check)
+│   ├── main.rs              — CLI: --check, --tokens, --ast, --run, --json, --help, --version
 │   ├── lexer/
 │   │   ├── mod.rs           — tokenizador, trackea saltos de línea (newline_before) por token
 │   │   └── token.rs         — TokenKind, tabla de palabras reservadas
@@ -75,7 +75,7 @@ compiler/
 │   ├── modules.rs            — carga multi-archivo: descubrimiento, ciclos (E1081), visibilidad (E1080), reescritura de AST (mangling de nombres cruzando módulos)
 │   └── package.rs            — ostrin.toml, dependencias `path` (funcionan) y `git` (reconocidas, rechazadas explícitamente sin red)
 └── tests/
-    └── examples.rs           — 61 pruebas de integración (invocan el binario compilado, comparan stdout/stderr exacto)
+    └── examples.rs           — 63 pruebas de integración (invocan el binario compilado, comparan stdout/stderr exacto)
 ```
 
 ### Cómo correrlo
@@ -83,11 +83,12 @@ compiler/
 ```bash
 cd compiler
 cargo build
-cargo test                                    # 61 pruebas, deben pasar todas
+cargo test                                    # 63 pruebas, deben pasar todas
 ./target/debug/ostrinc archivo.ostrin         # solo verifica tipos
 ./target/debug/ostrinc --run archivo.ostrin   # verifica y ejecuta
 ./target/debug/ostrinc --ast archivo.ostrin   # imprime el AST
 ./target/debug/ostrinc --tokens archivo.ostrin # imprime los tokens
+./target/debug/ostrinc --check --json archivo.ostrin # JSON Lines para editores
 ```
 
 En Windows, si `cargo`/`rustc` no están en el PATH de la sesión: `$env:Path += ";$env:USERPROFILE\.cargo\bin"` (rustup se instaló vía `winget install Rustlang.Rustup` durante esta sesión).
@@ -105,7 +106,7 @@ En Windows, si `cargo`/`rustc` no están en el PATH de la sesión: `$env:Path +=
 
 ## 5. Qué está probado (y cómo verificarlo)
 
-`compiler/tests/examples.rs` tiene 61 pruebas. Cubren, con valores exactos esperados (no solo "no falla"):
+`compiler/tests/examples.rs` tiene 63 pruebas. Cubren, con valores exactos esperados (no solo "no falla"):
 
 - Aritmética de `Quantity<D>` con conversión de unidades real (`5 nm + 2 m`, `velocity(10 m, 2 s)`, cancelación dimensional `2m/5nm = 400000000`).
 - Los 4 errores deliberados de dimensión/mutabilidad (`E1024`, `E1025`, `E1001`) en un mismo archivo.
@@ -1238,3 +1239,26 @@ Se añadió una primera superficie real de biblioteca estándar al intérprete:
   de integración. La prueba elimina su archivo temporal al terminar.
 
 La suite queda en **61 pruebas exitosas**.
+
+---
+
+## 35. Diagnósticos estructurados e integración inicial con VS Code — 2026-09-17
+
+El AST ahora conserva posiciones de origen para las sentencias y el checker
+las adjunta a los errores producidos mientras analiza funciones. El CLI añade
+una superficie estable para herramientas:
+
+- `--check` hace explícito el modo de verificación estática.
+- `--json` emite un objeto JSON por diagnóstico (JSON Lines), con `severity`,
+  `code`, `message`, `file`, `line` y `column`.
+- `--help` y `--version` hacen autodocumentado el ejecutable.
+- Los errores de lexer/parser de módulos también conservan archivo y posición.
+
+La extensión de VS Code ya ejecuta `ostrinc --check --json`, limpia los
+diagnósticos anteriores y muestra los nuevos en el panel Problems, además de
+conservar los comandos de ejecutar y revisar al guardar. La precisión actual
+es de sentencia; el siguiente refinamiento será llevar spans a expresiones y
+levantar un servidor LSP completo.
+
+Se añadieron dos pruebas de integración para el protocolo JSON y la interfaz
+CLI. La suite queda en **63 pruebas exitosas**.

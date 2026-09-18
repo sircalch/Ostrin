@@ -11,11 +11,43 @@ struct Module {
     exported: HashSet<String>,
 }
 
-pub fn load_project_with_deps(entry_path: &Path, deps: &HashMap<String, PathBuf>) -> Result<Vec<Item>, Vec<String>> {
+#[derive(Debug, Clone)]
+pub struct ModuleDiagnostic {
+    pub message: String,
+    pub file: Option<String>,
+    pub line: Option<usize>,
+    pub col: Option<usize>,
+}
+
+impl ModuleDiagnostic {
+    fn message(message: impl Into<String>) -> Self {
+        Self { message: message.into(), file: None, line: None, col: None }
+    }
+
+    fn at(file: &Path, line: usize, col: usize, message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+            file: Some(file.display().to_string()),
+            line: Some(line),
+            col: Some(col),
+        }
+    }
+}
+
+impl std::fmt::Display for ModuleDiagnostic {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
+pub fn load_project_with_deps(
+    entry_path: &Path,
+    deps: &HashMap<String, PathBuf>,
+) -> Result<Vec<Item>, Vec<ModuleDiagnostic>> {
     let root = entry_path.parent().unwrap_or_else(|| Path::new(".")).to_path_buf();
     let mut cache: HashMap<Vec<String>, Module> = HashMap::new();
     let mut in_progress: Vec<Vec<String>> = Vec::new();
-    let mut errors: Vec<String> = Vec::new();
+    let mut errors: Vec<ModuleDiagnostic> = Vec::new();
     if let Err(e) = load_module_file(entry_path, &[], &root, deps, &mut cache, &mut in_progress, &mut errors) {
         errors.push(e);
     }
@@ -26,12 +58,14 @@ pub fn load_project_with_deps(entry_path: &Path, deps: &HashMap<String, PathBuf>
     let mut merged = Vec::new();
     let paths: Vec<Vec<String>> = cache.keys().cloned().collect();
     for module_path in paths {
-        let (resolve_map, alias_map) = build_resolution_maps(&module_path, &cache).map_err(|e| vec![e])?;
+        let (resolve_map, alias_map) = build_resolution_maps(&module_path, &cache)
+            .map_err(|e| vec![ModuleDiagnostic::message(e)])?;
         let module = cache.get(&module_path).unwrap();
         let ctx = RewriteCtx { resolve_map: &resolve_map, alias_map: &alias_map, cache: &cache };
         for item in &module.items {
             let mut item = item.clone();
-            rewrite_item(&mut item, &module_path, &ctx).map_err(|e| vec![e])?;
+            rewrite_item(&mut item, &module_path, &ctx)
+                .map_err(|e| vec![ModuleDiagnostic::message(e)])?;
             if !matches!(item, Item::Import(_)) {
                 merged.push(item);
             }
@@ -73,8 +107,8 @@ fn load_module_file(
     deps: &HashMap<String, PathBuf>,
     cache: &mut HashMap<Vec<String>, Module>,
     in_progress: &mut Vec<Vec<String>>,
-    errors: &mut Vec<String>,
-) -> Result<(), String> {
+    errors: &mut Vec<ModuleDiagnostic>,
+) -> Result<(), ModuleDiagnostic> {
     if cache.contains_key(module_path) {
         return Ok(());
     }
@@ -82,21 +116,27 @@ fn load_module_file(
         let label = |p: &[String]| if p.is_empty() { "(entry)".to_string() } else { p.join(".") };
         let mut chain: Vec<String> = in_progress.iter().map(|p| label(p)).collect();
         chain.push(label(module_path));
-        return Err(format!(
+        return Err(ModuleDiagnostic::message(format!(
             "Error OSTRIN-E1081\nCircular import detected:\n    {}",
             chain.join(" → ")
-        ));
+        )));
     }
     in_progress.push(module_path.to_vec());
 
-    let source = fs::read_to_string(file_path)
-        .map_err(|e| format!("could not read module '{}' ({}): {e}", module_path.join("."), file_path.display()))?;
+    let source = fs::read_to_string(file_path).map_err(|e| {
+        ModuleDiagnostic::at(
+            file_path,
+            1,
+            1,
+            format!("could not read module '{}' ({}): {e}", module_path.join("."), file_path.display()),
+        )
+    })?;
     let tokens = Lexer::new(&source)
         .tokenize()
-        .map_err(|e| format!("{}: lex error at {}:{}: {}", file_path.display(), e.line, e.col, e.message))?;
+        .map_err(|e| ModuleDiagnostic::at(file_path, e.line, e.col, format!("lex error: {}", e.message)))?;
     let (items, parse_errors) = Parser::new(tokens).parse_program();
     for e in parse_errors {
-        errors.push(format!("{}: parse error at {}:{}: {}", file_path.display(), e.line, e.col, e.message));
+        errors.push(ModuleDiagnostic::at(file_path, e.line, e.col, format!("parse error: {}", e.message)));
     }
 
     for item in &items {
@@ -109,9 +149,26 @@ fn load_module_file(
     }
 
     in_progress.pop();
+    let mut items = items;
+    annotate_source_files(&mut items, file_path);
     let exported = compute_exports(&items);
     cache.insert(module_path.to_vec(), Module { items, exported });
     Ok(())
+}
+
+fn annotate_source_files(items: &mut [Item], file_path: &Path) {
+    let source_file = Some(file_path.display().to_string());
+    for item in items {
+        match item {
+            Item::Function(function) => function.source_file = source_file.clone(),
+            Item::Impl(implementation) => {
+                for method in &mut implementation.methods {
+                    method.source_file = source_file.clone();
+                }
+            }
+            _ => {}
+        }
+    }
 }
 
 fn compute_exports(items: &[Item]) -> HashSet<String> {
@@ -263,7 +320,7 @@ fn rewrite_item(item: &mut Item, module_path: &[String], ctx: &RewriteCtx) -> Re
 }
 
 fn rewrite_block(block: &mut Block, ctx: &RewriteCtx) -> Result<(), String> {
-    for stmt in &mut block.stmts { rewrite_stmt(stmt, ctx)?; }
+    for stmt in &mut block.stmts { rewrite_stmt(&mut stmt.stmt, ctx)?; }
     if let Some(tail) = &mut block.tail { rewrite_expr(tail, ctx)?; }
     Ok(())
 }

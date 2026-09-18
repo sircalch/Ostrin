@@ -172,6 +172,32 @@ fn standard_library_arguments_are_checked() {
 }
 
 #[test]
+fn json_diagnostics_are_editor_friendly_and_keep_source_locations() {
+    let out = run(&["--json", &example_path("field_access_errors.ostrin")]);
+    assert!(!out.status.success());
+    let text = stdout(&out);
+    let lines: Vec<&str> = text.lines().collect();
+    assert_eq!(lines.len(), 4, "expected one JSON object per diagnostic: {text}");
+    assert!(lines.iter().all(|line| line.starts_with('{') && line.ends_with('}')));
+    assert!(text.contains("\"code\":\"E1043\""));
+    assert!(text.contains("\"message\":\"Type 'Score' has no field 'missing'.\""));
+    assert!(text.contains("\"line\":8"));
+    assert!(text.contains("\"column\":5"));
+}
+
+#[test]
+fn cli_exposes_help_and_version() {
+    let version = run(&["--version"]);
+    assert!(version.status.success());
+    assert!(stdout(&version).contains("ostrinc 0.1.0"));
+
+    let help = run(&["--help"]);
+    assert!(help.status.success());
+    assert!(stdout(&help).contains("--json"));
+    assert!(stdout(&help).contains("--check"));
+}
+
+#[test]
 fn advanced_type_checks_ok() {
     let out = run(&[&example_path("advanced.ostrin")]);
     assert!(out.status.success());

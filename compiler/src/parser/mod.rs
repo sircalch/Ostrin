@@ -221,6 +221,7 @@ impl Parser {
     }
 
     fn parse_function(&mut self, is_pub: bool) -> PResult<FunctionDecl> {
+        let span = self.current_span();
         self.expect(&TokenKind::Fn)?;
         let name = self.expect_ident()?;
         let generics = if self.check(&TokenKind::Lt) { self.parse_generic_params()? } else { Vec::new() };
@@ -230,7 +231,16 @@ impl Parser {
         self.expect(&TokenKind::Arrow)?;
         let return_type = self.parse_type()?;
         let body = self.parse_block()?;
-        Ok(FunctionDecl { name, is_pub, generics, params, return_type, body })
+        Ok(FunctionDecl {
+            name,
+            is_pub,
+            generics,
+            params,
+            return_type,
+            body,
+            span,
+            source_file: None,
+        })
     }
 
     fn parse_generic_params(&mut self) -> PResult<Vec<GenericParam>> {
@@ -353,8 +363,8 @@ impl Parser {
         while !self.check(&TokenKind::RBrace) {
             let stmt = self.parse_statement()?;
             if self.check(&TokenKind::RBrace) {
-                if let Stmt::Expr(e) = stmt {
-                    tail = Some(Box::new(e));
+                if let Stmt::Expr(e) = &stmt.stmt {
+                    tail = Some(Box::new(e.clone()));
                     break;
                 }
             }
@@ -365,29 +375,30 @@ impl Parser {
         Ok(Block { stmts, tail })
     }
 
-    fn parse_statement(&mut self) -> PResult<Stmt> {
+    fn parse_statement(&mut self) -> PResult<LocatedStmt> {
+        let span = self.current_span();
         if self.eat(&TokenKind::Return) {
             let value = if self.check(&TokenKind::RBrace) { None } else { Some(self.parse_expr()?) };
-            return Ok(Stmt::Return(value));
+            return Ok(self.located(Stmt::Return(value), span));
         }
         if self.eat(&TokenKind::Break) {
             let value = if self.check(&TokenKind::RBrace) { None } else { Some(self.parse_expr()?) };
-            return Ok(Stmt::Break(value));
+            return Ok(self.located(Stmt::Break(value), span));
         }
         if self.eat(&TokenKind::Continue) {
-            return Ok(Stmt::Continue);
+            return Ok(self.located(Stmt::Continue, span));
         }
         if self.eat(&TokenKind::For) {
             let pattern = self.expect_ident()?;
             self.expect(&TokenKind::In)?;
             let iter = self.parse_expr_no_struct()?;
             let body = self.parse_block()?;
-            return Ok(Stmt::For { pattern, iter, body });
+            return Ok(self.located(Stmt::For { pattern, iter, body }, span));
         }
         if self.eat(&TokenKind::While) {
             let cond = self.parse_expr_no_struct()?;
             let body = self.parse_block()?;
-            return Ok(Stmt::While { cond, body });
+            return Ok(self.located(Stmt::While { cond, body }, span));
         }
         if self.check(&TokenKind::Mut) {
             self.advance();
@@ -395,7 +406,7 @@ impl Parser {
             let ty = if self.eat(&TokenKind::Colon) { Some(self.parse_type()?) } else { None };
             self.expect(&TokenKind::Eq)?;
             let value = self.parse_expr()?;
-            return Ok(Stmt::Binding { mut_: true, name, ty, value });
+            return Ok(self.located(Stmt::Binding { mut_: true, name, ty, value }, span));
         }
         if matches!(self.peek().kind, TokenKind::Ident(_)) && self.check_at(1, &TokenKind::Colon) {
             let name = self.expect_ident()?;
@@ -403,13 +414,13 @@ impl Parser {
             let ty = self.parse_type()?;
             self.expect(&TokenKind::Eq)?;
             let value = self.parse_expr()?;
-            return Ok(Stmt::Binding { mut_: false, name, ty: Some(ty), value });
+            return Ok(self.located(Stmt::Binding { mut_: false, name, ty: Some(ty), value }, span));
         }
         if matches!(self.peek().kind, TokenKind::Ident(_)) && self.check_at(1, &TokenKind::Eq) {
             let name = self.expect_ident()?;
             self.advance();
             let value = self.parse_expr()?;
-            return Ok(Stmt::Assign { name, value });
+            return Ok(self.located(Stmt::Assign { name, value }, span));
         }
         {
             let checkpoint = self.pos;
@@ -417,12 +428,13 @@ impl Parser {
                 if self.check(&TokenKind::Eq) && matches!(target, Expr::FieldAccess(..) | Expr::Index(..)) {
                     self.advance();
                     let value = self.parse_expr()?;
-                    return Ok(Stmt::FieldAssign { target, value });
+                    return Ok(self.located(Stmt::FieldAssign { target, value }, span));
                 }
             }
             self.pos = checkpoint;
         }
-        Ok(Stmt::Expr(self.parse_expr()?))
+        let expr = self.parse_expr()?;
+        Ok(self.located(Stmt::Expr(expr), span))
     }
 
     pub fn parse_expr(&mut self) -> PResult<Expr> {
@@ -629,8 +641,8 @@ impl Parser {
         while !self.check(&TokenKind::RBrace) {
             let stmt = self.parse_statement()?;
             if self.check(&TokenKind::RBrace) {
-                if let Stmt::Expr(e) = stmt {
-                    tail = Some(Box::new(e));
+                if let Stmt::Expr(e) = &stmt.stmt {
+                    tail = Some(Box::new(e.clone()));
                     break;
                 }
             }
@@ -946,6 +958,14 @@ impl Parser {
 
     fn peek(&self) -> &Token {
         &self.tokens[self.pos]
+    }
+
+    fn current_span(&self) -> Span {
+        Span { line: self.peek().line, col: self.peek().col }
+    }
+
+    fn located(&self, stmt: Stmt, span: Span) -> LocatedStmt {
+        LocatedStmt { stmt, span }
     }
 
     fn peek_at(&self, offset: usize) -> &Token {

@@ -7,6 +7,8 @@ use crate::types::*;
 pub struct TypeError {
     pub code: &'static str,
     pub message: String,
+    pub span: Option<Span>,
+    pub source_file: Option<String>,
 }
 
 #[derive(Clone)]
@@ -41,6 +43,8 @@ pub struct Checker {
     record_generics: HashMap<String, Vec<GenericParam>>,
     current_generic_bounds: HashMap<String, Vec<String>>,
     current_return_type: Option<Ty>,
+    current_span: Option<Span>,
+    current_source_file: Option<String>,
     errors: Vec<TypeError>,
 }
 
@@ -97,6 +101,8 @@ impl Checker {
             record_generics: HashMap::new(),
             current_generic_bounds: HashMap::new(),
             current_return_type: None,
+            current_span: None,
+            current_source_file: None,
             errors: Vec::new(),
         }
     }
@@ -215,6 +221,10 @@ impl Checker {
         f: &FunctionDecl,
         extra_bounds: &HashMap<String, Vec<String>>,
     ) {
+        let previous_span = self.current_span;
+        self.current_span = Some(f.span);
+        let previous_source_file = self.current_source_file.clone();
+        self.current_source_file = f.source_file.clone();
         let previous_bounds = std::mem::take(&mut self.current_generic_bounds);
         self.current_generic_bounds = f
             .generics
@@ -258,6 +268,8 @@ impl Checker {
         }
         self.current_return_type = previous_return_type;
         self.current_generic_bounds = previous_bounds;
+        self.current_span = previous_span;
+        self.current_source_file = previous_source_file;
     }
 
     fn check_trait_defaults(&mut self, trait_decl: &TraitDecl) {
@@ -284,6 +296,8 @@ impl Checker {
                 params: method.params.clone(),
                 return_type: method.return_type.clone(),
                 body: body.clone(),
+                span: Span::default(),
+                source_file: None,
             };
             self.check_function_with_extra_bounds(&function, &extra_bounds);
         }
@@ -528,7 +542,10 @@ impl Checker {
 
     fn check_block(&mut self, block: &Block, scope: &mut Scope) -> Ty {
         for stmt in &block.stmts {
-            self.check_stmt(stmt, scope);
+            let previous_span = self.current_span;
+            self.current_span = Some(stmt.span);
+            self.check_stmt(&stmt.stmt, scope);
+            self.current_span = previous_span;
         }
         match &block.tail {
             Some(e) => self.infer_expr(e, scope),
@@ -2281,7 +2298,12 @@ impl Checker {
     }
 
     fn push(&mut self, code: &'static str, message: String) {
-        self.errors.push(TypeError { code, message });
+        self.errors.push(TypeError {
+            code,
+            message,
+            span: self.current_span,
+            source_file: self.current_source_file.clone(),
+        });
     }
 }
 
@@ -2500,6 +2522,8 @@ fn check_concurrency_method(
                 expected_count,
                 arg_types.len()
             ),
+            span: None,
+            source_file: None,
         });
         return Some(Ty::Unknown);
     }
@@ -2520,6 +2544,8 @@ fn check_concurrency_method(
                         element_type.describe(),
                         arg_types[0].describe()
                     ),
+                    span: None,
+                    source_file: None,
                 });
             }
             Some(Ty::Void)
@@ -2574,6 +2600,8 @@ fn check_collection_method(
                 expected_args.len(),
                 arg_types.len()
             ),
+            span: None,
+            source_file: None,
         });
         return Some(Ty::Unknown);
     }
@@ -2588,6 +2616,8 @@ fn check_collection_method(
                     expected.describe(),
                     actual.describe()
                 ),
+                span: None,
+                source_file: None,
             });
         }
     }
@@ -2684,6 +2714,8 @@ fn check_option_result_method(
                 expected_args.len(),
                 arg_types.len()
             ),
+            span: None,
+            source_file: None,
         });
         return Some(Ty::Unknown);
     }
@@ -2698,6 +2730,8 @@ fn check_option_result_method(
                     expected.describe(),
                     actual.describe()
                 ),
+                span: None,
+                source_file: None,
             });
         }
     }
@@ -2729,6 +2763,8 @@ fn check_builtin_call(name: &str, arg_types: &[Ty], errors: &mut Vec<TypeError>)
                 expected_args.len(),
                 arg_types.len()
             ),
+            span: None,
+            source_file: None,
         });
         return Some(Ty::Unknown);
     }
@@ -2743,6 +2779,8 @@ fn check_builtin_call(name: &str, arg_types: &[Ty], errors: &mut Vec<TypeError>)
                     expected.describe(),
                     actual.describe()
                 ),
+                span: None,
+                source_file: None,
             });
         }
     }
@@ -2861,7 +2899,7 @@ fn free_vars_in_block(block: &Block) -> HashSet<String> {
 
 fn walk_block(block: &Block, bound: &HashSet<String>, free: &mut HashSet<String>) {
     let mut local = bound.clone();
-    for stmt in &block.stmts { walk_stmt(stmt, &mut local, free); }
+    for stmt in &block.stmts { walk_stmt(&stmt.stmt, &mut local, free); }
     if let Some(e) = &block.tail { walk_expr(e, &local, free); }
 }
 

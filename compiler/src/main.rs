@@ -17,8 +17,21 @@ fn main() -> ExitCode {
     let tokens_only = args.iter().any(|a| a == "--tokens");
     let ast_only = args.iter().any(|a| a == "--ast");
     let run = args.iter().any(|a| a == "--run");
+    let json = args.iter().any(|a| a == "--json");
+    let help = args.iter().any(|a| a == "--help" || a == "-h");
+    let version = args.iter().any(|a| a == "--version" || a == "-V");
+
+    if help {
+        print_help();
+        return ExitCode::SUCCESS;
+    }
+    if version {
+        println!("ostrinc 0.1.0");
+        return ExitCode::SUCCESS;
+    }
+
     let Some(path) = args.iter().skip(1).find(|a| !a.starts_with("--")) else {
-        eprintln!("usage: ostrinc [--tokens|--ast|--run] <entry_file.ostrin>");
+        eprintln!("usage: ostrinc [--check|--ast|--tokens|--run] [--json] <entry_file.ostrin>");
         return ExitCode::FAILURE;
     };
 
@@ -39,7 +52,11 @@ fn main() -> ExitCode {
                 ExitCode::SUCCESS
             }
             Err(e) => {
-                eprintln!("lex error at {}:{}: {}", e.line, e.col, e.message);
+                if json {
+                    emit_json_diagnostic(None, &format!("lex error: {}", e.message), Some(path), Some(e.line), Some(e.col));
+                } else {
+                    eprintln!("lex error at {}:{}: {}", e.line, e.col, e.message);
+                }
                 ExitCode::FAILURE
             }
         };
@@ -50,11 +67,17 @@ fn main() -> ExitCode {
     let deps = if manifest_path.is_file() {
         let manifest = match package::load_manifest(&manifest_path) {
             Ok(m) => m,
-            Err(e) => { eprintln!("{e}"); return ExitCode::FAILURE; }
+            Err(e) => {
+                if json { emit_json_diagnostic(None, &e, Some(path), None, None); } else { eprintln!("{e}"); }
+                return ExitCode::FAILURE;
+            }
         };
         let roots = match package::resolve_dependency_roots(&manifest) {
             Ok(r) => r,
-            Err(e) => { eprintln!("{e}"); return ExitCode::FAILURE; }
+            Err(e) => {
+                if json { emit_json_diagnostic(None, &e, Some(path), None, None); } else { eprintln!("{e}"); }
+                return ExitCode::FAILURE;
+            }
         };
         if let Err(e) = package::write_lockfile(manifest_path.parent().unwrap(), &manifest, &roots) {
             eprintln!("warning: could not write ostrin.lock: {e}");
@@ -67,10 +90,20 @@ fn main() -> ExitCode {
     let items = match modules::load_project_with_deps(entry_path, &deps) {
         Ok(items) => items,
         Err(messages) => {
-            for msg in &messages {
-                eprintln!("{msg}");
+            for diagnostic in &messages {
+                if json {
+                    emit_json_diagnostic(
+                        None,
+                        &diagnostic.message,
+                        diagnostic.file.as_deref().or(Some(path)),
+                        diagnostic.line,
+                        diagnostic.col,
+                    );
+                } else {
+                    eprintln!("{diagnostic}");
+                }
             }
-            eprintln!("\n{} error(es) de análisis", messages.len());
+            if !json { eprintln!("\n{} error(es) de análisis", messages.len()); }
             return ExitCode::FAILURE;
         }
     };
@@ -85,9 +118,19 @@ fn main() -> ExitCode {
     let errors = typeck::Checker::new().check_program(&items);
     if !errors.is_empty() {
         for e in &errors {
-            eprintln!("error OSTRIN-{}: {}", e.code, e.message);
+            if json {
+                emit_json_diagnostic(
+                    Some(e.code),
+                    &e.message,
+                    e.source_file.as_deref().or(Some(path)),
+                    e.span.map(|span| span.line),
+                    e.span.map(|span| span.col),
+                );
+            } else {
+                eprintln!("error OSTRIN-{}: {}", e.code, e.message);
+            }
         }
-        eprintln!("\n{} error(es)", errors.len());
+        if !json { eprintln!("\n{} error(es)", errors.len()); }
         return ExitCode::FAILURE;
     }
 
@@ -99,8 +142,66 @@ fn main() -> ExitCode {
     match interpreter::Interpreter::new(&items).run_main() {
         Ok(_) => ExitCode::SUCCESS,
         Err(msg) => {
-            eprintln!("runtime error: {msg}");
+            if json {
+                emit_json_diagnostic(None, &format!("runtime error: {msg}"), Some(path), None, None);
+            } else {
+                eprintln!("runtime error: {msg}");
+            }
             ExitCode::FAILURE
         }
     }
+}
+
+fn print_help() {
+    println!("ostrinc 0.1.0 — compiler and interpreter for Ostrin");
+    println!();
+    println!("Usage:\n  ostrinc [OPTIONS] <entry_file.ostrin>");
+    println!();
+    println!("Options:");
+    println!("  --check       Type-check the project (the default)");
+    println!("  --run         Type-check and run the entry file");
+    println!("  --ast         Print the parsed AST");
+    println!("  --tokens      Print lexer tokens");
+    println!("  --json        Emit machine-readable diagnostics as JSON Lines");
+    println!("  -h, --help    Print this help");
+    println!("  -V, --version Print the compiler version");
+}
+
+fn emit_json_diagnostic(
+    code: Option<&str>,
+    message: &str,
+    file: Option<&str>,
+    line: Option<usize>,
+    col: Option<usize>,
+) {
+    let code = code.map_or_else(|| "null".to_string(), json_string);
+    let file = file.map_or_else(|| "null".to_string(), json_string);
+    let line = line.map_or_else(|| "null".to_string(), |value| value.to_string());
+    let col = col.map_or_else(|| "null".to_string(), |value| value.to_string());
+    println!(
+        "{{\"severity\":\"error\",\"code\":{},\"message\":{},\"file\":{},\"line\":{},\"column\":{}}}",
+        code,
+        json_string(message),
+        file,
+        line,
+        col
+    );
+}
+
+fn json_string(value: &str) -> String {
+    let mut escaped = String::with_capacity(value.len() + 2);
+    escaped.push('"');
+    for ch in value.chars() {
+        match ch {
+            '"' => escaped.push_str("\\\""),
+            '\\' => escaped.push_str("\\\\"),
+            '\n' => escaped.push_str("\\n"),
+            '\r' => escaped.push_str("\\r"),
+            '\t' => escaped.push_str("\\t"),
+            c if c.is_control() => escaped.push_str(&format!("\\u{:04x}", c as u32)),
+            c => escaped.push(c),
+        }
+    }
+    escaped.push('"');
+    escaped
 }
