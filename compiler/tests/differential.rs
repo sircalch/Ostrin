@@ -223,7 +223,7 @@ fn mutated_sources_never_crash_the_front_end() {
 /// When you close a gap, lower `MAX_UNKNOWN_EXPRESSIONS` to the new value.
 #[test]
 fn typed_expression_table_does_not_regress() {
-    const MAX_UNKNOWN_EXPRESSIONS: usize = 46;
+    const MAX_UNKNOWN_EXPRESSIONS: usize = 11;
     let (mut total, mut unknown) = (0usize, 0usize);
     for path in examples() {
         let file = path.to_string_lossy().to_string();

@@ -343,6 +343,7 @@ impl Checker {
         }
         let previous_return_type = self.current_return_type.replace(expected.clone());
         let actual = self.check_block(&f.body, &mut scope);
+        self.note_expected_block(&f.body, &expected);
         if !compatible(&expected, &actual) {
             self.push(
                 "E1041",
@@ -654,6 +655,7 @@ impl Checker {
                 let final_ty = match ty {
                     Some(t) => {
                         let declared = self.resolve_type_in_context(t);
+                        self.note_expected(value, &declared);
                         if !compatible(&declared, &value_ty) {
                             self.push(
                                 "E1041",
@@ -708,6 +710,9 @@ impl Checker {
             }
             Stmt::Return(Some(e)) => {
                 let actual = self.infer_expr(e, scope);
+                if let Some(expected) = self.current_return_type.clone() {
+                    self.note_expected(e, &expected);
+                }
                 if let Some(expected) = &self.current_return_type {
                     if !compatible(expected, &actual) {
                         self.push(
@@ -766,6 +771,7 @@ impl Checker {
             Stmt::FieldAssign { target, value } => {
                 let target_ty = self.infer_expr(target, scope);
                 let value_ty = self.infer_expr(value, scope);
+                self.note_expected(value, &target_ty);
                 if let Expr::FieldAccess(receiver, field) = target {
                     self.check_field_assignment_target(receiver, field, &target_ty, scope);
                 }
@@ -781,6 +787,84 @@ impl Checker {
                 }
             }
             Stmt::Expr(e) => { self.infer_expr(e, scope); }
+        }
+    }
+
+    /// Feeds a known expected type back into an expression whose own type
+    /// came out only partially determined (`None`, `Ok(x)`, `Nothing`, a
+    /// nested `Just(Good(3))`): the recorded type is refined to the expected
+    /// one and the expectation is pushed down into branches and constructor
+    /// arguments. Purely additive — it never reports errors and never
+    /// replaces a fully known type.
+    fn note_expected(&mut self, expr: &Expr, expected: &Ty) {
+        if ty_contains_unknown(expected) {
+            return;
+        }
+        match expr {
+            Expr::Located(inner, range) => {
+                let key = ExprKey { file: self.current_source_file.clone(), start: range.start, end: range.end };
+                if let Some(recorded) = self.expr_types.get(&key) {
+                    if ty_contains_unknown(recorded) && compatible(expected, recorded) {
+                        self.expr_types.insert(key, expected.clone());
+                    }
+                }
+                self.note_expected_inner(inner, expected);
+            }
+            other => self.note_expected_inner(other, expected),
+        }
+    }
+
+    fn note_expected_block(&mut self, block: &Block, expected: &Ty) {
+        if let Some(tail) = &block.tail {
+            self.note_expected(tail, expected);
+        }
+    }
+
+    fn note_expected_inner(&mut self, expr: &Expr, expected: &Ty) {
+        match expr {
+            Expr::Block(block) => self.note_expected_block(block, expected),
+            Expr::If(_, then_block, else_block) => {
+                self.note_expected_block(then_block, expected);
+                if let Some(else_block) = else_block {
+                    self.note_expected_block(else_block, expected);
+                }
+            }
+            Expr::Match(_, arms) => {
+                for arm in arms {
+                    self.note_expected_block(&arm.body, expected);
+                }
+            }
+            Expr::ListLiteral(items) => {
+                if let Ty::List(element) = expected {
+                    for item in items {
+                        self.note_expected(item, element);
+                    }
+                }
+            }
+            Expr::Call(callee, args) | Expr::GenericCall(callee, _, args) => {
+                let Expr::Ident(name) = callee.unlocated() else { return };
+                let Some(enum_name) = self.variant_owners.get(name).cloned() else { return };
+                let type_args: Vec<Ty> = match expected {
+                    Ty::Applied(n, targs) if *n == enum_name => targs.clone(),
+                    Ty::Named(n) if *n == enum_name => Vec::new(),
+                    _ => return,
+                };
+                let generics = self.enum_generics.get(&enum_name).cloned().unwrap_or_default();
+                let subst: HashMap<String, Ty> = generics.iter().map(|g| g.name.clone()).zip(type_args).collect();
+                let field_types = self.variant_fields.get(&(enum_name.clone(), name.clone())).cloned().unwrap_or_default();
+                let field_names = self.variant_field_names.get(&(enum_name, name.clone())).cloned().unwrap_or_default();
+                for (position, arg) in args.iter().enumerate() {
+                    let (index, value) = match arg {
+                        Arg::Positional(value) => (Some(position), value),
+                        Arg::Named(field, value) => (field_names.iter().position(|n| n.as_deref() == Some(field.as_str())), value),
+                    };
+                    if let Some(field_ty) = index.and_then(|i| field_types.get(i)) {
+                        let field_ty = resolve_type_with_type_subst(field_ty, &subst, &HashMap::new());
+                        self.note_expected(value, &field_ty);
+                    }
+                }
+            }
+            _ => {}
         }
     }
 
@@ -1743,6 +1827,16 @@ impl Checker {
                     }
                 }
             }
+            if let Ty::Dyn(trait_name) = &receiver_ty {
+                let signature = self
+                    .traits
+                    .get(trait_name)
+                    .and_then(|decl| decl.methods.iter().find(|m| m.name == *method))
+                    .cloned();
+                if let Some(signature) = signature {
+                    return self.resolve_type_in_context(&signature.return_type);
+                }
+            }
             if let Some(return_type) = self.check_generic_method_call(
                 &receiver_ty,
                 method,
@@ -2026,9 +2120,12 @@ impl Checker {
         }
 
         if sig.generics.is_empty() {
-            for (param, arg_ty) in sig.params.iter().zip(bound_args.iter()) {
+            for (index, (param, arg_ty)) in sig.params.iter().zip(bound_args.iter()).enumerate() {
                 let Some(arg_ty) = arg_ty else { continue };
                 let expected = resolve_type_with_subst(&param.ty, &dim_subst);
+                if let Some(expr) = arg_expr_for_param(sig, args, index) {
+                    self.note_expected(expr, &expected);
+                }
                 if !compatible(&expected, arg_ty) {
                     self.push(
                         "E1041",
@@ -2080,6 +2177,13 @@ impl Checker {
                         ),
                     );
                 }
+            }
+        }
+
+        for (index, param) in sig.params.iter().enumerate() {
+            let expected = resolve_type_with_type_subst(&param.ty, &type_subst, &dim_subst);
+            if let Some(expr) = arg_expr_for_param(sig, args, index) {
+                self.note_expected(expr, &expected);
             }
         }
 
@@ -2561,6 +2665,7 @@ fn resolve_type_with_type_subst(
             params.iter().map(|t| resolve_type_with_type_subst(t, type_subst, dim_subst)).collect(),
             Box::new(resolve_type_with_type_subst(ret, type_subst, dim_subst)),
         ),
+        Type::Dyn(traits) if traits.len() == 1 => Ty::Dyn(traits[0].clone()),
         _ => Ty::Unknown,
     }
 }
@@ -3348,6 +3453,7 @@ fn type_from_ty(ty: &Ty) -> Type {
             args.iter().map(type_from_ty).collect(),
         ),
         Ty::Generic(name) => Type::Named(name.clone(), Vec::new()),
+        Ty::Dyn(name) => Type::Dyn(vec![name.clone()]),
         Ty::Fn(params, return_type) => Type::Fn(
             params.iter().map(type_from_ty).collect(),
             Box::new(type_from_ty(return_type)),
@@ -3511,11 +3617,34 @@ fn walk_expr(expr: &Expr, bound: &HashSet<String>, free: &mut HashSet<String>) {
     }
 }
 
+/// The argument expression bound to parameter `index` (positional by
+/// position, named by name), mirroring `bind_function_arguments`.
+fn arg_expr_for_param<'a>(sig: &FnSig, args: &'a [Arg], index: usize) -> Option<&'a Expr> {
+    let name = &sig.params.get(index)?.name;
+    let mut positional = 0usize;
+    for arg in args {
+        match arg {
+            Arg::Positional(expr) => {
+                if positional == index {
+                    return Some(expr);
+                }
+                positional += 1;
+            }
+            Arg::Named(n, expr) if n == name => return Some(expr),
+            Arg::Named(..) => {}
+        }
+    }
+    None
+}
+
 fn compatible(expected: &Ty, actual: &Ty) -> bool {
     if expected == &Ty::Unknown || actual == &Ty::Unknown {
         return true;
     }
     match (expected, actual) {
+        // A concrete type coerces to `dyn Trait` (whether it implements the
+        // trait is checked where the value is boxed, not here).
+        (Ty::Dyn(_), _) | (_, Ty::Dyn(_)) => true,
         (Ty::List(expected), Ty::List(actual)) | (Ty::Set(expected), Ty::Set(actual)) => {
             compatible(expected, actual)
         }

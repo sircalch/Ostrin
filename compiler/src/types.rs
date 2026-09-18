@@ -130,6 +130,8 @@ pub enum Ty {
     Named(String),
     Applied(String, Vec<Ty>),
     Generic(String),
+    /// `dyn Trait` (a single trait): the concrete type is erased.
+    Dyn(String),
     Fn(Vec<Ty>, Box<Ty>),
     Unknown,
 }
@@ -169,6 +171,7 @@ impl Ty {
                 format!("{name}<{}>", args.join(", "))
             }
             Ty::Generic(name) => name.clone(),
+            Ty::Dyn(name) => format!("dyn {name}"),
             Ty::Fn(params, ret) => {
                 let p: Vec<String> = params.iter().map(|t| t.describe()).collect();
                 format!("fn({}) -> {}", p.join(", "), ret.describe())

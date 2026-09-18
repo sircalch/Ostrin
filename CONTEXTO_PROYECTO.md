@@ -3109,3 +3109,26 @@ arquitectura, pruebas que detecten regresiones entre fases.
   objetivo con un cambio mucho menos invasivo. Se revisará si hiciera falta
   para nodos sin `Located` (patrones, declaraciones).
 - Suite: **97 pruebas**, sin warnings.
+
+---
+
+## 87. Etapa 1 (cont.): inferencia con tipo esperado en el checker — 2026-09-18
+
+- `Checker::note_expected`: cuando el contexto conoce el tipo esperado
+  (cola de función, `return`, anotación de `let`, asignación a campo, argumentos
+  de llamadas —posicionales y con nombre—), el tipo registrado de una expresión
+  parcial (`None`, `Ok(x)`, `Nothing`, `Just(Good(3))`) se **refina** al esperado
+  y la expectativa se propaga a ramas de `if`/`match`/bloques, listas y
+  argumentos de constructores de variantes (incluidos los genéricos, con la
+  sustitución de parámetros). Es aditivo: no emite errores ni reemplaza tipos ya
+  conocidos, por lo que el comportamiento del checker no cambia.
+- Nuevo `Ty::Dyn(trait)`: antes `dyn Trait` se resolvía a `Unknown`, es decir,
+  **ningún valor `dyn` estaba tipado**. Ahora `dyn Shape` es un tipo y las
+  llamadas a sus métodos devuelven el tipo declarado en el trait. La
+  compatibilidad sigue siendo permisiva (un tipo concreto se acepta donde se
+  espera `dyn`); endurecerla (comprobar que implementa el trait) queda pendiente.
+- Desconocidas en ejemplos válidos: **46 → 11** de 1 382. Las que quedan son
+  las muestras de sintaxis (`advanced`, `newlines`), un `Ok(7)` sin anotación ni
+  contexto (genuinamente indeterminado) y un `try … catch`. Límite del test de
+  trinquete: 11.
+- Suite: **97 pruebas**, sin warnings.
