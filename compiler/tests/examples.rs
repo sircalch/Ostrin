@@ -196,6 +196,7 @@ fn cli_exposes_help_and_version() {
     assert!(stdout(&help).contains("--json"));
     assert!(stdout(&help).contains("--check"));
     assert!(stdout(&help).contains("--symbols"));
+    assert!(stdout(&help).contains("--members"));
 }
 
 #[test]
@@ -207,6 +208,16 @@ fn compiler_exports_symbols_and_signatures_for_editor_tools() {
     assert!(text.contains("\"name\":\"double\""));
     assert!(text.contains("fn double<D: Dimension>(x: Quantity<D>) -> Quantity<D>"));
     assert!(text.contains("\"line\":1"));
+}
+
+#[test]
+fn compiler_exports_type_members_and_local_bindings_for_editor_tools() {
+    let out = run(&["--members", "--json", &example_path("collections.ostrin")]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let text = stdout(&out);
+    assert!(text.contains("\"memberKind\":\"method\",\"owner\":\"List\",\"name\":\"push\""));
+    assert!(text.contains("\"owner\":\"Map\",\"name\":\"get\""));
+    assert!(text.contains("\"kind\":\"binding\",\"name\":\"numbers\",\"type\":\"List<Int>\""));
 }
 
 #[test]

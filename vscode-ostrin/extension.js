@@ -62,7 +62,7 @@ function refreshSemanticIndex(document) {
   if (document.isUntitled) return;
   const cwd = vscode.workspace.getWorkspaceFolder(document.uri)?.uri.fsPath
     ?? path.dirname(document.uri.fsPath);
-  const child = childProcess.spawn(compilerPath(), ['--symbols', '--json', document.uri.fsPath], {
+  const child = childProcess.spawn(compilerPath(), ['--members', '--json', document.uri.fsPath], {
     cwd,
     windowsHide: true,
     shell: false
@@ -72,7 +72,13 @@ function refreshSemanticIndex(document) {
     // background symbol index must stay silent when the compiler is absent.
   });
   let buffer = '';
-  const found = [];
+  const found = { symbols: [], members: [], bindings: [] };
+  const addSemanticItem = (item) => {
+    if (!item || !item.name) return;
+    if (item.kind === 'member') found.members.push({ ...item, kind: item.memberKind || 'method' });
+    else if (item.kind === 'binding') found.bindings.push(item);
+    else if (item.kind) found.symbols.push(item);
+  };
   child.stdout.on('data', (data) => {
     buffer += data.toString();
     const lines = buffer.split(/\r?\n/);
@@ -80,7 +86,7 @@ function refreshSemanticIndex(document) {
     for (const line of lines) {
       try {
         const item = JSON.parse(line);
-        if (item && item.name && item.kind) found.push(item);
+        addSemanticItem(item);
       } catch (_) {
         // Ignore incomplete or diagnostic output from an older compiler.
       }
@@ -90,7 +96,7 @@ function refreshSemanticIndex(document) {
     if (buffer.trim()) {
       try {
         const item = JSON.parse(buffer);
-        if (item && item.name && item.kind) found.push(item);
+        addSemanticItem(item);
       } catch (_) {}
     }
     if (code === 0) semanticIndex.set(document.uri.toString(), found);
@@ -154,14 +160,14 @@ function activate(context) {
   const selector = { language: 'ostrin', scheme: 'file' };
   const completion = vscode.languages.registerCompletionItemProvider(
     selector,
-    { provideCompletionItems: (document) => languageFeatures.provideCompletionItems(vscode, semanticIndex.get(document.uri.toString()) || []) },
+    { provideCompletionItems: (document, position) => languageFeatures.provideCompletionItems(vscode, semanticIndex.get(document.uri.toString()) || {}, document, position) },
     '.', ':'
   );
   const hover = vscode.languages.registerHoverProvider(selector, {
-    provideHover: (document, position) => languageFeatures.provideHover(vscode, document, position, semanticIndex.get(document.uri.toString()) || [])
+    provideHover: (document, position) => languageFeatures.provideHover(vscode, document, position, semanticIndex.get(document.uri.toString()) || {})
   });
   const symbols = vscode.languages.registerDocumentSymbolProvider(selector, {
-    provideDocumentSymbols: (document) => languageFeatures.provideDocumentSymbols(vscode, document, semanticIndex.get(document.uri.toString()) || [])
+    provideDocumentSymbols: (document) => languageFeatures.provideDocumentSymbols(vscode, document, semanticIndex.get(document.uri.toString()) || {})
   });
   const check = vscode.commands.registerCommand('ostrin.check', async () => {
     const document = currentDocument();

@@ -11,6 +11,15 @@ pub struct TypeError {
     pub source_file: Option<String>,
 }
 
+#[derive(Debug, Clone)]
+pub struct EditorBinding {
+    pub name: String,
+    pub type_name: String,
+    pub function: String,
+    pub span: Span,
+    pub source_file: Option<String>,
+}
+
 #[derive(Clone)]
 struct FnSig {
     params: Vec<Param>,
@@ -45,6 +54,8 @@ pub struct Checker {
     current_return_type: Option<Ty>,
     current_span: Option<Span>,
     current_source_file: Option<String>,
+    current_function_name: Option<String>,
+    editor_bindings: Vec<EditorBinding>,
     errors: Vec<TypeError>,
 }
 
@@ -103,11 +114,17 @@ impl Checker {
             current_return_type: None,
             current_span: None,
             current_source_file: None,
+            current_function_name: None,
+            editor_bindings: Vec::new(),
             errors: Vec::new(),
         }
     }
 
-    pub fn check_program(mut self, items: &[Item]) -> Vec<TypeError> {
+    pub fn check_program(self, items: &[Item]) -> Vec<TypeError> {
+        self.check_program_with_bindings(items).0
+    }
+
+    pub fn check_program_with_bindings(mut self, items: &[Item]) -> (Vec<TypeError>, Vec<EditorBinding>) {
         for item in items {
             match item {
                 Item::Enum(e) => {
@@ -209,7 +226,7 @@ impl Checker {
                 Item::Record(_) | Item::Enum(_) | Item::Import(_) | Item::Trait(_) => {}
             }
         }
-        self.errors
+        (self.errors, self.editor_bindings)
     }
 
     fn check_function(&mut self, f: &FunctionDecl) {
@@ -225,6 +242,8 @@ impl Checker {
         self.current_span = Some(f.span);
         let previous_source_file = self.current_source_file.clone();
         self.current_source_file = f.source_file.clone();
+        let previous_function_name = self.current_function_name.clone();
+        self.current_function_name = Some(f.name.clone());
         let previous_bounds = std::mem::take(&mut self.current_generic_bounds);
         self.current_generic_bounds = f
             .generics
@@ -234,7 +253,15 @@ impl Checker {
         self.current_generic_bounds.extend(extra_bounds.clone());
         let mut scope: Scope = HashMap::new();
         for p in &f.params {
-            scope.insert(p.name.clone(), (self.resolve_type_in_context(&p.ty), p.is_mut));
+            let parameter_type = self.resolve_type_in_context(&p.ty);
+            self.editor_bindings.push(EditorBinding {
+                name: p.name.clone(),
+                type_name: parameter_type.describe(),
+                function: f.name.clone(),
+                span: f.span,
+                source_file: f.source_file.clone(),
+            });
+            scope.insert(p.name.clone(), (parameter_type, p.is_mut));
         }
         let expected = self.resolve_type_in_context(&f.return_type);
         for param in &f.params {
@@ -270,6 +297,7 @@ impl Checker {
         self.current_generic_bounds = previous_bounds;
         self.current_span = previous_span;
         self.current_source_file = previous_source_file;
+        self.current_function_name = previous_function_name;
     }
 
     fn check_trait_defaults(&mut self, trait_decl: &TraitDecl) {
@@ -575,6 +603,13 @@ impl Checker {
                     }
                     None => value_ty,
                 };
+                self.editor_bindings.push(EditorBinding {
+                    name: name.clone(),
+                    type_name: final_ty.describe(),
+                    function: self.current_function_name.clone().unwrap_or_default(),
+                    span: self.current_span.unwrap_or_default(),
+                    source_file: self.current_source_file.clone(),
+                });
                 scope.insert(name.clone(), (final_ty, *mut_));
             }
             Stmt::Assign { name, value } => {
@@ -592,6 +627,13 @@ impl Checker {
                         scope.insert(name.clone(), (value_ty, true));
                     }
                     None => {
+                        self.editor_bindings.push(EditorBinding {
+                            name: name.clone(),
+                            type_name: value_ty.describe(),
+                            function: self.current_function_name.clone().unwrap_or_default(),
+                            span: self.current_span.unwrap_or_default(),
+                            source_file: self.current_source_file.clone(),
+                        });
                         scope.insert(name.clone(), (value_ty, false));
                     }
                 }
@@ -630,6 +672,13 @@ impl Checker {
             Stmt::For { pattern, iter, body } => {
                 let iter_ty = self.infer_expr(iter, scope);
                 let elem_ty = iterator_element_type(&iter_ty).unwrap_or(iter_ty);
+                self.editor_bindings.push(EditorBinding {
+                    name: pattern.clone(),
+                    type_name: elem_ty.describe(),
+                    function: self.current_function_name.clone().unwrap_or_default(),
+                    span: self.current_span.unwrap_or_default(),
+                    source_file: self.current_source_file.clone(),
+                });
                 let mut inner = scope.clone();
                 inner.insert(pattern.clone(), (elem_ty, false));
                 self.check_block(body, &mut inner);

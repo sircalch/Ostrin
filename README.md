@@ -24,10 +24,11 @@ Ostrin is not yet a production compiler. The current implementation includes a
 lexer, parser, static checker, interpreter, modules, packages, collections,
 traits, pattern matching, quantities and a simulated concurrency model.
 
-The compiler suite currently passes **64 integration tests**. Function calls
+The compiler suite currently passes **65 integration tests**. Function calls
 support named/default arguments, collection lookups preserve `Option<T>`, and
 record fields are checked statically. The CLI also exposes JSON Lines
-diagnostics with source locations for editor integrations. The runtime is
+diagnostics with source locations for editor integrations, plus a compiler
+index of type members and local bindings for editor completion. The runtime is
 still synchronous, the standard library is small, and native code generation,
 full LSP support and production I/O are planned work.
 
@@ -48,6 +49,7 @@ ostrinc file.ostrin             # type-check
 ostrinc --check file.ostrin     # explicit type-check
 ostrinc --json --check file.ostrin # diagnostics for tools and editors
 ostrinc --symbols --json file.ostrin # symbols/signatures for editors
+ostrinc --members --json file.ostrin # type members/bindings for editors
 ostrinc --run file.ostrin       # type-check and run
 ostrinc --ast file.ostrin       # print the AST
 ostrinc --tokens file.ostrin   # print lexer tokens
@@ -59,8 +61,9 @@ The first editor integration is in [`vscode-ostrin/`](vscode-ostrin/). It
 recognizes `.ostrin` files, provides syntax highlighting, uses the official
 logo, exposes commands to check or run the current file with `ostrinc`, and
 shows compiler diagnostics directly in the Problems panel. It also provides
-syntax-aware completion, hover documentation and an outline for top-level
-declarations. Enable `ostrin.checkOnSave` to check automatically after saving.
+syntax-aware completion, type-aware member completion, hover documentation and
+an outline for top-level declarations. Enable `ostrin.checkOnSave` to check
+automatically after saving.
 A complete semantic Language Server Protocol implementation and debugging
 remain future work.
 

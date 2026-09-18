@@ -64,6 +64,40 @@ function sameFile(left, right) {
   return left && right && left.replace(/\\/g, '/').toLowerCase() === right.replace(/\\/g, '/').toLowerCase();
 }
 
+function normalizeSemanticIndex(index) {
+  if (Array.isArray(index)) return { symbols: index, members: [], bindings: [] };
+  const source = index || {};
+  return {
+    symbols: Array.isArray(source.symbols) ? source.symbols : [],
+    members: Array.isArray(source.members) ? source.members : [],
+    bindings: Array.isArray(source.bindings) ? source.bindings : []
+  };
+}
+
+function baseType(typeName) {
+  const match = String(typeName || '').match(/^([A-Za-z_][A-Za-z0-9_]*)/);
+  return match ? match[1] : undefined;
+}
+
+function memberAccessAt(document, position) {
+  const token = wordAt(document, position);
+  const line = document.lineAt(position.line).text;
+  const prefix = line.slice(0, token.start);
+  const match = prefix.match(/([A-Za-z_][A-Za-z0-9_]*)\.\s*$/);
+  return match ? { receiver: match[1], token } : undefined;
+}
+
+function receiverOwner(document, position, bindings) {
+  const access = memberAccessAt(document, position);
+  if (!access) return undefined;
+  const candidates = bindings
+    .filter((entry) => entry.name === access.receiver)
+    .filter((entry) => !entry.file || sameFile(entry.file, document.uri.fsPath))
+    .filter((entry) => !entry.line || entry.line <= position.line + 1)
+    .sort((left, right) => (right.line || 0) - (left.line || 0));
+  return baseType(candidates[0]?.type) || access.receiver;
+}
+
 function semanticCompletionItems(vscode, semanticSymbols) {
   const items = [];
   const known = new Set(symbols.keys());
@@ -89,7 +123,31 @@ function semanticCompletionItems(vscode, semanticSymbols) {
   return items;
 }
 
-function provideCompletionItems(vscode, semanticSymbols = []) {
+function memberCompletionItems(vscode, members, owner) {
+  const items = [];
+  const known = new Set();
+  const kinds = {
+    method: vscode.CompletionItemKind.Method,
+    field: vscode.CompletionItemKind.Field,
+    enumMember: vscode.CompletionItemKind.EnumMember
+  };
+  for (const entry of members) {
+    if (entry.owner !== owner || !entry.name || known.has(entry.name)) continue;
+    known.add(entry.name);
+    const item = new vscode.CompletionItem(entry.name, kinds[entry.kind] || vscode.CompletionItemKind.Value);
+    item.detail = entry.detail || `Ostrin ${entry.kind || 'member'}`;
+    if (entry.detail) item.documentation = new vscode.MarkdownString(`\`${entry.detail}\``);
+    items.push(item);
+  }
+  return items;
+}
+
+function provideCompletionItems(vscode, semanticIndex = [], document, position) {
+  const index = normalizeSemanticIndex(semanticIndex);
+  if (document && position) {
+    const owner = receiverOwner(document, position, index.bindings);
+    if (owner) return memberCompletionItems(vscode, index.members, owner);
+  }
   const items = [];
   for (const keyword of keywords) {
     const item = new vscode.CompletionItem(keyword, vscode.CompletionItemKind.Keyword);
@@ -102,13 +160,26 @@ function provideCompletionItems(vscode, semanticSymbols = []) {
     item.documentation = new vscode.MarkdownString(`\`${signature}\``);
     items.push(item);
   }
-  return items.concat(semanticCompletionItems(vscode, semanticSymbols));
+  return items.concat(semanticCompletionItems(vscode, index.symbols));
 }
 
-function provideHover(vscode, document, position, semanticSymbols = []) {
+function provideHover(vscode, document, position, semanticIndex = []) {
+  const index = normalizeSemanticIndex(semanticIndex);
   const token = wordAt(document, position);
-  const semantic = semanticSymbols.find((entry) => shortSymbolName(entry.name) === token.word);
-  const markdown = semantic
+  const access = memberAccessAt(document, position);
+  const owner = access && receiverOwner(document, position, index.bindings);
+  const member = owner && index.members.find((entry) => entry.owner === owner && entry.name === token.word);
+  const binding = index.bindings
+    .filter((entry) => entry.name === token.word)
+    .filter((entry) => !entry.file || sameFile(entry.file, document.uri.fsPath))
+    .filter((entry) => !entry.line || entry.line <= position.line + 1)
+    .sort((left, right) => (right.line || 0) - (left.line || 0))[0];
+  const semantic = index.symbols.find((entry) => shortSymbolName(entry.name) === token.word);
+  const markdown = member
+    ? `**Ostrin ${member.kind || 'member'}**\n\n\`${member.owner}.${member.name}: ${member.detail || ''}\``
+    : binding
+      ? `**Ostrin local binding**\n\n\`${binding.name}: ${binding.type}\``
+      : semantic
     ? `**Ostrin ${semantic.kind || 'symbol'}**\n\n\`${semantic.detail || semantic.name}\``
     : markdownFor(token.word);
   if (!markdown) return undefined;
@@ -119,9 +190,10 @@ function provideHover(vscode, document, position, semanticSymbols = []) {
   return new vscode.Hover(new vscode.MarkdownString(markdown), range);
 }
 
-function provideDocumentSymbols(vscode, document, semanticSymbols = []) {
+function provideDocumentSymbols(vscode, document, semanticIndex = []) {
+  const index = normalizeSemanticIndex(semanticIndex);
   const topLevelKinds = new Set(['function', 'record', 'enum', 'trait', 'implementation']);
-  const local = semanticSymbols.filter((entry) =>
+  const local = index.symbols.filter((entry) =>
     topLevelKinds.has(entry.kind) && (!entry.file || sameFile(entry.file, document.uri.fsPath))
   );
   if (local.length) {

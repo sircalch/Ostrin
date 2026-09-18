@@ -21,9 +21,9 @@ El objetivo explícito (dicho por el usuario al principio de la sesión): que Os
 
 - **17 documentos de diseño** completos y revisados (tres pasadas de consistencia formales), cubriendo el núcleo entero del lenguaje.
 - **Un compilador/intérprete real en Rust** (~4000+ líneas), en `compiler/`, que compila con `cargo build` y corre con `cargo run -- <flags> archivo.ostrin`.
-- **64 pruebas automatizadas** (`cargo test`) que verifican comportamiento exacto (no solo "no truena") sobre las piezas centrales del lenguaje.
+- **65 pruebas automatizadas** (`cargo test`) que verifican comportamiento exacto (no solo "no truena") sobre las piezas centrales del lenguaje.
 - **68 programas/archivos de ejemplo reales** en `examples/`, incluidos varios proyectos multi-archivo.
-- Sigue siendo un **prototipo de validación de diseño**, no un lenguaje listo para producción: es un intérprete que recorre el AST (no genera código máquina), sin paralelismo real de sistema operativo, con una stdlib inicial de E/S, sin LSP/herramientas de editor.
+- Sigue siendo un **prototipo de validación de diseño**, no un lenguaje listo para producción: es un intérprete que recorre el AST (no genera código máquina), sin paralelismo real de sistema operativo, con una stdlib inicial de E/S, sin LSP completo.
 
 **Lo más importante que hay que entender**: cada decisión de diseño de los 17 documentos fue *implementada y probada con un programa real*, no solo escrita en el papel. Varias veces, construir el compilador encontró bugs de diseño que ninguna revisión de texto había visto (ver sección 6).
 
@@ -63,7 +63,7 @@ Proyecto Cargo normal: `cd compiler && cargo build`, binario `ostrinc`.
 compiler/
 ├── Cargo.toml              (una sola dependencia externa: `toml`, para ostrin.toml)
 ├── src/
-│   ├── main.rs              — CLI: --check, --tokens, --ast, --run, --json, --help, --version
+│   ├── main.rs              — CLI: --check, --tokens, --ast, --run, --json, --symbols, --members, --help, --version
 │   ├── lexer/
 │   │   ├── mod.rs           — tokenizador, trackea saltos de línea (newline_before) por token
 │   │   └── token.rs         — TokenKind, tabla de palabras reservadas
@@ -75,7 +75,7 @@ compiler/
 │   ├── modules.rs            — carga multi-archivo: descubrimiento, ciclos (E1081), visibilidad (E1080), reescritura de AST (mangling de nombres cruzando módulos)
 │   └── package.rs            — ostrin.toml, dependencias `path` (funcionan) y `git` (reconocidas, rechazadas explícitamente sin red)
 └── tests/
-    └── examples.rs           — 64 pruebas de integración (invocan el binario compilado, comparan stdout/stderr exacto)
+    └── examples.rs           — 65 pruebas de integración (invocan el binario compilado, comparan stdout/stderr exacto)
 ```
 
 ### Cómo correrlo
@@ -83,12 +83,14 @@ compiler/
 ```bash
 cd compiler
 cargo build
-cargo test                                    # 64 pruebas, deben pasar todas
+cargo test                                    # 65 pruebas, deben pasar todas
 ./target/debug/ostrinc archivo.ostrin         # solo verifica tipos
 ./target/debug/ostrinc --run archivo.ostrin   # verifica y ejecuta
 ./target/debug/ostrinc --ast archivo.ostrin   # imprime el AST
 ./target/debug/ostrinc --tokens archivo.ostrin # imprime los tokens
 ./target/debug/ostrinc --check --json archivo.ostrin # JSON Lines para editores
+./target/debug/ostrinc --symbols --json archivo.ostrin # símbolos y firmas
+./target/debug/ostrinc --members --json archivo.ostrin # miembros por tipo y bindings locales
 ```
 
 En Windows, si `cargo`/`rustc` no están en el PATH de la sesión: `$env:Path += ";$env:USERPROFILE\.cargo\bin"` (rustup se instaló vía `winget install Rustlang.Rustup` durante esta sesión).
@@ -106,7 +108,7 @@ En Windows, si `cargo`/`rustc` no están en el PATH de la sesión: `$env:Path +=
 
 ## 5. Qué está probado (y cómo verificarlo)
 
-`compiler/tests/examples.rs` tiene 64 pruebas. Cubren, con valores exactos esperados (no solo "no falla"):
+`compiler/tests/examples.rs` tiene 65 pruebas. Cubren, con valores exactos esperados (no solo "no falla"):
 
 - Aritmética de `Quantity<D>` con conversión de unidades real (`5 nm + 2 m`, `velocity(10 m, 2 s)`, cancelación dimensional `2m/5nm = 400000000`).
 - Los 4 errores deliberados de dimensión/mutabilidad (`E1024`, `E1025`, `E1001`) en un mismo archivo.
@@ -1307,3 +1309,72 @@ consciente de las declaraciones y firmas del AST, mientras que el completado
 dependiente del tipo de una expresión (`valor.metodo`) queda pendiente de
 exponer resultados del checker. Se añadió una prueba de integración para la
 salida de símbolos y la suite queda en **64 pruebas exitosas**.
+
+---
+
+## 38. Miembros conscientes del tipo para VS Code — 2026-09-17
+
+Se cerró el siguiente tramo del editor: el compilador ya puede publicar no
+solo declaraciones, sino también los miembros disponibles por tipo y los
+bindings locales que el checker logra inferir.
+
+### Cambios realizados
+
+1. `compiler/src/typeck/mod.rs`
+   - Se añadió `EditorBinding`, con nombre, tipo renderizado, función, span y
+     archivo de origen.
+   - `Checker::check_program_with_bindings` conserva los parámetros, bindings
+     declarados o inferidos, bindings creados por asignación y variables de
+     iteración de `for`.
+   - `check_program` mantiene su API anterior y devuelve únicamente errores,
+     para no romper consumidores existentes.
+
+2. `compiler/src/symbols.rs` y `compiler/src/main.rs`
+   - Se añadió `MemberSymbol` y `collect_members`.
+   - El índice incluye campos de `record`, variantes de `enum`, métodos de
+     `trait`/`impl` y la superficie estable de `List`, `Map`, `Set`, `Option`,
+     `Result`, `Task` y `Channel`.
+   - Nuevo comando `ostrinc --members --json archivo.ostrin`. Publica JSON
+     Lines con objetos `member` (`owner`, `memberKind`, `name`, `detail`) y
+     `binding` (`name`, `type`, `function`, `file`, `line`, `column`).
+
+3. `vscode-ostrin/extension.js` y `language-features.js`
+   - La extensión consulta `ostrinc --members --json` en segundo plano.
+   - Al escribir `receiver.` resuelve el tipo base del binding más reciente
+     anterior a la posición y ofrece únicamente sus miembros.
+   - Hover reconoce métodos/campos de ese tipo y también muestra el tipo de
+     un binding local.
+   - Se conserva el completado global de keywords, tipos, unidades y
+     funciones para posiciones que no son acceso a miembros.
+
+4. `compiler/tests/examples.rs`, `README.md` y `website/`
+   - Se añadió una prueba de integración que verifica `List.push`, `Map.get`
+     y el binding `numbers: List<Int>`.
+   - La suite queda en **65 pruebas exitosas**.
+   - La documentación y la página pública reflejan `--members` y el estado
+     actual del tooling.
+
+### Decisión y límite actual
+
+La resolución del editor es deliberadamente pragmática: usa el binding local
+más reciente cuyo span precede al cursor y extrae el nombre base de tipos como
+`List<Int>` o `Option<String>`. Eso hace útil el completado inmediatamente sin
+convertir todavía el compilador en un LSP completo. Siguen pendientes la
+resolución exacta de scopes/shadowing, el tipo de cada expresión intermedia
+(`make().field.method()`), la propagación del tipo de retorno por cadenas y la
+navegación a la declaración del miembro.
+
+### Verificación
+
+```text
+cd compiler
+cargo test --quiet
+65 passed; 0 failed
+
+node --check vscode-ostrin/language-features.js
+node --check vscode-ostrin/extension.js
+```
+
+El `cargo fmt --check` global continúa mostrando diferencias de formato
+preexistentes en muchos archivos no relacionados; no se hizo un formateo
+masivo para no mezclar cambios ajenos.
