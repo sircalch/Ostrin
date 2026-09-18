@@ -2731,3 +2731,37 @@ sus operaciones básicas (`length`/`push`/`remove_at`/indexado/`for`).
 original — siguen bloqueados por lo mismo: closures, la única pieza de
 "resolver algo en tiempo de ejecución" que este backend todavía no tiene
 ninguna forma de representar.
+
+---
+
+## 68. Lambdas en combinadores de `List` (backend nativo) — 2026-09-18
+
+Cierra el ejemplo original `dyn_trait.ostrin` (`List<dyn Shape>` + `.fold()`
+con lambda): ahora compila a nativo y su salida coincide dígito a dígito con
+el intérprete.
+
+### Diseño: sin objetos closure
+
+En vez de funciones anónimas con entorno capturado (punteros a función +
+structs de entorno + análisis de escape), la lambda solo se acepta como
+argumento **directo** de `map`/`filter`/`fold`/`any`/`all` y el combinador se
+**expande en línea** como un bucle dentro de una expresión-sentencia GNU. El
+cuerpo de la lambda queda en el mismo ámbito C que el código que la rodea, así
+que las variables capturadas funcionan sin ningún mecanismo extra. El tipo de
+los parámetros no se declara en Ostrin: viene del combinador (elemento de la
+lista; en `fold`, el tipo del valor inicial), y el tipo del resultado sale del
+cuerpo (`map` puede cambiar el tipo de elemento; `fold` coacciona el cuerpo al
+tipo del acumulador, lo que permite acumular sobre valores `dyn`).
+
+### Otros cambios
+- `count()` como alias de `length()`.
+- Un literal de lista ligado a `List<dyn Trait>` embolsa cada elemento
+  (`gen_list_literal` recibe el tipo de elemento esperado).
+- `print` de `Float` usa `ostrin_print_float`: busca la menor precisión que
+  hace ida y vuelta exacta (como el formato por defecto de Rust), en vez de
+  `%g` (6 cifras), que daba 12.5664 frente a 12.56636 del intérprete.
+
+### Límites
+Valores función de primera clase (guardar una lambda en una variable o pasarla
+a una función de usuario) y `find` (devuelve `Option<T>`, genérico) siguen
+solo en el intérprete. Suite: **89 pruebas**, sin warnings.

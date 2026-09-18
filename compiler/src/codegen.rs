@@ -171,6 +171,15 @@ const PRELUDE: &str = "#include <stdint.h>\n\
 #include <stdlib.h>\n\
 #include <string.h>\n\
 \n\
+static void ostrin_print_float(double v) {\n\
+    char buf[64];\n\
+    for (int prec = 1; prec <= 17; prec++) {\n\
+        snprintf(buf, sizeof buf, \"%.*g\", prec, v);\n\
+        if (strtod(buf, NULL) == v) break;\n\
+    }\n\
+    printf(\"%s\\n\", buf);\n\
+}\n\
+\n\
 static char* ostrin_str_concat(const char* a, const char* b) {\n\
     size_t len = strlen(a) + strlen(b) + 1;\n\
     char* out = (char*)malloc(len);\n\
@@ -469,7 +478,20 @@ impl<'a> Codegen<'a> {
     fn gen_stmt(&mut self, stmt: &Stmt, out: &mut String) -> Result<(), String> {
         match stmt {
             Stmt::Binding { name, ty: declared, value, .. } => {
-                let (code, actual_ty) = self.gen_expr(value)?;
+                // A list literal bound to an explicit `List<dyn Trait>` needs
+                // its elements boxed one by one, so it must know the element
+                // type it is expected to produce before generating them.
+                let expected_elem = match (declared, value.unlocated()) {
+                    (Some(declared_ty), Expr::ListLiteral(_)) => match map_type(declared_ty, &self.named_types()) {
+                        Ok(CType::List(elem)) => Some(*elem),
+                        _ => None,
+                    },
+                    _ => None,
+                };
+                let (code, actual_ty) = match (&expected_elem, value.unlocated()) {
+                    (Some(elem), Expr::ListLiteral(items)) => self.gen_list_literal(items, Some(elem))?,
+                    _ => self.gen_expr(value)?,
+                };
                 // An explicit `name: dyn Trait = ConcreteRecord { ... }`
                 // needs boxing right here — with no annotation, `ty` is
                 // just whatever the value already produced.
@@ -662,7 +684,7 @@ impl<'a> Codegen<'a> {
             }
             Expr::Block(b) => self.gen_block_expr(b),
             Expr::Match(scrutinee, arms) => self.gen_match(scrutinee, arms),
-            Expr::ListLiteral(items) => self.gen_list_literal(items),
+            Expr::ListLiteral(items) => self.gen_list_literal(items, None),
             Expr::Index(obj, idx) => {
                 let (obj_code, obj_ty) = self.gen_expr(obj)?;
                 let CType::List(elem_ty) = obj_ty else {
@@ -681,14 +703,18 @@ impl<'a> Codegen<'a> {
     /// other element must match it exactly (no implicit widening, same as
     /// everywhere else in this backend). An empty literal (`[]`) has no
     /// element to infer from and isn't supported.
-    fn gen_list_literal(&mut self, items: &[Expr]) -> Result<(String, CType), String> {
+    fn gen_list_literal(&mut self, items: &[Expr], expected: Option<&CType>) -> Result<(String, CType), String> {
         if items.is_empty() {
             return Err("empty list literals aren't supported by the native backend yet (the element type can't be inferred)".to_string());
         }
         let mut codes = Vec::with_capacity(items.len());
-        let mut elem_ty: Option<CType> = None;
+        let mut elem_ty: Option<CType> = expected.cloned();
         for item in items {
-            let (code, ty) = self.gen_expr(item)?;
+            let (mut code, mut ty) = self.gen_expr(item)?;
+            if let Some(expected) = expected {
+                code = self.coerce(&code, &ty, expected)?;
+                ty = expected.clone();
+            }
             match &elem_ty {
                 Some(expected) if *expected != ty => {
                     return Err(format!(
@@ -1146,9 +1172,12 @@ impl<'a> Codegen<'a> {
             CType::List(elem_ty) => {
                 let elem_ty = (**elem_ty).clone();
                 let struct_name = self.ensure_list(&elem_ty);
+                if matches!(method_name, "map" | "filter" | "fold" | "any" | "all") {
+                    return self.gen_list_combinator(&obj_code, &elem_ty, method_name, args);
+                }
                 let (arg_codes, arg_types) = self.gen_args(args)?;
                 match method_name {
-                    "length" => {
+                    "length" | "count" => {
                         if !arg_codes.is_empty() {
                             return Err("'length' takes no arguments".to_string());
                         }
@@ -1177,13 +1206,133 @@ impl<'a> Codegen<'a> {
         }
     }
 
+    /// Splits a combinator argument into a lambda's parameter names and body.
+    fn lambda_of<'e>(arg: &'e Arg, method: &str) -> Result<(&'e [String], &'e Block), String> {
+        match arg {
+            Arg::Positional(e) => match e.unlocated() {
+                Expr::Lambda(params, body) => Ok((params.as_slice(), body)),
+                _ => Err(format!("'{method}' only supports an inline lambda argument in the native backend (function values aren't supported)")),
+            },
+            Arg::Named(..) => Err("named arguments aren't supported by the native backend yet".to_string()),
+        }
+    }
+
+    /// Types and generates a lambda body with its parameters bound to the
+    /// given concrete types. There is no closure object here at all: the
+    /// lambda is only ever accepted as a direct argument of a list
+    /// combinator, which is expanded *inline* as a loop, so the body simply
+    /// sees the enclosing C scope — captured variables need no environment
+    /// struct, function pointer or escape analysis.
+    fn inline_lambda(&mut self, names: &[String], types: &[CType], body: &Block) -> Result<(String, CType), String> {
+        if names.len() != types.len() {
+            return Err(format!("this lambda takes {} parameter(s) but the combinator supplies {}", names.len(), types.len()));
+        }
+        self.push_scope();
+        for (name, ty) in names.iter().zip(types) {
+            self.define(name, ty.clone());
+        }
+        let result = self.gen_block_expr(body);
+        self.pop_scope();
+        result
+    }
+
+    /// `map`/`filter`/`fold`/`any`/`all` on a list, expanded to an inline
+    /// loop inside a GNU statement expression (see `inline_lambda`).
+    fn gen_list_combinator(&mut self, list_code: &str, elem_ty: &CType, method: &str, args: &[Arg]) -> Result<(String, CType), String> {
+        let elem_c = c_type_name(elem_ty);
+        let src = self.next_temp();
+        let idx = self.next_temp();
+        let list_c = c_type_name(&CType::List(Box::new(elem_ty.clone())));
+        let head = format!("{list_c} {src} = {list_code};");
+        let loop_head = format!("for (int64_t {idx} = 0; {idx} < {src}->length; {idx}++)");
+        match method {
+            "fold" => {
+                if args.len() != 2 {
+                    return Err("'fold' expects an initial value and a lambda".to_string());
+                }
+                let Arg::Positional(init_expr) = &args[0] else {
+                    return Err("named arguments aren't supported by the native backend yet".to_string());
+                };
+                let (init_code, acc_ty) = self.gen_expr(init_expr)?;
+                let (names, body) = Self::lambda_of(&args[1], method)?;
+                if names.len() != 2 {
+                    return Err("'fold' needs a lambda with two parameters (accumulator, element)".to_string());
+                }
+                let (body_code, body_ty) = self.inline_lambda(names, &[acc_ty.clone(), elem_ty.clone()], body)?;
+                let body_code = self.coerce(&body_code, &body_ty, &acc_ty)?;
+                let acc_c = c_type_name(&acc_ty);
+                Ok((
+                    format!(
+                        "({{ {head} {acc_c} {acc} = {init_code}; {loop_head} {{ {elem_c} {el} = {src}->items[{idx}]; {acc} = {body_code}; }} {acc}; }})",
+                        acc = names[0],
+                        el = names[1]
+                    ),
+                    acc_ty,
+                ))
+            }
+            _ => {
+                if args.len() != 1 {
+                    return Err(format!("'{method}' expects exactly one lambda"));
+                }
+                let (names, body) = Self::lambda_of(&args[0], method)?;
+                if names.len() != 1 {
+                    return Err(format!("'{method}' needs a lambda with one parameter"));
+                }
+                let (body_code, body_ty) = self.inline_lambda(names, &[elem_ty.clone()], body)?;
+                let el = &names[0];
+                let bind = format!("{elem_c} {el} = {src}->items[{idx}];");
+                match method {
+                    "map" => {
+                        if body_ty == CType::Void {
+                            return Err("'map' lambda must produce a value".to_string());
+                        }
+                        let out_struct = self.ensure_list(&body_ty);
+                        let dst = self.next_temp();
+                        let out_c = c_type_name(&CType::List(Box::new(body_ty.clone())));
+                        Ok((
+                            format!(
+                                "({{ {head} {out_c} {dst} = {out_struct}_new_from_array(NULL, 0); {loop_head} {{ {bind} {out_struct}_push({dst}, {body_code}); }} {dst}; }})"
+                            ),
+                            CType::List(Box::new(body_ty)),
+                        ))
+                    }
+                    "filter" => {
+                        let dst = self.next_temp();
+                        let st = list_struct_name(elem_ty);
+                        Ok((
+                            format!(
+                                "({{ {head} {list_c} {dst} = {st}_new_from_array(NULL, 0); {loop_head} {{ {bind} if ({body_code}) {{ {st}_push({dst}, {el}); }} }} {dst}; }})"
+                            ),
+                            CType::List(Box::new(elem_ty.clone())),
+                        ))
+                    }
+                    "any" | "all" => {
+                        let r = self.next_temp();
+                        let (init, test, set) = if method == "any" {
+                            ("false", format!("({body_code})"), "true")
+                        } else {
+                            ("true", format!("!({body_code})"), "false")
+                        };
+                        Ok((
+                            format!(
+                                "({{ {head} bool {r} = {init}; {loop_head} {{ {bind} if ({test}) {{ {r} = {set}; break; }} }} {r}; }})"
+                            ),
+                            CType::Bool,
+                        ))
+                    }
+                    _ => unreachable!("only combinator names reach here"),
+                }
+            }
+        }
+    }
+
     fn gen_print(&self, arg_codes: &[String], arg_types: &[CType]) -> Result<(String, CType), String> {
         if arg_codes.len() != 1 {
             return Err("'print' expects exactly one argument".to_string());
         }
         let (spec, value) = match &arg_types[0] {
             CType::Int => ("%lld\\n", format!("(long long)({})", arg_codes[0])),
-            CType::Float => ("%g\\n", arg_codes[0].clone()),
+            CType::Float => return Ok((format!("ostrin_print_float({})", arg_codes[0]), CType::Void)),
             CType::Bool => ("%s\\n", format!("(({}) ? \"true\" : \"false\")", arg_codes[0])),
             CType::Str => ("%s\\n", arg_codes[0].clone()),
             CType::Void => return Err("cannot 'print' a Void value".to_string()),

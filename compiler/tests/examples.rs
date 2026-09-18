@@ -944,6 +944,43 @@ fn native_backend_compiles_and_runs_lists() {
 }
 
 #[test]
+fn native_backend_compiles_and_runs_list_combinators_with_captures() {
+    // map/filter/fold/any/all with lambdas that capture an enclosing local
+    // (`offset`), including a `map` that changes the element type.
+    let exe = temp_artifact("closures.exe");
+    let compile = run(&["--compile", "--out", &exe, &example_path("native_closures.ostrin")]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+    let run_output = Command::new(&exe).output().unwrap();
+    let _ = fs::remove_file(&exe);
+    assert_eq!(
+        String::from_utf8_lossy(&run_output.stdout).replace("\r\n", "\n"),
+        "11\n12\n13\n14\n15\n16\n3\n210\ntrue\nfalse\nn!\nn!\nn!\nn!\nn!\nn!\n"
+    );
+}
+
+#[test]
+fn native_backend_compiles_the_original_dyn_trait_example() {
+    // The project's own dyn_trait.ostrin: List<dyn Shape>, .fold() with a
+    // lambda calling a trait method through the vtable, and Float printing
+    // that must match the interpreter digit for digit.
+    let exe = temp_artifact("dyn_trait_original.exe");
+    let compile = run(&["--compile", "--out", &exe, &example_path("dyn_trait.ostrin")]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+    let run_output = Command::new(&exe).output().unwrap();
+    let _ = fs::remove_file(&exe);
+    assert_eq!(
+        String::from_utf8_lossy(&run_output.stdout).replace("\r\n", "\n"),
+        "12.56636\n9\n3.14159\n24.70795\n"
+    );
+}
+
+#[test]
 fn native_backend_monomorphizes_one_list_struct_per_element_type() {
     let out = run(&["--emit-c", &example_path("native_lists.ostrin")]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));

@@ -1,0 +1,23 @@
+fn main() -> Void {
+    numbers = [1, 2, 3, 4, 5, 6]
+    offset = 10
+
+    shifted = numbers.map(fn(n) { n + offset })
+    for s in shifted {
+        print(s)
+    }
+
+    evens = numbers.filter(fn(n) { n > 3 })
+    print(evens.length())
+
+    total = numbers.fold(0, fn(acc, n) { acc + n * offset })
+    print(total)
+
+    print(numbers.any(fn(n) { n > 5 }))
+    print(numbers.all(fn(n) { n > 1 }))
+
+    labels = numbers.map(fn(n) { "n" + "!" })
+    for l in labels {
+        print(l)
+    }
+}
