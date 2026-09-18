@@ -7,6 +7,26 @@ readability, physically meaningful types and safe-by-default concurrency.
 The project is currently a design-validation compiler and interpreter written
 in Rust.
 
+## Repository language map
+
+GitHub currently reports Rust in its language bar because the compiler and
+interpreter implementation live in `compiler/src/*.rs`. That is the
+implementation of Ostrin, not a claim that Rust and Ostrin are the same
+language. The actual Ostrin source files are the `.ostrin` programs in
+`examples/` and the validation cases in `tests/`.
+
+| Path | Role |
+| --- | --- |
+| `examples/*.ostrin` | Programs written in Ostrin |
+| `tests/**/*.ostrin` | Positive and negative Ostrin test programs |
+| `compiler/src/*.rs` | Ostrin compiler, checker and interpreter implementation in Rust |
+| `vscode-ostrin/` | VS Code tooling for the Ostrin language |
+
+GitHub Linguist does not yet know `Ostrin` as an official language, so the
+language bar cannot display it as a new category until Ostrin is accepted into
+that upstream catalog. The project will submit a Linguist definition once the
+language has enough public usage and its syntax/tooling are stable.
+
 ## Why Ostrin?
 
 - **Physical quantities as types.** `5 m / 2 s` carries its dimension through
@@ -24,7 +44,7 @@ Ostrin is not yet a production compiler. The current implementation includes a
 lexer, parser, static checker, interpreter, modules, packages, collections,
 traits, pattern matching, quantities and a simulated concurrency model.
 
-The compiler suite currently passes **65 integration tests**. Function calls
+The compiler suite currently passes **66 integration tests**. Function calls
 support named/default arguments, collection lookups preserve `Option<T>`, and
 record fields are checked statically. The CLI also exposes JSON Lines
 diagnostics with source locations for editor integrations, plus a compiler

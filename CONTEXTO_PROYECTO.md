@@ -1678,3 +1678,29 @@ entre módulos y expresiones completas con un índice persistente tipo LSP.
 El smoke test de VS Code verifica tres referencias y tres reemplazos para un
 binding local. También pasan la sintaxis JavaScript y las **66 pruebas** del
 compilador.
+
+---
+
+## 49. Identidad de Ostrin en las estadísticas de GitHub — 2026-09-17
+
+Se investigó por qué la barra de lenguajes del repositorio muestra Rust. No es
+un error del proyecto: GitHub Linguist clasifica el código según su catálogo
+oficial y actualmente no contiene una entrada para Ostrin. Por eso reconoce
+los archivos Rust del compilador, mientras que `.ostrin` todavía no aparece
+como una categoría propia.
+
+### Decisión
+
+- No se marcará Rust como vendored, generado o documentación: eso falsearía la
+  naturaleza del repositorio, porque Rust sí es la implementación del
+  compilador e intérprete.
+- El README ahora incluye un mapa explícito entre programas Ostrin,
+  implementación Rust y tooling de VS Code.
+- La solución definitiva será preparar una propuesta para `github-linguist`
+  con extensión `.ostrin`, color, identificador y scope de TextMate cuando el
+  lenguaje tenga suficiente adopción pública para cumplir sus criterios.
+
+GitHub documenta que `linguist-language` solo puede clasificar nombres que
+existen en su catálogo; un nombre personalizado aún no entra en las
+estadísticas. Esta aclaración evita presentar una alteración cosmética como si
+fuera reconocimiento oficial del lenguaje.
