@@ -1,0 +1,28 @@
+record Pair {
+    x: Int
+    y: Int
+}
+
+fn identity<T>(value: T) -> T {
+    value
+}
+
+fn max<T>(a: T, b: T) -> T {
+    if a > b {
+        a
+    } else {
+        b
+    }
+}
+
+fn sum_pair(p: Pair) -> Int {
+    p.x + p.y
+}
+
+fn main() -> Void {
+    print(identity(42))
+    print(identity("hello"))
+    print(max(3, 7))
+    print(max(9, 2))
+    print(sum_pair(identity(Pair { x: 4, y: 5 })))
+}

@@ -840,6 +840,46 @@ fn native_backend_compiles_and_runs_enums_and_match() {
 }
 
 #[test]
+fn native_backend_compiles_and_runs_generic_functions() {
+    // Monomorphization: `identity<T>` is called with Int, String and a
+    // record (Pair), so it must be emitted three times — once per concrete
+    // type actually used, never a single generic C function — and `max<T>`
+    // exercises a generic function whose body itself isn't trivial (an
+    // `if`-expression comparing its own type parameter).
+    let exe = temp_artifact("generics.exe");
+    let compile = run(&["--compile", "--out", &exe, &example_path("native_generics.ostrin")]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+
+    let run_output = Command::new(&exe).output().unwrap_or_else(|e| panic!("failed to run compiled binary '{exe}': {e}"));
+    let _ = fs::remove_file(&exe);
+    assert!(run_output.status.success(), "compiled binary exited unsuccessfully");
+    assert_eq!(
+        String::from_utf8_lossy(&run_output.stdout).replace("\r\n", "\n"),
+        "42\nhello\n7\n9\n9\n",
+        "native binary should match the interpreter's output for the same program"
+    );
+}
+
+#[test]
+fn native_backend_emits_one_c_function_per_concrete_instantiation() {
+    // Same source as above, inspected via --emit-c instead of run: there
+    // must be exactly one definition per (function, concrete type) pair
+    // actually called, reused across repeated calls with the same type
+    // rather than duplicated.
+    let out = run(&["--emit-c", &example_path("native_generics.ostrin")]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let source = stdout(&out);
+    assert_eq!(source.matches("identity__Int(int64_t value)").count(), 1);
+    assert_eq!(source.matches("identity__String(const char* value)").count(), 1);
+    assert_eq!(source.matches("identity__Pair(Pair* value)").count(), 1);
+    assert_eq!(source.matches("max__Int(int64_t a, int64_t b)").count(), 1);
+    assert!(!source.contains("<T>"), "no generic syntax should leak into the generated C: {source}");
+}
+
+#[test]
 fn cli_exposes_help_and_version() {
     let version = run(&["--version"]);
     assert!(version.status.success());

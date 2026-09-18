@@ -44,7 +44,7 @@ Ostrin is not yet a production compiler. The current implementation includes a
 lexer, parser, static checker, interpreter, modules, packages, collections,
 traits, pattern matching, quantities and a simulated concurrency model.
 
-The compiler suite currently passes **81 integration tests**. Function calls
+The compiler suite currently passes **83 integration tests**. Function calls
 support named/default arguments, collection lookups preserve `Option<T>`, and
 record fields are checked statically. The CLI also exposes JSON Lines
 diagnostics with source locations for editor integrations, plus a compiler
@@ -53,19 +53,21 @@ tooling. A persistent language server (`--lsp`) resolves a document's real
 import graph across unsaved buffers and serves hover, completion, references,
 rename, signature help and semantic tokens over the protocol; a debug adapter
 (`--dap`) gives real breakpoints, stepping, a call stack and variable
-inspection on top of the same interpreter. A first native backend (`--emit-c`/
-`--compile`) transpiles a real subset of the language — plain functions,
-plain records (heap-allocated, always by reference, to match the interpreter's
-identity semantics), their non-generic `impl` methods (resolved statically at
-compile time — there is no dynamic dispatch anywhere in this backend), and
-plain non-generic enums with `match` (compiled to a tagged union and a
-sequence of `if`s, no runtime type information needed) — over
-`Int`/`Float`/`Bool`/`String`, recursion, `if`/`while`/`for <range>`. Since
-`Option<T>`/`Result<T, E>` are themselves generic, they and any other generic
-type, along with dimensional `Quantity`, closures, collections, and any
-operator or trait-object dispatch that would actually need runtime dispatch,
-still only run through the interpreter. The runtime is still synchronous and
-the standard library is small.
+inspection on top of the same interpreter. A native backend (`--emit-c`/
+`--compile`) transpiles a real subset of the language to C and compiles it to
+a native executable: plain functions — including generic ones, monomorphized
+per concrete instantiation the way C++/Rust templates are, with a fresh C
+function generated the first time a given (function, concrete types) pair is
+called and reused after that — plain records (heap-allocated, always by
+reference, to match the interpreter's identity semantics) with their
+non-generic `impl` methods (resolved statically at compile time), and plain
+non-generic enums with `match` (compiled to a tagged union and a sequence of
+`if`s) — over `Int`/`Float`/`Bool`/`String`, recursion, `if`/`while`/
+`for <range>`. `dyn Trait` and trait-object dispatch, dimensional `Quantity`,
+closures, and collections still only run through the interpreter — nothing
+in this backend resolves anything at runtime, only at compile time, so
+whatever would require that stays with the interpreter. The runtime is still
+synchronous and the standard library is small.
 
 ## Quick start
 

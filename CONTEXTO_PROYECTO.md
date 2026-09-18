@@ -2481,3 +2481,86 @@ en un proyecto distinto sigue siendo lo mismo de siempre: todo lo que
 requiere resolver algo en tiempo de ejecución en vez de en tiempo de
 compilación — `dyn Trait`, genéricos reales (que es lo único que separa a
 este backend de soportar `Option`/`Result`, el enum más usado del lenguaje).
+
+---
+
+## 65. Genéricos reales (monomorfización) en el backend nativo — 2026-09-17
+
+Se le preguntó al usuario cómo seguir tras cerrar el subconjunto "sin
+dispatch dinámico" (funciones, records+métodos, enums+match); eligió
+genéricos reales vía monomorfización — el mismo mecanismo que usan las
+plantillas de C++ o los genéricos de Rust: generar una función de C
+distinta por cada combinación concreta de tipos con la que se llama una
+función genérica, en vez de una única función genérica en tiempo de
+ejecución.
+
+### Por qué "monomorfización" no es lo mismo que "genéricos reales" del todo
+
+Se acotó desde el principio, explícitamente ante el usuario: `Option<T>` y
+`Result<T, E>` son genéricos, así que quedan fuera de este alcance de todas
+formas — lo que se ganó hoy es **funciones** genéricas definidas por el
+usuario, no el enum genérico más usado del lenguaje. Records y enums
+genéricos, y métodos genéricos dentro de un `impl`, siguen fuera (se
+descartan silenciosamente de sus tablas respectivas, como ya pasaba con
+otros casos no soportados).
+
+### Cómo funciona
+
+- Una función `fn identity<T>(x: T) -> T` se guarda aparte
+  (`Codegen.generic_functions`), nunca se le asigna una única firma de C
+  (no tiene una, tiene una por cada instanciación) y nunca se emite por sí
+  misma.
+- En cada sitio de llamada, `infer_generic_substitutions` deduce `T` a
+  partir de los tipos **concretos** de los argumentos — nunca del tipo de
+  retorno ni del contexto donde se usa el resultado, a diferencia de
+  `typeck`, que sí hace inferencia bidireccional completa. Si `T` solo
+  aparece en el tipo de retorno, este backend no puede inferirlo y falla
+  con un mensaje claro (`typeck` normalmente ya habría rechazado ese mismo
+  programa con su propio error, así que en la práctica este caso casi
+  nunca llega vivo hasta aquí — pero el generador no confía en eso, falla
+  por su cuenta si ocurre).
+- El nombre mangled (`identity__Int`, `pair__Int_String`) sirve de clave
+  de caché (`Codegen.instantiations`): llamar `identity(3)` dos veces
+  reutiliza la misma función de C, no la duplica.
+- Como una instanciación solo se descubre mientras se genera el CUERPO de
+  otra función (nunca antes), y C exige que el prototipo exista antes de
+  cualquier uso — incluso si ese uso está en una función escrita más arriba
+  en el archivo generado — hubo que invertir el orden de generación: ahora
+  **todos los cuerpos** (funciones planas, métodos, e instanciaciones
+  genéricas, vaciando una cola de pendientes hasta que quede vacía — una
+  instanciación puede a su vez disparar otra) se generan primero en
+  memoria, y solo cuando la cola está vacía y todas las firmas son
+  conocidas se escriben los prototipos y después los cuerpos ya generados.
+  Antes de este cambio, prototipos y cuerpos de funciones normales se
+  escribían intercalados directamente en el archivo de salida.
+- `self`/`Self` en métodos y `<T>` en funciones genéricas terminaron siendo
+  el mismo mecanismo: ambos son solo un mapa de sustitución nombre→tipo
+  concreto (`map_type_with_subst`), aplicado antes de cualquier otra regla
+  de resolución de tipos. `map_method_type` (una función aparte para
+  `Self`) desapareció, reemplazada por esta versión única.
+- Un método/función genérica que dentro de su cuerpo llama a un método
+  sobre su parámetro `T` (p. ej. `T: Ord` y `a.compare(b)`) simplemente
+  funciona sin código adicional: en el punto de generación del cuerpo `T`
+  ya se sustituyó por un record concreto, y la búsqueda de métodos ya
+  existente (sección 63) encuentra el método real de ese record. Ninguna
+  infraestructura de despacho nueva hizo falta para esto tampoco.
+
+### Pruebas
+
+`examples/native_generics.ostrin` llama `identity<T>` con `Int`, `String` y
+un record (`Pair`), y `max<T>` con `Int` comparando mediante `if`. Un test
+compila y ejecuta el binario real comparando contra la salida ya verificada
+del intérprete; otro inspecciona el C generado con `--emit-c` y confirma
+exactamente una definición de C por cada combinación (función, tipo)
+realmente usada — ninguna duplicada, ninguna síntesis genérica filtrada al
+código (`<T>` no debe aparecer en ningún lado). Suite del compilador:
+**83 pruebas**, sin warnings nuevos.
+
+Frontera actual del backend nativo: funciones (incluidas las genéricas,
+monomorfizadas), records con métodos, y enums con match — todos no
+genéricos salvo las funciones. Lo único que de verdad falta para soportar
+`Option`/`Result` (records/enums genéricos) o `dyn Trait` es resolver algo
+en tiempo de ejecución de una forma que la monomorfización, por diseño, no
+cubre: un `dyn Trait` no sabe su tipo concreto en tiempo de compilación, así
+que necesitaría una vtable real — el primer mecanismo de despacho dinámico
+que este backend tendría que construir desde cero.
