@@ -1621,3 +1621,25 @@ configuración, proveedores y comandos de Ostrin incluidos.
 Los metadatos del paquete también quedaron preparados para Marketplace:
 publisher `ostrin-project`, licencia explícita, repositorio, página de inicio,
 issues, banner oscuro, precio gratuito, changelog y soporte.
+
+---
+
+## 47. Icono propio para archivos `.ostrin` — 2026-09-17
+
+La primera instalación ya coloreaba correctamente la sintaxis, pero el
+Explorador seguía mostrando el icono genérico del tema de archivos de VS Code.
+Se añadió una identidad visual específica para los archivos Ostrin.
+
+### Cambios realizados
+
+- La contribución de lenguaje `ostrin` publica iconos para tema claro y oscuro.
+- Los iconos son SVG ligeros basados en el símbolo oficial de Ostrin, con la
+  parte superior clara y la parte inferior violeta.
+- La asociación se hace directamente sobre el lenguaje `.ostrin`, por lo que
+  no reemplaza los iconos de otros tipos de archivo ni obliga a cambiar todo el
+  tema de iconos del usuario.
+- El changelog de la extensión quedó actualizado.
+
+Al reinstalar el `.vsix` actualizado y recargar VS Code, los archivos
+`.ostrin` deben mostrar el símbolo de Ostrin en el Explorador, pestañas y
+listas de archivos compatibles con iconos de lenguaje.

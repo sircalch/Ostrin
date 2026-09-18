@@ -49,6 +49,10 @@
         "extensions": [
           ".ostrin"
         ],
+        "icon": {
+          "light": "./images/ostrin-file-light.svg",
+          "dark": "./images/ostrin-file-dark.svg"
+        },
         "configuration": "./language-configuration.json"
       }
     ],
