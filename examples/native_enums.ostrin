@@ -1,0 +1,33 @@
+enum Shape {
+    Circle(radius: Int)
+    Rectangle(Int, Int)
+    Origin
+}
+
+fn area(shape: Shape) -> Int {
+    match shape {
+        Circle(radius) => radius * radius * 3,
+        Rectangle(width, height) => width * height,
+        Origin => 0,
+    }
+}
+
+fn classify(n: Int) -> String {
+    match n {
+        0 => "zero",
+        1 to 9 => "small",
+        big if big < 0 => "negative",
+        _ => "large",
+    }
+}
+
+fn main() -> Void {
+    print(area(Circle(radius: 3)))
+    print(area(Rectangle(4, 5)))
+    print(area(Origin))
+
+    print(classify(0))
+    print(classify(5))
+    print(classify(-3))
+    print(classify(100))
+}

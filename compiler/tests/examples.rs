@@ -745,13 +745,15 @@ fn native_backend_emit_c_writes_readable_c_source() {
 
 #[test]
 fn native_backend_rejects_constructs_it_does_not_support_yet() {
-    // `shapes.ostrin` uses records/traits, which only the interpreter runs;
-    // the native backend must fail with a clear message pointing back at
-    // `--run`, not silently emit something wrong.
+    // `shapes.ostrin`'s enum variants carry `Quantity<Length>` fields —
+    // dimensional quantities aren't a type this backend represents at all,
+    // so it must fail with a clear message naming the type, not silently
+    // emit something wrong (the enum/match machinery itself is otherwise
+    // fully exercised by `native_backend_compiles_and_runs_enums_and_match`).
     let out = run(&["--emit-c", &example_path("shapes.ostrin")]);
     assert!(!out.status.success(), "the native backend should refuse a program it can't fully compile");
     let error = stderr(&out);
-    assert!(error.contains("--run"), "the error should point users back at the interpreter: {error}");
+    assert!(error.contains("Quantity") && error.contains("not supported"), "unexpected error: {error}");
 }
 
 #[test]
@@ -808,6 +810,31 @@ fn native_backend_compiles_and_runs_record_methods() {
     assert_eq!(
         String::from_utf8_lossy(&run_output.stdout).replace("\r\n", "\n"),
         "7\n7\n",
+        "native binary should match the interpreter's output for the same program"
+    );
+}
+
+#[test]
+fn native_backend_compiles_and_runs_enums_and_match() {
+    // A named-field variant (`Circle(radius: Int)`, constructed with a
+    // named argument), a positional-field variant (`Rectangle(Int, Int)`,
+    // whose fields the pattern `Rectangle(width, height)` must resolve by
+    // position, not name), a unit variant, and a `match` over a plain Int
+    // exercising a literal, a range, a guard that reads its own binding,
+    // and a wildcard fallback.
+    let exe = temp_artifact("enums.exe");
+    let compile = run(&["--compile", "--out", &exe, &example_path("native_enums.ostrin")]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+
+    let run_output = Command::new(&exe).output().unwrap_or_else(|e| panic!("failed to run compiled binary '{exe}': {e}"));
+    let _ = fs::remove_file(&exe);
+    assert!(run_output.status.success(), "compiled binary exited unsuccessfully");
+    assert_eq!(
+        String::from_utf8_lossy(&run_output.stdout).replace("\r\n", "\n"),
+        "27\n20\n0\nzero\nsmall\nnegative\nlarge\n",
         "native binary should match the interpreter's output for the same program"
     );
 }

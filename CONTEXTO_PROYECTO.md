@@ -2392,3 +2392,92 @@ esta frontera se vuelva un proyecto distinto (no una extensión más) es todo
 lo que exige resolver algo en tiempo de ejecución: `dyn Trait`, genéricos
 reales, y operadores sobre tipos de usuario (que si necesitan resolver cuál
 `impl` aplica, a diferencia de una llamada nombrada `.metodo()`).
+
+---
+
+## 64. `enum` y `match` en el backend nativo — 2026-09-17
+
+Antes de empezar se le puso al usuario una limitación real sobre la mesa: al
+no soportar genéricos, `Option<T>`/`Result<T, E>` — el enum que aparece en
+casi todo programa real de Ostrin — quedarían fuera de todos modos. Aun así
+se pidió seguir, porque un `enum` de usuario sin genéricos sigue siendo un
+caso real (máquinas de estado simples, por ejemplo).
+
+### Por qué tampoco esto necesitó dispatch dinámico
+
+`match` se compila a una unión etiquetada (`struct { int tag; union {...}
+data; }`) y una secuencia de `if` sobre `tag` — es exactamente lo que
+`switch` haría, sin ninguna tabla de despacho: el compilador de C ya sabe,
+en cada `if`, exactamente qué comparar. La diferencia con `record` (sección
+62) es la representación: un enum se pasa **por valor**, nunca por puntero,
+porque `Value::EnumInstance` en el intérprete se clona profundamente (su
+`HashMap` interno se copia) cada vez que el `Value` que lo contiene se
+clona — es decir, ya se comporta como un tipo de valor en el intérprete, no
+uno con identidad compartida como `Record`. Copiar por valor en C es
+simplemente lo que le corresponde a ese mismo comportamiento.
+
+### Dos bugs reales, encontrados probando contra un programa real
+
+1. **Campos posicionales en patrones.** `Circle(radius)` funciona porque
+   `radius` es tanto el nombre del campo declarado como el nombre de binding
+   elegido. Pero `Rectangle(Int, Int)` no tiene nombres de campo — son
+   posicionales — y el patrón `Rectangle(width, height)` usa nombres de
+   binding que **no** coinciden con ningún campo declarado. El propio
+   intérprete resuelve esto con una regla de repliegue: primero busca por
+   nombre, y si no hay campo con ese nombre, cae a la posición
+   (`pattern_field_value` en `interpreter/mod.rs`). El generador de C
+   replicó exactamente esa misma regla — no inventó una propia.
+2. **Guardas que leen su propio binding.** `n if n > 0 => ...` (o, en el
+   programa de prueba, `big if big < 0 => ...`) necesita que `big` ya exista
+   como variable de C **antes** de evaluar la condición de la guarda. La
+   primera versión metía la guarda dentro de la misma condición `if` que
+   decide si el patrón calza, así que `big` se usaba antes de declararse —
+   un error de compilación de C real, no silencioso, pero real al fin.
+   Corregido separando la estructura en dos niveles: el `if` exterior solo
+   comprueba lo estructural (tag/literal/rango) y declara los bindings; un
+   `if` **anidado**, después de esas declaraciones, evalúa la guarda. Caer
+   por una guarda que da `false` dentro de ese `if` interior deja el
+   programa exactamente donde debía: sin marcar "matched", listo para que un
+   brazo posterior (incluso con el mismo patrón y otra guarda) se pruebe.
+3. (Menor, encontrado en la primera compilación) **Argumentos nombrados en
+   constructores de variantes.** `Circle(radius: 3)` es la forma idiomática
+   de construir una variante con campos — a diferencia de una llamada de
+   función normal, donde este backend sigue rechazando argumentos nombrados
+   sin más. Se le dio soporte específico solo para construcción de variantes
+   (resueltos por nombre de campo cuando son nombrados, por posición cuando
+   no).
+
+### Qué queda fuera, explícitamente
+
+`print()` sobre un valor de enum falla con un error claro — mostrarlo bien
+necesitaría generar una función de formato por enum que decida el `printf`
+correcto según el `tag`, y no se hizo hoy. Patrones anidados dentro de los
+campos de una variante (`Some(Some(x))`) también fallan explícitamente. Un
+enum que se contiene a sí mismo por valor (recursivo sin indirección) o dos
+enums que se referencian mutuamente en un orden desfavorable producirán un
+error de compilación de C (no un error de `ostrinc`) — un hueco conocido,
+no detectado en esta capa, documentado aquí en vez de en el código porque es
+un caso extremadamente raro comparado con un enum conteniendo un record por
+puntero (que sí funciona sin importar el orden).
+
+### Pruebas
+
+`examples/native_enums.ostrin` combina una variante con campo nombrado
+(`Circle(radius: Int)`, construida con argumento nombrado), una variante
+posicional (`Rectangle(Int, Int)`, destructurada por posición), una
+variante unitaria, y un `match` sobre un `Int` plano que ejercita un
+literal, un rango, una guarda que lee su propio binding, y un comodín. Se
+compiló y ejecutó de verdad, comparando contra la salida ya verificada del
+intérprete. Se actualizó también `native_backend_rejects_constructs_it_does_not_support_yet`
+(que usaba `shapes.ostrin` para probar el rechazo de `enum`): ahora ese
+mismo archivo sigue fallando, pero por su campo `Quantity<Length>`, no por
+el `enum` en sí — la razón del rechazo cambió porque el alcance del backend
+cambió de verdad. Suite del compilador: **81 pruebas**, sin warnings nuevos.
+
+Frontera actual del backend nativo: funciones, records (con métodos) y
+enums (con match) no genéricos, sobre `Int`/`Float`/`Bool`/`String`. Lo que
+falta para dejar de ser una serie de extensiones incrementales y convertirse
+en un proyecto distinto sigue siendo lo mismo de siempre: todo lo que
+requiere resolver algo en tiempo de ejecución en vez de en tiempo de
+compilación — `dyn Trait`, genéricos reales (que es lo único que separa a
+este backend de soportar `Option`/`Result`, el enum más usado del lenguaje).

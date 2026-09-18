@@ -44,7 +44,7 @@ Ostrin is not yet a production compiler. The current implementation includes a
 lexer, parser, static checker, interpreter, modules, packages, collections,
 traits, pattern matching, quantities and a simulated concurrency model.
 
-The compiler suite currently passes **80 integration tests**. Function calls
+The compiler suite currently passes **81 integration tests**. Function calls
 support named/default arguments, collection lookups preserve `Option<T>`, and
 record fields are checked statically. The CLI also exposes JSON Lines
 diagnostics with source locations for editor integrations, plus a compiler
@@ -56,13 +56,15 @@ rename, signature help and semantic tokens over the protocol; a debug adapter
 inspection on top of the same interpreter. A first native backend (`--emit-c`/
 `--compile`) transpiles a real subset of the language — plain functions,
 plain records (heap-allocated, always by reference, to match the interpreter's
-identity semantics) and their non-generic `impl` methods (resolved statically
-at compile time — there is no dynamic dispatch anywhere in this backend) over
-`Int`/`Float`/`Bool`/`String`, recursion, `if`/`while`/`for <range>` — to C
-and compiles it to a native executable; everything else (enums, generics,
-dimensional `Quantity`, closures, collections, pattern matching, and any
-operator or trait-object dispatch that would actually need dynamic dispatch)
-still only runs through the interpreter. The runtime is still synchronous and
+identity semantics), their non-generic `impl` methods (resolved statically at
+compile time — there is no dynamic dispatch anywhere in this backend), and
+plain non-generic enums with `match` (compiled to a tagged union and a
+sequence of `if`s, no runtime type information needed) — over
+`Int`/`Float`/`Bool`/`String`, recursion, `if`/`while`/`for <range>`. Since
+`Option<T>`/`Result<T, E>` are themselves generic, they and any other generic
+type, along with dimensional `Quantity`, closures, collections, and any
+operator or trait-object dispatch that would actually need runtime dispatch,
+still only run through the interpreter. The runtime is still synchronous and
 the standard library is small.
 
 ## Quick start

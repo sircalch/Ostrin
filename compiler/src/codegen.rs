@@ -42,6 +42,11 @@ enum CType {
     Str,
     Void,
     Record(String),
+    /// A plain-C tagged union, always passed *by value* (unlike `Record`):
+    /// the interpreter's `Value::EnumInstance` carries its own owned data
+    /// and is deep-cloned on assignment, so it behaves like a value type,
+    /// not a shared reference — see the module doc comment.
+    Enum(String),
 }
 
 fn c_type_name(ty: &CType) -> String {
@@ -52,10 +57,20 @@ fn c_type_name(ty: &CType) -> String {
         CType::Str => "const char*".to_string(),
         CType::Void => "void".to_string(),
         CType::Record(name) => format!("{name}*"),
+        CType::Enum(name) => name.clone(),
     }
 }
 
-fn map_type(ty: &Type, record_names: &HashSet<String>) -> Result<CType, String> {
+/// Names of every plain record/enum this backend has agreed to represent —
+/// just enough to resolve a bare type name to the right `CType` variant.
+/// Field/method type-checking already happened in `typeck`; this only picks
+/// which concrete C shape a name maps to.
+struct NamedTypes<'a> {
+    records: &'a HashSet<String>,
+    enums: &'a HashSet<String>,
+}
+
+fn map_type(ty: &Type, types: &NamedTypes) -> Result<CType, String> {
     match ty {
         Type::Named(name, args) if args.is_empty() => match name.as_str() {
             "Int" => Ok(CType::Int),
@@ -63,7 +78,8 @@ fn map_type(ty: &Type, record_names: &HashSet<String>) -> Result<CType, String> 
             "Bool" => Ok(CType::Bool),
             "String" => Ok(CType::Str),
             "Void" => Ok(CType::Void),
-            other if record_names.contains(other) => Ok(CType::Record(other.to_string())),
+            other if types.records.contains(other) => Ok(CType::Record(other.to_string())),
+            other if types.enums.contains(other) => Ok(CType::Enum(other.to_string())),
             _ => Err(format!("type '{}' is not supported by the native backend yet", type_to_string(ty))),
         },
         _ => Err(format!("type '{}' is not supported by the native backend yet", type_to_string(ty))),
@@ -75,11 +91,11 @@ fn map_type(ty: &Type, record_names: &HashSet<String>) -> Result<CType, String> 
 /// backend (no `dyn Trait`, no generics), so a call site always knows the
 /// receiver's concrete record at compile time — `Self` is just a name for
 /// it, nothing more.
-fn map_method_type(ty: &Type, self_record: &str, record_names: &HashSet<String>) -> Result<CType, String> {
+fn map_method_type(ty: &Type, self_record: &str, types: &NamedTypes) -> Result<CType, String> {
     if matches!(ty, Type::Named(name, args) if name == "Self" && args.is_empty()) {
         return Ok(CType::Record(self_record.to_string()));
     }
-    map_type(ty, record_names)
+    map_type(ty, types)
 }
 
 fn c_function_name(name: &str) -> String {
@@ -115,6 +131,19 @@ struct MethodInfo<'a> {
     self_record: String,
 }
 
+/// A variant resolved at codegen time: which enum it belongs to, its `switch`
+/// tag, and its fields (already `CType`-resolved) in declaration order. Named
+/// fields keep their name; positional fields (`name: None` in the AST) are
+/// given the synthetic names `f0`, `f1`, ... in order, both here and in the
+/// generated union member.
+#[derive(Clone)]
+struct VariantInfo {
+    enum_name: String,
+    name: String,
+    tag: usize,
+    fields: Vec<(String, CType)>,
+}
+
 struct Codegen<'a> {
     signatures: HashMap<String, (Vec<CType>, CType)>,
     /// Record name -> its fields in declaration order. Every field type is
@@ -129,9 +158,20 @@ struct Codegen<'a> {
     /// is simply absent, so calling it fails with "no method" rather than
     /// miscompiling.
     methods: HashMap<String, HashMap<String, MethodInfo<'a>>>,
+    /// Variant name -> its info. A flat namespace, matching the interpreter's
+    /// own `variant_to_enum` map: bare variant names are unique across the
+    /// whole program, never qualified by their enum.
+    variants: HashMap<String, VariantInfo>,
     record_names: HashSet<String>,
+    enum_names: HashSet<String>,
     scopes: Vec<HashMap<String, CType>>,
     temp_counter: usize,
+}
+
+impl<'a> Codegen<'a> {
+    fn named_types(&self) -> NamedTypes<'_> {
+        NamedTypes { records: &self.record_names, enums: &self.enum_names }
+    }
 }
 
 impl<'a> Codegen<'a> {
@@ -184,8 +224,8 @@ impl<'a> Codegen<'a> {
         self.push_scope();
         for param in params {
             let ty = match self_record {
-                Some(record_name) => map_method_type(&param.ty, record_name, &self.record_names)?,
-                None => map_type(&param.ty, &self.record_names)?,
+                Some(record_name) => map_method_type(&param.ty, record_name, &self.named_types())?,
+                None => map_type(&param.ty, &self.named_types())?,
             };
             self.define(&param.name, ty);
         }
@@ -354,10 +394,22 @@ impl<'a> Codegen<'a> {
             Expr::BoolLiteral(v) => Ok((if *v { "true".to_string() } else { "false".to_string() }, CType::Bool)),
             Expr::StringLiteral(s) => Ok((c_string_literal(s), CType::Str)),
             Expr::Ident(name) => {
-                let ty = self
-                    .lookup(name)
-                    .ok_or_else(|| format!("internal error: no type recorded for '{name}' in the native backend"))?;
-                Ok((name.clone(), ty))
+                if let Some(ty) = self.lookup(name) {
+                    return Ok((name.clone(), ty));
+                }
+                // A unit variant (`None`, or any fieldless variant of a
+                // user enum) reads as a bare identifier, never a call — see
+                // `Expr::Ident` in `eval_expr`, `interpreter/mod.rs`.
+                if let Some(variant) = self.variants.get(name).cloned() {
+                    if !variant.fields.is_empty() {
+                        return Err(format!("variant '{name}' has fields; construct it as '{name}(...)'"));
+                    }
+                    return Ok((
+                        format!("(({}){{ .tag = {} }})", variant.enum_name, variant.tag),
+                        CType::Enum(variant.enum_name),
+                    ));
+                }
+                Err(format!("internal error: no type recorded for '{name}' in the native backend"))
             }
             Expr::Unary(op, inner) => {
                 let (code, ty) = self.gen_expr(inner)?;
@@ -390,6 +442,7 @@ impl<'a> Codegen<'a> {
                 Ok((format!("({cond_code} ? {then_code} : {else_code})"), result_ty))
             }
             Expr::Block(b) => self.gen_block_expr(b),
+            Expr::Match(scrutinee, arms) => self.gen_match(scrutinee, arms),
             other => Err(format!("this expression isn't supported by the native backend yet: {other:?}")),
         }
     }
@@ -413,11 +466,181 @@ impl<'a> Codegen<'a> {
         Ok((format!("({{ {body} {temp}; }})"), CType::Record(name.to_string())))
     }
 
+    /// Compiles `match` to a `({ ... })` statement expression: a hidden
+    /// `matched` flag and result variable, then one `if (!matched && ...)`
+    /// per arm, in source order, each setting the result and the flag on
+    /// success. Falling through *without* setting the flag (a guard that
+    /// evaluated false) is exactly what lets a later arm — even one with
+    /// the same variant tag — still be tried, matching Ostrin's top-to-
+    /// bottom arm semantics. `typeck` has already proven the match
+    /// exhaustive; the final `if (!matched) abort()` only guards against a
+    /// bug in this codegen itself, not a real program's possible outcomes.
+    fn gen_match(&mut self, scrutinee: &Expr, arms: &[MatchArm]) -> Result<(String, CType), String> {
+        if arms.is_empty() {
+            return Err("'match' needs at least one arm".to_string());
+        }
+        let (scrutinee_code, scrutinee_ty) = self.gen_expr(scrutinee)?;
+        let scrutinee_var = self.next_temp();
+        let matched_var = self.next_temp();
+        let result_var = self.next_temp();
+
+        let mut arm_blocks = String::new();
+        let mut result_ty: Option<CType> = None;
+        for arm in arms {
+            self.push_scope();
+            let mut condition = format!("!{matched_var}");
+            let mut bindings = String::new();
+            let bind_result = self.gen_pattern(&arm.pattern, &scrutinee_var, &scrutinee_ty, &mut condition, &mut bindings);
+            if let Err(error) = bind_result {
+                self.pop_scope();
+                return Err(error);
+            }
+            let guard_code = match &arm.guard {
+                Some(guard_expr) => match self.gen_expr(guard_expr) {
+                    Ok((code, _)) => Some(code),
+                    Err(error) => {
+                        self.pop_scope();
+                        return Err(error);
+                    }
+                },
+                None => None,
+            };
+            let body = match self.gen_block_expr(&arm.body) {
+                Ok(body) => body,
+                Err(error) => {
+                    self.pop_scope();
+                    return Err(error);
+                }
+            };
+            self.pop_scope();
+            let (body_code, body_ty) = body;
+            if result_ty.is_none() {
+                result_ty = Some(body_ty);
+            }
+            // `condition` only ever covers the structural check (tag,
+            // literal, range): the guard is evaluated separately, in a
+            // *nested* `if` emitted after `bindings`, because a guard can
+            // reference names the pattern just bound (`n if n > 0 => ...`)
+            // — folding it into `condition` would reference those C
+            // variables before their own declaration even exists.
+            let commit = format!("{result_var} = {body_code}; {matched_var} = 1;");
+            let guarded_commit = match guard_code {
+                Some(guard_code) => format!("if ({guard_code}) {{ {commit} }}"),
+                None => commit,
+            };
+            arm_blocks.push_str(&format!("if ({condition}) {{ {bindings} {guarded_commit} }} "));
+        }
+        let result_ty = result_ty.expect("checked arms.is_empty() above");
+
+        let body = format!(
+            "{scrut_ty} {scrutinee_var} = {scrutinee_code}; \
+             int {matched_var} = 0; \
+             {result_ty_c} {result_var}; \
+             {arm_blocks} \
+             if (!{matched_var}) {{ fprintf(stderr, \"ostrin: non-exhaustive match at runtime\\n\"); abort(); }}",
+            scrut_ty = c_type_name(&scrutinee_ty),
+            result_ty_c = c_type_name(&result_ty),
+        );
+        Ok((format!("({{ {body} {result_var}; }})"), result_ty))
+    }
+
+    /// Appends this pattern's match condition to `condition` and any field
+    /// bindings it introduces to `bindings`, defining each bound name in the
+    /// current (already pushed, by the caller) scope. `scrutinee_var` is
+    /// always the whole match's scrutinee, by name — the same C variable
+    /// regardless of which arm is being compiled.
+    fn gen_pattern(
+        &mut self,
+        pattern: &Pattern,
+        scrutinee_var: &str,
+        scrutinee_ty: &CType,
+        condition: &mut String,
+        bindings: &mut String,
+    ) -> Result<(), String> {
+        match pattern {
+            Pattern::Wildcard => Ok(()),
+            Pattern::Ident(name) => {
+                bindings.push_str(&format!("{} {} = {}; ", c_type_name(scrutinee_ty), name, scrutinee_var));
+                self.define(name, scrutinee_ty.clone());
+                Ok(())
+            }
+            Pattern::Literal(literal) => {
+                let (literal_code, literal_ty) = self.gen_expr(literal)?;
+                let comparison = if literal_ty == CType::Str {
+                    format!("strcmp({scrutinee_var}, {literal_code}) == 0")
+                } else {
+                    format!("{scrutinee_var} == {literal_code}")
+                };
+                condition.push_str(&format!(" && ({comparison})"));
+                Ok(())
+            }
+            Pattern::Range(start, kind, end) => {
+                let (start_code, _) = self.gen_expr(start)?;
+                let (end_code, _) = self.gen_expr(end)?;
+                let upper = match kind {
+                    RangeKind::To => "<=",
+                    RangeKind::Until => "<",
+                };
+                condition.push_str(&format!(" && ({scrutinee_var} >= {start_code} && {scrutinee_var} {upper} {end_code})"));
+                Ok(())
+            }
+            Pattern::Variant(name, fields) => {
+                let Some(variant) = self.variants.get(name).cloned() else {
+                    return Err(format!("unknown variant '{name}' in a match pattern"));
+                };
+                condition.push_str(&format!(" && ({scrutinee_var}.tag == {})", variant.tag));
+                // The parser resolves the short form (`Circle(radius)`) by
+                // matching the pattern's field name against the declared
+                // one; for a variant with unnamed (positional) fields it
+                // instead falls back to position — see `pattern_field_value`
+                // in `interpreter/mod.rs`, which this mirrors exactly so a
+                // positional variant's fields are addressable the same way
+                // from either backend.
+                for (position, (field_name, sub_pattern)) in fields.iter().enumerate() {
+                    let resolved = variant
+                        .fields
+                        .iter()
+                        .find(|(declared_name, _)| declared_name == field_name)
+                        .or_else(|| variant.fields.get(position))
+                        .cloned();
+                    let Some((actual_field_name, field_ty)) = resolved else {
+                        return Err(format!("variant '{name}' has no field matching '{field_name}'"));
+                    };
+                    match sub_pattern {
+                        Pattern::Wildcard => {}
+                        Pattern::Ident(binding_name) => {
+                            bindings.push_str(&format!(
+                                "{} {} = {}.data.{}.{}; ",
+                                c_type_name(&field_ty),
+                                binding_name,
+                                scrutinee_var,
+                                variant.name,
+                                actual_field_name
+                            ));
+                            self.define(binding_name, field_ty);
+                        }
+                        _ => {
+                            return Err(
+                                "nested patterns inside a variant's fields aren't supported by the native backend yet".to_string()
+                            );
+                        }
+                    }
+                }
+                Ok(())
+            }
+        }
+    }
+
     fn gen_binary(&mut self, op: BinOp, l: &Expr, r: &Expr) -> Result<(String, CType), String> {
         let (lc, lt) = self.gen_expr(l)?;
         let (rc, rt) = self.gen_expr(r)?;
-        if matches!(lt, CType::Record(_)) || matches!(rt, CType::Record(_)) {
-            return Err("operators on records aren't supported by the native backend yet (no derive(Eq/Ord) dispatch)".to_string());
+        if matches!(lt, CType::Record(_) | CType::Enum(_)) || matches!(rt, CType::Record(_) | CType::Enum(_)) {
+            // C has no `==`/`<`/etc. on struct values at all (a compile
+            // error, not just the wrong answer) — but even where a raw `==`
+            // on two records *would* compile (comparing their pointers), it
+            // would silently mean identity, not the structural
+            // `derive(Eq)`/`impl Eq` comparison Ostrin actually defines.
+            return Err("operators on records/enums aren't supported by the native backend yet (no derive(Eq/Ord) dispatch)".to_string());
         }
         if lt == CType::Str || rt == CType::Str {
             return match op {
@@ -474,6 +697,10 @@ impl<'a> Codegen<'a> {
     }
 
     fn gen_function_call(&mut self, name: &str, args: &[Arg]) -> Result<(String, CType), String> {
+        if let Some(variant) = self.variants.get(name).cloned() {
+            let arg_codes = self.gen_variant_args(&variant, args)?;
+            return self.gen_variant_construct(&variant, &arg_codes);
+        }
         let (arg_codes, arg_types) = self.gen_args(args)?;
         if name == "print" {
             return self.gen_print(&arg_codes, &arg_types);
@@ -485,6 +712,73 @@ impl<'a> Codegen<'a> {
             return Err(format!("function '{name}' expects {} argument(s), got {}", param_types.len(), arg_codes.len()));
         }
         Ok((format!("{}({})", c_function_name(name), arg_codes.join(", ")), return_type))
+    }
+
+    /// Resolves a variant constructor's arguments to its declared fields —
+    /// unlike ordinary function/method calls, named arguments are common and
+    /// idiomatic here (`Circle(radius: 3)`), so they're supported for
+    /// construction specifically, matched by field name; positional
+    /// arguments still fill in declaration order.
+    fn gen_variant_args(&mut self, variant: &VariantInfo, args: &[Arg]) -> Result<Vec<String>, String> {
+        let mut codes: Vec<Option<String>> = vec![None; variant.fields.len()];
+        let mut next_positional = 0usize;
+        for arg in args {
+            match arg {
+                Arg::Positional(expr) => {
+                    if next_positional >= variant.fields.len() {
+                        return Err(format!(
+                            "variant '{}' expects {} argument(s), got more",
+                            variant.name,
+                            variant.fields.len()
+                        ));
+                    }
+                    let (code, _) = self.gen_expr(expr)?;
+                    codes[next_positional] = Some(code);
+                    next_positional += 1;
+                }
+                Arg::Named(field_name, expr) => {
+                    let Some(index) = variant.fields.iter().position(|(name, _)| name == field_name) else {
+                        return Err(format!("variant '{}' has no field '{field_name}'", variant.name));
+                    };
+                    let (code, _) = self.gen_expr(expr)?;
+                    codes[index] = Some(code);
+                }
+            }
+        }
+        codes
+            .into_iter()
+            .enumerate()
+            .map(|(index, code)| {
+                code.ok_or_else(|| format!("variant '{}' is missing argument for field '{}'", variant.name, variant.fields[index].0))
+            })
+            .collect()
+    }
+
+    /// Builds a variant instance with a C99 designated initializer
+    /// (`.tag = ..., .data.VariantName = { .field = ... }`) — args are
+    /// positional (named arguments are rejected earlier, in `gen_args`),
+    /// matched to the variant's fields in declaration order.
+    fn gen_variant_construct(&self, variant: &VariantInfo, arg_codes: &[String]) -> Result<(String, CType), String> {
+        if variant.fields.len() != arg_codes.len() {
+            return Err(format!(
+                "variant '{}' expects {} argument(s), got {}",
+                variant.name,
+                variant.fields.len(),
+                arg_codes.len()
+            ));
+        }
+        if variant.fields.is_empty() {
+            return Ok((
+                format!("(({}){{ .tag = {} }})", variant.enum_name, variant.tag),
+                CType::Enum(variant.enum_name.clone()),
+            ));
+        }
+        let inits: Vec<String> =
+            variant.fields.iter().zip(arg_codes).map(|((field_name, _), code)| format!(".{field_name} = {code}")).collect();
+        Ok((
+            format!("(({}){{ .tag = {}, .data.{} = {{ {} }} }})", variant.enum_name, variant.tag, variant.name, inits.join(", ")),
+            CType::Enum(variant.enum_name.clone()),
+        ))
     }
 
     fn gen_method_call(&mut self, obj: &Expr, method_name: &str, args: &[Arg]) -> Result<(String, CType), String> {
@@ -523,6 +817,7 @@ impl<'a> Codegen<'a> {
             CType::Str => ("%s\\n", arg_codes[0].clone()),
             CType::Void => return Err("cannot 'print' a Void value".to_string()),
             CType::Record(name) => return Err(format!("cannot 'print' a record value ('{name}' has no derived Display)")),
+            CType::Enum(name) => return Err(format!("cannot 'print' an enum value yet ('{name}' has no generated Display)")),
         };
         Ok((format!("printf(\"{spec}\", {value})"), CType::Void))
     }
@@ -545,53 +840,40 @@ fn c_string_literal(s: &str) -> String {
     out
 }
 
-fn item_name(item: &Item) -> String {
-    match item {
-        Item::Function(f) => format!("fn {}", f.name),
-        Item::Record(r) => format!("record {}", r.name),
-        Item::Enum(e) => format!("enum {}", e.name),
-        Item::Impl(i) => format!("impl for {}", i.type_name),
-        Item::Trait(t) => format!("trait {}", t.name),
-        Item::Import(_) => "import".to_string(),
-    }
-}
-
-/// Transpiles an already type-checked program to C. Top-level functions and
-/// plain (non-generic) records are supported, including non-generic
-/// inherent/trait methods on those records (no dynamic dispatch is needed:
-/// with no `dyn Trait` and no generics anywhere in this backend, a record's
-/// concrete method is always known at the call site). `enum`/`trait` make
-/// this return a clear error naming the construct, rather than silently
-/// ignoring it or emitting something incorrect. A generic method, or a
-/// method on a type this backend doesn't otherwise compile, is simply left
-/// out of the method table — calling it fails on its own in `gen_call`
-/// ("no method"), rather than this function rejecting the whole program
-/// up front for an `impl` block nothing may even use.
+/// Transpiles an already type-checked program to C. Top-level functions,
+/// plain (non-generic) records with their non-generic `impl` methods (no
+/// dynamic dispatch is needed: with no `dyn Trait` and no generics anywhere
+/// in this backend, a record's concrete method is always known at the call
+/// site), and plain (non-generic) enums with `match` are all supported.
+/// `trait` declarations carry no runtime representation of their own and
+/// are simply skipped, like `import`. A generic method/enum, or an `impl`
+/// for a type this backend doesn't otherwise compile, is left out of its
+/// respective table rather than rejecting the whole program up front —
+/// only an actual, unsupported use (a call, a match arm) fails on its own.
 pub fn generate(items: &[Item]) -> Result<String, String> {
     let mut functions = Vec::new();
     let mut records = Vec::new();
+    let mut enums = Vec::new();
     let mut impls = Vec::new();
     for item in items {
         match item {
             Item::Function(f) => functions.push(f),
             Item::Record(r) => records.push(r),
+            Item::Enum(e) => enums.push(e),
             Item::Impl(im) => impls.push(im),
-            Item::Import(_) => {}
-            other @ (Item::Enum(_) | Item::Trait(_)) => {
-                return Err(format!(
-                    "the native backend ('--emit-c'/'--compile') doesn't support '{}' yet — it needs the interpreter ('--run') for now",
-                    item_name(other)
-                ));
-            }
+            Item::Import(_) | Item::Trait(_) => {}
         }
     }
 
     let record_names: HashSet<String> = records.iter().map(|r| r.name.clone()).collect();
+    let enum_names: HashSet<String> = enums.iter().map(|e| e.name.clone()).collect();
     let mut codegen = Codegen {
         signatures: HashMap::new(),
         records: HashMap::new(),
         methods: HashMap::new(),
+        variants: HashMap::new(),
         record_names: record_names.clone(),
+        enum_names: enum_names.clone(),
         scopes: vec![HashMap::new()],
         temp_counter: 0,
     };
@@ -602,16 +884,33 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
         let fields = r
             .fields
             .iter()
-            .map(|field| map_type(&field.ty, &record_names).map(|ty| (field.name.clone(), ty)))
+            .map(|field| map_type(&field.ty, &codegen.named_types()).map(|ty| (field.name.clone(), ty)))
             .collect::<Result<Vec<_>, _>>()?;
         codegen.records.insert(r.name.clone(), fields);
+    }
+    for e in &enums {
+        if !e.generics.is_empty() {
+            return Err(format!("enum '{}' is generic; the native backend doesn't support generics yet", e.name));
+        }
+        for (tag, variant) in e.variants.iter().enumerate() {
+            let fields = variant
+                .fields
+                .iter()
+                .enumerate()
+                .map(|(index, field)| {
+                    let field_name = field.name.clone().unwrap_or_else(|| format!("f{index}"));
+                    map_type(&field.ty, &codegen.named_types()).map(|ty| (field_name, ty))
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            codegen.variants.insert(variant.name.clone(), VariantInfo { enum_name: e.name.clone(), name: variant.name.clone(), tag, fields });
+        }
     }
     for f in &functions {
         if !f.generics.is_empty() {
             return Err(format!("function '{}' is generic; the native backend doesn't support generics yet", f.name));
         }
-        let param_types = f.params.iter().map(|p| map_type(&p.ty, &record_names)).collect::<Result<Vec<_>, _>>()?;
-        let return_type = map_type(&f.return_type, &record_names)?;
+        let param_types = f.params.iter().map(|p| map_type(&p.ty, &codegen.named_types())).collect::<Result<Vec<_>, _>>()?;
+        let return_type = map_type(&f.return_type, &codegen.named_types())?;
         codegen.signatures.insert(f.name.clone(), (param_types, return_type));
     }
     if !codegen.signatures.contains_key("main") {
@@ -631,9 +930,9 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
                 continue;
             }
             let param_types: Result<Vec<CType>, String> =
-                method.params.iter().map(|p| map_method_type(&p.ty, &im.type_name, &record_names)).collect();
+                method.params.iter().map(|p| map_method_type(&p.ty, &im.type_name, &codegen.named_types())).collect();
             let Ok(param_types) = param_types else { continue };
-            let Ok(return_type) = map_method_type(&method.return_type, &im.type_name, &record_names) else { continue };
+            let Ok(return_type) = map_method_type(&method.return_type, &im.type_name, &codegen.named_types()) else { continue };
             let info = MethodInfo {
                 decl: method,
                 param_types,
@@ -661,6 +960,40 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
         out.push_str(&format!("struct {} {{\n", r.name));
         for (field_name, field_ty) in &codegen.records[&r.name] {
             out.push_str(&format!("    {} {};\n", c_type_name(field_ty), field_name));
+        }
+        out.push_str("};\n\n");
+    }
+
+    // Enums are tagged unions passed by value (never by pointer, see the
+    // module doc comment), so — unlike records — an enum containing another
+    // enum as a direct field genuinely needs that other enum's *complete*
+    // body already emitted; declared in source order is good enough for
+    // every case except that one, which is left as a known, undocumented-
+    // in-code gap (it would surface as an opaque C compiler error, not a
+    // silently wrong program).
+    for e in &enums {
+        out.push_str(&format!("typedef struct {0} {0};\n", e.name));
+    }
+    if !enums.is_empty() {
+        out.push('\n');
+    }
+    for e in &enums {
+        out.push_str(&format!("struct {} {{\n    int tag;\n", e.name));
+        let has_fields = e.variants.iter().any(|variant| !variant.fields.is_empty());
+        if has_fields {
+            out.push_str("    union {\n");
+            for variant in &e.variants {
+                let info = &codegen.variants[&variant.name];
+                if info.fields.is_empty() {
+                    continue;
+                }
+                out.push_str(&format!("        struct {{\n"));
+                for (field_name, field_ty) in &info.fields {
+                    out.push_str(&format!("            {} {};\n", c_type_name(field_ty), field_name));
+                }
+                out.push_str(&format!("        }} {};\n", variant.name));
+            }
+            out.push_str("    } data;\n");
         }
         out.push_str("};\n\n");
     }
