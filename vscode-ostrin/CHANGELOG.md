@@ -2,6 +2,12 @@
 
 All notable changes to the Ostrin VS Code extension are documented here.
 
+## [0.1.7] - 2026-09-17
+
+- Add signature help for Ostrin functions and methods.
+- Highlight the active call argument after nested commas and parentheses.
+- Resolve generic member signatures before presenting parameter information.
+
 ## [0.1.6] - 2026-09-17
 
 - Preserve complete start/end ranges for compiler-inferred expressions.

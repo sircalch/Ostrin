@@ -316,6 +316,203 @@ function provideCompletionItems(vscode, semanticIndex = [], document, position) 
   return items.concat(semanticCompletionItems(vscode, index.symbols));
 }
 
+function textBeforePosition(document, position) {
+  const lines = [];
+  for (let line = 0; line < position.line; line += 1) lines.push(document.lineAt(line).text);
+  lines.push(document.lineAt(position.line).text.slice(0, position.character));
+  return lines.join('\n');
+}
+
+function positionAtOffset(vscode, text, offset) {
+  const before = text.slice(0, offset);
+  const lines = before.split('\n');
+  return new vscode.Position(lines.length - 1, lines[lines.length - 1].length);
+}
+
+function callContext(vscode, document, position) {
+  const text = textBeforePosition(document, position);
+  const openParens = [];
+  let quote;
+  let lineComment = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
+    if (lineComment) {
+      if (character === '\n') lineComment = false;
+      continue;
+    }
+    if (quote) {
+      if (character === '\\') index += 1;
+      else if (character === quote) quote = undefined;
+      continue;
+    }
+    if (character === '/' && text[index + 1] === '/') {
+      lineComment = true;
+      index += 1;
+      continue;
+    }
+    if (character === '"' || character === "'") {
+      quote = character;
+      continue;
+    }
+    if (character === '(') openParens.push(index);
+    else if (character === ')') openParens.pop();
+  }
+  const openOffset = openParens[openParens.length - 1];
+  if (openOffset === undefined) return undefined;
+
+  const beforeOpen = text.slice(0, openOffset).trimEnd();
+  const match = beforeOpen.match(/([A-Za-z_][A-Za-z0-9_]*(?:\s*(?:\.|::)\s*[A-Za-z_][A-Za-z0-9_]*)*)$/);
+  if (!match) return undefined;
+  const callee = match[1].replace(/\s+/g, '');
+  return {
+    callee,
+    name: callee.split(/::|\./).pop(),
+    openOffset,
+    openPosition: positionAtOffset(vscode, text, openOffset),
+    activeParameter: activeCallParameter(text, openOffset + 1)
+  };
+}
+
+function activeCallParameter(text, start) {
+  let parentheses = 0;
+  let brackets = 0;
+  let braces = 0;
+  let angles = 0;
+  let commas = 0;
+  let quote;
+  for (let index = start; index < text.length; index += 1) {
+    const character = text[index];
+    if (quote) {
+      if (character === '\\') index += 1;
+      else if (character === quote) quote = undefined;
+      continue;
+    }
+    if (character === '"' || character === "'") {
+      quote = character;
+      continue;
+    }
+    if (character === '(') parentheses += 1;
+    else if (character === ')') parentheses = Math.max(0, parentheses - 1);
+    else if (character === '[') brackets += 1;
+    else if (character === ']') brackets = Math.max(0, brackets - 1);
+    else if (character === '{') braces += 1;
+    else if (character === '}') braces = Math.max(0, braces - 1);
+    else if (character === '<') angles += 1;
+    else if (character === '>') angles = Math.max(0, angles - 1);
+    else if (character === ',' && parentheses === 0 && brackets === 0 && braces === 0 && angles === 0) commas += 1;
+  }
+  return commas;
+}
+
+function signatureCandidates(document, context, index) {
+  const parts = splitMemberChain(context.callee);
+  const candidates = [];
+  if (parts.length > 1) {
+    const owner = receiverOwner(document, context.openPosition, index);
+    const receiverType = owner && resolveReceiverType(document, context.openPosition, index);
+    for (const member of index.members) {
+      if (member.owner !== owner || member.name !== context.name) continue;
+      const detail = resolvedMemberDetail(member, receiverType) || `${member.name}()`;
+      candidates.push({ name: member.name, detail, kind: member.kind || 'method' });
+    }
+  } else {
+    for (const symbol of index.symbols) {
+      if (shortSymbolName(symbol.name) === context.name && ['function', 'method'].includes(symbol.kind)) {
+        candidates.push({ name: context.name, detail: symbol.detail, kind: symbol.kind });
+      }
+    }
+    const builtin = symbols.get(context.name);
+    if (builtin && builtin[1].includes('(')) {
+      candidates.push({ name: context.name, detail: builtin[1], kind: builtin[0] });
+    }
+  }
+  const seen = new Set();
+  return candidates.filter((candidate) => {
+    const label = callableSignature(candidate.name, candidate.detail);
+    if (seen.has(label)) return false;
+    seen.add(label);
+    return true;
+  });
+}
+
+function callableSignature(name, detail) {
+  const text = String(detail || `${name}()`);
+  const open = text.indexOf('(');
+  if (open < 0) return `${name}()`;
+  let depth = 0;
+  let close = -1;
+  for (let index = open; index < text.length; index += 1) {
+    if (text[index] === '(') depth += 1;
+    else if (text[index] === ')') {
+      depth -= 1;
+      if (depth === 0) {
+        close = index;
+        break;
+      }
+    }
+  }
+  if (close < 0) return text;
+  const suffix = text.slice(close + 1).match(/\s*->\s*[^\s].*$/)?.[0] || '';
+  return `${text.slice(0, close + 1)}${suffix}`.trim();
+}
+
+function splitSignatureParameters(text) {
+  const parts = [];
+  let current = '';
+  let parentheses = 0;
+  let brackets = 0;
+  let braces = 0;
+  let angles = 0;
+  for (const character of text) {
+    if (character === '(') parentheses += 1;
+    else if (character === ')') parentheses = Math.max(0, parentheses - 1);
+    else if (character === '[') brackets += 1;
+    else if (character === ']') brackets = Math.max(0, brackets - 1);
+    else if (character === '{') braces += 1;
+    else if (character === '}') braces = Math.max(0, braces - 1);
+    else if (character === '<') angles += 1;
+    else if (character === '>') angles = Math.max(0, angles - 1);
+    if (character === ',' && parentheses === 0 && brackets === 0 && braces === 0 && angles === 0) {
+      if (current.trim()) parts.push(current.trim());
+      current = '';
+    } else {
+      current += character;
+    }
+  }
+  if (current.trim()) parts.push(current.trim());
+  return parts;
+}
+
+function signatureParameters(detail) {
+  const text = callableSignature('', detail);
+  const open = text.indexOf('(');
+  const close = text.lastIndexOf(')');
+  if (open < 0 || close < open) return [];
+  return splitSignatureParameters(text.slice(open + 1, close));
+}
+
+function provideSignatureHelp(vscode, document, position, semanticIndex = []) {
+  if (!document || !position || !vscode.SignatureHelp || !vscode.SignatureInformation) return undefined;
+  const index = normalizeSemanticIndex(semanticIndex);
+  const context = callContext(vscode, document, position);
+  if (!context) return undefined;
+  const candidates = signatureCandidates(document, context, index);
+  if (!candidates.length) return undefined;
+  const help = new vscode.SignatureHelp();
+  help.signatures = candidates.map((candidate) => {
+    const label = callableSignature(candidate.name, candidate.detail);
+    const signature = new vscode.SignatureInformation(label, `Ostrin ${candidate.kind}`);
+    signature.parameters = signatureParameters(candidate.detail).map((parameter) => (
+      new vscode.ParameterInformation(parameter, `Parameter ${parameter}`)
+    ));
+    return signature;
+  });
+  help.activeSignature = 0;
+  const parameterCount = help.signatures[0].parameters?.length || 0;
+  help.activeParameter = parameterCount ? Math.min(context.activeParameter, parameterCount - 1) : 0;
+  return help;
+}
+
 function provideHover(vscode, document, position, semanticIndex = []) {
   const index = normalizeSemanticIndex(semanticIndex);
   const token = wordAt(document, position);
@@ -690,6 +887,7 @@ function provideDocumentFormattingEdits(vscode, document) {
 
 module.exports = {
   provideCompletionItems,
+  provideSignatureHelp,
   provideHover,
   provideDefinition,
   provideReferences,

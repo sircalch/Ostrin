@@ -35,6 +35,29 @@ class Hover {
   }
 }
 
+class ParameterInformation {
+  constructor(label, documentation) {
+    this.label = label;
+    this.documentation = documentation;
+  }
+}
+
+class SignatureInformation {
+  constructor(label, documentation) {
+    this.label = label;
+    this.documentation = documentation;
+    this.parameters = [];
+  }
+}
+
+class SignatureHelp {
+  constructor() {
+    this.signatures = [];
+    this.activeSignature = 0;
+    this.activeParameter = 0;
+  }
+}
+
 class Location {
   constructor(uri, range) {
     this.uri = uri;
@@ -69,6 +92,9 @@ const vscode = {
   Position,
   Range,
   Hover,
+  ParameterInformation,
+  SignatureInformation,
+  SignatureHelp,
   Location,
   WorkspaceEdit,
   TextEdit,
@@ -121,6 +147,33 @@ const completions = features.provideCompletionItems(
 const pushCompletion = completions.find((item) => item.label === 'push');
 assert(pushCompletion, 'push should be offered for List<Int>');
 assert.strictEqual(pushCompletion.detail, 'push(value: Int) -> Void');
+
+const signatureDocument = {
+  uri: { fsPath: 'C:/project/signatures.ostrin' },
+  lineAt: (line) => ({ text: ['fn main() {', '  add(1, sum([1, 2]), ', '}'][line] }),
+  lineCount: 3
+};
+const signatureHelp = features.provideSignatureHelp(
+  vscode,
+  signatureDocument,
+  new Position(1, signatureDocument.lineAt(1).text.length),
+  {
+    symbols: [{
+      kind: 'function',
+      name: 'add',
+      detail: 'fn add(a: Int, b: Int, c: Int) -> Int',
+      file: 'C:/project/signatures.ostrin',
+      line: 1,
+      column: 1
+    }],
+    bindings: [],
+    members: []
+  }
+);
+assert(signatureHelp, 'function calls should expose signature help');
+assert.strictEqual(signatureHelp.signatures[0].label, 'fn add(a: Int, b: Int, c: Int) -> Int');
+assert.strictEqual(signatureHelp.signatures[0].parameters.length, 3);
+assert.strictEqual(signatureHelp.activeParameter, 2, 'the third argument should be active after nested commas');
 
 const hoverLines = ['fn main() {', '  numbers.push(1)', '}'];
 const hoverDocument = {

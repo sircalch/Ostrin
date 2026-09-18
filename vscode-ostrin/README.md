@@ -11,6 +11,7 @@ This is the first VS Code integration for Ostrin. It currently provides:
 - compiler errors in the VS Code Problems panel, with line and column when available;
 - keyword, type, unit and standard-library completion;
 - type-aware member completion for known local bindings and declared types;
+- signature help for functions and methods, including the active argument;
 - hover documentation and an outline for top-level declarations;
 - precise inferred expression ranges and types in hover when the compiler can resolve them;
 - conservative `Format Document` support for Ostrin blocks;
@@ -34,7 +35,7 @@ the repository root:
 ```powershell
 cd vscode-ostrin
 npx --yes @vscode/vsce package
-code --install-extension .\ostrin-language-support-0.1.6.vsix
+code --install-extension .\ostrin-language-support-0.1.7.vsix
 ```
 
 After restarting or reloading VS Code, opening any `.ostrin` file selects the
@@ -47,5 +48,6 @@ background semantic index also consumes `ostrinc --types --json` for inferred
 expression hover. The cache is invalidated while a document is dirty and
 rebuilt after saving. The current editor providers are intentionally lightweight:
 cross-file navigation is conservative when two modules expose the same short
-name. A full semantic language server with persistent state, formatting and
+name. Signature help is driven by the same compiler-produced signatures used by
+completion and hover. A full semantic language server with persistent state and
 debugging is future work.

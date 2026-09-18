@@ -1841,3 +1841,28 @@ el rango que recibe VS Code.
 
 La precisión de rangos está lista para el siguiente paso: exponer las mismas
 operaciones mediante el protocolo LSP estándar y añadir debugging.
+
+---
+
+## 55. Ayuda de firmas de llamadas en VS Code — 2026-09-17
+
+La extensión añade ahora `SignatureHelpProvider` para que una llamada Ostrin
+muestre su firma mientras se escribe. Los disparadores son `(` y `,`, y la
+ayuda identifica:
+
+- funciones globales publicadas por `ostrinc --symbols --json`;
+- métodos del receptor usando la misma resolución de tipos que completion y
+  hover;
+- sustitución de genéricos del receptor, por ejemplo `List<Int>` convierte
+  `push(value: T) -> Void` en `push(value: Int) -> Void`;
+- el argumento activo después de comas, paréntesis anidados, listas y bloques.
+
+La información se presenta con `SignatureInformation` y
+`ParameterInformation`, por lo que VS Code puede resaltar el parámetro actual
+de una llamada y mostrar la documentación contextual. La extensión pasa a la
+versión `0.1.7`; se añadieron pruebas de firma al smoke test de JavaScript y
+se actualizaron README, changelog, roadmap y la web.
+
+Este paso sigue siendo una integración directa con VS Code, no un servidor LSP
+independiente. El siguiente bloque grande continúa siendo extraer un servicio
+semántico persistente con protocolo LSP y después conectar depuración.
