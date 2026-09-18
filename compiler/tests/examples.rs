@@ -218,6 +218,10 @@ fn compiler_exports_type_members_and_local_bindings_for_editor_tools() {
     assert!(text.contains("\"memberKind\":\"method\",\"owner\":\"List\",\"name\":\"push\""));
     assert!(text.contains("\"owner\":\"Map\",\"name\":\"get\""));
     assert!(text.contains("\"kind\":\"binding\",\"name\":\"numbers\",\"type\":\"List<Int>\",\"function\":\"main\",\"scopeDepth\":1"));
+    assert!(text.contains("\"name\":\"doubled\",\"type\":\"List<Int>\""));
+    assert!(text.contains("\"name\":\"evens\",\"type\":\"List<Int>\""));
+    assert!(text.contains("\"name\":\"total\",\"type\":\"Int\""));
+    assert!(text.contains("\"name\":\"found\",\"type\":\"Option<Int>\""));
 
     let advanced = run(&["--members", "--json", &example_path("advanced.ostrin")]);
     assert!(advanced.status.success(), "stderr: {}", stderr(&advanced));

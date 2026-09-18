@@ -1525,3 +1525,36 @@ Se añadió `vscode-ostrin/test-language-features.js` y el script `npm test` de
 la extensión. La prueba verifica la firma sustituida de `List<Int>` en
 autocompletado y hover. El siguiente paso queda en firmas más precisas para
 genéricos de lambdas (`U`) y en referencias múltiples para navegación.
+
+---
+
+## 44. Inferencia contextual de lambdas en colecciones — 2026-09-17
+
+Se mejoró el checker para que una lambda reciba el tipo esperado por el método
+de colección donde se utiliza. Antes, una lambda se infería aislada con
+parámetros `Unknown`; por eso expresiones válidas como
+`numbers.map(fn(x) { x * 2 })` podían conservar un tipo incompleto aunque el
+receptor ya fuera `List<Int>`.
+
+### Cambios realizados
+
+- `map` propaga el tipo del elemento a la lambda y conserva el tipo concreto
+  que devuelve su cuerpo: `List<Int>.map(...)` ahora produce `List<Int>` cuando
+  la transformación devuelve `Int`.
+- `filter`, `find`, `any` y `all` contextualizan el parámetro de la lambda con
+  el tipo del elemento (`Int` en una `List<Int>`), manteniendo sus retornos
+  `List<T>`, `Option<T>` o `Bool`.
+- `fold` usa además el tipo del acumulador inicial para tipar el segundo
+  parámetro de la lambda: `fold(0, fn(acc, x) { acc + x })` analiza `acc` y
+  `x` como `Int` y devuelve `Int`.
+- Las cadenas de miembros se benefician de la mejora porque el tipo concreto
+  de una expresión intermedia queda disponible para el siguiente acceso.
+- Se ampliaron las pruebas del índice de bindings para verificar `doubled`,
+  `evens`, `total` y `found` en `examples/collections.ostrin`.
+
+### Verificación
+
+La suite del compilador permanece en **65 pruebas exitosas**. El programa de
+colecciones sigue ejecutándose y el índice semántico publica ahora
+`doubled: List<Int>`, `evens: List<Int>`, `total: Int` y
+`found: Option<Int>`.

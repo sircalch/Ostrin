@@ -856,14 +856,7 @@ impl Checker {
                 self.check_block(b, &mut inner)
             }
             Expr::Lambda(params, body) => {
-                let mut inner = scope.clone();
-                for p in params {
-                    inner.insert(p.clone(), (Ty::Unknown, false));
-                }
-                let previous_return_type = self.current_return_type.take();
-                let ret = self.check_block(body, &mut inner);
-                self.current_return_type = previous_return_type;
-                Ty::Fn(vec![Ty::Unknown; params.len()], Box::new(ret))
+                self.infer_lambda(params, body, None, scope)
             }
             Expr::ListLiteral(items) => {
                 let mut elem = Ty::Unknown;
@@ -1576,6 +1569,40 @@ impl Checker {
         );
     }
 
+    fn infer_expr_with_expected(
+        &mut self,
+        expr: &Expr,
+        expected: Option<&Ty>,
+        scope: &mut Scope,
+    ) -> Ty {
+        if let (Expr::Lambda(params, body), Some(Ty::Fn(expected_params, _))) = (expr, expected) {
+            return self.infer_lambda(params, body, Some(expected_params), scope);
+        }
+        self.infer_expr(expr, scope)
+    }
+
+    fn infer_lambda(
+        &mut self,
+        params: &[String],
+        body: &Block,
+        expected_params: Option<&[Ty]>,
+        scope: &mut Scope,
+    ) -> Ty {
+        let mut inner = scope.clone();
+        let mut parameter_types = Vec::with_capacity(params.len());
+        for (index, parameter) in params.iter().enumerate() {
+            let parameter_type = expected_params
+                .and_then(|types| types.get(index).cloned())
+                .unwrap_or(Ty::Unknown);
+            parameter_types.push(parameter_type.clone());
+            inner.insert(parameter.clone(), (parameter_type, false));
+        }
+        let previous_return_type = self.current_return_type.take();
+        let ret = self.check_block(body, &mut inner);
+        self.current_return_type = previous_return_type;
+        Ty::Fn(parameter_types, Box::new(ret))
+    }
+
     fn check_call(
         &mut self,
         callee: &Expr,
@@ -1583,13 +1610,27 @@ impl Checker {
         scope: &mut Scope,
         explicit_type_args: Option<&[Type]>,
     ) -> Ty {
-        let arg_types: Vec<Ty> = args
-            .iter()
-            .map(|a| match a {
-                Arg::Positional(e) => self.infer_expr(e, scope),
-                Arg::Named(_, e) => self.infer_expr(e, scope),
-            })
-            .collect();
+        // A member call can provide the missing context for a lambda argument.
+        // For example, `numbers.map(fn(x) { x * 2 })` should type `x` as the
+        // element type of `numbers`, instead of degrading the whole expression
+        // to `List<?>` because the lambda was initially inferred in isolation.
+        let member_receiver = if let Expr::FieldAccess(receiver, method) = callee {
+            Some((self.infer_expr(receiver, scope), method.as_str()))
+        } else {
+            None
+        };
+
+        let mut arg_types = Vec::with_capacity(args.len());
+        for (index, arg) in args.iter().enumerate() {
+            let expected = member_receiver.as_ref().and_then(|(receiver_ty, method)| {
+                collection_method_expected_args(receiver_ty, method, arg_types.first())
+                    .and_then(|expected_args| expected_args.get(index).cloned())
+            });
+            let expr = match arg {
+                Arg::Positional(e) | Arg::Named(_, e) => e,
+            };
+            arg_types.push(self.infer_expr_with_expected(expr, expected.as_ref(), scope));
+        }
 
         if let Expr::Ident(name) = callee {
             if let Some(return_type) = check_builtin_call(name, &arg_types, &mut self.errors) {
@@ -1604,7 +1645,10 @@ impl Checker {
         }
 
         if let Expr::FieldAccess(receiver, method) = callee {
-            let receiver_ty = self.infer_expr(receiver, scope);
+            let receiver_ty = member_receiver
+                .as_ref()
+                .map(|(receiver_ty, _)| receiver_ty.clone())
+                .unwrap_or_else(|| self.infer_expr(receiver, scope));
             if collection_method_requires_mut(&receiver_ty, method) {
                 if let Expr::Ident(name) = receiver.as_ref() {
                     if let Some((_, false)) = scope.get(name) {
@@ -2623,36 +2667,7 @@ fn check_collection_method(
     arg_types: &[Ty],
     errors: &mut Vec<TypeError>,
 ) -> Option<Ty> {
-    let expected_args = match (receiver_ty, method) {
-        (Ty::List(_), "length" | "count") => Some(Vec::new()),
-        (Ty::List(element), "push") => Some(vec![(**element).clone()]),
-        (Ty::List(_), "remove_at") => Some(vec![Ty::Int]),
-        (Ty::List(element), "map") => Some(vec![Ty::Fn(
-            vec![(**element).clone()],
-            Box::new(Ty::Unknown),
-        )]),
-        (Ty::List(element), "filter" | "find" | "any" | "all") => {
-            Some(vec![Ty::Fn(vec![(**element).clone()], Box::new(Ty::Bool))])
-        }
-        (Ty::List(element), "fold") => Some(vec![
-            Ty::Unknown,
-            Ty::Fn(vec![(**element).clone(), Ty::Unknown], Box::new(Ty::Unknown)),
-        ]),
-        (Ty::Map(_, _), "count") => Some(Vec::new()),
-        (Ty::Map(key, _), "keys" | "contains_key") => {
-            if method == "keys" {
-                Some(Vec::new())
-            } else {
-                Some(vec![(**key).clone()])
-            }
-        }
-        (Ty::Map(_, _), "values") => Some(Vec::new()),
-        (Ty::Map(key, _), "get" | "remove") => Some(vec![(**key).clone()]),
-        (Ty::Map(key, value), "set") => Some(vec![(**key).clone(), (**value).clone()]),
-        (Ty::Set(_), "count") => Some(Vec::new()),
-        (Ty::Set(element), "contains" | "add" | "remove") => Some(vec![(**element).clone()]),
-        _ => None,
-    }?;
+    let expected_args = collection_method_expected_args(receiver_ty, method, arg_types.first())?;
 
     if expected_args.len() != arg_types.len() {
         errors.push(TypeError {
@@ -2685,6 +2700,49 @@ fn check_collection_method(
         }
     }
     Some(collection_method_return_type(receiver_ty, method, arg_types))
+}
+
+fn collection_method_expected_args(
+    receiver_ty: &Ty,
+    method: &str,
+    first_arg: Option<&Ty>,
+) -> Option<Vec<Ty>> {
+    match (receiver_ty, method) {
+        (Ty::List(_), "length" | "count") => Some(Vec::new()),
+        (Ty::List(element), "push") => Some(vec![(**element).clone()]),
+        (Ty::List(_), "remove_at") => Some(vec![Ty::Int]),
+        (Ty::List(element), "map") => Some(vec![Ty::Fn(
+            vec![(**element).clone()],
+            Box::new(Ty::Unknown),
+        )]),
+        (Ty::List(element), "filter" | "find" | "any" | "all") => {
+            Some(vec![Ty::Fn(vec![(**element).clone()], Box::new(Ty::Bool))])
+        }
+        (Ty::List(element), "fold") => Some(vec![
+            Ty::Unknown,
+            Ty::Fn(
+                vec![
+                    (**element).clone(),
+                    first_arg.cloned().unwrap_or(Ty::Unknown),
+                ],
+                Box::new(Ty::Unknown),
+            ),
+        ]),
+        (Ty::Map(_, _), "count") => Some(Vec::new()),
+        (Ty::Map(key, _), "keys" | "contains_key") => {
+            if method == "keys" {
+                Some(Vec::new())
+            } else {
+                Some(vec![(**key).clone()])
+            }
+        }
+        (Ty::Map(_, _), "values") => Some(Vec::new()),
+        (Ty::Map(key, _), "get" | "remove") => Some(vec![(**key).clone()]),
+        (Ty::Map(key, value), "set") => Some(vec![(**key).clone(), (**value).clone()]),
+        (Ty::Set(_), "count") => Some(Vec::new()),
+        (Ty::Set(element), "contains" | "add" | "remove") => Some(vec![(**element).clone()]),
+        _ => None,
+    }
 }
 
 fn check_option_result_method(
