@@ -255,10 +255,11 @@ fn emit_json_member(member: &symbols::MemberSymbol) {
 fn emit_json_binding(binding: &typeck::EditorBinding, fallback_file: &str) {
     let file = binding.source_file.as_deref().unwrap_or(fallback_file);
     println!(
-        "{{\"kind\":\"binding\",\"name\":{},\"type\":{},\"function\":{},\"file\":{},\"line\":{},\"column\":{}}}",
+        "{{\"kind\":\"binding\",\"name\":{},\"type\":{},\"function\":{},\"scopeDepth\":{},\"file\":{},\"line\":{},\"column\":{}}}",
         json_string(&binding.name),
         json_string(&binding.type_name),
         json_string(&binding.function),
+        binding.scope_depth,
         json_string(file),
         binding.span.line,
         binding.span.col

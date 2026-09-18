@@ -16,6 +16,7 @@ pub struct EditorBinding {
     pub name: String,
     pub type_name: String,
     pub function: String,
+    pub scope_depth: usize,
     pub span: Span,
     pub source_file: Option<String>,
 }
@@ -55,6 +56,7 @@ pub struct Checker {
     current_span: Option<Span>,
     current_source_file: Option<String>,
     current_function_name: Option<String>,
+    editor_scope_depth: usize,
     editor_bindings: Vec<EditorBinding>,
     errors: Vec<TypeError>,
 }
@@ -115,6 +117,7 @@ impl Checker {
             current_span: None,
             current_source_file: None,
             current_function_name: None,
+            editor_scope_depth: 0,
             editor_bindings: Vec::new(),
             errors: Vec::new(),
         }
@@ -244,6 +247,8 @@ impl Checker {
         self.current_source_file = f.source_file.clone();
         let previous_function_name = self.current_function_name.clone();
         self.current_function_name = Some(f.name.clone());
+        let previous_scope_depth = self.editor_scope_depth;
+        self.editor_scope_depth = 0;
         let previous_bounds = std::mem::take(&mut self.current_generic_bounds);
         self.current_generic_bounds = f
             .generics
@@ -258,6 +263,7 @@ impl Checker {
                 name: p.name.clone(),
                 type_name: parameter_type.describe(),
                 function: f.name.clone(),
+                scope_depth: self.editor_scope_depth,
                 span: f.span,
                 source_file: f.source_file.clone(),
             });
@@ -298,6 +304,7 @@ impl Checker {
         self.current_span = previous_span;
         self.current_source_file = previous_source_file;
         self.current_function_name = previous_function_name;
+        self.editor_scope_depth = previous_scope_depth;
     }
 
     fn check_trait_defaults(&mut self, trait_decl: &TraitDecl) {
@@ -569,16 +576,20 @@ impl Checker {
     }
 
     fn check_block(&mut self, block: &Block, scope: &mut Scope) -> Ty {
+        let previous_scope_depth = self.editor_scope_depth;
+        self.editor_scope_depth += 1;
         for stmt in &block.stmts {
             let previous_span = self.current_span;
             self.current_span = Some(stmt.span);
             self.check_stmt(&stmt.stmt, scope);
             self.current_span = previous_span;
         }
-        match &block.tail {
+        let result = match &block.tail {
             Some(e) => self.infer_expr(e, scope),
             None => Ty::Void,
-        }
+        };
+        self.editor_scope_depth = previous_scope_depth;
+        result
     }
 
     fn check_stmt(&mut self, stmt: &Stmt, scope: &mut Scope) {
@@ -607,6 +618,7 @@ impl Checker {
                     name: name.clone(),
                     type_name: final_ty.describe(),
                     function: self.current_function_name.clone().unwrap_or_default(),
+                    scope_depth: self.editor_scope_depth,
                     span: self.current_span.unwrap_or_default(),
                     source_file: self.current_source_file.clone(),
                 });
@@ -631,6 +643,7 @@ impl Checker {
                             name: name.clone(),
                             type_name: value_ty.describe(),
                             function: self.current_function_name.clone().unwrap_or_default(),
+                            scope_depth: self.editor_scope_depth,
                             span: self.current_span.unwrap_or_default(),
                             source_file: self.current_source_file.clone(),
                         });
@@ -676,6 +689,7 @@ impl Checker {
                     name: pattern.clone(),
                     type_name: elem_ty.describe(),
                     function: self.current_function_name.clone().unwrap_or_default(),
+                    scope_depth: self.editor_scope_depth,
                     span: self.current_span.unwrap_or_default(),
                     source_file: self.current_source_file.clone(),
                 });

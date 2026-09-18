@@ -64,6 +64,35 @@ function sameFile(left, right) {
   return left && right && left.replace(/\\/g, '/').toLowerCase() === right.replace(/\\/g, '/').toLowerCase();
 }
 
+function braceBalance(text) {
+  return (text.match(/{/g) || []).length - (text.match(/}/g) || []).length;
+}
+
+function currentBraceDepth(document, position) {
+  let depth = 0;
+  for (let line = 0; line <= position.line; line += 1) {
+    depth += braceBalance(document.lineAt(line).text);
+  }
+  return Math.max(0, depth);
+}
+
+function currentFunctionName(document, position, semanticSymbols) {
+  for (let line = position.line; line >= 0; line -= 1) {
+    const text = document.lineAt(line).text;
+    const match = text.match(/^\s*(?:pub\s+)?fn\s+([A-Za-z_][A-Za-z0-9_]*)\b/);
+    if (!match) continue;
+    let balance = 0;
+    for (let candidate = line; candidate <= position.line; candidate += 1) {
+      balance += braceBalance(document.lineAt(candidate).text);
+    }
+    if (balance > 0) return match[1];
+  }
+  return semanticSymbols
+    .filter((entry) => entry.kind === 'function' && (!entry.file || sameFile(entry.file, document.uri.fsPath)))
+    .filter((entry) => entry.line && entry.line <= position.line + 1)
+    .sort((left, right) => (right.line || 0) - (left.line || 0))[0]?.name;
+}
+
 function normalizeSemanticIndex(index) {
   if (Array.isArray(index)) return { symbols: index, members: [], bindings: [] };
   const source = index || {};
@@ -87,14 +116,21 @@ function memberAccessAt(document, position) {
   return match ? { receiver: match[1], token } : undefined;
 }
 
-function receiverOwner(document, position, bindings) {
+function receiverOwner(document, position, bindings, semanticSymbols) {
   const access = memberAccessAt(document, position);
   if (!access) return undefined;
-  const candidates = bindings
+  const activeFunction = currentFunctionName(document, position, semanticSymbols);
+  let candidates = bindings
     .filter((entry) => entry.name === access.receiver)
     .filter((entry) => !entry.file || sameFile(entry.file, document.uri.fsPath))
     .filter((entry) => !entry.line || entry.line <= position.line + 1)
-    .sort((left, right) => (right.line || 0) - (left.line || 0));
+    .filter((entry) => !entry.scopeDepth || entry.scopeDepth <= currentBraceDepth(document, position))
+    .sort((left, right) =>
+      (right.scopeDepth || 0) - (left.scopeDepth || 0) || (right.line || 0) - (left.line || 0)
+    );
+  if (activeFunction) {
+    candidates = candidates.filter((entry) => entry.function === activeFunction);
+  }
   return baseType(candidates[0]?.type) || access.receiver;
 }
 
@@ -145,7 +181,7 @@ function memberCompletionItems(vscode, members, owner) {
 function provideCompletionItems(vscode, semanticIndex = [], document, position) {
   const index = normalizeSemanticIndex(semanticIndex);
   if (document && position) {
-    const owner = receiverOwner(document, position, index.bindings);
+    const owner = receiverOwner(document, position, index.bindings, index.symbols);
     if (owner) return memberCompletionItems(vscode, index.members, owner);
   }
   const items = [];
@@ -167,13 +203,19 @@ function provideHover(vscode, document, position, semanticIndex = []) {
   const index = normalizeSemanticIndex(semanticIndex);
   const token = wordAt(document, position);
   const access = memberAccessAt(document, position);
-  const owner = access && receiverOwner(document, position, index.bindings);
+  const owner = access && receiverOwner(document, position, index.bindings, index.symbols);
+  const activeFunction = currentFunctionName(document, position, index.symbols);
   const member = owner && index.members.find((entry) => entry.owner === owner && entry.name === token.word);
-  const binding = index.bindings
+  let bindingCandidates = index.bindings
     .filter((entry) => entry.name === token.word)
     .filter((entry) => !entry.file || sameFile(entry.file, document.uri.fsPath))
     .filter((entry) => !entry.line || entry.line <= position.line + 1)
-    .sort((left, right) => (right.line || 0) - (left.line || 0))[0];
+    .filter((entry) => !entry.scopeDepth || entry.scopeDepth <= currentBraceDepth(document, position))
+    .sort((left, right) =>
+      (right.scopeDepth || 0) - (left.scopeDepth || 0) || (right.line || 0) - (left.line || 0)
+    );
+  if (activeFunction) bindingCandidates = bindingCandidates.filter((entry) => entry.function === activeFunction);
+  const binding = bindingCandidates[0];
   const semantic = index.symbols.find((entry) => shortSymbolName(entry.name) === token.word);
   const markdown = member
     ? `**Ostrin ${member.kind || 'member'}**\n\n\`${member.owner}.${member.name}: ${member.detail || ''}\``

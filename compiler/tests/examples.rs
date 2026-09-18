@@ -217,7 +217,17 @@ fn compiler_exports_type_members_and_local_bindings_for_editor_tools() {
     let text = stdout(&out);
     assert!(text.contains("\"memberKind\":\"method\",\"owner\":\"List\",\"name\":\"push\""));
     assert!(text.contains("\"owner\":\"Map\",\"name\":\"get\""));
-    assert!(text.contains("\"kind\":\"binding\",\"name\":\"numbers\",\"type\":\"List<Int>\""));
+    assert!(text.contains("\"kind\":\"binding\",\"name\":\"numbers\",\"type\":\"List<Int>\",\"function\":\"main\",\"scopeDepth\":1"));
+
+    let advanced = run(&["--members", "--json", &example_path("advanced.ostrin")]);
+    assert!(advanced.status.success(), "stderr: {}", stderr(&advanced));
+    let advanced_text = stdout(&advanced);
+    assert!(advanced_text.contains("\"name\":\"x\",\"type\":\"Quantity<D>\",\"function\":\"double\",\"scopeDepth\":0"));
+
+    let generics = run(&["--members", "--json", &example_path("generics.ostrin")]);
+    assert!(generics.status.success(), "stderr: {}", stderr(&generics));
+    let generics_text = stdout(&generics);
+    assert!(generics_text.contains("\"name\":\"a\",\"type\":\"Score\",\"function\":\"main\",\"scopeDepth\":1"));
 }
 
 #[test]

@@ -1378,3 +1378,36 @@ node --check vscode-ostrin/extension.js
 El `cargo fmt --check` global continúa mostrando diferencias de formato
 preexistentes en muchos archivos no relacionados; no se hizo un formateo
 masivo para no mezclar cambios ajenos.
+
+---
+
+## 39. Alcance de bindings en el índice del editor — 2026-09-17
+
+Se corrigió una limitación concreta del primer índice: si dos funciones tenían
+un binding con el mismo nombre, VS Code podía elegir el tipo de la función que
+aparecía antes en el archivo. El índice ahora conserva suficiente contexto
+para seleccionar el binding de la función y del bloque actuales.
+
+### Cambios realizados
+
+- `EditorBinding` ahora publica `scope_depth`, además de su función, posición,
+  tipo y archivo.
+- El checker marca los parámetros en profundidad `0`, el cuerpo de una función
+  en profundidad `1` y los bloques anidados en profundidades posteriores.
+- `ostrinc --members --json` expone ese dato como `scopeDepth`.
+- VS Code identifica la función que contiene el cursor mediante sus
+  declaraciones y llaves, filtra bindings de otras funciones y prioriza el
+  binding del bloque más interno.
+- El hover aplica la misma selección de alcance, por lo que tampoco muestra
+  el tipo de una variable homónima de otra función.
+
+### Verificación
+
+La prueba de integración de miembros comprueba bindings de `main`, `double` y
+`generics.main`; además, una prueba de humo del proveedor de VS Code usa dos
+funciones con `numbers` y confirma que una recibe miembros de `List` y la otra
+de `Map`. La suite continúa en **65 pruebas exitosas**.
+
+La resolución sigue siendo deliberadamente ligera: el cálculo de llaves del
+proveedor es una aproximación para archivos incompletos y todavía no modela
+shadowing exacto, scopes por expresión ni cadenas de miembros.
