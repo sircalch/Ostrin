@@ -52,6 +52,17 @@ class WorkspaceEdit {
   }
 }
 
+class TextEdit {
+  constructor(range, newText) {
+    this.range = range;
+    this.newText = newText;
+  }
+
+  static replace(range, newText) {
+    return new TextEdit(range, newText);
+  }
+}
+
 const vscode = {
   CompletionItem,
   MarkdownString,
@@ -60,6 +71,7 @@ const vscode = {
   Hover,
   Location,
   WorkspaceEdit,
+  TextEdit,
   CompletionItemKind: {
     Method: 'method',
     Field: 'field',
@@ -138,6 +150,30 @@ const expressionHover = features.provideHover(
 );
 assert(expressionHover, 'inferred expression should have hover information');
 assert(expressionHover.contents.value.includes('Int'));
+
+const formatted = features.formatOstrinText([
+  'fn main() {',
+  'if true {',
+  'print("ok")',
+  '}',
+  '}'
+].join('\n'));
+assert.strictEqual(formatted, [
+  'fn main() {',
+  '    if true {',
+  '        print("ok")',
+  '    }',
+  '}'
+].join('\n'));
+
+const formatDocument = {
+  eol: 1,
+  lineCount: 5,
+  getText: () => ['fn main() {', 'if true {', 'print("ok")', '}', '}'].join('\n')
+};
+const formatEdits = features.provideDocumentFormattingEdits(vscode, formatDocument);
+assert.strictEqual(formatEdits.length, 1, 'formatter should return one full-document edit');
+assert(formatEdits[0].newText.includes('        print("ok")'));
 
 const referenceLines = [
   'fn main() {',

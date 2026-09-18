@@ -249,6 +249,9 @@ function activate(context) {
   const symbols = vscode.languages.registerDocumentSymbolProvider(selector, {
     provideDocumentSymbols: (document) => languageFeatures.provideDocumentSymbols(vscode, document, semanticIndexFor(document))
   });
+  const formatting = vscode.languages.registerDocumentFormattingEditProvider(selector, {
+    provideDocumentFormattingEdits: (document) => languageFeatures.provideDocumentFormattingEdits(vscode, document)
+  });
   const check = vscode.commands.registerCommand('ostrin.check', async () => {
     const document = currentDocument();
     if (document) await runCompiler(document, false, true);
@@ -274,7 +277,7 @@ function activate(context) {
     if (editor.document.languageId === 'ostrin') refreshSemanticIndex(editor.document);
   }
 
-  context.subscriptions.push(diagnostics, completion, hover, definitions, references, rename, symbols, check, run, saveSubscription, openSubscription);
+  context.subscriptions.push(diagnostics, completion, hover, definitions, references, rename, symbols, formatting, check, run, saveSubscription, openSubscription);
 }
 
 function deactivate() {}

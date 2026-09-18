@@ -613,11 +613,64 @@ function provideDocumentSymbols(vscode, document, semanticIndex = []) {
   return result;
 }
 
+function braceDelta(text) {
+  let delta = 0;
+  let quote;
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
+    if (quote) {
+      if (character === '\\') index += 1;
+      else if (character === quote) quote = undefined;
+      continue;
+    }
+    if (character === '/' && text[index + 1] === '/') break;
+    if (character === '"' || character === "'") {
+      quote = character;
+      continue;
+    }
+    if (character === '{') delta += 1;
+    else if (character === '}') delta -= 1;
+  }
+  return delta;
+}
+
+function formatOstrinText(text, indentSize = 4) {
+  const lines = String(text).split(/\r?\n/);
+  let depth = 0;
+  const formatted = lines.map((line) => {
+    const content = line.trim();
+    if (!content) return '';
+    const closesBlock = content.startsWith('}');
+    const lineDepth = Math.max(0, depth - (closesBlock ? 1 : 0));
+    const result = `${' '.repeat(lineDepth * indentSize)}${content}`;
+    depth = Math.max(0, depth + braceDelta(content));
+    return result;
+  });
+  return formatted.join('\n');
+}
+
+function provideDocumentFormattingEdits(vscode, document) {
+  if (!document || !vscode.TextEdit) return [];
+  const source = typeof document.getText === 'function'
+    ? document.getText()
+    : Array.from({ length: document.lineCount }, (_, line) => document.lineAt(line).text).join('\n');
+  const eol = document.eol === 2 ? '\r\n' : '\n';
+  const formatted = formatOstrinText(source).replace(/\n/g, eol);
+  if (formatted === source) return [];
+  const range = new vscode.Range(
+    new vscode.Position(0, 0),
+    new vscode.Position(document.lineCount, 0)
+  );
+  return [vscode.TextEdit.replace(range, formatted)];
+}
+
 module.exports = {
   provideCompletionItems,
   provideHover,
   provideDefinition,
   provideReferences,
   provideRenameEdits,
-  provideDocumentSymbols
+  provideDocumentSymbols,
+  provideDocumentFormattingEdits,
+  formatOstrinText
 };

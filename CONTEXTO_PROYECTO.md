@@ -1784,4 +1784,22 @@ extensión.
 
 La precisión actual es la posición inicial de cada expresión, no todavía un
 rango completo de inicio-fin. El siguiente refinamiento será persistir este
-índice como un servicio LSP y añadir formatter y debugging.
+índice como un servicio LSP y añadir debugging.
+
+---
+
+## 52. Formatter inicial para VS Code — 2026-09-17
+
+La extensión registra ahora un `DocumentFormattingEditProvider` para archivos
+`.ostrin`. El formatter es deliberadamente conservador: elimina espacios al
+final, normaliza la indentación a cuatro espacios según `{` y `}`, y conserva
+el contenido de strings, comentarios y operadores.
+
+No intenta reescribir la expresión ni imponer una estética que pudiera cambiar
+la interpretación de los saltos de línea significativos de Ostrin. Devuelve
+una edición de documento completa solo cuando el texto cambia, por lo que
+`Format Document` queda integrado sin añadir un comando propietario.
+
+La prueba de VS Code cubre tanto el texto formateado como la edición que
+recibiría el editor. La extensión pasa a `0.1.4`; el siguiente bloque de
+herramientas será persistir el estado semántico como un LSP y añadir debugging.

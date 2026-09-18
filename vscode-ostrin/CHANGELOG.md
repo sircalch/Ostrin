@@ -2,6 +2,12 @@
 
 All notable changes to the Ostrin VS Code extension are documented here.
 
+## [0.1.4] - 2026-09-17
+
+- Add conservative document formatting for Ostrin blocks and indentation.
+- Register `Format Document` support for `.ostrin` files.
+- Preserve strings, comments and operator text while normalizing indentation.
+
 ## [0.1.3] - 2026-09-17
 
 - Show compiler-inferred expression types in hover documentation.
