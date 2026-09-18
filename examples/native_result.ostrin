@@ -1,0 +1,37 @@
+fn parse_positive(n: Int) -> Result<Int, String> {
+    if n < 0 {
+        return Err("negative")
+    }
+    Ok(n)
+}
+
+fn double_it(n: Int) -> Result<Int, String> {
+    v = try parse_positive(n)
+    Ok(v * 2)
+}
+
+fn first_or_none(a: Int) -> Option<Int> {
+    x = try safe(a)
+    Some(x + 1)
+}
+
+fn safe(a: Int) -> Option<Int> {
+    if a > 0 { Some(a) } else { None }
+}
+
+fn show(r: Result<Int, String>) -> String {
+    match r {
+        Ok(v) => "ok",
+        Err(e) => e,
+    }
+}
+
+fn main() -> Void {
+    print(show(double_it(4)))
+    print(show(double_it(-1)))
+    print(double_it(5).unwrap())
+    print(double_it(-5).is_err())
+    print(double_it(-5).unwrap_or(0))
+    print(first_or_none(3).unwrap())
+    print(first_or_none(0).is_none())
+}

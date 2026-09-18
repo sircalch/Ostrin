@@ -999,6 +999,32 @@ fn native_backend_compiles_and_runs_option() {
 }
 
 #[test]
+fn native_backend_compiles_and_runs_result_and_try() {
+    // Result<T, E> with Ok/Err typed from the return position, early return
+    // through `try` for both Result and Option, a `catch` error handler that
+    // maps the error type, match on Ok/Err, and a call as a `match`
+    // scrutinee (which used to be misparsed as a trailing closure).
+    for (file, expected) in [
+        ("native_result.ostrin", "ok\nnegative\n10\ntrue\n0\n4\ntrue\n"),
+        ("native_result_catch.ostrin", "2\nbad code\n"),
+    ] {
+        let interpreted = run(&["--run", &example_path(file)]);
+        assert!(interpreted.status.success(), "interpreter failed on {file}: {}", stderr(&interpreted));
+        assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected, "interpreter output for {file}");
+
+        let exe = temp_artifact(&format!("{file}.exe"));
+        let compile = run(&["--compile", "--out", &exe, &example_path(file)]);
+        if skip_if_no_c_compiler(&compile) {
+            return;
+        }
+        assert!(compile.status.success(), "compile failed for {file}: {}", stderr(&compile));
+        let run_output = Command::new(&exe).output().unwrap();
+        let _ = fs::remove_file(&exe);
+        assert_eq!(String::from_utf8_lossy(&run_output.stdout).replace("\r\n", "\n"), expected, "native output for {file}");
+    }
+}
+
+#[test]
 fn native_backend_monomorphizes_one_list_struct_per_element_type() {
     let out = run(&["--emit-c", &example_path("native_lists.ostrin")]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));

@@ -1,0 +1,16 @@
+fn parse(n: Int) -> Result<Int, Int> {
+    if n < 0 { Err(n) } else { Ok(n) }
+}
+
+fn run(n: Int) -> Result<Int, String> {
+    v = try parse(n) catch fn(e) { "bad code" }
+    Ok(v + 1)
+}
+
+fn main() -> Void {
+    print(run(1).unwrap())
+    match run(-7) {
+        Ok(v) => print("ok"),
+        Err(e) => print(e),
+    }
+}

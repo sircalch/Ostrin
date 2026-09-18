@@ -2788,3 +2788,32 @@ representa como `{ bool has; T value; }` por valor, monomorfizado por `T`
 
 Fuera de alcance: `Result<T,E>`, `?`/`try`, `print` de un Option. Suite: **90
 pruebas**, sin warnings.
+
+---
+
+## 70. `Result<T, E>` y `try` en el backend nativo — 2026-09-18
+
+- `Result<T,E>` es `{ bool ok; T value; E error; }` por valor, monomorfizado por
+  el par (T, E). `Ok(x)`/`Err(e)` solo conocen un lado, así que llevan tipos
+  parciales (`OkLit(T)`/`ErrLit(E)`), igual que `None` (`NoneLit`); `coerce` los
+  completa contra el tipo esperado, y `unify_types` los combina entre brazos de
+  `if`/`match` (`Ok(x)` + `Err(e)` -> `Result<T,E>`).
+- `try expr` (Ostrin no tiene `?` postfijo) se compila a un `return` de C dentro
+  de una expresión-sentencia GNU: desenvuelve `Some`/`Ok` o retorna `None`/`Err`
+  de la función envolvente. Con `catch fn(e) {..}` el manejador se expande en
+  línea para mapear el tipo de error. Dentro de una lambda se rechaza (en el
+  intérprete retornaría de la lambda; aquí retornaría de la función).
+- `return expr` ahora también coacciona al tipo de retorno (antes solo lo hacía
+  la expresión final, así que `return Err("x")` no compilaba).
+- Patrones `Ok(v)`/`Err(e)`; métodos `is_ok`/`is_err`/`unwrap`/`unwrap_or`.
+
+### Dos bugs previos encontrados al probarlo (arreglados)
+1. **Parser:** una llamada seguida de `{` en cabecera de `match`/`if`/`while`
+   (`match run(7) { ... }`) se leía como cierre final (`f(x) { y -> .. }`) y
+   fallaba con "expected an expression". Ahora se desactiva en contextos sin
+   literales de struct.
+2. **Intérprete:** `print(f(try g()).unwrap())` desbordaba la pila (1 MiB en
+   Windows, marcos grandes en debug). Todo `ostrinc` corre ahora en un hilo con
+   pila de 512 MiB.
+
+Suite: **91 pruebas**, sin warnings.

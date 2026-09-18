@@ -622,7 +622,7 @@ impl Parser {
             }
         }
         self.expect(&TokenKind::RParen)?;
-        if self.check(&TokenKind::LBrace) {
+        if !self.no_struct_literal && self.check(&TokenKind::LBrace) {
             let lambda = self.parse_trailing_closure()?;
             args.push(Arg::Positional(lambda));
         }

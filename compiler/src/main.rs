@@ -18,7 +18,19 @@ use std::io::{self, Read};
 use std::path::Path;
 use std::process::ExitCode;
 
+/// The tree-walking interpreter recurses once per nested expression, and
+/// its frames are large (especially in debug builds), so deeply nested calls
+/// such as `print(f(try g()).unwrap())` overflowed the default 1 MiB main
+/// thread stack on Windows. Everything runs on a thread with a much larger
+/// stack instead.
 fn main() -> ExitCode {
+    match std::thread::Builder::new().stack_size(512 * 1024 * 1024).spawn(real_main) {
+        Ok(handle) => handle.join().unwrap_or(ExitCode::FAILURE),
+        Err(_) => real_main(),
+    }
+}
+
+fn real_main() -> ExitCode {
     let args: Vec<String> = env::args().collect();
     let tokens_only = args.iter().any(|a| a == "--tokens");
     let ast_only = args.iter().any(|a| a == "--ast");

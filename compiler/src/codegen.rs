@@ -83,6 +83,12 @@ enum CType {
     /// The type of a bare `None`, which by itself carries no `T`: it only
     /// becomes a concrete `Option<T>` when `coerce` meets an expected type.
     NoneLit,
+    /// `Result<T, E>`: by-value `{ bool ok; T value; E error; }`, monomorphized per (T, E).
+    Result(Box<CType>, Box<CType>),
+    /// A bare `Ok(x)` / `Err(e)` knows only one side of its `Result`; like
+    /// `NoneLit`, `coerce` completes it once an expected type is known.
+    OkLit(Box<CType>),
+    ErrLit(Box<CType>),
 }
 
 fn c_type_name(ty: &CType) -> String {
@@ -97,7 +103,8 @@ fn c_type_name(ty: &CType) -> String {
         CType::DynTrait(name) => format!("{name}_Dyn"),
         CType::List(elem) => format!("{}*", list_struct_name(elem)),
         CType::Option(inner) => format!("Option_{}", mangle_ctype(inner)),
-        CType::NoneLit => "int".to_string(),
+        CType::NoneLit | CType::OkLit(_) | CType::ErrLit(_) => "int".to_string(),
+        CType::Result(t, e) => format!("Result_{}_{}", mangle_ctype(t), mangle_ctype(e)),
     }
 }
 
@@ -131,6 +138,9 @@ fn map_type(ty: &Type, types: &NamedTypes) -> Result<CType, String> {
             other if types.enums.contains(other) => Ok(CType::Enum(other.to_string())),
             _ => Err(format!("type '{}' is not supported by the native backend yet", type_to_string(ty))),
         },
+        Type::Named(name, args) if name == "Result" && args.len() == 2 => {
+            Ok(CType::Result(Box::new(map_type(&args[0], types)?), Box::new(map_type(&args[1], types)?)))
+        }
         Type::Named(name, args) if name == "Option" && args.len() == 1 => Ok(CType::Option(Box::new(map_type(&args[0], types)?))),
         Type::Named(name, args) if name == "List" && args.len() == 1 => Ok(CType::List(Box::new(map_type(&args[0], types)?))),
         Type::Dyn(traits) => {
@@ -291,6 +301,10 @@ struct Codegen<'a> {
     pending_lists: VecDeque<CType>,
     option_instantiations: HashSet<String>,
     pending_options: VecDeque<CType>,
+    result_instantiations: HashSet<String>,
+    pending_results: VecDeque<(CType, CType)>,
+    current_return: Vec<CType>,
+    lambda_depth: usize,
     record_names: HashSet<String>,
     enum_names: HashSet<String>,
     scopes: Vec<HashMap<String, CType>>,
@@ -321,6 +335,9 @@ fn mangle_ctype(ty: &CType) -> String {
         CType::List(elem) => format!("List_{}", mangle_ctype(elem)),
         CType::Option(inner) => format!("Option_{}", mangle_ctype(inner)),
         CType::NoneLit => "None".to_string(),
+        CType::OkLit(t) => format!("Ok_{}", mangle_ctype(t)),
+        CType::ErrLit(t) => format!("Err_{}", mangle_ctype(t)),
+        CType::Result(t, e) => format!("Result_{}_{}", mangle_ctype(t), mangle_ctype(e)),
     }
 }
 
@@ -341,6 +358,14 @@ impl<'a> Codegen<'a> {
         if let (CType::NoneLit, CType::Option(inner)) = (from, to) {
             self.register_list_types(to);
             return Ok(format!("(({}){{ .has = false }})", c_type_name(&CType::Option(inner.clone()))));
+        }
+        if let (CType::OkLit(_), CType::Result(..)) = (from, to) {
+            self.register_list_types(to);
+            return Ok(format!("(({}){{ .ok = true, .value = {code} }})", c_type_name(to)));
+        }
+        if let (CType::ErrLit(_), CType::Result(..)) = (from, to) {
+            self.register_list_types(to);
+            return Ok(format!("(({}){{ .ok = false, .error = {code} }})", c_type_name(to)));
         }
         let (CType::Record(record_name), CType::DynTrait(trait_name)) = (from, to) else {
             return Err(format!("cannot use a value of type '{}' where '{}' was expected", c_type_name(from), c_type_name(to)));
@@ -393,7 +418,19 @@ impl<'a> Codegen<'a> {
         name
     }
 
+    fn ensure_result(&mut self, ok: &CType, err: &CType) {
+        let name = format!("Result_{}_{}", mangle_ctype(ok), mangle_ctype(err));
+        if self.result_instantiations.insert(name) {
+            self.pending_results.push_back((ok.clone(), err.clone()));
+        }
+    }
+
     fn register_list_types(&mut self, ty: &CType) {
+        if let CType::Result(ok, err) = ty {
+            self.register_list_types(ok);
+            self.register_list_types(err);
+            self.ensure_result(ok, err);
+        }
         if let CType::Option(inner) = ty {
             self.register_list_types(inner);
             self.ensure_option(inner);
@@ -452,6 +489,7 @@ impl<'a> Codegen<'a> {
         out: &mut String,
     ) -> Result<(), String> {
         self.push_scope();
+        self.current_return.push(return_type.clone());
         for param in params {
             let ty = map_type_with_subst(&param.ty, &self.named_types(), subst)?;
             self.define(&param.name, ty);
@@ -471,6 +509,7 @@ impl<'a> Codegen<'a> {
             }
             None => out.push_str("    return;\n"),
         }
+        self.current_return.pop();
         self.pop_scope();
         Ok(())
     }
@@ -556,7 +595,11 @@ impl<'a> Codegen<'a> {
             }
             Stmt::Return(value) => match value {
                 Some(e) => {
-                    let (code, _) = self.gen_expr(e)?;
+                    let (code, ty) = self.gen_expr(e)?;
+                    let code = match self.current_return.last().cloned() {
+                        Some(expected) => self.coerce(&code, &ty, &expected)?,
+                        None => code,
+                    };
                     out.push_str(&format!("    return {code};\n"));
                 }
                 None => out.push_str("    return;\n"),
@@ -716,7 +759,7 @@ impl<'a> Codegen<'a> {
                 if then_ty == CType::Void || else_ty == CType::Void {
                     return Ok((format!("({cond_code} ? {then_code} : {else_code})"), CType::Void));
                 }
-                let result_ty = if then_ty == CType::NoneLit { else_ty.clone() } else { then_ty.clone() };
+                let result_ty = unify_types(&then_ty, &else_ty);
                 let then_code = self.coerce(&then_code, &then_ty, &result_ty)?;
                 let else_code = self.coerce(&else_code, &else_ty, &result_ty)?;
                 Ok((format!("({cond_code} ? {then_code} : {else_code})"), result_ty))
@@ -724,6 +767,7 @@ impl<'a> Codegen<'a> {
             Expr::Block(b) => self.gen_block_expr(b),
             Expr::Match(scrutinee, arms) => self.gen_match(scrutinee, arms),
             Expr::ListLiteral(items) => self.gen_list_literal(items, None),
+            Expr::Try(inner, handler) => self.gen_try(inner, handler.as_deref()),
             Expr::Index(obj, idx) => {
                 let (obj_code, obj_ty) = self.gen_expr(obj)?;
                 let CType::List(elem_ty) = obj_ty else {
@@ -735,6 +779,52 @@ impl<'a> Codegen<'a> {
                 Ok((format!("{struct_name}_get({obj_code}, {idx_code})"), elem_ty))
             }
             other => Err(format!("this expression isn't supported by the native backend yet: {other:?}")),
+        }
+    }
+
+    /// `expr?` / `try expr`: unwrap `Some`/`Ok`, or return early from the
+    /// *enclosing function* (a C `return` inside a GNU statement expression
+    /// is legal). A `None`/`Err` propagates as the function's own
+    /// `Option`/`Result`; an optional handler lambda maps the error first.
+    fn gen_try(&mut self, inner: &Expr, handler: Option<&Expr>) -> Result<(String, CType), String> {
+        if self.lambda_depth > 0 {
+            return Err("'?' inside a lambda isn't supported by the native backend yet".to_string());
+        }
+        let (code, ty) = self.gen_expr(inner)?;
+        let Some(fn_ret) = self.current_return.last().cloned() else {
+            return Err("'?' outside a function".to_string());
+        };
+        let temp = self.next_temp();
+        let tc = c_type_name(&ty);
+        match (&ty, &fn_ret) {
+            (CType::Option(t), CType::Option(_)) => Ok((
+                format!("({{ {tc} {temp} = {code}; if (!{temp}.has) {{ return (({}){{ .has = false }}); }} {temp}.value; }})", c_type_name(&fn_ret)),
+                (**t).clone(),
+            )),
+            (CType::Result(t, e), CType::Result(_, fe)) => {
+                let err_code = match handler {
+                    Some(h) => {
+                        let Expr::Lambda(names, body) = h.unlocated() else {
+                            return Err("the '?' error handler must be an inline lambda in the native backend".to_string());
+                        };
+                        let (hc, ht) = self.inline_lambda(names, &[(**e).clone()], body)?;
+                        // The handler's parameter is bound by name in scope; bind it in C too.
+                        let bound = format!("({{ {} {} = {temp}.error; {hc}; }})", c_type_name(e), names[0]);
+                        self.coerce(&bound, &ht, fe)?
+                    }
+                    None => {
+                        if **e != **fe {
+                            return Err("'?' needs the same error type as the function's Result (or an error handler)".to_string());
+                        }
+                        format!("{temp}.error")
+                    }
+                };
+                Ok((
+                    format!("({{ {tc} {temp} = {code}; if (!{temp}.ok) {{ return (({}){{ .ok = false, .error = {err_code} }}); }} {temp}.value; }})", c_type_name(&fn_ret)),
+                    (**t).clone(),
+                ))
+            }
+            _ => Err("'?' needs an Option in a function returning Option, or a Result in a function returning Result".to_string()),
         }
     }
 
@@ -847,9 +937,10 @@ impl<'a> Codegen<'a> {
             let placeholder = format!("@@ARM{}@@", arm_bodies.len());
             arm_bodies.push((body_code, body_ty.clone()));
             let body_code = placeholder;
-            if result_ty.is_none() || (result_ty == Some(CType::NoneLit) && body_ty != CType::NoneLit) {
-                result_ty = Some(body_ty);
-            }
+            result_ty = Some(match &result_ty {
+                None => body_ty.clone(),
+                Some(prev) => unify_types(prev, &body_ty),
+            });
             // `condition` only ever covers the structural check (tag,
             // literal, range): the guard is evaluated separately, in a
             // *nested* `if` emitted after `bindings`, because a guard can
@@ -902,6 +993,20 @@ impl<'a> Codegen<'a> {
     ) -> Result<(), String> {
         match pattern {
             Pattern::Wildcard => Ok(()),
+            Pattern::Variant(name, fields) if (name == "Ok" || name == "Err") && matches!(scrutinee_ty, CType::Result(..)) => {
+                let CType::Result(ok, err) = scrutinee_ty else { unreachable!() };
+                let (flag, field, ty) = if name == "Ok" { (format!("{scrutinee_var}.ok"), "value", ok) } else { (format!("!{scrutinee_var}.ok"), "error", err) };
+                condition.push_str(&format!(" && ({flag})"));
+                match fields.as_slice() {
+                    [(_, Pattern::Ident(b))] => {
+                        bindings.push_str(&format!("{} {} = {}.{field}; ", c_type_name(ty), b, scrutinee_var));
+                        self.define(b, (**ty).clone());
+                        Ok(())
+                    }
+                    [(_, Pattern::Wildcard)] => Ok(()),
+                    _ => Err("only 'Ok(name)' / 'Err(name)' patterns are supported by the native backend yet".to_string()),
+                }
+            }
             Pattern::Ident(name) if name == "None" && matches!(scrutinee_ty, CType::Option(_)) => {
                 condition.push_str(&format!(" && (!{scrutinee_var}.has)"));
                 Ok(())
@@ -994,8 +1099,8 @@ impl<'a> Codegen<'a> {
     fn gen_binary(&mut self, op: BinOp, l: &Expr, r: &Expr) -> Result<(String, CType), String> {
         let (lc, lt) = self.gen_expr(l)?;
         let (rc, rt) = self.gen_expr(r)?;
-        if matches!(lt, CType::Record(_) | CType::Enum(_) | CType::DynTrait(_) | CType::List(_) | CType::Option(_) | CType::NoneLit)
-            || matches!(rt, CType::Record(_) | CType::Enum(_) | CType::DynTrait(_) | CType::List(_) | CType::Option(_) | CType::NoneLit)
+        if matches!(lt, CType::Record(_) | CType::Enum(_) | CType::DynTrait(_) | CType::List(_) | CType::Option(_) | CType::NoneLit | CType::Result(..) | CType::OkLit(_) | CType::ErrLit(_))
+            || matches!(rt, CType::Record(_) | CType::Enum(_) | CType::DynTrait(_) | CType::List(_) | CType::Option(_) | CType::NoneLit | CType::Result(..) | CType::OkLit(_) | CType::ErrLit(_))
         {
             // C has no `==`/`<`/etc. on struct values at all (a compile
             // error, not just the wrong answer) — but even where a raw `==`
@@ -1065,6 +1170,11 @@ impl<'a> Codegen<'a> {
         if let Some(variant) = self.variants.get(name).cloned() {
             let arg_codes = self.gen_variant_args(&variant, args)?;
             return self.gen_variant_construct(&variant, &arg_codes);
+        }
+        if (name == "Ok" || name == "Err") && args.len() == 1 {
+            let (codes, types) = self.gen_args(args)?;
+            let ty = if name == "Ok" { CType::OkLit(Box::new(types[0].clone())) } else { CType::ErrLit(Box::new(types[0].clone())) };
+            return Ok((codes[0].clone(), ty));
         }
         if name == "Some" && args.len() == 1 {
             let (codes, types) = self.gen_args(args)?;
@@ -1248,6 +1358,29 @@ impl<'a> Codegen<'a> {
                 let call = format!("({{ {trait_name}_Dyn {temp} = {obj_code}; {temp}.vtable->{method_name}({call_args}); }})");
                 Ok((call, return_type))
             }
+            CType::Result(ok, err) => {
+                let (ok, err) = ((**ok).clone(), (**err).clone());
+                let (arg_codes, arg_types) = self.gen_args(args)?;
+                let temp = self.next_temp();
+                let rc = c_type_name(&obj_ty);
+                match method_name {
+                    "is_ok" => Ok((format!("({{ {rc} {temp} = {obj_code}; {temp}.ok; }})"), CType::Bool)),
+                    "is_err" => Ok((format!("({{ {rc} {temp} = {obj_code}; !{temp}.ok; }})"), CType::Bool)),
+                    "unwrap" => Ok((
+                        format!("({{ {rc} {temp} = {obj_code}; if (!{temp}.ok) {{ fprintf(stderr, \"ostrin: unwrap on Err\\n\"); exit(1); }} {temp}.value; }})"),
+                        ok,
+                    )),
+                    "unwrap_or" => {
+                        if arg_codes.len() != 1 {
+                            return Err("'unwrap_or' expects one argument".to_string());
+                        }
+                        let d = self.coerce(&arg_codes[0], &arg_types[0], &ok)?;
+                        let _ = err;
+                        Ok((format!("({{ {rc} {temp} = {obj_code}; {temp}.ok ? {temp}.value : ({d}); }})"), ok))
+                    }
+                    other => Err(format!("Result has no method '{other}' the native backend supports yet")),
+                }
+            }
             CType::Option(inner) => {
                 let inner = (**inner).clone();
                 let (arg_codes, arg_types) = self.gen_args(args)?;
@@ -1332,7 +1465,9 @@ impl<'a> Codegen<'a> {
         for (name, ty) in names.iter().zip(types) {
             self.define(name, ty.clone());
         }
+        self.lambda_depth += 1;
         let result = self.gen_block_expr(body);
+        self.lambda_depth -= 1;
         self.pop_scope();
         result
     }
@@ -1453,7 +1588,9 @@ impl<'a> Codegen<'a> {
             CType::Enum(name) => return Err(format!("cannot 'print' an enum value yet ('{name}' has no generated Display)")),
             CType::DynTrait(name) => return Err(format!("cannot 'print' a 'dyn {name}' value")),
             CType::List(elem) => return Err(format!("cannot 'print' a List<{}> value yet", c_type_name(elem))),
-            CType::Option(_) | CType::NoneLit => return Err("cannot 'print' an Option value yet".to_string()),
+            CType::Option(_) | CType::NoneLit | CType::Result(..) | CType::OkLit(_) | CType::ErrLit(_) => {
+                return Err("cannot 'print' an Option/Result value yet".to_string())
+            }
         };
         Ok((format!("printf(\"{spec}\", {value})"), CType::Void))
     }
@@ -1499,6 +1636,18 @@ fn infer_generic_substitutions(decl: &FunctionDecl, arg_types: &[CType]) -> Resu
         }
     }
     Ok(subst)
+}
+
+/// The common type of two branch results, completing partial literals
+/// (`None`, `Ok(x)`, `Err(e)`) from whichever side is more informative.
+fn unify_types(a: &CType, b: &CType) -> CType {
+    match (a, b) {
+        (x, y) if x == y => x.clone(),
+        (CType::NoneLit, other) | (other, CType::NoneLit) => other.clone(),
+        (CType::OkLit(t), CType::ErrLit(e)) | (CType::ErrLit(e), CType::OkLit(t)) => CType::Result(t.clone(), e.clone()),
+        (CType::OkLit(_) | CType::ErrLit(_), r @ CType::Result(..)) | (r @ CType::Result(..), CType::OkLit(_) | CType::ErrLit(_)) => r.clone(),
+        _ => a.clone(),
+    }
 }
 
 fn c_string_literal(s: &str) -> String {
@@ -1571,6 +1720,10 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
         pending_lists: VecDeque::new(),
         option_instantiations: HashSet::new(),
         pending_options: VecDeque::new(),
+        result_instantiations: HashSet::new(),
+        pending_results: VecDeque::new(),
+        current_return: Vec::new(),
+        lambda_depth: 0,
         record_names: record_names.clone(),
         enum_names: enum_names.clone(),
         scopes: vec![HashMap::new()],
@@ -1802,9 +1955,14 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
     let mut vtable_defs: Vec<String> = Vec::new();
     let mut list_type_decls = String::new();
     let mut option_inners: Vec<CType> = Vec::new();
+    let mut result_pairs: Vec<(CType, CType)> = Vec::new();
     let mut list_helper_prototypes: Vec<String> = Vec::new();
     loop {
         let mut progressed = false;
+        while let Some(pair) = codegen.pending_results.pop_front() {
+            progressed = true;
+            result_pairs.push(pair);
+        }
         while let Some(inner) = codegen.pending_options.pop_front() {
             progressed = true;
             option_inners.push(inner);
@@ -1915,6 +2073,12 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
     // by this point), a `List`'s element type is only known once the drain
     // loop above has finished discovering it from actual usage.
     out.push_str(&list_type_decls);
+    for (ok, err) in std::mem::take(&mut result_pairs) {
+        let name = format!("Result_{}_{}", mangle_ctype(&ok), mangle_ctype(&err));
+        out.push_str(&format!("typedef struct {{ bool ok; {} value; {} error; }} {name};
+
+", c_type_name(&ok), c_type_name(&err)));
+    }
     for inner in std::mem::take(&mut option_inners) {
         let name = format!("Option_{}", mangle_ctype(&inner));
         out.push_str(&format!("typedef struct {{ bool has; {} value; }} {name};
