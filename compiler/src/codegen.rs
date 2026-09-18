@@ -323,6 +323,16 @@ struct VariantInfo {
     fields: Vec<(String, CType)>,
 }
 
+/// A method with its own type parameters (`fn map<U>(self, ..)`), kept
+/// aside until a call site fixes them.
+#[derive(Clone)]
+struct GenericMethod<'a> {
+    decl: &'a FunctionDecl,
+    /// The enclosing `impl`'s own substitution (its type parameters, `Self`).
+    binds: HashMap<String, CType>,
+    key: String,
+}
+
 /// One concrete instantiation of a generic function, queued the first time
 /// `gen_function_call` sees it called with a given set of argument types,
 /// and drained (its body generated) after every non-generic function's and
@@ -414,6 +424,12 @@ struct Codegen<'a> {
     expected: Option<CType>,
     /// Records/enums whose generated `ostrin_show_*` (used by `print`) is queued.
     show_queue: VecDeque<CType>,
+    /// Type key (record/enum/instance/quantity name) -> generic methods, instantiated per call.
+    generic_methods: HashMap<String, HashMap<String, GenericMethod<'a>>>,
+    quantity_impls: Vec<&'a ImplDecl>,
+    quantity_done: HashSet<String>,
+    /// The type-parameter substitution of the function body being generated.
+    subst_stack: Vec<HashMap<String, CType>>,
     /// Trait name -> its default-bodied methods, as function declarations.
     trait_defaults: HashMap<String, Vec<&'a FunctionDecl>>,
     pending_colls: VecDeque<CType>,
@@ -505,6 +521,118 @@ impl<'a> Codegen<'a> {
         methods
     }
 
+    /// Resolves a written type in the context of the function body being
+    /// generated (so `U` means whatever this instantiation bound it to).
+    fn resolve_type(&self, ty: &Type) -> Result<CType, String> {
+        match self.subst_stack.last() {
+            Some(subst) => map_type_with_subst(ty, &self.named_types(), subst),
+            None => map_type(ty, &self.named_types()),
+        }
+    }
+
+    /// Registers the methods of one `impl` for one concrete type: plain
+    /// methods go into `methods` (and, when `queue`, are queued for
+    /// generation); methods with their own type parameters wait for a call.
+    fn register_impl_methods(&mut self, im: &'a ImplDecl, key: &str, self_ty: &CType, binds: &HashMap<String, CType>, queue: bool) {
+        for method in self.impl_method_list(im) {
+            if !method.generics.is_empty() {
+                self.generic_methods
+                    .entry(key.to_string())
+                    .or_default()
+                    .insert(method.name.clone(), GenericMethod { decl: method, binds: binds.clone(), key: key.to_string() });
+                continue;
+            }
+            let param_types: Result<Vec<CType>, String> =
+                method.params.iter().map(|p| map_type_with_subst(&p.ty, &self.named_types(), binds)).collect();
+            let Ok(param_types) = param_types else { continue };
+            let Ok(return_type) = map_type_with_subst(&method.return_type, &self.named_types(), binds) else { continue };
+            for ty in param_types.iter().chain(std::iter::once(&return_type)) {
+                self.register_list_types(ty);
+            }
+            let c_name = format!("{key}__{}", method.name);
+            self.methods.entry(key.to_string()).or_default().insert(
+                method.name.clone(),
+                MethodInfo { decl: method, param_types: param_types.clone(), return_type: return_type.clone(), c_name: c_name.clone(), self_ty: self_ty.clone() },
+            );
+            if queue {
+                self.pending.push_back(PendingInstance { c_name, decl: method, subst: binds.clone(), param_types, return_type });
+            }
+        }
+    }
+
+    /// `impl Trait for Quantity<Length>` / `impl<D: Dimension> ... for
+    /// Quantity<D>`: registered lazily per dimension, the first time a
+    /// method is called on a quantity of that dimension.
+    fn ensure_quantity_methods(&mut self, dim: &Dimension) {
+        let self_ty = CType::Quantity(dim.clone());
+        let key = mangle_ctype(&self_ty);
+        if !self.quantity_done.insert(key.clone()) {
+            return;
+        }
+        for im in self.quantity_impls.clone() {
+            let Some(arg) = im.type_args.first() else { continue };
+            let mut binds: HashMap<String, CType> = HashMap::new();
+            let matches = match arg {
+                Type::Named(n, a) if a.is_empty() && im.generics.iter().any(|g| &g.name == n) => {
+                    binds.insert(n.clone(), self_ty.clone());
+                    true
+                }
+                other => &resolve_dimension(other, &HashMap::new()) == dim,
+            };
+            if !matches {
+                continue;
+            }
+            binds.insert("Self".to_string(), self_ty.clone());
+            self.register_impl_methods(im, &key, &self_ty, &binds, true);
+        }
+    }
+
+    /// A call to a method with its own type parameters: inferred from the
+    /// argument types (and any explicit `<...>`), then monomorphized.
+    fn gen_generic_method_call(&mut self, gm: GenericMethod<'a>, obj_code: &str, type_args: Option<&[Type]>, args: &[Arg]) -> Result<(String, CType), String> {
+        let decl = gm.decl;
+        let generics: Vec<String> = decl.generics.iter().map(|g| g.name.clone()).collect();
+        let (arg_codes, arg_types) = self.gen_args(args)?;
+        if arg_codes.len() + 1 != decl.params.len() {
+            return Err(format!("method '{}' expects {} argument(s), got {}", decl.name, decl.params.len() - 1, arg_codes.len()));
+        }
+        let mut subst: HashMap<String, CType> = HashMap::new();
+        if let Some(types) = type_args {
+            for (g, t) in generics.iter().zip(types) {
+                subst.insert(g.clone(), self.resolve_type(t)?);
+            }
+        }
+        for (param, arg_ty) in decl.params[1..].iter().zip(&arg_types) {
+            self.bind_type(&param.ty, arg_ty, &generics, &mut subst, &decl.name)?;
+        }
+        if let Some(missing) = generics.iter().find(|g| !subst.contains_key(*g)) {
+            return Err(format!("cannot infer type parameter '{missing}' of method '{}'; write it explicitly", decl.name));
+        }
+        let mut full = gm.binds.clone();
+        full.extend(subst.clone());
+        let suffix: Vec<String> = generics.iter().map(|g| mangle_ctype(&subst[g])).collect();
+        let c_name = format!("{}__{}__{}", gm.key, decl.name, suffix.join("_"));
+        let (param_types, return_type) = match self.instantiations.get(&c_name).cloned() {
+            Some(sig) => sig,
+            None => {
+                let types = self.named_types();
+                let param_types = decl.params.iter().map(|p| map_type_with_subst(&p.ty, &types, &full)).collect::<Result<Vec<_>, _>>()?;
+                let return_type = map_type_with_subst(&decl.return_type, &types, &full)?;
+                for ty in param_types.iter().chain(std::iter::once(&return_type)) {
+                    self.register_list_types(ty);
+                }
+                self.flush_instances()?;
+                self.instantiations.insert(c_name.clone(), (param_types.clone(), return_type.clone()));
+                self.pending.push_back(PendingInstance { c_name: c_name.clone(), decl, subst: full, param_types: param_types.clone(), return_type: return_type.clone() });
+                (param_types, return_type)
+            }
+        };
+        let coerced = self.coerce_args(&arg_codes, &arg_types, &param_types[1..])?;
+        let mut all = vec![obj_code.to_string()];
+        all.extend(coerced);
+        Ok((format!("{c_name}({})", all.join(", ")), return_type))
+    }
+
     fn register_instance(&mut self, base: &str, args: &[CType]) -> Result<(), String> {
         let mangled = instance_name(base, args);
         if !self.instances_done.insert(mangled.clone()) {
@@ -575,30 +703,7 @@ impl<'a> Codegen<'a> {
                 continue;
             }
             binds.insert("Self".to_string(), self_ty.clone());
-            for method in self.impl_method_list(im) {
-                if !method.generics.is_empty() {
-                    continue;
-                }
-                let param_types: Result<Vec<CType>, String> =
-                    method.params.iter().map(|p| map_type_with_subst(&p.ty, &self.named_types(), &binds)).collect();
-                let Ok(param_types) = param_types else { continue };
-                let Ok(return_type) = map_type_with_subst(&method.return_type, &self.named_types(), &binds) else { continue };
-                for ty in param_types.iter().chain(std::iter::once(&return_type)) {
-                    self.register_list_types(ty);
-                }
-                let c_name = format!("{mangled}__{}", method.name);
-                self.methods.entry(mangled.clone()).or_default().insert(
-                    method.name.clone(),
-                    MethodInfo {
-                        decl: method,
-                        param_types: param_types.clone(),
-                        return_type: return_type.clone(),
-                        c_name: c_name.clone(),
-                        self_ty: self_ty.clone(),
-                    },
-                );
-                self.pending.push_back(PendingInstance { c_name, decl: method, subst: binds.clone(), param_types, return_type });
-            }
+            self.register_impl_methods(im, &mangled, &self_ty, &binds, true);
         }
         Ok(())
     }
@@ -705,7 +810,7 @@ impl<'a> Codegen<'a> {
         let mut subst = HashMap::new();
         if let Some(types) = explicit {
             for (g, t) in generics.iter().zip(types) {
-                subst.insert(g.clone(), map_type(t, &self.named_types())?);
+                subst.insert(g.clone(), self.resolve_type(t)?);
             }
         } else if let Some(CType::Enum(inst) | CType::Record(inst)) = hint {
             if let Some((b, inst_args)) = self.instance_info.get(inst) {
@@ -961,6 +1066,7 @@ impl<'a> Codegen<'a> {
         out: &mut String,
     ) -> Result<(), String> {
         self.push_scope();
+        self.subst_stack.push(subst.clone());
         self.current_return.push(return_type.clone());
         for param in params {
             let ty = map_type_with_subst(&param.ty, &self.named_types(), subst)?;
@@ -983,6 +1089,7 @@ impl<'a> Codegen<'a> {
             None => out.push_str("    return;\n"),
         }
         self.current_return.pop();
+        self.subst_stack.pop();
         self.pop_scope();
         Ok(())
     }
@@ -1041,7 +1148,7 @@ impl<'a> Codegen<'a> {
                 // its elements boxed one by one, so it must know the element
                 // type it is expected to produce before generating them.
                 let expected_elem = match (declared, value.unlocated()) {
-                    (Some(declared_ty), Expr::ListLiteral(_)) => match map_type(declared_ty, &self.named_types()) {
+                    (Some(declared_ty), Expr::ListLiteral(_)) => match self.resolve_type(declared_ty) {
                         Ok(CType::List(elem)) => Some(*elem),
                         _ => None,
                     },
@@ -1050,7 +1157,7 @@ impl<'a> Codegen<'a> {
                 let (code, actual_ty) = match (&expected_elem, value.unlocated()) {
                     (Some(elem), Expr::ListLiteral(items)) => self.gen_list_literal(items, Some(elem))?,
                     _ => {
-                        let hint = declared.as_ref().and_then(|t| map_type(t, &self.named_types()).ok());
+                        let hint = declared.as_ref().and_then(|t| self.resolve_type(t).ok());
                         self.gen_expr_hint(value, hint)?
                     }
                 };
@@ -1059,7 +1166,7 @@ impl<'a> Codegen<'a> {
                 // just whatever the value already produced.
                 let (final_ty, code) = match declared {
                     Some(declared_ty) => {
-                        let declared_ctype = map_type(declared_ty, &self.named_types())?;
+                        let declared_ctype = self.resolve_type(declared_ty)?;
                         self.register_list_types(&declared_ctype);
                         let coerced = self.coerce(&code, &actual_ty, &declared_ctype)?;
                         (declared_ctype, coerced)
@@ -1300,8 +1407,8 @@ impl<'a> Codegen<'a> {
             Expr::ListLiteral(items) => self.gen_list_literal(items, None),
             Expr::EmptyCollection(name, types) => {
                 let ty = match (name.as_str(), types.as_slice()) {
-                    ("Map", [k, v]) => CType::Map(Box::new(map_type(k, &self.named_types())?), Box::new(map_type(v, &self.named_types())?)),
-                    ("Set", [t]) => CType::Set(Box::new(map_type(t, &self.named_types())?)),
+                    ("Map", [k, v]) => CType::Map(Box::new(self.resolve_type(k)?), Box::new(self.resolve_type(v)?)),
+                    ("Set", [t]) => CType::Set(Box::new(self.resolve_type(t)?)),
                     _ => return Err(format!("'{name}' has the wrong number of type arguments")),
                 };
                 self.register_list_types(&ty);
@@ -2009,7 +2116,7 @@ impl<'a> Codegen<'a> {
     fn gen_call(&mut self, callee: &Expr, type_args: Option<&[Type]>, args: &[Arg], hint: Option<CType>) -> Result<(String, CType), String> {
         match callee.unlocated() {
             Expr::Ident(name) => self.gen_function_call(name, type_args, args, hint),
-            Expr::FieldAccess(obj, method_name) => self.gen_method_call(obj, method_name, args),
+            Expr::FieldAccess(obj, method_name) => self.gen_method_call(obj, method_name, type_args, args),
             _ => Err("only a direct function call or 'record.method(...)' is supported by the native backend yet".to_string()),
         }
     }
@@ -2046,8 +2153,8 @@ impl<'a> Codegen<'a> {
         if (name == "Map" || name == "Set") && args.is_empty() {
             if let Some(types) = type_args {
                 let ty = match (name, types) {
-                    ("Map", [k, v]) => CType::Map(Box::new(map_type(k, &self.named_types())?), Box::new(map_type(v, &self.named_types())?)),
-                    ("Set", [t]) => CType::Set(Box::new(map_type(t, &self.named_types())?)),
+                    ("Map", [k, v]) => CType::Map(Box::new(self.resolve_type(k)?), Box::new(self.resolve_type(v)?)),
+                    ("Set", [t]) => CType::Set(Box::new(self.resolve_type(t)?)),
                     _ => return Err(format!("'{name}' has the wrong number of type arguments")),
                 };
                 self.register_list_types(&ty);
@@ -2056,7 +2163,7 @@ impl<'a> Codegen<'a> {
         }
         if name == "None" && args.is_empty() {
             if let Some([t]) = type_args {
-                let ty = CType::Option(Box::new(map_type(t, &self.named_types())?));
+                let ty = CType::Option(Box::new(self.resolve_type(t)?));
                 self.register_list_types(&ty);
                 let code = self.coerce("0", &CType::NoneLit, &ty)?;
                 return Ok((code, ty));
@@ -2064,7 +2171,7 @@ impl<'a> Codegen<'a> {
         }
         if (name == "Ok" || name == "Err") && args.len() == 1 {
             if let Some([t, e]) = type_args {
-                let ty = CType::Result(Box::new(map_type(t, &self.named_types())?), Box::new(map_type(e, &self.named_types())?));
+                let ty = CType::Result(Box::new(self.resolve_type(t)?), Box::new(self.resolve_type(e)?));
                 self.register_list_types(&ty);
                 let expected_arg = if name == "Ok" { match &ty { CType::Result(o, _) => (**o).clone(), _ => unreachable!() } } else { match &ty { CType::Result(_, e) => (**e).clone(), _ => unreachable!() } };
                 let (code, arg_ty) = self.gen_expr_hint(match &args[0] { Arg::Positional(e) => e, Arg::Named(_, e) => e }, Some(expected_arg.clone()))?;
@@ -2221,7 +2328,7 @@ impl<'a> Codegen<'a> {
         ))
     }
 
-    fn gen_method_call(&mut self, obj: &Expr, method_name: &str, args: &[Arg]) -> Result<(String, CType), String> {
+    fn gen_method_call(&mut self, obj: &Expr, method_name: &str, type_args: Option<&[Type]>, args: &[Arg]) -> Result<(String, CType), String> {
         let (obj_code, obj_ty) = self.gen_expr(obj)?;
         // `to_string()` exists on every scalar in the interpreter
         // (`receiver.to_string()` in `eval_call`); records/enums aren't
@@ -2242,9 +2349,21 @@ impl<'a> Codegen<'a> {
         if matches!(obj_ty, CType::Option(_) | CType::Result(..)) && matches!(method_name, "map" | "then" | "map_err") {
             return self.gen_wrapper_combinator(&obj_code, &obj_ty, method_name, args);
         }
+        let type_key = match &obj_ty {
+            CType::Record(n) | CType::Enum(n) => Some(n.clone()),
+            CType::Quantity(dim) => {
+                self.ensure_quantity_methods(dim);
+                Some(mangle_ctype(&obj_ty))
+            }
+            _ => None,
+        };
         match &obj_ty {
-            CType::Record(record_name) | CType::Enum(record_name) => {
+            CType::Record(_) | CType::Enum(_) | CType::Quantity(_) => {
+                let record_name = &type_key.clone().expect("computed above");
                 let Some(method) = self.methods.get(record_name).and_then(|methods| methods.get(method_name)) else {
+                    if let Some(gm) = self.generic_methods.get(record_name).and_then(|m| m.get(method_name)).cloned() {
+                        return self.gen_generic_method_call(gm, &obj_code, type_args, args);
+                    }
                     return Err(format!(
                         "record '{record_name}' has no method '{method_name}' the native backend can compile \
                          (generic methods and methods on unsupported types aren't supported yet)"
@@ -3002,6 +3121,10 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
         instance_variants: HashMap::new(),
         expected: None,
         show_queue: VecDeque::new(),
+        generic_methods: HashMap::new(),
+        quantity_impls: impls.iter().filter(|im| im.type_name == "Quantity").copied().collect(),
+        quantity_done: HashSet::new(),
+        subst_stack: Vec::new(),
         trait_defaults: default_decls.iter().map(|(t, ds)| (t.clone(), ds.iter().collect())).collect(),
         pending_colls: VecDeque::new(),
         coll_done: HashSet::new(),
@@ -3103,27 +3226,8 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
         } else {
             continue;
         };
-        for method in codegen.impl_method_list(im) {
-            if !method.generics.is_empty() {
-                continue;
-            }
-            let self_subst: HashMap<String, CType> = HashMap::from([("Self".to_string(), self_ty.clone())]);
-            let param_types: Result<Vec<CType>, String> =
-                method.params.iter().map(|p| map_type_with_subst(&p.ty, &codegen.named_types(), &self_subst)).collect();
-            let Ok(param_types) = param_types else { continue };
-            let Ok(return_type) = map_type_with_subst(&method.return_type, &codegen.named_types(), &self_subst) else { continue };
-            for ty in param_types.iter().chain(std::iter::once(&return_type)) {
-                codegen.register_list_types(ty);
-            }
-            let info = MethodInfo {
-                decl: method,
-                param_types,
-                return_type,
-                c_name: format!("{}__{}", im.type_name, method.name),
-                self_ty: self_ty.clone(),
-            };
-            codegen.methods.entry(im.type_name.clone()).or_default().insert(method.name.clone(), info);
-        }
+        let self_subst: HashMap<String, CType> = HashMap::from([("Self".to_string(), self_ty.clone())]);
+        codegen.register_impl_methods(im, &im.type_name, &self_ty, &self_subst, false);
     }
 
     codegen.flush_instances()?;
@@ -3160,7 +3264,11 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
         .flat_map(|methods| methods.values())
         // Methods of a generic instance were already queued for generation
         // (in `pending`) when the instance was registered.
-        .filter(|info| !matches!(&info.self_ty, CType::Record(n) | CType::Enum(n) if codegen.instance_info.contains_key(n)))
+        .filter(|info| match &info.self_ty {
+            CType::Record(n) | CType::Enum(n) => !codegen.instance_info.contains_key(n),
+            CType::Quantity(_) => false,
+            _ => true,
+        })
         .map(|info| (info.self_ty.clone(), info.param_types.clone(), info.return_type.clone(), info.c_name.clone(), info.decl))
         .collect();
     for (self_ty, param_types, return_type, c_name, decl) in method_infos {

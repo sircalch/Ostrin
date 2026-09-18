@@ -1,0 +1,58 @@
+record Wrapper {
+    tag: String
+}
+
+impl Wrapper {
+    fn echo<U>(self, value: U) -> U {
+        value
+    }
+    fn pair<A, B>(self, a: A, b: B) -> List<A> {
+        [a]
+    }
+}
+
+record Box<T> {
+    item: T
+}
+
+impl<T> Box<T> {
+    fn swap_in<U>(self, other: U) -> Box<U> {
+        Box { item: other }
+    }
+}
+
+trait Mapper {
+    fn map<U>(self, value: U) -> U
+}
+
+impl Mapper for Wrapper {
+    fn map<U>(self, value: U) -> U {
+        value
+    }
+}
+
+fn apply<T: Mapper, U>(container: T, value: U) -> U {
+    container.map<U>(value)
+}
+
+trait Doubler {
+    fn twice(self) -> Float
+}
+
+impl Doubler for Quantity<Length> {
+    fn twice(self) -> Float {
+        2.0
+    }
+}
+
+fn main() -> Void {
+    w = Wrapper { tag: "w" }
+    print(w.echo(5))
+    print(w.echo("s"))
+    print(w.echo<Float>(1.5))
+    print(w.pair(1, "x"))
+    b = Box<Int> { item: 1 }
+    print(b.swap_in("new").item)
+    print(apply(w, 42))
+    print((3 m).twice())
+}

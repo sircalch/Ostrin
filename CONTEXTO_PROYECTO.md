@@ -3000,3 +3000,22 @@ pruebas**, sin warnings.
   (`settle_literal`), que un programa que pasó el checker nunca observa.
 - `option_result*.ostrin` y `try_result.ostrin` compilan y coinciden.
   Suite: **93 pruebas**, sin warnings.
+
+---
+
+## 81. Métodos genéricos e `impl` sobre `Quantity` en el backend nativo — 2026-09-18
+
+- Un método con parámetros propios (`fn map<U>(self, v: U) -> U`) se guarda
+  aparte (`GenericMethod`) y se monomorfiza en cada llamada: `U` se infiere de
+  los argumentos o del `<...>` explícito, y se instancia como una función más
+  (`Tipo__metodo__Int`). Sirve en records, enums, instancias genéricas y
+  cantidades, y desde funciones genéricas con cotas (`apply<T: Mapper, U>`).
+- `impl Trait for Quantity<Length>` y `impl<D: Dimension> ... for Quantity<D>`:
+  los métodos se registran perezosamente por dimensión al primer uso
+  (`ensure_quantity_methods`).
+- `Codegen.subst_stack` lleva la sustitución de la función en curso, de modo
+  que un tipo escrito dentro de un cuerpo genérico (`map<U>`, `List<T>`, anotaciones)
+  se resuelve con los tipos concretos de esa instancia (`resolve_type`).
+- `generic_impls_and_methods`, `generics_explicit` y `quantity_impl_dispatch`
+  compilan y coinciden; ejemplo nuevo `native_generic_methods.ostrin`.
+  Suite: **93 pruebas**, sin warnings.
