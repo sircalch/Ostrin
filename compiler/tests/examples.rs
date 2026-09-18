@@ -918,6 +918,46 @@ fn native_backend_dedups_vtables_across_repeated_boxing() {
 }
 
 #[test]
+fn native_backend_compiles_and_runs_lists() {
+    // Three distinct monomorphized List instantiations in one program
+    // (List<Int>, List<Point> and List<String>): literals, `.length()`,
+    // `.push()`, indexing, `.remove_at()`, `for x in list`, and a plain
+    // function taking `List<Int>` as a parameter (register_list_types'
+    // reason to exist: nothing else in that function's own body
+    // constructs a list, so its signature is the only thing that would
+    // ever discover List_Int without it).
+    let exe = temp_artifact("lists.exe");
+    let compile = run(&["--compile", "--out", &exe, &example_path("native_lists.ostrin")]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+
+    let run_output = Command::new(&exe).output().unwrap_or_else(|e| panic!("failed to run compiled binary '{exe}': {e}"));
+    let _ = fs::remove_file(&exe);
+    assert!(run_output.status.success(), "compiled binary exited unsuccessfully");
+    assert_eq!(
+        String::from_utf8_lossy(&run_output.stdout).replace("\r\n", "\n"),
+        "4\n5\n1\n5\n15\n1\n4\n14\n3\n7\na\nb\nc\n",
+        "native binary should match the interpreter's output for the same program"
+    );
+}
+
+#[test]
+fn native_backend_monomorphizes_one_list_struct_per_element_type() {
+    let out = run(&["--emit-c", &example_path("native_lists.ostrin")]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let source = stdout(&out);
+    for struct_name in ["List_Int", "List_Point", "List_String"] {
+        assert_eq!(
+            source.matches(&format!("struct {struct_name} {{")).count(),
+            1,
+            "expected exactly one '{struct_name}' definition: {source}"
+        );
+    }
+}
+
+#[test]
 fn cli_exposes_help_and_version() {
     let version = run(&["--version"]);
     assert!(version.status.success());

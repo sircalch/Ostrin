@@ -1,17 +1,20 @@
 //! A real, honest native backend: `ostrinc --emit-c`/`--compile` transpile a
 //! *subset* of Ostrin to C and hand it to the system's C compiler. This is
-//! not the whole language — dimensional `Quantity`, closures, and
-//! collections (`List<T>` and friends) still only run through the
-//! interpreter (`--run`), and `dyn Trait` support stops at a standalone
-//! value: `List<dyn Trait>` isn't reachable without `List` itself. What is
+//! not the whole language — dimensional `Quantity` and closures still only
+//! run through the interpreter (`--run`), and without closures, `List`'s
+//! own combinators (`map`/`filter`/`fold`/`find`/`any`/`all`, all of which
+//! take a function) stay out of reach too — only `length`/`push`/
+//! `remove_at`, indexing and `for x in list` are supported. What is
 //! supported, all the way to a native executable — not reinterpreted, not
 //! simulated: plain functions (including generic ones, monomorphized per
 //! concrete instantiation — see `PendingInstance`), plain records with
 //! their non-generic `impl` methods (resolved statically — a call site
 //! always knows the receiver's concrete record type), plain enums with
-//! `match`, and standalone `dyn Trait` values (the one place in this whole
-//! backend where a call is actually resolved through a real vtable at
-//! *runtime* — see `CType::DynTrait` and `PendingVTable`) — over
+//! `match`, `dyn Trait` values (the one place in this whole backend where a
+//! call is actually resolved through a real vtable at *runtime* — see
+//! `CType::DynTrait` and `PendingVTable`), and `List<T>` (heap-allocated,
+//! by reference, monomorphized per element type exactly like a generic
+//! function — see `Codegen::ensure_list`) — over
 //! `Int`/`Float`/`Bool`/`String`, recursion, `if`/`while`/`for <range>`,
 //! and the usual operators.
 //!
@@ -66,6 +69,12 @@ enum CType {
     /// resolution; a `dyn` value's whole reason to exist is that its
     /// concrete type is erased, so there is no way around a vtable here.
     DynTrait(String),
+    /// A `List<T>`, heap-allocated and always by reference — like `Record`,
+    /// not like `Enum` — to match `Value::List`'s own `Rc<RefCell<...>>`
+    /// reference identity in the interpreter (two bindings sharing a list
+    /// must see each other's `push`). Monomorphized per element type the
+    /// same way a generic function is: see `Codegen::ensure_list`.
+    List(Box<CType>),
 }
 
 fn c_type_name(ty: &CType) -> String {
@@ -78,7 +87,16 @@ fn c_type_name(ty: &CType) -> String {
         CType::Record(name) => format!("{name}*"),
         CType::Enum(name) => name.clone(),
         CType::DynTrait(name) => format!("{name}_Dyn"),
+        CType::List(elem) => format!("{}*", list_struct_name(elem)),
     }
+}
+
+/// The mangled struct name for a `List` of this element type
+/// (`List_Int`, `List_Circle`, ...) — pure name construction, used both by
+/// `c_type_name` (which never needs `&mut self`) and `ensure_list` (which
+/// does, to queue the instantiation).
+fn list_struct_name(elem: &CType) -> String {
+    format!("List_{}", mangle_ctype(elem))
 }
 
 /// Names of every plain record/enum/trait this backend has agreed to
@@ -103,6 +121,7 @@ fn map_type(ty: &Type, types: &NamedTypes) -> Result<CType, String> {
             other if types.enums.contains(other) => Ok(CType::Enum(other.to_string())),
             _ => Err(format!("type '{}' is not supported by the native backend yet", type_to_string(ty))),
         },
+        Type::Named(name, args) if name == "List" && args.len() == 1 => Ok(CType::List(Box::new(map_type(&args[0], types)?))),
         Type::Dyn(traits) => {
             if traits.len() != 1 {
                 return Err("'dyn A + B' (more than one trait) isn't supported by the native backend yet".to_string());
@@ -244,6 +263,12 @@ struct Codegen<'a> {
     /// reuses one vtable instead of duplicating it.
     vtables_emitted: HashSet<(String, String)>,
     pending_vtables: VecDeque<PendingVTable>,
+    /// Every `List` element type discovered so far, keyed by its mangled
+    /// struct name (`List_Int`) — the dedup key, same idea as
+    /// `instantiations`: a second `List<Int>` reuses the first one's struct
+    /// and helper functions instead of generating them again.
+    list_instantiations: HashMap<String, CType>,
+    pending_lists: VecDeque<CType>,
     record_names: HashSet<String>,
     enum_names: HashSet<String>,
     scopes: Vec<HashMap<String, CType>>,
@@ -271,6 +296,7 @@ fn mangle_ctype(ty: &CType) -> String {
         CType::Str => "String".to_string(),
         CType::Void => "Void".to_string(),
         CType::Record(name) | CType::Enum(name) | CType::DynTrait(name) => name.clone(),
+        CType::List(elem) => format!("List_{}", mangle_ctype(elem)),
     }
 }
 
@@ -308,6 +334,34 @@ impl<'a> Codegen<'a> {
             self.pending_vtables.push_back(PendingVTable { trait_name: trait_name.clone(), record_name: record_name.clone() });
         }
         Ok(format!("(({trait_name}_Dyn){{ .self = (void*)({code}), .vtable = &{trait_name}__{record_name}__vtable }})"))
+    }
+
+    /// Registers (if new) the struct + helper functions a `List` of this
+    /// element type needs, and returns its mangled struct name. Called
+    /// wherever a list is actually constructed, indexed, iterated or has a
+    /// method called on it — never from `map_type`, which only builds the
+    /// `CType` shape and has no `&mut self` to queue anything with.
+    fn ensure_list(&mut self, elem: &CType) -> String {
+        let name = list_struct_name(elem);
+        if !self.list_instantiations.contains_key(&name) {
+            self.list_instantiations.insert(name.clone(), elem.clone());
+            self.pending_lists.push_back(elem.clone());
+        }
+        name
+    }
+
+    /// Walks a resolved `CType` and calls `ensure_list` on every `List`
+    /// found in it (including nested ones, `List<List<Int>>`). Signatures
+    /// (function/method params and return types) are resolved with plain
+    /// `map_type`, which never touches `&mut self` — this is the one place
+    /// a signature-only `List<T>` (never itself constructed, just forwarded
+    /// from a parameter to a return value, say) still gets its struct and
+    /// helpers queued, so its type actually exists in the generated C.
+    fn register_list_types(&mut self, ty: &CType) {
+        if let CType::List(elem) = ty {
+            self.register_list_types(elem);
+            self.ensure_list(elem);
+        }
     }
 }
 
@@ -422,6 +476,7 @@ impl<'a> Codegen<'a> {
                 let (final_ty, code) = match declared {
                     Some(declared_ty) => {
                         let declared_ctype = map_type(declared_ty, &self.named_types())?;
+                        self.register_list_types(&declared_ctype);
                         let coerced = self.coerce(&code, &actual_ty, &declared_ctype)?;
                         (declared_ctype, coerced)
                     }
@@ -508,27 +563,46 @@ impl<'a> Codegen<'a> {
     }
 
     fn gen_for(&mut self, pattern: &str, iter: &Expr, body: &Block, out: &mut String) -> Result<(), String> {
-        let Expr::Range(start, kind, end, step) = iter.unlocated() else {
-            return Err("the native backend only supports 'for x in a to b' / 'a until b' ranges yet".to_string());
-        };
-        if step.is_some() {
-            return Err("stepped ranges aren't supported by the native backend yet".to_string());
+        if let Expr::Range(start, kind, end, step) = iter.unlocated() {
+            if step.is_some() {
+                return Err("stepped ranges aren't supported by the native backend yet".to_string());
+            }
+            let (start_code, start_ty) = self.gen_expr(start)?;
+            let (end_code, _) = self.gen_expr(end)?;
+            if start_ty != CType::Int {
+                return Err("the native backend only supports Int ranges in 'for' yet".to_string());
+            }
+            let cmp = match kind {
+                RangeKind::To => "<=",
+                RangeKind::Until => "<",
+            };
+            out.push_str(&format!("    for (int64_t {pattern} = {start_code}; {pattern} {cmp} {end_code}; {pattern}++) {{\n"));
+            self.push_scope();
+            self.define(pattern, CType::Int);
+            self.gen_block_stmts(body, out)?;
+            self.pop_scope();
+            out.push_str("    }\n");
+            return Ok(());
         }
-        let (start_code, start_ty) = self.gen_expr(start)?;
-        let (end_code, _) = self.gen_expr(end)?;
-        if start_ty != CType::Int {
-            return Err("the native backend only supports Int ranges in 'for' yet".to_string());
-        }
-        let cmp = match kind {
-            RangeKind::To => "<=",
-            RangeKind::Until => "<",
+
+        let (iter_code, iter_ty) = self.gen_expr(iter)?;
+        let CType::List(elem_ty) = iter_ty else {
+            return Err("the native backend only supports 'for x in a to b' ranges or a List yet".to_string());
         };
-        out.push_str(&format!("    for (int64_t {pattern} = {start_code}; {pattern} {cmp} {end_code}; {pattern}++) {{\n"));
+        let elem_ty = *elem_ty;
+        let list_type_name = c_type_name(&CType::List(Box::new(elem_ty.clone())));
+        let list_temp = self.next_temp();
+        let index_temp = self.next_temp();
+        out.push_str(&format!("    {{\n        {list_type_name} {list_temp} = {iter_code};\n"));
+        out.push_str(&format!(
+            "        for (int64_t {index_temp} = 0; {index_temp} < {list_temp}->length; {index_temp}++) {{\n"
+        ));
+        out.push_str(&format!("            {} {pattern} = {list_temp}->items[{index_temp}];\n", c_type_name(&elem_ty)));
         self.push_scope();
-        self.define(pattern, CType::Int);
+        self.define(pattern, elem_ty);
         self.gen_block_stmts(body, out)?;
         self.pop_scope();
-        out.push_str("    }\n");
+        out.push_str("        }\n    }\n");
         Ok(())
     }
 
@@ -588,8 +662,50 @@ impl<'a> Codegen<'a> {
             }
             Expr::Block(b) => self.gen_block_expr(b),
             Expr::Match(scrutinee, arms) => self.gen_match(scrutinee, arms),
+            Expr::ListLiteral(items) => self.gen_list_literal(items),
+            Expr::Index(obj, idx) => {
+                let (obj_code, obj_ty) = self.gen_expr(obj)?;
+                let CType::List(elem_ty) = obj_ty else {
+                    return Err("indexing is only supported on List values by the native backend yet".to_string());
+                };
+                let elem_ty = *elem_ty;
+                let struct_name = self.ensure_list(&elem_ty);
+                let (idx_code, _) = self.gen_expr(idx)?;
+                Ok((format!("{struct_name}_get({obj_code}, {idx_code})"), elem_ty))
+            }
             other => Err(format!("this expression isn't supported by the native backend yet: {other:?}")),
         }
+    }
+
+    /// A list literal's element type comes from its first element; every
+    /// other element must match it exactly (no implicit widening, same as
+    /// everywhere else in this backend). An empty literal (`[]`) has no
+    /// element to infer from and isn't supported.
+    fn gen_list_literal(&mut self, items: &[Expr]) -> Result<(String, CType), String> {
+        if items.is_empty() {
+            return Err("empty list literals aren't supported by the native backend yet (the element type can't be inferred)".to_string());
+        }
+        let mut codes = Vec::with_capacity(items.len());
+        let mut elem_ty: Option<CType> = None;
+        for item in items {
+            let (code, ty) = self.gen_expr(item)?;
+            match &elem_ty {
+                Some(expected) if *expected != ty => {
+                    return Err(format!(
+                        "list literal elements must all have the same type ('{}' vs '{}')",
+                        c_type_name(expected),
+                        c_type_name(&ty)
+                    ));
+                }
+                Some(_) => {}
+                None => elem_ty = Some(ty),
+            }
+            codes.push(code);
+        }
+        let elem_ty = elem_ty.expect("checked items.is_empty() above");
+        let struct_name = self.ensure_list(&elem_ty);
+        let array_literal = format!("({}[]){{ {} }}", c_type_name(&elem_ty), codes.join(", "));
+        Ok((format!("{struct_name}_new_from_array({array_literal}, {})", items.len()), CType::List(Box::new(elem_ty))))
     }
 
     fn gen_record_literal(&mut self, name: &str, fields: &[(String, Expr)]) -> Result<(String, CType), String> {
@@ -779,14 +895,16 @@ impl<'a> Codegen<'a> {
     fn gen_binary(&mut self, op: BinOp, l: &Expr, r: &Expr) -> Result<(String, CType), String> {
         let (lc, lt) = self.gen_expr(l)?;
         let (rc, rt) = self.gen_expr(r)?;
-        if matches!(lt, CType::Record(_) | CType::Enum(_) | CType::DynTrait(_)) || matches!(rt, CType::Record(_) | CType::Enum(_) | CType::DynTrait(_)) {
+        if matches!(lt, CType::Record(_) | CType::Enum(_) | CType::DynTrait(_) | CType::List(_))
+            || matches!(rt, CType::Record(_) | CType::Enum(_) | CType::DynTrait(_) | CType::List(_))
+        {
             // C has no `==`/`<`/etc. on struct values at all (a compile
             // error, not just the wrong answer) — but even where a raw `==`
             // on two records *would* compile (comparing their pointers), it
             // would silently mean identity, not the structural
             // `derive(Eq)`/`impl Eq` comparison Ostrin actually defines.
             return Err(
-                "operators on records/enums/'dyn Trait' values aren't supported by the native backend yet (no derive(Eq/Ord) dispatch)"
+                "operators on records/enums/'dyn Trait'/List values aren't supported by the native backend yet (no derive(Eq/Ord) dispatch)"
                     .to_string(),
             );
         }
@@ -898,6 +1016,9 @@ impl<'a> Codegen<'a> {
         let types = self.named_types();
         let param_types = decl.params.iter().map(|p| map_type_with_subst(&p.ty, &types, &subst)).collect::<Result<Vec<_>, _>>()?;
         let return_type = map_type_with_subst(&decl.return_type, &types, &subst)?;
+        for ty in param_types.iter().chain(std::iter::once(&return_type)) {
+            self.register_list_types(ty);
+        }
         self.instantiations.insert(c_name.clone(), (param_types.clone(), return_type.clone()));
         self.pending.push_back(PendingInstance { c_name: c_name.clone(), decl, subst, param_types, return_type: return_type.clone() });
         Ok((format!("{c_name}({})", arg_codes.join(", ")), return_type))
@@ -1022,7 +1143,37 @@ impl<'a> Codegen<'a> {
                 let call = format!("({{ {trait_name}_Dyn {temp} = {obj_code}; {temp}.vtable->{method_name}({call_args}); }})");
                 Ok((call, return_type))
             }
-            _ => Err("method calls are only supported on records or 'dyn Trait' values by the native backend yet".to_string()),
+            CType::List(elem_ty) => {
+                let elem_ty = (**elem_ty).clone();
+                let struct_name = self.ensure_list(&elem_ty);
+                let (arg_codes, arg_types) = self.gen_args(args)?;
+                match method_name {
+                    "length" => {
+                        if !arg_codes.is_empty() {
+                            return Err("'length' takes no arguments".to_string());
+                        }
+                        Ok((format!("{struct_name}_length({obj_code})"), CType::Int))
+                    }
+                    "push" => {
+                        if arg_codes.len() != 1 {
+                            return Err("'push' expects exactly one argument".to_string());
+                        }
+                        let coerced = self.coerce(&arg_codes[0], &arg_types[0], &elem_ty)?;
+                        Ok((format!("{struct_name}_push({obj_code}, {coerced})"), CType::Void))
+                    }
+                    "remove_at" => {
+                        if arg_codes.len() != 1 {
+                            return Err("'remove_at' expects exactly one argument".to_string());
+                        }
+                        Ok((format!("{struct_name}_remove_at({obj_code}, {})", arg_codes[0]), elem_ty))
+                    }
+                    other => Err(format!(
+                        "List has no method '{other}' the native backend supports yet \
+                         ('map'/'filter'/'fold'/'find'/'any'/'all' need closures, which aren't supported)"
+                    )),
+                }
+            }
+            _ => Err("method calls are only supported on records, 'dyn Trait' values or List by the native backend yet".to_string()),
         }
     }
 
@@ -1039,6 +1190,7 @@ impl<'a> Codegen<'a> {
             CType::Record(name) => return Err(format!("cannot 'print' a record value ('{name}' has no derived Display)")),
             CType::Enum(name) => return Err(format!("cannot 'print' an enum value yet ('{name}' has no generated Display)")),
             CType::DynTrait(name) => return Err(format!("cannot 'print' a 'dyn {name}' value")),
+            CType::List(elem) => return Err(format!("cannot 'print' a List<{}> value yet", c_type_name(elem))),
         };
         Ok((format!("printf(\"{spec}\", {value})"), CType::Void))
     }
@@ -1107,9 +1259,10 @@ fn c_string_literal(s: &str) -> String {
 /// (generic ones monomorphized per call site — see `PendingInstance`),
 /// plain (non-generic) records with their non-generic `impl` methods
 /// (resolved statically — a record method call always knows its concrete
-/// target), plain (non-generic) enums with `match`, and standalone `dyn
-/// Trait` values (dispatched through a real vtable — see `PendingVTable`)
-/// are all supported. A non-generic trait whose methods are all "object
+/// target), plain (non-generic) enums with `match`, `dyn Trait` values
+/// (dispatched through a real vtable — see `PendingVTable`), and `List<T>`
+/// (monomorphized per element type — see `Codegen::ensure_list`) are all
+/// supported. A non-generic trait whose methods are all "object
 /// safe" (`Self` never appears anywhere but as the exact `self` receiver —
 /// checked implicitly, not as a separate pass: see the `trait_methods`
 /// field doc comment) gets a vtable/fat-pointer type declared eagerly;
@@ -1151,6 +1304,8 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
         trait_names,
         vtables_emitted: HashSet::new(),
         pending_vtables: VecDeque::new(),
+        list_instantiations: HashMap::new(),
+        pending_lists: VecDeque::new(),
         record_names: record_names.clone(),
         enum_names: enum_names.clone(),
         scopes: vec![HashMap::new()],
@@ -1190,6 +1345,9 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
             .iter()
             .map(|field| map_type(&field.ty, &codegen.named_types()).map(|ty| (field.name.clone(), ty)))
             .collect::<Result<Vec<_>, _>>()?;
+        for (_, ty) in &fields {
+            codegen.register_list_types(ty);
+        }
         codegen.records.insert(r.name.clone(), fields);
     }
     for e in &enums {
@@ -1206,6 +1364,9 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
                     map_type(&field.ty, &codegen.named_types()).map(|ty| (field_name, ty))
                 })
                 .collect::<Result<Vec<_>, _>>()?;
+            for (_, ty) in &fields {
+                codegen.register_list_types(ty);
+            }
             codegen.variants.insert(variant.name.clone(), VariantInfo { enum_name: e.name.clone(), name: variant.name.clone(), tag, fields });
         }
     }
@@ -1220,6 +1381,9 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
         }
         let param_types = f.params.iter().map(|p| map_type(&p.ty, &codegen.named_types())).collect::<Result<Vec<_>, _>>()?;
         let return_type = map_type(&f.return_type, &codegen.named_types())?;
+        for ty in param_types.iter().chain(std::iter::once(&return_type)) {
+            codegen.register_list_types(ty);
+        }
         codegen.signatures.insert(f.name.clone(), (param_types, return_type));
     }
     if !codegen.signatures.contains_key("main") {
@@ -1243,6 +1407,9 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
                 method.params.iter().map(|p| map_type_with_subst(&p.ty, &codegen.named_types(), &self_subst)).collect();
             let Ok(param_types) = param_types else { continue };
             let Ok(return_type) = map_type_with_subst(&method.return_type, &codegen.named_types(), &self_subst) else { continue };
+            for ty in param_types.iter().chain(std::iter::once(&return_type)) {
+                codegen.register_list_types(ty);
+            }
             let info = MethodInfo {
                 decl: method,
                 param_types,
@@ -1368,8 +1535,72 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
     // that ordering assumption from ever mattering.
     let mut thunk_prototypes: Vec<String> = Vec::new();
     let mut vtable_defs: Vec<String> = Vec::new();
+    let mut list_type_decls = String::new();
+    let mut list_helper_prototypes: Vec<String> = Vec::new();
     loop {
         let mut progressed = false;
+        while let Some(elem_ty) = codegen.pending_lists.pop_front() {
+            progressed = true;
+            let struct_name = list_struct_name(&elem_ty);
+            let elem_c = c_type_name(&elem_ty);
+            list_type_decls.push_str(&format!(
+                "typedef struct {struct_name} {struct_name};\n\
+                 struct {struct_name} {{\n    {elem_c}* items;\n    int64_t length;\n    int64_t capacity;\n}};\n\n"
+            ));
+
+            let new_sig = format!("static {struct_name}* {struct_name}_new_from_array({elem_c}* src_items, int64_t count)");
+            let new_body = format!(
+                "    {struct_name}* list = ({struct_name}*)malloc(sizeof({struct_name}));\n\
+                 \x20   if (!list) {{ fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); }}\n\
+                 \x20   list->capacity = count > 0 ? count : 1;\n\
+                 \x20   list->length = count;\n\
+                 \x20   list->items = ({elem_c}*)malloc(sizeof({elem_c}) * (size_t)list->capacity);\n\
+                 \x20   if (!list->items) {{ fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); }}\n\
+                 \x20   for (int64_t i = 0; i < count; i++) {{ list->items[i] = src_items[i]; }}\n\
+                 \x20   return list;\n"
+            );
+
+            let push_sig = format!("static void {struct_name}_push({struct_name}* list, {elem_c} value)");
+            let push_body = format!(
+                "    if (list->length >= list->capacity) {{\n\
+                 \x20       list->capacity = list->capacity == 0 ? 4 : list->capacity * 2;\n\
+                 \x20       list->items = ({elem_c}*)realloc(list->items, sizeof({elem_c}) * (size_t)list->capacity);\n\
+                 \x20       if (!list->items) {{ fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); }}\n\
+                 \x20   }}\n\
+                 \x20   list->items[list->length] = value;\n\
+                 \x20   list->length = list->length + 1;\n"
+            );
+
+            let length_sig = format!("static int64_t {struct_name}_length({struct_name}* list)");
+            let length_body = "    return list->length;\n".to_string();
+
+            let bounds_check = format!(
+                "    if (index < 0 || index >= list->length) {{ \
+                 fprintf(stderr, \"ostrin: index out of bounds: %lld\\n\", (long long)index); exit(1); }}\n"
+            );
+            let get_sig = format!("static {elem_c} {struct_name}_get({struct_name}* list, int64_t index)");
+            let get_body = format!("{bounds_check}    return list->items[index];\n");
+
+            let remove_sig = format!("static {elem_c} {struct_name}_remove_at({struct_name}* list, int64_t index)");
+            let remove_body = format!(
+                "{bounds_check}\
+                 \x20   {elem_c} removed = list->items[index];\n\
+                 \x20   for (int64_t i = index; i < list->length - 1; i++) {{ list->items[i] = list->items[i + 1]; }}\n\
+                 \x20   list->length = list->length - 1;\n\
+                 \x20   return removed;\n"
+            );
+
+            for (signature, body) in [
+                (new_sig, new_body),
+                (push_sig, push_body),
+                (length_sig, length_body),
+                (get_sig, get_body),
+                (remove_sig, remove_body),
+            ] {
+                list_helper_prototypes.push(format!("{signature};"));
+                bodies.push((signature, body));
+            }
+        }
         while let Some(job) = codegen.pending.pop_front() {
             progressed = true;
             let params = render_params(&job.param_types, &job.decl.params);
@@ -1408,6 +1639,13 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
         }
     }
 
+    // Every `List` struct is declared here, right before the prototype
+    // section that follows — unlike records/enums/trait vtable types
+    // (known upfront, from item declarations, so they're already in `out`
+    // by this point), a `List`'s element type is only known once the drain
+    // loop above has finished discovering it from actual usage.
+    out.push_str(&list_type_decls);
+
     for f in &functions {
         if f.generics.is_empty() {
             let (param_types, return_type) = codegen.signatures.get(&f.name).cloned().unwrap();
@@ -1424,7 +1662,7 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
     for (c_name, (param_types, return_type)) in &codegen.instantiations {
         out.push_str(&format!("{} {}({});\n", c_type_name(return_type), c_name, render_params_by_type(param_types)));
     }
-    for prototype in &thunk_prototypes {
+    for prototype in list_helper_prototypes.iter().chain(&thunk_prototypes) {
         out.push_str(prototype);
         out.push('\n');
     }

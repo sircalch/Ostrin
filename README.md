@@ -44,7 +44,7 @@ Ostrin is not yet a production compiler. The current implementation includes a
 lexer, parser, static checker, interpreter, modules, packages, collections,
 traits, pattern matching, quantities and a simulated concurrency model.
 
-The compiler suite currently passes **85 integration tests**. Function calls
+The compiler suite currently passes **87 integration tests**. Function calls
 support named/default arguments, collection lookups preserve `Option<T>`, and
 record fields are checked statically. The CLI also exposes JSON Lines
 diagnostics with source locations for editor integrations, plus a compiler
@@ -62,13 +62,15 @@ called and reused after that — plain records (heap-allocated, always by
 reference, to match the interpreter's identity semantics) with their
 non-generic `impl` methods (resolved statically at compile time), plain
 non-generic enums with `match` (compiled to a tagged union and a sequence of
-`if`s), and standalone `dyn Trait` values (a real vtable, the one place in
-this backend anything is actually resolved at runtime rather than compile
-time) — over `Int`/`Float`/`Bool`/`String`, recursion, `if`/`while`/
-`for <range>`. Dimensional `Quantity`, closures, and collections (`List<T>`
-and friends) still only run through the interpreter, and `dyn Trait` support
-stops at a standalone value — `List<dyn Trait>` isn't reachable without
-`List` itself. The runtime is still
+`if`s), `dyn Trait` values (a real vtable, the one place in this backend
+anything is actually resolved at runtime rather than compile time), and
+`List<T>` (heap-allocated, by reference, monomorphized per element type the
+same way a generic function is — `length`/`push`/`remove_at`, indexing and
+`for x in list`) — over `Int`/`Float`/`Bool`/`String`, recursion,
+`if`/`while`/`for <range>`. Dimensional `Quantity` and closures still only
+run through the interpreter, and without closures, `List`'s own combinators
+(`map`/`filter`/`fold`/`find`/`any`/`all`) stay out of reach too — every one
+of them takes a function. The runtime is still
 synchronous and the standard library is small.
 
 ## Quick start

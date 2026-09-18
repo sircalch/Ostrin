@@ -2651,3 +2651,83 @@ resuelto en tiempo de compilación excepto la única llamada a través de una
 vtable. Lo que sigue, si alguna vez se quiere cerrar la brecha real de
 `dyn_trait.ostrin`, es construir `List`/colecciones — un proyecto aparte,
 no una extensión de lo que ya existe.
+
+---
+
+## 67. `List<T>` en el backend nativo — 2026-09-17
+
+Se continuó exactamente por donde la sección 66 dejó marcado el siguiente
+paso.
+
+### Misma identidad de referencia que un record, misma monomorfización que una función genérica
+
+`Value::List` en el intérprete es `Rc<RefCell<Vec<Value>>>` — identidad
+compartida, igual que `Record` (dos bindings que comparten una lista deben
+ver el `push` del otro). Por eso `List<T>` se representa exactamente igual
+que un record: siempre por puntero, nunca por valor, a un struct reservado
+con `malloc` que crece con `realloc` cuando hace falta más capacidad.
+
+Pero el TIPO `List<T>` en sí mismo es genérico, así que su instanciación
+sigue el mismo patrón que una función genérica (sección 65): la primera vez
+que se ve una `List` de un tipo de elemento concreto, se genera su struct
+(`List_Int`, `List_Circle`, ...) y cinco funciones de ayuda
+(`_new_from_array`, `_push`, `_length`, `_get` con comprobación de límites,
+`_remove_at` con desplazamiento de elementos) — nunca antes de que algo la
+use de verdad, y reutilizadas si el mismo tipo de elemento vuelve a
+aparecer.
+
+### Un caso que ninguna de las llamadas ya existentes cubría
+
+Todo el resto de instanciaciones perezosas (genéricos, vtables) se
+descubrían siempre desde dentro de un CUERPO de función, porque solo ahí se
+generaban expresiones reales. Pero una `List<T>` puede aparecer **solo en
+una firma** — un parámetro `numbers: List<Int>` cuya función nunca
+construye una lista nueva, solo reenvía la que le pasaron — y las firmas se
+resuelven con `map_type`, una función libre sin `&mut self` que no puede
+encolar nada. Se resolvió con `register_list_types`, una pasada aparte que
+recorre cualquier `CType` ya resuelto (de un parámetro, un retorno, un
+campo de record o de variante) buscando cualquier `List` anidada y
+encolándola — sin este paso, `sum_list(numbers: List<Int>) -> Int` en el
+programa de prueba habría compilado el propio `sum_list` sin que
+`List_Int` existiera todavía en el archivo generado.
+
+### El mismo problema de orden que ya había aparecido con las vtables, en una forma nueva
+
+El struct de una lista (a diferencia de un record o un enum, cuyos structs
+se conocen de antemano por las declaraciones del programa) solo se conoce
+completo **después** de la fase de generación de cuerpos — la misma cola de
+pendientes que ya drenaban genéricos y vtables. Eso significa que el struct
+de `List_Int` no puede ir junto a los de `record`/`enum` al principio del
+archivo (donde se emitían antes de saber qué listas existen); tiene que
+emitirse justo después de que esa cola termine de vaciarse, y antes de
+cualquier prototipo de función — un tercer punto de inserción distinto a
+los dos que ya había para genéricos/vtables, pero siguiendo la misma idea:
+nada se escribe al archivo final hasta que todo lo que puede descubrirse
+por uso ya se descubrió.
+
+### Pruebas
+
+`examples/native_lists.ostrin` ejercita tres instanciaciones a la vez
+(`List<Int>`, `List<Point>`, `List<String>`): literales, `.length()`,
+`.push()`, indexado, `.remove_at()`, `for x in lista`, y una función
+(`sum_list`) cuyo único punto de contacto con `List<Int>` es su firma —
+exactamente el caso que `register_list_types` existe para cubrir. Se
+compiló y ejecutó de verdad, comparando contra la salida ya verificada del
+intérprete. Un segundo test confirma que cada tipo de elemento genera
+exactamente un struct, no uno por cada literal/uso. Suite del compilador:
+**87 pruebas**, sin warnings nuevos.
+
+Se verificó además, sin que fuera parte del alcance pedido, cuánto se
+acercó esto al ejemplo real `dyn_trait.ostrin` (`List<dyn Shape>` +
+`.fold()` + una lambda): con `List` ya soportado, ese archivo avanza mucho
+más lejos y ahora falla específicamente en la lambda pasada a `.fold()` —
+confirma que el único bloqueo que queda para ese ejemplo concreto son los
+closures, no las listas.
+
+Frontera actual del backend nativo: funciones (incluidas genéricas),
+records con métodos, enums con match, `dyn Trait` sueltos, y `List<T>` con
+sus operaciones básicas (`length`/`push`/`remove_at`/indexado/`for`).
+`map`/`filter`/`fold`/`find`/`any`/`all` — y con ellos, el `dyn_trait.ostrin`
+original — siguen bloqueados por lo mismo: closures, la única pieza de
+"resolver algo en tiempo de ejecución" que este backend todavía no tiene
+ninguna forma de representar.

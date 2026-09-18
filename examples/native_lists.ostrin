@@ -1,0 +1,37 @@
+record Point {
+    x: Int
+    y: Int
+}
+
+fn sum_list(numbers: List<Int>) -> Int {
+    mut total = 0
+    for n in numbers {
+        total = total + n
+    }
+    total
+}
+
+fn main() -> Void {
+    mut numbers = [1, 2, 3, 4]
+    print(numbers.length())
+    numbers.push(5)
+    print(numbers.length())
+    print(numbers[0])
+    print(numbers[4])
+    print(sum_list(numbers))
+
+    removed = numbers.remove_at(0)
+    print(removed)
+    print(numbers.length())
+    print(sum_list(numbers))
+
+    points = [Point { x: 1, y: 2 }, Point { x: 3, y: 4 }]
+    for p in points {
+        print(p.x + p.y)
+    }
+
+    words = ["a", "b", "c"]
+    for w in words {
+        print(w)
+    }
+}
