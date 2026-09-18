@@ -246,6 +246,8 @@ pub enum Expr {
     ListLiteral(Vec<Expr>),
     SetLiteral(Vec<Expr>),
     MapLiteral(Vec<(Expr, Expr)>),
+    /// `Map<K, V>()` / `Set<T>()`: an empty collection that keeps its written type arguments.
+    EmptyCollection(String, Vec<Type>),
     Try(Box<Expr>, Option<Box<Expr>>),
     Within(Box<Expr>, Box<Expr>),
     Approximately(Box<Expr>, Box<Expr>, Box<Expr>),

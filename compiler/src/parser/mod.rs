@@ -678,14 +678,15 @@ impl Parser {
                 self.advance();
                 if (name == "Map" || name == "Set") && self.check(&TokenKind::Lt) {
                     self.advance();
+                    let mut type_args = Vec::new();
                     loop {
-                        self.parse_type()?;
+                        type_args.push(self.parse_type()?);
                         if !self.eat(&TokenKind::Comma) { break; }
                     }
                     self.expect(&TokenKind::Gt)?;
                     self.expect(&TokenKind::LParen)?;
                     self.expect(&TokenKind::RParen)?;
-                    return Ok(if name == "Map" { Expr::MapLiteral(vec![]) } else { Expr::SetLiteral(vec![]) });
+                    return Ok(Expr::EmptyCollection(name, type_args));
                 }
                 if !self.no_struct_literal && self.check(&TokenKind::Lt) {
                     let checkpoint = self.pos;

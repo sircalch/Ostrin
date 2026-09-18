@@ -1,0 +1,37 @@
+record Point: Eq {
+    x: Int
+    y: Int
+}
+
+fn total(scores: Map<String, Int>) -> Int {
+    scores.values().fold(0, fn(acc, v) { acc + v })
+}
+
+fn main() -> Void {
+    mut scores = Map<String, Int>()
+    scores.set("ann", 3)
+    scores.set("bob", 5)
+    scores.set("ann", 4)
+    print(scores)
+    print(total(scores))
+    print(scores.keys())
+    print(scores.remove("bob"))
+    print(scores.remove("zed"))
+    print(scores.count())
+
+    mut seen = Set<String>()
+    seen.add("a")
+    seen.add("b")
+    seen.add("a")
+    seen.remove("b")
+    print(seen)
+    print(seen.contains("a"))
+
+    mut grid = Map<Point, String>()
+    grid.set(Point { x: 1, y: 2 }, "one-two")
+    print(grid.get(Point { x: 1, y: 2 }))
+    print(grid.contains_key(Point { x: 2, y: 1 }))
+
+    names = ["x", "y", "z"]
+    print(names)
+}

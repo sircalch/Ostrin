@@ -745,10 +745,10 @@ fn native_backend_emit_c_writes_readable_c_source() {
 
 #[test]
 fn native_backend_rejects_constructs_it_does_not_support_yet() {
-    // `collections.ostrin` uses Map/Set literals, which the native backend
-    // has no representation for: it must fail with a clear message rather
-    // than silently emit something wrong.
-    let out = run(&["--emit-c", &example_path("collections.ostrin")]);
+    // `concurrency.ostrin` uses channels, which the native backend has no
+    // representation for: it must fail with a clear message rather than
+    // silently emit something wrong.
+    let out = run(&["--emit-c", &example_path("concurrency.ostrin")]);
     assert!(!out.status.success(), "the native backend should refuse a program it can't fully compile");
     let error = stderr(&out);
     assert!(error.contains("isn't supported by the native backend"), "unexpected error: {error}");
@@ -1550,6 +1550,8 @@ fn native_backend_generic_records_and_enums_match_the_interpreter() {
         "native_display.ostrin",
         "native_derive.ostrin",
         "native_named_args.ostrin",
+        "native_collections.ostrin",
+        "collections.ostrin",
         "function_arguments.ostrin",
         "traits.ostrin",
     ] {

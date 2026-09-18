@@ -907,6 +907,9 @@ impl Checker {
                 }
                 Ty::Set(Box::new(elem))
             }
+            Expr::EmptyCollection(name, _) => {
+                if name == "Map" { Ty::Map(Box::new(Ty::Unknown), Box::new(Ty::Unknown)) } else { Ty::Set(Box::new(Ty::Unknown)) }
+            }
             Expr::MapLiteral(pairs) => {
                 let mut key = Ty::Unknown;
                 let mut value = Ty::Unknown;
@@ -3452,6 +3455,7 @@ fn walk_expr(expr: &Expr, bound: &HashSet<String>, free: &mut HashSet<String>) {
         Expr::FieldAccess(o, _) => walk_expr(o, bound, free),
         Expr::Index(o, i) => { walk_expr(o, bound, free); walk_expr(i, bound, free); }
         Expr::ListLiteral(items) | Expr::SetLiteral(items) => { for it in items { walk_expr(it, bound, free); } }
+        Expr::EmptyCollection(..) => {}
         Expr::MapLiteral(pairs) => { for (k, v) in pairs { walk_expr(k, bound, free); walk_expr(v, bound, free); } }
         Expr::Try(i, c) => { walk_expr(i, bound, free); if let Some(c) = c { walk_expr(c, bound, free); } }
         Expr::Approximately(a, b, t) => { walk_expr(a, bound, free); walk_expr(b, bound, free); walk_expr(t, bound, free); }

@@ -102,6 +102,10 @@ enum CType {
     /// `T` from: (enum base name, variant name). `coerce` completes it once
     /// the expected instance is known.
     GenLit(String, String),
+    /// `Map<K, V>` / `Set<T>`: heap-allocated, by reference, insertion-ordered
+    /// arrays searched linearly (like the interpreter's `Vec` state).
+    Map(Box<CType>, Box<CType>),
+    Set(Box<CType>),
 }
 
 fn c_type_name(ty: &CType) -> String {
@@ -115,6 +119,7 @@ fn c_type_name(ty: &CType) -> String {
         CType::Enum(name) => name.clone(),
         CType::DynTrait(name) => format!("{name}_Dyn"),
         CType::List(elem) => format!("{}*", list_struct_name(elem)),
+        CType::Map(..) | CType::Set(_) => format!("{}*", mangle_ctype(ty)),
         CType::Option(inner) => format!("Option_{}", mangle_ctype(inner)),
         CType::NoneLit | CType::OkLit(_) | CType::ErrLit(_) | CType::GenLit(..) => "int".to_string(),
         CType::Quantity(_) => "Qty".to_string(),
@@ -199,6 +204,11 @@ fn map_type_with_subst(ty: &Type, types: &NamedTypes, subst: &HashMap<String, CT
         Type::Named(name, args) if name == "Option" && args.len() == 1 => {
             Ok(CType::Option(Box::new(map_type_with_subst(&args[0], types, subst)?)))
         }
+        Type::Named(name, args) if name == "Map" && args.len() == 2 => Ok(CType::Map(
+            Box::new(map_type_with_subst(&args[0], types, subst)?),
+            Box::new(map_type_with_subst(&args[1], types, subst)?),
+        )),
+        Type::Named(name, args) if name == "Set" && args.len() == 1 => Ok(CType::Set(Box::new(map_type_with_subst(&args[0], types, subst)?))),
         Type::Named(name, args) if name == "List" && args.len() == 1 => {
             Ok(CType::List(Box::new(map_type_with_subst(&args[0], types, subst)?)))
         }
@@ -404,6 +414,8 @@ struct Codegen<'a> {
     expected: Option<CType>,
     /// Records/enums whose generated `ostrin_show_*` (used by `print`) is queued.
     show_queue: VecDeque<CType>,
+    pending_colls: VecDeque<CType>,
+    coll_done: HashSet<String>,
     /// Every top-level function by name, for named/default argument resolution.
     function_decls: HashMap<String, &'a FunctionDecl>,
     /// `derive(Eq)`/`derive(Ord)` helpers queued: (is_compare, type).
@@ -439,6 +451,8 @@ fn mangle_ctype(ty: &CType) -> String {
         CType::Void => "Void".to_string(),
         CType::Record(name) | CType::Enum(name) | CType::DynTrait(name) => name.clone(),
         CType::List(elem) => format!("List_{}", mangle_ctype(elem)),
+        CType::Map(k, v) => format!("Map_{}_{}", mangle_ctype(k), mangle_ctype(v)),
+        CType::Set(t) => format!("Set_{}", mangle_ctype(t)),
         CType::Option(inner) => format!("Option_{}", mangle_ctype(inner)),
         CType::NoneLit => "None".to_string(),
         CType::GenLit(base, variant) => format!("Lit_{base}_{variant}"),
@@ -645,6 +659,11 @@ impl<'a> Codegen<'a> {
                 }
             },
             (Type::Named(n, args), CType::List(elem)) if n == "List" && args.len() == 1 => self.bind_type(&args[0], elem, generics, subst, owner),
+            (Type::Named(n, args), CType::Map(k, v)) if n == "Map" && args.len() == 2 => {
+                self.bind_type(&args[0], k, generics, subst, owner)?;
+                self.bind_type(&args[1], v, generics, subst, owner)
+            }
+            (Type::Named(n, args), CType::Set(t)) if n == "Set" && args.len() == 1 => self.bind_type(&args[0], t, generics, subst, owner),
             (Type::Named(n, args), CType::Option(inner)) if n == "Option" && args.len() == 1 => self.bind_type(&args[0], inner, generics, subst, owner),
             (Type::Named(n, args), CType::Result(ok, err)) if n == "Result" && args.len() == 2 => {
                 self.bind_type(&args[0], ok, generics, subst, owner)?;
@@ -847,6 +866,22 @@ impl<'a> Codegen<'a> {
     }
 
     fn register_list_types(&mut self, ty: &CType) {
+        if let CType::Map(k, v) = ty {
+            self.register_list_types(k);
+            self.register_list_types(v);
+            self.ensure_option(v);
+            self.ensure_list(k);
+            self.ensure_list(v);
+            if self.coll_done.insert(mangle_ctype(ty)) {
+                self.pending_colls.push_back(ty.clone());
+            }
+        }
+        if let CType::Set(t) = ty {
+            self.register_list_types(t);
+            if self.coll_done.insert(mangle_ctype(ty)) {
+                self.pending_colls.push_back(ty.clone());
+            }
+        }
         if let CType::Result(ok, err) = ty {
             self.register_list_types(ok);
             self.register_list_types(err);
@@ -1228,6 +1263,68 @@ impl<'a> Codegen<'a> {
             Expr::Block(b) => self.gen_block_expr(b),
             Expr::Match(scrutinee, arms) => self.gen_match(scrutinee, arms),
             Expr::ListLiteral(items) => self.gen_list_literal(items, None),
+            Expr::EmptyCollection(name, types) => {
+                let ty = match (name.as_str(), types.as_slice()) {
+                    ("Map", [k, v]) => CType::Map(Box::new(map_type(k, &self.named_types())?), Box::new(map_type(v, &self.named_types())?)),
+                    ("Set", [t]) => CType::Set(Box::new(map_type(t, &self.named_types())?)),
+                    _ => return Err(format!("'{name}' has the wrong number of type arguments")),
+                };
+                self.register_list_types(&ty);
+                Ok((format!("{}_new()", mangle_ctype(&ty)), ty))
+            }
+            Expr::SetLiteral(items) => {
+                let mut parts = Vec::new();
+                let mut elem_ty: Option<CType> = None;
+                for item in items {
+                    let (code, ty) = self.gen_expr(item)?;
+                    elem_ty = Some(match &elem_ty {
+                        None => ty.clone(),
+                        Some(prev) => unify_types(prev, &ty),
+                    });
+                    parts.push((code, ty));
+                }
+                let elem_ty = elem_ty.ok_or("an empty set literal needs a type; use Set<T>()")?;
+                let set_ty = CType::Set(Box::new(elem_ty.clone()));
+                self.register_list_types(&set_ty);
+                let name = mangle_ctype(&set_ty);
+                let temp = self.next_temp();
+                let mut body = format!("{name}* {temp} = {name}_new(); ");
+                for (code, ty) in parts {
+                    let code = self.coerce(&code, &ty, &elem_ty)?;
+                    body.push_str(&format!("{name}_add({temp}, {code}); "));
+                }
+                Ok((format!("({{ {body} {temp}; }})"), set_ty))
+            }
+            Expr::MapLiteral(pairs) => {
+                let mut parts = Vec::new();
+                let (mut key_ty, mut val_ty): (Option<CType>, Option<CType>) = (None, None);
+                for (k, v) in pairs {
+                    let (kc, kt) = self.gen_expr(k)?;
+                    let (vc, vt) = self.gen_expr(v)?;
+                    key_ty = Some(match &key_ty {
+                        None => kt.clone(),
+                        Some(prev) => unify_types(prev, &kt),
+                    });
+                    val_ty = Some(match &val_ty {
+                        None => vt.clone(),
+                        Some(prev) => unify_types(prev, &vt),
+                    });
+                    parts.push((kc, kt, vc, vt));
+                }
+                let key_ty = key_ty.ok_or("an empty map literal needs a type; use Map<K, V>()")?;
+                let val_ty = val_ty.expect("non-empty");
+                let map_ty = CType::Map(Box::new(key_ty.clone()), Box::new(val_ty.clone()));
+                self.register_list_types(&map_ty);
+                let name = mangle_ctype(&map_ty);
+                let temp = self.next_temp();
+                let mut body = format!("{name}* {temp} = {name}_new(); ");
+                for (kc, kt, vc, vt) in parts {
+                    let kc = self.coerce(&kc, &kt, &key_ty)?;
+                    let vc = self.coerce(&vc, &vt, &val_ty)?;
+                    body.push_str(&format!("{name}_set({temp}, {kc}, {vc}); "));
+                }
+                Ok((format!("({{ {body} {temp}; }})"), map_ty))
+            }
             Expr::Try(inner, handler) => self.gen_try(inner, handler.as_deref()),
             Expr::UnitLiteral(num, unit) => {
                 let (code, ty) = self.gen_expr(num)?;
@@ -1911,6 +2008,17 @@ impl<'a> Codegen<'a> {
             let arg_codes = self.gen_variant_args(&variant, args)?;
             return self.gen_variant_construct(&variant, &arg_codes);
         }
+        if (name == "Map" || name == "Set") && args.is_empty() {
+            if let Some(types) = type_args {
+                let ty = match (name, types) {
+                    ("Map", [k, v]) => CType::Map(Box::new(map_type(k, &self.named_types())?), Box::new(map_type(v, &self.named_types())?)),
+                    ("Set", [t]) => CType::Set(Box::new(map_type(t, &self.named_types())?)),
+                    _ => return Err(format!("'{name}' has the wrong number of type arguments")),
+                };
+                self.register_list_types(&ty);
+                return Ok((format!("{}_new()", mangle_ctype(&ty)), ty));
+            }
+        }
         if (name == "Ok" || name == "Err") && args.len() == 1 {
             let (codes, types) = self.gen_args(args)?;
             let ty = if name == "Ok" { CType::OkLit(Box::new(types[0].clone())) } else { CType::ErrLit(Box::new(types[0].clone())) };
@@ -2174,6 +2282,52 @@ impl<'a> Codegen<'a> {
                     other => Err(format!("Option has no method '{other}' the native backend supports yet")),
                 }
             }
+            CType::Map(k, v) => {
+                let (k, v) = ((**k).clone(), (**v).clone());
+                let name = mangle_ctype(&obj_ty);
+                let hints: Vec<CType> = match method_name {
+                    "set" => vec![k.clone(), v.clone()],
+                    _ => vec![k.clone()],
+                };
+                let (codes, types) = self.gen_args_hinted(args, &hints)?;
+                let expect = |n: usize| if codes.len() == n { Ok(()) } else { Err(format!("Map.{method_name} expects {n} argument(s)")) };
+                match method_name {
+                    "get" | "remove" => {
+                        expect(1)?;
+                        let key = self.coerce(&codes[0], &types[0], &k)?;
+                        Ok((format!("{name}_{method_name}({obj_code}, {key})"), CType::Option(Box::new(v))))
+                    }
+                    "contains_key" => {
+                        expect(1)?;
+                        let key = self.coerce(&codes[0], &types[0], &k)?;
+                        Ok((format!("{name}_contains_key({obj_code}, {key})"), CType::Bool))
+                    }
+                    "count" => Ok((format!("{name}_count({obj_code})"), CType::Int)),
+                    "set" => {
+                        expect(2)?;
+                        let key = self.coerce(&codes[0], &types[0], &k)?;
+                        let value = self.coerce(&codes[1], &types[1], &v)?;
+                        Ok((format!("{name}_set({obj_code}, {key}, {value})"), CType::Void))
+                    }
+                    "keys" => Ok((format!("{name}_keys({obj_code})"), CType::List(Box::new(k)))),
+                    "values" => Ok((format!("{name}_values({obj_code})"), CType::List(Box::new(v)))),
+                    other => Err(format!("Map has no method '{other}' the native backend supports yet")),
+                }
+            }
+            CType::Set(t) => {
+                let t = (**t).clone();
+                let name = mangle_ctype(&obj_ty);
+                let (codes, types) = self.gen_args_hinted(args, &[t.clone()])?;
+                match method_name {
+                    "contains" | "add" | "remove" if codes.len() == 1 => {
+                        let item = self.coerce(&codes[0], &types[0], &t)?;
+                        let ret = if method_name == "contains" { CType::Bool } else { CType::Void };
+                        Ok((format!("{name}_{method_name}({obj_code}, {item})"), ret))
+                    }
+                    "count" => Ok((format!("{name}_count({obj_code})"), CType::Int)),
+                    other => Err(format!("Set has no method '{other}' the native backend supports yet")),
+                }
+            }
             CType::List(elem_ty) => {
                 let elem_ty = (**elem_ty).clone();
                 let struct_name = self.ensure_list(&elem_ty);
@@ -2354,7 +2508,8 @@ impl<'a> Codegen<'a> {
             CType::Bool => Ok(format!("(({code}) ? \"true\" : \"false\")")),
             CType::Str => Ok(code.to_string()),
             CType::Quantity(_) => Ok(format!("ostrin_qty_to_string({code})")),
-            CType::Record(name) | CType::Enum(name) => {
+            CType::Record(_) | CType::Enum(_) | CType::List(_) | CType::Option(_) | CType::Map(..) | CType::Set(_) => {
+                let name = mangle_ctype(ty);
                 if self.show_done.insert(name.clone()) {
                     self.show_queue.push_back(ty.clone());
                 }
@@ -2369,6 +2524,37 @@ impl<'a> Codegen<'a> {
     fn gen_show_body(&mut self, ty: &CType) -> Result<String, String> {
         let mut out = String::new();
         match ty {
+            CType::List(elem) => {
+                let shown = self.show_expr("v->items[i]", elem)?;
+                out.push_str("    const char* s = \"[\";\n");
+                out.push_str(&format!(
+                    "    for (int64_t i = 0; i < v->length; i++) {{\n        if (i > 0) s = ostrin_str_concat(s, \", \");\n        s = ostrin_str_concat(s, {shown});\n    }}\n"
+                ));
+                out.push_str("    return ostrin_str_concat(s, \"]\");\n");
+            }
+            CType::Set(elem) => {
+                let shown = self.show_expr("v->items[i]", elem)?;
+                out.push_str("    const char* s = \"{\";\n");
+                out.push_str(&format!(
+                    "    for (int64_t i = 0; i < v->length; i++) {{\n        if (i > 0) s = ostrin_str_concat(s, \", \");\n        s = ostrin_str_concat(s, {shown});\n    }}\n"
+                ));
+                out.push_str("    return ostrin_str_concat(s, \"}\");\n");
+            }
+            CType::Map(k, val) => {
+                let ks = self.show_expr("v->keys[i]", k)?;
+                let vs = self.show_expr("v->vals[i]", val)?;
+                out.push_str("    const char* s = \"[\";\n");
+                out.push_str(&format!(
+                    "    for (int64_t i = 0; i < v->length; i++) {{\n        if (i > 0) s = ostrin_str_concat(s, \", \");\n        s = ostrin_str_concat(s, {ks});\n        s = ostrin_str_concat(s, \": \");\n        s = ostrin_str_concat(s, {vs});\n    }}\n"
+                ));
+                out.push_str("    return ostrin_str_concat(s, \"]\");\n");
+            }
+            CType::Option(inner) => {
+                let shown = self.show_expr("v.value", inner)?;
+                out.push_str(&format!(
+                    "    if (!v.has) return \"None\";\n    return ostrin_str_concat(ostrin_str_concat(\"Some(\", {shown}), \")\");\n"
+                ));
+            }
             CType::Enum(name) => {
                 let variants: Vec<VariantInfo> = match self.instance_variants.get(name) {
                     Some(vs) => vs.clone(),
@@ -2426,11 +2612,14 @@ impl<'a> Codegen<'a> {
                 ("%s\\n", shown)
             }
             CType::DynTrait(name) => return Err(format!("cannot 'print' a 'dyn {name}' value")),
-            CType::List(elem) => return Err(format!("cannot 'print' a List<{}> value yet", c_type_name(elem))),
+            CType::List(_) | CType::Map(..) | CType::Set(_) | CType::Option(_) => {
+                let shown = self.show_expr(&arg_codes[0], &arg_types[0].clone())?;
+                ("%s\\n", shown)
+            }
             CType::Quantity(_) => return Ok((format!("ostrin_print_qty({})", arg_codes[0]), CType::Void)),
             CType::GenLit(..) => return Err("cannot infer the enum instance to print here".to_string()),
-            CType::Option(_) | CType::NoneLit | CType::Result(..) | CType::OkLit(_) | CType::ErrLit(_) => {
-                return Err("cannot 'print' an Option/Result value yet".to_string())
+            CType::NoneLit | CType::Result(..) | CType::OkLit(_) | CType::ErrLit(_) => {
+                return Err("cannot 'print' a Result value yet".to_string())
             }
         };
         Ok((format!("printf(\"{spec}\", {value})"), CType::Void))
@@ -2645,6 +2834,8 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
         instance_variants: HashMap::new(),
         expected: None,
         show_queue: VecDeque::new(),
+        pending_colls: VecDeque::new(),
+        coll_done: HashSet::new(),
         function_decls: functions.iter().map(|f| (f.name.clone(), *f)).collect(),
         op_queue: VecDeque::new(),
         op_done: HashSet::new(),
@@ -2909,12 +3100,54 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
             list_helper_prototypes.push(format!("{signature};"));
             bodies.push((signature, body));
         }
+        while let Some(ty) = codegen.pending_colls.pop_front() {
+            progressed = true;
+            let name = mangle_ctype(&ty);
+            list_typedefs.push_str(&format!("typedef struct {name} {name};\n"));
+            let oom = "if (!p) { fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); }";
+            let mut funcs: Vec<(String, String)> = Vec::new();
+            match &ty {
+                CType::Map(k, v) => {
+                    let (kc, vc) = (c_type_name(k), c_type_name(v));
+                    let opt = c_type_name(&CType::Option(v.clone()));
+                    let list_k = c_type_name(&CType::List(k.clone()));
+                    let list_v = c_type_name(&CType::List(v.clone()));
+                    let (lk, lv) = (list_struct_name(k), list_struct_name(v));
+                    let eq = codegen.eq_expr("m->keys[i]", "key", k)?;
+                    list_type_decls.push_str(&format!("struct {name} {{\n    {kc}* keys;\n    {vc}* vals;\n    int64_t length;\n    int64_t capacity;\n}};\n\n"));
+                    funcs.push((format!("static {name}* {name}_new(void)"), format!("    {name}* m = ({name}*)calloc(1, sizeof({name}));\n    {}\n    return m;\n", oom.replace("!p", "!m"))));
+                    funcs.push((format!("static int64_t {name}_find({name}* m, {kc} key)"), format!("    for (int64_t i = 0; i < m->length; i++) {{ if ({eq}) return i; }}\n    return -1;\n")));
+                    funcs.push((format!("static void {name}_set({name}* m, {kc} key, {vc} value)"), format!(
+                        "    int64_t i = {name}_find(m, key);\n    if (i >= 0) {{ m->keys[i] = key; m->vals[i] = value; return; }}\n    if (m->length >= m->capacity) {{\n        m->capacity = m->capacity == 0 ? 4 : m->capacity * 2;\n        m->keys = ({kc}*)realloc(m->keys, sizeof({kc}) * (size_t)m->capacity);\n        m->vals = ({vc}*)realloc(m->vals, sizeof({vc}) * (size_t)m->capacity);\n        if (!m->keys || !m->vals) {{ fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); }}\n    }}\n    m->keys[m->length] = key;\n    m->vals[m->length] = value;\n    m->length = m->length + 1;\n")));
+                    funcs.push((format!("static {opt} {name}_get({name}* m, {kc} key)"), format!("    {opt} r;\n    memset(&r, 0, sizeof r);\n    int64_t i = {name}_find(m, key);\n    if (i >= 0) {{ r.has = true; r.value = m->vals[i]; }}\n    return r;\n")));
+                    funcs.push((format!("static bool {name}_contains_key({name}* m, {kc} key)"), format!("    return {name}_find(m, key) >= 0;\n")));
+                    funcs.push((format!("static int64_t {name}_count({name}* m)"), "    return m->length;\n".to_string()));
+                    funcs.push((format!("static {opt} {name}_remove({name}* m, {kc} key)"), format!("    {opt} r;\n    memset(&r, 0, sizeof r);\n    int64_t i = {name}_find(m, key);\n    if (i < 0) return r;\n    r.has = true;\n    r.value = m->vals[i];\n    for (int64_t j = i; j < m->length - 1; j++) {{ m->keys[j] = m->keys[j + 1]; m->vals[j] = m->vals[j + 1]; }}\n    m->length = m->length - 1;\n    return r;\n")));
+                    funcs.push((format!("static {list_k} {name}_keys({name}* m)"), format!("    return {lk}_new_from_array(m->keys, m->length);\n")));
+                    funcs.push((format!("static {list_v} {name}_values({name}* m)"), format!("    return {lv}_new_from_array(m->vals, m->length);\n")));
+                }
+                CType::Set(t) => {
+                    let tc = c_type_name(t);
+                    let eq = codegen.eq_expr("s->items[i]", "item", t)?;
+                    list_type_decls.push_str(&format!("struct {name} {{\n    {tc}* items;\n    int64_t length;\n    int64_t capacity;\n}};\n\n"));
+                    funcs.push((format!("static {name}* {name}_new(void)"), format!("    {name}* s = ({name}*)calloc(1, sizeof({name}));\n    {}\n    return s;\n", oom.replace("!p", "!s"))));
+                    funcs.push((format!("static int64_t {name}_find({name}* s, {tc} item)"), format!("    for (int64_t i = 0; i < s->length; i++) {{ if ({eq}) return i; }}\n    return -1;\n")));
+                    funcs.push((format!("static bool {name}_contains({name}* s, {tc} item)"), format!("    return {name}_find(s, item) >= 0;\n")));
+                    funcs.push((format!("static void {name}_add({name}* s, {tc} item)"), format!(
+                        "    if ({name}_find(s, item) >= 0) return;\n    if (s->length >= s->capacity) {{\n        s->capacity = s->capacity == 0 ? 4 : s->capacity * 2;\n        s->items = ({tc}*)realloc(s->items, sizeof({tc}) * (size_t)s->capacity);\n        if (!s->items) {{ fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); }}\n    }}\n    s->items[s->length] = item;\n    s->length = s->length + 1;\n")));
+                    funcs.push((format!("static void {name}_remove({name}* s, {tc} item)"), format!("    int64_t i = {name}_find(s, item);\n    if (i < 0) return;\n    for (int64_t j = i; j < s->length - 1; j++) {{ s->items[j] = s->items[j + 1]; }}\n    s->length = s->length - 1;\n")));
+                    funcs.push((format!("static int64_t {name}_count({name}* s)"), "    return s->length;\n".to_string()));
+                }
+                _ => unreachable!(),
+            }
+            for (signature, body) in funcs {
+                list_helper_prototypes.push(format!("{signature};"));
+                bodies.push((signature, body));
+            }
+        }
         while let Some(ty) = codegen.show_queue.pop_front() {
             progressed = true;
-            let name = match &ty {
-                CType::Record(n) | CType::Enum(n) => n.clone(),
-                _ => unreachable!(),
-            };
+            let name = mangle_ctype(&ty);
             let signature = format!("static const char* ostrin_show_{name}({} v)", c_type_name(&ty));
             let body = codegen.gen_show_body(&ty)?;
             list_helper_prototypes.push(format!("{signature};"));

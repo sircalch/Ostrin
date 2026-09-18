@@ -2953,3 +2953,20 @@ pruebas**, sin warnings.
 - `function_arguments.ostrin` compila y coincide; ejemplo nuevo
   `native_named_args.ostrin`. (El checker no admite defaults en métodos, solo
   nombrados.) Suite: **93 pruebas**, sin warnings.
+
+---
+
+## 78. `Map`, `Set` y `print` de colecciones en el backend nativo — 2026-09-18
+
+- `Map<K, V>` y `Set<T>` son estructuras en el heap (por referencia, como
+  `List`), con arrays que conservan el orden de inserción y búsqueda lineal por
+  igualdad (`eq_expr`, así que sirven claves `Int`/`String`/records con
+  `derive(Eq)`). Métodos: `get`/`set`/`remove`/`contains_key`/`count`/`keys`/
+  `values` y `add`/`contains`/`remove`/`count`; literales `["a": 1]` y `{1, 2}`.
+- El parser descartaba los tipos de `Map<K, V>()`/`Set<T>()`; ahora produce
+  `Expr::EmptyCollection(nombre, tipos)` (tipado igual que antes, sin cambios de
+  comportamiento en el intérprete).
+- `print` de `List`, `Option`, `Map` y `Set` mediante `ostrin_show_*` generados
+  (`[1, 2]`, `Some(4)`, `[a: 1]`, `{a}`). Siguen sin imprimirse los `Result`.
+- `collections.ostrin` compila y coincide; el test de rechazo ahora usa
+  `concurrency.ostrin` (canales). Suite: **93 pruebas**, sin warnings.

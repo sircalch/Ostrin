@@ -1330,6 +1330,11 @@ impl Interpreter {
                 }
                 Ok(Value::Set(Rc::new(RefCell::new(values))))
             }
+            Expr::EmptyCollection(name, _) => Ok(if name == "Map" {
+                Value::Map(Rc::new(RefCell::new(Vec::new())))
+            } else {
+                Value::Set(Rc::new(RefCell::new(Vec::new())))
+            }),
             Expr::MapLiteral(pairs) => {
                 let mut values: Vec<(Value, Value)> = Vec::with_capacity(pairs.len());
                 for (k, v) in pairs {
