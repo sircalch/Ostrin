@@ -5,6 +5,11 @@
   "version": "0.1.0",
   "publisher": "ostrin-project",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sircalch/Ostrin.git"
+  },
+  "homepage": "https://sircalch.github.io/Ostrin/",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -62,7 +67,7 @@
         "ostrin.compilerPath": {
           "type": "string",
           "default": "ostrinc",
-          "description": "Path to the Ostrin compiler executable. Use 'ostrinc' when it is available on PATH."
+          "description": "Path to the Ostrin compiler executable. The extension auto-detects the repository's compiler/target build when this remains 'ostrinc'."
         },
         "ostrin.checkOnSave": {
           "type": "boolean",
@@ -74,6 +79,6 @@
   },
   "scripts": {
     "test": "node test-language-features.js",
-    "package": "vsce package"
+    "package": "npx --yes @vscode/vsce package"
   }
 }

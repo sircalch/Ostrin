@@ -1,13 +1,31 @@
 const vscode = require('vscode');
 const childProcess = require('child_process');
+const fs = require('fs');
 const path = require('path');
 const languageFeatures = require('./language-features');
 
 let diagnostics;
 const semanticIndex = new Map();
 
-function compilerPath() {
-  return vscode.workspace.getConfiguration('ostrin').get('compilerPath', 'ostrinc');
+function compilerPath(document) {
+  const configured = vscode.workspace.getConfiguration('ostrin').get('compilerPath', 'ostrinc');
+  if (configured && configured !== 'ostrinc') return configured;
+
+  const workspace = document
+    ? vscode.workspace.getWorkspaceFolder(document.uri)?.uri.fsPath
+    : undefined;
+  if (workspace) {
+    const executable = process.platform === 'win32' ? 'ostrinc.exe' : 'ostrinc';
+    const candidates = [
+      path.join(workspace, 'compiler', 'target', 'debug', executable),
+      path.join(workspace, 'compiler', 'target', 'release', executable),
+      path.join(workspace, 'target', 'debug', executable),
+      path.join(workspace, 'target', 'release', executable)
+    ];
+    const local = candidates.find((candidate) => fs.existsSync(candidate));
+    if (local) return local;
+  }
+  return configured || 'ostrinc';
 }
 
 function currentDocument() {
@@ -62,7 +80,7 @@ function refreshSemanticIndex(document) {
   if (document.isUntitled) return;
   const cwd = vscode.workspace.getWorkspaceFolder(document.uri)?.uri.fsPath
     ?? path.dirname(document.uri.fsPath);
-  const child = childProcess.spawn(compilerPath(), ['--members', '--json', document.uri.fsPath], {
+  const child = childProcess.spawn(compilerPath(document), ['--members', '--json', document.uri.fsPath], {
     cwd,
     windowsHide: true,
     shell: false
@@ -115,7 +133,7 @@ async function runCompiler(document, run, notify = true) {
 
   const cwd = vscode.workspace.getWorkspaceFolder(document.uri)?.uri.fsPath
     ?? path.dirname(document.uri.fsPath);
-  const executable = compilerPath();
+  const executable = compilerPath(document);
   if (!run) diagnostics.delete(document.uri);
   const args = run ? ['--run', document.uri.fsPath] : ['--check', '--json', document.uri.fsPath];
   const output = vscode.window.createOutputChannel('Ostrin');

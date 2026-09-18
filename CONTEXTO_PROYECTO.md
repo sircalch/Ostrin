@@ -1582,3 +1582,38 @@ tipo correcto del valor que procesan.
 
 La suite del compilador queda en **66 pruebas exitosas**. También se mantienen
 las pruebas de la extensión de VS Code y la validación de sintaxis JavaScript.
+
+---
+
+## 46. Reconocimiento instalable en Visual Studio Code — 2026-09-17
+
+Se aclaró y reforzó el flujo real de uso en VS Code. Ostrin no puede ser
+reconocido por VS Code únicamente por existir en el repositorio: primero hay
+que instalar la extensión. Una vez instalada, la contribución de lenguaje ya
+asocia automáticamente la extensión `.ostrin` con el identificador `ostrin`.
+
+### Cambios realizados
+
+- La extensión conserva el reconocimiento automático de `.ostrin`, el
+  resaltado, los comandos, diagnósticos, hover, completado y navegación.
+- Se documentó el empaquetado local mediante `@vscode/vsce` y la instalación
+  del archivo `.vsix` resultante con `code --install-extension`.
+- `extension.js` ahora busca automáticamente el compilador local en
+  `compiler/target/debug` o `compiler/target/release` antes de recurrir a
+  `ostrinc` en `PATH`. Esto permite usar la extensión desde el repositorio
+  después de ejecutar `cargo build`.
+- Se añadió `.vscodeignore` para que el paquete distribuible no incluya
+  pruebas internas ni metadatos del repositorio.
+- README, guía de la extensión y documentación web quedaron alineados con el
+  procedimiento real de instalación.
+
+### Respuesta concreta
+
+VS Code empieza a detectar Ostrin inmediatamente después de instalar la
+extensión. El reconocimiento de archivos no espera al LSP completo; el LSP
+será la siguiente capa para resolver expresiones con mayor precisión, rename,
+formateo y depuración.
+
+El paquete local se verificó con `npx --yes @vscode/vsce package` y genera
+`vscode-ostrin/ostrin-language-support-0.1.0.vsix` con el logo, gramática,
+configuración, proveedores y comandos de Ostrin incluidos.

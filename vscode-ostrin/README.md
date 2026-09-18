@@ -16,8 +16,26 @@ This is the first VS Code integration for Ostrin. It currently provides:
 - optional compiler checks on save.
 
 The extension calls the `ostrinc` executable configured in `ostrin.compilerPath`.
-The default assumes that `ostrinc` is available on `PATH`. During development,
-set the full path to the compiler binary in VS Code settings.
+The default first looks for a locally built compiler in
+`compiler/target/debug/ostrinc.exe` (or the platform equivalent) when the
+workspace is the Ostrin repository, and otherwise falls back to `ostrinc` on
+`PATH`. You can always set the full path manually in VS Code settings.
+
+## Install from the repository
+
+VS Code recognizes `.ostrin` files as soon as this extension is installed. From
+the repository root:
+
+```powershell
+cd vscode-ostrin
+npx --yes @vscode/vsce package
+code --install-extension .\ostrin-language-support-0.1.0.vsix
+```
+
+After restarting or reloading VS Code, opening any `.ostrin` file selects the
+Ostrin language automatically. Build the compiler first from the repository
+root with `cd compiler; cargo build` to enable diagnostics, hover data and
+type-aware completion without configuring a global `ostrinc` command.
 
 The compiler check command uses `ostrinc --check --json` internally. The
 current editor providers are intentionally lightweight. A full semantic

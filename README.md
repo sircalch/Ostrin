@@ -67,6 +67,22 @@ definition navigation and an outline for top-level declarations. Enable
 A complete semantic Language Server Protocol implementation and debugging
 remain future work.
 
+To install the current extension locally, build the compiler and package the
+extension:
+
+```powershell
+cd compiler
+cargo build
+cd ..\vscode-ostrin
+npx --yes @vscode/vsce package
+code --install-extension .\ostrin-language-support-0.1.0.vsix
+```
+
+Once installed, VS Code detects `.ostrin` files automatically. The extension
+will use `compiler/target/debug/ostrinc.exe` from this repository when it is
+available, so a global compiler installation is not required during
+development.
+
 ## Documentation
 
 The design is documented in [`docs/design/`](docs/design/), including:
