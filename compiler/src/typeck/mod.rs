@@ -1624,6 +1624,7 @@ impl Checker {
         for (index, arg) in args.iter().enumerate() {
             let expected = member_receiver.as_ref().and_then(|(receiver_ty, method)| {
                 collection_method_expected_args(receiver_ty, method, arg_types.first())
+                    .or_else(|| option_result_method_expected_args(receiver_ty, method))
                     .and_then(|expected_args| expected_args.get(index).cloned())
             });
             let expr = match arg {
@@ -2857,6 +2858,41 @@ fn check_option_result_method(
         }
     }
     Some(return_type)
+}
+
+fn option_result_method_expected_args(receiver_ty: &Ty, method: &str) -> Option<Vec<Ty>> {
+    let Ty::Applied(type_name, type_args) = receiver_ty else { return None };
+    let (value_type, error_type) = match type_name.as_str() {
+        "Option" if type_args.len() == 1 => (type_args[0].clone(), None),
+        "Result" if type_args.len() == 2 => (type_args[0].clone(), Some(type_args[1].clone())),
+        _ => return None,
+    };
+
+    match (type_name.as_str(), method) {
+        ("Option", "is_some" | "is_none" | "unwrap") => Some(Vec::new()),
+        ("Option", "unwrap_or") => Some(vec![value_type]),
+        ("Option", "ok_or") => Some(vec![Ty::Unknown]),
+        ("Option", "map") => Some(vec![Ty::Fn(vec![value_type], Box::new(Ty::Unknown))]),
+        ("Option", "then") => Some(vec![Ty::Fn(
+            vec![value_type],
+            Box::new(Ty::Applied("Option".to_string(), vec![Ty::Unknown])),
+        )]),
+        ("Result", "is_ok" | "is_err" | "unwrap" | "ok") => Some(Vec::new()),
+        ("Result", "unwrap_or") => Some(vec![value_type]),
+        ("Result", "map") => Some(vec![Ty::Fn(vec![value_type], Box::new(Ty::Unknown))]),
+        ("Result", "map_err") => Some(vec![Ty::Fn(
+            vec![error_type.unwrap_or(Ty::Unknown)],
+            Box::new(Ty::Unknown),
+        )]),
+        ("Result", "then") => Some(vec![Ty::Fn(
+            vec![value_type],
+            Box::new(Ty::Applied(
+                "Result".to_string(),
+                vec![Ty::Unknown, error_type.unwrap_or(Ty::Unknown)],
+            )),
+        )]),
+        _ => None,
+    }
 }
 
 fn function_return_type(ty: Option<&Ty>) -> Option<Ty> {

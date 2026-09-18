@@ -1,0 +1,16 @@
+fn main() -> Void {
+    maybe = Some(4)
+    mapped = maybe.map(fn(x) { x + 1 })
+    chained = maybe.then(fn(x) { Some(x + 1) })
+
+    success: Result<Int, String> = Ok(7)
+    result_mapped = success.map(fn(x) { x + 1 })
+
+    failure = Err<Int, String>("bad")
+    error_mapped = failure.map_err(fn(e) { e + "!" })
+
+    print(mapped)
+    print(chained)
+    print(result_mapped)
+    print(error_mapped)
+}

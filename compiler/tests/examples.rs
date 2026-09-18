@@ -122,6 +122,17 @@ fn option_and_result_methods_run() {
 }
 
 #[test]
+fn option_and_result_lambdas_receive_contextual_types() {
+    let out = run(&["--members", "--json", &example_path("option_result_types.ostrin")]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let text = stdout(&out);
+    assert!(text.contains("\"name\":\"mapped\",\"type\":\"Option<Int>\""));
+    assert!(text.contains("\"name\":\"chained\",\"type\":\"Option<Int>\""));
+    assert!(text.contains("\"name\":\"result_mapped\",\"type\":\"Result<Int, String>\""));
+    assert!(text.contains("\"name\":\"error_mapped\",\"type\":\"Result<Int, String>\""));
+}
+
+#[test]
 fn option_and_result_method_arguments_are_checked() {
     let out = run(&[&example_path("option_result_errors.ostrin")]);
     assert!(!out.status.success());

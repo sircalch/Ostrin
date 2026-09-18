@@ -1558,3 +1558,27 @@ La suite del compilador permanece en **65 pruebas exitosas**. El programa de
 colecciones sigue ejecutándose y el índice semántico publica ahora
 `doubled: List<Int>`, `evens: List<Int>`, `total: Int` y
 `found: Option<Int>`.
+
+---
+
+## 45. Inferencia contextual para `Option` y `Result` — 2026-09-17
+
+La misma estrategia se extendió a los contenedores algebraicos del núcleo. Las
+lambdas que transforman o encadenan `Option<T>` y `Result<T, E>` ya reciben el
+tipo correcto del valor que procesan.
+
+### Cambios realizados
+
+- `Option<T>.map` y `Option<T>.then` contextualizan sus lambdas con `T`.
+- `Result<T, E>.map` y `Result<T, E>.then` contextualizan el valor con `T`.
+- `Result<T, E>.map_err` contextualiza la lambda con el error `E`.
+- Las expresiones intermedias conservan sus tipos aplicados, por ejemplo
+  `Option<Int>.map(...) -> Option<Int>` y
+  `Result<Int, String>.map_err(...) -> Result<Int, String>`.
+- Se añadió `examples/option_result_types.ostrin` y una prueba de índice que
+  verifica los bindings `mapped`, `chained`, `result_mapped` y `error_mapped`.
+
+### Verificación
+
+La suite del compilador queda en **66 pruebas exitosas**. También se mantienen
+las pruebas de la extensión de VS Code y la validación de sintaxis JavaScript.
