@@ -320,12 +320,14 @@ fn emit_json_binding(binding: &typeck::EditorBinding, fallback_file: &str) {
 fn emit_json_expression(expression: &typeck::EditorExpression, fallback_file: &str) {
     let file = expression.source_file.as_deref().unwrap_or(fallback_file);
     println!(
-        "{{\"kind\":\"expression\",\"type\":{},\"function\":{},\"file\":{},\"line\":{},\"column\":{}}}",
+        "{{\"kind\":\"expression\",\"type\":{},\"function\":{},\"file\":{},\"line\":{},\"column\":{},\"endLine\":{},\"endColumn\":{}}}",
         json_string(&expression.type_name),
         json_string(&expression.function),
         json_string(file),
         expression.span.line,
-        expression.span.col
+        expression.span.col,
+        expression.end.line,
+        expression.end.col
     );
 }
 

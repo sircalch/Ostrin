@@ -328,9 +328,9 @@ function provideHover(vscode, document, position, semanticIndex = []) {
   const binding = visibleBinding(token.word, document, position, index.bindings, index.symbols);
   const semantic = index.symbols.find((entry) => shortSymbolName(entry.name) === token.word);
   const expression = index.expressions
-    .filter((entry) => (!entry.file || sameFile(entry.file, document.uri.fsPath)) && entry.line === position.line + 1)
-    .filter((entry) => (entry.column || 1) <= position.character + 1)
-    .sort((left, right) => (right.column || 1) - (left.column || 1))[0];
+    .filter((entry) => (!entry.file || sameFile(entry.file, document.uri.fsPath)))
+    .filter((entry) => expressionContains(entry, position))
+    .sort((left, right) => expressionSpanSize(left) - expressionSpanSize(right))[0];
   const markdown = member
     ? `**Ostrin ${member.kind || 'member'}**\n\n\`${member.owner}.${member.name}: ${detail || ''}\`${resolvedResult ? `\n\nReturns \`${resolvedResult}\`` : ''}`
     : binding
@@ -341,11 +341,35 @@ function provideHover(vscode, document, position, semanticIndex = []) {
       ? `**Ostrin inferred expression**\n\n\`${expression.type || '?'}\``
     : markdownFor(token.word);
   if (!markdown) return undefined;
-  const range = new vscode.Range(
-    new vscode.Position(position.line, token.start),
-    new vscode.Position(position.line, token.end)
-  );
+  const range = expression && expression.endLine
+    ? new vscode.Range(
+      new vscode.Position(Math.max(0, (expression.line || 1) - 1), Math.max(0, (expression.column || 1) - 1)),
+      new vscode.Position(Math.max(0, expression.endLine - 1), Math.max(0, (expression.endColumn || expression.column || 1) - 1))
+    )
+    : new vscode.Range(
+      new vscode.Position(position.line, token.start),
+      new vscode.Position(position.line, token.end)
+    );
   return new vscode.Hover(new vscode.MarkdownString(markdown), range);
+}
+
+function expressionContains(expression, position) {
+  const startLine = (expression.line || 1) - 1;
+  const startColumn = Math.max(0, (expression.column || 1) - 1);
+  const endLine = Math.max(startLine, (expression.endLine || expression.line || 1) - 1);
+  const endColumn = Math.max(startColumn + 1, (expression.endColumn || expression.column || 1) - 1);
+  if (position.line < startLine || position.line > endLine) return false;
+  if (position.line === startLine && position.character < startColumn) return false;
+  if (position.line === endLine && position.character >= endColumn) return false;
+  return true;
+}
+
+function expressionSpanSize(expression) {
+  const startLine = expression.line || 1;
+  const endLine = expression.endLine || startLine;
+  const startColumn = expression.column || 1;
+  const endColumn = expression.endColumn || startColumn + 1;
+  return (endLine - startLine) * 100000 + Math.max(1, endColumn - startColumn);
 }
 
 function locationForEntry(vscode, entry) {

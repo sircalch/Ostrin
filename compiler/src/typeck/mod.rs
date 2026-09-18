@@ -26,6 +26,7 @@ pub struct EditorExpression {
     pub type_name: String,
     pub function: String,
     pub span: Span,
+    pub end: Span,
     pub source_file: Option<String>,
 }
 
@@ -749,15 +750,16 @@ impl Checker {
 
     fn infer_expr(&mut self, expr: &Expr, scope: &mut Scope) -> Ty {
         match expr {
-            Expr::Located(inner, span) => {
+            Expr::Located(inner, range) => {
                 let previous_span = self.current_span;
-                self.current_span = Some(*span);
+                self.current_span = Some(range.start);
                 let ty = self.infer_expr(inner, scope);
                 self.current_span = previous_span;
                 self.editor_expressions.push(EditorExpression {
                     type_name: ty.describe(),
                     function: self.current_function_name.clone().unwrap_or_default(),
-                    span: *span,
+                    span: range.start,
+                    end: range.end,
                     source_file: self.current_source_file.clone(),
                 });
                 ty

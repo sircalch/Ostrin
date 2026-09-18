@@ -12,7 +12,7 @@ This is the first VS Code integration for Ostrin. It currently provides:
 - keyword, type, unit and standard-library completion;
 - type-aware member completion for known local bindings and declared types;
 - hover documentation and an outline for top-level declarations;
-- inferred expression types in hover when the compiler can resolve them;
+- precise inferred expression ranges and types in hover when the compiler can resolve them;
 - conservative `Format Document` support for Ostrin blocks;
 - workspace-scoped semantic caching that invalidates while editing;
 - basic definition navigation for indexed user declarations and members;
@@ -34,7 +34,7 @@ the repository root:
 ```powershell
 cd vscode-ostrin
 npx --yes @vscode/vsce package
-code --install-extension .\ostrin-language-support-0.1.5.vsix
+code --install-extension .\ostrin-language-support-0.1.6.vsix
 ```
 
 After restarting or reloading VS Code, opening any `.ostrin` file selects the

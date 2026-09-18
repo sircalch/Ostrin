@@ -2,6 +2,12 @@
 
 All notable changes to the Ostrin VS Code extension are documented here.
 
+## [0.1.6] - 2026-09-17
+
+- Preserve complete start/end ranges for compiler-inferred expressions.
+- Select the smallest expression containing the cursor for hover results.
+- Return precise hover ranges for nested expressions.
+
 ## [0.1.5] - 2026-09-17
 
 - Add workspace-scoped semantic cache lifecycle management.

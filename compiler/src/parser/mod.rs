@@ -442,8 +442,10 @@ impl Parser {
     }
 
     pub fn parse_expr(&mut self) -> PResult<Expr> {
-        let span = self.current_span();
-        Ok(Expr::Located(Box::new(self.parse_or()?), span))
+        let start = self.current_span();
+        let expression = self.parse_or()?;
+        let end = self.previous_span();
+        Ok(Expr::Located(Box::new(expression), SourceRange { start, end }))
     }
 
     fn parse_or(&mut self) -> PResult<Expr> {
@@ -967,6 +969,11 @@ impl Parser {
 
     fn current_span(&self) -> Span {
         Span { line: self.peek().line, col: self.peek().col }
+    }
+
+    fn previous_span(&self) -> Span {
+        let tok = self.tokens.get(self.pos.saturating_sub(1)).unwrap_or_else(|| self.peek());
+        Span { line: tok.line, col: tok.col + tok.lexeme.chars().count() }
     }
 
     fn located(&self, stmt: Stmt, span: Span) -> LocatedStmt {

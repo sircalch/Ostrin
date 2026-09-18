@@ -43,6 +43,12 @@ pub struct Span {
     pub col: usize,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct SourceRange {
+    pub start: Span,
+    pub end: Span,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct FieldDecl {
     pub name: String,
@@ -219,7 +225,7 @@ pub enum RangeKind {
 pub enum Expr {
     /// Preserves the source position of an expression for diagnostics and
     /// editor tooling. The wrapped expression remains semantically unchanged.
-    Located(Box<Expr>, Span),
+    Located(Box<Expr>, SourceRange),
     IntLiteral(i64),
     FloatLiteral(f64),
     StringLiteral(String),

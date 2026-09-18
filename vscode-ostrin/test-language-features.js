@@ -145,11 +145,20 @@ const expressionHover = features.provideHover(
     symbols: [],
     bindings: [],
     members: [],
-    expressions: [{ type: 'Int', file: 'C:/project/types.ostrin', line: 2, column: 3 }]
+    expressions: [{
+      type: 'Int',
+      file: 'C:/project/types.ostrin',
+      line: 2,
+      column: 3,
+      endLine: 2,
+      endColumn: 8
+    }]
   }
 );
 assert(expressionHover, 'inferred expression should have hover information');
 assert(expressionHover.contents.value.includes('Int'));
+assert.strictEqual(expressionHover.range.start.character, 2);
+assert.strictEqual(expressionHover.range.end.character, 7);
 
 const formatted = features.formatOstrinText([
   'fn main() {',

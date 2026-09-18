@@ -40,7 +40,9 @@ function semanticIndexFor(document) {
       item.column,
       item.function,
       item.scopeDepth,
-      item.type
+      item.type,
+      item.endLine,
+      item.endColumn
     ].join('|');
     if (seen.has(key)) return;
     seen.add(key);

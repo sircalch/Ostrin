@@ -258,6 +258,7 @@ fn compiler_exports_inferred_expression_types_for_editor_tools() {
     assert!(text.contains("\"type\":\"Option<Int>\""));
     assert!(text.contains("\"type\":\"Result<Int, String>\""));
     assert!(text.contains("\"line\":2,\"column\":13"));
+    assert!(text.contains("\"endLine\":2,\"endColumn\":20"));
 }
 
 #[test]

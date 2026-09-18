@@ -1823,3 +1823,21 @@ Esto mantiene persistencia durante la sesión sin fingir que ya existe un LSP
 completo. La extensión pasa a `0.1.5`. Se verificaron el smoke test de VS Code,
 la sintaxis JavaScript y las **67 pruebas** del compilador; el siguiente bloque
 grande es el protocolo LSP completo y debugging.
+
+---
+
+## 54. Rangos completos de expresiones — 2026-09-17
+
+La metadata de tipos dejó de publicar únicamente la posición inicial. Cada
+`Expr::Located` conserva ahora un `SourceRange` con `start` y `end`, calculado
+por el parser a partir de los tokens consumidos. `--types --json` publica esos
+datos como `line`, `column`, `endLine` y `endColumn`.
+
+La extensión usa el rango para elegir la expresión más pequeña que contiene el
+cursor. Por eso un hover puede distinguir una llamada interna de la expresión
+completa que la contiene, y devuelve un `Hover.range` preciso. Se añadieron
+aserciones Rust y JavaScript para comprobar tanto los límites publicados como
+el rango que recibe VS Code.
+
+La precisión de rangos está lista para el siguiente paso: exponer las mismas
+operaciones mediante el protocolo LSP estándar y añadir debugging.
