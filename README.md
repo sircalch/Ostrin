@@ -70,8 +70,9 @@ same way a generic function is — `length`/`push`/`remove_at`, indexing and
 `if`/`while`/`for <range>`. Lambdas are supported as inline arguments of
 `List`'s `map`/`filter`/`fold`/`any`/`all` (expanded to loops, so captures
 need no closure object); the project's own `dyn_trait.ostrin` compiles and
-runs natively. Dimensional `Quantity`, first-class function values and
-`Option<T>` and `Result<T, E>` (Some/None/Ok/Err, match, `try`, `find`) compile natively. The runtime is still
+runs natively, as do `Option<T>` and `Result<T, E>` (Some/None/Ok/Err,
+match, `try`, `find`). Dimensional `Quantity` and first-class function values
+still only run through the interpreter. The runtime is still
 synchronous and the standard library is small.
 
 ## Quick start
