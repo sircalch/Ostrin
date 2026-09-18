@@ -2838,3 +2838,33 @@ En nativo la unidad tendría que conocerse estáticamente, pero un parámetro
 `Quantity<Length>` no fija la unidad (puede llegar `m` o `km`), así que habría
 que monomorfizar funciones por unidad de argumento e inferir el tipo de retorno
 generando el cuerpo — un diseño propio, no una extensión menor.
+
+---
+
+## 72. `Quantity` en el backend nativo — 2026-09-18
+
+Se descartó monomorfizar por unidad (sección 71) a favor de un diseño más
+simple que reproduce el intérprete exactamente: **la dimensión es parte del
+tipo estático, la unidad es una cadena en tiempo de ejecución.**
+
+- `CType::Quantity(Dimension)`; en C, `Qty { double v; const char* u; }`.
+  Una función con `Quantity<Length>` recibe cualquier unidad de longitud sin
+  duplicarse, y `5 nm + 2 m` convierte en ejecución como `convert()` del
+  intérprete.
+- `qty_runtime.c` (`include_str!`, solo se inserta si el programa usa `Qty`)
+  porta la tabla de unidades, `resolve_unit_factor` y `convert`, y los
+  operadores. Las unidades compuestas se construyen en ejecución (`m/s`,
+  `kg*m/s*m/s`, `1/s`).
+- El tipo del resultado se decide en compilación: `Q/Q` con dimensión
+  resultante vacía devuelve `Float` (`ostrin_qty_ratio`); si no, `Quantity`.
+- Genéricos `<D: Dimension>`: `D` se infiere de la dimensión del argumento y
+  viaja por el mismo mapa de sustitución que cualquier parámetro de tipo.
+- También `as`, `within`, `approximately`, negación y escalar*Quantity. Se
+  reproducen incluso rarezas del intérprete (`1500 m as km` solo etiqueta, no
+  convierte; `within` compara valores crudos).
+- Formato de floats: `ostrin_fmt_double` nunca usa notación exponencial
+  (`400000000`, no `4e+08`), como Rust.
+
+Con esto `physics.ostrin` compila y coincide. `shapes.ostrin` avanza mucho más
+y ahora se detiene en métodos sobre **enums** (`impl Shape`), que el backend
+solo resuelve en records y `dyn Trait`. Suite: **93 pruebas**, sin warnings.

@@ -47,6 +47,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::ast::*;
 use crate::symbols::type_to_string;
+use crate::types::{dim_div, dim_is_dimensionless, dim_mul, dim_pow, dim_single, dim_to_string, resolve_unit_expr, Dimension};
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 enum CType {
@@ -83,6 +84,13 @@ enum CType {
     /// The type of a bare `None`, which by itself carries no `T`: it only
     /// becomes a concrete `Option<T>` when `coerce` meets an expected type.
     NoneLit,
+    /// A physical quantity: its *dimension* is part of the static type (as in
+    /// `typeck`), its *unit* is a runtime string carried in the value
+    /// (`Qty { double v; const char* u; }`), exactly like `Value::Quantity`
+    /// in the interpreter — so `5 nm + 2 m` and function arguments in mixed
+    /// units behave identically in both backends without monomorphizing on
+    /// units.
+    Quantity(Dimension),
     /// `Result<T, E>`: by-value `{ bool ok; T value; E error; }`, monomorphized per (T, E).
     Result(Box<CType>, Box<CType>),
     /// A bare `Ok(x)` / `Err(e)` knows only one side of its `Result`; like
@@ -104,6 +112,7 @@ fn c_type_name(ty: &CType) -> String {
         CType::List(elem) => format!("{}*", list_struct_name(elem)),
         CType::Option(inner) => format!("Option_{}", mangle_ctype(inner)),
         CType::NoneLit | CType::OkLit(_) | CType::ErrLit(_) => "int".to_string(),
+        CType::Quantity(_) => "Qty".to_string(),
         CType::Result(t, e) => format!("Result_{}_{}", mangle_ctype(t), mangle_ctype(e)),
     }
 }
@@ -126,8 +135,21 @@ struct NamedTypes<'a> {
     traits: &'a HashSet<String>,
 }
 
+/// Resolves a dimension expression (`Length`, `Length / Time`, `D`, ...) the
+/// same way `typeck` does, with generic `D`s taken from `subst`.
+fn resolve_dimension(ty: &Type, subst: &HashMap<String, Dimension>) -> Dimension {
+    match ty {
+        Type::Named(name, _) => subst.get(name).cloned().unwrap_or_else(|| dim_single(name)),
+        Type::Mul(a, b) => dim_mul(&resolve_dimension(a, subst), &resolve_dimension(b, subst)),
+        Type::Div(a, b) => dim_div(&resolve_dimension(a, subst), &resolve_dimension(b, subst)),
+        Type::Pow(a, n) => dim_pow(&resolve_dimension(a, subst), *n as i32),
+        _ => HashMap::new(),
+    }
+}
+
 fn map_type(ty: &Type, types: &NamedTypes) -> Result<CType, String> {
     match ty {
+        Type::Named(name, args) if name == "Quantity" && args.len() == 1 => Ok(CType::Quantity(resolve_dimension(&args[0], &HashMap::new()))),
         Type::Named(name, args) if args.is_empty() => match name.as_str() {
             "Int" => Ok(CType::Int),
             "Float" => Ok(CType::Float),
@@ -171,6 +193,15 @@ fn map_type(ty: &Type, types: &NamedTypes) -> Result<CType, String> {
 /// runs, known once and for all at compile time.
 fn map_type_with_subst(ty: &Type, types: &NamedTypes, subst: &HashMap<String, CType>) -> Result<CType, String> {
     if let Type::Named(name, args) = ty {
+        if name == "Quantity" && args.len() == 1 {
+            let dims: HashMap<String, Dimension> = subst
+                .iter()
+                .filter_map(|(k, v)| if let CType::Quantity(d) = v { Some((k.clone(), d.clone())) } else { None })
+                .collect();
+            return Ok(CType::Quantity(resolve_dimension(&args[0], &dims)));
+        }
+    }
+    if let Type::Named(name, args) = ty {
         if args.is_empty() {
             if let Some(concrete) = subst.get(name) {
                 return Ok(concrete.clone());
@@ -186,6 +217,10 @@ fn c_function_name(name: &str) -> String {
     if name == "main" { "ostrin_main".to_string() } else { name.to_string() }
 }
 
+/// Quantity runtime (unit table, conversion, arithmetic helpers), spliced in
+/// right after `PRELUDE` only when a program actually uses `Qty`.
+const QTY_RUNTIME: &str = include_str!("qty_runtime.c");
+
 const PRELUDE: &str = "#include <stdint.h>\n\
 #include <stdbool.h>\n\
 #include <stdio.h>\n\
@@ -197,12 +232,23 @@ static int64_t ostrin_idiv(int64_t a, int64_t b) {\n\
     return a / b;\n\
 }\n\
 \n\
-static void ostrin_print_float(double v) {\n\
-    char buf[64];\n\
-    for (int prec = 1; prec <= 17; prec++) {\n\
-        snprintf(buf, sizeof buf, \"%.*g\", prec, v);\n\
+static void ostrin_fmt_double(double v, char* buf, size_t n) {\n\
+    int prec;\n\
+    for (prec = 1; prec <= 17; prec++) {\n\
+        snprintf(buf, n, \"%.*g\", prec, v);\n\
         if (strtod(buf, NULL) == v) break;\n\
     }\n\
+    if (strchr(buf, 'e')) {\n\
+        char t[64];\n\
+        snprintf(t, sizeof t, \"%.*e\", prec - 1, v);\n\
+        int decimals = prec - 1 - atoi(strchr(t, 'e') + 1);\n\
+        snprintf(buf, n, \"%.*f\", decimals < 0 ? 0 : decimals, v);\n\
+    }\n\
+}\n\
+\n\
+static void ostrin_print_float(double v) {\n\
+    char buf[64];\n\
+    ostrin_fmt_double(v, buf, sizeof buf);\n\
     printf(\"%s\\n\", buf);\n\
 }\n\
 \n\
@@ -340,6 +386,7 @@ fn mangle_ctype(ty: &CType) -> String {
         CType::List(elem) => format!("List_{}", mangle_ctype(elem)),
         CType::Option(inner) => format!("Option_{}", mangle_ctype(inner)),
         CType::NoneLit => "None".to_string(),
+        CType::Quantity(d) => format!("Q_{}", dim_to_string(d).chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '_' }).collect::<String>()),
         CType::OkLit(t) => format!("Ok_{}", mangle_ctype(t)),
         CType::ErrLit(t) => format!("Err_{}", mangle_ctype(t)),
         CType::Result(t, e) => format!("Result_{}_{}", mangle_ctype(t), mangle_ctype(e)),
@@ -737,6 +784,10 @@ impl<'a> Codegen<'a> {
             Expr::Unary(op, inner) => {
                 let (code, ty) = self.gen_expr(inner)?;
                 match op {
+                    UnaryOp::Neg if matches!(ty, CType::Quantity(_)) => {
+                        let temp = self.next_temp();
+                        Ok((format!("({{ Qty {temp} = {code}; {temp}.v = -{temp}.v; {temp}; }})"), ty))
+                    }
                     UnaryOp::Neg => Ok((format!("(-{code})"), ty)),
                     UnaryOp::Not => Ok((format!("(!{code})"), CType::Bool)),
                 }
@@ -773,6 +824,40 @@ impl<'a> Codegen<'a> {
             Expr::Match(scrutinee, arms) => self.gen_match(scrutinee, arms),
             Expr::ListLiteral(items) => self.gen_list_literal(items, None),
             Expr::Try(inner, handler) => self.gen_try(inner, handler.as_deref()),
+            Expr::UnitLiteral(num, unit) => {
+                let (code, ty) = self.gen_expr(num)?;
+                let dim = resolve_unit_expr(unit).map_err(|u| format!("unknown unit '{u}'"))?;
+                let v = self.as_f64_code(&code, &ty)?;
+                Ok((format!("((Qty){{ {v}, {} }})", c_string_literal(unit)), CType::Quantity(dim)))
+            }
+            Expr::As(inner, unit_expr) => {
+                let (code, ty) = self.gen_expr(inner)?;
+                let Expr::Ident(sym) = unit_expr.unlocated() else {
+                    return Err("'as' expects a unit identifier".to_string());
+                };
+                let dim = resolve_unit_expr(sym).map_err(|u| format!("unknown unit '{u}'"))?;
+                let v = self.as_f64_code(&code, &ty)?;
+                Ok((format!("((Qty){{ {v}, {} }})", c_string_literal(sym)), CType::Quantity(dim)))
+            }
+            Expr::Within(value, range) => {
+                let Expr::Range(start, kind, end, _) = range.unlocated() else {
+                    return Err("'within' expects a range on the right-hand side".to_string());
+                };
+                let (vc, vt) = self.gen_expr(value)?;
+                let (sc, st) = self.gen_expr(start)?;
+                let (ec, et) = self.gen_expr(end)?;
+                let (v, s, e) = (self.as_f64_code(&vc, &vt)?, self.as_f64_code(&sc, &st)?, self.as_f64_code(&ec, &et)?);
+                let temp = self.next_temp();
+                let upper = if *kind == RangeKind::To { "<=" } else { "<" };
+                Ok((format!("({{ double {temp} = {v}; {temp} >= {s} && {temp} {upper} {e}; }})"), CType::Bool))
+            }
+            Expr::Approximately(a, b, tol) => {
+                let (ac, at) = self.gen_expr(a)?;
+                let (bc, bt) = self.gen_expr(b)?;
+                let (tc, tt) = self.gen_expr(tol)?;
+                let (a, b, t) = (self.as_f64_code(&ac, &at)?, self.as_f64_code(&bc, &bt)?, self.as_f64_code(&tc, &tt)?);
+                Ok((format!("(({a} - {b}) < 0 ? -(({a}) - ({b})) : (({a}) - ({b}))) <= {t}"), CType::Bool))
+            }
             Expr::Index(obj, idx) => {
                 let (obj_code, obj_ty) = self.gen_expr(obj)?;
                 let CType::List(elem_ty) = obj_ty else {
@@ -1104,6 +1189,9 @@ impl<'a> Codegen<'a> {
     fn gen_binary(&mut self, op: BinOp, l: &Expr, r: &Expr) -> Result<(String, CType), String> {
         let (lc, lt) = self.gen_expr(l)?;
         let (rc, rt) = self.gen_expr(r)?;
+        if matches!(lt, CType::Quantity(_)) || matches!(rt, CType::Quantity(_)) {
+            return self.gen_quantity_binary(op, &lc, &lt, &rc, &rt);
+        }
         if matches!(lt, CType::Record(_) | CType::Enum(_) | CType::DynTrait(_) | CType::List(_) | CType::Option(_) | CType::NoneLit | CType::Result(..) | CType::OkLit(_) | CType::ErrLit(_))
             || matches!(rt, CType::Record(_) | CType::Enum(_) | CType::DynTrait(_) | CType::List(_) | CType::Option(_) | CType::NoneLit | CType::Result(..) | CType::OkLit(_) | CType::ErrLit(_))
         {
@@ -1149,6 +1237,75 @@ impl<'a> Codegen<'a> {
             return Ok((format!("ostrin_idiv({lc}, {rc})"), CType::Int));
         }
         Ok((format!("({lc} {c_op} {rc})"), result_ty))
+    }
+
+    /// Arithmetic/comparison where at least one side is a `Quantity`,
+    /// following `eval_binary_builtin`/`compare` in the interpreter rule by
+    /// rule. Which helper runs (and the result's dimension) is decided here,
+    /// statically; only the unit strings are resolved at runtime.
+    fn gen_quantity_binary(&mut self, op: BinOp, lc: &str, lt: &CType, rc: &str, rt: &CType) -> Result<(String, CType), String> {
+        let scalar = |code: &str, ty: &CType| -> Option<String> {
+            matches!(ty, CType::Int | CType::Float).then(|| format!("(double)({code})"))
+        };
+        match (lt, rt) {
+            (CType::Quantity(d1), CType::Quantity(d2)) => match op {
+                BinOp::Add => Ok((format!("ostrin_qty_add({lc}, {rc})"), lt.clone())),
+                BinOp::Sub => Ok((format!("ostrin_qty_sub({lc}, {rc})"), lt.clone())),
+                BinOp::Mul => Ok((format!("ostrin_qty_mul({lc}, {rc})"), CType::Quantity(dim_mul(d1, d2)))),
+                BinOp::Div => {
+                    let combined = dim_div(d1, d2);
+                    if dim_is_dimensionless(&combined) {
+                        Ok((format!("ostrin_qty_ratio({lc}, {rc})"), CType::Float))
+                    } else {
+                        Ok((format!("ostrin_qty_div({lc}, {rc})"), CType::Quantity(combined)))
+                    }
+                }
+                BinOp::Eq | BinOp::NotEq | BinOp::Lt | BinOp::Gt | BinOp::LtEq | BinOp::GtEq => {
+                    let c_op = match op {
+                        BinOp::Eq => "==",
+                        BinOp::NotEq => "!=",
+                        BinOp::Lt => "<",
+                        BinOp::Gt => ">",
+                        BinOp::LtEq => "<=",
+                        _ => ">=",
+                    };
+                    Ok((format!("(ostrin_qty_cmp({lc}, {rc}) {c_op} 0)"), CType::Bool))
+                }
+                _ => Err("this operator isn't supported on Quantity values".to_string()),
+            },
+            (CType::Quantity(d), other) => {
+                let Some(s) = scalar(rc, other) else {
+                    return Err("cannot combine a Quantity with this operand in the native backend".to_string());
+                };
+                match op {
+                    BinOp::Mul => Ok((format!("ostrin_qty_scale_mul({lc}, {s})"), lt.clone())),
+                    BinOp::Div => Ok((format!("ostrin_qty_scale_div({lc}, {s})"), CType::Quantity(d.clone()))),
+                    _ => Err("cannot combine a Quantity with a plain scalar without an explicit unit ('as <unit>')".to_string()),
+                }
+            }
+            (other, CType::Quantity(d)) => {
+                let Some(s) = scalar(lc, other) else {
+                    return Err("cannot combine a Quantity with this operand in the native backend".to_string());
+                };
+                match op {
+                    BinOp::Mul => Ok((format!("ostrin_qty_scale_mul({rc}, {s})"), rt.clone())),
+                    BinOp::Div => Ok((format!("ostrin_scalar_div_qty({s}, {rc})"), CType::Quantity(dim_pow(d, -1)))),
+                    _ => Err("cannot combine a Quantity with a plain scalar without an explicit unit ('as <unit>')".to_string()),
+                }
+            }
+            _ => unreachable!("gen_quantity_binary is only called with a Quantity operand"),
+        }
+    }
+
+    /// A numeric operand as a bare `double` (a Quantity contributes its raw
+    /// value, ignoring its unit — as the interpreter's `as_f64` does for
+    /// `as`, `within` and `approximately`).
+    fn as_f64_code(&self, code: &str, ty: &CType) -> Result<String, String> {
+        match ty {
+            CType::Quantity(_) => Ok(format!("({code}).v")),
+            CType::Int | CType::Float => Ok(format!("(double)({code})")),
+            _ => Err("expected a number".to_string()),
+        }
     }
 
     fn gen_call(&mut self, callee: &Expr, args: &[Arg]) -> Result<(String, CType), String> {
@@ -1596,6 +1753,7 @@ impl<'a> Codegen<'a> {
             CType::Enum(name) => return Err(format!("cannot 'print' an enum value yet ('{name}' has no generated Display)")),
             CType::DynTrait(name) => return Err(format!("cannot 'print' a 'dyn {name}' value")),
             CType::List(elem) => return Err(format!("cannot 'print' a List<{}> value yet", c_type_name(elem))),
+            CType::Quantity(_) => return Ok((format!("ostrin_print_qty({})", arg_codes[0]), CType::Void)),
             CType::Option(_) | CType::NoneLit | CType::Result(..) | CType::OkLit(_) | CType::ErrLit(_) => {
                 return Err("cannot 'print' an Option/Result value yet".to_string())
             }
@@ -1617,6 +1775,19 @@ fn infer_generic_substitutions(decl: &FunctionDecl, arg_types: &[CType]) -> Resu
     let generic_names: HashSet<&str> = decl.generics.iter().map(|g| g.name.as_str()).collect();
     let mut subst: HashMap<String, CType> = HashMap::new();
     for (param, arg_ty) in decl.params.iter().zip(arg_types) {
+        // `Quantity<D>`: `D` stands for the dimension of the argument's
+        // Quantity (recorded as a `CType::Quantity` so it can be threaded
+        // through `subst` like any other type parameter).
+        if let (Type::Named(q, qargs), CType::Quantity(_)) = (&param.ty, arg_ty) {
+            if q == "Quantity" && qargs.len() == 1 {
+                if let Type::Named(d, dargs) = &qargs[0] {
+                    if dargs.is_empty() && generic_names.contains(d.as_str()) {
+                        subst.entry(d.clone()).or_insert_with(|| arg_ty.clone());
+                        continue;
+                    }
+                }
+            }
+        }
         if let Type::Named(name, args) = &param.ty {
             if args.is_empty() && generic_names.contains(name.as_str()) {
                 if let Some(existing) = subst.get(name) {
@@ -2129,6 +2300,9 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
         out.push_str(&format!("{signature} {{\n{body}}}\n\n"));
     }
     out.push_str("int main(void) {\n    ostrin_main();\n    return 0;\n}\n");
+    if out.contains("Qty") {
+        out = out.replacen(PRELUDE, &format!("{PRELUDE}{QTY_RUNTIME}"), 1);
+    }
     Ok(out)
 }
 

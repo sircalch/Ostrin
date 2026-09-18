@@ -1,0 +1,29 @@
+fn kinetic(mass: Quantity<Mass>, speed: Quantity<Length / Time>) -> Quantity<Mass * Length * Length / Time / Time> {
+    0.5 * mass * speed * speed
+}
+
+fn total<D: Dimension>(a: Quantity<D>, b: Quantity<D>) -> Quantity<D> {
+    a + b
+}
+
+fn main() -> Void {
+    print(physics())
+}
+
+fn physics() -> Bool {
+    print(total(3 m, 250 cm))
+    print(total(1 km, 5 m))
+    print(kinetic(2 kg, 3 m / 1 s))
+    d = 1500 m
+    print(d as km)
+    print(d > 1 km)
+    print(d < 1 km)
+    print(-d)
+    print(10 / (2 s))
+    print(3 * d)
+    print(d / 4)
+    print((90 min) / (1 h))
+    print(d within (1 km to 2 km))
+    print(d approximately 1499 m tolerance 2 m)
+    true
+}

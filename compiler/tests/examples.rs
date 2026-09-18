@@ -745,15 +745,13 @@ fn native_backend_emit_c_writes_readable_c_source() {
 
 #[test]
 fn native_backend_rejects_constructs_it_does_not_support_yet() {
-    // `shapes.ostrin`'s enum variants carry `Quantity<Length>` fields —
-    // dimensional quantities aren't a type this backend represents at all,
-    // so it must fail with a clear message naming the type, not silently
-    // emit something wrong (the enum/match machinery itself is otherwise
-    // fully exercised by `native_backend_compiles_and_runs_enums_and_match`).
+    // `shapes.ostrin` puts an `impl` (with methods) on an *enum*: the native
+    // backend only resolves methods on records and `dyn Trait`, so it must
+    // fail with a clear message rather than silently emit something wrong.
     let out = run(&["--emit-c", &example_path("shapes.ostrin")]);
     assert!(!out.status.success(), "the native backend should refuse a program it can't fully compile");
     let error = stderr(&out);
-    assert!(error.contains("Quantity") && error.contains("not supported"), "unexpected error: {error}");
+    assert!(error.contains("method calls are only supported"), "unexpected error: {error}");
 }
 
 #[test]
@@ -1039,6 +1037,30 @@ fn int_division_truncates_in_both_backends() {
     let native = Command::new(&exe).output().unwrap();
     let _ = fs::remove_file(&exe);
     assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), "3\n3\n");
+}
+
+#[test]
+fn native_backend_quantities_match_the_interpreter() {
+    // Dimension is static, the unit is a runtime string (as in the
+    // interpreter): mixed-unit addition, dimensionless division returning a
+    // Float, a generic `<D: Dimension>` function, compound units built at
+    // runtime (`m/s`, `kg*m/s*m/s`), comparisons across units, `as`,
+    // `within`, `approximately`, unary minus and scalar/Quantity math.
+    for file in ["physics.ostrin", "native_units.ostrin"] {
+        let interpreted = run(&["--run", &example_path(file)]);
+        assert!(interpreted.status.success(), "interpreter failed on {file}: {}", stderr(&interpreted));
+        let expected = stdout(&interpreted).replace("\r\n", "\n");
+
+        let exe = temp_artifact(&format!("{file}.exe"));
+        let compile = run(&["--compile", "--out", &exe, &example_path(file)]);
+        if skip_if_no_c_compiler(&compile) {
+            return;
+        }
+        assert!(compile.status.success(), "compile failed for {file}: {}", stderr(&compile));
+        let native = Command::new(&exe).output().unwrap();
+        let _ = fs::remove_file(&exe);
+        assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected, "output mismatch for {file}");
+    }
 }
 
 #[test]

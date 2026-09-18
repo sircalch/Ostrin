@@ -44,7 +44,7 @@ Ostrin is not yet a production compiler. The current implementation includes a
 lexer, parser, static checker, interpreter, modules, packages, collections,
 traits, pattern matching, quantities and a simulated concurrency model.
 
-The compiler suite currently passes **92 integration tests**. Function calls
+The compiler suite currently passes **93 integration tests**. Function calls
 support named/default arguments, collection lookups preserve `Option<T>`, and
 record fields are checked statically. The CLI also exposes JSON Lines
 diagnostics with source locations for editor integrations, plus a compiler
@@ -71,8 +71,10 @@ same way a generic function is — `length`/`push`/`remove_at`, indexing and
 `List`'s `map`/`filter`/`fold`/`any`/`all` (expanded to loops, so captures
 need no closure object); the project's own `dyn_trait.ostrin` compiles and
 runs natively, as do `Option<T>` and `Result<T, E>` (Some/None/Ok/Err,
-match, `try`, `find`). Dimensional `Quantity` and first-class function values
-still only run through the interpreter. The runtime is still
+match, `try`, `find`). Dimensional `Quantity` compiles too (dimension
+checked statically, unit carried at runtime exactly as in the interpreter).
+First-class function values and methods on enums still only run through the
+interpreter. The runtime is still
 synchronous and the standard library is small.
 
 ## Quick start
