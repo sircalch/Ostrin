@@ -3919,8 +3919,9 @@ La IR actual contiene:
 - CFG explícita para `if`, `while`, `for`, `break`, `continue` y `return`;
 - iteradores como `iter_init`, `iter_has_next` e `iter_next`;
 - instrucciones `retain`/`release` ya reservadas para la siguiente fase;
-- instrucciones `opaque` nombradas para `match`, cierres, `try`, concurrencia y conversiones
-  que todavía necesitan una bajada semántica completa, en lugar de perderse silenciosamente.
+- instrucciones `opaque` nombradas para cierres, concurrencia y conversiones que
+  todavía necesitan una bajada semántica completa, en lugar de perderse silenciosamente;
+  `match` y `try` ya tienen bloques y temporales propios.
 
 El verificador comprueba que no haya bloques sin terminador y que todos los saltos apunten a
 bloques existentes. `compiler/tests/examples.rs` cubre `--ir` sobre `native_fibonacci.ostrin`,
@@ -3928,8 +3929,8 @@ incluyendo una rama de bucle y la ausencia de violaciones. La suite queda en **6
 diferenciales y 109 de integración verdes**; `cargo check` también pasa.
 
 Esto aún no es un backend nuevo ni permite afirmar que Ostrin tenga ARC: es la infraestructura
-necesaria para implementarlo. El siguiente paquete debe bajar `match`/`try`/cierres/concurrencia
-desde HIR a CFG real y después añadir el primer pase de ownership (`retain/release` más
+necesaria para implementarlo. El siguiente paquete debe bajar cierres/concurrencia desde HIR a
+CFG real y después añadir el primer pase de ownership (`retain/release` más
 `--leak-check`) sin modificar la sintaxis del lenguaje.
 
 ## 136. Análisis conservador de ownership y último uso — 2026-09-18
@@ -3957,3 +3958,22 @@ La siguiente etapa no debe convertir automáticamente todos los candidatos en `r
 primero hay que añadir dominadores/joins, propagación por loops, escape de llamadas y tipos de
 destructor. Solo después se podrá introducir `retain/release` en una copia de la IR y
 comparar `--leak-check` contra el registro global del runtime.
+
+## 137. Match y try convertidos a control de flujo de IR — 2026-09-18
+
+La IR dejó de tratar estas dos familias como una sola instrucción opaca:
+
+- `match` baja el scrutinee, crea una cadena de bloques de prueba por brazo, emite
+  `pattern_test`, bindings explícitos para identificadores y campos, saltos de guardas,
+  caminos de fallo y un `phi` de convergencia;
+- `try` baja el valor protegido a `try_check`, separa los bloques normal y de
+  captura, emite `try_value`/`try_error` y converge ambos resultados con `phi`.
+
+La prueba `compiler_lowers_match_and_try_to_explicit_ir_control_flow` cubre
+`native_enums.ostrin` y `native_result.ostrin`, y exige que no aparezcan
+`opaque match` ni `opaque try`. La suite queda en **6 pruebas diferenciales
+y 111 de integración verdes**.
+
+La IR todavía no genera C ni resuelve completamente cierres y concurrencia; esos son los
+últimos grandes grupos de control de flujo antes de hacer la primera inserción real de
+`retain/release`.

@@ -132,14 +132,17 @@ fn defined_value(instruction: &IrInstr) -> Option<(ValueId, Ty)> {
         | IrInstr::Aggregate { dst, ty, .. }
         | IrInstr::IterInit { dst, ty, .. }
         | IrInstr::IterNext { dst, ty, .. }
+        | IrInstr::PatternBind { dst, ty, .. }
+        | IrInstr::TryValue { dst, ty, .. }
+        | IrInstr::TryError { dst, ty, .. }
         | IrInstr::Phi { dst, ty, .. } => Some((*dst, ty.clone())),
+        IrInstr::PatternTest { dst, .. } | IrInstr::TryCheck { dst, .. } | IrInstr::IterHasNext { dst, .. } => Some((*dst, Ty::Bool)),
         IrInstr::Call { dst: Some(dst), ty, .. }
         | IrInstr::MethodCall { dst: Some(dst), ty, .. }
         | IrInstr::Opaque { dst: Some(dst), ty, .. } => Some((*dst, ty.clone())),
         IrInstr::StoreLocal { .. }
         | IrInstr::Call { dst: None, .. }
         | IrInstr::MethodCall { dst: None, .. }
-        | IrInstr::IterHasNext { .. }
         | IrInstr::Opaque { dst: None, .. }
         | IrInstr::Retain { .. }
         | IrInstr::Release { .. } => None,
@@ -159,6 +162,8 @@ fn used_values(instruction: &IrInstr) -> Vec<ValueId> {
         IrInstr::Aggregate { fields, .. } => fields.clone(),
         IrInstr::IterInit { source, .. } => vec![*source],
         IrInstr::IterHasNext { iter, .. } | IrInstr::IterNext { iter, .. } => vec![*iter],
+        IrInstr::PatternTest { subject, .. } | IrInstr::PatternBind { subject, .. } => vec![*subject],
+        IrInstr::TryCheck { value, .. } | IrInstr::TryValue { value, .. } | IrInstr::TryError { value, .. } => vec![*value],
         IrInstr::Phi { incoming, .. } => incoming.iter().map(|(_, value)| *value).collect(),
         IrInstr::Opaque { inputs, .. } => inputs.clone(),
         IrInstr::Retain { value } | IrInstr::Release { value } => vec![*value],

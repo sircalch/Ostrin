@@ -56,6 +56,11 @@ pub enum IrInstr {
     IterInit { dst: ValueId, source: ValueId, ty: Ty },
     IterHasNext { dst: ValueId, iter: ValueId },
     IterNext { dst: ValueId, iter: ValueId, ty: Ty },
+    PatternTest { dst: ValueId, subject: ValueId, pattern: String },
+    PatternBind { dst: ValueId, subject: ValueId, name: String, path: Vec<String>, ty: Ty },
+    TryCheck { dst: ValueId, value: ValueId },
+    TryValue { dst: ValueId, value: ValueId, ty: Ty },
+    TryError { dst: ValueId, value: ValueId, ty: Ty },
     Phi { dst: ValueId, incoming: Vec<(BlockId, ValueId)>, ty: Ty },
     Opaque { dst: Option<ValueId>, op: String, inputs: Vec<ValueId>, ty: Ty },
     Retain { value: ValueId },
@@ -332,6 +337,77 @@ impl Builder {
         dst
     }
 
+    fn lower_match(&mut self, subject: &HirExpr, arms: &[crate::hir::HirArm], ty: &Ty) -> ValueId {
+        let subject_value = self.lower_expr(subject);
+        let merge_block = self.new_block();
+        let mut test_block = self.current;
+        let mut incoming = Vec::new();
+
+        for arm in arms {
+            let arm_block = self.new_block();
+            let next_test = self.new_block();
+            self.current = test_block;
+            let test = self.fresh();
+            self.emit(IrInstr::PatternTest {
+                dst: test,
+                subject: subject_value,
+                pattern: format!("{:?}", arm.pattern),
+            });
+            self.terminate(IrTerminator::Branch { condition: test, then_block: arm_block, else_block: next_test });
+
+            self.current = arm_block;
+            self.locals.push(HashMap::new());
+            self.bind_pattern(subject_value, &arm.pattern, Vec::new());
+            let body_block = if arm.guard.is_some() { self.new_block() } else { arm_block };
+            if let Some(guard) = &arm.guard {
+                let guard_value = self.lower_expr(guard);
+                self.terminate(IrTerminator::Branch { condition: guard_value, then_block: body_block, else_block: next_test });
+                self.current = body_block;
+            }
+            let body_value = self.lower_block_contents(&arm.body).unwrap_or_else(|| if !self.terminated() { self.unit() } else { self.fresh() });
+            let body_open = !self.terminated();
+            if body_open {
+                incoming.push((self.current, body_value));
+                self.terminate(IrTerminator::Goto(merge_block));
+            }
+            self.locals.pop();
+            test_block = next_test;
+        }
+
+        self.current = test_block;
+        if !self.terminated() {
+            self.terminate(IrTerminator::Unreachable);
+        }
+        self.current = merge_block;
+        let dst = self.fresh();
+        self.emit(IrInstr::Phi { dst, incoming, ty: ty.clone() });
+        dst
+    }
+
+    fn bind_pattern(&mut self, subject: ValueId, pattern: &crate::ast::Pattern, path: Vec<String>) {
+        match pattern {
+            crate::ast::Pattern::Ident(name) => {
+                let dst = self.fresh();
+                self.emit(IrInstr::PatternBind {
+                    dst,
+                    subject,
+                    name: name.clone(),
+                    path,
+                    ty: Ty::Unknown,
+                });
+                self.locals.last_mut().expect("match scope").insert(name.clone(), dst);
+            }
+            crate::ast::Pattern::Variant(_, fields) => {
+                for (field, subpattern) in fields {
+                    let mut nested = path.clone();
+                    nested.push(field.clone());
+                    self.bind_pattern(subject, subpattern, nested);
+                }
+            }
+            crate::ast::Pattern::Wildcard | crate::ast::Pattern::Literal(_) | crate::ast::Pattern::Range(..) => {}
+        }
+    }
+
     fn lower_expr(&mut self, expression: &HirExpr) -> ValueId {
         match &expression.kind {
             HirKind::Int(value) => self.const_value(value.to_string(), expression.ty.clone()),
@@ -436,15 +512,7 @@ impl Builder {
                 self.emit(IrInstr::Aggregate { dst, kind: format!("empty_{name}"), fields: Vec::new(), ty: expression.ty.clone() });
                 dst
             }
-            HirKind::Try(value, handler) => {
-                let mut inputs = vec![self.lower_expr(value)];
-                if let Some(handler) = handler {
-                    inputs.push(self.lower_expr(handler));
-                }
-                let dst = self.fresh();
-                self.emit(IrInstr::Opaque { dst: Some(dst), op: "try".to_string(), inputs, ty: expression.ty.clone() });
-                dst
-            }
+            HirKind::Try(value, handler) => self.lower_try(value, handler.as_deref(), &expression.ty),
             HirKind::Within(value, unit) => {
                 let inputs = vec![self.lower_expr(value), self.lower_expr(unit)];
                 let dst = self.fresh();
@@ -469,18 +537,45 @@ impl Builder {
                 self.emit(IrInstr::Aggregate { dst, kind: format!("record<{name}>"), fields, ty: expression.ty.clone() });
                 dst
             }
-            HirKind::Match(subject, arms) => {
-                let subject = self.lower_expr(subject);
-                let dst = self.fresh();
-                self.emit(IrInstr::Opaque { dst: Some(dst), op: format!("match<{}>", arms.len()), inputs: vec![subject], ty: expression.ty.clone() });
-                dst
-            }
+            HirKind::Match(subject, arms) => self.lower_match(subject, arms, &expression.ty),
             HirKind::Spawn(_) | HirKind::SpawnScope(_) | HirKind::Channel(_, _) => {
                 let dst = self.fresh();
                 self.emit(IrInstr::Opaque { dst: Some(dst), op: "concurrency".to_string(), inputs: Vec::new(), ty: expression.ty.clone() });
                 dst
             }
         }
+    }
+
+    fn lower_try(&mut self, value: &HirExpr, handler: Option<&HirExpr>, ty: &Ty) -> ValueId {
+        let value = self.lower_expr(value);
+        let normal_block = self.new_block();
+        let catch_block = self.new_block();
+        let merge_block = self.new_block();
+        let check = self.fresh();
+        self.emit(IrInstr::TryCheck { dst: check, value });
+        self.terminate(IrTerminator::Branch { condition: check, then_block: normal_block, else_block: catch_block });
+
+        self.current = normal_block;
+        let normal = self.fresh();
+        self.emit(IrInstr::TryValue { dst: normal, value, ty: ty.clone() });
+        self.terminate(IrTerminator::Goto(merge_block));
+
+        self.current = catch_block;
+        let caught = if let Some(handler) = handler {
+            self.lower_expr(handler)
+        } else {
+            let error = self.fresh();
+            self.emit(IrInstr::TryError { dst: error, value, ty: ty.clone() });
+            error
+        };
+        if !self.terminated() {
+            self.terminate(IrTerminator::Goto(merge_block));
+        }
+
+        self.current = merge_block;
+        let dst = self.fresh();
+        self.emit(IrInstr::Phi { dst, incoming: vec![(normal_block, normal), (catch_block, caught)], ty: ty.clone() });
+        dst
     }
 }
 
@@ -575,6 +670,11 @@ fn display_instruction(instruction: &IrInstr) -> String {
         IrInstr::IterInit { dst, source, .. } => format!("%{dst} = iter_init %{source}"),
         IrInstr::IterHasNext { dst, iter } => format!("%{dst} = iter_has_next %{iter}"),
         IrInstr::IterNext { dst, iter, .. } => format!("%{dst} = iter_next %{iter}"),
+        IrInstr::PatternTest { dst, subject, pattern } => format!("%{dst} = pattern_test %{subject} {pattern}"),
+        IrInstr::PatternBind { dst, subject, name, path, .. } => format!("%{dst} = pattern_bind %{subject} {name} path={}", path.join(".")),
+        IrInstr::TryCheck { dst, value } => format!("%{dst} = try_check %{value}"),
+        IrInstr::TryValue { dst, value, .. } => format!("%{dst} = try_value %{value}"),
+        IrInstr::TryError { dst, value, .. } => format!("%{dst} = try_error %{value}"),
         IrInstr::Phi { dst, incoming, .. } => format!("%{dst} = phi {}", incoming.iter().map(|(block, value)| format!("[bb{block}, %{value}]")).collect::<Vec<_>>().join(" ")),
         IrInstr::Opaque { dst, op, inputs, .. } => format!("{}opaque {op}({})", result_prefix(*dst), value_list(inputs)),
         IrInstr::Retain { value } => format!("retain %{value}"),

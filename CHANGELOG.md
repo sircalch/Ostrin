@@ -70,6 +70,10 @@
   heap-like IR values, records their uses and identifies straight-line last-use candidates
   while marking cross-block and opaque cases as barriers. It is analysis only: no
   `retain`/`release` is emitted until joins, loops and escape behavior are modeled.
+- Lowered `match` and `try` into explicit IR control flow: pattern tests,
+  pattern bindings, guarded-arm branches, try success/error blocks and phi convergence.
+  The IR now keeps these families semantic instead of representing them as opaque operations;
+  closures and concurrency remain the next control-flow families.
 - Module loader now rewrites types in signatures, fields, variants and annotations
   (a `record` from another module can be used as a type).
 - CI on Linux, macOS and Windows.

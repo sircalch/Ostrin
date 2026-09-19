@@ -757,6 +757,25 @@ fn compiler_lowers_hir_to_verified_cfg_ir() {
 }
 
 #[test]
+fn compiler_lowers_match_and_try_to_explicit_ir_control_flow() {
+    let match_ir = run(&["--ir", &example_path("native_enums.ostrin")]);
+    assert!(match_ir.status.success(), "stderr: {}", stderr(&match_ir));
+    let match_source = stdout(&match_ir);
+    assert!(match_source.contains("pattern_test"));
+    assert!(match_source.contains("pattern_bind"));
+    assert!(match_source.contains("phi"));
+    assert!(!match_source.contains("opaque match"), "match was left opaque: {match_source}");
+
+    let try_ir = run(&["--ir", &example_path("native_result.ostrin")]);
+    assert!(try_ir.status.success(), "stderr: {}", stderr(&try_ir));
+    let try_source = stdout(&try_ir);
+    assert!(try_source.contains("try_check"));
+    assert!(try_source.contains("try_value"));
+    assert!(try_source.contains("try_error"));
+    assert!(!try_source.contains("opaque try"), "try was left opaque: {try_source}");
+}
+
+#[test]
 fn compiler_reports_conservative_ownership_facts() {
     let out = run(&["--ownership-report", &example_path("native_records.ostrin")]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
