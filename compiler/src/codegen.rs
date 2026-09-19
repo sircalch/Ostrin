@@ -668,6 +668,10 @@ struct Codegen<'a> {
     /// references to other records — always valid as a pointer field even
     /// before that other record's own body has been emitted).
     records: HashMap<String, Vec<(String, CType)>>,
+    /// Record/enum names whose declarations contain mutable state. Only
+    /// these values receive the dynamic moved-after-send guard; immutable
+    /// records remain safely shareable values.
+    movable_records: HashSet<String>,
     /// Record name -> method name -> its resolved signature and body. Only
     /// ever holds inherent/trait methods on a record with no generics on
     /// either the `impl` block or the method itself; anything else (a
@@ -935,6 +939,10 @@ fn ctype_subst_to_hir(subst: &HashMap<String, CType>) -> HashMap<String, Ty> {
 }
 
 impl<'a> Codegen<'a> {
+    fn is_movable_record_type(&self, ty: &CType) -> bool {
+        matches!(ty, CType::Record(name) if self.movable_records.contains(name))
+    }
+
     fn named_types(&self) -> NamedTypes<'_> {
         NamedTypes {
             records: &self.record_names,
@@ -2630,7 +2638,7 @@ impl<'a> Codegen<'a> {
             Expr::Ident(name) => {
                 if let Some(ty) = self.lookup(name) {
                     // Reading a record variable after it was sent through a channel is an error (E1101).
-                    if self.track_moves && matches!(ty, CType::Record(_)) {
+                    if self.track_moves && self.is_movable_record_type(&ty) {
                         return Ok((format!("(({})ostrin_use_record((void*){name}, \"{name}\"))", c_type_name(&ty)), ty));
                     }
                     return Ok((name.clone(), ty));
@@ -4276,7 +4284,7 @@ impl<'a> Codegen<'a> {
                 match method_name {
                     "send" if codes.len() == 1 => {
                         let item = self.coerce(&codes[0], &types[0], &t)?;
-                        if matches!(t, CType::Record(_)) {
+                        if self.is_movable_record_type(&t) {
                             // The interpreter marks the sent record as moved; reads of it fail afterwards (E1101).
                             self.saw_record_send = true;
                             if self.track_moves {
@@ -5174,6 +5182,7 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>, tr
         instantiations: HashMap::new(),
         pending: VecDeque::new(),
         records: HashMap::new(),
+        movable_records: crate::ownership::movable_types(items),
         methods: HashMap::new(),
         variants: HashMap::new(),
         trait_methods: HashMap::new(),

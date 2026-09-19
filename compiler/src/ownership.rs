@@ -8,6 +8,7 @@
 
 use std::collections::{HashMap, HashSet};
 
+use crate::ast::{Item, Type};
 use crate::ir::{IrInstr, IrProgram, IrTerminator, ValueId};
 use crate::types::Ty;
 
@@ -192,6 +193,14 @@ pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
 /// aggregate/reference-like type are considered movable, while scalar and
 /// value-only `Option`/`Result` data remain copyable.
 pub fn check_moves(program: &IrProgram) -> Vec<MoveViolation> {
+    check_moves_impl(program, None)
+}
+
+pub fn check_moves_for_types(program: &IrProgram, movable_types: &HashSet<String>) -> Vec<MoveViolation> {
+    check_moves_impl(program, Some(movable_types))
+}
+
+fn check_moves_impl(program: &IrProgram, movable_types: Option<&HashSet<String>>) -> Vec<MoveViolation> {
     let mut violations = Vec::new();
     for function in &program.functions {
         let mut definitions: HashMap<ValueId, Ty> = HashMap::new();
@@ -215,7 +224,11 @@ pub fn check_moves(program: &IrProgram) -> Vec<MoveViolation> {
                     }
                 }
                 if let IrInstr::ChannelSend { value, .. } = instruction {
-                    if let Some(ty) = definitions.get(value).cloned().filter(is_move_type) {
+                    if let Some(ty) = definitions
+                        .get(value)
+                        .cloned()
+                        .filter(|ty| is_move_type(ty, movable_types))
+                    {
                         moved.entry(*value).or_insert((ty, block.id, index));
                     }
                 }
@@ -225,12 +238,90 @@ pub fn check_moves(program: &IrProgram) -> Vec<MoveViolation> {
     violations
 }
 
-fn is_move_type(ty: &Ty) -> bool {
+fn is_move_type(ty: &Ty, movable_types: Option<&HashSet<String>>) -> bool {
     match ty {
-        Ty::List(_) | Ty::Map(_, _) | Ty::Set(_) | Ty::Dyn(_) | Ty::Fn(_, _) => true,
-        Ty::Named(name) => !matches!(name.as_str(), "Int" | "Float" | "Bool" | "Char" | "String" | "Void" | "Ordering"),
-        Ty::Applied(name, _) => !matches!(name.as_str(), "Option" | "Result"),
+        // Collections have reference identity even when their elements are
+        // scalar, so sending `List<Int>`/`Map<String, Int>` is still a move
+        // of the collection handle itself.
+        Ty::List(_) | Ty::Map(_, _) | Ty::Set(_) => true,
+        Ty::Dyn(_) | Ty::Fn(_, _) => movable_types.is_none(),
+        Ty::Named(name) => movable_types.map_or(
+            !matches!(name.as_str(), "Int" | "Float" | "Bool" | "Char" | "String" | "Void" | "Ordering"),
+            |types| types.contains(name),
+        ),
+        Ty::Applied(name, args) => {
+            if matches!(name.as_str(), "Option" | "Result") {
+                return false;
+            }
+            movable_types.map_or(true, |types| types.contains(name) || args.iter().any(|arg| is_move_type(arg, Some(types))))
+        }
         _ => false,
+    }
+}
+
+pub fn movable_types(items: &[Item]) -> HashSet<String> {
+    let records: HashMap<String, _> = items
+        .iter()
+        .filter_map(|item| match item {
+            Item::Record(record) => Some((record.name.clone(), record)),
+            _ => None,
+        })
+        .collect();
+    let enums: HashMap<String, _> = items
+        .iter()
+        .filter_map(|item| match item {
+            Item::Enum(decl) => Some((decl.name.clone(), decl)),
+            _ => None,
+        })
+        .collect();
+    let mut movable = records
+        .values()
+        .filter(|record| record.fields.iter().any(|field| field.is_mut))
+        .map(|record| record.name.clone())
+        .collect::<HashSet<_>>();
+
+    loop {
+        let mut changed = false;
+        for record in records.values() {
+            if movable.contains(&record.name) {
+                continue;
+            }
+            if record.fields.iter().any(|field| type_contains_movable(&field.ty, &movable)) {
+                changed |= movable.insert(record.name.clone());
+            }
+        }
+        for decl in enums.values() {
+            if movable.contains(&decl.name) {
+                continue;
+            }
+            if decl
+                .variants
+                .iter()
+                .flat_map(|variant| variant.fields.iter())
+                .any(|field| type_contains_movable(&field.ty, &movable))
+            {
+                changed |= movable.insert(decl.name.clone());
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
+    movable
+}
+
+fn type_contains_movable(ty: &Type, movable: &HashSet<String>) -> bool {
+    match ty {
+        Type::Named(name, args) => {
+            if matches!(name.as_str(), "List" | "Map" | "Set" | "Array" | "Channel" | "Task" | "Rng") {
+                return true;
+            }
+            movable.contains(name) || args.iter().any(|arg| type_contains_movable(arg, movable))
+        }
+        Type::Mul(left, right) | Type::Div(left, right) => type_contains_movable(left, movable) || type_contains_movable(right, movable),
+        Type::Pow(inner, _) => type_contains_movable(inner, movable),
+        Type::Fn(params, ret) => params.iter().any(|param| type_contains_movable(param, movable)) || type_contains_movable(ret, movable),
+        Type::Dyn(_) => false,
     }
 }
 

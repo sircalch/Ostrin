@@ -74,6 +74,10 @@
   E1101 use-after-channel-send facts from the IR, and `ostrinc --ownership-ir` emits a cloned
   IR with `release` markers only at modeled linear transfers. Aggregates, calls, phis, loops
   and opaque escapes remain unresolved until their retain/borrow contracts are explicit.
+- Integrated static E1101 into normal checking, interpretation and native compilation. The
+  move classifier now distinguishes mutable/nested-mutable records from immutable records;
+  immutable records are shareable through channels in both backends, while collections remain
+  managed by identity. Added `examples/immutable_record_channel.ostrin` and parity coverage.
 - Lowered `match` and `try` into explicit IR control flow: pattern tests,
   pattern bindings, guarded-arm branches, try success/error blocks and phi convergence.
   The IR now keeps these families semantic instead of representing them as opaque operations;

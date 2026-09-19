@@ -1,0 +1,11 @@
+record Point {
+    x: Int
+}
+
+fn main() -> Void {
+    ch = channel<Point>()
+    point = Point { x: 1 }
+    ch.send(point)
+    print(point.x)
+    ch.close()
+}

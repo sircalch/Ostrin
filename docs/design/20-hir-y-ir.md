@@ -54,7 +54,9 @@ fn f(a: T) -> U { bb0: %1 = call g(a); %2 = field %1.x; br %2 ? bb1 : bb2; ... r
 Sobre este IR se hacen los análisis que el texto C no permite:
 
 1. **Último uso / movimiento** (documento 18): decide dónde van `retain`/`release` y elimina los innecesarios.
-2. **E1101 estático**: enviar por un canal *mueve*; usar después es error de compilación (hoy es una comprobación dinámica en ambos backends).
+2. **E1101 estático**: enviar por un canal *mueve* un valor gestionado; usarlo después es error
+   de compilación en `--check`, `--run`, `--emit-c` y `--compile`. Records inmutables quedan
+   fuera de la regla; las comprobaciones dinámicas se conservan como red de seguridad.
 3. **Escape** (para arenas): un valor que no sale de su función puede vivir en una arena.
 4. **Cierres**: capturas explícitas → estructura `{ fn_ptr, entorno }` (funciones como valores de primera clase).
 5. Optimización: inlining, plegado de constantes, eliminación de código muerto, fusión de bucles sobre `Array`.
@@ -67,7 +69,8 @@ Sobre este IR se hacen los análisis que el texto C no permite:
 4. **RC + último uso** sobre el IR (`--leak-check`: los ejemplos deben terminar sin objetos vivos).
    La primera subetapa ya inserta `release` solo en transferencias lineales y deja barreras
    explícitas para agregados, llamadas, `phi`, loops y escapes.
-5. **Cierres y funciones como valores**; retirar la comprobación dinámica de E1101.
+5. **Cierres y funciones como valores**; retirar la comprobación dinámica de E1101 cuando el
+   backend consuma la IR transformada de forma completa.
 6. Optimizador y, después, otros backends (LLVM, WASM, GPU) que consumen el mismo IR.
 
 ## 5. Riesgos y mitigaciones

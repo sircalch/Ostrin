@@ -4064,3 +4064,26 @@ diferenciales y 116 de integración verdes**.
 
 El siguiente bloque de memoria debe definir esos contratos de retain para `Aggregate`,
 `Call`, `Field`, `Phi` y retornos, y después hacer que el backend C consuma la IR transformada.
+
+## 142. E1101 estático integrado y records inmutables compartibles — 2026-09-19
+
+El análisis de movimiento pasó de ser una herramienta explícita a formar parte del contrato
+normal del compilador:
+
+- `ostrinc --run`, `--check`, `--emit-c` y `--compile` bajan el programa a HIR/IR y rechazan
+  antes de ejecutar o generar C cualquier uso de un valor movible después de `ChannelSend`.
+- El diagnóstico estable es `OSTRIN-E1101` e incluye temporal, tipo y bloques/instrucciones
+  de envío y uso. `--ownership-check` sigue disponible para inspeccionar únicamente el informe.
+- La clasificación ya distingue records y enums con estado mutable directo o anidado de los
+  records inmutables. `List`, `Map` y `Set` siguen siendo valores gestionados por identidad,
+  incluso cuando sus elementos son escalares.
+- Intérprete y backend nativo aplican la misma distinción: un `record` inmutable se puede
+  compartir por canal, mientras que uno mutable conserva la regla de transferencia única.
+- Se añadió `examples/immutable_record_channel.ostrin` y una prueba de paridad intérprete/C;
+  la prueba de `moved_after_send.ostrin` ahora verifica que ambos puntos de entrada fallen
+  estáticamente, sin compilar un ejecutable inválido.
+
+La suite queda en **6 pruebas diferenciales y 117 de integración verdes**. El siguiente bloque
+de memoria sigue siendo completar contratos de `retain`/`release` para llamadas, retornos,
+joins y loops, y hacer que el backend C consuma la IR transformada; E1101 ya está conectado
+al flujo normal, pero la ARC completa todavía no existe.

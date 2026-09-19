@@ -13,7 +13,8 @@ Estas propiedades vienen del intérprete y de los documentos 09 y 11, y **no** d
 3. Los `enum`, `Option`, `Result`, cantidades y escalares son **valores**.
 4. No hay sintaxis de préstamo (`&`, `&mut`) ni de movimiento: el usuario no escribe tiempos de vida.
 5. Los cierres capturan por valor lo inmutable; los `mut` no se capturan en `spawn` (E1100).
-6. Un record enviado por un canal no puede reutilizarse (E1101, hoy comprobado en ejecución).
+6. Un record con estado mutable enviado por un canal no puede reutilizarse (E1101); los
+   records inmutables se pueden compartir.
 
 ## 2. Requisitos
 
@@ -41,7 +42,10 @@ de RC que siguen.
 - Todo valor por referencia lleva un contador. `retain`/`release` los inserta el compilador **sobre el IR** (no sobre el texto C), en copias de variable, paso a funciones, campos y salida de ámbito.
 - **Análisis de último uso / movimiento** en el IR: si el compilador prueba que un valor no se vuelve a usar, transfiere la propiedad sin tocar el contador (así se recupera el coste cero en el caso común, sin sintaxis nueva).
 - **Ciclos**: son la debilidad conocida del RC. Decisión: (1) documentarlo, (2) proporcionar `Weak<T>` en la biblioteca estándar para grafos y padres, (3) un modo de depuración `--leak-check` que informe de lo no liberado al salir.
-- **E1101 (record enviado por canal)** pasa a ser un **análisis estático** de movimiento sobre el mismo IR: enviar por un canal *mueve* el record; usarlo después es un error de compilación. Esto cierra la última brecha de semántica entre intérprete y nativo.
+- **E1101 (valor movible enviado por canal)** ya es un **análisis estático** de movimiento sobre
+  el mismo IR en las rutas normales: enviar por un canal *mueve* el valor; usarlo después es un
+  error de compilación. La clasificación distingue records/enums con estado mutable, mientras
+  que records inmutables se pueden compartir; las guardas dinámicas quedan como red de seguridad.
 - **Arrays científicos** (documento 19) usan buffers con propietario único y vistas prestadas: es el único sitio donde sí hay préstamos, y son internos a la biblioteca.
 - **Concurrencia real**: contadores atómicos solo en valores que cruzan hilos (marcados por el análisis de canales y `spawn`); el resto usa contadores simples.
 
@@ -56,7 +60,8 @@ El RC sobre el generador actual (texto C con expresiones‑sentencia) exigiría 
 3. Inserción de retain/release + optimización de último uso. Ya existe una primera pasada
    (`--ownership-ir`) que solo marca transferencias lineales conocidas; no toca el backend C.
 4. `--leak-check` y pruebas: cada ejemplo debe terminar con cero objetos vivos.
-5. E1101 estático; retirar la comprobación dinámica del intérprete o mantenerla como red.
+5. E1101 estático integrado; mantener la comprobación dinámica del intérprete y nativo como red
+   de seguridad hasta que el backend consuma completamente la IR transformada.
 6. Arenas para datos que no escapan (optimización).
 
 ## 7. Preguntas abiertas

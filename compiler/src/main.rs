@@ -359,7 +359,8 @@ fn real_main() -> ExitCode {
     if ownership_check {
         let hir_program = hir::lower(&items, &typed_program);
         let ir_program = ir::lower(&hir_program);
-        let violations = ownership::check_moves(&ir_program);
+        let movable_types = ownership::movable_types(&items);
+        let violations = ownership::check_moves_for_types(&ir_program, &movable_types);
         print!("{}", ownership::dump_moves(&violations));
         return if violations.is_empty() { ExitCode::SUCCESS } else { ExitCode::FAILURE };
     }
@@ -371,6 +372,35 @@ fn real_main() -> ExitCode {
         print!("{}", ir::dump(&lowered));
         print!("{}", ownership::dump_lowering(&summary));
         return if ir::verify(&lowered).violations.is_empty() { ExitCode::SUCCESS } else { ExitCode::FAILURE };
+    }
+
+    // E1101 is part of the normal compiler contract now: every executable
+    // entry point sees the same ownership check before code generation or
+    // interpretation. The explicit --ownership-check mode above remains a
+    // useful report-only inspection of the same facts.
+    let hir_program = hir::lower(&items, &typed_program);
+    let ir_program = ir::lower(&hir_program);
+    let movable_types = ownership::movable_types(&items);
+    let move_violations = ownership::check_moves_for_types(&ir_program, &movable_types);
+    if !move_violations.is_empty() {
+        for violation in &move_violations {
+            let message = format!(
+                "value %{} in function '{}' of type '{}' was sent through a channel at bb{}:{} and used after channel send at bb{}:{}",
+                violation.value,
+                violation.function,
+                violation.ty.describe(),
+                violation.send_block,
+                violation.send_instruction,
+                violation.use_block,
+                violation.use_instruction,
+            );
+            if json {
+                emit_json_diagnostic(Some("E1101"), &message, Some(path), None, None);
+            } else {
+                eprintln!("error OSTRIN-E1101: {message}");
+            }
+        }
+        return ExitCode::FAILURE;
     }
 
     let emit_c = args.iter().any(|a| a == "--emit-c");

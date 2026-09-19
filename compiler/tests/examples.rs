@@ -853,25 +853,39 @@ fn native_backend_rejects_constructs_it_does_not_support_yet() {
 }
 
 #[test]
-fn moved_after_send_is_a_runtime_error_in_both_backends() {
-    // A record sent through a channel can't be read afterwards (E1101): the
-    // interpreter checks it dynamically, and the native backend mirrors that
-    // check with a set of moved addresses.
+fn moved_after_send_is_rejected_statically_in_both_entry_points() {
+    // E1101 is now a compiler diagnostic shared by the interpreter and native
+    // entry points. No backend should be generated for a use-after-send.
     let file = example_path("moved_after_send.ostrin");
     let interpreted = run(&["--run", &file]);
     assert!(!interpreted.status.success());
-    assert!(stderr(&interpreted).contains("was moved into a channel send"), "unexpected stderr: {}", stderr(&interpreted));
+    let interpreted_error = format!("{}{}", stdout(&interpreted), stderr(&interpreted));
+    assert!(interpreted_error.contains("OSTRIN-E1101"), "missing E1101: {interpreted_error}");
+    assert!(interpreted_error.contains("used after channel send"), "unexpected diagnostic: {interpreted_error}");
 
     let exe = temp_artifact("moved.exe");
     let compile = run(&["--compile", "--out", &exe, &file]);
+    assert!(!compile.status.success(), "native compilation must stop at E1101");
+    assert!(stderr(&compile).contains("OSTRIN-E1101"), "missing native E1101: {}", stderr(&compile));
+    let _ = fs::remove_file(&exe);
+}
+
+#[test]
+fn immutable_records_can_be_shared_through_channels() {
+    let interpreted = run(&["--run", &example_path("immutable_record_channel.ostrin")]);
+    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert_eq!(stdout(&interpreted).trim(), "1");
+
+    let exe = temp_artifact("immutable-record.exe");
+    let compile = run(&["--compile", "--out", &exe, &example_path("immutable_record_channel.ostrin")]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+    assert!(compile.status.success(), "native compile failed: {}", stderr(&compile));
     let native = Command::new(&exe).output().unwrap();
     let _ = fs::remove_file(&exe);
-    assert!(!native.status.success());
-    assert!(String::from_utf8_lossy(&native.stderr).contains("was moved into a channel send"));
+    assert!(native.status.success(), "native binary failed: {}", String::from_utf8_lossy(&native.stderr));
+    assert_eq!(String::from_utf8_lossy(&native.stdout).trim(), "1");
 }
 
 #[test]
@@ -1561,7 +1575,7 @@ fn spawn_capturing_mut_is_rejected() {
 fn moved_channel_value_cannot_be_reused() {
     let out = run(&["--run", &example_path("moved_after_send.ostrin")]);
     assert!(!out.status.success());
-    assert!(stderr(&out).contains("moved"));
+    assert!(stderr(&out).contains("OSTRIN-E1101"));
 }
 
 #[test]

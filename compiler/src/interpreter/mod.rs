@@ -371,6 +371,9 @@ pub struct Interpreter {
     traits: HashMap<String, TraitDecl>,
     derives: HashMap<String, Vec<String>>,
     runtime_record_type_args: HashMap<usize, Vec<Type>>,
+    /// Names of records/enums whose representation contains mutable state.
+    /// Immutable records are copy/share-safe when sent through a channel.
+    movable_types: HashSet<String>,
     moved: HashSet<usize>,
     call_stack: Vec<CallFrame>,
     debugger: Option<Debugger>,
@@ -442,6 +445,7 @@ impl Interpreter {
         ] {
             variant_to_enum.entry(variant.to_string()).or_insert_with(|| owner.to_string());
         }
+        let movable_types = crate::ownership::movable_types(items);
         Interpreter {
             functions,
             records,
@@ -451,6 +455,7 @@ impl Interpreter {
             traits,
             derives,
             runtime_record_type_args: HashMap::new(),
+            movable_types,
             moved: HashSet::new(),
             call_stack: Vec::new(),
             debugger: None,
@@ -2262,8 +2267,10 @@ impl Interpreter {
                             return Err(RuntimeError::Error("cannot send on a closed channel".to_string()));
                         }
                         let v = self.eval_arg(&args[0], env)?;
-                        if let Some(ptr) = Self::record_ptr(&v) {
-                            self.moved.insert(ptr);
+                        if let Value::Record(name, data) = &v {
+                            if self.movable_types.contains(name) {
+                                self.moved.insert(Rc::as_ptr(data) as usize);
+                            }
                         }
                         state.borrow_mut().queue.push_back(v);
                         return Ok(Value::Void);
