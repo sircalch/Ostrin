@@ -1,0 +1,74 @@
+// Funciones como valores: lambdas con captura, funciones con nombre, cierres devueltos.
+fn apply(f: fn(Int) -> Int, x: Int) -> Int {
+    f(x)
+}
+
+fn twice(f: fn(Int) -> Int) -> fn(Int) -> Int {
+    fn(x) { f(f(x)) }
+}
+
+fn make_adder(n: Int) -> fn(Int) -> Int {
+    fn(x) { x + n }
+}
+
+fn make_scaler(k: Int) -> fn(Int) -> fn(Int) -> Int {
+    fn(a) { fn(b) { a * k + b } }
+}
+
+fn double(x: Int) -> Int {
+    x * 2
+}
+
+fn greet(name: String) -> String {
+    "hola " + name
+}
+
+fn run(action: fn() -> Void) -> Void {
+    action()
+}
+
+fn compose(f: fn(Int) -> Int, g: fn(Int) -> Int) -> fn(Int) -> Int {
+    fn(x) { g(f(x)) }
+}
+
+record Handler {
+    name: String
+    on_value: fn(Int) -> Int
+}
+
+fn main() -> Void {
+    k = 5
+    add: fn(Int) -> Int = fn(x) { x + k }
+    print(add(1))
+    print(apply(add, 10))
+    print(apply(double, 4))
+    print(apply(fn(x) { x * x }, 7))
+
+    add3 = make_adder(3)
+    print(add3(4))
+    print(twice(add3)(10))
+    print(twice(double)(3))
+
+    scale = make_scaler(10)
+    print(scale(2)(3))
+
+    inc_then_double = compose(make_adder(1), double)
+    print(inc_then_double(5))
+
+    say: fn(String) -> String = greet
+    print(say("mundo"))
+
+    run(fn() { print("accion") })
+
+    fs: List<fn(Int) -> Int> = [double, add3, add]
+    mut total = 0
+    for f in fs {
+        total = total + f(100)
+    }
+    print(total)
+
+    h = Handler { name: "h1", on_value: fn(v) { v + k } }
+    print(h.name)
+    cb = h.on_value
+    print(cb(1))
+}

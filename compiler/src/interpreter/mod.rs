@@ -1330,6 +1330,11 @@ impl Interpreter {
                 if let Some(enum_name) = self.variant_to_enum.get(name).cloned() {
                     return Ok(Value::EnumInstance(enum_name, name.clone(), HashMap::new(), Vec::new()));
                 }
+                // A named function used as a value: a closure over its own parameters.
+                if let Some(decl) = self.functions.get(name).cloned() {
+                    let params: Vec<String> = decl.params.iter().map(|p| p.name.clone()).collect();
+                    return Ok(Value::Closure(Rc::new(params), Rc::new(decl.body.clone()), env.clone()));
+                }
                 Err(RuntimeError::Error(format!("undefined name '{name}'")))
             }
             Expr::Unary(UnaryOp::Neg, e)

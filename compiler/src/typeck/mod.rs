@@ -386,7 +386,7 @@ impl Checker {
             }
         }
         let previous_return_type = self.current_return_type.replace(expected.clone());
-        let actual = self.check_block(body, &mut scope);
+        let actual = self.check_block_expecting(body, &mut scope, Some(&expected));
         self.note_expected_block(body, &expected);
         let tail_adapted = match &body.tail {
             Some(tail) => self.adapt_literals(tail, &expected, &actual),
@@ -680,6 +680,12 @@ impl Checker {
     }
 
     fn check_block(&mut self, block: &Block, scope: &mut Scope) -> Ty {
+        self.check_block_expecting(block, scope, None)
+    }
+
+    /// Like `check_block`, but the tail expression is checked against the type the block is expected to
+    /// have (so a lambda in tail position learns its parameter types).
+    fn check_block_expecting(&mut self, block: &Block, scope: &mut Scope, expected: Option<&Ty>) -> Ty {
         let previous_scope_depth = self.editor_scope_depth;
         self.editor_scope_depth += 1;
         for stmt in &block.stmts {
@@ -689,7 +695,7 @@ impl Checker {
             self.current_span = previous_span;
         }
         let result = match &block.tail {
-            Some(e) => self.infer_expr(e, scope),
+            Some(e) => self.infer_expr_with_expected(e, expected, scope),
             None => Ty::Void,
         };
         self.editor_scope_depth = previous_scope_depth;
@@ -699,7 +705,8 @@ impl Checker {
     fn check_stmt(&mut self, stmt: &Stmt, scope: &mut Scope) {
         match stmt {
             Stmt::Binding { mut_, name, ty, value } => {
-                let value_ty = self.infer_expr(value, scope);
+                let declared_early = ty.as_ref().map(|t| self.resolve_type_in_context(t));
+                let value_ty = self.infer_expr_with_expected(value, declared_early.as_ref().filter(|d| matches!(d, Ty::Fn(..))), scope);
                 let final_ty = match ty {
                     Some(t) => {
                         let declared = self.resolve_type_in_context(t);
@@ -1591,7 +1598,7 @@ impl Checker {
                 self.check_block(b, &mut inner)
             }
             Expr::Lambda(params, body) => {
-                self.infer_lambda(params, body, None, scope)
+                self.infer_lambda(params, body, None, None, scope)
             }
             Expr::ListLiteral(items) => {
                 let mut elem = Ty::Unknown;
@@ -1807,7 +1814,15 @@ impl Checker {
     ) -> Ty {
         let value_types: HashMap<String, Ty> = fields
             .iter()
-            .map(|(field_name, value)| (field_name.clone(), self.infer_expr(value, scope)))
+            .map(|(field_name, value)| {
+                let declared_fn = self
+                    .record_fields
+                    .get(name)
+                    .and_then(|fs| fs.iter().find(|(n, _)| n == field_name).map(|(_, t)| t.clone()))
+                    .map(|t| self.resolve_type_in_context(&t))
+                    .filter(|t| matches!(t, Ty::Fn(..)));
+                (field_name.clone(), self.infer_expr_with_expected(value, declared_fn.as_ref(), scope))
+            })
             .collect();
         // Untyped integer literals in a field whose declared type is a
         // fixed-width integer (or a list of them) take that type.
@@ -2400,14 +2415,18 @@ impl Checker {
         expected: Option<&Ty>,
         scope: &mut Scope,
     ) -> Ty {
-        if let (Expr::Lambda(params, body), Some(Ty::Fn(expected_params, _))) = (expr.unlocated(), expected) {
-            let ty = self.infer_lambda(params, body, Some(expected_params), scope);
+        if let (Expr::Lambda(params, body), Some(Ty::Fn(expected_params, expected_ret))) = (expr.unlocated(), expected) {
+            let ty = self.infer_lambda(params, body, Some(expected_params), Some(expected_ret.as_ref()), scope);
             // This path bypasses `infer_expr`, so record the lambda's type here (every layer around it).
             let mut layer = expr;
             loop {
                 self.node_types.insert(layer as *const Expr as usize, ty.clone());
                 match layer {
-                    Expr::Located(inner, _) => layer = inner,
+                    Expr::Located(inner, range) => {
+                        let key = ExprKey { file: self.current_source_file.clone(), start: range.start, end: range.end };
+                        self.expr_types.insert(key, ty.clone());
+                        layer = inner
+                    }
                     _ => break,
                 }
             }
@@ -2421,6 +2440,7 @@ impl Checker {
         params: &[String],
         body: &Block,
         expected_params: Option<&[Ty]>,
+        expected_ret: Option<&Ty>,
         scope: &mut Scope,
     ) -> Ty {
         let mut inner = scope.clone();
@@ -2433,7 +2453,7 @@ impl Checker {
             inner.insert(parameter.clone(), (parameter_type, false));
         }
         let previous_return_type = self.current_return_type.take();
-        let ret = self.check_block(body, &mut inner);
+        let ret = self.check_block_expecting(body, &mut inner, expected_ret.filter(|r| !matches!(r, Ty::Unknown)));
         self.current_return_type = previous_return_type;
         Ty::Fn(parameter_types, Box::new(ret))
     }
@@ -2465,6 +2485,19 @@ impl Checker {
             let expr = match arg {
                 Arg::Positional(e) | Arg::Named(_, e) => e,
             };
+            // A function-typed parameter of a plain (non-generic) user function tells a lambda argument its types.
+            let expected = expected.or_else(|| {
+                let Expr::Ident(name) = callee.unlocated() else { return None };
+                let sig = self.functions.get(name)?.clone();
+                if !sig.generics.is_empty() {
+                    return None;
+                }
+                let param = match arg {
+                    Arg::Positional(_) => sig.params.get(index)?,
+                    Arg::Named(n, _) => sig.params.iter().find(|p| &p.name == n)?,
+                };
+                Some(self.resolve_type_in_context(&param.ty)).filter(|t| matches!(t, Ty::Fn(..)))
+            });
             arg_types.push(self.infer_expr_with_expected(expr, expected.as_ref(), scope));
         }
 

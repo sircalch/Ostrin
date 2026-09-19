@@ -3544,3 +3544,13 @@ Primer puente hacia el backend sobre HIR: la lógica que ordena argumentos nombr
 ## 109. Comprobación cruzada HIR↔nativo en constructores de variantes
 
 `gen_variant_args` compara el número de campos de la variante con `HirProgram.arities`; con esto funciones, métodos y constructores quedan contrastados. 6 + 98 pruebas verdes, 0 divergencias.
+
+## 110. Funciones como valores y cierres (intérprete, checker y backend nativo)
+
+Ejemplo: `examples/native_function_values.ostrin` (comparado intérprete↔nativo por la prueba diferencial).
+
+- **Intérprete:** una función con nombre ya se puede usar como valor (`apply(double, 4)`); antes daba `undefined name`.
+- **Checker:** una lambda aprende los tipos de sus parámetros del contexto: parámetro de función de usuario con tipo `fn(...) -> ...`, binding anotado, campo de record, cola de una función o de otra lambda (`fn(a) { fn(b) { ... } }`). Bajó de 19 a 1 las expresiones sin tipo y el ejemplo nuevo llega a 0.
+- **Nativo:** `CType::Fn` = `OstrinClosure { void* fn; void* env; }` por valor. Cada lambda se eleva a una función C que recibe el entorno; las variables capturadas se **copian** a un entorno en el montón (struct con nombre `OstrinEnv_N`: dos structs anónimos distintos rompían el aliasing estricto con `-O2`). Una función con nombre usada como valor recibe un thunk sin entorno. Se llama por puntero (`f(x)`, `make_adder(3)(4)`), se guardan en listas, records y bindings.
+- **Límites conocidos:** la captura es por valor (una variable `mut` modificada después de crear el cierre no se ve dentro; el intérprete comparte el entorno); una lambda sin contexto de tipos (`f = fn(x) { ... }` sin anotar) se rechaza en nativo pidiendo anotación; funciones genéricas no se pueden usar como valor; `?` dentro de una lambda sigue sin soportarse.
+- Pruebas: 6 diferenciales (checker↔nativo sin divergencias) y 98 de integración.

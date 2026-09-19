@@ -96,6 +96,9 @@ enum CType {
     Quantity(Dimension),
     /// `Result<T, E>`: by-value `{ bool ok; T value; E error; }`, monomorphized per (T, E).
     Result(Box<CType>, Box<CType>),
+    /// A function value: a closure `{ fn, env }` (`OstrinClosure`), by value. The environment holds
+    /// copies of the captured variables; calling goes through `fn` with `env` as first argument.
+    Fn(Vec<CType>, Box<CType>),
     /// A bare `Ok(x)` / `Err(e)` knows only one side of its `Result`; like
     /// `NoneLit`, `coerce` completes it once an expected type is known.
     OkLit(Box<CType>),
@@ -148,6 +151,7 @@ fn c_type_name(ty: &CType) -> String {
         CType::NoneLit | CType::OkLit(_) | CType::ErrLit(_) | CType::GenLit(..) => "int".to_string(),
         CType::Quantity(_) => "Qty".to_string(),
         CType::Result(t, e) => format!("Result_{}_{}", mangle_ctype(t), mangle_ctype(e)),
+        CType::Fn(..) => "OstrinClosure".to_string(),
     }
 }
 
@@ -163,6 +167,12 @@ fn list_struct_name(elem: &CType) -> String {
 /// represent — just enough to resolve a bare type name to the right `CType`
 /// variant. Field/method type-checking already happened in `typeck`; this
 /// only picks which concrete C shape a name maps to.
+/// A closure under construction: the scopes of the function around it, and the variables it captured from them.
+struct CaptureFrame {
+    outer: Vec<HashMap<String, CType>>,
+    captures: Vec<(String, CType)>,
+}
+
 struct NamedTypes<'a> {
     records: &'a HashSet<String>,
     enums: &'a HashSet<String>,
@@ -256,6 +266,10 @@ fn map_type_with_subst(ty: &Type, types: &NamedTypes, subst: &HashMap<String, CT
             types.seen.borrow_mut().push((name.clone(), concrete));
             Ok(if is_enum { CType::Enum(mangled) } else { CType::Record(mangled) })
         }
+        Type::Fn(params, ret) => Ok(CType::Fn(
+            params.iter().map(|p| map_type_with_subst(p, types, subst)).collect::<Result<Vec<_>, _>>()?,
+            Box::new(map_type_with_subst(ret, types, subst)?),
+        )),
         Type::Dyn(traits) => {
             if traits.len() != 1 {
                 return Err("'dyn A + B' (more than one trait) isn't supported by the native backend yet".to_string());
@@ -311,6 +325,7 @@ const PRELUDE: &str = "#include <stdint.h>\n\
 #include <string.h>\n\
 #include <errno.h>\n\
 #include <math.h>\n
+typedef struct { void* fn; void* env; } OstrinClosure;\n\
 #define OSTRIN_FAIL(msg) do { fprintf(stderr, \"runtime error: %s\\n\", msg); exit(1); } while (0)\n\
 #define OSTRIN_OOM() do { fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); } while (0)\n\
 \n\
@@ -556,6 +571,11 @@ struct Codegen<'a> {
     pending_results: VecDeque<(CType, CType)>,
     current_return: Vec<CType>,
     lambda_depth: usize,
+    /// Enclosing-function scopes of the closures being generated (innermost last), plus what each captured.
+    capture_frames: RefCell<Vec<CaptureFrame>>,
+    closure_bodies: Vec<(String, String)>,
+    closure_protos: Vec<String>,
+    closure_counter: usize,
     /// Generic records/enums (`Score<T>`, `Maybe<T>`): only their concrete
     /// instantiations, discovered on demand, are ever emitted.
     generic_records: HashMap<String, &'a RecordDecl>,
@@ -687,6 +707,7 @@ fn mangle_ctype(ty: &CType) -> String {
         CType::OkLit(t) => format!("Ok_{}", mangle_ctype(t)),
         CType::ErrLit(t) => format!("Err_{}", mangle_ctype(t)),
         CType::Result(t, e) => format!("Result_{}_{}", mangle_ctype(t), mangle_ctype(e)),
+        CType::Fn(params, ret) => format!("Fn_{}_to_{}", params.iter().map(mangle_ctype).collect::<Vec<_>>().join("_"), mangle_ctype(ret)),
     }
 }
 
@@ -1272,7 +1293,133 @@ impl<'a> Codegen<'a> {
     }
 
     fn lookup(&self, name: &str) -> Option<CType> {
-        self.scopes.iter().rev().find_map(|scope| scope.get(name).cloned())
+        if let Some(ty) = self.scopes.iter().rev().find_map(|scope| scope.get(name).cloned()) {
+            return Some(ty);
+        }
+        // Not local to the closure being generated: it may be a variable of an enclosing function,
+        // which every closure from there inwards must capture.
+        let mut frames = self.capture_frames.borrow_mut();
+        for i in (0..frames.len()).rev() {
+            if let Some(ty) = frames[i].outer.iter().rev().find_map(|scope| scope.get(name).cloned()) {
+                for frame in &mut frames[i..] {
+                    if !frame.captures.iter().any(|(n, _)| n == name) {
+                        frame.captures.push((name.to_string(), ty.clone()));
+                    }
+                }
+                return Some(ty);
+            }
+        }
+        None
+    }
+
+    /// The C function-pointer type a closure of this shape is called through.
+    fn closure_fn_type(params: &[CType], ret: &CType) -> String {
+        let rest: String = params.iter().map(|p| format!(", {}", c_type_name(p))).collect();
+        format!("{} (*)(void*{rest})", c_type_name(ret))
+    }
+
+    /// A lambda used as a value: hoisted to a C function taking its environment first; the
+    /// variables it uses from the enclosing scopes are copied into a heap environment.
+    fn gen_closure(&mut self, expr: &Expr, names: &[String], body: &Block, hint: Option<CType>) -> Result<(String, CType), String> {
+        let (expected, ret_hint) = match hint {
+            Some(CType::Fn(p, r)) if p.len() == names.len() => (Some(p), Some(*r)),
+            _ => (None, None),
+        };
+        let param_types = match expected {
+            Some(p) => p,
+            None => match self.node_types.and_then(|n| n.get(&(expr as *const Expr as usize))).cloned() {
+                Some(Ty::Fn(p, _)) if p.len() == names.len() => {
+                    p.iter().map(|t| self.ty_to_ctype(t)).collect::<Option<Vec<_>>>().ok_or("cannot determine the parameter types of this function value")?
+                }
+                _ => return Err("cannot determine the parameter types of this function value (add type annotations)".to_string()),
+            },
+        };
+        let outer = std::mem::replace(&mut self.scopes, vec![HashMap::new()]);
+        self.capture_frames.borrow_mut().push(CaptureFrame { outer, captures: Vec::new() });
+        for (name, ty) in names.iter().zip(&param_types) {
+            self.define(name, ty.clone());
+        }
+        let saved_expected = self.expected.take();
+        self.lambda_depth += 1;
+        // A body that is just an expression inherits the expected result type (a nested lambda needs it).
+        if body.stmts.is_empty() {
+            self.expected = ret_hint;
+        }
+        let result = self.gen_block_expr(body);
+        self.expected = None;
+        self.lambda_depth -= 1;
+        self.expected = saved_expected;
+        let frame = self.capture_frames.borrow_mut().pop().expect("frame pushed above");
+        self.scopes = frame.outer;
+        let (body_code, ret) = result?;
+        let id = self.closure_counter;
+        self.closure_counter += 1;
+        let fn_name = format!("ostrin_lambda_{id}");
+        let env_struct: String = frame.captures.iter().map(|(n, t)| format!("{} {n}; ", c_type_name(t))).collect();
+        let params_c: String = names.iter().zip(&param_types).map(|(n, t)| format!(", {} {n}", c_type_name(t))).collect();
+        let signature = format!("static {} {fn_name}(void* __env{params_c})", c_type_name(&ret));
+        let mut fn_body = String::new();
+        if !frame.captures.is_empty() {
+            fn_body.push_str(&format!("    OstrinEnv_{id}* __e = __env;\n"));
+            for (n, t) in &frame.captures {
+                fn_body.push_str(&format!("    {} {n} = __e->{n};\n", c_type_name(t)));
+            }
+        }
+        if ret == CType::Void {
+            fn_body.push_str(&format!("    {body_code};\n"));
+        } else {
+            fn_body.push_str(&format!("    return {body_code};\n"));
+        }
+        // A named struct (not an anonymous one per use site): both sides must share one type for strict aliasing.
+        if !frame.captures.is_empty() {
+            self.closure_protos.push(format!("typedef struct {{ {env_struct}}} OstrinEnv_{id};"));
+        }
+        self.closure_protos.push(format!("{signature};"));
+        self.closure_bodies.push((signature, fn_body));
+        let env = if frame.captures.is_empty() {
+            "NULL".to_string()
+        } else {
+            let copies: String = frame.captures.iter().map(|(n, _)| format!("__ce->{n} = {n}; ")).collect();
+            format!("({{ OstrinEnv_{id}* __ce = malloc(sizeof *__ce); if (!__ce) OSTRIN_OOM(); {copies}(void*)__ce; }})")
+        };
+        let ty = CType::Fn(param_types, Box::new(ret));
+        Ok((format!("((OstrinClosure){{ (void*){fn_name}, {env} }})"), ty))
+    }
+
+    fn function_usable_as_value(&self, name: &str) -> bool {
+        self.signatures.contains_key(name) && self.function_decls.get(name).is_some_and(|d| d.generics.is_empty())
+    }
+
+    /// A top-level function used as a value: a closure with no environment, over a forwarding thunk.
+    fn gen_function_value(&mut self, name: &str) -> Option<(String, CType)> {
+        if !self.function_usable_as_value(name) {
+            return None;
+        }
+        let (params, ret) = self.signatures.get(name).cloned()?;
+        let id = self.closure_counter;
+        self.closure_counter += 1;
+        let thunk = format!("ostrin_thunk_{id}");
+        let params_c: String = params.iter().enumerate().map(|(i, t)| format!(", {} a{i}", c_type_name(t))).collect();
+        let args: Vec<String> = (0..params.len()).map(|i| format!("a{i}")).collect();
+        let signature = format!("static {} {thunk}(void* __env{params_c})", c_type_name(&ret));
+        let call = format!("{}({})", c_function_name(name), args.join(", "));
+        let body = if ret == CType::Void { format!("    (void)__env; {call};\n") } else { format!("    (void)__env; return {call};\n") };
+        self.closure_protos.push(format!("{signature};"));
+        self.closure_bodies.push((signature, body));
+        Some((format!("((OstrinClosure){{ (void*){thunk}, NULL }})"), CType::Fn(params, Box::new(ret))))
+    }
+
+    /// Calls a function value: `callee` is C code of type `OstrinClosure`.
+    fn gen_closure_call(&mut self, callee: &str, params: &[CType], ret: &CType, args: &[Arg]) -> Result<(String, CType), String> {
+        if args.len() != params.len() {
+            return Err(format!("this function value takes {} argument(s), got {}", params.len(), args.len()));
+        }
+        let (codes, types) = self.gen_args_hinted(args, params)?;
+        let coerced = self.coerce_args(&codes, &types, params)?;
+        let temp = self.next_temp();
+        let rest: String = coerced.iter().map(|c| format!(", {c}")).collect();
+        let fn_type = Self::closure_fn_type(params, ret);
+        Ok((format!("({{ OstrinClosure {temp} = {callee}; (({fn_type}){temp}.fn)({temp}.env{rest}); }})"), ret.clone()))
     }
 
     fn next_temp(&mut self) -> String {
@@ -1612,7 +1759,7 @@ impl<'a> Codegen<'a> {
             }
             return;
         };
-        if crate::types::ty_contains_unknown(checker_ty) || matches!(checker_ty, Ty::Fn(..)) {
+        if crate::types::ty_contains_unknown(checker_ty) {
             self.type_report.unchecked += 1;
         } else if matches!(ty, CType::NoneLit | CType::OkLit(_) | CType::ErrLit(_) | CType::GenLit(..)) {
             self.type_report.partial += 1;
@@ -1641,7 +1788,7 @@ impl<'a> Codegen<'a> {
             self.type_report.node_unchecked += 1;
             return;
         };
-        if crate::types::ty_contains_unknown(checker_ty) || matches!(checker_ty, Ty::Fn(..)) || matches!(ty, CType::NoneLit | CType::OkLit(_) | CType::ErrLit(_) | CType::GenLit(..)) {
+        if crate::types::ty_contains_unknown(checker_ty) || matches!(ty, CType::NoneLit | CType::OkLit(_) | CType::ErrLit(_) | CType::GenLit(..)) {
             self.type_report.node_unchecked += 1;
         } else if self.ctype_agrees(checker_ty, ty) {
             self.type_report.node_agreed += 1;
@@ -1713,6 +1860,7 @@ impl<'a> Codegen<'a> {
                 matches!(elem, CType::Int | CType::Float | CType::Float32 | CType::Bool).then(|| CType::Array(Box::new(elem)))?
             }
             Ty::List(t) => CType::List(Box::new(self.ty_to_ctype(t)?)),
+            Ty::Fn(params, ret) => CType::Fn(params.iter().map(|p| self.ty_to_ctype(p)).collect::<Option<Vec<_>>>()?, Box::new(self.ty_to_ctype(ret)?)),
             Ty::Set(t) => CType::Set(Box::new(self.ty_to_ctype(t)?)),
             Ty::Map(k, v) => CType::Map(Box::new(self.ty_to_ctype(k)?), Box::new(self.ty_to_ctype(v)?)),
             Ty::Applied(n, args) if n == "Option" && args.len() == 1 => CType::Option(Box::new(self.ty_to_ctype(&args[0])?)),
@@ -1795,6 +1943,7 @@ impl<'a> Codegen<'a> {
                 })
             }
             (Ty::Dyn(t), CType::DynTrait(u)) => t == u,
+            (Ty::Fn(ps, r), CType::Fn(cps, cr)) => ps.len() == cps.len() && ps.iter().zip(cps).all(|(p, c)| self.ctype_agrees(p, c)) && self.ctype_agrees(r, cr),
             _ => false,
         }
     }
@@ -1833,6 +1982,10 @@ impl<'a> Codegen<'a> {
             Expr::Float32Literal(v) => Ok((c_f32_literal(*v), CType::Float32)),
             Expr::BoolLiteral(v) => Ok((if *v { "true".to_string() } else { "false".to_string() }, CType::Bool)),
             Expr::StringLiteral(s) => Ok((c_string_literal(s), CType::Str)),
+            Expr::Lambda(names, body) => self.gen_closure(expr, names, body, hint),
+            Expr::Ident(name) if self.lookup(name).is_none() && self.function_usable_as_value(name) => {
+                self.gen_function_value(name).ok_or_else(|| format!("function '{name}' can't be used as a value"))
+            }
             Expr::Ident(name) => {
                 if let Some(ty) = self.lookup(name) {
                     // Reading a record variable after it was sent through a channel is an error (E1101).
@@ -2834,7 +2987,13 @@ impl<'a> Codegen<'a> {
         match callee.unlocated() {
             Expr::Ident(name) => self.gen_function_call(name, type_args, args, hint),
             Expr::FieldAccess(obj, method_name) => self.gen_method_call(obj, method_name, type_args, args),
-            _ => Err("only a direct function call or 'record.method(...)' is supported by the native backend yet".to_string()),
+            _ => {
+                let (code, ty) = self.gen_expr(callee)?;
+                match ty {
+                    CType::Fn(params, ret) => self.gen_closure_call(&code, &params, &ret, args),
+                    _ => Err("only a direct function call, a function value or 'record.method(...)' is supported by the native backend yet".to_string()),
+                }
+            }
         }
     }
 
@@ -2861,6 +3020,9 @@ impl<'a> Codegen<'a> {
 
     fn gen_function_call(&mut self, name: &str, type_args: Option<&[Type]>, args: &[Arg], hint: Option<CType>) -> Result<(String, CType), String> {
         let call_key = self.current_call_key.take();
+        if let Some(CType::Fn(params, ret)) = self.lookup(name) {
+            return self.gen_closure_call(name, &params, &ret, args);
+        }
         if self.generic_variant_owner.contains_key(name) {
             return self.gen_generic_variant(name, type_args, args, hint);
         }
@@ -4023,6 +4185,7 @@ impl<'a> Codegen<'a> {
             }
             CType::Quantity(_) => return Ok((format!("ostrin_print_qty({})", arg_codes[0]), CType::Void)),
             CType::GenLit(..) => return Err("cannot infer the enum instance to print here".to_string()),
+            CType::Fn(..) => ("%s\n", "\"<function>\"".to_string()),
             CType::Channel(_) | CType::Task(_) | CType::Rng => return Err("cannot 'print' a Task, Channel or Rng value".to_string()),
             CType::NoneLit | CType::OkLit(_) | CType::ErrLit(_) => {
                 return Err("cannot 'print' a bare None/Ok/Err literal; its type can't be inferred here".to_string())
@@ -4247,6 +4410,10 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>, tr
         pending_results: VecDeque::new(),
         current_return: Vec::new(),
         lambda_depth: 0,
+        capture_frames: RefCell::new(Vec::new()),
+        closure_bodies: Vec::new(),
+        closure_protos: Vec::new(),
+        closure_counter: 0,
         generic_records,
         generic_enums,
         generic_arity,
@@ -4823,6 +4990,10 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>, tr
 ", c_type_name(&inner)));
     }
 
+    for proto in &codegen.closure_protos {
+        out.push_str(proto);
+        out.push('\n');
+    }
     for f in &functions {
         if f.generics.is_empty() {
             let (param_types, return_type) = codegen.signatures.get(&f.name).cloned().unwrap();
@@ -4858,6 +5029,7 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>, tr
     for block in array_blocks.iter().chain(&late_array_blocks) {
         out.push_str(block);
     }
+    bodies.extend(codegen.closure_bodies.drain(..));
     for (signature, body) in bodies {
         out.push_str(&format!("{signature} {{\n{body}}}\n\n"));
     }
