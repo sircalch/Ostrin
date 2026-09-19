@@ -1,0 +1,4 @@
+[package]
+name = "plot"
+version = "0.1.0"
+entry = "plot.ostrin"

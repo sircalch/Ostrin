@@ -1,0 +1,44 @@
+// Gráficos SVG generados desde Ostrin: dispersión y línea, con ejes y título. Salida determinista.
+fn scale(v: Float, lo: Float, hi: Float, size: Float) -> Float {
+    if hi == lo { size / 2.0 } else { (v - lo) / (hi - lo) * size }
+}
+
+fn num(v: Float) -> String {
+    (round(v * 100.0) / 100.0).to_string()
+}
+
+fn frame(title: String, xs: Array<Float>, ys: Array<Float>) -> String {
+    "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"400\" height=\"300\" viewBox=\"0 0 400 300\">\n" +
+    "<rect width=\"400\" height=\"300\" fill=\"white\"/>\n" +
+    "<text x=\"200\" y=\"20\" text-anchor=\"middle\" font-size=\"14\">" + title + "</text>\n" +
+    "<line x1=\"40\" y1=\"260\" x2=\"380\" y2=\"260\" stroke=\"black\"/>\n" +
+    "<line x1=\"40\" y1=\"40\" x2=\"40\" y2=\"260\" stroke=\"black\"/>\n" +
+    "<text x=\"40\" y=\"276\" font-size=\"10\">" + num(xs.min()) + "</text>\n" +
+    "<text x=\"380\" y=\"276\" font-size=\"10\" text-anchor=\"end\">" + num(xs.max()) + "</text>\n" +
+    "<text x=\"36\" y=\"260\" font-size=\"10\" text-anchor=\"end\">" + num(ys.min()) + "</text>\n" +
+    "<text x=\"36\" y=\"48\" font-size=\"10\" text-anchor=\"end\">" + num(ys.max()) + "</text>\n"
+}
+
+fn px(x: Float, xs: Array<Float>) -> Float {
+    40.0 + scale(x, xs.min(), xs.max(), 340.0)
+}
+
+fn py(y: Float, ys: Array<Float>) -> Float {
+    260.0 - scale(y, ys.min(), ys.max(), 220.0)
+}
+
+pub fn scatter_svg(title: String, xs: Array<Float>, ys: Array<Float>) -> String {
+    mut out = frame(title, xs, ys)
+    for i in 0 until xs.length() {
+        out = out + "<circle cx=\"" + num(px(xs[i], xs)) + "\" cy=\"" + num(py(ys[i], ys)) + "\" r=\"3\" fill=\"steelblue\"/>\n"
+    }
+    out + "</svg>\n"
+}
+
+pub fn line_svg(title: String, xs: Array<Float>, ys: Array<Float>) -> String {
+    mut points = ""
+    for i in 0 until xs.length() {
+        points = points + num(px(xs[i], xs)) + "," + num(py(ys[i], ys)) + " "
+    }
+    frame(title, xs, ys) + "<polyline fill=\"none\" stroke=\"crimson\" stroke-width=\"2\" points=\"" + points.trim() + "\"/>\n</svg>\n"
+}

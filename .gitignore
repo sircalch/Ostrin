@@ -14,3 +14,4 @@ Thumbs.db
 # VS Code extension packaging output
 *.vsix
 examples/data_project/app/ostrin.lock
+examples/plot_project/app/ostrin.lock

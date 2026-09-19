@@ -3589,3 +3589,7 @@ El ejemplo `pkg_project` ya compila también en nativo.
 ## 115. Agregaciones en la biblioteca de tablas
 
 `tables` gana `unique`, `head`, `group_mean` y `group_count` (agrupar por columna, orden de primera aparición) escritas en Ostrin; el ejemplo `data_project/app` imprime n y media por ciudad, idéntico en intérprete y nativo. Sintaxis a recordar: `and`/`or`/`not` (no `&&`/`!`).
+
+## 116. Gráficos SVG como paquete
+
+`examples/plot_project/{plot,app}`: el paquete `plot` genera SVG (`scatter_svg`, `line_svg`: ejes, extremos rotulados, título) sobre `Array<Float>`, todo en Ostrin, con salida determinista (redondeo a 2 decimales) e idéntica en intérprete y nativo (test `svg_plot_package_runs_identically_in_both_backends`). Guardar a disco: `write_file("grafico.svg", svg)`. Sin dependencias externas ni red. Pendiente: histograma/barras, varias series, leyenda, PNG.

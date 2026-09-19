@@ -1710,3 +1710,21 @@ fn table_library_module_runs_identically_in_both_backends() {
     assert_eq!(stdout(&interpreted).lines().collect::<Vec<_>>(), native_text.lines().collect::<Vec<_>>());
     assert!(stdout(&interpreted).contains("Cusco: n=2 media=11"), "unexpected output: {}", stdout(&interpreted));
 }
+
+#[test]
+fn svg_plot_package_runs_identically_in_both_backends() {
+    let entry = example_path("plot_project/app/main.ostrin");
+    let interpreted = run(&["--run", &entry]);
+    assert!(interpreted.status.success(), "stderr: {}", stderr(&interpreted));
+    let exe = temp_artifact("plot_lib.exe");
+    let compiled = run(&["--compile", "--out", &exe, &entry]);
+    if skip_if_no_c_compiler(&compiled) {
+        return;
+    }
+    assert!(compiled.status.success(), "stderr: {}", stderr(&compiled));
+    let native = Command::new(&exe).output().expect("run native binary");
+    let _ = fs::remove_file(&exe);
+    let native_text = String::from_utf8_lossy(&native.stdout).to_string();
+    assert_eq!(stdout(&interpreted).lines().collect::<Vec<_>>(), native_text.lines().collect::<Vec<_>>());
+    assert!(stdout(&interpreted).contains("<polyline"), "expected an SVG polyline: {}", stdout(&interpreted));
+}
