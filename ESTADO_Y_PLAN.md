@@ -1,9 +1,9 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-18 · rama `main` · 6 pruebas diferenciales y 102 de integración en verde.*
+*Corte: 2026-09-18 · rama `main` · 6 pruebas diferenciales y 103 de integración en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
-Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–127); para el diseño
+Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–128); para el diseño
 del lenguaje, `docs/design/` (20 documentos).
 
 ---
@@ -133,7 +133,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | `==` sobre `List/Option/Map` | No soportado (tampoco en intérprete para Option) |
 | Mensajes de error de E/S | `strerror` ≠ texto de Rust (difieren entre backends) |
 | `Result<Void,E>` | Campo de valor de relleno (`char`) en C |
-| Migración HIR | Escalares, records, enums/match y Option/Result ya migrados; listas/colecciones, cierres y genéricos pendientes |
+| Migración HIR | Escalares, records, enums/match, Option/Result y núcleo de listas/colecciones migrados; cierres y genéricos pendientes |
 | Paquetes | Diseño y lockfile básicos; sin registro remoto (decisión: **no** añadir red automática al compilador) |
 | Rendimiento del intérprete | Tree‑walking simple; sin optimizaciones |
 | `newlines.ostrin`, `advanced.ostrin` | Son muestras de sintaxis, no programas ejecutables |
@@ -142,10 +142,10 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
 convendría dividirlos; el backend nativo no comparte el sistema de tipos del checker
-(ya consume los tipos del checker y compara cada nodo; **61 funciones/métodos de los ejemplos
-ya se generan desde el HIR** —escalares, records, enums, `match` y `Option`/`Result`, módulo
-`hir_c.rs`—, con un trinquete mínimo de 55; el resto sigue por el AST; ver documento 20 y
-secciones 123–127 de `CONTEXTO_PROYECTO.md`);
+(ya consume los tipos del checker y compara cada nodo; **69 funciones/métodos de los ejemplos
+ya se generan desde el HIR** —escalares, records, enums, `match`, `Option`/`Result` y
+listas/colecciones, módulo `hir_c.rs`—, con un trinquete mínimo de 65; el resto sigue por el AST; ver documento 20 y
+secciones 123–128 de `CONTEXTO_PROYECTO.md`);
 la búsqueda en `Map/Set` es lineal.
 
 ---
@@ -214,7 +214,7 @@ Decisiones que necesito de ti para afinar el plan:
 
 ```powershell
 cd compiler
-cargo test                                   # 6 diferenciales + 102 de integración
+cargo test                                   # 6 diferenciales + 103 de integración
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```

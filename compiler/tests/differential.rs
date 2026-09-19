@@ -281,7 +281,7 @@ fn native_backend_types_agree_with_the_checker() {
     assert!(node_agreed > 3000, "only {node_agreed} AST nodes were compared with the checker's per-node types");
     // Ratchet: expressions the backend cannot compare (the checker has no type).
     // Ratchet: functions whose C is generated from the HIR (the migration of the native backend).
-    assert!(hir_generated >= 55, "only {hir_generated} functions were generated from the HIR (expected at least 55)");
+    assert!(hir_generated >= 65, "only {hir_generated} functions were generated from the HIR (expected at least 65)");
     println!("functions generated from the HIR: {hir_generated}");
     assert!(unchecked <= 4, "{unchecked} expressions have no checker type (limit 4)");
     // Every partial literal the backend meets is completed from the checker's type.

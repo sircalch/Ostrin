@@ -3695,3 +3695,31 @@ de los ejemplos mantiene la misma salida que el intérprete. Validación final d
 **Siguiente paso:** quinta familia, listas y colecciones; después cierres y genéricos. Al terminar
 esas migraciones se podrá retirar progresivamente el camino AST del backend y comenzar la etapa
 de gestión de memoria/último uso prevista en los documentos 18 y 20.
+
+## 128. Listas y colecciones generadas desde el HIR (quinta familia) — 2026-09-18
+
+Se cerró el núcleo de la quinta familia en `compiler/src/hir_c.rs`. El emisor HIR usa las mismas
+estructuras y helpers C monomorfizados del backend existente (`List_*`, `Map_*`, `Set_*`), por lo
+que la migración no crea una segunda semántica de colecciones.
+
+- **Tipos y construcción**: `List<T>`, `Map<K,V>` y `Set<T>` tienen representación C y nombres
+  mangled recursivos (`List_Int`, `Map_String_Int`, `Set_Int`); se generan literales de lista,
+  conjunto y mapa, además de `Map<K,V>()` y `Set<T>()` vacíos.
+- **Listas**: indexación con comprobación de límites del runtime, `for x in lista`,
+  `length`/`count`, `push`, `remove_at` y `List<String>.join`.
+- **Mapas**: `get`/`remove` (devuelven `Option<V>` y por tanto se pueden encadenar con
+  `unwrap_or` desde HIR), `contains_key`, `count`, `set`, `keys` y `values`.
+- **Conjuntos**: `contains`, `add`, `remove` y `count`, incluyendo deduplicación del runtime.
+- **Tipos locales**: el registro previo de tipos concretos del HIR cubre también colecciones
+  creadas dentro de `main`, sin exigir que aparezcan en una firma. Esto evita que falten las
+  declaraciones de structs/helpers cuando una función se genera enteramente desde HIR.
+
+`examples/native_hir_collections.ostrin` y `native_hir_handles_collections_core` cubren la
+equivalencia intérprete↔nativo con listas, mutación explícita, indexación, iteración, mapas,
+`Option` devuelto por `get`, conjuntos y colecciones vacías. La suite diferencial sube el
+trinquete de **55 a 65** funciones generadas desde HIR; la medición actual es **69**. La suite
+completa queda en **6 pruebas diferenciales y 103 de integración verdes**.
+
+Los combinadores de colecciones que reciben cierres (`map`, `filter`, `fold`, `any`, `all`,
+`find`) siguen usando el fallback AST hasta migrar la familia de cierres. El siguiente paso es
+esa migración; después vendrán genéricos y la retirada progresiva del AST del backend.

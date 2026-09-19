@@ -1058,6 +1058,40 @@ fn native_hir_handles_option_result_core() {
 }
 
 #[test]
+fn native_hir_handles_collections_core() {
+    // Collection literals, indexing, iteration and the non-closure methods
+    // are now emitted directly from HIR. Closure combinators remain an AST
+    // fallback until the closure family is migrated.
+    let file = example_path("native_hir_collections.ostrin");
+    let expected = "3\n2\n1\n9\n10\ntrue\n2\n2\ntrue\n2\n1\n";
+    let interpreted = run(&["--run", &file]);
+    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    let hir_functions = stdout(&report)
+        .lines()
+        .find_map(|line| line.strip_prefix("hir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .unwrap_or(0);
+    assert!(hir_functions >= 1, "collections example did not use the HIR backend");
+
+    let exe = temp_artifact("native_hir_collections.exe");
+    let compile = run(&["--compile", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+    let native = Command::new(&exe).output().expect("failed to run collections binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "collections binary failed: {}", String::from_utf8_lossy(&native.stderr));
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+}
+
+#[test]
 fn int_division_truncates_in_both_backends() {
     // The type checker types `Int / Int` as `Int`; the interpreter used to
     // return a Float (7 / 2 -> 3.5), contradicting it.

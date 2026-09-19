@@ -1,0 +1,27 @@
+fn main() -> Void {
+    mut numbers = [1, 2, 3]
+    print(numbers.length())
+    print(numbers[1])
+    numbers.push(4)
+    print(numbers.remove_at(0))
+
+    mut total = 0
+    for number in numbers {
+        total = total + number
+    }
+    print(total)
+
+    table = ["alpha": 10, "beta": 20]
+    print(table.get("alpha").unwrap_or(0))
+    print(table.contains_key("beta"))
+    print(table.count())
+    print(table.keys().length())
+
+    seen = {1, 2, 2}
+    print(seen.contains(2))
+    print(seen.count())
+
+    mut visited = Set<Int>()
+    visited.add(8)
+    print(visited.count())
+}

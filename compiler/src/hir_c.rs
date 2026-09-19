@@ -58,8 +58,9 @@ struct Emitter<'a> {
 }
 
 impl Emitter<'_> {
-    /// The C type of a value the emitter handles: scalars, records and the
-    /// monomorphized built-in `Option`/`Result` structs emitted by codegen.
+    /// The C type of a value the emitter handles: scalars, records, the
+    /// monomorphized built-in wrappers and the collection structs emitted by
+    /// codegen.
     fn c_type(&self, ty: &Ty) -> Bail<String> {
         match ty {
             Ty::Int => Ok("int64_t".to_string()),
@@ -68,6 +69,13 @@ impl Emitter<'_> {
             Ty::String => Ok("const char*".to_string()),
             Ty::Named(n) if self.world.records.contains_key(n) => Ok(format!("{n}*")),
             Ty::Named(n) if self.world.enums.contains(n) => Ok(n.clone()),
+            Ty::List(elem) => Ok(format!("List_{}*", self.mangle_type(elem)?)),
+            Ty::Map(key, value) => Ok(format!(
+                "Map_{}_{}*",
+                self.mangle_type(key)?,
+                self.mangle_type(value)?
+            )),
+            Ty::Set(elem) => Ok(format!("Set_{}*", self.mangle_type(elem)?)),
             Ty::Applied(name, args) if name == "Option" && args.len() == 1 => {
                 Ok(format!("Option_{}", self.mangle_type(&args[0])?))
             }
@@ -88,6 +96,13 @@ impl Emitter<'_> {
             Ty::String => "String".to_string(),
             Ty::Void => "Void".to_string(),
             Ty::Named(n) => n.clone(),
+            Ty::List(elem) => format!("List_{}", self.mangle_type(elem)?),
+            Ty::Map(key, value) => format!(
+                "Map_{}_{}",
+                self.mangle_type(key)?,
+                self.mangle_type(value)?
+            ),
+            Ty::Set(elem) => format!("Set_{}", self.mangle_type(elem)?),
             Ty::Applied(name, args) if name == "Option" && args.len() == 1 => {
                 format!("Option_{}", self.mangle_type(&args[0])?)
             }
@@ -228,21 +243,37 @@ impl Emitter<'_> {
                 out.push_str("    }\n");
             }
             HirStmt::For { var, iter, body } => {
-                let HirKind::Range(start, kind, end, None) = &iter.kind else {
+                if let HirKind::Range(start, kind, end, None) = &iter.kind {
+                    if start.ty != Ty::Int || end.ty != Ty::Int {
+                        return Err(());
+                    }
+                    let (s, e) = (self.expr(start)?, self.expr(end)?);
+                    let cmp = if *kind == RangeKind::To { "<=" } else { "<" };
+                    out.push_str(&format!(
+                        "    for (int64_t {var} = {s}; {var} {cmp} {e}; {var}++) {{\n"
+                    ));
+                    self.scopes.push(HashSet::from([var.clone()]));
+                    self.scoped_stmts(body, out)?;
+                    self.scopes.pop();
+                    out.push_str("    }\n");
+                    return Ok(());
+                }
+
+                let Ty::List(elem) = &iter.ty else {
                     return Err(());
                 };
-                if start.ty != Ty::Int || end.ty != Ty::Int {
-                    return Err(());
-                }
-                let (s, e) = (self.expr(start)?, self.expr(end)?);
-                let cmp = if *kind == RangeKind::To { "<=" } else { "<" };
+                let list_c = self.c_type(&iter.ty)?;
+                let elem_c = self.c_type(elem)?;
+                let list_temp = self.next_temp();
+                let index_temp = self.next_temp();
+                let iter_code = self.expr(iter)?;
                 out.push_str(&format!(
-                    "    for (int64_t {var} = {s}; {var} {cmp} {e}; {var}++) {{\n"
+                    "    {{ {list_c} {list_temp} = {iter_code}; for (int64_t {index_temp} = 0; {index_temp} < {list_temp}->length; {index_temp}++) {{ {elem_c} {var} = {list_temp}->items[{index_temp}];\n"
                 ));
                 self.scopes.push(HashSet::from([var.clone()]));
                 self.scoped_stmts(body, out)?;
                 self.scopes.pop();
-                out.push_str("    }\n");
+                out.push_str("    } }\n");
             }
             HirStmt::Expr(e) => self.expr_stmt(e, out)?,
             _ => return Err(()),
@@ -580,6 +611,22 @@ impl Emitter<'_> {
                 }
                 Ok(format!("({{ {body} {temp}; }})"))
             }
+            HirKind::List(values) => self.list_literal(e, values),
+            HirKind::Set(values) => self.set_literal(e, values),
+            HirKind::Map(values) => self.map_literal(e, values),
+            HirKind::EmptyCollection(_, _) => self.empty_collection(e),
+            HirKind::Index(obj, index) => {
+                let Ty::List(elem) = &obj.ty else {
+                    return Err(());
+                };
+                if index.ty != Ty::Int || e.ty != **elem {
+                    return Err(());
+                }
+                let list_name = self.mangle_type(&obj.ty)?;
+                let obj_code = self.expr(obj)?;
+                let index_code = self.expr(index)?;
+                Ok(format!("{list_name}_get({obj_code}, {index_code})"))
+            }
             HirKind::MethodCall {
                 recv,
                 method,
@@ -592,6 +639,15 @@ impl Emitter<'_> {
                 }
                 if is_result(&recv.ty) {
                     return self.result_method(e, recv, method, args);
+                }
+                if is_list(&recv.ty) {
+                    return self.list_method(e, recv, method, args);
+                }
+                if is_map(&recv.ty) {
+                    return self.map_method(e, recv, method, args);
+                }
+                if is_set(&recv.ty) {
+                    return self.set_method(e, recv, method, args);
                 }
                 let Ty::Named(record) = &recv.ty else {
                     return Err(());
@@ -876,6 +932,220 @@ impl Emitter<'_> {
         }
     }
 
+    fn list_literal(&mut self, e: &HirExpr, values: &[HirExpr]) -> Bail<String> {
+        let Ty::List(elem) = &e.ty else {
+            return Err(());
+        };
+        let elem_c = self.c_type(elem)?;
+        let mut codes = Vec::with_capacity(values.len());
+        for value in values {
+            if !c_compatible(&self.c_type(&value.ty)?, &elem_c) {
+                return Err(());
+            }
+            codes.push(self.expr(value)?);
+        }
+        let name = self.mangle_type(&e.ty)?;
+        if values.is_empty() {
+            return Ok(format!("{name}_new_from_array(NULL, 0)"));
+        }
+        Ok(format!(
+            "{name}_new_from_array(({elem_c}[]){{ {} }}, {})",
+            codes.join(", "),
+            values.len()
+        ))
+    }
+
+    fn set_literal(&mut self, e: &HirExpr, values: &[HirExpr]) -> Bail<String> {
+        let Ty::Set(elem) = &e.ty else { return Err(()) };
+        let elem_c = self.c_type(elem)?;
+        let name = self.mangle_type(&e.ty)?;
+        let temp = self.next_temp();
+        let mut body = format!("{name}* {temp} = {name}_new(); ");
+        for value in values {
+            if !c_compatible(&self.c_type(&value.ty)?, &elem_c) {
+                return Err(());
+            }
+            let code = self.expr(value)?;
+            body.push_str(&format!("{name}_add({temp}, {code}); "));
+        }
+        Ok(format!("({{ {body} {temp}; }})"))
+    }
+
+    fn map_literal(&mut self, e: &HirExpr, values: &[(HirExpr, HirExpr)]) -> Bail<String> {
+        let Ty::Map(key, value) = &e.ty else {
+            return Err(());
+        };
+        let key_c = self.c_type(key)?;
+        let value_c = self.c_type(value)?;
+        let name = self.mangle_type(&e.ty)?;
+        let temp = self.next_temp();
+        let mut body = format!("{name}* {temp} = {name}_new(); ");
+        for (key_expr, value_expr) in values {
+            if !c_compatible(&self.c_type(&key_expr.ty)?, &key_c)
+                || !c_compatible(&self.c_type(&value_expr.ty)?, &value_c)
+            {
+                return Err(());
+            }
+            let key_code = self.expr(key_expr)?;
+            let value_code = self.expr(value_expr)?;
+            body.push_str(&format!("{name}_set({temp}, {key_code}, {value_code}); "));
+        }
+        Ok(format!("({{ {body} {temp}; }})"))
+    }
+
+    fn empty_collection(&mut self, e: &HirExpr) -> Bail<String> {
+        if !matches!(e.ty, Ty::Map(..) | Ty::Set(_)) {
+            return Err(());
+        }
+        Ok(format!("{}_new()", self.mangle_type(&e.ty)?))
+    }
+
+    fn list_method(
+        &mut self,
+        e: &HirExpr,
+        recv: &HirExpr,
+        method: &str,
+        args: &[crate::hir::HirArg],
+    ) -> Bail<String> {
+        let Ty::List(elem) = &recv.ty else {
+            return Err(());
+        };
+        if args.iter().any(|arg| arg.name.is_some()) {
+            return Err(());
+        }
+        let elem_c = self.c_type(elem)?;
+        let recv_c = self.c_type(&recv.ty)?;
+        let recv_code = self.expr(recv)?;
+        let name = self.mangle_type(&recv.ty)?;
+        match method {
+            "length" | "count" if args.is_empty() && e.ty == Ty::Int => {
+                Ok(format!("{name}_length({recv_code})"))
+            }
+            "push" if args.len() == 1 && e.ty == Ty::Void => {
+                if !c_compatible(&self.c_type(&args[0].value.ty)?, &elem_c) {
+                    return Err(());
+                }
+                let value = self.expr(&args[0].value)?;
+                Ok(format!("{name}_push({recv_code}, {value})"))
+            }
+            "remove_at" if args.len() == 1 && e.ty == **elem => {
+                if args[0].value.ty != Ty::Int {
+                    return Err(());
+                }
+                let index = self.expr(&args[0].value)?;
+                Ok(format!("{name}_remove_at({recv_code}, {index})"))
+            }
+            "join" if **elem == Ty::String && args.len() == 1 && e.ty == Ty::String => {
+                if args[0].value.ty != Ty::String {
+                    return Err(());
+                }
+                let separator = self.expr(&args[0].value)?;
+                let temp = self.next_temp();
+                Ok(format!(
+                    "({{ {recv_c} {temp} = {recv_code}; ostrin_s_join({temp}->items, {temp}->length, {separator}); }})"
+                ))
+            }
+            _ => Err(()),
+        }
+    }
+
+    fn map_method(
+        &mut self,
+        e: &HirExpr,
+        recv: &HirExpr,
+        method: &str,
+        args: &[crate::hir::HirArg],
+    ) -> Bail<String> {
+        let Ty::Map(key, value) = &recv.ty else {
+            return Err(());
+        };
+        if args.iter().any(|arg| arg.name.is_some()) {
+            return Err(());
+        }
+        let key_c = self.c_type(key)?;
+        let value_c = self.c_type(value)?;
+        let recv_code = self.expr(recv)?;
+        let name = self.mangle_type(&recv.ty)?;
+        match method {
+            "get" | "remove"
+                if args.len() == 1 && c_compatible(&self.c_type(&args[0].value.ty)?, &key_c) =>
+            {
+                let expected = Ty::Applied("Option".to_string(), vec![(*value.clone())]);
+                if e.ty != expected {
+                    return Err(());
+                }
+                let key_code = self.expr(&args[0].value)?;
+                Ok(format!("{name}_{method}({recv_code}, {key_code})"))
+            }
+            "contains_key"
+                if args.len() == 1
+                    && e.ty == Ty::Bool
+                    && c_compatible(&self.c_type(&args[0].value.ty)?, &key_c) =>
+            {
+                let key_code = self.expr(&args[0].value)?;
+                Ok(format!("{name}_contains_key({recv_code}, {key_code})"))
+            }
+            "count" if args.is_empty() && e.ty == Ty::Int => {
+                Ok(format!("{name}_count({recv_code})"))
+            }
+            "set" if args.len() == 2 && e.ty == Ty::Void => {
+                if !c_compatible(&self.c_type(&args[0].value.ty)?, &key_c)
+                    || !c_compatible(&self.c_type(&args[1].value.ty)?, &value_c)
+                {
+                    return Err(());
+                }
+                let key_code = self.expr(&args[0].value)?;
+                let value_code = self.expr(&args[1].value)?;
+                Ok(format!("{name}_set({recv_code}, {key_code}, {value_code})"))
+            }
+            "keys" if args.is_empty() && e.ty == Ty::List(Box::new((**key).clone())) => {
+                Ok(format!("{name}_keys({recv_code})"))
+            }
+            "values" if args.is_empty() && e.ty == Ty::List(Box::new((**value).clone())) => {
+                Ok(format!("{name}_values({recv_code})"))
+            }
+            _ => Err(()),
+        }
+    }
+
+    fn set_method(
+        &mut self,
+        e: &HirExpr,
+        recv: &HirExpr,
+        method: &str,
+        args: &[crate::hir::HirArg],
+    ) -> Bail<String> {
+        let Ty::Set(elem) = &recv.ty else {
+            return Err(());
+        };
+        if args.iter().any(|arg| arg.name.is_some()) {
+            return Err(());
+        }
+        let elem_c = self.c_type(elem)?;
+        let recv_code = self.expr(recv)?;
+        let name = self.mangle_type(&recv.ty)?;
+        match method {
+            "contains" if args.len() == 1 && e.ty == Ty::Bool => {
+                if !c_compatible(&self.c_type(&args[0].value.ty)?, &elem_c) {
+                    return Err(());
+                }
+                let item = self.expr(&args[0].value)?;
+                Ok(format!("{name}_contains({recv_code}, {item})"))
+            }
+            "add" | "remove" if args.len() == 1 && e.ty == Ty::Void => {
+                if !c_compatible(&self.c_type(&args[0].value.ty)?, &elem_c) {
+                    return Err(());
+                }
+                let item = self.expr(&args[0].value)?;
+                Ok(format!("{name}_{method}({recv_code}, {item})"))
+            }
+            "count" if args.is_empty() && e.ty == Ty::Int => {
+                Ok(format!("{name}_count({recv_code})"))
+            }
+            _ => Err(()),
+        }
+    }
+
     fn try_expr(&mut self, inner: &HirExpr, handler: Option<&HirExpr>) -> Bail<String> {
         if handler.is_some() {
             return Err(());
@@ -913,6 +1183,18 @@ fn is_option(ty: &Ty) -> bool {
 
 fn is_result(ty: &Ty) -> bool {
     matches!(ty, Ty::Applied(name, args) if name == "Result" && args.len() == 2)
+}
+
+fn is_list(ty: &Ty) -> bool {
+    matches!(ty, Ty::List(_))
+}
+
+fn is_map(ty: &Ty) -> bool {
+    matches!(ty, Ty::Map(_, _))
+}
+
+fn is_set(ty: &Ty) -> bool {
+    matches!(ty, Ty::Set(_))
 }
 
 fn option_inner(ty: &Ty) -> Bail<Ty> {

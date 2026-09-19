@@ -27,6 +27,10 @@
   constructors, `match`, basic queries, unwrap/coercion helpers and `try`
   propagation are emitted directly from `hir_c.rs`; lambda combinators and
   `catch` deliberately remain on the AST fallback until closures are migrated.
+- Native HIR migration now covers the fifth family’s collection core: `List`,
+  `Map` and `Set` literals, local collection types, list indexing/iteration,
+  basic list/map/set methods and `List<String>.join`; collection combinators
+  that receive closures still use the AST fallback.
 - Module loader now rewrites types in signatures, fields, variants and annotations
   (a `record` from another module can be used as a type).
 - CI on Linux, macOS and Windows.
