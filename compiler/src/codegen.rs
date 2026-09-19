@@ -2085,7 +2085,13 @@ impl<'a> Codegen<'a> {
             }
             Expr::Block(b) => self.gen_block_expr(b),
             Expr::Match(scrutinee, arms) => self.gen_match(scrutinee, arms),
-            Expr::ListLiteral(items) => self.gen_list_literal(items, None),
+            Expr::ListLiteral(items) => {
+                let expected = match &hint {
+                    Some(CType::List(elem)) => Some((**elem).clone()),
+                    _ => None,
+                };
+                self.gen_list_literal(items, expected.as_ref())
+            }
             Expr::Spawn(block) => {
                 let (code, ty) = self.gen_block_expr(block)?;
                 let task_ty = CType::Task(Box::new(ty.clone()));
@@ -2285,7 +2291,7 @@ impl<'a> Codegen<'a> {
     /// everywhere else in this backend). An empty literal (`[]`) has no
     /// element to infer from and isn't supported.
     fn gen_list_literal(&mut self, items: &[Expr], expected: Option<&CType>) -> Result<(String, CType), String> {
-        if items.is_empty() {
+        if items.is_empty() && expected.is_none() {
             return Err("empty list literals aren't supported by the native backend yet (the element type can't be inferred)".to_string());
         }
         let mut codes = Vec::with_capacity(items.len());
@@ -2309,8 +2315,11 @@ impl<'a> Codegen<'a> {
             }
             codes.push(code);
         }
-        let elem_ty = elem_ty.expect("checked items.is_empty() above");
+        let elem_ty = elem_ty.expect("an empty literal has an expected element type");
         let struct_name = self.ensure_list(&elem_ty);
+        if items.is_empty() {
+            return Ok((format!("{struct_name}_new_from_array(NULL, 0)"), CType::List(Box::new(elem_ty))));
+        }
         let array_literal = format!("({}[]){{ {} }}", c_type_name(&elem_ty), codes.join(", "));
         Ok((format!("{struct_name}_new_from_array({array_literal}, {})", items.len()), CType::List(Box::new(elem_ty))))
     }

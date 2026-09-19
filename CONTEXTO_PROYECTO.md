@@ -3568,3 +3568,11 @@ Ejemplo: `examples/string_methods.ostrin` (incluye un lector de CSV escrito en O
 ## 112. `parse_csv`
 
 `parse_csv(texto) -> List<List<String>>` (RFC 4180: campos entre comillas con `""`, comas y saltos de línea dentro del campo, `\n` o `\r\n`, líneas vacías omitidas). Implementado en `interpreter/strings.rs` y espejado en `strings_runtime.c` (`ostrin_s_csv`). Para un archivo: `read_file(ruta)` y luego `parse_csv` sobre el texto (`read_file(p).map(fn(t) { parse_csv(t) })`). Ejemplo comparado entre backends: `examples/csv_parse.ostrin`. Es la base de un futuro `DataFrame`.
+
+## 113. Tabla de columnas (DataFrame mínimo) escrita en Ostrin
+
+`examples/dataframe.ostrin`: `record Table { names, cols }` con `table_from_csv` (sobre `parse_csv`), `col_index`, `floats` (columna → `Array<Float>`), `filter_rows` y `describe` (n, media, desviación, mínimo, máximo), más `corr` entre columnas. Se ejecuta igual en intérprete y nativo, así que sirve además de prueba de que el lenguaje ya alcanza para una biblioteca de datos sin tipos nuevos en el compilador.
+
+Cambio de compilador que salió de aquí: en el backend nativo, `[]` con tipo esperado (`mut xs: List<String> = []`, argumentos, campos) ya se acepta; antes fallaba con «empty list literals aren't supported».
+
+Decisión: la capa de datos crece como biblioteca en Ostrin (módulo `import`), no como tipo interno; el compilador solo se toca cuando la biblioteca choca con un límite del lenguaje.
