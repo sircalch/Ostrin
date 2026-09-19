@@ -1040,6 +1040,32 @@ impl Checker {
     }
 
     /// Methods of `Rng`.
+    /// Methods of `String` (`trim`, `split`, `to_float`, …).
+    fn check_string_method(&mut self, method: &str, arg_types: &[Ty]) -> Ty {
+        let list_of_strings = Ty::List(Box::new(Ty::String));
+        let result_of = |ok: Ty| Ty::Applied("Result".to_string(), vec![ok, Ty::String]);
+        let (expected, result): (Vec<Ty>, Ty) = match method {
+            "length" => (vec![], Ty::Int),
+            "is_empty" => (vec![], Ty::Bool),
+            "trim" | "to_upper" | "to_lower" => (vec![], Ty::String),
+            "contains" | "starts_with" | "ends_with" => (vec![Ty::String], Ty::Bool),
+            "replace" => (vec![Ty::String, Ty::String], Ty::String),
+            "split" => (vec![Ty::String], list_of_strings),
+            "lines" => (vec![], list_of_strings),
+            "to_int" => (vec![], result_of(Ty::Int)),
+            "to_float" => (vec![], result_of(Ty::Float)),
+            other => {
+                self.push("E1042", format!("String has no method '{other}'."));
+                return Ty::Unknown;
+            }
+        };
+        let ok = arg_types.len() == expected.len() && expected.iter().zip(arg_types).all(|(e, a)| compatible(e, a));
+        if !ok {
+            self.push("E1041", format!("String method '{method}' was called with arguments of the wrong number or type."));
+        }
+        result
+    }
+
     fn check_rng_method(&mut self, method: &str, arg_types: &[Ty]) -> Ty {
         let shape = |t: &Ty| matches!(t, Ty::List(e) if **e == Ty::Int || **e == Ty::Unknown);
         let ints = |ts: &[Ty]| ts.iter().all(|t| *t == Ty::Int || *t == Ty::Unknown);
@@ -2562,6 +2588,9 @@ impl Checker {
                     return self.resolve_type_in_context(&signature.return_type);
                 }
             }
+            if receiver_ty == Ty::String && STRING_METHOD_NAMES.contains(&method.as_str()) {
+                return self.check_string_method(method, &arg_types);
+            }
             if receiver_ty == Ty::Named("Rng".to_string()) && self.functions.get("Rng").is_none() {
                 return self.check_rng_method(method, &arg_types);
             }
@@ -3667,6 +3696,7 @@ fn collection_method_expected_args(
         (Ty::List(_), "length" | "count") => Some(Vec::new()),
         (Ty::List(element), "push") => Some(vec![(**element).clone()]),
         (Ty::List(_), "remove_at") => Some(vec![Ty::Int]),
+        (Ty::List(element), "join") if **element == Ty::String => Some(vec![Ty::String]),
         (Ty::List(element), "map") => Some(vec![Ty::Fn(
             vec![(**element).clone()],
             Box::new(Ty::Unknown),
@@ -3930,6 +3960,7 @@ fn collection_method_return_type(receiver_ty: &Ty, method: &str, arg_types: &[Ty
         (Ty::List(elem), "filter") => Ty::List(elem.clone()),
         (Ty::List(elem), "remove_at") => (**elem).clone(),
         (Ty::List(_), "push") => Ty::Void,
+        (Ty::List(_), "join") => Ty::String,
         (Ty::List(_), "fold") => arg_types.first().cloned().unwrap_or(Ty::Unknown),
         (Ty::List(elem), "find") => Ty::Applied("Option".to_string(), vec![(**elem).clone()]),
         (Ty::List(_), "any" | "all") => Ty::Bool,
@@ -4510,3 +4541,8 @@ fn replace_self_type_with_type(ty: &mut Type, owner: &Type) {
         Type::Dyn(_) => {}
     }
 }
+
+/// Methods of `String` (kept in step with `interpreter/strings.rs`).
+const STRING_METHOD_NAMES: &[&str] = &[
+    "length", "is_empty", "trim", "to_upper", "to_lower", "contains", "starts_with", "ends_with", "replace", "split", "lines", "to_int", "to_float",
+];

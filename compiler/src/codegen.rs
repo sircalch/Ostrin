@@ -302,6 +302,9 @@ const QTY_RUNTIME: &str = include_str!("qty_runtime.c");
 /// Reproducible random generator, spliced in when a program uses `Rng`.
 const RNG_RUNTIME: &str = include_str!("rng_runtime.c");
 
+/// String methods (mirror of `interpreter/strings.rs`), spliced in when a program uses them.
+const STRINGS_RUNTIME: &str = include_str!("strings_runtime.c");
+
 /// `E1101` tracking, spliced in when a program sends records through channels.
 const MOVES_RUNTIME: &str = include_str!("moves_runtime.c");
 
@@ -3241,6 +3244,57 @@ impl<'a> Codegen<'a> {
         ))
     }
 
+    /// Methods of `String` (see `strings_runtime.c`).
+    fn gen_string_method(&mut self, s: &str, method: &str, args: &[Arg]) -> Result<(String, CType), String> {
+        let (codes, types) = self.gen_args(args)?;
+        let bad = || format!("String method '{method}' was called with arguments of the wrong number or type");
+        let strings = |n: usize| types.len() == n && types.iter().all(|t| *t == CType::Str);
+        match method {
+            "length" if strings(0) => Ok((format!("ostrin_s_length({s})"), CType::Int)),
+            "is_empty" if strings(0) => Ok((format!("(*({s}) == 0)"), CType::Bool)),
+            "trim" if strings(0) => Ok((format!("ostrin_s_trim({s})"), CType::Str)),
+            "to_upper" if strings(0) => Ok((format!("ostrin_s_upper({s})"), CType::Str)),
+            "to_lower" if strings(0) => Ok((format!("ostrin_s_lower({s})"), CType::Str)),
+            "contains" if strings(1) => Ok((format!("(strstr({s}, {}) != NULL)", codes[0]), CType::Bool)),
+            "starts_with" if strings(1) => Ok((format!("ostrin_s_starts_with({s}, {})", codes[0]), CType::Bool)),
+            "ends_with" if strings(1) => Ok((format!("ostrin_s_ends_with({s}, {})", codes[0]), CType::Bool)),
+            "replace" if strings(2) => Ok((format!("ostrin_s_replace({s}, {}, {})", codes[0], codes[1]), CType::Str)),
+            "split" if strings(1) => {
+                let count = self.next_temp();
+                let items = self.next_temp();
+                let ty = CType::List(Box::new(CType::Str));
+                self.register_list_types(&ty);
+                let list_c = list_struct_name(&CType::Str);
+                Ok((format!("({{ int64_t {count}; const char** {items} = ostrin_s_split({s}, {}, &{count}); {list_c}_new_from_array({items}, {count}); }})", codes[0]), ty))
+            }
+            "lines" if strings(0) => {
+                let count = self.next_temp();
+                let items = self.next_temp();
+                let ty = CType::List(Box::new(CType::Str));
+                self.register_list_types(&ty);
+                let list_c = list_struct_name(&CType::Str);
+                Ok((format!("({{ int64_t {count}; const char** {items} = ostrin_s_lines({s}, &{count}); {list_c}_new_from_array({items}, {count}); }})"), ty))
+            }
+            "to_int" if strings(0) => Ok(self.gen_builtin("parse_int", &[s.to_string()], &[CType::Str])?.expect("parse_int is a builtin")),
+            "to_float" if strings(0) => {
+                let ty = CType::Result(Box::new(CType::Float), Box::new(CType::Str));
+                self.register_list_types(&ty);
+                let (r, a, k) = (self.next_temp(), self.next_temp(), self.next_temp());
+                Ok((
+                    format!(
+                        "({{ Result_Float_String {r}; memset(&{r}, 0, sizeof {r}); const char* {a} = {s}; int {k} = ostrin_s_float_check({a}); \
+                         if ({k} == 1) {{ {r}.error = \"cannot parse float from empty string\"; }} \
+                         else if ({k} == 2) {{ {r}.error = \"invalid float literal\"; }} \
+                         else {{ {r}.ok = true; {r}.value = strtod({a}, NULL); }} {r}; }})"
+                    ),
+                    ty,
+                ))
+            }
+            "length" | "is_empty" | "trim" | "to_upper" | "to_lower" | "contains" | "starts_with" | "ends_with" | "replace" | "split" | "lines" | "to_int" | "to_float" => Err(bad()),
+            other => Err(format!("String has no method '{other}' the native backend supports")),
+        }
+    }
+
     fn gen_method_call(&mut self, obj: &Expr, method_name: &str, type_args: Option<&[Type]>, args: &[Arg]) -> Result<(String, CType), String> {
         let (obj_code, obj_ty) = self.gen_expr(obj)?;
         // `to_string()` exists on every scalar in the interpreter
@@ -3263,6 +3317,17 @@ impl<'a> Codegen<'a> {
             if let Some(text) = text {
                 return Ok((text, CType::Str));
             }
+        }
+        if obj_ty == CType::Str && method_name != "to_string" {
+            return self.gen_string_method(&obj_code, method_name, args);
+        }
+        if matches!(&obj_ty, CType::List(e) if **e == CType::Str) && method_name == "join" {
+            let (codes, types) = self.gen_args(args)?;
+            if types != [CType::Str] {
+                return Err("'join' expects one String separator".to_string());
+            }
+            let list = self.next_temp();
+            return Ok((format!("({{ {} {list} = {obj_code}; ostrin_s_join({list}->items, {list}->length, {}); }})", c_type_name(&obj_ty), codes[0]), CType::Str));
         }
         if matches!(obj_ty, CType::Option(_) | CType::Result(..)) && matches!(method_name, "map" | "then" | "map_err") {
             return self.gen_wrapper_combinator(&obj_code, &obj_ty, method_name, args);
@@ -5043,6 +5108,9 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>, tr
     // Last, so it lands first: the RNG runtime itself calls `ostrin_dm_ln`.
     if out.contains("ostrin_dm_") {
         out = out.replacen(PRELUDE, &format!("{PRELUDE}{DETMATH_RUNTIME}"), 1);
+    }
+    if out.contains("ostrin_s_") {
+        out = out.replacen(PRELUDE, &format!("{PRELUDE}{STRINGS_RUNTIME}"), 1);
     }
     if out.contains("ostrin_mark_moved") {
         out = out.replacen(PRELUDE, &format!("{PRELUDE}{MOVES_RUNTIME}"), 1);

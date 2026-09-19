@@ -241,6 +241,7 @@ impl<'a> Lexer<'a> {
         match self.advance() {
             Some('n') => Ok('\n'),
             Some('t') => Ok('\t'),
+            Some('r') => Ok('\r'),
             Some('\\') => Ok('\\'),
             Some('"') => Ok('"'),
             Some('\'') => Ok('\''),

@@ -1,0 +1,76 @@
+// Métodos de String y un lector de CSV escrito en Ostrin: trim, split, lines, to_float, join.
+fn text_methods() -> Void {
+    line = "  name, 3.5 ,42,x  "
+    parts = line.trim().split(",")
+    print(parts.length())
+    for p in parts {
+        print(p.trim().to_upper())
+    }
+    print(parts.join("|"))
+    print("a,b,,c".split(",").length())
+    print("l1\nl2\r\nl3\n".lines().length())
+    print("héllo".length())
+    print("abc".contains("bc"))
+    print("abc".starts_with("ab"))
+    print("abc".ends_with("bd"))
+    print("aXbXc".replace("X", "--"))
+    print("".is_empty())
+    match "3.25".to_float() {
+        Ok(v) => print(v * 2.0),
+        Err(e) => print(e),
+    }
+    match "abc".to_float() {
+        Ok(v) => print(v),
+        Err(e) => print(e),
+    }
+    match "".to_float() {
+        Ok(v) => print(v),
+        Err(e) => print(e),
+    }
+    match "12".to_int() {
+        Ok(v) => print(v + 1),
+        Err(e) => print(e),
+    }
+    match "1e3".to_float() {
+        Ok(v) => print(v),
+        Err(e) => print(e),
+    }
+    match ".5".to_float() {
+        Ok(v) => print(v),
+        Err(e) => print(e),
+    }
+    match "5.".to_float() {
+        Ok(v) => print(v),
+        Err(e) => print(e),
+    }
+    match ".".to_float() {
+        Ok(v) => print(v),
+        Err(e) => print(e),
+    }
+}
+
+fn column_mean(rows: List<List<String>>, col: Int) -> Float {
+    mut total = 0.0
+    mut count = 0
+    for row in rows {
+        match row[col].to_float() {
+            Ok(v) => {
+                total = total + v
+                count = count + 1
+            },
+            Err(e) => print("fila descartada: " + e),
+        }
+    }
+    total / (count as Float)
+}
+
+fn main() -> Void {
+    text_methods()
+    data = "sensor,temp,humedad\r\na,21.5,40\r\nb,19.0,55\r\nc,xx,50\r\nd,23.5,45\r\n"
+    rows = data.lines().map(fn(l) { l.split(",") })
+    print(rows.length())
+    print(rows[0].join(" | "))
+    body = rows.filter(fn(r) { r[0] != "sensor" })
+    print(column_mean(body, 1))
+    print(column_mean(body, 2))
+}

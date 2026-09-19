@@ -15,6 +15,7 @@ mod detmath;
 mod regress;
 mod math;
 mod rng;
+mod strings;
 use crate::types::{dim_div, dim_is_dimensionless, dim_mul, dim_pow, dim_to_string, resolve_unit_expr, Dimension};
 
 #[derive(Clone)]
@@ -1825,6 +1826,13 @@ impl Interpreter {
             }
             if let Value::List(state) = &receiver {
                 match method.as_str() {
+                    "join" => {
+                        let sep = self.eval_arg(&args[0], env)?;
+                        let Value::String(sep) = sep else {
+                            return Err(RuntimeError::Error("'join' expects a String separator".to_string()));
+                        };
+                        return strings::join(&state.borrow(), &sep);
+                    }
                     "push" => {
                         let item = self.eval_arg(&args[0], env)?;
                         state.borrow_mut().push(item);
@@ -1938,6 +1946,17 @@ impl Interpreter {
                         });
                     }
                     _ => {}
+                }
+            }
+            if let Value::String(text) = &receiver {
+                if strings::STRING_METHODS.contains(&method.as_str()) {
+                    let mut values = Vec::with_capacity(args.len());
+                    for arg in args {
+                        values.push(self.eval_arg(arg, env)?);
+                    }
+                    if let Some(result) = strings::call_method(text, method, &values) {
+                        return result;
+                    }
                 }
             }
             if let Value::Rng(state) = &receiver {

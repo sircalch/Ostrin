@@ -3554,3 +3554,13 @@ Ejemplo: `examples/native_function_values.ostrin` (comparado intérprete↔nativ
 - **Nativo:** `CType::Fn` = `OstrinClosure { void* fn; void* env; }` por valor. Cada lambda se eleva a una función C que recibe el entorno; las variables capturadas se **copian** a un entorno en el montón (struct con nombre `OstrinEnv_N`: dos structs anónimos distintos rompían el aliasing estricto con `-O2`). Una función con nombre usada como valor recibe un thunk sin entorno. Se llama por puntero (`f(x)`, `make_adder(3)(4)`), se guardan en listas, records y bindings.
 - **Límites conocidos:** la captura es por valor (una variable `mut` modificada después de crear el cierre no se ve dentro; el intérprete comparte el entorno); una lambda sin contexto de tipos (`f = fn(x) { ... }` sin anotar) se rechaza en nativo pidiendo anotación; funciones genéricas no se pueden usar como valor; `?` dentro de una lambda sigue sin soportarse.
 - Pruebas: 6 diferenciales (checker↔nativo sin divergencias) y 98 de integración.
+
+## 111. Métodos de String, `List<String>.join` y lectura de CSV
+
+Ejemplo: `examples/string_methods.ostrin` (incluye un lector de CSV escrito en Ostrin; comparado intérprete↔nativo).
+
+- Métodos de `String`: `length` (caracteres), `is_empty`, `trim`, `to_upper`, `to_lower` (ASCII), `contains`, `starts_with`, `ends_with`, `replace` (patrón no vacío), `split` (separador no vacío), `lines` (como Rust: quita `\r` antes de `\n`), `to_int`, `to_float` (`Result<_, String>` con los mismos mensajes que Rust). `List<String>.join(sep)`.
+- Tres implementaciones que se reflejan: `interpreter/strings.rs`, `check_string_method` en el checker y `strings_runtime.c` en el nativo (se inserta solo si el programa usa `ostrin_s_*`). `to_float` valida la gramática de Rust antes de `strtod`, así `"5."`, `".5"`, `"1e3"` valen y `"."`/`"abc"` no.
+- El lexer acepta `\r` como escape.
+- Límite: solo semántica ASCII para mayúsculas/espacios; no hay `Int.to_float()` (se usa `x as Float`).
+- Siguiente paso natural: `read_csv`/`DataFrame` sobre esto (columnas tipadas, `describe`, `group_by`).
