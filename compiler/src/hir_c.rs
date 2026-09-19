@@ -18,33 +18,62 @@ use crate::types::Ty;
 
 type Bail<T> = Result<T, ()>;
 
-fn c_scalar(ty: &Ty) -> Bail<&'static str> {
-    match ty {
-        Ty::Int => Ok("int64_t"),
-        Ty::Float => Ok("double"),
-        Ty::Bool => Ok("bool"),
-        Ty::String => Ok("const char*"),
-        _ => Err(()),
-    }
+/// What the emitter needs to know about the program, taken from the native backend's registry
+/// (C type names are compared as strings, so this module never sees the backend's own types).
+pub struct World {
+    /// User functions: name -> (C parameter types, C return type).
+    pub functions: HashMap<String, (Vec<String>, String)>,
+    /// Non-generic records: name -> [(field, C type)] in declaration order. Empty when reads of
+    /// records must be tracked (E1101), which only the AST path knows how to do.
+    pub records: HashMap<String, Vec<(String, String)>>,
+    /// Methods of records: (record, method) -> (C name, C parameter types with `self` first, C return type).
+    pub methods: HashMap<(String, String), (String, Vec<String>, String)>,
+    pub c_name: fn(&str) -> String,
+}
+
+fn is_scalar(ty: &Ty) -> bool {
+    matches!(ty, Ty::Int | Ty::Float | Ty::Bool | Ty::String)
+}
+
+/// Scalars compatible in C without a conversion helper (`Int` where a `Float` goes, …).
+fn c_compatible(arg: &str, param: &str) -> bool {
+    arg == param || (matches!(arg, "int64_t" | "double" | "bool") && matches!(param, "int64_t" | "double" | "bool"))
 }
 
 struct Emitter<'a> {
-    /// Names of the user functions a call may target, with their C names.
-    functions: &'a HashSet<String>,
-    c_name: fn(&str) -> String,
+    world: &'a World,
     scopes: Vec<HashSet<String>>,
     ret: Ty,
 }
 
+impl Emitter<'_> {
+    /// The C type of a value the emitter handles: scalars and non-generic records.
+    fn c_type(&self, ty: &Ty) -> Bail<String> {
+        match ty {
+            Ty::Int => Ok("int64_t".to_string()),
+            Ty::Float => Ok("double".to_string()),
+            Ty::Bool => Ok("bool".to_string()),
+            Ty::String => Ok("const char*".to_string()),
+            Ty::Named(n) if self.world.records.contains_key(n) => Ok(format!("{n}*")),
+            _ => Err(()),
+        }
+    }
+
+    fn field(&self, record: &Ty, field: &str) -> Bail<String> {
+        let Ty::Named(n) = record else { return Err(()) };
+        self.world.records.get(n).and_then(|fs| fs.iter().find(|(f, _)| f == field)).map(|(_, t)| t.clone()).ok_or(())
+    }
+}
+
 /// The body (without braces) of an eligible function, or `None`.
-pub fn generate(f: &HirFunction, functions: &HashSet<String>, c_name: fn(&str) -> String) -> Option<String> {
-    if !f.generics.is_empty() || f.params.iter().any(|(_, t)| c_scalar(t).is_err()) {
+pub fn generate(f: &HirFunction, world: &World) -> Option<String> {
+    let mut e = Emitter { world, scopes: vec![f.params.iter().map(|(n, _)| n.clone()).collect()], ret: f.ret.clone() };
+    if !f.generics.is_empty() || f.params.iter().any(|(_, t)| e.c_type(t).is_err()) {
         return None;
     }
-    if !matches!(f.ret, Ty::Int | Ty::Float | Ty::Bool | Ty::String | Ty::Void) {
+    if f.ret != Ty::Void && e.c_type(&f.ret).is_err() {
         return None;
     }
-    let mut e = Emitter { functions, c_name, scopes: vec![f.params.iter().map(|(n, _)| n.clone()).collect()], ret: f.ret.clone() };
     let mut out = String::new();
     e.body(&f.body, &mut out).ok()?;
     Some(out)
@@ -91,7 +120,7 @@ impl Emitter<'_> {
                 if declared.is_some() {
                     return Err(());
                 }
-                let ty = c_scalar(&value.ty)?;
+                let ty = self.c_type(&value.ty)?;
                 let code = self.expr(value)?;
                 out.push_str(&format!("    {ty} {name} = {code};\n"));
                 self.scopes.last_mut().expect("scope").insert(name.clone());
@@ -101,10 +130,19 @@ impl Emitter<'_> {
                 if self.declared(name) {
                     out.push_str(&format!("    {name} = {code};\n"));
                 } else {
-                    let ty = c_scalar(&value.ty)?;
+                    let ty = self.c_type(&value.ty)?;
                     out.push_str(&format!("    {ty} {name} = {code};\n"));
                     self.scopes.last_mut().expect("scope").insert(name.clone());
                 }
+            }
+            HirStmt::FieldAssign { target, value } => {
+                let HirKind::Field(obj, field) = &target.kind else { return Err(()) };
+                let field_ty = self.field(&obj.ty, field)?;
+                if !c_compatible(&self.c_type(&value.ty)?, &field_ty) && self.c_type(&value.ty)? != field_ty {
+                    return Err(());
+                }
+                let (o, v) = (self.expr(obj)?, self.expr(value)?);
+                out.push_str(&format!("    {o}->{field} = {v};\n"));
             }
             HirStmt::Return(Some(value)) => {
                 let code = self.expr(value)?;
@@ -181,14 +219,63 @@ impl Emitter<'_> {
     }
 
     fn expr(&mut self, e: &HirExpr) -> Bail<String> {
-        c_scalar(&e.ty).or_else(|_| if e.ty == Ty::Void { Ok("void") } else { Err(()) })?;
+        if e.ty != Ty::Void {
+            self.c_type(&e.ty)?;
+        }
         match &e.kind {
             HirKind::Int(v) => Ok(format!("INT64_C({v})")),
             HirKind::Float(v) => Ok(format!("{v:?}")),
             HirKind::Bool(v) => Ok(if *v { "true" } else { "false" }.to_string()),
             HirKind::Str(s) => Ok(crate::codegen::c_string_literal(s)),
             HirKind::Local(name) => Ok(name.clone()),
+            HirKind::Field(obj, field) => {
+                let field_ty = self.field(&obj.ty, field)?;
+                if field_ty != self.c_type(&e.ty)? {
+                    return Err(());
+                }
+                Ok(format!("{}->{field}", self.expr(obj)?))
+            }
+            HirKind::Record { name, type_args, fields } if type_args.is_empty() => {
+                let declared = self.world.records.get(name).ok_or(())?.clone();
+                if fields.len() != declared.len() {
+                    return Err(());
+                }
+                // Same shape as the AST path: allocate, then assign each field in source order.
+                let temp = format!("__hir_rec{}", self.scopes.len());
+                let mut body = format!("{name}* {temp} = ({name}*)malloc(sizeof({name})); if (!{temp}) {{ fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); }} ");
+                for (field, value) in fields {
+                    let want = declared.iter().find(|(f, _)| f == field).map(|(_, t)| t.clone()).ok_or(())?;
+                    let have = self.c_type(&value.ty)?;
+                    if !c_compatible(&have, &want) {
+                        return Err(());
+                    }
+                    let code = self.expr(value)?;
+                    body.push_str(&format!("{temp}->{field} = {code}; "));
+                }
+                Ok(format!("({{ {body} {temp}; }})"))
+            }
+            HirKind::MethodCall { recv, method, args, subst: None, type_args } if type_args.is_empty() => {
+                let Ty::Named(record) = &recv.ty else { return Err(()) };
+                let (c_name, params, ret) = self.world.methods.get(&(record.clone(), method.clone())).ok_or(())?.clone();
+                if params.len() != args.len() + 1 || params[0] != self.c_type(&recv.ty)? || args.iter().any(|a| a.name.is_some()) {
+                    return Err(());
+                }
+                if e.ty == Ty::Void { if ret != "void" { return Err(()); } } else if ret != self.c_type(&e.ty)? {
+                    return Err(());
+                }
+                let mut codes = vec![self.expr(recv)?];
+                for (arg, want) in args.iter().zip(&params[1..]) {
+                    if !c_compatible(&self.c_type(&arg.value.ty)?, want) {
+                        return Err(());
+                    }
+                    codes.push(self.expr(&arg.value)?);
+                }
+                Ok(format!("{c_name}({})", codes.join(", ")))
+            }
             HirKind::Unary(op, inner) => {
+                if !is_scalar(&inner.ty) {
+                    return Err(());
+                }
                 let code = self.expr(inner)?;
                 match op {
                     UnaryOp::Neg if matches!(inner.ty, Ty::Int | Ty::Float) => Ok(format!("(-{code})")),
@@ -197,6 +284,9 @@ impl Emitter<'_> {
                 }
             }
             HirKind::Binary(op, l, r) => {
+                if !is_scalar(&l.ty) || !is_scalar(&r.ty) {
+                    return Err(());
+                }
                 let (lc, rc) = (self.expr(l)?, self.expr(r)?);
                 if l.ty == Ty::String || r.ty == Ty::String {
                     return match op {
@@ -227,8 +317,11 @@ impl Emitter<'_> {
             }
             HirKind::Call { callee, args, subst: None, type_args } if type_args.is_empty() => {
                 let HirKind::Global(name) = &callee.kind else { return Err(()) };
-                if name == "print" && !self.functions.contains(name) && args.len() == 1 && args[0].name.is_none() {
+                if name == "print" && !self.world.functions.contains_key(name) && args.len() == 1 && args[0].name.is_none() {
                     let arg = &args[0].value;
+                    if !is_scalar(&arg.ty) {
+                        return Err(());
+                    }
                     let code = self.expr(arg)?;
                     return match arg.ty {
                         Ty::Int => Ok(format!("printf(\"%lld\\n\", (long long)({code}))")),
@@ -238,11 +331,20 @@ impl Emitter<'_> {
                         _ => Err(()),
                     };
                 }
-                if !self.functions.contains(name) || args.iter().any(|a| a.name.is_some() || c_scalar(&a.value.ty).is_err()) {
+                let (params, ret) = self.world.functions.get(name).ok_or(())?.clone();
+                if params.len() != args.len() || args.iter().any(|a| a.name.is_some()) {
+                    return Err(());
+                }
+                for (arg, want) in args.iter().zip(&params) {
+                    if !c_compatible(&self.c_type(&arg.value.ty)?, want) {
+                        return Err(());
+                    }
+                }
+                if e.ty == Ty::Void { if ret != "void" { return Err(()); } } else if !c_compatible(&self.c_type(&e.ty)?, &ret) {
                     return Err(());
                 }
                 let codes = args.iter().map(|a| self.expr(&a.value)).collect::<Bail<Vec<_>>>()?;
-                Ok(format!("{}({})", (self.c_name)(name), codes.join(", ")))
+                Ok(format!("{}({})", (self.world.c_name)(name), codes.join(", ")))
             }
             HirKind::If(cond, then_block, Some(else_block)) if e.ty != Ty::Void => {
                 let c = self.expr(cond)?;
@@ -255,7 +357,3 @@ impl Emitter<'_> {
     }
 }
 
-/// Every function the emitter can target, by name.
-pub fn user_functions(arities: &HashMap<String, usize>, programs: &[HirFunction]) -> HashSet<String> {
-    programs.iter().filter(|f| !f.name.contains('.') || f.name.contains("::")).map(|f| f.name.clone()).filter(|n| arities.contains_key(n)).collect()
-}

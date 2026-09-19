@@ -3635,3 +3635,12 @@ Nuevo `hir_c.rs`: genera el cuerpo C directamente del HIR para las funciones **e
 - Conectado en `generate_impl`; `--native-type-report` imprime `hir-generated: N`; `OSTRIN_NO_HIR_CODEGEN=1` fuerza la ruta antigua (para comparar) y `OSTRIN_HIR_DEBUG=1` lista qué funciones van por cada ruta.
 - Hoy: 15 funciones de los ejemplos (antes de `print`/`String`: 6). Ratchet en `differential.rs` (≥ 12). Las 6 pruebas diferenciales y las 101 de integración siguen verdes.
 - Siguiente familia según el documento 20: records/enums y campos, luego listas/colecciones, patrones, genéricos; cada una ampliando el conjunto elegible y bajando el uso del AST hasta poder borrarlo del generador.
+
+## 124. Records y métodos generados desde el HIR (segunda familia)
+
+`hir_c.rs` ahora entiende **records no genéricos**: literales (mismo esquema que el AST: `malloc` y asignación campo a campo en orden de escritura), lectura y asignación de campos (`->`), records como parámetros/retorno/locales, y **llamadas a métodos** y a funciones de usuario con argumentos de tipo record. Las funciones y los métodos de records (`Tipo.método`) elegibles salen del HIR.
+
+- Para no depender de los tipos internos del backend, el emisor recibe un `World` con nombres de tipos C ya resueltos (firmas de funciones, campos de records, firmas de métodos) y **compara cadenas de tipos C**: si el argumento no coincide con el parámetro (p. ej. un record pasado a un `dyn Trait`), esa función se queda en la ruta del AST.
+- Con seguimiento E1101 activo (programas que envían records por canales) los records se desactivan en esta ruta: solo el AST sabe envolver las lecturas.
+- Cobertura: 36 funciones/métodos de los ejemplos (15 antes); ratchet ≥ 30. Sigue todo verde (6 diferenciales, 101 de integración).
+- Siguientes: enums y `match`, listas/colecciones, closures, genéricos; luego borrar del AST-path lo que ya no use.

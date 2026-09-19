@@ -4693,7 +4693,37 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>, tr
     // later-discovered instantiation still compiles: C requires the
     // prototype before use, not the body.
     let mut bodies: Vec<(String, String)> = Vec::new(); // (signature, body)
-    let hir_functions: HashSet<String> = hir.as_ref().map(|h| crate::hir_c::user_functions(&h.arities, &h.functions)).unwrap_or_default();
+    // What the HIR emitter may rely on: signatures, records (unless reads are tracked) and methods.
+    let hir_world = crate::hir_c::World {
+        functions: functions
+            .iter()
+            .filter(|f| f.generics.is_empty())
+            .filter_map(|f| {
+                let (params, ret) = codegen.signatures.get(&f.name)?;
+                Some((f.name.clone(), (params.iter().map(c_type_name).collect(), c_type_name(ret))))
+            })
+            .collect(),
+        records: if codegen.track_moves {
+            HashMap::new()
+        } else {
+            codegen
+                .records
+                .iter()
+                .filter(|(name, _)| !codegen.instance_info.contains_key(*name))
+                .map(|(name, fields)| (name.clone(), fields.iter().map(|(f, t)| (f.clone(), c_type_name(t))).collect()))
+                .collect()
+        },
+        methods: codegen
+            .methods
+            .iter()
+            .flat_map(|(ty, ms)| {
+                ms.iter().map(move |(name, m)| {
+                    ((ty.clone(), name.clone()), (m.c_name.clone(), m.param_types.iter().map(c_type_name).collect(), c_type_name(&m.return_type)))
+                })
+            })
+            .collect(),
+        c_name: c_function_name,
+    };
     for f in &functions {
         if !f.generics.is_empty() {
             continue;
@@ -4709,7 +4739,7 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>, tr
                 .functions
                 .iter()
                 .find(|hf| hf.name == f.name)
-                .and_then(|hf| crate::hir_c::generate(hf, &hir_functions, c_function_name)),
+                .and_then(|hf| crate::hir_c::generate(hf, &hir_world)),
             _ => None,
         };
         if std::env::var_os("OSTRIN_HIR_DEBUG").is_some() {
@@ -4743,10 +4773,23 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>, tr
     for (self_ty, param_types, return_type, c_name, decl) in method_infos {
         let params = render_params(&param_types, &decl.params);
         let signature = format!("{} {}({})", c_type_name(&return_type), c_name, params);
+        let hir_method = match (&hir, &self_ty, std::env::var_os("OSTRIN_NO_HIR_CODEGEN")) {
+            (Some(h), CType::Record(record), None) => {
+                let wanted = format!("{record}.{}", decl.name);
+                h.functions.iter().find(|hf| hf.name == wanted).and_then(|hf| crate::hir_c::generate(hf, &hir_world))
+            }
+            _ => None,
+        };
         let self_subst: HashMap<String, CType> = HashMap::from([("Self".to_string(), self_ty)]);
         let mut body = String::new();
         codegen.current_file = decl.source_file.clone();
-        codegen.gen_callable_body(&decl.params, &decl.body, &return_type, &self_subst, &mut body)?;
+        match hir_method {
+            Some(text) => {
+                codegen.type_report.hir_generated += 1;
+                body = text;
+            }
+            None => codegen.gen_callable_body(&decl.params, &decl.body, &return_type, &self_subst, &mut body)?,
+        }
         bodies.push((signature, body));
     }
     // A generic instantiation's body can call another generic function (or
