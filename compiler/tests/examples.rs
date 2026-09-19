@@ -1601,3 +1601,27 @@ fn test_mode_runs_test_functions_and_reports_failures() {
     assert!(text.contains("test test_condition_fails ... FAILED (assertion failed)"), "unexpected output: {text}");
     assert!(text.contains("1 passed; 2 failed"), "unexpected output: {text}");
 }
+
+#[test]
+fn fixed_width_integer_overflow_is_an_error_in_both_backends() {
+    // 250 + 5 fits a UInt8, 250 + 10 does not: both the interpreter and the
+    // native backend must print the first result and then fail with an
+    // overflow error rather than wrapping around.
+    let file = example_path("sized_ints_overflow.ostrin");
+    let interpreted = run(&["--run", &file]);
+    assert!(!interpreted.status.success());
+    assert!(stdout(&interpreted).replace("\r\n", "\n").starts_with("255\n"));
+    assert!(stderr(&interpreted).contains("integer overflow"), "unexpected stderr: {}", stderr(&interpreted));
+
+    let exe = temp_artifact("overflow.exe");
+    let compile = run(&["--compile", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+    let native = Command::new(&exe).output().unwrap();
+    let _ = fs::remove_file(&exe);
+    assert!(!native.status.success());
+    assert!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n").starts_with("255\n"));
+    assert!(String::from_utf8_lossy(&native.stderr).contains("integer overflow"));
+}

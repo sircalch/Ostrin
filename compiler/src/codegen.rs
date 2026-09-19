@@ -113,6 +113,8 @@ enum CType {
     Channel(Box<CType>),
     /// A finished `spawn` block's result (by value); `join()` reads it.
     Task(Box<CType>),
+    /// A fixed-width integer other than `Int` (`UInt8`, `Int32`, …): a C `stdint` type.
+    Sized(IntKind),
 }
 
 /// A struct-field spelling of a type: `Void` (a `Result<Void, E>`'s value) becomes a placeholder `char`.
@@ -133,6 +135,7 @@ fn c_type_name(ty: &CType) -> String {
         CType::List(elem) => format!("{}*", list_struct_name(elem)),
         CType::Map(..) | CType::Set(_) | CType::Channel(_) => format!("{}*", mangle_ctype(ty)),
         CType::Task(_) => mangle_ctype(ty),
+        CType::Sized(kind) => kind.c_type().to_string(),
         CType::Option(inner) => format!("Option_{}", mangle_ctype(inner)),
         CType::NoneLit | CType::OkLit(_) | CType::ErrLit(_) | CType::GenLit(..) => "int".to_string(),
         CType::Quantity(_) => "Qty".to_string(),
@@ -201,7 +204,8 @@ fn map_type_with_subst(ty: &Type, types: &NamedTypes, subst: &HashMap<String, CT
         }
         Type::Named(name, args) if args.is_empty() && subst.contains_key(name) => Ok(subst[name].clone()),
         Type::Named(name, args) if args.is_empty() => match name.as_str() {
-            "Int" => Ok(CType::Int),
+            "Int" | "Int64" => Ok(CType::Int),
+            other if IntKind::from_name(other).is_some() => Ok(CType::Sized(IntKind::from_name(other).unwrap())),
             "Float" => Ok(CType::Float),
             "Bool" => Ok(CType::Bool),
             "String" => Ok(CType::Str),
@@ -292,6 +296,12 @@ static void ostrin_fmt_double(double v, char* buf, size_t n) {\n\
 static const char* ostrin_int_to_string(int64_t v) {\n\
     char* out = (char*)malloc(32);\n\
     snprintf(out, 32, \"%lld\", (long long)v);\n\
+    return out;\n\
+}\n\
+\n\
+static const char* ostrin_uint_to_string(uint64_t v) {\n\
+    char* out = (char*)malloc(32);\n\
+    snprintf(out, 32, \"%llu\", (unsigned long long)v);\n\
     return out;\n\
 }\n\
 \n\
@@ -466,6 +476,8 @@ struct Codegen<'a> {
     /// The checker's type for every expression, when the caller supplied it
     /// (see `generate_with_report`): used only to *compare*, never to generate.
     checker_types: Option<&'a HashMap<ExprKey, Ty>>,
+    /// Integer literals the checker typed as fixed-width.
+    literal_kinds: Option<&'a HashMap<ExprKey, IntKind>>,
     /// The checker's resolved generic arguments per call site.
     call_substs: Option<&'a HashMap<ExprKey, crate::typeck::CallSubst>>,
     /// Set by `gen_expr` for a call to a plain identifier, consumed by `gen_function_call`.
@@ -506,6 +518,26 @@ struct PendingVTable {
     record_name: String,
 }
 
+/// Aborts the program with the interpreter's error text for an overflow.
+const OVERFLOW_ABORT: &str = "fprintf(stderr, \"runtime error: integer overflow\\n\"); exit(1);";
+
+/// A C integer constant for any value in a fixed-width integer's range.
+fn c_int_literal(value: i128) -> String {
+    if value > i64::MAX as i128 {
+        format!("{value}ULL")
+    } else if value == i64::MIN as i128 {
+        "(-9223372036854775807LL - 1)".to_string()
+    } else if value < 0 {
+        format!("(-{}LL)", -value)
+    } else {
+        format!("{value}LL")
+    }
+}
+
+fn c_sized_literal(value: i128, kind: IntKind) -> String {
+    format!("(({}){})", kind.c_type(), c_int_literal(value))
+}
+
 /// Every `CType` this backend knows, spelled as a valid piece of a C
 /// identifier — used only to build a monomorphized function's mangled name
 /// (`identity__Int`, `pair__Int_String`), never emitted as an actual type.
@@ -520,6 +552,7 @@ fn mangle_ctype(ty: &CType) -> String {
         CType::List(elem) => format!("List_{}", mangle_ctype(elem)),
         CType::Map(k, v) => format!("Map_{}_{}", mangle_ctype(k), mangle_ctype(v)),
         CType::Set(t) => format!("Set_{}", mangle_ctype(t)),
+        CType::Sized(kind) => kind.name().to_string(),
         CType::Channel(t) => format!("Channel_{}", mangle_ctype(t)),
         CType::Task(t) => format!("Task_{}", mangle_ctype(t)),
         CType::Option(inner) => format!("Option_{}", mangle_ctype(inner)),
@@ -1422,7 +1455,15 @@ impl<'a> Codegen<'a> {
         }
         let key = ExprKey { file: self.current_file.clone(), start: range.start, end: range.end };
         let Some(checker_ty) = types.get(&key) else {
-            self.type_report.unchecked += 1;
+            // Literals in `match` patterns are never inferred by the checker;
+            // that is not a gap in its expression typing.
+            let mut node = expr;
+            while let Expr::Located(inner, _) = node {
+                node = inner;
+            }
+            if !matches!(node, Expr::IntLiteral(_)) {
+                self.type_report.unchecked += 1;
+            }
             return;
         };
         if crate::types::ty_contains_unknown(checker_ty) || matches!(checker_ty, Ty::Fn(..)) {
@@ -1497,6 +1538,7 @@ impl<'a> Codegen<'a> {
             Ty::String => CType::Str,
             Ty::Void => CType::Void,
             Ty::Quantity(d) => CType::Quantity(self.substitute_dimension(d)),
+            Ty::Sized(kind) => CType::Sized(*kind),
             Ty::List(t) => CType::List(Box::new(self.ty_to_ctype(t)?)),
             Ty::Set(t) => CType::Set(Box::new(self.ty_to_ctype(t)?)),
             Ty::Map(k, v) => CType::Map(Box::new(self.ty_to_ctype(k)?), Box::new(self.ty_to_ctype(v)?)),
@@ -1558,6 +1600,7 @@ impl<'a> Codegen<'a> {
             // whatever this instantiation bound it to.
             (Ty::Generic(name), c) => self.subst_stack.last().and_then(|s| s.get(name)).is_none_or(|bound| bound == c),
             (Ty::Quantity(a), CType::Quantity(b)) => &self.substitute_dimension(a) == b,
+            (Ty::Sized(a), CType::Sized(b)) => a == b,
             (Ty::List(a), CType::List(b)) | (Ty::Set(a), CType::Set(b)) => self.ctype_agrees(a, b),
             (Ty::Map(k, v), CType::Map(ck, cv)) => self.ctype_agrees(k, ck) && self.ctype_agrees(v, cv),
             (Ty::Applied(n, args), CType::Option(inner)) if n == "Option" && args.len() == 1 => self.ctype_agrees(&args[0], inner),
@@ -1585,6 +1628,9 @@ impl<'a> Codegen<'a> {
     /// up its fields, variants or methods.
     fn gen_expr(&mut self, expr: &Expr) -> Result<(String, CType), String> {
         let mut hint = self.expected.take();
+        if let Some(literal) = self.typed_int_literal(expr) {
+            return Ok(literal);
+        }
         self.current_call_key = match expr {
             Expr::Located(inner, range) if matches!(inner.as_ref(), Expr::Call(callee, _) | Expr::GenericCall(callee, _, _) if matches!(callee.unlocated(), Expr::Ident(_))) => {
                 Some(ExprKey { file: self.current_file.clone(), start: range.start, end: range.end })
@@ -1603,6 +1649,7 @@ impl<'a> Codegen<'a> {
 
     fn gen_expr_inner(&mut self, expr: &Expr, hint: Option<CType>) -> Result<(String, CType), String> {
         match expr.unlocated() {
+            Expr::SizedIntLiteral(value, kind) => Ok((c_sized_literal(*value, *kind), CType::Sized(*kind))),
             Expr::IntLiteral(v) => Ok((format!("INT64_C({v})"), CType::Int)),
             Expr::FloatLiteral(v) => Ok((format!("{v}"), CType::Float)),
             Expr::BoolLiteral(v) => Ok((if *v { "true".to_string() } else { "false".to_string() }, CType::Bool)),
@@ -1637,6 +1684,14 @@ impl<'a> Codegen<'a> {
                     UnaryOp::Neg if matches!(ty, CType::Quantity(_)) => {
                         let temp = self.next_temp();
                         Ok((format!("({{ Qty {temp} = {code}; {temp}.v = -{temp}.v; {temp}; }})"), ty))
+                    }
+                    UnaryOp::Neg if matches!(ty, CType::Sized(_)) => {
+                        let CType::Sized(kind) = ty else { unreachable!() };
+                        let temp = self.next_temp();
+                        Ok((
+                            format!("({{ {} {temp} = {code}; if ({temp} == {}) {{ {OVERFLOW_ABORT} }} ({}){}-{temp}; }})", kind.c_type(), c_int_literal(kind.min()), kind.c_type(), ""),
+                            ty,
+                        ))
                     }
                     UnaryOp::Neg => Ok((format!("(-{code})"), ty)),
                     UnaryOp::Not => Ok((format!("(!{code})"), CType::Bool)),
@@ -1770,6 +1825,11 @@ impl<'a> Codegen<'a> {
                 let dim = resolve_unit_expr(unit).map_err(|u| format!("unknown unit '{u}'"))?;
                 let v = self.as_f64_code(&code, &ty)?;
                 Ok((format!("((Qty){{ {v}, {} }})", c_string_literal(unit)), CType::Quantity(dim)))
+            }
+            Expr::As(inner, unit_expr) if matches!(unit_expr.unlocated(), Expr::Ident(sym) if matches!(sym.as_str(), "Int" | "Int64" | "Float") || IntKind::from_name(sym).is_some()) => {
+                let (code, ty) = self.gen_expr(inner)?;
+                let Expr::Ident(target) = unit_expr.unlocated() else { unreachable!() };
+                self.gen_numeric_conversion(&code, &ty, target)
             }
             Expr::As(inner, unit_expr) => {
                 let (code, ty) = self.gen_expr(inner)?;
@@ -2211,7 +2271,7 @@ impl<'a> Codegen<'a> {
     /// A C boolean expression for `a == b` under the interpreter's rules.
     fn eq_expr(&mut self, a: &str, b: &str, ty: &CType) -> Result<String, String> {
         match ty {
-            CType::Int | CType::Float | CType::Bool => Ok(format!("(({a}) == ({b}))")),
+            CType::Int | CType::Float | CType::Bool | CType::Sized(_) => Ok(format!("(({a}) == ({b}))")),
             CType::Str => Ok(format!("(strcmp({a}, {b}) == 0)")),
             CType::Quantity(_) => Ok(format!("(ostrin_qty_cmp({a}, {b}) == 0)")),
             CType::Record(n) | CType::Enum(n) => {
@@ -2233,7 +2293,7 @@ impl<'a> Codegen<'a> {
     /// A C `int` expression: negative, zero or positive, like `compare`.
     fn cmp_expr(&mut self, a: &str, b: &str, ty: &CType) -> Result<String, String> {
         match ty {
-            CType::Int | CType::Float | CType::Bool => Ok(format!("((({a}) < ({b})) ? -1 : ((({a}) > ({b})) ? 1 : 0))")),
+            CType::Int | CType::Float | CType::Bool | CType::Sized(_) => Ok(format!("((({a}) < ({b})) ? -1 : ((({a}) > ({b})) ? 1 : 0))")),
             CType::Str => Ok(format!("strcmp({a}, {b})")),
             CType::Quantity(_) => Ok(format!("ostrin_qty_cmp({a}, {b})")),
             CType::Record(n) if self.has_derive(n, "Ord") => {
@@ -2285,11 +2345,99 @@ impl<'a> Codegen<'a> {
         Ok(out)
     }
 
+    /// An integer literal the checker typed as fixed-width (`a * 1` with `a:
+    /// UInt8`): its real C type, taken from the checker's decision.
+    fn typed_int_literal(&self, expr: &Expr) -> Option<(String, CType)> {
+        let kinds = self.literal_kinds?;
+        if kinds.is_empty() {
+            return None;
+        }
+        let mut node = expr;
+        let mut range = None;
+        while let Expr::Located(inner, r) = node {
+            range = Some(*r);
+            node = inner;
+        }
+        let (Expr::IntLiteral(n), Some(range)) = (node, range) else { return None };
+        let key = ExprKey { file: self.current_file.clone(), start: range.start, end: range.end };
+        let kind = *kinds.get(&key)?;
+        Some((c_sized_literal(*n as i128, kind), CType::Sized(kind)))
+    }
+
+    /// `+ - * /` (overflow-checked) and comparisons on fixed-width integers.
+    fn gen_sized_binary(&mut self, op: BinOp, lc: &str, lt: &CType, rc: &str, rt: &CType) -> Result<(String, CType), String> {
+        let (CType::Sized(kind), CType::Sized(other)) = (lt, rt) else {
+            return Err("fixed-width integers can't be mixed with other types here; the checker should have rejected this".to_string());
+        };
+        if kind != other {
+            return Err("mismatched fixed-width integer types".to_string());
+        }
+        let c = kind.c_type();
+        let (a, b) = (self.next_temp(), self.next_temp());
+        let decl = format!("{c} {a} = {lc}; {c} {b} = {rc};");
+        let checked = |builtin: &str| {
+            let r = "__r";
+            format!("({{ {decl} {c} {r}; if ({builtin}({a}, {b}, &{r})) {{ {OVERFLOW_ABORT} }} {r}; }})")
+        };
+        Ok(match op {
+            BinOp::Add => (checked("__builtin_add_overflow"), lt.clone()),
+            BinOp::Sub => (checked("__builtin_sub_overflow"), lt.clone()),
+            BinOp::Mul => (checked("__builtin_mul_overflow"), lt.clone()),
+            BinOp::Div => (
+                format!(
+                    "({{ {decl} if ({b} == 0) {{ fprintf(stderr, \"runtime error: division by zero\\n\"); exit(1); }} \
+                     __int128 __q = (__int128){a} / (__int128){b}; \
+                     if (__q < (__int128){} || __q > (__int128){}) {{ {OVERFLOW_ABORT} }} ({c})__q; }})",
+                    c_int_literal(kind.min()),
+                    c_int_literal(kind.max())
+                ),
+                lt.clone(),
+            ),
+            BinOp::Eq => (format!("(({lc}) == ({rc}))"), CType::Bool),
+            BinOp::NotEq => (format!("(({lc}) != ({rc}))"), CType::Bool),
+            BinOp::Lt => (format!("(({lc}) < ({rc}))"), CType::Bool),
+            BinOp::Gt => (format!("(({lc}) > ({rc}))"), CType::Bool),
+            BinOp::LtEq => (format!("(({lc}) <= ({rc}))"), CType::Bool),
+            BinOp::GtEq => (format!("(({lc}) >= ({rc}))"), CType::Bool),
+            BinOp::And | BinOp::Or => return Err("logical operators need Bool operands".to_string()),
+        })
+    }
+
+    /// `x as UInt8` / `as Int` / `as Float`: explicit and range-checked, like the interpreter's.
+    fn gen_numeric_conversion(&mut self, code: &str, from: &CType, target: &str) -> Result<(String, CType), String> {
+        if !matches!(from, CType::Int | CType::Float | CType::Sized(_)) {
+            return Err(format!("cannot convert '{}' with 'as'", mangle_ctype(from)));
+        }
+        if target == "Float" {
+            return Ok((format!("((double)({code}))"), CType::Float));
+        }
+        let (to_ty, min, max, c_name) = match IntKind::from_name(target) {
+            Some(kind) => (CType::Sized(kind), kind.min(), kind.max(), kind.c_type()),
+            None => (CType::Int, i64::MIN as i128, i64::MAX as i128, "int64_t"),
+        };
+        let temp = self.next_temp();
+        let (lo, hi) = (c_int_literal(min), c_int_literal(max));
+        let fail = "fprintf(stderr, \"runtime error: value does not fit in the target integer type\\n\"); exit(1);";
+        let converted = if *from == CType::Float {
+            // Truncate toward zero, then range-check: `d <= min - 1` (below range) or `d >= max + 1`.
+            let low_check = if min == 0 { "-1.0".to_string() } else if min == i64::MIN as i128 { "-9223372036854775809.0".to_string() } else { format!("(double)({})", c_int_literal(min - 1)) };
+            let low_cmp = if min == i64::MIN as i128 { "<" } else { "<=" };
+            let high = format!("{}.0", max + 1);
+            format!("({{ double {temp} = {code}; if ({temp} != {temp} || {temp} {low_cmp} {low_check} || {temp} >= {high}) {{ {fail} }} ({c_name}){temp}; }})")
+        } else {
+            format!("({{ __int128 {temp} = (__int128)({code}); if ({temp} < (__int128){lo} || {temp} > (__int128){hi}) {{ {fail} }} ({c_name}){temp}; }})")
+        };
+        Ok((converted, to_ty))
+    }
+
     fn gen_binary(&mut self, op: BinOp, l: &Expr, r: &Expr) -> Result<(String, CType), String> {
         let (lc, lt) = self.gen_expr(l)?;
         let (rc, rt) = self.gen_expr(r)?;
         if matches!(lt, CType::Quantity(_)) || matches!(rt, CType::Quantity(_)) {
             return self.gen_quantity_binary(op, &lc, &lt, &rc, &rt);
+        }
+        if matches!(lt, CType::Sized(_)) || matches!(rt, CType::Sized(_)) {
+            return self.gen_sized_binary(op, &lc, &lt, &rc, &rt);
         }
         if matches!(lt, CType::Record(_) | CType::Enum(_)) && !matches!(op, BinOp::And | BinOp::Or) {
             return self.gen_user_operator(op, &lc, &lt, &rc, &rt);
@@ -2657,6 +2805,8 @@ impl<'a> Codegen<'a> {
         if method_name == "to_string" && args.is_empty() {
             let text = match &obj_ty {
                 CType::Int => Some(format!("ostrin_int_to_string({obj_code})")),
+                CType::Sized(kind) if kind.is_signed() => Some(format!("ostrin_int_to_string({obj_code})")),
+                CType::Sized(_) => Some(format!("ostrin_uint_to_string({obj_code})")),
                 CType::Float => Some(format!("ostrin_float_to_string({obj_code})")),
                 CType::Bool => Some(format!("(({obj_code}) ? \"true\" : \"false\")")),
                 CType::Str => Some(obj_code.clone()),
@@ -3108,6 +3258,8 @@ impl<'a> Codegen<'a> {
     fn show_expr(&mut self, code: &str, ty: &CType) -> Result<String, String> {
         match ty {
             CType::Int => Ok(format!("ostrin_int_to_string({code})")),
+            CType::Sized(kind) if kind.is_signed() => Ok(format!("ostrin_int_to_string({code})")),
+            CType::Sized(_) => Ok(format!("ostrin_uint_to_string({code})")),
             CType::Float => Ok(format!("ostrin_float_to_string({code})")),
             CType::Bool => Ok(format!("(({code}) ? \"true\" : \"false\")")),
             CType::Str => Ok(code.to_string()),
@@ -3316,6 +3468,8 @@ impl<'a> Codegen<'a> {
         }
         let (spec, value) = match &arg_types[0] {
             CType::Int => ("%lld\\n", format!("(long long)({})", arg_codes[0])),
+            CType::Sized(kind) if kind.is_signed() => ("%lld\\n", format!("(long long)({})", arg_codes[0])),
+            CType::Sized(_) => ("%llu\\n", format!("(unsigned long long)({})", arg_codes[0])),
             CType::Float => return Ok((format!("ostrin_print_float({})", arg_codes[0]), CType::Void)),
             CType::Bool => ("%s\\n", format!("(({}) ? \"true\" : \"false\")", arg_codes[0])),
             CType::Str => ("%s\\n", arg_codes[0].clone()),
@@ -3584,6 +3738,7 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>) ->
         show_queue: VecDeque::new(),
         checker_types,
         call_substs,
+        literal_kinds: typed.map(|t| &t.literal_kinds),
         current_call_key: None,
         current_file: None,
         compare_enabled: false,

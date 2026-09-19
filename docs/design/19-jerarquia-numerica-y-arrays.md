@@ -1,6 +1,6 @@
 # 19. Jerarquía numérica y arrays
 
-*Estado: propuesta de especificación. Hoy solo existen `Int` (64 bits con signo), `Float` (64 bits) y `List<T>`.*
+*Estado: la fase 1 (enteros de ancho fijo) está implementada, ver §93 de CONTEXTO; el resto es propuesta. Al redactarlo solo existían `Int` (64 bits con signo), `Float` (64 bits) y `List<T>`.*
 
 ## 1. Principios
 

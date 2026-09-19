@@ -302,14 +302,14 @@ fn real_main() -> ExitCode {
 
     if test_mode {
         // Runs every zero-argument `test_*` function, each in a fresh interpreter.
-        let names = interpreter::Interpreter::new(&items).test_function_names();
+        let names = interpreter::Interpreter::new(&items).with_literal_kinds(typed_program.literal_kinds.clone()).test_function_names();
         if names.is_empty() {
             eprintln!("error: no 'test_*' functions found in '{path}'");
             return ExitCode::FAILURE;
         }
         let mut failed = 0usize;
         for name in &names {
-            match interpreter::Interpreter::new(&items).run_function(name) {
+            match interpreter::Interpreter::new(&items).with_literal_kinds(typed_program.literal_kinds.clone()).run_function(name) {
                 Ok(_) => println!("test {name} ... ok"),
                 Err(message) => {
                     failed += 1;
@@ -327,7 +327,7 @@ test result: {}. {} passed; {failed} failed", if failed == 0 { "ok" } else { "FA
         return ExitCode::SUCCESS;
     }
 
-    match interpreter::Interpreter::new(&items).run_main() {
+    match interpreter::Interpreter::new(&items).with_literal_kinds(typed_program.literal_kinds.clone()).run_main() {
         Ok(_) => ExitCode::SUCCESS,
         Err(msg) => {
             if json {

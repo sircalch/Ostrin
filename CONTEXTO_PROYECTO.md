@@ -3231,3 +3231,38 @@ arquitectura, pruebas que detecten regresiones entre fases.
   y `docs/design/19-jerarquia-numerica-y-arrays.md` (enteros de ancho fijo,
   `Float32`, `Complex`, `Array<T, Shape>` con broadcasting y formas estáticas).
 - Suite: **99 pruebas** (94 + 5 diferenciales), sin warnings.
+
+---
+
+## 93. Enteros de ancho fijo (fase 1 del documento 19) — 2026-09-18
+
+Implementado de punta a punta (léxico → parser → checker → intérprete → nativo):
+
+- **Tipos**: `Int8 Int16 Int32 UInt8 UInt16 UInt32 UInt64` (`Int` es `Int64`; `Int128`/`UInt128`
+  quedan pendientes). En C son los tipos `stdint` correspondientes.
+- **Literales**: con sufijo (`200u8`, `5i32`, `9u64`, `7i64` = `Int`); un literal sin
+  sufijo mayor que `Int` que cabe en 64 bits sin signo es `UInt64`.
+  **Un literal sin sufijo toma el tipo que exige el contexto** (`a: UInt8 = 200`,
+  `x + 1` con `x: UInt8`, argumento, `return`, cola de función, campo de record,
+  `List<UInt8> = [1, 2]`) si cabe exactamente; si no, error `OSTRIN-E1070`.
+  Para que intérprete y nativo lo sepan sin reinferir, el checker publica
+  `TypedProgram.literal_kinds` (clave = el nodo literal) y ambos lo consultan.
+  Para ello el parser ahora envuelve cada literal entero en `Expr::Located`.
+- **Sin mezcla implícita**: `UInt8 + Int32`, `UInt8 + Int` (no literal) → `E1041`;
+  hay que convertir con `as`. Negar un tipo sin signo → `E1041`. (La ampliación exacta
+  implícita del documento 19 §3 queda pendiente; hoy es más estricto.)
+- **Conversión explícita** `x as UInt8 | Int | Float | …`, con comprobación de rango
+  (Float→entero trunca hacia cero y falla si sale del rango).
+- **Overflow definido**: `+ - * / -x` fallan con `integer overflow` en ambos backends
+  (el nativo usa `__builtin_*_overflow`); división por cero también.
+- `print`, `to_string`, igualdad y orden funcionan; el nativo genera `uint8_t`…
+  y `ostrin_uint_to_string`.
+- Ejemplos: `sized_ints.ostrin` (compara nativo/intérprete),
+  `sized_ints_errors.ostrin` (3 códigos), `sized_ints_overflow.ostrin`
+  (test `fixed_width_integer_overflow_is_an_error_in_both_backends`).
+- Limitaciones conocidas: `-128i8` con sufijo no se acepta (usar `-127i8 - 1i8`);
+  la adaptación de literales no cubre argumentos de métodos ni de variantes de enum
+  (usar sufijo); `for` sobre rangos solo admite `Int`; `sum` sobre listas sized no
+  está en el nativo; ni el resaltado de VS Code ni los tokens semánticos del LSP
+  conocen aún los sufijos.
+- Suite: **100 pruebas** (5 diferenciales + 95 de integración), sin warnings.

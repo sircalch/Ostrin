@@ -58,6 +58,9 @@ pub struct TypedProgram {
     pub expr_types: HashMap<ExprKey, Ty>,
     /// The resolved generic arguments of every call to a generic function.
     pub call_substs: HashMap<ExprKey, CallSubst>,
+    /// Untyped integer literals (or negated literals) that the context typed as a
+    /// fixed-width integer: backends read the literal's real type from here.
+    pub literal_kinds: HashMap<ExprKey, IntKind>,
 }
 
 #[derive(Clone)]
@@ -100,6 +103,7 @@ pub struct Checker {
     editor_expressions: Vec<EditorExpression>,
     expr_types: HashMap<ExprKey, Ty>,
     call_substs: HashMap<ExprKey, CallSubst>,
+    literal_kinds: HashMap<ExprKey, IntKind>,
     call_key_stack: Vec<ExprKey>,
     errors: Vec<TypeError>,
 }
@@ -165,6 +169,7 @@ impl Checker {
             editor_expressions: Vec::new(),
             expr_types: HashMap::new(),
             call_substs: HashMap::new(),
+            literal_kinds: HashMap::new(),
             call_key_stack: Vec::new(),
             errors: Vec::new(),
         }
@@ -183,20 +188,20 @@ impl Checker {
         self,
         items: &[Item],
     ) -> (Vec<TypeError>, Vec<EditorBinding>, Vec<EditorExpression>) {
-        let (errors, bindings, expressions, _, _) = self.check_all(items);
+        let (errors, bindings, expressions, _, _, _) = self.check_all(items);
         (errors, bindings, expressions)
     }
 
     /// Like `check_program`, but also returns the type of every expression.
     pub fn check_program_typed(self, items: &[Item]) -> TypedProgram {
-        let (errors, _, _, expr_types, call_substs) = self.check_all(items);
-        TypedProgram { errors, expr_types, call_substs }
+        let (errors, _, _, expr_types, call_substs, literal_kinds) = self.check_all(items);
+        TypedProgram { errors, expr_types, call_substs, literal_kinds }
     }
 
     fn check_all(
         mut self,
         items: &[Item],
-    ) -> (Vec<TypeError>, Vec<EditorBinding>, Vec<EditorExpression>, HashMap<ExprKey, Ty>, HashMap<ExprKey, CallSubst>) {
+    ) -> (Vec<TypeError>, Vec<EditorBinding>, Vec<EditorExpression>, HashMap<ExprKey, Ty>, HashMap<ExprKey, CallSubst>, HashMap<ExprKey, IntKind>) {
         for item in items {
             match item {
                 Item::Enum(e) => {
@@ -298,7 +303,7 @@ impl Checker {
                 Item::Record(_) | Item::Enum(_) | Item::Import(_) | Item::Trait(_) => {}
             }
         }
-        (self.errors, self.editor_bindings, self.editor_expressions, self.expr_types, self.call_substs)
+        (self.errors, self.editor_bindings, self.editor_expressions, self.expr_types, self.call_substs, self.literal_kinds)
     }
 
     fn check_function(&mut self, f: &FunctionDecl) {
@@ -358,7 +363,11 @@ impl Checker {
         let previous_return_type = self.current_return_type.replace(expected.clone());
         let actual = self.check_block(&f.body, &mut scope);
         self.note_expected_block(&f.body, &expected);
-        if !compatible(&expected, &actual) {
+        let tail_adapted = match &f.body.tail {
+            Some(tail) => self.adapt_literals(tail, &expected, &actual),
+            None => false,
+        };
+        if !tail_adapted && !compatible(&expected, &actual) {
             self.push(
                 "E1041",
                 format!(
@@ -670,7 +679,7 @@ impl Checker {
                     Some(t) => {
                         let declared = self.resolve_type_in_context(t);
                         self.note_expected(value, &declared);
-                        if !compatible(&declared, &value_ty) {
+                        if !compatible(&declared, &value_ty) && !self.adapt_literals(value, &declared, &value_ty) {
                             self.push(
                                 "E1041",
                                 format!(
@@ -727,8 +736,12 @@ impl Checker {
                 if let Some(expected) = self.current_return_type.clone() {
                     self.note_expected(e, &expected);
                 }
+                let adapted = match self.current_return_type.clone() {
+                    Some(expected) => self.adapt_literals(e, &expected, &actual),
+                    None => false,
+                };
                 if let Some(expected) = &self.current_return_type {
-                    if !compatible(expected, &actual) {
+                    if !adapted && !compatible(expected, &actual) {
                         self.push(
                             "E1041",
                             format!(
@@ -799,7 +812,7 @@ impl Checker {
                 if let Expr::FieldAccess(receiver, field) = target {
                     self.check_field_assignment_target(receiver, field, &target_ty, scope);
                 }
-                if !compatible(&target_ty, &value_ty) {
+                if !compatible(&target_ty, &value_ty) && !self.adapt_literals(value, &target_ty, &value_ty) {
                     self.push(
                         "E1041",
                         format!(
@@ -811,6 +824,64 @@ impl Checker {
                 }
             }
             Stmt::Expr(e) => { self.infer_expr(e, scope); }
+        }
+    }
+
+    /// Types an untyped integer literal (or a negated one) as `kind` when the
+    /// context demands it. Records the choice for the backends and reports an
+    /// out-of-range literal. Returns false when `expr` is not such a literal.
+    fn adapt_int_literal(&mut self, expr: &Expr, kind: IntKind) -> bool {
+        // `-5` is a negated literal: the literal itself is what gets typed.
+        let (literal, negated) = match expr.unlocated() {
+            Expr::Unary(UnaryOp::Neg, operand) => (operand.as_ref(), true),
+            _ => (expr, false),
+        };
+        // Peel every `Located` layer; they all share the innermost range.
+        let mut node = literal;
+        let mut range = None;
+        while let Expr::Located(inner, r) = node {
+            range = Some(*r);
+            node = inner;
+        }
+        let (Expr::IntLiteral(n), Some(range)) = (node, range) else { return false };
+        let value = if negated { -(*n as i128) } else { *n as i128 };
+        if !kind.fits(value) {
+            self.push("E1070", format!("Literal {value} does not fit in '{}' (range {}..={}).", kind.name(), kind.min(), kind.max()));
+            return true;
+        }
+        let key = ExprKey { file: self.current_source_file.clone(), start: range.start, end: range.end };
+        self.literal_kinds.insert(key.clone(), kind);
+        self.expr_types.insert(key, Ty::Sized(kind));
+        // The negation wrapping the literal has the literal's type too.
+        if negated {
+            if let Expr::Located(_, outer) = expr {
+                let outer_key = ExprKey { file: self.current_source_file.clone(), start: outer.start, end: outer.end };
+                self.expr_types.insert(outer_key, Ty::Sized(kind));
+            }
+        }
+        true
+    }
+
+    /// If `expected` is a fixed-width integer (or a list of them) and `expr`
+    /// is made of untyped integer literals, adapts them and returns true.
+    fn adapt_literals(&mut self, expr: &Expr, expected: &Ty, actual: &Ty) -> bool {
+        match (expected, actual) {
+            (Ty::Sized(kind), Ty::Int) => self.adapt_int_literal(expr, *kind),
+            (Ty::List(want), Ty::List(have)) if matches!(**want, Ty::Sized(_)) && **have == Ty::Int => {
+                let Expr::ListLiteral(items) = expr.unlocated() else { return false };
+                let mut all = true;
+                for item in items {
+                    all &= self.adapt_literals(item, want, &Ty::Int);
+                }
+                if all {
+                    if let Expr::Located(_, range) = expr {
+                        let key = ExprKey { file: self.current_source_file.clone(), start: range.start, end: range.end };
+                        self.expr_types.insert(key, expected.clone());
+                    }
+                }
+                all
+            }
+            _ => false,
         }
     }
 
@@ -923,6 +994,12 @@ impl Checker {
                 ty
             }
             Expr::IntLiteral(_) => Ty::Int,
+            Expr::SizedIntLiteral(value, kind) => {
+                if !kind.fits(*value) {
+                    self.push("E1070", format!("Literal {value} does not fit in '{}' (range {}..={}).", kind.name(), kind.min(), kind.max()));
+                }
+                Ty::Sized(*kind)
+            }
             Expr::FloatLiteral(_) => Ty::Float,
             Expr::StringLiteral(_) => Ty::String,
             Expr::CharLiteral(_) => Ty::Char,
@@ -958,12 +1035,29 @@ impl Checker {
                 let t = self.infer_expr(e, scope);
                 match op {
                     UnaryOp::Not => Ty::Bool,
-                    UnaryOp::Neg => t,
+                    UnaryOp::Neg => {
+                        if let Ty::Sized(kind) = &t {
+                            if !kind.is_signed() {
+                                self.push("E1041", format!("Cannot negate an unsigned '{}'.", kind.name()));
+                            }
+                        }
+                        t
+                    }
                 }
             }
             Expr::Binary(op, l, r) => {
-                let lt = self.infer_expr(l, scope);
-                let rt = self.infer_expr(r, scope);
+                let mut lt = self.infer_expr(l, scope);
+                let mut rt = self.infer_expr(r, scope);
+                // An untyped integer literal next to a fixed-width operand takes its type.
+                if let Ty::Sized(kind) = &lt {
+                    if rt == Ty::Int && self.adapt_int_literal(r, *kind) {
+                        rt = lt.clone();
+                    }
+                } else if let Ty::Sized(kind) = &rt {
+                    if lt == Ty::Int && self.adapt_int_literal(l, *kind) {
+                        lt = rt.clone();
+                    }
+                }
                 self.check_binary(*op, lt, rt)
             }
             Expr::Range(start, _kind, end, step) => {
@@ -1178,7 +1272,21 @@ impl Checker {
                 Ty::Bool
             }
             Expr::As(expr, unit_expr) => {
-                self.infer_expr(expr, scope);
+                let source_ty = self.infer_expr(expr, scope);
+                // `x as UInt8` / `x as Int` / `x as Float`: an explicit numeric conversion.
+                if let Expr::Ident(sym) = unit_expr.as_ref().unlocated() {
+                    let target = match sym.as_str() {
+                        "Int" | "Int64" => Some(Ty::Int),
+                        "Float" => Some(Ty::Float),
+                        other => IntKind::from_name(other).map(Ty::Sized),
+                    };
+                    if let Some(target) = target {
+                        if !matches!(source_ty, Ty::Int | Ty::Float | Ty::Sized(_) | Ty::Unknown) {
+                            self.push("E1041", format!("Cannot convert '{}' to '{}' with 'as'.", source_ty.describe(), target.describe()));
+                        }
+                        return target;
+                    }
+                }
                 if let Expr::Ident(sym) = unit_expr.as_ref() {
                     if let Some(dim) = unit_dimension(sym) {
                         return Ty::Quantity(dim);
@@ -1250,6 +1358,18 @@ impl Checker {
             .iter()
             .map(|(field_name, value)| (field_name.clone(), self.infer_expr(value, scope)))
             .collect();
+        // Untyped integer literals in a field whose declared type is a
+        // fixed-width integer (or a list of them) take that type.
+        if let Some(declared_fields) = self.record_fields.get(name).cloned() {
+            for (field_name, field_type) in declared_fields {
+                let Some((_, value)) = fields.iter().find(|(n, _)| *n == field_name) else { continue };
+                let declared = self.resolve_type_in_context(&field_type);
+                if matches!(declared, Ty::Sized(_) | Ty::List(_)) {
+                    let actual = value_types.get(&field_name).cloned().unwrap_or(Ty::Unknown);
+                    self.adapt_literals(value, &declared, &actual);
+                }
+            }
+        }
         let Some(generics) = self.record_generics.get(name).cloned() else {
             return Ty::Named(name.to_string());
         };
@@ -1524,6 +1644,32 @@ impl Checker {
             return match op {
                 Eq | NotEq | Lt | Gt | LtEq | GtEq | And | Or => Ty::Bool,
                 _ => Ty::Unknown,
+            };
+        }
+        if matches!(lt, Ty::Sized(_)) || matches!(rt, Ty::Sized(_)) {
+            if matches!(op, And | Or) {
+                self.push("E1041", format!("Logical operators expect 'Bool' operands, got '{}' and '{}'.", lt.describe(), rt.describe()));
+                return Ty::Bool;
+            }
+            return match (&lt, &rt) {
+                (Ty::Sized(a), Ty::Sized(b)) if a == b => match op {
+                    Eq | NotEq | Lt | Gt | LtEq | GtEq => Ty::Bool,
+                    _ => lt.clone(),
+                },
+                _ => {
+                    self.push(
+                        "E1041",
+                        format!(
+                            "Cannot apply this operator to '{}' and '{}': fixed-width integers never mix implicitly; convert one side with 'as'.",
+                            lt.describe(),
+                            rt.describe()
+                        ),
+                    );
+                    match op {
+                        Eq | NotEq | Lt | Gt | LtEq | GtEq => Ty::Bool,
+                        _ => Ty::Unknown,
+                    }
+                }
             };
         }
         if let (Ty::Named(left_name), Ty::Named(right_name)) = (&lt, &rt) {
@@ -2157,7 +2303,11 @@ impl Checker {
                 if let Some(expr) = arg_expr_for_param(sig, args, index) {
                     self.note_expected(expr, &expected);
                 }
-                if !compatible(&expected, arg_ty) {
+                let adapted = match arg_expr_for_param(sig, args, index) {
+                    Some(expr) => self.adapt_literals(expr, &expected, arg_ty),
+                    None => false,
+                };
+                if !adapted && !compatible(&expected, arg_ty) {
                     self.push(
                         "E1041",
                         format!(
@@ -2678,7 +2828,8 @@ fn resolve_type_with_type_subst(
                 }
             }
             match name.as_str() {
-            "Int" => Ty::Int,
+            "Int" | "Int64" => Ty::Int,
+            other if args.is_empty() && IntKind::from_name(other).is_some() => Ty::Sized(IntKind::from_name(other).unwrap()),
             "Float" => Ty::Float,
             "Bool" => Ty::Bool,
             "Char" => Ty::Char,
@@ -3501,6 +3652,7 @@ fn type_from_ty(ty: &Ty) -> Type {
         ),
         Ty::Generic(name) => Type::Named(name.clone(), Vec::new()),
         Ty::Dyn(name) => Type::Dyn(vec![name.clone()]),
+        Ty::Sized(kind) => Type::Named(kind.name().to_string(), Vec::new()),
         Ty::Fn(params, return_type) => Type::Fn(
             params.iter().map(type_from_ty).collect(),
             Box::new(type_from_ty(return_type)),
@@ -3660,7 +3812,7 @@ fn walk_expr(expr: &Expr, bound: &HashSet<String>, free: &mut HashSet<String>) {
         Expr::RecordLiteral(_, fields) => { for (_, v) in fields { walk_expr(v, bound, free); } }
         Expr::GenericRecordLiteral(_, _, fields) => { for (_, v) in fields { walk_expr(v, bound, free); } }
         Expr::Channel(_, cap) => { if let Some(c) = cap { walk_expr(c, bound, free); } }
-        Expr::IntLiteral(_) | Expr::FloatLiteral(_) | Expr::StringLiteral(_) | Expr::CharLiteral(_) | Expr::BoolLiteral(_) => {}
+        Expr::IntLiteral(_) | Expr::SizedIntLiteral(..) | Expr::FloatLiteral(_) | Expr::StringLiteral(_) | Expr::CharLiteral(_) | Expr::BoolLiteral(_) => {}
     }
 }
 

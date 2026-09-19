@@ -1,0 +1,49 @@
+record Pixel {
+    r: UInt8
+    g: UInt8
+    b: UInt8
+}
+
+fn brighten(p: Pixel) -> Pixel {
+    Pixel { r: p.r + 10, g: p.g + 10, b: p.b + 10 }
+}
+
+fn checksum(values: List<UInt8>) -> UInt32 {
+    mut total = 0u32
+    for v in values {
+        total = total + (v as UInt32)
+    }
+    total
+}
+
+fn main() -> Void {
+    a: UInt8 = 200
+    b = 55u8
+    print(a + b)
+    print(a - b)
+    print(a * 1)
+    print(a > b)
+    print(a == 200)
+
+    small: Int8 = -100
+    print(small)
+    print(-small)
+    print(small - 20)
+
+    big: UInt64 = 18446744073709551615
+    print(big)
+
+    n = 300
+    print(n as UInt16)
+    print(1000 as Float)
+    print((3.9 as Int32) + 4)
+
+    p = brighten(Pixel { r: 240, g: 0, b: 128 })
+    print(p.g)
+    print(checksum([1, 2, 3, 250]))
+
+    x: Int32 = 2147483647
+    print(x / 2)
+    print(x as Int)
+    print(x.to_string() + "!")
+}

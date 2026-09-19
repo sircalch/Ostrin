@@ -123,7 +123,8 @@ pub fn run() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let errors = Checker::new().check_program(&items);
+    let typed = Checker::new().check_program_typed(&items);
+    let errors = typed.errors;
     if !errors.is_empty() {
         for error in &errors {
             send_event(
@@ -141,7 +142,7 @@ pub fn run() -> ExitCode {
     let writer_box: Box<dyn Write> = Box::new(writer);
     let debugger = Debugger::new(reader, writer_box, breakpoints, stop_on_entry);
 
-    let mut interpreter = Interpreter::new(&items);
+    let mut interpreter = Interpreter::new(&items).with_literal_kinds(typed.literal_kinds);
     interpreter.attach_debugger(debugger);
     let result = interpreter.run_main();
 

@@ -1,0 +1,10 @@
+fn main() -> Void {
+    a: UInt8 = 10
+    b: Int32 = 5
+    print(a + b)
+    c: UInt8 = 300
+    d: UInt16 = 5
+    print(-d)
+    e = 7
+    f: UInt8 = e
+}

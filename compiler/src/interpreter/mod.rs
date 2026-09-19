@@ -14,6 +14,8 @@ use crate::types::{dim_div, dim_is_dimensionless, dim_mul, dim_pow, dim_to_strin
 #[derive(Clone)]
 pub enum Value {
     Int(i64),
+    /// A fixed-width integer (`UInt8`, `Int32`, …), stored widened.
+    Sized(i128, IntKind),
     Float(f64),
     Bool(bool),
     Char(char),
@@ -49,6 +51,7 @@ impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Value::Int(n) => write!(f, "{n}"),
+            Value::Sized(n, _) => write!(f, "{n}"),
             Value::Float(n) => write!(f, "{n}"),
             Value::Bool(b) => write!(f, "{b}"),
             Value::Char(c) => write!(f, "{c}"),
@@ -333,9 +336,17 @@ pub struct Interpreter {
     call_stack: Vec<CallFrame>,
     debugger: Option<Debugger>,
     terminated: bool,
+    /// Integer literals the checker typed as fixed-width (see `TypedProgram::literal_kinds`).
+    literal_kinds: HashMap<crate::typeck::ExprKey, IntKind>,
 }
 
 impl Interpreter {
+    /// Supplies the checker's fixed-width literal choices.
+    pub fn with_literal_kinds(mut self, kinds: HashMap<crate::typeck::ExprKey, IntKind>) -> Self {
+        self.literal_kinds = kinds;
+        self
+    }
+
     pub fn new(items: &[Item]) -> Self {
         let mut functions = HashMap::new();
         let mut records = HashMap::new();
@@ -399,6 +410,7 @@ impl Interpreter {
             moved: HashSet::new(),
             call_stack: Vec::new(),
             debugger: None,
+            literal_kinds: HashMap::new(),
             terminated: false,
         }
     }
@@ -677,6 +689,7 @@ impl Interpreter {
 
     fn runtime_type_of_value(&self, value: &Value) -> Type {
         match value {
+            Value::Sized(_, kind) => Type::Named(kind.name().to_string(), Vec::new()),
             Value::List(state) => {
                 let element = state
                     .borrow()
@@ -1253,7 +1266,22 @@ impl Interpreter {
 
     fn eval_expr(&mut self, expr: &Expr, env: &Env) -> EvalResult {
         match expr {
-            Expr::Located(inner, _) => self.eval_expr(inner, env),
+            Expr::Located(inner, range) => {
+                if !self.literal_kinds.is_empty() {
+                    let key = crate::typeck::ExprKey {
+                        file: self.call_stack.last().and_then(|frame| frame.file.clone()),
+                        start: range.start,
+                        end: range.end,
+                    };
+                    if let Some(kind) = self.literal_kinds.get(&key).copied() {
+                        if let Expr::IntLiteral(n) = inner.as_ref() {
+                            return Ok(Value::Sized(*n as i128, kind));
+                        }
+                    }
+                }
+                self.eval_expr(inner, env)
+            }
+            Expr::SizedIntLiteral(n, kind) => Ok(Value::Sized(*n, *kind)),
             Expr::IntLiteral(n) => Ok(Value::Int(*n)),
             Expr::FloatLiteral(n) => Ok(Value::Float(*n)),
             Expr::StringLiteral(s) => Ok(Value::String(s.clone())),
@@ -1284,6 +1312,8 @@ impl Interpreter {
                 let v = self.eval_expr(e, env)?;
                 match (op, &v) {
                     (UnaryOp::Neg, Value::Int(n)) => Ok(Value::Int(-n)),
+                    (UnaryOp::Neg, Value::Sized(n, kind)) if kind.is_signed() && kind.fits(-n) => Ok(Value::Sized(-n, *kind)),
+                    (UnaryOp::Neg, Value::Sized(_, kind)) => Err(RuntimeError::Error(format!("integer overflow: cannot negate this {}", kind.name()))),
                     (UnaryOp::Neg, Value::Float(n)) => Ok(Value::Float(-n)),
                     (UnaryOp::Neg, Value::Quantity(n, d, u)) => Ok(Value::Quantity(-n, d.clone(), u.clone())),
                     (UnaryOp::Not, Value::Bool(b)) => Ok(Value::Bool(!b)),
@@ -1431,6 +1461,13 @@ impl Interpreter {
                 let bv = as_f64(&self.eval_expr(b, env)?)?;
                 let tv = as_f64(&self.eval_expr(tol, env)?)?;
                 Ok(Value::Bool((av - bv).abs() <= tv))
+            }
+            Expr::As(e, unit_expr)
+                if matches!(unit_expr.as_ref().unlocated(), Expr::Ident(sym) if matches!(sym.as_str(), "Int" | "Int64" | "Float") || IntKind::from_name(sym).is_some()) =>
+            {
+                let value = self.eval_expr(e, env)?;
+                let Expr::Ident(target) = unit_expr.as_ref().unlocated() else { unreachable!() };
+                convert_numeric(value, target)
             }
             Expr::As(e, unit_expr) => {
                 let v = as_f64(&self.eval_expr(e, env)?)?;
@@ -2039,6 +2076,7 @@ fn value_type_name(v: &Value) -> String {
         Value::EnumInstance(name, _, _, _) => name.clone(),
         Value::List(_) => "List".to_string(),
         Value::Int(_) => "Int".to_string(),
+        Value::Sized(_, kind) => kind.name().to_string(),
         Value::Float(_) => "Float".to_string(),
         Value::Bool(_) => "Bool".to_string(),
         Value::Char(_) => "Char".to_string(),
@@ -2221,6 +2259,7 @@ fn truthy(v: &Value) -> bool {
 fn as_i64(v: &Value) -> Result<i64, RuntimeError> {
     match v {
         Value::Int(n) => Ok(*n),
+        Value::Sized(n, _) => i64::try_from(*n).map_err(|_| RuntimeError::Error(format!("integer {n} does not fit in Int"))),
         Value::Float(n) => Ok(*n as i64),
         other => Err(RuntimeError::Error(format!("expected a number, got '{other}'"))),
     }
@@ -2229,14 +2268,95 @@ fn as_i64(v: &Value) -> Result<i64, RuntimeError> {
 fn as_f64(v: &Value) -> Result<f64, RuntimeError> {
     match v {
         Value::Int(n) => Ok(*n as f64),
+        Value::Sized(n, _) => Ok(*n as f64),
         Value::Float(n) => Ok(*n),
         Value::Quantity(n, _, _) => Ok(*n),
         other => Err(RuntimeError::Error(format!("expected a number, got '{other}'"))),
     }
 }
 
+/// Arithmetic and comparison on fixed-width integers: never mixes kinds,
+/// and every result must fit its type (overflow is a runtime error, not wrap-around).
+fn sized_binary(op: BinOp, lv: Value, rv: Value) -> EvalResult {
+    use BinOp::*;
+    if matches!(op, And | Or) {
+        return Ok(Value::Bool(if op == And { truthy(&lv) && truthy(&rv) } else { truthy(&lv) || truthy(&rv) }));
+    }
+    let (a, b, kind) = match (&lv, &rv) {
+        (Value::Sized(a, k1), Value::Sized(b, k2)) if k1 == k2 => (*a, *b, *k1),
+        (Value::Sized(a, k), Value::Int(b)) => (*a, *b as i128, *k),
+        (Value::Int(a), Value::Sized(b, k)) => (*a as i128, *b, *k),
+        _ => return Err(RuntimeError::Error(format!("mismatched integer types: '{lv}' and '{rv}'"))),
+    };
+    let overflow = |what: &str| RuntimeError::Error(format!("integer overflow: {a} {what} {b} does not fit in {}", kind.name()));
+    let checked = |value: Option<i128>, what: &str| match value {
+        Some(v) if kind.fits(v) => Ok(Value::Sized(v, kind)),
+        _ => Err(overflow(what)),
+    };
+    match op {
+        Add => checked(a.checked_add(b), "+"),
+        Sub => checked(a.checked_sub(b), "-"),
+        Mul => checked(a.checked_mul(b), "*"),
+        Div => {
+            if b == 0 {
+                Err(RuntimeError::Error("division by zero".to_string()))
+            } else {
+                checked(a.checked_div(b), "/")
+            }
+        }
+        Eq => Ok(Value::Bool(a == b)),
+        NotEq => Ok(Value::Bool(a != b)),
+        Lt => Ok(Value::Bool(a < b)),
+        Gt => Ok(Value::Bool(a > b)),
+        LtEq => Ok(Value::Bool(a <= b)),
+        GtEq => Ok(Value::Bool(a >= b)),
+        And | Or => unreachable!(),
+    }
+}
+
+/// `x as UInt8` / `as Int` / `as Float`: an explicit, range-checked conversion.
+fn convert_numeric(value: Value, target: &str) -> EvalResult {
+    let integer: Option<i128> = match &value {
+        Value::Int(n) => Some(*n as i128),
+        Value::Sized(n, _) => Some(*n),
+        Value::Float(f) => {
+            if !f.is_finite() {
+                return Err(RuntimeError::Error(format!("cannot convert {f} to {target}")));
+            }
+            if target == "Float" {
+                None
+            } else {
+                Some(f.trunc() as i128)
+            }
+        }
+        other => return Err(RuntimeError::Error(format!("cannot convert '{other}' to {target}"))),
+    };
+    match target {
+        "Float" => Ok(Value::Float(match &value {
+            Value::Float(f) => *f,
+            _ => integer.unwrap() as f64,
+        })),
+        "Int" | "Int64" => {
+            let n = integer.unwrap();
+            i64::try_from(n).map(Value::Int).map_err(|_| RuntimeError::Error(format!("value {n} does not fit in Int")))
+        }
+        other => {
+            let kind = IntKind::from_name(other).expect("checked by the caller");
+            let n = integer.unwrap();
+            if kind.fits(n) {
+                Ok(Value::Sized(n, kind))
+            } else {
+                Err(RuntimeError::Error(format!("value {n} does not fit in {}", kind.name())))
+            }
+        }
+    }
+}
+
 fn eval_binary_builtin(op: BinOp, lv: Value, rv: Value) -> EvalResult {
     use BinOp::*;
+    if matches!(lv, Value::Sized(..)) || matches!(rv, Value::Sized(..)) {
+        return sized_binary(op, lv, rv);
+    }
     match op {
         Add | Sub => match (&lv, &rv) {
             (Value::Quantity(a, d1, u1), Value::Quantity(b, d2, u2)) => {

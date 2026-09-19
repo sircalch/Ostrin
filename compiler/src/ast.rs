@@ -1,3 +1,97 @@
+/// Fixed-width integer types (`Int` is `Int64`, so it has no entry here).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum IntKind {
+    I8,
+    I16,
+    I32,
+    U8,
+    U16,
+    U32,
+    U64,
+}
+
+impl IntKind {
+    pub fn name(self) -> &'static str {
+        match self {
+            IntKind::I8 => "Int8",
+            IntKind::I16 => "Int16",
+            IntKind::I32 => "Int32",
+            IntKind::U8 => "UInt8",
+            IntKind::U16 => "UInt16",
+            IntKind::U32 => "UInt32",
+            IntKind::U64 => "UInt64",
+        }
+    }
+
+    pub fn from_name(name: &str) -> Option<IntKind> {
+        Some(match name {
+            "Int8" => IntKind::I8,
+            "Int16" => IntKind::I16,
+            "Int32" => IntKind::I32,
+            "UInt8" => IntKind::U8,
+            "UInt16" => IntKind::U16,
+            "UInt32" => IntKind::U32,
+            "UInt64" => IntKind::U64,
+            _ => return None,
+        })
+    }
+
+    /// `8u`-style literal suffixes: `i8`, `i16`, `i32`, `u8`, `u16`, `u32`, `u64`.
+    pub fn from_suffix(suffix: &str) -> Option<IntKind> {
+        Some(match suffix {
+            "i8" => IntKind::I8,
+            "i16" => IntKind::I16,
+            "i32" => IntKind::I32,
+            "u8" => IntKind::U8,
+            "u16" => IntKind::U16,
+            "u32" => IntKind::U32,
+            "u64" => IntKind::U64,
+            _ => return None,
+        })
+    }
+
+    pub fn min(self) -> i128 {
+        match self {
+            IntKind::I8 => i8::MIN as i128,
+            IntKind::I16 => i16::MIN as i128,
+            IntKind::I32 => i32::MIN as i128,
+            _ => 0,
+        }
+    }
+
+    pub fn max(self) -> i128 {
+        match self {
+            IntKind::I8 => i8::MAX as i128,
+            IntKind::I16 => i16::MAX as i128,
+            IntKind::I32 => i32::MAX as i128,
+            IntKind::U8 => u8::MAX as i128,
+            IntKind::U16 => u16::MAX as i128,
+            IntKind::U32 => u32::MAX as i128,
+            IntKind::U64 => u64::MAX as i128,
+        }
+    }
+
+    pub fn is_signed(self) -> bool {
+        matches!(self, IntKind::I8 | IntKind::I16 | IntKind::I32)
+    }
+
+    pub fn fits(self, value: i128) -> bool {
+        value >= self.min() && value <= self.max()
+    }
+
+    pub fn c_type(self) -> &'static str {
+        match self {
+            IntKind::I8 => "int8_t",
+            IntKind::I16 => "int16_t",
+            IntKind::I32 => "int32_t",
+            IntKind::U8 => "uint8_t",
+            IntKind::U16 => "uint16_t",
+            IntKind::U32 => "uint32_t",
+            IntKind::U64 => "uint64_t",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
     Named(String, Vec<Type>),
@@ -227,6 +321,8 @@ pub enum Expr {
     /// editor tooling. The wrapped expression remains semantically unchanged.
     Located(Box<Expr>, SourceRange),
     IntLiteral(i64),
+    /// `200u8`, `5i32`: an integer literal with an explicit fixed width.
+    SizedIntLiteral(i128, IntKind),
     FloatLiteral(f64),
     StringLiteral(String),
     CharLiteral(char),

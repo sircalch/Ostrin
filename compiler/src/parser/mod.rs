@@ -663,8 +663,15 @@ impl Parser {
     fn parse_primary(&mut self) -> PResult<Expr> {
         match self.peek().kind.clone() {
             TokenKind::IntLiteral(n) => {
+                // Located, so a context that fixes the literal's type can name this exact node.
+                let start = self.current_span();
                 self.advance();
-                self.maybe_unit_literal(Expr::IntLiteral(n))
+                let end = self.previous_span();
+                self.maybe_unit_literal(Expr::Located(Box::new(Expr::IntLiteral(n)), SourceRange { start, end }))
+            }
+            TokenKind::SizedIntLiteral(n, kind) => {
+                self.advance();
+                Ok(Expr::SizedIntLiteral(n, kind))
             }
             TokenKind::FloatLiteral(f) => {
                 self.advance();
@@ -870,7 +877,7 @@ impl Parser {
             return Ok(Pattern::Wildcard);
         }
         match self.peek().kind.clone() {
-            TokenKind::IntLiteral(_) | TokenKind::FloatLiteral(_) | TokenKind::StringLiteral(_)
+            TokenKind::IntLiteral(_) | TokenKind::SizedIntLiteral(..) | TokenKind::FloatLiteral(_) | TokenKind::StringLiteral(_)
             | TokenKind::CharLiteral(_) | TokenKind::True | TokenKind::False => {
                 let lit = self.parse_primary()?;
                 if self.eat(&TokenKind::To) {
@@ -905,6 +912,7 @@ impl Parser {
                     || matches!(
                         self.peek().kind,
                         TokenKind::IntLiteral(_)
+                            | TokenKind::SizedIntLiteral(..)
                             | TokenKind::FloatLiteral(_)
                             | TokenKind::StringLiteral(_)
                             | TokenKind::CharLiteral(_)

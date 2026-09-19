@@ -428,7 +428,7 @@ fn rewrite_expr(expr: &mut Expr, ctx: &RewriteCtx) -> Result<(), String> {
             for it in items { rewrite_expr(it, ctx)?; }
             Ok(())
         }
-        Expr::EmptyCollection(..) => Ok(()),
+        Expr::EmptyCollection(..) | Expr::SizedIntLiteral(..) => Ok(()),
         Expr::MapLiteral(pairs) => {
             for (k, v) in pairs { rewrite_expr(k, ctx)?; rewrite_expr(v, ctx)?; }
             Ok(())

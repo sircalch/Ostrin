@@ -2,6 +2,7 @@
 pub enum TokenKind {
     Ident(String),
     IntLiteral(i64),
+    SizedIntLiteral(i128, crate::ast::IntKind),
     FloatLiteral(f64),
     StringLiteral(String),
     CharLiteral(char),

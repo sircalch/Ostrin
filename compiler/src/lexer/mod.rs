@@ -138,8 +138,43 @@ impl<'a> Lexer<'a> {
             let value: f64 = text.parse().map_err(|_| self.error("invalid float literal"))?;
             Ok(TokenKind::FloatLiteral(value))
         } else {
-            let value: i64 = text.parse().map_err(|_| self.error("invalid integer literal"))?;
-            Ok(TokenKind::IntLiteral(value))
+            // A width suffix (`200u8`, `5i32`) directly after the digits.
+            if matches!(self.peek(), Some('i') | Some('u')) {
+                let mut lookahead = 0;
+                let mut suffix = String::new();
+                while let Some(c) = self.peek_at(lookahead) {
+                    if c.is_ascii_alphanumeric() {
+                        suffix.push(c);
+                        lookahead += 1;
+                    } else {
+                        break;
+                    }
+                }
+                if suffix == "i64" {
+                    for _ in 0..lookahead {
+                        self.advance();
+                    }
+                    self.last_token_start = start;
+                    let value: i64 = text.parse().map_err(|_| self.error("invalid integer literal"))?;
+                    return Ok(TokenKind::IntLiteral(value));
+                }
+                if let Some(kind) = crate::ast::IntKind::from_suffix(&suffix) {
+                    for _ in 0..lookahead {
+                        self.advance();
+                    }
+                    self.last_token_start = start;
+                    let value: i128 = text.parse().map_err(|_| self.error("invalid integer literal"))?;
+                    return Ok(TokenKind::SizedIntLiteral(value, kind));
+                }
+            }
+            // A plain literal beyond `Int`'s range that still fits 64 unsigned bits is a `UInt64`.
+            match text.parse::<i64>() {
+                Ok(value) => Ok(TokenKind::IntLiteral(value)),
+                Err(_) => {
+                    let value: u64 = text.parse().map_err(|_| self.error("invalid integer literal"))?;
+                    Ok(TokenKind::SizedIntLiteral(value as i128, crate::ast::IntKind::U64))
+                }
+            }
         }
     }
 
