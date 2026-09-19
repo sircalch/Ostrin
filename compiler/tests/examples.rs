@@ -1512,6 +1512,18 @@ fn concurrency_channel_and_task_work() {
 }
 
 #[test]
+fn concurrency_scheduler_defers_tasks_and_drains_scopes() {
+    let out = run(&["--run", &example_path("concurrency_scheduler.ostrin")]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let text = stdout(&out);
+    let lines: Vec<&str> = text.lines().collect();
+    assert_eq!(
+        lines,
+        ["main", "task", "42", "scope-body", "scope-task", "7"]
+    );
+}
+
+#[test]
 fn spawn_capturing_mut_is_rejected() {
     let out = run(&[&example_path("concurrency_errors.ostrin")]);
     assert!(!out.status.success());

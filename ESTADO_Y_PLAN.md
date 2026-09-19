@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-18 · rama `main` · 6 pruebas diferenciales y 112 de integración en verde.*
+*Corte: 2026-09-18 · rama `main` · 6 pruebas diferenciales y 113 de integración en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
 Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–138); para el diseño
@@ -64,9 +64,11 @@ escalar a la izquierda (`rmul`, `radd`, …).
 **Control**: `if/else`, `while`, `for` (rangos `to`/`until`, listas, canales, iteradores
 propios con `next`), `match` con guardas, patrones anidados, rangos y destructuración.
 
-**Concurrencia (simulada)**: `spawn`, `join`, `channel<T>()`, `send/receive/close`;
-`spawn` se ejecuta de forma síncrona e inmediata. Se verifica en el checker que no se
-capturen bindings `mut` (E1100) y en ejecución que un record enviado no se reutilice (E1101).
+**Concurrencia (scheduler cooperativo del intérprete)**: `spawn`, `join`, `spawn_scope`,
+`channel<T>()`, `send/receive/close`; las tareas se difieren, `join` las ejecuta y los
+canales bombean tareas pendientes cuando esperan datos. Esto todavía no usa hilos del SO ni
+paralelismo de CPU. Se verifica en el checker que no se capturen bindings `mut` (E1100) y en
+ejecución que un record enviado no se reutilice (E1101).
 
 **Numérico/científico**: enteros de ancho fijo, `Float32`, `Array<T>` (difusión, máscaras,
 rebanadas, `@`), estadística, regresión, `det/inv/eigvals/norm`, `Rng` reproducible,

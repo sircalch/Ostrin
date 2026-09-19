@@ -3993,7 +3993,31 @@ La bajada HIR→IR ya no representa la concurrencia como `opaque concurrency`:
 `compiler_lowers_concurrency_operations_to_explicit_ir` cubren la superficie completa.
 La suite queda en **6 pruebas diferenciales y 112 de integración verdes**.
 
-Esto es una mejora del compilador, no todavía concurrencia real: el intérprete y el backend C
-conservan el modelo síncrono. El próximo paquete de runtime deberá implementar scheduler,
-hilos o tareas cooperativas, canales bloqueantes, cancelación y `select`, manteniendo
-estas mismas operaciones como contrato de backend.
+Esto es una mejora del compilador, no todavía paralelismo nativo: el intérprete puede ejecutar
+estas operaciones mediante el scheduler cooperativo documentado en la sección siguiente,
+mientras el backend C conserva el modelo síncrono. El próximo paquete de runtime deberá
+implementar hilos/canales bloqueantes, cancelación y `select`, manteniendo estas mismas
+operaciones como contrato de backend.
+
+## 139. Scheduler cooperativo ejecutable en el intérprete — 2026-09-18
+
+El intérprete dejó de ejecutar `spawn` inmediatamente. Ahora cada tarea se registra como un
+estado diferido (`Pending`, `Running`, `Completed` o `Failed`) y conserva su bloque y entorno
+capturado. `join()` ejecuta la tarea solicitada y guarda su resultado; un `join` cíclico se
+diagnostica como posible deadlock en lugar de recursar indefinidamente.
+
+La espera de canales también tiene semántica ejecutable: `receive()` y `for value in channel`
+consumen la cola, reconocen `close()` y ejecutan tareas pendientes cuando todavía no hay datos.
+Si no queda ninguna tarea que pueda producir un valor, el intérprete devuelve un error de
+bloqueo en vez de colgar el proceso. `spawn_scope` registra su frontera y drena las tareas
+creadas dentro del bloque antes de continuar.
+
+`examples/concurrency_scheduler.ostrin` y
+`concurrency_scheduler_defers_tasks_and_drains_scopes` protegen el orden observable:
+el cuerpo principal avanza antes de la tarea, el scope espera a sus hijos y un productor
+pendiente puede alimentar un canal consumido por la tarea anfitriona. La suite queda en
+**6 pruebas diferenciales y 113 de integración verdes**.
+
+Esta es concurrencia cooperativa determinista, no paralelismo de CPU. El siguiente paquete
+debe reutilizar estos estados y las operaciones de la IR para añadir una implementación nativa
+con hilos/canales bloqueantes, además de cancelación y `select`.

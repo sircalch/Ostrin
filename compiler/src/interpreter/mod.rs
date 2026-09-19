@@ -41,7 +41,7 @@ pub enum Value {
     Closure(Rc<Vec<String>>, Rc<Block>, Env),
     Record(String, Rc<RefCell<Vec<(String, Value)>>>),
     EnumInstance(String, String, HashMap<String, Value>, Vec<Type>),
-    Task(Rc<RefCell<Value>>),
+    Task(Rc<RefCell<TaskState>>),
     Channel(Rc<RefCell<ChannelState>>),
     Map(Rc<RefCell<Vec<(Value, Value)>>>),
     Set(Rc<RefCell<Vec<Value>>>),
@@ -58,6 +58,21 @@ struct RuntimeImpl {
 pub struct ChannelState {
     queue: VecDeque<Value>,
     closed: bool,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TaskStatus {
+    Pending,
+    Running,
+    Completed,
+    Failed,
+}
+
+pub(crate) struct TaskState {
+    body: Rc<Block>,
+    env: Env,
+    status: TaskStatus,
+    result: Option<Result<Value, String>>,
 }
 
 impl fmt::Display for Value {
@@ -109,7 +124,15 @@ impl fmt::Display for Value {
                     write!(f, ")")
                 }
             }
-            Value::Task(result) => write!(f, "Task({})", result.borrow()),
+            Value::Task(task) => {
+                let state = task.borrow();
+                match (&state.status, &state.result) {
+                    (TaskStatus::Completed, Some(Ok(value))) => write!(f, "Task({value})"),
+                    (TaskStatus::Failed, Some(Err(error))) => write!(f, "Task(error: {error})"),
+                    (TaskStatus::Running, _) => write!(f, "Task(running)"),
+                    _ => write!(f, "Task(pending)"),
+                }
+            }
             Value::Channel(state) => write!(f, "Channel({} pending)", state.borrow().queue.len()),
             Value::Map(state) => {
                 write!(f, "[")?;
@@ -352,6 +375,11 @@ pub struct Interpreter {
     call_stack: Vec<CallFrame>,
     debugger: Option<Debugger>,
     terminated: bool,
+    /// Cooperative tasks created by `spawn`. The interpreter owns the queue;
+    /// a Task value is only a handle to one of these states. This keeps the
+    /// interpreter deterministic while giving `spawn` real deferred
+    /// semantics before the native thread backend is introduced.
+    tasks: Vec<Rc<RefCell<TaskState>>>,
     /// Integer literals the checker typed as fixed-width (see `TypedProgram::literal_kinds`).
     literal_kinds: HashMap<crate::typeck::ExprKey, LitKind>,
 }
@@ -428,6 +456,7 @@ impl Interpreter {
             debugger: None,
             literal_kinds: HashMap::new(),
             terminated: false,
+            tasks: Vec::new(),
         }
     }
 
@@ -445,6 +474,85 @@ impl Interpreter {
     /// failed outright (client vanished without a clean `disconnect`).
     pub fn take_debugger(&mut self) -> Option<Debugger> {
         self.debugger.take()
+    }
+
+    fn task_error(error: RuntimeError) -> String {
+        match error {
+            RuntimeError::Error(message) => message,
+            RuntimeError::Return(_) => "task returned through an invalid control-flow path".to_string(),
+            RuntimeError::Break(_) => "task escaped with break".to_string(),
+            RuntimeError::Continue => "task escaped with continue".to_string(),
+            RuntimeError::Terminated => "task was terminated by the debugger".to_string(),
+        }
+    }
+
+    /// Runs one task to completion on the interpreter's cooperative scheduler.
+    /// The task is deliberately removed from the pending set while executing,
+    /// so a cyclic join is diagnosed instead of recursing forever.
+    fn run_task(&mut self, task: Rc<RefCell<TaskState>>) -> EvalResult {
+        let (body, env) = {
+            let mut state = task.borrow_mut();
+            match state.status {
+                TaskStatus::Pending => {
+                    state.status = TaskStatus::Running;
+                    (state.body.clone(), state.env.clone())
+                }
+                TaskStatus::Running => {
+                    return Err(RuntimeError::Error("cyclic task join would deadlock".to_string()));
+                }
+                TaskStatus::Completed => {
+                    return match state.result.clone() {
+                        Some(Ok(value)) => Ok(value),
+                        Some(Err(error)) => Err(RuntimeError::Error(format!("task failed: {error}"))),
+                        None => Err(RuntimeError::Error("completed task has no result".to_string())),
+                    };
+                }
+                TaskStatus::Failed => {
+                    return match state.result.clone() {
+                        Some(Err(error)) => Err(RuntimeError::Error(format!("task failed: {error}"))),
+                        _ => Err(RuntimeError::Error("failed task has no error".to_string())),
+                    };
+                }
+            }
+        };
+
+        let outcome = match self.eval_block(&body, &env) {
+            Ok(value) => Ok(value),
+            Err(RuntimeError::Return(value)) => Ok(value),
+            Err(error) => Err(Self::task_error(error)),
+        };
+        let status = if outcome.is_ok() { TaskStatus::Completed } else { TaskStatus::Failed };
+        {
+            let mut state = task.borrow_mut();
+            state.status = status;
+            state.result = Some(outcome.clone());
+        }
+        match outcome {
+            Ok(value) => Ok(value),
+            Err(error) => Err(RuntimeError::Error(format!("task failed: {error}"))),
+        }
+    }
+
+    /// Makes one pending task make progress. Returning `false` means the
+    /// scheduler has no runnable task left, which is how the interpreter
+    /// reports an unfinished channel wait instead of hanging the process.
+    fn run_one_pending_task(&mut self) -> Result<bool, RuntimeError> {
+        let task = self.tasks.iter().find_map(|candidate| {
+            (candidate.borrow().status == TaskStatus::Pending).then(|| candidate.clone())
+        });
+        let Some(task) = task else { return Ok(false) };
+        self.run_task(task)?;
+        Ok(true)
+    }
+
+    fn drain_tasks_from(&mut self, start: usize) -> Result<(), RuntimeError> {
+        loop {
+            let task = self.tasks.iter().skip(start).find_map(|candidate| {
+                (candidate.borrow().status == TaskStatus::Pending).then(|| candidate.clone())
+            });
+            let Some(task) = task else { return Ok(()) };
+            self.run_task(task)?;
+        }
     }
 
     fn has_derive(&self, type_name: &str, trait_name: &str) -> bool {
@@ -1185,7 +1293,14 @@ impl Interpreter {
                                     Err(other) => return Err(other),
                                 }
                             }
-                            None => break,
+                            None if state.borrow().closed => break,
+                            None => {
+                                if !self.run_one_pending_task()? {
+                                    return Err(RuntimeError::Error(
+                                        "channel receive would block: no runnable task remains".to_string(),
+                                    ));
+                                }
+                            }
                         }
                     },
                     Value::List(state) => {
@@ -1606,15 +1721,33 @@ impl Interpreter {
                 }
                 Err(RuntimeError::Error("no 'match' arm matched the value".to_string()))
             }
-            // 'spawn' se ejecuta de forma síncrona e inmediata (documento 10 §7:
-            // simulación de una tarea, sin hilos de SO reales todavía) — lo que
-            // sí se verifica de verdad son las reglas de seguridad del diseño
-            // (E1100 en el verificador de tipos; movido-tras-enviar aquí abajo).
             Expr::Spawn(block) => {
-                let result = self.eval_block(block, env)?;
-                Ok(Value::Task(Rc::new(RefCell::new(result))))
+                let task = Rc::new(RefCell::new(TaskState {
+                    body: Rc::new(block.clone()),
+                    env: env.clone(),
+                    status: TaskStatus::Pending,
+                    result: None,
+                }));
+                self.tasks.push(task.clone());
+                Ok(Value::Task(task))
             }
-            Expr::SpawnScope(block) => self.eval_block(block, env),
+            Expr::SpawnScope(block) => {
+                let first_task = self.tasks.len();
+                let body_result = self.eval_block(block, env);
+                let drain_result = self.drain_tasks_from(first_task);
+                match body_result {
+                    Ok(value) => {
+                        drain_result?;
+                        Ok(value)
+                    }
+                    Err(error) => {
+                        // A structured scope still gives its children a chance
+                        // to finish before propagating the body's control flow.
+                        let _ = drain_result;
+                        Err(error)
+                    }
+                }
+            }
             Expr::Channel(_, _capacity) => {
                 Ok(Value::Channel(Rc::new(RefCell::new(ChannelState { queue: VecDeque::new(), closed: false }))))
             }
@@ -2119,12 +2252,15 @@ impl Interpreter {
             }
             if let Value::Task(result) = &receiver {
                 if method == "join" {
-                    return Ok(result.borrow().clone());
+                    return self.run_task(result.clone());
                 }
             }
             if let Value::Channel(state) = &receiver {
                 match method.as_str() {
                     "send" => {
+                        if state.borrow().closed {
+                            return Err(RuntimeError::Error("cannot send on a closed channel".to_string()));
+                        }
                         let v = self.eval_arg(&args[0], env)?;
                         if let Some(ptr) = Self::record_ptr(&v) {
                             self.moved.insert(ptr);
@@ -2133,11 +2269,30 @@ impl Interpreter {
                         return Ok(Value::Void);
                     }
                     "receive" => {
-                        let popped = state.borrow_mut().queue.pop_front();
-                        return Ok(match popped {
-                            Some(v) => Value::EnumInstance("Option".to_string(), "Some".to_string(), HashMap::from([("0".to_string(), v)]), Vec::new()),
-                            None => Value::EnumInstance("Option".to_string(), "None".to_string(), HashMap::new(), Vec::new()),
-                        });
+                        loop {
+                            let popped = state.borrow_mut().queue.pop_front();
+                            if let Some(v) = popped {
+                                return Ok(Value::EnumInstance(
+                                    "Option".to_string(),
+                                    "Some".to_string(),
+                                    HashMap::from([("0".to_string(), v)]),
+                                    Vec::new(),
+                                ));
+                            }
+                            if state.borrow().closed {
+                                return Ok(Value::EnumInstance(
+                                    "Option".to_string(),
+                                    "None".to_string(),
+                                    HashMap::new(),
+                                    Vec::new(),
+                                ));
+                            }
+                            if !self.run_one_pending_task()? {
+                                return Err(RuntimeError::Error(
+                                    "channel receive would block: no runnable task remains".to_string(),
+                                ));
+                            }
+                        }
                     }
                     "close" => {
                         state.borrow_mut().closed = true;

@@ -1,0 +1,24 @@
+fn main() -> Void {
+    task = spawn {
+        print("task")
+        42
+    }
+
+    print("main")
+    print(task.join())
+
+    spawn_scope {
+        child = spawn {
+            print("scope-task")
+        }
+        print("scope-body")
+    }
+
+    values = channel<Int>()
+    producer = spawn {
+        values.send(7)
+        values.close()
+    }
+    print(values.receive().unwrap())
+    producer.join()
+}
