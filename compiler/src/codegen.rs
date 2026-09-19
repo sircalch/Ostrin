@@ -292,7 +292,13 @@ fn c_function_name(name: &str) -> String {
     // (which returns Void, not `int`, and takes no argv/argc) is renamed.
     // Every user function is prefixed so its name can never collide with a C
     // keyword or type (`double`, `int`, `default`) or a libc function (`abs`, `exit`).
-    if name == "main" { "ostrin_main".to_string() } else { format!("ostrin_fn_{name}") }
+    if name == "main" {
+        "ostrin_main".to_string()
+    } else {
+        // Module-qualified names (`pkg.module::f`) are not valid C identifiers.
+        let safe: String = name.chars().map(|c| if c.is_ascii_alphanumeric() || c == '_' { c } else { '_' }).collect();
+        format!("ostrin_fn_{safe}")
+    }
 }
 
 /// Quantity runtime (unit table, conversion, arithmetic helpers), spliced in
@@ -5140,6 +5146,23 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>, tr
     }
     if out.contains("ostrin_mark_moved") {
         out = out.replacen(PRELUDE, &format!("{PRELUDE}{MOVES_RUNTIME}"), 1);
+    }
+    // Module-qualified type names (`pkg.module::Table`) are not C identifiers: they are spelled the
+    // same everywhere internally, so one rewrite of the finished source fixes every use at once.
+    let mut qualified: Vec<&str> = items
+        .iter()
+        .filter_map(|item| match item {
+            Item::Record(r) => Some(r.name.as_str()),
+            Item::Enum(e) => Some(e.name.as_str()),
+            Item::Trait(t) => Some(t.name.as_str()),
+            _ => None,
+        })
+        .filter(|name| name.chars().any(|c| !(c.is_ascii_alphanumeric() || c == '_')))
+        .collect();
+    qualified.sort_by_key(|name| std::cmp::Reverse(name.len()));
+    for name in qualified {
+        let safe: String = name.chars().map(|c| if c.is_ascii_alphanumeric() || c == '_' { c } else { '_' }).collect();
+        out = out.replace(name, &safe);
     }
     let mut report = codegen.type_report.clone();
     report.sends_records = codegen.saw_record_send;

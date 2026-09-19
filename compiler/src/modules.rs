@@ -302,15 +302,27 @@ fn rewrite_item(item: &mut Item, module_path: &[String], ctx: &RewriteCtx) -> Re
     match item {
         Item::Function(f) => {
             f.name = mangled(module_path, &f.name);
+            rewrite_signature(&mut f.params, &mut f.return_type, ctx)?;
             rewrite_block(&mut f.body, ctx)?;
         }
         Item::Record(r) => {
             r.module_path = module_path.to_vec();
             r.name = mangled(module_path, &r.name);
+            for field in &mut r.fields {
+                rewrite_type(&mut field.ty, ctx)?;
+                if let Some(default) = &mut field.default {
+                    rewrite_expr(default, ctx)?;
+                }
+            }
         }
         Item::Enum(e) => {
             e.module_path = module_path.to_vec();
             e.name = mangled(module_path, &e.name);
+            for variant in &mut e.variants {
+                for field in &mut variant.fields {
+                    rewrite_type(&mut field.ty, ctx)?;
+                }
+            }
         }
         Item::Impl(im) => {
             im.module_path = module_path.to_vec();
@@ -329,6 +341,7 @@ fn rewrite_item(item: &mut Item, module_path: &[String], ctx: &RewriteCtx) -> Re
                 rewrite_type(type_arg, ctx)?;
             }
             for m in &mut im.methods {
+                rewrite_signature(&mut m.params, &mut m.return_type, ctx)?;
                 rewrite_block(&mut m.body, ctx)?;
             }
         }
@@ -341,9 +354,27 @@ fn rewrite_item(item: &mut Item, module_path: &[String], ctx: &RewriteCtx) -> Re
                 }
             }
             t.name = mangled(module_path, &t.name);
+            for method in &mut t.methods {
+                rewrite_signature(&mut method.params, &mut method.return_type, ctx)?;
+                if let Some(body) = &mut method.default_body {
+                    rewrite_block(body, ctx)?;
+                }
+            }
         }
     }
     Ok(())
+}
+
+/// Types written in a signature name items of the module (or things it imported): they must be
+/// spelled the way the merged program knows them, exactly like names in a body.
+fn rewrite_signature(params: &mut [Param], return_type: &mut Type, ctx: &RewriteCtx) -> Result<(), String> {
+    for param in params {
+        rewrite_type(&mut param.ty, ctx)?;
+        if let Some(default) = &mut param.default {
+            rewrite_expr(default, ctx)?;
+        }
+    }
+    rewrite_type(return_type, ctx)
 }
 
 fn rewrite_block(block: &mut Block, ctx: &RewriteCtx) -> Result<(), String> {
@@ -354,7 +385,12 @@ fn rewrite_block(block: &mut Block, ctx: &RewriteCtx) -> Result<(), String> {
 
 fn rewrite_stmt(stmt: &mut Stmt, ctx: &RewriteCtx) -> Result<(), String> {
     match stmt {
-        Stmt::Binding { value, .. } => rewrite_expr(value, ctx),
+        Stmt::Binding { ty, value, .. } => {
+            if let Some(ty) = ty {
+                rewrite_type(ty, ctx)?;
+            }
+            rewrite_expr(value, ctx)
+        }
         Stmt::Assign { value, .. } => rewrite_expr(value, ctx),
         Stmt::Return(Some(e)) | Stmt::Break(Some(e)) => rewrite_expr(e, ctx),
         Stmt::Return(None) | Stmt::Break(None) | Stmt::Continue => Ok(()),
@@ -428,7 +464,13 @@ fn rewrite_expr(expr: &mut Expr, ctx: &RewriteCtx) -> Result<(), String> {
             for it in items { rewrite_expr(it, ctx)?; }
             Ok(())
         }
-        Expr::EmptyCollection(..) | Expr::SizedIntLiteral(..) | Expr::Float32Literal(_) => Ok(()),
+        Expr::EmptyCollection(_, type_args) => {
+            for type_arg in type_args {
+                rewrite_type(type_arg, ctx)?;
+            }
+            Ok(())
+        }
+        Expr::SizedIntLiteral(..) | Expr::Float32Literal(_) => Ok(()),
         Expr::MapLiteral(pairs) => {
             for (k, v) in pairs { rewrite_expr(k, ctx)?; rewrite_expr(v, ctx)?; }
             Ok(())

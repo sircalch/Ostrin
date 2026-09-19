@@ -1692,3 +1692,21 @@ fn empty_mask_is_a_runtime_error_in_both_backends() {
     assert!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n").starts_with("[1, 2, 3]\n"));
     assert!(String::from_utf8_lossy(&native.stderr).contains("selects no elements"));
 }
+
+#[test]
+fn table_library_module_runs_identically_in_both_backends() {
+    let entry = example_path("data_project/app/main.ostrin");
+    let interpreted = run(&["--run", &entry]);
+    assert!(interpreted.status.success(), "stderr: {}", stderr(&interpreted));
+    let exe = temp_artifact("table_lib.exe");
+    let compiled = run(&["--compile", "--out", &exe, &entry]);
+    if skip_if_no_c_compiler(&compiled) {
+        return;
+    }
+    assert!(compiled.status.success(), "stderr: {}", stderr(&compiled));
+    let native = Command::new(&exe).output().expect("run native binary");
+    let _ = fs::remove_file(&exe);
+    let native_text = String::from_utf8_lossy(&native.stdout).to_string();
+    assert_eq!(stdout(&interpreted).lines().collect::<Vec<_>>(), native_text.lines().collect::<Vec<_>>());
+    assert!(stdout(&interpreted).contains("temp: n=3 mean=19"), "unexpected output: {}", stdout(&interpreted));
+}

@@ -1,0 +1,76 @@
+// Biblioteca de tablas: columnas de texto sobre parse_csv, con conversión a Array<Float>.
+pub record Table {
+    names: List<String>
+    cols: List<List<String>>
+}
+
+pub fn table_from_csv(text: String) -> Table {
+    rows = parse_csv(text)
+    names = rows[0]
+    mut cols: List<List<String>> = []
+    mut j = 0
+    while j < names.length() {
+        mut column: List<String> = []
+        mut i = 1
+        while i < rows.length() {
+            column.push(rows[i][j])
+            i = i + 1
+        }
+        cols.push(column)
+        j = j + 1
+    }
+    Table { names: names, cols: cols }
+}
+
+pub fn table_rows(t: Table) -> Int {
+    if t.cols.length() == 0 { 0 } else { t.cols[0].length() }
+}
+
+pub fn col_index(t: Table, name: String) -> Int {
+    mut found = -1
+    mut j = 0
+    while j < t.names.length() {
+        if t.names[j] == name { found = j }
+        j = j + 1
+    }
+    found
+}
+
+pub fn floats(t: Table, name: String) -> Array<Float> {
+    j = col_index(t, name)
+    if j < 0 { panic("no existe la columna " + name) }
+    mut values: List<Float> = []
+    for text in t.cols[j] {
+        match text.trim().to_float() {
+            Ok(v) => { values.push(v) },
+            Err(e) => panic("columna " + name + ": " + e),
+        }
+    }
+    array(values)
+}
+
+pub fn filter_rows(t: Table, name: String, value: String) -> Table {
+    j = col_index(t, name)
+    mut cols: List<List<String>> = []
+    for k in 0 until t.cols.length() {
+        mut column: List<String> = []
+        cols.push(column)
+    }
+    mut i = 0
+    while i < table_rows(t) {
+        if t.cols[j][i] == value {
+            mut k = 0
+            while k < t.cols.length() {
+                cols[k].push(t.cols[k][i])
+                k = k + 1
+            }
+        }
+        i = i + 1
+    }
+    Table { names: t.names, cols: cols }
+}
+
+pub fn describe(t: Table, name: String) -> Void {
+    x = floats(t, name)
+    print(name + ": n=" + x.length().to_string() + " mean=" + x.mean().to_string() + " std=" + x.std().to_string() + " min=" + x.min().to_string() + " max=" + x.max().to_string())
+}

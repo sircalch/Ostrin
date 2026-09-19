@@ -1,0 +1,11 @@
+import tables.table
+
+fn main() -> Void {
+    data = "ciudad,temp\nLima,21.5\nCusco,12.0\nLima,23.5\n"
+    t = table.table_from_csv(data)
+    print(table.table_rows(t))
+    table.describe(t, "temp")
+    lima = table.filter_rows(t, "ciudad", "Lima")
+    print(table.table_rows(lima))
+    table.describe(lima, "temp")
+}

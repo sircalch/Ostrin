@@ -3576,3 +3576,12 @@ Ejemplo: `examples/string_methods.ostrin` (incluye un lector de CSV escrito en O
 Cambio de compilador que salió de aquí: en el backend nativo, `[]` con tipo esperado (`mut xs: List<String> = []`, argumentos, campos) ya se acepta; antes fallaba con «empty list literals aren't supported».
 
 Decisión: la capa de datos crece como biblioteca en Ostrin (módulo `import`), no como tipo interno; el compilador solo se toca cuando la biblioteca choca con un límite del lenguaje.
+
+## 114. Biblioteca de tablas como paquete + arreglos de módulos (tipos y nativo)
+
+`examples/data_project/{tables,app}`: `tables` es un paquete (`pub record Table`, `table_from_csv`, `floats`, `filter_rows`, `describe`, …) y `app` lo importa (`import tables.table`). Se ejecuta igual en intérprete y nativo (test `table_library_module_runs_identically_in_both_backends`).
+
+Errores reales de los módulos que salieron a la luz y se corrigieron:
+- `modules.rs` reescribía los nombres en los cuerpos pero **no en tipos de firmas, campos de records, variantes, anotaciones de bindings ni `List<T>[]` vacíos**; un `record` de un módulo no se podía usar como tipo entre módulos (`declared to return 'Table' but its body evaluates to 'pkg.mod::Table'`). Ahora `rewrite_signature`/`rewrite_type` cubren params, retorno, campos, variantes, métodos de impl/trait y anotaciones.
+- Nativo: los nombres calificados (`pkg.mod::f`, `pkg.mod::Table`) no son identificadores C. Las funciones se sanean en `c_function_name`; los tipos, con un reemplazo único sobre el C final.
+El ejemplo `pkg_project` ya compila también en nativo.
