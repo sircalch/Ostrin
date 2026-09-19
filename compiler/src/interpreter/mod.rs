@@ -593,6 +593,70 @@ impl Interpreter {
         }
     }
 
+    /// Structural equality for the collection and sum types supplied by the
+    /// language core. Records/enums still use `derive(Eq)` or an explicit
+    /// `equals` method; these built-ins have a stable value semantics even
+    /// though their storage is reference counted internally.
+    fn structural_equals(&mut self, lv: &Value, rv: &Value, env: &Env) -> Result<bool, RuntimeError> {
+        match (lv, rv) {
+            (Value::List(left), Value::List(right)) => {
+                let left = left.borrow().clone();
+                let right = right.borrow().clone();
+                if left.len() != right.len() { return Ok(false); }
+                for (a, b) in left.into_iter().zip(right) {
+                    if !truthy(&self.eval_binary(BinOp::Eq, a, b, env)?) { return Ok(false); }
+                }
+                Ok(true)
+            }
+            (Value::Map(left), Value::Map(right)) => {
+                let left = left.borrow().clone();
+                let right = right.borrow().clone();
+                if left.len() != right.len() { return Ok(false); }
+                for (key, value) in left {
+                    let mut found = false;
+                    for (other_key, other_value) in &right {
+                        if truthy(&self.eval_binary(BinOp::Eq, key.clone(), other_key.clone(), env)?) {
+                            if !truthy(&self.eval_binary(BinOp::Eq, value.clone(), other_value.clone(), env)?) {
+                                return Ok(false);
+                            }
+                            found = true;
+                            break;
+                        }
+                    }
+                    if !found { return Ok(false); }
+                }
+                Ok(true)
+            }
+            (Value::Set(left), Value::Set(right)) => {
+                let left = left.borrow().clone();
+                let right = right.borrow().clone();
+                if left.len() != right.len() { return Ok(false); }
+                for value in left {
+                    let mut found = false;
+                    for other in &right {
+                        if truthy(&self.eval_binary(BinOp::Eq, value.clone(), other.clone(), env)?) {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if !found { return Ok(false); }
+                }
+                Ok(true)
+            }
+            (Value::EnumInstance(left_type, left_variant, left_fields, _), Value::EnumInstance(right_type, right_variant, right_fields, _))
+                if left_type == right_type && matches!(left_type.as_str(), "Option" | "Result") =>
+            {
+                if left_variant != right_variant { return Ok(false); }
+                match (left_fields.get("0"), right_fields.get("0")) {
+                    (Some(a), Some(b)) => Ok(truthy(&self.eval_binary(BinOp::Eq, a.clone(), b.clone(), env)?)),
+                    (None, None) => Ok(true),
+                    _ => Ok(false),
+                }
+            }
+            _ => Ok(false),
+        }
+    }
+
     /// Genera 'compare' para 'record' con 'derive(Ord)': orden lexicográfico
     /// por campo, en el orden de declaración (documento 12, §2.2). Los
     /// 'enum' con 'derive(Ord)' distintos de 'Ordering' no están cubiertos
@@ -650,6 +714,16 @@ impl Interpreter {
                     return self.call_user_function(&f, vec![rv, lv], env.clone());
                 }
             }
+        }
+        if matches!(lv, Value::List(..) | Value::Map(..) | Value::Set(..))
+            || matches!(rv, Value::List(..) | Value::Map(..) | Value::Set(..))
+            || matches!((&lv, &rv), (Value::EnumInstance(a, ..), Value::EnumInstance(b, ..)) if a == "Option" && b == "Option" || a == "Result" && b == "Result")
+        {
+            return match op {
+                BinOp::Eq => Ok(Value::Bool(self.structural_equals(&lv, &rv, env)?)),
+                BinOp::NotEq => Ok(Value::Bool(!self.structural_equals(&lv, &rv, env)?)),
+                _ => Err(RuntimeError::Error("only '==' and '!=' are defined for collections, Option and Result".to_string())),
+            };
         }
         if matches!(lv, Value::Record(..) | Value::EnumInstance(..)) {
             let type_name = value_type_name(&lv);

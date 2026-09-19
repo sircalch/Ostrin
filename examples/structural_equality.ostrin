@@ -1,0 +1,24 @@
+fn main() -> Void {
+    first = [1, 2, 3]
+    same = [1, 2, 3]
+    different = [1, 3]
+    print(first == same)
+    print(first != different)
+
+    maybe_a = Some(first)
+    maybe_b = Some(same)
+    print(maybe_a == maybe_b)
+    print(None<Int>() == None<Int>())
+
+    result_a: Result<List<Int>, String> = Ok(first)
+    result_b: Result<List<Int>, String> = Ok(same)
+    print(result_a == result_b)
+
+    left = ["alpha": 1, "beta": 2]
+    right = ["beta": 2, "alpha": 1]
+    print(left == right)
+
+    set_a = {1, 2, 3}
+    set_b = {3, 2, 1}
+    print(set_a == set_b)
+}

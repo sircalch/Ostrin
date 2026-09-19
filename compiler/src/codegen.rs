@@ -3352,6 +3352,14 @@ impl<'a> Codegen<'a> {
                 }
                 Ok(format!("ostrin_eq_{n}({a}, {b})"))
             }
+            CType::List(_) | CType::Map(..) | CType::Set(_) | CType::Option(_) | CType::Result(..) | CType::Array(_) => {
+                self.register_list_types(ty);
+                let name = mangle_ctype(ty);
+                if self.op_done.insert((false, name.clone())) {
+                    self.op_queue.push_back((false, ty.clone()));
+                }
+                Ok(format!("ostrin_eq_{name}({a}, {b})"))
+            }
             other => Err(format!("cannot compare values of type '{}' with '==' yet", c_type_name(other))),
         }
     }
@@ -3406,7 +3414,41 @@ impl<'a> Codegen<'a> {
                 }
                 out.push_str("    return 0;\n");
             }
-            _ => unreachable!("only records and enums are queued"),
+            (false, CType::List(elem)) => {
+                let eq = self.eq_expr("a->items[i]", "b->items[i]", elem)?;
+                out.push_str(&format!(
+                    "    if (a == b) return true;\n    if (!a || !b || a->length != b->length) return false;\n    for (int64_t i = 0; i < a->length; i++) {{ if (!({eq})) return false; }}\n    return true;\n"
+                ));
+            }
+            (false, CType::Map(key, value)) => {
+                let key_eq = self.eq_expr("a->keys[i]", "b->keys[j]", key)?;
+                let value_eq = self.eq_expr("a->vals[i]", "b->vals[j]", value)?;
+                out.push_str(&format!(
+                    "    if (a == b) return true;\n    if (!a || !b || a->length != b->length) return false;\n    for (int64_t i = 0; i < a->length; i++) {{ bool found = false; for (int64_t j = 0; j < b->length; j++) {{ if (({key_eq}) && ({value_eq})) {{ found = true; break; }} }} if (!found) return false; }}\n    return true;\n"
+                ));
+            }
+            (false, CType::Set(elem)) => {
+                let eq = self.eq_expr("a->items[i]", "b->items[j]", elem)?;
+                out.push_str(&format!(
+                    "    if (a == b) return true;\n    if (!a || !b || a->length != b->length) return false;\n    for (int64_t i = 0; i < a->length; i++) {{ bool found = false; for (int64_t j = 0; j < b->length; j++) {{ if ({eq}) {{ found = true; break; }} }} if (!found) return false; }}\n    return true;\n"
+                ));
+            }
+            (false, CType::Option(inner)) => {
+                let eq = self.eq_expr("a.value", "b.value", inner)?;
+                out.push_str(&format!("    if (a.has != b.has) return false;\n    return !a.has || ({eq});\n"));
+            }
+            (false, CType::Result(ok, err)) => {
+                let ok_eq = self.eq_expr("a.value", "b.value", ok)?;
+                let err_eq = self.eq_expr("a.error", "b.error", err)?;
+                out.push_str(&format!("    if (a.ok != b.ok) return false;\n    return a.ok ? ({ok_eq}) : ({err_eq});\n"));
+            }
+            (false, CType::Array(elem)) => {
+                let eq = self.eq_expr("a->data[i]", "b->data[i]", elem)?;
+                out.push_str(&format!(
+                    "    if (a == b) return true;\n    if (!a || !b || a->rank != b->rank || a->size != b->size) return false;\n    for (int64_t i = 0; i < a->rank; i++) {{ if (a->shape[i] != b->shape[i]) return false; }}\n    for (int64_t i = 0; i < a->size; i++) {{ if (!({eq})) return false; }}\n    return true;\n"
+                ));
+            }
+            _ => unreachable!("only equality-capable types are queued"),
         }
         Ok(out)
     }
@@ -3590,8 +3632,15 @@ impl<'a> Codegen<'a> {
         if matches!(lt, CType::Record(_) | CType::Enum(_)) && !matches!(op, BinOp::And | BinOp::Or) {
             return self.gen_user_operator(op, &lc, &lt, &rc, &rt);
         }
-        if matches!(lt, CType::Record(_) | CType::Enum(_) | CType::DynTrait(_) | CType::List(_) | CType::Option(_) | CType::NoneLit | CType::Result(..) | CType::OkLit(_) | CType::ErrLit(_))
-            || matches!(rt, CType::Record(_) | CType::Enum(_) | CType::DynTrait(_) | CType::List(_) | CType::Option(_) | CType::NoneLit | CType::Result(..) | CType::OkLit(_) | CType::ErrLit(_))
+        if matches!(op, BinOp::Eq | BinOp::NotEq)
+            && lt == rt
+            && matches!(lt, CType::List(_) | CType::Map(..) | CType::Set(_) | CType::Option(_) | CType::Result(..))
+        {
+            let eq = self.eq_expr(&lc, &rc, &lt)?;
+            return Ok((if op == BinOp::Eq { eq } else { format!("(!{eq})") }, CType::Bool));
+        }
+        if matches!(lt, CType::Record(_) | CType::Enum(_) | CType::DynTrait(_) | CType::List(_) | CType::Map(..) | CType::Set(_) | CType::Option(_) | CType::NoneLit | CType::Result(..) | CType::OkLit(_) | CType::ErrLit(_))
+            || matches!(rt, CType::Record(_) | CType::Enum(_) | CType::DynTrait(_) | CType::List(_) | CType::Map(..) | CType::Set(_) | CType::Option(_) | CType::NoneLit | CType::Result(..) | CType::OkLit(_) | CType::ErrLit(_))
         {
             // C has no `==`/`<`/etc. on struct values at all (a compile
             // error, not just the wrong answer) — but even where a raw `==`
@@ -3599,7 +3648,7 @@ impl<'a> Codegen<'a> {
             // would silently mean identity, not the structural
             // `derive(Eq)`/`impl Eq` comparison Ostrin actually defines.
             return Err(
-                "operators on records/enums/'dyn Trait'/List values aren't supported by the native backend yet (no derive(Eq/Ord) dispatch)"
+                "operators on records/enums/'dyn Trait'/collections aren't supported by the native backend yet (no structural/operator dispatch)"
                     .to_string(),
             );
         }
@@ -5638,10 +5687,7 @@ fn generate_impl(
         }
         while let Some((is_compare, ty)) = codegen.op_queue.pop_front() {
             progressed = true;
-            let name = match &ty {
-                CType::Record(n) | CType::Enum(n) => n.clone(),
-                _ => unreachable!(),
-            };
+            let name = mangle_ctype(&ty);
             let (prefix, ret) = if is_compare { ("cmp", "int") } else { ("eq", "bool") };
             let c = c_type_name(&ty);
             let signature = format!("static {ret} ostrin_{prefix}_{name}({c} a, {c} b)");

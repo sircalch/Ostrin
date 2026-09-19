@@ -4144,3 +4144,24 @@ la representación de `Option<String>` y la salida de la ruta en ambos backends.
 Esto completa el primer bloque de entorno/rutas de la stdlib. Aún faltan un formateador estable,
 fechas, JSON, red y una colección hash eficiente; no se presenta este bloque como un sistema de
 paquetes completo.
+
+## 146. Igualdad estructural de colecciones y tipos suma — 2026-09-19
+
+La comparación `==`/`!=` deja de ser una limitación del backend nativo para los tipos de datos
+compuestos del núcleo:
+
+- `List<T>` compara longitud y elementos en orden, recursivamente.
+- `Map<K,V>` compara pares clave/valor sin depender del orden de inserción.
+- `Set<T>` compara pertenencia, también sin depender del orden interno.
+- `Option<T>` y `Result<T,E>` comparan primero la variante (`Some`/`None`, `Ok`/`Err`) y después
+  su payload cuando existe.
+
+El intérprete usa la misma operación recursiva que ya emplean `contains`, `find`, `Map` y `Set`;
+el backend C genera helpers tipados `ostrin_eq_*`, registra las instancias anidadas y conserva
+la semántica para valores dentro de records, enums y colecciones. `Array<T>` también tiene helper
+estructural para aserciones, mientras que sus operadores ordinarios mantienen su semántica
+científica elemento a elemento y devuelven una máscara.
+
+`examples/structural_equality.ostrin` y la prueba
+`structural_equality_matches_between_interpreter_and_native` cubren las siete salidas esperadas
+en ambos backends. La suite queda en **6 pruebas diferenciales y 121 de integración verdes**.

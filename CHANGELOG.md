@@ -87,6 +87,8 @@
   both expose a `List<String>` with identical behavior.
 - Added cross-backend standard-library primitives `env(String) -> Option<String>` and
   `path_join(String, String) -> String`, with matching interpreter/native behavior.
+- Added structural equality for `List`, `Map`, `Set`, `Option` and `Result` in both backends;
+  maps and sets compare by contents rather than insertion order, including nested values.
 - Lowered `match` and `try` into explicit IR control flow: pattern tests,
   pattern bindings, guarded-arm branches, try success/error blocks and phi convergence.
   The IR now keeps these families semantic instead of representing them as opaque operations;
