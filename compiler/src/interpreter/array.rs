@@ -165,8 +165,8 @@ fn coords_of(mut linear: usize, shape: &[usize]) -> Vec<usize> {
 
 /// `+ - * /` between two arrays (broadcast) or an array and a scalar.
 pub fn binary(op: BinOp, lv: Value, rv: Value) -> Res<Value> {
-    if !matches!(op, BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div) {
-        return fail("only + - * / are defined on arrays");
+    if !matches!(op, BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Eq | BinOp::NotEq | BinOp::Lt | BinOp::Gt | BinOp::LtEq | BinOp::GtEq | BinOp::And | BinOp::Or) {
+        return fail("only + - * / comparisons and and/or are defined on arrays");
     }
     match (&lv, &rv) {
         (Value::Array(a), Value::Array(b)) => {
@@ -295,6 +295,35 @@ pub fn call_method(receiver: &Rc<RefCell<ArrayData>>, method: &str, args: Vec<Va
                 return fail(format!("cannot reshape an array of {} element(s) to {shape:?}", a.data.len()));
             }
             Ok(make(shape, a.data.clone()))
+        }
+        "any" | "all" | "count_true" => {
+            let mut count = 0i64;
+            for x in a.data.iter() {
+                match x {
+                    Value::Bool(b) => count += *b as i64,
+                    other => return fail(format!("'{method}' needs Bool elements, got '{other}'")),
+                }
+            }
+            Ok(match method {
+                "any" => Value::Bool(count > 0),
+                "all" => Value::Bool(count as usize == a.data.len()),
+                _ => Value::Int(count),
+            })
+        }
+        "row" | "col" => {
+            if a.shape.len() != 2 {
+                return fail(format!("{method} needs a two-dimensional array"));
+            }
+            let Value::Int(i) = &args[0] else { return fail(format!("{method} expects an Int index")) };
+            let (rows, cols) = (a.shape[0] as i64, a.shape[1] as i64);
+            let (limit, count) = if method == "row" { (rows, cols) } else { (cols, rows) };
+            if *i < 0 || *i >= limit {
+                return fail(format!("index out of bounds: {i}"));
+            }
+            let data = (0..count)
+                .map(|k| if method == "row" { a.data[(*i * cols + k) as usize].clone() } else { a.data[(k * cols + *i) as usize].clone() })
+                .collect();
+            Ok(make(vec![count as usize], data))
         }
         "var" | "std" | "sample_var" | "sample_std" | "median" | "percentile" => stats_method(&a, method, &args),
         "cumsum" => {
@@ -569,4 +598,84 @@ pub fn cov_corr(name: &str, a: &Value, b: &Value) -> Res<Value> {
         }
         _ => fail(format!("{name} needs two arrays of the same float type")),
     }
+}
+
+/// `a[mask]` with an `Array<Bool>` of the same shape: the selected elements, as a vector.
+pub fn index_mask(array: &Rc<RefCell<ArrayData>>, mask: &Value) -> Res<Value> {
+    let Value::Array(mask) = mask else { return fail("a mask must be an Array<Bool>") };
+    let (a, m) = (array.borrow(), mask.borrow());
+    if a.shape != m.shape {
+        return fail(format!("mask shape {:?} doesn't match the array shape {:?}", m.shape, a.shape));
+    }
+    let mut data = Vec::new();
+    for (x, keep) in a.data.iter().zip(m.data.iter()) {
+        match keep {
+            Value::Bool(true) => data.push(x.clone()),
+            Value::Bool(false) => {}
+            other => return fail(format!("a mask must hold Bool values, got '{other}'")),
+        }
+    }
+    if data.is_empty() {
+        return fail("the mask selects no elements (arrays are never empty)");
+    }
+    Ok(make(vec![data.len()], data))
+}
+
+/// `a[lo until hi]` / `a[lo to hi]` on a vector: a copy of the elements in `[lo, hi)`.
+pub fn slice(array: &Rc<RefCell<ArrayData>>, lo: i64, hi_exclusive: i64) -> Res<Value> {
+    let a = array.borrow();
+    if a.shape.len() != 1 {
+        return fail("slicing needs a one-dimensional array (use row(i) / col(j) on matrices)");
+    }
+    if lo < 0 || hi_exclusive > a.shape[0] as i64 || lo >= hi_exclusive {
+        return fail(format!("invalid slice {lo}..{hi_exclusive} for an array of length {}", a.shape[0]));
+    }
+    Ok(make(vec![(hi_exclusive - lo) as usize], a.data[lo as usize..hi_exclusive as usize].to_vec()))
+}
+
+pub fn not_array(value: &Value) -> Res<Value> {
+    let Value::Array(a) = value else { return fail("cannot negate this value") };
+    let a = a.borrow();
+    let data = a
+        .data
+        .iter()
+        .map(|x| match x {
+            Value::Bool(b) => Ok(Value::Bool(!b)),
+            other => fail(format!("'not' needs Bool elements, got '{other}'")),
+        })
+        .collect::<Res<Vec<_>>>()?;
+    Ok(make(a.shape.clone(), data))
+}
+
+fn as_operand(value: &Value) -> (Vec<usize>, Vec<Value>) {
+    match value {
+        Value::Array(a) => {
+            let a = a.borrow();
+            (a.shape.clone(), a.data.clone())
+        }
+        scalar => (vec![1], vec![scalar.clone()]),
+    }
+}
+
+/// `where(mask, a, b)`: elementwise choice, with broadcasting; scalars broadcast as one element.
+pub fn where_select(mask: &Value, a: &Value, b: &Value) -> Res<Value> {
+    if !matches!(mask, Value::Array(_)) {
+        return fail("where expects an Array<Bool> mask first");
+    }
+    let (ms, md) = as_operand(mask);
+    let (as_, ad) = as_operand(a);
+    let (bs, bd) = as_operand(b);
+    let shape = broadcast_shape(&broadcast_shape(&ms, &as_)?, &bs)?;
+    let n = total(&shape);
+    let mut data = Vec::with_capacity(n);
+    for linear in 0..n {
+        let coords = coords_of(linear, &shape);
+        let chosen = match &md[broadcast_index(&ms, &coords)] {
+            Value::Bool(true) => &ad[broadcast_index(&as_, &coords)],
+            Value::Bool(false) => &bd[broadcast_index(&bs, &coords)],
+            other => return fail(format!("a mask must hold Bool values, got '{other}'")),
+        };
+        data.push(chosen.clone());
+    }
+    Ok(make(shape, data))
 }

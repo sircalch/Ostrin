@@ -544,6 +544,16 @@ impl Parser {
             let op = match self.peek().kind {
                 TokenKind::Star => BinOp::Mul,
                 TokenKind::Slash => BinOp::Div,
+                TokenKind::At => {
+                    // `a @ b` is `a.matmul(b)`: no new AST node, so every later stage already handles it.
+                    self.advance();
+                    let right = self.parse_unary()?;
+                    left = Expr::Call(
+                        Box::new(Expr::FieldAccess(Box::new(left), "matmul".to_string())),
+                        vec![Arg::Positional(right)],
+                    );
+                    continue;
+                }
                 _ => break,
             };
             self.advance();

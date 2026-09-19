@@ -71,6 +71,8 @@ static @T@ @N@_apply(int op, @T@ x, @T@ y) {
         case 0: return OSTRIN_ADD(x, y);
         case 1: return OSTRIN_SUB(x, y);
         case 2: return OSTRIN_MUL(x, y);
+        case 4: return (@T@)((x) && (y));
+        case 5: return (@T@)((x) || (y));
         default: return OSTRIN_DIV(x, y);
     }
 }
@@ -102,6 +104,148 @@ static @N@* @N@_binop(@N@* a, @N@* b, int op) {
             ib = ib * dim + (dim == 1 ? 0 : coords[d + (rank - b->rank)]);
         }
         r->data[lin] = @N@_apply(op, a->data[ia], b->data[ib]);
+    }
+    free(shape);
+    free(coords);
+    return r;
+}
+
+static Array_Bool* Array_Bool_alloc(int64_t rank, const int64_t* shape);
+
+static int @N@_cmp_apply(int op, @T@ x, @T@ y) {
+    switch (op) {
+        case 0: return x == y;
+        case 1: return x != y;
+        case 2: return x < y;
+        case 3: return x > y;
+        case 4: return x <= y;
+        default: return x >= y;
+    }
+}
+
+static Array_Bool* @N@_cmp(@N@* a, @N@* b, int op) {
+    int64_t rank = a->rank > b->rank ? a->rank : b->rank;
+    int64_t* shape = (int64_t*)malloc(sizeof(int64_t) * (size_t)rank);
+    int64_t* coords = (int64_t*)malloc(sizeof(int64_t) * (size_t)rank);
+    if (!shape || !coords) OSTRIN_OOM();
+    for (int64_t i = 0; i < rank; i++) {
+        int64_t da = i < rank - a->rank ? 1 : a->shape[i - (rank - a->rank)];
+        int64_t db = i < rank - b->rank ? 1 : b->shape[i - (rank - b->rank)];
+        if (da == db) shape[i] = da;
+        else if (da == 1) shape[i] = db;
+        else if (db == 1) shape[i] = da;
+        else OSTRIN_FAIL("shape mismatch: the arrays can't be broadcast together");
+    }
+    Array_Bool* r = Array_Bool_alloc(rank, shape);
+    for (int64_t lin = 0; lin < r->size; lin++) {
+        int64_t rem = lin;
+        for (int64_t d = rank - 1; d >= 0; d--) { coords[d] = rem % r->shape[d]; rem /= r->shape[d]; }
+        int64_t ia = 0, ib = 0;
+        for (int64_t d = 0; d < a->rank; d++) {
+            int64_t dim = a->shape[d];
+            ia = ia * dim + (dim == 1 ? 0 : coords[d + (rank - a->rank)]);
+        }
+        for (int64_t d = 0; d < b->rank; d++) {
+            int64_t dim = b->shape[d];
+            ib = ib * dim + (dim == 1 ? 0 : coords[d + (rank - b->rank)]);
+        }
+        r->data[lin] = @N@_cmp_apply(op, a->data[ia], b->data[ib]);
+    }
+    free(shape);
+    free(coords);
+    return r;
+}
+
+static Array_Bool* @N@_cmp_scalar(@N@* a, @T@ s, int op, int scalar_left) {
+    Array_Bool* r = Array_Bool_alloc(a->rank, a->shape);
+    for (int64_t i = 0; i < a->size; i++) {
+        r->data[i] = scalar_left ? @N@_cmp_apply(op, s, a->data[i]) : @N@_cmp_apply(op, a->data[i], s);
+    }
+    return r;
+}
+
+static @N@* @N@_mask(@N@* a, Array_Bool* m) {
+    if (a->rank != m->rank) OSTRIN_FAIL("the mask shape doesn't match the array shape");
+    for (int64_t d = 0; d < a->rank; d++) if (a->shape[d] != m->shape[d]) OSTRIN_FAIL("the mask shape doesn't match the array shape");
+    int64_t count = 0;
+    for (int64_t i = 0; i < a->size; i++) if (m->data[i]) count++;
+    if (count == 0) OSTRIN_FAIL("the mask selects no elements (arrays are never empty)");
+    int64_t shape[1] = { count };
+    @N@* r = @N@_alloc(1, shape);
+    int64_t k = 0;
+    for (int64_t i = 0; i < a->size; i++) if (m->data[i]) r->data[k++] = a->data[i];
+    return r;
+}
+
+static @N@* @N@_slice(@N@* a, int64_t lo, int64_t hi) {
+    if (a->rank != 1) OSTRIN_FAIL("slicing needs a one-dimensional array (use row(i) / col(j) on matrices)");
+    if (lo < 0 || hi > a->shape[0] || lo >= hi) OSTRIN_FAIL("invalid slice for this array");
+    int64_t shape[1] = { hi - lo };
+    @N@* r = @N@_alloc(1, shape);
+    memcpy(r->data, a->data + lo, sizeof(@T@) * (size_t)(hi - lo));
+    return r;
+}
+
+static int @N@_any(@N@* a) { for (int64_t i = 0; i < a->size; i++) if (a->data[i]) return 1; return 0; }
+static int @N@_all(@N@* a) { for (int64_t i = 0; i < a->size; i++) if (!a->data[i]) return 0; return 1; }
+static int64_t @N@_count_true(@N@* a) { int64_t n = 0; for (int64_t i = 0; i < a->size; i++) if (a->data[i]) n++; return n; }
+
+static @N@* @N@_row(@N@* a, int64_t i) {
+    if (a->rank != 2) OSTRIN_FAIL("row needs a two-dimensional array");
+    if (i < 0 || i >= a->shape[0]) { fprintf(stderr, "runtime error: index out of bounds: %lld\n", (long long)i); exit(1); }
+    int64_t shape[1] = { a->shape[1] };
+    @N@* r = @N@_alloc(1, shape);
+    for (int64_t k = 0; k < a->shape[1]; k++) r->data[k] = a->data[i * a->shape[1] + k];
+    return r;
+}
+
+static @N@* @N@_col(@N@* a, int64_t j) {
+    if (a->rank != 2) OSTRIN_FAIL("col needs a two-dimensional array");
+    if (j < 0 || j >= a->shape[1]) { fprintf(stderr, "runtime error: index out of bounds: %lld\n", (long long)j); exit(1); }
+    int64_t shape[1] = { a->shape[0] };
+    @N@* r = @N@_alloc(1, shape);
+    for (int64_t k = 0; k < a->shape[0]; k++) r->data[k] = a->data[k * a->shape[1] + j];
+    return r;
+}
+
+static @N@* @N@_from_scalar(@T@ v) {
+    int64_t shape[1] = { 1 };
+    @N@* r = @N@_alloc(1, shape);
+    r->data[0] = v;
+    return r;
+}
+
+static @N@* @N@_not(@N@* a) {
+    @N@* r = @N@_alloc(a->rank, a->shape);
+    for (int64_t i = 0; i < a->size; i++) r->data[i] = (@T@)(!a->data[i]);
+    return r;
+}
+
+static @N@* @N@_where(Array_Bool* m, @N@* a, @N@* b) {
+    int64_t rank = m->rank;
+    if (a->rank > rank) rank = a->rank;
+    if (b->rank > rank) rank = b->rank;
+    int64_t* shape = (int64_t*)malloc(sizeof(int64_t) * (size_t)rank);
+    int64_t* coords = (int64_t*)malloc(sizeof(int64_t) * (size_t)rank);
+    if (!shape || !coords) OSTRIN_OOM();
+    for (int64_t i = 0; i < rank; i++) {
+        int64_t dm = i < rank - m->rank ? 1 : m->shape[i - (rank - m->rank)];
+        int64_t da = i < rank - a->rank ? 1 : a->shape[i - (rank - a->rank)];
+        int64_t db = i < rank - b->rank ? 1 : b->shape[i - (rank - b->rank)];
+        int64_t s = dm;
+        if (da != 1) { if (s != 1 && s != da) OSTRIN_FAIL("shape mismatch: the arrays can't be broadcast together"); s = da; }
+        if (db != 1) { if (s != 1 && s != db) OSTRIN_FAIL("shape mismatch: the arrays can't be broadcast together"); s = db; }
+        shape[i] = s;
+    }
+    @N@* r = @N@_alloc(rank, shape);
+    for (int64_t lin = 0; lin < r->size; lin++) {
+        int64_t rem = lin;
+        for (int64_t d = rank - 1; d >= 0; d--) { coords[d] = rem % r->shape[d]; rem /= r->shape[d]; }
+        int64_t im = 0, ia = 0, ib = 0;
+        for (int64_t d = 0; d < m->rank; d++) { int64_t dim = m->shape[d]; im = im * dim + (dim == 1 ? 0 : coords[d + (rank - m->rank)]); }
+        for (int64_t d = 0; d < a->rank; d++) { int64_t dim = a->shape[d]; ia = ia * dim + (dim == 1 ? 0 : coords[d + (rank - a->rank)]); }
+        for (int64_t d = 0; d < b->rank; d++) { int64_t dim = b->shape[d]; ib = ib * dim + (dim == 1 ? 0 : coords[d + (rank - b->rank)]); }
+        r->data[lin] = m->data[im] ? a->data[ia] : b->data[ib];
     }
     free(shape);
     free(coords);

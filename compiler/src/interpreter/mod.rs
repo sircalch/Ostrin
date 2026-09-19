@@ -1347,6 +1347,7 @@ impl Interpreter {
                     (UnaryOp::Neg, Value::Float(n)) => Ok(Value::Float(-n)),
                     (UnaryOp::Neg, Value::F32(n)) => Ok(Value::F32(-n)),
                     (UnaryOp::Neg, Value::Array(_)) => array::negate(&v),
+                    (UnaryOp::Not, Value::Array(_)) => array::not_array(&v),
                     (UnaryOp::Neg, Value::Quantity(n, d, u)) => Ok(Value::Quantity(-n, d.clone(), u.clone())),
                     (UnaryOp::Not, Value::Bool(b)) => Ok(Value::Bool(!b)),
                     _ => Err(RuntimeError::Error(format!("cannot apply unary operator to '{v}'"))),
@@ -1365,9 +1366,24 @@ impl Interpreter {
             Expr::Call(callee, args) => self.eval_call(callee, args, env, None),
             Expr::GenericCall(callee, type_args, args) => self.eval_call(callee, args, env, Some(type_args)),
             Expr::FieldAccess(obj, field) => self.eval_method(obj, field, &[], env),
+            Expr::Index(obj, idx) if matches!(idx.unlocated(), Expr::Range(_, _, _, None)) => {
+                // `a[lo until hi]` / `a[lo to hi]` on an array: a slice, not a list of indices.
+                let ov = self.eval_expr(obj, env)?;
+                let Expr::Range(start, kind, end, _) = idx.unlocated() else { unreachable!() };
+                let lo = as_i64(&self.eval_expr(start, env)?)?;
+                let hi = as_i64(&self.eval_expr(end, env)?)? + if *kind == RangeKind::To { 1 } else { 0 };
+                match ov {
+                    Value::Array(a) => array::slice(&a, lo, hi),
+                    other => Err(RuntimeError::Error(format!("cannot slice '{other}'"))),
+                }
+            }
             Expr::Index(obj, idx) => {
                 let ov = self.eval_expr(obj, env)?;
-                let iv = as_i64(&self.eval_expr(idx, env)?)?;
+                let index_value = self.eval_expr(idx, env)?;
+                if let (Value::Array(a), Value::Array(_)) = (&ov, &index_value) {
+                    return array::index_mask(a, &index_value);
+                }
+                let iv = as_i64(&index_value)?;
                 match ov {
                     Value::List(state) => state
                         .borrow()
@@ -1753,6 +1769,12 @@ impl Interpreter {
                 ("rng", 1) => {
                     let seed = as_i64(&self.eval_arg(&args[0], env)?)?;
                     return Ok(Value::Rng(Rc::new(RefCell::new(rng::RngState::new(seed)))));
+                }
+                ("where", 3) => {
+                    let mask = self.eval_arg(&args[0], env)?;
+                    let a = self.eval_arg(&args[1], env)?;
+                    let b = self.eval_arg(&args[2], env)?;
+                    return array::where_select(&mask, &a, &b);
                 }
                 ("cov", 2) | ("corr", 2) => {
                     let a = self.eval_arg(&args[0], env)?;

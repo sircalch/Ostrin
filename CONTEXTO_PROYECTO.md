@@ -3433,3 +3433,25 @@ Cierra el aviso de reproducibilidad del §96.
 - Ejemplos `calibration.ostrin` y `calibration_errors.ostrin` (6 errores). Suite: **110 pruebas**.
 - Límites: solo `Float` (no `Float32`); las ecuaciones normales de `polyfit` pierden precisión con
   grados altos (usar grado ≤ ~8); sin descomposiciones LU/QR/SVD reutilizables todavía.
+
+---
+
+## 101. Sintaxis de arrays: `@`, comparaciones, máscaras y cortes — 2026-09-18
+
+- **`a @ b`** es producto matricial. El parser lo desazucara a `a.matmul(b)` (sin nodo nuevo en
+  el AST, así que checker, intérprete y nativo ya lo soportaban); mismo nivel que `*` y `/`,
+  asociativo por la izquierda: `a @ b @ c`.
+- **Comparaciones** elemento a elemento (`== != < > <= >=`) entre arrays (con broadcasting) o
+  con un escalar dan `Array<Bool>`; `and`/`or`/`not` operan elemento a elemento sobre
+  `Array<Bool>`. `Array<Bool>` solo admite métodos estructurales y `any()`, `all()`,
+  `count_true()` (aritmética o `sum` sobre Bool es `E1041`); `array([true, false])` y
+  `full(forma, true)` están permitidos.
+- **Máscaras**: `a[a > 0.0]` selecciona los elementos (vector, orden row-major);
+  `where(mascara, a, b)` elige elemento a elemento con broadcasting (`a`/`b` pueden ser
+  escalares). Una máscara que no selecciona nada es un error en ejecución (los arrays nunca son
+  vacíos), igual en ambos backends.
+- **Cortes** de vectores: `a[lo until hi]` y `a[lo to hi]` (copia, no vista) y `row(i)`/`col(j)` de
+  matrices. Sin vistas ni cortes multidimensionales (`a[:, 0]`) todavía: exigen un modelo de vistas
+  prestadas (documento 18) para no copiar.
+- Ejemplos `array_syntax.ostrin` (nativo = intérprete), `array_syntax_errors.ostrin` (9 errores),
+  `array_empty_mask.ostrin` (test en ambos backends). Suite: **112 pruebas**.

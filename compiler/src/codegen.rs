@@ -239,10 +239,10 @@ fn map_type_with_subst(ty: &Type, types: &NamedTypes, subst: &HashMap<String, CT
         Type::Named(name, args) if name == "Task" && args.len() == 1 => Ok(CType::Task(Box::new(map_type_with_subst(&args[0], types, subst)?))),
         Type::Named(name, args) if name == "Array" && args.len() == 1 => {
             let elem = map_type_with_subst(&args[0], types, subst)?;
-            if matches!(elem, CType::Int | CType::Float | CType::Float32) {
+            if matches!(elem, CType::Int | CType::Float | CType::Float32 | CType::Bool) {
                 Ok(CType::Array(Box::new(elem)))
             } else {
-                Err("Array<T> is only supported by the native backend for Int, Float and Float32 elements yet".to_string())
+                Err("Array<T> is only supported by the native backend for Int, Float, Float32 and Bool elements yet".to_string())
             }
         }
         Type::Named(name, args) if name == "Set" && args.len() == 1 => Ok(CType::Set(Box::new(map_type_with_subst(&args[0], types, subst)?))),
@@ -1203,6 +1203,10 @@ impl<'a> Codegen<'a> {
         }
         if let CType::Array(t) = ty {
             self.register_list_types(t);
+            if **t != CType::Bool {
+                // Comparisons produce (and masks consume) an `Array<Bool>`.
+                self.register_list_types(&CType::Array(Box::new(CType::Bool)));
+            }
             if **t == CType::Float {
                 // `histogram` returns an `Array<Int>`.
                 self.register_list_types(&CType::Array(Box::new(CType::Int)));
@@ -1670,7 +1674,7 @@ impl<'a> Codegen<'a> {
             Ty::Named(n) if n == "Rng" => CType::Rng,
             Ty::Applied(n, args) if n == "Array" && args.len() == 1 => {
                 let elem = self.ty_to_ctype(&args[0])?;
-                matches!(elem, CType::Int | CType::Float | CType::Float32).then(|| CType::Array(Box::new(elem)))?
+                matches!(elem, CType::Int | CType::Float | CType::Float32 | CType::Bool).then(|| CType::Array(Box::new(elem)))?
             }
             Ty::List(t) => CType::List(Box::new(self.ty_to_ctype(t)?)),
             Ty::Set(t) => CType::Set(Box::new(self.ty_to_ctype(t)?)),
@@ -1830,6 +1834,7 @@ impl<'a> Codegen<'a> {
                         Ok((format!("({{ Qty {temp} = {code}; {temp}.v = -{temp}.v; {temp}; }})"), ty))
                     }
                     UnaryOp::Neg if matches!(ty, CType::Array(_)) => Ok((format!("{}_neg({code})", mangle_ctype(&ty)), ty)),
+                    UnaryOp::Not if matches!(ty, CType::Array(_)) => Ok((format!("{}_not({code})", mangle_ctype(&ty)), ty)),
                     UnaryOp::Neg if matches!(ty, CType::Sized(_)) => {
                         let CType::Sized(kind) = ty else { unreachable!() };
                         let temp = self.next_temp();
@@ -2007,8 +2012,18 @@ impl<'a> Codegen<'a> {
             Expr::Index(obj, idx) => {
                 let (obj_code, obj_ty) = self.gen_expr(obj)?;
                 if let CType::Array(elem) = &obj_ty {
-                    let (idx_code, _) = self.gen_expr(idx)?;
-                    return Ok((format!("{}_index1({obj_code}, {idx_code})", mangle_ctype(&obj_ty)), (**elem).clone()));
+                    let n = mangle_ctype(&obj_ty);
+                    if let Expr::Range(start, kind, end, None) = idx.unlocated() {
+                        let (lo, _) = self.gen_expr(start)?;
+                        let (hi, _) = self.gen_expr(end)?;
+                        let hi = if *kind == RangeKind::To { format!("(({hi}) + 1)") } else { hi };
+                        return Ok((format!("{n}_slice({obj_code}, {lo}, {hi})"), obj_ty.clone()));
+                    }
+                    let (idx_code, idx_ty) = self.gen_expr(idx)?;
+                    if matches!(&idx_ty, CType::Array(m) if **m == CType::Bool) {
+                        return Ok((format!("{n}_mask({obj_code}, {idx_code})"), obj_ty.clone()));
+                    }
+                    return Ok((format!("{n}_index1({obj_code}, {idx_code})"), (**elem).clone()));
                 }
                 let CType::List(elem_ty) = obj_ty else {
                     return Err("indexing is only supported on List values by the native backend yet".to_string());
@@ -2600,17 +2615,35 @@ impl<'a> Codegen<'a> {
             return self.gen_quantity_binary(op, &lc, &lt, &rc, &rt);
         }
         if matches!(lt, CType::Array(_)) || matches!(rt, CType::Array(_)) {
-            let code = match op {
-                BinOp::Add => 0,
-                BinOp::Sub => 1,
-                BinOp::Mul => 2,
-                BinOp::Div => 3,
-                _ => return Err("only + - * / are defined on arrays".to_string()),
+            let arithmetic = match op {
+                BinOp::Add => Some(0),
+                BinOp::Sub => Some(1),
+                BinOp::Mul => Some(2),
+                BinOp::Div => Some(3),
+                BinOp::And => Some(4),
+                BinOp::Or => Some(5),
+                _ => None,
             };
+            let comparison = match op {
+                BinOp::Eq => Some(0),
+                BinOp::NotEq => Some(1),
+                BinOp::Lt => Some(2),
+                BinOp::Gt => Some(3),
+                BinOp::LtEq => Some(4),
+                BinOp::GtEq => Some(5),
+                _ => None,
+            };
+            let (array_ty, function, code) = match (arithmetic, comparison) {
+                (Some(code), _) => (if matches!(lt, CType::Array(_)) { lt.clone() } else { rt.clone() }, "", code),
+                (_, Some(code)) => (if matches!(lt, CType::Array(_)) { lt.clone() } else { rt.clone() }, "cmp_", code),
+                _ => return Err("this operator isn't defined on arrays".to_string()),
+            };
+            let n = mangle_ctype(&array_ty);
+            let result = if function == "cmp_" { CType::Array(Box::new(CType::Bool)) } else { array_ty.clone() };
             return match (&lt, &rt) {
-                (CType::Array(a), CType::Array(b)) if a == b => Ok((format!("{}_binop({lc}, {rc}, {code})", mangle_ctype(&lt)), lt.clone())),
-                (CType::Array(a), scalar) if **a == *scalar => Ok((format!("{}_scalar({lc}, {rc}, {code}, 0)", mangle_ctype(&lt)), lt.clone())),
-                (scalar, CType::Array(b)) if **b == *scalar => Ok((format!("{}_scalar({rc}, {lc}, {code}, 1)", mangle_ctype(&rt)), rt.clone())),
+                (CType::Array(a), CType::Array(b)) if a == b => Ok((format!("{n}_{}({lc}, {rc}, {code})", if function == "cmp_" { "cmp" } else { "binop" }), result)),
+                (CType::Array(a), scalar) if **a == *scalar => Ok((format!("{n}_{}({lc}, {rc}, {code}, 0)", if function == "cmp_" { "cmp_scalar" } else { "scalar" }), result)),
+                (scalar, CType::Array(b)) if **b == *scalar => Ok((format!("{n}_{}({rc}, {lc}, {code}, 1)", if function == "cmp_" { "cmp_scalar" } else { "scalar" }), result)),
                 _ => Err("array operands must have the same element type".to_string()),
             };
         }
@@ -3215,6 +3248,12 @@ impl<'a> Codegen<'a> {
                     "mean" => Ok((format!("{n}_mean({obj_code})"), if t == CType::Int { CType::Float } else { t })),
                     "to_list" => Ok((format!("{n}_to_list({obj_code})"), CType::List(Box::new(t)))),
                     "cumsum" | "sort" => Ok((format!("{n}_{method_name}({obj_code})"), obj_ty.clone())),
+                    "any" | "all" => Ok((format!("{n}_{method_name}({obj_code})"), CType::Bool)),
+                    "count_true" => Ok((format!("{n}_count_true({obj_code})"), CType::Int)),
+                    "row" | "col" => {
+                        one(self, 1)?;
+                        Ok((format!("{n}_{method_name}({obj_code}, {})", codes[0]), CType::Array(Box::new(t))))
+                    }
                     "var" | "std" | "sample_var" | "sample_std" | "median" if matches!(t, CType::Float | CType::Float32) => {
                         Ok((format!("{n}_{method_name}({obj_code})"), t))
                     }
@@ -3646,7 +3685,7 @@ impl<'a> Codegen<'a> {
             "rng" => 1,
             "pow" | "atan2" => 2,
             "write_file" | "assert_eq" | "full" | "arange" | "cov" | "corr" | "linfit" | "solve" | "polyval" => 2,
-            "polyfit" | "norm_pdf" | "norm_cdf" => 3,
+            "polyfit" | "norm_pdf" | "norm_cdf" | "where" => 3,
             "histogram" => 4,
             "linspace" => 3,
             _ => return Ok(None),
@@ -3702,6 +3741,25 @@ impl<'a> Codegen<'a> {
                     ),
                     ty,
                 )))
+            }
+            "where" => {
+                let bool_array = CType::Array(Box::new(CType::Bool));
+                if types[0] != bool_array {
+                    return Err("'where' needs an Array<Bool> mask first".to_string());
+                }
+                let elem = match (&types[1], &types[2]) {
+                    (CType::Array(a), _) => (**a).clone(),
+                    (a, CType::Array(_)) => a.clone(),
+                    (a, _) => a.clone(),
+                };
+                if !matches!(elem, CType::Int | CType::Float | CType::Float32 | CType::Bool) {
+                    return Err("'where' supports Int, Float, Float32 or Bool elements in the native backend".to_string());
+                }
+                let result = CType::Array(Box::new(elem.clone()));
+                self.register_list_types(&result);
+                let n = mangle_ctype(&result);
+                let operand = |code: &str, ty: &CType| if matches!(ty, CType::Array(_)) { code.to_string() } else { format!("{n}_from_scalar({code})") };
+                Ok(Some((format!("{n}_where({}, {}, {})", codes[0], operand(&codes[1], &types[1]), operand(&codes[2], &types[2])), result)))
             }
             "linfit" | "solve" | "polyfit" | "polyval" | "histogram" | "norm_pdf" | "norm_cdf" => {
                 let float_array = CType::Array(Box::new(CType::Float));
@@ -3808,8 +3866,8 @@ impl<'a> Codegen<'a> {
                     ty = inner;
                     depth += 1;
                 }
-                if !(1..=3).contains(&depth) || !matches!(ty, CType::Int | CType::Float | CType::Float32) {
-                    return Err("'array' supports nested lists (up to 3 deep) of Int, Float or Float32 in the native backend".to_string());
+                if !(1..=3).contains(&depth) || !matches!(ty, CType::Int | CType::Float | CType::Float32 | CType::Bool) {
+                    return Err("'array' supports nested lists (up to 3 deep) of Int, Float, Float32 or Bool in the native backend".to_string());
                 }
                 let array_ty = CType::Array(Box::new(ty.clone()));
                 self.register_list_types(&array_ty);
@@ -3821,8 +3879,8 @@ impl<'a> Codegen<'a> {
                 Ok(Some((format!("Array_Float_full({}, {})", codes[0], if name == "ones" { "1.0" } else { "0.0" }), array_ty)))
             }
             "full" => {
-                if !matches!(types[1], CType::Int | CType::Float | CType::Float32) {
-                    return Err("'full' supports Int, Float or Float32 fill values in the native backend".to_string());
+                if !matches!(types[1], CType::Int | CType::Float | CType::Float32 | CType::Bool) {
+                    return Err("'full' supports Int, Float, Float32 or Bool fill values in the native backend".to_string());
                 }
                 let array_ty = CType::Array(Box::new(types[1].clone()));
                 self.register_list_types(&array_ty);
@@ -4437,6 +4495,7 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>) ->
                 let show_elem = codegen.show_expr("a->data[off]", elem)?;
                 let (add, sub, mul, div, lt_macro) = match **elem {
                     CType::Int => ("((a) + (b))", "((a) - (b))", "((a) * (b))", "ostrin_idiv((a), (b))", "((a) < (b))"),
+                    CType::Bool => ("(a)", "(a)", "(a)", "(a)", "((a) < (b))"),
                     CType::Float => ("((a) + (b))", "((a) - (b))", "((a) * (b))", "((a) / (b))", "((a) < (b))"),
                     _ => ("((float)((a) + (b)))", "((float)((a) - (b)))", "((float)((a) * (b)))", "((float)((a) / (b)))", "((a) < (b))"),
                 };
@@ -4512,7 +4571,8 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>) ->
                          \x20   return r;\n\
                          }}\n"
                     )),
-                    _ => text.push_str(&format!("static float {name}_mean({name}* a) {{ return (float)({name}_sum(a) / (float)a->size); }}\n")),
+                    CType::Float32 => text.push_str(&format!("static float {name}_mean({name}* a) {{ return (float)({name}_sum(a) / (float)a->size); }}\n")),
+                    _ => {}
                 }
                 text.push_str("#undef OSTRIN_SQRT\n#undef OSTRIN_ADD\n#undef OSTRIN_SUB\n#undef OSTRIN_MUL\n#undef OSTRIN_DIV\n#undef OSTRIN_ELEM_LT\n\n");
                 array_blocks.push(text);

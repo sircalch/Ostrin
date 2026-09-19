@@ -283,6 +283,7 @@ impl<'a> Lexer<'a> {
             '+' => Plus,
             '-' => if self.peek() == Some('>') { self.advance(); Arrow } else { Minus },
             '*' => Star,
+            '@' => At,
             '/' => Slash,
             '^' => Caret,
             '%' => Percent,

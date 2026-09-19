@@ -1,0 +1,14 @@
+fn main() -> Void {
+    a = array([1.0, 2.0, 3.0])
+    m = a > 1.0
+    print(m + m)
+    print(m.sum())
+    print(a.any())
+    print(a > 1)
+    print(where(a, a, a))
+    print(where(m, a, array([1, 2, 3])))
+    print(a @ 2.0)
+    print(m < m)
+    print(m and a)
+    print(a.row(0))
+}

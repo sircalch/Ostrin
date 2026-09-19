@@ -53,6 +53,8 @@ pub enum TokenKind {
     Plus,
     Minus,
     Star,
+    /// `@`: matrix product (desugared by the parser to `.matmul(...)`).
+    At,
     Slash,
     Caret,
     Percent,

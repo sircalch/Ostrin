@@ -875,6 +875,7 @@ impl Checker {
         let arity = match name {
             "array" | "zeros" | "ones" => 1,
             "full" | "arange" | "cov" | "corr" => 2,
+            "where" => 3,
             "linspace" => 3,
             _ => return None,
         };
@@ -885,6 +886,20 @@ impl Checker {
         let is_shape = |t: &Ty| matches!(t, Ty::List(e) if **e == Ty::Int || **e == Ty::Unknown);
         let array_of = |t: Ty| Ty::Applied("Array".to_string(), vec![t]);
         match name {
+            "where" => {
+                let bools = Ty::Applied("Array".to_string(), vec![Ty::Bool]);
+                if arg_types[0] != bools && arg_types[0] != Ty::Unknown {
+                    self.push("E1041", format!("'where' expects an Array<Bool> mask first, got '{}'.", arg_types[0].describe()));
+                    return Some(Ty::Unknown);
+                }
+                let element = |t: &Ty| array_elem(t).unwrap_or_else(|| t.clone());
+                let (a, b) = (element(&arg_types[1]), element(&arg_types[2]));
+                if (a != b && a != Ty::Unknown && b != Ty::Unknown) || !is_array_scalar(&a) {
+                    self.push("E1041", format!("'where' needs two values of the same element type, got '{}' and '{}'.", arg_types[1].describe(), arg_types[2].describe()));
+                    return Some(Ty::Unknown);
+                }
+                Some(array_of(a))
+            }
             "cov" | "corr" => {
                 let (a, b) = (&arg_types[0], &arg_types[1]);
                 match (array_elem(a), array_elem(b)) {
@@ -1049,8 +1064,8 @@ impl Checker {
         let elem = array_elem(receiver).expect("called for arrays only");
         let list_int = Ty::List(Box::new(Ty::Int));
         let expected_count = match method {
-            "shape" | "rank" | "size" | "length" | "count" | "sum" | "min" | "max" | "mean" | "to_list" | "transpose" | "var" | "std" | "sample_var" | "sample_std" | "median" | "cumsum" | "sort" | "to_float" => Some(0),
-            "reshape" | "sum_axis" | "dot" | "matmul" | "percentile" => Some(1),
+            "shape" | "rank" | "size" | "length" | "count" | "sum" | "min" | "max" | "mean" | "to_list" | "transpose" | "var" | "std" | "sample_var" | "sample_std" | "median" | "cumsum" | "sort" | "to_float" | "any" | "all" | "count_true" => Some(0),
+            "reshape" | "sum_axis" | "dot" | "matmul" | "percentile" | "row" | "col" => Some(1),
             _ => None,
         };
         if let Some(count) = expected_count {
@@ -1058,6 +1073,16 @@ impl Checker {
                 self.push("E1041", format!("Array method '{method}' expects {count} argument(s), got {}.", arg_types.len()));
                 return Ty::Unknown;
             }
+        }
+        // Bool arrays are masks: only structural methods and any/all/count_true apply.
+        let bool_ok = matches!(method, "shape" | "rank" | "size" | "length" | "count" | "to_list" | "reshape" | "transpose" | "get" | "set" | "any" | "all" | "count_true" | "row" | "col");
+        if elem == Ty::Bool && !bool_ok {
+            self.push("E1041", format!("'{method}' isn't defined for arrays of Bool."));
+            return Ty::Unknown;
+        }
+        if elem != Ty::Bool && matches!(method, "any" | "all" | "count_true") {
+            self.push("E1041", format!("'{method}' needs an Array<Bool>, got '{}'.", receiver.describe()));
+            return Ty::Unknown;
         }
         match method {
             "shape" => list_int,
@@ -1072,6 +1097,14 @@ impl Checker {
                 }
             },
             "to_list" => Ty::List(Box::new(elem)),
+            "any" | "all" => Ty::Bool,
+            "count_true" => Ty::Int,
+            "row" | "col" => {
+                if arg_types[0] != Ty::Int && arg_types[0] != Ty::Unknown {
+                    self.push("E1041", format!("'{method}' expects an Int index."));
+                }
+                Ty::Applied("Array".to_string(), vec![elem])
+            }
             "cumsum" | "sort" => receiver.clone(),
             "to_float" => {
                 if elem != Ty::Int {
@@ -1356,6 +1389,7 @@ impl Checker {
             Expr::Unary(op, e) => {
                 let t = self.infer_expr(e, scope);
                 match op {
+                    UnaryOp::Not if array_elem(&t) == Some(Ty::Bool) => t,
                     UnaryOp::Not => Ty::Bool,
                     UnaryOp::Neg => {
                         if let Ty::Sized(kind) = &t {
@@ -1432,9 +1466,12 @@ impl Checker {
                 }
             }
             Expr::Index(obj, idx) => {
-                self.infer_expr(idx, scope);
+                let index_ty = self.infer_expr(idx, scope);
+                let is_range = matches!(idx.unlocated(), Expr::Range(..));
                 match self.infer_expr(obj, scope) {
                     Ty::List(t) => *t,
+                    // `a[lo until hi]` and `a[mask]` give a new array; `a[i]` an element.
+                    array if array_elem(&array).is_some() && (is_range || array_elem(&index_ty) == Some(Ty::Bool)) => array,
                     array if array_elem(&array).is_some() => array_elem(&array).unwrap(),
                     _ => Ty::Unknown,
                 }
@@ -1982,19 +2019,29 @@ impl Checker {
             };
         }
         if array_elem(&lt).is_some() || array_elem(&rt).is_some() {
-            if !matches!(op, Add | Sub | Mul | Div) {
-                self.push("E1041", "Only '+', '-', '*' and '/' are defined on arrays (elementwise, with broadcasting).".to_string());
+            let (left_elem, right_elem) = (array_elem(&lt), array_elem(&rt));
+            let same = match (&left_elem, &right_elem) {
+                (Some(a), Some(b)) => a == b,
+                (Some(a), None) => rt == *a,
+                (None, Some(b)) => lt == *b,
+                _ => false,
+            };
+            if !same {
+                self.push(
+                    "E1041",
+                    format!("Cannot apply this operator to '{}' and '{}': array elements and scalars must have the same type.", lt.describe(), rt.describe()),
+                );
                 return Ty::Unknown;
             }
-            return match (array_elem(&lt), array_elem(&rt)) {
-                (Some(a), Some(b)) if a == b => lt.clone(),
-                (Some(a), None) if rt == a => lt.clone(),
-                (None, Some(b)) if lt == b => rt.clone(),
+            let elem = left_elem.or(right_elem).expect("one side is an array");
+            let array = if array_elem(&lt).is_some() { lt.clone() } else { rt.clone() };
+            let bools = Ty::Applied("Array".to_string(), vec![Ty::Bool]);
+            return match op {
+                Add | Sub | Mul | Div if elem != Ty::Bool => array,
+                Eq | NotEq | Lt | Gt | LtEq | GtEq if elem != Ty::Bool => bools,
+                And | Or if elem == Ty::Bool => bools,
                 _ => {
-                    self.push(
-                        "E1041",
-                        format!("Cannot apply this operator to '{}' and '{}': array elements and scalars must have the same type.", lt.describe(), rt.describe()),
-                    );
+                    self.push("E1041", format!("This operator isn't defined on arrays of '{}' (arithmetic and comparisons need numbers, and/or need Bool).", elem.describe()));
                     Ty::Unknown
                 }
             };
@@ -4247,7 +4294,7 @@ fn array_elem(ty: &Ty) -> Option<Ty> {
 }
 
 fn is_array_scalar(ty: &Ty) -> bool {
-    matches!(ty, Ty::Int | Ty::Float | Ty::Float32 | Ty::Sized(_))
+    matches!(ty, Ty::Int | Ty::Float | Ty::Float32 | Ty::Sized(_) | Ty::Bool)
 }
 
 fn compatible(expected: &Ty, actual: &Ty) -> bool {

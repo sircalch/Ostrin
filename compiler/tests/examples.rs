@@ -1648,3 +1648,26 @@ fn array_shape_mismatch_is_a_runtime_error_in_both_backends() {
     assert!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n").starts_with("[2, 3]\n"));
     assert!(String::from_utf8_lossy(&native.stderr).contains("shape mismatch"));
 }
+
+#[test]
+fn empty_mask_is_a_runtime_error_in_both_backends() {
+    // A mask that selects nothing would produce an empty array, which Ostrin
+    // arrays never are: both backends print the first selection, then fail.
+    let file = example_path("array_empty_mask.ostrin");
+    let interpreted = run(&["--run", &file]);
+    assert!(!interpreted.status.success());
+    assert!(stdout(&interpreted).replace("\r\n", "\n").starts_with("[1, 2, 3]\n"));
+    assert!(stderr(&interpreted).contains("selects no elements"), "unexpected stderr: {}", stderr(&interpreted));
+
+    let exe = temp_artifact("empty_mask.exe");
+    let compile = run(&["--compile", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+    let native = Command::new(&exe).output().unwrap();
+    let _ = fs::remove_file(&exe);
+    assert!(!native.status.success());
+    assert!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n").starts_with("[1, 2, 3]\n"));
+    assert!(String::from_utf8_lossy(&native.stderr).contains("selects no elements"));
+}
