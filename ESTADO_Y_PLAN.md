@@ -1,9 +1,9 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-18 · rama `main` · 6 pruebas diferenciales y 106 de integración en verde.*
+*Corte: 2026-09-18 · rama `main` · 6 pruebas diferenciales y 107 de integración en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
-Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–132); para el diseño
+Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–133); para el diseño
 del lenguaje, `docs/design/` (20 documentos).
 
 ---
@@ -136,7 +136,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | `==` sobre `List/Option/Map` | No soportado (tampoco en intérprete para Option) |
 | Mensajes de error de E/S | `strerror` ≠ texto de Rust (difieren entre backends) |
 | `Result<Void,E>` | Campo de valor de relleno (`char`) en C |
-| Migración HIR | Escalares, records, enums/match, Option/Result, colecciones, cierres, instancias concretas de genéricos, llamadas anidadas, records/enums genéricos aplicados y sus campos/variantes migrados; métodos genéricos complejos siguen con fallback |
+| Migración HIR | Escalares, records, enums/match, Option/Result, colecciones, cierres, instancias concretas de genéricos, llamadas anidadas, records/enums genéricos aplicados y métodos genéricos centrales migrados; formas complejas restantes siguen con fallback |
 | Paquetes | Diseño y lockfile básicos; sin registro remoto (decisión: **no** añadir red automática al compilador) |
 | Rendimiento del intérprete | Tree‑walking simple; sin optimizaciones |
 | `newlines.ostrin`, `advanced.ostrin` | Son muestras de sintaxis, no programas ejecutables |
@@ -147,9 +147,9 @@ Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes 
 convendría dividirlos; el backend nativo no comparte el sistema de tipos del checker
 (ya consume los tipos del checker y compara cada nodo; **117 funciones/métodos de los ejemplos
 ya se generan desde el HIR** —escalares, records, enums, `match`, `Option`/`Result`,
-listas/colecciones, cierres, instancias concretas de genéricos y records/enums aplicados,
-módulo `hir_c.rs`—, con un trinquete mínimo de 110; el resto sigue por el AST; ver documento 20 y
-secciones 123–132 de `CONTEXTO_PROYECTO.md`);
+listas/colecciones, cierres, instancias concretas de genéricos, records/enums aplicados y métodos
+genéricos centrales, módulo `hir_c.rs`—, con un trinquete mínimo de 115; el resto sigue por el AST;
+ver documento 20 y secciones 123–133 de `CONTEXTO_PROYECTO.md`);
 la búsqueda en `Map/Set` es lineal.
 
 ---
@@ -159,7 +159,7 @@ la búsqueda en `Map/Set` es lineal.
 Ordenadas por mi recomendación (valor / riesgo). Cada una es independiente.
 
 ### A. Cerrar la semántica del backend nativo (corto plazo)
-1. **Ampliar la migración HIR de genéricos**: métodos genéricos complejos y formas restantes; mantener la resolución de llamadas anidadas y los records/enums aplicados como base.
+1. **Ampliar la migración HIR de genéricos**: métodos genéricos complejos y formas restantes; mantener la resolución de llamadas anidadas, los records/enums aplicados y las identidades de impl como base.
 2. **Retirada progresiva del fallback AST**: conservar solo familias aún no migradas.
 3. **Gestión de memoria**: conteo de referencias o arena por ámbito; hoy nada se libera.
 4. **`==` estructural** para `List/Option/Map`.
@@ -217,7 +217,7 @@ Decisiones que necesito de ti para afinar el plan:
 
 ```powershell
 cd compiler
-cargo test                                   # 6 diferenciales + 106 de integración
+cargo test                                   # 6 diferenciales + 107 de integración
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```

@@ -510,6 +510,8 @@ struct GenericMethod<'a> {
     /// The enclosing `impl`'s own substitution (its type parameters, `Self`).
     binds: HashMap<String, CType>,
     key: String,
+    /// Collision-free HIR name of the source method declaration.
+    hir_name: String,
 }
 
 /// One concrete instantiation of a generic function, queued the first time
@@ -873,7 +875,15 @@ impl<'a> Codegen<'a> {
                 self.generic_methods
                     .entry(key.to_string())
                     .or_default()
-                    .insert(method.name.clone(), GenericMethod { decl: method, binds: binds.clone(), key: key.to_string() });
+                    .insert(
+                        method.name.clone(),
+                        GenericMethod {
+                            decl: method,
+                            binds: binds.clone(),
+                            key: key.to_string(),
+                            hir_name: crate::hir::impl_method_name(im, &method.name),
+                        },
+                    );
                 continue;
             }
             let param_types: Result<Vec<CType>, String> =
@@ -967,7 +977,7 @@ impl<'a> Codegen<'a> {
                 self.instantiations.insert(c_name.clone(), (param_types.clone(), return_type.clone()));
                 self.pending.push_back(PendingInstance {
                     c_name: c_name.clone(),
-                    hir_name: format!("{}.{}", gm.key, decl.name),
+                    hir_name: gm.hir_name.clone(),
                     decl,
                     hir_subst: ctype_subst_to_hir(&full),
                     subst: full,
@@ -2300,6 +2310,68 @@ impl<'a> Codegen<'a> {
             decl,
             subst,
             hir_subst,
+            param_types,
+            return_type,
+        });
+        Some(c_name)
+    }
+
+    /// Ensures that a generic method called from a specialized HIR body has
+    /// the same concrete C instance and pending body as the AST path.
+    fn ensure_hir_generic_method_instance(
+        &mut self,
+        recv_ty: &Ty,
+        method: &str,
+        recorded: &crate::typeck::CallSubst,
+    ) -> Option<String> {
+        let receiver = self.ty_to_ctype(recv_ty)?;
+        let owner = match receiver {
+            CType::Record(name) | CType::Enum(name) => name,
+            _ => return None,
+        };
+        let gm = self.generic_methods.get(&owner)?.get(method)?.clone();
+        let decl = gm.decl;
+        let mut subst = HashMap::new();
+        for generic in &decl.generics {
+            if let Some(dimension) = recorded.dims.get(&generic.name) {
+                subst.insert(generic.name.clone(), CType::Quantity(dimension.clone()));
+            } else {
+                let ty = recorded.types.get(&generic.name)?.clone();
+                subst.insert(generic.name.clone(), self.ty_to_ctype(&ty)?);
+            }
+        }
+        let suffix = decl
+            .generics
+            .iter()
+            .map(|generic| subst.get(&generic.name).map(mangle_ctype))
+            .collect::<Option<Vec<_>>>()?
+            .join("_");
+        let c_name = format!("{}__{}__{}", gm.key, decl.name, suffix);
+        if self.instantiations.contains_key(&c_name) {
+            return Some(c_name);
+        }
+
+        let mut full = gm.binds.clone();
+        full.extend(subst);
+        let types = self.named_types();
+        let param_types = decl
+            .params
+            .iter()
+            .map(|param| map_type_with_subst(&param.ty, &types, &full))
+            .collect::<Result<Vec<_>, _>>()
+            .ok()?;
+        let return_type = map_type_with_subst(&decl.return_type, &types, &full).ok()?;
+        for ty in param_types.iter().chain(std::iter::once(&return_type)) {
+            self.register_list_types(ty);
+        }
+        self.flush_instances().ok()?;
+        self.instantiations.insert(c_name.clone(), (param_types.clone(), return_type.clone()));
+        self.pending.push_back(PendingInstance {
+            c_name: c_name.clone(),
+            hir_name: gm.hir_name,
+            decl,
+            hir_subst: ctype_subst_to_hir(&full),
+            subst: full,
             param_types,
             return_type,
         });
@@ -5493,18 +5565,37 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>, tr
 
                     let mut specialized = crate::hir::specialize_function(function, &job.hir_subst);
                     {
-                        let mut resolver = |name: &str, recorded: &crate::typeck::CallSubst| {
-                            let target = codegen.ensure_hir_generic_instance(name, recorded)?;
-                            let (params, ret) = codegen.instantiations.get(&target).cloned()?;
-                            hir_world.functions.insert(
-                                target.clone(),
-                                (
-                                    params.iter().map(c_type_name).collect(),
-                                    c_type_name(&ret),
-                                ),
-                            );
-                            hir_world.function_c_names.insert(target.clone(), target.clone());
-                            Some(target)
+                        let mut resolver = |call: crate::hir::GenericCall<'_>| match call {
+                            crate::hir::GenericCall::Function { name, subst } => {
+                                let target = codegen.ensure_hir_generic_instance(name, subst)?;
+                                let (params, ret) = codegen.instantiations.get(&target).cloned()?;
+                                hir_world.functions.insert(
+                                    target.clone(),
+                                    (
+                                        params.iter().map(c_type_name).collect(),
+                                        c_type_name(&ret),
+                                    ),
+                                );
+                                hir_world.function_c_names.insert(target.clone(), target.clone());
+                                Some(target)
+                            }
+                            crate::hir::GenericCall::Method { receiver, name, subst } => {
+                                let target = codegen.ensure_hir_generic_method_instance(receiver, name, subst)?;
+                                let owner = match codegen.ty_to_ctype(receiver)? {
+                                    CType::Record(owner) | CType::Enum(owner) => owner,
+                                    _ => return None,
+                                };
+                                let (params, ret) = codegen.instantiations.get(&target).cloned()?;
+                                hir_world.methods.insert(
+                                    (owner, target.clone()),
+                                    (
+                                        target.clone(),
+                                        params.iter().map(c_type_name).collect(),
+                                        c_type_name(&ret),
+                                    ),
+                                );
+                                Some(target)
+                            }
                         };
                         crate::hir::resolve_generic_calls(&mut specialized, &mut resolver);
                     }

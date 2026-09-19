@@ -682,16 +682,21 @@ fn specialize_expr(expr: &HirExpr, subst: &HashMap<String, Ty>) -> HirExpr {
 /// callback belongs to the backend because only it knows the concrete C
 /// mangling and can queue a missing monomorphized body. Keeping this as a
 /// separate pass means specialization stays a pure HIR transformation.
+pub enum GenericCall<'a> {
+    Function { name: &'a str, subst: &'a CallSubst },
+    Method { receiver: &'a Ty, name: &'a str, subst: &'a CallSubst },
+}
+
 pub fn resolve_generic_calls<F>(function: &mut HirFunction, resolver: &mut F)
 where
-    F: FnMut(&str, &CallSubst) -> Option<String>,
+    F: FnMut(GenericCall<'_>) -> Option<String>,
 {
     resolve_block_calls(&mut function.body, resolver);
 }
 
 fn resolve_block_calls<F>(block: &mut HirBlock, resolver: &mut F)
 where
-    F: FnMut(&str, &CallSubst) -> Option<String>,
+    F: FnMut(GenericCall<'_>) -> Option<String>,
 {
     for stmt in &mut block.stmts {
         resolve_stmt_calls(stmt, resolver);
@@ -703,7 +708,7 @@ where
 
 fn resolve_stmt_calls<F>(stmt: &mut HirStmt, resolver: &mut F)
 where
-    F: FnMut(&str, &CallSubst) -> Option<String>,
+    F: FnMut(GenericCall<'_>) -> Option<String>,
 {
     match stmt {
         HirStmt::Let { value, .. } | HirStmt::Assign { value, .. } => resolve_expr_calls(value, resolver),
@@ -731,7 +736,7 @@ where
 
 fn resolve_expr_calls<F>(expr: &mut HirExpr, resolver: &mut F)
 where
-    F: FnMut(&str, &CallSubst) -> Option<String>,
+    F: FnMut(GenericCall<'_>) -> Option<String>,
 {
     match &mut expr.kind {
         HirKind::Unit(value, _) | HirKind::Unary(_, value) | HirKind::Field(value, _) | HirKind::As(value, _) => {
@@ -759,7 +764,7 @@ where
                 resolve_expr_calls(&mut arg.value, resolver);
             }
             let target = if let HirKind::Global(name) = &callee.kind {
-                subst.as_ref().and_then(|call| resolver(name, call))
+                subst.as_ref().and_then(|call| resolver(GenericCall::Function { name, subst: call }))
             } else {
                 None
             };
@@ -769,10 +774,18 @@ where
                 type_args.clear();
             }
         }
-        HirKind::MethodCall { recv, args, .. } => {
+        HirKind::MethodCall { recv, method, args, type_args, subst } => {
             resolve_expr_calls(recv, resolver);
             for arg in args {
                 resolve_expr_calls(&mut arg.value, resolver);
+            }
+            let target = subst.as_ref().and_then(|call| {
+                resolver(GenericCall::Method { receiver: &recv.ty, name: method, subst: call })
+            });
+            if let Some(target) = target {
+                *method = target;
+                *subst = None;
+                type_args.clear();
             }
         }
         HirKind::If(cond, then_block, else_block) => {

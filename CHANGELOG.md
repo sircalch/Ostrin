@@ -49,6 +49,11 @@
   emit record literals/field access, enum constructors and `match` patterns;
   nested applied type arguments preserve their source-level HIR spelling. The
   differential HIR ratchet is now 110 (117 measured).
+- Generic method instances now use their collision-free impl declaration in
+  HIR, including generic methods on applied records and nested calls such as
+  `container.map<U>(value)`. The existing monomorphization queue remains the
+  single source of concrete C bodies; the differential HIR ratchet is now 115
+  (119 measured).
 - Module loader now rewrites types in signatures, fields, variants and annotations
   (a `record` from another module can be used as a type).
 - CI on Linux, macOS and Windows.

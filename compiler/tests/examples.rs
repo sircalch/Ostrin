@@ -1197,6 +1197,41 @@ fn native_hir_handles_generic_records_and_enums() {
 }
 
 #[test]
+fn native_hir_handles_generic_methods() {
+    // Generic method instances use the same pending queue as the AST backend,
+    // but HIR must preserve the declaring impl when multiple methods share a
+    // source name and must resolve nested calls such as `container.map<U>`.
+    let file = example_path("native_generic_methods.ostrin");
+    let report = run(&["--native-type-report", &file]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    let hir_functions = stdout(&report)
+        .lines()
+        .find_map(|line| line.strip_prefix("hir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .unwrap_or(0);
+    assert!(hir_functions >= 6, "generic method example generated only {hir_functions} HIR functions");
+
+    let c = run(&["--emit-c", &file]);
+    assert!(c.status.success(), "C emission failed: {}", stderr(&c));
+    assert!(stdout(&c).contains("Box__String* __hir_rec"), "generic method record return did not come from HIR");
+
+    let expected = run(&["--run", &file]);
+    assert!(expected.status.success(), "interpreter failed: {}", stderr(&expected));
+    let exe = temp_artifact("native_generic_methods_hir.exe");
+    let compile = run(&["--compile", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+    let native = Command::new(&exe).output().expect("failed to run generic method binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "generic method binary failed: {}", String::from_utf8_lossy(&native.stderr));
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), stdout(&expected).replace("\r\n", "\n"));
+}
+
+#[test]
 fn int_division_truncates_in_both_backends() {
     // The type checker types `Int / Int` as `Int`; the interpreter used to
     // return a Float (7 / 2 -> 3.5), contradicting it.

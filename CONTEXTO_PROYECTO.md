@@ -3843,3 +3843,33 @@ sube de **90 a 110**.
 La siguiente ampliación es completar métodos genéricos complejos y retirar más fallback AST; después
 se puede empezar la gestión de memoria nativa y el análisis de último uso previsto en los documentos
 18 y 20.
+
+## 133. Métodos genéricos y llamadas de método anidadas desde HIR — 2026-09-18
+
+Se completó el siguiente tramo: los métodos con parámetros propios (`echo<U>`, `swap_in<U>`,
+`map<U>`, etc.) ahora reutilizan desde HIR la misma cola de monomorfización que ya usa el backend
+AST. El `GenericMethod` conserva el nombre HIR exacto de la declaración y la especialización
+concreta de su `impl`, por lo que varias implementaciones con el mismo método (`label` para
+`Box<Int>` y `Box<String>`) no pueden cruzar sus cuerpos.
+
+La resolución de llamadas genéricas del HIR ahora cubre dos formas:
+
+- llamadas de función `f<T>(...)`, que se convierten al nombre C concreto;
+- llamadas de método `receiver.m<U>(...)`, que registran la firma y el nombre C directo de la
+  instancia y quedan listas para el emisor HIR sin prefijo de función fuente.
+
+Esto permite que una función genérica especializada mantenga una llamada de método anidada,
+por ejemplo `container.map<U>(value)`, y que un método genérico de un record aplicado devuelva
+otro record aplicado (`Box<Int>.swap_in<String> -> Box<String>`) con literal HIR y campos concretos.
+Si la forma no está registrada o usa una familia que el emisor todavía no representa, la función
+completa conserva el fallback AST.
+
+`native_generic_methods.ostrin` y `native_hir_handles_generic_methods` cubren métodos genéricos
+de records normales y aplicados, métodos con múltiples parámetros, argumentos explícitos, métodos
+de traits y llamadas anidadas. La suite diferencial mantiene la equivalencia intérprete↔nativo:
+**6 pruebas diferenciales y 107 de integración verdes**, con **119 funciones/métodos HIR** y un
+trinquete mínimo de **115**.
+
+El siguiente bloque es reducir las formas restantes que dependen del AST y, con la migración HIR
+ya dominante, preparar la retirada gradual del generador antiguo antes de entrar en gestión de
+memoria/último uso y concurrencia real.
