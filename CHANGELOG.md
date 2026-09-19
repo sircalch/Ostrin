@@ -60,6 +60,12 @@
   closures, collections, strings, arrays and runtime buffers. This is the first
   leak-free baseline for native programs; scope-level ARC, ownership checking and
   type-aware destructors remain the next memory milestone.
+- Added opt-in native concurrency with `--native-threads`: `spawn` uses POSIX
+  pthreads or Windows threads, `join` uses mutex/condition synchronization, and
+  channels use blocking condition variables while the deterministic cooperative
+  scheduler remains the default. Captured task environments are retained for the
+  thread lifetime and released on completion; the native test covers a blocking
+  receive and `live_allocations=0`.
 - Added the first HIR-to-IR lowering pass and `ostrinc --ir`. Functions now expose
   explicit temporaries, basic blocks, branches, loop edges, calls, aggregates, phi
   nodes and named opaque instructions for constructs awaiting semantic lowering.

@@ -1,0 +1,10 @@
+fn main() -> Void {
+    values = channel<Int>()
+    producer = spawn {
+        values.send(7)
+        values.close()
+    }
+
+    print(values.receive().unwrap())
+    producer.join()
+}

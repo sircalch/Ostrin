@@ -409,11 +409,12 @@ fn real_main() -> ExitCode {
     let emit_c = args.iter().any(|a| a == "--emit-c");
     let compile_native = args.iter().any(|a| a == "--compile");
     let leak_check = args.iter().any(|a| a == "--leak-check");
+    let native_threads = args.iter().any(|a| a == "--native-threads");
     if emit_c || compile_native {
-        return run_codegen(&items, &typed_program, entry_path, path, &args, emit_c, json, leak_check);
+        return run_codegen(&items, &typed_program, entry_path, path, &args, emit_c, json, leak_check, native_threads);
     }
-    if leak_check {
-        eprintln!("error: --leak-check requires --emit-c or --compile");
+    if leak_check || native_threads {
+        eprintln!("error: --leak-check and --native-threads require --emit-c or --compile");
         return ExitCode::FAILURE;
     }
 
@@ -462,8 +463,18 @@ test result: {}. {} passed; {failed} failed", if failed == 0 { "ok" } else { "FA
 /// or stdout); `--compile` additionally hands that source to whatever C
 /// compiler `codegen::find_c_compiler` finds, producing a real native
 /// executable.
-fn run_codegen(items: &[ast::Item], typed: &typeck::TypedProgram, entry_path: &Path, display_path: &str, args: &[String], emit_c: bool, json: bool, leak_check: bool) -> ExitCode {
-    let source = match codegen::generate_with_options(items, typed, leak_check) {
+fn run_codegen(
+    items: &[ast::Item],
+    typed: &typeck::TypedProgram,
+    entry_path: &Path,
+    display_path: &str,
+    args: &[String],
+    emit_c: bool,
+    json: bool,
+    leak_check: bool,
+    native_threads: bool,
+) -> ExitCode {
+    let source = match codegen::generate_with_native_options(items, typed, leak_check, native_threads) {
         Ok((source, _)) => source,
         Err(message) => {
             if json {
@@ -512,6 +523,7 @@ fn run_codegen(items: &[ast::Item], typed: &typeck::TypedProgram, entry_path: &P
         .arg("-o")
         .arg(&output_path)
         .arg("-O2")
+        .args((!cfg!(windows)).then_some("-pthread"))
         // No fused multiply-add: results must match the interpreter bit for bit.
         .arg("-ffp-contract=off")
         .status();
@@ -555,6 +567,7 @@ fn print_help() {
     println!("  --ownership-ir      Insert proof-guided linear release markers into a cloned IR");
     println!("  --ownership-check   Detect managed values used after channel send (E1101)");
     println!("  --leak-check       Report native allocations before process cleanup (with --emit-c/--compile)");
+    println!("  --native-threads   Use OS threads and blocking native channels (with --emit-c/--compile)");
     println!("  --emit-c      Transpile to C (a supported subset only; see docs) instead of running");
     println!("  --compile     Transpile to C and compile it to a native executable");
     println!("  --out PATH    Output path for --emit-c/--compile (defaults: stdout / <entry>.exe next to the source)");

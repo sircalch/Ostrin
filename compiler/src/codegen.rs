@@ -354,7 +354,72 @@ const PRELUDE: &str = "#include <stdint.h>\n\
 #include <stdlib.h>\n\
 #include <string.h>\n\
 #include <errno.h>\n\
-#include <math.h>\n
+#include <math.h>\n\
+#if defined(_WIN32)\n\
+#include <windows.h>\n\
+typedef CRITICAL_SECTION OstrinMutex;\n\
+typedef CONDITION_VARIABLE OstrinCond;\n\
+typedef HANDLE OstrinThread;\n\
+static void ostrin_mutex_init(OstrinMutex* mutex) { InitializeCriticalSection(mutex); }\n\
+static void ostrin_mutex_destroy(OstrinMutex* mutex) { DeleteCriticalSection(mutex); }\n\
+static void ostrin_mutex_lock(OstrinMutex* mutex) { EnterCriticalSection(mutex); }\n\
+static void ostrin_mutex_unlock(OstrinMutex* mutex) { LeaveCriticalSection(mutex); }\n\
+static void ostrin_cond_init(OstrinCond* cond) { InitializeConditionVariable(cond); }\n\
+static void ostrin_cond_destroy(OstrinCond* cond) { (void)cond; }\n\
+static void ostrin_cond_wait(OstrinCond* cond, OstrinMutex* mutex) { SleepConditionVariableCS(cond, mutex, INFINITE); }\n\
+static void ostrin_cond_signal(OstrinCond* cond) { WakeConditionVariable(cond); }\n\
+static void ostrin_cond_broadcast(OstrinCond* cond) { WakeAllConditionVariable(cond); }\n\
+#else\n\
+#include <pthread.h>\n\
+typedef pthread_mutex_t OstrinMutex;\n\
+typedef pthread_cond_t OstrinCond;\n\
+typedef pthread_t OstrinThread;\n\
+static void ostrin_mutex_init(OstrinMutex* mutex) { pthread_mutex_init(mutex, NULL); }\n\
+static void ostrin_mutex_destroy(OstrinMutex* mutex) { pthread_mutex_destroy(mutex); }\n\
+static void ostrin_mutex_lock(OstrinMutex* mutex) { pthread_mutex_lock(mutex); }\n\
+static void ostrin_mutex_unlock(OstrinMutex* mutex) { pthread_mutex_unlock(mutex); }\n\
+static void ostrin_cond_init(OstrinCond* cond) { pthread_cond_init(cond, NULL); }\n\
+static void ostrin_cond_destroy(OstrinCond* cond) { pthread_cond_destroy(cond); }\n\
+static void ostrin_cond_wait(OstrinCond* cond, OstrinMutex* mutex) { pthread_cond_wait(cond, mutex); }\n\
+static void ostrin_cond_signal(OstrinCond* cond) { pthread_cond_signal(cond); }\n\
+static void ostrin_cond_broadcast(OstrinCond* cond) { pthread_cond_broadcast(cond); }\n\
+#endif\n\
+typedef struct { void (*entry)(void*); void* arg; } OstrinThreadStart;\n\
+#if defined(_WIN32)\n\
+static DWORD WINAPI ostrin_thread_boot(void* raw) {\n\
+    OstrinThreadStart* start = (OstrinThreadStart*)raw;\n\
+    start->entry(start->arg);\n\
+    free(start);\n\
+    return 0;\n\
+}\n\
+#else\n\
+static void* ostrin_thread_boot(void* raw) {\n\
+    OstrinThreadStart* start = (OstrinThreadStart*)raw;\n\
+    start->entry(start->arg);\n\
+    free(start);\n\
+    return NULL;\n\
+}\n\
+#endif\n\
+static void ostrin_thread_start(OstrinThread* thread, void (*entry)(void*), void* arg) {\n\
+    OstrinThreadStart* start = (OstrinThreadStart*)malloc(sizeof *start);\n\
+    if (!start) { fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); }\n\
+    start->entry = entry;\n\
+    start->arg = arg;\n\
+#if defined(_WIN32)\n\
+    *thread = CreateThread(NULL, 0, ostrin_thread_boot, start, 0, NULL);\n\
+    if (!*thread) { free(start); fprintf(stderr, \"runtime error: could not create native thread\\n\"); exit(1); }\n\
+#else\n\
+    if (pthread_create(thread, NULL, ostrin_thread_boot, start) != 0) { free(start); fprintf(stderr, \"runtime error: could not create native thread\\n\"); exit(1); }\n\
+#endif\n\
+}\n\
+static void ostrin_thread_join(OstrinThread* thread) {\n\
+#if defined(_WIN32)\n\
+    WaitForSingleObject(*thread, INFINITE);\n\
+    CloseHandle(*thread);\n\
+#else\n\
+    pthread_join(*thread, NULL);\n\
+#endif\n\
+}\n\
 #if defined(_WIN32)\n\
 #include <direct.h>\n\
 #define OSTRIN_GETCWD _getcwd\n\
@@ -377,6 +442,11 @@ static size_t ostrin_peak_allocation_count = 0;\n\
 static size_t ostrin_total_allocations = 0;\n\
 static int ostrin_argc = 0;\n\
 static char** ostrin_argv = NULL;\n\
+static OstrinMutex ostrin_heap_mutex;\n\
+static bool ostrin_heap_mutex_ready = false;\n\
+static void ostrin_runtime_init(void) { ostrin_mutex_init(&ostrin_heap_mutex); ostrin_heap_mutex_ready = true; }\n\
+static void ostrin_heap_lock(void) { if (!ostrin_heap_mutex_ready) ostrin_runtime_init(); ostrin_mutex_lock(&ostrin_heap_mutex); }\n\
+static void ostrin_heap_unlock(void) { ostrin_mutex_unlock(&ostrin_heap_mutex); }\n\
 typedef bool (*OstrinTaskPoll)(void*);\n\
 typedef struct OstrinTaskNode {\n\
     void* task;\n\
@@ -420,6 +490,7 @@ static void ostrin_drain_tasks(size_t minimum_ordinal) {\n\
 \n\
 \n\
 static void ostrin_register_allocation_with_drop(void* ptr, void (*drop)(void*)) {\n\
+    ostrin_heap_lock();\n\
     OstrinAllocation* entry = (OstrinAllocation*)malloc(sizeof *entry);\n\
     if (!entry) { free(ptr); OSTRIN_OOM(); }\n\
     entry->ptr = ptr;\n\
@@ -432,6 +503,7 @@ static void ostrin_register_allocation_with_drop(void* ptr, void (*drop)(void*))
     if (ostrin_allocation_count > ostrin_peak_allocation_count) {\n\
         ostrin_peak_allocation_count = ostrin_allocation_count;\n\
     }\n\
+    ostrin_heap_unlock();\n\
 }\n\
 \n\
 static void ostrin_register_allocation(void* ptr) {\n\
@@ -472,17 +544,24 @@ static void* ostrin_calloc(size_t count, size_t size) {\n\
 \n\
 static void* ostrin_realloc(void* old_ptr, size_t size) {\n\
     if (!old_ptr) return ostrin_alloc(size);\n\
+    ostrin_heap_lock();\n\
     void* ptr = realloc(old_ptr, size == 0 ? 1 : size);\n\
-    if (!ptr) OSTRIN_OOM();\n\
+    if (!ptr) { ostrin_heap_unlock(); OSTRIN_OOM(); }\n\
     for (OstrinAllocation* entry = ostrin_allocations; entry; entry = entry->next) {\n\
-        if (entry->ptr == old_ptr) { entry->ptr = ptr; return ptr; }\n\
+        if (entry->ptr == old_ptr) { entry->ptr = ptr; ostrin_heap_unlock(); return ptr; }\n\
     }\n\
-    ostrin_register_allocation(ptr);\n\
+    OstrinAllocation* entry = (OstrinAllocation*)malloc(sizeof *entry);\n\
+    if (!entry) { ostrin_heap_unlock(); free(ptr); OSTRIN_OOM(); }\n\
+    entry->ptr = ptr; entry->refs = 1; entry->drop = NULL; entry->next = ostrin_allocations;\n\
+    ostrin_allocations = entry; ostrin_allocation_count++; ostrin_total_allocations++;\n\
+    if (ostrin_allocation_count > ostrin_peak_allocation_count) ostrin_peak_allocation_count = ostrin_allocation_count;\n\
+    ostrin_heap_unlock();\n\
     return ptr;\n\
 }\n\
 \n\
 static void ostrin_free(void* ptr) {\n\
     if (!ptr) return;\n\
+    ostrin_heap_lock();\n\
     OstrinAllocation** link = &ostrin_allocations;\n\
     while (*link) {\n\
         OstrinAllocation* entry = *link;\n\
@@ -491,10 +570,12 @@ static void ostrin_free(void* ptr) {\n\
             free(entry->ptr);\n\
             free(entry);\n\
             ostrin_allocation_count--;\n\
+            ostrin_heap_unlock();\n\
             return;\n\
         }\n\
         link = &entry->next;\n\
     }\n\
+    ostrin_heap_unlock();\n\
     free(ptr);\n\
 }\n\
 /* Ownership runtime ABI. Generated composite values may register a typed\n\
@@ -503,16 +584,20 @@ static void ostrin_free(void* ptr) {\n\
  * source of automatic last-use emission. */\n\
 static void ostrin_retain(void* ptr) {\n\
     if (!ptr) return;\n\
+    ostrin_heap_lock();\n\
     for (OstrinAllocation* entry = ostrin_allocations; entry; entry = entry->next) {\n\
         if (entry->ptr == ptr) {\n\
             if (entry->refs != SIZE_MAX) entry->refs++;\n\
+            ostrin_heap_unlock();\n\
             return;\n\
         }\n\
     }\n\
+    ostrin_heap_unlock();\n\
 }\n\
 \n\
 static void ostrin_release(void* ptr) {\n\
     if (!ptr) return;\n\
+    ostrin_heap_lock();\n\
     OstrinAllocation** link = &ostrin_allocations;\n\
     while (*link) {\n\
         OstrinAllocation* entry = *link;\n\
@@ -522,22 +607,30 @@ static void ostrin_release(void* ptr) {\n\
             } else {\n\
                 *link = entry->next;\n\
                 ostrin_allocation_count--;\n\
-                if (entry->drop) entry->drop(ptr);\n\
-                free(ptr);\n\
+                void (*drop)(void*) = entry->drop;\n\
                 free(entry);\n\
+                ostrin_heap_unlock();\n\
+                if (drop) drop(ptr);\n\
+                free(ptr);\n\
+                return;\n\
             }\n\
+            ostrin_heap_unlock();\n\
             return;\n\
         }\n\
         link = &entry->next;\n\
     }\n\
+    ostrin_heap_unlock();\n\
 }\n\
 \n\
 static void ostrin_mem_report(void) {\n\
+    ostrin_heap_lock();\n\
     fprintf(stderr, \"ostrin memory: live_allocations=%zu peak_allocations=%zu total_allocations=%zu\\n\",\n\
             ostrin_allocation_count, ostrin_peak_allocation_count, ostrin_total_allocations);\n\
+    ostrin_heap_unlock();\n\
 }\n\
 \n\
 static void ostrin_mem_cleanup(void) {\n\
+    ostrin_heap_lock();\n\
     while (ostrin_tasks) {\n\
         OstrinTaskNode* node = ostrin_tasks;\n\
         ostrin_tasks = node->next;\n\
@@ -550,6 +643,7 @@ static void ostrin_mem_cleanup(void) {\n\
         free(entry);\n\
     }\n\
     ostrin_allocation_count = 0;\n\
+    ostrin_heap_unlock();\n\
 }\n\
 \n\
 static int64_t ostrin_abs_i64(int64_t x) {\n\
@@ -919,6 +1013,7 @@ struct Codegen<'a> {
     /// scope; nested blocks remain a later CFG/IR phase.
     owned_locals: Vec<(String, CType)>,
     ownership_active: bool,
+    native_threads: bool,
 }
 
 /// A `dyn Trait` boxing site the first `coerce()` call for this exact
@@ -1880,10 +1975,28 @@ impl<'a> Codegen<'a> {
                 fn_body.push_str(&format!("    {} {n} = __e->{n};\n", c_type_name(t)));
             }
         }
+        let env_cleanup: String = frame
+            .captures
+            .iter()
+            .filter(|(_, t)| is_reference_type(t))
+            .map(|(n, _)| format!("    ostrin_release((void*)__e->{n});\n"))
+            .collect::<String>();
+        let env_cleanup = if frame.captures.is_empty() {
+            String::new()
+        } else {
+            format!("{env_cleanup}    ostrin_release((void*)__env);\n")
+        };
         if ret == CType::Void {
             fn_body.push_str(&format!("    {body_code};\n"));
+            fn_body.push_str(&env_cleanup);
         } else {
-            fn_body.push_str(&format!("    return {body_code};\n"));
+            let result_temp = self.next_temp();
+            fn_body.push_str(&format!("    {} {result_temp} = {body_code};\n", c_type_name(&ret)));
+            if body.tail.as_ref().is_some_and(|tail| is_reference_type(&ret) && borrowed_reference_expr(tail)) {
+                fn_body.push_str(&format!("    ostrin_retain((void*){result_temp});\n"));
+            }
+            fn_body.push_str(&env_cleanup);
+            fn_body.push_str(&format!("    return {result_temp};\n"));
         }
         if !frame.captures.is_empty() {
             self.closure_protos.push(format!("typedef struct {{ {env_struct}}} OstrinEnv_{id};"));
@@ -1894,16 +2007,37 @@ impl<'a> Codegen<'a> {
         let env = if frame.captures.is_empty() {
             "NULL".to_string()
         } else {
-            let copies: String = frame.captures.iter().map(|(n, _)| format!("__ce->{n} = {n}; ")).collect();
+            let copies: String = frame
+                .captures
+                .iter()
+                .map(|(n, t)| {
+                    let retain = if is_reference_type(t) {
+                        format!("ostrin_retain((void*)__ce->{n}); ")
+                    } else {
+                        String::new()
+                    };
+                    format!("__ce->{n} = {n}; {retain}")
+                })
+                .collect();
             format!("({{ OstrinEnv_{id}* __ce = ostrin_alloc(sizeof *__ce); {copies}(void*)__ce; }})")
         };
         let task_ty = CType::Task(Box::new(ret));
         self.register_list_types(&task_ty);
         let name = mangle_ctype(&task_ty);
         let temp = self.next_temp();
+        let allocation = if self.native_threads {
+            format!("ostrin_calloc_with_drop(1, sizeof *{temp}, (void (*)(void*)){name}_drop)")
+        } else {
+            format!("ostrin_calloc(1, sizeof *{temp})")
+        };
+        let start = if self.native_threads {
+            format!("{name}_start({temp}); ostrin_register_task({temp}, {name}_poll);")
+        } else {
+            format!("ostrin_register_task({temp}, {name}_poll);")
+        };
         Ok((
             format!(
-                "({{ {name}* {temp} = ({name}*)ostrin_calloc(1, sizeof *{temp}); {temp}->run = {fn_name}; {temp}->env = {env}; ostrin_register_task({temp}, {name}_poll); {temp}; }})"
+                "({{ {name}* {temp} = ({name}*){allocation}; {temp}->run = {fn_name}; {temp}->env = {env}; {start} {temp}; }})"
             ),
             task_ty,
         ))
@@ -4606,7 +4740,7 @@ impl<'a> Codegen<'a> {
                         Ok((format!("{name}_send({obj_code}, {item})"), CType::Void))
                     }
                     "receive" if codes.is_empty() => Ok((format!("{name}_receive({obj_code})"), CType::Option(Box::new(t)))),
-                    "close" if codes.is_empty() => Ok((format!("({obj_code})->closed = true"), CType::Void)),
+                    "close" if codes.is_empty() => Ok((format!("{name}_close({obj_code})"), CType::Void)),
                     other => Err(format!("Channel has no method '{other}' the native backend supports yet")),
                 }
             }
@@ -5472,10 +5606,23 @@ pub fn generate_with_options(
     typed: &crate::typeck::TypedProgram,
     leak_check: bool,
 ) -> Result<(String, NativeTypeReport), String> {
-    let (source, report) = generate_impl(items, Some(typed), false, leak_check)?;
+    generate_with_native_options(items, typed, leak_check, false)
+}
+
+/// Generates native C with optional threaded task/channel runtime. The
+/// default remains the deterministic cooperative scheduler so interpreter ↔
+/// native differential tests retain their ordering contract; callers that
+/// explicitly request native execution can opt into OS threads.
+pub fn generate_with_native_options(
+    items: &[Item],
+    typed: &crate::typeck::TypedProgram,
+    leak_check: bool,
+    native_threads: bool,
+) -> Result<(String, NativeTypeReport), String> {
+    let (source, report) = generate_impl(items, Some(typed), false, leak_check, native_threads)?;
     if report.sends_records {
         // A record is sent through a channel: regenerate with read tracking (E1101).
-        return generate_impl(items, Some(typed), true, leak_check);
+        return generate_impl(items, Some(typed), true, leak_check, native_threads);
     }
     Ok((source, report))
 }
@@ -5485,6 +5632,7 @@ fn generate_impl(
     typed: Option<&crate::typeck::TypedProgram>,
     track_moves: bool,
     leak_check: bool,
+    native_threads: bool,
 ) -> Result<(String, NativeTypeReport), String> {
     let checker_types = typed.map(|t| &t.expr_types);
     let call_substs = typed.map(|t| &t.call_substs);
@@ -5638,6 +5786,7 @@ fn generate_impl(
         temp_counter: 0,
         owned_locals: Vec::new(),
         ownership_active: false,
+        native_threads,
     };
     // A trait method is only ever object-safe here if `Self` never appears
     // anywhere but as the exact `self` receiver — see the field doc comment
@@ -6142,7 +6291,17 @@ fn generate_impl(
                CType::Task(t) => {
                     let ret = c_type_name(t);
                     let value = field_c_type(t);
-                    list_type_decls.push_str(&format!("typedef {} (*{name}_Run)(void*);\nstruct {name} {{\n    {name}_Run run;\n    void* env;\n    int status;\n    {value} value;\n}};\n\n", ret));
+                     if codegen.native_threads {
+                         list_type_decls.push_str(&format!("typedef {} (*{name}_Run)(void*);\nstruct {name} {{\n    {name}_Run run;\n    void* env;\n    int status;\n    bool thread_started;\n    bool thread_joined;\n    bool join_in_progress;\n    {value} value;\n    OstrinMutex mutex;\n    OstrinCond ready;\n    OstrinThread thread;\n}};\n\n", ret));
+                         let result_release = if is_reference_type(t) { "    if (task->status == 2) ostrin_release((void*)task->value);\n" } else { "" };
+                         funcs.push((format!("static void {name}_drop({name}* task)"), format!("    if (!task) return;\n    if (task->thread_started && !task->thread_joined) {name}_join(task);\n{result_release}    ostrin_mutex_destroy(&task->mutex);\n    ostrin_cond_destroy(&task->ready);\n")));
+                         funcs.push((format!("static void {name}_thread_entry(void* raw)"), format!("    {name}* task = ({name}*)raw;\n{run}\n    ostrin_mutex_lock(&task->mutex);\n    task->status = 2;\n    ostrin_cond_broadcast(&task->ready);\n    ostrin_mutex_unlock(&task->mutex);\n", run = if **t == CType::Void { "    task->run(task->env); task->value = 0;".to_string() } else { "    task->value = task->run(task->env);".to_string() })));
+                         funcs.push((format!("static void {name}_start({name}* task)"), format!("    ostrin_mutex_init(&task->mutex);\n    ostrin_cond_init(&task->ready);\n    task->status = 1;\n    task->thread_started = true;\n    ostrin_thread_start(&task->thread, {name}_thread_entry, task);\n")));
+                         funcs.push((format!("static bool {name}_poll(void* raw)"), format!("    {name}* task = ({name}*)raw;\n    if (task->status == 2) return false;\n    {name}_join(task);\n    return true;\n")));
+                         let result = if **t == CType::Void { "    return;".to_string() } else if is_reference_type(t) { "    ostrin_retain((void*)task->value);\n    return task->value;".to_string() } else { "    return task->value;".to_string() };
+                         funcs.push((format!("static {ret} {name}_join({name}* task)"), format!("    ostrin_mutex_lock(&task->mutex);\n    while (task->status != 2 || task->join_in_progress) ostrin_cond_wait(&task->ready, &task->mutex);\n    if (!task->thread_joined) {{ task->join_in_progress = true; ostrin_mutex_unlock(&task->mutex); ostrin_thread_join(&task->thread); ostrin_mutex_lock(&task->mutex); task->thread_joined = true; task->join_in_progress = false; ostrin_cond_broadcast(&task->ready); }}\n    ostrin_mutex_unlock(&task->mutex);\n{result}\n")));
+                     } else {
+                     list_type_decls.push_str(&format!("typedef {} (*{name}_Run)(void*);\nstruct {name} {{\n    {name}_Run run;\n    void* env;\n    int status;\n    {value} value;\n}};\n\n", ret));
                     funcs.push((format!("static bool {name}_poll(void* raw)"), format!(
                         "    {name}* task = ({name}*)raw;\n    if (task->status != 0) return false;\n    task->status = 1;\n    {run}\n    task->status = 2;\n    return true;\n",
                         run = if **t == CType::Void {
@@ -6151,31 +6310,42 @@ fn generate_impl(
                             "    task->value = task->run(task->env);".to_string()
                         },
                     )));
-                    funcs.push((format!("static {ret} {name}_join({name}* task)"), format!(
-                        "    while (task->status == 0) {{\n        if (!ostrin_poll_all()) OSTRIN_FAIL(\"task join would block: no runnable task remains\");\n    }}\n    if (task->status == 1) OSTRIN_FAIL(\"cyclic task join would deadlock\");\n    {result}\n",
+                     funcs.push((format!("static {ret} {name}_join({name}* task)"), format!(
+                         "    while (task->status == 0) {{\n        if (!ostrin_poll_all()) OSTRIN_FAIL(\"task join would block: no runnable task remains\");\n    }}\n    if (task->status == 1) OSTRIN_FAIL(\"cyclic task join would deadlock\");\n    {result}\n",
                         result = if **t == CType::Void {
                             "    return;".to_string()
                         } else {
                             "    return task->value;".to_string()
-                        },
-                    )));
+                         },
+                     )));
+                     }
                }
                 CType::Channel(t) => {
                     let tc = c_type_name(t);
                     let opt = c_type_name(&CType::Option(t.clone()));
-                    list_type_decls.push_str(&format!("struct {name} {{\n    {tc}* items;\n    int64_t head;\n    int64_t length;\n    int64_t capacity;\n    bool closed;\n}};\n\n"));
+                    let sync_fields = if codegen.native_threads { "    OstrinMutex mutex;\n    OstrinCond ready;\n" } else { "" };
+                    list_type_decls.push_str(&format!("struct {name} {{\n    {tc}* items;\n    int64_t head;\n    int64_t length;\n    int64_t capacity;\n    bool closed;\n{sync_fields}}};\n\n"));
                      let drop_sig = format!("static void {name}_drop({name}* c)");
+                     let sync_drop = if codegen.native_threads { "    ostrin_mutex_destroy(&c->mutex);\n    ostrin_cond_destroy(&c->ready);\n" } else { "" };
                      let drop_body = format!(
-                         "    if (!c) return;\n{}    if (c->items) ostrin_free(c->items);\n",
+                         "    if (!c) return;\n{}    if (c->items) ostrin_free(c->items);\n{sync_drop}",
                          if is_reference_type(t) { "    for (int64_t i = c->head; i < c->length; i++) ostrin_release((void*)c->items[i]);\n" } else { "" },
                      );
                      funcs.push((drop_sig, drop_body));
-                     funcs.push((format!("static {name}* {name}_new(void)"), format!("    {name}* c = ({name}*)ostrin_calloc_with_drop(1, sizeof({name}), (void (*)(void*)){name}_drop);\n    return c;\n")));
-                     funcs.push((format!("static void {name}_send({name}* c, {tc} item)"), format!(
-                         "    if (c->length >= c->capacity) {{\n        c->capacity = c->capacity == 0 ? 4 : c->capacity * 2;\n        c->items = ({tc}*)ostrin_realloc(c->items, sizeof({tc}) * (size_t)c->capacity);\n    }}\n    c->items[c->length] = item;\n{retain}    c->length = c->length + 1;\n",
-                         retain = if is_reference_type(t) { "    ostrin_retain((void*)item);\n" } else { "" }
-                     )));
-                    funcs.push((format!("static {opt} {name}_receive({name}* c)"), format!("    {opt} r;\n    memset(&r, 0, sizeof r);\n    while (c->head >= c->length && !c->closed) {{\n        if (!ostrin_poll_all()) break;\n    }}\n    if (c->head < c->length) {{ r.has = true; r.value = c->items[c->head++]; }}\n    return r;\n")));
+                     let sync_init = if codegen.native_threads { "    ostrin_mutex_init(&c->mutex); ostrin_cond_init(&c->ready);\n" } else { "" };
+                     funcs.push((format!("static {name}* {name}_new(void)"), format!("    {name}* c = ({name}*)ostrin_calloc_with_drop(1, sizeof({name}), (void (*)(void*)){name}_drop);\n{sync_init}    return c;\n")));
+                     if codegen.native_threads {
+                         funcs.push((format!("static void {name}_send({name}* c, {tc} item)"), format!("    ostrin_mutex_lock(&c->mutex);\n    if (c->closed) {{ ostrin_mutex_unlock(&c->mutex); OSTRIN_FAIL(\"send on closed channel\"); }}\n    if (c->length >= c->capacity) {{\n        c->capacity = c->capacity == 0 ? 4 : c->capacity * 2;\n        c->items = ({tc}*)ostrin_realloc(c->items, sizeof({tc}) * (size_t)c->capacity);\n    }}\n    c->items[c->length] = item;\n{retain}    c->length = c->length + 1;\n    ostrin_cond_signal(&c->ready);\n    ostrin_mutex_unlock(&c->mutex);\n", retain = if is_reference_type(t) { "    ostrin_retain((void*)item);\n" } else { "" })));
+                         funcs.push((format!("static {opt} {name}_receive({name}* c)"), format!("    {opt} r;\n    memset(&r, 0, sizeof r);\n    ostrin_mutex_lock(&c->mutex);\n    while (c->head >= c->length && !c->closed) ostrin_cond_wait(&c->ready, &c->mutex);\n    if (c->head < c->length) {{ r.has = true; r.value = c->items[c->head++]; }}\n    ostrin_mutex_unlock(&c->mutex);\n    return r;\n")));
+                         funcs.push((format!("static void {name}_close({name}* c)"), format!("    ostrin_mutex_lock(&c->mutex);\n    c->closed = true;\n    ostrin_cond_broadcast(&c->ready);\n    ostrin_mutex_unlock(&c->mutex);\n")));
+                     } else {
+                         funcs.push((format!("static void {name}_send({name}* c, {tc} item)"), format!(
+                             "    if (c->length >= c->capacity) {{\n        c->capacity = c->capacity == 0 ? 4 : c->capacity * 2;\n        c->items = ({tc}*)ostrin_realloc(c->items, sizeof({tc}) * (size_t)c->capacity);\n    }}\n    c->items[c->length] = item;\n{retain}    c->length = c->length + 1;\n",
+                             retain = if is_reference_type(t) { "    ostrin_retain((void*)item);\n" } else { "" }
+                         )));
+                         funcs.push((format!("static {opt} {name}_receive({name}* c)"), format!("    {opt} r;\n    memset(&r, 0, sizeof r);\n    while (c->head >= c->length && !c->closed) {{\n        if (!ostrin_poll_all()) break;\n    }}\n    if (c->head < c->length) {{ r.has = true; r.value = c->items[c->head++]; }}\n    return r;\n")));
+                         funcs.push((format!("static void {name}_close({name}* c)"), "    c->closed = true;\n".to_string()));
+                     }
                 }
                 CType::Set(t) => {
                     let tc = c_type_name(t);
@@ -6526,7 +6696,7 @@ fn generate_impl(
     for (signature, body) in bodies {
         out.push_str(&format!("{signature} {{\n{body}}}\n\n"));
     }
-    out.push_str("int main(int argc, char** argv) {\n    ostrin_argc = argc > 0 ? argc - 1 : 0;\n    ostrin_argv = argc > 0 ? argv + 1 : argv;\n    atexit(ostrin_mem_cleanup);\n    ostrin_main();\n");
+    out.push_str("int main(int argc, char** argv) {\n    ostrin_runtime_init();\n    ostrin_argc = argc > 0 ? argc - 1 : 0;\n    ostrin_argv = argc > 0 ? argv + 1 : argv;\n    atexit(ostrin_mem_cleanup);\n    ostrin_main();\n");
     if leak_check {
         out.push_str("    ostrin_mem_report();\n");
     }

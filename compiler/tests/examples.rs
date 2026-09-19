@@ -916,6 +916,32 @@ fn native_ownership_automatically_releases_aliases_reassignments_and_returns() {
 }
 
 #[test]
+fn native_threads_use_os_thread_and_blocking_channel_runtime() {
+    let exe = temp_artifact("native-threads.exe");
+    let compile = run(&[
+        "--compile",
+        "--native-threads",
+        "--leak-check",
+        "--out",
+        &exe,
+        &example_path("native_threads.ostrin"),
+    ]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "native thread compile failed: {}", stderr(&compile));
+    let native = Command::new(&exe).output().expect("run native thread binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native thread binary failed: {}", String::from_utf8_lossy(&native.stderr));
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), "7\n");
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "native thread runtime should release task, environment and channel allocations: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn compiler_lowers_hir_to_verified_cfg_ir() {
     let out = run(&["--ir", &example_path("native_fibonacci.ostrin")]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));

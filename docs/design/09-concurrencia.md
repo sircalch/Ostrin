@@ -8,12 +8,13 @@ Decisiones de fondo ya cerradas:
 - **Sin colorear funciones**: no existe `async fn`/`await` contagioso. `spawn` se llama desde cualquier función normal.
 - **Prohibido compartir un binding `mut` directamente entre tareas.** Toda comunicación de datos que cambian pasa por canales.
 
-Estado de implementación: el intérprete ya ejecuta `spawn` con un scheduler cooperativo
-determinista. Las tareas se crean diferidas, `join` las completa, `spawn_scope` espera a sus
-hijas y `receive`/`for` bombean tareas pendientes para evitar que una espera abandone el
-programa prematuramente. El intérprete y el backend C comparten esta semántica cooperativa
-determinista; todavía no hay paralelismo de hilos del sistema operativo, canales bloqueantes
-entre hilos ni `select`.
+Estado de implementación: el intérprete ejecuta `spawn` con un scheduler cooperativo
+determinista. El backend C conserva ese modo por defecto para mantener la paridad reproducible,
+y añade `--native-threads` como modo explícito de ejecución real: cada `spawn` arranca un
+hilo del sistema operativo, `join` espera con mutex/condición y los canales usan un buffer
+protegido con espera bloqueante y despiertan a los receptores al enviar o cerrar. La API del
+lenguaje no cambia y E1100/E1101 siguen aplicándose; `select`, cancelación y grupos nativos
+completos todavía no están implementados.
 
 La idea central de este documento es que Ostrin **no necesita un borrow checker al estilo Rust** para ser seguro en concurrencia, porque ya partimos de "inmutable por defecto" (documento 01). Un dato inmutable nunca puede tener una condición de carrera — no importa cuántas tareas lo lean a la vez. El único lugar donde hace falta una regla especial es en el manejo de datos `mut`, y ahí basta una regla simple y local (no un sistema de ownership/lifetimes que atraviese todo el lenguaje).
 
@@ -99,6 +100,21 @@ Error OSTRIN-E1101
 ```
 
 Esta es la única forma de seguimiento de "movido" que existe en Ostrin, y solo aplica a valores mutables enviados por un canal o capturados en un `spawn` — no es un sistema de ownership general como en Rust (los bindings inmutables, que son el caso por defecto y la mayoría del código, nunca están sujetos a esta regla).
+
+### 2.2 Backend nativo con hilos reales
+
+El backend C ofrece dos modos deliberados:
+
+- sin `--native-threads`: scheduler cooperativo determinista, usado por la paridad
+  intérprete↔nativo y por las pruebas diferenciales;
+- con `--native-threads`: `pthread` en POSIX y `CreateThread` en Windows, mutexes y
+  variables de condición para `Task<T>`, y canales bloqueantes con buffer dinámico.
+
+El flag solo es válido con `--emit-c` o `--compile`. Las tareas nativas conservan su
+entorno capturado mientras el hilo puede usarlo y lo liberan al terminar; el runtime de
+memoria protege su tabla global contra accesos concurrentes. Esta primera entrega cubre
+`spawn`, `join`, `send`, `receive` y `close`; no promete todavía `select` ni
+cancelación cooperativa.
 
 ## 3. Concurrencia estructurada — `spawn_scope`
 

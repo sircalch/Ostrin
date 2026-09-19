@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-19 · rama `main` · 6 pruebas diferenciales y 125 de integración en verde.*
+*Corte: 2026-09-19 · rama `main` · 6 pruebas diferenciales y 126 de integración en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
 Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–149); para el diseño
@@ -35,7 +35,7 @@ Implementación: compilador + intérprete + herramientas de editor, todo en Rust
 | Servidor de lenguaje | `lsp.rs`, `symbols.rs`, `protocol.rs` | LSP sobre stdio |
 | Adaptador de depuración | `dap.rs` + hooks del intérprete | DAP sobre stdio |
 | **Backend nativo** | `codegen.rs`, `hir_c.rs` y runtimes C | Transpila a C y compila con gcc/clang/cc |
-| CLI | `main.rs` | `--check --run --ast --tokens --json --lsp --dap --emit-c --compile` |
+| CLI | `main.rs` | `--check --run --ast --tokens --json --lsp --dap --emit-c --compile --native-threads` |
 | Editor | `vscode-ostrin/` (v0.4.0) | Resaltado, LSP, DAP, comandos, VSIX |
 
 Regla de oro del proyecto: **el intérprete es la referencia**. Cada capacidad del
@@ -64,12 +64,12 @@ escalar a la izquierda (`rmul`, `radd`, …).
 **Control**: `if/else`, `while`, `for` (rangos `to`/`until`, listas, canales, iteradores
 propios con `next`), `match` con guardas, patrones anidados, rangos y destructuración.
 
-**Concurrencia (scheduler cooperativo del intérprete)**: `spawn`, `join`, `spawn_scope`,
-`channel<T>()`, `send/receive/close`; las tareas se difieren, `join` las ejecuta y los
-canales bombean tareas pendientes cuando esperan datos. Esto todavía no usa hilos del SO ni
-paralelismo de CPU. Se verifica en el checker que no se capturen bindings `mut` (E1100) y el
-análisis HIR/IR rechaza por defecto reutilizar un valor movible después de enviarlo (E1101);
-`--ownership-check` conserva el informe detallado.
+**Concurrencia**: el intérprete conserva el scheduler cooperativo determinista con `spawn`,
+`join`, `spawn_scope` y `channel<T>()`. El backend nativo mantiene ese modo por defecto
+para la paridad reproducible, y `--native-threads` habilita hilos del SO, mutexes/condiciones
+y canales bloqueantes con la misma API. Se verifica en el checker que no se capturen bindings
+`mut` (E1100) y el análisis HIR/IR rechaza por defecto reutilizar un valor movible después de
+enviarlo (E1101); `--ownership-check` conserva el informe detallado.
 
 **Numérico/científico**: enteros de ancho fijo, `Float32`, `Array<T>` (difusión, máscaras,
 rebanadas, `@`), estadística, regresión, `det/inv/eigvals/norm`, `Rng` reproducible,
@@ -139,8 +139,10 @@ la bajada completa de ownership sobre la IR.
 - Operadores de usuario, `derive(Eq/Ord)`, `Ordering` incorporado.
 - `print` de records, enums, listas, mapas, sets, `Option`, `Result` (mismo formato que el intérprete).
 - Argumentos nombrados y por defecto, iteradores propios, funciones incorporadas de E/S.
-- `spawn`/`join`/`spawn_scope`/canales con scheduler cooperativo determinista, igual que el intérprete;
-  no son todavía hilos del sistema operativo.
+- `spawn`/`join`/`spawn_scope`/canales con scheduler cooperativo determinista por defecto, igual
+  que el intérprete. Con `--native-threads`, las tareas se ejecutan en hilos del SO y los
+  canales usan espera/señalización bloqueante; el modo determinista sigue disponible para
+  pruebas diferenciales.
 - Primitivas de ownership `clone`/`drop` para valores gestionados; el ejemplo
   `ownership_primitives.ostrin` verifica que una lista y su buffer terminen con cero
   asignaciones vivas bajo `--leak-check`.
@@ -157,7 +159,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 |---|---|
 | Cierres en nativo | Captura **por valor** (una variable `mut` cambiada después no se ve dentro); lambda sin contexto de tipos exige anotación |
 | Chequeo «movido tras enviar» (E1101) | Integrado por defecto en `--check`, `--run`, `--emit-c` y `--compile`; `--ownership-check` conserva el informe explícito |
-| Paralelismo nativo (hilos, canales bloqueantes, `select`) | No existe todavía; ambos backends tienen scheduler cooperativo |
+| Paralelismo nativo (`--native-threads`, canales bloqueantes, `select`) | Hilos del SO, mutexes/condiciones y canales bloqueantes implementados de forma opt-in en el backend C; `select`, cancelación y grupos de tareas robustos siguen pendientes |
 | Memoria en nativo | Registro, destructores tipados para records/colecciones, `clone`/`drop`, limpieza automática de locales directos y `--leak-check`; scopes anidados y ARC completa sobre IR siguen pendientes |
 | IR de bloques | HIR→CFG disponible con `--ir`; `if/while/for/match/try/spawn/channel` ya tienen operaciones explícitas, aún no reemplaza el backend C |
 | Ownership/último uso | `--ownership-report`, `--ownership-check` y `--ownership-ir`; el backend C ya aplica retain/release lineal en locales directos, pero la IR aún no es la fuente única |
@@ -196,10 +198,10 @@ Ordenadas por mi recomendación (valor / riesgo). Cada una es independiente.
    reinferencia (reduce errores y abre optimizaciones).
 
 ### B. Paralelismo nativo (medio plazo, requiere runtime)
-El scheduler cooperativo ya existe en intérprete y backend C. El siguiente salto es añadir
-hilos del sistema operativo y canales bloqueantes sin romper E1100/E1101; después vendrán
-cancelación y `select` (ya esbozados en `docs/design/09`). Sigue siendo el mayor salto de
-capacidad y riesgo.
+El primer bloque ya está implementado detrás de `--native-threads`: hilos del sistema
+operativo, mutexes/condiciones y canales bloqueantes, sin romper E1100/E1101 ni la paridad
+determinista por defecto. El siguiente paso es cerrar `spawn_scope` con grupos de tareas
+nativos, cancelación y `select` (esbozados en `docs/design/09`).
 
 ### C. Biblioteca estándar y ecosistema
 Cadenas (split/trim/format), fechas, JSON, argumentos y entorno, `HashMap` real,

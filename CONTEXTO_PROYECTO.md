@@ -4256,3 +4256,28 @@ La batería queda en **6 pruebas diferenciales y 125 de integración verdes**. E
 siendo deliberadamente lineal: bindings creados dentro de scopes anidados, `phi`, loops, cierres,
 contenedores suma y escapes complejos esperan la bajada completa desde `ownership.rs` hacia el
 backend C.
+
+## 151. Hilos nativos y canales bloqueantes opt-in — 2026-09-19
+
+El backend nativo incorpora una primera ejecución concurrente real sin cambiar la semántica
+determinista que usa la suite diferencial:
+
+- `--native-threads` solo se habilita junto con `--emit-c` o `--compile`; sin el flag,
+  `spawn` conserva el scheduler cooperativo existente.
+- El runtime C abstrae `pthread` en POSIX y `CreateThread` en Windows, con mutexes,
+  variables de condición y join seguro para `Task<T>`.
+- `Channel<T>` tiene un camino bloqueante con buffer protegido: `send` despierta receptores,
+  `receive` espera mientras el canal está vacío y `close` despierta a quienes esperan para
+  que puedan observar `None`.
+- La tabla global de allocations usa un mutex para que retain/release/realloc y los
+  destructores tipados no corran concurrentemente sobre la misma lista.
+- Los entornos capturados por una tarea retienen sus valores gestionados al crearse y liberan
+  esas referencias al terminar el callback; el destructor de la tarea espera el hilo antes de
+  destruir sus primitivas de sincronización.
+- `examples/native_threads.ostrin` y su prueba nativa ejercitan un receive que bloquea hasta
+  un productor real, `close`, `join` y `--leak-check`; esperan `7` y
+  `live_allocations=0`.
+
+La batería queda en **6 pruebas diferenciales y 126 de integración verdes**. Quedan para el
+siguiente bloque de concurrencia `select`, cancelación y un administrador de grupos nativos
+para que `spawn_scope` tenga garantías completas también en el modo con hilos.
