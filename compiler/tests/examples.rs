@@ -811,6 +811,15 @@ fn compiler_inserts_only_conservative_linear_releases() {
 }
 
 #[test]
+fn compiler_marks_reference_aliases_with_retains() {
+    let out = run(&["--ownership-ir", &example_path("native_records.ostrin")]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let source = stdout(&out);
+    assert!(source.contains("retain %"), "managed aggregate aliases need retain markers: {source}");
+    assert!(source.contains("ownership-ir inserted-retains:"), "missing retain summary: {source}");
+}
+
+#[test]
 fn compiler_reports_static_channel_move_violations() {
     let out = run(&["--ownership-check", &example_path("moved_after_send.ostrin")]);
     assert!(!out.status.success(), "use-after-send must be rejected by the ownership check");

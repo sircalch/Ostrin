@@ -35,6 +35,7 @@ pub struct OwnershipFact {
 
 #[derive(Debug, Default, Clone)]
 pub struct LoweringSummary {
+    pub inserted_retains: usize,
     pub inserted_releases: usize,
     pub unresolved_values: usize,
     pub functions: usize,
@@ -108,9 +109,11 @@ pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
             }
         }
 
-        let mut insertions: HashMap<(usize, usize), Vec<ValueId>> = HashMap::new();
-        for (value, (ty, definition_block, definition_instruction)) in definitions {
-            if !requires_management(&ty) {
+        let mut retain_before: HashMap<(usize, usize), Vec<ValueId>> = HashMap::new();
+        let mut retain_after: HashMap<(usize, usize), Vec<ValueId>> = HashMap::new();
+        let mut release_after: HashMap<(usize, usize), Vec<ValueId>> = HashMap::new();
+        for (value, (ty, definition_block, definition_instruction)) in &definitions {
+            if !requires_management(ty) {
                 continue;
             }
             let value_uses = uses.get(&value).cloned().unwrap_or_default();
@@ -127,14 +130,29 @@ pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
                 // terminators are treated as unresolved for now.
                 let block = &function.blocks[last.block];
                 if last.instruction < block.instructions.len() && safe_release_site(&block.instructions[last.instruction]) {
-                    insertions.entry((last.block, last.instruction + 1)).or_default().push(value);
+                    release_after.entry((last.block, last.instruction + 1)).or_default().push(*value);
                 } else {
                     summary.unresolved_values += 1;
                 }
             } else if value_uses.is_empty() {
-                insertions.entry((definition_block, definition_instruction + 1)).or_default().push(value);
+                release_after.entry((*definition_block, definition_instruction + 1)).or_default().push(*value);
             } else {
                 summary.unresolved_values += 1;
+            }
+        }
+
+        for block in &function.blocks {
+            for (index, instruction) in block.instructions.iter().enumerate() {
+                if let IrInstr::Aggregate { fields, .. } = instruction {
+                    for value in fields {
+                        if definitions.get(value).is_some_and(|(ty, _, _)| requires_management(ty)) {
+                            retain_before.entry((block.id, index)).or_default().push(*value);
+                        }
+                    }
+                }
+                if let Some((value, _)) = alias_destination(instruction).filter(|(_, ty)| requires_management(ty)) {
+                    retain_after.entry((block.id, index + 1)).or_default().push(value);
+                }
             }
         }
 
@@ -142,8 +160,20 @@ pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
             let old = std::mem::take(&mut block.instructions);
             let mut instructions = Vec::with_capacity(old.len());
             for (index, instruction) in old.into_iter().enumerate() {
+                if let Some(values) = retain_before.remove(&(block.id, index)) {
+                    for value in values {
+                        instructions.push(IrInstr::Retain { value });
+                        summary.inserted_retains += 1;
+                    }
+                }
                 instructions.push(instruction);
-                if let Some(values) = insertions.remove(&(block.id, index + 1)) {
+                if let Some(values) = retain_after.remove(&(block.id, index + 1)) {
+                    for value in values {
+                        instructions.push(IrInstr::Retain { value });
+                        summary.inserted_retains += 1;
+                    }
+                }
+                if let Some(values) = release_after.remove(&(block.id, index + 1)) {
                     for value in values {
                         instructions.push(IrInstr::Release { value });
                         summary.inserted_releases += 1;
@@ -210,6 +240,16 @@ fn safe_release_site(instruction: &IrInstr) -> bool {
     // channel. Calls, aggregates, fields and phis remain unresolved until
     // their retain/borrow contract is explicit in the IR.
     matches!(instruction, IrInstr::StoreLocal { .. } | IrInstr::ChannelSend { .. })
+}
+
+fn alias_destination(instruction: &IrInstr) -> Option<(ValueId, Ty)> {
+    match instruction {
+        IrInstr::Field { dst, ty, .. }
+        | IrInstr::Index { dst, ty, .. }
+        | IrInstr::PatternBind { dst, ty, .. }
+        | IrInstr::Phi { dst, ty, .. } => Some((*dst, ty.clone())),
+        _ => None,
+    }
 }
 
 fn analyze_function(function: &crate::ir::IrFunction, report: &mut OwnershipReport) {
@@ -393,7 +433,7 @@ pub fn dump_moves(violations: &[MoveViolation]) -> String {
 
 pub fn dump_lowering(summary: &LoweringSummary) -> String {
     format!(
-        "ownership-ir functions: {}\nownership-ir inserted-releases: {}\nownership-ir unresolved-values: {}\n",
-        summary.functions, summary.inserted_releases, summary.unresolved_values
+        "ownership-ir functions: {}\nownership-ir inserted-retains: {}\nownership-ir inserted-releases: {}\nownership-ir unresolved-values: {}\n",
+        summary.functions, summary.inserted_retains, summary.inserted_releases, summary.unresolved_values
     )
 }
