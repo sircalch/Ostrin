@@ -757,6 +757,17 @@ fn compiler_lowers_hir_to_verified_cfg_ir() {
 }
 
 #[test]
+fn compiler_reports_conservative_ownership_facts() {
+    let out = run(&["--ownership-report", &example_path("native_records.ostrin")]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let source = stdout(&out);
+    assert!(source.contains("ownership managed-values:"));
+    assert!(source.contains("ownership last-use-candidates:"));
+    assert!(source.contains("Point"), "record values should be classified as managed: {source}");
+    assert!(source.contains("candidate=true"), "straight-line record uses should be reported: {source}");
+}
+
+#[test]
 fn native_backend_emits_centralized_memory_cleanup() {
     let out = run(&["--emit-c", &example_path("native_hir_collections.ostrin")]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));

@@ -3931,3 +3931,29 @@ Esto aún no es un backend nuevo ni permite afirmar que Ostrin tenga ARC: es la 
 necesaria para implementarlo. El siguiente paquete debe bajar `match`/`try`/cierres/concurrencia
 desde HIR a CFG real y después añadir el primer pase de ownership (`retain/release` más
 `--leak-check`) sin modificar la sintaxis del lenguaje.
+
+## 136. Análisis conservador de ownership y último uso — 2026-09-18
+
+Sobre la IR de la sección 135 se añadió `compiler/src/ownership.rs` y el comando
+`ostrinc --ownership-report`. El pase no modifica todavía el programa ni inserta
+liberaciones: produce hechos que se pueden inspeccionar antes de activar RC.
+
+Para cada temporal definido, el análisis:
+
+- clasifica como gestionables los records/enums nombrados, colecciones, funciones y valores
+  dinámicos;
+- recoge todos sus usos en instrucciones y terminadores;
+- identifica el último uso cuando todas las referencias permanecen dentro del mismo bloque;
+- marca como barreras los valores usados en varios bloques o consumidos por una instrucción
+  `opaque`, donde todavía no se conoce el escape real;
+- informa valores gestionables sin uso, que serán candidatos a optimización o diagnóstico.
+
+La salida sobre `native_records.ostrin` encuentra 8 valores gestionables y 8 candidatos
+lineales. La prueba `compiler_reports_conservative_ownership_facts` protege esta
+observabilidad y la suite completa queda en **6 pruebas diferenciales y 110 de integración
+verdes**.
+
+La siguiente etapa no debe convertir automáticamente todos los candidatos en `release`:
+primero hay que añadir dominadores/joins, propagación por loops, escape de llamadas y tipos de
+destructor. Solo después se podrá introducir `retain/release` en una copia de la IR y
+comparar `--leak-check` contra el registro global del runtime.

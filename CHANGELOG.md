@@ -66,6 +66,10 @@
   The IR verifier rejects missing block terminators and invalid CFG targets; the C
   backend remains unchanged until this representation is mature enough to host RC
   and last-use insertion.
+- Added the conservative ownership report `ostrinc --ownership-report`. It classifies
+  heap-like IR values, records their uses and identifies straight-line last-use candidates
+  while marking cross-block and opaque cases as barriers. It is analysis only: no
+  `retain`/`release` is emitted until joins, loops and escape behavior are modeled.
 - Module loader now rewrites types in signatures, fields, variants and annotations
   (a `record` from another module can be used as a type).
 - CI on Linux, macOS and Windows.

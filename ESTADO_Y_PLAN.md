@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-18 · rama `main` · 6 pruebas diferenciales y 109 de integración en verde.*
+*Corte: 2026-09-18 · rama `main` · 6 pruebas diferenciales y 110 de integración en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
 Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–135); para el diseño
@@ -139,6 +139,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Concurrencia real (hilos, planificador, `select`) | No existe; `spawn` es síncrono |
 | Memoria en nativo | Registro de allocations y limpieza global al salir; ARC/último uso y destructores por tipo siguen pendientes |
 | IR de bloques | Primera bajada HIR→CFG disponible con `--ir`; aún es observabilidad/infraestructura, no reemplaza el backend C |
+| Ownership/último uso | `--ownership-report` clasifica valores gestionables y candidatos lineales; no inserta `retain/release` todavía |
 | Biblioteca estándar | Mínima: sin `HashMap` eficiente, fechas, red, formateo, `args`, entorno |
 | `==` sobre `List/Option/Map` | No soportado (tampoco en intérprete para Option) |
 | Mensajes de error de E/S | `strerror` ≠ texto de Rust (difieren entre backends) |
@@ -224,7 +225,7 @@ Decisiones que necesito de ti para afinar el plan:
 
 ```powershell
 cd compiler
-cargo test                                   # 6 diferenciales + 109 de integración
+cargo test                                   # 6 diferenciales + 110 de integración
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```
