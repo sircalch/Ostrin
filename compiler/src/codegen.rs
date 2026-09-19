@@ -353,6 +353,9 @@ pub struct NativeTypeReport {
     pub partial: usize,
     /// Of those, how many were completed from the checker's type.
     pub completed: usize,
+    /// Generic function calls instantiated from the checker's resolved arguments / by the backend's own inference.
+    pub calls_from_checker: usize,
+    pub calls_inferred: usize,
     /// Real disagreements: `file:line:col: checker says …, native says …`.
     pub divergences: Vec<String>,
 }
@@ -461,6 +464,10 @@ struct Codegen<'a> {
     /// The checker's type for every expression, when the caller supplied it
     /// (see `generate_with_report`): used only to *compare*, never to generate.
     checker_types: Option<&'a HashMap<ExprKey, Ty>>,
+    /// The checker's resolved generic arguments per call site.
+    call_substs: Option<&'a HashMap<ExprKey, crate::typeck::CallSubst>>,
+    /// Set by `gen_expr` for a call to a plain identifier, consumed by `gen_function_call`.
+    current_call_key: Option<ExprKey>,
     current_file: Option<String>,
     compare_enabled: bool,
     type_report: NativeTypeReport,
@@ -1521,6 +1528,26 @@ impl<'a> Codegen<'a> {
         out
     }
 
+    /// The checker's resolved type arguments for a call, as backend types
+    /// (dimension parameters as `Quantity`), or `None` when the checker
+    /// recorded none or one has no native representation.
+    fn checker_call_subst(&mut self, decl: &FunctionDecl, key: &ExprKey) -> Option<HashMap<String, CType>> {
+        let recorded = self.call_substs?.get(key)?.clone();
+        let mut out = HashMap::new();
+        for generic in &decl.generics {
+            if let Some(dim) = recorded.dims.get(&generic.name) {
+                out.insert(generic.name.clone(), CType::Quantity(self.substitute_dimension(dim)));
+            } else {
+                let ty = recorded.types.get(&generic.name)?;
+                if crate::types::ty_contains_unknown(ty) {
+                    return None;
+                }
+                out.insert(generic.name.clone(), self.ty_to_ctype(ty)?);
+            }
+        }
+        Some(out)
+    }
+
     fn ctype_agrees(&self, ty: &Ty, c: &CType) -> bool {
         match (ty, c) {
             (Ty::Int, CType::Int) | (Ty::Float, CType::Float) | (Ty::Bool, CType::Bool) | (Ty::String, CType::Str) | (Ty::Void, CType::Void) => true,
@@ -1556,6 +1583,12 @@ impl<'a> Codegen<'a> {
     /// up its fields, variants or methods.
     fn gen_expr(&mut self, expr: &Expr) -> Result<(String, CType), String> {
         let mut hint = self.expected.take();
+        self.current_call_key = match expr {
+            Expr::Located(inner, range) if matches!(inner.as_ref(), Expr::Call(callee, _) | Expr::GenericCall(callee, _, _) if matches!(callee.unlocated(), Expr::Ident(_))) => {
+                Some(ExprKey { file: self.current_file.clone(), start: range.start, end: range.end })
+            }
+            _ => None,
+        };
         if hint.is_none() {
             hint = self.checker_hint(expr);
         }
@@ -2405,6 +2438,7 @@ impl<'a> Codegen<'a> {
     }
 
     fn gen_function_call(&mut self, name: &str, type_args: Option<&[Type]>, args: &[Arg], hint: Option<CType>) -> Result<(String, CType), String> {
+        let call_key = self.current_call_key.take();
         if self.generic_variant_owner.contains_key(name) {
             return self.gen_generic_variant(name, type_args, args, hint);
         }
@@ -2473,7 +2507,7 @@ impl<'a> Codegen<'a> {
             }
         }
         if let Some(decl) = self.generic_functions.get(name).copied() {
-            return self.gen_generic_call(decl, type_args, &arg_codes, &arg_types);
+            return self.gen_generic_call(decl, type_args, call_key, &arg_codes, &arg_types);
         }
         let Some((param_types, return_type)) = self.signatures.get(name).cloned() else {
             return Err(format!("unknown function '{name}' (the native backend only sees other top-level 'fn' declarations)"));
@@ -2498,11 +2532,29 @@ impl<'a> Codegen<'a> {
     /// `typeck`, which already proved this call sound). Monomorphizes on
     /// first use of a given (function, concrete types) pair and reuses the
     /// same C function for later calls with the same types.
-    fn gen_generic_call(&mut self, decl: &'a FunctionDecl, type_args: Option<&[Type]>, arg_codes: &[String], arg_types: &[CType]) -> Result<(String, CType), String> {
+    fn gen_generic_call(&mut self, decl: &'a FunctionDecl, type_args: Option<&[Type]>, call_key: Option<ExprKey>, arg_codes: &[String], arg_types: &[CType]) -> Result<(String, CType), String> {
         if decl.params.len() != arg_codes.len() {
             return Err(format!("function '{}' expects {} argument(s), got {}", decl.name, decl.params.len(), arg_codes.len()));
         }
-        let subst = self.infer_generic_substitutions(decl, type_args, arg_types)?;
+        // The checker already resolved this call's type arguments: use them.
+        // The backend's own inference stays as a fallback (and as a cross-check).
+        let from_checker = call_key.as_ref().and_then(|key| self.checker_call_subst(decl, key));
+        let subst = match from_checker {
+            Some(subst) => {
+                self.type_report.calls_from_checker += 1;
+                if let Ok(own) = self.infer_generic_substitutions(decl, type_args, arg_types) {
+                    if own != subst {
+                        let file = self.current_file.clone().unwrap_or_default();
+                        self.type_report.divergences.push(format!("{file}: generic call to '{}': checker and backend resolved different type arguments", decl.name));
+                    }
+                }
+                subst
+            }
+            None => {
+                self.type_report.calls_inferred += 1;
+                self.infer_generic_substitutions(decl, type_args, arg_types)?
+            }
+        };
         let mangled_suffix: Vec<String> =
             decl.generics.iter().map(|g| mangle_ctype(subst.get(&g.name).expect("checked by infer_generic_substitutions"))).collect();
         let c_name = format!("{}__{}", decl.name, mangled_suffix.join("_"));
@@ -3395,11 +3447,13 @@ fn c_string_literal(s: &str) -> String {
 /// typed-expression table: it completes the types the backend can only infer
 /// partially (`None`, `Ok(x)`, `Nothing`, …) and lets `NativeTypeReport`
 /// compare the backend's own inference with the checker's.
-pub fn generate_with_report(items: &[Item], checker_types: &HashMap<ExprKey, Ty>) -> Result<(String, NativeTypeReport), String> {
-    generate_impl(items, Some(checker_types))
+pub fn generate_with_report(items: &[Item], typed: &crate::typeck::TypedProgram) -> Result<(String, NativeTypeReport), String> {
+    generate_impl(items, Some(typed))
 }
 
-fn generate_impl(items: &[Item], checker_types: Option<&HashMap<ExprKey, Ty>>) -> Result<(String, NativeTypeReport), String> {
+fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>) -> Result<(String, NativeTypeReport), String> {
+    let checker_types = typed.map(|t| &t.expr_types);
+    let call_substs = typed.map(|t| &t.call_substs);
     let mut functions = Vec::new();
     let mut records = Vec::new();
     let mut enums = Vec::new();
@@ -3516,6 +3570,8 @@ fn generate_impl(items: &[Item], checker_types: Option<&HashMap<ExprKey, Ty>>) -
         expected: None,
         show_queue: VecDeque::new(),
         checker_types,
+        call_substs,
+        current_call_key: None,
         current_file: None,
         compare_enabled: false,
         type_report: NativeTypeReport::default(),

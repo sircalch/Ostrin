@@ -40,6 +40,14 @@ pub struct ExprKey {
     pub end: Span,
 }
 
+/// The type/dimension arguments the checker resolved for one call of a generic
+/// function (`identity(5)` ↦ `T = Int`).
+#[derive(Debug, Clone, Default)]
+pub struct CallSubst {
+    pub types: HashMap<String, Ty>,
+    pub dims: HashMap<String, Dimension>,
+}
+
 /// Everything the checker learned, in structured form: the foundation for a
 /// typed AST/HIR that backends can consume instead of re-inferring types.
 pub struct TypedProgram {
@@ -48,6 +56,8 @@ pub struct TypedProgram {
     /// so their expressions carry `Ty::Generic` types; a type the checker
     /// could not determine is `Ty::Unknown`.
     pub expr_types: HashMap<ExprKey, Ty>,
+    /// The resolved generic arguments of every call to a generic function.
+    pub call_substs: HashMap<ExprKey, CallSubst>,
 }
 
 #[derive(Clone)]
@@ -89,6 +99,8 @@ pub struct Checker {
     editor_bindings: Vec<EditorBinding>,
     editor_expressions: Vec<EditorExpression>,
     expr_types: HashMap<ExprKey, Ty>,
+    call_substs: HashMap<ExprKey, CallSubst>,
+    call_key_stack: Vec<ExprKey>,
     errors: Vec<TypeError>,
 }
 
@@ -152,6 +164,8 @@ impl Checker {
             editor_bindings: Vec::new(),
             editor_expressions: Vec::new(),
             expr_types: HashMap::new(),
+            call_substs: HashMap::new(),
+            call_key_stack: Vec::new(),
             errors: Vec::new(),
         }
     }
@@ -169,20 +183,20 @@ impl Checker {
         self,
         items: &[Item],
     ) -> (Vec<TypeError>, Vec<EditorBinding>, Vec<EditorExpression>) {
-        let (errors, bindings, expressions, _) = self.check_all(items);
+        let (errors, bindings, expressions, _, _) = self.check_all(items);
         (errors, bindings, expressions)
     }
 
     /// Like `check_program`, but also returns the type of every expression.
     pub fn check_program_typed(self, items: &[Item]) -> TypedProgram {
-        let (errors, _, _, expr_types) = self.check_all(items);
-        TypedProgram { errors, expr_types }
+        let (errors, _, _, expr_types, call_substs) = self.check_all(items);
+        TypedProgram { errors, expr_types, call_substs }
     }
 
     fn check_all(
         mut self,
         items: &[Item],
-    ) -> (Vec<TypeError>, Vec<EditorBinding>, Vec<EditorExpression>, HashMap<ExprKey, Ty>) {
+    ) -> (Vec<TypeError>, Vec<EditorBinding>, Vec<EditorExpression>, HashMap<ExprKey, Ty>, HashMap<ExprKey, CallSubst>) {
         for item in items {
             match item {
                 Item::Enum(e) => {
@@ -284,7 +298,7 @@ impl Checker {
                 Item::Record(_) | Item::Enum(_) | Item::Import(_) | Item::Trait(_) => {}
             }
         }
-        (self.errors, self.editor_bindings, self.editor_expressions, self.expr_types)
+        (self.errors, self.editor_bindings, self.editor_expressions, self.expr_types, self.call_substs)
     }
 
     fn check_function(&mut self, f: &FunctionDecl) {
@@ -883,7 +897,14 @@ impl Checker {
             Expr::Located(inner, range) => {
                 let previous_span = self.current_span;
                 self.current_span = Some(range.start);
+                let is_call = matches!(inner.as_ref(), Expr::Call(..) | Expr::GenericCall(..));
+                if is_call {
+                    self.call_key_stack.push(ExprKey { file: self.current_source_file.clone(), start: range.start, end: range.end });
+                }
                 let ty = self.infer_expr(inner, scope);
+                if is_call {
+                    self.call_key_stack.pop();
+                }
                 self.current_span = previous_span;
                 // A body can be inferred more than once (a lambda is first
                 // checked in isolation); never let a later `Unknown` erase a
@@ -2197,6 +2218,14 @@ impl Checker {
             }
         }
 
+        // Remember what this call instantiated, for backends.
+        if let Some(key) = self.call_key_stack.last().cloned() {
+            let complete = sig.generics.iter().all(|g| type_subst.contains_key(&g.name) || dim_subst.contains_key(&g.name));
+            if complete {
+                self.call_substs.insert(key, CallSubst { types: type_subst.clone(), dims: dim_subst.clone() });
+            }
+        }
+
         resolve_type_with_type_subst(&sig.return_type, &type_subst, &dim_subst)
     }
 
@@ -2706,6 +2735,12 @@ fn unify_generic_type(
     match param {
         Type::Named(name, args) if args.is_empty() && generic_names.contains(name) => {
             if let Some(previous) = subst.get(name) {
+                // An earlier, only partly known binding (`Maybe<?>` from a bare
+                // `Nothing`) yields to a fully known one.
+                if ty_contains_unknown(previous) && !ty_contains_unknown(actual) && compatible(previous, actual) {
+                    subst.insert(name.clone(), actual.clone());
+                    return Ok(());
+                }
                 if compatible(previous, actual) || compatible(actual, previous) {
                     return Ok(());
                 }

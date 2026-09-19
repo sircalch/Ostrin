@@ -196,11 +196,13 @@ fn real_main() -> ExitCode {
     if native_type_report {
         // Compares the native backend's own type inference with the checker's.
         let typed = typeck::Checker::new().check_program_typed(&items);
-        return match codegen::generate_with_report(&items, &typed.expr_types) {
+        return match codegen::generate_with_report(&items, &typed) {
             Ok((_, report)) => {
                 println!("agreed: {}", report.agreed);
                 println!("partial: {}", report.partial);
                 println!("completed: {}", report.completed);
+                println!("generic-calls-from-checker: {}", report.calls_from_checker);
+                println!("generic-calls-inferred: {}", report.calls_inferred);
                 println!("unchecked: {}", report.unchecked);
                 println!("divergences: {}", report.divergences.len());
                 for line in &report.divergences {
@@ -272,7 +274,7 @@ fn real_main() -> ExitCode {
     }
 
     let typed_program = typeck::Checker::new().check_program_typed(&items);
-    let errors = typed_program.errors;
+    let errors = typed_program.errors.clone();
     if !errors.is_empty() {
         for e in &errors {
             if json {
@@ -294,7 +296,7 @@ fn real_main() -> ExitCode {
     let emit_c = args.iter().any(|a| a == "--emit-c");
     let compile_native = args.iter().any(|a| a == "--compile");
     if emit_c || compile_native {
-        return run_codegen(&items, &typed_program.expr_types, entry_path, path, &args, emit_c, json);
+        return run_codegen(&items, &typed_program, entry_path, path, &args, emit_c, json);
     }
 
     if !run {
@@ -320,8 +322,8 @@ fn real_main() -> ExitCode {
 /// or stdout); `--compile` additionally hands that source to whatever C
 /// compiler `codegen::find_c_compiler` finds, producing a real native
 /// executable.
-fn run_codegen(items: &[ast::Item], expr_types: &std::collections::HashMap<typeck::ExprKey, types::Ty>, entry_path: &Path, display_path: &str, args: &[String], emit_c: bool, json: bool) -> ExitCode {
-    let source = match codegen::generate_with_report(items, expr_types) {
+fn run_codegen(items: &[ast::Item], typed: &typeck::TypedProgram, entry_path: &Path, display_path: &str, args: &[String], emit_c: bool, json: bool) -> ExitCode {
+    let source = match codegen::generate_with_report(items, typed) {
         Ok((source, _)) => source,
         Err(message) => {
             if json {

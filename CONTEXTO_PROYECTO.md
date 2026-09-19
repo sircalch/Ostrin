@@ -3191,3 +3191,21 @@ arquitectura, pruebas que detecten regresiones entre fases.
   (`bind_type`/`infer_generic_substitutions`) y `expected`/`settle_literal`; se
   hará cuando el checker exponga las sustituciones por llamada.
 - Suite: **98 pruebas**, sin warnings.
+
+---
+
+## 91. Etapa 2: el checker entrega las sustituciones de cada llamada genérica — 2026-09-18
+
+- `TypedProgram.call_substs`: por cada llamada a una función genérica, los tipos y
+  dimensiones con que se instanció (`CallSubst`, clave = la expresión de la
+  llamada). El checker las calculaba y las descartaba.
+- El backend las usa como **fuente autoritativa** al monomorfizar
+  (`checker_call_subst`, con los tipos genéricos del cuerpo actual sustituidos);
+  su propia inferencia (`infer_generic_substitutions`) queda como respaldo y como
+  comprobación cruzada (una discrepancia se cuenta como divergencia).
+  En los ejemplos: **27 de 28** llamadas genéricas salen del checker; 0 discrepancias.
+  La restante es `wrap(5).is_just()` (receptor de una llamada a método) que el
+  checker no registra todavía.
+- Mejora del unificador del checker: un enlace parcial (`Maybe<?>` de un
+  `Nothing` suelto) cede ante uno completamente conocido (`get_or(Nothing, 3)`).
+- Suite: **98 pruebas**, sin warnings.
