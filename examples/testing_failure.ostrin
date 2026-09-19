@@ -1,0 +1,19 @@
+fn double(n: Int) -> Int {
+    n * 2
+}
+
+fn test_passes() -> Void {
+    assert_eq(double(2), 4)
+}
+
+fn test_fails() -> Void {
+    assert_eq(double(2), 5)
+}
+
+fn test_condition_fails() -> Void {
+    assert(double(1) > 10)
+}
+
+fn main() -> Void {
+    print("not a test run")
+}

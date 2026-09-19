@@ -1,0 +1,30 @@
+record Point {
+    x: Int
+    y: Int
+}
+
+fn add(a: Int, b: Int) -> Int {
+    a + b
+}
+
+fn test_add() -> Void {
+    assert_eq(add(2, 3), 5)
+    assert_eq(add(-1, 1), 0)
+}
+
+fn test_strings() -> Void {
+    assert_eq("os" + "trin", "ostrin")
+    assert("abc" != "abd")
+}
+
+fn test_records() -> Void {
+    p = Point { x: 1, y: 2 }
+    assert_eq(p.x + p.y, 3)
+}
+
+fn main() -> Void {
+    test_add()
+    test_strings()
+    test_records()
+    print("all good")
+}

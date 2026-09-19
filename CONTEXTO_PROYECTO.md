@@ -3209,3 +3209,25 @@ arquitectura, pruebas que detecten regresiones entre fases.
 - Mejora del unificador del checker: un enlace parcial (`Maybe<?>` de un
   `Nothing` suelto) cede ante uno completamente conocido (`get_or(Nothing, 3)`).
 - Suite: **98 pruebas**, sin warnings.
+
+---
+
+## 92. Paquete grande: `--test`, aserciones, prefijo de funciones y dos especificaciones — 2026-09-18
+
+- **`ostrinc --test archivo.ostrin`**: ejecuta cada función `test_*` sin argumentos
+  (en orden de aparición, cada una en un intérprete nuevo), imprime
+  `test nombre ... ok/FAILED (mensaje)` y un resumen; código de salida distinto de
+  cero si alguna falla. Builtins nuevos `assert(cond)` y `assert_eq(a, b)` en
+  checker, intérprete y backend nativo (`assert_eq` usa la igualdad del lenguaje:
+  `equals`/`derive(Eq)`). Ejemplos `testing.ostrin` y `testing_failure.ostrin`.
+- **Bug encontrado**: una función de usuario llamada `double` (o cualquier palabra
+  de C o de libc) rompía el C generado. Ahora toda función de usuario se emite como
+  `ostrin_fn_<nombre>`. **Limitación conocida**: variables locales y campos con
+  nombre de palabra reservada de C (`default`, `switch`, `register`…) todavía no se
+  renombran.
+- Especificaciones (rama «semántica primero» del plan):
+  `docs/design/18-modelo-de-memoria-nativo.md` (recomienda RC determinista +
+  análisis de último uso + arenas, y E1101 como análisis estático de movimiento)
+  y `docs/design/19-jerarquia-numerica-y-arrays.md` (enteros de ancho fijo,
+  `Float32`, `Complex`, `Array<T, Shape>` con broadcasting y formas estáticas).
+- Suite: **99 pruebas** (94 + 5 diferenciales), sin warnings.

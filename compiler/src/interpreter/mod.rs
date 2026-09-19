@@ -721,9 +721,26 @@ impl Interpreter {
         }
     }
 
+    /// The zero-argument functions named `test_*`, in source order: what
+    /// `ostrinc --test` runs.
+    pub fn test_function_names(&self) -> Vec<String> {
+        let mut tests: Vec<(usize, String)> = self
+            .functions
+            .values()
+            .filter(|f| f.name.starts_with("test_") && f.params.is_empty())
+            .map(|f| (f.span.line, f.name.clone()))
+            .collect();
+        tests.sort();
+        tests.into_iter().map(|(_, name)| name).collect()
+    }
+
     pub fn run_main(&mut self) -> Result<Value, String> {
-        let Some(main_fn) = self.functions.get("main").cloned() else {
-            return Err("no 'main' function found".to_string());
+        self.run_function("main")
+    }
+
+    pub fn run_function(&mut self, name: &str) -> Result<Value, String> {
+        let Some(main_fn) = self.functions.get(name).cloned() else {
+            return Err(format!("no '{name}' function found"));
         };
         let env = Env::root();
         match self.call_user_function(&main_fn, vec![], env) {
@@ -1620,6 +1637,22 @@ impl Interpreter {
                 "panic" => {
                     let message = self.eval_arg(&args[0], env)?;
                     return Err(RuntimeError::Error(format!("panic: {message}")));
+                }
+                "assert" => {
+                    let condition = self.eval_arg(&args[0], env)?;
+                    if !truthy(&condition) {
+                        return Err(RuntimeError::Error("assertion failed".to_string()));
+                    }
+                    return Ok(Value::Void);
+                }
+                "assert_eq" => {
+                    let left = self.eval_arg(&args[0], env)?;
+                    let right = self.eval_arg(&args[1], env)?;
+                    let equal = self.eval_binary(BinOp::Eq, left.clone(), right.clone(), env)?;
+                    if !truthy(&equal) {
+                        return Err(RuntimeError::Error(format!("assertion failed: left = {left}, right = {right}")));
+                    }
+                    return Ok(Value::Void);
                 }
                 _ => {}
             }

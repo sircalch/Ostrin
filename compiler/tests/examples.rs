@@ -739,7 +739,7 @@ fn native_backend_emit_c_writes_readable_c_source() {
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     let source = stdout(&out);
     assert!(source.contains("#include <stdint.h>"));
-    assert!(source.contains("int64_t fib(int64_t n)"));
+    assert!(source.contains("int64_t ostrin_fn_fib(int64_t n)"));
     assert!(source.contains("int main(void)"), "the generated file must supply its own C main: {source}");
 }
 
@@ -1584,4 +1584,20 @@ fn native_backend_generic_records_and_enums_match_the_interpreter() {
         let _ = fs::remove_file(&exe);
         assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected, "output mismatch for {file}");
     }
+}
+
+#[test]
+fn test_mode_runs_test_functions_and_reports_failures() {
+    let ok = run(&["--test", &example_path("testing.ostrin")]);
+    assert!(ok.status.success(), "all tests should pass: {}", stdout(&ok));
+    let text = stdout(&ok);
+    assert!(text.contains("test test_add ... ok") && text.contains("3 passed; 0 failed"), "unexpected output: {text}");
+
+    let bad = run(&["--test", &example_path("testing_failure.ostrin")]);
+    assert!(!bad.status.success(), "failing tests must give a non-zero exit code");
+    let text = stdout(&bad);
+    assert!(text.contains("test test_passes ... ok"), "unexpected output: {text}");
+    assert!(text.contains("test test_fails ... FAILED (assertion failed: left = 4, right = 5)"), "unexpected output: {text}");
+    assert!(text.contains("test test_condition_fails ... FAILED (assertion failed)"), "unexpected output: {text}");
+    assert!(text.contains("1 passed; 2 failed"), "unexpected output: {text}");
 }

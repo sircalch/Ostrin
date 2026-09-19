@@ -254,7 +254,9 @@ fn map_type_with_subst(ty: &Type, types: &NamedTypes, subst: &HashMap<String, CT
 fn c_function_name(name: &str) -> String {
     // The generated file supplies its own `main`, so the user's `main`
     // (which returns Void, not `int`, and takes no argv/argc) is renamed.
-    if name == "main" { "ostrin_main".to_string() } else { name.to_string() }
+    // Every user function is prefixed so its name can never collide with a C
+    // keyword or type (`double`, `int`, `default`) or a libc function (`abs`, `exit`).
+    if name == "main" { "ostrin_main".to_string() } else { format!("ostrin_fn_{name}") }
 }
 
 /// Quantity runtime (unit table, conversion, arithmetic helpers), spliced in
@@ -3210,8 +3212,8 @@ impl<'a> Codegen<'a> {
     /// `write_file`, `parse_int`, `sum` and `panic`.
     fn gen_builtin(&mut self, name: &str, codes: &[String], types: &[CType]) -> Result<Option<(String, CType)>, String> {
         let arity = match name {
-            "read_file" | "parse_int" | "sum" | "panic" => 1,
-            "write_file" => 2,
+            "read_file" | "parse_int" | "sum" | "panic" | "assert" => 1,
+            "write_file" | "assert_eq" => 2,
             _ => return Ok(None),
         };
         if codes.len() != arity {
@@ -3264,6 +3266,17 @@ impl<'a> Codegen<'a> {
                         t = codes[0]
                     ),
                     ty,
+                )))
+            }
+            "assert" => Ok(Some((
+                format!("({{ if (!({})) {{ fprintf(stderr, \"runtime error: assertion failed\\n\"); exit(1); }} }})", codes[0]),
+                CType::Void,
+            ))),
+            "assert_eq" => {
+                let equal = self.eq_expr(&codes[0], &codes[1], &types[0])?;
+                Ok(Some((
+                    format!("({{ if (!{equal}) {{ fprintf(stderr, \"runtime error: assertion failed: left != right\\n\"); exit(1); }} }})"),
+                    CType::Void,
                 )))
             }
             "panic" => Ok(Some((

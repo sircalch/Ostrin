@@ -3140,6 +3140,8 @@ fn check_builtin_call(name: &str, arg_types: &[Ty], errors: &mut Vec<TypeError>)
         "read_file" | "parse_int" => vec![Ty::String],
         "write_file" => vec![Ty::String, Ty::String],
         "panic" => vec![Ty::String],
+        "assert" => vec![Ty::Bool],
+        "assert_eq" => vec![Ty::Unknown, Ty::Unknown],
         _ => return None,
     };
     if expected_args.len() != arg_types.len() {
@@ -3173,7 +3175,7 @@ fn check_builtin_call(name: &str, arg_types: &[Ty], errors: &mut Vec<TypeError>)
         }
     }
     match name {
-        "print" | "panic" => Some(Ty::Void),
+        "print" | "panic" | "assert" | "assert_eq" => Some(Ty::Void),
         "read_file" | "write_file" => Some(Ty::Applied(
             "Result".to_string(),
             vec![

@@ -43,6 +43,7 @@ fn real_main() -> ExitCode {
     let lsp_server = args.iter().any(|a| a == "--lsp");
     let dap_server = args.iter().any(|a| a == "--dap");
     let run = args.iter().any(|a| a == "--run");
+    let test_mode = args.iter().any(|a| a == "--test");
     let json = args.iter().any(|a| a == "--json");
     let help = args.iter().any(|a| a == "--help" || a == "-h");
     let version = args.iter().any(|a| a == "--version" || a == "-V");
@@ -297,6 +298,28 @@ fn real_main() -> ExitCode {
     let compile_native = args.iter().any(|a| a == "--compile");
     if emit_c || compile_native {
         return run_codegen(&items, &typed_program, entry_path, path, &args, emit_c, json);
+    }
+
+    if test_mode {
+        // Runs every zero-argument `test_*` function, each in a fresh interpreter.
+        let names = interpreter::Interpreter::new(&items).test_function_names();
+        if names.is_empty() {
+            eprintln!("error: no 'test_*' functions found in '{path}'");
+            return ExitCode::FAILURE;
+        }
+        let mut failed = 0usize;
+        for name in &names {
+            match interpreter::Interpreter::new(&items).run_function(name) {
+                Ok(_) => println!("test {name} ... ok"),
+                Err(message) => {
+                    failed += 1;
+                    println!("test {name} ... FAILED ({message})");
+                }
+            }
+        }
+        println!("
+test result: {}. {} passed; {failed} failed", if failed == 0 { "ok" } else { "FAILED" }, names.len() - failed);
+        return if failed == 0 { ExitCode::SUCCESS } else { ExitCode::FAILURE };
     }
 
     if !run {
