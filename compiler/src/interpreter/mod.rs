@@ -1942,6 +1942,42 @@ impl Interpreter {
                         _ => format!("{left}/{right}"),
                     }));
                 }
+                "cwd" => {
+                    return std::env::current_dir()
+                        .map(|path| Value::String(path.to_string_lossy().into_owned()))
+                        .map_err(|error| RuntimeError::Error(format!("'cwd' failed: {error}")));
+                }
+                "file_exists" => {
+                    let path = self.eval_arg(&args[0], env)?;
+                    let Value::String(path) = path else {
+                        return Err(RuntimeError::Error("'file_exists' expects a String path".to_string()));
+                    };
+                    return Ok(Value::Bool(std::path::Path::new(&path).is_file()));
+                }
+                "format" => {
+                    let template = self.eval_arg(&args[0], env)?;
+                    let values = self.eval_arg(&args[1], env)?;
+                    let (Value::String(template), Value::List(values)) = (template, values) else {
+                        return Err(RuntimeError::Error("'format' expects a String and a List<String>".to_string()));
+                    };
+                    let values = values.borrow().clone();
+                    let mut rendered = String::with_capacity(template.len());
+                    let mut chars = template.chars().peekable();
+                    let mut index = 0usize;
+                    while let Some(ch) = chars.next() {
+                        if ch == '{' && chars.peek() == Some(&'}') {
+                            chars.next();
+                            let Some(Value::String(value)) = values.get(index) else {
+                                return Err(RuntimeError::Error(format!("'format' needs a value for placeholder {index}")));
+                            };
+                            rendered.push_str(value);
+                            index += 1;
+                        } else {
+                            rendered.push(ch);
+                        }
+                    }
+                    return Ok(Value::String(rendered));
+                }
                 "sum" => {
                     let v = self.eval_arg(&args[0], env)?;
                     return match v {

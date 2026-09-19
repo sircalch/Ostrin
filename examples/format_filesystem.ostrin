@@ -1,0 +1,5 @@
+fn main() -> Void {
+    print(format("{} + {} = {}", ["2", "3", "5"]))
+    print(cwd().length() > 0)
+    print(file_exists("../examples/format_filesystem.ostrin"))
+}

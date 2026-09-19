@@ -1,9 +1,9 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-19 · rama `main` · 6 pruebas diferenciales y 121 de integración en verde.*
+*Corte: 2026-09-19 · rama `main` · 6 pruebas diferenciales y 122 de integración en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
-Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–146); para el diseño
+Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–147); para el diseño
 del lenguaje, `docs/design/` (20 documentos).
 
 ---
@@ -82,8 +82,9 @@ funciones elementales deterministas (idénticas en intérprete y nativo).
 `Result` por valor en el intérprete y en el backend nativo; mapas y conjuntos no dependen del
 orden de inserción.
 
-**Biblioteca estándar** (pequeña): `print`, `args`, `env`, `path_join`, `sum`, `panic`, `read_file`, `write_file`,
-`parse_int`, métodos de `List` (`map/filter/fold/any/all/find/push/remove_at/length`),
+**Biblioteca estándar** (pequeña): `print`, `args`, `env`, `path_join`, `cwd`, `file_exists`,
+`format`, `sum`, `panic`, `read_file`, `write_file`, `parse_int`, métodos de `List`
+(`map/filter/fold/any/all/find/push/remove_at/length`),
 `Map` (`get/set/remove/contains_key/count/keys/values`), `Set`, `Option`, `Result`.
 
 **Diagnósticos**: códigos `OSTRIN-Exxxx` con ubicación; salida JSON Lines para editores.
@@ -149,7 +150,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Memoria en nativo | Registro, limpieza global, ABI retain/release y `--leak-check`; ARC/último uso y destructores por tipo siguen pendientes |
 | IR de bloques | HIR→CFG disponible con `--ir`; `if/while/for/match/try/spawn/channel` ya tienen operaciones explícitas, aún no reemplaza el backend C |
 | Ownership/último uso | `--ownership-report`, `--ownership-check` y `--ownership-ir`; inserta solo `release` en transferencias lineales demostrables, sin ARC completa |
-| Biblioteca estándar | Mínima: `args`, `env`, `path_join`, E/S y colecciones básicas; faltan `HashMap` eficiente, fechas, red y formateo |
+| Biblioteca estándar | Mínima: `args`, entorno/rutas, `format`, E/S y colecciones básicas; faltan `HashMap` eficiente, fechas, JSON y red |
 | Mensajes de error de E/S | `strerror` ≠ texto de Rust (difieren entre backends) |
 | `Result<Void,E>` | Campo de valor de relleno (`char`) en C |
 | Migración HIR | Escalares, records, enums/match, Option/Result, colecciones, cierres, instancias concretas de genéricos, llamadas anidadas, records/enums genéricos aplicados y métodos genéricos centrales migrados; formas complejas restantes siguen con fallback |
@@ -234,7 +235,7 @@ Decisiones que necesito de ti para afinar el plan:
 
 ```powershell
 cd compiler
-cargo test                                   # 6 diferenciales + 121 de integración
+cargo test                                   # 6 diferenciales + 122 de integración
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```

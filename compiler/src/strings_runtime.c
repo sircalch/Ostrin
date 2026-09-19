@@ -69,6 +69,40 @@ static const char* ostrin_s_replace(const char* s, const char* from, const char*
     return r;
 }
 
+static const char* ostrin_s_format(const char* template, const char** values, int64_t count) {
+    size_t length = 0;
+    int64_t index = 0;
+    for (size_t i = 0; template[i]; i++) {
+        if (template[i] == '{' && template[i + 1] == '}') {
+            if (index >= count) OSTRIN_FAIL("format needs a value for every '{}' placeholder");
+            size_t value_length = strlen(values[index++]);
+            if (length > SIZE_MAX - value_length) OSTRIN_OOM();
+            length += value_length;
+            i++;
+        } else {
+            if (length == SIZE_MAX) OSTRIN_OOM();
+            length++;
+        }
+    }
+    char* out = (char*)ostrin_alloc(length + 1);
+    if (!out) OSTRIN_OOM();
+    size_t written = 0;
+    index = 0;
+    for (size_t i = 0; template[i]; i++) {
+        if (template[i] == '{' && template[i + 1] == '}') {
+            const char* value = values[index++];
+            size_t value_length = strlen(value);
+            memcpy(out + written, value, value_length);
+            written += value_length;
+            i++;
+        } else {
+            out[written++] = template[i];
+        }
+    }
+    out[written] = 0;
+    return out;
+}
+
 static const char* ostrin_s_path_join(const char* left, const char* right) {
     size_t l = strlen(left), r = strlen(right);
     while (l > 0 && (left[l - 1] == '/' || left[l - 1] == '\\')) l--;

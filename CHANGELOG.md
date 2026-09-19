@@ -89,6 +89,9 @@
   `path_join(String, String) -> String`, with matching interpreter/native behavior.
 - Added structural equality for `List`, `Map`, `Set`, `Option` and `Result` in both backends;
   maps and sets compare by contents rather than insertion order, including nested values.
+- Added cross-backend formatting and filesystem primitives: `format(template, values)`, `cwd()` and
+  `file_exists(path)`, with a bounded `{}` placeholder contract and platform-aware current-directory
+  lookup in native programs.
 - Lowered `match` and `try` into explicit IR control flow: pattern tests,
   pattern bindings, guarded-arm branches, try success/error blocks and phi convergence.
   The IR now keeps these families semantic instead of representing them as opaque operations;

@@ -336,6 +336,13 @@ const PRELUDE: &str = "#include <stdint.h>\n\
 #include <string.h>\n\
 #include <errno.h>\n\
 #include <math.h>\n
+#if defined(_WIN32)\n\
+#include <direct.h>\n\
+#define OSTRIN_GETCWD _getcwd\n\
+#else\n\
+#include <unistd.h>\n\
+#define OSTRIN_GETCWD getcwd\n\
+#endif\n\
 typedef struct { void* fn; void* env; } OstrinClosure;\n\
 #define OSTRIN_FAIL(msg) do { fprintf(stderr, \"runtime error: %s\\n\", msg); exit(1); } while (0)\n\
 #define OSTRIN_OOM() do { fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); } while (0)\n\
@@ -503,6 +510,25 @@ static int64_t ostrin_idiv(int64_t a, int64_t b) {\n\
     return a / b;\n\
 }\n\
 \n\
+static const char* ostrin_cwd(void) {\n\
+    size_t capacity = 256;\n\
+    for (;;) {\n\
+        char* out = (char*)ostrin_alloc(capacity);\n\
+        if (OSTRIN_GETCWD(out, (int)capacity)) return out;\n\
+        int error = errno;\n\
+        ostrin_free(out);\n\
+        if (error != ERANGE) OSTRIN_FAIL(strerror(error));\n\
+        capacity *= 2;\n\
+    }\n\
+}\n\
+\
+static bool ostrin_file_exists(const char* path) {\n\
+    FILE* file = fopen(path, \"rb\");\n\
+    if (!file) return false;\n\
+    fclose(file);\n\
+    return true;\n\
+}\n\
+\
 static void ostrin_expand_exp(const char* t_in, char* buf, size_t n) {\n\
     char t[64];\n\
     snprintf(t, sizeof t, \"%s\", t_in);\n\
@@ -4749,6 +4775,9 @@ impl<'a> Codegen<'a> {
             "args" => 0,
             "env" => 1,
             "path_join" => 2,
+            "cwd" => 0,
+            "file_exists" => 1,
+            "format" => 2,
             "norm" | "eigvals" | "det" | "inv" | "trace" | "eye" | "read_file" | "parse_int" | "parse_csv" | "sum" | "panic" | "assert" | "array" | "zeros" | "ones" | "abs" => 1,
             n if ["sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh", "exp", "ln", "log10", "sqrt", "floor", "ceil", "round", "erf"].contains(&n) => 1,
             "pi" => 0,
@@ -4791,6 +4820,23 @@ impl<'a> Codegen<'a> {
                 format!("ostrin_s_path_join({}, {})", codes[0], codes[1]),
                 CType::Str,
             ))),
+            "cwd" => Ok(Some(("ostrin_cwd()".to_string(), CType::Str))),
+            "file_exists" => Ok(Some((format!("ostrin_file_exists({})", codes[0]), CType::Bool))),
+            "format" => {
+                let CType::List(elem) = &types[1] else {
+                    return Err("'format' expects a List<String> as its second argument".to_string());
+                };
+                if **elem != CType::Str {
+                    return Err("'format' expects a List<String> as its second argument".to_string());
+                }
+                self.register_list_types(&types[1]);
+                let list_ty = c_type_name(&types[1]);
+                let list = self.next_temp();
+                Ok(Some((
+                    format!("({{ {list_ty} {list} = {}; ostrin_s_format({}, {list}->items, {list}->length); }})", codes[1], codes[0]),
+                    CType::Str,
+                )))
+            }
             "parse_csv" => {
                 let inner = CType::List(Box::new(CType::Str));
                 let ty = CType::List(Box::new(inner.clone()));

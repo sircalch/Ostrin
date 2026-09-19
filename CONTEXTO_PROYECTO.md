@@ -4165,3 +4165,24 @@ científica elemento a elemento y devuelven una máscara.
 `examples/structural_equality.ostrin` y la prueba
 `structural_equality_matches_between_interpreter_and_native` cubren las siete salidas esperadas
 en ambos backends. La suite queda en **6 pruebas diferenciales y 121 de integración verdes**.
+
+## 147. Formateo y filesystem mínimo para programas CLI — 2026-09-19
+
+La stdlib gana un bloque pequeño de utilidades de aplicación, disponible con la misma firma y
+semántica en el intérprete y en el backend C:
+
+- `format(template, values)` recibe un `String` y un `List<String>`. Cada marcador `{}` consume
+  el siguiente valor; si falta un valor, el programa termina con un error de runtime explícito.
+- `cwd()` devuelve el directorio de trabajo actual como `String`; el backend nativo usa una consulta
+  que crece dinámicamente y distingue `_getcwd` en Windows de `getcwd` en plataformas POSIX.
+- `file_exists(path)` devuelve `Bool` y comprueba que la ruta sea un archivo legible mediante la
+  misma convención de proceso en ambos backends.
+
+`examples/format_filesystem.ostrin` y la prueba
+`formatting_and_filesystem_builtins_match_between_interpreter_and_native` validan una expansión
+con tres placeholders y consultas reales de directorio/archivo. La suite queda en **6 pruebas
+diferenciales y 122 de integración verdes**.
+
+El formateador es deliberadamente acotado: todavía no ofrece especificadores numéricos, escape de
+llaves, JSON ni interpolación tipada. Es una base estable para añadir esas capas sin inventar una
+API distinta por backend.

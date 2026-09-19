@@ -814,6 +814,26 @@ fn structural_equality_matches_between_interpreter_and_native() {
 }
 
 #[test]
+fn formatting_and_filesystem_builtins_match_between_interpreter_and_native() {
+    let file = example_path("format_filesystem.ostrin");
+    let interpreted = run(&["--run", &file]);
+    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    let expected = stdout(&interpreted).replace("\r\n", "\n");
+    assert_eq!(expected, "2 + 3 = 5\ntrue\ntrue\n");
+
+    let exe = temp_artifact("format-filesystem.exe");
+    let compile = run(&["--compile", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "native compile failed: {}", stderr(&compile));
+    let native = Command::new(&exe).output().expect("run formatting/filesystem binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native binary failed: {}", String::from_utf8_lossy(&native.stderr));
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+}
+
+#[test]
 fn native_backend_exposes_ownership_runtime_and_leak_check() {
     let out = run(&["--emit-c", "--leak-check", &example_path("native_fibonacci.ostrin")]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
