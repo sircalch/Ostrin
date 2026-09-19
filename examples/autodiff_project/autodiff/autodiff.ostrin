@@ -1,4 +1,5 @@
 // Diferenciación automática hacia adelante con números duales: (v, d) = (valor, derivada).
+// Los operadores + - * / funcionan sobre Dual (impl Add/Sub/Mul/Div).
 pub record Dual {
     v: Float
     d: Float
@@ -7,17 +8,29 @@ pub record Dual {
 pub fn constant(c: Float) -> Dual { Dual { v: c, d: 0.0 } }
 pub fn variable(x: Float) -> Dual { Dual { v: x, d: 1.0 } }
 
-pub fn add(a: Dual, b: Dual) -> Dual { Dual { v: a.v + b.v, d: a.d + b.d } }
-pub fn sub(a: Dual, b: Dual) -> Dual { Dual { v: a.v - b.v, d: a.d - b.d } }
-pub fn mul(a: Dual, b: Dual) -> Dual { Dual { v: a.v * b.v, d: a.d * b.v + a.v * b.d } }
-pub fn div(a: Dual, b: Dual) -> Dual { Dual { v: a.v / b.v, d: (a.d * b.v - a.v * b.d) / (b.v * b.v) } }
+impl Add for Dual {
+    fn add(self, b: Self) -> Self { Dual { v: self.v + b.v, d: self.d + b.d } }
+}
+
+impl Sub for Dual {
+    fn sub(self, b: Self) -> Self { Dual { v: self.v - b.v, d: self.d - b.d } }
+}
+
+impl Mul for Dual {
+    fn mul(self, b: Self) -> Self { Dual { v: self.v * b.v, d: self.d * b.v + self.v * b.d } }
+}
+
+impl Div for Dual {
+    fn div(self, b: Self) -> Self { Dual { v: self.v / b.v, d: (self.d * b.v - self.v * b.d) / (b.v * b.v) } }
+}
+
 pub fn neg(a: Dual) -> Dual { Dual { v: 0.0 - a.v, d: 0.0 - a.d } }
 pub fn scale(k: Float, a: Dual) -> Dual { Dual { v: k * a.v, d: k * a.d } }
 pub fn powi(a: Dual, n: Int) -> Dual {
     mut r = constant(1.0)
     mut i = 0
     while i < n {
-        r = mul(r, a)
+        r = r * a
         i = i + 1
     }
     r
