@@ -31,6 +31,9 @@
   `Map` and `Set` literals, local collection types, list indexing/iteration,
   basic list/map/set methods and `List<String>.join`; collection combinators
   that receive closures still use the AST fallback.
+- Native HIR migration now covers closures and function values: captured
+  lambdas, named-function thunks, indirect calls, and `List` combinators
+  (`map`, `filter`, `fold`, `any`, `all`, `find`) that invoke closures from HIR.
 - Module loader now rewrites types in signatures, fields, variants and annotations
   (a `record` from another module can be used as a type).
 - CI on Linux, macOS and Windows.

@@ -7,6 +7,7 @@
 //! operators, `ostrin_idiv` for `Int / Int`, C blocks for scopes), so both paths behave
 //! identically; the differential tests compare them through the interpreter.
 
+use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 
 use crate::ast::{BinOp, Expr, RangeKind, UnaryOp};
@@ -29,6 +30,11 @@ pub struct World {
     /// Non-generic enums (tagged unions passed by value) and their variants by name.
     pub enums: HashSet<String>,
     pub variants: HashMap<String, VariantView>,
+    /// C declarations produced while lowering HIR lambdas/function values.
+    /// They are drained by `codegen.rs` after all HIR bodies have been visited.
+    pub closure_protos: RefCell<Vec<String>>,
+    pub closure_bodies: RefCell<Vec<(String, String)>>,
+    pub closure_counter: Cell<usize>,
 }
 
 /// One enum variant: its enum, tag and fields with C types (in declaration order).
@@ -76,6 +82,7 @@ impl Emitter<'_> {
                 self.mangle_type(value)?
             )),
             Ty::Set(elem) => Ok(format!("Set_{}*", self.mangle_type(elem)?)),
+            Ty::Fn(..) => Ok("OstrinClosure".to_string()),
             Ty::Applied(name, args) if name == "Option" && args.len() == 1 => {
                 Ok(format!("Option_{}", self.mangle_type(&args[0])?))
             }
@@ -103,6 +110,15 @@ impl Emitter<'_> {
                 self.mangle_type(value)?
             ),
             Ty::Set(elem) => format!("Set_{}", self.mangle_type(elem)?),
+            Ty::Fn(params, ret) => format!(
+                "Fn_{}_to_{}",
+                params
+                    .iter()
+                    .map(|param| self.mangle_type(param))
+                    .collect::<Bail<Vec<_>>>()?
+                    .join("_"),
+                self.mangle_type(ret)?
+            ),
             Ty::Applied(name, args) if name == "Option" && args.len() == 1 => {
                 format!("Option_{}", self.mangle_type(&args[0])?)
             }
@@ -560,6 +576,7 @@ impl Emitter<'_> {
             HirKind::Bool(v) => Ok(if *v { "true" } else { "false" }.to_string()),
             HirKind::Str(s) => Ok(crate::codegen::c_string_literal(s)),
             HirKind::Local(name) => Ok(name.clone()),
+            HirKind::Lambda(params, body) => self.lambda_expr(e, params, body),
             HirKind::Global(name)
                 if self
                     .world
@@ -575,6 +592,9 @@ impl Emitter<'_> {
             }
             HirKind::Global(name) if name == "None" && is_option(&e.ty) => {
                 Ok(format!("(({}){{ .has = false }})", self.c_type(&e.ty)?))
+            }
+            HirKind::Global(name) if self.world.functions.contains_key(name) && is_fn(&e.ty) => {
+                self.function_value(e, name)
             }
             HirKind::Match(scrutinee, arms) => self.matching(e, scrutinee, arms),
             HirKind::Field(obj, field) => {
@@ -747,6 +767,11 @@ impl Emitter<'_> {
                 subst: None,
                 type_args,
             } if type_args.is_empty() => {
+                if matches!(&callee.kind, HirKind::Local(_) | HirKind::Lambda(..))
+                    && is_fn(&callee.ty)
+                {
+                    return self.closure_call(e, callee, args);
+                }
                 let HirKind::Global(name) = &callee.kind else {
                     return Err(());
                 };
@@ -932,6 +957,209 @@ impl Emitter<'_> {
         }
     }
 
+    fn lambda_expr(&mut self, e: &HirExpr, params: &[String], body: &HirBlock) -> Bail<String> {
+        let Ty::Fn(param_tys, ret) = &e.ty else {
+            return Err(());
+        };
+        if params.len() != param_tys.len() || hir_contains_lambda(body) {
+            return Err(());
+        }
+        let captures = self.lambda_captures(params, body)?;
+        let id = self.world.closure_counter.get();
+        self.world.closure_counter.set(id + 1);
+        let env_name = format!("OstrinHirEnv_{id}");
+        let fn_name = format!("ostrin_hir_lambda_{id}");
+        let ret_c = self.c_type(ret)?;
+        let param_cs = param_tys
+            .iter()
+            .map(|ty| self.c_type(ty))
+            .collect::<Bail<Vec<_>>>()?;
+        let env_fields = captures
+            .iter()
+            .map(|(name, ty)| Ok(format!("{} {name}; ", self.c_type(ty)?)))
+            .collect::<Bail<Vec<_>>>()?;
+        let params_c = params
+            .iter()
+            .zip(&param_cs)
+            .map(|(name, ty)| format!(", {ty} {name}"))
+            .collect::<String>();
+
+        let mut names = params.iter().cloned().collect::<HashSet<_>>();
+        names.extend(captures.iter().map(|(name, _)| name.clone()));
+        let mut lambda_emitter = Emitter {
+            world: self.world,
+            scopes: vec![names],
+            ret: (**ret).clone(),
+            temp: 0,
+        };
+        let mut body_c = String::new();
+        lambda_emitter.body(body, &mut body_c)?;
+
+        let mut prototype = Vec::new();
+        if !captures.is_empty() {
+            prototype.push(format!(
+                "typedef struct {{ {} }} {env_name};",
+                env_fields.join("")
+            ));
+        }
+        let signature = format!("static {ret_c} {fn_name}(void* __env{params_c})");
+        if !captures.is_empty() {
+            body_c = format!(
+                "    {env_name}* __e = __env;\n{}",
+                captures
+                    .iter()
+                    .map(|(name, ty)| format!(
+                        "    {} {name} = __e->{name};\n",
+                        self.c_type(ty).unwrap()
+                    ))
+                    .collect::<String>()
+                    + &body_c
+            );
+        }
+        prototype.push(format!("{signature};"));
+        self.world.closure_protos.borrow_mut().extend(prototype);
+        self.world
+            .closure_bodies
+            .borrow_mut()
+            .push((signature, body_c));
+
+        let env = if captures.is_empty() {
+            "NULL".to_string()
+        } else {
+            let assignments = captures
+                .iter()
+                .map(|(name, _)| format!("__ce->{name} = {name}; "))
+                .collect::<String>();
+            format!(
+                "({{ {env_name}* __ce = malloc(sizeof *__ce); if (!__ce) OSTRIN_OOM(); {assignments} (void*)__ce; }})"
+            )
+        };
+        Ok(format!("((OstrinClosure){{ (void*){fn_name}, {env} }})"))
+    }
+
+    fn lambda_captures(&self, params: &[String], body: &HirBlock) -> Bail<Vec<(String, Ty)>> {
+        let mut used = HashMap::new();
+        let mut bound = params.iter().cloned().collect::<HashSet<_>>();
+        collect_hir_locals_block(body, &mut used, &mut bound);
+        let mut names = used
+            .into_iter()
+            .filter(|(name, _)| self.declared(name) && !bound.contains(name))
+            .collect::<Vec<_>>();
+        names.sort_by(|a, b| a.0.cmp(&b.0));
+        for (_, ty) in &names {
+            self.c_type(ty)?;
+        }
+        Ok(names)
+    }
+
+    fn function_value(&mut self, e: &HirExpr, name: &str) -> Bail<String> {
+        let Ty::Fn(params, ret) = &e.ty else {
+            return Err(());
+        };
+        let Some((world_params, world_ret)) = self.world.functions.get(name) else {
+            return Err(());
+        };
+        if world_params.len() != params.len()
+            || world_params.iter().zip(params).any(|(actual, expected)| {
+                !c_compatible(actual, &self.c_type(expected).unwrap_or_default())
+            })
+            || *world_ret != self.c_type(ret)?
+        {
+            return Err(());
+        }
+        let id = self.world.closure_counter.get();
+        self.world.closure_counter.set(id + 1);
+        let fn_name = format!("ostrin_hir_thunk_{id}");
+        let params_c = world_params
+            .iter()
+            .enumerate()
+            .map(|(index, ty)| format!(", {ty} a{index}"))
+            .collect::<String>();
+        let args = (0..params.len())
+            .map(|index| format!("a{index}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let signature = format!("static {world_ret} {fn_name}(void* __env{params_c})");
+        let call = format!("{}({args})", (self.world.c_name)(name));
+        let body = if **ret == Ty::Void {
+            format!("    (void)__env; {call};\n")
+        } else {
+            format!("    (void)__env; return {call};\n")
+        };
+        self.world
+            .closure_protos
+            .borrow_mut()
+            .push(format!("{signature};"));
+        self.world
+            .closure_bodies
+            .borrow_mut()
+            .push((signature, body));
+        Ok(format!("((OstrinClosure){{ (void*){fn_name}, NULL }})"))
+    }
+
+    fn closure_call(
+        &mut self,
+        e: &HirExpr,
+        callee: &HirExpr,
+        args: &[crate::hir::HirArg],
+    ) -> Bail<String> {
+        let Ty::Fn(params, ret) = &callee.ty else {
+            return Err(());
+        };
+        if args.len() != params.len() || args.iter().any(|arg| arg.name.is_some()) {
+            return Err(());
+        }
+        if e.ty != **ret {
+            return Err(());
+        }
+        let callee_code = self.expr(callee)?;
+        let mut arg_codes = Vec::with_capacity(args.len());
+        for (arg, param) in args.iter().zip(params) {
+            if !c_compatible(&self.c_type(&arg.value.ty)?, &self.c_type(param)?) {
+                return Err(());
+            }
+            arg_codes.push(self.expr(&arg.value)?);
+        }
+        self.closure_call_raw(&callee_code, params, ret, &arg_codes)
+    }
+
+    fn closure_call_raw(
+        &mut self,
+        callee_code: &str,
+        params: &[Ty],
+        ret: &Ty,
+        arg_codes: &[String],
+    ) -> Bail<String> {
+        let fn_type = self.closure_fn_type(params, ret)?;
+        if arg_codes.len() != params.len() {
+            return Err(());
+        }
+        let temp = self.next_temp();
+        let rest = if arg_codes.is_empty() {
+            String::new()
+        } else {
+            format!(", {}", arg_codes.join(", "))
+        };
+        Ok(format!(
+            "({{ OstrinClosure {temp} = {callee_code}; (({fn_type}){temp}.fn)({temp}.env{rest}); }})"
+        ))
+    }
+
+    fn closure_fn_type(&self, params: &[Ty], ret: &Ty) -> Bail<String> {
+        let params = params
+            .iter()
+            .map(|ty| self.c_type(ty))
+            .collect::<Bail<Vec<_>>>()?;
+        Ok(format!(
+            "{} (*)(void*{})",
+            self.c_type(ret)?,
+            params
+                .iter()
+                .map(|ty| format!(", {ty}"))
+                .collect::<String>()
+        ))
+    }
+
     fn list_literal(&mut self, e: &HirExpr, values: &[HirExpr]) -> Bail<String> {
         let Ty::List(elem) = &e.ty else {
             return Err(());
@@ -1015,8 +1243,11 @@ impl Emitter<'_> {
         }
         let elem_c = self.c_type(elem)?;
         let recv_c = self.c_type(&recv.ty)?;
-        let recv_code = self.expr(recv)?;
         let name = self.mangle_type(&recv.ty)?;
+        if matches!(method, "map" | "filter" | "fold" | "any" | "all" | "find") {
+            return self.list_combinator(e, recv, method, args);
+        }
+        let recv_code = self.expr(recv)?;
         match method {
             "length" | "count" if args.is_empty() && e.ty == Ty::Int => {
                 Ok(format!("{name}_length({recv_code})"))
@@ -1044,6 +1275,140 @@ impl Emitter<'_> {
                 Ok(format!(
                     "({{ {recv_c} {temp} = {recv_code}; ostrin_s_join({temp}->items, {temp}->length, {separator}); }})"
                 ))
+            }
+            _ => Err(()),
+        }
+    }
+
+    fn list_combinator(
+        &mut self,
+        e: &HirExpr,
+        recv: &HirExpr,
+        method: &str,
+        args: &[crate::hir::HirArg],
+    ) -> Bail<String> {
+        let Ty::List(elem) = &recv.ty else {
+            return Err(());
+        };
+        if args.iter().any(|arg| arg.name.is_some()) {
+            return Err(());
+        }
+        let recv_c = self.c_type(&recv.ty)?;
+        let recv_code = self.expr(recv)?;
+        let list_name = self.mangle_type(&recv.ty)?;
+        let list_temp = self.next_temp();
+        let closure_temp = self.next_temp();
+        let index_temp = self.next_temp();
+        let mut head =
+            format!("({{ {recv_c} {list_temp} = {recv_code}; OstrinClosure {closure_temp} = ");
+
+        match method {
+            "map" => {
+                let [closure] = args else { return Err(()) };
+                let Ty::Fn(params, ret) = &closure.value.ty else {
+                    return Err(());
+                };
+                if params.as_slice() != [(*elem.clone())] {
+                    return Err(());
+                }
+                let Ty::List(out_elem) = &e.ty else {
+                    return Err(());
+                };
+                if **ret != **out_elem {
+                    return Err(());
+                }
+                let closure_code = self.expr(&closure.value)?;
+                let out_c = self.c_type(out_elem)?;
+                let out_ty = Ty::List(out_elem.clone());
+                let out_name = self.mangle_type(&out_ty)?;
+                let out_temp = self.next_temp();
+                let fn_type = self.closure_fn_type(params, ret)?;
+                head.push_str(&format!(
+                    "{closure_code}; {out_name}* {out_temp} = {out_name}_new_from_array(NULL, 0); for (int64_t {index_temp} = 0; {index_temp} < {list_temp}->length; {index_temp}++) {{ {out_c} __hir_item = (({fn_type}){closure_temp}.fn)({closure_temp}.env, {list_temp}->items[{index_temp}]); "
+                ));
+                head.push_str(&format!(
+                    "{out_name}_push({out_temp}, __hir_item); }} {out_temp}; }})"
+                ));
+                return Ok(head);
+            }
+            "filter" => {
+                let [closure] = args else { return Err(()) };
+                let Ty::Fn(params, ret) = &closure.value.ty else {
+                    return Err(());
+                };
+                if params.as_slice() != [(*elem.clone())] || **ret != Ty::Bool || e.ty != recv.ty {
+                    return Err(());
+                }
+                let closure_code = self.expr(&closure.value)?;
+                let out_temp = self.next_temp();
+                let fn_type = self.closure_fn_type(params, ret)?;
+                head.push_str(&format!(
+                    "{closure_code}; {list_name}* {out_temp} = {list_name}_new_from_array(NULL, 0); for (int64_t {index_temp} = 0; {index_temp} < {list_temp}->length; {index_temp}++) {{ if ((({fn_type}){closure_temp}.fn)({closure_temp}.env, {list_temp}->items[{index_temp}])) {list_name}_push({out_temp}, {list_temp}->items[{index_temp}]); }} {out_temp}; }})"
+                ));
+                Ok(head)
+            }
+            "fold" => {
+                let [initial, closure] = args else {
+                    return Err(());
+                };
+                let Ty::Fn(params, ret) = &closure.value.ty else {
+                    return Err(());
+                };
+                if params.len() != 2 || params[1] != **elem || **ret != e.ty {
+                    return Err(());
+                }
+                if !c_compatible(&self.c_type(&initial.value.ty)?, &self.c_type(&e.ty)?) {
+                    return Err(());
+                }
+                let closure_code = self.expr(&closure.value)?;
+                let accumulator = self.expr(&initial.value)?;
+                let acc_c = self.c_type(&e.ty)?;
+                let fn_type = self.closure_fn_type(params, ret)?;
+                head.push_str(&format!(
+                    "{closure_code}; {acc_c} __hir_acc = {accumulator}; for (int64_t {index_temp} = 0; {index_temp} < {list_temp}->length; {index_temp}++) {{ __hir_acc = (({fn_type}){closure_temp}.fn)({closure_temp}.env, __hir_acc, {list_temp}->items[{index_temp}]); }} __hir_acc; }})"
+                ));
+                Ok(head)
+            }
+            "any" | "all" => {
+                let [closure] = args else { return Err(()) };
+                let Ty::Fn(params, ret) = &closure.value.ty else {
+                    return Err(());
+                };
+                if params.as_slice() != [(*elem.clone())] || **ret != Ty::Bool || e.ty != Ty::Bool {
+                    return Err(());
+                }
+                let closure_code = self.expr(&closure.value)?;
+                let initial = if method == "all" { "true" } else { "false" };
+                let wanted = if method == "all" {
+                    "!__hir_pred"
+                } else {
+                    "__hir_pred"
+                };
+                let fn_type = self.closure_fn_type(params, ret)?;
+                head.push_str(&format!(
+                    "{closure_code}; bool __hir_result = {initial}; for (int64_t {index_temp} = 0; {index_temp} < {list_temp}->length; {index_temp}++) {{ bool __hir_pred = (({fn_type}){closure_temp}.fn)({closure_temp}.env, {list_temp}->items[{index_temp}]); if ({wanted}) {{ __hir_result = __hir_pred; break; }} }} __hir_result; }})"
+                ));
+                Ok(head)
+            }
+            "find" => {
+                let [closure] = args else { return Err(()) };
+                let Ty::Fn(params, ret) = &closure.value.ty else {
+                    return Err(());
+                };
+                if params.as_slice() != [(*elem.clone())] || **ret != Ty::Bool {
+                    return Err(());
+                }
+                let expected = Ty::Applied("Option".to_string(), vec![(*elem.clone())]);
+                if e.ty != expected {
+                    return Err(());
+                }
+                let option_c = self.c_type(&e.ty)?;
+                let closure_code = self.expr(&closure.value)?;
+                let fn_type = self.closure_fn_type(params, ret)?;
+                head.push_str(&format!(
+                    "{closure_code}; {option_c} __hir_found; memset(&__hir_found, 0, sizeof __hir_found); for (int64_t {index_temp} = 0; {index_temp} < {list_temp}->length; {index_temp}++) {{ if ((({fn_type}){closure_temp}.fn)({closure_temp}.env, {list_temp}->items[{index_temp}])) {{ __hir_found.has = true; __hir_found.value = {list_temp}->items[{index_temp}]; break; }} }} __hir_found; }})"
+                ));
+                Ok(head)
             }
             _ => Err(()),
         }
@@ -1177,6 +1542,243 @@ impl Emitter<'_> {
     }
 }
 
+fn hir_contains_lambda(block: &HirBlock) -> bool {
+    block.stmts.iter().any(hir_stmt_contains_lambda)
+        || block.tail.as_deref().is_some_and(hir_expr_contains_lambda)
+}
+
+fn hir_stmt_contains_lambda(stmt: &HirStmt) -> bool {
+    match stmt {
+        HirStmt::Let { value, .. } | HirStmt::Assign { value, .. } => {
+            hir_expr_contains_lambda(value)
+        }
+        HirStmt::FieldAssign { target, value } => {
+            hir_expr_contains_lambda(target) || hir_expr_contains_lambda(value)
+        }
+        HirStmt::Return(value) | HirStmt::Break(value) => {
+            value.as_ref().is_some_and(hir_expr_contains_lambda)
+        }
+        HirStmt::Continue => false,
+        HirStmt::While { cond, body }
+        | HirStmt::For {
+            iter: cond, body, ..
+        } => hir_expr_contains_lambda(cond) || hir_contains_lambda(body),
+        HirStmt::Expr(value) => hir_expr_contains_lambda(value),
+    }
+}
+
+fn hir_expr_contains_lambda(expr: &HirExpr) -> bool {
+    match &expr.kind {
+        HirKind::Lambda(..) => true,
+        HirKind::Unit(value, _)
+        | HirKind::Unary(_, value)
+        | HirKind::Field(value, _)
+        | HirKind::As(value, _)
+        | HirKind::Try(value, None) => hir_expr_contains_lambda(value),
+        HirKind::Try(value, Some(handler)) => {
+            hir_expr_contains_lambda(value) || hir_expr_contains_lambda(handler)
+        }
+        HirKind::Binary(_, left, right)
+        | HirKind::Index(left, right)
+        | HirKind::Within(left, right) => {
+            hir_expr_contains_lambda(left) || hir_expr_contains_lambda(right)
+        }
+        HirKind::Approximately(a, b, tolerance) => {
+            hir_expr_contains_lambda(a)
+                || hir_expr_contains_lambda(b)
+                || hir_expr_contains_lambda(tolerance)
+        }
+        HirKind::Range(start, _, end, step) => {
+            hir_expr_contains_lambda(start)
+                || hir_expr_contains_lambda(end)
+                || step.as_deref().is_some_and(hir_expr_contains_lambda)
+        }
+        HirKind::Call { callee, args, .. } => {
+            hir_expr_contains_lambda(callee)
+                || args.iter().any(|arg| hir_expr_contains_lambda(&arg.value))
+        }
+        HirKind::MethodCall { recv, args, .. } => {
+            hir_expr_contains_lambda(recv)
+                || args.iter().any(|arg| hir_expr_contains_lambda(&arg.value))
+        }
+        HirKind::If(cond, then_block, else_block) => {
+            hir_expr_contains_lambda(cond)
+                || hir_contains_lambda(then_block)
+                || else_block.as_ref().is_some_and(hir_contains_lambda)
+        }
+        HirKind::Block(block)
+        | HirKind::Loop(block)
+        | HirKind::Spawn(block)
+        | HirKind::SpawnScope(block) => hir_contains_lambda(block),
+        HirKind::List(values) | HirKind::Set(values) => values.iter().any(hir_expr_contains_lambda),
+        HirKind::Map(values) => values
+            .iter()
+            .any(|(key, value)| hir_expr_contains_lambda(key) || hir_expr_contains_lambda(value)),
+        HirKind::Record { fields, .. } => fields
+            .iter()
+            .any(|(_, value)| hir_expr_contains_lambda(value)),
+        HirKind::Match(scrutinee, arms) => {
+            hir_expr_contains_lambda(scrutinee)
+                || arms.iter().any(|arm| {
+                    arm.guard.as_ref().is_some_and(hir_expr_contains_lambda)
+                        || hir_contains_lambda(&arm.body)
+                })
+        }
+        HirKind::Channel(_, capacity) => capacity.as_deref().is_some_and(hir_expr_contains_lambda),
+        HirKind::Int(_)
+        | HirKind::Sized(..)
+        | HirKind::Float(_)
+        | HirKind::Float32(_)
+        | HirKind::Str(_)
+        | HirKind::Char(_)
+        | HirKind::Bool(_)
+        | HirKind::Local(_)
+        | HirKind::Global(_)
+        | HirKind::EmptyCollection(..) => false,
+    }
+}
+
+fn collect_hir_locals_block(
+    block: &HirBlock,
+    used: &mut HashMap<String, Ty>,
+    bound: &mut HashSet<String>,
+) {
+    for stmt in &block.stmts {
+        match stmt {
+            HirStmt::Let { name, value, .. } => {
+                collect_hir_locals_expr(value, used, bound);
+                bound.insert(name.clone());
+            }
+            HirStmt::Assign { value, .. } => collect_hir_locals_expr(value, used, bound),
+            HirStmt::FieldAssign { target, value } => {
+                collect_hir_locals_expr(target, used, bound);
+                collect_hir_locals_expr(value, used, bound);
+            }
+            HirStmt::Return(value) | HirStmt::Break(value) => {
+                if let Some(value) = value {
+                    collect_hir_locals_expr(value, used, bound);
+                }
+            }
+            HirStmt::Continue => {}
+            HirStmt::While { cond, body } => {
+                collect_hir_locals_expr(cond, used, bound);
+                collect_hir_locals_block(body, used, bound);
+            }
+            HirStmt::For { var, iter, body } => {
+                collect_hir_locals_expr(iter, used, bound);
+                bound.insert(var.clone());
+                collect_hir_locals_block(body, used, bound);
+            }
+            HirStmt::Expr(value) => collect_hir_locals_expr(value, used, bound),
+        }
+    }
+    if let Some(tail) = &block.tail {
+        collect_hir_locals_expr(tail, used, bound);
+    }
+}
+
+fn collect_hir_locals_expr(
+    expr: &HirExpr,
+    used: &mut HashMap<String, Ty>,
+    bound: &mut HashSet<String>,
+) {
+    match &expr.kind {
+        HirKind::Local(name) => {
+            used.entry(name.clone()).or_insert_with(|| expr.ty.clone());
+        }
+        HirKind::Unit(value, _)
+        | HirKind::Unary(_, value)
+        | HirKind::Field(value, _)
+        | HirKind::As(value, _)
+        | HirKind::Try(value, None) => collect_hir_locals_expr(value, used, bound),
+        HirKind::Try(value, Some(handler)) => {
+            collect_hir_locals_expr(value, used, bound);
+            collect_hir_locals_expr(handler, used, bound);
+        }
+        HirKind::Binary(_, left, right)
+        | HirKind::Index(left, right)
+        | HirKind::Within(left, right) => {
+            collect_hir_locals_expr(left, used, bound);
+            collect_hir_locals_expr(right, used, bound);
+        }
+        HirKind::Approximately(a, b, tolerance) => {
+            collect_hir_locals_expr(a, used, bound);
+            collect_hir_locals_expr(b, used, bound);
+            collect_hir_locals_expr(tolerance, used, bound);
+        }
+        HirKind::Range(start, _, end, step) => {
+            collect_hir_locals_expr(start, used, bound);
+            collect_hir_locals_expr(end, used, bound);
+            if let Some(step) = step {
+                collect_hir_locals_expr(step, used, bound);
+            }
+        }
+        HirKind::Call { callee, args, .. } => {
+            collect_hir_locals_expr(callee, used, bound);
+            for arg in args {
+                collect_hir_locals_expr(&arg.value, used, bound);
+            }
+        }
+        HirKind::MethodCall { recv, args, .. } => {
+            collect_hir_locals_expr(recv, used, bound);
+            for arg in args {
+                collect_hir_locals_expr(&arg.value, used, bound);
+            }
+        }
+        HirKind::If(cond, then_block, else_block) => {
+            collect_hir_locals_expr(cond, used, bound);
+            collect_hir_locals_block(then_block, used, bound);
+            if let Some(else_block) = else_block {
+                collect_hir_locals_block(else_block, used, bound);
+            }
+        }
+        HirKind::Block(block)
+        | HirKind::Loop(block)
+        | HirKind::Spawn(block)
+        | HirKind::SpawnScope(block)
+        | HirKind::Lambda(_, block) => collect_hir_locals_block(block, used, bound),
+        HirKind::List(values) | HirKind::Set(values) => {
+            for value in values {
+                collect_hir_locals_expr(value, used, bound);
+            }
+        }
+        HirKind::Map(values) => {
+            for (key, value) in values {
+                collect_hir_locals_expr(key, used, bound);
+                collect_hir_locals_expr(value, used, bound);
+            }
+        }
+        HirKind::Record { fields, .. } => {
+            for (_, value) in fields {
+                collect_hir_locals_expr(value, used, bound);
+            }
+        }
+        HirKind::Match(scrutinee, arms) => {
+            collect_hir_locals_expr(scrutinee, used, bound);
+            for arm in arms {
+                if let Some(guard) = &arm.guard {
+                    collect_hir_locals_expr(guard, used, bound);
+                }
+                collect_hir_locals_block(&arm.body, used, bound);
+            }
+        }
+        HirKind::Channel(_, capacity) => {
+            if let Some(capacity) = capacity {
+                collect_hir_locals_expr(capacity, used, bound);
+            }
+        }
+        HirKind::Int(_)
+        | HirKind::Sized(..)
+        | HirKind::Float(_)
+        | HirKind::Float32(_)
+        | HirKind::Str(_)
+        | HirKind::Char(_)
+        | HirKind::Bool(_)
+        | HirKind::Global(_)
+        | HirKind::EmptyCollection(..) => {}
+    }
+}
+
 fn is_option(ty: &Ty) -> bool {
     matches!(ty, Ty::Applied(name, args) if name == "Option" && args.len() == 1)
 }
@@ -1195,6 +1797,10 @@ fn is_map(ty: &Ty) -> bool {
 
 fn is_set(ty: &Ty) -> bool {
     matches!(ty, Ty::Set(_))
+}
+
+fn is_fn(ty: &Ty) -> bool {
+    matches!(ty, Ty::Fn(_, _))
 }
 
 fn option_inner(ty: &Ty) -> Bail<Ty> {

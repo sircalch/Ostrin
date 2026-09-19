@@ -3723,3 +3723,26 @@ completa queda en **6 pruebas diferenciales y 103 de integración verdes**.
 Los combinadores de colecciones que reciben cierres (`map`, `filter`, `fold`, `any`, `all`,
 `find`) siguen usando el fallback AST hasta migrar la familia de cierres. El siguiente paso es
 esa migración; después vendrán genéricos y la retirada progresiva del AST del backend.
+
+## 129. Cierres y valores de función generados desde el HIR (sexta familia) — 2026-09-18
+
+Se cerró la sexta familia en `compiler/src/hir_c.rs`. El emisor HIR comparte la representación
+`OstrinClosure { fn, env }` del backend nativo y registra sus prototipos/cuerpos auxiliares para
+que el programa C final los emita junto con las funciones normales.
+
+- **Cierres**: lambdas con parámetros tipados por el HIR, captura por valor de locales externos,
+  entorno C en heap y llamadas indirectas con la misma firma que el backend AST.
+- **Valores de función**: una función nombrada puede almacenarse en una variable y llamarse como
+  cualquier cierre; se genera un thunk HIR sin entorno.
+- **Combinadores**: `List<T>.map`, `filter`, `fold`, `any`, `all` y `find` invocan esos cierres
+  desde bucles C generados por HIR, preservando el tipo de salida y el `Option<T>` de `find`.
+- **Fallback seguro**: cierres anidados u otras formas todavía no representadas hacen que la
+  función completa vuelva al backend AST; no se emite C parcial ni se cambia la semántica.
+
+`examples/native_hir_closures.ostrin` y `native_hir_handles_closures_core` cubren una captura,
+un valor de función nombrada y la ejecución idéntica en intérprete y nativo. Con esta familia la
+medición global sube a **78 funciones/métodos HIR** y el trinquete diferencial queda en **74**;
+la suite completa queda en **6 pruebas diferenciales y 104 de integración verdes**.
+
+El siguiente bloque es la migración de genéricos concretamente instanciados; después se podrá
+retirar más código duplicado del camino AST y abordar memoria/último uso.

@@ -4881,6 +4881,9 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>, tr
                 (name.clone(), crate::hir_c::VariantView { enum_name: v.enum_name.clone(), tag: v.tag, fields: v.fields.iter().map(|(f, t)| (f.clone(), c_type_name(t))).collect() })
             })
             .collect(),
+        closure_protos: std::cell::RefCell::new(Vec::new()),
+        closure_bodies: std::cell::RefCell::new(Vec::new()),
+        closure_counter: std::cell::Cell::new(0),
     };
     if let Some(program) = &hir {
         codegen.register_hir_types(program);
@@ -4953,6 +4956,12 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>, tr
         }
         bodies.push((signature, body));
     }
+    codegen
+        .closure_protos
+        .extend(hir_world.closure_protos.into_inner());
+    codegen
+        .closure_bodies
+        .extend(hir_world.closure_bodies.into_inner());
     // A generic instantiation's body can call another generic function (or
     // box a record into a `dyn Trait`) for the first time, and a `dyn`
     // boxing needs no further discovery of its own (a thunk's body is just
