@@ -2,6 +2,10 @@
 
 All notable changes to the Ostrin VS Code extension are documented here.
 
+## [Unreleased]
+
+- Highlight fixed-width integer literals (`200u8`, `5i32`) and the `Int8`…`UInt64` type names.
+
 ## [0.4.0] - 2026-09-17
 
 - Add a real debugger: `ostrinc --dap` runs the same tree-walking

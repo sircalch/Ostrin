@@ -1,0 +1,33 @@
+enum Sample {
+    Reading(UInt8)
+    Pair(Int16, Int16)
+}
+
+record Meter {
+    mut level: UInt8
+}
+
+impl Meter {
+    fn raise(mut self, by: UInt8) -> UInt8 {
+        self.level = self.level + by
+        self.level
+    }
+}
+
+fn show(s: Sample) -> Int32 {
+    match s {
+        Reading(v) => v as Int32,
+        Pair(a, b) => (a as Int32) + (b as Int32),
+    }
+}
+
+fn main() -> Void {
+    lowest = -128i8
+    print(lowest)
+    print(lowest + 127)
+    m = Meter { level: 10 }
+    print(m.raise(5))
+    print(m.raise(200))
+    print(show(Reading(42)))
+    print(show(Pair(-3, 10)))
+}

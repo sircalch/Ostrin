@@ -1678,6 +1678,12 @@ impl<'a> Codegen<'a> {
                 }
                 Err(format!("internal error: no type recorded for '{name}' in the native backend"))
             }
+            Expr::Unary(UnaryOp::Neg, inner)
+                if matches!(inner.unlocated(), Expr::SizedIntLiteral(v, k) if k.is_signed() && *v == -k.min()) =>
+            {
+                let Expr::SizedIntLiteral(_, kind) = inner.unlocated() else { unreachable!() };
+                Ok((c_sized_literal(kind.min(), *kind), CType::Sized(*kind)))
+            }
             Expr::Unary(op, inner) => {
                 let (code, ty) = self.gen_expr(inner)?;
                 match op {

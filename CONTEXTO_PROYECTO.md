@@ -3260,7 +3260,7 @@ Implementado de punta a punta (léxico → parser → checker → intérprete �
 - Ejemplos: `sized_ints.ostrin` (compara nativo/intérprete),
   `sized_ints_errors.ostrin` (3 códigos), `sized_ints_overflow.ostrin`
   (test `fixed_width_integer_overflow_is_an_error_in_both_backends`).
-- Limitaciones conocidas: `-128i8` con sufijo no se acepta (usar `-127i8 - 1i8`);
+- Limitaciones conocidas (actualizado: `-128i8`, argumentos de métodos y de variantes ya se aceptan; ver `sized_ints_contexts.ostrin`):
   la adaptación de literales no cubre argumentos de métodos ni de variantes de enum
   (usar sufijo); `for` sobre rangos solo admite `Int`; `sum` sobre listas sized no
   está en el nativo; ni el resaltado de VS Code ni los tokens semánticos del LSP

@@ -1308,6 +1308,12 @@ impl Interpreter {
                 }
                 Err(RuntimeError::Error(format!("undefined name '{name}'")))
             }
+            Expr::Unary(UnaryOp::Neg, e)
+                if matches!(e.unlocated(), Expr::SizedIntLiteral(v, k) if k.is_signed() && *v == -k.min()) =>
+            {
+                let Expr::SizedIntLiteral(_, kind) = e.unlocated() else { unreachable!() };
+                Ok(Value::Sized(kind.min(), *kind))
+            }
             Expr::Unary(op, e) => {
                 let v = self.eval_expr(e, env)?;
                 match (op, &v) {

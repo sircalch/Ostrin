@@ -1031,6 +1031,13 @@ impl Checker {
                     Ty::Unknown
                 }
             }
+            Expr::Unary(UnaryOp::Neg, e)
+                if matches!(e.unlocated(), Expr::SizedIntLiteral(v, k) if k.is_signed() && *v == -k.min()) =>
+            {
+                // `-128i8`: the magnitude alone doesn't fit, the negated value does.
+                let Expr::SizedIntLiteral(_, kind) = e.unlocated() else { unreachable!() };
+                Ty::Sized(*kind)
+            }
             Expr::Unary(op, e) => {
                 let t = self.infer_expr(e, scope);
                 match op {
@@ -1975,12 +1982,19 @@ impl Checker {
             arg_types.push(self.infer_expr_with_expected(expr, expected.as_ref(), scope));
         }
 
+        let arg_exprs: Vec<&Expr> = args
+            .iter()
+            .map(|arg| match arg {
+                Arg::Positional(e) | Arg::Named(_, e) => e,
+            })
+            .collect();
+
         if let Expr::Ident(name) = callee.unlocated() {
             if let Some(return_type) = check_builtin_call(name, &arg_types, &mut self.errors) {
                 return return_type;
             }
             if self.variant_owners.contains_key(name) {
-                return self.check_variant_constructor(name, &arg_types, explicit_type_args);
+                return self.check_variant_constructor(name, &arg_types, &arg_exprs, explicit_type_args);
             }
             if let Some(sig) = self.functions.get(name) {
                 return self.check_function_call(&sig.clone(), args, &arg_types, explicit_type_args);
@@ -2031,6 +2045,7 @@ impl Checker {
                 &receiver_ty,
                 method,
                 &arg_types,
+                &arg_exprs,
                 explicit_type_args,
             ) {
                 return return_type;
@@ -2100,6 +2115,7 @@ impl Checker {
         &mut self,
         variant_name: &str,
         arg_types: &[Ty],
+        arg_exprs: &[&Expr],
         explicit_type_args: Option<&[Type]>,
     ) -> Ty {
         let Some(enum_name) = self.variant_owners.get(variant_name).cloned() else {
@@ -2147,7 +2163,14 @@ impl Checker {
                 }
             }
         }
-        for (field_type, arg_type) in field_types.iter().zip(arg_types.iter()) {
+        for (index, (field_type, arg_type)) in field_types.iter().zip(arg_types.iter()).enumerate() {
+            // An untyped integer literal for a fixed-width field takes the field's type.
+            let declared = resolve_type_with_type_subst(field_type, &type_subst, &HashMap::new());
+            let adapted = match arg_exprs.get(index) {
+                Some(expr) if matches!(declared, Ty::Sized(_) | Ty::List(_)) => self.adapt_literals(expr, &declared, arg_type),
+                _ => false,
+            };
+            let arg_type = if adapted { &declared } else { arg_type };
             if let Err(message) = unify_generic_type(field_type, arg_type, &generic_names, &mut type_subst) {
                 self.push("E1061", format!("Invalid argument for constructor '{}': {message}", variant_name));
             }
@@ -2523,6 +2546,7 @@ impl Checker {
         receiver_ty: &Ty,
         method: &str,
         arg_types: &[Ty],
+        arg_exprs: &[&Expr],
         explicit_type_args: Option<&[Type]>,
     ) -> Option<Ty> {
         let candidate = self.concrete_method_candidate(receiver_ty, method)?;
@@ -2613,8 +2637,12 @@ impl Checker {
             })
             .collect();
 
-        for (expected, actual) in expected_args.iter().zip(arg_types.iter()) {
-            if !compatible(expected, actual) {
+        for (index, (expected, actual)) in expected_args.iter().zip(arg_types.iter()).enumerate() {
+            let adapted = match arg_exprs.get(index) {
+                Some(expr) => self.adapt_literals(expr, expected, actual),
+                None => false,
+            };
+            if !adapted && !compatible(expected, actual) {
                 self.push(
                     "E1042",
                     format!(

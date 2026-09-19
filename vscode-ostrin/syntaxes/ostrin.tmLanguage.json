@@ -51,6 +51,10 @@
         },
         {
           "name": "constant.numeric.ostrin",
+          "match": "\\b[0-9][0-9_]*(?:[iu](?:8|16|32|64))\\b"
+        },
+        {
+          "name": "constant.numeric.ostrin",
           "match": "\\b(?:0[xX][0-9a-fA-F]+|[0-9]+(?:\\.[0-9]+)?)\\b"
         }
       ]
@@ -71,7 +75,7 @@
       "patterns": [
         {
           "name": "support.type.ostrin",
-          "match": "\\b(?:Int|Float|Bool|Char|String|Void|List|Map|Set|Option|Result|Ordering|Quantity|Task|Channel|Dimension)\\b"
+          "match": "\\b(?:Int|Int8|Int16|Int32|Int64|UInt8|UInt16|UInt32|UInt64|Float|Bool|Char|String|Void|List|Map|Set|Option|Result|Ordering|Quantity|Task|Channel|Dimension)\\b"
         },
         {
           "name": "entity.name.type.ostrin",
