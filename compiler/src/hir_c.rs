@@ -12,7 +12,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::ast::{BinOp, RangeKind, UnaryOp};
+use crate::ast::{BinOp, Expr, RangeKind, UnaryOp};
 use crate::hir::{HirBlock, HirExpr, HirFunction, HirKind, HirStmt};
 use crate::types::Ty;
 
@@ -29,6 +29,17 @@ pub struct World {
     /// Methods of records: (record, method) -> (C name, C parameter types with `self` first, C return type).
     pub methods: HashMap<(String, String), (String, Vec<String>, String)>,
     pub c_name: fn(&str) -> String,
+    /// Non-generic enums (tagged unions passed by value) and their variants by name.
+    pub enums: HashSet<String>,
+    pub variants: HashMap<String, VariantView>,
+}
+
+/// One enum variant: its enum, tag and fields with C types (in declaration order).
+#[derive(Clone)]
+pub struct VariantView {
+    pub enum_name: String,
+    pub tag: usize,
+    pub fields: Vec<(String, String)>,
 }
 
 fn is_scalar(ty: &Ty) -> bool {
@@ -44,6 +55,7 @@ struct Emitter<'a> {
     world: &'a World,
     scopes: Vec<HashSet<String>>,
     ret: Ty,
+    temp: usize,
 }
 
 impl Emitter<'_> {
@@ -55,6 +67,7 @@ impl Emitter<'_> {
             Ty::Bool => Ok("bool".to_string()),
             Ty::String => Ok("const char*".to_string()),
             Ty::Named(n) if self.world.records.contains_key(n) => Ok(format!("{n}*")),
+            Ty::Named(n) if self.world.enums.contains(n) => Ok(n.clone()),
             _ => Err(()),
         }
     }
@@ -67,7 +80,7 @@ impl Emitter<'_> {
 
 /// The body (without braces) of an eligible function, or `None`.
 pub fn generate(f: &HirFunction, world: &World) -> Option<String> {
-    let mut e = Emitter { world, scopes: vec![f.params.iter().map(|(n, _)| n.clone()).collect()], ret: f.ret.clone() };
+    let mut e = Emitter { world, scopes: vec![f.params.iter().map(|(n, _)| n.clone()).collect()], ret: f.ret.clone(), temp: 0 };
     if !f.generics.is_empty() || f.params.iter().any(|(_, t)| e.c_type(t).is_err()) {
         return None;
     }
@@ -204,6 +217,118 @@ impl Emitter<'_> {
         Ok(())
     }
 
+    /// `match`, compiled like the AST path: a scrutinee variable, a `matched` flag, a result
+    /// variable and one `if (!matched && <pattern>)` per arm, in source order.
+    fn matching(&mut self, e: &HirExpr, scrutinee: &HirExpr, arms: &[crate::hir::HirArm]) -> Bail<String> {
+        if arms.is_empty() {
+            return Err(());
+        }
+        let scrutinee_c = self.c_type(&scrutinee.ty)?;
+        let void = e.ty == Ty::Void;
+        let result_c = if void { String::new() } else { self.c_type(&e.ty)? };
+        let scrutinee_code = self.expr(scrutinee)?;
+        self.temp += 1;
+        let (svar, mvar, rvar) = (format!("__hir_s{}", self.temp), format!("__hir_m{}", self.temp), format!("__hir_r{}", self.temp));
+        let mut blocks = String::new();
+        for arm in arms {
+            let mut condition = format!("!{mvar}");
+            let mut bindings = String::new();
+            let mut bound = HashSet::new();
+            self.pattern(&arm.pattern, &svar, &scrutinee.ty, &mut condition, &mut bindings, &mut bound)?;
+            self.scopes.push(bound);
+            let guard = match &arm.guard {
+                Some(g) => Some(self.expr(g)?),
+                None => None,
+            };
+            let body = self.block_value(&arm.body);
+            self.scopes.pop();
+            let body = body?;
+            let commit = if void { format!("{body}; {mvar} = 1;") } else { format!("{rvar} = {body}; {mvar} = 1;") };
+            let commit = match guard {
+                Some(g) => format!("if ({g}) {{ {commit} }}"),
+                None => commit,
+            };
+            blocks.push_str(&format!("if ({condition}) {{ {bindings} {commit} }} "));
+        }
+        let decl = if void { String::new() } else { format!("{result_c} {rvar};") };
+        let yielded = if void { "(void)0".to_string() } else { rvar };
+        Ok(format!(
+            "({{ {scrutinee_c} {svar} = {scrutinee_code}; int {mvar} = 0; {decl} {blocks} if (!{mvar}) {{ fprintf(stderr, \"ostrin: non-exhaustive match at runtime\\n\"); abort(); }} {yielded}; }})"
+        ))
+    }
+
+    /// One pattern: its condition (appended to `condition`) and the bindings it introduces.
+    fn pattern(&mut self, pattern: &crate::ast::Pattern, var: &str, ty: &Ty, condition: &mut String, bindings: &mut String, bound: &mut HashSet<String>) -> Bail<()> {
+        use crate::ast::Pattern;
+        let c = self.c_type(ty)?;
+        match pattern {
+            Pattern::Wildcard => Ok(()),
+            Pattern::Ident(name) => {
+                let unit = self.world.variants.get(name).filter(|v| v.fields.is_empty() && *ty == Ty::Named(v.enum_name.clone()));
+                match unit {
+                    Some(v) => {
+                        condition.push_str(&format!(" && ({var}.tag == {})", v.tag));
+                    }
+                    None => {
+                        bindings.push_str(&format!("{c} {name} = {var}; "));
+                        bound.insert(name.clone());
+                    }
+                }
+                Ok(())
+            }
+            Pattern::Variant(name, fields) => {
+                let v = self.world.variants.get(name).filter(|v| *ty == Ty::Named(v.enum_name.clone())).ok_or(())?.clone();
+                condition.push_str(&format!(" && ({var}.tag == {})", v.tag));
+                for (position, (field_name, sub)) in fields.iter().enumerate() {
+                    let (actual, field_c) = v.fields.iter().find(|(n, _)| n == field_name).or_else(|| v.fields.get(position)).ok_or(())?.clone();
+                    let field_ty = self.ty_of_c(&field_c)?;
+                    self.pattern(sub, &format!("{var}.data.{name}.{actual}"), &field_ty, condition, bindings, bound)?;
+                }
+                Ok(())
+            }
+            Pattern::Literal(lit) => {
+                let code = match lit.unlocated() {
+                    Expr::IntLiteral(v) if *ty == Ty::Int => format!("INT64_C({v})"),
+                    Expr::BoolLiteral(v) if *ty == Ty::Bool => v.to_string(),
+                    Expr::StringLiteral(s) if *ty == Ty::String => crate::codegen::c_string_literal(s),
+                    _ => return Err(()),
+                };
+                condition.push_str(&if *ty == Ty::String { format!(" && (strcmp({var}, {code}) == 0)") } else { format!(" && ({var} == {code})") });
+                Ok(())
+            }
+            Pattern::Range(lo, kind, hi) => {
+                let (Expr::IntLiteral(lo), Expr::IntLiteral(hi)) = (lo.unlocated(), hi.unlocated()) else { return Err(()) };
+                if *ty != Ty::Int {
+                    return Err(());
+                }
+                let upper = if *kind == RangeKind::To { "<=" } else { "<" };
+                condition.push_str(&format!(" && ({var} >= INT64_C({lo}) && {var} {upper} INT64_C({hi}))"));
+                Ok(())
+            }
+        }
+    }
+
+    /// The `Ty` a variant field's C type stands for (only the types this emitter handles).
+    fn ty_of_c(&self, c: &str) -> Bail<Ty> {
+        Ok(match c {
+            "int64_t" => Ty::Int,
+            "double" => Ty::Float,
+            "bool" => Ty::Bool,
+            "const char*" => Ty::String,
+            other => {
+                if let Some(name) = other.strip_suffix('*') {
+                    if self.world.records.contains_key(name) {
+                        return Ok(Ty::Named(name.to_string()));
+                    }
+                }
+                if self.world.enums.contains(other) {
+                    return Ok(Ty::Named(other.to_string()));
+                }
+                return Err(());
+            }
+        })
+    }
+
     fn block_value(&mut self, block: &HirBlock) -> Bail<String> {
         let mut body = String::new();
         self.scopes.push(HashSet::new());
@@ -228,6 +353,14 @@ impl Emitter<'_> {
             HirKind::Bool(v) => Ok(if *v { "true" } else { "false" }.to_string()),
             HirKind::Str(s) => Ok(crate::codegen::c_string_literal(s)),
             HirKind::Local(name) => Ok(name.clone()),
+            HirKind::Global(name) if self.world.variants.get(name).is_some_and(|v| v.fields.is_empty()) => {
+                let v = &self.world.variants[name];
+                if self.c_type(&e.ty)? != v.enum_name {
+                    return Err(());
+                }
+                Ok(format!("(({}){{ .tag = {} }})", v.enum_name, v.tag))
+            }
+            HirKind::Match(scrutinee, arms) => self.matching(e, scrutinee, arms),
             HirKind::Field(obj, field) => {
                 let field_ty = self.field(&obj.ty, field)?;
                 if field_ty != self.c_type(&e.ty)? {
@@ -330,6 +463,20 @@ impl Emitter<'_> {
                         Ty::String => Ok(format!("printf(\"%s\\n\", {code})")),
                         _ => Err(()),
                     };
+                }
+                if let (Some(v), false) = (self.world.variants.get(name), self.world.functions.contains_key(name)) {
+                    let v = v.clone();
+                    if v.fields.len() != args.len() || args.iter().any(|a| a.name.is_some()) || self.c_type(&e.ty)? != v.enum_name {
+                        return Err(());
+                    }
+                    let mut inits = Vec::new();
+                    for (arg, (field, want)) in args.iter().zip(&v.fields) {
+                        if !c_compatible(&self.c_type(&arg.value.ty)?, want) {
+                            return Err(());
+                        }
+                        inits.push(format!(".{field} = {}", self.expr(&arg.value)?));
+                    }
+                    return Ok(format!("(({}){{ .tag = {}, .data.{name} = {{ {} }} }})", v.enum_name, v.tag, inits.join(", ")));
                 }
                 let (params, ret) = self.world.functions.get(name).ok_or(())?.clone();
                 if params.len() != args.len() || args.iter().any(|a| a.name.is_some()) {

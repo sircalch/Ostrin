@@ -3644,3 +3644,8 @@ Nuevo `hir_c.rs`: genera el cuerpo C directamente del HIR para las funciones **e
 - Con seguimiento E1101 activo (programas que envían records por canales) los records se desactivan en esta ruta: solo el AST sabe envolver las lecturas.
 - Cobertura: 36 funciones/métodos de los ejemplos (15 antes); ratchet ≥ 30. Sigue todo verde (6 diferenciales, 101 de integración).
 - Siguientes: enums y `match`, listas/colecciones, closures, genéricos; luego borrar del AST-path lo que ya no use.
+
+## 125. Enums y `match` generados desde el HIR (tercera familia)
+
+`hir_c.rs` genera ahora enums no genéricos (uniones etiquetadas por valor): constructores (`Circle(2.0)`, variantes unitarias como valor), enums como parámetros/retorno/locales y `match` con el mismo esquema que el AST (variable del escrutinio, bandera `matched`, variable de resultado, una `if (!matched && patrón)` por brazo, guardas anidadas, aborto si ningún brazo encaja). Patrones cubiertos: comodín, ligadura, variante unitaria, variante con subpatrones (nombre o posición), literal `Int/Bool/String`, rango `Int`. Records-patrón, `Option/Result` y genéricos siguen por el AST.
+Cobertura: 43 funciones y métodos de los ejemplos (36 antes); ratchet ≥ 40; todo verde (6 + 101).

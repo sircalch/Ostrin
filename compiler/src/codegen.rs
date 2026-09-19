@@ -4723,6 +4723,15 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>, tr
             })
             .collect(),
         c_name: c_function_name,
+        enums: codegen.enum_names.iter().filter(|n| !codegen.generic_arity.contains_key(*n) && !codegen.instance_info.contains_key(*n)).cloned().collect(),
+        variants: codegen
+            .variants
+            .iter()
+            .filter(|(_, v)| codegen.enum_names.contains(&v.enum_name) && !codegen.generic_arity.contains_key(&v.enum_name) && !codegen.instance_info.contains_key(&v.enum_name))
+            .map(|(name, v)| {
+                (name.clone(), crate::hir_c::VariantView { enum_name: v.enum_name.clone(), tag: v.tag, fields: v.fields.iter().map(|(f, t)| (f.clone(), c_type_name(t))).collect() })
+            })
+            .collect(),
     };
     for f in &functions {
         if !f.generics.is_empty() {
@@ -4774,7 +4783,7 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>, tr
         let params = render_params(&param_types, &decl.params);
         let signature = format!("{} {}({})", c_type_name(&return_type), c_name, params);
         let hir_method = match (&hir, &self_ty, std::env::var_os("OSTRIN_NO_HIR_CODEGEN")) {
-            (Some(h), CType::Record(record), None) => {
+            (Some(h), CType::Record(record) | CType::Enum(record), None) => {
                 let wanted = format!("{record}.{}", decl.name);
                 h.functions.iter().find(|hf| hf.name == wanted).and_then(|hf| crate::hir_c::generate(hf, &hir_world))
             }
