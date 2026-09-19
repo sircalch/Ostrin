@@ -3528,3 +3528,7 @@ Cierra el aviso de reproducibilidad del §96.
   nodos de los ejemplos (26 sin tipo). Esta lógica es la que hoy duplica `normalize_call_args` en
   el backend; desaparecerá de `codegen.rs` cuando el backend genere desde el HIR.
 - Suite: **114 pruebas**.
+
+## 106. Una sola definición de argumentos nombrados/por defecto (HIR ↔ backend nativo)
+
+Primer puente hacia el backend sobre HIR: la lógica que ordena argumentos nombrados y rellena valores por defecto vive ahora en `hir::arrange_arguments` (genérica sobre el tipo del argumento) y la usan tanto el HIR como `codegen::normalize_call_args` (que pasa a ser un adaptador fino). Antes eran dos implementaciones independientes. Pruebas: 6 diferenciales + 98 de integración verdes. El backend todavía genera desde el AST; la migración por familias de nodos (documento 20, etapa 2) continúa con literales/operadores.

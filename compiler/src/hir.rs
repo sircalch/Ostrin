@@ -318,35 +318,12 @@ impl<'a> Lowerer<'a> {
     /// at the call site, like the interpreter evaluates them). Leaves the call untouched when an
     /// argument can't be matched, so the verifier reports it.
     fn normalize(&mut self, params: &[Param], args: Vec<HirArg>) -> Vec<HirArg> {
-        let mut slots: Vec<Option<HirExpr>> = (0..params.len()).map(|_| None).collect();
-        let mut next = 0usize;
-        let original: Vec<HirArg> = args.clone();
-        for arg in args {
-            match arg.name {
-                None => {
-                    if next >= slots.len() {
-                        return original;
-                    }
-                    slots[next] = Some(arg.value);
-                    next += 1;
-                }
-                Some(name) => match params.iter().position(|p| p.name == name) {
-                    Some(index) => slots[index] = Some(arg.value),
-                    None => return original,
-                },
-            }
+        let original = args.clone();
+        let named: Vec<(Option<String>, HirExpr)> = args.into_iter().map(|a| (a.name, a.value)).collect();
+        match arrange_arguments(params, named, |d| self.expr(d)) {
+            Ok(list) => list.into_iter().map(|value| HirArg { name: None, value }).collect(),
+            Err(_) => original,
         }
-        let mut out = Vec::with_capacity(params.len());
-        for (slot, param) in slots.into_iter().zip(params) {
-            match slot {
-                Some(value) => out.push(HirArg { name: None, value }),
-                None => match &param.default {
-                    Some(default) => out.push(HirArg { name: None, value: self.expr(default) }),
-                    None => return original,
-                },
-            }
-        }
-        out
     }
 
     fn call(&mut self, callee: &Expr, type_args: &[Type], args: &[Arg], key: Option<ExprKey>, result: &Ty, node: usize) -> HirKind {
@@ -745,4 +722,42 @@ fn one_line(e: &HirExpr) -> String {
         HirKind::Channel(t, _) => format!("channel<{}>()", crate::symbols::type_to_string(t)),
     };
     format!("{inner}:{}", e.ty.describe())
+}
+
+/// Reorders call arguments into parameter order and fills omitted ones from their defaults
+/// (lowered by `lower_default`). The single implementation shared by the HIR and the native
+/// backend, so both agree on what a call with named/default arguments means.
+pub fn arrange_arguments<T>(
+    params: &[Param],
+    args: Vec<(Option<String>, T)>,
+    mut lower_default: impl FnMut(&Expr) -> T,
+) -> Result<Vec<T>, String> {
+    let mut slots: Vec<Option<T>> = (0..params.len()).map(|_| None).collect();
+    let mut next = 0usize;
+    for (name, value) in args {
+        match name {
+            None => {
+                if next >= slots.len() {
+                    return Err("too many arguments in call".to_string());
+                }
+                slots[next] = Some(value);
+                next += 1;
+            }
+            Some(name) => match params.iter().position(|p| p.name == name) {
+                Some(index) => slots[index] = Some(value),
+                None => return Err(format!("no parameter named '{name}'")),
+            },
+        }
+    }
+    slots
+        .into_iter()
+        .zip(params)
+        .map(|(slot, param)| match slot {
+            Some(value) => Ok(value),
+            None => match &param.default {
+                Some(default) => Ok(lower_default(default)),
+                None => Err(format!("missing argument for parameter '{}'", param.name)),
+            },
+        })
+        .collect()
 }

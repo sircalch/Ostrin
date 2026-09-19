@@ -4024,35 +4024,15 @@ fn normalize_call_args(params: &[Param], args: &[Arg], skip: usize) -> Result<Op
     if args.len() == params.len() && args.iter().all(|a| matches!(a, Arg::Positional(_))) {
         return Ok(None);
     }
-    let mut slots: Vec<Option<Expr>> = vec![None; params.len()];
-    let mut next = 0usize;
-    for arg in args {
-        match arg {
-            Arg::Positional(e) => {
-                if next >= params.len() {
-                    return Err("too many arguments in call".to_string());
-                }
-                slots[next] = Some(e.clone());
-                next += 1;
-            }
-            Arg::Named(name, e) => {
-                let Some(index) = params.iter().position(|p| &p.name == name) else {
-                    return Err(format!("no parameter named '{name}'"));
-                };
-                slots[index] = Some(e.clone());
-            }
-        }
-    }
-    slots
-        .into_iter()
-        .zip(params)
-        .map(|(slot, param)| {
-            slot.or_else(|| param.default.clone())
-                .map(Arg::Positional)
-                .ok_or_else(|| format!("missing argument for parameter '{}'", param.name))
+    let named = args
+        .iter()
+        .map(|a| match a {
+            Arg::Positional(e) => (None, e.clone()),
+            Arg::Named(n, e) => (Some(n.clone()), e.clone()),
         })
-        .collect::<Result<Vec<_>, _>>()
-        .map(Some)
+        .collect();
+    crate::hir::arrange_arguments(params, named, Expr::clone)
+        .map(|list| Some(list.into_iter().map(Arg::Positional).collect()))
 }
 
 /// Matches a variant constructor's arguments to its declared fields:
