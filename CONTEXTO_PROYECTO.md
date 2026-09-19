@@ -3605,3 +3605,11 @@ Limitaciones: `Float * Dual` y la negación unaria no están sobrecargadas (se u
 ## 118. El paquete de autodiff usa operadores
 
 Al ir a implementar sobrecarga de operadores descubrí que ya existe (traits integrados `Add`, `Sub`, `Mul`, `Div`, `Eq`, `Ord`; método `add`, `sub`, … resuelto en intérprete, checker y nativo). No hacía falta ningún cambio de compilador: `autodiff.ostrin` ahora declara `impl Add/Sub/Mul/Div for Dual` y las funciones del usuario se escriben como fórmulas (`x * x * x - autodiff.scale(2.0, x) - autodiff.constant(5.0)`). Mismos resultados en ambos backends. Pendiente real: `Float * Dual` (operando izquierdo escalar) y negación unaria sobrecargable.
+
+## 119. Operadores con escalar a la izquierda y negación unaria
+
+Se cierran los dos huecos de la sección 118, en intérprete, checker y nativo:
+- `-x` sobre un record/enum llama a su método `neg`.
+- `2.0 * x`, `1.0 - x`, `2 + x`… con un tipo de usuario a la derecha llaman al método **reflejado** del tipo (`rmul`, `rsub`, `radd`, `rdiv`), como en Python (`__rmul__`). El escalar llega como segundo argumento.
+- Además el checker acepta operandos derechos distintos cuando el tipo declara el método (`v * k` con `fn mul(self, k: Float)`), y devuelve el tipo declarado por el método.
+`autodiff.ostrin` los usa: `x * x * x - 2.0 * x - autodiff.constant(5.0)`, `-(1.0 / x)`. Mismos resultados en ambos backends. Límite: los métodos reflejados no pertenecen a un trait (van en un `impl` normal) y no hay `rem`/`pow` sobrecargables.

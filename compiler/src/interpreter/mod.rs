@@ -530,6 +530,14 @@ impl Interpreter {
     /// el trait estándar correspondiente). Los tipos incorporados (Int, Float,
     /// Quantity, String, Bool) siguen resolviéndose por la vía rápida existente.
     fn eval_binary(&mut self, op: BinOp, lv: Value, rv: Value, env: &Env) -> EvalResult {
+        // `2.0 * x` with a user type on the right: the reflected method (`rmul`, `radd`, …) of that type.
+        if matches!(rv, Value::Record(..) | Value::EnumInstance(..)) && !matches!(lv, Value::Record(..) | Value::EnumInstance(..)) {
+            if let Some(method) = operator_method_name(op).filter(|_| op != BinOp::Eq).map(|m| format!("r{m}")) {
+                if let Some(f) = self.find_method_for_value(&rv, &method) {
+                    return self.call_user_function(&f, vec![rv, lv], env.clone());
+                }
+            }
+        }
         if matches!(lv, Value::Record(..) | Value::EnumInstance(..)) {
             let type_name = value_type_name(&lv);
             if let Some(method) = operator_method_name(op) {
@@ -1352,6 +1360,10 @@ impl Interpreter {
                     (UnaryOp::Neg, Value::Sized(_, kind)) => Err(RuntimeError::Error(format!("integer overflow: cannot negate this {}", kind.name()))),
                     (UnaryOp::Neg, Value::Float(n)) => Ok(Value::Float(-n)),
                     (UnaryOp::Neg, Value::F32(n)) => Ok(Value::F32(-n)),
+                    (UnaryOp::Neg, Value::Record(..) | Value::EnumInstance(..)) => match self.find_method_for_value(&v, "neg") {
+                        Some(f) => self.call_user_function(&f, vec![v.clone()], env.clone()),
+                        None => Err(RuntimeError::Error(format!("'{}' has no 'neg' method", value_type_name(&v)))),
+                    },
                     (UnaryOp::Neg, Value::Array(_)) => array::negate(&v),
                     (UnaryOp::Not, Value::Array(_)) => array::not_array(&v),
                     (UnaryOp::Neg, Value::Quantity(n, d, u)) => Ok(Value::Quantity(-n, d.clone(), u.clone())),

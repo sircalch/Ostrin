@@ -5,6 +5,15 @@ pub record Dual {
     d: Float
 }
 
+// Con un escalar a la izquierda (2.0 * x, 1.0 - x): métodos reflejados; -x: neg.
+impl Dual {
+    fn neg(self) -> Dual { Dual { v: 0.0 - self.v, d: 0.0 - self.d } }
+    fn radd(self, k: Float) -> Dual { Dual { v: k + self.v, d: self.d } }
+    fn rsub(self, k: Float) -> Dual { Dual { v: k - self.v, d: 0.0 - self.d } }
+    fn rmul(self, k: Float) -> Dual { Dual { v: k * self.v, d: k * self.d } }
+    fn rdiv(self, k: Float) -> Dual { Dual { v: k / self.v, d: 0.0 - k * self.d / (self.v * self.v) } }
+}
+
 pub fn constant(c: Float) -> Dual { Dual { v: c, d: 0.0 } }
 pub fn variable(x: Float) -> Dual { Dual { v: x, d: 1.0 } }
 
@@ -24,7 +33,6 @@ impl Div for Dual {
     fn div(self, b: Self) -> Self { Dual { v: self.v / b.v, d: (self.d * b.v - self.v * b.d) / (b.v * b.v) } }
 }
 
-pub fn neg(a: Dual) -> Dual { Dual { v: 0.0 - a.v, d: 0.0 - a.d } }
 pub fn scale(k: Float, a: Dual) -> Dual { Dual { v: k * a.v, d: k * a.d } }
 pub fn powi(a: Dual, n: Int) -> Dual {
     mut r = constant(1.0)

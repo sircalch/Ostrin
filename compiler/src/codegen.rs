@@ -2036,6 +2036,13 @@ impl<'a> Codegen<'a> {
                         let temp = self.next_temp();
                         Ok((format!("({{ Qty {temp} = {code}; {temp}.v = -{temp}.v; {temp}; }})"), ty))
                     }
+                    UnaryOp::Neg if matches!(ty, CType::Record(_) | CType::Enum(_)) => {
+                        let (CType::Record(name) | CType::Enum(name)) = &ty else { unreachable!() };
+                        let Some(info) = self.methods.get(name).and_then(|m| m.get("neg")) else {
+                            return Err(format!("'{name}' has no 'neg' method"));
+                        };
+                        Ok((format!("{}({code})", info.c_name), info.return_type.clone()))
+                    }
                     UnaryOp::Neg if matches!(ty, CType::Array(_)) => Ok((format!("{}_neg({code})", mangle_ctype(&ty)), ty)),
                     UnaryOp::Not if matches!(ty, CType::Array(_)) => Ok((format!("{}_not({code})", mangle_ctype(&ty)), ty)),
                     UnaryOp::Neg if matches!(ty, CType::Sized(_)) => {
@@ -2823,6 +2830,21 @@ impl<'a> Codegen<'a> {
     fn gen_binary(&mut self, op: BinOp, l: &Expr, r: &Expr) -> Result<(String, CType), String> {
         let (lc, lt) = self.gen_expr(l)?;
         let (rc, rt) = self.gen_expr(r)?;
+        // `2.0 * x` with a user type on the right: that type's reflected method (`rmul`, …).
+        if let (CType::Record(name) | CType::Enum(name), false) = (&rt, matches!(lt, CType::Record(_) | CType::Enum(_))) {
+            let method = match op {
+                BinOp::Add => Some("radd"),
+                BinOp::Sub => Some("rsub"),
+                BinOp::Mul => Some("rmul"),
+                BinOp::Div => Some("rdiv"),
+                _ => None,
+            };
+            if let Some(info) = method.and_then(|m| self.methods.get(name).and_then(|ms| ms.get(m))) {
+                let (c_name, param_types, return_type) = (info.c_name.clone(), info.param_types.clone(), info.return_type.clone());
+                let arg = self.coerce(&lc, &lt, param_types.get(1).unwrap_or(&lt))?;
+                return Ok((format!("{c_name}({rc}, {arg})"), return_type));
+            }
+        }
         if matches!(lt, CType::Quantity(_)) || matches!(rt, CType::Quantity(_)) {
             return self.gen_quantity_binary(op, &lc, &lt, &rc, &rt);
         }

@@ -2196,6 +2196,26 @@ impl Checker {
                 }
             };
         }
+        // A user type with an operator method accepts other right-hand types (`v * 2.0`), and a scalar on
+        // the left uses the type's reflected method (`2.0 * v` -> `rmul`).
+        if matches!(op, Add | Sub | Mul | Div) {
+            let name = match op {
+                Add => "add",
+                Sub => "sub",
+                Mul => "mul",
+                _ => "div",
+            };
+            if let (Ty::Named(_), false) = (&lt, lt == rt) {
+                if let Some(ret) = self.operator_method_return(&lt, name) {
+                    return ret;
+                }
+            }
+            if let (true, Ty::Named(_)) = (lt.is_numeric_scalar(), &rt) {
+                if let Some(ret) = self.operator_method_return(&rt, &format!("r{name}")) {
+                    return ret;
+                }
+            }
+        }
         if let (Ty::Named(left_name), Ty::Named(right_name)) = (&lt, &rt) {
             if left_name == right_name {
                 let trait_name = match op {
@@ -3247,6 +3267,15 @@ impl Checker {
             &substitutions,
             &HashMap::new(),
         ))
+    }
+
+    /// The result type of `receiver.method(..)` for an operator method of a user type.
+    fn operator_method_return(&self, receiver: &Ty, method: &str) -> Option<Ty> {
+        let found = self.concrete_method_candidate(receiver, method)?;
+        Some(match &found.return_type {
+            Type::Named(n, a) if n == "Self" && a.is_empty() => receiver.clone(),
+            other => resolve_type(other),
+        })
     }
 
     fn concrete_method_candidate(&self, receiver_ty: &Ty, method: &str) -> Option<ConcreteMethod> {
