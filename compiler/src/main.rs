@@ -2,6 +2,7 @@ mod ast;
 mod codegen;
 mod dap;
 mod hir;
+mod hir_c;
 mod interpreter;
 mod lexer;
 mod lsp;
@@ -204,6 +205,7 @@ fn real_main() -> ExitCode {
                 println!("agreed: {}", report.agreed);
                 println!("node-agreed: {}", report.node_agreed);
                 println!("node-unchecked: {}", report.node_unchecked);
+                println!("hir-generated: {}", report.hir_generated);
                 println!("partial: {}", report.partial);
                 println!("completed: {}", report.completed);
                 println!("generic-calls-from-checker: {}", report.calls_from_checker);

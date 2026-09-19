@@ -287,7 +287,7 @@ fn map_type_with_subst(ty: &Type, types: &NamedTypes, subst: &HashMap<String, CT
     }
 }
 
-fn c_function_name(name: &str) -> String {
+pub(crate) fn c_function_name(name: &str) -> String {
     // The generated file supplies its own `main`, so the user's `main`
     // (which returns Void, not `int`, and takes no argv/argc) is renamed.
     // Every user function is prefixed so its name can never collide with a C
@@ -495,6 +495,8 @@ pub struct NativeTypeReport {
     pub divergences: Vec<String>,
     /// The program sends a record through a channel (so reads must be tracked).
     pub sends_records: bool,
+    /// Functions whose C body was generated from the HIR (see `hir_c.rs`) instead of the AST.
+    pub hir_generated: usize,
     /// The same comparison, but for *every* expression node (operands included), by node address.
     pub node_agreed: usize,
     pub node_unchecked: usize,
@@ -4387,7 +4389,7 @@ fn unify_types(a: &CType, b: &CType) -> CType {
     }
 }
 
-fn c_string_literal(s: &str) -> String {
+pub(crate) fn c_string_literal(s: &str) -> String {
     let mut out = String::from("\"");
     for ch in s.chars() {
         match ch {
@@ -4520,6 +4522,7 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>, tr
     let record_names: HashSet<String> = records.iter().map(|r| r.name.clone()).collect();
     let enum_names: HashSet<String> = enums.iter().map(|e| e.name.clone()).collect();
     let trait_names: HashSet<String> = traits.iter().map(|t| t.name.clone()).collect();
+    let hir = typed.map(|t| crate::hir::lower(items, t));
     let mut codegen = Codegen {
         signatures: HashMap::new(),
         generic_functions: HashMap::new(),
@@ -4559,7 +4562,7 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>, tr
         checker_types,
         call_substs,
         literal_kinds: typed.map(|t| &t.literal_kinds),
-        hir_arities: typed.map(|t| crate::hir::lower(items, t).arities).unwrap_or_default(),
+        hir_arities: hir.as_ref().map(|h| h.arities.clone()).unwrap_or_default(),
         node_types: typed.map(|t| &t.node_types),
         track_moves,
         saw_record_send: false,
@@ -4690,6 +4693,7 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>, tr
     // later-discovered instantiation still compiles: C requires the
     // prototype before use, not the body.
     let mut bodies: Vec<(String, String)> = Vec::new(); // (signature, body)
+    let hir_functions: HashSet<String> = hir.as_ref().map(|h| crate::hir_c::user_functions(&h.arities, &h.functions)).unwrap_or_default();
     for f in &functions {
         if !f.generics.is_empty() {
             continue;
@@ -4699,7 +4703,25 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>, tr
         let signature = format!("{} {}({})", c_type_name(&return_type), c_function_name(&f.name), params);
         let mut body = String::new();
         codegen.current_file = f.source_file.clone();
-        codegen.gen_function_body(f, &return_type, &mut body)?;
+        // Scalar functions are generated from the HIR; everything else still goes through the AST.
+        let from_hir = match (&hir, std::env::var_os("OSTRIN_NO_HIR_CODEGEN")) {
+            (Some(h), None) => h
+                .functions
+                .iter()
+                .find(|hf| hf.name == f.name)
+                .and_then(|hf| crate::hir_c::generate(hf, &hir_functions, c_function_name)),
+            _ => None,
+        };
+        if std::env::var_os("OSTRIN_HIR_DEBUG").is_some() {
+            eprintln!("hir-codegen {}: {}", f.name, if from_hir.is_some() { "yes" } else { "no" });
+        }
+        match from_hir {
+            Some(text) => {
+                codegen.type_report.hir_generated += 1;
+                body = text;
+            }
+            None => codegen.gen_function_body(f, &return_type, &mut body)?,
+        }
         bodies.push((signature, body));
     }
     // Collected into a plain list first (one pass) so the mutable borrow

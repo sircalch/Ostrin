@@ -3627,3 +3627,11 @@ Pendiente: LU/QR/SVD, autovectores, autovalores de matrices no simétricas.
 ## 122. `norm` y `eigvals` (matrices simétricas)
 
 `norm(a)`: norma euclídea/Frobenius de un `Array<Float>` de cualquier forma. `eigvals(a)`: autovalores de una matriz **simétrica** por rotaciones de Jacobi cíclicas, ordenados de menor a mayor (error si no es cuadrada o no es simétrica). Solo `+ - * /` y `sqrt` en orden fijo, espejado en `array_linalg.c`: resultados idénticos bit a bit en intérprete y nativo (`[[2,1,0],[1,3,1],[0,1,4]]` → `[1.2679491924311221, 2.9999999999999982, 4.732050807568877]`, exactos 3−… ‑ 3 ‑ 3+√3 salvo 1 ulp). Ejemplo: `examples/linear_algebra.ostrin`.
+
+## 123. Primera familia del backend nativo generada desde el HIR (código escalar)
+
+Nuevo `hir_c.rs`: genera el cuerpo C directamente del HIR para las funciones **elegibles** — todo nodo es `Int/Float/Bool/String` (o `Void` en sentencias) y solo usa locales, literales, aritmética/comparación/lógica, concatenación y `==` de `String`, `if`/`while`/`for` sobre rangos `Int`, `return`/`break`/`continue`, `print` de escalares y llamadas a funciones de usuario con argumentos escalares. Si un nodo no cabe, `generate` devuelve `None` y esa función sigue por el generador del AST (por eso la migración es incremental y segura).
+
+- Conectado en `generate_impl`; `--native-type-report` imprime `hir-generated: N`; `OSTRIN_NO_HIR_CODEGEN=1` fuerza la ruta antigua (para comparar) y `OSTRIN_HIR_DEBUG=1` lista qué funciones van por cada ruta.
+- Hoy: 15 funciones de los ejemplos (antes de `print`/`String`: 6). Ratchet en `differential.rs` (≥ 12). Las 6 pruebas diferenciales y las 101 de integración siguen verdes.
+- Siguiente familia según el documento 20: records/enums y campos, luego listas/colecciones, patrones, genéricos; cada una ampliando el conjunto elegible y bajando el uso del AST hasta poder borrarlo del generador.
