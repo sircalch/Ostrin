@@ -405,10 +405,14 @@ static @T@ @N@_dot(@N@* a, @N@* b) {
 }
 
 static @N@* @N@_matmul(@N@* a, @N@* b) {
-    if (a->rank != 2 || b->rank != 2 || a->shape[1] != b->shape[0]) OSTRIN_FAIL("matmul needs (m, k) x (k, n) matrices");
-    int64_t m = a->shape[0], k = a->shape[1], n = b->shape[1];
-    int64_t shape[2] = { m, n };
-    @N@* r = @N@_alloc(2, shape);
+    /* A vector on the right is a column (result: vector of length m); on the left, a row (result: length n). */
+    int64_t m, k, n, out_rank = 2;
+    if (a->rank == 2 && b->rank == 2 && a->shape[1] == b->shape[0]) { m = a->shape[0]; k = a->shape[1]; n = b->shape[1]; }
+    else if (a->rank == 2 && b->rank == 1 && a->shape[1] == b->shape[0]) { m = a->shape[0]; k = a->shape[1]; n = 1; out_rank = 1; }
+    else if (a->rank == 1 && b->rank == 2 && a->shape[0] == b->shape[0]) { m = 1; k = a->shape[0]; n = b->shape[1]; out_rank = 1; }
+    else OSTRIN_FAIL("matmul needs (m, k) x (k, n) matrices (or a matrix and a vector)");
+    int64_t shape[2] = { out_rank == 1 ? (a->rank == 2 ? m : n) : m, n };
+    @N@* r = @N@_alloc(out_rank, shape);
     for (int64_t i = 0; i < m; i++) {
         for (int64_t j = 0; j < n; j++) {
             @T@ acc = OSTRIN_MUL(a->data[i * k], b->data[j]);

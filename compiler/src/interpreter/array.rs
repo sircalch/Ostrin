@@ -423,10 +423,17 @@ pub fn call_method(receiver: &Rc<RefCell<ArrayData>>, method: &str, args: Vec<Va
         "matmul" => {
             let Value::Array(other) = &args[0] else { return fail("matmul expects an array") };
             let b = other.borrow();
-            if a.shape.len() != 2 || b.shape.len() != 2 || a.shape[1] != b.shape[0] {
-                return fail(format!("matmul needs (m, k) x (k, n) matrices, got {:?} and {:?}", a.shape, b.shape));
+            // A vector on the right is a column (result: vector of length m); on the left, a row (result: length n).
+            let (a_shape, b_shape, out_shape): (Vec<usize>, Vec<usize>, Option<Vec<usize>>) = match (a.shape.len(), b.shape.len()) {
+                (2, 2) => (a.shape.clone(), b.shape.clone(), None),
+                (2, 1) => (a.shape.clone(), vec![b.shape[0], 1], Some(vec![a.shape[0]])),
+                (1, 2) => (vec![1, a.shape[0]], b.shape.clone(), Some(vec![b.shape[1]])),
+                _ => (Vec::new(), Vec::new(), None),
+            };
+            if a_shape.len() != 2 || b_shape.len() != 2 || a_shape[1] != b_shape[0] {
+                return fail(format!("matmul needs (m, k) x (k, n) matrices (or a matrix and a vector), got {:?} and {:?}", a.shape, b.shape));
             }
-            let (m, k, n) = (a.shape[0], a.shape[1], b.shape[1]);
+            let (m, k, n) = (a_shape[0], a_shape[1], b_shape[1]);
             let mut data = Vec::with_capacity(m * n);
             for i in 0..m {
                 for j in 0..n {
@@ -437,7 +444,7 @@ pub fn call_method(receiver: &Rc<RefCell<ArrayData>>, method: &str, args: Vec<Va
                     data.push(accumulate(BinOp::Add, terms.into_iter())?);
                 }
             }
-            Ok(make(vec![m, n], data))
+            Ok(make(out_shape.unwrap_or(vec![m, n]), data))
         }
         other => fail(format!("Array has no method '{other}'")),
     }

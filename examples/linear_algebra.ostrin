@@ -16,4 +16,7 @@ fn main() -> Void {
     print(det(singular))
     b = array([1.0, 2.0, 3.0])
     print(solve(a, b))
+    print(a @ b)
+    print(b @ a)
+    print(ai @ (a @ b))
 }
