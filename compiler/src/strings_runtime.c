@@ -2,7 +2,7 @@
  * `length` counts code points. Every result is a fresh malloc'd string (never freed, like the
  * rest of this backend's heap values). */
 static char* ostrin_s_dup(const char* s, size_t n) {
-    char* r = (char*)malloc(n + 1);
+    char* r = (char*)ostrin_alloc(n + 1);
     if (!r) OSTRIN_OOM();
     memcpy(r, s, n);
     r[n] = 0;
@@ -55,7 +55,7 @@ static const char* ostrin_s_replace(const char* s, const char* from, const char*
     size_t count = 0;
     for (const char* p = s; (p = strstr(p, from)); p += fl) count++;
     size_t n = strlen(s);
-    char* r = (char*)malloc(n + count * (tl > fl ? tl - fl : 0) + 1);
+    char* r = (char*)ostrin_alloc(n + count * (tl > fl ? tl - fl : 0) + 1);
     if (!r) OSTRIN_OOM();
     char* w = r;
     const char* p = s;
@@ -74,7 +74,7 @@ static const char** ostrin_s_split(const char* s, const char* sep, int64_t* out_
     if (sl == 0) OSTRIN_FAIL("'split' needs a non-empty separator");
     int64_t count = 1;
     for (const char* p = s; (p = strstr(p, sep)); p += sl) count++;
-    const char** items = (const char**)malloc(sizeof(char*) * (size_t)count);
+    const char** items = (const char**)ostrin_alloc(sizeof(char*) * (size_t)count);
     if (!items) OSTRIN_OOM();
     int64_t i = 0;
     const char* p = s;
@@ -96,7 +96,7 @@ static const char** ostrin_s_lines(const char* s, int64_t* out_n) {
         if (!q) break;
         p = q + 1;
     }
-    const char** items = (const char**)malloc(sizeof(char*) * (size_t)(count > 0 ? count : 1));
+    const char** items = (const char**)ostrin_alloc(sizeof(char*) * (size_t)(count > 0 ? count : 1));
     if (!items) OSTRIN_OOM();
     int64_t i = 0;
     for (const char* p = s; *p; ) {
@@ -114,7 +114,7 @@ static const char** ostrin_s_lines(const char* s, int64_t* out_n) {
 static const char* ostrin_s_join(const char** items, int64_t n, const char* sep) {
     size_t sl = strlen(sep), total = 1;
     for (int64_t i = 0; i < n; i++) total += strlen(items[i]) + (i ? sl : 0);
-    char* r = (char*)malloc(total);
+    char* r = (char*)ostrin_alloc(total);
     if (!r) OSTRIN_OOM();
     char* w = r;
     for (int64_t i = 0; i < n; i++) {
@@ -164,7 +164,7 @@ typedef struct { char* buf; size_t len, cap; } OstrinSBuf;
 static void ostrin_sbuf_push(OstrinSBuf* b, char c) {
     if (b->len + 1 >= b->cap) {
         b->cap = b->cap ? b->cap * 2 : 16;
-        b->buf = (char*)realloc(b->buf, b->cap);
+        b->buf = (char*)ostrin_realloc(b->buf, b->cap);
         if (!b->buf) OSTRIN_OOM();
     }
     b->buf[b->len++] = c;
@@ -178,7 +178,7 @@ typedef struct { const char** items; int64_t n, cap; } OstrinSRow;
 static void ostrin_srow_push(OstrinSRow* r, const char* s) {
     if (r->n >= r->cap) {
         r->cap = r->cap ? r->cap * 2 : 4;
-        r->items = (const char**)realloc((void*)r->items, sizeof(char*) * (size_t)r->cap);
+        r->items = (const char**)ostrin_realloc((void*)r->items, sizeof(char*) * (size_t)r->cap);
         if (!r->items) OSTRIN_OOM();
     }
     r->items[r->n++] = s;
@@ -203,8 +203,8 @@ static const char*** ostrin_s_csv(const char* s, int64_t* out_rows, int64_t** ou
                 ostrin_srow_push(&row, ostrin_sbuf_take(&field));
                 if (nrows >= cap) {
                     cap = cap ? cap * 2 : 8;
-                    rows = (const char***)realloc((void*)rows, sizeof(void*) * (size_t)cap);
-                    cols = (int64_t*)realloc(cols, sizeof(int64_t) * (size_t)cap);
+                    rows = (const char***)ostrin_realloc((void*)rows, sizeof(void*) * (size_t)cap);
+                    cols = (int64_t*)ostrin_realloc(cols, sizeof(int64_t) * (size_t)cap);
                     if (!rows || !cols) OSTRIN_OOM();
                 }
                 rows[nrows] = row.items; cols[nrows] = row.n; nrows++;
@@ -217,13 +217,13 @@ static const char*** ostrin_s_csv(const char* s, int64_t* out_rows, int64_t** ou
         ostrin_srow_push(&row, ostrin_sbuf_take(&field));
         if (nrows >= cap) {
             cap = cap ? cap * 2 : 8;
-            rows = (const char***)realloc((void*)rows, sizeof(void*) * (size_t)cap);
-            cols = (int64_t*)realloc(cols, sizeof(int64_t) * (size_t)cap);
+            rows = (const char***)ostrin_realloc((void*)rows, sizeof(void*) * (size_t)cap);
+            cols = (int64_t*)ostrin_realloc(cols, sizeof(int64_t) * (size_t)cap);
             if (!rows || !cols) OSTRIN_OOM();
         }
         rows[nrows] = row.items; cols[nrows] = row.n; nrows++;
     }
-    free(field.buf);
+    ostrin_free(field.buf);
     *out_rows = nrows; *out_cols = cols;
     return rows;
 }

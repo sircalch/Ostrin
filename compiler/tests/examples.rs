@@ -744,6 +744,19 @@ fn native_backend_emit_c_writes_readable_c_source() {
 }
 
 #[test]
+fn native_backend_emits_centralized_memory_cleanup() {
+    let out = run(&["--emit-c", &example_path("native_hir_collections.ostrin")]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let source = stdout(&out);
+    assert!(source.contains("typedef struct OstrinAllocation"));
+    assert!(source.contains("static void* ostrin_alloc(size_t size)"));
+    assert!(source.contains("static void* ostrin_realloc(void* old_ptr, size_t size)"));
+    assert!(source.contains("static void ostrin_free(void* ptr)"));
+    assert!(source.contains("atexit(ostrin_mem_cleanup);"));
+    assert!(source.contains("ostrin_realloc("), "collection growth must use the tracked allocator");
+}
+
+#[test]
 fn native_backend_rejects_constructs_it_does_not_support_yet() {
     // `advanced.ostrin` is a syntax showcase that names a type (`Trajectory`)
     // the backend has no representation for: it must fail with a clear

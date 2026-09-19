@@ -1,9 +1,9 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-18 · rama `main` · 6 pruebas diferenciales y 107 de integración en verde.*
+*Corte: 2026-09-18 · rama `main` · 6 pruebas diferenciales y 108 de integración en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
-Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–133); para el diseño
+Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–134); para el diseño
 del lenguaje, `docs/design/` (20 documentos).
 
 ---
@@ -100,6 +100,12 @@ funciones elementales deterministas (idénticas en intérprete y nativo).
 Transpila a C con expresiones‑sentencia GNU (`({ … })`); compilador vía `OSTRIN_CC`.
 Monomorfización bajo demanda (funciones, records, enums, métodos, vtables, listas, mapas…).
 
+El runtime C generado centraliza las reservas en `ostrin_alloc`/`ostrin_calloc`/
+`ostrin_realloc`, registra cada bloque y lo libera mediante `atexit` al terminar el
+programa. Los buffers temporales de arrays, CSV, strings, cantidades, RNG y el detector
+E1101 también usan esa API. Esto es una base de limpieza y observabilidad, no todavía ARC
+por ámbito ni destrucción basada en último uso.
+
 **Soportado** (todos los ejemplos ejecutables del repo, salvo lo listado en §6):
 - Escalares, strings, recursión, `if/while/for`, `match` (con guardas y patrones anidados).
 - Records (heap, por referencia) y enums (unión etiquetada por valor), ambos genéricos;
@@ -131,7 +137,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Cierres en nativo | Captura **por valor** (una variable `mut` cambiada después no se ve dentro); lambda sin contexto de tipos exige anotación |
 | Chequeo «movido tras enviar» (E1101) | Dinámico en ambos backends; estático pendiente del IR (doc. 20) |
 | Concurrencia real (hilos, planificador, `select`) | No existe; `spawn` es síncrono |
-| Memoria en nativo | Se usa `malloc` sin liberar (sin GC ni conteo de referencias) |
+| Memoria en nativo | Registro de allocations y limpieza global al salir; ARC/último uso y destructores por tipo siguen pendientes |
 | Biblioteca estándar | Mínima: sin `HashMap` eficiente, fechas, red, formateo, `args`, entorno |
 | `==` sobre `List/Option/Map` | No soportado (tampoco en intérprete para Option) |
 | Mensajes de error de E/S | `strerror` ≠ texto de Rust (difieren entre backends) |
@@ -145,7 +151,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
 convendría dividirlos; el backend nativo no comparte el sistema de tipos del checker
-(ya consume los tipos del checker y compara cada nodo; **117 funciones/métodos de los ejemplos
+(ya consume los tipos del checker y compara cada nodo; **119 funciones/métodos de los ejemplos
 ya se generan desde el HIR** —escalares, records, enums, `match`, `Option`/`Result`,
 listas/colecciones, cierres, instancias concretas de genéricos, records/enums aplicados y métodos
 genéricos centrales, módulo `hir_c.rs`—, con un trinquete mínimo de 115; el resto sigue por el AST;
@@ -159,9 +165,9 @@ la búsqueda en `Map/Set` es lineal.
 Ordenadas por mi recomendación (valor / riesgo). Cada una es independiente.
 
 ### A. Cerrar la semántica del backend nativo (corto plazo)
-1. **Ampliar la migración HIR de genéricos**: métodos genéricos complejos y formas restantes; mantener la resolución de llamadas anidadas, los records/enums aplicados y las identidades de impl como base.
+1. **Retirar progresivamente el fallback AST**: métodos genéricos complejos y formas restantes; mantener la resolución de llamadas anidadas, los records/enums aplicados y las identidades de impl como base.
 2. **Retirada progresiva del fallback AST**: conservar solo familias aún no migradas.
-3. **Gestión de memoria**: conteo de referencias o arena por ámbito; hoy nada se libera.
+3. **Gestión de memoria**: convertir el registro global en ownership real: tipos con destructor, conteo/borrows y liberación por último uso.
 4. **`==` estructural** para `List/Option/Map`.
 6. Reutilizar el checker: que `typeck` entregue tipos resueltos al codegen y eliminar la
    reinferencia (reduce errores y abre optimizaciones).
@@ -217,7 +223,7 @@ Decisiones que necesito de ti para afinar el plan:
 
 ```powershell
 cd compiler
-cargo test                                   # 6 diferenciales + 107 de integración
+cargo test                                   # 6 diferenciales + 108 de integración
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```

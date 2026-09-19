@@ -56,7 +56,7 @@ static double ostrin_convert(double v, const char* from, const char* to) {
 
 static const char* ostrin_unit_cat(const char* a, const char* op, const char* b) {
     size_t n = strlen(a) + strlen(op) + strlen(b) + 1;
-    char* out = (char*)malloc(n);
+    char* out = (char*)ostrin_alloc(n);
     if (!out) { fprintf(stderr, "ostrin: out of memory\n"); exit(1); }
     snprintf(out, n, "%s%s%s", a, op, b);
     return out;

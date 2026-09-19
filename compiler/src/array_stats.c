@@ -24,7 +24,7 @@ static @T@ @N@_median(@N@* a) {
     @T@* s = @N@_sorted_flat(a);
     int64_t n = a->size;
     @T@ r = (n % 2 == 1) ? s[n / 2] : OSTRIN_DIV(OSTRIN_ADD(s[n / 2 - 1], s[n / 2]), (@T@)2);
-    free(s);
+    ostrin_free(s);
     return r;
 }
 
@@ -37,7 +37,7 @@ static @T@ @N@_percentile(@N@* a, double p) {
     double frac = pos - (double)lo;
     int64_t hi = lo + 1 < n ? lo + 1 : n - 1;
     @T@ r = OSTRIN_ADD(s[lo], OSTRIN_MUL(OSTRIN_SUB(s[hi], s[lo]), (@T@)frac));
-    free(s);
+    ostrin_free(s);
     return r;
 }
 

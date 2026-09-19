@@ -3873,3 +3873,33 @@ trinquete mínimo de **115**.
 El siguiente bloque es reducir las formas restantes que dependen del AST y, con la migración HIR
 ya dominante, preparar la retirada gradual del generador antiguo antes de entrar en gestión de
 memoria/último uso y concurrencia real.
+
+## 134. Primera capa de memoria nativa: registro global y cleanup al salir — 2026-09-18
+
+Se cerró la primera capa de gestión de memoria del backend C. Antes, cada sitio generado
+llamaba directamente a `malloc`, `calloc` o `realloc` y el proceso nunca liberaba esos bloques.
+Ahora el prelude generado define una API única:
+
+- `ostrin_alloc` para reservas normales;
+- `ostrin_calloc` con comprobación de overflow de `count * size`;
+- `ostrin_realloc`, que actualiza la entrada registrada cuando cambia la dirección;
+- `ostrin_free`, que desregistra antes de liberar;
+- `ostrin_mem_cleanup`, que vacía el registro completo.
+
+Cada bloque queda enlazado en un registro interno (`OstrinAllocation`) y `main` instala
+`atexit(ostrin_mem_cleanup)`. Se migraron los sitios del generador para records, cierres,
+listas, mapas, conjuntos, canales, strings, archivos y buffers de CSV. También se migraron
+los runtimes de arrays, álgebra lineal, estadísticas, cantidades, RNG, strings y seguimiento
+de movimientos E1101. Los temporales que sí tienen una vida local (`sort`, broadcasting,
+`solve`, buffers CSV, etc.) llaman a `ostrin_free`, por lo que no quedan registrados dos veces.
+
+La prueba `native_backend_emits_centralized_memory_cleanup` inspecciona el C generado y exige
+la API y el `atexit`; las pruebas nativas existentes ejercitan records, strings, colecciones,
+arrays y paquetes. Resultado: **6 pruebas diferenciales y 108 de integración verdes**, y
+`cargo check` limpio.
+
+Este bloque no se presenta como ARC completo: todavía no existe conteo de referencias por
+alias, análisis de último uso, préstamos, destructores por tipo ni liberación por salida de
+ámbito. El registro global es una base segura y comprobable para implementar esas capas sin
+mantener asignaciones dispersas. El siguiente bloque de memoria debe añadir metadatos de tipo
+y destrucción recursiva; en paralelo se puede continuar retirando el fallback AST.

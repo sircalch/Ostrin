@@ -37,9 +37,11 @@
 //! never copied by value, to match the interpreter's `Rc<RefCell<...>>`
 //! identity semantics (two bindings that alias the same record must see
 //! each other's field writes — see `Value::Record` in `interpreter/mod.rs`).
-//! Nothing here ever frees that memory: for the short-lived programs this
-//! backend targets that is an acceptable, documented trade-off, not an
-//! oversight. Enums are the opposite: a plain-by-value tagged union, since
+//! The generated runtime tracks heap allocations and releases them at process
+//! exit. Scope-level ARC/ownership is a later layer; this baseline makes
+//! native programs leak-free on normal termination without pretending that it
+//! has already solved alias-aware destruction. Enums are the opposite: a
+//! plain-by-value tagged union, since
 //! `Value::EnumInstance` is itself deep-cloned on assignment in the
 //! interpreter, i.e. already a value type there.
 
@@ -337,6 +339,76 @@ const PRELUDE: &str = "#include <stdint.h>\n\
 typedef struct { void* fn; void* env; } OstrinClosure;\n\
 #define OSTRIN_FAIL(msg) do { fprintf(stderr, \"runtime error: %s\\n\", msg); exit(1); } while (0)\n\
 #define OSTRIN_OOM() do { fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); } while (0)\n\
+typedef struct OstrinAllocation {\n\
+    void* ptr;\n\
+    struct OstrinAllocation* next;\n\
+} OstrinAllocation;\n\
+\n\
+static OstrinAllocation* ostrin_allocations = NULL;\n\
+static size_t ostrin_allocation_count = 0;\n\
+\n\
+static void ostrin_register_allocation(void* ptr) {\n\
+    OstrinAllocation* entry = (OstrinAllocation*)malloc(sizeof *entry);\n\
+    if (!entry) { free(ptr); OSTRIN_OOM(); }\n\
+    entry->ptr = ptr;\n\
+    entry->next = ostrin_allocations;\n\
+    ostrin_allocations = entry;\n\
+    ostrin_allocation_count++;\n\
+}\n\
+\n\
+static void* ostrin_alloc(size_t size) {\n\
+    void* ptr = malloc(size == 0 ? 1 : size);\n\
+    if (!ptr) OSTRIN_OOM();\n\
+    ostrin_register_allocation(ptr);\n\
+    return ptr;\n\
+}\n\
+\n\
+static void* ostrin_calloc(size_t count, size_t size) {\n\
+    if (count != 0 && size > SIZE_MAX / count) OSTRIN_OOM();\n\
+    size_t bytes = count * size;\n\
+    void* ptr = calloc(1, bytes == 0 ? 1 : bytes);\n\
+    if (!ptr) OSTRIN_OOM();\n\
+    ostrin_register_allocation(ptr);\n\
+    return ptr;\n\
+}\n\
+\n\
+static void* ostrin_realloc(void* old_ptr, size_t size) {\n\
+    if (!old_ptr) return ostrin_alloc(size);\n\
+    void* ptr = realloc(old_ptr, size == 0 ? 1 : size);\n\
+    if (!ptr) OSTRIN_OOM();\n\
+    for (OstrinAllocation* entry = ostrin_allocations; entry; entry = entry->next) {\n\
+        if (entry->ptr == old_ptr) { entry->ptr = ptr; return ptr; }\n\
+    }\n\
+    ostrin_register_allocation(ptr);\n\
+    return ptr;\n\
+}\n\
+\n\
+static void ostrin_free(void* ptr) {\n\
+    if (!ptr) return;\n\
+    OstrinAllocation** link = &ostrin_allocations;\n\
+    while (*link) {\n\
+        OstrinAllocation* entry = *link;\n\
+        if (entry->ptr == ptr) {\n\
+            *link = entry->next;\n\
+            free(entry->ptr);\n\
+            free(entry);\n\
+            ostrin_allocation_count--;\n\
+            return;\n\
+        }\n\
+        link = &entry->next;\n\
+    }\n\
+    free(ptr);\n\
+}\n\
+\n\
+static void ostrin_mem_cleanup(void) {\n\
+    while (ostrin_allocations) {\n\
+        OstrinAllocation* entry = ostrin_allocations;\n\
+        ostrin_allocations = entry->next;\n\
+        free(entry->ptr);\n\
+        free(entry);\n\
+    }\n\
+    ostrin_allocation_count = 0;\n\
+}\n\
 \n\
 static int64_t ostrin_abs_i64(int64_t x) {\n\
     if (x == INT64_MIN) OSTRIN_FAIL(\"integer overflow: abs of the smallest Int\");\n\
@@ -405,7 +477,7 @@ static void ostrin_fmt_single(float v, char* buf, size_t n) {\n\
 }\n\
 \n\
 static const char* ostrin_single_to_string(float v) {\n\
-    char* out = (char*)malloc(64);\n\
+    char* out = (char*)ostrin_alloc(64);\n\
     ostrin_fmt_single(v, out, 64);\n\
     return out;\n\
 }\n\
@@ -417,19 +489,19 @@ static void ostrin_print_single(float v) {\n\
 }\n\
 \n\
 static const char* ostrin_int_to_string(int64_t v) {\n\
-    char* out = (char*)malloc(32);\n\
+    char* out = (char*)ostrin_alloc(32);\n\
     snprintf(out, 32, \"%lld\", (long long)v);\n\
     return out;\n\
 }\n\
 \n\
 static const char* ostrin_uint_to_string(uint64_t v) {\n\
-    char* out = (char*)malloc(32);\n\
+    char* out = (char*)ostrin_alloc(32);\n\
     snprintf(out, 32, \"%llu\", (unsigned long long)v);\n\
     return out;\n\
 }\n\
 \n\
 static const char* ostrin_float_to_string(double v) {\n\
-    char* out = (char*)malloc(64);\n\
+    char* out = (char*)ostrin_alloc(64);\n\
     ostrin_fmt_double(v, out, 64);\n\
     return out;\n\
 }\n\
@@ -442,8 +514,7 @@ static void ostrin_print_float(double v) {\n\
 \n\
 static char* ostrin_str_concat(const char* a, const char* b) {\n\
     size_t len = strlen(a) + strlen(b) + 1;\n\
-    char* out = (char*)malloc(len);\n\
-    if (!out) { fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); }\n\
+    char* out = (char*)ostrin_alloc(len);\n\
     snprintf(out, len, \"%s%s\", a, b);\n\
     return out;\n\
 }\n\
@@ -1242,7 +1313,7 @@ impl<'a> Codegen<'a> {
         let CType::Record(inst) = self.instance_type(base, inst_args)? else { unreachable!() };
         let temp = self.next_temp();
         let mut body = format!(
-            "{inst}* {temp} = ({inst}*)malloc(sizeof({inst})); \
+            "{inst}* {temp} = ({inst}*)ostrin_alloc(sizeof({inst})); \
              if (!{temp}) {{ fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); }} "
         );
         for (field_name, code, ty) in values {
@@ -1510,7 +1581,7 @@ impl<'a> Codegen<'a> {
             "NULL".to_string()
         } else {
             let copies: String = frame.captures.iter().map(|(n, _)| format!("__ce->{n} = {n}; ")).collect();
-            format!("({{ OstrinEnv_{id}* __ce = malloc(sizeof *__ce); if (!__ce) OSTRIN_OOM(); {copies}(void*)__ce; }})")
+            format!("({{ OstrinEnv_{id}* __ce = ostrin_alloc(sizeof *__ce); {copies}(void*)__ce; }})")
         };
         let ty = CType::Fn(param_types, Box::new(ret));
         Ok((format!("((OstrinClosure){{ (void*){fn_name}, {env} }})"), ty))
@@ -2799,7 +2870,7 @@ impl<'a> Codegen<'a> {
         }
         let temp = self.next_temp();
         let mut body = format!(
-            "{name}* {temp} = ({name}*)malloc(sizeof({name})); \
+            "{name}* {temp} = ({name}*)ostrin_alloc(sizeof({name})); \
              if (!{temp}) {{ fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); }} "
         );
         for (field_name, value_expr) in fields {
@@ -4496,7 +4567,7 @@ impl<'a> Codegen<'a> {
                 Ok(Some((
                     format!(
                         "({{ int64_t {r}_n; int64_t* {r}_c; const char*** {r}_rows = ostrin_s_csv({t}, &{r}_n, &{r}_c); \
-                         {inner_ptr}* {r}_lists = ({inner_ptr}*)malloc(sizeof({inner_ptr}) * (size_t)({r}_n + 1)); \
+                         {inner_ptr}* {r}_lists = ({inner_ptr}*)ostrin_alloc(sizeof({inner_ptr}) * (size_t)({r}_n + 1)); \
                          for (int64_t {r}_i = 0; {r}_i < {r}_n; {r}_i++) {{ {r}_lists[{r}_i] = {inner_c}_new_from_array({r}_rows[{r}_i], {r}_c[{r}_i]); }} \
                          {outer_c}_new_from_array({r}_lists, {r}_n); }})",
                         t = codes[0],
@@ -4513,8 +4584,7 @@ impl<'a> Codegen<'a> {
                         "({{ Result_String_String {r}; memset(&{r}, 0, sizeof {r}); FILE* {a} = fopen({p}, \"rb\"); \
                          if (!{a}) {{ {r}.error = strerror(errno); }} else {{ \
                          fseek({a}, 0, SEEK_END); long {b} = ftell({a}); fseek({a}, 0, SEEK_SET); \
-                         char* {c} = (char*)malloc((size_t){b} + 1); \
-                         if (!{c}) {{ fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); }} \
+                         char* {c} = (char*)ostrin_alloc((size_t){b} + 1); \
                          size_t {r}_n = fread({c}, 1, (size_t){b}, {a}); {c}[{r}_n] = 0; fclose({a}); \
                          {r}.ok = true; {r}.value = {c}; }} {r}; }})",
                         p = codes[0]
@@ -5315,11 +5385,11 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>, tr
 
             let new_sig = format!("static {struct_name}* {struct_name}_new_from_array({elem_c}* src_items, int64_t count)");
             let new_body = format!(
-                "    {struct_name}* list = ({struct_name}*)malloc(sizeof({struct_name}));\n\
+                "    {struct_name}* list = ({struct_name}*)ostrin_alloc(sizeof({struct_name}));\n\
                  \x20   if (!list) {{ fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); }}\n\
                  \x20   list->capacity = count > 0 ? count : 1;\n\
                  \x20   list->length = count;\n\
-                 \x20   list->items = ({elem_c}*)malloc(sizeof({elem_c}) * (size_t)list->capacity);\n\
+                 \x20   list->items = ({elem_c}*)ostrin_alloc(sizeof({elem_c}) * (size_t)list->capacity);\n\
                  \x20   if (!list->items) {{ fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); }}\n\
                  \x20   for (int64_t i = 0; i < count; i++) {{ list->items[i] = src_items[i]; }}\n\
                  \x20   return list;\n"
@@ -5329,7 +5399,7 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>, tr
             let push_body = format!(
                 "    if (list->length >= list->capacity) {{\n\
                  \x20       list->capacity = list->capacity == 0 ? 4 : list->capacity * 2;\n\
-                 \x20       list->items = ({elem_c}*)realloc(list->items, sizeof({elem_c}) * (size_t)list->capacity);\n\
+                 \x20       list->items = ({elem_c}*)ostrin_realloc(list->items, sizeof({elem_c}) * (size_t)list->capacity);\n\
                  \x20       if (!list->items) {{ fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); }}\n\
                  \x20   }}\n\
                  \x20   list->items[list->length] = value;\n\
@@ -5476,7 +5546,6 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>, tr
                 array_blocks.push(text);
                 continue;
             }
-            let oom = "if (!p) { fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); }";
             let mut funcs: Vec<(String, String)> = Vec::new();
             match &ty {
                 CType::Map(k, v) => {
@@ -5487,10 +5556,10 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>, tr
                     let (lk, lv) = (list_struct_name(k), list_struct_name(v));
                     let eq = codegen.eq_expr("m->keys[i]", "key", k)?;
                     list_type_decls.push_str(&format!("struct {name} {{\n    {kc}* keys;\n    {vc}* vals;\n    int64_t length;\n    int64_t capacity;\n}};\n\n"));
-                    funcs.push((format!("static {name}* {name}_new(void)"), format!("    {name}* m = ({name}*)calloc(1, sizeof({name}));\n    {}\n    return m;\n", oom.replace("!p", "!m"))));
+                    funcs.push((format!("static {name}* {name}_new(void)"), format!("    {name}* m = ({name}*)ostrin_calloc(1, sizeof({name}));\n    return m;\n")));
                     funcs.push((format!("static int64_t {name}_find({name}* m, {kc} key)"), format!("    for (int64_t i = 0; i < m->length; i++) {{ if ({eq}) return i; }}\n    return -1;\n")));
                     funcs.push((format!("static void {name}_set({name}* m, {kc} key, {vc} value)"), format!(
-                        "    int64_t i = {name}_find(m, key);\n    if (i >= 0) {{ m->keys[i] = key; m->vals[i] = value; return; }}\n    if (m->length >= m->capacity) {{\n        m->capacity = m->capacity == 0 ? 4 : m->capacity * 2;\n        m->keys = ({kc}*)realloc(m->keys, sizeof({kc}) * (size_t)m->capacity);\n        m->vals = ({vc}*)realloc(m->vals, sizeof({vc}) * (size_t)m->capacity);\n        if (!m->keys || !m->vals) {{ fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); }}\n    }}\n    m->keys[m->length] = key;\n    m->vals[m->length] = value;\n    m->length = m->length + 1;\n")));
+                        "    int64_t i = {name}_find(m, key);\n    if (i >= 0) {{ m->keys[i] = key; m->vals[i] = value; return; }}\n    if (m->length >= m->capacity) {{\n        m->capacity = m->capacity == 0 ? 4 : m->capacity * 2;\n        m->keys = ({kc}*)ostrin_realloc(m->keys, sizeof({kc}) * (size_t)m->capacity);\n        m->vals = ({vc}*)ostrin_realloc(m->vals, sizeof({vc}) * (size_t)m->capacity);\n    }}\n    m->keys[m->length] = key;\n    m->vals[m->length] = value;\n    m->length = m->length + 1;\n")));
                     funcs.push((format!("static {opt} {name}_get({name}* m, {kc} key)"), format!("    {opt} r;\n    memset(&r, 0, sizeof r);\n    int64_t i = {name}_find(m, key);\n    if (i >= 0) {{ r.has = true; r.value = m->vals[i]; }}\n    return r;\n")));
                     funcs.push((format!("static bool {name}_contains_key({name}* m, {kc} key)"), format!("    return {name}_find(m, key) >= 0;\n")));
                     funcs.push((format!("static int64_t {name}_count({name}* m)"), "    return m->length;\n".to_string()));
@@ -5505,20 +5574,20 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>, tr
                     let tc = c_type_name(t);
                     let opt = c_type_name(&CType::Option(t.clone()));
                     list_type_decls.push_str(&format!("struct {name} {{\n    {tc}* items;\n    int64_t head;\n    int64_t length;\n    int64_t capacity;\n    bool closed;\n}};\n\n"));
-                    funcs.push((format!("static {name}* {name}_new(void)"), format!("    {name}* c = ({name}*)calloc(1, sizeof({name}));\n    if (!c) {{ fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); }}\n    return c;\n")));
+                    funcs.push((format!("static {name}* {name}_new(void)"), format!("    {name}* c = ({name}*)ostrin_calloc(1, sizeof({name}));\n    return c;\n")));
                     funcs.push((format!("static void {name}_send({name}* c, {tc} item)"), format!(
-                        "    if (c->length >= c->capacity) {{\n        c->capacity = c->capacity == 0 ? 4 : c->capacity * 2;\n        c->items = ({tc}*)realloc(c->items, sizeof({tc}) * (size_t)c->capacity);\n        if (!c->items) {{ fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); }}\n    }}\n    c->items[c->length] = item;\n    c->length = c->length + 1;\n")));
+                        "    if (c->length >= c->capacity) {{\n        c->capacity = c->capacity == 0 ? 4 : c->capacity * 2;\n        c->items = ({tc}*)ostrin_realloc(c->items, sizeof({tc}) * (size_t)c->capacity);\n    }}\n    c->items[c->length] = item;\n    c->length = c->length + 1;\n")));
                     funcs.push((format!("static {opt} {name}_receive({name}* c)"), format!("    {opt} r;\n    memset(&r, 0, sizeof r);\n    if (c->head < c->length) {{ r.has = true; r.value = c->items[c->head++]; }}\n    return r;\n")));
                 }
                 CType::Set(t) => {
                     let tc = c_type_name(t);
                     let eq = codegen.eq_expr("s->items[i]", "item", t)?;
                     list_type_decls.push_str(&format!("struct {name} {{\n    {tc}* items;\n    int64_t length;\n    int64_t capacity;\n}};\n\n"));
-                    funcs.push((format!("static {name}* {name}_new(void)"), format!("    {name}* s = ({name}*)calloc(1, sizeof({name}));\n    {}\n    return s;\n", oom.replace("!p", "!s"))));
+                    funcs.push((format!("static {name}* {name}_new(void)"), format!("    {name}* s = ({name}*)ostrin_calloc(1, sizeof({name}));\n    return s;\n")));
                     funcs.push((format!("static int64_t {name}_find({name}* s, {tc} item)"), format!("    for (int64_t i = 0; i < s->length; i++) {{ if ({eq}) return i; }}\n    return -1;\n")));
                     funcs.push((format!("static bool {name}_contains({name}* s, {tc} item)"), format!("    return {name}_find(s, item) >= 0;\n")));
                     funcs.push((format!("static void {name}_add({name}* s, {tc} item)"), format!(
-                        "    if ({name}_find(s, item) >= 0) return;\n    if (s->length >= s->capacity) {{\n        s->capacity = s->capacity == 0 ? 4 : s->capacity * 2;\n        s->items = ({tc}*)realloc(s->items, sizeof({tc}) * (size_t)s->capacity);\n        if (!s->items) {{ fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); }}\n    }}\n    s->items[s->length] = item;\n    s->length = s->length + 1;\n")));
+                        "    if ({name}_find(s, item) >= 0) return;\n    if (s->length >= s->capacity) {{\n        s->capacity = s->capacity == 0 ? 4 : s->capacity * 2;\n        s->items = ({tc}*)ostrin_realloc(s->items, sizeof({tc}) * (size_t)s->capacity);\n    }}\n    s->items[s->length] = item;\n    s->length = s->length + 1;\n")));
                     funcs.push((format!("static void {name}_remove({name}* s, {tc} item)"), format!("    int64_t i = {name}_find(s, item);\n    if (i < 0) return;\n    for (int64_t j = i; j < s->length - 1; j++) {{ s->items[j] = s->items[j + 1]; }}\n    s->length = s->length - 1;\n")));
                     funcs.push((format!("static int64_t {name}_count({name}* s)"), "    return s->length;\n".to_string()));
                 }
@@ -5796,7 +5865,7 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>, tr
     for (signature, body) in bodies {
         out.push_str(&format!("{signature} {{\n{body}}}\n\n"));
     }
-    out.push_str("int main(void) {\n    ostrin_main();\n    return 0;\n}\n");
+    out.push_str("int main(void) {\n    atexit(ostrin_mem_cleanup);\n    ostrin_main();\n    return 0;\n}\n");
     if out.contains("Qty") {
         out = out.replacen(PRELUDE, &format!("{PRELUDE}{QTY_RUNTIME}"), 1);
     }

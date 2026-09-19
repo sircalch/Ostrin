@@ -12,7 +12,7 @@ static uint64_t ostrin_splitmix64(uint64_t* x) {
 }
 
 static OstrinRng* ostrin_rng_new(int64_t seed) {
-    OstrinRng* r = (OstrinRng*)malloc(sizeof(OstrinRng));
+    OstrinRng* r = (OstrinRng*)ostrin_alloc(sizeof(OstrinRng));
     if (!r) OSTRIN_OOM();
     uint64_t x = (uint64_t)seed;
     for (int i = 0; i < 4; i++) r->s[i] = ostrin_splitmix64(&x);

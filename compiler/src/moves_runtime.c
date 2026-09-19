@@ -22,11 +22,11 @@ static void ostrin_mark_moved(void* p) {
         void** old = ostrin_moved_table;
         uint64_t old_capacity = ostrin_moved_capacity;
         ostrin_moved_capacity = old_capacity ? old_capacity * 2 : 64;
-        ostrin_moved_table = (void**)calloc(ostrin_moved_capacity, sizeof(void*));
+        ostrin_moved_table = (void**)ostrin_calloc(ostrin_moved_capacity, sizeof(void*));
         if (!ostrin_moved_table) OSTRIN_OOM();
         ostrin_moved_count = 0;
         for (uint64_t i = 0; i < old_capacity; i++) if (old[i]) ostrin_moved_insert_raw(old[i]);
-        free(old);
+        ostrin_free(old);
     }
     ostrin_moved_insert_raw(p);
 }

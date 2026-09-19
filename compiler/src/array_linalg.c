@@ -48,7 +48,7 @@ static @N@* @N@_eigvals(@N@* a) {
     for (int64_t i = 0; i < n; i++)
         for (int64_t j = i + 1; j < n; j++)
             if (fabs(a->data[i * n + j] - a->data[j * n + i]) > 1e-9 * (1.0 + fabs(a->data[i * n + j]))) OSTRIN_FAIL("eigvals needs a symmetric matrix");
-    double* m = (double*)malloc(sizeof(double) * (size_t)(n * n));
+    double* m = (double*)ostrin_alloc(sizeof(double) * (size_t)(n * n));
     if (!m) OSTRIN_OOM();
     memcpy(m, a->data, sizeof(double) * (size_t)(n * n));
     for (int sweep = 0; sweep < 100; sweep++) {
@@ -77,7 +77,7 @@ static @N@* @N@_eigvals(@N@* a) {
         }
         if (!rotated) break;
     }
-    double* values = (double*)malloc(sizeof(double) * (size_t)n);
+    double* values = (double*)ostrin_alloc(sizeof(double) * (size_t)n);
     if (!values) OSTRIN_OOM();
     for (int64_t i = 0; i < n; i++) values[i] = m[i * n + i];
     for (int64_t i = 1; i < n; i++) {
@@ -85,7 +85,7 @@ static @N@* @N@_eigvals(@N@* a) {
         while (j > 0 && values[j - 1] > values[j]) { double t = values[j - 1]; values[j - 1] = values[j]; values[j] = t; j--; }
     }
     @N@* r = @N@_vector(n, values);
-    free(m); free(values);
+    ostrin_free(m); ostrin_free(values);
     return r;
 }
 
@@ -123,11 +123,11 @@ static void @N@_square_check(@N@* a, const char* what) {
 static double @N@_det(@N@* a) {
     @N@_square_check(a, "det");
     int64_t n = a->shape[0];
-    double* m = (double*)malloc(sizeof(double) * (size_t)(n * n));
+    double* m = (double*)ostrin_alloc(sizeof(double) * (size_t)(n * n));
     if (!m) OSTRIN_OOM();
     memcpy(m, a->data, sizeof(double) * (size_t)(n * n));
     double d = @N@_det_raw(m, n);
-    free(m);
+    ostrin_free(m);
     return d;
 }
 
@@ -144,9 +144,9 @@ static @N@* @N@_inv(@N@* a) {
     int64_t n = a->shape[0];
     int64_t shape[2] = { n, n };
     @N@* r = @N@_alloc(2, shape);
-    double* m = (double*)malloc(sizeof(double) * (size_t)(n * n));
-    double* v = (double*)malloc(sizeof(double) * (size_t)n);
-    double* x = (double*)malloc(sizeof(double) * (size_t)n);
+    double* m = (double*)ostrin_alloc(sizeof(double) * (size_t)(n * n));
+    double* v = (double*)ostrin_alloc(sizeof(double) * (size_t)n);
+    double* x = (double*)ostrin_alloc(sizeof(double) * (size_t)n);
     if (!m || !v || !x) OSTRIN_OOM();
     for (int64_t j = 0; j < n; j++) {
         memcpy(m, a->data, sizeof(double) * (size_t)(n * n));
@@ -155,7 +155,7 @@ static @N@* @N@_inv(@N@* a) {
         @N@_solve_raw(m, v, n, x);
         for (int64_t i = 0; i < n; i++) r->data[i * n + j] = x[i];
     }
-    free(m); free(v); free(x);
+    ostrin_free(m); ostrin_free(v); ostrin_free(x);
     return r;
 }
 
@@ -171,15 +171,15 @@ static @N@* @N@_eye(int64_t n) {
 static @N@* @N@_solve(@N@* a, @N@* b) {
     if (a->rank != 2 || a->shape[0] != a->shape[1] || b->rank != 1 || b->shape[0] != a->shape[0]) OSTRIN_FAIL("solve needs an (n, n) matrix and a vector of length n");
     int64_t n = a->shape[0];
-    double* m = (double*)malloc(sizeof(double) * (size_t)(n * n));
-    double* v = (double*)malloc(sizeof(double) * (size_t)n);
-    double* x = (double*)malloc(sizeof(double) * (size_t)n);
+    double* m = (double*)ostrin_alloc(sizeof(double) * (size_t)(n * n));
+    double* v = (double*)ostrin_alloc(sizeof(double) * (size_t)n);
+    double* x = (double*)ostrin_alloc(sizeof(double) * (size_t)n);
     if (!m || !v || !x) OSTRIN_OOM();
     memcpy(m, a->data, sizeof(double) * (size_t)(n * n));
     memcpy(v, b->data, sizeof(double) * (size_t)n);
     @N@_solve_raw(m, v, n, x);
     @N@* r = @N@_vector(n, x);
-    free(m); free(v); free(x);
+    ostrin_free(m); ostrin_free(v); ostrin_free(x);
     return r;
 }
 
@@ -209,10 +209,10 @@ static @N@* @N@_polyfit(@N@* x, @N@* y, int64_t degree) {
     if (x->rank != 1 || y->rank != 1 || x->size != y->size) OSTRIN_FAIL("polyfit needs two one-dimensional arrays of the same length");
     if (degree < 0 || degree + 1 > x->size) OSTRIN_FAIL("polyfit needs 0 <= degree < number of points");
     int64_t d = degree, k = d + 1, n = x->size;
-    double* powers = (double*)malloc(sizeof(double) * (size_t)(n * (2 * d + 1)));
-    double* a = (double*)malloc(sizeof(double) * (size_t)(k * k));
-    double* b = (double*)malloc(sizeof(double) * (size_t)k);
-    double* sol = (double*)malloc(sizeof(double) * (size_t)k);
+    double* powers = (double*)ostrin_alloc(sizeof(double) * (size_t)(n * (2 * d + 1)));
+    double* a = (double*)ostrin_alloc(sizeof(double) * (size_t)(k * k));
+    double* b = (double*)ostrin_alloc(sizeof(double) * (size_t)k);
+    double* sol = (double*)ostrin_alloc(sizeof(double) * (size_t)k);
     if (!powers || !a || !b || !sol) OSTRIN_OOM();
     int64_t stride = 2 * d + 1;
     for (int64_t i = 0; i < n; i++) {
@@ -231,7 +231,7 @@ static @N@* @N@_polyfit(@N@* x, @N@* y, int64_t degree) {
     }
     @N@_solve_raw(a, b, k, sol);
     @N@* r = @N@_vector(k, sol);
-    free(powers); free(a); free(b); free(sol);
+    ostrin_free(powers); ostrin_free(a); ostrin_free(b); ostrin_free(sol);
     return r;
 }
 

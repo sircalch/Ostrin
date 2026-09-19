@@ -6,14 +6,14 @@
  * instantiation. Mirrors interpreter/array.rs operation for operation (same
  * accumulation order, same error conditions). */
 static @N@* @N@_alloc(int64_t rank, const int64_t* shape) {
-    @N@* r = (@N@*)calloc(1, sizeof(@N@));
+    @N@* r = (@N@*)ostrin_calloc(1, sizeof(@N@));
     if (!r) OSTRIN_OOM();
     int64_t size = 1;
     for (int64_t i = 0; i < rank; i++) size *= shape[i];
     r->rank = rank;
     r->size = size;
-    r->shape = (int64_t*)malloc(sizeof(int64_t) * (size_t)rank);
-    r->data = (@T@*)malloc(sizeof(@T@) * (size_t)size);
+    r->shape = (int64_t*)ostrin_alloc(sizeof(int64_t) * (size_t)rank);
+    r->data = (@T@*)ostrin_alloc(sizeof(@T@) * (size_t)size);
     if (!r->shape || !r->data) OSTRIN_OOM();
     memcpy(r->shape, shape, sizeof(int64_t) * (size_t)rank);
     return r;
@@ -79,8 +79,8 @@ static @T@ @N@_apply(int op, @T@ x, @T@ y) {
 
 static @N@* @N@_binop(@N@* a, @N@* b, int op) {
     int64_t rank = a->rank > b->rank ? a->rank : b->rank;
-    int64_t* shape = (int64_t*)malloc(sizeof(int64_t) * (size_t)rank);
-    int64_t* coords = (int64_t*)malloc(sizeof(int64_t) * (size_t)rank);
+    int64_t* shape = (int64_t*)ostrin_alloc(sizeof(int64_t) * (size_t)rank);
+    int64_t* coords = (int64_t*)ostrin_alloc(sizeof(int64_t) * (size_t)rank);
     if (!shape || !coords) OSTRIN_OOM();
     for (int64_t i = 0; i < rank; i++) {
         int64_t da = i < rank - a->rank ? 1 : a->shape[i - (rank - a->rank)];
@@ -105,8 +105,8 @@ static @N@* @N@_binop(@N@* a, @N@* b, int op) {
         }
         r->data[lin] = @N@_apply(op, a->data[ia], b->data[ib]);
     }
-    free(shape);
-    free(coords);
+    ostrin_free(shape);
+    ostrin_free(coords);
     return r;
 }
 
@@ -125,8 +125,8 @@ static int @N@_cmp_apply(int op, @T@ x, @T@ y) {
 
 static Array_Bool* @N@_cmp(@N@* a, @N@* b, int op) {
     int64_t rank = a->rank > b->rank ? a->rank : b->rank;
-    int64_t* shape = (int64_t*)malloc(sizeof(int64_t) * (size_t)rank);
-    int64_t* coords = (int64_t*)malloc(sizeof(int64_t) * (size_t)rank);
+    int64_t* shape = (int64_t*)ostrin_alloc(sizeof(int64_t) * (size_t)rank);
+    int64_t* coords = (int64_t*)ostrin_alloc(sizeof(int64_t) * (size_t)rank);
     if (!shape || !coords) OSTRIN_OOM();
     for (int64_t i = 0; i < rank; i++) {
         int64_t da = i < rank - a->rank ? 1 : a->shape[i - (rank - a->rank)];
@@ -151,8 +151,8 @@ static Array_Bool* @N@_cmp(@N@* a, @N@* b, int op) {
         }
         r->data[lin] = @N@_cmp_apply(op, a->data[ia], b->data[ib]);
     }
-    free(shape);
-    free(coords);
+    ostrin_free(shape);
+    ostrin_free(coords);
     return r;
 }
 
@@ -225,8 +225,8 @@ static @N@* @N@_where(Array_Bool* m, @N@* a, @N@* b) {
     int64_t rank = m->rank;
     if (a->rank > rank) rank = a->rank;
     if (b->rank > rank) rank = b->rank;
-    int64_t* shape = (int64_t*)malloc(sizeof(int64_t) * (size_t)rank);
-    int64_t* coords = (int64_t*)malloc(sizeof(int64_t) * (size_t)rank);
+    int64_t* shape = (int64_t*)ostrin_alloc(sizeof(int64_t) * (size_t)rank);
+    int64_t* coords = (int64_t*)ostrin_alloc(sizeof(int64_t) * (size_t)rank);
     if (!shape || !coords) OSTRIN_OOM();
     for (int64_t i = 0; i < rank; i++) {
         int64_t dm = i < rank - m->rank ? 1 : m->shape[i - (rank - m->rank)];
@@ -247,8 +247,8 @@ static @N@* @N@_where(Array_Bool* m, @N@* a, @N@* b) {
         for (int64_t d = 0; d < b->rank; d++) { int64_t dim = b->shape[d]; ib = ib * dim + (dim == 1 ? 0 : coords[d + (rank - b->rank)]); }
         r->data[lin] = m->data[im] ? a->data[ia] : b->data[ib];
     }
-    free(shape);
-    free(coords);
+    ostrin_free(shape);
+    ostrin_free(coords);
     return r;
 }
 
@@ -286,12 +286,12 @@ static void @N@_msort(@T@* v, @T@* tmp, int64_t lo, int64_t hi) {
 }
 
 static @T@* @N@_sorted_flat(@N@* a) {
-    @T@* v = (@T@*)malloc(sizeof(@T@) * (size_t)a->size);
-    @T@* tmp = (@T@*)malloc(sizeof(@T@) * (size_t)a->size);
+    @T@* v = (@T@*)ostrin_alloc(sizeof(@T@) * (size_t)a->size);
+    @T@* tmp = (@T@*)ostrin_alloc(sizeof(@T@) * (size_t)a->size);
     if (!v || !tmp) OSTRIN_OOM();
     memcpy(v, a->data, sizeof(@T@) * (size_t)a->size);
     @N@_msort(v, tmp, 0, a->size);
-    free(tmp);
+    ostrin_free(tmp);
     return v;
 }
 
@@ -300,7 +300,7 @@ static @N@* @N@_sort(@N@* a) {
     @N@* r = @N@_alloc(1, a->shape);
     @T@* v = @N@_sorted_flat(a);
     memcpy(r->data, v, sizeof(@T@) * (size_t)a->size);
-    free(v);
+    ostrin_free(v);
     return r;
 }
 
@@ -375,8 +375,8 @@ static @N@* @N@_sum_axis(@N@* a, int64_t axis) {
     if (a->rank < 2) OSTRIN_FAIL("sum_axis needs at least two dimensions");
     if (axis < 0 || axis >= a->rank) OSTRIN_FAIL("the axis is out of range");
     int64_t orank = a->rank - 1;
-    int64_t* oshape = (int64_t*)malloc(sizeof(int64_t) * (size_t)orank);
-    int64_t* coords = (int64_t*)malloc(sizeof(int64_t) * (size_t)a->rank);
+    int64_t* oshape = (int64_t*)ostrin_alloc(sizeof(int64_t) * (size_t)orank);
+    int64_t* coords = (int64_t*)ostrin_alloc(sizeof(int64_t) * (size_t)a->rank);
     if (!oshape || !coords) OSTRIN_OOM();
     for (int64_t d = 0, o = 0; d < a->rank; d++) if (d != axis) oshape[o++] = a->shape[d];
     @N@* r = @N@_alloc(orank, oshape);
@@ -392,8 +392,8 @@ static @N@* @N@_sum_axis(@N@* a, int64_t axis) {
         }
         r->data[lin] = acc;
     }
-    free(oshape);
-    free(coords);
+    ostrin_free(oshape);
+    ostrin_free(coords);
     return r;
 }
 

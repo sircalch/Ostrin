@@ -54,6 +54,12 @@
   `container.map<U>(value)`. The existing monomorphization queue remains the
   single source of concrete C bodies; the differential HIR ratchet is now 115
   (119 measured).
+- Native memory now goes through one generated runtime API
+  (`ostrin_alloc`/`ostrin_calloc`/`ostrin_realloc`/`ostrin_free`). Every generated
+  heap block is registered and reclaimed at process exit, including records,
+  closures, collections, strings, arrays and runtime buffers. This is the first
+  leak-free baseline for native programs; scope-level ARC, ownership checking and
+  type-aware destructors remain the next memory milestone.
 - Module loader now rewrites types in signatures, fields, variants and annotations
   (a `record` from another module can be used as a type).
 - CI on Linux, macOS and Windows.
