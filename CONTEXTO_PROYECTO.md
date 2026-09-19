@@ -3585,3 +3585,7 @@ Errores reales de los módulos que salieron a la luz y se corrigieron:
 - `modules.rs` reescribía los nombres en los cuerpos pero **no en tipos de firmas, campos de records, variantes, anotaciones de bindings ni `List<T>[]` vacíos**; un `record` de un módulo no se podía usar como tipo entre módulos (`declared to return 'Table' but its body evaluates to 'pkg.mod::Table'`). Ahora `rewrite_signature`/`rewrite_type` cubren params, retorno, campos, variantes, métodos de impl/trait y anotaciones.
 - Nativo: los nombres calificados (`pkg.mod::f`, `pkg.mod::Table`) no son identificadores C. Las funciones se sanean en `c_function_name`; los tipos, con un reemplazo único sobre el C final.
 El ejemplo `pkg_project` ya compila también en nativo.
+
+## 115. Agregaciones en la biblioteca de tablas
+
+`tables` gana `unique`, `head`, `group_mean` y `group_count` (agrupar por columna, orden de primera aparición) escritas en Ostrin; el ejemplo `data_project/app` imprime n y media por ciudad, idéntico en intérprete y nativo. Sintaxis a recordar: `and`/`or`/`not` (no `&&`/`!`).

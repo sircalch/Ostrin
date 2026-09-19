@@ -74,3 +74,47 @@ pub fn describe(t: Table, name: String) -> Void {
     x = floats(t, name)
     print(name + ": n=" + x.length().to_string() + " mean=" + x.mean().to_string() + " std=" + x.std().to_string() + " min=" + x.min().to_string() + " max=" + x.max().to_string())
 }
+
+pub fn unique(t: Table, name: String) -> List<String> {
+    j = col_index(t, name)
+    mut seen: List<String> = []
+    for text in t.cols[j] {
+        mut found = false
+        for other in seen {
+            if other == text { found = true }
+        }
+        if found == false { seen.push(text) }
+    }
+    seen
+}
+
+pub fn head(t: Table, n: Int) -> Table {
+    mut cols: List<List<String>> = []
+    for column in t.cols {
+        mut kept: List<String> = []
+        mut i = 0
+        while i < n and i < column.length() {
+            kept.push(column[i])
+            i = i + 1
+        }
+        cols.push(kept)
+    }
+    Table { names: t.names, cols: cols }
+}
+
+/// Media de la columna `value` por cada valor distinto de `key` (mismo orden que `unique`).
+pub fn group_mean(t: Table, key: String, value: String) -> List<Float> {
+    mut means: List<Float> = []
+    for k in unique(t, key) {
+        means.push(floats(filter_rows(t, key, k), value).mean())
+    }
+    means
+}
+
+pub fn group_count(t: Table, key: String) -> List<Int> {
+    mut counts: List<Int> = []
+    for k in unique(t, key) {
+        counts.push(table_rows(filter_rows(t, key, k)))
+    }
+    counts
+}

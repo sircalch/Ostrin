@@ -1708,5 +1708,5 @@ fn table_library_module_runs_identically_in_both_backends() {
     let _ = fs::remove_file(&exe);
     let native_text = String::from_utf8_lossy(&native.stdout).to_string();
     assert_eq!(stdout(&interpreted).lines().collect::<Vec<_>>(), native_text.lines().collect::<Vec<_>>());
-    assert!(stdout(&interpreted).contains("temp: n=3 mean=19"), "unexpected output: {}", stdout(&interpreted));
+    assert!(stdout(&interpreted).contains("Cusco: n=2 media=11"), "unexpected output: {}", stdout(&interpreted));
 }
