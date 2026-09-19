@@ -582,6 +582,8 @@ struct Codegen<'a> {
     checker_types: Option<&'a HashMap<ExprKey, Ty>>,
     /// Integer literals the checker typed as fixed-width.
     literal_kinds: Option<&'a HashMap<ExprKey, LitKind>>,
+    /// Parameter counts from the HIR: a normalized call must match them.
+    hir_arities: HashMap<String, usize>,
     /// The checker's type of every AST node (by node address): the same lookup the HIR uses.
     node_types: Option<&'a HashMap<usize, Ty>>,
     /// Emit "moved after send" checks on record reads (needed once a record is sent through a channel).
@@ -2916,6 +2918,11 @@ impl<'a> Codegen<'a> {
                 args = &normalized;
             }
         }
+        if let Some(&arity) = self.hir_arities.get(name) {
+            if arity != args.len() {
+                self.type_report.divergences.push(format!("call to '{name}': native normalized {} argument(s), HIR expects {arity}", args.len()));
+            }
+        }
         let hints = self.signatures.get(name).map(|(params, _)| params.clone()).unwrap_or_default();
         let (arg_codes, arg_types) = self.gen_args_hinted(args, &hints)?;
         if name == "print" {
@@ -4245,6 +4252,7 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>, tr
         checker_types,
         call_substs,
         literal_kinds: typed.map(|t| &t.literal_kinds),
+        hir_arities: typed.map(|t| crate::hir::lower(items, t).arities).unwrap_or_default(),
         node_types: typed.map(|t| &t.node_types),
         track_moves,
         saw_record_send: false,

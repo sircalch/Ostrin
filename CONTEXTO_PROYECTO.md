@@ -3532,3 +3532,7 @@ Cierra el aviso de reproducibilidad del §96.
 ## 106. Una sola definición de argumentos nombrados/por defecto (HIR ↔ backend nativo)
 
 Primer puente hacia el backend sobre HIR: la lógica que ordena argumentos nombrados y rellena valores por defecto vive ahora en `hir::arrange_arguments` (genérica sobre el tipo del argumento) y la usan tanto el HIR como `codegen::normalize_call_args` (que pasa a ser un adaptador fino). Antes eran dos implementaciones independientes. Pruebas: 6 diferenciales + 98 de integración verdes. El backend todavía genera desde el AST; la migración por familias de nodos (documento 20, etapa 2) continúa con literales/operadores.
+
+## 107. El backend nativo contrasta sus llamadas con la aridad del HIR
+
+`generate_impl` construye el HIR y guarda `hir_arities`; tras normalizar los argumentos de una llamada a función de usuario, si el número no coincide con el del HIR se registra una divergencia (que el test diferencial exige que sea 0). Es la primera comprobación cruzada HIR↔backend en llamadas; sirve de red de seguridad para migrar las llamadas al HIR. 6 + 98 pruebas verdes.
