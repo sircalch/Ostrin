@@ -1857,6 +1857,7 @@ fn native_backend_generic_records_and_enums_match_the_interpreter() {
         "native_named_args.ostrin",
         "native_concurrency.ostrin",
         "concurrency.ostrin",
+        "concurrency_scheduler.ostrin",
         "fibonacci.ostrin",
         "native_builtins.ostrin",
         "native_generic_methods.ostrin",

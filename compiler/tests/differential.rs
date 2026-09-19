@@ -46,10 +46,6 @@ const KNOWN_NATIVE_GAPS: &[(&str, &str)] = &[];
 /// (operating-system error text comes from `strerror` vs Rust's `io::Error`).
 const KNOWN_OUTPUT_DIFFERENCES: &[(&str, &str)] = &[
     ("stdlib_io.ostrin", "OS-specific error message text"),
-    (
-        "concurrency_scheduler.ostrin",
-        "the interpreter now defers cooperative tasks; the C backend is still synchronous",
-    ),
 ];
 
 /// Files that are syntax showcases, not runnable programs.

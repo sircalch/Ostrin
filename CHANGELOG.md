@@ -76,10 +76,10 @@
   closures and concurrency remain the next control-flow families.
 - Lowered the concurrency surface into explicit IR operations: task regions for `spawn`,
   `channel`/`send`/`receive`/`close` and `task_join`. This is the
-  compiler-side contract for a future native scheduler. The interpreter now has a deterministic
-  cooperative scheduler: `spawn` is deferred, `join` runs the task, `spawn_scope` drains child
-  tasks, and channel waits pump runnable tasks; the C backend remains synchronous until native
-  threads/channels are implemented.
+  compiler-side contract for the runtime. Both interpreter and C backend now have the same
+  deterministic cooperative semantics: `spawn` is deferred, `join` runs the task,
+  `spawn_scope` drains child tasks, and channel waits pump runnable tasks. Native OS threads,
+  blocking cross-thread channels, cancellation and `select` remain future work.
 - Module loader now rewrites types in signatures, fields, variants and annotations
   (a `record` from another module can be used as a type).
 - CI on Linux, macOS and Windows.

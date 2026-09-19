@@ -11,8 +11,9 @@ Decisiones de fondo ya cerradas:
 Estado de implementación: el intérprete ya ejecuta `spawn` con un scheduler cooperativo
 determinista. Las tareas se crean diferidas, `join` las completa, `spawn_scope` espera a sus
 hijas y `receive`/`for` bombean tareas pendientes para evitar que una espera abandone el
-programa prematuramente. Todavía no hay paralelismo de hilos del sistema operativo, canales
-bloqueantes entre hilos ni `select`; el backend C conserva su modelo síncrono.
+programa prematuramente. El intérprete y el backend C comparten esta semántica cooperativa
+determinista; todavía no hay paralelismo de hilos del sistema operativo, canales bloqueantes
+entre hilos ni `select`.
 
 La idea central de este documento es que Ostrin **no necesita un borrow checker al estilo Rust** para ser seguro en concurrencia, porque ya partimos de "inmutable por defecto" (documento 01). Un dato inmutable nunca puede tener una condición de carrera — no importa cuántas tareas lo lean a la vez. El único lugar donde hace falta una regla especial es en el manejo de datos `mut`, y ahí basta una regla simple y local (no un sistema de ownership/lifetimes que atraviese todo el lenguaje).
 

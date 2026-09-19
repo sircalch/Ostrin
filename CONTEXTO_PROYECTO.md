@@ -4019,5 +4019,24 @@ pendiente puede alimentar un canal consumido por la tarea anfitriona. La suite q
 **6 pruebas diferenciales y 113 de integración verdes**.
 
 Esta es concurrencia cooperativa determinista, no paralelismo de CPU. El siguiente paquete
-debe reutilizar estos estados y las operaciones de la IR para añadir una implementación nativa
-con hilos/canales bloqueantes, además de cancelación y `select`.
+debe reutilizar estos estados y las operaciones de la IR para añadir hilos/canales bloqueantes,
+además de cancelación y `select`.
+
+## 140. Scheduler cooperativo alineado en el backend C — 2026-09-18
+
+El backend nativo ya no ejecuta `spawn` como una expresión inmediata. Cada bloque se baja a un
+callback C con su entorno capturado por valor y se registra en un scheduler global cooperativo.
+Los handles `Task<T>` son heap-owned, tienen estados pendiente/en ejecución/completado y
+`join()` ejecuta el callback exactamente una vez; los joins cíclicos producen un error explícito.
+
+Los canales nativos ahora pueden bombear tareas pendientes cuando `receive()` no tiene datos,
+y el `for value in channel` usa ese mismo protocolo en lugar de leer la cola directamente.
+`spawn_scope` toma una marca del scheduler y drena las tareas creadas dentro de su alcance.
+Con esto, `concurrency.ostrin` y `concurrency_scheduler.ostrin` producen la misma salida en
+intérprete y C; la prueba dedicada nativa y la comparación diferencial protegen esa paridad.
+
+La paridad actual es cooperativa y determinista: no crea hilos del sistema operativo, no hace
+paralelismo de CPU y todavía no implementa cancelación ni `select`. La suite queda en **6
+pruebas diferenciales y 113 de integración verdes**. El siguiente bloque de runtime debe
+añadir el modo multi-hilo de forma opt-in o por backend, con canales sincronizados y una
+política clara para E/S y cancelación.

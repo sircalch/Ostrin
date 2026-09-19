@@ -113,10 +113,10 @@ enum CType {
     /// arrays searched linearly (like the interpreter's `Vec` state).
     Map(Box<CType>, Box<CType>),
     Set(Box<CType>),
-    /// `channel<T>()`: a FIFO queue in the heap, by reference. `spawn` runs
-    /// synchronously, exactly like the interpreter, so no locking is needed.
+    /// `channel<T>()`: a FIFO queue in the heap, by reference. Channels pump
+    /// pending native tasks cooperatively when a receive has no value yet.
     Channel(Box<CType>),
-    /// A finished `spawn` block's result (by value); `join()` reads it.
+    /// A heap task handle with a deferred callback; `join()` executes it once.
     Task(Box<CType>),
     /// A fixed-width integer other than `Int` (`UInt8`, `Int32`, …): a C `stdint` type.
     Sized(IntKind),
@@ -145,7 +145,7 @@ fn c_type_name(ty: &CType) -> String {
         CType::DynTrait(name) => format!("{name}_Dyn"),
         CType::List(elem) => format!("{}*", list_struct_name(elem)),
         CType::Map(..) | CType::Set(_) | CType::Channel(_) | CType::Array(_) => format!("{}*", mangle_ctype(ty)),
-        CType::Task(_) => mangle_ctype(ty),
+        CType::Task(_) => format!("{}*", mangle_ctype(ty)),
         CType::Sized(kind) => kind.c_type().to_string(),
         CType::Float32 => "float".to_string(),
         CType::Rng => "OstrinRng*".to_string(),
@@ -346,6 +346,47 @@ typedef struct OstrinAllocation {\n\
 \n\
 static OstrinAllocation* ostrin_allocations = NULL;\n\
 static size_t ostrin_allocation_count = 0;\n\
+typedef bool (*OstrinTaskPoll)(void*);\n\
+typedef struct OstrinTaskNode {\n\
+    void* task;\n\
+    OstrinTaskPoll poll;\n\
+    size_t ordinal;\n\
+    struct OstrinTaskNode* next;\n\
+} OstrinTaskNode;\n\
+\n\
+static OstrinTaskNode* ostrin_tasks = NULL;\n\
+static size_t ostrin_next_task_ordinal = 0;\n\
+\n\
+static void ostrin_register_task(void* task, OstrinTaskPoll poll) {\n\
+    OstrinTaskNode* node = (OstrinTaskNode*)malloc(sizeof *node);\n\
+    if (!node) OSTRIN_OOM();\n\
+    node->task = task;\n\
+    node->poll = poll;\n\
+    node->ordinal = ostrin_next_task_ordinal++;\n\
+    node->next = ostrin_tasks;\n\
+    ostrin_tasks = node;\n\
+}\n\
+\n\
+static bool ostrin_poll_tasks_from(size_t minimum_ordinal) {\n\
+    bool progress = false;\n\
+    for (OstrinTaskNode* node = ostrin_tasks; node; node = node->next) {\n\
+        if (node->ordinal >= minimum_ordinal && node->poll(node->task)) progress = true;\n\
+    }\n\
+    return progress;\n\
+}\n\
+\n\
+static bool ostrin_poll_all(void) {\n\
+    return ostrin_poll_tasks_from(0);\n\
+}\n\
+\n\
+static size_t ostrin_task_mark(void) {\n\
+    return ostrin_next_task_ordinal;\n\
+}\n\
+\n\
+static void ostrin_drain_tasks(size_t minimum_ordinal) {\n\
+    while (ostrin_poll_tasks_from(minimum_ordinal)) {}\n\
+}\n\
+\n\
 \n\
 static void ostrin_register_allocation(void* ptr) {\n\
     OstrinAllocation* entry = (OstrinAllocation*)malloc(sizeof *entry);\n\
@@ -401,6 +442,11 @@ static void ostrin_free(void* ptr) {\n\
 }\n\
 \n\
 static void ostrin_mem_cleanup(void) {\n\
+    while (ostrin_tasks) {\n\
+        OstrinTaskNode* node = ostrin_tasks;\n\
+        ostrin_tasks = node->next;\n\
+        free(node);\n\
+    }\n\
     while (ostrin_allocations) {\n\
         OstrinAllocation* entry = ostrin_allocations;\n\
         ostrin_allocations = entry->next;\n\
@@ -1587,6 +1633,63 @@ impl<'a> Codegen<'a> {
         Ok((format!("((OstrinClosure){{ (void*){fn_name}, {env} }})"), ty))
     }
 
+    /// A `spawn` block is a zero-argument closure whose callback is registered
+    /// with the native cooperative scheduler. Captures use the same by-value
+    /// environment mechanism as ordinary function values, so the native
+    /// backend now agrees with the interpreter that creation is deferred and
+    /// `join` is the operation that executes the body.
+    fn gen_task(&mut self, body: &Block) -> Result<(String, CType), String> {
+        let outer = std::mem::replace(&mut self.scopes, vec![HashMap::new()]);
+        self.capture_frames.borrow_mut().push(CaptureFrame { outer, captures: Vec::new() });
+        let saved_expected = self.expected.take();
+        self.lambda_depth += 1;
+        let result = self.gen_block_expr(body);
+        self.lambda_depth -= 1;
+        self.expected = saved_expected;
+        let frame = self.capture_frames.borrow_mut().pop().expect("frame pushed above");
+        self.scopes = frame.outer;
+        let (body_code, ret) = result?;
+        let id = self.closure_counter;
+        self.closure_counter += 1;
+        let fn_name = format!("ostrin_task_{id}");
+        let env_struct: String = frame.captures.iter().map(|(n, t)| format!("{} {n}; ", c_type_name(t))).collect();
+        let signature = format!("static {} {fn_name}(void* __env)", c_type_name(&ret));
+        let mut fn_body = String::new();
+        if !frame.captures.is_empty() {
+            fn_body.push_str(&format!("    OstrinEnv_{id}* __e = __env;\n"));
+            for (n, t) in &frame.captures {
+                fn_body.push_str(&format!("    {} {n} = __e->{n};\n", c_type_name(t)));
+            }
+        }
+        if ret == CType::Void {
+            fn_body.push_str(&format!("    {body_code};\n"));
+        } else {
+            fn_body.push_str(&format!("    return {body_code};\n"));
+        }
+        if !frame.captures.is_empty() {
+            self.closure_protos.push(format!("typedef struct {{ {env_struct}}} OstrinEnv_{id};"));
+        }
+        self.closure_protos.push(format!("{signature};"));
+        self.closure_bodies.push((signature, fn_body));
+
+        let env = if frame.captures.is_empty() {
+            "NULL".to_string()
+        } else {
+            let copies: String = frame.captures.iter().map(|(n, _)| format!("__ce->{n} = {n}; ")).collect();
+            format!("({{ OstrinEnv_{id}* __ce = ostrin_alloc(sizeof *__ce); {copies}(void*)__ce; }})")
+        };
+        let task_ty = CType::Task(Box::new(ret));
+        self.register_list_types(&task_ty);
+        let name = mangle_ctype(&task_ty);
+        let temp = self.next_temp();
+        Ok((
+            format!(
+                "({{ {name}* {temp} = ({name}*)ostrin_calloc(1, sizeof *{temp}); {temp}->run = {fn_name}; {temp}->env = {env}; ostrin_register_task({temp}, {name}_poll); {temp}; }})"
+            ),
+            task_ty,
+        ))
+    }
+
     fn function_usable_as_value(&self, name: &str) -> bool {
         self.signatures.contains_key(name) && self.function_decls.get(name).is_some_and(|d| d.generics.is_empty())
     }
@@ -1882,8 +1985,10 @@ impl<'a> Codegen<'a> {
         let (iter_code, iter_ty) = self.gen_expr(iter)?;
         if let CType::Channel(elem_ty) = &iter_ty {
             let ch = self.next_temp();
+            let item = self.next_temp();
+            let option = c_type_name(&CType::Option(elem_ty.clone()));
             out.push_str(&format!("    {{\n        {} {ch} = {iter_code};\n", c_type_name(&iter_ty)));
-            out.push_str(&format!("        while ({ch}->head < {ch}->length) {{\n            {} {pattern} = {ch}->items[{ch}->head++];\n", c_type_name(elem_ty)));
+            out.push_str(&format!("        for (;;) {{\n            {option} {item} = {}_receive({ch});\n            if (!{item}.has) break;\n            {} {pattern} = {item}.value;\n", mangle_ctype(&iter_ty), c_type_name(elem_ty)));
             self.push_scope();
             self.define(pattern, (**elem_ty).clone());
             self.gen_block_stmts(body, out)?;
@@ -2633,18 +2738,24 @@ impl<'a> Codegen<'a> {
                 self.gen_list_literal(items, expected.as_ref())
             }
             Expr::Spawn(block) => {
-                let (code, ty) = self.gen_block_expr(block)?;
-                let task_ty = CType::Task(Box::new(ty.clone()));
-                self.register_list_types(&task_ty);
-                let name = c_type_name(&task_ty);
-                let temp = self.next_temp();
-                Ok(if ty == CType::Void {
-                    (format!("({{ {code}; ({name}){{ 0 }}; }})"), task_ty)
-                } else {
-                    (format!("({{ {} {temp} = {code}; ({name}){{ {temp} }}; }})", c_type_name(&ty)), task_ty)
-                })
+                self.gen_task(block)
             }
-            Expr::SpawnScope(block) => self.gen_block_expr(block),
+            Expr::SpawnScope(block) => {
+                let (code, ty) = self.gen_block_expr(block)?;
+                let mark = self.next_temp();
+                if ty == CType::Void {
+                    Ok((
+                        format!("({{ size_t {mark} = ostrin_task_mark(); (void){code}; ostrin_drain_tasks({mark}); (void)0; }})"),
+                        CType::Void,
+                    ))
+                } else {
+                    let result = self.next_temp();
+                    Ok((
+                        format!("({{ size_t {mark} = ostrin_task_mark(); {} {result} = {code}; ostrin_drain_tasks({mark}); {result}; }})", c_type_name(&ty)),
+                        ty,
+                    ))
+                }
+            }
             Expr::Channel(elem, _) => {
                 let ty = CType::Channel(Box::new(self.resolve_type(elem)?));
                 self.register_list_types(&ty);
@@ -4154,11 +4265,9 @@ impl<'a> Codegen<'a> {
                 if method_name != "join" || !args.is_empty() {
                     return Err(format!("Task has no method '{method_name}' the native backend supports"));
                 }
-                if **t == CType::Void {
-                    Ok((format!("({{ (void)({obj_code}); (void)0; }})"), CType::Void))
-                } else {
-                    Ok((format!("({obj_code}).value"), (**t).clone()))
-                }
+                self.register_list_types(&obj_ty);
+                let name = mangle_ctype(&obj_ty);
+                Ok((format!("{name}_join({obj_code})"), if **t == CType::Void { CType::Void } else { (**t).clone() }))
             }
             CType::Channel(t) => {
                 let t = (**t).clone();
@@ -5567,9 +5676,27 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>, tr
                     funcs.push((format!("static {list_k} {name}_keys({name}* m)"), format!("    return {lk}_new_from_array(m->keys, m->length);\n")));
                     funcs.push((format!("static {list_v} {name}_values({name}* m)"), format!("    return {lv}_new_from_array(m->vals, m->length);\n")));
                 }
-                CType::Task(t) => {
-                    list_type_decls.push_str(&format!("struct {name} {{\n    {} value;\n}};\n\n", field_c_type(t)));
-                }
+               CType::Task(t) => {
+                    let ret = c_type_name(t);
+                    let value = field_c_type(t);
+                    list_type_decls.push_str(&format!("typedef {} (*{name}_Run)(void*);\nstruct {name} {{\n    {name}_Run run;\n    void* env;\n    int status;\n    {value} value;\n}};\n\n", ret));
+                    funcs.push((format!("static bool {name}_poll(void* raw)"), format!(
+                        "    {name}* task = ({name}*)raw;\n    if (task->status != 0) return false;\n    task->status = 1;\n    {run}\n    task->status = 2;\n    return true;\n",
+                        run = if **t == CType::Void {
+                            "    task->run(task->env); task->value = 0;".to_string()
+                        } else {
+                            "    task->value = task->run(task->env);".to_string()
+                        },
+                    )));
+                    funcs.push((format!("static {ret} {name}_join({name}* task)"), format!(
+                        "    while (task->status == 0) {{\n        if (!ostrin_poll_all()) OSTRIN_FAIL(\"task join would block: no runnable task remains\");\n    }}\n    if (task->status == 1) OSTRIN_FAIL(\"cyclic task join would deadlock\");\n    {result}\n",
+                        result = if **t == CType::Void {
+                            "    return;".to_string()
+                        } else {
+                            "    return task->value;".to_string()
+                        },
+                    )));
+               }
                 CType::Channel(t) => {
                     let tc = c_type_name(t);
                     let opt = c_type_name(&CType::Option(t.clone()));
@@ -5577,7 +5704,7 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>, tr
                     funcs.push((format!("static {name}* {name}_new(void)"), format!("    {name}* c = ({name}*)ostrin_calloc(1, sizeof({name}));\n    return c;\n")));
                     funcs.push((format!("static void {name}_send({name}* c, {tc} item)"), format!(
                         "    if (c->length >= c->capacity) {{\n        c->capacity = c->capacity == 0 ? 4 : c->capacity * 2;\n        c->items = ({tc}*)ostrin_realloc(c->items, sizeof({tc}) * (size_t)c->capacity);\n    }}\n    c->items[c->length] = item;\n    c->length = c->length + 1;\n")));
-                    funcs.push((format!("static {opt} {name}_receive({name}* c)"), format!("    {opt} r;\n    memset(&r, 0, sizeof r);\n    if (c->head < c->length) {{ r.has = true; r.value = c->items[c->head++]; }}\n    return r;\n")));
+                    funcs.push((format!("static {opt} {name}_receive({name}* c)"), format!("    {opt} r;\n    memset(&r, 0, sizeof r);\n    while (c->head >= c->length && !c->closed) {{\n        if (!ostrin_poll_all()) break;\n    }}\n    if (c->head < c->length) {{ r.has = true; r.value = c->items[c->head++]; }}\n    return r;\n")));
                 }
                 CType::Set(t) => {
                     let tc = c_type_name(t);

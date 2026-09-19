@@ -3,7 +3,7 @@
 *Corte: 2026-09-18 · rama `main` · 6 pruebas diferenciales y 113 de integración en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
-Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–138); para el diseño
+Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–140); para el diseño
 del lenguaje, `docs/design/` (20 documentos).
 
 ---
@@ -31,7 +31,7 @@ Implementación: compilador + intérprete + herramientas de editor, todo en Rust
 | Módulos y paquetes | `modules.rs`, `package.rs`, `ostrin.toml` | Imports, resolución, dependencias |
 | Verificador de tipos | `typeck/mod.rs` (~3 500 l.) | Tipos, dimensiones, traits, exhaustividad, genéricos |
 | HIR/IR | `hir.rs`, `hir_c.rs`, `ir.rs` | HIR verificado, primera CFG con temporales explícitos y generación C por familias, con fallback AST |
-| Intérprete | `interpreter/mod.rs` | Ejecución tree‑walking; referencia semántica |
+| Intérprete | `interpreter/mod.rs` | Ejecución tree‑walking y scheduler cooperativo; referencia semántica |
 | Servidor de lenguaje | `lsp.rs`, `symbols.rs`, `protocol.rs` | LSP sobre stdio |
 | Adaptador de depuración | `dap.rs` + hooks del intérprete | DAP sobre stdio |
 | **Backend nativo** | `codegen.rs` (~3 900 l.), `qty_runtime.c` | Transpila a C y compila con gcc/clang/cc |
@@ -124,7 +124,8 @@ por ámbito ni destrucción basada en último uso.
 - Operadores de usuario, `derive(Eq/Ord)`, `Ordering` incorporado.
 - `print` de records, enums, listas, mapas, sets, `Option`, `Result` (mismo formato que el intérprete).
 - Argumentos nombrados y por defecto, iteradores propios, funciones incorporadas de E/S.
-- `spawn`/`join`/canales (modelo síncrono, igual que el intérprete).
+- `spawn`/`join`/`spawn_scope`/canales con scheduler cooperativo determinista, igual que el intérprete;
+  no son todavía hilos del sistema operativo.
 
 **Rechazado a propósito con mensaje claro** (mejor error que comportamiento distinto):
 `for` sobre `Map/Set` (el intérprete tampoco lo permite), `?` dentro de una lambda, usar una
@@ -138,7 +139,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 |---|---|
 | Cierres en nativo | Captura **por valor** (una variable `mut` cambiada después no se ve dentro); lambda sin contexto de tipos exige anotación |
 | Chequeo «movido tras enviar» (E1101) | Dinámico en ambos backends; estático pendiente del IR (doc. 20) |
-| Concurrencia real (hilos, planificador, `select`) | No existe; `spawn` es síncrono |
+| Paralelismo nativo (hilos, canales bloqueantes, `select`) | No existe todavía; ambos backends tienen scheduler cooperativo |
 | Memoria en nativo | Registro de allocations y limpieza global al salir; ARC/último uso y destructores por tipo siguen pendientes |
 | IR de bloques | HIR→CFG disponible con `--ir`; `if/while/for/match/try/spawn/channel` ya tienen operaciones explícitas, aún no reemplaza el backend C |
 | Ownership/último uso | `--ownership-report` clasifica valores gestionables y candidatos lineales; no inserta `retain/release` todavía |
@@ -176,10 +177,11 @@ Ordenadas por mi recomendación (valor / riesgo). Cada una es independiente.
 6. Reutilizar el checker: que `typeck` entregue tipos resueltos al codegen y eliminar la
    reinferencia (reduce errores y abre optimizaciones).
 
-### B. Concurrencia real (medio plazo, requiere diseño)
-Decidir modelo: hilos de SO + canales bloqueantes, o tareas cooperativas (async). Implica
-revisar E1100/E1101, `select`, cancelación (ya esbozados en `docs/design/09`). Es el mayor
-salto de capacidad y el de mayor riesgo.
+### B. Paralelismo nativo (medio plazo, requiere runtime)
+El scheduler cooperativo ya existe en intérprete y backend C. El siguiente salto es añadir
+hilos del sistema operativo y canales bloqueantes sin romper E1100/E1101; después vendrán
+cancelación y `select` (ya esbozados en `docs/design/09`). Sigue siendo el mayor salto de
+capacidad y riesgo.
 
 ### C. Biblioteca estándar y ecosistema
 Cadenas (split/trim/format), fechas, JSON, argumentos y entorno, `HashMap` real,
@@ -227,7 +229,7 @@ Decisiones que necesito de ti para afinar el plan:
 
 ```powershell
 cd compiler
-cargo test                                   # 6 diferenciales + 112 de integración
+cargo test                                   # 6 diferenciales + 113 de integración
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```
