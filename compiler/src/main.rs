@@ -202,6 +202,8 @@ fn real_main() -> ExitCode {
         return match codegen::generate_with_report(&items, &typed) {
             Ok((_, report)) => {
                 println!("agreed: {}", report.agreed);
+                println!("node-agreed: {}", report.node_agreed);
+                println!("node-unchecked: {}", report.node_unchecked);
                 println!("partial: {}", report.partial);
                 println!("completed: {}", report.completed);
                 println!("generic-calls-from-checker: {}", report.calls_from_checker);

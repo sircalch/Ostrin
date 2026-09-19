@@ -471,6 +471,9 @@ pub struct NativeTypeReport {
     pub divergences: Vec<String>,
     /// The program sends a record through a channel (so reads must be tracked).
     pub sends_records: bool,
+    /// The same comparison, but for *every* expression node (operands included), by node address.
+    pub node_agreed: usize,
+    pub node_unchecked: usize,
 }
 
 /// A method with its own type parameters (`fn map<U>(self, ..)`), kept
@@ -579,6 +582,8 @@ struct Codegen<'a> {
     checker_types: Option<&'a HashMap<ExprKey, Ty>>,
     /// Integer literals the checker typed as fixed-width.
     literal_kinds: Option<&'a HashMap<ExprKey, LitKind>>,
+    /// The checker's type of every AST node (by node address): the same lookup the HIR uses.
+    node_types: Option<&'a HashMap<usize, Ty>>,
     /// Emit "moved after send" checks on record reads (needed once a record is sent through a channel).
     track_moves: bool,
     saw_record_send: bool,
@@ -1623,6 +1628,27 @@ impl<'a> Codegen<'a> {
         }
     }
 
+    /// Compares the backend's type for `expr` with the checker's type for that exact AST
+    /// node — the lookup the HIR is built on. Covers operands and other nodes with no source range.
+    fn compare_by_node(&mut self, expr: &Expr, ty: &CType) {
+        let Some(nodes) = self.node_types else { return };
+        if !self.compare_enabled {
+            return;
+        }
+        let Some(checker_ty) = nodes.get(&(expr as *const Expr as usize)) else {
+            self.type_report.node_unchecked += 1;
+            return;
+        };
+        if crate::types::ty_contains_unknown(checker_ty) || matches!(checker_ty, Ty::Fn(..)) || matches!(ty, CType::NoneLit | CType::OkLit(_) | CType::ErrLit(_) | CType::GenLit(..)) {
+            self.type_report.node_unchecked += 1;
+        } else if self.ctype_agrees(checker_ty, ty) {
+            self.type_report.node_agreed += 1;
+        } else {
+            let file = self.current_file.clone().unwrap_or_default();
+            self.type_report.divergences.push(format!("{file}: (node) checker says '{}', native says '{}'", checker_ty.describe(), mangle_ctype(ty)));
+        }
+    }
+
     /// For a constructor expression (a call, a bare variant name, a record
     /// literal), the checker's full type for it: the authoritative source for
     /// the type arguments of a generic record/enum, so they need not be
@@ -1790,6 +1816,7 @@ impl<'a> Codegen<'a> {
         }
         let result = self.gen_expr_inner(expr, hint)?;
         self.compare_with_checker(expr, &result.1);
+        self.compare_by_node(expr, &result.1);
         let result = self.complete_from_checker(expr, result)?;
         self.flush_instances()?;
         Ok(result)
@@ -4238,6 +4265,7 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>, tr
         checker_types,
         call_substs,
         literal_kinds: typed.map(|t| &t.literal_kinds),
+        node_types: typed.map(|t| &t.node_types),
         track_moves,
         saw_record_send: false,
         current_call_key: None,

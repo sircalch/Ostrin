@@ -65,6 +65,9 @@ pub struct TypedProgram {
     /// (immutable) AST the checker was given — including operands, which have no
     /// source range of their own. Lowering to HIR reads types from here.
     pub node_types: HashMap<usize, Ty>,
+    /// Resolved generic arguments of a call, keyed by the call node's address (works for
+    /// calls with no source range of their own, e.g. a receiver `wrap(5).is_just()`).
+    pub call_substs_by_node: HashMap<usize, CallSubst>,
 }
 
 #[derive(Clone)]
@@ -109,6 +112,8 @@ pub struct Checker {
     call_substs: HashMap<ExprKey, CallSubst>,
     literal_kinds: HashMap<ExprKey, LitKind>,
     node_types: HashMap<usize, Ty>,
+    call_substs_by_node: HashMap<usize, CallSubst>,
+    call_node_stack: Vec<usize>,
     call_key_stack: Vec<ExprKey>,
     errors: Vec<TypeError>,
 }
@@ -176,6 +181,8 @@ impl Checker {
             call_substs: HashMap::new(),
             literal_kinds: HashMap::new(),
             node_types: HashMap::new(),
+            call_substs_by_node: HashMap::new(),
+            call_node_stack: Vec::new(),
             call_key_stack: Vec::new(),
             errors: Vec::new(),
         }
@@ -194,20 +201,20 @@ impl Checker {
         self,
         items: &[Item],
     ) -> (Vec<TypeError>, Vec<EditorBinding>, Vec<EditorExpression>) {
-        let (errors, bindings, expressions, _, _, _, _) = self.check_all(items);
+        let (errors, bindings, expressions, _, _, _, _, _) = self.check_all(items);
         (errors, bindings, expressions)
     }
 
     /// Like `check_program`, but also returns the type of every expression.
     pub fn check_program_typed(self, items: &[Item]) -> TypedProgram {
-        let (errors, _, _, expr_types, call_substs, literal_kinds, node_types) = self.check_all(items);
-        TypedProgram { errors, expr_types, call_substs, literal_kinds, node_types }
+        let (errors, _, _, expr_types, call_substs, literal_kinds, node_types, call_substs_by_node) = self.check_all(items);
+        TypedProgram { errors, expr_types, call_substs, literal_kinds, node_types, call_substs_by_node }
     }
 
     fn check_all(
         mut self,
         items: &[Item],
-    ) -> (Vec<TypeError>, Vec<EditorBinding>, Vec<EditorExpression>, HashMap<ExprKey, Ty>, HashMap<ExprKey, CallSubst>, HashMap<ExprKey, LitKind>, HashMap<usize, Ty>) {
+    ) -> (Vec<TypeError>, Vec<EditorBinding>, Vec<EditorExpression>, HashMap<ExprKey, Ty>, HashMap<ExprKey, CallSubst>, HashMap<ExprKey, LitKind>, HashMap<usize, Ty>, HashMap<usize, CallSubst>) {
         for item in items {
             match item {
                 Item::Enum(e) => {
@@ -309,7 +316,7 @@ impl Checker {
                 Item::Record(_) | Item::Enum(_) | Item::Import(_) | Item::Trait(_) => {}
             }
         }
-        (self.errors, self.editor_bindings, self.editor_expressions, self.expr_types, self.call_substs, self.literal_kinds, self.node_types)
+        (self.errors, self.editor_bindings, self.editor_expressions, self.expr_types, self.call_substs, self.literal_kinds, self.node_types, self.call_substs_by_node)
     }
 
     fn check_function(&mut self, f: &FunctionDecl) {
@@ -1225,6 +1232,18 @@ impl Checker {
         true
     }
 
+    /// Records `ty` for `expr` and every `Located` layer around it.
+    fn set_node_type_layers(&mut self, expr: &Expr, ty: &Ty) {
+        let mut layer = expr;
+        loop {
+            self.node_types.insert(layer as *const Expr as usize, ty.clone());
+            match layer {
+                Expr::Located(inner, _) => layer = inner,
+                _ => break,
+            }
+        }
+    }
+
     /// If `expected` is a fixed-width integer (or a list of them) and `expr`
     /// is made of untyped integer literals, adapts them and returns true.
     fn adapt_literals(&mut self, expr: &Expr, expected: &Ty, actual: &Ty) -> bool {
@@ -1242,6 +1261,7 @@ impl Checker {
                         let key = ExprKey { file: self.current_source_file.clone(), start: range.start, end: range.end };
                         self.expr_types.insert(key, expected.clone());
                     }
+                    self.set_node_type_layers(expr, expected);
                 }
                 all
             }
@@ -1256,6 +1276,7 @@ impl Checker {
                         let key = ExprKey { file: self.current_source_file.clone(), start: range.start, end: range.end };
                         self.expr_types.insert(key, expected.clone());
                     }
+                    self.set_node_type_layers(expr, expected);
                 }
                 all
             }
@@ -1344,7 +1365,14 @@ impl Checker {
     }
 
     fn infer_expr(&mut self, expr: &Expr, scope: &mut Scope) -> Ty {
+        let is_call = matches!(expr, Expr::Call(..) | Expr::GenericCall(..));
+        if is_call {
+            self.call_node_stack.push(expr as *const Expr as usize);
+        }
         let ty = self.infer_expr_inner(expr, scope);
+        if is_call {
+            self.call_node_stack.pop();
+        }
         // A later, less-informed visit (a lambda is checked twice) never erases a known type.
         let key = expr as *const Expr as usize;
         if ty != Ty::Unknown || !self.node_types.contains_key(&key) {
@@ -1427,6 +1455,14 @@ impl Checker {
             {
                 // `-128i8`: the magnitude alone doesn't fit, the negated value does.
                 let Expr::SizedIntLiteral(_, kind) = e.unlocated() else { unreachable!() };
+                let mut layer: &Expr = e;
+                loop {
+                    self.node_types.insert(layer as *const Expr as usize, Ty::Sized(*kind));
+                    match layer {
+                        Expr::Located(inner, _) => layer = inner,
+                        _ => break,
+                    }
+                }
                 Ty::Sized(*kind)
             }
             Expr::Unary(op, e) => {
@@ -2365,7 +2401,17 @@ impl Checker {
         scope: &mut Scope,
     ) -> Ty {
         if let (Expr::Lambda(params, body), Some(Ty::Fn(expected_params, _))) = (expr.unlocated(), expected) {
-            return self.infer_lambda(params, body, Some(expected_params), scope);
+            let ty = self.infer_lambda(params, body, Some(expected_params), scope);
+            // This path bypasses `infer_expr`, so record the lambda's type here (every layer around it).
+            let mut layer = expr;
+            loop {
+                self.node_types.insert(layer as *const Expr as usize, ty.clone());
+                match layer {
+                    Expr::Located(inner, _) => layer = inner,
+                    _ => break,
+                }
+            }
+            return ty;
         }
         self.infer_expr(expr, scope)
     }
@@ -2853,10 +2899,14 @@ impl Checker {
         }
 
         // Remember what this call instantiated, for backends.
-        if let Some(key) = self.call_key_stack.last().cloned() {
-            let complete = sig.generics.iter().all(|g| type_subst.contains_key(&g.name) || dim_subst.contains_key(&g.name));
-            if complete {
-                self.call_substs.insert(key, CallSubst { types: type_subst.clone(), dims: dim_subst.clone() });
+        let complete = sig.generics.iter().all(|g| type_subst.contains_key(&g.name) || dim_subst.contains_key(&g.name));
+        if complete {
+            let recorded = CallSubst { types: type_subst.clone(), dims: dim_subst.clone() };
+            if let Some(key) = self.call_key_stack.last().cloned() {
+                self.call_substs.insert(key, recorded.clone());
+            }
+            if let Some(node) = self.call_node_stack.last().copied() {
+                self.call_substs_by_node.insert(node, recorded);
             }
         }
 
@@ -3594,9 +3644,10 @@ fn collection_method_expected_args(
         (Ty::List(element), "fold") => Some(vec![
             Ty::Unknown,
             Ty::Fn(
+                // `fold(initial, fn(accumulator, element) { … })`: the accumulator comes first.
                 vec![
-                    (**element).clone(),
                     first_arg.cloned().unwrap_or(Ty::Unknown),
+                    (**element).clone(),
                 ],
                 Box::new(Ty::Unknown),
             ),

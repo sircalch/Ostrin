@@ -247,7 +247,7 @@ fn typed_expression_table_does_not_regress() {
 /// for an expression must agree with the checker's — zero divergences.
 #[test]
 fn native_backend_types_agree_with_the_checker() {
-    let (mut agreed, mut partial, mut completed, mut unchecked, mut divergences) = (0usize, 0usize, 0usize, 0usize, Vec::<String>::new());
+    let (mut agreed, mut partial, mut completed, mut unchecked, mut node_agreed, mut divergences) = (0usize, 0usize, 0usize, 0usize, 0usize, Vec::<String>::new());
     for path in examples() {
         let file = path.to_string_lossy().to_string();
         if !ostrinc(&["--check", &file]).status.success() {
@@ -260,6 +260,8 @@ fn native_backend_types_agree_with_the_checker() {
         for line in text(&out.stdout).lines() {
             if let Some(n) = line.strip_prefix("agreed: ") {
                 agreed += n.trim().parse::<usize>().unwrap();
+            } else if let Some(n) = line.strip_prefix("node-agreed: ") {
+                node_agreed += n.trim().parse::<usize>().unwrap();
             } else if let Some(n) = line.strip_prefix("partial: ") {
                 partial += n.trim().parse::<usize>().unwrap();
             } else if let Some(n) = line.strip_prefix("unchecked: ") {
@@ -272,6 +274,8 @@ fn native_backend_types_agree_with_the_checker() {
         }
     }
     assert!(agreed > 1300, "only {agreed} expressions were compared");
+    // The same comparison over *every* AST node (operands included), by node address.
+    assert!(node_agreed > 3000, "only {node_agreed} AST nodes were compared with the checker's per-node types");
     // Ratchet: expressions the backend cannot compare (the checker has no type).
     assert!(unchecked <= 4, "{unchecked} expressions have no checker type (limit 4)");
     // Every partial literal the backend meets is completed from the checker's type.
@@ -285,8 +289,8 @@ fn native_backend_types_agree_with_the_checker() {
 /// (`ostrinc --hir`) may only go down; lower the limits when a gap is closed.
 #[test]
 fn hir_covers_the_examples_with_known_types() {
-    const MAX_UNKNOWN_NODES: usize = 53;
-    const MAX_VIOLATIONS: usize = 1;
+    const MAX_UNKNOWN_NODES: usize = 29;
+    const MAX_VIOLATIONS: usize = 0;
     let (mut nodes, mut unknown, mut violations) = (0usize, 0usize, Vec::<String>::new());
     for path in examples() {
         let file = path.to_string_lossy().to_string();

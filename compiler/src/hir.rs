@@ -241,8 +241,8 @@ impl<'a> Lowerer<'a> {
             Expr::Range(a, kind, b, step) => {
                 HirKind::Range(Box::new(self.expr(a)), *kind, Box::new(self.expr(b)), step.as_ref().map(|s| Box::new(self.expr(s))))
             }
-            Expr::Call(callee, args) => self.call(callee, &[], args, key, &ty),
-            Expr::GenericCall(callee, type_args, args) => self.call(callee, type_args, args, key, &ty),
+            Expr::Call(callee, args) => self.call(callee, &[], args, key, &ty, expr as *const Expr as usize),
+            Expr::GenericCall(callee, type_args, args) => self.call(callee, type_args, args, key, &ty, expr as *const Expr as usize),
             Expr::FieldAccess(obj, field) => HirKind::Field(Box::new(self.expr(obj)), field.clone()),
             Expr::Index(obj, idx) => HirKind::Index(Box::new(self.expr(obj)), Box::new(self.expr(idx))),
             Expr::If(cond, then_b, else_b) => {
@@ -302,8 +302,8 @@ impl<'a> Lowerer<'a> {
         HirExpr { ty, kind }
     }
 
-fn call(&mut self, callee: &Expr, type_args: &[Type], args: &[Arg], key: Option<ExprKey>, result: &Ty) -> HirKind {
-        let subst = key.and_then(|k| self.typed.call_substs.get(&k).cloned());
+    fn call(&mut self, callee: &Expr, type_args: &[Type], args: &[Arg], key: Option<ExprKey>, result: &Ty, node: usize) -> HirKind {
+        let subst = self.typed.call_substs_by_node.get(&node).cloned().or_else(|| key.and_then(|k| self.typed.call_substs.get(&k).cloned()));
         let type_args = type_args.to_vec();
         // `recv.method(args)` is a method call, not a call of a field value.
         if let Expr::FieldAccess(recv, method) = callee.unlocated() {

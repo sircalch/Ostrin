@@ -3496,3 +3496,20 @@ Cierra el aviso de reproducibilidad del §96.
 - Test de trinquete `hir_covers_the_examples_with_known_types` (límites 53 / 1).
 - Siguiente (documento 20, paso 2): migrar el backend nativo a este HIR por familias de nodos.
 - Suite: **114 pruebas**.
+
+---
+
+## 104. HIR sin huecos y comparación del backend por nodo — 2026-09-18
+
+- **HIR**: 4 109 nodos, **29 sin tipo y 0 violaciones** (antes 53 y 1). Los 29 restantes son las muestras
+  de sintaxis (`advanced`, `newlines`, nombres sin resolver) y `Ok(7)` sin contexto (`Result<Int, ?>`,
+  genuinamente indeterminado). Arreglos: los tipos de las lambdas pasadas a métodos (esa ruta no pasaba
+  por `infer_expr`), el operando de `-128i8`, los literales de lista adaptados (`List<UInt8>`), y
+  `TypedProgram.call_substs_by_node` (argumentos de tipo por *nodo* de llamada, no solo por rango: el
+  receptor `wrap(5).is_just()` ya los tiene).
+- **Bug del checker encontrado por la comparación por nodo**: en `fold(inicial, fn(acc, x) { … })` el
+  checker daba a la lambda los parámetros en orden `(elemento, acumulador)`; ahora `(acumulador, elemento)`.
+- **El backend compara ahora contra el tipo de *cada nodo* del AST** (`node-agreed` en
+  `--native-type-report`, misma búsqueda por dirección que usa el HIR), no solo contra los que tienen
+  rango: **3 173 nodos coinciden, 0 divergencias** (70 no comparables). Test: `node_agreed > 3000`.
+- Trinquetes: HIR ≤ 29 desconocidos / 0 violaciones; suite **114 pruebas**.
