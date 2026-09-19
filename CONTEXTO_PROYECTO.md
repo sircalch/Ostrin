@@ -3536,3 +3536,7 @@ Primer puente hacia el backend sobre HIR: la lógica que ordena argumentos nombr
 ## 107. El backend nativo contrasta sus llamadas con la aridad del HIR
 
 `generate_impl` construye el HIR y guarda `hir_arities`; tras normalizar los argumentos de una llamada a función de usuario, si el número no coincide con el del HIR se registra una divergencia (que el test diferencial exige que sea 0). Es la primera comprobación cruzada HIR↔backend en llamadas; sirve de red de seguridad para migrar las llamadas al HIR. 6 + 98 pruebas verdes.
+
+## 108. La comprobación cruzada HIR↔nativo cubre también los métodos
+
+`HirProgram.arities` incluye `Tipo.método` (sin contar `self`); el backend nativo compara con ella tras normalizar los argumentos de cada llamada a método de registro y registra una divergencia si difiere. 6 + 98 pruebas verdes, 0 divergencias.

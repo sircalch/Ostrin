@@ -404,6 +404,8 @@ pub fn lower<'a>(items: &'a [Item], typed: &'a TypedProgram) -> HirProgram {
             Item::Impl(im) => {
                 for m in &im.methods {
                     signatures.methods.insert((im.type_name.as_str(), m.name.as_str()), m);
+                    let skip = usize::from(m.params.first().is_some_and(|p| p.name == "self"));
+                    arities.insert(format!("{}.{}", im.type_name, m.name), m.params.len() - skip);
                 }
             }
             Item::Enum(e) => {

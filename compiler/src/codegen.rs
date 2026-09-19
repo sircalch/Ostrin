@@ -3125,6 +3125,11 @@ impl<'a> Codegen<'a> {
                 let decl = method.decl;
                 let normalized = normalize_call_args(&decl.params, args, 1)?;
                 let args = normalized.as_deref().unwrap_or(args);
+                if let Some(&arity) = self.hir_arities.get(&format!("{record_name}.{method_name}")) {
+                    if arity != args.len() {
+                        self.type_report.divergences.push(format!("method '{record_name}.{method_name}': native normalized {} argument(s), HIR expects {arity}", args.len()));
+                    }
+                }
                 let (arg_codes, arg_types) = self.gen_args_hinted(args, param_types.get(1..).unwrap_or(&[]))?;
                 if param_types.len() != arg_types.len() + 1 {
                     return Err(format!(
