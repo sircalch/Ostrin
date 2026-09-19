@@ -1,0 +1,8 @@
+fn main() -> Void {
+    a: Float32 = 1.5
+    b: Float = 2.5
+    print(a + b)
+    i: Int32 = 3
+    print(a * i)
+    c: Float32 = 7
+}

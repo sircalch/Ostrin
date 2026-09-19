@@ -92,6 +92,13 @@ impl IntKind {
     }
 }
 
+/// What an untyped numeric literal was resolved to by its context.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum LitKind {
+    Int(IntKind),
+    F32,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
     Named(String, Vec<Type>),
@@ -324,6 +331,8 @@ pub enum Expr {
     /// `200u8`, `5i32`: an integer literal with an explicit fixed width.
     SizedIntLiteral(i128, IntKind),
     FloatLiteral(f64),
+    /// `2.5f32`: a single-precision literal.
+    Float32Literal(f32),
     StringLiteral(String),
     CharLiteral(char),
     BoolLiteral(bool),

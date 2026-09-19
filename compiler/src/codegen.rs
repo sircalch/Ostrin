@@ -115,6 +115,8 @@ enum CType {
     Task(Box<CType>),
     /// A fixed-width integer other than `Int` (`UInt8`, `Int32`, …): a C `stdint` type.
     Sized(IntKind),
+    /// Single-precision float (C `float`).
+    Float32,
 }
 
 /// A struct-field spelling of a type: `Void` (a `Result<Void, E>`'s value) becomes a placeholder `char`.
@@ -136,6 +138,7 @@ fn c_type_name(ty: &CType) -> String {
         CType::Map(..) | CType::Set(_) | CType::Channel(_) => format!("{}*", mangle_ctype(ty)),
         CType::Task(_) => mangle_ctype(ty),
         CType::Sized(kind) => kind.c_type().to_string(),
+        CType::Float32 => "float".to_string(),
         CType::Option(inner) => format!("Option_{}", mangle_ctype(inner)),
         CType::NoneLit | CType::OkLit(_) | CType::ErrLit(_) | CType::GenLit(..) => "int".to_string(),
         CType::Quantity(_) => "Qty".to_string(),
@@ -206,7 +209,8 @@ fn map_type_with_subst(ty: &Type, types: &NamedTypes, subst: &HashMap<String, CT
         Type::Named(name, args) if args.is_empty() => match name.as_str() {
             "Int" | "Int64" => Ok(CType::Int),
             other if IntKind::from_name(other).is_some() => Ok(CType::Sized(IntKind::from_name(other).unwrap())),
-            "Float" => Ok(CType::Float),
+            "Float" | "Float64" => Ok(CType::Float),
+            "Float32" => Ok(CType::Float32),
             "Bool" => Ok(CType::Bool),
             "String" => Ok(CType::Str),
             "Void" => Ok(CType::Void),
@@ -273,6 +277,7 @@ const PRELUDE: &str = "#include <stdint.h>\n\
 #include <stdlib.h>\n\
 #include <string.h>\n\
 #include <errno.h>\n\
+#include <math.h>\n
 \n\
 static int64_t ostrin_idiv(int64_t a, int64_t b) {\n\
     if (b == 0) { fprintf(stderr, \"runtime error: division by zero\\n\"); exit(1); }\n\
@@ -291,6 +296,32 @@ static void ostrin_fmt_double(double v, char* buf, size_t n) {\n\
         int decimals = prec - 1 - atoi(strchr(t, 'e') + 1);\n\
         snprintf(buf, n, \"%.*f\", decimals < 0 ? 0 : decimals, v);\n\
     }\n\
+}\n\
+\n\
+static void ostrin_fmt_single(float v, char* buf, size_t n) {\n\
+    int prec;\n\
+    for (prec = 1; prec <= 9; prec++) {\n\
+        snprintf(buf, n, \"%.*g\", prec, (double)v);\n\
+        if (strtof(buf, NULL) == v) break;\n\
+    }\n\
+    if (strchr(buf, 'e')) {\n\
+        char t[64];\n\
+        snprintf(t, sizeof t, \"%.*e\", prec - 1, (double)v);\n\
+        int decimals = prec - 1 - atoi(strchr(t, 'e') + 1);\n\
+        snprintf(buf, n, \"%.*f\", decimals < 0 ? 0 : decimals, (double)v);\n\
+    }\n\
+}\n\
+\n\
+static const char* ostrin_single_to_string(float v) {\n\
+    char* out = (char*)malloc(64);\n\
+    ostrin_fmt_single(v, out, 64);\n\
+    return out;\n\
+}\n\
+\n\
+static void ostrin_print_single(float v) {\n\
+    char buf[64];\n\
+    ostrin_fmt_single(v, buf, sizeof buf);\n\
+    printf(\"%s\\n\", buf);\n\
 }\n\
 \n\
 static const char* ostrin_int_to_string(int64_t v) {\n\
@@ -477,7 +508,7 @@ struct Codegen<'a> {
     /// (see `generate_with_report`): used only to *compare*, never to generate.
     checker_types: Option<&'a HashMap<ExprKey, Ty>>,
     /// Integer literals the checker typed as fixed-width.
-    literal_kinds: Option<&'a HashMap<ExprKey, IntKind>>,
+    literal_kinds: Option<&'a HashMap<ExprKey, LitKind>>,
     /// The checker's resolved generic arguments per call site.
     call_substs: Option<&'a HashMap<ExprKey, crate::typeck::CallSubst>>,
     /// Set by `gen_expr` for a call to a plain identifier, consumed by `gen_function_call`.
@@ -534,6 +565,17 @@ fn c_int_literal(value: i128) -> String {
     }
 }
 
+/// A C single-precision literal (`{:e}` is Rust's shortest round-trip form).
+fn c_f32_literal(value: f32) -> String {
+    if value.is_nan() {
+        "((float)NAN)".to_string()
+    } else if value.is_infinite() {
+        format!("((float){}INFINITY)", if value < 0.0 { "-" } else { "" })
+    } else {
+        format!("((float){value:e}f)")
+    }
+}
+
 fn c_sized_literal(value: i128, kind: IntKind) -> String {
     format!("(({}){})", kind.c_type(), c_int_literal(value))
 }
@@ -553,6 +595,7 @@ fn mangle_ctype(ty: &CType) -> String {
         CType::Map(k, v) => format!("Map_{}_{}", mangle_ctype(k), mangle_ctype(v)),
         CType::Set(t) => format!("Set_{}", mangle_ctype(t)),
         CType::Sized(kind) => kind.name().to_string(),
+        CType::Float32 => "Float32".to_string(),
         CType::Channel(t) => format!("Channel_{}", mangle_ctype(t)),
         CType::Task(t) => format!("Task_{}", mangle_ctype(t)),
         CType::Option(inner) => format!("Option_{}", mangle_ctype(inner)),
@@ -1539,6 +1582,7 @@ impl<'a> Codegen<'a> {
             Ty::Void => CType::Void,
             Ty::Quantity(d) => CType::Quantity(self.substitute_dimension(d)),
             Ty::Sized(kind) => CType::Sized(*kind),
+            Ty::Float32 => CType::Float32,
             Ty::List(t) => CType::List(Box::new(self.ty_to_ctype(t)?)),
             Ty::Set(t) => CType::Set(Box::new(self.ty_to_ctype(t)?)),
             Ty::Map(k, v) => CType::Map(Box::new(self.ty_to_ctype(k)?), Box::new(self.ty_to_ctype(v)?)),
@@ -1601,6 +1645,7 @@ impl<'a> Codegen<'a> {
             (Ty::Generic(name), c) => self.subst_stack.last().and_then(|s| s.get(name)).is_none_or(|bound| bound == c),
             (Ty::Quantity(a), CType::Quantity(b)) => &self.substitute_dimension(a) == b,
             (Ty::Sized(a), CType::Sized(b)) => a == b,
+            (Ty::Float32, CType::Float32) => true,
             (Ty::List(a), CType::List(b)) | (Ty::Set(a), CType::Set(b)) => self.ctype_agrees(a, b),
             (Ty::Map(k, v), CType::Map(ck, cv)) => self.ctype_agrees(k, ck) && self.ctype_agrees(v, cv),
             (Ty::Applied(n, args), CType::Option(inner)) if n == "Option" && args.len() == 1 => self.ctype_agrees(&args[0], inner),
@@ -1651,7 +1696,9 @@ impl<'a> Codegen<'a> {
         match expr.unlocated() {
             Expr::SizedIntLiteral(value, kind) => Ok((c_sized_literal(*value, *kind), CType::Sized(*kind))),
             Expr::IntLiteral(v) => Ok((format!("INT64_C({v})"), CType::Int)),
-            Expr::FloatLiteral(v) => Ok((format!("{v}"), CType::Float)),
+            // `{:?}` keeps `3.0` a C double literal (`{}` would print `3`, an int).
+            Expr::FloatLiteral(v) => Ok((format!("{v:?}"), CType::Float)),
+            Expr::Float32Literal(v) => Ok((c_f32_literal(*v), CType::Float32)),
             Expr::BoolLiteral(v) => Ok((if *v { "true".to_string() } else { "false".to_string() }, CType::Bool)),
             Expr::StringLiteral(s) => Ok((c_string_literal(s), CType::Str)),
             Expr::Ident(name) => {
@@ -1832,7 +1879,7 @@ impl<'a> Codegen<'a> {
                 let v = self.as_f64_code(&code, &ty)?;
                 Ok((format!("((Qty){{ {v}, {} }})", c_string_literal(unit)), CType::Quantity(dim)))
             }
-            Expr::As(inner, unit_expr) if matches!(unit_expr.unlocated(), Expr::Ident(sym) if matches!(sym.as_str(), "Int" | "Int64" | "Float") || IntKind::from_name(sym).is_some()) => {
+            Expr::As(inner, unit_expr) if matches!(unit_expr.unlocated(), Expr::Ident(sym) if matches!(sym.as_str(), "Int" | "Int64" | "Float" | "Float64" | "Float32") || IntKind::from_name(sym).is_some()) => {
                 let (code, ty) = self.gen_expr(inner)?;
                 let Expr::Ident(target) = unit_expr.unlocated() else { unreachable!() };
                 self.gen_numeric_conversion(&code, &ty, target)
@@ -2277,7 +2324,7 @@ impl<'a> Codegen<'a> {
     /// A C boolean expression for `a == b` under the interpreter's rules.
     fn eq_expr(&mut self, a: &str, b: &str, ty: &CType) -> Result<String, String> {
         match ty {
-            CType::Int | CType::Float | CType::Bool | CType::Sized(_) => Ok(format!("(({a}) == ({b}))")),
+            CType::Int | CType::Float | CType::Float32 | CType::Bool | CType::Sized(_) => Ok(format!("(({a}) == ({b}))")),
             CType::Str => Ok(format!("(strcmp({a}, {b}) == 0)")),
             CType::Quantity(_) => Ok(format!("(ostrin_qty_cmp({a}, {b}) == 0)")),
             CType::Record(n) | CType::Enum(n) => {
@@ -2299,7 +2346,7 @@ impl<'a> Codegen<'a> {
     /// A C `int` expression: negative, zero or positive, like `compare`.
     fn cmp_expr(&mut self, a: &str, b: &str, ty: &CType) -> Result<String, String> {
         match ty {
-            CType::Int | CType::Float | CType::Bool | CType::Sized(_) => Ok(format!("((({a}) < ({b})) ? -1 : ((({a}) > ({b})) ? 1 : 0))")),
+            CType::Int | CType::Float | CType::Float32 | CType::Bool | CType::Sized(_) => Ok(format!("((({a}) < ({b})) ? -1 : ((({a}) > ({b})) ? 1 : 0))")),
             CType::Str => Ok(format!("strcmp({a}, {b})")),
             CType::Quantity(_) => Ok(format!("ostrin_qty_cmp({a}, {b})")),
             CType::Record(n) if self.has_derive(n, "Ord") => {
@@ -2364,10 +2411,13 @@ impl<'a> Codegen<'a> {
             range = Some(*r);
             node = inner;
         }
-        let (Expr::IntLiteral(n), Some(range)) = (node, range) else { return None };
+        let range = range?;
         let key = ExprKey { file: self.current_file.clone(), start: range.start, end: range.end };
-        let kind = *kinds.get(&key)?;
-        Some((c_sized_literal(*n as i128, kind), CType::Sized(kind)))
+        match (node, *kinds.get(&key)?) {
+            (Expr::IntLiteral(n), LitKind::Int(kind)) => Some((c_sized_literal(*n as i128, kind), CType::Sized(kind))),
+            (Expr::FloatLiteral(f), LitKind::F32) => Some((c_f32_literal(*f as f32), CType::Float32)),
+            _ => None,
+        }
     }
 
     /// `+ - * /` (overflow-checked) and comparisons on fixed-width integers.
@@ -2411,10 +2461,21 @@ impl<'a> Codegen<'a> {
 
     /// `x as UInt8` / `as Int` / `as Float`: explicit and range-checked, like the interpreter's.
     fn gen_numeric_conversion(&mut self, code: &str, from: &CType, target: &str) -> Result<(String, CType), String> {
-        if !matches!(from, CType::Int | CType::Float | CType::Sized(_)) {
+        if !matches!(from, CType::Int | CType::Float | CType::Float32 | CType::Sized(_)) {
             return Err(format!("cannot convert '{}' with 'as'", mangle_ctype(from)));
         }
-        if target == "Float" {
+        if target == "Float32" {
+            return Ok((format!("((float)({code}))"), CType::Float32));
+        }
+        // A `Float32` converts exactly like the `Float` holding the same value.
+        let widened;
+        let (code, from) = if *from == CType::Float32 {
+            widened = format!("((double)({code}))");
+            (widened.as_str(), &CType::Float)
+        } else {
+            (code, from)
+        };
+        if target == "Float" || target == "Float64" {
             return Ok((format!("((double)({code}))"), CType::Float));
         }
         let (to_ty, min, max, c_name) = match IntKind::from_name(target) {
@@ -2444,6 +2505,26 @@ impl<'a> Codegen<'a> {
         }
         if matches!(lt, CType::Sized(_)) || matches!(rt, CType::Sized(_)) {
             return self.gen_sized_binary(op, &lc, &lt, &rc, &rt);
+        }
+        if matches!(lt, CType::Float32) || matches!(rt, CType::Float32) {
+            if lt != rt {
+                return Err("Float32 can't be mixed with other types here; the checker should have rejected this".to_string());
+            }
+            let (c_op, result) = match op {
+                BinOp::Add => ("+", CType::Float32),
+                BinOp::Sub => ("-", CType::Float32),
+                BinOp::Mul => ("*", CType::Float32),
+                BinOp::Div => ("/", CType::Float32),
+                BinOp::Eq => ("==", CType::Bool),
+                BinOp::NotEq => ("!=", CType::Bool),
+                BinOp::Lt => ("<", CType::Bool),
+                BinOp::Gt => (">", CType::Bool),
+                BinOp::LtEq => ("<=", CType::Bool),
+                BinOp::GtEq => (">=", CType::Bool),
+                BinOp::And | BinOp::Or => return Err("logical operators need Bool operands".to_string()),
+            };
+            let code = if result == CType::Float32 { format!("((float)(({lc}) {c_op} ({rc})))") } else { format!("(({lc}) {c_op} ({rc}))") };
+            return Ok((code, result));
         }
         if matches!(lt, CType::Record(_) | CType::Enum(_)) && !matches!(op, BinOp::And | BinOp::Or) {
             return self.gen_user_operator(op, &lc, &lt, &rc, &rt);
@@ -2813,6 +2894,7 @@ impl<'a> Codegen<'a> {
                 CType::Int => Some(format!("ostrin_int_to_string({obj_code})")),
                 CType::Sized(kind) if kind.is_signed() => Some(format!("ostrin_int_to_string({obj_code})")),
                 CType::Sized(_) => Some(format!("ostrin_uint_to_string({obj_code})")),
+                CType::Float32 => Some(format!("ostrin_single_to_string({obj_code})")),
                 CType::Float => Some(format!("ostrin_float_to_string({obj_code})")),
                 CType::Bool => Some(format!("(({obj_code}) ? \"true\" : \"false\")")),
                 CType::Str => Some(obj_code.clone()),
@@ -3266,6 +3348,7 @@ impl<'a> Codegen<'a> {
             CType::Int => Ok(format!("ostrin_int_to_string({code})")),
             CType::Sized(kind) if kind.is_signed() => Ok(format!("ostrin_int_to_string({code})")),
             CType::Sized(_) => Ok(format!("ostrin_uint_to_string({code})")),
+            CType::Float32 => Ok(format!("ostrin_single_to_string({code})")),
             CType::Float => Ok(format!("ostrin_float_to_string({code})")),
             CType::Bool => Ok(format!("(({code}) ? \"true\" : \"false\")")),
             CType::Str => Ok(code.to_string()),
@@ -3474,6 +3557,7 @@ impl<'a> Codegen<'a> {
         }
         let (spec, value) = match &arg_types[0] {
             CType::Int => ("%lld\\n", format!("(long long)({})", arg_codes[0])),
+            CType::Float32 => return Ok((format!("ostrin_print_single({})", arg_codes[0]), CType::Void)),
             CType::Sized(kind) if kind.is_signed() => ("%lld\\n", format!("(long long)({})", arg_codes[0])),
             CType::Sized(_) => ("%llu\\n", format!("(unsigned long long)({})", arg_codes[0])),
             CType::Float => return Ok((format!("ostrin_print_float({})", arg_codes[0]), CType::Void)),

@@ -674,8 +674,14 @@ impl Parser {
                 Ok(Expr::SizedIntLiteral(n, kind))
             }
             TokenKind::FloatLiteral(f) => {
+                let start = self.current_span();
                 self.advance();
-                self.maybe_unit_literal(Expr::FloatLiteral(f))
+                let end = self.previous_span();
+                self.maybe_unit_literal(Expr::Located(Box::new(Expr::FloatLiteral(f)), SourceRange { start, end }))
+            }
+            TokenKind::Float32Literal(f) => {
+                self.advance();
+                Ok(Expr::Float32Literal(f))
             }
             TokenKind::StringLiteral(s) => { self.advance(); Ok(Expr::StringLiteral(s)) }
             TokenKind::CharLiteral(c) => { self.advance(); Ok(Expr::CharLiteral(c)) }
@@ -877,7 +883,7 @@ impl Parser {
             return Ok(Pattern::Wildcard);
         }
         match self.peek().kind.clone() {
-            TokenKind::IntLiteral(_) | TokenKind::SizedIntLiteral(..) | TokenKind::FloatLiteral(_) | TokenKind::StringLiteral(_)
+            TokenKind::IntLiteral(_) | TokenKind::SizedIntLiteral(..) | TokenKind::FloatLiteral(_) | TokenKind::Float32Literal(_) | TokenKind::StringLiteral(_)
             | TokenKind::CharLiteral(_) | TokenKind::True | TokenKind::False => {
                 let lit = self.parse_primary()?;
                 if self.eat(&TokenKind::To) {
@@ -914,6 +920,7 @@ impl Parser {
                         TokenKind::IntLiteral(_)
                             | TokenKind::SizedIntLiteral(..)
                             | TokenKind::FloatLiteral(_)
+                            | TokenKind::Float32Literal(_)
                             | TokenKind::StringLiteral(_)
                             | TokenKind::CharLiteral(_)
                             | TokenKind::True

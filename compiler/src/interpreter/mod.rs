@@ -16,6 +16,8 @@ pub enum Value {
     Int(i64),
     /// A fixed-width integer (`UInt8`, `Int32`, …), stored widened.
     Sized(i128, IntKind),
+    /// A single-precision float (`Float32`).
+    F32(f32),
     Float(f64),
     Bool(bool),
     Char(char),
@@ -52,6 +54,7 @@ impl fmt::Display for Value {
         match self {
             Value::Int(n) => write!(f, "{n}"),
             Value::Sized(n, _) => write!(f, "{n}"),
+            Value::F32(n) => write!(f, "{n}"),
             Value::Float(n) => write!(f, "{n}"),
             Value::Bool(b) => write!(f, "{b}"),
             Value::Char(c) => write!(f, "{c}"),
@@ -337,12 +340,12 @@ pub struct Interpreter {
     debugger: Option<Debugger>,
     terminated: bool,
     /// Integer literals the checker typed as fixed-width (see `TypedProgram::literal_kinds`).
-    literal_kinds: HashMap<crate::typeck::ExprKey, IntKind>,
+    literal_kinds: HashMap<crate::typeck::ExprKey, LitKind>,
 }
 
 impl Interpreter {
     /// Supplies the checker's fixed-width literal choices.
-    pub fn with_literal_kinds(mut self, kinds: HashMap<crate::typeck::ExprKey, IntKind>) -> Self {
+    pub fn with_literal_kinds(mut self, kinds: HashMap<crate::typeck::ExprKey, LitKind>) -> Self {
         self.literal_kinds = kinds;
         self
     }
@@ -690,6 +693,7 @@ impl Interpreter {
     fn runtime_type_of_value(&self, value: &Value) -> Type {
         match value {
             Value::Sized(_, kind) => Type::Named(kind.name().to_string(), Vec::new()),
+            Value::F32(_) => Type::Named("Float32".to_string(), Vec::new()),
             Value::List(state) => {
                 let element = state
                     .borrow()
@@ -1274,14 +1278,17 @@ impl Interpreter {
                         end: range.end,
                     };
                     if let Some(kind) = self.literal_kinds.get(&key).copied() {
-                        if let Expr::IntLiteral(n) = inner.as_ref() {
-                            return Ok(Value::Sized(*n as i128, kind));
+                        match (inner.as_ref(), kind) {
+                            (Expr::IntLiteral(n), LitKind::Int(kind)) => return Ok(Value::Sized(*n as i128, kind)),
+                            (Expr::FloatLiteral(f), LitKind::F32) => return Ok(Value::F32(*f as f32)),
+                            _ => {}
                         }
                     }
                 }
                 self.eval_expr(inner, env)
             }
             Expr::SizedIntLiteral(n, kind) => Ok(Value::Sized(*n, *kind)),
+            Expr::Float32Literal(f) => Ok(Value::F32(*f)),
             Expr::IntLiteral(n) => Ok(Value::Int(*n)),
             Expr::FloatLiteral(n) => Ok(Value::Float(*n)),
             Expr::StringLiteral(s) => Ok(Value::String(s.clone())),
@@ -1321,6 +1328,7 @@ impl Interpreter {
                     (UnaryOp::Neg, Value::Sized(n, kind)) if kind.is_signed() && kind.fits(-n) => Ok(Value::Sized(-n, *kind)),
                     (UnaryOp::Neg, Value::Sized(_, kind)) => Err(RuntimeError::Error(format!("integer overflow: cannot negate this {}", kind.name()))),
                     (UnaryOp::Neg, Value::Float(n)) => Ok(Value::Float(-n)),
+                    (UnaryOp::Neg, Value::F32(n)) => Ok(Value::F32(-n)),
                     (UnaryOp::Neg, Value::Quantity(n, d, u)) => Ok(Value::Quantity(-n, d.clone(), u.clone())),
                     (UnaryOp::Not, Value::Bool(b)) => Ok(Value::Bool(!b)),
                     _ => Err(RuntimeError::Error(format!("cannot apply unary operator to '{v}'"))),
@@ -1469,7 +1477,7 @@ impl Interpreter {
                 Ok(Value::Bool((av - bv).abs() <= tv))
             }
             Expr::As(e, unit_expr)
-                if matches!(unit_expr.as_ref().unlocated(), Expr::Ident(sym) if matches!(sym.as_str(), "Int" | "Int64" | "Float") || IntKind::from_name(sym).is_some()) =>
+                if matches!(unit_expr.as_ref().unlocated(), Expr::Ident(sym) if matches!(sym.as_str(), "Int" | "Int64" | "Float" | "Float64" | "Float32") || IntKind::from_name(sym).is_some()) =>
             {
                 let value = self.eval_expr(e, env)?;
                 let Expr::Ident(target) = unit_expr.as_ref().unlocated() else { unreachable!() };
@@ -2083,6 +2091,7 @@ fn value_type_name(v: &Value) -> String {
         Value::List(_) => "List".to_string(),
         Value::Int(_) => "Int".to_string(),
         Value::Sized(_, kind) => kind.name().to_string(),
+        Value::F32(_) => "Float32".to_string(),
         Value::Float(_) => "Float".to_string(),
         Value::Bool(_) => "Bool".to_string(),
         Value::Char(_) => "Char".to_string(),
@@ -2265,6 +2274,7 @@ fn truthy(v: &Value) -> bool {
 fn as_i64(v: &Value) -> Result<i64, RuntimeError> {
     match v {
         Value::Int(n) => Ok(*n),
+        Value::F32(n) => Ok(*n as i64),
         Value::Sized(n, _) => i64::try_from(*n).map_err(|_| RuntimeError::Error(format!("integer {n} does not fit in Int"))),
         Value::Float(n) => Ok(*n as i64),
         other => Err(RuntimeError::Error(format!("expected a number, got '{other}'"))),
@@ -2275,6 +2285,7 @@ fn as_f64(v: &Value) -> Result<f64, RuntimeError> {
     match v {
         Value::Int(n) => Ok(*n as f64),
         Value::Sized(n, _) => Ok(*n as f64),
+        Value::F32(n) => Ok(*n as f64),
         Value::Float(n) => Ok(*n),
         Value::Quantity(n, _, _) => Ok(*n),
         other => Err(RuntimeError::Error(format!("expected a number, got '{other}'"))),
@@ -2322,6 +2333,20 @@ fn sized_binary(op: BinOp, lv: Value, rv: Value) -> EvalResult {
 
 /// `x as UInt8` / `as Int` / `as Float`: an explicit, range-checked conversion.
 fn convert_numeric(value: Value, target: &str) -> EvalResult {
+    // A `Float32` converts exactly like the `Float` holding the same value.
+    let value = match value {
+        Value::F32(f) if target != "Float32" => Value::Float(f as f64),
+        other => other,
+    };
+    if target == "Float32" {
+        return match &value {
+            Value::Int(n) => Ok(Value::F32(*n as f32)),
+            Value::Sized(n, _) => Ok(Value::F32(*n as f32)),
+            Value::Float(f) => Ok(Value::F32(*f as f32)),
+            Value::F32(f) => Ok(Value::F32(*f)),
+            other => Err(RuntimeError::Error(format!("cannot convert '{other}' to Float32"))),
+        };
+    }
     let integer: Option<i128> = match &value {
         Value::Int(n) => Some(*n as i128),
         Value::Sized(n, _) => Some(*n),
@@ -2338,7 +2363,7 @@ fn convert_numeric(value: Value, target: &str) -> EvalResult {
         other => return Err(RuntimeError::Error(format!("cannot convert '{other}' to {target}"))),
     };
     match target {
-        "Float" => Ok(Value::Float(match &value {
+        "Float" | "Float64" => Ok(Value::Float(match &value {
             Value::Float(f) => *f,
             _ => integer.unwrap() as f64,
         })),
@@ -2358,10 +2383,39 @@ fn convert_numeric(value: Value, target: &str) -> EvalResult {
     }
 }
 
+/// Single-precision arithmetic: both operands must be `Float32` (the checker
+/// guarantees it), and every operation rounds to `f32`.
+fn f32_binary(op: BinOp, lv: Value, rv: Value) -> EvalResult {
+    use BinOp::*;
+    if matches!(op, And | Or) {
+        return Ok(Value::Bool(if op == And { truthy(&lv) && truthy(&rv) } else { truthy(&lv) || truthy(&rv) }));
+    }
+    let (Value::F32(a), Value::F32(b)) = (&lv, &rv) else {
+        return Err(RuntimeError::Error(format!("mismatched float types: '{lv}' and '{rv}'")));
+    };
+    let (a, b) = (*a, *b);
+    Ok(match op {
+        Add => Value::F32(a + b),
+        Sub => Value::F32(a - b),
+        Mul => Value::F32(a * b),
+        Div => Value::F32(a / b),
+        Eq => Value::Bool(a == b),
+        NotEq => Value::Bool(a != b),
+        Lt => Value::Bool(a < b),
+        Gt => Value::Bool(a > b),
+        LtEq => Value::Bool(a <= b),
+        GtEq => Value::Bool(a >= b),
+        And | Or => unreachable!(),
+    })
+}
+
 fn eval_binary_builtin(op: BinOp, lv: Value, rv: Value) -> EvalResult {
     use BinOp::*;
     if matches!(lv, Value::Sized(..)) || matches!(rv, Value::Sized(..)) {
         return sized_binary(op, lv, rv);
+    }
+    if matches!(lv, Value::F32(_)) || matches!(rv, Value::F32(_)) {
+        return f32_binary(op, lv, rv);
     }
     match op {
         Add | Sub => match (&lv, &rv) {

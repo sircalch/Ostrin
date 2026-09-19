@@ -134,6 +134,30 @@ impl<'a> Lexer<'a> {
         }
         self.last_token_start = start;
         let text: String = self.chars[start..self.pos].iter().filter(|c| **c != '_').collect();
+        // `2.5f32` / `1f32` (single precision) and `2.5f64` / `1f64` (the default width).
+        if self.peek() == Some('f') {
+            let mut suffix = String::new();
+            let mut lookahead = 0;
+            while let Some(c) = self.peek_at(lookahead) {
+                if c.is_ascii_alphanumeric() {
+                    suffix.push(c);
+                    lookahead += 1;
+                } else {
+                    break;
+                }
+            }
+            if suffix == "f32" || suffix == "f64" {
+                for _ in 0..lookahead {
+                    self.advance();
+                }
+                self.last_token_start = start;
+                return if suffix == "f32" {
+                    Ok(TokenKind::Float32Literal(text.parse().map_err(|_| self.error("invalid float literal"))?))
+                } else {
+                    Ok(TokenKind::FloatLiteral(text.parse().map_err(|_| self.error("invalid float literal"))?))
+                };
+            }
+        }
         if is_float {
             let value: f64 = text.parse().map_err(|_| self.error("invalid float literal"))?;
             Ok(TokenKind::FloatLiteral(value))

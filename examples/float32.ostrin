@@ -1,0 +1,28 @@
+record Vec2 {
+    x: Float32
+    y: Float32
+}
+
+fn length_squared(v: Vec2) -> Float32 {
+    v.x * v.x + v.y * v.y
+}
+
+fn main() -> Void {
+    a: Float32 = 0.1
+    b = 0.2f32
+    print(a + b)
+    print(a + b == 0.3f32)
+    c: Float = 0.1
+    print(c + 0.2)
+    print(1.0f32 / 3.0f32)
+    print(16777216.0f32 + 1.0f32)
+    print((3.7f32) as Int32)
+    print(7 as Float32)
+    print(a as Float)
+    print(length_squared(Vec2 { x: 3.0, y: 4.0 }))
+    xs: List<Float32> = [1.5, 2.5]
+    print(xs)
+    print(-a)
+    print(3.0 / 2.0)
+    print(a.to_string() + "!")
+}

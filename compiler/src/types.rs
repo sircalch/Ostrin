@@ -134,6 +134,8 @@ pub enum Ty {
     Dyn(String),
     /// A fixed-width integer other than `Int` (which is `Int64`).
     Sized(crate::ast::IntKind),
+    /// Single-precision float (`Float` is `Float64`).
+    Float32,
     Fn(Vec<Ty>, Box<Ty>),
     Unknown,
 }
@@ -175,6 +177,7 @@ impl Ty {
             Ty::Generic(name) => name.clone(),
             Ty::Dyn(name) => format!("dyn {name}"),
             Ty::Sized(kind) => kind.name().to_string(),
+            Ty::Float32 => "Float32".to_string(),
             Ty::Fn(params, ret) => {
                 let p: Vec<String> = params.iter().map(|t| t.describe()).collect();
                 format!("fn({}) -> {}", p.join(", "), ret.describe())

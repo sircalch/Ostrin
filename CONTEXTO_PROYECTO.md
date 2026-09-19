@@ -3266,3 +3266,26 @@ Implementado de punta a punta (léxico → parser → checker → intérprete �
   está en el nativo; ni el resaltado de VS Code ni los tokens semánticos del LSP
   conocen aún los sufijos.
 - Suite: **100 pruebas** (5 diferenciales + 95 de integración), sin warnings.
+
+---
+
+## 94. Ergonomía de literales y `Float32` (fase 2 del documento 19) — 2026-09-18
+
+- Cierre de los límites del §93: la adaptación de literales cubre **argumentos de
+  métodos y de variantes de enum**; `-128i8` se acepta (checker, intérprete y
+  nativo tratan `-<min>` como literal). El resaltado de VS Code reconoce los
+  sufijos y los nombres `Int8`…`UInt64` (`sized_ints_contexts.ostrin`).
+- **`Float32`** (`Float` = `Float64`): literales `2.5f32`/`1f32` (y `2.5f64`),
+  adaptación de literales sin sufijo (`a: Float32 = 0.1`, `x + 0.5`,
+  `List<Float32> = [1.5]`, campos y argumentos), aritmética y comparaciones en
+  precisión simple (C `float`), sin mezcla implícita con `Float`/enteros
+  (`E1041`), conversiones `as Float32 | Float | Int | UIntN…` con comprobación de
+  rango. `print`/`to_string` usan la representación más corta que reproduce el
+  `f32` (mismo texto en intérprete y nativo: `0.33333334`, `0.1f32 + 0.2f32 = 0.3`).
+  `literal_kinds` pasó a valores `LitKind { Int(IntKind), F32 }`.
+- **Bug del backend nativo encontrado**: un literal `3.0` se emitía como `3` (el `{}`
+  de Rust quita el `.0`), es decir, un literal *entero* en C, y `print(3.0 / 2.0)`
+  daba `1` en vez de `1.5`. Ahora se emite con `{:?}` (`3.0`).
+- Ejemplos: `float32.ostrin` (comparado nativo/intérprete), `float32_errors.ostrin`.
+- Suite: **100 pruebas**, sin warnings. Pendiente del documento 19: `Complex`,
+  `Int128`/`UInt128`, `Float16`, y las fases de arrays.

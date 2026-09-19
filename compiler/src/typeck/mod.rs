@@ -60,7 +60,7 @@ pub struct TypedProgram {
     pub call_substs: HashMap<ExprKey, CallSubst>,
     /// Untyped integer literals (or negated literals) that the context typed as a
     /// fixed-width integer: backends read the literal's real type from here.
-    pub literal_kinds: HashMap<ExprKey, IntKind>,
+    pub literal_kinds: HashMap<ExprKey, LitKind>,
 }
 
 #[derive(Clone)]
@@ -103,7 +103,7 @@ pub struct Checker {
     editor_expressions: Vec<EditorExpression>,
     expr_types: HashMap<ExprKey, Ty>,
     call_substs: HashMap<ExprKey, CallSubst>,
-    literal_kinds: HashMap<ExprKey, IntKind>,
+    literal_kinds: HashMap<ExprKey, LitKind>,
     call_key_stack: Vec<ExprKey>,
     errors: Vec<TypeError>,
 }
@@ -201,7 +201,7 @@ impl Checker {
     fn check_all(
         mut self,
         items: &[Item],
-    ) -> (Vec<TypeError>, Vec<EditorBinding>, Vec<EditorExpression>, HashMap<ExprKey, Ty>, HashMap<ExprKey, CallSubst>, HashMap<ExprKey, IntKind>) {
+    ) -> (Vec<TypeError>, Vec<EditorBinding>, Vec<EditorExpression>, HashMap<ExprKey, Ty>, HashMap<ExprKey, CallSubst>, HashMap<ExprKey, LitKind>) {
         for item in items {
             match item {
                 Item::Enum(e) => {
@@ -850,7 +850,7 @@ impl Checker {
             return true;
         }
         let key = ExprKey { file: self.current_source_file.clone(), start: range.start, end: range.end };
-        self.literal_kinds.insert(key.clone(), kind);
+        self.literal_kinds.insert(key.clone(), LitKind::Int(kind));
         self.expr_types.insert(key, Ty::Sized(kind));
         // The negation wrapping the literal has the literal's type too.
         if negated {
@@ -862,11 +862,51 @@ impl Checker {
         true
     }
 
+    /// Types an untyped float literal (or a negated one) as `Float32`.
+    fn adapt_float_literal(&mut self, expr: &Expr) -> bool {
+        let (literal, negated) = match expr.unlocated() {
+            Expr::Unary(UnaryOp::Neg, operand) => (operand.as_ref(), true),
+            _ => (expr, false),
+        };
+        let mut node = literal;
+        let mut range = None;
+        while let Expr::Located(inner, r) = node {
+            range = Some(*r);
+            node = inner;
+        }
+        let (Expr::FloatLiteral(_), Some(range)) = (node, range) else { return false };
+        let key = ExprKey { file: self.current_source_file.clone(), start: range.start, end: range.end };
+        self.literal_kinds.insert(key.clone(), LitKind::F32);
+        self.expr_types.insert(key, Ty::Float32);
+        if negated {
+            if let Expr::Located(_, outer) = expr {
+                let outer_key = ExprKey { file: self.current_source_file.clone(), start: outer.start, end: outer.end };
+                self.expr_types.insert(outer_key, Ty::Float32);
+            }
+        }
+        true
+    }
+
     /// If `expected` is a fixed-width integer (or a list of them) and `expr`
     /// is made of untyped integer literals, adapts them and returns true.
     fn adapt_literals(&mut self, expr: &Expr, expected: &Ty, actual: &Ty) -> bool {
         match (expected, actual) {
             (Ty::Sized(kind), Ty::Int) => self.adapt_int_literal(expr, *kind),
+            (Ty::Float32, Ty::Float) => self.adapt_float_literal(expr),
+            (Ty::List(want), Ty::List(have)) if matches!(**want, Ty::Float32) && **have == Ty::Float => {
+                let Expr::ListLiteral(items) = expr.unlocated() else { return false };
+                let mut all = true;
+                for item in items {
+                    all &= self.adapt_float_literal(item);
+                }
+                if all {
+                    if let Expr::Located(_, range) = expr {
+                        let key = ExprKey { file: self.current_source_file.clone(), start: range.start, end: range.end };
+                        self.expr_types.insert(key, expected.clone());
+                    }
+                }
+                all
+            }
             (Ty::List(want), Ty::List(have)) if matches!(**want, Ty::Sized(_)) && **have == Ty::Int => {
                 let Expr::ListLiteral(items) = expr.unlocated() else { return false };
                 let mut all = true;
@@ -1001,6 +1041,7 @@ impl Checker {
                 Ty::Sized(*kind)
             }
             Expr::FloatLiteral(_) => Ty::Float,
+            Expr::Float32Literal(_) => Ty::Float32,
             Expr::StringLiteral(_) => Ty::String,
             Expr::CharLiteral(_) => Ty::Char,
             Expr::BoolLiteral(_) => Ty::Bool,
@@ -1064,6 +1105,11 @@ impl Checker {
                     if lt == Ty::Int && self.adapt_int_literal(l, *kind) {
                         lt = rt.clone();
                     }
+                }
+                if lt == Ty::Float32 && rt == Ty::Float && self.adapt_float_literal(r) {
+                    rt = Ty::Float32;
+                } else if rt == Ty::Float32 && lt == Ty::Float && self.adapt_float_literal(l) {
+                    lt = Ty::Float32;
                 }
                 self.check_binary(*op, lt, rt)
             }
@@ -1284,11 +1330,12 @@ impl Checker {
                 if let Expr::Ident(sym) = unit_expr.as_ref().unlocated() {
                     let target = match sym.as_str() {
                         "Int" | "Int64" => Some(Ty::Int),
-                        "Float" => Some(Ty::Float),
+                        "Float" | "Float64" => Some(Ty::Float),
+                        "Float32" => Some(Ty::Float32),
                         other => IntKind::from_name(other).map(Ty::Sized),
                     };
                     if let Some(target) = target {
-                        if !matches!(source_ty, Ty::Int | Ty::Float | Ty::Sized(_) | Ty::Unknown) {
+                        if !matches!(source_ty, Ty::Int | Ty::Float | Ty::Float32 | Ty::Sized(_) | Ty::Unknown) {
                             self.push("E1041", format!("Cannot convert '{}' to '{}' with 'as'.", source_ty.describe(), target.describe()));
                         }
                         return target;
@@ -1371,7 +1418,7 @@ impl Checker {
             for (field_name, field_type) in declared_fields {
                 let Some((_, value)) = fields.iter().find(|(n, _)| *n == field_name) else { continue };
                 let declared = self.resolve_type_in_context(&field_type);
-                if matches!(declared, Ty::Sized(_) | Ty::List(_)) {
+                if matches!(declared, Ty::Sized(_) | Ty::Float32 | Ty::List(_)) {
                     let actual = value_types.get(&field_name).cloned().unwrap_or(Ty::Unknown);
                     self.adapt_literals(value, &declared, &actual);
                 }
@@ -1653,7 +1700,7 @@ impl Checker {
                 _ => Ty::Unknown,
             };
         }
-        if matches!(lt, Ty::Sized(_)) || matches!(rt, Ty::Sized(_)) {
+        if matches!(lt, Ty::Sized(_) | Ty::Float32) || matches!(rt, Ty::Sized(_) | Ty::Float32) {
             if matches!(op, And | Or) {
                 self.push("E1041", format!("Logical operators expect 'Bool' operands, got '{}' and '{}'.", lt.describe(), rt.describe()));
                 return Ty::Bool;
@@ -1663,11 +1710,15 @@ impl Checker {
                     Eq | NotEq | Lt | Gt | LtEq | GtEq => Ty::Bool,
                     _ => lt.clone(),
                 },
+                (Ty::Float32, Ty::Float32) => match op {
+                    Eq | NotEq | Lt | Gt | LtEq | GtEq => Ty::Bool,
+                    _ => Ty::Float32,
+                },
                 _ => {
                     self.push(
                         "E1041",
                         format!(
-                            "Cannot apply this operator to '{}' and '{}': fixed-width integers never mix implicitly; convert one side with 'as'.",
+                            "Cannot apply this operator to '{}' and '{}': fixed-width numbers never mix implicitly; convert one side with 'as'.",
                             lt.describe(),
                             rt.describe()
                         ),
@@ -2167,7 +2218,7 @@ impl Checker {
             // An untyped integer literal for a fixed-width field takes the field's type.
             let declared = resolve_type_with_type_subst(field_type, &type_subst, &HashMap::new());
             let adapted = match arg_exprs.get(index) {
-                Some(expr) if matches!(declared, Ty::Sized(_) | Ty::List(_)) => self.adapt_literals(expr, &declared, arg_type),
+                Some(expr) if matches!(declared, Ty::Sized(_) | Ty::Float32 | Ty::List(_)) => self.adapt_literals(expr, &declared, arg_type),
                 _ => false,
             };
             let arg_type = if adapted { &declared } else { arg_type };
@@ -2858,7 +2909,8 @@ fn resolve_type_with_type_subst(
             match name.as_str() {
             "Int" | "Int64" => Ty::Int,
             other if args.is_empty() && IntKind::from_name(other).is_some() => Ty::Sized(IntKind::from_name(other).unwrap()),
-            "Float" => Ty::Float,
+            "Float" | "Float64" => Ty::Float,
+            "Float32" => Ty::Float32,
             "Bool" => Ty::Bool,
             "Char" => Ty::Char,
             "String" => Ty::String,
@@ -3406,6 +3458,7 @@ fn pattern_literal_type(literal: &Expr) -> Ty {
     match literal.unlocated() {
         Expr::IntLiteral(_) => Ty::Int,
         Expr::FloatLiteral(_) => Ty::Float,
+        Expr::Float32Literal(_) => Ty::Float32,
         Expr::StringLiteral(_) => Ty::String,
         Expr::CharLiteral(_) => Ty::Char,
         Expr::BoolLiteral(_) => Ty::Bool,
@@ -3681,6 +3734,7 @@ fn type_from_ty(ty: &Ty) -> Type {
         Ty::Generic(name) => Type::Named(name.clone(), Vec::new()),
         Ty::Dyn(name) => Type::Dyn(vec![name.clone()]),
         Ty::Sized(kind) => Type::Named(kind.name().to_string(), Vec::new()),
+        Ty::Float32 => Type::Named("Float32".to_string(), Vec::new()),
         Ty::Fn(params, return_type) => Type::Fn(
             params.iter().map(type_from_ty).collect(),
             Box::new(type_from_ty(return_type)),
@@ -3840,7 +3894,7 @@ fn walk_expr(expr: &Expr, bound: &HashSet<String>, free: &mut HashSet<String>) {
         Expr::RecordLiteral(_, fields) => { for (_, v) in fields { walk_expr(v, bound, free); } }
         Expr::GenericRecordLiteral(_, _, fields) => { for (_, v) in fields { walk_expr(v, bound, free); } }
         Expr::Channel(_, cap) => { if let Some(c) = cap { walk_expr(c, bound, free); } }
-        Expr::IntLiteral(_) | Expr::SizedIntLiteral(..) | Expr::FloatLiteral(_) | Expr::StringLiteral(_) | Expr::CharLiteral(_) | Expr::BoolLiteral(_) => {}
+        Expr::IntLiteral(_) | Expr::SizedIntLiteral(..) | Expr::FloatLiteral(_) | Expr::Float32Literal(_) | Expr::StringLiteral(_) | Expr::CharLiteral(_) | Expr::BoolLiteral(_) => {}
     }
 }
 
