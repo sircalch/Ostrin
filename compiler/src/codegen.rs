@@ -1116,7 +1116,7 @@ impl<'a> Codegen<'a> {
         subst: &HashMap<String, CType>,
         out: &mut String,
     ) -> Result<(), String> {
-        self.compare_enabled = subst.keys().all(|k| k == "Self");
+        self.compare_enabled = true;
         self.push_scope();
         self.subst_stack.push(subst.clone());
         self.current_return.push(return_type.clone());
@@ -1416,7 +1416,7 @@ impl<'a> Codegen<'a> {
             self.type_report.unchecked += 1;
             return;
         };
-        if crate::types::ty_contains_unknown(checker_ty) || matches!(checker_ty, Ty::Generic(_) | Ty::Fn(..)) {
+        if crate::types::ty_contains_unknown(checker_ty) || matches!(checker_ty, Ty::Fn(..)) {
             self.type_report.unchecked += 1;
         } else if matches!(ty, CType::NoneLit | CType::OkLit(_) | CType::ErrLit(_) | CType::GenLit(..)) {
             self.type_report.partial += 1;
@@ -1432,6 +1432,28 @@ impl<'a> Codegen<'a> {
                 mangle_ctype(ty)
             ));
         }
+    }
+
+    /// For a constructor expression (a call, a bare variant name, a record
+    /// literal), the checker's full type for it: the authoritative source for
+    /// the type arguments of a generic record/enum, so they need not be
+    /// re-derived from the arguments.
+    fn checker_hint(&mut self, expr: &Expr) -> Option<CType> {
+        let types = self.checker_types?;
+        if !self.compare_enabled {
+            return None;
+        }
+        let Expr::Located(inner, range) = expr else { return None };
+        if !matches!(inner.as_ref(), Expr::Call(..) | Expr::GenericCall(..) | Expr::Ident(_) | Expr::RecordLiteral(..) | Expr::GenericRecordLiteral(..)) {
+            return None;
+        }
+        let key = ExprKey { file: self.current_file.clone(), start: range.start, end: range.end };
+        let checker_ty = types.get(&key)?;
+        if crate::types::ty_contains_unknown(checker_ty) || !matches!(checker_ty, Ty::Applied(..)) {
+            return None;
+        }
+        let ctype = self.ty_to_ctype(checker_ty)?;
+        matches!(ctype, CType::Record(_) | CType::Enum(_)).then_some(ctype)
     }
 
     /// A literal the backend can only type partially (`None`, `Ok(x)`, a bare
@@ -1465,7 +1487,7 @@ impl<'a> Codegen<'a> {
             Ty::Bool => CType::Bool,
             Ty::String => CType::Str,
             Ty::Void => CType::Void,
-            Ty::Quantity(d) => CType::Quantity(d.clone()),
+            Ty::Quantity(d) => CType::Quantity(self.substitute_dimension(d)),
             Ty::List(t) => CType::List(Box::new(self.ty_to_ctype(t)?)),
             Ty::Set(t) => CType::Set(Box::new(self.ty_to_ctype(t)?)),
             Ty::Map(k, v) => CType::Map(Box::new(self.ty_to_ctype(k)?), Box::new(self.ty_to_ctype(v)?)),
@@ -1480,15 +1502,33 @@ impl<'a> Codegen<'a> {
             Ty::Named(n) if self.record_names.contains(n) => CType::Record(n.clone()),
             Ty::Named(n) if self.enum_names.contains(n) => CType::Enum(n.clone()),
             Ty::Dyn(t) => CType::DynTrait(t.clone()),
+            Ty::Generic(name) => self.subst_stack.last()?.get(name)?.clone(),
             _ => return None,
         })
+    }
+
+    /// A checker dimension may mention this body's dimension parameters
+    /// (`Quantity<D>`); replace each with the dimension it was bound to.
+    fn substitute_dimension(&self, dim: &Dimension) -> Dimension {
+        let Some(subst) = self.subst_stack.last() else { return dim.clone() };
+        let mut out = Dimension::new();
+        for (name, exponent) in dim {
+            match subst.get(name) {
+                Some(CType::Quantity(bound)) => out = dim_mul(&out, &dim_pow(bound, *exponent)),
+                _ => out = dim_mul(&out, &HashMap::from([(name.clone(), *exponent)])),
+            }
+        }
+        out
     }
 
     fn ctype_agrees(&self, ty: &Ty, c: &CType) -> bool {
         match (ty, c) {
             (Ty::Int, CType::Int) | (Ty::Float, CType::Float) | (Ty::Bool, CType::Bool) | (Ty::String, CType::Str) | (Ty::Void, CType::Void) => true,
             (Ty::Char, _) => true,
-            (Ty::Quantity(a), CType::Quantity(b)) => a == b,
+            // Inside a monomorphized body a checker type parameter stands for
+            // whatever this instantiation bound it to.
+            (Ty::Generic(name), c) => self.subst_stack.last().and_then(|s| s.get(name)).is_none_or(|bound| bound == c),
+            (Ty::Quantity(a), CType::Quantity(b)) => &self.substitute_dimension(a) == b,
             (Ty::List(a), CType::List(b)) | (Ty::Set(a), CType::Set(b)) => self.ctype_agrees(a, b),
             (Ty::Map(k, v), CType::Map(ck, cv)) => self.ctype_agrees(k, ck) && self.ctype_agrees(v, cv),
             (Ty::Applied(n, args), CType::Option(inner)) if n == "Option" && args.len() == 1 => self.ctype_agrees(&args[0], inner),
@@ -1515,7 +1555,10 @@ impl<'a> Codegen<'a> {
     /// instantiation its type mentions is registered before a parent looks
     /// up its fields, variants or methods.
     fn gen_expr(&mut self, expr: &Expr) -> Result<(String, CType), String> {
-        let hint = self.expected.take();
+        let mut hint = self.expected.take();
+        if hint.is_none() {
+            hint = self.checker_hint(expr);
+        }
         let result = self.gen_expr_inner(expr, hint)?;
         self.compare_with_checker(expr, &result.1);
         let result = self.complete_from_checker(expr, result)?;

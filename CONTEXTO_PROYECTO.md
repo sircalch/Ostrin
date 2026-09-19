@@ -3172,3 +3172,22 @@ arquitectura, pruebas que detecten regresiones entre fases.
 - Siguiente: instancias genéricas (el checker debe dar tipos sustituibles por el
   monomorfizador) y retirar `expected`/`settle_literal` cuando ya no hagan falta.
 - Suite: **98 pruebas**, sin warnings.
+
+---
+
+## 90. Etapa 2: instancias genéricas comparadas y constructores guiados por el checker — 2026-09-18
+
+- Dentro de una instanciación monomorfizada, un tipo del checker se interpreta
+  con la sustitución del cuerpo: `Ty::Generic("T")` ↦ el `CType` con que se
+  instanció, y `Quantity<D>` ↦ la dimensión enlazada a `D`
+  (`substitute_dimension`). Con ello el detector ya **compara también el código
+  genérico**: **1 330 expresiones coinciden, 0 divergencias, 4 sin tipo**
+  (antes 1 260 / 1 / 73).
+- `checker_hint`: para constructores (`Just(9)`, `Pair { .. }`, `Nothing`, …) el
+  tipo completo del checker es ahora la pista autoritativa de los argumentos de
+  tipo del record/enum genérico; la inferencia propia queda solo como respaldo.
+- Nuevos límites del test: `agreed > 1300`, `unchecked <= 4`.
+- Queda por retirar la reinferencia de llamadas a funciones genéricas
+  (`bind_type`/`infer_generic_substitutions`) y `expected`/`settle_literal`; se
+  hará cuando el checker exponga las sustituciones por llamada.
+- Suite: **98 pruebas**, sin warnings.
