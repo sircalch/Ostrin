@@ -1,0 +1,11 @@
+fn main() -> Void {
+    a = array([1.0, 2.0])
+    b = array([1, 2])
+    print(a + b)
+    print(a + 1)
+    print(a < a)
+    print(a.mean(1))
+    print(a.missing())
+    c = array([true, false])
+    d = zeros(3)
+}

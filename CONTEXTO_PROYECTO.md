@@ -3289,3 +3289,36 @@ Implementado de punta a punta (léxico → parser → checker → intérprete �
 - Ejemplos: `float32.ostrin` (comparado nativo/intérprete), `float32_errors.ostrin`.
 - Suite: **100 pruebas**, sin warnings. Pendiente del documento 19: `Complex`,
   `Int128`/`UInt128`, `Float16`, y las fases de arrays.
+
+---
+
+## 95. `Array<T>`: arrays N-dimensionales (fase 3 del documento 19) — 2026-09-18
+
+Primer bloque del eje científico, de punta a punta (checker → intérprete → nativo):
+
+- **Tipo** `Array<T>` con `T` ∈ `Int`, `Float`, `Float32` (el intérprete admite además enteros de
+  ancho fijo; el nativo solo esos tres). Forma **dinámica** (el rango y las dimensiones se
+  conocen en ejecución), row-major, por referencia como `List`. Nunca vacío (toda dimensión ≥ 1).
+- **Constructores**: `array(lista)` (listas anidadas hasta profundidad 3 en nativo),
+  `zeros(forma)`, `ones(forma)` (`Float`), `full(forma, valor)`, `arange(a, b)` (`Int`,
+  `b` exclusivo), `linspace(a, b, n)` (`Float`, el último elemento es exactamente `b`).
+  Una función de usuario con el mismo nombre tiene prioridad.
+- **Aritmética** `+ - * /` elemento a elemento con **broadcasting** (reglas de NumPy),
+  entre arrays o con un escalar del mismo tipo (un literal toma el tipo del elemento:
+  `f * 2.0` con `Array<Float32>`); negación. No hay comparaciones ni `@` todavía
+  (usar `matmul`/`dot`); las formas incompatibles fallan con `shape mismatch`.
+- **Métodos**: `shape rank size/length/count sum mean min max to_list transpose
+  reshape sum_axis dot matmul get set`, e indexado `a[i]` en rango 1. `dot` (rango 1,
+  devuelve el elemento) y `matmul` (rango 2) se separan para que el tipo de retorno sea
+  estático aunque el rango no lo sea. `mean` de `Int` es `Float`.
+- **Semántica única**: el intérprete aplica cada operación de elemento con
+  `eval_binary_builtin` (overflow de `UInt8`, redondeo de `Float32` idénticos a los escalares) y el
+  runtime C (`array_runtime.c`, plantilla instanciada por tipo de elemento) replica el mismo
+  orden de acumulación; `print`/`to_string` dan `[[1, 2], [3, 4]]`.
+- Mejora colateral: `to_string()` sobre listas, mapas, sets, options, results, records y enums en el nativo.
+- Ejemplos: `arrays.ostrin`, `arrays_3d.ostrin` (comparados nativo/intérprete),
+  `arrays_errors.ostrin` (7 errores de tipo), `arrays_shape_mismatch.ostrin`
+  (test en ambos backends).
+- Pendiente: formas estáticas (fase 4), operador `@`, comparaciones que devuelvan `Array<Bool>`,
+  vistas/slices sin copia, `Array<Complex>`, SIMD/paralelismo, y álgebra lineal (LU/QR/SVD).
+- Suite: **102 pruebas** (5 diferenciales + 97 de integración), sin warnings.

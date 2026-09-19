@@ -862,6 +862,149 @@ impl Checker {
         true
     }
 
+    fn adapt_scalar_operand(&mut self, expr: &Expr, elem: &Ty, ty: &mut Ty) {
+        match (elem, &*ty) {
+            (Ty::Float32, Ty::Float) if self.adapt_float_literal(expr) => *ty = Ty::Float32,
+            (Ty::Sized(kind), Ty::Int) if self.adapt_int_literal(expr, *kind) => *ty = elem.clone(),
+            _ => {}
+        }
+    }
+
+    /// `array`, `zeros`, `ones`, `full`, `arange`, `linspace`.
+    fn check_array_call(&mut self, name: &str, arg_types: &[Ty]) -> Option<Ty> {
+        let arity = match name {
+            "array" | "zeros" | "ones" => 1,
+            "full" | "arange" => 2,
+            "linspace" => 3,
+            _ => return None,
+        };
+        if arg_types.len() != arity {
+            self.push("E1041", format!("'{name}' expects {arity} argument(s), got {}.", arg_types.len()));
+            return Some(Ty::Unknown);
+        }
+        let is_shape = |t: &Ty| matches!(t, Ty::List(e) if **e == Ty::Int || **e == Ty::Unknown);
+        let array_of = |t: Ty| Ty::Applied("Array".to_string(), vec![t]);
+        match name {
+            "array" => {
+                let mut ty = &arg_types[0];
+                let mut depth = 0;
+                while let Ty::List(inner) = ty {
+                    ty = inner;
+                    depth += 1;
+                }
+                if depth == 0 || !is_array_scalar(ty) {
+                    if *ty != Ty::Unknown {
+                        self.push("E1041", format!("'array' expects a (nested) List of numbers, got '{}'.", arg_types[0].describe()));
+                    }
+                    return Some(Ty::Unknown);
+                }
+                Some(array_of(ty.clone()))
+            }
+            "zeros" | "ones" => {
+                if !is_shape(&arg_types[0]) {
+                    self.push("E1041", format!("'{name}' expects a shape List<Int>, got '{}'.", arg_types[0].describe()));
+                }
+                Some(array_of(Ty::Float))
+            }
+            "full" => {
+                if !is_shape(&arg_types[0]) {
+                    self.push("E1041", format!("'full' expects a shape List<Int>, got '{}'.", arg_types[0].describe()));
+                }
+                if !is_array_scalar(&arg_types[1]) && arg_types[1] != Ty::Unknown {
+                    self.push("E1041", format!("'full' expects a numeric fill value, got '{}'.", arg_types[1].describe()));
+                    return Some(Ty::Unknown);
+                }
+                Some(array_of(arg_types[1].clone()))
+            }
+            "arange" => {
+                if arg_types.iter().any(|t| *t != Ty::Int && *t != Ty::Unknown) {
+                    self.push("E1041", "'arange' expects two Int arguments (start, stop).".to_string());
+                }
+                Some(array_of(Ty::Int))
+            }
+            _ => {
+                if arg_types[..2].iter().any(|t| *t != Ty::Float && *t != Ty::Unknown) || (arg_types[2] != Ty::Int && arg_types[2] != Ty::Unknown) {
+                    self.push("E1041", "'linspace' expects (Float, Float, Int).".to_string());
+                }
+                Some(array_of(Ty::Float))
+            }
+        }
+    }
+
+    /// Methods of `Array<T>`.
+    fn check_array_method(&mut self, receiver: &Ty, method: &str, arg_types: &[Ty]) -> Ty {
+        let elem = array_elem(receiver).expect("called for arrays only");
+        let list_int = Ty::List(Box::new(Ty::Int));
+        let expected_count = match method {
+            "shape" | "rank" | "size" | "length" | "count" | "sum" | "min" | "max" | "mean" | "to_list" | "transpose" => Some(0),
+            "reshape" | "sum_axis" | "dot" | "matmul" => Some(1),
+            _ => None,
+        };
+        if let Some(count) = expected_count {
+            if arg_types.len() != count {
+                self.push("E1041", format!("Array method '{method}' expects {count} argument(s), got {}.", arg_types.len()));
+                return Ty::Unknown;
+            }
+        }
+        match method {
+            "shape" => list_int,
+            "rank" | "size" | "length" | "count" => Ty::Int,
+            "sum" | "min" | "max" => elem,
+            "mean" => match elem {
+                Ty::Int => Ty::Float,
+                Ty::Float | Ty::Float32 => elem,
+                other => {
+                    self.push("E1041", format!("'mean' isn't defined for arrays of '{}'.", other.describe()));
+                    Ty::Unknown
+                }
+            },
+            "to_list" => Ty::List(Box::new(elem)),
+            "transpose" => receiver.clone(),
+            "reshape" => {
+                if !matches!(&arg_types[0], Ty::List(e) if **e == Ty::Int || **e == Ty::Unknown) {
+                    self.push("E1041", "'reshape' expects a shape List<Int>.".to_string());
+                }
+                receiver.clone()
+            }
+            "sum_axis" => {
+                if arg_types[0] != Ty::Int && arg_types[0] != Ty::Unknown {
+                    self.push("E1041", "'sum_axis' expects an Int axis.".to_string());
+                }
+                receiver.clone()
+            }
+            "dot" | "matmul" => {
+                if !compatible(receiver, &arg_types[0]) {
+                    self.push("E1041", format!("'{method}' expects '{}', got '{}'.", receiver.describe(), arg_types[0].describe()));
+                }
+                if method == "dot" { elem } else { receiver.clone() }
+            }
+            "get" if !arg_types.is_empty() => {
+                if arg_types.iter().any(|t| *t != Ty::Int && *t != Ty::Unknown) {
+                    self.push("E1041", "'get' expects Int indices.".to_string());
+                }
+                elem
+            }
+            "set" if arg_types.len() >= 2 => {
+                let (value, indices) = arg_types.split_last().expect("checked above");
+                if indices.iter().any(|t| *t != Ty::Int && *t != Ty::Unknown) {
+                    self.push("E1041", "'set' expects Int indices followed by the new value.".to_string());
+                }
+                if !compatible(&elem, value) {
+                    self.push("E1041", format!("'set' expects a '{}' value, got '{}'.", elem.describe(), value.describe()));
+                }
+                Ty::Void
+            }
+            "get" | "set" => {
+                self.push("E1041", format!("Array method '{method}' needs at least one index."));
+                Ty::Unknown
+            }
+            other => {
+                self.push("E1042", format!("Array has no method '{other}'."));
+                Ty::Unknown
+            }
+        }
+    }
+
     /// Types an untyped float literal (or a negated one) as `Float32`.
     fn adapt_float_literal(&mut self, expr: &Expr) -> bool {
         let (literal, negated) = match expr.unlocated() {
@@ -1106,6 +1249,12 @@ impl Checker {
                         lt = rt.clone();
                     }
                 }
+                // A scalar literal next to an array takes the array's element type.
+                if let Some(elem) = array_elem(&lt) {
+                    self.adapt_scalar_operand(r, &elem, &mut rt);
+                } else if let Some(elem) = array_elem(&rt) {
+                    self.adapt_scalar_operand(l, &elem, &mut lt);
+                }
                 if lt == Ty::Float32 && rt == Ty::Float && self.adapt_float_literal(r) {
                     rt = Ty::Float32;
                 } else if rt == Ty::Float32 && lt == Ty::Float && self.adapt_float_literal(l) {
@@ -1155,6 +1304,7 @@ impl Checker {
                 self.infer_expr(idx, scope);
                 match self.infer_expr(obj, scope) {
                     Ty::List(t) => *t,
+                    array if array_elem(&array).is_some() => array_elem(&array).unwrap(),
                     _ => Ty::Unknown,
                 }
             }
@@ -1700,6 +1850,24 @@ impl Checker {
                 _ => Ty::Unknown,
             };
         }
+        if array_elem(&lt).is_some() || array_elem(&rt).is_some() {
+            if !matches!(op, Add | Sub | Mul | Div) {
+                self.push("E1041", "Only '+', '-', '*' and '/' are defined on arrays (elementwise, with broadcasting).".to_string());
+                return Ty::Unknown;
+            }
+            return match (array_elem(&lt), array_elem(&rt)) {
+                (Some(a), Some(b)) if a == b => lt.clone(),
+                (Some(a), None) if rt == a => lt.clone(),
+                (None, Some(b)) if lt == b => rt.clone(),
+                _ => {
+                    self.push(
+                        "E1041",
+                        format!("Cannot apply this operator to '{}' and '{}': array elements and scalars must have the same type.", lt.describe(), rt.describe()),
+                    );
+                    Ty::Unknown
+                }
+            };
+        }
         if matches!(lt, Ty::Sized(_) | Ty::Float32) || matches!(rt, Ty::Sized(_) | Ty::Float32) {
             if matches!(op, And | Or) {
                 self.push("E1041", format!("Logical operators expect 'Bool' operands, got '{}' and '{}'.", lt.describe(), rt.describe()));
@@ -2050,6 +2218,9 @@ impl Checker {
             if let Some(sig) = self.functions.get(name) {
                 return self.check_function_call(&sig.clone(), args, &arg_types, explicit_type_args);
             }
+            if let Some(result) = self.check_array_call(name, &arg_types) {
+                return result;
+            }
         }
 
         if let Expr::FieldAccess(receiver, method) = callee.unlocated() {
@@ -2078,6 +2249,9 @@ impl Checker {
                 if let Some(signature) = signature {
                     return self.resolve_type_in_context(&signature.return_type);
                 }
+            }
+            if array_elem(&receiver_ty).is_some() && method != "to_string" {
+                return self.check_array_method(&receiver_ty, method, &arg_types);
             }
             if let Some(return_type) = self.check_generic_method_call(
                 &receiver_ty,
@@ -3916,6 +4090,18 @@ fn arg_expr_for_param<'a>(sig: &FnSig, args: &'a [Arg], index: usize) -> Option<
         }
     }
     None
+}
+
+/// `Array<T>` gives `T`.
+fn array_elem(ty: &Ty) -> Option<Ty> {
+    match ty {
+        Ty::Applied(name, args) if name == "Array" && args.len() == 1 => Some(args[0].clone()),
+        _ => None,
+    }
+}
+
+fn is_array_scalar(ty: &Ty) -> bool {
+    matches!(ty, Ty::Int | Ty::Float | Ty::Float32 | Ty::Sized(_))
 }
 
 fn compatible(expected: &Ty, actual: &Ty) -> bool {

@@ -117,6 +117,8 @@ enum CType {
     Sized(IntKind),
     /// Single-precision float (C `float`).
     Float32,
+    /// `Array<T>`: a heap-allocated dense N-dimensional array (by reference); `T` is `Int`, `Float` or `Float32`.
+    Array(Box<CType>),
 }
 
 /// A struct-field spelling of a type: `Void` (a `Result<Void, E>`'s value) becomes a placeholder `char`.
@@ -135,7 +137,7 @@ fn c_type_name(ty: &CType) -> String {
         CType::Enum(name) => name.clone(),
         CType::DynTrait(name) => format!("{name}_Dyn"),
         CType::List(elem) => format!("{}*", list_struct_name(elem)),
-        CType::Map(..) | CType::Set(_) | CType::Channel(_) => format!("{}*", mangle_ctype(ty)),
+        CType::Map(..) | CType::Set(_) | CType::Channel(_) | CType::Array(_) => format!("{}*", mangle_ctype(ty)),
         CType::Task(_) => mangle_ctype(ty),
         CType::Sized(kind) => kind.c_type().to_string(),
         CType::Float32 => "float".to_string(),
@@ -231,6 +233,14 @@ fn map_type_with_subst(ty: &Type, types: &NamedTypes, subst: &HashMap<String, CT
         )),
         Type::Named(name, args) if name == "Channel" && args.len() == 1 => Ok(CType::Channel(Box::new(map_type_with_subst(&args[0], types, subst)?))),
         Type::Named(name, args) if name == "Task" && args.len() == 1 => Ok(CType::Task(Box::new(map_type_with_subst(&args[0], types, subst)?))),
+        Type::Named(name, args) if name == "Array" && args.len() == 1 => {
+            let elem = map_type_with_subst(&args[0], types, subst)?;
+            if matches!(elem, CType::Int | CType::Float | CType::Float32) {
+                Ok(CType::Array(Box::new(elem)))
+            } else {
+                Err("Array<T> is only supported by the native backend for Int, Float and Float32 elements yet".to_string())
+            }
+        }
         Type::Named(name, args) if name == "Set" && args.len() == 1 => Ok(CType::Set(Box::new(map_type_with_subst(&args[0], types, subst)?))),
         Type::Named(name, args) if name == "List" && args.len() == 1 => {
             Ok(CType::List(Box::new(map_type_with_subst(&args[0], types, subst)?)))
@@ -271,6 +281,9 @@ fn c_function_name(name: &str) -> String {
 /// right after `PRELUDE` only when a program actually uses `Qty`.
 const QTY_RUNTIME: &str = include_str!("qty_runtime.c");
 
+/// `Array<T>` runtime template, instantiated per element type (see the header of the file).
+const ARRAY_RUNTIME: &str = include_str!("array_runtime.c");
+
 const PRELUDE: &str = "#include <stdint.h>\n\
 #include <stdbool.h>\n\
 #include <stdio.h>\n\
@@ -278,6 +291,8 @@ const PRELUDE: &str = "#include <stdint.h>\n\
 #include <string.h>\n\
 #include <errno.h>\n\
 #include <math.h>\n
+#define OSTRIN_FAIL(msg) do { fprintf(stderr, \"runtime error: %s\\n\", msg); exit(1); } while (0)\n\
+#define OSTRIN_OOM() do { fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); } while (0)\n\
 \n\
 static int64_t ostrin_idiv(int64_t a, int64_t b) {\n\
     if (b == 0) { fprintf(stderr, \"runtime error: division by zero\\n\"); exit(1); }\n\
@@ -596,6 +611,7 @@ fn mangle_ctype(ty: &CType) -> String {
         CType::Set(t) => format!("Set_{}", mangle_ctype(t)),
         CType::Sized(kind) => kind.name().to_string(),
         CType::Float32 => "Float32".to_string(),
+        CType::Array(t) => format!("Array_{}", mangle_ctype(t)),
         CType::Channel(t) => format!("Channel_{}", mangle_ctype(t)),
         CType::Task(t) => format!("Task_{}", mangle_ctype(t)),
         CType::Option(inner) => format!("Option_{}", mangle_ctype(inner)),
@@ -911,6 +927,7 @@ impl<'a> Codegen<'a> {
                 self.bind_type(&args[0], k, generics, subst, owner)?;
                 self.bind_type(&args[1], v, generics, subst, owner)
             }
+            (Type::Named(n, args), CType::Array(t)) if n == "Array" && args.len() == 1 => self.bind_type(&args[0], t, generics, subst, owner),
             (Type::Named(n, args), CType::Set(t)) if n == "Set" && args.len() == 1 => self.bind_type(&args[0], t, generics, subst, owner),
             (Type::Named(n, args), CType::Option(inner)) if n == "Option" && args.len() == 1 => self.bind_type(&args[0], inner, generics, subst, owner),
             (Type::Named(n, args), CType::Result(ok, err)) if n == "Result" && args.len() == 2 => {
@@ -1129,6 +1146,18 @@ impl<'a> Codegen<'a> {
             if matches!(ty, CType::Channel(_)) {
                 self.ensure_option(t);
             }
+            if self.coll_done.insert(mangle_ctype(ty)) {
+                self.pending_colls.push_back(ty.clone());
+            }
+        }
+        if let CType::Array(t) = ty {
+            self.register_list_types(t);
+            // The runtime returns/consumes these list types.
+            let rows = CType::List(t.clone());
+            self.ensure_list(&CType::Int);
+            self.ensure_list(t);
+            self.ensure_list(&rows);
+            self.ensure_list(&CType::List(Box::new(rows.clone())));
             if self.coll_done.insert(mangle_ctype(ty)) {
                 self.pending_colls.push_back(ty.clone());
             }
@@ -1583,6 +1612,10 @@ impl<'a> Codegen<'a> {
             Ty::Quantity(d) => CType::Quantity(self.substitute_dimension(d)),
             Ty::Sized(kind) => CType::Sized(*kind),
             Ty::Float32 => CType::Float32,
+            Ty::Applied(n, args) if n == "Array" && args.len() == 1 => {
+                let elem = self.ty_to_ctype(&args[0])?;
+                matches!(elem, CType::Int | CType::Float | CType::Float32).then(|| CType::Array(Box::new(elem)))?
+            }
             Ty::List(t) => CType::List(Box::new(self.ty_to_ctype(t)?)),
             Ty::Set(t) => CType::Set(Box::new(self.ty_to_ctype(t)?)),
             Ty::Map(k, v) => CType::Map(Box::new(self.ty_to_ctype(k)?), Box::new(self.ty_to_ctype(v)?)),
@@ -1646,6 +1679,7 @@ impl<'a> Codegen<'a> {
             (Ty::Quantity(a), CType::Quantity(b)) => &self.substitute_dimension(a) == b,
             (Ty::Sized(a), CType::Sized(b)) => a == b,
             (Ty::Float32, CType::Float32) => true,
+            (Ty::Applied(n, args), CType::Array(inner)) if n == "Array" && args.len() == 1 => self.ctype_agrees(&args[0], inner),
             (Ty::List(a), CType::List(b)) | (Ty::Set(a), CType::Set(b)) => self.ctype_agrees(a, b),
             (Ty::Map(k, v), CType::Map(ck, cv)) => self.ctype_agrees(k, ck) && self.ctype_agrees(v, cv),
             (Ty::Applied(n, args), CType::Option(inner)) if n == "Option" && args.len() == 1 => self.ctype_agrees(&args[0], inner),
@@ -1738,6 +1772,7 @@ impl<'a> Codegen<'a> {
                         let temp = self.next_temp();
                         Ok((format!("({{ Qty {temp} = {code}; {temp}.v = -{temp}.v; {temp}; }})"), ty))
                     }
+                    UnaryOp::Neg if matches!(ty, CType::Array(_)) => Ok((format!("{}_neg({code})", mangle_ctype(&ty)), ty)),
                     UnaryOp::Neg if matches!(ty, CType::Sized(_)) => {
                         let CType::Sized(kind) = ty else { unreachable!() };
                         let temp = self.next_temp();
@@ -1914,6 +1949,10 @@ impl<'a> Codegen<'a> {
             }
             Expr::Index(obj, idx) => {
                 let (obj_code, obj_ty) = self.gen_expr(obj)?;
+                if let CType::Array(elem) = &obj_ty {
+                    let (idx_code, _) = self.gen_expr(idx)?;
+                    return Ok((format!("{}_index1({obj_code}, {idx_code})", mangle_ctype(&obj_ty)), (**elem).clone()));
+                }
                 let CType::List(elem_ty) = obj_ty else {
                     return Err("indexing is only supported on List values by the native backend yet".to_string());
                 };
@@ -2503,6 +2542,21 @@ impl<'a> Codegen<'a> {
         if matches!(lt, CType::Quantity(_)) || matches!(rt, CType::Quantity(_)) {
             return self.gen_quantity_binary(op, &lc, &lt, &rc, &rt);
         }
+        if matches!(lt, CType::Array(_)) || matches!(rt, CType::Array(_)) {
+            let code = match op {
+                BinOp::Add => 0,
+                BinOp::Sub => 1,
+                BinOp::Mul => 2,
+                BinOp::Div => 3,
+                _ => return Err("only + - * / are defined on arrays".to_string()),
+            };
+            return match (&lt, &rt) {
+                (CType::Array(a), CType::Array(b)) if a == b => Ok((format!("{}_binop({lc}, {rc}, {code})", mangle_ctype(&lt)), lt.clone())),
+                (CType::Array(a), scalar) if **a == *scalar => Ok((format!("{}_scalar({lc}, {rc}, {code}, 0)", mangle_ctype(&lt)), lt.clone())),
+                (scalar, CType::Array(b)) if **b == *scalar => Ok((format!("{}_scalar({rc}, {lc}, {code}, 1)", mangle_ctype(&rt)), rt.clone())),
+                _ => Err("array operands must have the same element type".to_string()),
+            };
+        }
         if matches!(lt, CType::Sized(_)) || matches!(rt, CType::Sized(_)) {
             return self.gen_sized_binary(op, &lc, &lt, &rc, &rt);
         }
@@ -2899,6 +2953,8 @@ impl<'a> Codegen<'a> {
                 CType::Bool => Some(format!("(({obj_code}) ? \"true\" : \"false\")")),
                 CType::Str => Some(obj_code.clone()),
                 CType::Quantity(_) => Some(format!("ostrin_qty_to_string({obj_code})")),
+                // Everything else prints through its generated `ostrin_show_*`.
+                CType::Array(_) | CType::List(_) | CType::Map(..) | CType::Set(_) | CType::Option(_) | CType::Result(..) | CType::Record(_) | CType::Enum(_) => self.show_expr(&obj_code, &obj_ty).ok(),
                 _ => None,
             };
             if let Some(text) = text {
@@ -3066,6 +3122,47 @@ impl<'a> Codegen<'a> {
                     "keys" => Ok((format!("{name}_keys({obj_code})"), CType::List(Box::new(k)))),
                     "values" => Ok((format!("{name}_values({obj_code})"), CType::List(Box::new(v)))),
                     other => Err(format!("Map has no method '{other}' the native backend supports yet")),
+                }
+            }
+            CType::Array(t) => {
+                let t = (**t).clone();
+                let n = mangle_ctype(&obj_ty);
+                let (codes, types) = self.gen_args(args)?;
+                let one = |this: &Self, want: usize| -> Result<(), String> {
+                    let _ = this;
+                    if codes.len() == want { Ok(()) } else { Err(format!("Array.{method_name} expects {want} argument(s)")) }
+                };
+                match method_name {
+                    "shape" => Ok((format!("{n}_shape({obj_code})"), CType::List(Box::new(CType::Int)))),
+                    "rank" => Ok((format!("{n}_rank({obj_code})"), CType::Int)),
+                    "size" | "length" | "count" => Ok((format!("{n}_size({obj_code})"), CType::Int)),
+                    "sum" | "min" | "max" => Ok((format!("{n}_{method_name}({obj_code})"), t)),
+                    "mean" => Ok((format!("{n}_mean({obj_code})"), if t == CType::Int { CType::Float } else { t })),
+                    "to_list" => Ok((format!("{n}_to_list({obj_code})"), CType::List(Box::new(t)))),
+                    "transpose" => Ok((format!("{n}_transpose({obj_code})"), obj_ty.clone())),
+                    "reshape" => {
+                        one(self, 1)?;
+                        Ok((format!("{n}_reshape({obj_code}, {})", codes[0]), obj_ty.clone()))
+                    }
+                    "sum_axis" => {
+                        one(self, 1)?;
+                        Ok((format!("{n}_sum_axis({obj_code}, {})", codes[0]), obj_ty.clone()))
+                    }
+                    "dot" => {
+                        one(self, 1)?;
+                        Ok((format!("{n}_dot({obj_code}, {})", codes[0]), t))
+                    }
+                    "matmul" => {
+                        one(self, 1)?;
+                        Ok((format!("{n}_matmul({obj_code}, {})", codes[0]), obj_ty.clone()))
+                    }
+                    "get" if !codes.is_empty() => Ok((format!("{n}_get({obj_code}, (int64_t[]){{ {} }}, {})", codes.join(", "), codes.len()), t)),
+                    "set" if codes.len() >= 2 => {
+                        let (value, indices) = codes.split_last().expect("checked above");
+                        let value = self.coerce(value, &types[types.len() - 1], &t)?;
+                        Ok((format!("{n}_set({obj_code}, (int64_t[]){{ {} }}, {}, {value})", indices.join(", "), indices.len()), CType::Void))
+                    }
+                    other => Err(format!("Array has no method '{other}' the native backend supports")),
                 }
             }
             CType::Task(t) => {
@@ -3353,7 +3450,7 @@ impl<'a> Codegen<'a> {
             CType::Bool => Ok(format!("(({code}) ? \"true\" : \"false\")")),
             CType::Str => Ok(code.to_string()),
             CType::Quantity(_) => Ok(format!("ostrin_qty_to_string({code})")),
-            CType::Record(_) | CType::Enum(_) | CType::List(_) | CType::Option(_) | CType::Result(..) | CType::Map(..) | CType::Set(_) => {
+            CType::Record(_) | CType::Enum(_) | CType::List(_) | CType::Option(_) | CType::Result(..) | CType::Map(..) | CType::Set(_) | CType::Array(_) => {
                 let name = mangle_ctype(ty);
                 if self.show_done.insert(name.clone()) {
                     self.show_queue.push_back(ty.clone());
@@ -3369,6 +3466,9 @@ impl<'a> Codegen<'a> {
     fn gen_show_body(&mut self, ty: &CType) -> Result<String, String> {
         let mut out = String::new();
         match ty {
+            CType::Array(_) => {
+                out.push_str(&format!("    return {}_show_rec(v, 0, 0);\n", mangle_ctype(ty)));
+            }
             CType::List(elem) => {
                 let shown = self.show_expr("v->items[i]", elem)?;
                 out.push_str("    const char* s = \"[\";\n");
@@ -3453,8 +3553,9 @@ impl<'a> Codegen<'a> {
     /// `write_file`, `parse_int`, `sum` and `panic`.
     fn gen_builtin(&mut self, name: &str, codes: &[String], types: &[CType]) -> Result<Option<(String, CType)>, String> {
         let arity = match name {
-            "read_file" | "parse_int" | "sum" | "panic" | "assert" => 1,
-            "write_file" | "assert_eq" => 2,
+            "read_file" | "parse_int" | "sum" | "panic" | "assert" | "array" | "zeros" | "ones" => 1,
+            "write_file" | "assert_eq" | "full" | "arange" => 2,
+            "linspace" => 3,
             _ => return Ok(None),
         };
         if codes.len() != arity {
@@ -3508,6 +3609,43 @@ impl<'a> Codegen<'a> {
                     ),
                     ty,
                 )))
+            }
+            "array" => {
+                let mut ty = &types[0];
+                let mut depth = 0;
+                while let CType::List(inner) = ty {
+                    ty = inner;
+                    depth += 1;
+                }
+                if !(1..=3).contains(&depth) || !matches!(ty, CType::Int | CType::Float | CType::Float32) {
+                    return Err("'array' supports nested lists (up to 3 deep) of Int, Float or Float32 in the native backend".to_string());
+                }
+                let array_ty = CType::Array(Box::new(ty.clone()));
+                self.register_list_types(&array_ty);
+                Ok(Some((format!("{}_from{depth}({})", mangle_ctype(&array_ty), codes[0]), array_ty)))
+            }
+            "zeros" | "ones" => {
+                let array_ty = CType::Array(Box::new(CType::Float));
+                self.register_list_types(&array_ty);
+                Ok(Some((format!("Array_Float_full({}, {})", codes[0], if name == "ones" { "1.0" } else { "0.0" }), array_ty)))
+            }
+            "full" => {
+                if !matches!(types[1], CType::Int | CType::Float | CType::Float32) {
+                    return Err("'full' supports Int, Float or Float32 fill values in the native backend".to_string());
+                }
+                let array_ty = CType::Array(Box::new(types[1].clone()));
+                self.register_list_types(&array_ty);
+                Ok(Some((format!("{}_full({}, {})", mangle_ctype(&array_ty), codes[0], codes[1]), array_ty)))
+            }
+            "arange" => {
+                let array_ty = CType::Array(Box::new(CType::Int));
+                self.register_list_types(&array_ty);
+                Ok(Some((format!("Array_Int_arange({}, {})", codes[0], codes[1]), array_ty)))
+            }
+            "linspace" => {
+                let array_ty = CType::Array(Box::new(CType::Float));
+                self.register_list_types(&array_ty);
+                Ok(Some((format!("Array_Float_linspace({}, {}, {})", codes[0], codes[1], codes[2]), array_ty)))
             }
             "assert" => Ok(Some((
                 format!("({{ if (!({})) {{ fprintf(stderr, \"runtime error: assertion failed\\n\"); exit(1); }} }})", codes[0]),
@@ -3569,7 +3707,7 @@ impl<'a> Codegen<'a> {
                 ("%s\\n", shown)
             }
             CType::DynTrait(name) => return Err(format!("cannot 'print' a 'dyn {name}' value")),
-            CType::List(_) | CType::Map(..) | CType::Set(_) | CType::Option(_) | CType::Result(..) => {
+            CType::List(_) | CType::Map(..) | CType::Set(_) | CType::Option(_) | CType::Result(..) | CType::Array(_) => {
                 let shown = self.show_expr(&arg_codes[0], &arg_types[0].clone())?;
                 ("%s\\n", shown)
             }
@@ -4003,6 +4141,7 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>) ->
     let mut vtable_defs: Vec<String> = Vec::new();
     let mut list_type_decls = String::new();
     let mut list_typedefs = String::new();
+    let mut array_blocks: Vec<String> = Vec::new();
     let mut option_inners: Vec<CType> = Vec::new();
     let mut result_pairs: Vec<(CType, CType)> = Vec::new();
     let mut list_helper_prototypes: Vec<String> = Vec::new();
@@ -4095,6 +4234,62 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>) ->
             progressed = true;
             let name = mangle_ctype(&ty);
             list_typedefs.push_str(&format!("typedef struct {name} {name};\n"));
+            if let CType::Array(elem) = &ty {
+                let tc = c_type_name(elem);
+                list_type_decls.push_str(&format!("struct {name} {{\n    {tc}* data;\n    int64_t* shape;\n    int64_t rank;\n    int64_t size;\n}};\n\n"));
+                let lt = list_struct_name(elem);
+                let rows = CType::List(elem.clone());
+                let llt = list_struct_name(&rows);
+                let lllt = list_struct_name(&CType::List(Box::new(rows)));
+                let show_elem = codegen.show_expr("a->data[off]", elem)?;
+                let (add, sub, mul, div, lt_macro) = match **elem {
+                    CType::Int => ("((a) + (b))", "((a) - (b))", "((a) * (b))", "ostrin_idiv((a), (b))", "((a) < (b))"),
+                    CType::Float => ("((a) + (b))", "((a) - (b))", "((a) * (b))", "((a) / (b))", "((a) < (b))"),
+                    _ => ("((float)((a) + (b)))", "((float)((a) - (b)))", "((float)((a) * (b)))", "((float)((a) / (b)))", "((a) < (b))"),
+                };
+                let mut text = format!(
+                    "#define OSTRIN_ADD(a, b) {add}\n#define OSTRIN_SUB(a, b) {sub}\n#define OSTRIN_MUL(a, b) {mul}\n#define OSTRIN_DIV(a, b) {div}\n#define OSTRIN_ELEM_LT(a, b) {lt_macro}\n"
+                );
+                text.push_str(
+                    &ARRAY_RUNTIME
+                        .replace("@SHOW_ELEM@", &show_elem)
+                        .replace("@LLLT@", &lllt)
+                        .replace("@LLT@", &llt)
+                        .replace("@LT@", &lt)
+                        .replace("@N@", &name)
+                        .replace("@T@", &tc),
+                );
+                match **elem {
+                    CType::Int => text.push_str(&format!(
+                        "static double {name}_mean({name}* a) {{ return (double){name}_sum(a) / (double)a->size; }}\n\
+                         static {name}* {name}_arange(int64_t lo, int64_t hi) {{\n\
+                         \x20   if (hi <= lo) OSTRIN_FAIL(\"arange needs start < stop\");\n\
+                         \x20   int64_t shape[1] = {{ hi - lo }};\n\
+                         \x20   {name}* r = {name}_alloc(1, shape);\n\
+                         \x20   for (int64_t i = 0; i < r->size; i++) r->data[i] = lo + i;\n\
+                         \x20   return r;\n\
+                         }}\n"
+                    )),
+                    CType::Float => text.push_str(&format!(
+                        "static double {name}_mean({name}* a) {{ return {name}_sum(a) / (double)a->size; }}\n\
+                         static {name}* {name}_linspace(double lo, double hi, int64_t n) {{\n\
+                         \x20   if (n < 1) OSTRIN_FAIL(\"linspace needs at least one point\");\n\
+                         \x20   int64_t shape[1] = {{ n }};\n\
+                         \x20   {name}* r = {name}_alloc(1, shape);\n\
+                         \x20   for (int64_t i = 0; i < n; i++) {{\n\
+                         \x20       if (i + 1 == n && n > 1) r->data[i] = hi;\n\
+                         \x20       else if (n == 1) r->data[i] = lo;\n\
+                         \x20       else r->data[i] = lo + (hi - lo) * (double)i / (double)(n - 1);\n\
+                         \x20   }}\n\
+                         \x20   return r;\n\
+                         }}\n"
+                    )),
+                    _ => text.push_str(&format!("static float {name}_mean({name}* a) {{ return (float)({name}_sum(a) / (float)a->size); }}\n")),
+                }
+                text.push_str("#undef OSTRIN_ADD\n#undef OSTRIN_SUB\n#undef OSTRIN_MUL\n#undef OSTRIN_DIV\n#undef OSTRIN_ELEM_LT\n\n");
+                array_blocks.push(text);
+                continue;
+            }
             let oom = "if (!p) { fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); }";
             let mut funcs: Vec<(String, String)> = Vec::new();
             match &ty {
@@ -4321,6 +4516,10 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>) ->
         out.push_str("\n\n");
     }
 
+    // Array runtimes: full definitions, after every prototype they call.
+    for block in &array_blocks {
+        out.push_str(block);
+    }
     for (signature, body) in bodies {
         out.push_str(&format!("{signature} {{\n{body}}}\n\n"));
     }

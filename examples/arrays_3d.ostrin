@@ -1,0 +1,29 @@
+fn total(a: Array<Int>) -> Int {
+    a.sum()
+}
+
+fn main() -> Void {
+    cube = array([[[1, 2], [3, 4]], [[5, 6], [7, 8]]])
+    print(cube.shape())
+    print(cube.rank())
+    print(cube.get(1, 0, 1))
+    print(cube.sum_axis(0))
+    print(cube.sum_axis(2))
+    print(total(cube))
+
+    col = array([[1.0], [2.0], [3.0]])
+    row = array([10.0, 20.0])
+    print(col + row)
+    print(col * row)
+    print((col + row).shape())
+
+    grid = arange(0, 6).reshape([2, 3])
+    print(grid)
+    print(grid.transpose())
+    print(grid * grid)
+
+    scale: Array<Float32> = array([1.0f32, 2.0f32, 4.0f32])
+    print(scale / 4.0)
+    print(scale.max())
+    print(scale.to_string() + "!")
+}

@@ -1625,3 +1625,26 @@ fn fixed_width_integer_overflow_is_an_error_in_both_backends() {
     assert!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n").starts_with("255\n"));
     assert!(String::from_utf8_lossy(&native.stderr).contains("integer overflow"));
 }
+
+#[test]
+fn array_shape_mismatch_is_a_runtime_error_in_both_backends() {
+    // (2, 3) + (2,) can't be broadcast: both backends must print the shape,
+    // then fail with the same kind of error instead of reading out of bounds.
+    let file = example_path("arrays_shape_mismatch.ostrin");
+    let interpreted = run(&["--run", &file]);
+    assert!(!interpreted.status.success());
+    assert!(stdout(&interpreted).replace("\r\n", "\n").starts_with("[2, 3]\n"));
+    assert!(stderr(&interpreted).contains("shape mismatch"), "unexpected stderr: {}", stderr(&interpreted));
+
+    let exe = temp_artifact("shape_mismatch.exe");
+    let compile = run(&["--compile", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+    let native = Command::new(&exe).output().unwrap();
+    let _ = fs::remove_file(&exe);
+    assert!(!native.status.success());
+    assert!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n").starts_with("[2, 3]\n"));
+    assert!(String::from_utf8_lossy(&native.stderr).contains("shape mismatch"));
+}

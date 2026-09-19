@@ -9,6 +9,8 @@ use serde_json::{json, Value as JsonValue};
 
 use crate::ast::*;
 use crate::protocol;
+
+mod array;
 use crate::types::{dim_div, dim_is_dimensionless, dim_mul, dim_pow, dim_to_string, resolve_unit_expr, Dimension};
 
 #[derive(Clone)]
@@ -18,6 +20,8 @@ pub enum Value {
     Sized(i128, IntKind),
     /// A single-precision float (`Float32`).
     F32(f32),
+    /// A dense N-dimensional numeric array (`Array<T>`), by reference like `List`.
+    Array(Rc<RefCell<array::ArrayData>>),
     Float(f64),
     Bool(bool),
     Char(char),
@@ -55,6 +59,7 @@ impl fmt::Display for Value {
             Value::Int(n) => write!(f, "{n}"),
             Value::Sized(n, _) => write!(f, "{n}"),
             Value::F32(n) => write!(f, "{n}"),
+            Value::Array(a) => write!(f, "{}", array::display(&a.borrow())),
             Value::Float(n) => write!(f, "{n}"),
             Value::Bool(b) => write!(f, "{b}"),
             Value::Char(c) => write!(f, "{c}"),
@@ -694,6 +699,10 @@ impl Interpreter {
         match value {
             Value::Sized(_, kind) => Type::Named(kind.name().to_string(), Vec::new()),
             Value::F32(_) => Type::Named("Float32".to_string(), Vec::new()),
+            Value::Array(a) => {
+                let element = a.borrow().data.first().map(|v| self.runtime_type_of_value(v)).unwrap_or_else(|| Type::Named("Unknown".to_string(), Vec::new()));
+                Type::Named("Array".to_string(), vec![element])
+            }
             Value::List(state) => {
                 let element = state
                     .borrow()
@@ -1329,6 +1338,7 @@ impl Interpreter {
                     (UnaryOp::Neg, Value::Sized(_, kind)) => Err(RuntimeError::Error(format!("integer overflow: cannot negate this {}", kind.name()))),
                     (UnaryOp::Neg, Value::Float(n)) => Ok(Value::Float(-n)),
                     (UnaryOp::Neg, Value::F32(n)) => Ok(Value::F32(-n)),
+                    (UnaryOp::Neg, Value::Array(_)) => array::negate(&v),
                     (UnaryOp::Neg, Value::Quantity(n, d, u)) => Ok(Value::Quantity(-n, d.clone(), u.clone())),
                     (UnaryOp::Not, Value::Bool(b)) => Ok(Value::Bool(!b)),
                     _ => Err(RuntimeError::Error(format!("cannot apply unary operator to '{v}'"))),
@@ -1356,6 +1366,7 @@ impl Interpreter {
                         .get(iv as usize)
                         .cloned()
                         .ok_or_else(|| RuntimeError::Error(format!("index out of bounds: {iv}"))),
+                    Value::Array(a) => array::index1(&a, iv),
                     other => Err(RuntimeError::Error(format!("cannot index '{other}'"))),
                 }
             }
@@ -1713,6 +1724,34 @@ impl Interpreter {
             if let Some(f) = self.functions.get(name).cloned() {
                 return self.call_user_function_with_args(&f, args, env.clone());
             }
+            // Array constructors (a user function of the same name wins, above).
+            match (name.as_str(), args.len()) {
+                ("array", 1) => {
+                    let list = self.eval_arg(&args[0], env)?;
+                    return array::from_list(&list);
+                }
+                ("zeros", 1) | ("ones", 1) => {
+                    let shape = self.eval_arg(&args[0], env)?;
+                    return array::full(&shape, Value::Float(if name == "ones" { 1.0 } else { 0.0 }));
+                }
+                ("full", 2) => {
+                    let shape = self.eval_arg(&args[0], env)?;
+                    let value = self.eval_arg(&args[1], env)?;
+                    return array::full(&shape, value);
+                }
+                ("arange", 2) => {
+                    let start = as_i64(&self.eval_arg(&args[0], env)?)?;
+                    let stop = as_i64(&self.eval_arg(&args[1], env)?)?;
+                    return array::arange(start, stop);
+                }
+                ("linspace", 3) => {
+                    let a = as_f64(&self.eval_arg(&args[0], env)?)?;
+                    let b = as_f64(&self.eval_arg(&args[1], env)?)?;
+                    let n = as_i64(&self.eval_arg(&args[2], env)?)?;
+                    return array::linspace(a, b, n);
+                }
+                _ => {}
+            }
         }
         if let Expr::FieldAccess(obj, method) = callee.unlocated() {
             let receiver = self.eval_expr(obj, env)?;
@@ -1840,6 +1879,13 @@ impl Interpreter {
                     }
                     _ => {}
                 }
+            }
+            if let Value::Array(state) = &receiver {
+                let mut values = Vec::with_capacity(args.len());
+                for arg in args {
+                    values.push(self.eval_arg(arg, env)?);
+                }
+                return array::call_method(state, method, values);
             }
             if let Value::Set(state) = &receiver {
                 match method.as_str() {
@@ -2092,6 +2138,7 @@ fn value_type_name(v: &Value) -> String {
         Value::Int(_) => "Int".to_string(),
         Value::Sized(_, kind) => kind.name().to_string(),
         Value::F32(_) => "Float32".to_string(),
+        Value::Array(_) => "Array".to_string(),
         Value::Float(_) => "Float".to_string(),
         Value::Bool(_) => "Bool".to_string(),
         Value::Char(_) => "Char".to_string(),
@@ -2411,6 +2458,9 @@ fn f32_binary(op: BinOp, lv: Value, rv: Value) -> EvalResult {
 
 fn eval_binary_builtin(op: BinOp, lv: Value, rv: Value) -> EvalResult {
     use BinOp::*;
+    if matches!(lv, Value::Array(_)) || matches!(rv, Value::Array(_)) {
+        return array::binary(op, lv, rv);
+    }
     if matches!(lv, Value::Sized(..)) || matches!(rv, Value::Sized(..)) {
         return sized_binary(op, lv, rv);
     }
