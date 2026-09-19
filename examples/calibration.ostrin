@@ -1,0 +1,35 @@
+fn main() -> Void {
+    // Calibration curve of a sensor: signal against concentration.
+    concentration = array([0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
+    signal = array([0.05, 1.02, 2.11, 2.95, 4.08, 5.02, 5.96])
+
+    line = linfit(concentration, signal)
+    print(line)
+    print(line[0])
+    print(line[2])
+
+    quad = polyfit(concentration, signal, 2)
+    print(quad)
+    print(polyval(quad, 3.5))
+    print(polyval(quad, array([0.0, 10.0])))
+
+    a = array([[2.0, 1.0, -1.0], [-3.0, -1.0, 2.0], [-2.0, 1.0, 2.0]])
+    b = array([8.0, -11.0, -3.0])
+    print(solve(a, b))
+
+    g = rng(3)
+    samples = g.randn([2000])
+    counts = histogram(samples, 8, -4.0, 4.0)
+    print(counts)
+    print(counts.sum())
+
+    print(erf(0.5))
+    print(erf(-1.5))
+    print(erf(3.0))
+    print(norm_cdf(0.0, 0.0, 1.0))
+    print(norm_cdf(1.96, 0.0, 1.0))
+    print(norm_pdf(0.0, 0.0, 1.0))
+    xs = linspace(-3.0, 3.0, 7)
+    print(norm_pdf(xs, 0.0, 1.0))
+    print(norm_cdf(xs, 0.0, 1.0))
+}

@@ -280,3 +280,47 @@ pub fn pow(x: f64, y: f64) -> f64 {
     }
     exp(y * ln(x))
 }
+
+const TWO_OVER_SQRTPI: f64 = 1.1283791670955126;
+const SQRT_PI: f64 = 1.7724538509055159;
+const SQRT2: f64 = 1.4142135623730951;
+const SQRT_2PI: f64 = 2.5066282746310002;
+
+/// Error function: Taylor series below 2, continued fraction for the
+/// complementary function above (no cancellation), saturated beyond 6.
+pub fn erf(x: f64) -> f64 {
+    if x.is_nan() {
+        return x;
+    }
+    let ax = if x < 0.0 { -x } else { x };
+    let magnitude = if ax >= 6.0 {
+        1.0
+    } else if ax < 2.0 {
+        let x2 = ax * ax;
+        let mut term = ax;
+        let mut sum = ax;
+        for n in 1..=60 {
+            term = -term * x2 / (n as f64);
+            sum = sum + term / ((2 * n + 1) as f64);
+        }
+        TWO_OVER_SQRTPI * sum
+    } else {
+        let mut t = ax;
+        for k in (1..=60).rev() {
+            t = ax + (k as f64 / 2.0) / t;
+        }
+        1.0 - exp(-ax * ax) / SQRT_PI / t
+    };
+    if x < 0.0 { -magnitude } else { magnitude }
+}
+
+/// Density of `N(mu, sigma)` at `x`.
+pub fn norm_pdf(x: f64, mu: f64, sigma: f64) -> f64 {
+    let z = (x - mu) / sigma;
+    exp(-0.5 * z * z) / (sigma * SQRT_2PI)
+}
+
+/// Cumulative distribution of `N(mu, sigma)` at `x`.
+pub fn norm_cdf(x: f64, mu: f64, sigma: f64) -> f64 {
+    0.5 * (1.0 + erf((x - mu) / (sigma * SQRT2)))
+}

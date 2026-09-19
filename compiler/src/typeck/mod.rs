@@ -942,6 +942,43 @@ impl Checker {
         }
     }
 
+    /// `linfit polyfit polyval solve histogram norm_pdf norm_cdf` (on `Array<Float>`).
+    fn check_science_call(&mut self, name: &str, arg_types: &[Ty]) -> Option<Ty> {
+        let arity = match name {
+            "linfit" | "solve" | "polyval" => 2,
+            "polyfit" | "norm_pdf" | "norm_cdf" => 3,
+            "histogram" => 4,
+            _ => return None,
+        };
+        if arg_types.len() != arity {
+            self.push("E1041", format!("'{name}' expects {arity} argument(s), got {}.", arg_types.len()));
+            return Some(Ty::Unknown);
+        }
+        let floats = Ty::Applied("Array".to_string(), vec![Ty::Float]);
+        let ints = Ty::Applied("Array".to_string(), vec![Ty::Int]);
+        let is_float_array = |t: &Ty| *t == floats || *t == Ty::Unknown;
+        let is_float = |t: &Ty| *t == Ty::Float || *t == Ty::Unknown;
+        let (ok, result) = match name {
+            "linfit" | "solve" => (is_float_array(&arg_types[0]) && is_float_array(&arg_types[1]), floats.clone()),
+            "polyfit" => (is_float_array(&arg_types[0]) && is_float_array(&arg_types[1]) && (arg_types[2] == Ty::Int || arg_types[2] == Ty::Unknown), floats.clone()),
+            "polyval" => {
+                let result = if is_float(&arg_types[1]) && arg_types[1] != Ty::Unknown { Ty::Float } else { floats.clone() };
+                (is_float_array(&arg_types[0]) && (is_float(&arg_types[1]) || is_float_array(&arg_types[1])), result)
+            }
+            "histogram" => (is_float_array(&arg_types[0]) && (arg_types[1] == Ty::Int || arg_types[1] == Ty::Unknown) && is_float(&arg_types[2]) && is_float(&arg_types[3]), ints),
+            _ => {
+                let result = if is_float(&arg_types[0]) && arg_types[0] != Ty::Unknown { Ty::Float } else { floats.clone() };
+                ((is_float(&arg_types[0]) || is_float_array(&arg_types[0])) && is_float(&arg_types[1]) && is_float(&arg_types[2]), result)
+            }
+        };
+        if !ok {
+            let got: Vec<String> = arg_types.iter().map(|t| t.describe()).collect();
+            self.push("E1041", format!("'{name}' was called with unsupported argument types ({}); it works on Array<Float> and Float values.", got.join(", ")));
+            return Some(Ty::Unknown);
+        }
+        Some(result)
+    }
+
     /// Methods of `Rng`.
     fn check_rng_method(&mut self, method: &str, arg_types: &[Ty]) -> Ty {
         let shape = |t: &Ty| matches!(t, Ty::List(e) if **e == Ty::Int || **e == Ty::Unknown);
@@ -965,7 +1002,7 @@ impl Checker {
 
     /// `sin`, `cos`, `sqrt`, …, `abs`, `pow`, `atan2`, `pi`.
     fn check_math_call(&mut self, name: &str, arg_types: &[Ty]) -> Option<Ty> {
-        const UNARY: &[&str] = &["sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh", "exp", "ln", "log10", "sqrt", "floor", "ceil", "round"];
+        const UNARY: &[&str] = &["sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh", "exp", "ln", "log10", "sqrt", "floor", "ceil", "round", "erf"];
         let arity = match name {
             "pi" => 0,
             "pow" | "atan2" => 2,
@@ -2316,6 +2353,9 @@ impl Checker {
                 return result;
             }
             if let Some(result) = self.check_math_call(name, &arg_types) {
+                return result;
+            }
+            if let Some(result) = self.check_science_call(name, &arg_types) {
                 return result;
             }
             if name == "rng" {

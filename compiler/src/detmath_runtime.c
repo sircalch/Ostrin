@@ -225,3 +225,41 @@ OSTRIN_DM_F32(sin) OSTRIN_DM_F32(cos) OSTRIN_DM_F32(tan) OSTRIN_DM_F32(asin) OST
 OSTRIN_DM_F32(sinh) OSTRIN_DM_F32(cosh) OSTRIN_DM_F32(tanh) OSTRIN_DM_F32(exp) OSTRIN_DM_F32(ln) OSTRIN_DM_F32(log10)
 static float ostrin_dm_powf(float a, float b) { return (float)ostrin_dm_pow((double)a, (double)b); }
 static float ostrin_dm_atan2f(float a, float b) { return (float)ostrin_dm_atan2((double)a, (double)b); }
+
+#define OSTRIN_DM_TWO_OVER_SQRTPI 1.1283791670955126
+#define OSTRIN_DM_SQRT_PI 1.7724538509055159
+#define OSTRIN_DM_SQRT2 1.4142135623730951
+#define OSTRIN_DM_SQRT_2PI 2.5066282746310002
+
+static double ostrin_dm_erf(double x) {
+    if (x != x) return x;
+    double ax = x < 0.0 ? -x : x;
+    double magnitude;
+    if (ax >= 6.0) {
+        magnitude = 1.0;
+    } else if (ax < 2.0) {
+        double x2 = ax * ax;
+        double term = ax;
+        double sum = ax;
+        for (int n = 1; n <= 60; n++) {
+            term = -term * x2 / (double)n;
+            sum = sum + term / (double)(2 * n + 1);
+        }
+        magnitude = OSTRIN_DM_TWO_OVER_SQRTPI * sum;
+    } else {
+        double t = ax;
+        for (int k = 60; k >= 1; k--) t = ax + ((double)k / 2.0) / t;
+        magnitude = 1.0 - ostrin_dm_exp(-ax * ax) / OSTRIN_DM_SQRT_PI / t;
+    }
+    return x < 0.0 ? -magnitude : magnitude;
+}
+OSTRIN_DM_F32(erf)
+
+static double ostrin_dm_norm_pdf(double x, double mu, double sigma) {
+    double z = (x - mu) / sigma;
+    return ostrin_dm_exp(-0.5 * z * z) / (sigma * OSTRIN_DM_SQRT_2PI);
+}
+
+static double ostrin_dm_norm_cdf(double x, double mu, double sigma) {
+    return 0.5 * (1.0 + ostrin_dm_erf((x - mu) / (sigma * OSTRIN_DM_SQRT2)));
+}

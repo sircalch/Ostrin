@@ -12,6 +12,7 @@ use crate::protocol;
 
 mod array;
 mod detmath;
+mod regress;
 mod math;
 mod rng;
 use crate::types::{dim_div, dim_is_dimensionless, dim_mul, dim_pow, dim_to_string, resolve_unit_expr, Dimension};
@@ -1730,6 +1731,14 @@ impl Interpreter {
             }
             if let Some(f) = self.functions.get(name).cloned() {
                 return self.call_user_function_with_args(&f, args, env.clone());
+            }
+            // Regression / distributions on Array<Float> (a user function of the same name wins, above).
+            if regress::is_regress(name, args.len()) {
+                let mut values = Vec::with_capacity(args.len());
+                for arg in args {
+                    values.push(self.eval_arg(arg, env)?);
+                }
+                return regress::call(name, &values);
             }
             // Math builtins (a user function of the same name wins, above).
             if math::is_math(name, args.len()) {

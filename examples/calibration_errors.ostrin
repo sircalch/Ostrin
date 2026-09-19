@@ -1,0 +1,10 @@
+fn main() -> Void {
+    x = array([1, 2, 3])
+    y = array([1.0, 2.0, 3.0])
+    print(linfit(x, y))
+    print(polyfit(y, y, 1.5))
+    print(solve(y))
+    print(histogram(y, 4.0, 0.0, 1.0))
+    print(norm_pdf("x", 0.0, 1.0))
+    print(erf(1))
+}

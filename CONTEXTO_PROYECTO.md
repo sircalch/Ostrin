@@ -3413,3 +3413,23 @@ Cierra el aviso de reproducibilidad del §96.
 - Aviso: `unit` no puede usarse como nombre de variable (palabra reservada del parser).
 - Ejemplo `detmath.ostrin` (barridos de todas las funciones; salida idéntica bit a bit
   en intérprete y nativo). Suite: **108 pruebas**, sin warnings.
+
+---
+
+## 100. Regresión, sistemas lineales, histogramas y distribución normal — 2026-09-18
+
+- Funciones sobre `Array<Float>` (`interpreter/regress.rs`, espejo nativo `array_linalg.c`):
+  `linfit(x, y)` → `[pendiente, ordenada, r²]`; `polyfit(x, y, grado)` → coeficientes de menor
+  a mayor grado (ecuaciones normales); `polyval(coefs, x)` (Horner; `x` escalar o array);
+  `solve(A, b)` (eliminación gaussiana con pivote parcial; `singular matrix` si no hay solución
+  única); `histogram(datos, bins, lo, hi)` → `Array<Int>` (bins de igual ancho, el extremo superior
+  cuenta en el último, lo de fuera se ignora); `erf(x)`; `norm_pdf(x, mu, sigma)` y
+  `norm_cdf(x, mu, sigma)` (`x` escalar o array; `sigma > 0`).
+- `erf` es determinista (serie de Taylor por debajo de 2, fracción continua de `erfc`
+  por encima, saturada en 6) y se suma a `detmath`; `norm_pdf/cdf` la usan.
+- Mismo contrato de determinismo que el resto: orden fijo de sumas, sin operaciones fusionadas;
+  `calibration.ostrin` (curva de calibración, sistema 3×3, histograma de 2 000 normales de `Rng`,
+  `erf` y la normal) da idéntica salida en intérprete y nativo. `solve` recupera `[2, 3, -1]`.
+- Ejemplos `calibration.ostrin` y `calibration_errors.ostrin` (6 errores). Suite: **110 pruebas**.
+- Límites: solo `Float` (no `Float32`); las ecuaciones normales de `polyfit` pierden precisión con
+  grados altos (usar grado ≤ ~8); sin descomposiciones LU/QR/SVD reutilizables todavía.

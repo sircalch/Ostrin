@@ -295,6 +295,9 @@ const DETMATH_RUNTIME: &str = include_str!("detmath_runtime.c");
 /// Statistics appended to the array runtime of float element types.
 const ARRAY_STATS: &str = include_str!("array_stats.c");
 
+/// Regression / solve / histogram / normal distribution, appended to `Array<Float>`'s runtime.
+const ARRAY_LINALG: &str = include_str!("array_linalg.c");
+
 /// `Array<T>` runtime template, instantiated per element type (see the header of the file).
 const ARRAY_RUNTIME: &str = include_str!("array_runtime.c");
 
@@ -1200,6 +1203,10 @@ impl<'a> Codegen<'a> {
         }
         if let CType::Array(t) = ty {
             self.register_list_types(t);
+            if **t == CType::Float {
+                // `histogram` returns an `Array<Int>`.
+                self.register_list_types(&CType::Array(Box::new(CType::Int)));
+            }
             // The runtime returns/consumes these list types.
             let rows = CType::List(t.clone());
             self.ensure_list(&CType::Int);
@@ -3634,11 +3641,13 @@ impl<'a> Codegen<'a> {
     fn gen_builtin(&mut self, name: &str, codes: &[String], types: &[CType]) -> Result<Option<(String, CType)>, String> {
         let arity = match name {
             "read_file" | "parse_int" | "sum" | "panic" | "assert" | "array" | "zeros" | "ones" | "abs" => 1,
-            n if ["sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh", "exp", "ln", "log10", "sqrt", "floor", "ceil", "round"].contains(&n) => 1,
+            n if ["sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh", "exp", "ln", "log10", "sqrt", "floor", "ceil", "round", "erf"].contains(&n) => 1,
             "pi" => 0,
             "rng" => 1,
             "pow" | "atan2" => 2,
-            "write_file" | "assert_eq" | "full" | "arange" | "cov" | "corr" => 2,
+            "write_file" | "assert_eq" | "full" | "arange" | "cov" | "corr" | "linfit" | "solve" | "polyval" => 2,
+            "polyfit" | "norm_pdf" | "norm_cdf" => 3,
+            "histogram" => 4,
             "linspace" => 3,
             _ => return Ok(None),
         };
@@ -3694,6 +3703,45 @@ impl<'a> Codegen<'a> {
                     ty,
                 )))
             }
+            "linfit" | "solve" | "polyfit" | "polyval" | "histogram" | "norm_pdf" | "norm_cdf" => {
+                let float_array = CType::Array(Box::new(CType::Float));
+                self.register_list_types(&float_array);
+                let is_float_array = |t: &CType| *t == float_array;
+                match name {
+                    "linfit" | "solve" if is_float_array(&types[0]) && is_float_array(&types[1]) => {
+                        Ok(Some((format!("Array_Float_{name}({}, {})", codes[0], codes[1]), float_array)))
+                    }
+                    "polyfit" if is_float_array(&types[0]) && is_float_array(&types[1]) => {
+                        Ok(Some((format!("Array_Float_polyfit({}, {}, {})", codes[0], codes[1], codes[2]), float_array)))
+                    }
+                    "polyval" if is_float_array(&types[0]) && types[1] == CType::Float => {
+                        Ok(Some((format!("Array_Float_polyval({}, {})", codes[0], codes[1]), CType::Float)))
+                    }
+                    "polyval" if is_float_array(&types[0]) && is_float_array(&types[1]) => {
+                        Ok(Some((format!("Array_Float_polyval_array({}, {})", codes[0], codes[1]), float_array)))
+                    }
+                    "histogram" if is_float_array(&types[0]) => {
+                        let ints = CType::Array(Box::new(CType::Int));
+                        self.register_list_types(&ints);
+                        Ok(Some((format!("Array_Float_histogram({}, {}, {}, {})", codes[0], codes[1], codes[2], codes[3]), ints)))
+                    }
+                    "norm_pdf" | "norm_cdf" if types[0] == CType::Float => {
+                        let (x, s) = (self.next_temp(), self.next_temp());
+                        Ok(Some((
+                            format!(
+                                "({{ double {x} = {}; double {s} = {}; double {r} = {}; if (!({r} > 0.0)) OSTRIN_FAIL(\"the normal distribution needs sigma > 0\"); ostrin_dm_{name}({x}, {s}, {r}); }})",
+                                codes[0], codes[1], codes[2]
+                            ),
+                            CType::Float,
+                        )))
+                    }
+                    "norm_pdf" | "norm_cdf" if is_float_array(&types[0]) => Ok(Some((
+                        format!("Array_Float_norm_map({}, {}, {}, {})", codes[0], codes[1], codes[2], if name == "norm_cdf" { 1 } else { 0 }),
+                        float_array,
+                    ))),
+                    _ => Err(format!("'{name}' works on Array<Float> and Float values in the native backend")),
+                }
+            }
             "cov" | "corr" => match (&types[0], &types[1]) {
                 (CType::Array(a), CType::Array(b)) if a == b && matches!(**a, CType::Float | CType::Float32) => {
                     Ok(Some((format!("{}_{name}({}, {})", mangle_ctype(&types[0]), codes[0], codes[1]), (**a).clone())))
@@ -3733,7 +3781,7 @@ impl<'a> Codegen<'a> {
                 }
                 Ok(Some((format!("{function}({})", codes[0]), elem)))
             }
-            m if ["sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh", "exp", "ln", "log10", "sqrt", "floor", "ceil", "round"].contains(&m) => {
+            m if ["sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh", "exp", "ln", "log10", "sqrt", "floor", "ceil", "round", "erf"].contains(&m) => {
                 // Exactly-rounded operations use libm; the rest use the deterministic runtime.
                 let exact = matches!(m, "sqrt" | "floor" | "ceil" | "round");
                 let c_name = if exact { m.to_string() } else { format!("ostrin_dm_{m}") };
@@ -4424,6 +4472,9 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>) ->
                         .replace("@N@", &name)
                         .replace("@T@", &tc),
                 );
+                if **elem == CType::Float {
+                    text.push_str(&ARRAY_LINALG.replace("@N@", &name));
+                }
                 if matches!(**elem, CType::Float | CType::Float32) {
                     text.push_str(
                         &ARRAY_STATS

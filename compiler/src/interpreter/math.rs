@@ -16,7 +16,7 @@ pub fn is_math(name: &str, arity: usize) -> bool {
 }
 
 pub const UNARY: &[&str] = &[
-    "sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh", "exp", "ln", "log10", "sqrt", "floor", "ceil", "round",
+    "sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh", "exp", "ln", "log10", "sqrt", "floor", "ceil", "round", "erf",
 ];
 
 fn f64_fn(name: &str, x: f64) -> f64 {
@@ -33,6 +33,7 @@ fn f64_fn(name: &str, x: f64) -> f64 {
         "exp" => detmath::exp(x),
         "ln" => detmath::ln(x),
         "log10" => detmath::log10(x),
+        "erf" => detmath::erf(x),
         // Exactly rounded by IEEE 754, so the platform's own routine is safe.
         "sqrt" => x.sqrt(),
         "floor" => x.floor(),
