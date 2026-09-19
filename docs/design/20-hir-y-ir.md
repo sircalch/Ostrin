@@ -1,6 +1,8 @@
 # 20. HIR e IR: plan de migración del backend
 
-*Estado: especificación. Lo implementado hasta hoy (tabla de tipos por expresión, sustituciones por llamada genérica, tipos de literales, detector de divergencias) es la **Etapa 1–2 del plan**; este documento fija lo que falta y en qué orden, para que la gestión de memoria (documento 18) y las funciones como valores tengan dónde apoyarse.*
+*Estado: HIR implementado y primera bajada HIR→CFG ejecutable. La etapa IR aún es
+inicial: `--ir` expone temporales y bloques verificados, pero el backend C todavía
+no consume esta representación ni inserta RC/último uso.*
 
 ## 1. Qué existe ya (comprobado en el código)
 
@@ -10,6 +12,7 @@
 | `TypedProgram.call_substs` | `typeck` | Argumentos de tipo por llamada genérica |
 | `TypedProgram.literal_kinds` | `typeck` | Tipo elegido para cada literal numérico |
 | `NativeTypeReport` | `codegen` | Detecta divergencias checker↔backend (0 hoy, en ~1 350 expresiones) |
+| `IrProgram` / `IrFunction` / `IrBlock` | `ir.rs` | Primera CFG con temporales explícitos, terminadores y verificador de destinos |
 | Intérprete como oráculo | `interpreter` | Semántica de referencia; pruebas diferenciales automáticas |
 
 Por tanto el backend **ya no infiere solo**: la reinferencia que queda (`bind_type`, `expected`, `settle_literal`) es respaldo verificado.
@@ -59,7 +62,7 @@ Sobre este IR se hacen los análisis que el texto C no permite:
 
 1. **HIR + verificador + `--hir`** para *todo* lo que el checker tipa; medida de cobertura por ejemplo (ratchet).
 2. Migrar el backend C por **familias de nodos** al HIR (literales/operadores → llamadas → records/enums → patrones → colecciones → genéricos), eliminando la reinferencia correspondiente en cada paso.
-3. **IR de bloques básicos** y generación de C desde el IR (el HIR deja de generar C directamente).
+3. **IR de bloques básicos** y generación de C desde el IR (el HIR deja de generar C directamente). La primera CFG observable ya existe en `--ir`; faltan la bajada semántica completa y el cambio de backend.
 4. **RC + último uso** sobre el IR (`--leak-check`: los ejemplos deben terminar sin objetos vivos).
 5. **Cierres y funciones como valores**; retirar la comprobación dinámica de E1101.
 6. Optimizador y, después, otros backends (LLVM, WASM, GPU) que consumen el mismo IR.

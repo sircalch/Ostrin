@@ -3903,3 +3903,31 @@ alias, análisis de último uso, préstamos, destructores por tipo ni liberació
 ámbito. El registro global es una base segura y comprobable para implementar esas capas sin
 mantener asignaciones dispersas. El siguiente bloque de memoria debe añadir metadatos de tipo
 y destrucción recursiva; en paralelo se puede continuar retirando el fallback AST.
+
+## 135. Primera bajada HIR → IR con CFG y temporales explícitos — 2026-09-18
+
+Se implementó `compiler/src/ir.rs` y el comando `ostrinc --ir`, como primera parte ejecutable
+de la etapa 3 del diseño 20. El backend C todavía no consume esta representación: el objetivo
+de esta tanda es crear el lugar correcto para que el análisis de ownership, RC, último uso y
+E1101 estático opere sobre valores nombrados y bloques, no sobre expresiones C anidadas.
+
+La IR actual contiene:
+
+- `IrProgram`, `IrFunction` e `IrBlock` con entrada y terminadores;
+- temporales numerados (`%0`, `%1`, …), parámetros, constantes, locales y llamadas;
+- operaciones unarias/binarias, campos, índices, agregados y valores `phi`;
+- CFG explícita para `if`, `while`, `for`, `break`, `continue` y `return`;
+- iteradores como `iter_init`, `iter_has_next` e `iter_next`;
+- instrucciones `retain`/`release` ya reservadas para la siguiente fase;
+- instrucciones `opaque` nombradas para `match`, cierres, `try`, concurrencia y conversiones
+  que todavía necesitan una bajada semántica completa, en lugar de perderse silenciosamente.
+
+El verificador comprueba que no haya bloques sin terminador y que todos los saltos apunten a
+bloques existentes. `compiler/tests/examples.rs` cubre `--ir` sobre `native_fibonacci.ostrin`,
+incluyendo una rama de bucle y la ausencia de violaciones. La suite queda en **6 pruebas
+diferenciales y 109 de integración verdes**; `cargo check` también pasa.
+
+Esto aún no es un backend nuevo ni permite afirmar que Ostrin tenga ARC: es la infraestructura
+necesaria para implementarlo. El siguiente paquete debe bajar `match`/`try`/cierres/concurrencia
+desde HIR a CFG real y después añadir el primer pase de ownership (`retain/release` más
+`--leak-check`) sin modificar la sintaxis del lenguaje.

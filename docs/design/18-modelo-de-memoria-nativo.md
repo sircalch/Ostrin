@@ -1,6 +1,8 @@
 # 18. Modelo de memoria del backend nativo
 
-*Estado: propuesta para decisión. Ninguna parte está implementada; hoy el backend nativo hace `malloc` y nunca libera.*
+*Estado: base de runtime implementada; RC/último uso aún no están implementados. El backend
+usa un registro de allocations y cleanup global al terminar, como etapa previa a la propiedad
+determinista.*
 
 ## 1. Punto de partida (semántica ya fijada por el lenguaje)
 
@@ -30,6 +32,11 @@ Sin fugas en programas de larga duración; sin doble liberación ni uso tras lib
 ## 4. Recomendación
 
 **RC determinista (D) como base, más arenas (E) como optimización, y ownership solo como análisis interno.**
+
+La primera etapa ya implementada centraliza las reservas en `ostrin_alloc`, `ostrin_calloc`,
+`ostrin_realloc` y `ostrin_free`, y registra los bloques para liberarlos al salir. Esto
+resuelve la fuga global de los programas cortos y da una API única; no sustituye los pasos
+de RC que siguen.
 
 - Todo valor por referencia lleva un contador. `retain`/`release` los inserta el compilador **sobre el IR** (no sobre el texto C), en copias de variable, paso a funciones, campos y salida de ámbito.
 - **Análisis de último uso / movimiento** en el IR: si el compilador prueba que un valor no se vuelve a usar, transfiere la propiedad sin tocar el contador (así se recupera el coste cero en el caso común, sin sintaxis nueva).

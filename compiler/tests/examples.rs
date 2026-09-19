@@ -744,6 +744,19 @@ fn native_backend_emit_c_writes_readable_c_source() {
 }
 
 #[test]
+fn compiler_lowers_hir_to_verified_cfg_ir() {
+    let out = run(&["--ir", &example_path("native_fibonacci.ostrin")]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let source = stdout(&out);
+    assert!(source.contains("ir fn"));
+    assert!(source.contains("bb0:"));
+    assert!(source.contains("br %"), "the loop must become an explicit branch: {source}");
+    assert!(source.contains("ret"), "the IR must terminate functions: {source}");
+    assert!(source.contains("ir functions:"));
+    assert!(source.contains("ir violations: 0"), "IR verifier reported a problem: {source}");
+}
+
+#[test]
 fn native_backend_emits_centralized_memory_cleanup() {
     let out = run(&["--emit-c", &example_path("native_hir_collections.ostrin")]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));

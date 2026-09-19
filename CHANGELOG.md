@@ -60,6 +60,12 @@
   closures, collections, strings, arrays and runtime buffers. This is the first
   leak-free baseline for native programs; scope-level ARC, ownership checking and
   type-aware destructors remain the next memory milestone.
+- Added the first HIR-to-IR lowering pass and `ostrinc --ir`. Functions now expose
+  explicit temporaries, basic blocks, branches, loop edges, calls, aggregates, phi
+  nodes and named opaque instructions for constructs awaiting semantic lowering.
+  The IR verifier rejects missing block terminators and invalid CFG targets; the C
+  backend remains unchanged until this representation is mature enough to host RC
+  and last-use insertion.
 - Module loader now rewrites types in signatures, fields, variants and annotations
   (a `record` from another module can be used as a type).
 - CI on Linux, macOS and Windows.
