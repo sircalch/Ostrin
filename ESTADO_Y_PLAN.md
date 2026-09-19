@@ -113,7 +113,7 @@ enviar un *record* por un canal (no hay equivalente del chequeo E1101), `for` so
 | Área | Estado |
 |---|---|
 | Valores de función de primera clase (guardar/pasar `fn` como valor) | Solo intérprete; nativo solo admite lambdas *en línea* en combinadores |
-| Chequeo «movido tras enviar» (E1101) | Solo intérprete (dinámico) |
+| Chequeo «movido tras enviar» (E1101) | Dinámico en ambos backends; estático pendiente del IR (doc. 20) |
 | Concurrencia real (hilos, planificador, `select`) | No existe; `spawn` es síncrono |
 | Memoria en nativo | Se usa `malloc` sin liberar (sin GC ni conteo de referencias) |
 | Biblioteca estándar | Mínima: sin `HashMap` eficiente, fechas, red, formateo, `args`, entorno |

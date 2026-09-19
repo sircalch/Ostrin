@@ -40,9 +40,7 @@ fn text(bytes: &[u8]) -> String {
 /// Examples the native backend deliberately does not reproduce, with the
 /// reason. Each entry must *fail* to compile natively — when a gap is closed
 /// the assertion below fires and the entry must be deleted.
-const KNOWN_NATIVE_GAPS: &[(&str, &str)] = &[
-    ("moved_after_send.ostrin", "records sent through a channel need the E1101 moved-after-send analysis"),
-];
+const KNOWN_NATIVE_GAPS: &[(&str, &str)] = &[];
 
 /// Examples that compile natively but whose output legitimately differs
 /// (operating-system error text comes from `strerror` vs Rust's `io::Error`).

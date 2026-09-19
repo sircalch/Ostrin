@@ -3455,3 +3455,22 @@ Cierra el aviso de reproducibilidad del §96.
   prestadas (documento 18) para no copiar.
 - Ejemplos `array_syntax.ostrin` (nativo = intérprete), `array_syntax_errors.ostrin` (9 errores),
   `array_empty_mask.ostrin` (test en ambos backends). Suite: **112 pruebas**.
+
+---
+
+## 102. E1101 en el backend nativo y plan de HIR/IR — 2026-09-18
+
+- **«Movido tras enviar» (E1101) ya funciona en nativo** con la misma semántica dinámica
+  del intérprete: `send` de un record lo registra por dirección en un conjunto (`moves_runtime.c`,
+  tabla hash de direcciones) y leer después una variable que lo contiene falla con
+  `'x' was moved into a channel send earlier…`. La generación es en dos pasadas: si el programa
+  envía algún record, se regenera con las lecturas instrumentadas (los programas sin ese patrón
+  no pagan nada). Se elimina la única entrada de `KNOWN_NATIVE_GAPS` (ahora vacía) y el test
+  `moved_after_send_is_a_runtime_error_in_both_backends` comprueba ambos backends. La prueba de
+  rechazo del nativo usa `advanced.ostrin` (`Trajectory`).
+- Nuevo `docs/design/20-hir-y-ir.md`: qué existe ya (tablas de tipos, sustituciones,
+  literales, detector de divergencias), definición del HIR tipado y desazucarado con su
+  verificador, IR de bloques básicos y el orden de migración (HIR → backend por familias → IR →
+  RC/último uso → cierres → optimizador). Sustituye a la comprobación dinámica de E1101 por un
+  análisis estático cuando exista el IR.
+- Suite: **113 pruebas**.

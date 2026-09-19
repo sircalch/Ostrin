@@ -288,6 +288,9 @@ const QTY_RUNTIME: &str = include_str!("qty_runtime.c");
 /// Reproducible random generator, spliced in when a program uses `Rng`.
 const RNG_RUNTIME: &str = include_str!("rng_runtime.c");
 
+/// `E1101` tracking, spliced in when a program sends records through channels.
+const MOVES_RUNTIME: &str = include_str!("moves_runtime.c");
+
 /// Deterministic elementary functions (mirror of `interpreter/detmath.rs`), spliced in
 /// whenever the program uses `sin`, `exp`, `pow`, `Rng`, …
 const DETMATH_RUNTIME: &str = include_str!("detmath_runtime.c");
@@ -466,6 +469,8 @@ pub struct NativeTypeReport {
     pub calls_inferred: usize,
     /// Real disagreements: `file:line:col: checker says …, native says …`.
     pub divergences: Vec<String>,
+    /// The program sends a record through a channel (so reads must be tracked).
+    pub sends_records: bool,
 }
 
 /// A method with its own type parameters (`fn map<U>(self, ..)`), kept
@@ -574,6 +579,9 @@ struct Codegen<'a> {
     checker_types: Option<&'a HashMap<ExprKey, Ty>>,
     /// Integer literals the checker typed as fixed-width.
     literal_kinds: Option<&'a HashMap<ExprKey, LitKind>>,
+    /// Emit "moved after send" checks on record reads (needed once a record is sent through a channel).
+    track_moves: bool,
+    saw_record_send: bool,
     /// The checker's resolved generic arguments per call site.
     call_substs: Option<&'a HashMap<ExprKey, crate::typeck::CallSubst>>,
     /// Set by `gen_expr` for a call to a plain identifier, consumed by `gen_function_call`.
@@ -1798,6 +1806,10 @@ impl<'a> Codegen<'a> {
             Expr::StringLiteral(s) => Ok((c_string_literal(s), CType::Str)),
             Expr::Ident(name) => {
                 if let Some(ty) = self.lookup(name) {
+                    // Reading a record variable after it was sent through a channel is an error (E1101).
+                    if self.track_moves && matches!(ty, CType::Record(_)) {
+                        return Ok((format!("(({})ostrin_use_record((void*){name}, \"{name}\"))", c_type_name(&ty)), ty));
+                    }
                     return Ok((name.clone(), ty));
                 }
                 // A unit variant (`None`, or any fieldless variant of a
@@ -3307,10 +3319,15 @@ impl<'a> Codegen<'a> {
                 let (codes, types) = self.gen_args_hinted(args, &[t.clone()])?;
                 match method_name {
                     "send" if codes.len() == 1 => {
-                        if matches!(t, CType::Record(_)) {
-                            return Err("sending a record through a channel isn't supported by the native backend: the interpreter's 'moved after send' check (E1101) has no native equivalent yet".to_string());
-                        }
                         let item = self.coerce(&codes[0], &types[0], &t)?;
+                        if matches!(t, CType::Record(_)) {
+                            // The interpreter marks the sent record as moved; reads of it fail afterwards (E1101).
+                            self.saw_record_send = true;
+                            if self.track_moves {
+                                let temp = self.next_temp();
+                                return Ok((format!("({{ {} {temp} = {item}; ostrin_mark_moved((void*){temp}); {name}_send({obj_code}, {temp}); }})", c_type_name(&t)), CType::Void));
+                            }
+                        }
                         Ok((format!("{name}_send({obj_code}, {item})"), CType::Void))
                     }
                     "receive" if codes.is_empty() => Ok((format!("{name}_receive({obj_code})"), CType::Option(Box::new(t)))),
@@ -4092,10 +4109,15 @@ fn c_string_literal(s: &str) -> String {
 /// partially (`None`, `Ok(x)`, `Nothing`, …) and lets `NativeTypeReport`
 /// compare the backend's own inference with the checker's.
 pub fn generate_with_report(items: &[Item], typed: &crate::typeck::TypedProgram) -> Result<(String, NativeTypeReport), String> {
-    generate_impl(items, Some(typed))
+    let (source, report) = generate_impl(items, Some(typed), false)?;
+    if report.sends_records {
+        // A record is sent through a channel: regenerate with read tracking (E1101).
+        return generate_impl(items, Some(typed), true);
+    }
+    Ok((source, report))
 }
 
-fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>) -> Result<(String, NativeTypeReport), String> {
+fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>, track_moves: bool) -> Result<(String, NativeTypeReport), String> {
     let checker_types = typed.map(|t| &t.expr_types);
     let call_substs = typed.map(|t| &t.call_substs);
     let mut functions = Vec::new();
@@ -4216,6 +4238,8 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>) ->
         checker_types,
         call_substs,
         literal_kinds: typed.map(|t| &t.literal_kinds),
+        track_moves,
+        saw_record_send: false,
         current_call_key: None,
         current_file: None,
         compare_enabled: false,
@@ -4822,7 +4846,12 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>) ->
     if out.contains("ostrin_dm_") {
         out = out.replacen(PRELUDE, &format!("{PRELUDE}{DETMATH_RUNTIME}"), 1);
     }
-    Ok((out, codegen.type_report.clone()))
+    if out.contains("ostrin_mark_moved") {
+        out = out.replacen(PRELUDE, &format!("{PRELUDE}{MOVES_RUNTIME}"), 1);
+    }
+    let mut report = codegen.type_report.clone();
+    report.sends_records = codegen.saw_record_send;
+    Ok((out, report))
 }
 
 fn render_params(types: &[CType], params: &[Param]) -> String {

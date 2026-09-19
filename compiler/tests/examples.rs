@@ -745,14 +745,35 @@ fn native_backend_emit_c_writes_readable_c_source() {
 
 #[test]
 fn native_backend_rejects_constructs_it_does_not_support_yet() {
-    // `moved_after_send.ostrin` sends a record through a channel, whose
-    // "moved after send" runtime check the native backend can't reproduce:
-    // it must refuse with a clear message rather than silently run the
-    // program the interpreter rejects.
-    let out = run(&["--emit-c", &example_path("moved_after_send.ostrin")]);
+    // `advanced.ostrin` is a syntax showcase that names a type (`Trajectory`)
+    // the backend has no representation for: it must fail with a clear
+    // message rather than silently emit something wrong.
+    let out = run(&["--emit-c", &example_path("advanced.ostrin")]);
     assert!(!out.status.success(), "the native backend should refuse a program it can't fully compile");
     let error = stderr(&out);
-    assert!(error.contains("isn't supported by the native backend"), "unexpected error: {error}");
+    assert!(error.contains("supported by the native backend"), "unexpected error: {error}");
+}
+
+#[test]
+fn moved_after_send_is_a_runtime_error_in_both_backends() {
+    // A record sent through a channel can't be read afterwards (E1101): the
+    // interpreter checks it dynamically, and the native backend mirrors that
+    // check with a set of moved addresses.
+    let file = example_path("moved_after_send.ostrin");
+    let interpreted = run(&["--run", &file]);
+    assert!(!interpreted.status.success());
+    assert!(stderr(&interpreted).contains("was moved into a channel send"), "unexpected stderr: {}", stderr(&interpreted));
+
+    let exe = temp_artifact("moved.exe");
+    let compile = run(&["--compile", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+    let native = Command::new(&exe).output().unwrap();
+    let _ = fs::remove_file(&exe);
+    assert!(!native.status.success());
+    assert!(String::from_utf8_lossy(&native.stderr).contains("was moved into a channel send"));
 }
 
 #[test]
