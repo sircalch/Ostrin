@@ -1,6 +1,7 @@
 # 18. Modelo de memoria del backend nativo
 
-*Estado: base de runtime implementada; el primer lowering conservador de ownership ya existe,
+*Estado: base de runtime implementada; el primer lowering conservador de ownership y el ABI
+`retain`/`release` ya existen,
 pero RC/último uso completo aún no están implementados. El backend usa un registro de
 allocations y cleanup global al terminar, como etapa previa a la propiedad determinista.*
 
@@ -35,9 +36,10 @@ Sin fugas en programas de larga duración; sin doble liberación ni uso tras lib
 **RC determinista (D) como base, más arenas (E) como optimización, y ownership solo como análisis interno.**
 
 La primera etapa ya implementada centraliza las reservas en `ostrin_alloc`, `ostrin_calloc`,
-`ostrin_realloc` y `ostrin_free`, y registra los bloques para liberarlos al salir. Esto
-resuelve la fuga global de los programas cortos y da una API única; no sustituye los pasos
-de RC que siguen.
+`ostrin_realloc` y `ostrin_free`, registra los bloques para liberarlos al salir y expone
+`ostrin_retain`/`ostrin_release` como ABI del futuro lowering. `--leak-check` imprime las
+asignaciones vivas, el pico y el total antes de la limpieza. Esto resuelve la fuga global de
+los programas cortos y da una API única; todavía no inserta RC por cada copia.
 
 - Todo valor por referencia lleva un contador. `retain`/`release` los inserta el compilador **sobre el IR** (no sobre el texto C), en copias de variable, paso a funciones, campos y salida de ámbito.
 - **Análisis de último uso / movimiento** en el IR: si el compilador prueba que un valor no se vuelve a usar, transfiere la propiedad sin tocar el contador (así se recupera el coste cero en el caso común, sin sintaxis nueva).
@@ -58,7 +60,8 @@ El RC sobre el generador actual (texto C con expresiones‑sentencia) exigiría 
 1. HIR → IR con valores temporales explícitos (Etapas 2–4 de `docs/ARQUITECTURA_Y_VISION.md`).
 2. Runtime C: cabecera de objeto con contador; `ostrin_retain`/`ostrin_release`; destructores por tipo.
 3. Inserción de retain/release + optimización de último uso. Ya existe una primera pasada
-   (`--ownership-ir`) que solo marca transferencias lineales conocidas; no toca el backend C.
+   (`--ownership-ir`) que marca transferencias lineales conocidas y el runtime ofrece el ABI;
+   aún falta que el backend C consuma la IR transformada.
 4. `--leak-check` y pruebas: cada ejemplo debe terminar con cero objetos vivos.
 5. E1101 estático integrado; mantener la comprobación dinámica del intérprete y nativo como red
    de seguridad hasta que el backend consuma completamente la IR transformada.

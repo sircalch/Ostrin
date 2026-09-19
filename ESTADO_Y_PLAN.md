@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-19 · rama `main` · 6 pruebas diferenciales y 117 de integración en verde.*
+*Corte: 2026-09-19 · rama `main` · 6 pruebas diferenciales y 118 de integración en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
 Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–142); para el diseño
@@ -105,9 +105,10 @@ Monomorfización bajo demanda (funciones, records, enums, métodos, vtables, lis
 
 El runtime C generado centraliza las reservas en `ostrin_alloc`/`ostrin_calloc`/
 `ostrin_realloc`, registra cada bloque y lo libera mediante `atexit` al terminar el
-programa. Los buffers temporales de arrays, CSV, strings, cantidades, RNG y el detector
-E1101 también usan esa API. Esto es una base de limpieza y observabilidad, no todavía ARC
-por ámbito ni destrucción basada en último uso.
+programa. Expone ya el ABI `ostrin_retain`/`ostrin_release` y `--leak-check` reporta
+asignaciones vivas, pico y total antes de la limpieza. Los buffers temporales de arrays, CSV,
+strings, cantidades, RNG y el detector E1101 también usan esa API. Esto es una base de
+limpieza y observabilidad, no todavía ARC por ámbito ni destrucción basada en último uso.
 
 **Soportado** (todos los ejemplos ejecutables del repo, salvo lo listado en §6):
 - Escalares, strings, recursión, `if/while/for`, `match` (con guardas y patrones anidados).
@@ -141,7 +142,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Cierres en nativo | Captura **por valor** (una variable `mut` cambiada después no se ve dentro); lambda sin contexto de tipos exige anotación |
 | Chequeo «movido tras enviar» (E1101) | Integrado por defecto en `--check`, `--run`, `--emit-c` y `--compile`; `--ownership-check` conserva el informe explícito |
 | Paralelismo nativo (hilos, canales bloqueantes, `select`) | No existe todavía; ambos backends tienen scheduler cooperativo |
-| Memoria en nativo | Registro de allocations y limpieza global al salir; ARC/último uso y destructores por tipo siguen pendientes |
+| Memoria en nativo | Registro, limpieza global, ABI retain/release y `--leak-check`; ARC/último uso y destructores por tipo siguen pendientes |
 | IR de bloques | HIR→CFG disponible con `--ir`; `if/while/for/match/try/spawn/channel` ya tienen operaciones explícitas, aún no reemplaza el backend C |
 | Ownership/último uso | `--ownership-report`, `--ownership-check` y `--ownership-ir`; inserta solo `release` en transferencias lineales demostrables, sin ARC completa |
 | Biblioteca estándar | Mínima: sin `HashMap` eficiente, fechas, red, formateo, `args`, entorno |
@@ -230,7 +231,7 @@ Decisiones que necesito de ti para afinar el plan:
 
 ```powershell
 cd compiler
-cargo test                                   # 6 diferenciales + 117 de integración
+cargo test                                   # 6 diferenciales + 118 de integración
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```

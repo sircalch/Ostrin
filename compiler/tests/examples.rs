@@ -744,6 +744,18 @@ fn native_backend_emit_c_writes_readable_c_source() {
 }
 
 #[test]
+fn native_backend_exposes_ownership_runtime_and_leak_check() {
+    let out = run(&["--emit-c", "--leak-check", &example_path("native_fibonacci.ostrin")]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let source = stdout(&out);
+    assert!(source.contains("static void ostrin_retain(void* ptr)"));
+    assert!(source.contains("static void ostrin_release(void* ptr)"));
+    assert!(source.contains("static void ostrin_mem_report(void)"));
+    assert!(source.contains("ostrin memory: live_allocations="));
+    assert!(source.contains("ostrin_mem_report();"));
+}
+
+#[test]
 fn compiler_lowers_hir_to_verified_cfg_ir() {
     let out = run(&["--ir", &example_path("native_fibonacci.ostrin")]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));

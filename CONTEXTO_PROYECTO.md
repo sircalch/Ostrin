@@ -4087,3 +4087,24 @@ La suite queda en **6 pruebas diferenciales y 117 de integración verdes**. El s
 de memoria sigue siendo completar contratos de `retain`/`release` para llamadas, retornos,
 joins y loops, y hacer que el backend C consuma la IR transformada; E1101 ya está conectado
 al flujo normal, pero la ARC completa todavía no existe.
+
+## 143. ABI de ownership nativo y `--leak-check` — 2026-09-19
+
+El runtime C ya tiene la primera superficie ejecutable para el próximo lowering de memoria:
+
+- Cada bloque registrado mantiene un contador `refs` inicializado en uno; `ostrin_retain` lo
+  incrementa de forma saturante y `ostrin_release` lo decrementa, liberando por la misma ruta
+  registrada cuando llega a cero.
+- `--leak-check` se puede combinar con `--emit-c` o `--compile`. El programa nativo imprime
+  `live_allocations`, `peak_allocations` y `total_allocations` antes de que `atexit` ejecute la
+  limpieza global.
+- La API todavía no se inserta automáticamente en cada copia de record, colección, llamada o
+  retorno: el backend C actual sigue usando el registro global como red de seguridad. Esto es
+  intencional hasta que la IR transformada sea la fuente de emisión y pueda respetar joins,
+  loops, escapes y destructores sin liberar dos veces.
+- Se añadió una prueba que inspecciona el C generado y verifica la presencia del ABI y del
+  informe. La suite queda en **6 pruebas diferenciales y 118 de integración verdes**.
+
+Siguiente paso: conectar `--ownership-ir` con una emisión mínima de retain/release para
+temporales de records y colecciones en bloques lineales, dejando llamadas, phi, loops y escapes
+marcados como barreras hasta que sus contratos estén implementados.

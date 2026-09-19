@@ -341,11 +341,13 @@ typedef struct { void* fn; void* env; } OstrinClosure;\n\
 #define OSTRIN_OOM() do { fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); } while (0)\n\
 typedef struct OstrinAllocation {\n\
     void* ptr;\n\
+    size_t refs;\n\
     struct OstrinAllocation* next;\n\
 } OstrinAllocation;\n\
-\n\
 static OstrinAllocation* ostrin_allocations = NULL;\n\
 static size_t ostrin_allocation_count = 0;\n\
+static size_t ostrin_peak_allocation_count = 0;\n\
+static size_t ostrin_total_allocations = 0;\n\
 typedef bool (*OstrinTaskPoll)(void*);\n\
 typedef struct OstrinTaskNode {\n\
     void* task;\n\
@@ -392,9 +394,14 @@ static void ostrin_register_allocation(void* ptr) {\n\
     OstrinAllocation* entry = (OstrinAllocation*)malloc(sizeof *entry);\n\
     if (!entry) { free(ptr); OSTRIN_OOM(); }\n\
     entry->ptr = ptr;\n\
+    entry->refs = 1;\n\
     entry->next = ostrin_allocations;\n\
     ostrin_allocations = entry;\n\
     ostrin_allocation_count++;\n\
+    ostrin_total_allocations++;\n\
+    if (ostrin_allocation_count > ostrin_peak_allocation_count) {\n\
+        ostrin_peak_allocation_count = ostrin_allocation_count;\n\
+    }\n\
 }\n\
 \n\
 static void* ostrin_alloc(size_t size) {\n\
@@ -439,6 +446,34 @@ static void ostrin_free(void* ptr) {\n\
         link = &entry->next;\n\
     }\n\
     free(ptr);\n\
+}\n\
+/* Ownership runtime ABI. The current generator still relies on global\n\
+ * cleanup for safety; the IR backend will consume these operations for\n\
+ * per-value retain/release once its C emission is complete. */\n\
+static void ostrin_retain(void* ptr) {\n\
+    if (!ptr) return;\n\
+    for (OstrinAllocation* entry = ostrin_allocations; entry; entry = entry->next) {\n\
+        if (entry->ptr == ptr) {\n\
+            if (entry->refs != SIZE_MAX) entry->refs++;\n\
+            return;\n\
+        }\n\
+    }\n\
+}\n\
+\n\
+static void ostrin_release(void* ptr) {\n\
+    if (!ptr) return;\n\
+    for (OstrinAllocation* entry = ostrin_allocations; entry; entry = entry->next) {\n\
+        if (entry->ptr == ptr) {\n\
+            if (entry->refs > 1) entry->refs--;\n\
+            else ostrin_free(ptr);\n\
+            return;\n\
+        }\n\
+    }\n\
+}\n\
+\n\
+static void ostrin_mem_report(void) {\n\
+    fprintf(stderr, \"ostrin memory: live_allocations=%zu peak_allocations=%zu total_allocations=%zu\\n\",\n\
+            ostrin_allocation_count, ostrin_peak_allocation_count, ostrin_total_allocations);\n\
 }\n\
 \n\
 static void ostrin_mem_cleanup(void) {\n\
@@ -5081,15 +5116,31 @@ pub(crate) fn c_string_literal(s: &str) -> String {
 /// partially (`None`, `Ok(x)`, `Nothing`, …) and lets `NativeTypeReport`
 /// compare the backend's own inference with the checker's.
 pub fn generate_with_report(items: &[Item], typed: &crate::typeck::TypedProgram) -> Result<(String, NativeTypeReport), String> {
-    let (source, report) = generate_impl(items, Some(typed), false)?;
+    generate_with_options(items, typed, false)
+}
+
+/// Generates native C with optional memory observability. The ordinary API
+/// stays unchanged for editor/type-report callers; the CLI uses this option
+/// for `--leak-check`.
+pub fn generate_with_options(
+    items: &[Item],
+    typed: &crate::typeck::TypedProgram,
+    leak_check: bool,
+) -> Result<(String, NativeTypeReport), String> {
+    let (source, report) = generate_impl(items, Some(typed), false, leak_check)?;
     if report.sends_records {
         // A record is sent through a channel: regenerate with read tracking (E1101).
-        return generate_impl(items, Some(typed), true);
+        return generate_impl(items, Some(typed), true, leak_check);
     }
     Ok((source, report))
 }
 
-fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>, track_moves: bool) -> Result<(String, NativeTypeReport), String> {
+fn generate_impl(
+    items: &[Item],
+    typed: Option<&crate::typeck::TypedProgram>,
+    track_moves: bool,
+    leak_check: bool,
+) -> Result<(String, NativeTypeReport), String> {
     let checker_types = typed.map(|t| &t.expr_types);
     let call_substs = typed.map(|t| &t.call_substs);
     let mut functions = Vec::new();
@@ -6001,7 +6052,11 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>, tr
     for (signature, body) in bodies {
         out.push_str(&format!("{signature} {{\n{body}}}\n\n"));
     }
-    out.push_str("int main(void) {\n    atexit(ostrin_mem_cleanup);\n    ostrin_main();\n    return 0;\n}\n");
+    out.push_str("int main(void) {\n    atexit(ostrin_mem_cleanup);\n    ostrin_main();\n");
+    if leak_check {
+        out.push_str("    ostrin_mem_report();\n");
+    }
+    out.push_str("    return 0;\n}\n");
     if out.contains("Qty") {
         out = out.replacen(PRELUDE, &format!("{PRELUDE}{QTY_RUNTIME}"), 1);
     }

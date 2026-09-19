@@ -78,6 +78,10 @@
   move classifier now distinguishes mutable/nested-mutable records from immutable records;
   immutable records are shareable through channels in both backends, while collections remain
   managed by identity. Added `examples/immutable_record_channel.ostrin` and parity coverage.
+- Added the native ownership runtime ABI (`ostrin_retain`/`ostrin_release`) and the
+  `--leak-check` diagnostic mode, which reports live, peak and total allocations before the
+  global cleanup safety net runs. The ABI is ready for IR-driven insertion; automatic retain/
+  release at every ownership boundary is still the next memory stage.
 - Lowered `match` and `try` into explicit IR control flow: pattern tests,
   pattern bindings, guarded-arm branches, try success/error blocks and phi convergence.
   The IR now keeps these families semantic instead of representing them as opaque operations;

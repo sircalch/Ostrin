@@ -67,7 +67,8 @@ Sobre este IR se hacen los análisis que el texto C no permite:
 2. Migrar el backend C por **familias de nodos** al HIR (literales/operadores → llamadas → records/enums → patrones → colecciones → genéricos), eliminando la reinferencia correspondiente en cada paso.
 3. **IR de bloques básicos** y generación de C desde el IR (el HIR deja de generar C directamente). La primera CFG observable ya existe en `--ir`; faltan la bajada semántica completa y el cambio de backend.
 4. **RC + último uso** sobre el IR (`--leak-check`: los ejemplos deben terminar sin objetos vivos).
-   La primera subetapa ya inserta `release` solo en transferencias lineales y deja barreras
+   El runtime ya expone `ostrin_retain`/`ostrin_release` y la primera subetapa inserta `release`
+   solo en transferencias lineales; deja barreras
    explícitas para agregados, llamadas, `phi`, loops y escapes.
 5. **Cierres y funciones como valores**; retirar la comprobación dinámica de E1101 cuando el
    backend consuma la IR transformada de forma completa.
