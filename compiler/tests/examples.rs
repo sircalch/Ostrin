@@ -740,7 +740,26 @@ fn native_backend_emit_c_writes_readable_c_source() {
     let source = stdout(&out);
     assert!(source.contains("#include <stdint.h>"));
     assert!(source.contains("int64_t ostrin_fn_fib(int64_t n)"));
-    assert!(source.contains("int main(void)"), "the generated file must supply its own C main: {source}");
+    assert!(source.contains("int main(int argc, char** argv)"), "the generated file must supply its own C main: {source}");
+}
+
+#[test]
+fn program_arguments_match_between_interpreter_and_native() {
+    let file = example_path("args.ostrin");
+    let interpreted = run(&["--run", &file, "--", "uno", "dos"]);
+    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), "2\nuno\ndos\n");
+
+    let exe = temp_artifact("args.exe");
+    let compile = run(&["--compile", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "native compile failed: {}", stderr(&compile));
+    let native = Command::new(&exe).args(["uno", "dos"]).output().expect("run args binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native binary failed: {}", String::from_utf8_lossy(&native.stderr));
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), "2\nuno\ndos\n");
 }
 
 #[test]

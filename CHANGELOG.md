@@ -82,6 +82,9 @@
   `--leak-check` diagnostic mode, which reports live, peak and total allocations before the
   global cleanup safety net runs. The ABI is ready for IR-driven insertion; automatic retain/
   release at every ownership boundary is still the next memory stage.
+- Added the cross-backend `args()` standard-library builtin. Interpreted programs read
+  arguments after the `--` separator, while native programs receive `argc/argv` directly;
+  both expose a `List<String>` with identical behavior.
 - Lowered `match` and `try` into explicit IR control flow: pattern tests,
   pattern bindings, guarded-arm branches, try success/error blocks and phi convergence.
   The IR now keeps these families semantic instead of representing them as opaque operations;

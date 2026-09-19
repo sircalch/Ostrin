@@ -348,6 +348,8 @@ static OstrinAllocation* ostrin_allocations = NULL;\n\
 static size_t ostrin_allocation_count = 0;\n\
 static size_t ostrin_peak_allocation_count = 0;\n\
 static size_t ostrin_total_allocations = 0;\n\
+static int ostrin_argc = 0;\n\
+static char** ostrin_argv = NULL;\n\
 typedef bool (*OstrinTaskPoll)(void*);\n\
 typedef struct OstrinTaskNode {\n\
     void* task;\n\
@@ -4695,6 +4697,7 @@ impl<'a> Codegen<'a> {
     /// `write_file`, `parse_int`, `sum` and `panic`.
     fn gen_builtin(&mut self, name: &str, codes: &[String], types: &[CType]) -> Result<Option<(String, CType)>, String> {
         let arity = match name {
+            "args" => 0,
             "norm" | "eigvals" | "det" | "inv" | "trace" | "eye" | "read_file" | "parse_int" | "parse_csv" | "sum" | "panic" | "assert" | "array" | "zeros" | "ones" | "abs" => 1,
             n if ["sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh", "exp", "ln", "log10", "sqrt", "floor", "ceil", "round", "erf"].contains(&n) => 1,
             "pi" => 0,
@@ -4711,6 +4714,15 @@ impl<'a> Codegen<'a> {
         }
         let (r, a, b, c) = (self.next_temp(), self.next_temp(), self.next_temp(), self.next_temp());
         match name {
+            "args" => {
+                let ty = CType::List(Box::new(CType::Str));
+                self.register_list_types(&ty);
+                let list = list_struct_name(&CType::Str);
+                Ok(Some((
+                    format!("({{ {list}* {r} = {list}_new_from_array((const char**)ostrin_argv, (int64_t)ostrin_argc); {r}; }})"),
+                    ty,
+                )))
+            }
             "parse_csv" => {
                 let inner = CType::List(Box::new(CType::Str));
                 let ty = CType::List(Box::new(inner.clone()));
@@ -6052,7 +6064,7 @@ fn generate_impl(
     for (signature, body) in bodies {
         out.push_str(&format!("{signature} {{\n{body}}}\n\n"));
     }
-    out.push_str("int main(void) {\n    atexit(ostrin_mem_cleanup);\n    ostrin_main();\n");
+    out.push_str("int main(int argc, char** argv) {\n    ostrin_argc = argc > 0 ? argc - 1 : 0;\n    ostrin_argv = argc > 0 ? argv + 1 : argv;\n    atexit(ostrin_mem_cleanup);\n    ostrin_main();\n");
     if leak_check {
         out.push_str("    ostrin_mem_report();\n");
     }

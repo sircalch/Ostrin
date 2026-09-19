@@ -1836,6 +1836,14 @@ impl Interpreter {
                     }
                     return Ok(Value::Void);
                 }
+                "args" => {
+                    let values = std::env::args()
+                        .skip_while(|value| value != "--")
+                        .skip(1)
+                        .map(Value::String)
+                        .collect();
+                    return Ok(Value::List(Rc::new(RefCell::new(values))));
+                }
                 "sum" => {
                     let v = self.eval_arg(&args[0], env)?;
                     return match v {

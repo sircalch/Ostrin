@@ -1,0 +1,10 @@
+fn main() -> Void {
+    values = args()
+    print(values.length())
+    if values.length() > 0 {
+        print(values[0])
+    }
+    if values.length() > 1 {
+        print(values[1])
+    }
+}

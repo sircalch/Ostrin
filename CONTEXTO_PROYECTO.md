@@ -4108,3 +4108,19 @@ El runtime C ya tiene la primera superficie ejecutable para el próximo lowering
 Siguiente paso: conectar `--ownership-ir` con una emisión mínima de retain/release para
 temporales de records y colecciones en bloques lineales, dejando llamadas, phi, loops y escapes
 marcados como barreras hasta que sus contratos estén implementados.
+
+## 144. Argumentos de programa como capacidad de biblioteca estándar — 2026-09-19
+
+Ostrin ahora expone `args()` como una primitiva de aplicación en ambos backends:
+
+- El checker reconoce `args()` sin argumentos y devuelve `List<String>`.
+- El intérprete recoge los argumentos situados después del separador `--` de la invocación
+  de `ostrinc`, evitando mezclar opciones del compilador con los datos del programa.
+- El backend nativo genera `main(int argc, char** argv)`, conserva `argc/argv` en el runtime y
+  construye la misma `List<String>` a partir de `argv[1..]`.
+- `examples/args.ostrin` y la prueba `program_arguments_match_between_interpreter_and_native`
+  validan valores reales (`uno`, `dos`) y la paridad de salida.
+
+La suite queda en **6 pruebas diferenciales y 119 de integración verdes**. Esta base permite
+crear CLI Ostrin reales; el siguiente bloque de stdlib puede añadir entorno, rutas y formato
+estructurado sin cambiar el contrato de ejecución.
