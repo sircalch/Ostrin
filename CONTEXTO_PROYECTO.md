@@ -3779,3 +3779,34 @@ sube de **78 a 96 funciones/métodos generados desde HIR** y el trinquete difere
 **90**. El siguiente paso es resolver nombres/prototipos de instancias genéricas dentro de los
 cuerpos especializados, y después extender la misma ruta a records/enums aplicados y métodos
 genéricos.
+
+## 131. Llamadas genéricas anidadas desde HIR — 2026-09-18
+
+La continuación de la sección 130 cerró la resolución de funciones genéricas dentro de otras
+funciones genéricas. `hir.rs` ahora tiene una segunda pasada que recorre el HIR especializado;
+para cada `CallSubst` concreto pide al backend el nombre de la instancia C correspondiente,
+reescribe el callee y elimina la sustitución abstracta antes de llamar a `hir_c.rs`.
+
+`codegen.rs` reutiliza la misma cola de monomorfización que ya servía al AST. Si la instancia
+anidada aún no existe, la crea, registra sus parámetros y retorno, la agrega a la cola y deja
+disponible su nombre directo (`identity__Int`) en el `World` HIR. Así se soportan llamadas como:
+
+```ostrin
+fn twice<T>(value: T) -> T {
+    identity(identity(value))
+}
+```
+
+También queda cubierta la recursión genérica: la instancia que se está emitiendo se registra
+antes de resolver su propio cuerpo. El prefijo normal de funciones fuente (`ostrin_fn_`) no se
+aplica a estos nombres ya mangled; los nombres ordinarios conservan exactamente su ruta previa.
+
+`examples/native_hir_generics.ostrin` prueba `twice<T>`, una llamada recursiva genérica y el C
+generado contiene la llamada directa a `identity__Int` dos veces. La suite diferencial conserva
+equivalencia con el intérprete: **6 pruebas diferenciales y 105 de integración verdes**; la medición
+global pasa de **96 a 98**
+funciones/métodos HIR y el trinquete queda en **90**.
+
+Queda como siguiente familia la resolución HIR de `record<T>`/`enum<T>` aplicados dentro de estas
+instancias y, después, los métodos genéricos. En esos casos el fallback AST sigue siendo obligatorio
+hasta que el `World` conozca sus nombres, campos, variantes y métodos concretos.

@@ -659,6 +659,162 @@ fn specialize_expr(expr: &HirExpr, subst: &HashMap<String, Ty>) -> HirExpr {
     HirExpr { ty: specialize_ty(&expr.ty, subst), kind }
 }
 
+/// Resolves generic calls inside an already-specialized function. The
+/// callback belongs to the backend because only it knows the concrete C
+/// mangling and can queue a missing monomorphized body. Keeping this as a
+/// separate pass means specialization stays a pure HIR transformation.
+pub fn resolve_generic_calls<F>(function: &mut HirFunction, resolver: &mut F)
+where
+    F: FnMut(&str, &CallSubst) -> Option<String>,
+{
+    resolve_block_calls(&mut function.body, resolver);
+}
+
+fn resolve_block_calls<F>(block: &mut HirBlock, resolver: &mut F)
+where
+    F: FnMut(&str, &CallSubst) -> Option<String>,
+{
+    for stmt in &mut block.stmts {
+        resolve_stmt_calls(stmt, resolver);
+    }
+    if let Some(tail) = &mut block.tail {
+        resolve_expr_calls(tail, resolver);
+    }
+}
+
+fn resolve_stmt_calls<F>(stmt: &mut HirStmt, resolver: &mut F)
+where
+    F: FnMut(&str, &CallSubst) -> Option<String>,
+{
+    match stmt {
+        HirStmt::Let { value, .. } | HirStmt::Assign { value, .. } => resolve_expr_calls(value, resolver),
+        HirStmt::FieldAssign { target, value } => {
+            resolve_expr_calls(target, resolver);
+            resolve_expr_calls(value, resolver);
+        }
+        HirStmt::Return(value) | HirStmt::Break(value) => {
+            if let Some(value) = value {
+                resolve_expr_calls(value, resolver);
+            }
+        }
+        HirStmt::Continue => {}
+        HirStmt::While { cond, body } => {
+            resolve_expr_calls(cond, resolver);
+            resolve_block_calls(body, resolver);
+        }
+        HirStmt::For { iter, body, .. } => {
+            resolve_expr_calls(iter, resolver);
+            resolve_block_calls(body, resolver);
+        }
+        HirStmt::Expr(expr) => resolve_expr_calls(expr, resolver),
+    }
+}
+
+fn resolve_expr_calls<F>(expr: &mut HirExpr, resolver: &mut F)
+where
+    F: FnMut(&str, &CallSubst) -> Option<String>,
+{
+    match &mut expr.kind {
+        HirKind::Unit(value, _) | HirKind::Unary(_, value) | HirKind::Field(value, _) | HirKind::As(value, _) => {
+            resolve_expr_calls(value, resolver)
+        }
+        HirKind::Binary(_, left, right) | HirKind::Index(left, right) | HirKind::Within(left, right) => {
+            resolve_expr_calls(left, resolver);
+            resolve_expr_calls(right, resolver);
+        }
+        HirKind::Approximately(value, target, tolerance) => {
+            resolve_expr_calls(value, resolver);
+            resolve_expr_calls(target, resolver);
+            resolve_expr_calls(tolerance, resolver);
+        }
+        HirKind::Range(start, _, end, step) => {
+            resolve_expr_calls(start, resolver);
+            resolve_expr_calls(end, resolver);
+            if let Some(step) = step {
+                resolve_expr_calls(step, resolver);
+            }
+        }
+        HirKind::Call { callee, args, type_args, subst } => {
+            resolve_expr_calls(callee, resolver);
+            for arg in args {
+                resolve_expr_calls(&mut arg.value, resolver);
+            }
+            let target = if let HirKind::Global(name) = &callee.kind {
+                subst.as_ref().and_then(|call| resolver(name, call))
+            } else {
+                None
+            };
+            if let Some(target) = target {
+                callee.kind = HirKind::Global(target);
+                *subst = None;
+                type_args.clear();
+            }
+        }
+        HirKind::MethodCall { recv, args, .. } => {
+            resolve_expr_calls(recv, resolver);
+            for arg in args {
+                resolve_expr_calls(&mut arg.value, resolver);
+            }
+        }
+        HirKind::If(cond, then_block, else_block) => {
+            resolve_expr_calls(cond, resolver);
+            resolve_block_calls(then_block, resolver);
+            if let Some(else_block) = else_block {
+                resolve_block_calls(else_block, resolver);
+            }
+        }
+        HirKind::Block(block) | HirKind::Loop(block) | HirKind::Spawn(block) | HirKind::SpawnScope(block) | HirKind::Lambda(_, block) => {
+            resolve_block_calls(block, resolver)
+        }
+        HirKind::List(values) | HirKind::Set(values) => {
+            for value in values {
+                resolve_expr_calls(value, resolver);
+            }
+        }
+        HirKind::Map(values) => {
+            for (key, value) in values {
+                resolve_expr_calls(key, resolver);
+                resolve_expr_calls(value, resolver);
+            }
+        }
+        HirKind::Try(value, handler) => {
+            resolve_expr_calls(value, resolver);
+            if let Some(handler) = handler {
+                resolve_expr_calls(handler, resolver);
+            }
+        }
+        HirKind::Record { fields, .. } => {
+            for (_, value) in fields {
+                resolve_expr_calls(value, resolver);
+            }
+        }
+        HirKind::Match(scrutinee, arms) => {
+            resolve_expr_calls(scrutinee, resolver);
+            for arm in arms {
+                if let Some(guard) = &mut arm.guard {
+                    resolve_expr_calls(guard, resolver);
+                }
+                resolve_block_calls(&mut arm.body, resolver);
+            }
+        }
+        HirKind::Channel(_, capacity) => {
+            if let Some(capacity) = capacity {
+                resolve_expr_calls(capacity, resolver);
+            }
+        }
+        HirKind::Int(_)
+        | HirKind::Sized(..)
+        | HirKind::Float(_)
+        | HirKind::Float32(_)
+        | HirKind::Str(_)
+        | HirKind::Char(_)
+        | HirKind::Bool(_)
+        | HirKind::Local(_)
+        | HirKind::Global(_)
+        | HirKind::EmptyCollection(..) => {}
+    }
+}
+
 /// A HIR invariant that does not hold.
 #[derive(Debug)]
 pub struct Violation {

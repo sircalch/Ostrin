@@ -2147,6 +2147,61 @@ impl<'a> Codegen<'a> {
         Some(out)
     }
 
+    /// Ensures that a generic call discovered while specializing HIR has the
+    /// same concrete instance and pending body as an AST-generated call. The
+    /// caller supplies the checker's already-specialized `CallSubst`, so this
+    /// path never performs a second inference pass.
+    fn ensure_hir_generic_instance(&mut self, name: &str, recorded: &crate::typeck::CallSubst) -> Option<String> {
+        let decl = self.generic_functions.get(name).copied()?;
+        let mut subst = HashMap::new();
+        let mut hir_subst = HashMap::new();
+        for generic in &decl.generics {
+            if let Some(dimension) = recorded.dims.get(&generic.name) {
+                subst.insert(generic.name.clone(), CType::Quantity(dimension.clone()));
+                hir_subst.insert(generic.name.clone(), Ty::Quantity(dimension.clone()));
+            } else {
+                let ty = recorded.types.get(&generic.name)?.clone();
+                let concrete = self.ty_to_ctype(&ty)?;
+                subst.insert(generic.name.clone(), concrete);
+                hir_subst.insert(generic.name.clone(), ty);
+            }
+        }
+        let suffix = decl
+            .generics
+            .iter()
+            .map(|generic| subst.get(&generic.name).map(mangle_ctype))
+            .collect::<Option<Vec<_>>>()?
+            .join("_");
+        let c_name = format!("{}__{suffix}", decl.name);
+        if self.instantiations.contains_key(&c_name) {
+            return Some(c_name);
+        }
+
+        let types = self.named_types();
+        let param_types = decl
+            .params
+            .iter()
+            .map(|param| map_type_with_subst(&param.ty, &types, &subst))
+            .collect::<Result<Vec<_>, _>>()
+            .ok()?;
+        let return_type = map_type_with_subst(&decl.return_type, &types, &subst).ok()?;
+        for ty in param_types.iter().chain(std::iter::once(&return_type)) {
+            self.register_list_types(ty);
+        }
+        self.flush_instances().ok()?;
+        self.instantiations.insert(c_name.clone(), (param_types.clone(), return_type.clone()));
+        self.pending.push_back(PendingInstance {
+            c_name: c_name.clone(),
+            hir_name: decl.name.clone(),
+            decl,
+            subst,
+            hir_subst,
+            param_types,
+            return_type,
+        });
+        Some(c_name)
+    }
+
     fn ctype_agrees(&self, ty: &Ty, c: &CType) -> bool {
         match (ty, c) {
             (Ty::Int, CType::Int) | (Ty::Float, CType::Float) | (Ty::Bool, CType::Bool) | (Ty::String, CType::Str) | (Ty::Void, CType::Void) => true,
@@ -4929,7 +4984,7 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>, tr
     // prototype before use, not the body.
     let mut bodies: Vec<(String, String)> = Vec::new(); // (signature, body)
     // What the HIR emitter may rely on: signatures, records (unless reads are tracked) and methods.
-    let hir_world = crate::hir_c::World {
+    let mut hir_world = crate::hir_c::World {
         functions: functions
             .iter()
             .filter(|f| f.generics.is_empty())
@@ -4938,6 +4993,7 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>, tr
                 Some((f.name.clone(), (params.iter().map(c_type_name).collect(), c_type_name(ret))))
             })
             .collect(),
+        function_c_names: HashMap::new(),
         records: if codegen.track_moves {
             HashMap::new()
         } else {
@@ -5313,21 +5369,48 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>, tr
             // generic call, generic record, or another not-yet-migrated node
             // is present, `generate` returns None and the established AST
             // monomorphization remains the fallback.
-            let from_hir = match (&hir, std::env::var_os("OSTRIN_NO_HIR_CODEGEN")) {
-                (Some(program), None) => program
-                    .functions
-                    .iter()
-                    .find(|function| function.name == job.hir_name)
-                    .and_then(|function| {
-                        let specialized = crate::hir::specialize_function(function, &job.hir_subst);
-                        for (_, ty) in &specialized.params {
-                            codegen.register_hir_type(ty);
-                        }
-                        codegen.register_hir_type(&specialized.ret);
-                        codegen.register_hir_block_types(&specialized.body);
-                        crate::hir_c::generate(&specialized, &hir_world)
-                    }),
-                _ => None,
+            let from_hir = if let (Some(program), None) = (&hir, std::env::var_os("OSTRIN_NO_HIR_CODEGEN")) {
+                if let Some(function) = program.functions.iter().find(|function| function.name == job.hir_name) {
+                    // Register the current instance before resolving a
+                    // recursive generic call such as `walk<T>` calling
+                    // `walk<T>` again.
+                    hir_world.functions.insert(
+                        job.c_name.clone(),
+                        (
+                            job.param_types.iter().map(c_type_name).collect(),
+                            c_type_name(&job.return_type),
+                        ),
+                    );
+                    hir_world.function_c_names.insert(job.c_name.clone(), job.c_name.clone());
+
+                    let mut specialized = crate::hir::specialize_function(function, &job.hir_subst);
+                    {
+                        let mut resolver = |name: &str, recorded: &crate::typeck::CallSubst| {
+                            let target = codegen.ensure_hir_generic_instance(name, recorded)?;
+                            let (params, ret) = codegen.instantiations.get(&target).cloned()?;
+                            hir_world.functions.insert(
+                                target.clone(),
+                                (
+                                    params.iter().map(c_type_name).collect(),
+                                    c_type_name(&ret),
+                                ),
+                            );
+                            hir_world.function_c_names.insert(target.clone(), target.clone());
+                            Some(target)
+                        };
+                        crate::hir::resolve_generic_calls(&mut specialized, &mut resolver);
+                    }
+                    for (_, ty) in &specialized.params {
+                        codegen.register_hir_type(ty);
+                    }
+                    codegen.register_hir_type(&specialized.ret);
+                    codegen.register_hir_block_types(&specialized.body);
+                    crate::hir_c::generate(&specialized, &hir_world)
+                } else {
+                    None
+                }
+            } else {
+                None
             };
             if let Some(text) = from_hir {
                 codegen.type_report.hir_generated += 1;

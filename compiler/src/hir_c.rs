@@ -21,6 +21,11 @@ type Bail<T> = Result<T, ()>;
 pub struct World {
     /// User functions: name -> (C parameter types, C return type).
     pub functions: HashMap<String, (Vec<String>, String)>,
+    /// Optional direct C names for synthesized functions. Ordinary source
+    /// functions use `c_name`; monomorphized generic instances already have
+    /// their final C name (`identity__Int`) and must not receive the normal
+    /// `ostrin_fn_` prefix a second time.
+    pub function_c_names: HashMap<String, String>,
     /// Non-generic records: name -> [(field, C type)] in declaration order. Empty when reads of
     /// records must be tracked (E1101), which only the AST path knows how to do.
     pub records: HashMap<String, Vec<(String, String)>>,
@@ -840,11 +845,13 @@ impl Emitter<'_> {
                     .iter()
                     .map(|a| self.expr(&a.value))
                     .collect::<Bail<Vec<_>>>()?;
-                Ok(format!(
-                    "{}({})",
-                    (self.world.c_name)(name),
-                    codes.join(", ")
-                ))
+                let emitted_name = self
+                    .world
+                    .function_c_names
+                    .get(name)
+                    .cloned()
+                    .unwrap_or_else(|| (self.world.c_name)(name));
+                Ok(format!("{}({})", emitted_name, codes.join(", ")))
             }
             HirKind::If(cond, then_block, Some(else_block)) if e.ty != Ty::Void => {
                 let c = self.expr(cond)?;

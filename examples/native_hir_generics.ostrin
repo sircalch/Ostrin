@@ -2,6 +2,18 @@ fn identity<T>(value: T) -> T {
     value
 }
 
+fn twice<T>(value: T) -> T {
+    identity(identity(value))
+}
+
+fn repeat_value<T>(value: T, steps: Int) -> T {
+    if steps > 0 {
+        repeat_value(value, steps - 1)
+    } else {
+        value
+    }
+}
+
 fn first<T>(values: List<T>) -> T {
     values[0]
 }
@@ -18,4 +30,6 @@ fn main() -> Void {
     print(first([4, 8, 15]))
     print(unwrap_value(maybe("ostrin")))
     print(identity(42))
+    print(twice(27))
+    print(repeat_value("loop", 2))
 }

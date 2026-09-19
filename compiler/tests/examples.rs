@@ -1131,7 +1131,7 @@ fn native_hir_handles_concrete_generic_instances() {
     // each concrete call: scalar identity, List indexing, and Option methods
     // all share the same native representation as their non-generic forms.
     let file = example_path("native_hir_generics.ostrin");
-    let expected = "4\nostrin\n42\n";
+    let expected = "4\nostrin\n42\n27\nloop\n";
     let interpreted = run(&["--run", &file]);
     assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
