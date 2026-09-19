@@ -122,6 +122,12 @@ static @N@* @N@_neg(@N@* a) {
     return r;
 }
 
+static @N@* @N@_map(@N@* a, @T@ (*f)(@T@)) {
+    @N@* r = @N@_alloc(a->rank, a->shape);
+    for (int64_t i = 0; i < a->size; i++) r->data[i] = f(a->data[i]);
+    return r;
+}
+
 static @T@ @N@_sum(@N@* a) {
     @T@ acc = a->data[0];
     for (int64_t i = 1; i < a->size; i++) acc = OSTRIN_ADD(acc, a->data[i]);

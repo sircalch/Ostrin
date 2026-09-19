@@ -931,6 +931,50 @@ impl Checker {
         }
     }
 
+    /// `sin`, `cos`, `sqrt`, …, `abs`, `pow`, `atan2`, `pi`.
+    fn check_math_call(&mut self, name: &str, arg_types: &[Ty]) -> Option<Ty> {
+        const UNARY: &[&str] = &["sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh", "exp", "ln", "log10", "sqrt", "floor", "ceil", "round"];
+        let arity = match name {
+            "pi" => 0,
+            "pow" | "atan2" => 2,
+            n if UNARY.contains(&n) || n == "abs" => 1,
+            _ => return None,
+        };
+        if arg_types.len() != arity {
+            self.push("E1041", format!("'{name}' expects {arity} argument(s), got {}.", arg_types.len()));
+            return Some(Ty::Unknown);
+        }
+        match name {
+            "pi" => Some(Ty::Float),
+            "pow" | "atan2" => match (&arg_types[0], &arg_types[1]) {
+                (Ty::Float, Ty::Float) => Some(Ty::Float),
+                (Ty::Float32, Ty::Float32) => Some(Ty::Float32),
+                (Ty::Unknown, _) | (_, Ty::Unknown) => Some(Ty::Unknown),
+                (a, b) => {
+                    self.push("E1041", format!("'{name}' expects two Float or two Float32 arguments, got '{}' and '{}'.", a.describe(), b.describe()));
+                    Some(Ty::Unknown)
+                }
+            },
+            _ => {
+                let arg = &arg_types[0];
+                let elem = array_elem(arg).unwrap_or_else(|| arg.clone());
+                let ok = match name {
+                    "abs" => matches!(elem, Ty::Int | Ty::Float | Ty::Float32 | Ty::Sized(_)),
+                    _ => matches!(elem, Ty::Float | Ty::Float32),
+                };
+                if elem == Ty::Unknown {
+                    return Some(Ty::Unknown);
+                }
+                if !ok {
+                    let hint = if matches!(elem, Ty::Int | Ty::Sized(_)) { " (convert with 'as Float' first)" } else { "" };
+                    self.push("E1041", format!("'{name}' isn't defined for '{}'{hint}.", arg.describe()));
+                    return Some(Ty::Unknown);
+                }
+                Some(arg.clone())
+            }
+        }
+    }
+
     /// Methods of `Array<T>`.
     fn check_array_method(&mut self, receiver: &Ty, method: &str, arg_types: &[Ty]) -> Ty {
         let elem = array_elem(receiver).expect("called for arrays only");
@@ -2219,6 +2263,9 @@ impl Checker {
                 return self.check_function_call(&sig.clone(), args, &arg_types, explicit_type_args);
             }
             if let Some(result) = self.check_array_call(name, &arg_types) {
+                return result;
+            }
+            if let Some(result) = self.check_math_call(name, &arg_types) {
                 return result;
             }
         }

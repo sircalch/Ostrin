@@ -1,0 +1,8 @@
+fn main() -> Void {
+    print(sqrt(2))
+    print(sin("x"))
+    print(pow(2.0, 3))
+    print(abs(true))
+    print(pi(1))
+    print(sqrt(array([1, 2])))
+}

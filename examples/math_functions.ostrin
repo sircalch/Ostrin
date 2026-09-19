@@ -1,0 +1,29 @@
+fn clean(x: Float) -> Float {
+    round(x * 1000000.0) / 1000000.0
+}
+
+fn main() -> Void {
+    print(sqrt(16.0))
+    print(clean(sin(pi() / 6.0)))
+    print(clean(cos(0.0)))
+    print(clean(exp(1.0)))
+    print(clean(ln(10.0)))
+    print(clean(atan2(1.0, 1.0) * 4.0))
+    print(pow(2.0, 10.0))
+    print(floor(-2.5))
+    print(ceil(2.1))
+    print(round(2.5))
+    print(abs(-7))
+    print(abs(-2.5))
+    print(abs(-128i8 + 1i8))
+
+    x = linspace(0.0, 10.0, 6)
+    y = sin(x) * exp(-x / 5.0)
+    print(round(y * 1000.0) / 1000.0)
+    print(sqrt(array([1.0, 4.0, 9.0])))
+    print(abs(array([-1, 2, -3])))
+
+    single = sqrt(2.0f32)
+    print(single * single)
+    print(abs(array([-1.5f32, 2.5f32])))
+}

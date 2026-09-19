@@ -3322,3 +3322,27 @@ Primer bloque del eje científico, de punta a punta (checker → intérprete →
 - Pendiente: formas estáticas (fase 4), operador `@`, comparaciones que devuelvan `Array<Bool>`,
   vistas/slices sin copia, `Array<Complex>`, SIMD/paralelismo, y álgebra lineal (LU/QR/SVD).
 - Suite: **102 pruebas** (5 diferenciales + 97 de integración), sin warnings.
+
+---
+
+## 96. Funciones matemáticas elementales — 2026-09-18
+
+- `sin cos tan asin acos atan sinh cosh tanh exp ln log10 sqrt floor ceil round`,
+  `abs`, `pow`, `atan2` y `pi()`, sobre `Float`, `Float32` y **elemento a elemento
+  sobre `Array<Float|Float32>`** (`abs` también sobre `Int`, enteros de ancho fijo e
+  `Array<Int>`). El tipo de resultado es el del argumento; `Int` nunca se convierte
+  implícitamente (`sqrt(2)` es `E1041` con la pista «convert with 'as Float'»).
+  `pow`/`atan2` son solo escalares (dos `Float` o dos `Float32`).
+- Una función de usuario con el mismo nombre tiene prioridad. Intérprete:
+  `interpreter/math.rs`; nativo: `libm` (`sin`/`sinf`, `ostrin_abs_i64`, `Array_T_map` con
+  puntero a función). `abs` de un entero en su mínimo falla con overflow en ambos.
+- Se puede escribir ya el ejemplo de éxito del prompt maestro:
+  `y = sin(x) * exp(-x / 5.0)` con `x = linspace(0.0, 10.0, 6)`.
+- **Aviso de reproducibilidad**: `libm` puede diferir en la última cifra entre plataformas
+  (Rust vs C, o Windows vs Linux) para `sin`, `exp`, `pow`…; solo `sqrt`, `floor`, `ceil`,
+  `round`, `abs` están garantizadas bit a bit. `math_functions.ostrin` redondea
+  antes de imprimir por eso. Una decisión pendiente (`docs/design/19`): fijar una
+  implementación propia (p. ej. `libm` de referencia) si se quiere reproducibilidad exacta
+  entre plataformas.
+- Ejemplos `math_functions.ostrin` (nativo = intérprete) y `math_functions_errors.ostrin`.
+- Suite: **103 pruebas**, sin warnings.

@@ -294,6 +294,11 @@ const PRELUDE: &str = "#include <stdint.h>\n\
 #define OSTRIN_FAIL(msg) do { fprintf(stderr, \"runtime error: %s\\n\", msg); exit(1); } while (0)\n\
 #define OSTRIN_OOM() do { fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); } while (0)\n\
 \n\
+static int64_t ostrin_abs_i64(int64_t x) {\n\
+    if (x == INT64_MIN) OSTRIN_FAIL(\"integer overflow: abs of the smallest Int\");\n\
+    return x < 0 ? -x : x;\n\
+}\n\
+\n\
 static int64_t ostrin_idiv(int64_t a, int64_t b) {\n\
     if (b == 0) { fprintf(stderr, \"runtime error: division by zero\\n\"); exit(1); }\n\
     return a / b;\n\
@@ -3553,7 +3558,10 @@ impl<'a> Codegen<'a> {
     /// `write_file`, `parse_int`, `sum` and `panic`.
     fn gen_builtin(&mut self, name: &str, codes: &[String], types: &[CType]) -> Result<Option<(String, CType)>, String> {
         let arity = match name {
-            "read_file" | "parse_int" | "sum" | "panic" | "assert" | "array" | "zeros" | "ones" => 1,
+            "read_file" | "parse_int" | "sum" | "panic" | "assert" | "array" | "zeros" | "ones" | "abs" => 1,
+            n if ["sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh", "exp", "ln", "log10", "sqrt", "floor", "ceil", "round"].contains(&n) => 1,
+            "pi" => 0,
+            "pow" | "atan2" => 2,
             "write_file" | "assert_eq" | "full" | "arange" => 2,
             "linspace" => 3,
             _ => return Ok(None),
@@ -3609,6 +3617,56 @@ impl<'a> Codegen<'a> {
                     ),
                     ty,
                 )))
+            }
+            "pi" => Ok(Some(("3.141592653589793".to_string(), CType::Float))),
+            "pow" | "atan2" => match (&types[0], &types[1]) {
+                (CType::Float, CType::Float) => Ok(Some((format!("{name}({}, {})", codes[0], codes[1]), CType::Float))),
+                (CType::Float32, CType::Float32) => Ok(Some((format!("{name}f({}, {})", codes[0], codes[1]), CType::Float32))),
+                _ => Err(format!("'{name}' needs two Float or two Float32 arguments")),
+            },
+            "abs" => {
+                let (elem, array) = match &types[0] {
+                    CType::Array(t) => ((**t).clone(), true),
+                    other => (other.clone(), false),
+                };
+                let function = match &elem {
+                    CType::Float => "fabs".to_string(),
+                    CType::Float32 => "fabsf".to_string(),
+                    CType::Int => "ostrin_abs_i64".to_string(),
+                    CType::Sized(_) if !array => String::new(),
+                    other => return Err(format!("'abs' isn't supported on '{}' by the native backend", c_type_name(other))),
+                };
+                if array {
+                    let array_ty = types[0].clone();
+                    return Ok(Some((format!("{}_map({}, {function})", mangle_ctype(&array_ty), codes[0]), array_ty)));
+                }
+                if let CType::Sized(kind) = &elem {
+                    let temp = self.next_temp();
+                    let c = kind.c_type();
+                    return Ok(Some((
+                        format!("({{ {c} {temp} = {}; if ({temp} == {}) {{ {OVERFLOW_ABORT} }} ({c})({temp} < 0 ? -{temp} : {temp}); }})", codes[0], c_int_literal(kind.min())),
+                        elem,
+                    )));
+                }
+                Ok(Some((format!("{function}({})", codes[0]), elem)))
+            }
+            m if ["sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh", "exp", "ln", "log10", "sqrt", "floor", "ceil", "round"].contains(&m) => {
+                let c_name = if m == "ln" { "log" } else { m };
+                let (elem, array) = match &types[0] {
+                    CType::Array(t) => ((**t).clone(), true),
+                    other => (other.clone(), false),
+                };
+                let function = match elem {
+                    CType::Float => c_name.to_string(),
+                    CType::Float32 => format!("{c_name}f"),
+                    other => return Err(format!("'{m}' isn't supported on '{}' by the native backend", c_type_name(&other))),
+                };
+                if array {
+                    let array_ty = types[0].clone();
+                    Ok(Some((format!("{}_map({}, {function})", mangle_ctype(&array_ty), codes[0]), array_ty)))
+                } else {
+                    Ok(Some((format!("{function}({})", codes[0]), types[0].clone())))
+                }
             }
             "array" => {
                 let mut ty = &types[0];
