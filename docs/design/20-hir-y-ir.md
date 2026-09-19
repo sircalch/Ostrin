@@ -2,8 +2,9 @@
 
 *Estado: HIR implementado y primera bajada HIR→CFG ejecutable. La etapa IR aún es
 inicial: `--ir` expone temporales y bloques verificados; `--ownership-check` y
-`--ownership-ir` ya consumen esa representación, aunque el backend C todavía no se genera
-desde ella ni aplica ARC completa.*
+`--ownership-ir` ya consumen esa representación. El backend C aplica ahora ownership lineal
+automático en los locales directos de cada callable desde sus emisores HIR y AST, mientras la
+IR sigue siendo el destino para scopes anidados, escapes y la fuente única de generación.*
 
 ## 1. Qué existe ya (comprobado en el código)
 
@@ -67,9 +68,11 @@ Sobre este IR se hacen los análisis que el texto C no permite:
 2. Migrar el backend C por **familias de nodos** al HIR (literales/operadores → llamadas → records/enums → patrones → colecciones → genéricos), eliminando la reinferencia correspondiente en cada paso.
 3. **IR de bloques básicos** y generación de C desde el IR (el HIR deja de generar C directamente). La primera CFG observable ya existe en `--ir`; faltan la bajada semántica completa y el cambio de backend.
 4. **RC + último uso** sobre el IR (`--leak-check`: los ejemplos deben terminar sin objetos vivos).
-   El runtime ya expone `ostrin_retain`/`ostrin_release` y la primera subetapa inserta `release`
-   solo en transferencias lineales; deja barreras
-   explícitas para agregados, llamadas, `phi`, loops y escapes.
+   El runtime ya expone `ostrin_retain`/`ostrin_release`; el emisor C cubre la primera subetapa
+   de forma lineal en locales directos: aliases y campos prestados retienen, las reasignaciones
+   liberan el valor anterior y los retornos transfieren o retienen según su origen. Los records
+   construidos desde HIR registran además destructores tipados y retienen sus campos. La IR aún
+   deja barreras explícitas para agregados, llamadas, `phi`, loops, scopes anidados y escapes.
 5. **Cierres y funciones como valores**; retirar la comprobación dinámica de E1101 cuando el
    backend consuma la IR transformada de forma completa.
 6. Optimizador y, después, otros backends (LLVM, WASM, GPU) que consumen el mismo IR.

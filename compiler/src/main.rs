@@ -21,6 +21,9 @@ use std::fs;
 use std::io::{self, Read};
 use std::path::Path;
 use std::process::ExitCode;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+static NEXT_C_SOURCE_ID: AtomicU64 = AtomicU64::new(0);
 
 /// The tree-walking interpreter recurses once per nested expression, and
 /// its frames are large (especially in debug builds), so deeply nested calls
@@ -498,7 +501,8 @@ fn run_codegen(items: &[ast::Item], typed: &typeck::TypedProgram, entry_path: &P
         let exe_name = if cfg!(windows) { format!("{stem}.exe") } else { stem.to_string() };
         dir.join(exe_name).display().to_string()
     });
-    let c_path = env::temp_dir().join(format!("ostrin_codegen_{}.c", std::process::id()));
+    let c_source_id = NEXT_C_SOURCE_ID.fetch_add(1, Ordering::Relaxed);
+    let c_path = env::temp_dir().join(format!("ostrin_codegen_{}_{}.c", std::process::id(), c_source_id));
     if let Err(e) = fs::write(&c_path, &source) {
         eprintln!("error: could not write temporary C source: {e}");
         return ExitCode::FAILURE;

@@ -73,6 +73,10 @@ struct Emitter<'a> {
     scopes: Vec<HashSet<String>>,
     ret: Ty,
     temp: usize,
+    /// Direct locals in the current callable that own one native reference.
+    /// Nested HIR blocks remain conservative until block-exit cleanup is
+    /// represented explicitly.
+    owned_locals: Vec<(String, Ty)>,
 }
 
 impl Emitter<'_> {
@@ -111,6 +115,10 @@ impl Emitter<'_> {
             )),
             _ => Err(()),
         }
+    }
+
+    fn managed_c_type(ty: &str) -> bool {
+        ty == "const char*" || ty.ends_with('*')
     }
 
     fn mangle_type(&self, ty: &Ty) -> Bail<String> {
@@ -220,6 +228,7 @@ pub fn generate(f: &HirFunction, world: &World) -> Option<String> {
         scopes: vec![f.params.iter().map(|(n, _)| n.clone()).collect()],
         ret: f.ret.clone(),
         temp: 0,
+        owned_locals: Vec::new(),
     };
     if !f.generics.is_empty() || f.params.iter().any(|(_, t)| e.c_type(t).is_err()) {
         return None;
@@ -238,6 +247,67 @@ impl Emitter<'_> {
         format!("__hir_t{}", self.temp)
     }
 
+    fn managed(&self, ty: &Ty) -> bool {
+        match ty {
+            Ty::String | Ty::List(_) | Ty::Map(_, _) | Ty::Set(_) => true,
+            Ty::Named(name) => self.world.records.contains_key(name),
+            Ty::Applied(..) => self.world.applied_records.contains_key(&ty.describe()),
+            _ => false,
+        }
+    }
+
+    fn borrowed_expr(expr: &HirExpr) -> bool {
+        matches!(expr.kind, HirKind::Local(_) | HirKind::Field(..) | HirKind::Index(..))
+    }
+
+    fn owned_local(&self, name: &str) -> bool {
+        self.owned_locals.iter().any(|(owned, _)| owned == name)
+    }
+
+    fn owned_local_expr(&self, expr: &HirExpr) -> Option<String> {
+        let HirKind::Local(name) = &expr.kind else { return None };
+        self.owned_local(name).then(|| name.clone())
+    }
+
+    fn track_owned_local(&mut self, name: &str, ty: &Ty, borrowed: bool, out: &mut String) {
+        if self.scopes.len() != 1 || !self.managed(ty) {
+            return;
+        }
+        if borrowed {
+            out.push_str(&format!("    ostrin_retain((void*){name});\n"));
+        }
+        if !self.owned_local(name) {
+            self.owned_locals.push((name.to_string(), ty.clone()));
+        }
+    }
+
+    fn cleanup(&self, out: &mut String, transfer: Option<&str>) {
+        for (name, ty) in self.owned_locals.iter().rev() {
+            if transfer == Some(name.as_str()) || !self.managed(ty) {
+                continue;
+            }
+            out.push_str(&format!("    ostrin_release((void*){name});\n"));
+        }
+    }
+
+    fn emit_return(&mut self, expr: Option<&HirExpr>, code: String, ty: &Ty, out: &mut String) -> Bail<()> {
+        if self.managed(ty) {
+            let cty = self.c_type(ty)?;
+            let temp = self.next_temp();
+            out.push_str(&format!("    {cty} {temp} = {code};\n"));
+            let transfer = expr.and_then(|value| self.owned_local_expr(value));
+            if transfer.is_none() && expr.is_some_and(Self::borrowed_expr) {
+                out.push_str(&format!("    ostrin_retain((void*){temp});\n"));
+            }
+            self.cleanup(out, transfer.as_deref());
+            out.push_str(&format!("    return {temp};\n"));
+        } else {
+            self.cleanup(out, None);
+            out.push_str(&format!("    return {code};\n"));
+        }
+        Ok(())
+    }
+
     fn declared(&self, name: &str) -> bool {
         self.scopes.iter().any(|s| s.contains(name))
     }
@@ -249,13 +319,18 @@ impl Emitter<'_> {
         match &block.tail {
             Some(tail) if self.ret == Ty::Void => {
                 self.expr_stmt(tail, out)?;
+                self.cleanup(out, None);
                 out.push_str("    return;\n");
             }
             Some(tail) => {
                 let code = self.expr(tail)?;
-                out.push_str(&format!("    return {code};\n"));
+                let ret = self.ret.clone();
+                self.emit_return(Some(tail), code, &ret, out)?;
             }
-            None => out.push_str("    return;\n"),
+            None => {
+                self.cleanup(out, None);
+                out.push_str("    return;\n");
+            }
         }
         Ok(())
     }
@@ -289,15 +364,27 @@ impl Emitter<'_> {
                 }
                 let code = self.expr(value)?;
                 out.push_str(&format!("    {ty} {name} = {code};\n"));
+                self.track_owned_local(name, &value.ty, Self::borrowed_expr(value), out);
                 self.scopes.last_mut().expect("scope").insert(name.clone());
             }
             HirStmt::Assign { name, value } => {
                 let code = self.expr(value)?;
                 if self.declared(name) {
-                    out.push_str(&format!("    {name} = {code};\n"));
+                    if self.scopes.len() == 1 && self.owned_local(name) && self.managed(&value.ty) {
+                        let temp = self.next_temp();
+                        let ty = self.c_type(&value.ty)?;
+                        out.push_str(&format!("    {ty} {temp} = {code};\n"));
+                        if Self::borrowed_expr(value) {
+                            out.push_str(&format!("    ostrin_retain((void*){temp});\n"));
+                        }
+                        out.push_str(&format!("    ostrin_release((void*){name}); {name} = {temp};\n"));
+                    } else {
+                        out.push_str(&format!("    {name} = {code};\n"));
+                    }
                 } else {
                     let ty = self.c_type(&value.ty)?;
                     out.push_str(&format!("    {ty} {name} = {code};\n"));
+                    self.track_owned_local(name, &value.ty, Self::borrowed_expr(value), out);
                     self.scopes.last_mut().expect("scope").insert(name.clone());
                 }
             }
@@ -316,9 +403,13 @@ impl Emitter<'_> {
             }
             HirStmt::Return(Some(value)) => {
                 let code = self.expr(value)?;
-                out.push_str(&format!("    return {code};\n"));
+                let ret = self.ret.clone();
+                self.emit_return(Some(value), code, &ret, out)?;
             }
-            HirStmt::Return(None) => out.push_str("    return;\n"),
+            HirStmt::Return(None) => {
+                self.cleanup(out, None);
+                out.push_str("    return;\n");
+            }
             HirStmt::Break(None) => out.push_str("    break;\n"),
             HirStmt::Continue => out.push_str("    continue;\n"),
             HirStmt::While { cond, body } => {
@@ -670,7 +761,9 @@ impl Emitter<'_> {
                 }
                 // Same shape as the AST path: allocate, then assign each field in source order.
                 let temp = format!("__hir_rec{}", self.scopes.len());
-                let mut body = format!("{record}* {temp} = ({record}*)malloc(sizeof({record})); if (!{temp}) {{ fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); }} ");
+                let mut body = format!(
+                    "{record}* {temp} = ({record}*)ostrin_calloc_with_drop(1, sizeof({record}), (void (*)(void*))(ostrin_drop_{record})); if (!{temp}) {{ fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); }} "
+                );
                 for (field, value) in fields {
                     let want = declared
                         .iter()
@@ -683,6 +776,9 @@ impl Emitter<'_> {
                     }
                     let code = self.expr(value)?;
                     body.push_str(&format!("{temp}->{field} = {code}; "));
+                    if Self::managed_c_type(&want) {
+                        body.push_str(&format!("ostrin_retain((void*){temp}->{field}); "));
+                    }
                 }
                 Ok(format!("({{ {body} {temp}; }})"))
             }
@@ -1029,6 +1125,7 @@ impl Emitter<'_> {
             scopes: vec![names],
             ret: (**ret).clone(),
             temp: 0,
+            owned_locals: Vec::new(),
         };
         let mut body_c = String::new();
         lambda_emitter.body(body, &mut body_c)?;

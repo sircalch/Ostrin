@@ -1,0 +1,15 @@
+fn identity(value: List<Int>) -> List<Int> {
+    value
+}
+
+fn main() -> Void {
+    values = [1, 2, 3]
+    mut alias = values
+    print(alias.length())
+
+    alias = [4]
+    print(alias.length())
+
+    result = identity(alias)
+    print(result.length())
+}

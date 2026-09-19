@@ -914,6 +914,11 @@ struct Codegen<'a> {
     enum_names: HashSet<String>,
     scopes: Vec<HashMap<String, CType>>,
     temp_counter: usize,
+    /// Top-level locals whose native reference is owned by the current
+    /// callable. This intentionally starts with the straight-line function
+    /// scope; nested blocks remain a later CFG/IR phase.
+    owned_locals: Vec<(String, CType)>,
+    ownership_active: bool,
 }
 
 /// A `dyn Trait` boxing site the first `coerce()` call for this exact
@@ -1073,6 +1078,17 @@ fn ctype_subst_to_hir(subst: &HashMap<String, CType>) -> HashMap<String, Ty> {
         .iter()
         .filter_map(|(name, ty)| ctype_to_hir_ty(ty).map(|ty| (name.clone(), ty)))
         .collect()
+}
+
+/// Whether evaluating an expression borrows an already-existing native
+/// reference. Fresh constructors and calls transfer their initial reference;
+/// identifiers, fields and indexes need a retain before the value is stored
+/// in another owned local or returned from a function.
+fn borrowed_reference_expr(expr: &Expr) -> bool {
+    match expr.unlocated() {
+        Expr::Ident(_) | Expr::FieldAccess(..) | Expr::Index(..) => true,
+        _ => false,
+    }
 }
 
 impl<'a> Codegen<'a> {
@@ -1683,6 +1699,61 @@ impl<'a> Codegen<'a> {
         self.scopes.pop();
     }
 
+    fn track_owned_local(&mut self, name: &str, ty: &CType, borrowed: bool, out: &mut String) {
+        // `scopes[0]` is the generator's outer frame; a callable's direct
+        // locals live in the frame pushed by `gen_callable_body`.
+        if !self.ownership_active || self.scopes.len() != 2 || !is_reference_type(ty) {
+            return;
+        }
+        if borrowed {
+            out.push_str(&format!("    ostrin_retain((void*){name});\n"));
+        }
+        if !self.owned_locals.iter().any(|(existing, _)| existing == name) {
+            self.owned_locals.push((name.to_string(), ty.clone()));
+        }
+    }
+
+    fn owned_local_name(&self, expr: &Expr) -> Option<String> {
+        let Expr::Ident(name) = expr.unlocated() else { return None };
+        self.owned_locals.iter().any(|(owned, _)| owned == name).then(|| name.clone())
+    }
+
+    fn owned_local_name_by_str(&self, name: &str) -> Option<&CType> {
+        self.owned_locals.iter().find_map(|(owned, ty)| (owned == name).then_some(ty))
+    }
+
+    fn emit_owned_cleanup(&self, out: &mut String, transfer: Option<&str>) {
+        if !self.ownership_active {
+            return;
+        }
+        for (name, ty) in self.owned_locals.iter().rev() {
+            if transfer == Some(name.as_str()) || !is_reference_type(ty) {
+                continue;
+            }
+            out.push_str(&format!("    ostrin_release((void*){name});\n"));
+        }
+    }
+
+    /// Emits a return through a temporary when the value is reference-like.
+    /// That evaluates the expression before local cleanup, then retains only
+    /// borrowed expressions (parameters, fields and indexes). A directly
+    /// owned local transfers its existing reference to the caller.
+    fn emit_owned_return(&mut self, expr: Option<&Expr>, code: String, ty: CType, out: &mut String) {
+        if is_reference_type(&ty) {
+            let temp = self.next_temp();
+            out.push_str(&format!("    {} {temp} = {code};\n", c_type_name(&ty)));
+            let transfer = expr.and_then(|value| self.owned_local_name(value));
+            if transfer.is_none() && expr.is_some_and(borrowed_reference_expr) {
+                out.push_str(&format!("    ostrin_retain((void*){temp});\n"));
+            }
+            self.emit_owned_cleanup(out, transfer.as_deref());
+            out.push_str(&format!("    return {temp};\n"));
+        } else {
+            self.emit_owned_cleanup(out, None);
+            out.push_str(&format!("    return {code};\n"));
+        }
+    }
+
     fn define(&mut self, name: &str, ty: CType) {
         self.scopes.last_mut().expect("codegen scope stack must never be empty").insert(name.to_string(), ty);
     }
@@ -1905,6 +1976,8 @@ impl<'a> Codegen<'a> {
     ) -> Result<(), String> {
         self.compare_enabled = true;
         self.push_scope();
+        self.owned_locals.clear();
+        self.ownership_active = true;
         self.subst_stack.push(subst.clone());
         self.current_return.push(return_type.clone());
         for param in params {
@@ -1919,14 +1992,21 @@ impl<'a> Codegen<'a> {
             Some(e) => {
                 let (code, ty) = self.gen_expr_hint(e, Some(return_type.clone()))?;
                 if *return_type == CType::Void {
-                    out.push_str(&format!("    {code};\n    return;\n"));
+                    out.push_str(&format!("    {code};\n"));
+                    self.emit_owned_cleanup(out, None);
+                    out.push_str("    return;\n");
                 } else {
                     let code = self.coerce(&code, &ty, return_type)?;
-                    out.push_str(&format!("    return {code};\n"));
+                    self.emit_owned_return(Some(e), code, return_type.clone(), out);
                 }
             }
-            None => out.push_str("    return;\n"),
+            None => {
+                self.emit_owned_cleanup(out, None);
+                out.push_str("    return;\n");
+            }
         }
+        self.ownership_active = false;
+        self.owned_locals.clear();
         self.current_return.pop();
         self.subst_stack.pop();
         self.pop_scope();
@@ -2016,12 +2096,13 @@ impl<'a> Codegen<'a> {
                     }
                 };
                 out.push_str(&format!("    {} {} = {};\n", c_type_name(&final_ty), name, code));
+                self.track_owned_local(name, &final_ty, borrowed_reference_expr(value), out);
                 self.define(name, final_ty);
             }
             Stmt::Assign { name, value } => {
                 let existing = self.lookup(name);
                 let (code, ty) = self.gen_expr_hint(value, existing.clone())?;
-                let (code, ty) = match existing {
+                let (code, ty) = match existing.clone() {
                     Some(existing_ty) => (self.coerce(&code, &ty, &existing_ty)?, existing_ty),
                     None => self.settle_literal(ty, code)?,
                 };
@@ -2033,9 +2114,23 @@ impl<'a> Codegen<'a> {
                 // tracking, so this backend re-derives it the same way the
                 // interpreter does, from whether `name` is already in scope.
                 if self.lookup(name).is_some() {
-                    out.push_str(&format!("    {name} = {code};\n"));
+                    if self.ownership_active
+                        && self.scopes.len() == 2
+                        && existing.as_ref().is_some_and(is_reference_type)
+                        && self.owned_local_name_by_str(name).is_some()
+                    {
+                        let temp = self.next_temp();
+                        out.push_str(&format!("    {} {temp} = {code};\n", c_type_name(existing.as_ref().expect("checked above"))));
+                        if borrowed_reference_expr(value) {
+                            out.push_str(&format!("    ostrin_retain((void*){temp});\n"));
+                        }
+                        out.push_str(&format!("    ostrin_release((void*){name}); {name} = {temp};\n"));
+                    } else {
+                        out.push_str(&format!("    {name} = {code};\n"));
+                    }
                 } else {
                     out.push_str(&format!("    {} {} = {};\n", c_type_name(&ty), name, code));
+                    self.track_owned_local(name, &ty, borrowed_reference_expr(value), out);
                     self.define(name, ty);
                 }
             }
@@ -2047,9 +2142,13 @@ impl<'a> Codegen<'a> {
                         Some(expected) => self.coerce(&code, &ty, &expected)?,
                         None => code,
                     };
-                    out.push_str(&format!("    return {code};\n"));
+                    let expected = self.current_return.last().cloned().unwrap_or(ty);
+                    self.emit_owned_return(Some(e), code, expected, out);
                 }
-                None => out.push_str("    return;\n"),
+                None => {
+                    self.emit_owned_cleanup(out, None);
+                    out.push_str("    return;\n");
+                }
             },
             Stmt::Break(value) => {
                 if value.is_some() {
@@ -5537,6 +5636,8 @@ fn generate_impl(
         enum_names: enum_names.clone(),
         scopes: vec![HashMap::new()],
         temp_counter: 0,
+        owned_locals: Vec::new(),
+        ownership_active: false,
     };
     // A trait method is only ever object-safe here if `Self` never appears
     // anywhere but as the exact `self` receiver — see the field doc comment

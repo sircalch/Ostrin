@@ -4229,3 +4229,30 @@ debe confundir con ARC completa: las copias ordinarias, retornos, `phi`, escapes
 salidas de ámbito todavía no reciben automáticamente `retain`/`release` desde la IR. El próximo
 bloque recomendado es conectar los contratos lineales de `ownership.rs` a una emisión controlada
 para temporales locales simples, manteniendo llamadas, bucles, joins y escapes como barreras.
+
+## 150. Ownership automático lineal en HIR/AST — 2026-09-19
+
+El backend nativo ya consume una primera parte del contrato de ownership sin depender de
+`clone`/`drop` escritos por el usuario:
+
+- Los locales directos de cada callable que reciben una referencia nueva quedan registrados como
+  dueños; una asignación desde un identificador, campo o índice emite `ostrin_retain` antes de
+  almacenar el alias.
+- Una reasignación evalúa el valor nuevo en un temporal, retiene el préstamo si corresponde,
+  libera el valor anterior y solo después actualiza el binding. Esto evita perder el valor nuevo
+  cuando la expresión es `x = x`.
+- Los retornos de referencias pasan por un temporal: un local propio transfiere su referencia al
+  llamador y un parámetro/campo/índice prestado recibe un retain antes de limpiar los dueños
+  restantes. Los retornos tempranos y el retorno final usan la misma ruta.
+- La política está implementada tanto en `hir_c.rs` como en el fallback AST de `codegen.rs`.
+  Los records construidos desde HIR usan también allocation registrada y destructores tipados,
+  reteniendo sus campos de referencia; esto evita devolver records con listas ya liberadas.
+- Se añadió `examples/ownership_auto.ostrin`, que prueba alias, reasignación y retorno de un
+  parámetro, y la prueba nativa exige salida `3/1/1` y `live_allocations=0`.
+- Las compilaciones nativas de tests usan nombres únicos para sus fuentes C temporales; antes
+  podían sobrescribirse al correr pruebas en paralelo.
+
+La batería queda en **6 pruebas diferenciales y 125 de integración verdes**. El alcance sigue
+siendo deliberadamente lineal: bindings creados dentro de scopes anidados, `phi`, loops, cierres,
+contenedores suma y escapes complejos esperan la bajada completa desde `ownership.rs` hacia el
+backend C.

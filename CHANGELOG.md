@@ -78,6 +78,14 @@
   move classifier now distinguishes mutable/nested-mutable records from immutable records;
   immutable records are shareable through channels in both backends, while collections remain
   managed by identity. Added `examples/immutable_record_channel.ostrin` and parity coverage.
+- Native ownership now has a verified first automatic scope: both HIR and AST C emitters retain
+  borrowed aliases, release replaced direct locals, transfer returned owned references, and
+  release direct callable locals on every generated return path. Added
+  `examples/ownership_auto.ostrin` and leak-check coverage for aliases, reassignment and a
+  returned parameter. HIR record construction now uses typed registered destructors and retains
+  reference fields, fixing ownership-safe records returned from package functions.
+- Native compile tests now use unique temporary C source names, so parallel test processes cannot
+  overwrite one another's generated source.
 - Added the native ownership runtime ABI (`ostrin_retain`/`ostrin_release`) and the
   `--leak-check` diagnostic mode, which reports live, peak and total allocations before the
   global cleanup safety net runs. The ABI is ready for IR-driven insertion; automatic retain/

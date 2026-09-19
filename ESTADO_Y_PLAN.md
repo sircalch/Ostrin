@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-19 · rama `main` · 6 pruebas diferenciales y 124 de integración en verde.*
+*Corte: 2026-09-19 · rama `main` · 6 pruebas diferenciales y 125 de integración en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
 Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–149); para el diseño
@@ -34,7 +34,7 @@ Implementación: compilador + intérprete + herramientas de editor, todo en Rust
 | Intérprete | `interpreter/mod.rs` | Ejecución tree‑walking y scheduler cooperativo; referencia semántica |
 | Servidor de lenguaje | `lsp.rs`, `symbols.rs`, `protocol.rs` | LSP sobre stdio |
 | Adaptador de depuración | `dap.rs` + hooks del intérprete | DAP sobre stdio |
-| **Backend nativo** | `codegen.rs` (~3 900 l.), `qty_runtime.c` | Transpila a C y compila con gcc/clang/cc |
+| **Backend nativo** | `codegen.rs`, `hir_c.rs` y runtimes C | Transpila a C y compila con gcc/clang/cc |
 | CLI | `main.rs` | `--check --run --ast --tokens --json --lsp --dap --emit-c --compile` |
 | Editor | `vscode-ostrin/` (v0.4.0) | Resaltado, LSP, DAP, comandos, VSIX |
 
@@ -114,10 +114,14 @@ El runtime C generado centraliza las reservas en `ostrin_alloc`/`ostrin_calloc`/
 programa. Expone ya el ABI `ostrin_retain`/`ostrin_release` y `--leak-check` reporta
 asignaciones vivas, pico y total antes de la limpieza. Los buffers temporales de arrays, CSV,
 strings, cantidades, RNG y el detector E1101 también usan esa API. Records y colecciones
-registran ahora callbacks de destrucción tipados; sus campos/elementos por referencia se
-retienen al almacenarse y se liberan al destruir el contenedor. `clone(x)` y `drop(x)` permiten
-probar explícitamente el contrato en programas nativos. Esto sigue siendo una base de ARC, no
-liberación automática por último uso ni ownership completo insertado desde la IR.
+registran callbacks de destrucción tipados; sus campos/elementos por referencia se
+retienen al almacenarse y se liberan al destruir el contenedor. El backend inserta ahora
+`retain` para aliases y valores prestados, libera valores reemplazados y limpia los locales
+propietarios directos al retornar; el mismo contrato se aplica al emisor HIR y al fallback AST.
+`clone(x)` y `drop(x)` siguen disponibles para probar explícitamente el contrato en programas
+nativos. El alcance deliberado de esta etapa es el camino lineal/directo de cada función:
+los bindings creados dentro de bloques anidados y los escapes complejos siguen pendientes de
+la bajada completa de ownership sobre la IR.
 
 **Soportado** (todos los ejemplos ejecutables del repo, salvo lo listado en §6):
 - Escalares, strings, recursión, `if/while/for`, `match` (con guardas y patrones anidados).
@@ -154,9 +158,9 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Cierres en nativo | Captura **por valor** (una variable `mut` cambiada después no se ve dentro); lambda sin contexto de tipos exige anotación |
 | Chequeo «movido tras enviar» (E1101) | Integrado por defecto en `--check`, `--run`, `--emit-c` y `--compile`; `--ownership-check` conserva el informe explícito |
 | Paralelismo nativo (hilos, canales bloqueantes, `select`) | No existe todavía; ambos backends tienen scheduler cooperativo |
-| Memoria en nativo | Registro, destructores tipados para records/colecciones, `clone`/`drop`, limpieza global y `--leak-check`; ARC automática por último uso sigue pendiente |
+| Memoria en nativo | Registro, destructores tipados para records/colecciones, `clone`/`drop`, limpieza automática de locales directos y `--leak-check`; scopes anidados y ARC completa sobre IR siguen pendientes |
 | IR de bloques | HIR→CFG disponible con `--ir`; `if/while/for/match/try/spawn/channel` ya tienen operaciones explícitas, aún no reemplaza el backend C |
-| Ownership/último uso | `--ownership-report`, `--ownership-check` y `--ownership-ir`; inserta solo `release` en transferencias lineales demostrables, sin ARC completa |
+| Ownership/último uso | `--ownership-report`, `--ownership-check` y `--ownership-ir`; el backend C ya aplica retain/release lineal en locales directos, pero la IR aún no es la fuente única |
 | Biblioteca estándar | Mínima: `args`, entorno/rutas, `format`, E/S y `Map` hash para claves escalares; faltan `Hash` formal, fechas, JSON y red |
 | Mensajes de error de E/S | `strerror` ≠ texto de Rust (difieren entre backends) |
 | `Result<Void,E>` | Campo de valor de relleno (`char`) en C |
@@ -243,7 +247,7 @@ Decisiones que necesito de ti para afinar el plan:
 
 ```powershell
 cd compiler
-cargo test                                   # 6 diferenciales + 124 de integración
+cargo test                                   # 6 diferenciales + 125 de integración
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```
