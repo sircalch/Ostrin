@@ -8,12 +8,12 @@
 //! Fields no consumer reads yet are part of the contract, hence `dead_code` is allowed.
 #![allow(dead_code)]
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
 
 use crate::ast::*;
 use crate::typeck::{CallSubst, ExprKey, TypedProgram};
-use crate::types::Ty;
+use crate::types::{dim_mul, dim_pow, Dimension, Ty};
 
 #[derive(Debug, Clone)]
 pub struct HirProgram {
@@ -453,6 +453,210 @@ pub fn lower<'a>(items: &'a [Item], typed: &'a TypedProgram) -> HirProgram {
         }
     }
     HirProgram { functions, arities }
+}
+
+/// Creates the concrete HIR body of one monomorphized generic function.
+///
+/// Generic functions are lowered once, with `Ty::Generic` nodes, because the
+/// checker validates their body independently of every call site. The native
+/// backend, however, emits one C function per concrete instantiation. This
+/// pass specializes the already-validated HIR just before that C body is
+/// emitted; it deliberately does not re-check the AST or infer anything.
+pub fn specialize_function(function: &HirFunction, subst: &HashMap<String, Ty>) -> HirFunction {
+    HirFunction {
+        name: function.name.clone(),
+        generics: Vec::new(),
+        params: function
+            .params
+            .iter()
+            .map(|(name, ty)| (name.clone(), specialize_ty(ty, subst)))
+            .collect(),
+        ret: specialize_ty(&function.ret, subst),
+        body: specialize_block(&function.body, subst),
+        source_file: function.source_file.clone(),
+    }
+}
+
+fn specialize_dimension(dimension: &Dimension, subst: &HashMap<String, Ty>) -> Dimension {
+    let mut result = Dimension::new();
+    for (name, exponent) in dimension {
+        if let Some(Ty::Quantity(bound)) = subst.get(name) {
+            result = dim_mul(&result, &dim_pow(bound, *exponent));
+        } else {
+            result = dim_mul(&result, &HashMap::from([(name.clone(), *exponent)]));
+        }
+    }
+    result
+}
+
+fn specialize_ty(ty: &Ty, subst: &HashMap<String, Ty>) -> Ty {
+    match ty {
+        Ty::Generic(name) => subst.get(name).cloned().unwrap_or_else(|| ty.clone()),
+        // Function and method signatures are lowered from their source
+        // `Type`, so a generic parameter there arrives as `Ty::Named("T")`
+        // while expression nodes normally carry `Ty::Generic("T")`.
+        Ty::Named(name) if subst.contains_key(name) => subst[name].clone(),
+        Ty::Quantity(dimension) => Ty::Quantity(specialize_dimension(dimension, subst)),
+        Ty::List(inner) => Ty::List(Box::new(specialize_ty(inner, subst))),
+        Ty::Map(key, value) => Ty::Map(Box::new(specialize_ty(key, subst)), Box::new(specialize_ty(value, subst))),
+        Ty::Set(inner) => Ty::Set(Box::new(specialize_ty(inner, subst))),
+        Ty::Applied(name, args) => Ty::Applied(name.clone(), args.iter().map(|arg| specialize_ty(arg, subst)).collect()),
+        Ty::Fn(params, ret) => Ty::Fn(
+            params.iter().map(|param| specialize_ty(param, subst)).collect(),
+            Box::new(specialize_ty(ret, subst)),
+        ),
+        _ => ty.clone(),
+    }
+}
+
+fn specialize_subst(call: &Option<CallSubst>, subst: &HashMap<String, Ty>) -> Option<CallSubst> {
+    call.as_ref().map(|call| CallSubst {
+        types: call.types.iter().map(|(name, ty)| (name.clone(), specialize_ty(ty, subst))).collect(),
+        dims: call.dims.iter().map(|(name, dimension)| (name.clone(), specialize_dimension(dimension, subst))).collect(),
+    })
+}
+
+fn specialize_block(block: &HirBlock, subst: &HashMap<String, Ty>) -> HirBlock {
+    HirBlock {
+        stmts: block.stmts.iter().map(|stmt| specialize_stmt(stmt, subst)).collect(),
+        tail: block.tail.as_ref().map(|expr| Box::new(specialize_expr(expr, subst))),
+    }
+}
+
+fn specialize_stmt(stmt: &HirStmt, subst: &HashMap<String, Ty>) -> HirStmt {
+    match stmt {
+        HirStmt::Let { name, mutable, value, .. } => HirStmt::Let {
+            name: name.clone(),
+            mutable: *mutable,
+            // The HIR expression type is authoritative after specialization;
+            // retaining the source Type<T> annotation would make the emitter
+            // compare it against an already-concrete Ty and reject valid code.
+            declared: None,
+            value: specialize_expr(value, subst),
+        },
+        HirStmt::Assign { name, value } => HirStmt::Assign { name: name.clone(), value: specialize_expr(value, subst) },
+        HirStmt::FieldAssign { target, value } => HirStmt::FieldAssign {
+            target: specialize_expr(target, subst),
+            value: specialize_expr(value, subst),
+        },
+        HirStmt::Return(value) => HirStmt::Return(value.as_ref().map(|value| specialize_expr(value, subst))),
+        HirStmt::Break(value) => HirStmt::Break(value.as_ref().map(|value| specialize_expr(value, subst))),
+        HirStmt::Continue => HirStmt::Continue,
+        HirStmt::While { cond, body } => HirStmt::While {
+            cond: specialize_expr(cond, subst),
+            body: specialize_block(body, subst),
+        },
+        HirStmt::For { var, iter, body } => HirStmt::For {
+            var: var.clone(),
+            iter: specialize_expr(iter, subst),
+            body: specialize_block(body, subst),
+        },
+        HirStmt::Expr(expr) => HirStmt::Expr(specialize_expr(expr, subst)),
+    }
+}
+
+fn specialize_arg(arg: &HirArg, subst: &HashMap<String, Ty>) -> HirArg {
+    HirArg { name: arg.name.clone(), value: specialize_expr(&arg.value, subst) }
+}
+
+fn specialize_arm(arm: &HirArm, subst: &HashMap<String, Ty>) -> HirArm {
+    HirArm {
+        pattern: arm.pattern.clone(),
+        guard: arm.guard.as_ref().map(|guard| specialize_expr(guard, subst)),
+        body: specialize_block(&arm.body, subst),
+    }
+}
+
+fn specialize_expr(expr: &HirExpr, subst: &HashMap<String, Ty>) -> HirExpr {
+    let kind = match &expr.kind {
+        HirKind::Int(value) => HirKind::Int(*value),
+        HirKind::Sized(value, kind) => HirKind::Sized(*value, *kind),
+        HirKind::Float(value) => HirKind::Float(*value),
+        HirKind::Float32(value) => HirKind::Float32(*value),
+        HirKind::Str(value) => HirKind::Str(value.clone()),
+        HirKind::Char(value) => HirKind::Char(*value),
+        HirKind::Bool(value) => HirKind::Bool(*value),
+        HirKind::Unit(value, unit) => HirKind::Unit(Box::new(specialize_expr(value, subst)), unit.clone()),
+        HirKind::Local(name) => HirKind::Local(name.clone()),
+        HirKind::Global(name) => HirKind::Global(name.clone()),
+        HirKind::Unary(op, value) => HirKind::Unary(*op, Box::new(specialize_expr(value, subst))),
+        HirKind::Binary(op, left, right) => HirKind::Binary(
+            *op,
+            Box::new(specialize_expr(left, subst)),
+            Box::new(specialize_expr(right, subst)),
+        ),
+        HirKind::Range(start, kind, end, step) => HirKind::Range(
+            Box::new(specialize_expr(start, subst)),
+            *kind,
+            Box::new(specialize_expr(end, subst)),
+            step.as_ref().map(|step| Box::new(specialize_expr(step, subst))),
+        ),
+        HirKind::Call { callee, args, type_args, subst: call } => HirKind::Call {
+            callee: Box::new(specialize_expr(callee, subst)),
+            args: args.iter().map(|arg| specialize_arg(arg, subst)).collect(),
+            type_args: type_args.clone(),
+            subst: specialize_subst(call, subst),
+        },
+        HirKind::MethodCall { recv, method, args, type_args, subst: call } => HirKind::MethodCall {
+            recv: Box::new(specialize_expr(recv, subst)),
+            method: method.clone(),
+            args: args.iter().map(|arg| specialize_arg(arg, subst)).collect(),
+            type_args: type_args.clone(),
+            subst: specialize_subst(call, subst),
+        },
+        HirKind::Field(value, field) => HirKind::Field(Box::new(specialize_expr(value, subst)), field.clone()),
+        HirKind::Index(value, index) => HirKind::Index(
+            Box::new(specialize_expr(value, subst)),
+            Box::new(specialize_expr(index, subst)),
+        ),
+        HirKind::If(cond, then_block, else_block) => HirKind::If(
+            Box::new(specialize_expr(cond, subst)),
+            specialize_block(then_block, subst),
+            else_block.as_ref().map(|block| specialize_block(block, subst)),
+        ),
+        HirKind::Block(block) => HirKind::Block(specialize_block(block, subst)),
+        HirKind::Lambda(params, block) => HirKind::Lambda(params.clone(), specialize_block(block, subst)),
+        HirKind::List(values) => HirKind::List(values.iter().map(|value| specialize_expr(value, subst)).collect()),
+        HirKind::Set(values) => HirKind::Set(values.iter().map(|value| specialize_expr(value, subst)).collect()),
+        HirKind::Map(values) => HirKind::Map(
+            values
+                .iter()
+                .map(|(key, value)| (specialize_expr(key, subst), specialize_expr(value, subst)))
+                .collect(),
+        ),
+        HirKind::EmptyCollection(name, type_args) => HirKind::EmptyCollection(name.clone(), type_args.clone()),
+        HirKind::Try(value, handler) => HirKind::Try(
+            Box::new(specialize_expr(value, subst)),
+            handler.as_ref().map(|handler| Box::new(specialize_expr(handler, subst))),
+        ),
+        HirKind::Within(left, right) => HirKind::Within(
+            Box::new(specialize_expr(left, subst)),
+            Box::new(specialize_expr(right, subst)),
+        ),
+        HirKind::Approximately(value, target, tolerance) => HirKind::Approximately(
+            Box::new(specialize_expr(value, subst)),
+            Box::new(specialize_expr(target, subst)),
+            Box::new(specialize_expr(tolerance, subst)),
+        ),
+        HirKind::As(value, target) => HirKind::As(Box::new(specialize_expr(value, subst)), target.clone()),
+        HirKind::Loop(block) => HirKind::Loop(specialize_block(block, subst)),
+        HirKind::Record { name, type_args, fields } => HirKind::Record {
+            name: name.clone(),
+            type_args: type_args.clone(),
+            fields: fields.iter().map(|(name, value)| (name.clone(), specialize_expr(value, subst))).collect(),
+        },
+        HirKind::Match(scrutinee, arms) => HirKind::Match(
+            Box::new(specialize_expr(scrutinee, subst)),
+            arms.iter().map(|arm| specialize_arm(arm, subst)).collect(),
+        ),
+        HirKind::Spawn(block) => HirKind::Spawn(specialize_block(block, subst)),
+        HirKind::SpawnScope(block) => HirKind::SpawnScope(specialize_block(block, subst)),
+        HirKind::Channel(ty, capacity) => HirKind::Channel(
+            ty.clone(),
+            capacity.as_ref().map(|capacity| Box::new(specialize_expr(capacity, subst))),
+        ),
+    };
+    HirExpr { ty: specialize_ty(&expr.ty, subst), kind }
 }
 
 /// A HIR invariant that does not hold.

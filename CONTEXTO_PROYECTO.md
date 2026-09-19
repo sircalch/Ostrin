@@ -3746,3 +3746,36 @@ la suite completa queda en **6 pruebas diferenciales y 104 de integración verde
 
 El siguiente bloque es la migración de genéricos concretamente instanciados; después se podrá
 retirar más código duplicado del camino AST y abordar memoria/último uso.
+
+## 130. Primeras instancias genéricas generadas desde el HIR — 2026-09-18
+
+Se conectó la monomorfización que ya existía en `codegen.rs` con el backend HIR. Una función
+genérica sigue validándose una sola vez y conserva una única definición HIR con parámetros
+abstractos; cuando el backend descubre una llamada concreta, `hir.rs` crea una copia
+especializada con la sustitución que entregó el checker (`CallSubst`) y `hir_c.rs` intenta emitir
+esa copia como C.
+
+La especialización cubre recursivamente `Ty::Generic` y los parámetros genéricos que llegan como
+`Ty::Named("T")` en las firmas, además de listas, mapas, conjuntos, `Option`, `Result`, funciones
+y dimensiones de cantidades. También especializa los tipos de expresiones, bloques, argumentos,
+ramas y sustituciones de llamadas anidadas para dejar preparada la siguiente ampliación.
+
+La integración actual demuestra:
+
+- `identity<T>` con `Int`, `String` y un `record` concreto;
+- `max<T>` sobre escalares;
+- `first<T>(List<T>) -> T` con indexación HIR;
+- `maybe<T>(T) -> Option<T>` y `unwrap_value<T>(Option<T>) -> T`;
+- registro previo de helpers C para los tipos concretos de una instancia HIR.
+
+`examples/native_hir_generics.ostrin` y `native_hir_handles_concrete_generic_instances` cubren
+la equivalencia con el intérprete. Si el cuerpo especializado contiene una llamada genérica
+anidada que todavía no tiene una entrada de función HIR/C resoluble, un record o enum genérico
+aplicado, o cualquier nodo no migrado, `hir_c::generate` devuelve `None` y la instancia completa
+vuelve al backend AST; nunca se mezcla C parcialmente generado.
+
+Resultado de la tanda: **6 pruebas diferenciales y 105 de integración verdes**; la medición global
+sube de **78 a 96 funciones/métodos generados desde HIR** y el trinquete diferencial queda en
+**90**. El siguiente paso es resolver nombres/prototipos de instancias genéricas dentro de los
+cuerpos especializados, y después extender la misma ruta a records/enums aplicados y métodos
+genéricos.

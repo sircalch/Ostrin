@@ -520,8 +520,14 @@ struct GenericMethod<'a> {
 /// until the queue is empty rather than assuming one pass suffices.
 struct PendingInstance<'a> {
     c_name: String,
+    /// Name of the source-level HIR function (`identity` or `Record.method`).
+    hir_name: String,
     decl: &'a FunctionDecl,
     subst: HashMap<String, CType>,
+    /// The same instantiation in the checker/HIR type universe. `CType` is
+    /// intentionally kept for the AST backend; this parallel map lets the
+    /// concrete HIR body be emitted without re-inferring types.
+    hir_subst: HashMap<String, Ty>,
     param_types: Vec<CType>,
     return_type: CType,
 }
@@ -722,6 +728,42 @@ fn mangle_ctype(ty: &CType) -> String {
     }
 }
 
+/// Converts a fully concrete native type back into the HIR vocabulary. This
+/// is only a fallback for call sites where the checker did not leave a
+/// source-keyed `CallSubst`; the normal path uses the checker's exact `Ty`s.
+fn ctype_to_hir_ty(ty: &CType) -> Option<Ty> {
+    Some(match ty {
+        CType::Int => Ty::Int,
+        CType::Float => Ty::Float,
+        CType::Bool => Ty::Bool,
+        CType::Str => Ty::String,
+        CType::Void => Ty::Void,
+        CType::Record(name) | CType::Enum(name) => Ty::Named(name.clone()),
+        CType::DynTrait(name) => Ty::Dyn(name.clone()),
+        CType::List(inner) => Ty::List(Box::new(ctype_to_hir_ty(inner)?)),
+        CType::Map(key, value) => Ty::Map(Box::new(ctype_to_hir_ty(key)?), Box::new(ctype_to_hir_ty(value)?)),
+        CType::Set(inner) => Ty::Set(Box::new(ctype_to_hir_ty(inner)?)),
+        CType::Option(inner) => Ty::Applied("Option".to_string(), vec![ctype_to_hir_ty(inner)?]),
+        CType::Result(ok, err) => Ty::Applied("Result".to_string(), vec![ctype_to_hir_ty(ok)?, ctype_to_hir_ty(err)?]),
+        CType::Fn(params, ret) => Ty::Fn(params.iter().map(ctype_to_hir_ty).collect::<Option<Vec<_>>>()?, Box::new(ctype_to_hir_ty(ret)?)),
+        CType::Quantity(dimension) => Ty::Quantity(dimension.clone()),
+        CType::Sized(kind) => Ty::Sized(*kind),
+        CType::Float32 => Ty::Float32,
+        CType::Array(inner) => Ty::Applied("Array".to_string(), vec![ctype_to_hir_ty(inner)?]),
+        CType::Channel(inner) => Ty::Applied("Channel".to_string(), vec![ctype_to_hir_ty(inner)?]),
+        CType::Task(inner) => Ty::Applied("Task".to_string(), vec![ctype_to_hir_ty(inner)?]),
+        CType::Rng => Ty::Named("Rng".to_string()),
+        CType::NoneLit | CType::OkLit(_) | CType::ErrLit(_) | CType::GenLit(..) => return None,
+    })
+}
+
+fn ctype_subst_to_hir(subst: &HashMap<String, CType>) -> HashMap<String, Ty> {
+    subst
+        .iter()
+        .filter_map(|(name, ty)| ctype_to_hir_ty(ty).map(|ty| (name.clone(), ty)))
+        .collect()
+}
+
 impl<'a> Codegen<'a> {
     fn named_types(&self) -> NamedTypes<'_> {
         NamedTypes {
@@ -796,7 +838,15 @@ impl<'a> Codegen<'a> {
                 MethodInfo { decl: method, param_types: param_types.clone(), return_type: return_type.clone(), c_name: c_name.clone(), self_ty: self_ty.clone() },
             );
             if queue {
-                self.pending.push_back(PendingInstance { c_name, decl: method, subst: binds.clone(), param_types, return_type });
+                self.pending.push_back(PendingInstance {
+                    c_name,
+                    hir_name: format!("{}.{}", im.type_name, method.name),
+                    decl: method,
+                    hir_subst: ctype_subst_to_hir(binds),
+                    subst: binds.clone(),
+                    param_types,
+                    return_type,
+                });
             }
         }
     }
@@ -864,7 +914,15 @@ impl<'a> Codegen<'a> {
                 }
                 self.flush_instances()?;
                 self.instantiations.insert(c_name.clone(), (param_types.clone(), return_type.clone()));
-                self.pending.push_back(PendingInstance { c_name: c_name.clone(), decl, subst: full, param_types: param_types.clone(), return_type: return_type.clone() });
+                self.pending.push_back(PendingInstance {
+                    c_name: c_name.clone(),
+                    hir_name: format!("{}.{}", gm.key, decl.name),
+                    decl,
+                    hir_subst: ctype_subst_to_hir(&full),
+                    subst: full,
+                    param_types: param_types.clone(),
+                    return_type: return_type.clone(),
+                });
                 (param_types, return_type)
             }
         };
@@ -2068,6 +2126,22 @@ impl<'a> Codegen<'a> {
                     return None;
                 }
                 out.insert(generic.name.clone(), self.ty_to_ctype(ty)?);
+            }
+        }
+        Some(out)
+    }
+
+    /// The checker's exact type-level substitution for a generic call. Unlike
+    /// `checker_call_subst`, this intentionally stays in `Ty`: the HIR emitter
+    /// needs the concrete checker types, not their lossy native-C projection.
+    fn checker_hir_subst(&self, decl: &FunctionDecl, key: &ExprKey) -> Option<HashMap<String, Ty>> {
+        let recorded = self.call_substs?.get(key)?;
+        let mut out = HashMap::new();
+        for generic in &decl.generics {
+            if let Some(dimension) = recorded.dims.get(&generic.name) {
+                out.insert(generic.name.clone(), Ty::Quantity(dimension.clone()));
+            } else {
+                out.insert(generic.name.clone(), recorded.types.get(&generic.name)?.clone());
             }
         }
         Some(out)
@@ -3356,7 +3430,19 @@ impl<'a> Codegen<'a> {
         self.flush_instances()?;
         self.instantiations.insert(c_name.clone(), (param_types.clone(), return_type.clone()));
         let coerced = self.coerce_args(arg_codes, arg_types, &param_types)?;
-        self.pending.push_back(PendingInstance { c_name: c_name.clone(), decl, subst, param_types, return_type: return_type.clone() });
+        let hir_subst = call_key
+            .as_ref()
+            .and_then(|key| self.checker_hir_subst(decl, key))
+            .unwrap_or_else(|| ctype_subst_to_hir(&subst));
+        self.pending.push_back(PendingInstance {
+            c_name: c_name.clone(),
+            hir_name: decl.name.clone(),
+            decl,
+            hir_subst,
+            subst,
+            param_types,
+            return_type: return_type.clone(),
+        });
         Ok((format!("{c_name}({})", coerced.join(", ")), return_type))
     }
 
@@ -4956,12 +5042,6 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>, tr
         }
         bodies.push((signature, body));
     }
-    codegen
-        .closure_protos
-        .extend(hir_world.closure_protos.into_inner());
-    codegen
-        .closure_bodies
-        .extend(hir_world.closure_bodies.into_inner());
     // A generic instantiation's body can call another generic function (or
     // box a record into a `dyn Trait`) for the first time, and a `dyn`
     // boxing needs no further discovery of its own (a thunk's body is just
@@ -5227,7 +5307,34 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>, tr
             let signature = format!("{} {}({})", c_type_name(&job.return_type), job.c_name, params);
             let mut body = String::new();
             codegen.current_file = job.decl.source_file.clone();
-            codegen.gen_callable_body(&job.decl.params, &job.decl.body, &job.return_type, &job.subst, &mut body)?;
+            // Generic functions are lowered once with `Ty::Generic` nodes.
+            // Specialize that HIR for this concrete pending instance and try
+            // the same safe emitter used by ordinary functions. If a nested
+            // generic call, generic record, or another not-yet-migrated node
+            // is present, `generate` returns None and the established AST
+            // monomorphization remains the fallback.
+            let from_hir = match (&hir, std::env::var_os("OSTRIN_NO_HIR_CODEGEN")) {
+                (Some(program), None) => program
+                    .functions
+                    .iter()
+                    .find(|function| function.name == job.hir_name)
+                    .and_then(|function| {
+                        let specialized = crate::hir::specialize_function(function, &job.hir_subst);
+                        for (_, ty) in &specialized.params {
+                            codegen.register_hir_type(ty);
+                        }
+                        codegen.register_hir_type(&specialized.ret);
+                        codegen.register_hir_block_types(&specialized.body);
+                        crate::hir_c::generate(&specialized, &hir_world)
+                    }),
+                _ => None,
+            };
+            if let Some(text) = from_hir {
+                codegen.type_report.hir_generated += 1;
+                body = text;
+            } else {
+                codegen.gen_callable_body(&job.decl.params, &job.decl.body, &job.return_type, &job.subst, &mut body)?;
+            }
             bodies.push((signature, body));
         }
         while let Some(PendingVTable { trait_name, record_name }) = codegen.pending_vtables.pop_front() {
@@ -5259,6 +5366,14 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>, tr
             break;
         }
     }
+    // Drain these only after pending generic bodies have been visited: a
+    // specialized HIR instance may itself contain a closure.
+    codegen
+        .closure_protos
+        .extend(hir_world.closure_protos.into_inner());
+    codegen
+        .closure_bodies
+        .extend(hir_world.closure_bodies.into_inner());
 
     // Every type declaration is written out here, after the drain loop, so
     // generic instantiations (only discovered from actual usage) are all

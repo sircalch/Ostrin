@@ -1,0 +1,21 @@
+fn identity<T>(value: T) -> T {
+    value
+}
+
+fn first<T>(values: List<T>) -> T {
+    values[0]
+}
+
+fn maybe<T>(value: T) -> Option<T> {
+    Some(value)
+}
+
+fn unwrap_value<T>(value: Option<T>) -> T {
+    value.unwrap()
+}
+
+fn main() -> Void {
+    print(first([4, 8, 15]))
+    print(unwrap_value(maybe("ostrin")))
+    print(identity(42))
+}

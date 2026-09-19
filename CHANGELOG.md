@@ -34,6 +34,11 @@
 - Native HIR migration now covers closures and function values: captured
   lambdas, named-function thunks, indirect calls, and `List` combinators
   (`map`, `filter`, `fold`, `any`, `all`, `find`) that invoke closures from HIR.
+- Native HIR migration now specializes concrete generic function instances
+  from the checker's `CallSubst`: scalar generic functions, `List<T>` indexing,
+  `Option<T>` construction and structural methods can emit directly from the
+  specialized HIR, while nested/unsupported generic shapes safely retain the
+  AST fallback. The differential HIR ratchet is now 90 (96 measured).
 - Module loader now rewrites types in signatures, fields, variants and annotations
   (a `record` from another module can be used as a type).
 - CI on Linux, macOS and Windows.
