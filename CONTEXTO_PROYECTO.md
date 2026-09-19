@@ -3153,3 +3153,22 @@ arquitectura, pruebas que detecten regresiones entre fases.
 - Test `native_backend_types_agree_with_the_checker`: cero divergencias en todos
   los ejemplos. Sirve de red durante la migración del backend al HIR.
 - Suite: **98 pruebas**, sin warnings.
+
+---
+
+## 89. Etapa 2: el backend empieza a leer los tipos del checker — 2026-09-18
+
+- `codegen::generate_with_report` es ahora la única entrada del generador y
+  `--emit-c`/`--compile` le pasan la tabla de tipos del checker
+  (`check_program_typed`). Primera porción retirada: los **literales parciales**
+  (`None`, `Ok(x)`, `Err(e)`, un `Nothing` suelto). Antes esperaban a que un padre
+  aportase una pista (`expected`/`coerce`); ahora, en código no genérico, se
+  completan en el propio nodo con el tipo del checker (`complete_from_checker`,
+  con `ty_to_ctype` como inverso de `ctype_agrees`).
+- Resultado: los 16 literales parciales de los ejemplos se completan
+  (`partial == completed`, comprobado por test). Las pistas antiguas siguen
+  activas como respaldo (instancias genéricas, `Ok(7)` sin contexto), de modo que
+  la salida no cambia: 5 pruebas diferenciales y las 93 de integración en verde.
+- Siguiente: instancias genéricas (el checker debe dar tipos sustituibles por el
+  monomorfizador) y retirar `expected`/`settle_literal` cuando ya no hagan falta.
+- Suite: **98 pruebas**, sin warnings.

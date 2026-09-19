@@ -200,6 +200,7 @@ fn real_main() -> ExitCode {
             Ok((_, report)) => {
                 println!("agreed: {}", report.agreed);
                 println!("partial: {}", report.partial);
+                println!("completed: {}", report.completed);
                 println!("unchecked: {}", report.unchecked);
                 println!("divergences: {}", report.divergences.len());
                 for line in &report.divergences {
@@ -270,7 +271,8 @@ fn real_main() -> ExitCode {
         return ExitCode::SUCCESS;
     }
 
-    let errors = typeck::Checker::new().check_program(&items);
+    let typed_program = typeck::Checker::new().check_program_typed(&items);
+    let errors = typed_program.errors;
     if !errors.is_empty() {
         for e in &errors {
             if json {
@@ -292,7 +294,7 @@ fn real_main() -> ExitCode {
     let emit_c = args.iter().any(|a| a == "--emit-c");
     let compile_native = args.iter().any(|a| a == "--compile");
     if emit_c || compile_native {
-        return run_codegen(&items, entry_path, path, &args, emit_c, json);
+        return run_codegen(&items, &typed_program.expr_types, entry_path, path, &args, emit_c, json);
     }
 
     if !run {
@@ -318,9 +320,9 @@ fn real_main() -> ExitCode {
 /// or stdout); `--compile` additionally hands that source to whatever C
 /// compiler `codegen::find_c_compiler` finds, producing a real native
 /// executable.
-fn run_codegen(items: &[ast::Item], entry_path: &Path, display_path: &str, args: &[String], emit_c: bool, json: bool) -> ExitCode {
-    let source = match codegen::generate(items) {
-        Ok(source) => source,
+fn run_codegen(items: &[ast::Item], expr_types: &std::collections::HashMap<typeck::ExprKey, types::Ty>, entry_path: &Path, display_path: &str, args: &[String], emit_c: bool, json: bool) -> ExitCode {
+    let source = match codegen::generate_with_report(items, expr_types) {
+        Ok((source, _)) => source,
         Err(message) => {
             if json {
                 emit_json_diagnostic(None, &message, Some(display_path), None, None);

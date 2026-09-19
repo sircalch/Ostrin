@@ -351,6 +351,8 @@ pub struct NativeTypeReport {
     /// Expressions the backend types only partially (`None`, `Ok(x)`, …) but
     /// the checker knows completely: places where reinference can be retired.
     pub partial: usize,
+    /// Of those, how many were completed from the checker's type.
+    pub completed: usize,
     /// Real disagreements: `file:line:col: checker says …, native says …`.
     pub divergences: Vec<String>,
 }
@@ -1432,6 +1434,56 @@ impl<'a> Codegen<'a> {
         }
     }
 
+    /// A literal the backend can only type partially (`None`, `Ok(x)`, a bare
+    /// `Nothing`) is completed with the checker's full type for that very
+    /// expression, instead of waiting for a parent to supply a hint.
+    fn complete_from_checker(&mut self, expr: &Expr, result: (String, CType)) -> Result<(String, CType), String> {
+        let (code, ty) = result;
+        if !matches!(ty, CType::NoneLit | CType::OkLit(_) | CType::ErrLit(_) | CType::GenLit(..)) || !self.compare_enabled {
+            return Ok((code, ty));
+        }
+        let (Some(types), Expr::Located(_, range)) = (self.checker_types, expr) else { return Ok((code, ty)) };
+        let key = ExprKey { file: self.current_file.clone(), start: range.start, end: range.end };
+        let Some(checker_ty) = types.get(&key) else { return Ok((code, ty)) };
+        if crate::types::ty_contains_unknown(checker_ty) {
+            return Ok((code, ty));
+        }
+        let Some(full) = self.ty_to_ctype(checker_ty) else { return Ok((code, ty)) };
+        self.register_list_types(&full);
+        self.flush_instances()?;
+        let completed = self.coerce(&code, &ty, &full)?;
+        self.type_report.completed += 1;
+        Ok((completed, full))
+    }
+
+    /// The backend's type for a fully known checker type (the inverse of
+    /// `ctype_agrees`); `None` when the backend has no representation.
+    fn ty_to_ctype(&mut self, ty: &Ty) -> Option<CType> {
+        Some(match ty {
+            Ty::Int => CType::Int,
+            Ty::Float => CType::Float,
+            Ty::Bool => CType::Bool,
+            Ty::String => CType::Str,
+            Ty::Void => CType::Void,
+            Ty::Quantity(d) => CType::Quantity(d.clone()),
+            Ty::List(t) => CType::List(Box::new(self.ty_to_ctype(t)?)),
+            Ty::Set(t) => CType::Set(Box::new(self.ty_to_ctype(t)?)),
+            Ty::Map(k, v) => CType::Map(Box::new(self.ty_to_ctype(k)?), Box::new(self.ty_to_ctype(v)?)),
+            Ty::Applied(n, args) if n == "Option" && args.len() == 1 => CType::Option(Box::new(self.ty_to_ctype(&args[0])?)),
+            Ty::Applied(n, args) if n == "Result" && args.len() == 2 => {
+                CType::Result(Box::new(self.ty_to_ctype(&args[0])?), Box::new(self.ty_to_ctype(&args[1])?))
+            }
+            Ty::Applied(n, args) if self.generic_arity.contains_key(n) => {
+                let concrete = args.iter().map(|a| self.ty_to_ctype(a)).collect::<Option<Vec<_>>>()?;
+                self.instance_type(n, concrete).ok()?
+            }
+            Ty::Named(n) if self.record_names.contains(n) => CType::Record(n.clone()),
+            Ty::Named(n) if self.enum_names.contains(n) => CType::Enum(n.clone()),
+            Ty::Dyn(t) => CType::DynTrait(t.clone()),
+            _ => return None,
+        })
+    }
+
     fn ctype_agrees(&self, ty: &Ty, c: &CType) -> bool {
         match (ty, c) {
             (Ty::Int, CType::Int) | (Ty::Float, CType::Float) | (Ty::Bool, CType::Bool) | (Ty::String, CType::Str) | (Ty::Void, CType::Void) => true,
@@ -1466,6 +1518,7 @@ impl<'a> Codegen<'a> {
         let hint = self.expected.take();
         let result = self.gen_expr_inner(expr, hint)?;
         self.compare_with_checker(expr, &result.1);
+        let result = self.complete_from_checker(expr, result)?;
         self.flush_instances()?;
         Ok(result)
     }
@@ -3295,13 +3348,10 @@ fn c_string_literal(s: &str) -> String {
 /// otherwise compile, is left out of its respective table rather than
 /// rejecting the whole program up front — only an actual, unsupported use
 /// (a call, a match arm, a boxing site) fails on its own.
-pub fn generate(items: &[Item]) -> Result<String, String> {
-    generate_impl(items, None).map(|(source, _)| source)
-}
-
-/// Like `generate`, but also compares the backend's own type inference with
-/// the checker's typed-expression table (see `NativeTypeReport`). The
-/// generated code is identical.
+/// Transpiles a type-checked program to C. `checker_types` is the checker's
+/// typed-expression table: it completes the types the backend can only infer
+/// partially (`None`, `Ok(x)`, `Nothing`, …) and lets `NativeTypeReport`
+/// compare the backend's own inference with the checker's.
 pub fn generate_with_report(items: &[Item], checker_types: &HashMap<ExprKey, Ty>) -> Result<(String, NativeTypeReport), String> {
     generate_impl(items, Some(checker_types))
 }

@@ -249,7 +249,7 @@ fn typed_expression_table_does_not_regress() {
 /// for an expression must agree with the checker's — zero divergences.
 #[test]
 fn native_backend_types_agree_with_the_checker() {
-    let (mut agreed, mut divergences) = (0usize, Vec::<String>::new());
+    let (mut agreed, mut partial, mut completed, mut divergences) = (0usize, 0usize, 0usize, Vec::<String>::new());
     for path in examples() {
         let file = path.to_string_lossy().to_string();
         if !ostrinc(&["--check", &file]).status.success() {
@@ -262,11 +262,17 @@ fn native_backend_types_agree_with_the_checker() {
         for line in text(&out.stdout).lines() {
             if let Some(n) = line.strip_prefix("agreed: ") {
                 agreed += n.trim().parse::<usize>().unwrap();
+            } else if let Some(n) = line.strip_prefix("partial: ") {
+                partial += n.trim().parse::<usize>().unwrap();
+            } else if let Some(n) = line.strip_prefix("completed: ") {
+                completed += n.trim().parse::<usize>().unwrap();
             } else if line.starts_with("  ") {
                 divergences.push(format!("{}: {}", name_of(&path), line.trim()));
             }
         }
     }
     assert!(agreed > 1000, "only {agreed} expressions were compared");
+    // Every partial literal the backend meets is completed from the checker's type.
+    assert_eq!(partial, completed, "{} partial literal(s) were not completed from the checker's type", partial - completed);
     assert!(divergences.is_empty(), "the backend and the checker disagree on types:\n  {}", divergences.join("\n  "));
 }
