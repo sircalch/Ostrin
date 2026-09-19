@@ -278,3 +278,34 @@ fn native_backend_types_agree_with_the_checker() {
     assert_eq!(partial, completed, "{} partial literal(s) were not completed from the checker's type", partial - completed);
     assert!(divergences.is_empty(), "the backend and the checker disagree on types:\n  {}", divergences.join("\n  "));
 }
+
+/// Ratchet for the HIR (Stage 2 of the architecture plan): every function of
+/// every example that type-checks lowers to a typed HIR whose nodes carry
+/// their types. The unknown-type count and the invariant violations
+/// (`ostrinc --hir`) may only go down; lower the limits when a gap is closed.
+#[test]
+fn hir_covers_the_examples_with_known_types() {
+    const MAX_UNKNOWN_NODES: usize = 53;
+    const MAX_VIOLATIONS: usize = 1;
+    let (mut nodes, mut unknown, mut violations) = (0usize, 0usize, Vec::<String>::new());
+    for path in examples() {
+        let file = path.to_string_lossy().to_string();
+        if !ostrinc(&["--check", &file]).status.success() {
+            continue;
+        }
+        let out = ostrinc(&["--hir", "--quiet", &file]);
+        assert!(out.status.success(), "--hir failed on {}", name_of(&path));
+        for line in text(&out.stdout).lines() {
+            if let Some(n) = line.strip_prefix("hir nodes: ") {
+                nodes += n.trim().parse::<usize>().unwrap();
+            } else if let Some(n) = line.strip_prefix("hir unknown: ") {
+                unknown += n.trim().parse::<usize>().unwrap();
+            } else if line.starts_with("  ") {
+                violations.push(format!("{}: {}", name_of(&path), line.trim()));
+            }
+        }
+    }
+    assert!(nodes > 4000, "the HIR covered only {nodes} nodes");
+    assert!(unknown <= MAX_UNKNOWN_NODES, "{unknown} of {nodes} HIR nodes have no known type (limit {MAX_UNKNOWN_NODES})");
+    assert!(violations.len() <= MAX_VIOLATIONS, "HIR invariant violations:\n  {}", violations.join("\n  "));
+}

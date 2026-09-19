@@ -3474,3 +3474,25 @@ Cierra el aviso de reproducibilidad del §96.
   RC/último uso → cierres → optimizador). Sustituye a la comprobación dinámica de E1101 por un
   análisis estático cuando exista el IR.
 - Suite: **113 pruebas**.
+
+---
+
+## 103. HIR: primera etapa construida (árbol tipado + verificador + `--hir`) — 2026-09-18
+
+- `compiler/src/hir.rs`: `lower(items, typed)` construye un **HIR por función** (funciones y métodos
+  de `impl`) con un tipo en cada nodo (`HirExpr { ty, kind }`); `verify` comprueba los invariantes
+  (nodos con tipo conocido, llamadas a funciones genéricas con sus argumentos de tipo resueltos);
+  `dump` lo imprime. CLI: `ostrinc --hir archivo.ostrin` (`--quiet` solo el resumen).
+  Las llamadas `recv.metodo(args)` son un nodo propio (`MethodCall`); los operadores, `for`,
+  `try` y los patrones se conservan tal cual (el desazucarado es el siguiente paso).
+- Base en el checker: `TypedProgram.node_types` (tipo de **cada** nodo, por dirección del nodo en
+  el AST, incluidos operandos sin rango propio). **Bug corregido**: los métodos de `impl` y los
+  cuerpos por defecto de traits se comprobaban sobre una *copia* del AST, así que sus nodos no
+  quedaban registrados; ahora se comprueba el cuerpo original.
+- **Cobertura medida** sobre los ejemplos válidos: **4 109 nodos, 53 sin tipo (1,3 %)** y 1
+  violación (`wrap(5).is_just()`: una llamada usada como receptor no registra sus argumentos de
+  tipo). Antes del arreglo de los métodos eran 1 244 sin tipo. Las que quedan son sobre todo
+  lambdas (parámetros sin tipo).
+- Test de trinquete `hir_covers_the_examples_with_known_types` (límites 53 / 1).
+- Siguiente (documento 20, paso 2): migrar el backend nativo a este HIR por familias de nodos.
+- Suite: **114 pruebas**.

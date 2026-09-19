@@ -61,6 +61,10 @@ pub struct TypedProgram {
     /// Untyped integer literals (or negated literals) that the context typed as a
     /// fixed-width integer: backends read the literal's real type from here.
     pub literal_kinds: HashMap<ExprKey, LitKind>,
+    /// The type of *every* expression node, keyed by the node's address in the
+    /// (immutable) AST the checker was given — including operands, which have no
+    /// source range of their own. Lowering to HIR reads types from here.
+    pub node_types: HashMap<usize, Ty>,
 }
 
 #[derive(Clone)]
@@ -104,6 +108,7 @@ pub struct Checker {
     expr_types: HashMap<ExprKey, Ty>,
     call_substs: HashMap<ExprKey, CallSubst>,
     literal_kinds: HashMap<ExprKey, LitKind>,
+    node_types: HashMap<usize, Ty>,
     call_key_stack: Vec<ExprKey>,
     errors: Vec<TypeError>,
 }
@@ -170,6 +175,7 @@ impl Checker {
             expr_types: HashMap::new(),
             call_substs: HashMap::new(),
             literal_kinds: HashMap::new(),
+            node_types: HashMap::new(),
             call_key_stack: Vec::new(),
             errors: Vec::new(),
         }
@@ -188,20 +194,20 @@ impl Checker {
         self,
         items: &[Item],
     ) -> (Vec<TypeError>, Vec<EditorBinding>, Vec<EditorExpression>) {
-        let (errors, bindings, expressions, _, _, _) = self.check_all(items);
+        let (errors, bindings, expressions, _, _, _, _) = self.check_all(items);
         (errors, bindings, expressions)
     }
 
     /// Like `check_program`, but also returns the type of every expression.
     pub fn check_program_typed(self, items: &[Item]) -> TypedProgram {
-        let (errors, _, _, expr_types, call_substs, literal_kinds) = self.check_all(items);
-        TypedProgram { errors, expr_types, call_substs, literal_kinds }
+        let (errors, _, _, expr_types, call_substs, literal_kinds, node_types) = self.check_all(items);
+        TypedProgram { errors, expr_types, call_substs, literal_kinds, node_types }
     }
 
     fn check_all(
         mut self,
         items: &[Item],
-    ) -> (Vec<TypeError>, Vec<EditorBinding>, Vec<EditorExpression>, HashMap<ExprKey, Ty>, HashMap<ExprKey, CallSubst>, HashMap<ExprKey, LitKind>) {
+    ) -> (Vec<TypeError>, Vec<EditorBinding>, Vec<EditorExpression>, HashMap<ExprKey, Ty>, HashMap<ExprKey, CallSubst>, HashMap<ExprKey, LitKind>, HashMap<usize, Ty>) {
         for item in items {
             match item {
                 Item::Enum(e) => {
@@ -303,7 +309,7 @@ impl Checker {
                 Item::Record(_) | Item::Enum(_) | Item::Import(_) | Item::Trait(_) => {}
             }
         }
-        (self.errors, self.editor_bindings, self.editor_expressions, self.expr_types, self.call_substs, self.literal_kinds)
+        (self.errors, self.editor_bindings, self.editor_expressions, self.expr_types, self.call_substs, self.literal_kinds, self.node_types)
     }
 
     fn check_function(&mut self, f: &FunctionDecl) {
@@ -314,6 +320,18 @@ impl Checker {
         &mut self,
         f: &FunctionDecl,
         extra_bounds: &HashMap<String, Vec<String>>,
+    ) {
+        self.check_function_with_body(f, extra_bounds, &f.body);
+    }
+
+    /// Checks `f` (whose parameters/generics may have been rewritten, e.g. `Self` replaced)
+    /// against `body`, which must be the *original* AST block so the node-type table
+    /// keys (node addresses) match the tree that later stages read.
+    fn check_function_with_body(
+        &mut self,
+        f: &FunctionDecl,
+        extra_bounds: &HashMap<String, Vec<String>>,
+        body: &Block,
     ) {
         let previous_span = self.current_span;
         self.current_span = Some(f.span);
@@ -361,9 +379,9 @@ impl Checker {
             }
         }
         let previous_return_type = self.current_return_type.replace(expected.clone());
-        let actual = self.check_block(&f.body, &mut scope);
-        self.note_expected_block(&f.body, &expected);
-        let tail_adapted = match &f.body.tail {
+        let actual = self.check_block(body, &mut scope);
+        self.note_expected_block(body, &expected);
+        let tail_adapted = match &body.tail {
             Some(tail) => self.adapt_literals(tail, &expected, &actual),
             None => false,
         };
@@ -413,12 +431,12 @@ impl Checker {
                 span: Span::default(),
                 source_file: None,
             };
-            self.check_function_with_extra_bounds(&function, &extra_bounds);
+            self.check_function_with_body(&function, &extra_bounds, body);
         }
     }
 
-    fn check_impl_method(&mut self, method: &FunctionDecl, implementation: &ImplDecl) {
-        let mut method = method.clone();
+    fn check_impl_method(&mut self, original: &FunctionDecl, implementation: &ImplDecl) {
+        let mut method = original.clone();
         if !implementation.generics.is_empty() {
             let mut generics = implementation.generics.clone();
             generics.extend(method.generics);
@@ -429,7 +447,7 @@ impl Checker {
             replace_self_type_with_type(&mut param.ty, &owner);
         }
         replace_self_type_with_type(&mut method.return_type, &owner);
-        self.check_function(&method);
+        self.check_function_with_body(&method, &HashMap::new(), &original.body);
     }
 
     fn validate_impl(&mut self, implementation: &ImplDecl) {
@@ -852,6 +870,19 @@ impl Checker {
         let key = ExprKey { file: self.current_source_file.clone(), start: range.start, end: range.end };
         self.literal_kinds.insert(key.clone(), LitKind::Int(kind));
         self.expr_types.insert(key, Ty::Sized(kind));
+        // Every layer around the literal (and a negation around them) has its type too.
+        let mut layer = literal;
+        loop {
+            self.node_types.insert(layer as *const Expr as usize, Ty::Sized(kind));
+            match layer {
+                Expr::Located(inner, _) => layer = inner,
+                _ => break,
+            }
+        }
+        if negated {
+            self.node_types.insert(expr as *const Expr as usize, Ty::Sized(kind));
+            self.node_types.insert(expr.unlocated() as *const Expr as usize, Ty::Sized(kind));
+        }
         // The negation wrapping the literal has the literal's type too.
         if negated {
             if let Expr::Located(_, outer) = expr {
@@ -1248,6 +1279,8 @@ impl Checker {
                 if let Some(recorded) = self.expr_types.get(&key) {
                     if ty_contains_unknown(recorded) && compatible(expected, recorded) {
                         self.expr_types.insert(key, expected.clone());
+                        self.node_types.insert(expr as *const Expr as usize, expected.clone());
+                        self.node_types.insert(&**inner as *const Expr as usize, expected.clone());
                     }
                 }
                 self.note_expected_inner(inner, expected);
@@ -1311,6 +1344,16 @@ impl Checker {
     }
 
     fn infer_expr(&mut self, expr: &Expr, scope: &mut Scope) -> Ty {
+        let ty = self.infer_expr_inner(expr, scope);
+        // A later, less-informed visit (a lambda is checked twice) never erases a known type.
+        let key = expr as *const Expr as usize;
+        if ty != Ty::Unknown || !self.node_types.contains_key(&key) {
+            self.node_types.insert(key, ty.clone());
+        }
+        ty
+    }
+
+    fn infer_expr_inner(&mut self, expr: &Expr, scope: &mut Scope) -> Ty {
         match expr {
             Expr::Located(inner, range) => {
                 let previous_span = self.current_span;
@@ -3253,7 +3296,7 @@ fn is_dimension_name(name: &str) -> bool {
     })
 }
 
-fn resolve_type(ty: &Type) -> Ty {
+pub fn resolve_type(ty: &Type) -> Ty {
     resolve_type_with_subst(ty, &HashMap::new())
 }
 

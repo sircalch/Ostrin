@@ -1,6 +1,7 @@
 mod ast;
 mod codegen;
 mod dap;
+mod hir;
 mod interpreter;
 mod lexer;
 mod lsp;
@@ -39,6 +40,7 @@ fn real_main() -> ExitCode {
     let types_only = args.iter().any(|a| a == "--types");
     let typed_report = args.iter().any(|a| a == "--typed-report");
     let native_type_report = args.iter().any(|a| a == "--native-type-report");
+    let hir_mode = args.iter().any(|a| a == "--hir");
     let stdin_source = args.iter().any(|a| a == "--stdin");
     let lsp_server = args.iter().any(|a| a == "--lsp");
     let dap_server = args.iter().any(|a| a == "--dap");
@@ -292,6 +294,30 @@ fn real_main() -> ExitCode {
         }
         if !json { eprintln!("\n{} error(es)", errors.len()); }
         return ExitCode::FAILURE;
+    }
+
+    if hir_mode {
+        // Lowers every function to the typed HIR, verifies its invariants and prints it.
+        let program = hir::lower(&items, &typed_program);
+        let generic_functions: std::collections::HashSet<String> = items
+            .iter()
+            .filter_map(|item| match item {
+                ast::Item::Function(f) if !f.generics.is_empty() => Some(f.name.clone()),
+                _ => None,
+            })
+            .collect();
+        let report = hir::verify(&program, &generic_functions);
+        if !args.iter().any(|a| a == "--quiet") {
+            print!("{}", hir::dump(&program));
+        }
+        println!("hir functions: {}", program.functions.len());
+        println!("hir nodes: {}", report.nodes);
+        println!("hir unknown: {}", report.unknown);
+        println!("hir violations: {}", report.violations.len());
+        for v in &report.violations {
+            println!("  {}: {}", v.function, v.message);
+        }
+        return ExitCode::SUCCESS;
     }
 
     let emit_c = args.iter().any(|a| a == "--emit-c");
