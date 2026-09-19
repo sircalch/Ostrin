@@ -3593,3 +3593,9 @@ El ejemplo `pkg_project` ya compila también en nativo.
 ## 116. Gráficos SVG como paquete
 
 `examples/plot_project/{plot,app}`: el paquete `plot` genera SVG (`scatter_svg`, `line_svg`: ejes, extremos rotulados, título) sobre `Array<Float>`, todo en Ostrin, con salida determinista (redondeo a 2 decimales) e idéntica en intérprete y nativo (test `svg_plot_package_runs_identically_in_both_backends`). Guardar a disco: `write_file("grafico.svg", svg)`. Sin dependencias externas ni red. Pendiente: histograma/barras, varias series, leyenda, PNG.
+
+## 117. Diferenciación automática (forward-mode) como paquete
+
+`examples/autodiff_project/{autodiff,app}`: números duales `Dual { v, d }` con `add/sub/mul/div/neg/scale/powi`, `dsin/dcos/dexp/dln/dsqrt`, y sobre las **funciones como valores** (sección 110) `derivative`, `value`, `gradient2` y `newton`. Comprobado a mano: f(x)=x³−2x−5 → f(2)=−1, f'(2)=10, raíz de Newton 2.0945514815423265; gradiente de Rosenbrock en (0.5, 0.5) = (−51, 50). Idéntico en intérprete y nativo (matemática determinista, doc. 19).
+
+Limitaciones: no hay sobrecarga de operadores, así que las funciones se escriben con `autodiff.add(...)` en vez de `a + b`; los tipos importados se usan con `import pkg.mod.{Dual}` (no existe `mod.Dual` en posición de tipo). Reverse-mode y arrays de duales quedan pendientes; la sobrecarga de operadores (`impl Add for Dual`) es el siguiente paso de lenguaje que haría esto legible.

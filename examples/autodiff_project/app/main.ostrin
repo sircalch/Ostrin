@@ -1,0 +1,29 @@
+import autodiff.autodiff
+import autodiff.autodiff.{Dual}
+
+fn poly(x: Dual) -> Dual {
+    // f(x) = x^3 - 2x - 5
+    autodiff.sub(autodiff.sub(autodiff.powi(x, 3), autodiff.scale(2.0, x)), autodiff.constant(5.0))
+}
+
+fn wave(x: Dual) -> Dual {
+    // f(x) = sin(x) * exp(x / 2)
+    autodiff.mul(autodiff.dsin(x), autodiff.dexp(autodiff.scale(0.5, x)))
+}
+
+fn rosenbrock(x: Dual, y: Dual) -> Dual {
+    // f(x, y) = (1 - x)^2 + 100 (y - x^2)^2
+    a = autodiff.powi(autodiff.sub(autodiff.constant(1.0), x), 2)
+    b = autodiff.powi(autodiff.sub(y, autodiff.powi(x, 2)), 2)
+    autodiff.add(a, autodiff.scale(100.0, b))
+}
+
+fn main() -> Void {
+    print(autodiff.value(poly, 2.0))
+    print(autodiff.derivative(poly, 2.0))
+    print(autodiff.derivative(wave, 1.0))
+    g = autodiff.gradient2(rosenbrock, 0.5, 0.5)
+    print(g[0])
+    print(g[1])
+    print(autodiff.newton(poly, 2.0, 8))
+}

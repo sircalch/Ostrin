@@ -1,0 +1,57 @@
+// Diferenciación automática hacia adelante con números duales: (v, d) = (valor, derivada).
+pub record Dual {
+    v: Float
+    d: Float
+}
+
+pub fn constant(c: Float) -> Dual { Dual { v: c, d: 0.0 } }
+pub fn variable(x: Float) -> Dual { Dual { v: x, d: 1.0 } }
+
+pub fn add(a: Dual, b: Dual) -> Dual { Dual { v: a.v + b.v, d: a.d + b.d } }
+pub fn sub(a: Dual, b: Dual) -> Dual { Dual { v: a.v - b.v, d: a.d - b.d } }
+pub fn mul(a: Dual, b: Dual) -> Dual { Dual { v: a.v * b.v, d: a.d * b.v + a.v * b.d } }
+pub fn div(a: Dual, b: Dual) -> Dual { Dual { v: a.v / b.v, d: (a.d * b.v - a.v * b.d) / (b.v * b.v) } }
+pub fn neg(a: Dual) -> Dual { Dual { v: 0.0 - a.v, d: 0.0 - a.d } }
+pub fn scale(k: Float, a: Dual) -> Dual { Dual { v: k * a.v, d: k * a.d } }
+pub fn powi(a: Dual, n: Int) -> Dual {
+    mut r = constant(1.0)
+    mut i = 0
+    while i < n {
+        r = mul(r, a)
+        i = i + 1
+    }
+    r
+}
+pub fn dsin(a: Dual) -> Dual { Dual { v: sin(a.v), d: cos(a.v) * a.d } }
+pub fn dcos(a: Dual) -> Dual { Dual { v: cos(a.v), d: 0.0 - sin(a.v) * a.d } }
+pub fn dexp(a: Dual) -> Dual { Dual { v: exp(a.v), d: exp(a.v) * a.d } }
+pub fn dln(a: Dual) -> Dual { Dual { v: ln(a.v), d: a.d / a.v } }
+pub fn dsqrt(a: Dual) -> Dual { Dual { v: sqrt(a.v), d: a.d / (2.0 * sqrt(a.v)) } }
+
+/// f'(x) para una función escrita con las operaciones de este paquete.
+pub fn derivative(f: fn(Dual) -> Dual, x: Float) -> Float {
+    f(variable(x)).d
+}
+
+pub fn value(f: fn(Dual) -> Dual, x: Float) -> Float {
+    f(variable(x)).v
+}
+
+/// Gradiente de f(x, y): una pasada hacia adelante por variable.
+pub fn gradient2(f: fn(Dual, Dual) -> Dual, x: Float, y: Float) -> List<Float> {
+    dx = f(variable(x), constant(y)).d
+    dy = f(constant(x), variable(y)).d
+    [dx, dy]
+}
+
+/// Método de Newton con derivada exacta.
+pub fn newton(f: fn(Dual) -> Dual, start: Float, steps: Int) -> Float {
+    mut x = start
+    mut i = 0
+    while i < steps {
+        r = f(variable(x))
+        x = x - r.v / r.d
+        i = i + 1
+    }
+    x
+}

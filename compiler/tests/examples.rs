@@ -1728,3 +1728,23 @@ fn svg_plot_package_runs_identically_in_both_backends() {
     assert_eq!(stdout(&interpreted).lines().collect::<Vec<_>>(), native_text.lines().collect::<Vec<_>>());
     assert!(stdout(&interpreted).contains("<polyline"), "expected an SVG polyline: {}", stdout(&interpreted));
 }
+
+#[test]
+fn autodiff_package_runs_identically_in_both_backends() {
+    let entry = example_path("autodiff_project/app/main.ostrin");
+    let interpreted = run(&["--run", &entry]);
+    assert!(interpreted.status.success(), "stderr: {}", stderr(&interpreted));
+    let text = stdout(&interpreted);
+    // f(x) = x^3 - 2x - 5: f(2) = -1, f'(2) = 10; Newton converges to 2.0945514815423265.
+    assert_eq!(text.lines().collect::<Vec<_>>(), ["-1", "10", "1.58448345995801", "-51", "50", "2.0945514815423265"]);
+    let exe = temp_artifact("autodiff_lib.exe");
+    let compiled = run(&["--compile", "--out", &exe, &entry]);
+    if skip_if_no_c_compiler(&compiled) {
+        return;
+    }
+    assert!(compiled.status.success(), "stderr: {}", stderr(&compiled));
+    let native = Command::new(&exe).output().expect("run native binary");
+    let _ = fs::remove_file(&exe);
+    let native_text = String::from_utf8_lossy(&native.stdout).to_string();
+    assert_eq!(text.lines().collect::<Vec<_>>(), native_text.lines().collect::<Vec<_>>());
+}

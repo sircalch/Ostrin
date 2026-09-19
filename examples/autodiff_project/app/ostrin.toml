@@ -1,0 +1,7 @@
+[package]
+name = "autodiff_app"
+version = "0.1.0"
+entry = "main.ostrin"
+
+[dependencies]
+autodiff = { path = "../autodiff" }
