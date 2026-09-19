@@ -48,6 +48,8 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::ast::*;
 use crate::symbols::type_to_string;
+use crate::typeck::ExprKey;
+use crate::types::Ty;
 use crate::types::{dim_div, dim_is_dimensionless, dim_mul, dim_pow, dim_single, dim_to_string, resolve_unit_expr, Dimension};
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -337,6 +339,22 @@ struct VariantInfo {
     fields: Vec<(String, CType)>,
 }
 
+/// How the backend's own type inference compares with the checker's
+/// (the typed-expression table), expression by expression.
+#[derive(Debug, Default, Clone)]
+pub struct NativeTypeReport {
+    /// Expressions where both agree.
+    pub agreed: usize,
+    /// Expressions with no checker type, an unknown one, or inside a generic
+    /// instantiation (whose checker types are still abstract).
+    pub unchecked: usize,
+    /// Expressions the backend types only partially (`None`, `Ok(x)`, …) but
+    /// the checker knows completely: places where reinference can be retired.
+    pub partial: usize,
+    /// Real disagreements: `file:line:col: checker says …, native says …`.
+    pub divergences: Vec<String>,
+}
+
 /// A method with its own type parameters (`fn map<U>(self, ..)`), kept
 /// aside until a call site fixes them.
 #[derive(Clone)]
@@ -438,6 +456,12 @@ struct Codegen<'a> {
     expected: Option<CType>,
     /// Records/enums whose generated `ostrin_show_*` (used by `print`) is queued.
     show_queue: VecDeque<CType>,
+    /// The checker's type for every expression, when the caller supplied it
+    /// (see `generate_with_report`): used only to *compare*, never to generate.
+    checker_types: Option<&'a HashMap<ExprKey, Ty>>,
+    current_file: Option<String>,
+    compare_enabled: bool,
+    type_report: NativeTypeReport,
     /// Type key (record/enum/instance/quantity name) -> generic methods, instantiated per call.
     generic_methods: HashMap<String, HashMap<String, GenericMethod<'a>>>,
     quantity_impls: Vec<&'a ImplDecl>,
@@ -1090,6 +1114,7 @@ impl<'a> Codegen<'a> {
         subst: &HashMap<String, CType>,
         out: &mut String,
     ) -> Result<(), String> {
+        self.compare_enabled = subst.keys().all(|k| k == "Self");
         self.push_scope();
         self.subst_stack.push(subst.clone());
         self.current_return.push(return_type.clone());
@@ -1375,12 +1400,72 @@ impl<'a> Codegen<'a> {
         Ok(())
     }
 
+    /// Records whether the backend's inferred type for `expr` agrees with the
+    /// checker's. Observation only: never changes what is generated.
+    fn compare_with_checker(&mut self, expr: &Expr, ty: &CType) {
+        let Some(types) = self.checker_types else { return };
+        let Expr::Located(_, range) = expr else { return };
+        if !self.compare_enabled {
+            self.type_report.unchecked += 1;
+            return;
+        }
+        let key = ExprKey { file: self.current_file.clone(), start: range.start, end: range.end };
+        let Some(checker_ty) = types.get(&key) else {
+            self.type_report.unchecked += 1;
+            return;
+        };
+        if crate::types::ty_contains_unknown(checker_ty) || matches!(checker_ty, Ty::Generic(_) | Ty::Fn(..)) {
+            self.type_report.unchecked += 1;
+        } else if matches!(ty, CType::NoneLit | CType::OkLit(_) | CType::ErrLit(_) | CType::GenLit(..)) {
+            self.type_report.partial += 1;
+        } else if self.ctype_agrees(checker_ty, ty) {
+            self.type_report.agreed += 1;
+        } else {
+            let file = self.current_file.clone().unwrap_or_default();
+            self.type_report.divergences.push(format!(
+                "{file}:{}:{}: checker says '{}', native says '{}'",
+                range.start.line,
+                range.start.col,
+                checker_ty.describe(),
+                mangle_ctype(ty)
+            ));
+        }
+    }
+
+    fn ctype_agrees(&self, ty: &Ty, c: &CType) -> bool {
+        match (ty, c) {
+            (Ty::Int, CType::Int) | (Ty::Float, CType::Float) | (Ty::Bool, CType::Bool) | (Ty::String, CType::Str) | (Ty::Void, CType::Void) => true,
+            (Ty::Char, _) => true,
+            (Ty::Quantity(a), CType::Quantity(b)) => a == b,
+            (Ty::List(a), CType::List(b)) | (Ty::Set(a), CType::Set(b)) => self.ctype_agrees(a, b),
+            (Ty::Map(k, v), CType::Map(ck, cv)) => self.ctype_agrees(k, ck) && self.ctype_agrees(v, cv),
+            (Ty::Applied(n, args), CType::Option(inner)) if n == "Option" && args.len() == 1 => self.ctype_agrees(&args[0], inner),
+            (Ty::Applied(n, args), CType::Result(ok, err)) if n == "Result" && args.len() == 2 => {
+                self.ctype_agrees(&args[0], ok) && self.ctype_agrees(&args[1], err)
+            }
+            (Ty::Applied(n, args), CType::Channel(inner)) | (Ty::Applied(n, args), CType::Task(inner))
+                if (n == "Channel" || n == "Task") && args.len() == 1 =>
+            {
+                self.ctype_agrees(&args[0], inner)
+            }
+            (Ty::Named(n), CType::Record(m) | CType::Enum(m)) => n == m,
+            (Ty::Applied(n, args), CType::Record(m) | CType::Enum(m)) => {
+                self.instance_info.get(m).is_some_and(|(base, cargs)| {
+                    base == n && cargs.len() == args.len() && args.iter().zip(cargs).all(|(a, c)| self.ctype_agrees(a, c))
+                })
+            }
+            (Ty::Dyn(t), CType::DynTrait(u)) => t == u,
+            _ => false,
+        }
+    }
+
     /// Every expression is generated through here so that any generic
     /// instantiation its type mentions is registered before a parent looks
     /// up its fields, variants or methods.
     fn gen_expr(&mut self, expr: &Expr) -> Result<(String, CType), String> {
         let hint = self.expected.take();
         let result = self.gen_expr_inner(expr, hint)?;
+        self.compare_with_checker(expr, &result.1);
         self.flush_instances()?;
         Ok(result)
     }
@@ -3211,6 +3296,17 @@ fn c_string_literal(s: &str) -> String {
 /// rejecting the whole program up front — only an actual, unsupported use
 /// (a call, a match arm, a boxing site) fails on its own.
 pub fn generate(items: &[Item]) -> Result<String, String> {
+    generate_impl(items, None).map(|(source, _)| source)
+}
+
+/// Like `generate`, but also compares the backend's own type inference with
+/// the checker's typed-expression table (see `NativeTypeReport`). The
+/// generated code is identical.
+pub fn generate_with_report(items: &[Item], checker_types: &HashMap<ExprKey, Ty>) -> Result<(String, NativeTypeReport), String> {
+    generate_impl(items, Some(checker_types))
+}
+
+fn generate_impl(items: &[Item], checker_types: Option<&HashMap<ExprKey, Ty>>) -> Result<(String, NativeTypeReport), String> {
     let mut functions = Vec::new();
     let mut records = Vec::new();
     let mut enums = Vec::new();
@@ -3326,6 +3422,10 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
         instance_variants: HashMap::new(),
         expected: None,
         show_queue: VecDeque::new(),
+        checker_types,
+        current_file: None,
+        compare_enabled: false,
+        type_report: NativeTypeReport::default(),
         generic_methods: HashMap::new(),
         quantity_impls: impls.iter().filter(|im| im.type_name == "Quantity").copied().collect(),
         quantity_done: HashSet::new(),
@@ -3457,6 +3557,7 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
         let params = render_params(&param_types, &f.params);
         let signature = format!("{} {}({})", c_type_name(&return_type), c_function_name(&f.name), params);
         let mut body = String::new();
+        codegen.current_file = f.source_file.clone();
         codegen.gen_function_body(f, &return_type, &mut body)?;
         bodies.push((signature, body));
     }
@@ -3481,6 +3582,7 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
         let signature = format!("{} {}({})", c_type_name(&return_type), c_name, params);
         let self_subst: HashMap<String, CType> = HashMap::from([("Self".to_string(), self_ty)]);
         let mut body = String::new();
+        codegen.current_file = decl.source_file.clone();
         codegen.gen_callable_body(&decl.params, &decl.body, &return_type, &self_subst, &mut body)?;
         bodies.push((signature, body));
     }
@@ -3652,6 +3754,7 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
             let params = render_params(&job.param_types, &job.decl.params);
             let signature = format!("{} {}({})", c_type_name(&job.return_type), job.c_name, params);
             let mut body = String::new();
+            codegen.current_file = job.decl.source_file.clone();
             codegen.gen_callable_body(&job.decl.params, &job.decl.body, &job.return_type, &job.subst, &mut body)?;
             bodies.push((signature, body));
         }
@@ -3818,7 +3921,7 @@ pub fn generate(items: &[Item]) -> Result<String, String> {
     if out.contains("Qty") {
         out = out.replacen(PRELUDE, &format!("{PRELUDE}{QTY_RUNTIME}"), 1);
     }
-    Ok(out)
+    Ok((out, codegen.type_report.clone()))
 }
 
 fn render_params(types: &[CType], params: &[Param]) -> String {

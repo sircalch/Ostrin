@@ -38,6 +38,7 @@ fn real_main() -> ExitCode {
     let members_only = args.iter().any(|a| a == "--members");
     let types_only = args.iter().any(|a| a == "--types");
     let typed_report = args.iter().any(|a| a == "--typed-report");
+    let native_type_report = args.iter().any(|a| a == "--native-type-report");
     let stdin_source = args.iter().any(|a| a == "--stdin");
     let lsp_server = args.iter().any(|a| a == "--lsp");
     let dap_server = args.iter().any(|a| a == "--dap");
@@ -190,6 +191,27 @@ fn real_main() -> ExitCode {
             }
         }
         return ExitCode::SUCCESS;
+    }
+
+    if native_type_report {
+        // Compares the native backend's own type inference with the checker's.
+        let typed = typeck::Checker::new().check_program_typed(&items);
+        return match codegen::generate_with_report(&items, &typed.expr_types) {
+            Ok((_, report)) => {
+                println!("agreed: {}", report.agreed);
+                println!("partial: {}", report.partial);
+                println!("unchecked: {}", report.unchecked);
+                println!("divergences: {}", report.divergences.len());
+                for line in &report.divergences {
+                    println!("  {line}");
+                }
+                ExitCode::SUCCESS
+            }
+            Err(message) => {
+                eprintln!("error: {message}");
+                ExitCode::FAILURE
+            }
+        };
     }
 
     if typed_report {

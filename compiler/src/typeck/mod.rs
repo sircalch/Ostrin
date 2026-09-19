@@ -744,7 +744,17 @@ impl Checker {
             Stmt::Break(None) => {}
             Stmt::For { pattern, iter, body } => {
                 let iter_ty = self.infer_expr(iter, scope);
-                let elem_ty = iterator_element_type(&iter_ty).unwrap_or(iter_ty);
+                // A user type with `impl Iterator<T>` yields `T` (its `next` returns `Option<T>`).
+                let user_iterator_item = match &iter_ty {
+                    Ty::Named(n) | Ty::Applied(n, _) => self
+                        .implementations
+                        .iter()
+                        .find(|im| im.trait_name.as_deref() == Some("Iterator") && im.type_name == *n)
+                        .and_then(|im| im.trait_args.first().cloned())
+                        .map(|t| self.resolve_type_in_context(&t)),
+                    _ => None,
+                };
+                let elem_ty = iterator_element_type(&iter_ty).or(user_iterator_item).unwrap_or(iter_ty);
                 self.editor_bindings.push(EditorBinding {
                     name: pattern.clone(),
                     type_name: elem_ty.describe(),

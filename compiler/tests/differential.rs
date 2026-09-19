@@ -242,3 +242,31 @@ fn typed_expression_table_does_not_regress() {
     assert!(total > 1000, "typed report covered only {total} expressions");
     assert!(unknown <= MAX_UNKNOWN_EXPRESSIONS, "{unknown} of {total} expressions have an unknown type (limit {MAX_UNKNOWN_EXPRESSIONS})");
 }
+
+/// The native backend still infers its own types (it has not yet been moved
+/// onto the checker's typed-expression table). Until it is, this test keeps
+/// the two honest: on every program the backend compiles, the backend's type
+/// for an expression must agree with the checker's — zero divergences.
+#[test]
+fn native_backend_types_agree_with_the_checker() {
+    let (mut agreed, mut divergences) = (0usize, Vec::<String>::new());
+    for path in examples() {
+        let file = path.to_string_lossy().to_string();
+        if !ostrinc(&["--check", &file]).status.success() {
+            continue;
+        }
+        let out = ostrinc(&["--native-type-report", &file]);
+        if !out.status.success() {
+            continue; // not compilable natively (already covered by the differential test)
+        }
+        for line in text(&out.stdout).lines() {
+            if let Some(n) = line.strip_prefix("agreed: ") {
+                agreed += n.trim().parse::<usize>().unwrap();
+            } else if line.starts_with("  ") {
+                divergences.push(format!("{}: {}", name_of(&path), line.trim()));
+            }
+        }
+    }
+    assert!(agreed > 1000, "only {agreed} expressions were compared");
+    assert!(divergences.is_empty(), "the backend and the checker disagree on types:\n  {}", divergences.join("\n  "));
+}

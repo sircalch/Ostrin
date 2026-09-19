@@ -3132,3 +3132,24 @@ arquitectura, pruebas que detecten regresiones entre fases.
   contexto (genuinamente indeterminado) y un `try … catch`. Límite del test de
   trinquete: 11.
 - Suite: **97 pruebas**, sin warnings.
+
+---
+
+## 88. Etapa 2 (arranque): detector de divergencias checker↔nativo — 2026-09-18
+
+- `codegen::generate_with_report(items, &tabla_de_tipos)` genera **exactamente
+  el mismo C**, pero además compara, expresión por expresión, el tipo que infiere
+  el backend con el de la tabla del checker (`NativeTypeReport`: `agreed`,
+  `partial`, `unchecked`, `divergences`). CLI: `ostrinc --native-type-report`.
+  Se compara solo en código no genérico (las instancias monomorfizadas tienen
+  tipos abstractos en el checker).
+- Medición inicial sobre los ejemplos compilables: **1 260 de ~1 350 expresiones
+  coinciden**, 16 son literales parciales del backend (`None`, `Ok(x)`, …) que el
+  checker ya conoce completos (candidatas a retirar la reinferencia), 73 no
+  comparables (instancias genéricas o sin tipo) y **1 divergencia real**.
+- La divergencia era un **bug del checker**: en `for n in fib` sobre un record con
+  `impl Iterator<Int>`, `n` se tipaba como `Fibonacci` en vez de `Int`. Corregido
+  (el elemento es el argumento de `Iterator<T>`). Primer fruto del detector.
+- Test `native_backend_types_agree_with_the_checker`: cero divergencias en todos
+  los ejemplos. Sirve de red durante la migración del backend al HIR.
+- Suite: **98 pruebas**, sin warnings.
