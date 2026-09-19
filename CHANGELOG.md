@@ -74,6 +74,10 @@
   pattern bindings, guarded-arm branches, try success/error blocks and phi convergence.
   The IR now keeps these families semantic instead of representing them as opaque operations;
   closures and concurrency remain the next control-flow families.
+- Lowered the concurrency surface into explicit IR operations: task regions for `spawn`,
+  `channel`/`send`/`receive`/`close` and `task_join`. This is the
+  compiler-side contract for a future real scheduler; the current interpreter and C runtime
+  remain synchronous and are intentionally unchanged.
 - Module loader now rewrites types in signatures, fields, variants and annotations
   (a `record` from another module can be used as a type).
 - CI on Linux, macOS and Windows.

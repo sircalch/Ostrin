@@ -1,9 +1,9 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-18 · rama `main` · 6 pruebas diferenciales y 111 de integración en verde.*
+*Corte: 2026-09-18 · rama `main` · 6 pruebas diferenciales y 112 de integración en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
-Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–137); para el diseño
+Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–138); para el diseño
 del lenguaje, `docs/design/` (20 documentos).
 
 ---
@@ -138,7 +138,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Chequeo «movido tras enviar» (E1101) | Dinámico en ambos backends; estático pendiente del IR (doc. 20) |
 | Concurrencia real (hilos, planificador, `select`) | No existe; `spawn` es síncrono |
 | Memoria en nativo | Registro de allocations y limpieza global al salir; ARC/último uso y destructores por tipo siguen pendientes |
-| IR de bloques | HIR→CFG disponible con `--ir`; `if/while/for/match/try` ya tienen control de flujo explícito, aún no reemplaza el backend C |
+| IR de bloques | HIR→CFG disponible con `--ir`; `if/while/for/match/try/spawn/channel` ya tienen operaciones explícitas, aún no reemplaza el backend C |
 | Ownership/último uso | `--ownership-report` clasifica valores gestionables y candidatos lineales; no inserta `retain/release` todavía |
 | Biblioteca estándar | Mínima: sin `HashMap` eficiente, fechas, red, formateo, `args`, entorno |
 | `==` sobre `List/Option/Map` | No soportado (tampoco en intérprete para Option) |
@@ -225,7 +225,7 @@ Decisiones que necesito de ti para afinar el plan:
 
 ```powershell
 cd compiler
-cargo test                                   # 6 diferenciales + 111 de integración
+cargo test                                   # 6 diferenciales + 112 de integración
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```

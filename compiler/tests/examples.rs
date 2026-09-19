@@ -776,6 +776,21 @@ fn compiler_lowers_match_and_try_to_explicit_ir_control_flow() {
 }
 
 #[test]
+fn compiler_lowers_concurrency_operations_to_explicit_ir() {
+    let out = run(&["--ir", &example_path("native_concurrency.ostrin")]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let source = stdout(&out);
+    assert!(source.contains("channel("));
+    assert!(source.contains("channel_send"));
+    assert!(source.contains("channel_receive"));
+    assert!(source.contains("channel_close"));
+    assert!(source.contains("spawn"));
+    assert!(source.contains("task_join"));
+    assert!(source.contains("region_ret"));
+    assert!(!source.contains("opaque concurrency"), "concurrency remained opaque: {source}");
+}
+
+#[test]
 fn compiler_reports_conservative_ownership_facts() {
     let out = run(&["--ownership-report", &example_path("native_records.ostrin")]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));

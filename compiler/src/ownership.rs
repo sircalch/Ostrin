@@ -135,6 +135,10 @@ fn defined_value(instruction: &IrInstr) -> Option<(ValueId, Ty)> {
         | IrInstr::PatternBind { dst, ty, .. }
         | IrInstr::TryValue { dst, ty, .. }
         | IrInstr::TryError { dst, ty, .. }
+        | IrInstr::Spawn { dst, ty, .. }
+        | IrInstr::ChannelNew { dst, ty, .. }
+        | IrInstr::ChannelReceive { dst, ty, .. }
+        | IrInstr::TaskJoin { dst, ty, .. }
         | IrInstr::Phi { dst, ty, .. } => Some((*dst, ty.clone())),
         IrInstr::PatternTest { dst, .. } | IrInstr::TryCheck { dst, .. } | IrInstr::IterHasNext { dst, .. } => Some((*dst, Ty::Bool)),
         IrInstr::Call { dst: Some(dst), ty, .. }
@@ -144,6 +148,8 @@ fn defined_value(instruction: &IrInstr) -> Option<(ValueId, Ty)> {
         | IrInstr::Call { dst: None, .. }
         | IrInstr::MethodCall { dst: None, .. }
         | IrInstr::Opaque { dst: None, .. }
+        | IrInstr::ChannelSend { .. }
+        | IrInstr::ChannelClose { .. }
         | IrInstr::Retain { .. }
         | IrInstr::Release { .. } => None,
     }
@@ -164,6 +170,12 @@ fn used_values(instruction: &IrInstr) -> Vec<ValueId> {
         IrInstr::IterHasNext { iter, .. } | IrInstr::IterNext { iter, .. } => vec![*iter],
         IrInstr::PatternTest { subject, .. } | IrInstr::PatternBind { subject, .. } => vec![*subject],
         IrInstr::TryCheck { value, .. } | IrInstr::TryValue { value, .. } | IrInstr::TryError { value, .. } => vec![*value],
+        IrInstr::Spawn { .. } => Vec::new(),
+        IrInstr::ChannelNew { capacity, .. } => capacity.iter().copied().collect(),
+        IrInstr::ChannelSend { channel, value } => vec![*channel, *value],
+        IrInstr::ChannelReceive { channel, .. } => vec![*channel],
+        IrInstr::ChannelClose { channel } => vec![*channel],
+        IrInstr::TaskJoin { task, .. } => vec![*task],
         IrInstr::Phi { incoming, .. } => incoming.iter().map(|(_, value)| *value).collect(),
         IrInstr::Opaque { inputs, .. } => inputs.clone(),
         IrInstr::Retain { value } | IrInstr::Release { value } => vec![*value],
@@ -174,8 +186,8 @@ fn used_values(instruction: &IrInstr) -> Vec<ValueId> {
 fn terminator_values(terminator: &IrTerminator) -> Vec<ValueId> {
     match terminator {
         IrTerminator::Branch { condition, .. } => vec![*condition],
-        IrTerminator::Return(Some(value)) => vec![*value],
-        IrTerminator::Goto(_) | IrTerminator::Return(None) | IrTerminator::Unreachable => Vec::new(),
+        IrTerminator::Return(Some(value)) | IrTerminator::RegionReturn(Some(value)) => vec![*value],
+        IrTerminator::Goto(_) | IrTerminator::Return(None) | IrTerminator::RegionReturn(None) | IrTerminator::Unreachable => Vec::new(),
     }
 }
 

@@ -3974,6 +3974,26 @@ La prueba `compiler_lowers_match_and_try_to_explicit_ir_control_flow` cubre
 `opaque match` ni `opaque try`. La suite queda en **6 pruebas diferenciales
 y 111 de integración verdes**.
 
-La IR todavía no genera C ni resuelve completamente cierres y concurrencia; esos son los
-últimos grandes grupos de control de flujo antes de hacer la primera inserción real de
-`retain/release`.
+La IR todavía no genera C ni resuelve completamente cierres; la concurrencia tiene ya el
+contrato de operaciones, pero el intérprete y el runtime C siguen siendo síncronos. El siguiente
+gran bloque es conectar estas operaciones a hilos/canales reales y después hacer la primera
+inserción real de `retain/release`.
+
+## 138. Superficie de concurrencia explícita en la IR — 2026-09-18
+
+La bajada HIR→IR ya no representa la concurrencia como `opaque concurrency`:
+
+- `channel` produce `ChannelNew` con capacidad opcional;
+- `send`, `receive` y `close` producen operaciones de canal tipadas;
+- `join` produce `TaskJoin`;
+- `spawn` y `spawn_scope` crean una región de tarea referenciada por
+  `Spawn`, con `region_ret` separado del `return` de la función anfitriona.
+
+`native_concurrency.ostrin` y la prueba
+`compiler_lowers_concurrency_operations_to_explicit_ir` cubren la superficie completa.
+La suite queda en **6 pruebas diferenciales y 112 de integración verdes**.
+
+Esto es una mejora del compilador, no todavía concurrencia real: el intérprete y el backend C
+conservan el modelo síncrono. El próximo paquete de runtime deberá implementar scheduler,
+hilos o tareas cooperativas, canales bloqueantes, cancelación y `select`, manteniendo
+estas mismas operaciones como contrato de backend.

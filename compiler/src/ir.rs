@@ -61,6 +61,12 @@ pub enum IrInstr {
     TryCheck { dst: ValueId, value: ValueId },
     TryValue { dst: ValueId, value: ValueId, ty: Ty },
     TryError { dst: ValueId, value: ValueId, ty: Ty },
+    Spawn { dst: ValueId, region: BlockId, scoped: bool, ty: Ty },
+    ChannelNew { dst: ValueId, capacity: Option<ValueId>, ty: Ty },
+    ChannelSend { channel: ValueId, value: ValueId },
+    ChannelReceive { dst: ValueId, channel: ValueId, ty: Ty },
+    ChannelClose { channel: ValueId },
+    TaskJoin { dst: ValueId, task: ValueId, ty: Ty },
     Phi { dst: ValueId, incoming: Vec<(BlockId, ValueId)>, ty: Ty },
     Opaque { dst: Option<ValueId>, op: String, inputs: Vec<ValueId>, ty: Ty },
     Retain { value: ValueId },
@@ -72,6 +78,7 @@ pub enum IrTerminator {
     Goto(BlockId),
     Branch { condition: ValueId, then_block: BlockId, else_block: BlockId },
     Return(Option<ValueId>),
+    RegionReturn(Option<ValueId>),
     Unreachable,
 }
 
@@ -90,6 +97,7 @@ struct Builder {
     next_value: ValueId,
     locals: Vec<HashMap<String, ValueId>>,
     break_targets: Vec<(BlockId, BlockId)>,
+    region_depth: usize,
 }
 
 impl Builder {
@@ -107,6 +115,7 @@ impl Builder {
             next_value: 0,
             locals: vec![HashMap::new()],
             break_targets: Vec::new(),
+            region_depth: 0,
         }
     }
 
@@ -220,7 +229,11 @@ impl Builder {
             }
             HirStmt::Return(value) => {
                 let value = value.as_ref().map(|value| self.lower_expr(value));
-                self.terminate(IrTerminator::Return(value));
+                if self.region_depth > 0 {
+                    self.terminate(IrTerminator::RegionReturn(value));
+                } else {
+                    self.terminate(IrTerminator::Return(value));
+                }
             }
             HirStmt::Break(value) => {
                 if let Some((break_block, _)) = self.break_targets.last().copied() {
@@ -463,17 +476,39 @@ impl Builder {
                         "<dynamic>".to_string()
                     }
                 };
-                let args = args.iter().map(|arg| self.lower_expr(&arg.value)).collect();
+                let args: Vec<ValueId> = args.iter().map(|arg| self.lower_expr(&arg.value)).collect();
                 let dst = if expression.ty == Ty::Void { None } else { Some(self.fresh()) };
                 self.emit(IrInstr::Call { dst, callee: callee_name, args, ty: expression.ty.clone() });
                 dst.unwrap_or_else(|| self.unit())
             }
             HirKind::MethodCall { recv, method, args, .. } => {
                 let receiver = self.lower_expr(recv);
-                let args = args.iter().map(|arg| self.lower_expr(&arg.value)).collect();
-                let dst = if expression.ty == Ty::Void { None } else { Some(self.fresh()) };
-                self.emit(IrInstr::MethodCall { dst, method: method.clone(), receiver, args, ty: expression.ty.clone() });
-                dst.unwrap_or_else(|| self.unit())
+                let args: Vec<ValueId> = args.iter().map(|arg| self.lower_expr(&arg.value)).collect();
+                match (method.as_str(), args.as_slice()) {
+                    ("send", [value]) => {
+                        self.emit(IrInstr::ChannelSend { channel: receiver, value: *value });
+                        self.unit()
+                    }
+                    ("receive", []) => {
+                        let dst = self.fresh();
+                        self.emit(IrInstr::ChannelReceive { dst, channel: receiver, ty: expression.ty.clone() });
+                        dst
+                    }
+                    ("close", []) => {
+                        self.emit(IrInstr::ChannelClose { channel: receiver });
+                        self.unit()
+                    }
+                    ("join", []) => {
+                        let dst = self.fresh();
+                        self.emit(IrInstr::TaskJoin { dst, task: receiver, ty: expression.ty.clone() });
+                        dst
+                    }
+                    _ => {
+                        let dst = if expression.ty == Ty::Void { None } else { Some(self.fresh()) };
+                        self.emit(IrInstr::MethodCall { dst, method: method.clone(), receiver, args, ty: expression.ty.clone() });
+                        dst.unwrap_or_else(|| self.unit())
+                    }
+                }
             }
             HirKind::Field(object, field) => {
                 let object = self.lower_expr(object);
@@ -538,9 +573,12 @@ impl Builder {
                 dst
             }
             HirKind::Match(subject, arms) => self.lower_match(subject, arms, &expression.ty),
-            HirKind::Spawn(_) | HirKind::SpawnScope(_) | HirKind::Channel(_, _) => {
+            HirKind::Spawn(block) => self.lower_spawn(block, false, &expression.ty),
+            HirKind::SpawnScope(block) => self.lower_spawn(block, true, &expression.ty),
+            HirKind::Channel(_, capacity) => {
+                let capacity = capacity.as_ref().map(|capacity| self.lower_expr(capacity));
                 let dst = self.fresh();
-                self.emit(IrInstr::Opaque { dst: Some(dst), op: "concurrency".to_string(), inputs: Vec::new(), ty: expression.ty.clone() });
+                self.emit(IrInstr::ChannelNew { dst, capacity, ty: expression.ty.clone() });
                 dst
             }
         }
@@ -575,6 +613,25 @@ impl Builder {
         self.current = merge_block;
         let dst = self.fresh();
         self.emit(IrInstr::Phi { dst, incoming: vec![(normal_block, normal), (catch_block, caught)], ty: ty.clone() });
+        dst
+    }
+
+    fn lower_spawn(&mut self, block: &HirBlock, scoped: bool, ty: &Ty) -> ValueId {
+        let caller = self.current;
+        let caller_locals = self.locals.clone();
+        let region = self.new_block();
+        self.current = region;
+        self.locals = caller_locals.clone();
+        self.region_depth += 1;
+        let result = self.lower_block(block);
+        self.region_depth -= 1;
+        if !self.terminated() {
+            self.terminate(IrTerminator::RegionReturn(result));
+        }
+        self.locals = caller_locals;
+        self.current = caller;
+        let dst = self.fresh();
+        self.emit(IrInstr::Spawn { dst, region, scoped, ty: ty.clone() });
         dst
     }
 }
@@ -621,7 +678,7 @@ pub fn verify(program: &IrProgram) -> VerifyReport {
                 let targets = match terminator {
                     IrTerminator::Goto(target) => vec![*target],
                     IrTerminator::Branch { then_block, else_block, .. } => vec![*then_block, *else_block],
-                    IrTerminator::Return(_) | IrTerminator::Unreachable => Vec::new(),
+                    IrTerminator::Return(_) | IrTerminator::RegionReturn(_) | IrTerminator::Unreachable => Vec::new(),
                 };
                 for target in targets {
                     if target >= function.blocks.len() {
@@ -675,6 +732,12 @@ fn display_instruction(instruction: &IrInstr) -> String {
         IrInstr::TryCheck { dst, value } => format!("%{dst} = try_check %{value}"),
         IrInstr::TryValue { dst, value, .. } => format!("%{dst} = try_value %{value}"),
         IrInstr::TryError { dst, value, .. } => format!("%{dst} = try_error %{value}"),
+        IrInstr::Spawn { dst, region, scoped, .. } => format!("%{dst} = spawn{} bb{region}", if *scoped { "_scope" } else { "" }),
+        IrInstr::ChannelNew { dst, capacity, .. } => format!("%{dst} = channel({})", capacity.map_or_else(|| "unbounded".to_string(), |value| format!("%{value}"))),
+        IrInstr::ChannelSend { channel, value } => format!("channel_send %{channel}, %{value}"),
+        IrInstr::ChannelReceive { dst, channel, .. } => format!("%{dst} = channel_receive %{channel}"),
+        IrInstr::ChannelClose { channel } => format!("channel_close %{channel}"),
+        IrInstr::TaskJoin { dst, task, .. } => format!("%{dst} = task_join %{task}"),
         IrInstr::Phi { dst, incoming, .. } => format!("%{dst} = phi {}", incoming.iter().map(|(block, value)| format!("[bb{block}, %{value}]")).collect::<Vec<_>>().join(" ")),
         IrInstr::Opaque { dst, op, inputs, .. } => format!("{}opaque {op}({})", result_prefix(*dst), value_list(inputs)),
         IrInstr::Retain { value } => format!("retain %{value}"),
@@ -695,6 +758,7 @@ fn display_terminator(terminator: &IrTerminator) -> String {
         IrTerminator::Goto(target) => format!("goto bb{target}"),
         IrTerminator::Branch { condition, then_block, else_block } => format!("br %{condition} -> bb{then_block}, bb{else_block}"),
         IrTerminator::Return(value) => value.map_or_else(|| "ret".to_string(), |value| format!("ret %{value}")),
+        IrTerminator::RegionReturn(value) => value.map_or_else(|| "region_ret".to_string(), |value| format!("region_ret %{value}")),
         IrTerminator::Unreachable => "unreachable".to_string(),
     }
 }
