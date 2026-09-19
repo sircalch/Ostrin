@@ -4698,6 +4698,8 @@ impl<'a> Codegen<'a> {
     fn gen_builtin(&mut self, name: &str, codes: &[String], types: &[CType]) -> Result<Option<(String, CType)>, String> {
         let arity = match name {
             "args" => 0,
+            "env" => 1,
+            "path_join" => 2,
             "norm" | "eigvals" | "det" | "inv" | "trace" | "eye" | "read_file" | "parse_int" | "parse_csv" | "sum" | "panic" | "assert" | "array" | "zeros" | "ones" | "abs" => 1,
             n if ["sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh", "exp", "ln", "log10", "sqrt", "floor", "ceil", "round", "erf"].contains(&n) => 1,
             "pi" => 0,
@@ -4723,6 +4725,23 @@ impl<'a> Codegen<'a> {
                     ty,
                 )))
             }
+            "env" => {
+                let ty = CType::Option(Box::new(CType::Str));
+                self.register_list_types(&ty);
+                Ok(Some((
+                    format!(
+                        "({{ const char* {a} = getenv({}); Option_String {r}; memset(&{r}, 0, sizeof {r}); if ({a}) {{ {r}.has = true; {r}.value = {a}; }} {r}; }})",
+                        codes[0],
+                        a = a,
+                        r = r,
+                    ),
+                    ty,
+                )))
+            }
+            "path_join" => Ok(Some((
+                format!("ostrin_s_path_join({}, {})", codes[0], codes[1]),
+                CType::Str,
+            ))),
             "parse_csv" => {
                 let inner = CType::List(Box::new(CType::Str));
                 let ty = CType::List(Box::new(inner.clone()));

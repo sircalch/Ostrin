@@ -1844,6 +1844,30 @@ impl Interpreter {
                         .collect();
                     return Ok(Value::List(Rc::new(RefCell::new(values))));
                 }
+                "env" => {
+                    let key = self.eval_arg(&args[0], env)?;
+                    let Value::String(key) = key else {
+                        return Err(RuntimeError::Error("'env' expects a String name".to_string()));
+                    };
+                    return Ok(match std::env::var(key) {
+                        Ok(value) => some_value(Value::String(value)),
+                        Err(_) => none_value(),
+                    });
+                }
+                "path_join" => {
+                    let left = self.eval_arg(&args[0], env)?;
+                    let right = self.eval_arg(&args[1], env)?;
+                    let (Value::String(left), Value::String(right)) = (left, right) else {
+                        return Err(RuntimeError::Error("'path_join' expects two String arguments".to_string()));
+                    };
+                    let left = left.trim_end_matches(|c| c == '/' || c == '\\');
+                    let right = right.trim_start_matches(|c| c == '/' || c == '\\');
+                    return Ok(Value::String(match (left.is_empty(), right.is_empty()) {
+                        (true, _) => right.to_string(),
+                        (_, true) => left.to_string(),
+                        _ => format!("{left}/{right}"),
+                    }));
+                }
                 "sum" => {
                     let v = self.eval_arg(&args[0], env)?;
                     return match v {

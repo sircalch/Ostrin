@@ -69,6 +69,22 @@ static const char* ostrin_s_replace(const char* s, const char* from, const char*
     return r;
 }
 
+static const char* ostrin_s_path_join(const char* left, const char* right) {
+    size_t l = strlen(left), r = strlen(right);
+    while (l > 0 && (left[l - 1] == '/' || left[l - 1] == '\\')) l--;
+    size_t start = 0;
+    while (start < r && (right[start] == '/' || right[start] == '\\')) start++;
+    size_t n = l + (l > 0 && start < r ? 1 : 0) + (r - start);
+    char* out = (char*)ostrin_alloc(n + 1);
+    if (!out) OSTRIN_OOM();
+    size_t p = 0;
+    if (l > 0) { memcpy(out + p, left, l); p += l; }
+    if (l > 0 && start < r) out[p++] = '/';
+    if (start < r) { memcpy(out + p, right + start, r - start); p += r - start; }
+    out[p] = 0;
+    return out;
+}
+
 static const char** ostrin_s_split(const char* s, const char* sep, int64_t* out_n) {
     size_t sl = strlen(sep);
     if (sl == 0) OSTRIN_FAIL("'split' needs a non-empty separator");

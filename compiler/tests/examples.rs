@@ -34,6 +34,14 @@ fn run(args: &[&str]) -> Output {
         .expect("failed to run ostrinc")
 }
 
+fn run_with_env(args: &[&str], key: &str, value: &str) -> Output {
+    Command::new(env!("CARGO_BIN_EXE_ostrinc"))
+        .args(args)
+        .env(key, value)
+        .output()
+        .expect("failed to run ostrinc with environment")
+}
+
 fn run_stdin(args: &[&str], source: &str) -> Output {
     let mut child = Command::new(env!("CARGO_BIN_EXE_ostrinc"))
         .args(args)
@@ -760,6 +768,29 @@ fn program_arguments_match_between_interpreter_and_native() {
     let _ = fs::remove_file(&exe);
     assert!(native.status.success(), "native binary failed: {}", String::from_utf8_lossy(&native.stderr));
     assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), "2\nuno\ndos\n");
+}
+
+#[test]
+fn environment_and_paths_match_between_interpreter_and_native() {
+    let file = example_path("env_path.ostrin");
+    let interpreted = run_with_env(&["--run", &file], "OSTRIN_TEST_VALUE", "Ostrin");
+    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    let expected = stdout(&interpreted).replace("\r\n", "\n");
+    assert_eq!(expected, "Some(Ostrin)\nsrc/main.ostrin\n");
+
+    let exe = temp_artifact("env-path.exe");
+    let compile = run(&["--compile", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "native compile failed: {}", stderr(&compile));
+    let native = Command::new(&exe)
+        .env("OSTRIN_TEST_VALUE", "Ostrin")
+        .output()
+        .expect("run environment/path binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native binary failed: {}", String::from_utf8_lossy(&native.stderr));
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
 }
 
 #[test]

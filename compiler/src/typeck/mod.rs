@@ -3925,6 +3925,8 @@ fn function_return_type(ty: Option<&Ty>) -> Option<Ty> {
 fn check_builtin_call(name: &str, arg_types: &[Ty], errors: &mut Vec<TypeError>) -> Option<Ty> {
     let expected_args = match name {
         "args" => vec![],
+        "env" => vec![Ty::String],
+        "path_join" => vec![Ty::String, Ty::String],
         "print" => vec![Ty::Unknown],
         "sum" => vec![Ty::List(Box::new(Ty::Unknown))],
         "read_file" | "parse_int" | "parse_csv" => vec![Ty::String],
@@ -3966,6 +3968,8 @@ fn check_builtin_call(name: &str, arg_types: &[Ty], errors: &mut Vec<TypeError>)
     }
     match name {
         "args" => Some(Ty::List(Box::new(Ty::String))),
+        "env" => Some(Ty::Applied("Option".to_string(), vec![Ty::String])),
+        "path_join" => Some(Ty::String),
         "print" | "panic" | "assert" | "assert_eq" => Some(Ty::Void),
         "parse_csv" => Some(Ty::List(Box::new(Ty::List(Box::new(Ty::String))))),
         "read_file" | "write_file" => Some(Ty::Applied(

@@ -1,0 +1,5 @@
+fn main() -> Void {
+    value = env("OSTRIN_TEST_VALUE")
+    print(value)
+    print(path_join("src", "main.ostrin"))
+}

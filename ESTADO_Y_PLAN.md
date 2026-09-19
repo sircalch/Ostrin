@@ -1,9 +1,9 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-19 · rama `main` · 6 pruebas diferenciales y 119 de integración en verde.*
+*Corte: 2026-09-19 · rama `main` · 6 pruebas diferenciales y 120 de integración en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
-Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–144); para el diseño
+Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–145); para el diseño
 del lenguaje, `docs/design/` (20 documentos).
 
 ---
@@ -78,7 +78,7 @@ funciones elementales deterministas (idénticas en intérprete y nativo).
 **Datos**: métodos de `String`, `parse_csv`; paquetes de ejemplo en Ostrin: `tables`
 (DataFrame mínimo), `plot` (SVG), `autodiff` (modo directo).
 
-**Biblioteca estándar** (pequeña): `print`, `args`, `sum`, `panic`, `read_file`, `write_file`,
+**Biblioteca estándar** (pequeña): `print`, `args`, `env`, `path_join`, `sum`, `panic`, `read_file`, `write_file`,
 `parse_int`, métodos de `List` (`map/filter/fold/any/all/find/push/remove_at/length`),
 `Map` (`get/set/remove/contains_key/count/keys/values`), `Set`, `Option`, `Result`.
 
@@ -145,7 +145,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Memoria en nativo | Registro, limpieza global, ABI retain/release y `--leak-check`; ARC/último uso y destructores por tipo siguen pendientes |
 | IR de bloques | HIR→CFG disponible con `--ir`; `if/while/for/match/try/spawn/channel` ya tienen operaciones explícitas, aún no reemplaza el backend C |
 | Ownership/último uso | `--ownership-report`, `--ownership-check` y `--ownership-ir`; inserta solo `release` en transferencias lineales demostrables, sin ARC completa |
-| Biblioteca estándar | Mínima: `args`, E/S y colecciones básicas; faltan `HashMap` eficiente, fechas, red, formateo y entorno |
+| Biblioteca estándar | Mínima: `args`, `env`, `path_join`, E/S y colecciones básicas; faltan `HashMap` eficiente, fechas, red y formateo |
 | `==` sobre `List/Option/Map` | No soportado (tampoco en intérprete para Option) |
 | Mensajes de error de E/S | `strerror` ≠ texto de Rust (difieren entre backends) |
 | `Result<Void,E>` | Campo de valor de relleno (`char`) en C |
@@ -231,7 +231,7 @@ Decisiones que necesito de ti para afinar el plan:
 
 ```powershell
 cd compiler
-cargo test                                   # 6 diferenciales + 119 de integración
+cargo test                                   # 6 diferenciales + 120 de integración
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```

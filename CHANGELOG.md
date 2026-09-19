@@ -85,6 +85,8 @@
 - Added the cross-backend `args()` standard-library builtin. Interpreted programs read
   arguments after the `--` separator, while native programs receive `argc/argv` directly;
   both expose a `List<String>` with identical behavior.
+- Added cross-backend standard-library primitives `env(String) -> Option<String>` and
+  `path_join(String, String) -> String`, with matching interpreter/native behavior.
 - Lowered `match` and `try` into explicit IR control flow: pattern tests,
   pattern bindings, guarded-arm branches, try success/error blocks and phi convergence.
   The IR now keeps these families semantic instead of representing them as opaque operations;

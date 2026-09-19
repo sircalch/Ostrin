@@ -4124,3 +4124,23 @@ Ostrin ahora expone `args()` como una primitiva de aplicación en ambos backends
 La suite queda en **6 pruebas diferenciales y 119 de integración verdes**. Esta base permite
 crear CLI Ostrin reales; el siguiente bloque de stdlib puede añadir entorno, rutas y formato
 estructurado sin cambiar el contrato de ejecución.
+
+## 145. Entorno y rutas como biblioteca estándar multiplataforma — 2026-09-19
+
+La biblioteca estándar incorpora dos primitivas pequeñas pero necesarias para que los programas
+Ostrin puedan dejar de depender de valores fijados en el código fuente:
+
+- `env(name)` es reconocida por el checker como `Option<String>`, consulta el entorno del proceso
+  en el intérprete y usa `getenv` en el runtime C. Un nombre ausente devuelve `None` en ambos casos.
+- `path_join(left, right)` normaliza separadores iniciales/finales y devuelve una ruta compuesta
+  con `/`, con el mismo comportamiento en Windows, Linux y macOS porque la operación pertenece al
+  lenguaje y no a una concatenación específica del host.
+
+El ejemplo `examples/env_path.ostrin` y la prueba diferencial
+`environment_and_paths_match_between_interpreter_and_native` comprueban el valor real de entorno,
+la representación de `Option<String>` y la salida de la ruta en ambos backends. La suite queda en
+**6 pruebas diferenciales y 120 de integración verdes**.
+
+Esto completa el primer bloque de entorno/rutas de la stdlib. Aún faltan un formateador estable,
+fechas, JSON, red y una colección hash eficiente; no se presenta este bloque como un sistema de
+paquetes completo.
