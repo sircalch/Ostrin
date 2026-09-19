@@ -3613,3 +3613,9 @@ Se cierran los dos huecos de la sección 118, en intérprete, checker y nativo:
 - `2.0 * x`, `1.0 - x`, `2 + x`… con un tipo de usuario a la derecha llaman al método **reflejado** del tipo (`rmul`, `rsub`, `radd`, `rdiv`), como en Python (`__rmul__`). El escalar llega como segundo argumento.
 - Además el checker acepta operandos derechos distintos cuando el tipo declara el método (`v * k` con `fn mul(self, k: Float)`), y devuelve el tipo declarado por el método.
 `autodiff.ostrin` los usa: `x * x * x - 2.0 * x - autodiff.constant(5.0)`, `-(1.0 / x)`. Mismos resultados en ambos backends. Límite: los métodos reflejados no pertenecen a un trait (van en un `impl` normal) y no hay `rem`/`pow` sobrecargables.
+
+## 120. Álgebra lineal: `det`, `inv`, `trace`, `eye`
+
+Sobre `Array<Float>`: `det(a)` (eliminación con pivoteo parcial; singular → exactamente 0), `inv(a)` (resuelve `A x = e_j` por columna con el mismo `solve`; singular → error «singular matrix»), `trace(a)`, `eye(n)`. Implementados en `interpreter/regress.rs` y `array_linalg.c` con el mismo orden de operaciones, así que los resultados coinciden **bit a bit**, ruido de redondeo incluido (`examples/linear_algebra.ostrin`, comparado intérprete↔nativo: `A @ inv(A)` da `0.9999999999999997` en ambos). Una función de usuario con el mismo nombre tiene prioridad.
+
+Pendiente: matriz @ vector (`matmul` solo admite matrices 2D), LU/QR/SVD/autovalores, normas.

@@ -4004,7 +4004,7 @@ impl<'a> Codegen<'a> {
     /// `write_file`, `parse_int`, `sum` and `panic`.
     fn gen_builtin(&mut self, name: &str, codes: &[String], types: &[CType]) -> Result<Option<(String, CType)>, String> {
         let arity = match name {
-            "read_file" | "parse_int" | "parse_csv" | "sum" | "panic" | "assert" | "array" | "zeros" | "ones" | "abs" => 1,
+            "det" | "inv" | "trace" | "eye" | "read_file" | "parse_int" | "parse_csv" | "sum" | "panic" | "assert" | "array" | "zeros" | "ones" | "abs" => 1,
             n if ["sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh", "exp", "ln", "log10", "sqrt", "floor", "ceil", "round", "erf"].contains(&n) => 1,
             "pi" => 0,
             "rng" => 1,
@@ -4102,6 +4102,16 @@ impl<'a> Codegen<'a> {
                 let n = mangle_ctype(&result);
                 let operand = |code: &str, ty: &CType| if matches!(ty, CType::Array(_)) { code.to_string() } else { format!("{n}_from_scalar({code})") };
                 Ok(Some((format!("{n}_where({}, {}, {})", codes[0], operand(&codes[1], &types[1]), operand(&codes[2], &types[2])), result)))
+            }
+            "det" | "inv" | "trace" | "eye" => {
+                let float_array = CType::Array(Box::new(CType::Float));
+                self.register_list_types(&float_array);
+                match name {
+                    "det" | "trace" if types[0] == float_array => Ok(Some((format!("Array_Float_{name}({})", codes[0]), CType::Float))),
+                    "inv" if types[0] == float_array => Ok(Some((format!("Array_Float_inv({})", codes[0]), float_array))),
+                    "eye" if types[0] == CType::Int => Ok(Some((format!("Array_Float_eye({})", codes[0]), float_array))),
+                    _ => Err(format!("'{name}' works on Array<Float> (and eye on an Int) in the native backend")),
+                }
             }
             "linfit" | "solve" | "polyfit" | "polyval" | "histogram" | "norm_pdf" | "norm_cdf" => {
                 let float_array = CType::Array(Box::new(CType::Float));

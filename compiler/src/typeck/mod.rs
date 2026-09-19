@@ -1006,6 +1006,7 @@ impl Checker {
     fn check_science_call(&mut self, name: &str, arg_types: &[Ty]) -> Option<Ty> {
         let arity = match name {
             "linfit" | "solve" | "polyval" => 2,
+            "det" | "inv" | "trace" | "eye" => 1,
             "polyfit" | "norm_pdf" | "norm_cdf" => 3,
             "histogram" => 4,
             _ => return None,
@@ -1020,6 +1021,9 @@ impl Checker {
         let is_float = |t: &Ty| *t == Ty::Float || *t == Ty::Unknown;
         let (ok, result) = match name {
             "linfit" | "solve" => (is_float_array(&arg_types[0]) && is_float_array(&arg_types[1]), floats.clone()),
+            "det" | "trace" => (is_float_array(&arg_types[0]), Ty::Float),
+            "inv" => (is_float_array(&arg_types[0]), floats.clone()),
+            "eye" => (arg_types[0] == Ty::Int || arg_types[0] == Ty::Unknown, floats.clone()),
             "polyfit" => (is_float_array(&arg_types[0]) && is_float_array(&arg_types[1]) && (arg_types[2] == Ty::Int || arg_types[2] == Ty::Unknown), floats.clone()),
             "polyval" => {
                 let result = if is_float(&arg_types[1]) && arg_types[1] != Ty::Unknown { Ty::Float } else { floats.clone() };

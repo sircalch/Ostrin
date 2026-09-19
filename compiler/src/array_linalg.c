@@ -36,6 +36,85 @@ static void @N@_solve_raw(double* m, double* v, int64_t n, double* x) {
     }
 }
 
+static double @N@_det_raw(double* m, int64_t n) {
+    double det = 1.0;
+    for (int64_t col = 0; col < n; col++) {
+        int64_t piv = col;
+        double best = fabs(m[col * n + col]);
+        for (int64_t r = col + 1; r < n; r++) {
+            double candidate = fabs(m[r * n + col]);
+            if (candidate > best) { best = candidate; piv = r; }
+        }
+        if (best == 0.0) return 0.0;
+        if (piv != col) {
+            for (int64_t c = 0; c < n; c++) { double t = m[piv * n + c]; m[piv * n + c] = m[col * n + c]; m[col * n + c] = t; }
+            det = -det;
+        }
+        det = det * m[col * n + col];
+        for (int64_t r = col + 1; r < n; r++) {
+            double f = m[r * n + col] / m[col * n + col];
+            for (int64_t c = col; c < n; c++) m[r * n + c] = m[r * n + c] - f * m[col * n + c];
+        }
+    }
+    return det;
+}
+
+static void @N@_square_check(@N@* a, const char* what) {
+    if (a->rank != 2 || a->shape[0] != a->shape[1]) {
+        char msg[96];
+        snprintf(msg, sizeof msg, "%s needs a square (n, n) matrix", what);
+        OSTRIN_FAIL(msg);
+    }
+}
+
+static double @N@_det(@N@* a) {
+    @N@_square_check(a, "det");
+    int64_t n = a->shape[0];
+    double* m = (double*)malloc(sizeof(double) * (size_t)(n * n));
+    if (!m) OSTRIN_OOM();
+    memcpy(m, a->data, sizeof(double) * (size_t)(n * n));
+    double d = @N@_det_raw(m, n);
+    free(m);
+    return d;
+}
+
+static double @N@_trace(@N@* a) {
+    @N@_square_check(a, "trace");
+    int64_t n = a->shape[0];
+    double acc = 0.0;
+    for (int64_t i = 0; i < n; i++) acc = acc + a->data[i * n + i];
+    return acc;
+}
+
+static @N@* @N@_inv(@N@* a) {
+    @N@_square_check(a, "inv");
+    int64_t n = a->shape[0];
+    int64_t shape[2] = { n, n };
+    @N@* r = @N@_alloc(2, shape);
+    double* m = (double*)malloc(sizeof(double) * (size_t)(n * n));
+    double* v = (double*)malloc(sizeof(double) * (size_t)n);
+    double* x = (double*)malloc(sizeof(double) * (size_t)n);
+    if (!m || !v || !x) OSTRIN_OOM();
+    for (int64_t j = 0; j < n; j++) {
+        memcpy(m, a->data, sizeof(double) * (size_t)(n * n));
+        for (int64_t i = 0; i < n; i++) v[i] = 0.0;
+        v[j] = 1.0;
+        @N@_solve_raw(m, v, n, x);
+        for (int64_t i = 0; i < n; i++) r->data[i * n + j] = x[i];
+    }
+    free(m); free(v); free(x);
+    return r;
+}
+
+static @N@* @N@_eye(int64_t n) {
+    if (n < 1) OSTRIN_FAIL("eye needs n >= 1");
+    int64_t shape[2] = { n, n };
+    @N@* r = @N@_alloc(2, shape);
+    for (int64_t i = 0; i < n * n; i++) r->data[i] = 0.0;
+    for (int64_t i = 0; i < n; i++) r->data[i * n + i] = 1.0;
+    return r;
+}
+
 static @N@* @N@_solve(@N@* a, @N@* b) {
     if (a->rank != 2 || a->shape[0] != a->shape[1] || b->rank != 1 || b->shape[0] != a->shape[0]) OSTRIN_FAIL("solve needs an (n, n) matrix and a vector of length n");
     int64_t n = a->shape[0];

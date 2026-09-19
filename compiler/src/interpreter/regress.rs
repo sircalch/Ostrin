@@ -12,7 +12,7 @@ fn fail<T>(message: impl Into<String>) -> Res<T> {
 }
 
 pub fn is_regress(name: &str, arity: usize) -> bool {
-    matches!((name, arity), ("linfit", 2) | ("polyfit", 3) | ("polyval", 2) | ("solve", 2) | ("histogram", 4) | ("norm_pdf", 3) | ("norm_cdf", 3))
+    matches!((name, arity), ("linfit", 2) | ("polyfit", 3) | ("polyval", 2) | ("solve", 2) | ("det", 1) | ("inv", 1) | ("trace", 1) | ("eye", 1) | ("histogram", 4) | ("norm_pdf", 3) | ("norm_cdf", 3))
 }
 
 fn floats(value: &Value, what: &str) -> Res<(Vec<usize>, Vec<f64>)> {
@@ -38,6 +38,39 @@ fn float(value: &Value, what: &str) -> Res<f64> {
 fn vector(values: Vec<f64>) -> Value {
     let n = values.len();
     array::make(vec![n], values.into_iter().map(Value::Float).collect())
+}
+
+/// Determinant by the same elimination as `solve_system`; a singular matrix gives exactly 0.
+fn determinant(mut m: Vec<f64>, n: usize) -> f64 {
+    let mut det = 1.0;
+    for col in 0..n {
+        let mut piv = col;
+        let mut best = m[col * n + col].abs();
+        for r in col + 1..n {
+            let candidate = m[r * n + col].abs();
+            if candidate > best {
+                best = candidate;
+                piv = r;
+            }
+        }
+        if best == 0.0 {
+            return 0.0;
+        }
+        if piv != col {
+            for c in 0..n {
+                m.swap(piv * n + c, col * n + c);
+            }
+            det = -det;
+        }
+        det = det * m[col * n + col];
+        for r in col + 1..n {
+            let f = m[r * n + col] / m[col * n + col];
+            for c in col..n {
+                m[r * n + c] = m[r * n + c] - f * m[col * n + c];
+            }
+        }
+    }
+    det
 }
 
 /// Gaussian elimination with partial pivoting (first maximum wins ties).
@@ -162,6 +195,47 @@ pub fn call(name: &str, args: &[Value]) -> Res<Value> {
                     Ok(array::make(shape, xs.into_iter().map(|x| Value::Float(horner(x))).collect()))
                 }
             }
+        }
+        "det" | "inv" | "trace" => {
+            let (shape, a) = floats(&args[0], name)?;
+            if shape.len() != 2 || shape[0] != shape[1] {
+                return fail(format!("{name} needs a square (n, n) matrix"));
+            }
+            let n = shape[0];
+            match name {
+                "trace" => {
+                    let mut acc = 0.0;
+                    for i in 0..n {
+                        acc = acc + a[i * n + i];
+                    }
+                    Ok(Value::Float(acc))
+                }
+                "det" => Ok(Value::Float(determinant(a, n))),
+                _ => {
+                    let mut out = vec![0.0; n * n];
+                    for j in 0..n {
+                        let mut unit = vec![0.0; n];
+                        unit[j] = 1.0;
+                        let column = solve_system(a.clone(), unit, n)?;
+                        for i in 0..n {
+                            out[i * n + j] = column[i];
+                        }
+                    }
+                    Ok(array::make(vec![n, n], out.into_iter().map(Value::Float).collect()))
+                }
+            }
+        }
+        "eye" => {
+            let Value::Int(n) = &args[0] else { return fail("eye expects an Int size") };
+            if *n < 1 {
+                return fail("eye needs n >= 1");
+            }
+            let n = *n as usize;
+            let mut out = vec![0.0; n * n];
+            for i in 0..n {
+                out[i * n + i] = 1.0;
+            }
+            Ok(array::make(vec![n, n], out.into_iter().map(Value::Float).collect()))
         }
         "solve" => {
             let ((sa, a), (sb, b)) = (floats(&args[0], "solve")?, floats(&args[1], "solve")?);
