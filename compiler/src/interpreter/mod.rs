@@ -2115,6 +2115,18 @@ impl Interpreter {
                     }
                     return Ok(Value::String(rendered));
                 }
+                // The interpreter already uses Rc-backed identity for
+                // records and collections. Cloning a Value therefore creates
+                // the same logical alias as native retain; drop is a
+                // deliberate no-op here because Rust releases the temporary
+                // Value at the end of this call.
+                "clone" => {
+                    return Ok(self.eval_arg(&args[0], env)?);
+                }
+                "drop" => {
+                    let _ = self.eval_arg(&args[0], env)?;
+                    return Ok(Value::Void);
+                }
                 "sum" => {
                     let v = self.eval_arg(&args[0], env)?;
                     return match v {

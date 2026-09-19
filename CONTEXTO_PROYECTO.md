@@ -4205,3 +4205,27 @@ identificar de forma segura (`Int`, enteros de ancho fijo, `Bool`, `String`, `Fl
 `examples/hash_map_stress.ostrin` inserta 51 claves, actualiza una, elimina otra y verifica
 consultas posteriores. `hash_map_scalars_match_between_interpreter_and_native` comprueba la misma
 salida en ambos backends. La suite queda en **6 pruebas diferenciales y 123 de integración verdes**.
+
+## 149. Destrucción tipada y ownership explícito en el backend nativo — 2026-09-19
+
+El runtime C da ahora un paso ejecutable entre el registro global y la ARC automática:
+
+- Cada allocation puede registrar un callback `drop(void*)` junto con su contador de referencias.
+  `ostrin_release` retira el bloque de la tabla, ejecuta su destructor y libera el almacenamiento
+  cuando la cuenta llega a cero; `ostrin_realloc` conserva el callback y la identidad del bloque.
+- Records, `List<T>`, `Map<K,V>`, `Set<T>` y `Channel<T>` registran destructores tipados. Esos
+  destructores liberan buffers internos y sueltan los elementos/campos que son referencias.
+  Las inserciones en listas, mapas, sets y canales retienen las referencias almacenadas; los
+  records retienen sus campos y liberan el campo anterior al reasignarlo.
+- `clone(value)` incrementa la referencia nativa para tipos gestionados y devuelve el mismo
+  valor con identidad compartida. `drop(value)` libera explícitamente una referencia; los tipos
+  escalares siguen siendo valores sin coste. El intérprete expone la misma superficie semántica
+  de alias, mientras que su gestión de memoria la resuelve Rust/Rc.
+- `examples/ownership_primitives.ostrin` crea una lista, clona el alias y libera ambos dueños.
+  La prueba nativa verifica la salida `3` y `live_allocations=0` con `--leak-check`.
+
+La batería queda en **6 pruebas diferenciales y 124 de integración verdes**. Este hito no se
+debe confundir con ARC completa: las copias ordinarias, retornos, `phi`, escapes, cierres y
+salidas de ámbito todavía no reciben automáticamente `retain`/`release` desde la IR. El próximo
+bloque recomendado es conectar los contratos lineales de `ownership.rs` a una emisión controlada
+para temporales locales simples, manteniendo llamadas, bucles, joins y escapes como barreras.

@@ -133,6 +133,25 @@ fn field_c_type(ty: &CType) -> String {
     if *ty == CType::Void { "char".to_string() } else { c_type_name(ty) }
 }
 
+/// Values whose native representation points at a ref-counted allocation.
+/// `Str` is included deliberately: string literals are static and therefore
+/// ignored by the runtime, while strings returned by the standard library
+/// are registered allocations and can participate in the same ownership ABI.
+fn is_reference_type(ty: &CType) -> bool {
+    matches!(
+        ty,
+        CType::Str
+            | CType::Record(_)
+            | CType::List(_)
+            | CType::Map(..)
+            | CType::Set(_)
+            | CType::Channel(_)
+            | CType::Task(_)
+            | CType::Array(_)
+            | CType::Rng
+    )
+}
+
 fn c_type_name(ty: &CType) -> String {
     match ty {
         CType::Int => "int64_t".to_string(),
@@ -349,6 +368,7 @@ typedef struct { void* fn; void* env; } OstrinClosure;\n\
 typedef struct OstrinAllocation {\n\
     void* ptr;\n\
     size_t refs;\n\
+    void (*drop)(void*);\n\
     struct OstrinAllocation* next;\n\
 } OstrinAllocation;\n\
 static OstrinAllocation* ostrin_allocations = NULL;\n\
@@ -399,11 +419,12 @@ static void ostrin_drain_tasks(size_t minimum_ordinal) {\n\
 }\n\
 \n\
 \n\
-static void ostrin_register_allocation(void* ptr) {\n\
+static void ostrin_register_allocation_with_drop(void* ptr, void (*drop)(void*)) {\n\
     OstrinAllocation* entry = (OstrinAllocation*)malloc(sizeof *entry);\n\
     if (!entry) { free(ptr); OSTRIN_OOM(); }\n\
     entry->ptr = ptr;\n\
     entry->refs = 1;\n\
+    entry->drop = drop;\n\
     entry->next = ostrin_allocations;\n\
     ostrin_allocations = entry;\n\
     ostrin_allocation_count++;\n\
@@ -413,10 +434,30 @@ static void ostrin_register_allocation(void* ptr) {\n\
     }\n\
 }\n\
 \n\
+static void ostrin_register_allocation(void* ptr) {\n\
+    ostrin_register_allocation_with_drop(ptr, NULL);\n\
+}\n\
+\n\
 static void* ostrin_alloc(size_t size) {\n\
     void* ptr = malloc(size == 0 ? 1 : size);\n\
     if (!ptr) OSTRIN_OOM();\n\
     ostrin_register_allocation(ptr);\n\
+    return ptr;\n\
+}\n\
+\n\
+static void* ostrin_alloc_with_drop(size_t size, void (*drop)(void*)) {\n\
+    void* ptr = malloc(size == 0 ? 1 : size);\n\
+    if (!ptr) OSTRIN_OOM();\n\
+    ostrin_register_allocation_with_drop(ptr, drop);\n\
+    return ptr;\n\
+}\n\
+\n\
+static void* ostrin_calloc_with_drop(size_t count, size_t size, void (*drop)(void*)) {\n\
+    if (count != 0 && size > SIZE_MAX / count) OSTRIN_OOM();\n\
+    size_t bytes = count * size;\n\
+    void* ptr = calloc(1, bytes == 0 ? 1 : bytes);\n\
+    if (!ptr) OSTRIN_OOM();\n\
+    ostrin_register_allocation_with_drop(ptr, drop);\n\
     return ptr;\n\
 }\n\
 \n\
@@ -456,9 +497,10 @@ static void ostrin_free(void* ptr) {\n\
     }\n\
     free(ptr);\n\
 }\n\
-/* Ownership runtime ABI. The current generator still relies on global\n\
- * cleanup for safety; the IR backend will consume these operations for\n\
- * per-value retain/release once its C emission is complete. */\n\
+/* Ownership runtime ABI. Generated composite values may register a typed\n\
+ * destructor, and `clone`/`drop` exercise this ABI explicitly. Ordinary\n\
+ * copies still rely on global cleanup until the ownership IR becomes the\n\
+ * source of automatic last-use emission. */\n\
 static void ostrin_retain(void* ptr) {\n\
     if (!ptr) return;\n\
     for (OstrinAllocation* entry = ostrin_allocations; entry; entry = entry->next) {\n\
@@ -471,12 +513,22 @@ static void ostrin_retain(void* ptr) {\n\
 \n\
 static void ostrin_release(void* ptr) {\n\
     if (!ptr) return;\n\
-    for (OstrinAllocation* entry = ostrin_allocations; entry; entry = entry->next) {\n\
+    OstrinAllocation** link = &ostrin_allocations;\n\
+    while (*link) {\n\
+        OstrinAllocation* entry = *link;\n\
         if (entry->ptr == ptr) {\n\
-            if (entry->refs > 1) entry->refs--;\n\
-            else ostrin_free(ptr);\n\
+            if (entry->refs > 1) {\n\
+                entry->refs--;\n\
+            } else {\n\
+                *link = entry->next;\n\
+                ostrin_allocation_count--;\n\
+                if (entry->drop) entry->drop(ptr);\n\
+                free(ptr);\n\
+                free(entry);\n\
+            }\n\
             return;\n\
         }\n\
+        link = &entry->next;\n\
     }\n\
 }\n\
 \n\
@@ -1452,13 +1504,16 @@ impl<'a> Codegen<'a> {
         let CType::Record(inst) = self.instance_type(base, inst_args)? else { unreachable!() };
         let temp = self.next_temp();
         let mut body = format!(
-            "{inst}* {temp} = ({inst}*)ostrin_alloc(sizeof({inst})); \
+            "{inst}* {temp} = ({inst}*)ostrin_calloc_with_drop(1, sizeof({inst}), (void (*)(void*))(ostrin_drop_{inst})); \
              if (!{temp}) {{ fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); }} "
         );
         for (field_name, code, ty) in values {
             let field_ty = self.field_type(&inst, &field_name).expect("field checked above");
             let code = self.coerce(&code, &ty, &field_ty)?;
             body.push_str(&format!("{temp}->{field_name} = {code}; "));
+            if is_reference_type(&field_ty) {
+                body.push_str(&format!("ostrin_retain((void*){temp}->{field_name}); "));
+            }
         }
         Ok((format!("({{ {body} {temp}; }})"), CType::Record(inst)))
     }
@@ -2026,7 +2081,15 @@ impl<'a> Codegen<'a> {
                 let field_ty = self.field_type(record_name, field_name).expect("checked above");
                 let (value_code, value_ty) = self.gen_expr_hint(value, Some(field_ty.clone()))?;
                 let value_code = self.coerce(&value_code, &value_ty, &field_ty)?;
-                out.push_str(&format!("    {obj_code}->{field_name} = {value_code};\n"));
+                if is_reference_type(&field_ty) {
+                    let temp = self.next_temp();
+                    out.push_str(&format!(
+                        "    {} {temp} = {value_code}; ostrin_retain((void*){temp}); ostrin_release((void*){obj_code}->{field_name}); {obj_code}->{field_name} = {temp};\n",
+                        c_type_name(&field_ty)
+                    ));
+                } else {
+                    out.push_str(&format!("    {obj_code}->{field_name} = {value_code};\n"));
+                }
             }
             Stmt::Expr(e) => {
                 if let Expr::If(cond, then_b, else_b) = e.unlocated() {
@@ -3074,7 +3137,7 @@ impl<'a> Codegen<'a> {
         }
         let temp = self.next_temp();
         let mut body = format!(
-            "{name}* {temp} = ({name}*)ostrin_alloc(sizeof({name})); \
+            "{name}* {temp} = ({name}*)ostrin_calloc_with_drop(1, sizeof({name}), (void (*)(void*))(ostrin_drop_{name})); \
              if (!{temp}) {{ fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); }} "
         );
         for (field_name, value_expr) in fields {
@@ -3085,6 +3148,9 @@ impl<'a> Codegen<'a> {
             let (value_code, value_ty) = self.gen_expr_hint(value_expr, Some(field_ty.clone()))?;
             let value_code = self.coerce(&value_code, &value_ty, &field_ty)?;
             body.push_str(&format!("{temp}->{field_name} = {value_code}; "));
+            if is_reference_type(&field_ty) {
+                body.push_str(&format!("ostrin_retain((void*){temp}->{field_name}); "));
+            }
         }
         Ok((format!("({{ {body} {temp}; }})"), CType::Record(name.to_string())))
     }
@@ -4812,6 +4878,7 @@ impl<'a> Codegen<'a> {
             "cwd" => 0,
             "file_exists" => 1,
             "format" => 2,
+            "clone" | "drop" => 1,
             "norm" | "eigvals" | "det" | "inv" | "trace" | "eye" | "read_file" | "parse_int" | "parse_csv" | "sum" | "panic" | "assert" | "array" | "zeros" | "ones" | "abs" => 1,
             n if ["sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh", "exp", "ln", "log10", "sqrt", "floor", "ceil", "round", "erf"].contains(&n) => 1,
             "pi" => 0,
@@ -4828,6 +4895,25 @@ impl<'a> Codegen<'a> {
         }
         let (r, a, b, c) = (self.next_temp(), self.next_temp(), self.next_temp(), self.next_temp());
         match name {
+            "clone" => {
+                let ty = types.first().cloned().unwrap_or(CType::Void);
+                if is_reference_type(&ty) {
+                    let ct = c_type_name(&ty);
+                    return Ok(Some((
+                        format!("({{ {ct} {r} = {code}; ostrin_retain((void*){r}); {r}; }})", code = codes[0]),
+                        ty,
+                    )));
+                }
+                Ok(Some((codes[0].clone(), ty)))
+            }
+            "drop" => {
+                let ty = types.first().cloned().unwrap_or(CType::Void);
+                if is_reference_type(&ty) {
+                    Ok(Some((format!("({{ ostrin_release((void*){}); (void)0; }})", codes[0]), CType::Void)))
+                } else {
+                    Ok(Some(("(void)0".to_string(), CType::Void)))
+                }
+            }
             "args" => {
                 let ty = CType::List(Box::new(CType::Str));
                 self.register_list_types(&ty);
@@ -5712,16 +5798,26 @@ fn generate_impl(
                 "struct {struct_name} {{\n    {elem_c}* items;\n    int64_t length;\n    int64_t capacity;\n}};\n\n"
             ));
 
+            let drop_sig = format!("static void {struct_name}_drop({struct_name}* list)");
+            let drop_body = format!(
+                "    if (!list) return;\n{}    if (list->items) ostrin_free(list->items);\n",
+                if is_reference_type(&elem_ty) {
+                    format!("    for (int64_t i = 0; i < list->length; i++) ostrin_release((void*)list->items[i]);\n")
+                } else {
+                    String::new()
+                }
+            );
             let new_sig = format!("static {struct_name}* {struct_name}_new_from_array({elem_c}* src_items, int64_t count)");
             let new_body = format!(
-                "    {struct_name}* list = ({struct_name}*)ostrin_alloc(sizeof({struct_name}));\n\
+                "    {struct_name}* list = ({struct_name}*)ostrin_alloc_with_drop(sizeof({struct_name}), (void (*)(void*)){struct_name}_drop);\n\
                  \x20   if (!list) {{ fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); }}\n\
                  \x20   list->capacity = count > 0 ? count : 1;\n\
                  \x20   list->length = count;\n\
                  \x20   list->items = ({elem_c}*)ostrin_alloc(sizeof({elem_c}) * (size_t)list->capacity);\n\
                  \x20   if (!list->items) {{ fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); }}\n\
-                 \x20   for (int64_t i = 0; i < count; i++) {{ list->items[i] = src_items[i]; }}\n\
-                 \x20   return list;\n"
+                 \x20   for (int64_t i = 0; i < count; i++) {{ list->items[i] = src_items[i];{retain} }}\n\
+                  \x20   return list;\n",
+                retain = if is_reference_type(&elem_ty) { " ostrin_retain((void*)list->items[i]);" } else { "" }
             );
 
             let push_sig = format!("static void {struct_name}_push({struct_name}* list, {elem_c} value)");
@@ -5731,8 +5827,9 @@ fn generate_impl(
                  \x20       list->items = ({elem_c}*)ostrin_realloc(list->items, sizeof({elem_c}) * (size_t)list->capacity);\n\
                  \x20       if (!list->items) {{ fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); }}\n\
                  \x20   }}\n\
-                 \x20   list->items[list->length] = value;\n\
-                 \x20   list->length = list->length + 1;\n"
+                 \x20   list->items[list->length] = value;{retain}\n\
+                 \x20   list->length = list->length + 1;\n",
+                retain = if is_reference_type(&elem_ty) { " ostrin_retain((void*)value);" } else { "" }
             );
 
             let length_sig = format!("static int64_t {struct_name}_length({struct_name}* list)");
@@ -5755,6 +5852,7 @@ fn generate_impl(
             );
 
             for (signature, body) in [
+                (drop_sig, drop_body),
                 (new_sig, new_body),
                 (push_sig, push_body),
                 (length_sig, length_body),
@@ -5889,7 +5987,20 @@ fn generate_impl(
                         ""
                     };
                     list_type_decls.push_str(&format!("struct {name} {{\n    {kc}* keys;\n    {vc}* vals;\n    int64_t length;\n    int64_t capacity;\n{fields}}};\n\n"));
-                    funcs.push((format!("static {name}* {name}_new(void)"), format!("    {name}* m = ({name}*)ostrin_calloc(1, sizeof({name}));\n    return m;\n")));
+                    let drop_sig = format!("static void {name}_drop({name}* m)");
+                    let mut drop_body = String::from("    if (!m) return;\n");
+                    if is_reference_type(k) {
+                        drop_body.push_str("    for (int64_t i = 0; i < m->length; i++) ostrin_release((void*)m->keys[i]);\n");
+                    }
+                    if is_reference_type(v) {
+                        drop_body.push_str("    for (int64_t i = 0; i < m->length; i++) ostrin_release((void*)m->vals[i]);\n");
+                    }
+                    drop_body.push_str("    if (m->keys) ostrin_free(m->keys);\n    if (m->vals) ostrin_free(m->vals);\n");
+                    if hashable.is_some() {
+                        drop_body.push_str("    if (m->buckets) ostrin_free(m->buckets);\n");
+                    }
+                    funcs.push((drop_sig, drop_body));
+                    funcs.push((format!("static {name}* {name}_new(void)"), format!("    {name}* m = ({name}*)ostrin_calloc_with_drop(1, sizeof({name}), (void (*)(void*)){name}_drop);\n    return m;\n")));
                     let linear_find = format!("for (int64_t i = 0; i < m->length; i++) {{ if ({eq}) return i; }}\n    return -1;");
                     let find_body = match &hashable {
                         Some(hash) => format!(
@@ -5907,11 +6018,15 @@ fn generate_impl(
                         let _ = hash;
                     }
                     funcs.push((format!("static void {name}_set({name}* m, {kc} key, {vc} value)"), format!(
-                        "    int64_t i = {name}_find(m, key);\n    if (i >= 0) {{ m->keys[i] = key; m->vals[i] = value; return; }}\n    if (m->length >= m->capacity) {{\n        m->capacity = m->capacity == 0 ? 4 : m->capacity * 2;\n        m->keys = ({kc}*)ostrin_realloc(m->keys, sizeof({kc}) * (size_t)m->capacity);\n        m->vals = ({vc}*)ostrin_realloc(m->vals, sizeof({vc}) * (size_t)m->capacity);\n    }}\n{hash_setup}    m->keys[m->length] = key;\n    m->vals[m->length] = value;\n    m->length = m->length + 1;\n{hash_insert}"
+                        "    int64_t i = {name}_find(m, key);\n    if (i >= 0) {{ {release_value}m->vals[i] = value; {retain_value}return; }}\n    if (m->length >= m->capacity) {{\n        m->capacity = m->capacity == 0 ? 4 : m->capacity * 2;\n        m->keys = ({kc}*)ostrin_realloc(m->keys, sizeof({kc}) * (size_t)m->capacity);\n        m->vals = ({vc}*)ostrin_realloc(m->vals, sizeof({vc}) * (size_t)m->capacity);\n    }}\n{hash_setup}    m->keys[m->length] = key;\n    m->vals[m->length] = value;\n{retain_key}{retain_new_value}    m->length = m->length + 1;\n{hash_insert}"
                         , hash_setup = if hashable.is_some() {
                             format!("    if (!m->buckets) {name}_rehash(m, 8); else if ((m->length + 1) * 10 >= m->bucket_capacity * 7) {name}_rehash(m, m->bucket_capacity * 2);\n")
                         } else { String::new() },
-                        hash_insert = match hashable.as_ref() {
+                         release_value = if is_reference_type(v) { "ostrin_release((void*)m->vals[i]); " } else { "" },
+                         retain_value = if is_reference_type(v) { "ostrin_retain((void*)value); " } else { "" },
+                         retain_key = if is_reference_type(k) { "    ostrin_retain((void*)m->keys[m->length]);\n" } else { "" },
+                         retain_new_value = if is_reference_type(v) { "    ostrin_retain((void*)m->vals[m->length]);\n" } else { "" },
+                         hash_insert = match hashable.as_ref() {
                             Some(hash) => format!("    {{ uint64_t hash = {hash}; int64_t slot = (int64_t)(hash % (uint64_t)m->bucket_capacity); while (m->buckets[slot] >= 0) slot = (slot + 1) % m->bucket_capacity; m->buckets[slot] = m->length - 1; }}\n"),
                             None => String::new(),
                         }
@@ -5919,7 +6034,7 @@ fn generate_impl(
                     funcs.push((format!("static {opt} {name}_get({name}* m, {kc} key)"), format!("    {opt} r;\n    memset(&r, 0, sizeof r);\n    int64_t i = {name}_find(m, key);\n    if (i >= 0) {{ r.has = true; r.value = m->vals[i]; }}\n    return r;\n")));
                     funcs.push((format!("static bool {name}_contains_key({name}* m, {kc} key)"), format!("    return {name}_find(m, key) >= 0;\n")));
                     funcs.push((format!("static int64_t {name}_count({name}* m)"), "    return m->length;\n".to_string()));
-                    funcs.push((format!("static {opt} {name}_remove({name}* m, {kc} key)"), format!("    {opt} r;\n    memset(&r, 0, sizeof r);\n    int64_t i = {name}_find(m, key);\n    if (i < 0) return r;\n    r.has = true;\n    r.value = m->vals[i];\n    for (int64_t j = i; j < m->length - 1; j++) {{ m->keys[j] = m->keys[j + 1]; m->vals[j] = m->vals[j + 1]; }}\n    m->length = m->length - 1;\n{rehash_after}    return r;\n", rehash_after = if hashable.is_some() { format!("    if (m->buckets) {name}_rehash(m, m->bucket_capacity);\n") } else { String::new() })));
+                    funcs.push((format!("static {opt} {name}_remove({name}* m, {kc} key)"), format!("    {opt} r;\n    memset(&r, 0, sizeof r);\n    int64_t i = {name}_find(m, key);\n    if (i < 0) return r;\n    r.has = true;\n    r.value = m->vals[i];\n{release_key}    for (int64_t j = i; j < m->length - 1; j++) {{ m->keys[j] = m->keys[j + 1]; m->vals[j] = m->vals[j + 1]; }}\n    m->length = m->length - 1;\n{rehash_after}    return r;\n", release_key = if is_reference_type(k) { "    ostrin_release((void*)m->keys[i]);\n" } else { "" }, rehash_after = if hashable.is_some() { format!("    if (m->buckets) {name}_rehash(m, m->bucket_capacity);\n") } else { String::new() })));
                     funcs.push((format!("static {list_k} {name}_keys({name}* m)"), format!("    return {lk}_new_from_array(m->keys, m->length);\n")));
                     funcs.push((format!("static {list_v} {name}_values({name}* m)"), format!("    return {lv}_new_from_array(m->vals, m->length);\n")));
                 }
@@ -5948,9 +6063,17 @@ fn generate_impl(
                     let tc = c_type_name(t);
                     let opt = c_type_name(&CType::Option(t.clone()));
                     list_type_decls.push_str(&format!("struct {name} {{\n    {tc}* items;\n    int64_t head;\n    int64_t length;\n    int64_t capacity;\n    bool closed;\n}};\n\n"));
-                    funcs.push((format!("static {name}* {name}_new(void)"), format!("    {name}* c = ({name}*)ostrin_calloc(1, sizeof({name}));\n    return c;\n")));
-                    funcs.push((format!("static void {name}_send({name}* c, {tc} item)"), format!(
-                        "    if (c->length >= c->capacity) {{\n        c->capacity = c->capacity == 0 ? 4 : c->capacity * 2;\n        c->items = ({tc}*)ostrin_realloc(c->items, sizeof({tc}) * (size_t)c->capacity);\n    }}\n    c->items[c->length] = item;\n    c->length = c->length + 1;\n")));
+                     let drop_sig = format!("static void {name}_drop({name}* c)");
+                     let drop_body = format!(
+                         "    if (!c) return;\n{}    if (c->items) ostrin_free(c->items);\n",
+                         if is_reference_type(t) { "    for (int64_t i = c->head; i < c->length; i++) ostrin_release((void*)c->items[i]);\n" } else { "" },
+                     );
+                     funcs.push((drop_sig, drop_body));
+                     funcs.push((format!("static {name}* {name}_new(void)"), format!("    {name}* c = ({name}*)ostrin_calloc_with_drop(1, sizeof({name}), (void (*)(void*)){name}_drop);\n    return c;\n")));
+                     funcs.push((format!("static void {name}_send({name}* c, {tc} item)"), format!(
+                         "    if (c->length >= c->capacity) {{\n        c->capacity = c->capacity == 0 ? 4 : c->capacity * 2;\n        c->items = ({tc}*)ostrin_realloc(c->items, sizeof({tc}) * (size_t)c->capacity);\n    }}\n    c->items[c->length] = item;\n{retain}    c->length = c->length + 1;\n",
+                         retain = if is_reference_type(t) { "    ostrin_retain((void*)item);\n" } else { "" }
+                     )));
                     funcs.push((format!("static {opt} {name}_receive({name}* c)"), format!("    {opt} r;\n    memset(&r, 0, sizeof r);\n    while (c->head >= c->length && !c->closed) {{\n        if (!ostrin_poll_all()) break;\n    }}\n    if (c->head < c->length) {{ r.has = true; r.value = c->items[c->head++]; }}\n    return r;\n")));
                 }
                 CType::Set(t) => {
@@ -5964,7 +6087,14 @@ fn generate_impl(
                         ""
                     };
                     list_type_decls.push_str(&format!("struct {name} {{\n    {tc}* items;\n    int64_t length;\n    int64_t capacity;\n{fields}}};\n\n"));
-                    funcs.push((format!("static {name}* {name}_new(void)"), format!("    {name}* s = ({name}*)ostrin_calloc(1, sizeof({name}));\n    return s;\n")));
+                    let drop_sig = format!("static void {name}_drop({name}* s)");
+                    let drop_body = format!(
+                        "    if (!s) return;\n{}    if (s->items) ostrin_free(s->items);\n{}",
+                        if is_reference_type(t) { "    for (int64_t i = 0; i < s->length; i++) ostrin_release((void*)s->items[i]);\n" } else { "" },
+                        if hashable.is_some() { "    if (s->buckets) ostrin_free(s->buckets);\n" } else { "" },
+                    );
+                    funcs.push((drop_sig, drop_body));
+                     funcs.push((format!("static {name}* {name}_new(void)"), format!("    {name}* s = ({name}*)ostrin_calloc_with_drop(1, sizeof({name}), (void (*)(void*)){name}_drop);\n    return s;\n")));
                     let linear_find = format!("for (int64_t i = 0; i < s->length; i++) {{ if ({eq}) return i; }}\n    return -1;");
                     let find_body = match &hashable {
                         Some(hash) => format!(
@@ -5982,8 +6112,9 @@ fn generate_impl(
                     }
                     funcs.push((format!("static bool {name}_contains({name}* s, {tc} item)"), format!("    return {name}_find(s, item) >= 0;\n")));
                     funcs.push((format!("static void {name}_add({name}* s, {tc} item)"), format!(
-                        "    if ({name}_find(s, item) >= 0) return;\n    if (s->length >= s->capacity) {{\n        s->capacity = s->capacity == 0 ? 4 : s->capacity * 2;\n        s->items = ({tc}*)ostrin_realloc(s->items, sizeof({tc}) * (size_t)s->capacity);\n    }}\n{hash_setup}    s->items[s->length] = item;\n    s->length = s->length + 1;\n{hash_insert}"
-                        , hash_setup = if hashable.is_some() {
+                        "    if ({name}_find(s, item) >= 0) return;\n    if (s->length >= s->capacity) {{\n        s->capacity = s->capacity == 0 ? 4 : s->capacity * 2;\n        s->items = ({tc}*)ostrin_realloc(s->items, sizeof({tc}) * (size_t)s->capacity);\n    }}\n{hash_setup}    s->items[s->length] = item;\n{retain}    s->length = s->length + 1;\n{hash_insert}"
+                        , retain = if is_reference_type(t) { "    ostrin_retain((void*)s->items[s->length]);\n" } else { "" },
+                        hash_setup = if hashable.is_some() {
                             format!("    if (!s->buckets) {name}_rehash(s, 8); else if ((s->length + 1) * 10 >= s->bucket_capacity * 7) {name}_rehash(s, s->bucket_capacity * 2);\n")
                         } else { String::new() },
                         hash_insert = match hashable.as_ref() {
@@ -6223,6 +6354,32 @@ fn generate_impl(
         out.push_str(&format!("typedef struct {{ bool has; {} value; }} {name};
 
 ", c_type_name(&inner)));
+    }
+
+    // Record instances own any direct reference fields they contain. The
+    // callback is registered with the allocation table and releases children
+    // before the record storage itself is returned to malloc.
+    let mut drop_record_names = records.iter().map(|record| record.name.clone()).collect::<Vec<_>>();
+    drop_record_names.extend(
+        codegen
+            .instance_order
+            .iter()
+            .filter(|(is_enum, _)| !*is_enum)
+            .map(|(_, name)| name.clone()),
+    );
+    drop_record_names.sort();
+    drop_record_names.dedup();
+    for name in drop_record_names {
+        let fields = codegen.record_fields(&name).to_vec();
+        let signature = format!("static void ostrin_drop_{name}({name}* value)");
+        let mut body = String::from("    if (!value) return;\n");
+        for (field, ty) in fields {
+            if is_reference_type(&ty) {
+                body.push_str(&format!("    ostrin_release((void*)value->{field});\n"));
+            }
+        }
+        list_helper_prototypes.push(format!("{signature};"));
+        bodies.push((signature, body));
     }
 
     for proto in &codegen.closure_protos {

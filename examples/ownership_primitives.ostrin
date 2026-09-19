@@ -1,0 +1,7 @@
+fn main() -> Void {
+    values = [1, 2, 3]
+    alias = clone(values)
+    print(alias.length())
+    drop(alias)
+    drop(values)
+}

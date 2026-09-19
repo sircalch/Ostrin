@@ -3930,6 +3930,10 @@ fn check_builtin_call(name: &str, arg_types: &[Ty], errors: &mut Vec<TypeError>)
         "cwd" => vec![],
         "file_exists" => vec![Ty::String],
         "format" => vec![Ty::String, Ty::List(Box::new(Ty::String))],
+        // Ownership primitives are intentionally generic. `clone` creates a
+        // new native reference to the same identity-managed value; `drop`
+        // releases one native reference and returns unit.
+        "clone" | "drop" => vec![Ty::Unknown],
         "print" => vec![Ty::Unknown],
         "sum" => vec![Ty::List(Box::new(Ty::Unknown))],
         "read_file" | "parse_int" | "parse_csv" => vec![Ty::String],
@@ -3976,6 +3980,8 @@ fn check_builtin_call(name: &str, arg_types: &[Ty], errors: &mut Vec<TypeError>)
         "cwd" => Some(Ty::String),
         "file_exists" => Some(Ty::Bool),
         "format" => Some(Ty::String),
+        "clone" => Some(arg_types.first().cloned().unwrap_or(Ty::Unknown)),
+        "drop" => Some(Ty::Void),
         "print" | "panic" | "assert" | "assert_eq" => Some(Ty::Void),
         "parse_csv" => Some(Ty::List(Box::new(Ty::List(Box::new(Ty::String))))),
         "read_file" | "write_file" => Some(Ty::Applied(

@@ -82,6 +82,11 @@
   `--leak-check` diagnostic mode, which reports live, peak and total allocations before the
   global cleanup safety net runs. The ABI is ready for IR-driven insertion; automatic retain/
   release at every ownership boundary is still the next memory stage.
+- Added typed destruction callbacks for native records, lists, maps, sets and channels. Managed
+  children are retained when stored and released when their owner is destroyed; `clone` and
+  `drop` expose an explicit ownership exercise path shared by the interpreter and native
+  backend. `examples/ownership_primitives.ostrin` proves that a cloned list reaches
+  `live_allocations=0` under `--leak-check`. Automatic last-use ARC remains pending.
 - Added the cross-backend `args()` standard-library builtin. Interpreted programs read
   arguments after the `--` separator, while native programs receive `argc/argv` directly;
   both expose a `List<String>` with identical behavior.

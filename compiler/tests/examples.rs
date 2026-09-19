@@ -866,6 +866,31 @@ fn native_backend_exposes_ownership_runtime_and_leak_check() {
 }
 
 #[test]
+fn native_ownership_primitives_release_composite_allocations() {
+    let exe = temp_artifact("ownership_primitives.exe");
+    let compile = run(&[
+        "--compile",
+        "--leak-check",
+        "--out",
+        &exe,
+        &example_path("ownership_primitives.ostrin"),
+    ]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "ownership compile failed: {}", stderr(&compile));
+    let native = Command::new(&exe).output().expect("run ownership primitive binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "ownership binary failed: {}", String::from_utf8_lossy(&native.stderr));
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), "3\n");
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "explicit clone/drop should release the list and its backing storage: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn compiler_lowers_hir_to_verified_cfg_ir() {
     let out = run(&["--ir", &example_path("native_fibonacci.ostrin")]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
