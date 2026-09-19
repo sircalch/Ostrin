@@ -1,9 +1,9 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-19 · rama `main` · 6 pruebas diferenciales y 122 de integración en verde.*
+*Corte: 2026-09-19 · rama `main` · 6 pruebas diferenciales y 123 de integración en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
-Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–147); para el diseño
+Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–148); para el diseño
 del lenguaje, `docs/design/` (20 documentos).
 
 ---
@@ -75,7 +75,8 @@ análisis HIR/IR rechaza por defecto reutilizar un valor movible después de env
 rebanadas, `@`), estadística, regresión, `det/inv/eigvals/norm`, `Rng` reproducible,
 funciones elementales deterministas (idénticas en intérprete y nativo).
 
-**Datos**: métodos de `String`, `parse_csv`; paquetes de ejemplo en Ostrin: `tables`
+**Datos**: métodos de `String`, `parse_csv`; `Map` usa índice hash para claves escalares y
+conserva orden de iteración; paquetes de ejemplo en Ostrin: `tables`
 (DataFrame mínimo), `plot` (SVG), `autodiff` (modo directo).
 
 **Igualdad estructural**: `==`/`!=` compara recursivamente `List`, `Map`, `Set`, `Option` y
@@ -150,7 +151,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Memoria en nativo | Registro, limpieza global, ABI retain/release y `--leak-check`; ARC/último uso y destructores por tipo siguen pendientes |
 | IR de bloques | HIR→CFG disponible con `--ir`; `if/while/for/match/try/spawn/channel` ya tienen operaciones explícitas, aún no reemplaza el backend C |
 | Ownership/último uso | `--ownership-report`, `--ownership-check` y `--ownership-ir`; inserta solo `release` en transferencias lineales demostrables, sin ARC completa |
-| Biblioteca estándar | Mínima: `args`, entorno/rutas, `format`, E/S y colecciones básicas; faltan `HashMap` eficiente, fechas, JSON y red |
+| Biblioteca estándar | Mínima: `args`, entorno/rutas, `format`, E/S y `Map` hash para claves escalares; faltan `Hash` formal, fechas, JSON y red |
 | Mensajes de error de E/S | `strerror` ≠ texto de Rust (difieren entre backends) |
 | `Result<Void,E>` | Campo de valor de relleno (`char`) en C |
 | Migración HIR | Escalares, records, enums/match, Option/Result, colecciones, cierres, instancias concretas de genéricos, llamadas anidadas, records/enums genéricos aplicados y métodos genéricos centrales migrados; formas complejas restantes siguen con fallback |
@@ -167,7 +168,8 @@ ya se generan desde el HIR** —escalares, records, enums, `match`, `Option`/`Re
 listas/colecciones, cierres, instancias concretas de genéricos, records/enums aplicados y métodos
 genéricos centrales, módulo `hir_c.rs`—, con un trinquete mínimo de 115; el resto sigue por el AST;
 ver documento 20 y secciones 123–133 de `CONTEXTO_PROYECTO.md`);
-la búsqueda en `Map/Set` es lineal.
+`Set` y las claves compuestas aún usan búsqueda lineal; el siguiente paso es formalizar `Hash + Eq`
+en el checker y extender el índice a tipos de usuario.
 
 ---
 
@@ -235,7 +237,7 @@ Decisiones que necesito de ti para afinar el plan:
 
 ```powershell
 cd compiler
-cargo test                                   # 6 diferenciales + 122 de integración
+cargo test                                   # 6 diferenciales + 123 de integración
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```

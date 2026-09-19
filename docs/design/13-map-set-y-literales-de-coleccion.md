@@ -65,6 +65,11 @@ empty: Map<String, Int> = Map<String, Int>()
 - El caso vacío **no** tiene forma literal (evita inventar un token especial tipo `[:]`): se construye con el constructor explícito `Map<K, V>()`, siempre con los tipos anotados porque no hay elementos de los que inferirlos.
 - Requiere que `K` implemente `Hash + Eq` (ver §5). `V` no tiene restricción.
 
+La primera implementación operativa usa una representación híbrida: las claves escalares tienen
+índice hash con direccionamiento abierto y mantienen las entradas en orden de inserción para que
+`keys()`/`values()` sean deterministas; las claves compuestas usan temporalmente el fallback lineal
+hasta que el checker haga cumplir y el compilador genere `Hash` para tipos de usuario.
+
 ### 3.1 Operaciones
 
 ```ostrin

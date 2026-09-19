@@ -510,6 +510,28 @@ static int64_t ostrin_idiv(int64_t a, int64_t b) {\n\
     return a / b;\n\
 }\n\
 \n\
+static uint64_t ostrin_hash_u64(uint64_t value) {\n\
+    value ^= value >> 30;\n\
+    value *= UINT64_C(0xbf58476d1ce4e5b9);\n\
+    value ^= value >> 27;\n\
+    value *= UINT64_C(0x94d049bb133111eb);\n\
+    return value ^ (value >> 31);\n\
+}\n\
+\
+static uint64_t ostrin_hash_string(const char* value) {\n\
+    uint64_t hash = UINT64_C(1469598103934665603);\n\
+    for (const unsigned char* p = (const unsigned char*)value; *p; p++) {\n\
+        hash ^= (uint64_t)*p;\n\
+        hash *= UINT64_C(1099511628211);\n\
+    }\n\
+    return hash;\n\
+}\n\
+\
+static uint64_t ostrin_hash_float(double value) {\n\
+    union { double value; uint64_t bits; } bits = { value };\n\
+    return ostrin_hash_u64(bits.bits);\n\
+}\n\
+\
 static const char* ostrin_cwd(void) {\n\
     size_t capacity = 256;\n\
     for (;;) {\n\
@@ -3390,6 +3412,18 @@ impl<'a> Codegen<'a> {
         }
     }
 
+    /// Returns a stable runtime hash for the scalar keys currently supported
+    /// by the native Map implementation. Composite keys keep the verified
+    /// equality fallback until the user-facing `Hash` trait is enforced.
+    fn hash_expr(&self, value: &str, ty: &CType) -> Option<String> {
+        Some(match ty {
+            CType::Str => format!("ostrin_hash_string({value})"),
+            CType::Int | CType::Bool | CType::Sized(_) => format!("ostrin_hash_u64((uint64_t)({value}))"),
+            CType::Float | CType::Float32 => format!("ostrin_hash_float((double)({value}))"),
+            _ => return None,
+        })
+    }
+
     /// A C `int` expression: negative, zero or positive, like `compare`.
     fn cmp_expr(&mut self, a: &str, b: &str, ty: &CType) -> Result<String, String> {
         match ty {
@@ -5847,15 +5881,45 @@ fn generate_impl(
                     let list_v = c_type_name(&CType::List(v.clone()));
                     let (lk, lv) = (list_struct_name(k), list_struct_name(v));
                     let eq = codegen.eq_expr("m->keys[i]", "key", k)?;
-                    list_type_decls.push_str(&format!("struct {name} {{\n    {kc}* keys;\n    {vc}* vals;\n    int64_t length;\n    int64_t capacity;\n}};\n\n"));
+                    let hashable = codegen.hash_expr("key", k);
+                    let hash_entry = codegen.hash_expr("m->keys[i]", k);
+                    let fields = if hashable.is_some() {
+                        "    int64_t* buckets;\n    int64_t bucket_capacity;\n"
+                    } else {
+                        ""
+                    };
+                    list_type_decls.push_str(&format!("struct {name} {{\n    {kc}* keys;\n    {vc}* vals;\n    int64_t length;\n    int64_t capacity;\n{fields}}};\n\n"));
                     funcs.push((format!("static {name}* {name}_new(void)"), format!("    {name}* m = ({name}*)ostrin_calloc(1, sizeof({name}));\n    return m;\n")));
-                    funcs.push((format!("static int64_t {name}_find({name}* m, {kc} key)"), format!("    for (int64_t i = 0; i < m->length; i++) {{ if ({eq}) return i; }}\n    return -1;\n")));
+                    let linear_find = format!("for (int64_t i = 0; i < m->length; i++) {{ if ({eq}) return i; }}\n    return -1;");
+                    let find_body = match &hashable {
+                        Some(hash) => format!(
+                            "    if (!m->buckets || m->bucket_capacity == 0) {{ {linear_find} }}\n    uint64_t hash = {hash};\n    int64_t slot = (int64_t)(hash % (uint64_t)m->bucket_capacity);\n    for (int64_t step = 0; step < m->bucket_capacity; step++) {{ int64_t i = m->buckets[slot]; if (i < 0) return -1; if ({eq}) return i; slot = (slot + 1) % m->bucket_capacity; }}\n    return -1;\n"
+                        ),
+                        None => format!("    {linear_find}\n"),
+                    };
+                    funcs.push((format!("static int64_t {name}_find({name}* m, {kc} key)"), find_body));
+                    if let (Some(hash), Some(entry_hash)) = (hashable.clone(), hash_entry) {
+                        let rehash_sig = format!("static void {name}_rehash({name}* m, int64_t capacity)");
+                        let rehash_body = format!(
+                            "    if (capacity < 8) capacity = 8;\n    int64_t* buckets = (int64_t*)ostrin_alloc(sizeof(int64_t) * (size_t)capacity);\n    for (int64_t i = 0; i < capacity; i++) buckets[i] = -1;\n    for (int64_t i = 0; i < m->length; i++) {{ uint64_t hash = {entry_hash}; int64_t slot = (int64_t)(hash % (uint64_t)capacity); while (buckets[slot] >= 0) slot = (slot + 1) % capacity; buckets[slot] = i; }}\n    if (m->buckets) ostrin_free(m->buckets);\n    m->buckets = buckets;\n    m->bucket_capacity = capacity;\n"
+                        );
+                        funcs.push((rehash_sig, rehash_body));
+                        let _ = hash;
+                    }
                     funcs.push((format!("static void {name}_set({name}* m, {kc} key, {vc} value)"), format!(
-                        "    int64_t i = {name}_find(m, key);\n    if (i >= 0) {{ m->keys[i] = key; m->vals[i] = value; return; }}\n    if (m->length >= m->capacity) {{\n        m->capacity = m->capacity == 0 ? 4 : m->capacity * 2;\n        m->keys = ({kc}*)ostrin_realloc(m->keys, sizeof({kc}) * (size_t)m->capacity);\n        m->vals = ({vc}*)ostrin_realloc(m->vals, sizeof({vc}) * (size_t)m->capacity);\n    }}\n    m->keys[m->length] = key;\n    m->vals[m->length] = value;\n    m->length = m->length + 1;\n")));
+                        "    int64_t i = {name}_find(m, key);\n    if (i >= 0) {{ m->keys[i] = key; m->vals[i] = value; return; }}\n    if (m->length >= m->capacity) {{\n        m->capacity = m->capacity == 0 ? 4 : m->capacity * 2;\n        m->keys = ({kc}*)ostrin_realloc(m->keys, sizeof({kc}) * (size_t)m->capacity);\n        m->vals = ({vc}*)ostrin_realloc(m->vals, sizeof({vc}) * (size_t)m->capacity);\n    }}\n{hash_setup}    m->keys[m->length] = key;\n    m->vals[m->length] = value;\n    m->length = m->length + 1;\n{hash_insert}"
+                        , hash_setup = if hashable.is_some() {
+                            format!("    if (!m->buckets) {name}_rehash(m, 8); else if ((m->length + 1) * 10 >= m->bucket_capacity * 7) {name}_rehash(m, m->bucket_capacity * 2);\n")
+                        } else { String::new() },
+                        hash_insert = match hashable.as_ref() {
+                            Some(hash) => format!("    {{ uint64_t hash = {hash}; int64_t slot = (int64_t)(hash % (uint64_t)m->bucket_capacity); while (m->buckets[slot] >= 0) slot = (slot + 1) % m->bucket_capacity; m->buckets[slot] = m->length - 1; }}\n"),
+                            None => String::new(),
+                        }
+                    )));
                     funcs.push((format!("static {opt} {name}_get({name}* m, {kc} key)"), format!("    {opt} r;\n    memset(&r, 0, sizeof r);\n    int64_t i = {name}_find(m, key);\n    if (i >= 0) {{ r.has = true; r.value = m->vals[i]; }}\n    return r;\n")));
                     funcs.push((format!("static bool {name}_contains_key({name}* m, {kc} key)"), format!("    return {name}_find(m, key) >= 0;\n")));
                     funcs.push((format!("static int64_t {name}_count({name}* m)"), "    return m->length;\n".to_string()));
-                    funcs.push((format!("static {opt} {name}_remove({name}* m, {kc} key)"), format!("    {opt} r;\n    memset(&r, 0, sizeof r);\n    int64_t i = {name}_find(m, key);\n    if (i < 0) return r;\n    r.has = true;\n    r.value = m->vals[i];\n    for (int64_t j = i; j < m->length - 1; j++) {{ m->keys[j] = m->keys[j + 1]; m->vals[j] = m->vals[j + 1]; }}\n    m->length = m->length - 1;\n    return r;\n")));
+                    funcs.push((format!("static {opt} {name}_remove({name}* m, {kc} key)"), format!("    {opt} r;\n    memset(&r, 0, sizeof r);\n    int64_t i = {name}_find(m, key);\n    if (i < 0) return r;\n    r.has = true;\n    r.value = m->vals[i];\n    for (int64_t j = i; j < m->length - 1; j++) {{ m->keys[j] = m->keys[j + 1]; m->vals[j] = m->vals[j + 1]; }}\n    m->length = m->length - 1;\n{rehash_after}    return r;\n", rehash_after = if hashable.is_some() { format!("    if (m->buckets) {name}_rehash(m, m->bucket_capacity);\n") } else { String::new() })));
                     funcs.push((format!("static {list_k} {name}_keys({name}* m)"), format!("    return {lk}_new_from_array(m->keys, m->length);\n")));
                     funcs.push((format!("static {list_v} {name}_values({name}* m)"), format!("    return {lv}_new_from_array(m->vals, m->length);\n")));
                 }

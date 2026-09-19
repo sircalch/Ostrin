@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt;
 use std::fs;
+use std::hash::{Hash, Hasher};
 use std::io::{BufRead, Write};
 use std::rc::Rc;
 
@@ -17,6 +18,55 @@ mod math;
 mod rng;
 mod strings;
 use crate::types::{dim_div, dim_is_dimensionless, dim_mul, dim_pow, dim_to_string, resolve_unit_expr, Dimension};
+
+#[derive(Clone)]
+pub(crate) struct MapState {
+    entries: Vec<(Value, Value)>,
+    /// Hash buckets store entry indexes so iteration remains insertion-ordered
+    /// while ordinary lookups are expected O(1) for scalar keys.
+    index: HashMap<u64, Vec<usize>>,
+}
+
+impl MapState {
+    fn new(entries: Vec<(Value, Value)>) -> Self {
+        let mut state = Self { entries, index: HashMap::new() };
+        state.rebuild_index();
+        state
+    }
+
+    fn rebuild_index(&mut self) {
+        self.index.clear();
+        for (position, (key, _)) in self.entries.iter().enumerate() {
+            if let Some(hash) = map_key_hash(key) {
+                self.index.entry(hash).or_default().push(position);
+            }
+        }
+    }
+
+    fn candidates(&self, key: &Value) -> Vec<usize> {
+        match map_key_hash(key).and_then(|hash| self.index.get(&hash)) {
+            Some(indexes) => indexes.clone(),
+            None => (0..self.entries.len()).collect(),
+        }
+    }
+}
+
+impl std::ops::Deref for MapState {
+    type Target = Vec<(Value, Value)>;
+
+    fn deref(&self) -> &Self::Target { &self.entries }
+}
+
+impl std::ops::DerefMut for MapState {
+    fn deref_mut(&mut self) -> &mut Self::Target { &mut self.entries }
+}
+
+impl IntoIterator for MapState {
+    type Item = (Value, Value);
+    type IntoIter = std::vec::IntoIter<(Value, Value)>;
+
+    fn into_iter(self) -> Self::IntoIter { self.entries.into_iter() }
+}
 
 #[derive(Clone)]
 pub enum Value {
@@ -43,9 +93,27 @@ pub enum Value {
     EnumInstance(String, String, HashMap<String, Value>, Vec<Type>),
     Task(Rc<RefCell<TaskState>>),
     Channel(Rc<RefCell<ChannelState>>),
-    Map(Rc<RefCell<Vec<(Value, Value)>>>),
+    Map(Rc<RefCell<MapState>>),
     Set(Rc<RefCell<Vec<Value>>>),
     Void,
+}
+
+fn map_key_hash(value: &Value) -> Option<u64> {
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    match value {
+        Value::Int(n) => n.hash(&mut hasher),
+        Value::Sized(n, kind) => {
+            n.hash(&mut hasher);
+            kind.hash(&mut hasher);
+        }
+        Value::F32(n) => n.to_bits().hash(&mut hasher),
+        Value::Float(n) => n.to_bits().hash(&mut hasher),
+        Value::Bool(value) => value.hash(&mut hasher),
+        Value::Char(value) => value.hash(&mut hasher),
+        Value::String(value) => value.hash(&mut hasher),
+        _ => return None,
+    }
+    Some(hasher.finish())
 }
 
 struct RuntimeImpl {
@@ -614,7 +682,7 @@ impl Interpreter {
                 if left.len() != right.len() { return Ok(false); }
                 for (key, value) in left {
                     let mut found = false;
-                    for (other_key, other_value) in &right {
+                    for (other_key, other_value) in right.entries.iter() {
                         if truthy(&self.eval_binary(BinOp::Eq, key.clone(), other_key.clone(), env)?) {
                             if !truthy(&self.eval_binary(BinOp::Eq, value.clone(), other_value.clone(), env)?) {
                                 return Ok(false);
@@ -655,6 +723,17 @@ impl Interpreter {
             }
             _ => Ok(false),
         }
+    }
+
+    fn map_find(&mut self, state: &Rc<RefCell<MapState>>, key: &Value, env: &Env) -> Result<Option<usize>, RuntimeError> {
+        let candidates = state.borrow().candidates(key);
+        for index in candidates {
+            let existing = state.borrow().entries[index].0.clone();
+            if truthy(&self.eval_binary(BinOp::Eq, existing, key.clone(), env)?) {
+                return Ok(Some(index));
+            }
+        }
+        Ok(None)
     }
 
     /// Genera 'compare' para 'record' con 'derive(Ord)': orden lexicográfico
@@ -1639,7 +1718,7 @@ impl Interpreter {
                 Ok(Value::Set(Rc::new(RefCell::new(values))))
             }
             Expr::EmptyCollection(name, _) => Ok(if name == "Map" {
-                Value::Map(Rc::new(RefCell::new(Vec::new())))
+                Value::Map(Rc::new(RefCell::new(MapState::new(Vec::new()))))
             } else {
                 Value::Set(Rc::new(RefCell::new(Vec::new())))
             }),
@@ -1658,7 +1737,7 @@ impl Interpreter {
                     }
                     if !replaced { values.push((kv, vv)); }
                 }
-                Ok(Value::Map(Rc::new(RefCell::new(values))))
+                Ok(Value::Map(Rc::new(RefCell::new(MapState::new(values)))))
             }
             Expr::Try(inner, catch) => {
                 let value = self.eval_expr(inner, env)?;
@@ -2201,19 +2280,14 @@ impl Interpreter {
                 match method.as_str() {
                     "get" => {
                         let k = self.eval_arg(&args[0], env)?;
-                        let snapshot = state.borrow().clone();
-                        for (mk, mv) in snapshot {
-                            if truthy(&self.eval_binary(BinOp::Eq, mk, k.clone(), env)?) { return Ok(some_value(mv)); }
+                        if let Some(index) = self.map_find(state, &k, env)? {
+                            return Ok(some_value(state.borrow().entries[index].1.clone()));
                         }
                         return Ok(none_value());
                     }
                     "contains_key" => {
                         let k = self.eval_arg(&args[0], env)?;
-                        let snapshot = state.borrow().clone();
-                        for (mk, _) in snapshot {
-                            if truthy(&self.eval_binary(BinOp::Eq, mk, k.clone(), env)?) { return Ok(Value::Bool(true)); }
-                        }
-                        return Ok(Value::Bool(false));
+                        return Ok(Value::Bool(self.map_find(state, &k, env)?.is_some()));
                     }
                     "keys" => return Ok(Value::List(Rc::new(RefCell::new(state.borrow().iter().map(|(k, _)| k.clone()).collect())))),
                     "values" => return Ok(Value::List(Rc::new(RefCell::new(state.borrow().iter().map(|(_, v)| v.clone()).collect())))),
@@ -2221,28 +2295,20 @@ impl Interpreter {
                     "set" => {
                         let k = self.eval_arg(&args[0], env)?;
                         let v = self.eval_arg(&args[1], env)?;
-                        let snapshot = state.borrow().clone();
-                        let mut found = None;
-                        for (i, (mk, _)) in snapshot.iter().enumerate() {
-                            if truthy(&self.eval_binary(BinOp::Eq, mk.clone(), k.clone(), env)?) { found = Some(i); break; }
+                        match self.map_find(state, &k, env)? {
+                            Some(i) => state.borrow_mut().entries[i] = (k, v),
+                            None => state.borrow_mut().entries.push((k, v)),
                         }
-                        match found {
-                            Some(i) => state.borrow_mut()[i] = (k, v),
-                            None => state.borrow_mut().push((k, v)),
-                        }
+                        state.borrow_mut().rebuild_index();
                         return Ok(Value::Void);
                     }
                     "remove" => {
                         let k = self.eval_arg(&args[0], env)?;
-                        let snapshot = state.borrow().clone();
-                        let mut found = None;
-                        for (i, (mk, mv)) in snapshot.iter().enumerate() {
-                            if truthy(&self.eval_binary(BinOp::Eq, mk.clone(), k.clone(), env)?) { found = Some((i, mv.clone())); break; }
-                        }
-                        return Ok(match found {
-                            Some((i, v)) => { state.borrow_mut().remove(i); some_value(v) }
-                            None => none_value(),
-                        });
+                        let Some(index) = self.map_find(state, &k, env)? else { return Ok(none_value()) };
+                        let value = state.borrow().entries[index].1.clone();
+                        state.borrow_mut().entries.remove(index);
+                        state.borrow_mut().rebuild_index();
+                        return Ok(some_value(value));
                     }
                     _ => {}
                 }

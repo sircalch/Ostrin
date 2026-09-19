@@ -4186,3 +4186,22 @@ diferenciales y 122 de integración verdes**.
 El formateador es deliberadamente acotado: todavía no ofrece especificadores numéricos, escape de
 llaves, JSON ni interpolación tipada. Es una base estable para añadir esas capas sin inventar una
 API distinta por backend.
+
+## 148. Índice hash para `Map` con orden estable — 2026-09-19
+
+`Map<K,V>` deja de hacer una búsqueda lineal para las claves escalares que el backend puede
+identificar de forma segura (`Int`, enteros de ancho fijo, `Bool`, `String`, `Float` y `Float32`):
+
+- El intérprete conserva sus entradas en orden de inserción y mantiene un índice hash secundario;
+  actualizar o borrar una entrada reconstruye el índice para que los índices de posiciones nunca
+  queden obsoletos.
+- El backend C genera buckets de direccionamiento abierto, rehash con umbral de carga del 70 %,
+  crecimiento geométrico y reconstrucción después de `remove`. `keys()` y `values()` siguen
+  devolviendo el orden de inserción anterior.
+- Las claves compuestas todavía usan el camino lineal correcto. Esto es intencional: el trait
+  `Hash` existe en el vocabulario del checker, pero todavía no se exige ni se genera automáticamente
+  para records y colecciones; se completará antes de declarar hashables los tipos de usuario.
+
+`examples/hash_map_stress.ostrin` inserta 51 claves, actualiza una, elimina otra y verifica
+consultas posteriores. `hash_map_scalars_match_between_interpreter_and_native` comprueba la misma
+salida en ambos backends. La suite queda en **6 pruebas diferenciales y 123 de integración verdes**.

@@ -1,0 +1,12 @@
+fn main() -> Void {
+    mut values = Map<Int, Int>()
+    for i in 0 to 50 {
+        values.set(i, i * 2)
+    }
+    values.set(25, 999)
+    print(values.count())
+    print(values.get(25))
+    values.remove(7)
+    print(values.contains_key(7))
+    print(values.get(49))
+}
