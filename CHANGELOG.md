@@ -95,6 +95,8 @@
 - Replaced scalar-key `Map` linear lookup with an insertion-order-preserving hash index in the
   interpreter and native C runtime. Updates, removals and rehashing are covered by a 51-entry
   cross-backend stress test; unsupported composite keys retain a correct linear fallback.
+- Extended the same indexed representation to scalar-key `Set` membership, duplicate detection and
+  removal while preserving insertion order and the existing set API.
 - Lowered `match` and `try` into explicit IR control flow: pattern tests,
   pattern bindings, guarded-arm branches, try success/error blocks and phi convergence.
   The IR now keeps these families semantic instead of representing them as opaque operations;

@@ -101,7 +101,7 @@ En Windows, si `cargo`/`rustc` no están en el PATH de la sesión: `$env:Path +=
 
 ### Arquitectura de evaluación (para quien continúe el intérprete)
 
-- **`Value`** (en `interpreter/mod.rs`): `Int, Float, Bool, Char, String, Quantity(f64, Dimension, unit_str), List(Rc<RefCell<Vec<Value>>>), Closure, Record(String, Rc<RefCell<Vec<(String,Value)>>>), EnumInstance(enum, variant, HashMap<String,Value>), Task, Channel, Map(Rc<RefCell<Vec<(K,V)>>>), Set(Rc<RefCell<Vec<Value>>>), Void`.
+- **`Value`** (en `interpreter/mod.rs`): `Int, Float, Bool, Char, String, Quantity(f64, Dimension, unit_str), List(Rc<RefCell<Vec<Value>>>), Closure, Record(String, Rc<RefCell<Vec<(String,Value)>>>), EnumInstance(enum, variant, HashMap<String,Value>), Task, Channel, `MapState`/`SetState` con entradas en orden e índice hash para escalares, `Void`.
 - **Mutabilidad/identidad**: `List`, `Record`, `Map`, `Set`, `Task` y `Channel` usan `Rc<RefCell<>>` cuando necesitan identidad mutable. `List.push(value)` y `List.remove_at(index)` modifican el storage compartido; un alias puede observar el cambio. El type-checker exige binding `mut` para `push`/`remove_at` (E1053), y también para `Map.set`/`Map.remove` y `Set.add`/`Set.remove`.
 - **Errores de control de flujo** (`return`/`break`/`continue`) se implementan reutilizando el canal `Result<Value, RuntimeError>` de Rust — `RuntimeError::Return(v)` sube por `?` de forma natural hasta el punto que sabe capturarlo (llamada de función para `Return`, bucle para `Break`/`Continue`). Patrón limpio, vale la pena mantenerlo si se sigue extendiendo.
 - **Operadores sobre tipos de usuario** pasan por `Interpreter::eval_binary`, que busca `impl` real vía `find_method`, y si no hay `impl` pero el tipo tiene `derive(Eq)`/`derive(Ord)`, sintetiza la comparación campo por campo usando el orden de declaración (`self.records[type_name].fields`). Los tipos incorporados (`Int`, `Quantity`, etc.) tienen una vía rápida aparte (`eval_binary_builtin`) que **no** pasa por traits — es una simplificación deliberada del intérprete, no lo que dicta el diseño.
@@ -4196,9 +4196,9 @@ identificar de forma segura (`Int`, enteros de ancho fijo, `Bool`, `String`, `Fl
   actualizar o borrar una entrada reconstruye el índice para que los índices de posiciones nunca
   queden obsoletos.
 - El backend C genera buckets de direccionamiento abierto, rehash con umbral de carga del 70 %,
-  crecimiento geométrico y reconstrucción después de `remove`. `keys()` y `values()` siguen
-  devolviendo el orden de inserción anterior.
-- Las claves compuestas todavía usan el camino lineal correcto. Esto es intencional: el trait
+  crecimiento geométrico y reconstrucción después de `remove` tanto para `Map` como para `Set`.
+  `keys()`/`values()` y la iteración de conjuntos siguen devolviendo el orden de inserción anterior.
+- Las claves y elementos compuestos todavía usan el camino lineal correcto. Esto es intencional: el trait
   `Hash` existe en el vocabulario del checker, pero todavía no se exige ni se genera automáticamente
   para records y colecciones; se completará antes de declarar hashables los tipos de usuario.
 

@@ -839,7 +839,7 @@ fn hash_map_scalars_match_between_interpreter_and_native() {
     let interpreted = run(&["--run", &file]);
     assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
     let expected = stdout(&interpreted).replace("\r\n", "\n");
-    assert_eq!(expected, "51\nSome(999)\nfalse\nSome(98)\n");
+    assert_eq!(expected, "51\nSome(999)\nfalse\nSome(98)\n51\ntrue\nfalse\n");
 
     let exe = temp_artifact("hash-map-stress.exe");
     let compile = run(&["--compile", "--out", &exe, &file]);

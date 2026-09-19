@@ -75,8 +75,8 @@ análisis HIR/IR rechaza por defecto reutilizar un valor movible después de env
 rebanadas, `@`), estadística, regresión, `det/inv/eigvals/norm`, `Rng` reproducible,
 funciones elementales deterministas (idénticas en intérprete y nativo).
 
-**Datos**: métodos de `String`, `parse_csv`; `Map` usa índice hash para claves escalares y
-conserva orden de iteración; paquetes de ejemplo en Ostrin: `tables`
+**Datos**: métodos de `String`, `parse_csv`; `Map` y `Set` usan índice hash para claves/elementos
+escalares y conservan orden de iteración; paquetes de ejemplo en Ostrin: `tables`
 (DataFrame mínimo), `plot` (SVG), `autodiff` (modo directo).
 
 **Igualdad estructural**: `==`/`!=` compara recursivamente `List`, `Map`, `Set`, `Option` y
@@ -168,7 +168,7 @@ ya se generan desde el HIR** —escalares, records, enums, `match`, `Option`/`Re
 listas/colecciones, cierres, instancias concretas de genéricos, records/enums aplicados y métodos
 genéricos centrales, módulo `hir_c.rs`—, con un trinquete mínimo de 115; el resto sigue por el AST;
 ver documento 20 y secciones 123–133 de `CONTEXTO_PROYECTO.md`);
-`Set` y las claves compuestas aún usan búsqueda lineal; el siguiente paso es formalizar `Hash + Eq`
+Las claves/elementos compuestos aún usan búsqueda lineal; el siguiente paso es formalizar `Hash + Eq`
 en el checker y extender el índice a tipos de usuario.
 
 ---

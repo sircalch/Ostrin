@@ -69,6 +69,53 @@ impl IntoIterator for MapState {
 }
 
 #[derive(Clone)]
+pub(crate) struct SetState {
+    entries: Vec<Value>,
+    index: HashMap<u64, Vec<usize>>,
+}
+
+impl SetState {
+    fn new(entries: Vec<Value>) -> Self {
+        let mut state = Self { entries, index: HashMap::new() };
+        state.rebuild_index();
+        state
+    }
+
+    fn rebuild_index(&mut self) {
+        self.index.clear();
+        for (position, value) in self.entries.iter().enumerate() {
+            if let Some(hash) = map_key_hash(value) {
+                self.index.entry(hash).or_default().push(position);
+            }
+        }
+    }
+
+    fn candidates(&self, value: &Value) -> Vec<usize> {
+        match map_key_hash(value).and_then(|hash| self.index.get(&hash)) {
+            Some(indexes) => indexes.clone(),
+            None => (0..self.entries.len()).collect(),
+        }
+    }
+}
+
+impl std::ops::Deref for SetState {
+    type Target = Vec<Value>;
+
+    fn deref(&self) -> &Self::Target { &self.entries }
+}
+
+impl std::ops::DerefMut for SetState {
+    fn deref_mut(&mut self) -> &mut Self::Target { &mut self.entries }
+}
+
+impl IntoIterator for SetState {
+    type Item = Value;
+    type IntoIter = std::vec::IntoIter<Value>;
+
+    fn into_iter(self) -> Self::IntoIter { self.entries.into_iter() }
+}
+
+#[derive(Clone)]
 pub enum Value {
     Int(i64),
     /// A fixed-width integer (`UInt8`, `Int32`, …), stored widened.
@@ -94,7 +141,7 @@ pub enum Value {
     Task(Rc<RefCell<TaskState>>),
     Channel(Rc<RefCell<ChannelState>>),
     Map(Rc<RefCell<MapState>>),
-    Set(Rc<RefCell<Vec<Value>>>),
+    Set(Rc<RefCell<SetState>>),
     Void,
 }
 
@@ -701,7 +748,7 @@ impl Interpreter {
                 if left.len() != right.len() { return Ok(false); }
                 for value in left {
                     let mut found = false;
-                    for other in &right {
+                    for other in right.entries.iter() {
                         if truthy(&self.eval_binary(BinOp::Eq, value.clone(), other.clone(), env)?) {
                             found = true;
                             break;
@@ -730,6 +777,17 @@ impl Interpreter {
         for index in candidates {
             let existing = state.borrow().entries[index].0.clone();
             if truthy(&self.eval_binary(BinOp::Eq, existing, key.clone(), env)?) {
+                return Ok(Some(index));
+            }
+        }
+        Ok(None)
+    }
+
+    fn set_find(&mut self, state: &Rc<RefCell<SetState>>, value: &Value, env: &Env) -> Result<Option<usize>, RuntimeError> {
+        let candidates = state.borrow().candidates(value);
+        for index in candidates {
+            let existing = state.borrow().entries[index].clone();
+            if truthy(&self.eval_binary(BinOp::Eq, existing, value.clone(), env)?) {
                 return Ok(Some(index));
             }
         }
@@ -1715,12 +1773,12 @@ impl Interpreter {
                     }
                     if !dup { values.push(v); }
                 }
-                Ok(Value::Set(Rc::new(RefCell::new(values))))
+                Ok(Value::Set(Rc::new(RefCell::new(SetState::new(values)))))
             }
             Expr::EmptyCollection(name, _) => Ok(if name == "Map" {
                 Value::Map(Rc::new(RefCell::new(MapState::new(Vec::new()))))
             } else {
-                Value::Set(Rc::new(RefCell::new(Vec::new())))
+                Value::Set(Rc::new(RefCell::new(SetState::new(Vec::new()))))
             }),
             Expr::MapLiteral(pairs) => {
                 let mut values: Vec<(Value, Value)> = Vec::with_capacity(pairs.len());
@@ -2342,34 +2400,23 @@ impl Interpreter {
                 match method.as_str() {
                     "contains" => {
                         let x = self.eval_arg(&args[0], env)?;
-                        let snapshot = state.borrow().clone();
-                        for item in snapshot {
-                            if truthy(&self.eval_binary(BinOp::Eq, item, x.clone(), env)?) { return Ok(Value::Bool(true)); }
-                        }
-                        return Ok(Value::Bool(false));
+                        return Ok(Value::Bool(self.set_find(state, &x, env)?.is_some()));
                     }
                     "count" => return Ok(Value::Int(state.borrow().len() as i64)),
                     "add" => {
                         let x = self.eval_arg(&args[0], env)?;
-                        let snapshot = state.borrow().clone();
-                        let exists = {
-                            let mut found = false;
-                            for item in snapshot {
-                                if truthy(&self.eval_binary(BinOp::Eq, item, x.clone(), env)?) { found = true; break; }
-                            }
-                            found
-                        };
-                        if !exists { state.borrow_mut().push(x); }
+                        if self.set_find(state, &x, env)?.is_none() {
+                            state.borrow_mut().entries.push(x);
+                            state.borrow_mut().rebuild_index();
+                        }
                         return Ok(Value::Void);
                     }
                     "remove" => {
                         let x = self.eval_arg(&args[0], env)?;
-                        let snapshot = state.borrow().clone();
-                        let mut found = None;
-                        for (i, item) in snapshot.iter().enumerate() {
-                            if truthy(&self.eval_binary(BinOp::Eq, item.clone(), x.clone(), env)?) { found = Some(i); break; }
+                        if let Some(index) = self.set_find(state, &x, env)? {
+                            state.borrow_mut().entries.remove(index);
+                            state.borrow_mut().rebuild_index();
                         }
-                        if let Some(i) = found { state.borrow_mut().remove(i); }
                         return Ok(Value::Void);
                     }
                     _ => {}

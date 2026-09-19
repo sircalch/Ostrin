@@ -5956,13 +5956,42 @@ fn generate_impl(
                 CType::Set(t) => {
                     let tc = c_type_name(t);
                     let eq = codegen.eq_expr("s->items[i]", "item", t)?;
-                    list_type_decls.push_str(&format!("struct {name} {{\n    {tc}* items;\n    int64_t length;\n    int64_t capacity;\n}};\n\n"));
+                    let hashable = codegen.hash_expr("item", t);
+                    let hash_entry = codegen.hash_expr("s->items[i]", t);
+                    let fields = if hashable.is_some() {
+                        "    int64_t* buckets;\n    int64_t bucket_capacity;\n"
+                    } else {
+                        ""
+                    };
+                    list_type_decls.push_str(&format!("struct {name} {{\n    {tc}* items;\n    int64_t length;\n    int64_t capacity;\n{fields}}};\n\n"));
                     funcs.push((format!("static {name}* {name}_new(void)"), format!("    {name}* s = ({name}*)ostrin_calloc(1, sizeof({name}));\n    return s;\n")));
-                    funcs.push((format!("static int64_t {name}_find({name}* s, {tc} item)"), format!("    for (int64_t i = 0; i < s->length; i++) {{ if ({eq}) return i; }}\n    return -1;\n")));
+                    let linear_find = format!("for (int64_t i = 0; i < s->length; i++) {{ if ({eq}) return i; }}\n    return -1;");
+                    let find_body = match &hashable {
+                        Some(hash) => format!(
+                            "    if (!s->buckets || s->bucket_capacity == 0) {{ {linear_find} }}\n    uint64_t hash = {hash};\n    int64_t slot = (int64_t)(hash % (uint64_t)s->bucket_capacity);\n    for (int64_t step = 0; step < s->bucket_capacity; step++) {{ int64_t i = s->buckets[slot]; if (i < 0) return -1; if ({eq}) return i; slot = (slot + 1) % s->bucket_capacity; }}\n    return -1;\n"
+                        ),
+                        None => format!("    {linear_find}\n"),
+                    };
+                    funcs.push((format!("static int64_t {name}_find({name}* s, {tc} item)"), find_body));
+                    if let Some(entry_hash) = hash_entry {
+                        let rehash_sig = format!("static void {name}_rehash({name}* s, int64_t capacity)");
+                        let rehash_body = format!(
+                            "    if (capacity < 8) capacity = 8;\n    int64_t* buckets = (int64_t*)ostrin_alloc(sizeof(int64_t) * (size_t)capacity);\n    for (int64_t i = 0; i < capacity; i++) buckets[i] = -1;\n    for (int64_t i = 0; i < s->length; i++) {{ uint64_t hash = {entry_hash}; int64_t slot = (int64_t)(hash % (uint64_t)capacity); while (buckets[slot] >= 0) slot = (slot + 1) % capacity; buckets[slot] = i; }}\n    if (s->buckets) ostrin_free(s->buckets);\n    s->buckets = buckets;\n    s->bucket_capacity = capacity;\n"
+                        );
+                        funcs.push((rehash_sig, rehash_body));
+                    }
                     funcs.push((format!("static bool {name}_contains({name}* s, {tc} item)"), format!("    return {name}_find(s, item) >= 0;\n")));
                     funcs.push((format!("static void {name}_add({name}* s, {tc} item)"), format!(
-                        "    if ({name}_find(s, item) >= 0) return;\n    if (s->length >= s->capacity) {{\n        s->capacity = s->capacity == 0 ? 4 : s->capacity * 2;\n        s->items = ({tc}*)ostrin_realloc(s->items, sizeof({tc}) * (size_t)s->capacity);\n    }}\n    s->items[s->length] = item;\n    s->length = s->length + 1;\n")));
-                    funcs.push((format!("static void {name}_remove({name}* s, {tc} item)"), format!("    int64_t i = {name}_find(s, item);\n    if (i < 0) return;\n    for (int64_t j = i; j < s->length - 1; j++) {{ s->items[j] = s->items[j + 1]; }}\n    s->length = s->length - 1;\n")));
+                        "    if ({name}_find(s, item) >= 0) return;\n    if (s->length >= s->capacity) {{\n        s->capacity = s->capacity == 0 ? 4 : s->capacity * 2;\n        s->items = ({tc}*)ostrin_realloc(s->items, sizeof({tc}) * (size_t)s->capacity);\n    }}\n{hash_setup}    s->items[s->length] = item;\n    s->length = s->length + 1;\n{hash_insert}"
+                        , hash_setup = if hashable.is_some() {
+                            format!("    if (!s->buckets) {name}_rehash(s, 8); else if ((s->length + 1) * 10 >= s->bucket_capacity * 7) {name}_rehash(s, s->bucket_capacity * 2);\n")
+                        } else { String::new() },
+                        hash_insert = match hashable.as_ref() {
+                            Some(hash) => format!("    {{ uint64_t hash = {hash}; int64_t slot = (int64_t)(hash % (uint64_t)s->bucket_capacity); while (s->buckets[slot] >= 0) slot = (slot + 1) % s->bucket_capacity; s->buckets[slot] = s->length - 1; }}\n"),
+                            None => String::new(),
+                        }
+                    )));
+                    funcs.push((format!("static void {name}_remove({name}* s, {tc} item)"), format!("    int64_t i = {name}_find(s, item);\n    if (i < 0) return;\n    for (int64_t j = i; j < s->length - 1; j++) {{ s->items[j] = s->items[j + 1]; }}\n    s->length = s->length - 1;\n{rehash_after}", rehash_after = if hashable.is_some() { format!("    if (s->buckets) {name}_rehash(s, s->bucket_capacity);\n") } else { String::new() })));
                     funcs.push((format!("static int64_t {name}_count({name}* s)"), "    return s->length;\n".to_string()));
                 }
                 _ => unreachable!(),
