@@ -1,8 +1,9 @@
 # 20. HIR e IR: plan de migración del backend
 
 *Estado: HIR implementado y primera bajada HIR→CFG ejecutable. La etapa IR aún es
-inicial: `--ir` expone temporales y bloques verificados, pero el backend C todavía
-no consume esta representación ni inserta RC/último uso.*
+inicial: `--ir` expone temporales y bloques verificados; `--ownership-check` y
+`--ownership-ir` ya consumen esa representación, aunque el backend C todavía no se genera
+desde ella ni aplica ARC completa.*
 
 ## 1. Qué existe ya (comprobado en el código)
 
@@ -64,6 +65,8 @@ Sobre este IR se hacen los análisis que el texto C no permite:
 2. Migrar el backend C por **familias de nodos** al HIR (literales/operadores → llamadas → records/enums → patrones → colecciones → genéricos), eliminando la reinferencia correspondiente en cada paso.
 3. **IR de bloques básicos** y generación de C desde el IR (el HIR deja de generar C directamente). La primera CFG observable ya existe en `--ir`; faltan la bajada semántica completa y el cambio de backend.
 4. **RC + último uso** sobre el IR (`--leak-check`: los ejemplos deben terminar sin objetos vivos).
+   La primera subetapa ya inserta `release` solo en transferencias lineales y deja barreras
+   explícitas para agregados, llamadas, `phi`, loops y escapes.
 5. **Cierres y funciones como valores**; retirar la comprobación dinámica de E1101.
 6. Optimizador y, después, otros backends (LLVM, WASM, GPU) que consumen el mismo IR.
 

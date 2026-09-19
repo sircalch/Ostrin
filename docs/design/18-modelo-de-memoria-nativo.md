@@ -1,8 +1,8 @@
 # 18. Modelo de memoria del backend nativo
 
-*Estado: base de runtime implementada; RC/último uso aún no están implementados. El backend
-usa un registro de allocations y cleanup global al terminar, como etapa previa a la propiedad
-determinista.*
+*Estado: base de runtime implementada; el primer lowering conservador de ownership ya existe,
+pero RC/último uso completo aún no están implementados. El backend usa un registro de
+allocations y cleanup global al terminar, como etapa previa a la propiedad determinista.*
 
 ## 1. Punto de partida (semántica ya fijada por el lenguaje)
 
@@ -53,7 +53,8 @@ El RC sobre el generador actual (texto C con expresiones‑sentencia) exigiría 
 
 1. HIR → IR con valores temporales explícitos (Etapas 2–4 de `docs/ARQUITECTURA_Y_VISION.md`).
 2. Runtime C: cabecera de objeto con contador; `ostrin_retain`/`ostrin_release`; destructores por tipo.
-3. Inserción de retain/release + optimización de último uso.
+3. Inserción de retain/release + optimización de último uso. Ya existe una primera pasada
+   (`--ownership-ir`) que solo marca transferencias lineales conocidas; no toca el backend C.
 4. `--leak-check` y pruebas: cada ejemplo debe terminar con cero objetos vivos.
 5. E1101 estático; retirar la comprobación dinámica del intérprete o mantenerla como red.
 6. Arenas para datos que no escapan (optimización).

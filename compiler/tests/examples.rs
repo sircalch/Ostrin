@@ -802,6 +802,24 @@ fn compiler_reports_conservative_ownership_facts() {
 }
 
 #[test]
+fn compiler_inserts_only_conservative_linear_releases() {
+    let out = run(&["--ownership-ir", &example_path("ownership_linear.ostrin")]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let source = stdout(&out);
+    assert!(source.contains("release %"), "the channel transfer should have a release marker: {source}");
+    assert!(source.contains("ownership-ir inserted-releases: 1"), "unexpected lowering summary: {source}");
+}
+
+#[test]
+fn compiler_reports_static_channel_move_violations() {
+    let out = run(&["--ownership-check", &example_path("moved_after_send.ostrin")]);
+    assert!(!out.status.success(), "use-after-send must be rejected by the ownership check");
+    let source = format!("{}{}", stdout(&out), stderr(&out));
+    assert!(source.contains("OSTRIN-E1101"), "missing static E1101: {source}");
+    assert!(source.contains("sent at") && source.contains("then used at"), "missing move locations: {source}");
+}
+
+#[test]
 fn native_backend_emits_centralized_memory_cleanup() {
     let out = run(&["--emit-c", &example_path("native_hir_collections.ostrin")]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));

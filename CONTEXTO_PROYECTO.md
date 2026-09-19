@@ -4037,6 +4037,28 @@ intérprete y C; la prueba dedicada nativa y la comparación diferencial protege
 
 La paridad actual es cooperativa y determinista: no crea hilos del sistema operativo, no hace
 paralelismo de CPU y todavía no implementa cancelación ni `select`. La suite queda en **6
-pruebas diferenciales y 113 de integración verdes**. El siguiente bloque de runtime debe
+pruebas diferenciales y 115 de integración verdes**. El siguiente bloque de runtime debe
 añadir el modo multi-hilo de forma opt-in o por backend, con canales sincronizados y una
 política clara para E/S y cancelación.
+
+## 141. Primera bajada conservadora de ownership sobre la IR — 2026-09-18
+
+La IR ahora tiene dos herramientas de ownership que no dependen del texto C:
+
+- `--ownership-check` recorre los usos de valores gestionados y emite `OSTRIN-E1101` cuando
+  un valor de tipo agregado/referencia se usa después de `ChannelSend`. La salida conserva la
+  función, el temporal y las posiciones de bloque/instrucción para que el diagnóstico sea
+  inspeccionable antes de conectarlo a spans de origen.
+- `--ownership-ir` clona la IR e inserta `release` solo después de un último uso lineal en una
+  transferencia que ya tiene contrato: almacenamiento local sin lecturas posteriores o envío
+  por canal. Los valores que cruzan bloques, pasan por `opaque`, agregados, llamadas, `phi` o
+  terminadores quedan contados como `unresolved-values`.
+
+`ownership_linear.ostrin` protege la inserción de un marcador de liberación y
+`moved_after_send.ostrin` protege el diagnóstico estático. La pasada no cambia todavía el
+backend C ni pretende ser ARC completa: faltan `retain` en copias/aliases, dominadores y
+loops, análisis de escape, destructores por tipo y ciclos. La suite queda en **6 pruebas
+diferenciales y 115 de integración verdes**.
+
+El siguiente bloque de memoria debe definir esos contratos de retain para `Aggregate`,
+`Call`, `Field`, `Phi` y retornos, y después hacer que el backend C consuma la IR transformada.

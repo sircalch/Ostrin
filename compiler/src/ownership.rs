@@ -33,6 +33,24 @@ pub struct OwnershipFact {
     pub candidate: bool,
 }
 
+#[derive(Debug, Default, Clone)]
+pub struct LoweringSummary {
+    pub inserted_releases: usize,
+    pub unresolved_values: usize,
+    pub functions: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct MoveViolation {
+    pub function: String,
+    pub value: ValueId,
+    pub ty: Ty,
+    pub send_block: usize,
+    pub send_instruction: usize,
+    pub use_block: usize,
+    pub use_instruction: usize,
+}
+
 #[derive(Debug, Clone)]
 struct Definition {
     ty: Ty,
@@ -51,6 +69,147 @@ pub fn analyze(program: &IrProgram) -> OwnershipReport {
         analyze_function(function, &mut report);
     }
     report
+}
+
+/// Adds only releases whose last use is provably in one straight-line block.
+/// The returned program is still an analysis artifact: the native backend does
+/// not consume it yet, so this pass cannot accidentally change executable
+/// behavior while the ownership contract is being completed.
+pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
+    let mut lowered = program.clone();
+    let mut summary = LoweringSummary { functions: lowered.functions.len(), ..LoweringSummary::default() };
+
+    for function in &mut lowered.functions {
+        let mut definitions: HashMap<ValueId, (Ty, usize, usize)> = HashMap::new();
+        let mut uses: HashMap<ValueId, Vec<UsePoint>> = HashMap::new();
+        let mut opaque_values = HashSet::new();
+
+        for block in &function.blocks {
+            for (index, instruction) in block.instructions.iter().enumerate() {
+                if let Some((value, ty)) = defined_value(instruction) {
+                    definitions.insert(value, (ty, block.id, index));
+                }
+                for value in used_values(instruction) {
+                    uses.entry(value).or_default().push(UsePoint { block: block.id, instruction: index });
+                }
+                if matches!(instruction, IrInstr::Opaque { .. }) {
+                    for value in used_values(instruction) {
+                        opaque_values.insert(value);
+                    }
+                }
+            }
+            if let Some(terminator) = &block.terminator {
+                for value in terminator_values(terminator) {
+                    uses.entry(value).or_default().push(UsePoint {
+                        block: block.id,
+                        instruction: block.instructions.len(),
+                    });
+                }
+            }
+        }
+
+        let mut insertions: HashMap<(usize, usize), Vec<ValueId>> = HashMap::new();
+        for (value, (ty, definition_block, definition_instruction)) in definitions {
+            if !requires_management(&ty) {
+                continue;
+            }
+            let value_uses = uses.get(&value).cloned().unwrap_or_default();
+            let blocks: HashSet<usize> = value_uses.iter().map(|point| point.block).collect();
+            let candidate = !value_uses.is_empty() && blocks.len() == 1 && !opaque_values.contains(&value);
+            if candidate {
+                let last = value_uses
+                    .iter()
+                    .max_by_key(|point| point.instruction)
+                    .copied()
+                    .expect("candidate has a use");
+                // A return transfers the value to the caller; releasing after
+                // its terminator would be a use-after-release. All other
+                // terminators are treated as unresolved for now.
+                let block = &function.blocks[last.block];
+                if last.instruction < block.instructions.len() && safe_release_site(&block.instructions[last.instruction]) {
+                    insertions.entry((last.block, last.instruction + 1)).or_default().push(value);
+                } else {
+                    summary.unresolved_values += 1;
+                }
+            } else if value_uses.is_empty() {
+                insertions.entry((definition_block, definition_instruction + 1)).or_default().push(value);
+            } else {
+                summary.unresolved_values += 1;
+            }
+        }
+
+        for block in &mut function.blocks {
+            let old = std::mem::take(&mut block.instructions);
+            let mut instructions = Vec::with_capacity(old.len());
+            for (index, instruction) in old.into_iter().enumerate() {
+                instructions.push(instruction);
+                if let Some(values) = insertions.remove(&(block.id, index + 1)) {
+                    for value in values {
+                        instructions.push(IrInstr::Release { value });
+                        summary.inserted_releases += 1;
+                    }
+                }
+            }
+            block.instructions = instructions;
+        }
+    }
+
+    (lowered, summary)
+}
+
+/// Finds values that are sent through a channel and then used again in the
+/// same function. This is deliberately conservative: only values with an
+/// aggregate/reference-like type are considered movable, while scalar and
+/// value-only `Option`/`Result` data remain copyable.
+pub fn check_moves(program: &IrProgram) -> Vec<MoveViolation> {
+    let mut violations = Vec::new();
+    for function in &program.functions {
+        let mut definitions: HashMap<ValueId, Ty> = HashMap::new();
+        let mut moved: HashMap<ValueId, (Ty, usize, usize)> = HashMap::new();
+        for block in &function.blocks {
+            for (index, instruction) in block.instructions.iter().enumerate() {
+                if let Some((value, ty)) = defined_value(instruction) {
+                    definitions.insert(value, ty);
+                }
+                for value in used_values(instruction) {
+                    if let Some((ty, send_block, send_instruction)) = moved.get(&value) {
+                        violations.push(MoveViolation {
+                            function: function.name.clone(),
+                            value,
+                            ty: ty.clone(),
+                            send_block: *send_block,
+                            send_instruction: *send_instruction,
+                            use_block: block.id,
+                            use_instruction: index,
+                        });
+                    }
+                }
+                if let IrInstr::ChannelSend { value, .. } = instruction {
+                    if let Some(ty) = definitions.get(value).cloned().filter(is_move_type) {
+                        moved.entry(*value).or_insert((ty, block.id, index));
+                    }
+                }
+            }
+        }
+    }
+    violations
+}
+
+fn is_move_type(ty: &Ty) -> bool {
+    match ty {
+        Ty::List(_) | Ty::Map(_, _) | Ty::Set(_) | Ty::Dyn(_) | Ty::Fn(_, _) => true,
+        Ty::Named(name) => !matches!(name.as_str(), "Int" | "Float" | "Bool" | "Char" | "String" | "Void" | "Ordering"),
+        Ty::Applied(name, _) => !matches!(name.as_str(), "Option" | "Result"),
+        _ => false,
+    }
+}
+
+fn safe_release_site(instruction: &IrInstr) -> bool {
+    // These are the only ownership transfers modeled by this first pass:
+    // binding a value into a local with no later read, or moving it into a
+    // channel. Calls, aggregates, fields and phis remain unresolved until
+    // their retain/borrow contract is explicit in the IR.
+    matches!(instruction, IrInstr::StoreLocal { .. } | IrInstr::ChannelSend { .. })
 }
 
 fn analyze_function(function: &crate::ir::IrFunction, report: &mut OwnershipReport) {
@@ -212,4 +371,29 @@ pub fn dump(report: &OwnershipReport) -> String {
         ));
     }
     out
+}
+
+pub fn dump_moves(violations: &[MoveViolation]) -> String {
+    let mut out = String::new();
+    out.push_str(&format!("ownership move-violations: {}\n", violations.len()));
+    for violation in violations {
+        out.push_str(&format!(
+            "  OSTRIN-E1101 {}: %{} {} sent at bb{}:{} then used at bb{}:{}\n",
+            violation.function,
+            violation.value,
+            violation.ty.describe(),
+            violation.send_block,
+            violation.send_instruction,
+            violation.use_block,
+            violation.use_instruction
+        ));
+    }
+    out
+}
+
+pub fn dump_lowering(summary: &LoweringSummary) -> String {
+    format!(
+        "ownership-ir functions: {}\nownership-ir inserted-releases: {}\nownership-ir unresolved-values: {}\n",
+        summary.functions, summary.inserted_releases, summary.unresolved_values
+    )
 }

@@ -1,9 +1,9 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-18 · rama `main` · 6 pruebas diferenciales y 113 de integración en verde.*
+*Corte: 2026-09-18 · rama `main` · 6 pruebas diferenciales y 115 de integración en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
-Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–140); para el diseño
+Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–141); para el diseño
 del lenguaje, `docs/design/` (20 documentos).
 
 ---
@@ -68,7 +68,8 @@ propios con `next`), `match` con guardas, patrones anidados, rangos y destructur
 `channel<T>()`, `send/receive/close`; las tareas se difieren, `join` las ejecuta y los
 canales bombean tareas pendientes cuando esperan datos. Esto todavía no usa hilos del SO ni
 paralelismo de CPU. Se verifica en el checker que no se capturen bindings `mut` (E1100) y en
-ejecución que un record enviado no se reutilice (E1101).
+ejecución que un record enviado no se reutilice (E1101); `--ownership-check` ya puede
+detectar ese uso posterior directamente sobre la IR.
 
 **Numérico/científico**: enteros de ancho fijo, `Float32`, `Array<T>` (difusión, máscaras,
 rebanadas, `@`), estadística, regresión, `det/inv/eigvals/norm`, `Rng` reproducible,
@@ -138,11 +139,11 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Área | Estado |
 |---|---|
 | Cierres en nativo | Captura **por valor** (una variable `mut` cambiada después no se ve dentro); lambda sin contexto de tipos exige anotación |
-| Chequeo «movido tras enviar» (E1101) | Dinámico en ambos backends; estático pendiente del IR (doc. 20) |
+| Chequeo «movido tras enviar» (E1101) | Red dinámica en ejecución y `--ownership-check` estático sobre la IR; falta integrarlo al checker por defecto |
 | Paralelismo nativo (hilos, canales bloqueantes, `select`) | No existe todavía; ambos backends tienen scheduler cooperativo |
 | Memoria en nativo | Registro de allocations y limpieza global al salir; ARC/último uso y destructores por tipo siguen pendientes |
 | IR de bloques | HIR→CFG disponible con `--ir`; `if/while/for/match/try/spawn/channel` ya tienen operaciones explícitas, aún no reemplaza el backend C |
-| Ownership/último uso | `--ownership-report` clasifica valores gestionables y candidatos lineales; no inserta `retain/release` todavía |
+| Ownership/último uso | `--ownership-report`, `--ownership-check` y `--ownership-ir`; inserta solo `release` en transferencias lineales demostrables, sin ARC completa |
 | Biblioteca estándar | Mínima: sin `HashMap` eficiente, fechas, red, formateo, `args`, entorno |
 | `==` sobre `List/Option/Map` | No soportado (tampoco en intérprete para Option) |
 | Mensajes de error de E/S | `strerror` ≠ texto de Rust (difieren entre backends) |
@@ -229,7 +230,7 @@ Decisiones que necesito de ti para afinar el plan:
 
 ```powershell
 cd compiler
-cargo test                                   # 6 diferenciales + 113 de integración
+cargo test                                   # 6 diferenciales + 115 de integración
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```

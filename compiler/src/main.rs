@@ -46,6 +46,8 @@ fn real_main() -> ExitCode {
     let hir_mode = args.iter().any(|a| a == "--hir");
     let ir_mode = args.iter().any(|a| a == "--ir");
     let ownership_report = args.iter().any(|a| a == "--ownership-report");
+    let ownership_ir = args.iter().any(|a| a == "--ownership-ir");
+    let ownership_check = args.iter().any(|a| a == "--ownership-check");
     let stdin_source = args.iter().any(|a| a == "--stdin");
     let lsp_server = args.iter().any(|a| a == "--lsp");
     let dap_server = args.iter().any(|a| a == "--dap");
@@ -90,7 +92,7 @@ fn real_main() -> ExitCode {
         }
         !a.starts_with("--")
     }) else {
-        eprintln!("usage: ostrinc [--check|--ast|--tokens|--symbols|--members|--types|--hir|--ir|--ownership-report|--run] [--json] <entry_file.ostrin>");
+        eprintln!("usage: ostrinc [--check|--ast|--tokens|--symbols|--members|--types|--hir|--ir|--ownership-report|--ownership-ir|--ownership-check|--run] [--json] <entry_file.ostrin>");
         return ExitCode::FAILURE;
     };
 
@@ -354,6 +356,23 @@ fn real_main() -> ExitCode {
         return ExitCode::SUCCESS;
     }
 
+    if ownership_check {
+        let hir_program = hir::lower(&items, &typed_program);
+        let ir_program = ir::lower(&hir_program);
+        let violations = ownership::check_moves(&ir_program);
+        print!("{}", ownership::dump_moves(&violations));
+        return if violations.is_empty() { ExitCode::SUCCESS } else { ExitCode::FAILURE };
+    }
+
+    if ownership_ir {
+        let hir_program = hir::lower(&items, &typed_program);
+        let ir_program = ir::lower(&hir_program);
+        let (lowered, summary) = ownership::lower_linear(&ir_program);
+        print!("{}", ir::dump(&lowered));
+        print!("{}", ownership::dump_lowering(&summary));
+        return if ir::verify(&lowered).violations.is_empty() { ExitCode::SUCCESS } else { ExitCode::FAILURE };
+    }
+
     let emit_c = args.iter().any(|a| a == "--emit-c");
     let compile_native = args.iter().any(|a| a == "--compile");
     if emit_c || compile_native {
@@ -494,6 +513,8 @@ fn print_help() {
     println!("  --hir         Print the typed, verified HIR");
     println!("  --ir          Lower HIR to explicit basic blocks and temporaries");
     println!("  --ownership-report  Report conservative managed values and last-use candidates");
+    println!("  --ownership-ir      Insert proof-guided linear release markers into a cloned IR");
+    println!("  --ownership-check   Detect managed values used after channel send (E1101)");
     println!("  --emit-c      Transpile to C (a supported subset only; see docs) instead of running");
     println!("  --compile     Transpile to C and compile it to a native executable");
     println!("  --out PATH    Output path for --emit-c/--compile (defaults: stdout / <entry>.exe next to the source)");

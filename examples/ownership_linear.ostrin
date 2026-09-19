@@ -1,0 +1,10 @@
+record Packet {
+    mut value: Int
+}
+
+fn main() -> Void {
+    ch = channel<Packet>()
+    packet = Packet { value: 1 }
+    ch.send(packet)
+    ch.close()
+}
