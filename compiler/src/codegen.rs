@@ -3967,7 +3967,7 @@ impl<'a> Codegen<'a> {
     /// `write_file`, `parse_int`, `sum` and `panic`.
     fn gen_builtin(&mut self, name: &str, codes: &[String], types: &[CType]) -> Result<Option<(String, CType)>, String> {
         let arity = match name {
-            "read_file" | "parse_int" | "sum" | "panic" | "assert" | "array" | "zeros" | "ones" | "abs" => 1,
+            "read_file" | "parse_int" | "parse_csv" | "sum" | "panic" | "assert" | "array" | "zeros" | "ones" | "abs" => 1,
             n if ["sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh", "exp", "ln", "log10", "sqrt", "floor", "ceil", "round", "erf"].contains(&n) => 1,
             "pi" => 0,
             "rng" => 1,
@@ -3983,6 +3983,23 @@ impl<'a> Codegen<'a> {
         }
         let (r, a, b, c) = (self.next_temp(), self.next_temp(), self.next_temp(), self.next_temp());
         match name {
+            "parse_csv" => {
+                let inner = CType::List(Box::new(CType::Str));
+                let ty = CType::List(Box::new(inner.clone()));
+                self.register_list_types(&ty);
+                let (outer_c, inner_c) = (list_struct_name(&inner), list_struct_name(&CType::Str));
+                Ok(Some((
+                    format!(
+                        "({{ int64_t {r}_n; int64_t* {r}_c; const char*** {r}_rows = ostrin_s_csv({t}, &{r}_n, &{r}_c); \
+                         {inner_ptr}* {r}_lists = ({inner_ptr}*)malloc(sizeof({inner_ptr}) * (size_t)({r}_n + 1)); \
+                         for (int64_t {r}_i = 0; {r}_i < {r}_n; {r}_i++) {{ {r}_lists[{r}_i] = {inner_c}_new_from_array({r}_rows[{r}_i], {r}_c[{r}_i]); }} \
+                         {outer_c}_new_from_array({r}_lists, {r}_n); }})",
+                        t = codes[0],
+                        inner_ptr = c_type_name(&inner),
+                    ),
+                    ty,
+                )))
+            }
             "read_file" => {
                 let ty = CType::Result(Box::new(CType::Str), Box::new(CType::Str));
                 self.register_list_types(&ty);

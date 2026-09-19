@@ -1,0 +1,25 @@
+// parse_csv: comillas, comas y saltos de línea dentro de un campo, líneas vacías, \r\n.
+fn show(rows: List<List<String>>) -> Void {
+    print(rows.length())
+    for row in rows {
+        print(row.length())
+        print(row.join("|"))
+    }
+}
+
+fn main() -> Void {
+    show(parse_csv("a,b,c\n1,2,3\n"))
+    show(parse_csv("nombre,nota\r\n\"Perez, Ana\",9.5\r\n\r\n\"dijo \"\"hola\"\"\",7\r\n"))
+    show(parse_csv("x,\"linea1\nlinea2\",z"))
+    show(parse_csv(",,\n\"\"\n"))
+    show(parse_csv(""))
+    first = parse_csv("k,v\nuno,1\ndos,2")
+    mut total = 0
+    for row in first {
+        match row[1].to_int() {
+            Ok(n) => { total = total + n },
+            Err(e) => print("cabecera: " + e),
+        }
+    }
+    print(total)
+}

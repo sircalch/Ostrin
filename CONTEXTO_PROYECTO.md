@@ -3564,3 +3564,7 @@ Ejemplo: `examples/string_methods.ostrin` (incluye un lector de CSV escrito en O
 - El lexer acepta `\r` como escape.
 - Límite: solo semántica ASCII para mayúsculas/espacios; no hay `Int.to_float()` (se usa `x as Float`).
 - Siguiente paso natural: `read_csv`/`DataFrame` sobre esto (columnas tipadas, `describe`, `group_by`).
+
+## 112. `parse_csv`
+
+`parse_csv(texto) -> List<List<String>>` (RFC 4180: campos entre comillas con `""`, comas y saltos de línea dentro del campo, `\n` o `\r\n`, líneas vacías omitidas). Implementado en `interpreter/strings.rs` y espejado en `strings_runtime.c` (`ostrin_s_csv`). Para un archivo: `read_file(ruta)` y luego `parse_csv` sobre el texto (`read_file(p).map(fn(t) { parse_csv(t) })`). Ejemplo comparado entre backends: `examples/csv_parse.ostrin`. Es la base de un futuro `DataFrame`.

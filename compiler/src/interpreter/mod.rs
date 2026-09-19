@@ -1716,6 +1716,13 @@ impl Interpreter {
                         Err(error) => err_value(Value::String(error.to_string())),
                     });
                 }
+                "parse_csv" => {
+                    let text = self.eval_arg(&args[0], env)?;
+                    let Value::String(text) = text else {
+                        return Err(RuntimeError::Error("'parse_csv' expects a String".to_string()));
+                    };
+                    return Ok(strings::csv_value(&text));
+                }
                 "parse_int" => {
                     let text = self.eval_arg(&args[0], env)?;
                     let Value::String(text) = text else {

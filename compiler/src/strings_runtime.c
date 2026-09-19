@@ -157,3 +157,73 @@ static int ostrin_s_float_check(const char* s) {
     }
     return *p == 0 ? 0 : 2;
 }
+
+/* `parse_csv`, mirroring `parse_csv` in interpreter/strings.rs. Returns the rows (each an array
+ * of fields) with their counts. */
+typedef struct { char* buf; size_t len, cap; } OstrinSBuf;
+static void ostrin_sbuf_push(OstrinSBuf* b, char c) {
+    if (b->len + 1 >= b->cap) {
+        b->cap = b->cap ? b->cap * 2 : 16;
+        b->buf = (char*)realloc(b->buf, b->cap);
+        if (!b->buf) OSTRIN_OOM();
+    }
+    b->buf[b->len++] = c;
+}
+static const char* ostrin_sbuf_take(OstrinSBuf* b) {
+    char* r = ostrin_s_dup(b->buf ? b->buf : "", b->len);
+    b->len = 0;
+    return r;
+}
+typedef struct { const char** items; int64_t n, cap; } OstrinSRow;
+static void ostrin_srow_push(OstrinSRow* r, const char* s) {
+    if (r->n >= r->cap) {
+        r->cap = r->cap ? r->cap * 2 : 4;
+        r->items = (const char**)realloc((void*)r->items, sizeof(char*) * (size_t)r->cap);
+        if (!r->items) OSTRIN_OOM();
+    }
+    r->items[r->n++] = s;
+}
+static const char*** ostrin_s_csv(const char* s, int64_t* out_rows, int64_t** out_cols) {
+    const char*** rows = NULL; int64_t* cols = NULL; int64_t nrows = 0, cap = 0;
+    OstrinSRow row = {0}; OstrinSBuf field = {0};
+    bool quoted = false, touched = false;
+    for (const char* p = s; *p; p++) {
+        char c = *p;
+        if (quoted) {
+            if (c == '"') {
+                if (p[1] == '"') { ostrin_sbuf_push(&field, '"'); p++; } else quoted = false;
+            } else ostrin_sbuf_push(&field, c);
+            continue;
+        }
+        if (c == '"') { quoted = true; touched = true; }
+        else if (c == ',') { ostrin_srow_push(&row, ostrin_sbuf_take(&field)); touched = true; }
+        else if (c == '\r' && p[1] == '\n') { }
+        else if (c == '\n') {
+            if (touched) {
+                ostrin_srow_push(&row, ostrin_sbuf_take(&field));
+                if (nrows >= cap) {
+                    cap = cap ? cap * 2 : 8;
+                    rows = (const char***)realloc((void*)rows, sizeof(void*) * (size_t)cap);
+                    cols = (int64_t*)realloc(cols, sizeof(int64_t) * (size_t)cap);
+                    if (!rows || !cols) OSTRIN_OOM();
+                }
+                rows[nrows] = row.items; cols[nrows] = row.n; nrows++;
+                row.items = NULL; row.n = 0; row.cap = 0;
+            }
+            touched = false;
+        } else { ostrin_sbuf_push(&field, c); touched = true; }
+    }
+    if (touched) {
+        ostrin_srow_push(&row, ostrin_sbuf_take(&field));
+        if (nrows >= cap) {
+            cap = cap ? cap * 2 : 8;
+            rows = (const char***)realloc((void*)rows, sizeof(void*) * (size_t)cap);
+            cols = (int64_t*)realloc(cols, sizeof(int64_t) * (size_t)cap);
+            if (!rows || !cols) OSTRIN_OOM();
+        }
+        rows[nrows] = row.items; cols[nrows] = row.n; nrows++;
+    }
+    free(field.buf);
+    *out_rows = nrows; *out_cols = cols;
+    return rows;
+}

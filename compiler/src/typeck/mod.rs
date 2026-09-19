@@ -3892,7 +3892,7 @@ fn check_builtin_call(name: &str, arg_types: &[Ty], errors: &mut Vec<TypeError>)
     let expected_args = match name {
         "print" => vec![Ty::Unknown],
         "sum" => vec![Ty::List(Box::new(Ty::Unknown))],
-        "read_file" | "parse_int" => vec![Ty::String],
+        "read_file" | "parse_int" | "parse_csv" => vec![Ty::String],
         "write_file" => vec![Ty::String, Ty::String],
         "panic" => vec![Ty::String],
         "assert" => vec![Ty::Bool],
@@ -3931,6 +3931,7 @@ fn check_builtin_call(name: &str, arg_types: &[Ty], errors: &mut Vec<TypeError>)
     }
     match name {
         "print" | "panic" | "assert" | "assert_eq" => Some(Ty::Void),
+        "parse_csv" => Some(Ty::List(Box::new(Ty::List(Box::new(Ty::String))))),
         "read_file" | "write_file" => Some(Ty::Applied(
             "Result".to_string(),
             vec![

@@ -86,3 +86,61 @@ pub fn join(items: &[Value], sep: &str) -> Result<Value, RuntimeError> {
     }
     Ok(Value::String(parts.join(sep)))
 }
+
+/// `parse_csv`: RFC 4180-style records. `"` opens/closes a quoted field (`""` is a literal quote,
+/// and a quoted field may contain commas and newlines); records end at `\n` or `\r\n`; a line with
+/// nothing on it is skipped. `strings_runtime.c` (`ostrin_s_csv`) mirrors this state machine.
+pub fn parse_csv(text: &str) -> Vec<Vec<String>> {
+    let mut rows: Vec<Vec<String>> = Vec::new();
+    let mut row: Vec<String> = Vec::new();
+    let mut field = String::new();
+    let mut quoted = false;
+    let mut touched = false;
+    let mut chars = text.chars().peekable();
+    while let Some(c) = chars.next() {
+        if quoted {
+            if c == '"' {
+                if chars.peek() == Some(&'"') {
+                    chars.next();
+                    field.push('"');
+                } else {
+                    quoted = false;
+                }
+            } else {
+                field.push(c);
+            }
+            continue;
+        }
+        match c {
+            '"' => {
+                quoted = true;
+                touched = true;
+            }
+            ',' => {
+                row.push(std::mem::take(&mut field));
+                touched = true;
+            }
+            '\r' if chars.peek() == Some(&'\n') => {}
+            '\n' => {
+                if touched {
+                    row.push(std::mem::take(&mut field));
+                    rows.push(std::mem::take(&mut row));
+                }
+                touched = false;
+            }
+            other => {
+                field.push(other);
+                touched = true;
+            }
+        }
+    }
+    if touched {
+        row.push(field);
+        rows.push(row);
+    }
+    rows
+}
+
+pub fn csv_value(text: &str) -> Value {
+    Value::List(Rc::new(RefCell::new(parse_csv(text).into_iter().map(list_of).collect())))
+}
