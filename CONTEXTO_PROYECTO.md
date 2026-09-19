@@ -3384,3 +3384,32 @@ Primer bloque del eje científico, de punta a punta (checker → intérprete →
 - Ejemplos `statistics.ostrin` y `statistics_errors.ostrin` (6 errores). Suite: **107 pruebas**.
 - Pendiente de la biblioteca científica: histogramas, regresión (mínimos cuadrados),
   tests de hipótesis/ANOVA, distribuciones (`pdf`/`cdf`), y una `libm` propia determinista.
+
+---
+
+## 99. Librería matemática determinista (`detmath`) — 2026-09-18
+
+Cierra el aviso de reproducibilidad del §96.
+
+- `sin cos tan asin acos atan sinh cosh tanh exp ln log10 pow atan2` ya **no usan la `libm`**:
+  se calculan con operaciones enteras, `floor`, `sqrt` y las operaciones IEEE `+ - * /`
+  (exactamente redondeadas), en `interpreter/detmath.rs` y su espejo `detmath_runtime.c`
+  (mismas fórmulas, mismo orden; el nativo se compila con `-ffp-contract=off`).
+  `sqrt floor ceil round abs` siguen siendo las del sistema porque IEEE las define exactas.
+  `Float32` calcula en doble precisión y redondea una sola vez.
+- Algoritmos: `exp` con reducción de Cody–Waite y serie de Taylor; `ln` por reducción a
+  `[√½, √2)` y serie de atanh (compartida con `Rng`); `sin/cos/tan` con reducción por
+  cuadrantes (|x| ≤ 1e6; fuera de rango devuelven `NaN`) y núcleos de Taylor; `atan` con
+  reducción de argumento; `asin/acos` vía `atan2`; `sinh/cosh/tanh` vía `exp` (serie cerca de 0);
+  `pow` con exponenciación binaria exacta para exponentes enteros (`|y| ≤ 1024`) y
+  `exp(y·ln x)` en el resto.
+- **Precisión medida** contra `math` de Python en 60 entradas aleatorias por función:
+  ≤ 1 ulp (`ln`, `log10`), ≤ 2 ulp (`sin cos exp atan asin acos cosh`), 3–5 ulp
+  (`tan sinh tanh`), hasta 10 ulp en `pow` no entero. No son correctamente redondeadas; es
+  el precio de la reproducibilidad exacta. Mejorable con polinomios minimax sin cambiar el contrato.
+- Bug encontrado: el formato de floats grandes en el nativo (`%.0f`) imprimía la expansión
+  binaria exacta (`5184705528587073093632`) mientras Rust imprime los dígitos más cortos
+  rellenados con ceros (`5184705528587073000000`). Nuevo `ostrin_expand_exp` reproduce el formato de Rust.
+- Aviso: `unit` no puede usarse como nombre de variable (palabra reservada del parser).
+- Ejemplo `detmath.ostrin` (barridos de todas las funciones; salida idéntica bit a bit
+  en intérprete y nativo). Suite: **108 pruebas**, sin warnings.

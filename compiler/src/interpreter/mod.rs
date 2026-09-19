@@ -11,6 +11,7 @@ use crate::ast::*;
 use crate::protocol;
 
 mod array;
+mod detmath;
 mod math;
 mod rng;
 use crate::types::{dim_div, dim_is_dimensionless, dim_mul, dim_pow, dim_to_string, resolve_unit_expr, Dimension};

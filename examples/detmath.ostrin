@@ -1,0 +1,40 @@
+fn main() -> Void {
+    xs = linspace(-3.0, 3.0, 13)
+    print(sin(xs))
+    print(cos(xs))
+    print(tan(xs))
+    print(exp(xs))
+    print(atan(xs))
+    print(sinh(xs))
+    print(cosh(xs))
+    print(tanh(xs))
+
+    ps = linspace(0.1, 50.0, 9)
+    print(ln(ps))
+    print(log10(ps))
+    print(sqrt(ps))
+
+    ratios = linspace(-1.0, 1.0, 9)
+    print(asin(ratios))
+    print(acos(ratios))
+
+    print(pow(2.0, 10.0))
+    print(pow(2.0, 0.5))
+    print(pow(10.0, -3.0))
+    print(pow(-2.0, 3.0))
+    print(pow(1.5, 7.25))
+    print(atan2(1.0, -1.0))
+    print(atan2(-1.0, -2.0))
+    print(sin(1000.0))
+    print(exp(50.0))
+    print(exp(-30.0))
+    print(ln(0.000001))
+
+    ys = linspace(0.0, 10.0, 6)
+    print(sin(ys) * exp(-ys / 5.0))
+
+    single = array([0.5f32, 1.0f32, 2.0f32])
+    print(sin(single))
+    print(exp(single))
+    print(pow(2.0f32, 0.5f32))
+}

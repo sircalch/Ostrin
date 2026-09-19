@@ -1,9 +1,9 @@
 //! `Rng`: a reproducible pseudo-random generator (xoshiro256** seeded through
 //! splitmix64). Every step uses only integer operations and correctly-rounded
-//! IEEE arithmetic (`+ - * /` and `sqrt`), plus a hand-written natural log built
+//! IEEE arithmetic (`+ - * /` and `sqrt`), plus the deterministic natural log of `detmath.rs`, built
 //! from those same operations, so the stream is bit-for-bit identical on every
 //! platform and in the native backend (`RNG_RUNTIME` in `codegen.rs` mirrors this
-//! file line by line). Never replace `det_ln` with `f64::ln`: the platform's libm
+//! file line by line). Never replace `detmath::ln` with `f64::ln`: the platform's libm
 //! is allowed to differ in the last digit.
 
 use super::{array, RuntimeError, Value};
@@ -74,31 +74,10 @@ impl RngState {
             let v = 2.0 * self.next_float() - 1.0;
             let s = u * u + v * v;
             if s > 0.0 && s < 1.0 {
-                return u * ((-2.0 * det_ln(s)) / s).sqrt();
+                return u * ((-2.0 * super::detmath::ln(s)) / s).sqrt();
             }
         }
     }
-}
-
-/// Natural logarithm from basic IEEE operations only (argument reduction to
-/// `[sqrt(1/2), sqrt(2))`, then the atanh series). Accurate to ~1e-16.
-pub fn det_ln(x: f64) -> f64 {
-    let bits = x.to_bits();
-    let mut e = ((bits >> 52) & 0x7FF) as i64 - 1023;
-    let mut m = f64::from_bits((bits & 0x000F_FFFF_FFFF_FFFF) | 0x3FF0_0000_0000_0000);
-    if m > 1.4142135623730951 {
-        m *= 0.5;
-        e += 1;
-    }
-    let z = (m - 1.0) / (m + 1.0);
-    let z2 = z * z;
-    let mut term = z;
-    let mut sum = 0.0;
-    for k in 0..16 {
-        sum += term / (2 * k + 1) as f64;
-        term *= z2;
-    }
-    e as f64 * 0.6931471805599453 + 2.0 * sum
 }
 
 fn shape_of(value: &Value) -> Result<Vec<usize>, RuntimeError> {

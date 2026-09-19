@@ -288,6 +288,10 @@ const QTY_RUNTIME: &str = include_str!("qty_runtime.c");
 /// Reproducible random generator, spliced in when a program uses `Rng`.
 const RNG_RUNTIME: &str = include_str!("rng_runtime.c");
 
+/// Deterministic elementary functions (mirror of `interpreter/detmath.rs`), spliced in
+/// whenever the program uses `sin`, `exp`, `pow`, `Rng`, …
+const DETMATH_RUNTIME: &str = include_str!("detmath_runtime.c");
+
 /// Statistics appended to the array runtime of float element types.
 const ARRAY_STATS: &str = include_str!("array_stats.c");
 
@@ -314,6 +318,36 @@ static int64_t ostrin_idiv(int64_t a, int64_t b) {\n\
     return a / b;\n\
 }\n\
 \n\
+static void ostrin_expand_exp(const char* t_in, char* buf, size_t n) {\n\
+    char t[64];\n\
+    snprintf(t, sizeof t, \"%s\", t_in);\n\
+    char* e = strchr(t, 'e');\n\
+    int ex = atoi(e + 1);\n\
+    *e = 0;\n\
+    int neg = t[0] == '-';\n\
+    char digits[40];\n\
+    int nd = 0;\n\
+    for (char* p = t + neg; *p; p++) if (*p != '.') digits[nd++] = *p;\n\
+    digits[nd] = 0;\n\
+    char out[400];\n\
+    int o = 0;\n\
+    if (neg) out[o++] = '-';\n\
+    if (ex >= nd - 1) {\n\
+        memcpy(out + o, digits, (size_t)nd); o += nd;\n\
+        for (int i = 0; i < ex - (nd - 1); i++) out[o++] = '0';\n\
+    } else if (ex >= 0) {\n\
+        memcpy(out + o, digits, (size_t)(ex + 1)); o += ex + 1;\n\
+        out[o++] = '.';\n\
+        memcpy(out + o, digits + ex + 1, (size_t)(nd - ex - 1)); o += nd - ex - 1;\n\
+    } else {\n\
+        out[o++] = '0'; out[o++] = '.';\n\
+        for (int i = 0; i < -ex - 1; i++) out[o++] = '0';\n\
+        memcpy(out + o, digits, (size_t)nd); o += nd;\n\
+    }\n\
+    out[o] = 0;\n\
+    snprintf(buf, n, \"%s\", out);\n\
+}\n\
+\n\
 static void ostrin_fmt_double(double v, char* buf, size_t n) {\n\
     int prec;\n\
     for (prec = 1; prec <= 17; prec++) {\n\
@@ -323,8 +357,7 @@ static void ostrin_fmt_double(double v, char* buf, size_t n) {\n\
     if (strchr(buf, 'e')) {\n\
         char t[64];\n\
         snprintf(t, sizeof t, \"%.*e\", prec - 1, v);\n\
-        int decimals = prec - 1 - atoi(strchr(t, 'e') + 1);\n\
-        snprintf(buf, n, \"%.*f\", decimals < 0 ? 0 : decimals, v);\n\
+        ostrin_expand_exp(t, buf, n);\n\
     }\n\
 }\n\
 \n\
@@ -337,8 +370,7 @@ static void ostrin_fmt_single(float v, char* buf, size_t n) {\n\
     if (strchr(buf, 'e')) {\n\
         char t[64];\n\
         snprintf(t, sizeof t, \"%.*e\", prec - 1, (double)v);\n\
-        int decimals = prec - 1 - atoi(strchr(t, 'e') + 1);\n\
-        snprintf(buf, n, \"%.*f\", decimals < 0 ? 0 : decimals, (double)v);\n\
+        ostrin_expand_exp(t, buf, n);\n\
     }\n\
 }\n\
 \n\
@@ -3671,8 +3703,8 @@ impl<'a> Codegen<'a> {
             "pi" => Ok(Some(("3.141592653589793".to_string(), CType::Float))),
             "rng" => Ok(Some((format!("ostrin_rng_new({})", codes[0]), CType::Rng))),
             "pow" | "atan2" => match (&types[0], &types[1]) {
-                (CType::Float, CType::Float) => Ok(Some((format!("{name}({}, {})", codes[0], codes[1]), CType::Float))),
-                (CType::Float32, CType::Float32) => Ok(Some((format!("{name}f({}, {})", codes[0], codes[1]), CType::Float32))),
+                (CType::Float, CType::Float) => Ok(Some((format!("ostrin_dm_{name}({}, {})", codes[0], codes[1]), CType::Float))),
+                (CType::Float32, CType::Float32) => Ok(Some((format!("ostrin_dm_{name}f({}, {})", codes[0], codes[1]), CType::Float32))),
                 _ => Err(format!("'{name}' needs two Float or two Float32 arguments")),
             },
             "abs" => {
@@ -3702,13 +3734,15 @@ impl<'a> Codegen<'a> {
                 Ok(Some((format!("{function}({})", codes[0]), elem)))
             }
             m if ["sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh", "exp", "ln", "log10", "sqrt", "floor", "ceil", "round"].contains(&m) => {
-                let c_name = if m == "ln" { "log" } else { m };
+                // Exactly-rounded operations use libm; the rest use the deterministic runtime.
+                let exact = matches!(m, "sqrt" | "floor" | "ceil" | "round");
+                let c_name = if exact { m.to_string() } else { format!("ostrin_dm_{m}") };
                 let (elem, array) = match &types[0] {
                     CType::Array(t) => ((**t).clone(), true),
                     other => (other.clone(), false),
                 };
                 let function = match elem {
-                    CType::Float => c_name.to_string(),
+                    CType::Float => c_name.clone(),
                     CType::Float32 => format!("{c_name}f"),
                     other => return Err(format!("'{m}' isn't supported on '{}' by the native backend", c_type_name(&other))),
                 };
@@ -4672,6 +4706,10 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>) ->
     }
     if out.contains("OstrinRng") {
         out = out.replacen(PRELUDE, &format!("{PRELUDE}{RNG_RUNTIME}"), 1);
+    }
+    // Last, so it lands first: the RNG runtime itself calls `ostrin_dm_ln`.
+    if out.contains("ostrin_dm_") {
+        out = out.replacen(PRELUDE, &format!("{PRELUDE}{DETMATH_RUNTIME}"), 1);
     }
     Ok((out, codegen.type_report.clone()))
 }

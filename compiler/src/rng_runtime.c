@@ -1,7 +1,7 @@
 /* Runtime for Rng: xoshiro256** seeded through splitmix64. Mirrors
  * interpreter/rng.rs line by line so both backends produce the same stream.
  * Only integer operations and correctly-rounded IEEE arithmetic are used
- * (ostrin_ln is built from + - * / alone); compile with -ffp-contract=off. */
+ * (ostrin_dm_ln, from detmath_runtime.c, is built from + - * / alone); compile with -ffp-contract=off. */
 typedef struct { uint64_t s[4]; } OstrinRng;
 
 static uint64_t ostrin_splitmix64(uint64_t* x) {
@@ -47,30 +47,11 @@ static int64_t ostrin_rng_int(OstrinRng* r, int64_t lo, int64_t hi) {
     return (int64_t)((uint64_t)lo + x % range);
 }
 
-static double ostrin_ln(double x) {
-    uint64_t bits;
-    memcpy(&bits, &x, sizeof bits);
-    int64_t e = (int64_t)((bits >> 52) & 0x7FF) - 1023;
-    bits = (bits & 0x000FFFFFFFFFFFFFULL) | 0x3FF0000000000000ULL;
-    double m;
-    memcpy(&m, &bits, sizeof m);
-    if (m > 1.4142135623730951) { m = m * 0.5; e += 1; }
-    double z = (m - 1.0) / (m + 1.0);
-    double z2 = z * z;
-    double term = z;
-    double sum = 0.0;
-    for (int k = 0; k < 16; k++) {
-        sum = sum + term / (double)(2 * k + 1);
-        term = term * z2;
-    }
-    return (double)e * 0.6931471805599453 + 2.0 * sum;
-}
-
 static double ostrin_rng_normal(OstrinRng* r) {
     for (;;) {
         double u = 2.0 * ostrin_rng_float(r) - 1.0;
         double v = 2.0 * ostrin_rng_float(r) - 1.0;
         double s = u * u + v * v;
-        if (s > 0.0 && s < 1.0) return u * sqrt((-2.0 * ostrin_ln(s)) / s);
+        if (s > 0.0 && s < 1.0) return u * sqrt((-2.0 * ostrin_dm_ln(s)) / s);
     }
 }

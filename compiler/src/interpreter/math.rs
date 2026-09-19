@@ -3,7 +3,7 @@
 //! round abs pow atan2 pi`. The result type always equals the argument type;
 //! `Int` is never converted implicitly (the checker asks for `x as Float`).
 
-use super::{array, RuntimeError, Value};
+use super::{array, detmath, RuntimeError, Value};
 
 /// True when `name` with `arity` arguments is one of the math builtins.
 pub fn is_math(name: &str, arity: usize) -> bool {
@@ -21,18 +21,19 @@ pub const UNARY: &[&str] = &[
 
 fn f64_fn(name: &str, x: f64) -> f64 {
     match name {
-        "sin" => x.sin(),
-        "cos" => x.cos(),
-        "tan" => x.tan(),
-        "asin" => x.asin(),
-        "acos" => x.acos(),
-        "atan" => x.atan(),
-        "sinh" => x.sinh(),
-        "cosh" => x.cosh(),
-        "tanh" => x.tanh(),
-        "exp" => x.exp(),
-        "ln" => x.ln(),
-        "log10" => x.log10(),
+        "sin" => detmath::sin(x),
+        "cos" => detmath::cos(x),
+        "tan" => detmath::tan(x),
+        "asin" => detmath::asin(x),
+        "acos" => detmath::acos(x),
+        "atan" => detmath::atan(x),
+        "sinh" => detmath::sinh(x),
+        "cosh" => detmath::cosh(x),
+        "tanh" => detmath::tanh(x),
+        "exp" => detmath::exp(x),
+        "ln" => detmath::ln(x),
+        "log10" => detmath::log10(x),
+        // Exactly rounded by IEEE 754, so the platform's own routine is safe.
         "sqrt" => x.sqrt(),
         "floor" => x.floor(),
         "ceil" => x.ceil(),
@@ -41,25 +42,14 @@ fn f64_fn(name: &str, x: f64) -> f64 {
     }
 }
 
+/// `Float32` functions compute in double precision and round once.
 fn f32_fn(name: &str, x: f32) -> f32 {
     match name {
-        "sin" => x.sin(),
-        "cos" => x.cos(),
-        "tan" => x.tan(),
-        "asin" => x.asin(),
-        "acos" => x.acos(),
-        "atan" => x.atan(),
-        "sinh" => x.sinh(),
-        "cosh" => x.cosh(),
-        "tanh" => x.tanh(),
-        "exp" => x.exp(),
-        "ln" => x.ln(),
-        "log10" => x.log10(),
         "sqrt" => x.sqrt(),
         "floor" => x.floor(),
         "ceil" => x.ceil(),
         "round" => x.round(),
-        _ => unreachable!("checked by is_math"),
+        other => f64_fn(other, x as f64) as f32,
     }
 }
 
@@ -93,10 +83,10 @@ fn unary(name: &str, value: &Value) -> Result<Value, RuntimeError> {
 pub fn call(name: &str, args: &[Value]) -> Result<Value, RuntimeError> {
     match (name, args) {
         ("pi", []) => Ok(Value::Float(std::f64::consts::PI)),
-        ("pow", [Value::Float(a), Value::Float(b)]) => Ok(Value::Float(a.powf(*b))),
-        ("pow", [Value::F32(a), Value::F32(b)]) => Ok(Value::F32(a.powf(*b))),
-        ("atan2", [Value::Float(y), Value::Float(x)]) => Ok(Value::Float(y.atan2(*x))),
-        ("atan2", [Value::F32(y), Value::F32(x)]) => Ok(Value::F32(y.atan2(*x))),
+        ("pow", [Value::Float(a), Value::Float(b)]) => Ok(Value::Float(detmath::pow(*a, *b))),
+        ("pow", [Value::F32(a), Value::F32(b)]) => Ok(Value::F32(detmath::pow(*a as f64, *b as f64) as f32)),
+        ("atan2", [Value::Float(y), Value::Float(x)]) => Ok(Value::Float(detmath::atan2(*y, *x))),
+        ("atan2", [Value::F32(y), Value::F32(x)]) => Ok(Value::F32(detmath::atan2(*y as f64, *x as f64) as f32)),
         (_, [value]) => unary(name, value),
         _ => Err(RuntimeError::Error(format!("'{name}' was called with unsupported arguments"))),
     }
