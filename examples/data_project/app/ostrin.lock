@@ -1,8 +1,0 @@
-# generado por ostrinc — no editar a mano
-package = "data_app"
-version = "0.1.0"
-
-[[dependency]]
-name = "tables"
-resolved_path = "C:/Users/Andre/Downloads/Lenguaje nuevo/examples/data_project/tables"
-
