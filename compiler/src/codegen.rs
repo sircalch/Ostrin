@@ -3013,6 +3013,11 @@ impl<'a> Codegen<'a> {
     /// construction specifically, matched by field name; positional
     /// arguments still fill in declaration order.
     fn gen_variant_args(&mut self, variant: &VariantInfo, args: &[Arg]) -> Result<Vec<String>, String> {
+        if let Some(&arity) = self.hir_arities.get(&variant.name) {
+            if arity != variant.fields.len() {
+                self.type_report.divergences.push(format!("variant '{}': native has {} field(s), HIR expects {arity}", variant.name, variant.fields.len()));
+            }
+        }
         let mut codes: Vec<Option<String>> = vec![None; variant.fields.len()];
         let mut next_positional = 0usize;
         for arg in args {

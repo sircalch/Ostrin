@@ -3540,3 +3540,7 @@ Primer puente hacia el backend sobre HIR: la lógica que ordena argumentos nombr
 ## 108. La comprobación cruzada HIR↔nativo cubre también los métodos
 
 `HirProgram.arities` incluye `Tipo.método` (sin contar `self`); el backend nativo compara con ella tras normalizar los argumentos de cada llamada a método de registro y registra una divergencia si difiere. 6 + 98 pruebas verdes, 0 divergencias.
+
+## 109. Comprobación cruzada HIR↔nativo en constructores de variantes
+
+`gen_variant_args` compara el número de campos de la variante con `HirProgram.arities`; con esto funciones, métodos y constructores quedan contrastados. 6 + 98 pruebas verdes, 0 divergencias.
