@@ -3649,3 +3649,17 @@ Nuevo `hir_c.rs`: genera el cuerpo C directamente del HIR para las funciones **e
 
 `hir_c.rs` genera ahora enums no genéricos (uniones etiquetadas por valor): constructores (`Circle(2.0)`, variantes unitarias como valor), enums como parámetros/retorno/locales y `match` con el mismo esquema que el AST (variable del escrutinio, bandera `matched`, variable de resultado, una `if (!matched && patrón)` por brazo, guardas anidadas, aborto si ningún brazo encaja). Patrones cubiertos: comodín, ligadura, variante unitaria, variante con subpatrones (nombre o posición), literal `Int/Bool/String`, rango `Int`. Records-patrón, `Option/Result` y genéricos siguen por el AST.
 Cobertura: 43 funciones y métodos de los ejemplos (36 antes); ratchet ≥ 40; todo verde (6 + 101).
+
+## 126. Punto de retoma (para continuar en otro chat)
+
+**Estado al cierre:** todo commiteado y subido a `main` (`sircalch/Ostrin`). `cargo test` en `compiler/`: 6 diferenciales + 101 de integración en verde. Bitácora al día hasta la sección 125; `ESTADO_Y_PLAN.md` y `CHANGELOG.md` refrescados.
+
+**Lo hecho en esta tanda (secciones 106–125):** funciones como valores y cierres; métodos de `String`, `parse_csv`; paquetes en Ostrin `tables`, `plot` (SVG) y `autodiff`; operadores completos (`neg`, escalar a la izquierda); `det/inv/trace/eye/norm/eigvals` y `matriz @ vector`; arreglos de módulos (tipos en firmas, nombres calificados en nativo); y la **migración del backend nativo al HIR** por familias (`hir_c.rs`: escalares → records/métodos → enums/`match`).
+
+**Siguiente paso recomendado:** cuarta familia en `hir_c.rs`: `Option`/`Result` (`Some/None/Ok/Err`, `try`/`?`, patrones sobre ellos), luego listas/colecciones, cierres, genéricos. Cada familia: ampliar el conjunto elegible, mantener verde `cargo test`, subir el ratchet `hir_generated` en `tests/differential.rs`, y documentar. Al cubrir todo, borrar el camino del AST en `codegen.rs` (habilita RC/último uso, E1101 estático, `--leak-check`: docs 18 y 20).
+
+**Herramientas útiles:** `OSTRIN_HIR_DEBUG=1 ostrinc --emit-c f.ostrin` (qué funciones van por HIR), `OSTRIN_NO_HIR_CODEGEN=1` (fuerza AST), `--native-type-report`, `--typed-report`, `--hir`.
+
+**Trampas conocidas:** editar con scripts Python en el scratchpad (los heredocs de bash rompen comillas/backslashes); los `.rs` del repo usan CRLF (normalizar al editar); sintaxis: `and/or/not`, sin `let`, `match` con comas, sin `` hasta la sección 111; un ejemplo nuevo no debe pisar uno existente (`native_strings.ostrin` ya existía); los `ostrin.lock` de ejemplos se ignoran por `.gitignore`.
+
+**Pendientes de producto (no empezados):** concurrencia real, gestión de memoria en nativo (hoy `malloc` sin liberar), LU/QR/SVD, autovectores, histograma/barras en `plot`, `Array` de más tipos, WASM/playground, instalador y binarios.

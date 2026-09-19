@@ -137,8 +137,9 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
 convendría dividirlos; el backend nativo no comparte el sistema de tipos del checker
-(ya consume los tipos del checker y compara cada nodo, pero aún genera desde el AST; la
-migración al HIR está en el documento 20);
+(ya consume los tipos del checker y compara cada nodo; **43 funciones/métodos de los ejemplos
+ya se generan desde el HIR** —escalares, records, enums y `match`, módulo `hir_c.rs`— y el resto
+sigue por el AST; ver documento 20 y secciones 123–125 de `CONTEXTO_PROYECTO.md`);
 la búsqueda en `Map/Set` es lineal.
 
 ---
