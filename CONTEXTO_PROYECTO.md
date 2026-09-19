@@ -3346,3 +3346,23 @@ Primer bloque del eje científico, de punta a punta (checker → intérprete →
   entre plataformas.
 - Ejemplos `math_functions.ostrin` (nativo = intérprete) y `math_functions_errors.ostrin`.
 - Suite: **103 pruebas**, sin warnings.
+
+---
+
+## 97. `Rng`: números aleatorios reproducibles — 2026-09-18
+
+- `g = rng(semilla)` crea un generador (tipo `Rng`, por referencia). xoshiro256** con
+  semilla expandida por splitmix64, **implementado por nosotros** en Rust
+  (`interpreter/rng.rs`) y en C (`rng_runtime.c`), línea por línea.
+- Métodos: `next_float()` (`[0,1)`, 53 bits), `next_int(lo, hi)` (`[lo,hi)`, sin sesgo de módulo),
+  `normal()` (normal estándar, método polar de Marsaglia), `rand(forma)`/`randn(forma)`
+  (`Array<Float>`), `randint(lo, hi, forma)` y `permutation(n)` (`Array<Int>`, Fisher–Yates).
+- **Reproducibilidad bit a bit** entre intérprete y nativo (y entre plataformas): solo se
+  usan operaciones enteras y aritmética IEEE correctamente redondeada (`+ - * /`,
+  `sqrt`); el logaritmo natural del método polar es propio (`det_ln`: reducción de argumento +
+  serie de atanh, ~1e-16), **no** el de `libm`. El nativo se compila con
+  `-ffp-contract=off` para impedir multiplicaciones-sumas fusionadas.
+  `random.ostrin` (incluye una estimación Monte Carlo de π) da idéntica salida en ambos backends.
+- Siguiente paso natural: reutilizar `det_ln` como base de una `libm` propia determinista
+  (`exp`, `sin`, `cos`, `pow`) y cerrar el aviso del §96.
+- Ejemplos `random.ostrin`, `random_errors.ostrin`. Suite: **105 pruebas**, sin warnings.

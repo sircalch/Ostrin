@@ -12,6 +12,7 @@ use crate::protocol;
 
 mod array;
 mod math;
+mod rng;
 use crate::types::{dim_div, dim_is_dimensionless, dim_mul, dim_pow, dim_to_string, resolve_unit_expr, Dimension};
 
 #[derive(Clone)]
@@ -23,6 +24,8 @@ pub enum Value {
     F32(f32),
     /// A dense N-dimensional numeric array (`Array<T>`), by reference like `List`.
     Array(Rc<RefCell<array::ArrayData>>),
+    /// A reproducible random generator (`Rng`), by reference.
+    Rng(Rc<RefCell<rng::RngState>>),
     Float(f64),
     Bool(bool),
     Char(char),
@@ -61,6 +64,7 @@ impl fmt::Display for Value {
             Value::Sized(n, _) => write!(f, "{n}"),
             Value::F32(n) => write!(f, "{n}"),
             Value::Array(a) => write!(f, "{}", array::display(&a.borrow())),
+            Value::Rng(_) => write!(f, "Rng"),
             Value::Float(n) => write!(f, "{n}"),
             Value::Bool(b) => write!(f, "{b}"),
             Value::Char(c) => write!(f, "{c}"),
@@ -700,6 +704,7 @@ impl Interpreter {
         match value {
             Value::Sized(_, kind) => Type::Named(kind.name().to_string(), Vec::new()),
             Value::F32(_) => Type::Named("Float32".to_string(), Vec::new()),
+            Value::Rng(_) => Type::Named("Rng".to_string(), Vec::new()),
             Value::Array(a) => {
                 let element = a.borrow().data.first().map(|v| self.runtime_type_of_value(v)).unwrap_or_else(|| Type::Named("Unknown".to_string(), Vec::new()));
                 Type::Named("Array".to_string(), vec![element])
@@ -1735,6 +1740,10 @@ impl Interpreter {
             }
             // Array constructors (a user function of the same name wins, above).
             match (name.as_str(), args.len()) {
+                ("rng", 1) => {
+                    let seed = as_i64(&self.eval_arg(&args[0], env)?)?;
+                    return Ok(Value::Rng(Rc::new(RefCell::new(rng::RngState::new(seed)))));
+                }
                 ("array", 1) => {
                     let list = self.eval_arg(&args[0], env)?;
                     return array::from_list(&list);
@@ -1888,6 +1897,13 @@ impl Interpreter {
                     }
                     _ => {}
                 }
+            }
+            if let Value::Rng(state) = &receiver {
+                let mut values = Vec::with_capacity(args.len());
+                for arg in args {
+                    values.push(self.eval_arg(arg, env)?);
+                }
+                return rng::call_method(&mut state.borrow_mut(), method, &values);
             }
             if let Value::Array(state) = &receiver {
                 let mut values = Vec::with_capacity(args.len());
@@ -2148,6 +2164,7 @@ fn value_type_name(v: &Value) -> String {
         Value::Sized(_, kind) => kind.name().to_string(),
         Value::F32(_) => "Float32".to_string(),
         Value::Array(_) => "Array".to_string(),
+        Value::Rng(_) => "Rng".to_string(),
         Value::Float(_) => "Float".to_string(),
         Value::Bool(_) => "Bool".to_string(),
         Value::Char(_) => "Char".to_string(),

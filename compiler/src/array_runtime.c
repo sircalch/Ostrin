@@ -128,6 +128,7 @@ static @N@* @N@_map(@N@* a, @T@ (*f)(@T@)) {
     return r;
 }
 
+@ELEM_EXTRAS@
 static @T@ @N@_sum(@N@* a) {
     @T@ acc = a->data[0];
     for (int64_t i = 1; i < a->size; i++) acc = OSTRIN_ADD(acc, a->data[i]);

@@ -1,0 +1,8 @@
+fn main() -> Void {
+    a = rng("seed")
+    g = rng(1)
+    print(g.next_int(1))
+    print(g.rand(3))
+    print(g.missing())
+    print(g.normal(2.0))
+}

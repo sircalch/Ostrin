@@ -1,0 +1,38 @@
+fn main() -> Void {
+    g = rng(42)
+    print(g.next_float())
+    print(g.next_float())
+    print(g.next_int(0, 100))
+    print(g.next_int(-5, 5))
+    print(g.normal())
+    print(g.rand([2, 3]))
+    print(g.randn([4]))
+    print(g.randint(1, 7, [2, 5]))
+    print(g.permutation(8))
+
+    same = rng(42)
+    print(same.next_float())
+
+    other = rng(43)
+    print(other.next_float())
+
+    // A reproducible Monte Carlo estimate of pi.
+    mc = rng(2024)
+    points = mc.rand([20000, 2])
+    mut hits = 0
+    total = 20000
+    mut i = 0
+    while i < total {
+        x = points.get(i, 0)
+        y = points.get(i, 1)
+        if x * x + y * y < 1.0 {
+            hits = hits + 1
+        }
+        i = i + 1
+    }
+    print(4.0 * (hits as Float) / (total as Float))
+
+    samples = rng(7).randn([1000])
+    print(samples.mean())
+    print(samples.max() - samples.min())
+}

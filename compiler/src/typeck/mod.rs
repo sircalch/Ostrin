@@ -931,6 +931,27 @@ impl Checker {
         }
     }
 
+    /// Methods of `Rng`.
+    fn check_rng_method(&mut self, method: &str, arg_types: &[Ty]) -> Ty {
+        let shape = |t: &Ty| matches!(t, Ty::List(e) if **e == Ty::Int || **e == Ty::Unknown);
+        let ints = |ts: &[Ty]| ts.iter().all(|t| *t == Ty::Int || *t == Ty::Unknown);
+        let (ok, result) = match method {
+            "next_float" | "normal" => (arg_types.is_empty(), Ty::Float),
+            "next_int" => (arg_types.len() == 2 && ints(arg_types), Ty::Int),
+            "rand" | "randn" => (arg_types.len() == 1 && shape(&arg_types[0]), Ty::Applied("Array".to_string(), vec![Ty::Float])),
+            "randint" => (arg_types.len() == 3 && ints(&arg_types[..2]) && shape(&arg_types[2]), Ty::Applied("Array".to_string(), vec![Ty::Int])),
+            "permutation" => (arg_types.len() == 1 && ints(arg_types), Ty::Applied("Array".to_string(), vec![Ty::Int])),
+            other => {
+                self.push("E1042", format!("Rng has no method '{other}'."));
+                return Ty::Unknown;
+            }
+        };
+        if !ok {
+            self.push("E1041", format!("Rng method '{method}' was called with arguments of the wrong number or type."));
+        }
+        result
+    }
+
     /// `sin`, `cos`, `sqrt`, …, `abs`, `pow`, `atan2`, `pi`.
     fn check_math_call(&mut self, name: &str, arg_types: &[Ty]) -> Option<Ty> {
         const UNARY: &[&str] = &["sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh", "exp", "ln", "log10", "sqrt", "floor", "ceil", "round"];
@@ -2268,6 +2289,12 @@ impl Checker {
             if let Some(result) = self.check_math_call(name, &arg_types) {
                 return result;
             }
+            if name == "rng" {
+                if arg_types.len() != 1 || (arg_types[0] != Ty::Int && arg_types[0] != Ty::Unknown) {
+                    self.push("E1041", "'rng' expects one Int seed.".to_string());
+                }
+                return Ty::Named("Rng".to_string());
+            }
         }
 
         if let Expr::FieldAccess(receiver, method) = callee.unlocated() {
@@ -2296,6 +2323,9 @@ impl Checker {
                 if let Some(signature) = signature {
                     return self.resolve_type_in_context(&signature.return_type);
                 }
+            }
+            if receiver_ty == Ty::Named("Rng".to_string()) && self.functions.get("Rng").is_none() {
+                return self.check_rng_method(method, &arg_types);
             }
             if array_elem(&receiver_ty).is_some() && method != "to_string" {
                 return self.check_array_method(&receiver_ty, method, &arg_types);

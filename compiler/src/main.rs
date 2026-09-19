@@ -394,6 +394,8 @@ fn run_codegen(items: &[ast::Item], typed: &typeck::TypedProgram, entry_path: &P
         .arg("-o")
         .arg(&output_path)
         .arg("-O2")
+        // No fused multiply-add: results must match the interpreter bit for bit.
+        .arg("-ffp-contract=off")
         .status();
     let _ = fs::remove_file(&c_path);
     match status {

@@ -119,6 +119,8 @@ enum CType {
     Float32,
     /// `Array<T>`: a heap-allocated dense N-dimensional array (by reference); `T` is `Int`, `Float` or `Float32`.
     Array(Box<CType>),
+    /// A reproducible random generator (`Rng`), by reference.
+    Rng,
 }
 
 /// A struct-field spelling of a type: `Void` (a `Result<Void, E>`'s value) becomes a placeholder `char`.
@@ -141,6 +143,7 @@ fn c_type_name(ty: &CType) -> String {
         CType::Task(_) => mangle_ctype(ty),
         CType::Sized(kind) => kind.c_type().to_string(),
         CType::Float32 => "float".to_string(),
+        CType::Rng => "OstrinRng*".to_string(),
         CType::Option(inner) => format!("Option_{}", mangle_ctype(inner)),
         CType::NoneLit | CType::OkLit(_) | CType::ErrLit(_) | CType::GenLit(..) => "int".to_string(),
         CType::Quantity(_) => "Qty".to_string(),
@@ -213,6 +216,7 @@ fn map_type_with_subst(ty: &Type, types: &NamedTypes, subst: &HashMap<String, CT
             other if IntKind::from_name(other).is_some() => Ok(CType::Sized(IntKind::from_name(other).unwrap())),
             "Float" | "Float64" => Ok(CType::Float),
             "Float32" => Ok(CType::Float32),
+            "Rng" => Ok(CType::Rng),
             "Bool" => Ok(CType::Bool),
             "String" => Ok(CType::Str),
             "Void" => Ok(CType::Void),
@@ -280,6 +284,9 @@ fn c_function_name(name: &str) -> String {
 /// Quantity runtime (unit table, conversion, arithmetic helpers), spliced in
 /// right after `PRELUDE` only when a program actually uses `Qty`.
 const QTY_RUNTIME: &str = include_str!("qty_runtime.c");
+
+/// Reproducible random generator, spliced in when a program uses `Rng`.
+const RNG_RUNTIME: &str = include_str!("rng_runtime.c");
 
 /// `Array<T>` runtime template, instantiated per element type (see the header of the file).
 const ARRAY_RUNTIME: &str = include_str!("array_runtime.c");
@@ -616,6 +623,7 @@ fn mangle_ctype(ty: &CType) -> String {
         CType::Set(t) => format!("Set_{}", mangle_ctype(t)),
         CType::Sized(kind) => kind.name().to_string(),
         CType::Float32 => "Float32".to_string(),
+        CType::Rng => "Rng".to_string(),
         CType::Array(t) => format!("Array_{}", mangle_ctype(t)),
         CType::Channel(t) => format!("Channel_{}", mangle_ctype(t)),
         CType::Task(t) => format!("Task_{}", mangle_ctype(t)),
@@ -1617,6 +1625,7 @@ impl<'a> Codegen<'a> {
             Ty::Quantity(d) => CType::Quantity(self.substitute_dimension(d)),
             Ty::Sized(kind) => CType::Sized(*kind),
             Ty::Float32 => CType::Float32,
+            Ty::Named(n) if n == "Rng" => CType::Rng,
             Ty::Applied(n, args) if n == "Array" && args.len() == 1 => {
                 let elem = self.ty_to_ctype(&args[0])?;
                 matches!(elem, CType::Int | CType::Float | CType::Float32).then(|| CType::Array(Box::new(elem)))?
@@ -1684,6 +1693,7 @@ impl<'a> Codegen<'a> {
             (Ty::Quantity(a), CType::Quantity(b)) => &self.substitute_dimension(a) == b,
             (Ty::Sized(a), CType::Sized(b)) => a == b,
             (Ty::Float32, CType::Float32) => true,
+            (Ty::Named(n), CType::Rng) => n == "Rng",
             (Ty::Applied(n, args), CType::Array(inner)) if n == "Array" && args.len() == 1 => self.ctype_agrees(&args[0], inner),
             (Ty::List(a), CType::List(b)) | (Ty::Set(a), CType::Set(b)) => self.ctype_agrees(a, b),
             (Ty::Map(k, v), CType::Map(ck, cv)) => self.ctype_agrees(k, ck) && self.ctype_agrees(v, cv),
@@ -3129,6 +3139,24 @@ impl<'a> Codegen<'a> {
                     other => Err(format!("Map has no method '{other}' the native backend supports yet")),
                 }
             }
+            CType::Rng => {
+                let (codes, _) = self.gen_args(args)?;
+                let array_of = |this: &mut Self, elem: CType| {
+                    let ty = CType::Array(Box::new(elem));
+                    this.register_list_types(&ty);
+                    ty
+                };
+                match (method_name, codes.as_slice()) {
+                    ("next_float", []) => Ok((format!("ostrin_rng_float({obj_code})"), CType::Float)),
+                    ("normal", []) => Ok((format!("ostrin_rng_normal({obj_code})"), CType::Float)),
+                    ("next_int", [lo, hi]) => Ok((format!("ostrin_rng_int({obj_code}, {lo}, {hi})"), CType::Int)),
+                    ("rand", [shape]) => Ok((format!("Array_Float_rand({obj_code}, {shape})"), array_of(self, CType::Float))),
+                    ("randn", [shape]) => Ok((format!("Array_Float_randn({obj_code}, {shape})"), array_of(self, CType::Float))),
+                    ("randint", [lo, hi, shape]) => Ok((format!("Array_Int_randint({obj_code}, {lo}, {hi}, {shape})"), array_of(self, CType::Int))),
+                    ("permutation", [n]) => Ok((format!("Array_Int_permutation({obj_code}, {n})"), array_of(self, CType::Int))),
+                    (other, _) => Err(format!("Rng has no method '{other}' with these arguments")),
+                }
+            }
             CType::Array(t) => {
                 let t = (**t).clone();
                 let n = mangle_ctype(&obj_ty);
@@ -3561,6 +3589,7 @@ impl<'a> Codegen<'a> {
             "read_file" | "parse_int" | "sum" | "panic" | "assert" | "array" | "zeros" | "ones" | "abs" => 1,
             n if ["sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh", "exp", "ln", "log10", "sqrt", "floor", "ceil", "round"].contains(&n) => 1,
             "pi" => 0,
+            "rng" => 1,
             "pow" | "atan2" => 2,
             "write_file" | "assert_eq" | "full" | "arange" => 2,
             "linspace" => 3,
@@ -3619,6 +3648,7 @@ impl<'a> Codegen<'a> {
                 )))
             }
             "pi" => Ok(Some(("3.141592653589793".to_string(), CType::Float))),
+            "rng" => Ok(Some((format!("ostrin_rng_new({})", codes[0]), CType::Rng))),
             "pow" | "atan2" => match (&types[0], &types[1]) {
                 (CType::Float, CType::Float) => Ok(Some((format!("{name}({}, {})", codes[0], codes[1]), CType::Float))),
                 (CType::Float32, CType::Float32) => Ok(Some((format!("{name}f({}, {})", codes[0], codes[1]), CType::Float32))),
@@ -3771,7 +3801,7 @@ impl<'a> Codegen<'a> {
             }
             CType::Quantity(_) => return Ok((format!("ostrin_print_qty({})", arg_codes[0]), CType::Void)),
             CType::GenLit(..) => return Err("cannot infer the enum instance to print here".to_string()),
-            CType::Channel(_) | CType::Task(_) => return Err("cannot 'print' a Task or Channel value".to_string()),
+            CType::Channel(_) | CType::Task(_) | CType::Rng => return Err("cannot 'print' a Task, Channel or Rng value".to_string()),
             CType::NoneLit | CType::OkLit(_) | CType::ErrLit(_) => {
                 return Err("cannot 'print' a bare None/Ok/Err literal; its type can't be inferred here".to_string())
             }
@@ -4308,8 +4338,27 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>) ->
                 let mut text = format!(
                     "#define OSTRIN_ADD(a, b) {add}\n#define OSTRIN_SUB(a, b) {sub}\n#define OSTRIN_MUL(a, b) {mul}\n#define OSTRIN_DIV(a, b) {div}\n#define OSTRIN_ELEM_LT(a, b) {lt_macro}\n"
                 );
+                let elem_extras = match **elem {
+                    CType::Float => format!(
+                        "static {name}* {name}_rand(OstrinRng* g, List_Int* s) {{ {name}* r = {name}_full(s, 0.0); for (int64_t i = 0; i < r->size; i++) r->data[i] = ostrin_rng_float(g); return r; }}\n\
+                         static {name}* {name}_randn(OstrinRng* g, List_Int* s) {{ {name}* r = {name}_full(s, 0.0); for (int64_t i = 0; i < r->size; i++) r->data[i] = ostrin_rng_normal(g); return r; }}\n"
+                    ),
+                    CType::Int => format!(
+                        "static {name}* {name}_randint(OstrinRng* g, int64_t lo, int64_t hi, List_Int* s) {{ {name}* r = {name}_full(s, 0); for (int64_t i = 0; i < r->size; i++) r->data[i] = ostrin_rng_int(g, lo, hi); return r; }}\n\
+                         static {name}* {name}_permutation(OstrinRng* g, int64_t n) {{\n\
+                         \x20   if (n < 1) OSTRIN_FAIL(\"permutation needs n >= 1\");\n\
+                         \x20   int64_t shape[1] = {{ n }};\n\
+                         \x20   {name}* r = {name}_alloc(1, shape);\n\
+                         \x20   for (int64_t i = 0; i < n; i++) r->data[i] = i;\n\
+                         \x20   for (int64_t i = n - 1; i >= 1; i--) {{ int64_t j = ostrin_rng_int(g, 0, i + 1); int64_t t = r->data[i]; r->data[i] = r->data[j]; r->data[j] = t; }}\n\
+                         \x20   return r;\n\
+                         }}\n"
+                    ),
+                    _ => String::new(),
+                };
                 text.push_str(
                     &ARRAY_RUNTIME
+                        .replace("@ELEM_EXTRAS@", &elem_extras)
                         .replace("@SHOW_ELEM@", &show_elem)
                         .replace("@LLLT@", &lllt)
                         .replace("@LLT@", &llt)
@@ -4584,6 +4633,9 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>) ->
     out.push_str("int main(void) {\n    ostrin_main();\n    return 0;\n}\n");
     if out.contains("Qty") {
         out = out.replacen(PRELUDE, &format!("{PRELUDE}{QTY_RUNTIME}"), 1);
+    }
+    if out.contains("OstrinRng") {
+        out = out.replacen(PRELUDE, &format!("{PRELUDE}{RNG_RUNTIME}"), 1);
     }
     Ok((out, codegen.type_report.clone()))
 }
