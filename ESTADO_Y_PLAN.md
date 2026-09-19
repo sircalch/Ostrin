@@ -51,12 +51,14 @@ backend nativo se valida comparando su salida con `--run`.
 **Datos**: `record` (identidad por referencia, campos `mut`), `enum` con variantes
 con/sin campos (tipos valor), genéricos en ambos, `derive(Eq, Ord, …)`.
 
-**Funciones**: genéricas con cotas, argumentos nombrados y por defecto, lambdas,
+**Funciones**: genéricas con cotas, argumentos nombrados y por defecto, lambdas y
+**valores de función** (`fn(Int) -> Int`, cierres con captura por valor en nativo),
 `try … catch`, recursión.
 
 **Traits**: traits nominales, métodos por defecto, herencia de traits, `impl` genéricos
 y especializados (`impl X for Box<Int>`), `impl` sobre `Quantity<D>`, `dyn Trait`,
-sobrecarga de operadores vía `impl Add/Eq/Ord…`.
+sobrecarga de operadores vía `impl Add/Sub/Mul/Div/Eq/Ord…`, negación unaria (`neg`) y
+escalar a la izquierda (`rmul`, `radd`, …).
 
 **Control**: `if/else`, `while`, `for` (rangos `to`/`until`, listas, canales, iteradores
 propios con `next`), `match` con guardas, patrones anidados, rangos y destructuración.
@@ -64,6 +66,13 @@ propios con `next`), `match` con guardas, patrones anidados, rangos y destructur
 **Concurrencia (simulada)**: `spawn`, `join`, `channel<T>()`, `send/receive/close`;
 `spawn` se ejecuta de forma síncrona e inmediata. Se verifica en el checker que no se
 capturen bindings `mut` (E1100) y en ejecución que un record enviado no se reutilice (E1101).
+
+**Numérico/científico**: enteros de ancho fijo, `Float32`, `Array<T>` (difusión, máscaras,
+rebanadas, `@`), estadística, regresión, `det/inv/eigvals/norm`, `Rng` reproducible,
+funciones elementales deterministas (idénticas en intérprete y nativo).
+
+**Datos**: métodos de `String`, `parse_csv`; paquetes de ejemplo en Ostrin: `tables`
+(DataFrame mínimo), `plot` (SVG), `autodiff` (modo directo).
 
 **Biblioteca estándar** (pequeña): `print`, `sum`, `panic`, `read_file`, `write_file`,
 `parse_int`, métodos de `List` (`map/filter/fold/any/all/find/push/remove_at/length`),
@@ -103,8 +112,8 @@ Monomorfización bajo demanda (funciones, records, enums, métodos, vtables, lis
 - `spawn`/`join`/canales (modelo síncrono, igual que el intérprete).
 
 **Rechazado a propósito con mensaje claro** (mejor error que comportamiento distinto):
-enviar un *record* por un canal (no hay equivalente del chequeo E1101), `for` sobre `Map/Set`
-(el intérprete tampoco lo permite).
+`for` sobre `Map/Set` (el intérprete tampoco lo permite), `?` dentro de una lambda, usar una
+función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bool.
 
 ---
 
@@ -112,7 +121,7 @@ enviar un *record* por un canal (no hay equivalente del chequeo E1101), `for` so
 
 | Área | Estado |
 |---|---|
-| Valores de función de primera clase (guardar/pasar `fn` como valor) | Solo intérprete; nativo solo admite lambdas *en línea* en combinadores |
+| Cierres en nativo | Captura **por valor** (una variable `mut` cambiada después no se ve dentro); lambda sin contexto de tipos exige anotación |
 | Chequeo «movido tras enviar» (E1101) | Dinámico en ambos backends; estático pendiente del IR (doc. 20) |
 | Concurrencia real (hilos, planificador, `select`) | No existe; `spawn` es síncrono |
 | Memoria en nativo | Se usa `malloc` sin liberar (sin GC ni conteo de referencias) |
@@ -123,12 +132,13 @@ enviar un *record* por un canal (no hay equivalente del chequeo E1101), `for` so
 | Paquetes | Diseño y lockfile básicos; sin registro remoto (decisión: **no** añadir red automática al compilador) |
 | Rendimiento del intérprete | Tree‑walking simple; sin optimizaciones |
 | `newlines.ostrin`, `advanced.ostrin` | Son muestras de sintaxis, no programas ejecutables |
-| CI | Existe (`cargo test` en Ubuntu); falta Windows/macOS y validar el backend nativo |
+| CI | Linux, macOS y Windows; incluye las pruebas diferenciales intérprete↔nativo |
 | Distribución | Sin instalador ni binarios publicados; `.exe` de aplicación pendiente |
 
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
 convendría dividirlos; el backend nativo no comparte el sistema de tipos del checker
-(reinfiere por su cuenta, con una inferencia bidireccional mínima vía `expected`);
+(ya consume los tipos del checker y compara cada nodo, pero aún genera desde el AST; la
+migración al HIR está en el documento 20);
 la búsqueda en `Map/Set` es lineal.
 
 ---
@@ -196,7 +206,7 @@ Decisiones que necesito de ti para afinar el plan:
 
 ```powershell
 cd compiler
-cargo test                                   # 93 pruebas
+cargo test                                   # 6 diferenciales + 101 de integración
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```
