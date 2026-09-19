@@ -874,7 +874,7 @@ impl Checker {
     fn check_array_call(&mut self, name: &str, arg_types: &[Ty]) -> Option<Ty> {
         let arity = match name {
             "array" | "zeros" | "ones" => 1,
-            "full" | "arange" => 2,
+            "full" | "arange" | "cov" | "corr" => 2,
             "linspace" => 3,
             _ => return None,
         };
@@ -885,6 +885,17 @@ impl Checker {
         let is_shape = |t: &Ty| matches!(t, Ty::List(e) if **e == Ty::Int || **e == Ty::Unknown);
         let array_of = |t: Ty| Ty::Applied("Array".to_string(), vec![t]);
         match name {
+            "cov" | "corr" => {
+                let (a, b) = (&arg_types[0], &arg_types[1]);
+                match (array_elem(a), array_elem(b)) {
+                    (Some(x), Some(y)) if x == y && matches!(x, Ty::Float | Ty::Float32) => Some(x),
+                    _ if *a == Ty::Unknown || *b == Ty::Unknown => Some(Ty::Unknown),
+                    _ => {
+                        self.push("E1041", format!("'{name}' expects two arrays of the same float type, got '{}' and '{}'.", a.describe(), b.describe()));
+                        Some(Ty::Unknown)
+                    }
+                }
+            }
             "array" => {
                 let mut ty = &arg_types[0];
                 let mut depth = 0;
@@ -1001,8 +1012,8 @@ impl Checker {
         let elem = array_elem(receiver).expect("called for arrays only");
         let list_int = Ty::List(Box::new(Ty::Int));
         let expected_count = match method {
-            "shape" | "rank" | "size" | "length" | "count" | "sum" | "min" | "max" | "mean" | "to_list" | "transpose" => Some(0),
-            "reshape" | "sum_axis" | "dot" | "matmul" => Some(1),
+            "shape" | "rank" | "size" | "length" | "count" | "sum" | "min" | "max" | "mean" | "to_list" | "transpose" | "var" | "std" | "sample_var" | "sample_std" | "median" | "cumsum" | "sort" | "to_float" => Some(0),
+            "reshape" | "sum_axis" | "dot" | "matmul" | "percentile" => Some(1),
             _ => None,
         };
         if let Some(count) = expected_count {
@@ -1024,6 +1035,24 @@ impl Checker {
                 }
             },
             "to_list" => Ty::List(Box::new(elem)),
+            "cumsum" | "sort" => receiver.clone(),
+            "to_float" => {
+                if elem != Ty::Int {
+                    self.push("E1041", format!("'to_float' converts an Array<Int>, got '{}'.", receiver.describe()));
+                    return Ty::Unknown;
+                }
+                Ty::Applied("Array".to_string(), vec![Ty::Float])
+            }
+            "var" | "std" | "sample_var" | "sample_std" | "median" | "percentile" => {
+                if !matches!(elem, Ty::Float | Ty::Float32) {
+                    self.push("E1041", format!("'{method}' needs an array of Float or Float32, got '{}' (use to_float() on an Int array).", receiver.describe()));
+                    return Ty::Unknown;
+                }
+                if method == "percentile" && arg_types[0] != Ty::Float && arg_types[0] != Ty::Unknown {
+                    self.push("E1041", "'percentile' expects a Float p between 0.0 and 100.0.".to_string());
+                }
+                elem
+            }
             "transpose" => receiver.clone(),
             "reshape" => {
                 if !matches!(&arg_types[0], Ty::List(e) if **e == Ty::Int || **e == Ty::Unknown) {

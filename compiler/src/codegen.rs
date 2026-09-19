@@ -288,6 +288,9 @@ const QTY_RUNTIME: &str = include_str!("qty_runtime.c");
 /// Reproducible random generator, spliced in when a program uses `Rng`.
 const RNG_RUNTIME: &str = include_str!("rng_runtime.c");
 
+/// Statistics appended to the array runtime of float element types.
+const ARRAY_STATS: &str = include_str!("array_stats.c");
+
 /// `Array<T>` runtime template, instantiated per element type (see the header of the file).
 const ARRAY_RUNTIME: &str = include_str!("array_runtime.c");
 
@@ -3172,6 +3175,18 @@ impl<'a> Codegen<'a> {
                     "sum" | "min" | "max" => Ok((format!("{n}_{method_name}({obj_code})"), t)),
                     "mean" => Ok((format!("{n}_mean({obj_code})"), if t == CType::Int { CType::Float } else { t })),
                     "to_list" => Ok((format!("{n}_to_list({obj_code})"), CType::List(Box::new(t)))),
+                    "cumsum" | "sort" => Ok((format!("{n}_{method_name}({obj_code})"), obj_ty.clone())),
+                    "var" | "std" | "sample_var" | "sample_std" | "median" if matches!(t, CType::Float | CType::Float32) => {
+                        Ok((format!("{n}_{method_name}({obj_code})"), t))
+                    }
+                    "percentile" if matches!(t, CType::Float | CType::Float32) && codes.len() == 1 => {
+                        Ok((format!("{n}_percentile({obj_code}, {})", codes[0]), t))
+                    }
+                    "to_float" if t == CType::Int => {
+                        let float_array = CType::Array(Box::new(CType::Float));
+                        self.register_list_types(&float_array);
+                        Ok((format!("Array_Int_to_float({obj_code})"), float_array))
+                    }
                     "transpose" => Ok((format!("{n}_transpose({obj_code})"), obj_ty.clone())),
                     "reshape" => {
                         one(self, 1)?;
@@ -3591,7 +3606,7 @@ impl<'a> Codegen<'a> {
             "pi" => 0,
             "rng" => 1,
             "pow" | "atan2" => 2,
-            "write_file" | "assert_eq" | "full" | "arange" => 2,
+            "write_file" | "assert_eq" | "full" | "arange" | "cov" | "corr" => 2,
             "linspace" => 3,
             _ => return Ok(None),
         };
@@ -3647,6 +3662,12 @@ impl<'a> Codegen<'a> {
                     ty,
                 )))
             }
+            "cov" | "corr" => match (&types[0], &types[1]) {
+                (CType::Array(a), CType::Array(b)) if a == b && matches!(**a, CType::Float | CType::Float32) => {
+                    Ok(Some((format!("{}_{name}({}, {})", mangle_ctype(&types[0]), codes[0], codes[1]), (**a).clone())))
+                }
+                _ => Err(format!("'{name}' needs two arrays of the same float type")),
+            },
             "pi" => Ok(Some(("3.141592653589793".to_string(), CType::Float))),
             "rng" => Ok(Some((format!("ostrin_rng_new({})", codes[0]), CType::Rng))),
             "pow" | "atan2" => match (&types[0], &types[1]) {
@@ -4230,6 +4251,8 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>) ->
     let mut list_type_decls = String::new();
     let mut list_typedefs = String::new();
     let mut array_blocks: Vec<String> = Vec::new();
+    // Definitions that reference another array type's functions: emitted after all `array_blocks`.
+    let mut late_array_blocks: Vec<String> = Vec::new();
     let mut option_inners: Vec<CType> = Vec::new();
     let mut result_pairs: Vec<(CType, CType)> = Vec::new();
     let mut list_helper_prototypes: Vec<String> = Vec::new();
@@ -4335,8 +4358,9 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>) ->
                     CType::Float => ("((a) + (b))", "((a) - (b))", "((a) * (b))", "((a) / (b))", "((a) < (b))"),
                     _ => ("((float)((a) + (b)))", "((float)((a) - (b)))", "((float)((a) * (b)))", "((float)((a) / (b)))", "((a) < (b))"),
                 };
+                let sqrt_macro = if matches!(**elem, CType::Float32) { "sqrtf(a)" } else { "sqrt(a)" };
                 let mut text = format!(
-                    "#define OSTRIN_ADD(a, b) {add}\n#define OSTRIN_SUB(a, b) {sub}\n#define OSTRIN_MUL(a, b) {mul}\n#define OSTRIN_DIV(a, b) {div}\n#define OSTRIN_ELEM_LT(a, b) {lt_macro}\n"
+                    "#define OSTRIN_SQRT(a) {sqrt_macro}\n#define OSTRIN_ADD(a, b) {add}\n#define OSTRIN_SUB(a, b) {sub}\n#define OSTRIN_MUL(a, b) {mul}\n#define OSTRIN_DIV(a, b) {div}\n#define OSTRIN_ELEM_LT(a, b) {lt_macro}\n"
                 );
                 let elem_extras = match **elem {
                     CType::Float => format!(
@@ -4366,6 +4390,18 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>) ->
                         .replace("@N@", &name)
                         .replace("@T@", &tc),
                 );
+                if matches!(**elem, CType::Float | CType::Float32) {
+                    text.push_str(
+                        &ARRAY_STATS
+                            .replace("@N@", &name)
+                            .replace("@T@", &tc),
+                    );
+                }
+                if **elem == CType::Int {
+                    late_array_blocks.push(
+                        "static Array_Float* Array_Int_to_float(Array_Int* a) {\n    Array_Float* r = Array_Float_alloc(a->rank, a->shape);\n    for (int64_t i = 0; i < a->size; i++) r->data[i] = (double)a->data[i];\n    return r;\n}\n\n".to_string(),
+                    );
+                }
                 match **elem {
                     CType::Int => text.push_str(&format!(
                         "static double {name}_mean({name}* a) {{ return (double){name}_sum(a) / (double)a->size; }}\n\
@@ -4393,7 +4429,7 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>) ->
                     )),
                     _ => text.push_str(&format!("static float {name}_mean({name}* a) {{ return (float)({name}_sum(a) / (float)a->size); }}\n")),
                 }
-                text.push_str("#undef OSTRIN_ADD\n#undef OSTRIN_SUB\n#undef OSTRIN_MUL\n#undef OSTRIN_DIV\n#undef OSTRIN_ELEM_LT\n\n");
+                text.push_str("#undef OSTRIN_SQRT\n#undef OSTRIN_ADD\n#undef OSTRIN_SUB\n#undef OSTRIN_MUL\n#undef OSTRIN_DIV\n#undef OSTRIN_ELEM_LT\n\n");
                 array_blocks.push(text);
                 continue;
             }
@@ -4624,7 +4660,7 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>) ->
     }
 
     // Array runtimes: full definitions, after every prototype they call.
-    for block in &array_blocks {
+    for block in array_blocks.iter().chain(&late_array_blocks) {
         out.push_str(block);
     }
     for (signature, body) in bodies {

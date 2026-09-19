@@ -1,0 +1,10 @@
+fn main() -> Void {
+    ints = array([1, 2, 3])
+    print(ints.std())
+    floats = array([1.0, 2.0])
+    print(floats.percentile(50))
+    print(floats.to_float())
+    print(cov(ints, ints))
+    print(corr(floats))
+    print(floats.median(1))
+}

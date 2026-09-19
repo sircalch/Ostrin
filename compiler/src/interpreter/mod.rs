@@ -1744,6 +1744,11 @@ impl Interpreter {
                     let seed = as_i64(&self.eval_arg(&args[0], env)?)?;
                     return Ok(Value::Rng(Rc::new(RefCell::new(rng::RngState::new(seed)))));
                 }
+                ("cov", 2) | ("corr", 2) => {
+                    let a = self.eval_arg(&args[0], env)?;
+                    let b = self.eval_arg(&args[1], env)?;
+                    return array::cov_corr(name, &a, &b);
+                }
                 ("array", 1) => {
                     let list = self.eval_arg(&args[0], env)?;
                     return array::from_list(&list);

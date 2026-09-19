@@ -3366,3 +3366,21 @@ Primer bloque del eje científico, de punta a punta (checker → intérprete →
 - Siguiente paso natural: reutilizar `det_ln` como base de una `libm` propia determinista
   (`exp`, `sin`, `cos`, `pow`) y cerrar el aviso del §96.
 - Ejemplos `random.ostrin`, `random_errors.ostrin`. Suite: **105 pruebas**, sin warnings.
+
+---
+
+## 98. Estadística sobre `Array` — 2026-09-18
+
+- Métodos de `Array<Float|Float32>`: `var()`/`std()` (poblacional), `sample_var()`/`sample_std()`
+  (ddof = 1), `median()`, `percentile(p)` (`p` en `[0, 100]`, interpolación lineal, `p` siempre `Float`).
+  De cualquier `Array`: `cumsum()` y `sort()` (rango 1). De `Array<Int>`: `to_float()`
+  (las estadísticas sobre `Int` piden convertir antes: `E1041` con esa pista).
+  Funciones `cov(a, b)` y `corr(a, b)` (vectores de rango 1 del mismo tipo flotante).
+- **Determinismo**: algoritmos de dos pasadas con orden de acumulación fijo (media, luego
+  suma de cuadrados), ordenación estable (merge sort en C; `sort_by` estable en Rust) e
+  interpolación con las mismas operaciones; las plantillas `array_stats.c` (nativo) y la
+  macro `stats_impl!` (intérprete, una por ancho de flotante) coinciden operación a operación.
+  `statistics.ostrin` (incluye 500 normales de `Rng`) da salida idéntica en ambos backends.
+- Ejemplos `statistics.ostrin` y `statistics_errors.ostrin` (6 errores). Suite: **107 pruebas**.
+- Pendiente de la biblioteca científica: histogramas, regresión (mínimos cuadrados),
+  tests de hipótesis/ANOVA, distribuciones (`pdf`/`cdf`), y una `libm` propia determinista.

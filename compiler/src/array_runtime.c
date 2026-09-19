@@ -129,6 +129,44 @@ static @N@* @N@_map(@N@* a, @T@ (*f)(@T@)) {
 }
 
 @ELEM_EXTRAS@
+static void @N@_msort(@T@* v, @T@* tmp, int64_t lo, int64_t hi) {
+    if (hi - lo < 2) return;
+    int64_t mid = lo + (hi - lo) / 2;
+    @N@_msort(v, tmp, lo, mid);
+    @N@_msort(v, tmp, mid, hi);
+    int64_t i = lo, j = mid, k = lo;
+    while (i < mid && j < hi) tmp[k++] = OSTRIN_ELEM_LT(v[j], v[i]) ? v[j++] : v[i++];
+    while (i < mid) tmp[k++] = v[i++];
+    while (j < hi) tmp[k++] = v[j++];
+    for (k = lo; k < hi; k++) v[k] = tmp[k];
+}
+
+static @T@* @N@_sorted_flat(@N@* a) {
+    @T@* v = (@T@*)malloc(sizeof(@T@) * (size_t)a->size);
+    @T@* tmp = (@T@*)malloc(sizeof(@T@) * (size_t)a->size);
+    if (!v || !tmp) OSTRIN_OOM();
+    memcpy(v, a->data, sizeof(@T@) * (size_t)a->size);
+    @N@_msort(v, tmp, 0, a->size);
+    free(tmp);
+    return v;
+}
+
+static @N@* @N@_sort(@N@* a) {
+    if (a->rank != 1) OSTRIN_FAIL("sort needs a one-dimensional array");
+    @N@* r = @N@_alloc(1, a->shape);
+    @T@* v = @N@_sorted_flat(a);
+    memcpy(r->data, v, sizeof(@T@) * (size_t)a->size);
+    free(v);
+    return r;
+}
+
+static @N@* @N@_cumsum(@N@* a) {
+    @N@* r = @N@_alloc(a->rank, a->shape);
+    r->data[0] = a->data[0];
+    for (int64_t i = 1; i < a->size; i++) r->data[i] = OSTRIN_ADD(r->data[i - 1], a->data[i]);
+    return r;
+}
+
 static @T@ @N@_sum(@N@* a) {
     @T@ acc = a->data[0];
     for (int64_t i = 1; i < a->size; i++) acc = OSTRIN_ADD(acc, a->data[i]);

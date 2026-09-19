@@ -296,6 +296,51 @@ pub fn call_method(receiver: &Rc<RefCell<ArrayData>>, method: &str, args: Vec<Va
             }
             Ok(make(shape, a.data.clone()))
         }
+        "var" | "std" | "sample_var" | "sample_std" | "median" | "percentile" => stats_method(&a, method, &args),
+        "cumsum" => {
+            let mut data = Vec::with_capacity(a.data.len());
+            let mut acc = a.data[0].clone();
+            data.push(acc.clone());
+            for x in &a.data[1..] {
+                acc = eval_binary_builtin(BinOp::Add, acc, x.clone())?;
+                data.push(acc.clone());
+            }
+            Ok(make(a.shape.clone(), data))
+        }
+        "sort" => {
+            if a.shape.len() != 1 {
+                return fail("sort needs a one-dimensional array");
+            }
+            let mut data = a.data.clone();
+            let mut failure = None;
+            data.sort_by(|x, y| {
+                let less = |p: &Value, q: &Value| eval_binary_builtin(BinOp::Lt, p.clone(), q.clone());
+                match (less(x, y), less(y, x)) {
+                    (Ok(Value::Bool(true)), _) => std::cmp::Ordering::Less,
+                    (Ok(_), Ok(Value::Bool(true))) => std::cmp::Ordering::Greater,
+                    (Ok(_), Ok(_)) => std::cmp::Ordering::Equal,
+                    (Err(e), _) | (_, Err(e)) => {
+                        failure = Some(e);
+                        std::cmp::Ordering::Equal
+                    }
+                }
+            });
+            match failure {
+                Some(e) => Err(e),
+                None => Ok(make(a.shape.clone(), data)),
+            }
+        }
+        "to_float" => {
+            let data = a
+                .data
+                .iter()
+                .map(|x| match x {
+                    Value::Int(n) => Ok(Value::Float(*n as f64)),
+                    other => fail(format!("to_float expects Int elements, got '{other}'")),
+                })
+                .collect::<Res<Vec<_>>>()?;
+            Ok(make(a.shape.clone(), data))
+        }
         "transpose" => {
             if a.shape.len() != 2 {
                 return fail("transpose needs a two-dimensional array");
@@ -388,4 +433,140 @@ pub fn display(array: &ArrayData) -> String {
     let mut out = String::new();
     rec(array, 0, 0, &mut out);
     out
+}
+
+/// Statistics on `Float`/`Float32` arrays, generated once per width so the
+/// operations (and their rounding) are exactly those of the native runtime
+/// (`array_stats.c`): two-pass variance, stable sort, interpolated percentiles.
+macro_rules! stats_impl {
+    ($module:ident, $t:ty, $wrap:path, $unwrap:path) => {
+        pub mod $module {
+            use super::*;
+
+            pub fn values(a: &ArrayData) -> Res<Vec<$t>> {
+                a.data
+                    .iter()
+                    .map(|v| match v {
+                        $unwrap(x) => Ok(*x),
+                        other => fail(format!("expected a {} element, got '{other}'", stringify!($t))),
+                    })
+                    .collect()
+            }
+
+            fn sum(v: &[$t]) -> $t {
+                let mut acc = v[0];
+                for x in &v[1..] {
+                    acc = acc + *x;
+                }
+                acc
+            }
+
+            fn mean(v: &[$t]) -> $t {
+                sum(v) / v.len() as $t
+            }
+
+            pub fn var_ddof(v: &[$t], ddof: usize) -> Res<$t> {
+                if v.len() < ddof + 1 {
+                    return fail("not enough elements for this variance");
+                }
+                let m = mean(v);
+                let mut acc: $t = 0.0;
+                for x in v {
+                    let d = *x - m;
+                    acc = acc + d * d;
+                }
+                Ok(acc / (v.len() - ddof) as $t)
+            }
+
+            fn sorted(v: &[$t]) -> Vec<$t> {
+                let mut s = v.to_vec();
+                s.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+                s
+            }
+
+            pub fn median(v: &[$t]) -> $t {
+                let s = sorted(v);
+                let n = s.len();
+                if n % 2 == 1 { s[n / 2] } else { (s[n / 2 - 1] + s[n / 2]) / 2.0 }
+            }
+
+            pub fn percentile(v: &[$t], p: f64) -> Res<$t> {
+                if !(p >= 0.0 && p <= 100.0) {
+                    return fail("percentile needs 0 <= p <= 100");
+                }
+                let s = sorted(v);
+                let n = s.len();
+                let pos = p / 100.0 * ((n - 1) as f64);
+                let lo = pos as usize;
+                let frac = pos - lo as f64;
+                let hi = if lo + 1 < n { lo + 1 } else { n - 1 };
+                Ok(s[lo] + (s[hi] - s[lo]) * (frac as $t))
+            }
+
+            pub fn cov(a: &[$t], b: &[$t]) -> Res<$t> {
+                if a.len() != b.len() {
+                    return fail("cov needs two one-dimensional arrays of the same length");
+                }
+                let (ma, mb) = (mean(a), mean(b));
+                let mut acc: $t = 0.0;
+                for i in 0..a.len() {
+                    acc = acc + (a[i] - ma) * (b[i] - mb);
+                }
+                Ok(acc / a.len() as $t)
+            }
+
+            pub fn corr(a: &[$t], b: &[$t]) -> Res<$t> {
+                let c = cov(a, b)?;
+                Ok(c / (var_ddof(a, 0)?.sqrt() * var_ddof(b, 0)?.sqrt()))
+            }
+
+            pub fn call(method: &str, a: &ArrayData, args: &[Value]) -> Res<Value> {
+                let v = values(a)?;
+                Ok($wrap(match method {
+                    "var" => var_ddof(&v, 0)?,
+                    "std" => var_ddof(&v, 0)?.sqrt(),
+                    "sample_var" => var_ddof(&v, 1)?,
+                    "sample_std" => var_ddof(&v, 1)?.sqrt(),
+                    "median" => median(&v),
+                    "percentile" => match args {
+                        [Value::Float(p)] => percentile(&v, *p)?,
+                        _ => return fail("percentile expects a Float p"),
+                    },
+                    _ => unreachable!("dispatched by stats_method"),
+                }))
+            }
+        }
+    };
+}
+
+stats_impl!(stats64, f64, Value::Float, Value::Float);
+stats_impl!(stats32, f32, Value::F32, Value::F32);
+
+/// `var std sample_var sample_std median percentile` on a float array.
+pub fn stats_method(a: &ArrayData, method: &str, args: &[Value]) -> Res<Value> {
+    match a.data.first() {
+        Some(Value::Float(_)) => stats64::call(method, a, args),
+        Some(Value::F32(_)) => stats32::call(method, a, args),
+        _ => fail(format!("'{method}' needs an array of Float or Float32 (use to_float() on an Int array)")),
+    }
+}
+
+/// `cov(a, b)` / `corr(a, b)` on two one-dimensional float arrays.
+pub fn cov_corr(name: &str, a: &Value, b: &Value) -> Res<Value> {
+    let (Value::Array(a), Value::Array(b)) = (a, b) else { return fail(format!("{name} expects two arrays")) };
+    let (a, b) = (a.borrow(), b.borrow());
+    if a.shape.len() != 1 || b.shape.len() != 1 {
+        return fail(format!("{name} needs two one-dimensional arrays"));
+    }
+    match (a.data.first(), b.data.first()) {
+        (Some(Value::Float(_)), Some(Value::Float(_))) => {
+            let (x, y) = (stats64::values(&a)?, stats64::values(&b)?);
+            Ok(Value::Float(if name == "cov" { stats64::cov(&x, &y)? } else { stats64::corr(&x, &y)? }))
+        }
+        (Some(Value::F32(_)), Some(Value::F32(_))) => {
+            let (x, y) = (stats32::values(&a)?, stats32::values(&b)?);
+            Ok(Value::F32(if name == "cov" { stats32::cov(&x, &y)? } else { stats32::corr(&x, &y)? }))
+        }
+        _ => fail(format!("{name} needs two arrays of the same float type")),
+    }
 }

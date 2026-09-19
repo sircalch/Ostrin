@@ -1,0 +1,37 @@
+fn main() -> Void {
+    data = array([2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0])
+    print(data.mean())
+    print(data.var())
+    print(data.std())
+    print(data.sample_var())
+    print(data.median())
+    print(data.percentile(25.0))
+    print(data.percentile(90.0))
+    print(data.cumsum())
+
+    unsorted = array([5.0, 1.0, 4.0, 2.0, 3.0])
+    print(unsorted.sort())
+    print(unsorted.median())
+
+    x = array([1.0, 2.0, 3.0, 4.0, 5.0])
+    y = array([2.0, 4.1, 5.9, 8.2, 9.9])
+    print(cov(x, y))
+    print(corr(x, y))
+    print(corr(x, x * -1.0))
+
+    counts = array([3, 1, 2])
+    print(counts.sort())
+    print(counts.cumsum())
+    print(counts.to_float().std())
+
+    g = rng(11)
+    noise = g.randn([500])
+    print(noise.mean())
+    print(noise.std())
+    print(noise.percentile(50.0))
+
+    small = array([1.5f32, 2.5f32, 4.0f32, 8.0f32])
+    print(small.var())
+    print(small.median())
+    print(small.percentile(50.0))
+}
