@@ -36,6 +36,59 @@ static void @N@_solve_raw(double* m, double* v, int64_t n, double* x) {
     }
 }
 
+static double @N@_norm(@N@* a) {
+    double acc = 0.0;
+    for (int64_t i = 0; i < a->size; i++) acc = acc + a->data[i] * a->data[i];
+    return sqrt(acc);
+}
+
+static @N@* @N@_eigvals(@N@* a) {
+    if (a->rank != 2 || a->shape[0] != a->shape[1]) OSTRIN_FAIL("eigvals needs a square (n, n) matrix");
+    int64_t n = a->shape[0];
+    for (int64_t i = 0; i < n; i++)
+        for (int64_t j = i + 1; j < n; j++)
+            if (fabs(a->data[i * n + j] - a->data[j * n + i]) > 1e-9 * (1.0 + fabs(a->data[i * n + j]))) OSTRIN_FAIL("eigvals needs a symmetric matrix");
+    double* m = (double*)malloc(sizeof(double) * (size_t)(n * n));
+    if (!m) OSTRIN_OOM();
+    memcpy(m, a->data, sizeof(double) * (size_t)(n * n));
+    for (int sweep = 0; sweep < 100; sweep++) {
+        bool rotated = false;
+        for (int64_t p = 0; p < n; p++) {
+            for (int64_t q = p + 1; q < n; q++) {
+                double apq = m[p * n + q];
+                if (fabs(apq) <= 1e-15 * (fabs(m[p * n + p]) + fabs(m[q * n + q]))) continue;
+                rotated = true;
+                double theta = (m[q * n + q] - m[p * n + p]) / (2.0 * apq);
+                double sign = theta < 0.0 ? -1.0 : 1.0;
+                double t = sign / (fabs(theta) + sqrt(theta * theta + 1.0));
+                double c = 1.0 / sqrt(t * t + 1.0);
+                double s = t * c;
+                for (int64_t k = 0; k < n; k++) {
+                    double akp = m[k * n + p], akq = m[k * n + q];
+                    m[k * n + p] = c * akp - s * akq;
+                    m[k * n + q] = s * akp + c * akq;
+                }
+                for (int64_t k = 0; k < n; k++) {
+                    double apk = m[p * n + k], aqk = m[q * n + k];
+                    m[p * n + k] = c * apk - s * aqk;
+                    m[q * n + k] = s * apk + c * aqk;
+                }
+            }
+        }
+        if (!rotated) break;
+    }
+    double* values = (double*)malloc(sizeof(double) * (size_t)n);
+    if (!values) OSTRIN_OOM();
+    for (int64_t i = 0; i < n; i++) values[i] = m[i * n + i];
+    for (int64_t i = 1; i < n; i++) {
+        int64_t j = i;
+        while (j > 0 && values[j - 1] > values[j]) { double t = values[j - 1]; values[j - 1] = values[j]; values[j] = t; j--; }
+    }
+    @N@* r = @N@_vector(n, values);
+    free(m); free(values);
+    return r;
+}
+
 static double @N@_det_raw(double* m, int64_t n) {
     double det = 1.0;
     for (int64_t col = 0; col < n; col++) {

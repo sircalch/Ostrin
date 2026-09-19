@@ -3618,8 +3618,12 @@ Se cierran los dos huecos de la sección 118, en intérprete, checker y nativo:
 
 Sobre `Array<Float>`: `det(a)` (eliminación con pivoteo parcial; singular → exactamente 0), `inv(a)` (resuelve `A x = e_j` por columna con el mismo `solve`; singular → error «singular matrix»), `trace(a)`, `eye(n)`. Implementados en `interpreter/regress.rs` y `array_linalg.c` con el mismo orden de operaciones, así que los resultados coinciden **bit a bit**, ruido de redondeo incluido (`examples/linear_algebra.ostrin`, comparado intérprete↔nativo: `A @ inv(A)` da `0.9999999999999997` en ambos). Una función de usuario con el mismo nombre tiene prioridad.
 
-Pendiente: LU/QR/SVD/autovalores, normas.
+Pendiente: LU/QR/SVD, autovectores, autovalores de matrices no simétricas.
 
 ## 121. `matriz @ vector` y `vector @ matriz`
 
 `matmul` (y `@`) acepta ahora `(m, k) @ (k)` → vector de longitud `m` y `(k) @ (k, n)` → vector de longitud `n` (el vector se trata como columna a la derecha y como fila a la izquierda); vector @ vector sigue siendo un error (se usa `dot`). Mismo orden de acumulación en intérprete y nativo, salida idéntica (`examples/linear_algebra.ostrin`).
+
+## 122. `norm` y `eigvals` (matrices simétricas)
+
+`norm(a)`: norma euclídea/Frobenius de un `Array<Float>` de cualquier forma. `eigvals(a)`: autovalores de una matriz **simétrica** por rotaciones de Jacobi cíclicas, ordenados de menor a mayor (error si no es cuadrada o no es simétrica). Solo `+ - * /` y `sqrt` en orden fijo, espejado en `array_linalg.c`: resultados idénticos bit a bit en intérprete y nativo (`[[2,1,0],[1,3,1],[0,1,4]]` → `[1.2679491924311221, 2.9999999999999982, 4.732050807568877]`, exactos 3−… ‑ 3 ‑ 3+√3 salvo 1 ulp). Ejemplo: `examples/linear_algebra.ostrin`.

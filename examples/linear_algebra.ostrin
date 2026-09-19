@@ -19,4 +19,9 @@ fn main() -> Void {
     print(a @ b)
     print(b @ a)
     print(ai @ (a @ b))
+    print(norm(b))
+    sym = array([[2.0, 1.0, 0.0], [1.0, 3.0, 1.0], [0.0, 1.0, 4.0]])
+    print(eigvals(sym))
+    print(eigvals(array([[2.0, 0.0], [0.0, 1.0]])))
+    print(eigvals(sym).sum() - trace(sym))
 }

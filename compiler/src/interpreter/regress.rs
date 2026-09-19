@@ -12,7 +12,7 @@ fn fail<T>(message: impl Into<String>) -> Res<T> {
 }
 
 pub fn is_regress(name: &str, arity: usize) -> bool {
-    matches!((name, arity), ("linfit", 2) | ("polyfit", 3) | ("polyval", 2) | ("solve", 2) | ("det", 1) | ("inv", 1) | ("trace", 1) | ("eye", 1) | ("histogram", 4) | ("norm_pdf", 3) | ("norm_cdf", 3))
+    matches!((name, arity), ("linfit", 2) | ("polyfit", 3) | ("polyval", 2) | ("solve", 2) | ("norm", 1) | ("eigvals", 1) | ("det", 1) | ("inv", 1) | ("trace", 1) | ("eye", 1) | ("histogram", 4) | ("norm_pdf", 3) | ("norm_cdf", 3))
 }
 
 fn floats(value: &Value, what: &str) -> Res<(Vec<usize>, Vec<f64>)> {
@@ -38,6 +38,50 @@ fn float(value: &Value, what: &str) -> Res<f64> {
 fn vector(values: Vec<f64>) -> Value {
     let n = values.len();
     array::make(vec![n], values.into_iter().map(Value::Float).collect())
+}
+
+/// Eigenvalues of a symmetric matrix by cyclic Jacobi rotations, sorted ascending. Only `+ - * /`
+/// and `sqrt`, in a fixed order (mirrored by `array_linalg.c`).
+fn jacobi_eigenvalues(mut a: Vec<f64>, n: usize) -> Vec<f64> {
+    for _sweep in 0..100 {
+        let mut rotated = false;
+        for p in 0..n {
+            for q in p + 1..n {
+                let apq = a[p * n + q];
+                if apq.abs() <= 1e-15 * (a[p * n + p].abs() + a[q * n + q].abs()) {
+                    continue;
+                }
+                rotated = true;
+                let theta = (a[q * n + q] - a[p * n + p]) / (2.0 * apq);
+                let sign = if theta < 0.0 { -1.0 } else { 1.0 };
+                let t = sign / (theta.abs() + (theta * theta + 1.0).sqrt());
+                let c = 1.0 / (t * t + 1.0).sqrt();
+                let s = t * c;
+                for k in 0..n {
+                    let (akp, akq) = (a[k * n + p], a[k * n + q]);
+                    a[k * n + p] = c * akp - s * akq;
+                    a[k * n + q] = s * akp + c * akq;
+                }
+                for k in 0..n {
+                    let (apk, aqk) = (a[p * n + k], a[q * n + k]);
+                    a[p * n + k] = c * apk - s * aqk;
+                    a[q * n + k] = s * apk + c * aqk;
+                }
+            }
+        }
+        if !rotated {
+            break;
+        }
+    }
+    let mut values: Vec<f64> = (0..n).map(|i| a[i * n + i]).collect();
+    for i in 1..n {
+        let mut j = i;
+        while j > 0 && values[j - 1] > values[j] {
+            values.swap(j - 1, j);
+            j -= 1;
+        }
+    }
+    values
 }
 
 /// Determinant by the same elimination as `solve_system`; a singular matrix gives exactly 0.
@@ -224,6 +268,29 @@ pub fn call(name: &str, args: &[Value]) -> Res<Value> {
                     Ok(array::make(vec![n, n], out.into_iter().map(Value::Float).collect()))
                 }
             }
+        }
+        "norm" => {
+            let (_, a) = floats(&args[0], "norm")?;
+            let mut acc = 0.0;
+            for x in a {
+                acc = acc + x * x;
+            }
+            Ok(Value::Float(acc.sqrt()))
+        }
+        "eigvals" => {
+            let (shape, a) = floats(&args[0], "eigvals")?;
+            if shape.len() != 2 || shape[0] != shape[1] {
+                return fail("eigvals needs a square (n, n) matrix");
+            }
+            let n = shape[0];
+            for i in 0..n {
+                for j in i + 1..n {
+                    if (a[i * n + j] - a[j * n + i]).abs() > 1e-9 * (1.0 + a[i * n + j].abs()) {
+                        return fail("eigvals needs a symmetric matrix");
+                    }
+                }
+            }
+            Ok(vector(jacobi_eigenvalues(a, n)))
         }
         "eye" => {
             let Value::Int(n) = &args[0] else { return fail("eye expects an Int size") };
