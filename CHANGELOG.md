@@ -44,6 +44,11 @@
   discovered monomorphization, registers its direct C name and prototype, and
   rewrites the specialized HIR call without applying the ordinary source-name
   prefix. Coverage is now 98 measured functions/methods.
+- Generic `record<T>` and `enum<T>` instances are now visible to HIR with their
+  concrete C names, fields, variants and tags. Specialized generic bodies can
+  emit record literals/field access, enum constructors and `match` patterns;
+  nested applied type arguments preserve their source-level HIR spelling. The
+  differential HIR ratchet is now 110 (117 measured).
 - Module loader now rewrites types in signatures, fields, variants and annotations
   (a `record` from another module can be used as a type).
 - CI on Linux, macOS and Windows.

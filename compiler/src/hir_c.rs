@@ -11,7 +11,7 @@ use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 
 use crate::ast::{BinOp, Expr, RangeKind, UnaryOp};
-use crate::hir::{HirBlock, HirExpr, HirFunction, HirKind, HirStmt};
+use crate::hir::{HirArg, HirBlock, HirExpr, HirFunction, HirKind, HirStmt};
 use crate::types::Ty;
 
 type Bail<T> = Result<T, ()>;
@@ -29,12 +29,19 @@ pub struct World {
     /// Non-generic records: name -> [(field, C type)] in declaration order. Empty when reads of
     /// records must be tracked (E1101), which only the AST path knows how to do.
     pub records: HashMap<String, Vec<(String, String)>>,
+    /// Applied generic records/enums are keyed by their HIR spelling
+    /// (`Box<Int>`) and point at the concrete C instance (`Box__Int`).
+    pub applied_records: HashMap<String, String>,
+    pub applied_enums: HashMap<String, String>,
     /// Methods of records: (record, method) -> (C name, C parameter types with `self` first, C return type).
     pub methods: HashMap<(String, String), (String, Vec<String>, String)>,
     pub c_name: fn(&str) -> String,
     /// Non-generic enums (tagged unions passed by value) and their variants by name.
     pub enums: HashSet<String>,
     pub variants: HashMap<String, VariantView>,
+    /// Generic variants need the concrete enum name in their key because
+    /// `Just<Int>` and `Just<String>` share the source-level variant name.
+    pub applied_variants: HashMap<(String, String), VariantView>,
     /// C declarations produced while lowering HIR lambdas/function values.
     /// They are drained by `codegen.rs` after all HIR bodies have been visited.
     pub closure_protos: RefCell<Vec<String>>,
@@ -80,6 +87,12 @@ impl Emitter<'_> {
             Ty::String => Ok("const char*".to_string()),
             Ty::Named(n) if self.world.records.contains_key(n) => Ok(format!("{n}*")),
             Ty::Named(n) if self.world.enums.contains(n) => Ok(n.clone()),
+            Ty::Applied(..) if self.world.applied_records.contains_key(&ty.describe()) => {
+                Ok(format!("{}*", self.world.applied_records[&ty.describe()]))
+            }
+            Ty::Applied(..) if self.world.applied_enums.contains_key(&ty.describe()) => {
+                Ok(self.world.applied_enums[&ty.describe()].clone())
+            }
             Ty::List(elem) => Ok(format!("List_{}*", self.mangle_type(elem)?)),
             Ty::Map(key, value) => Ok(format!(
                 "Map_{}_{}*",
@@ -134,18 +147,69 @@ impl Emitter<'_> {
                     self.mangle_type(&args[1])?
                 )
             }
+            Ty::Applied(..) if self.world.applied_records.contains_key(&ty.describe()) => {
+                self.world.applied_records[&ty.describe()].clone()
+            }
+            Ty::Applied(..) if self.world.applied_enums.contains_key(&ty.describe()) => {
+                self.world.applied_enums[&ty.describe()].clone()
+            }
             _ => return Err(()),
         })
     }
 
     fn field(&self, record: &Ty, field: &str) -> Bail<String> {
-        let Ty::Named(n) = record else { return Err(()) };
+        let name = self.record_name(record)?;
         self.world
             .records
-            .get(n)
+            .get(&name)
             .and_then(|fs| fs.iter().find(|(f, _)| f == field))
             .map(|(_, t)| t.clone())
             .ok_or(())
+    }
+
+    fn record_name(&self, ty: &Ty) -> Bail<String> {
+        match ty {
+            Ty::Named(name) if self.world.records.contains_key(name) => Ok(name.clone()),
+            Ty::Applied(..) => self.world.applied_records.get(&ty.describe()).cloned().ok_or(()),
+            _ => Err(()),
+        }
+    }
+
+    fn enum_name(&self, ty: &Ty) -> Bail<String> {
+        match ty {
+            Ty::Named(name) if self.world.enums.contains(name) => Ok(name.clone()),
+            Ty::Applied(..) => self.world.applied_enums.get(&ty.describe()).cloned().ok_or(()),
+            _ => Err(()),
+        }
+    }
+
+    fn variant(&self, name: &str, ty: &Ty) -> Option<VariantView> {
+        let enum_name = self.enum_name(ty).ok()?;
+        self.world
+            .applied_variants
+            .get(&(enum_name.clone(), name.to_string()))
+            .cloned()
+            .or_else(|| self.world.variants.get(name).filter(|variant| variant.enum_name == enum_name).cloned())
+    }
+
+    fn variant_constructor(&mut self, e: &HirExpr, name: &str, args: &[HirArg]) -> Bail<String> {
+        let v = self.variant(name, &e.ty).ok_or(())?;
+        if v.fields.len() != args.len() || args.iter().any(|arg| arg.name.is_some()) || self.c_type(&e.ty)? != v.enum_name {
+            return Err(());
+        }
+        let mut inits = Vec::new();
+        for (arg, (field, want)) in args.iter().zip(&v.fields) {
+            if !c_compatible(&self.c_type(&arg.value.ty)?, want) {
+                return Err(());
+            }
+            inits.push(format!(".{field} = {}", self.expr(&arg.value)?));
+        }
+        Ok(format!(
+            "(({}){{ .tag = {}, .data.{name} = {{ {} }} }})",
+            v.enum_name,
+            v.tag,
+            inits.join(", ")
+        ))
     }
 }
 
@@ -458,11 +522,7 @@ impl Emitter<'_> {
                 )
             }
             Pattern::Ident(name) => {
-                let unit = self
-                    .world
-                    .variants
-                    .get(name)
-                    .filter(|v| v.fields.is_empty() && *ty == Ty::Named(v.enum_name.clone()));
+                let unit = self.variant(name, ty).filter(|v| v.fields.is_empty() && self.c_type(ty).ok().as_deref() == Some(v.enum_name.as_str()));
                 match unit {
                     Some(v) => {
                         condition.push_str(&format!(" && ({var}.tag == {})", v.tag));
@@ -475,13 +535,7 @@ impl Emitter<'_> {
                 Ok(())
             }
             Pattern::Variant(name, fields) => {
-                let v = self
-                    .world
-                    .variants
-                    .get(name)
-                    .filter(|v| *ty == Ty::Named(v.enum_name.clone()))
-                    .ok_or(())?
-                    .clone();
+                let v = self.variant(name, ty).filter(|v| self.c_type(ty).ok().as_deref() == Some(v.enum_name.as_str())).ok_or(())?;
                 condition.push_str(&format!(" && ({var}.tag == {})", v.tag));
                 for (position, (field_name, sub)) in fields.iter().enumerate() {
                     let (actual, field_c) = v
@@ -582,14 +636,9 @@ impl Emitter<'_> {
             HirKind::Str(s) => Ok(crate::codegen::c_string_literal(s)),
             HirKind::Local(name) => Ok(name.clone()),
             HirKind::Lambda(params, body) => self.lambda_expr(e, params, body),
-            HirKind::Global(name)
-                if self
-                    .world
-                    .variants
-                    .get(name)
-                    .is_some_and(|v| v.fields.is_empty()) =>
+            HirKind::Global(name) if self.variant(name, &e.ty).is_some_and(|v| v.fields.is_empty()) =>
             {
-                let v = &self.world.variants[name];
+                let v = self.variant(name, &e.ty).ok_or(())?;
                 if self.c_type(&e.ty)? != v.enum_name {
                     return Err(());
                 }
@@ -609,18 +658,19 @@ impl Emitter<'_> {
                 }
                 Ok(format!("{}->{field}", self.expr(obj)?))
             }
-            HirKind::Record {
-                name,
-                type_args,
-                fields,
-            } if type_args.is_empty() => {
-                let declared = self.world.records.get(name).ok_or(())?.clone();
+            HirKind::Record { fields, .. } => {
+                let record = match &e.ty {
+                    Ty::Named(name) if self.world.records.contains_key(name) => name.clone(),
+                    Ty::Applied(..) => self.world.applied_records.get(&e.ty.describe()).cloned().ok_or(())?,
+                    _ => return Err(()),
+                };
+                let declared = self.world.records.get(&record).ok_or(())?.clone();
                 if fields.len() != declared.len() {
                     return Err(());
                 }
                 // Same shape as the AST path: allocate, then assign each field in source order.
                 let temp = format!("__hir_rec{}", self.scopes.len());
-                let mut body = format!("{name}* {temp} = ({name}*)malloc(sizeof({name})); if (!{temp}) {{ fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); }} ");
+                let mut body = format!("{record}* {temp} = ({record}*)malloc(sizeof({record})); if (!{temp}) {{ fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); }} ");
                 for (field, value) in fields {
                     let want = declared
                         .iter()
@@ -674,13 +724,11 @@ impl Emitter<'_> {
                 if is_set(&recv.ty) {
                     return self.set_method(e, recv, method, args);
                 }
-                let Ty::Named(record) = &recv.ty else {
-                    return Err(());
-                };
+                let record = self.record_name(&recv.ty)?;
                 let (c_name, params, ret) = self
                     .world
                     .methods
-                    .get(&(record.clone(), method.clone()))
+                    .get(&(record, method.clone()))
                     .ok_or(())?
                     .clone();
                 if params.len() != args.len() + 1
@@ -766,6 +814,14 @@ impl Emitter<'_> {
                 };
                 self.constructor(e, name, args)
             }
+            HirKind::Call { callee, args, .. }
+                if matches!(&callee.kind, HirKind::Global(name) if self.variant(name, &e.ty).is_some()) =>
+            {
+                let HirKind::Global(name) = &callee.kind else {
+                    return Err(());
+                };
+                self.variant_constructor(e, name, args)
+            }
             HirKind::Call {
                 callee,
                 args,
@@ -799,31 +855,6 @@ impl Emitter<'_> {
                         Ty::String => Ok(format!("printf(\"%s\\n\", {code})")),
                         _ => Err(()),
                     };
-                }
-                if let (Some(v), false) = (
-                    self.world.variants.get(name),
-                    self.world.functions.contains_key(name),
-                ) {
-                    let v = v.clone();
-                    if v.fields.len() != args.len()
-                        || args.iter().any(|a| a.name.is_some())
-                        || self.c_type(&e.ty)? != v.enum_name
-                    {
-                        return Err(());
-                    }
-                    let mut inits = Vec::new();
-                    for (arg, (field, want)) in args.iter().zip(&v.fields) {
-                        if !c_compatible(&self.c_type(&arg.value.ty)?, want) {
-                            return Err(());
-                        }
-                        inits.push(format!(".{field} = {}", self.expr(&arg.value)?));
-                    }
-                    return Ok(format!(
-                        "(({}){{ .tag = {}, .data.{name} = {{ {} }} }})",
-                        v.enum_name,
-                        v.tag,
-                        inits.join(", ")
-                    ));
                 }
                 let (params, ret) = self.world.functions.get(name).ok_or(())?.clone();
                 if params.len() != args.len() || args.iter().any(|a| a.name.is_some()) {

@@ -757,6 +757,57 @@ fn ctype_to_hir_ty(ty: &CType) -> Option<Ty> {
     })
 }
 
+/// Converts a concrete native type back into HIR while recovering the source
+/// spelling of a monomorphized user type (`Box__Int` -> `Box<Int>`).  HIR
+/// specializes generic bodies with `Ty::Applied`, so the native instance name
+/// alone would make field and variant lookup lose the generic arguments.
+fn ctype_to_hir_ty_with_instances(ty: &CType, instances: &HashMap<String, (String, Vec<CType>)>) -> Option<Ty> {
+    Some(match ty {
+        CType::Record(name) | CType::Enum(name) => match instances.get(name) {
+            Some((base, args)) => Ty::Applied(
+                base.clone(),
+                args.iter().map(|arg| ctype_to_hir_ty_with_instances(arg, instances)).collect::<Option<Vec<_>>>()?,
+            ),
+            None => Ty::Named(name.clone()),
+        },
+        CType::List(inner) => Ty::List(Box::new(ctype_to_hir_ty_with_instances(inner, instances)?)),
+        CType::Map(key, value) => Ty::Map(
+            Box::new(ctype_to_hir_ty_with_instances(key, instances)?),
+            Box::new(ctype_to_hir_ty_with_instances(value, instances)?),
+        ),
+        CType::Set(inner) => Ty::Set(Box::new(ctype_to_hir_ty_with_instances(inner, instances)?)),
+        CType::Option(inner) => Ty::Applied("Option".to_string(), vec![ctype_to_hir_ty_with_instances(inner, instances)?]),
+        CType::Result(ok, err) => Ty::Applied(
+            "Result".to_string(),
+            vec![
+                ctype_to_hir_ty_with_instances(ok, instances)?,
+                ctype_to_hir_ty_with_instances(err, instances)?,
+            ],
+        ),
+        CType::Fn(params, ret) => Ty::Fn(
+            params
+                .iter()
+                .map(|param| ctype_to_hir_ty_with_instances(param, instances))
+                .collect::<Option<Vec<_>>>()?,
+            Box::new(ctype_to_hir_ty_with_instances(ret, instances)?),
+        ),
+        CType::DynTrait(name) => Ty::Dyn(name.clone()),
+        CType::Quantity(dimension) => Ty::Quantity(dimension.clone()),
+        CType::Sized(kind) => Ty::Sized(*kind),
+        CType::Float32 => Ty::Float32,
+        CType::Array(inner) => Ty::Applied("Array".to_string(), vec![ctype_to_hir_ty_with_instances(inner, instances)?]),
+        CType::Channel(inner) => Ty::Applied("Channel".to_string(), vec![ctype_to_hir_ty_with_instances(inner, instances)?]),
+        CType::Task(inner) => Ty::Applied("Task".to_string(), vec![ctype_to_hir_ty_with_instances(inner, instances)?]),
+        CType::Rng => Ty::Named("Rng".to_string()),
+        CType::Int => Ty::Int,
+        CType::Float => Ty::Float,
+        CType::Bool => Ty::Bool,
+        CType::Str => Ty::String,
+        CType::Void => Ty::Void,
+        CType::NoneLit | CType::OkLit(_) | CType::ErrLit(_) | CType::GenLit(..) => return None,
+    })
+}
+
 fn ctype_subst_to_hir(subst: &HashMap<String, CType>) -> HashMap<String, Ty> {
     subst
         .iter()
@@ -840,7 +891,7 @@ impl<'a> Codegen<'a> {
             if queue {
                 self.pending.push_back(PendingInstance {
                     c_name,
-                    hir_name: format!("{}.{}", im.type_name, method.name),
+                    hir_name: crate::hir::impl_method_name(im, &method.name),
                     decl: method,
                     hir_subst: ctype_subst_to_hir(binds),
                     subst: binds.clone(),
@@ -1960,6 +2011,59 @@ impl<'a> Codegen<'a> {
             }
             self.register_hir_type(&function.ret);
             self.register_hir_block_types(&function.body);
+        }
+    }
+
+    /// Publishes concrete generic record/enum metadata to the HIR emitter.
+    /// The native backend owns the monomorphized C names; this is the bridge
+    /// that lets HIR keep seeing `Ty::Applied("Box", [Int])` while emitting
+    /// `Box__Int*` fields and `Maybe__String` variants.
+    fn sync_hir_instances(&self, world: &mut crate::hir_c::World) {
+        for (instance, (base, args)) in &self.instance_info {
+            let Some((is_enum, _)) = self.generic_arity.get(base) else { continue };
+            let Some(hir_args) = args
+                .iter()
+                .map(|arg| ctype_to_hir_ty_with_instances(arg, &self.instance_info))
+                .collect::<Option<Vec<_>>>()
+            else {
+                continue;
+            };
+            let applied = Ty::Applied(base.clone(), hir_args).describe();
+            if *is_enum {
+                world.applied_enums.insert(applied, instance.clone());
+                world.enums.insert(instance.clone());
+                if let Some(variants) = self.instance_variants.get(instance) {
+                    for variant in variants {
+                        world.applied_variants.insert(
+                            (instance.clone(), variant.name.clone()),
+                            crate::hir_c::VariantView {
+                                enum_name: variant.enum_name.clone(),
+                                tag: variant.tag,
+                                fields: variant
+                                    .fields
+                                    .iter()
+                                    .map(|(field, ty)| {
+                                        (field.clone(), c_type_name(ty))
+                                    })
+                                    .collect(),
+                            },
+                        );
+                    }
+                }
+            } else {
+                world.applied_records.insert(applied, instance.clone());
+                if !self.track_moves {
+                    if let Some(fields) = self.records.get(instance) {
+                        world.records.insert(
+                            instance.clone(),
+                            fields
+                                .iter()
+                                .map(|(field, ty)| (field.clone(), c_type_name(ty)))
+                                .collect(),
+                        );
+                    }
+                }
+            }
         }
     }
 
@@ -5004,6 +5108,8 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>, tr
                 .map(|(name, fields)| (name.clone(), fields.iter().map(|(f, t)| (f.clone(), c_type_name(t))).collect()))
                 .collect()
         },
+        applied_records: HashMap::new(),
+        applied_enums: HashMap::new(),
         methods: codegen
             .methods
             .iter()
@@ -5023,12 +5129,14 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>, tr
                 (name.clone(), crate::hir_c::VariantView { enum_name: v.enum_name.clone(), tag: v.tag, fields: v.fields.iter().map(|(f, t)| (f.clone(), c_type_name(t))).collect() })
             })
             .collect(),
+        applied_variants: HashMap::new(),
         closure_protos: std::cell::RefCell::new(Vec::new()),
         closure_bodies: std::cell::RefCell::new(Vec::new()),
         closure_counter: std::cell::Cell::new(0),
     };
     if let Some(program) = &hir {
         codegen.register_hir_types(program);
+        codegen.sync_hir_instances(&mut hir_world);
     }
     for f in &functions {
         if !f.generics.is_empty() {
@@ -5405,6 +5513,7 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>, tr
                     }
                     codegen.register_hir_type(&specialized.ret);
                     codegen.register_hir_block_types(&specialized.body);
+                    codegen.sync_hir_instances(&mut hir_world);
                     crate::hir_c::generate(&specialized, &hir_world)
                 } else {
                     None

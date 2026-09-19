@@ -34,6 +34,25 @@ pub struct HirFunction {
     pub source_file: Option<String>,
 }
 
+/// Gives impl methods a collision-free HIR name when a generic record/enum
+/// has more than one concrete or trait implementation with the same method
+/// spelling. Plain non-generic impls retain the historical `Type.method`
+/// name used by editor output and the native backend.
+pub fn impl_method_name(im: &ImplDecl, method: &str) -> String {
+    if im.generics.is_empty() && im.type_args.is_empty() {
+        format!("{}.{}", im.type_name, method)
+    } else {
+        format!(
+            "{}::{}::{}@{}:{}",
+            im.type_name,
+            im.trait_name.as_deref().unwrap_or("inherent"),
+            method,
+            im.span.line,
+            im.span.col
+        )
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct HirBlock {
     pub stmts: Vec<HirStmt>,
@@ -446,7 +465,7 @@ pub fn lower<'a>(items: &'a [Item], typed: &'a TypedProgram) -> HirProgram {
                     Ty::Applied(im.type_name.clone(), im.type_args.iter().map(crate::typeck::resolve_type).collect())
                 };
                 for m in &im.methods {
-                    functions.push(lower_fn(format!("{}.{}", im.type_name, m.name), m, &im.generics, self_ty.clone()));
+                    functions.push(lower_fn(impl_method_name(im, &m.name), m, &im.generics, self_ty.clone()));
                 }
             }
             _ => {}

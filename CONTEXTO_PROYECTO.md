@@ -3810,3 +3810,36 @@ funciones/métodos HIR y el trinquete queda en **90**.
 Queda como siguiente familia la resolución HIR de `record<T>`/`enum<T>` aplicados dentro de estas
 instancias y, después, los métodos genéricos. En esos casos el fallback AST sigue siendo obligatorio
 hasta que el `World` conozca sus nombres, campos, variantes y métodos concretos.
+
+## 132. Records y enums genéricos aplicados desde HIR — 2026-09-18
+
+Se cerró la siguiente parte de la migración: las instancias concretas de `record<T>` y `enum<T>`
+que ya monomorfiza `codegen.rs` ahora también se publican en el `World` de `hir_c.rs`. El puente
+conserva el tipo fuente aplicado (`Pair<Int, String>`, `Maybe<Int>`) y lo relaciona con su nombre
+C concreto (`Pair__Int_String`, `Maybe__Int`), incluidos argumentos anidados dentro de listas,
+mapas, opciones y otras instancias.
+
+El emisor HIR ya puede generar, dentro de una función genérica especializada:
+
+- literales de records genéricos, asignación de sus campos y acceso `obj.field`;
+- constructores de variantes genéricas con y sin payload, incluso cuando llevan argumentos de tipo
+  explícitos;
+- patrones de variantes genéricas en `match`, con sus ligaduras y tags concretos;
+- métodos de instancias concretas cuando el registro de métodos ya fue monomorfizado;
+- firmas C correctas para records por referencia y enums por valor, sin aplicar el prefijo de
+  funciones fuente a nombres ya mangled.
+
+La conversión inversa de tipos nativos a HIR recupera también la forma aplicada de una instancia
+anidada, evitando que `Box__Int` se degrade a un nombre opaco cuando aparece como argumento de
+otro tipo genérico. Si el seguimiento de movimientos E1101 está activo, los campos de records
+siguen forzando el fallback AST para conservar esa comprobación.
+
+`native_generic_types.ostrin` y `native_hir_handles_generic_records_and_enums` cubren records,
+enums, campos, `match`, métodos y constructores dentro de instancias especializadas. El C emitido
+contiene literales HIR concretos como `Pair__String_Int* __hir_rec`. La suite diferencial conserva
+la equivalencia intérprete↔nativo y mide **117 funciones/métodos generados desde HIR**; el trinquete
+sube de **90 a 110**.
+
+La siguiente ampliación es completar métodos genéricos complejos y retirar más fallback AST; después
+se puede empezar la gestión de memoria nativa y el análisis de último uso previsto en los documentos
+18 y 20.
