@@ -3663,3 +3663,35 @@ Cobertura: 43 funciones y métodos de los ejemplos (36 antes); ratchet ≥ 40; t
 **Trampas conocidas:** editar con scripts Python en el scratchpad (los heredocs de bash rompen comillas/backslashes); los `.rs` del repo usan CRLF (normalizar al editar); sintaxis: `and/or/not`, sin `let`, `match` con comas, sin `` hasta la sección 111; un ejemplo nuevo no debe pisar uno existente (`native_strings.ostrin` ya existía); los `ostrin.lock` de ejemplos se ignoran por `.gitignore`.
 
 **Pendientes de producto (no empezados):** concurrencia real, gestión de memoria en nativo (hoy `malloc` sin liberar), LU/QR/SVD, autovectores, histograma/barras en `plot`, `Array` de más tipos, WASM/playground, instalador y binarios.
+
+## 127. `Option` y `Result` generados desde el HIR (cuarta familia)
+
+Se cerró la cuarta familia de la migración del backend nativo en `compiler/src/hir_c.rs`.
+El emisor HIR reconoce ahora `Ty::Applied("Option", ..)` y `Ty::Applied("Result", ..)` y usa
+los mismos nombres de instanciación C que el camino AST (`Option_Int`, `Result_Int_String`, etc.).
+
+- **Construcción**: `Some(x)`, `None` y `None<T>()`, `Ok(x)` y `Err(e)`, incluidos constructores
+  con argumentos de tipo explícitos cuando el checker ya resolvió el tipo aplicado.
+- **Métodos estructurales**: `is_some`, `is_none`, `unwrap`, `unwrap_or`, `ok_or` en `Option`;
+  `is_ok`, `is_err`, `unwrap`, `unwrap_or` y `ok` en `Result`.
+- **Patrones**: `Some(x)`/`None` y `Ok(x)`/`Err(e)` en `match`, con ligaduras y subpatrones
+  compatibles con los campos internos (`value`, `error`).
+- **Propagación**: `try` para `Option` y `Result`, incluyendo el retorno temprano de la variante
+  ausente o errónea. `try … catch` y los combinadores que reciben lambdas (`map`, `then`,
+  `map_err`) siguen cayendo al AST hasta migrar la familia de cierres.
+- **Bindings anotados**: el camino HIR valida que el tipo declarado y el tipo inferido coincidan,
+  en vez de rechazar cualquier binding anotado.
+- **Tipos locales**: `codegen.rs` recorre los tipos concretos del HIR antes de emitir cuerpos y
+  registra sus declaraciones C. Así un `Option` local dentro de `main` no depende de aparecer en
+  una firma; `examples/native_hir_option_locals.ostrin` cubre este caso.
+
+La cobertura medida subió de **43 a 61 funciones/métodos generados desde HIR**. El trinquete de
+`compiler/tests/differential.rs` queda en **55**. Se añadió `native_hir_handles_option_result_core`
+en `compiler/tests/examples.rs`, que exige cobertura HIR en `native_option.ostrin`,
+`native_hir_option_locals.ostrin`, `native_result.ostrin`, `native_result_catch.ostrin` y `try_result.ostrin`. La ejecución nativa
+de los ejemplos mantiene la misma salida que el intérprete. Validación final de la tanda:
+**6 pruebas diferenciales y 102 de integración en verde**.
+
+**Siguiente paso:** quinta familia, listas y colecciones; después cierres y genéricos. Al terminar
+esas migraciones se podrá retirar progresivamente el camino AST del backend y comenzar la etapa
+de gestión de memoria/último uso prevista en los documentos 18 y 20.

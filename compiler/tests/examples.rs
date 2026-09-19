@@ -1032,6 +1032,32 @@ fn native_backend_compiles_and_runs_result_and_try() {
 }
 
 #[test]
+fn native_hir_handles_option_result_core() {
+    // The structural Option/Result family now comes from HIR: constructors,
+    // match, basic queries, unwrap/unwrap_or, ok/ok_or and propagation with
+    // `try`. Lambda-based combinators and `catch` remain AST responsibilities
+    // until the closure family is migrated.
+    for (file, minimum_hir_functions) in [
+        ("native_option.ostrin", 2usize),
+        ("native_hir_option_locals.ostrin", 1usize),
+        ("native_result.ostrin", 5usize),
+        ("native_result_catch.ostrin", 2usize),
+        ("try_result.ostrin", 5usize),
+    ] {
+        let report = run(&["--native-type-report", &example_path(file)]);
+        if skip_if_no_c_compiler(&report) {
+            return;
+        }
+        assert!(report.status.success(), "native type report failed for {file}: {}", stderr(&report));
+        let hir_functions = stdout(&report)
+            .lines()
+            .find_map(|line| line.strip_prefix("hir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+            .unwrap_or(0);
+        assert!(hir_functions >= minimum_hir_functions, "{file} generated only {hir_functions} HIR function(s), expected at least {minimum_hir_functions}");
+    }
+}
+
+#[test]
 fn int_division_truncates_in_both_backends() {
     // The type checker types `Int / Int` as `Int`; the interpreter used to
     // return a Float (7 / 2 -> 3.5), contradicting it.

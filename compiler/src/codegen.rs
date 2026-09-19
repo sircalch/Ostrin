@@ -1890,6 +1890,155 @@ impl<'a> Codegen<'a> {
         })
     }
 
+    /// Register C helper/type declarations for every concrete type appearing
+    /// in the HIR before any HIR body is emitted. The AST path discovers local
+    /// `Option`/`Result` values while walking statements; an HIR body can be
+    /// generated without that walk, so signatures alone are not sufficient
+    /// (for example, `main` may create a local `Some(4)`).
+    fn register_hir_types(&mut self, program: &crate::hir::HirProgram) {
+        for function in &program.functions {
+            for (_, ty) in &function.params {
+                self.register_hir_type(ty);
+            }
+            self.register_hir_type(&function.ret);
+            self.register_hir_block_types(&function.body);
+        }
+    }
+
+    fn register_hir_type(&mut self, ty: &Ty) {
+        if let Some(ctype) = self.ty_to_ctype(ty) {
+            self.register_list_types(&ctype);
+        }
+    }
+
+    fn register_hir_block_types(&mut self, block: &crate::hir::HirBlock) {
+        for stmt in &block.stmts {
+            match stmt {
+                crate::hir::HirStmt::Let { value, .. } | crate::hir::HirStmt::Assign { value, .. } => self.register_hir_expr_types(value),
+                crate::hir::HirStmt::FieldAssign { target, value } => {
+                    self.register_hir_expr_types(target);
+                    self.register_hir_expr_types(value);
+                }
+                crate::hir::HirStmt::Return(value) | crate::hir::HirStmt::Break(value) => {
+                    if let Some(value) = value {
+                        self.register_hir_expr_types(value);
+                    }
+                }
+                crate::hir::HirStmt::Continue => {}
+                crate::hir::HirStmt::While { cond, body } => {
+                    self.register_hir_expr_types(cond);
+                    self.register_hir_block_types(body);
+                }
+                crate::hir::HirStmt::For { iter, body, .. } => {
+                    self.register_hir_expr_types(iter);
+                    self.register_hir_block_types(body);
+                }
+                crate::hir::HirStmt::Expr(value) => self.register_hir_expr_types(value),
+            }
+        }
+        if let Some(tail) = &block.tail {
+            self.register_hir_expr_types(tail);
+        }
+    }
+
+    fn register_hir_expr_types(&mut self, expr: &crate::hir::HirExpr) {
+        self.register_hir_type(&expr.ty);
+        match &expr.kind {
+            crate::hir::HirKind::Unit(value, _)
+            | crate::hir::HirKind::Unary(_, value)
+            | crate::hir::HirKind::Field(value, _)
+            | crate::hir::HirKind::As(value, _) => self.register_hir_expr_types(value),
+            crate::hir::HirKind::Binary(_, left, right)
+            | crate::hir::HirKind::Index(left, right)
+            | crate::hir::HirKind::Within(left, right) => {
+                self.register_hir_expr_types(left);
+                self.register_hir_expr_types(right);
+            }
+            crate::hir::HirKind::Approximately(a, b, tolerance) => {
+                self.register_hir_expr_types(a);
+                self.register_hir_expr_types(b);
+                self.register_hir_expr_types(tolerance);
+            }
+            crate::hir::HirKind::Range(start, _, end, step) => {
+                self.register_hir_expr_types(start);
+                self.register_hir_expr_types(end);
+                if let Some(step) = step {
+                    self.register_hir_expr_types(step);
+                }
+            }
+            crate::hir::HirKind::Call { callee, args, .. } => {
+                self.register_hir_expr_types(callee);
+                for arg in args {
+                    self.register_hir_expr_types(&arg.value);
+                }
+            }
+            crate::hir::HirKind::MethodCall { recv, args, .. } => {
+                self.register_hir_expr_types(recv);
+                for arg in args {
+                    self.register_hir_expr_types(&arg.value);
+                }
+            }
+            crate::hir::HirKind::If(cond, then_block, else_block) => {
+                self.register_hir_expr_types(cond);
+                self.register_hir_block_types(then_block);
+                if let Some(else_block) = else_block {
+                    self.register_hir_block_types(else_block);
+                }
+            }
+            crate::hir::HirKind::Block(block)
+            | crate::hir::HirKind::Loop(block)
+            | crate::hir::HirKind::Spawn(block)
+            | crate::hir::HirKind::SpawnScope(block)
+            | crate::hir::HirKind::Lambda(_, block) => self.register_hir_block_types(block),
+            crate::hir::HirKind::List(values) | crate::hir::HirKind::Set(values) => {
+                for value in values {
+                    self.register_hir_expr_types(value);
+                }
+            }
+            crate::hir::HirKind::Map(values) => {
+                for (key, value) in values {
+                    self.register_hir_expr_types(key);
+                    self.register_hir_expr_types(value);
+                }
+            }
+            crate::hir::HirKind::Try(value, handler) => {
+                self.register_hir_expr_types(value);
+                if let Some(handler) = handler {
+                    self.register_hir_expr_types(handler);
+                }
+            }
+            crate::hir::HirKind::Record { fields, .. } => {
+                for (_, value) in fields {
+                    self.register_hir_expr_types(value);
+                }
+            }
+            crate::hir::HirKind::Match(scrutinee, arms) => {
+                self.register_hir_expr_types(scrutinee);
+                for arm in arms {
+                    if let Some(guard) = &arm.guard {
+                        self.register_hir_expr_types(guard);
+                    }
+                    self.register_hir_block_types(&arm.body);
+                }
+            }
+            crate::hir::HirKind::Channel(_, capacity) => {
+                if let Some(capacity) = capacity {
+                    self.register_hir_expr_types(capacity);
+                }
+            }
+            crate::hir::HirKind::Int(_)
+            | crate::hir::HirKind::Sized(..)
+            | crate::hir::HirKind::Float(_)
+            | crate::hir::HirKind::Float32(_)
+            | crate::hir::HirKind::Str(_)
+            | crate::hir::HirKind::Char(_)
+            | crate::hir::HirKind::Bool(_)
+            | crate::hir::HirKind::Local(_)
+            | crate::hir::HirKind::Global(_)
+            | crate::hir::HirKind::EmptyCollection(..) => {}
+        }
+    }
+
     /// A checker dimension may mention this body's dimension parameters
     /// (`Quantity<D>`); replace each with the dimension it was bound to.
     fn substitute_dimension(&self, dim: &Dimension) -> Dimension {
@@ -4733,6 +4882,9 @@ fn generate_impl(items: &[Item], typed: Option<&crate::typeck::TypedProgram>, tr
             })
             .collect(),
     };
+    if let Some(program) = &hir {
+        codegen.register_hir_types(program);
+    }
     for f in &functions {
         if !f.generics.is_empty() {
             continue;

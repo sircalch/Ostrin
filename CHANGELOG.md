@@ -23,6 +23,10 @@
   module-qualified names; interpreter and native output are compared on every example.
 - Typed HIR with a verifier (`--hir`), per-node checker/backend type agreement,
   `--typed-report` and `--native-type-report`.
+- Native HIR migration expanded through the fourth family: `Option`/`Result`
+  constructors, `match`, basic queries, unwrap/coercion helpers and `try`
+  propagation are emitted directly from `hir_c.rs`; lambda combinators and
+  `catch` deliberately remain on the AST fallback until closures are migrated.
 - Module loader now rewrites types in signatures, fields, variants and annotations
   (a `record` from another module can be used as a type).
 - CI on Linux, macOS and Windows.

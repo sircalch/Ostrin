@@ -1,10 +1,10 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-18 · commit `90e525e` · 93 pruebas de integración en verde, sin warnings.*
+*Corte: 2026-09-18 · rama `main` · 6 pruebas diferenciales y 102 de integración en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
-Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–84); para el diseño
-del lenguaje, `docs/design/` (17 documentos).
+Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–127); para el diseño
+del lenguaje, `docs/design/` (20 documentos).
 
 ---
 
@@ -30,6 +30,7 @@ Implementación: compilador + intérprete + herramientas de editor, todo en Rust
 | Léxico / parser | `lexer/`, `parser/mod.rs` | Tokens, AST con rangos de origen |
 | Módulos y paquetes | `modules.rs`, `package.rs`, `ostrin.toml` | Imports, resolución, dependencias |
 | Verificador de tipos | `typeck/mod.rs` (~3 500 l.) | Tipos, dimensiones, traits, exhaustividad, genéricos |
+| HIR tipado | `hir.rs`, `hir_c.rs` | HIR verificado y generación C por familias, con fallback AST |
 | Intérprete | `interpreter/mod.rs` | Ejecución tree‑walking; referencia semántica |
 | Servidor de lenguaje | `lsp.rs`, `symbols.rs`, `protocol.rs` | LSP sobre stdio |
 | Adaptador de depuración | `dap.rs` + hooks del intérprete | DAP sobre stdio |
@@ -105,6 +106,9 @@ Monomorfización bajo demanda (funciones, records, enums, métodos, vtables, lis
   métodos estáticos y genéricos; métodos por defecto de traits.
 - `dyn Trait` con vtable real (único punto de despacho en tiempo de ejecución).
 - `List/Map/Set/Option/Result`, combinadores con lambdas expandidas en línea, `try`.
+- `Option`/`Result` estructurales también se generan desde HIR: `Some`/`None`, `Ok`/`Err`,
+  `match`, `is_some`/`is_none`, `is_ok`/`is_err`, `unwrap`, `unwrap_or`, `ok`/`ok_or` y
+  propagación con `try`; los combinadores con lambdas y `catch` siguen usando el fallback AST.
 - `Quantity` (dimensión estática, unidad como cadena en ejecución) e `impl` sobre cantidades.
 - Operadores de usuario, `derive(Eq/Ord)`, `Ordering` incorporado.
 - `print` de records, enums, listas, mapas, sets, `Option`, `Result` (mismo formato que el intérprete).
@@ -129,6 +133,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | `==` sobre `List/Option/Map` | No soportado (tampoco en intérprete para Option) |
 | Mensajes de error de E/S | `strerror` ≠ texto de Rust (difieren entre backends) |
 | `Result<Void,E>` | Campo de valor de relleno (`char`) en C |
+| Migración HIR | Escalares, records, enums/match y Option/Result ya migrados; listas/colecciones, cierres y genéricos pendientes |
 | Paquetes | Diseño y lockfile básicos; sin registro remoto (decisión: **no** añadir red automática al compilador) |
 | Rendimiento del intérprete | Tree‑walking simple; sin optimizaciones |
 | `newlines.ostrin`, `advanced.ostrin` | Son muestras de sintaxis, no programas ejecutables |
@@ -137,9 +142,10 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
 convendría dividirlos; el backend nativo no comparte el sistema de tipos del checker
-(ya consume los tipos del checker y compara cada nodo; **43 funciones/métodos de los ejemplos
-ya se generan desde el HIR** —escalares, records, enums y `match`, módulo `hir_c.rs`— y el resto
-sigue por el AST; ver documento 20 y secciones 123–125 de `CONTEXTO_PROYECTO.md`);
+(ya consume los tipos del checker y compara cada nodo; **61 funciones/métodos de los ejemplos
+ya se generan desde el HIR** —escalares, records, enums, `match` y `Option`/`Result`, módulo
+`hir_c.rs`—, con un trinquete mínimo de 55; el resto sigue por el AST; ver documento 20 y
+secciones 123–127 de `CONTEXTO_PROYECTO.md`);
 la búsqueda en `Map/Set` es lineal.
 
 ---
@@ -149,11 +155,12 @@ la búsqueda en `Map/Set` es lineal.
 Ordenadas por mi recomendación (valor / riesgo). Cada una es independiente.
 
 ### A. Cerrar la semántica del backend nativo (corto plazo)
-1. **Chequeo E1101 nativo** (records por canal): seguimiento estático de uso tras `send`.
-2. **Funciones como valores** (punteros a función + cierres con entorno capturado).
-3. **Gestión de memoria**: conteo de referencias o arena por ámbito; hoy nada se libera.
-4. **`==` estructural** para `List/Option/Map`.
-5. Reutilizar el checker: que `typeck` entregue tipos resueltos al codegen y eliminar la
+1. **Migración HIR de listas y colecciones**: literales, indexación, iteración y métodos básicos.
+2. **Migración HIR de cierres**: conservar la equivalencia con los entornos del backend nativo.
+3. **Migración HIR de genéricos**: instanciación concreta y llamadas ya resueltas.
+4. **Gestión de memoria**: conteo de referencias o arena por ámbito; hoy nada se libera.
+5. **`==` estructural** para `List/Option/Map`.
+6. Reutilizar el checker: que `typeck` entregue tipos resueltos al codegen y eliminar la
    reinferencia (reduce errores y abre optimizaciones).
 
 ### B. Concurrencia real (medio plazo, requiere diseño)
@@ -207,7 +214,7 @@ Decisiones que necesito de ti para afinar el plan:
 
 ```powershell
 cd compiler
-cargo test                                   # 6 diferenciales + 101 de integración
+cargo test                                   # 6 diferenciales + 102 de integración
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```

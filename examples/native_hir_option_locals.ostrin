@@ -1,0 +1,9 @@
+fn main() -> Void {
+    maybe = Some(4)
+    print(maybe.is_some())
+    print(maybe.unwrap_or(0))
+
+    missing = None<Int>()
+    print(missing.is_none())
+    print(missing.unwrap_or(9))
+}
