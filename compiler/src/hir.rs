@@ -18,6 +18,9 @@ use crate::types::Ty;
 #[derive(Debug, Clone)]
 pub struct HirProgram {
     pub functions: Vec<HirFunction>,
+    /// Parameter count of every user function and every enum variant constructor: after
+    /// lowering, a call to one of these carries exactly this many positional arguments.
+    pub arities: std::collections::HashMap<String, usize>,
 }
 
 #[derive(Debug, Clone)]
@@ -108,8 +111,17 @@ pub enum HirKind {
     Channel(Type, Option<Box<HirExpr>>),
 }
 
+/// The declarations calls are resolved against (to normalize named/default arguments).
+struct Signatures<'a> {
+    functions: std::collections::HashMap<&'a str, &'a FunctionDecl>,
+    methods: std::collections::HashMap<(&'a str, &'a str), &'a FunctionDecl>,
+    /// Variant name -> its field names, in declaration order.
+    variants: std::collections::HashMap<&'a str, Vec<Option<String>>>,
+}
+
 struct Lowerer<'a> {
     typed: &'a TypedProgram,
+    signatures: &'a Signatures<'a>,
     file: Option<String>,
     /// Innermost-last stack of local names, to tell `Local` from `Global`.
     scopes: Vec<HashSet<String>>,
@@ -302,14 +314,67 @@ impl<'a> Lowerer<'a> {
         HirExpr { ty, kind }
     }
 
+    /// Reorders `args` into `params` order, filling omitted ones from their defaults (lowered here,
+    /// at the call site, like the interpreter evaluates them). Leaves the call untouched when an
+    /// argument can't be matched, so the verifier reports it.
+    fn normalize(&mut self, params: &[Param], args: Vec<HirArg>) -> Vec<HirArg> {
+        let mut slots: Vec<Option<HirExpr>> = (0..params.len()).map(|_| None).collect();
+        let mut next = 0usize;
+        let original: Vec<HirArg> = args.clone();
+        for arg in args {
+            match arg.name {
+                None => {
+                    if next >= slots.len() {
+                        return original;
+                    }
+                    slots[next] = Some(arg.value);
+                    next += 1;
+                }
+                Some(name) => match params.iter().position(|p| p.name == name) {
+                    Some(index) => slots[index] = Some(arg.value),
+                    None => return original,
+                },
+            }
+        }
+        let mut out = Vec::with_capacity(params.len());
+        for (slot, param) in slots.into_iter().zip(params) {
+            match slot {
+                Some(value) => out.push(HirArg { name: None, value }),
+                None => match &param.default {
+                    Some(default) => out.push(HirArg { name: None, value: self.expr(default) }),
+                    None => return original,
+                },
+            }
+        }
+        out
+    }
+
     fn call(&mut self, callee: &Expr, type_args: &[Type], args: &[Arg], key: Option<ExprKey>, result: &Ty, node: usize) -> HirKind {
         let subst = self.typed.call_substs_by_node.get(&node).cloned().or_else(|| key.and_then(|k| self.typed.call_substs.get(&k).cloned()));
         let type_args = type_args.to_vec();
         // `recv.method(args)` is a method call, not a call of a field value.
         if let Expr::FieldAccess(recv, method) = callee.unlocated() {
-            return HirKind::MethodCall { recv: Box::new(self.expr(recv)), method: method.clone(), args: self.args(args), type_args, subst };
+            let recv = self.expr(recv);
+            let mut args = self.args(args);
+            let owner = match &recv.ty {
+                Ty::Named(n) | Ty::Applied(n, _) => Some(n.clone()),
+                _ => None,
+            };
+            if let Some(decl) = owner.and_then(|n| self.signatures.methods.get(&(n.as_str(), method.as_str())).copied()) {
+                let without_self = if decl.params.first().is_some_and(|p| p.name == "self") { &decl.params[1..] } else { &decl.params[..] };
+                args = self.normalize(without_self, args);
+            }
+            return HirKind::MethodCall { recv: Box::new(recv), method: method.clone(), args, type_args, subst };
         }
-        let args = self.args(args);
+        let mut args = self.args(args);
+        // Named and defaulted arguments become plain positional ones, in parameter order.
+        if let Expr::Ident(name) = callee.unlocated() {
+            if let Some(decl) = self.signatures.functions.get(name.as_str()).copied() {
+                args = self.normalize(&decl.params, args);
+            } else if let Some(fields) = self.signatures.variants.get(name.as_str()) {
+                args = normalize_variant(fields, args);
+            }
+        }
         let mut callee = self.expr(callee);
         // The callee itself is rarely typed by the checker (builtins, constructors);
         // its type follows from the arguments and the call's result.
@@ -320,11 +385,63 @@ impl<'a> Lowerer<'a> {
     }
 }
 
+/// Orders a variant constructor's arguments by field name.
+fn normalize_variant(fields: &[Option<String>], args: Vec<HirArg>) -> Vec<HirArg> {
+    if args.iter().all(|a| a.name.is_none()) {
+        return args;
+    }
+    let original = args.clone();
+    let mut slots: Vec<Option<HirExpr>> = (0..fields.len()).map(|_| None).collect();
+    let mut next = 0usize;
+    for arg in args {
+        match arg.name {
+            None => {
+                if next >= slots.len() {
+                    return original;
+                }
+                slots[next] = Some(arg.value);
+                next += 1;
+            }
+            Some(name) => match fields.iter().position(|f| f.as_deref() == Some(name.as_str())) {
+                Some(index) => slots[index] = Some(arg.value),
+                None => return original,
+            },
+        }
+    }
+    if slots.iter().any(Option::is_none) {
+        return original;
+    }
+    slots.into_iter().map(|s| HirArg { name: None, value: s.expect("checked above") }).collect()
+}
+
 /// Builds the HIR of every function, method and trait default body.
-pub fn lower(items: &[Item], typed: &TypedProgram) -> HirProgram {
+pub fn lower<'a>(items: &'a [Item], typed: &'a TypedProgram) -> HirProgram {
+    let mut signatures = Signatures { functions: Default::default(), methods: Default::default(), variants: Default::default() };
+    let mut arities = std::collections::HashMap::new();
+    for item in items {
+        match item {
+            Item::Function(f) => {
+                signatures.functions.insert(f.name.as_str(), f);
+                arities.insert(f.name.clone(), f.params.len());
+            }
+            Item::Impl(im) => {
+                for m in &im.methods {
+                    signatures.methods.insert((im.type_name.as_str(), m.name.as_str()), m);
+                }
+            }
+            Item::Enum(e) => {
+                for v in &e.variants {
+                    signatures.variants.insert(v.name.as_str(), v.fields.iter().map(|f| f.name.clone()).collect());
+                    arities.insert(v.name.clone(), v.fields.len());
+                }
+            }
+            _ => {}
+        }
+    }
+    let signatures = &signatures;
     let mut functions = Vec::new();
     let lower_fn = |name: String, f: &FunctionDecl, extra_generics: &[GenericParam], self_ty: Ty| {
-        let mut lowerer = Lowerer { typed, file: f.source_file.clone(), scopes: vec![HashSet::new()], local_types: Default::default() };
+        let mut lowerer = Lowerer { typed, signatures, file: f.source_file.clone(), scopes: vec![HashSet::new()], local_types: Default::default() };
         for p in &f.params {
             lowerer.declare(&p.name);
             let ty = if p.name == "self" { self_ty.clone() } else { crate::typeck::resolve_type(&p.ty) };
@@ -356,7 +473,7 @@ pub fn lower(items: &[Item], typed: &TypedProgram) -> HirProgram {
             _ => {}
         }
     }
-    HirProgram { functions }
+    HirProgram { functions, arities }
 }
 
 /// A HIR invariant that does not hold.
@@ -378,13 +495,13 @@ pub struct VerifyReport {
 pub fn verify(program: &HirProgram, generic_functions: &HashSet<String>) -> VerifyReport {
     let mut report = VerifyReport::default();
     for f in &program.functions {
-        let mut ctx = (f.name.clone(), &mut report);
+        let mut ctx = (f.name.clone(), &mut report, &program.arities);
         verify_block(&f.body, generic_functions, &mut ctx);
     }
     report
 }
 
-type Ctx<'r> = (String, &'r mut VerifyReport);
+type Ctx<'r> = (String, &'r mut VerifyReport, &'r std::collections::HashMap<String, usize>);
 
 fn verify_block(block: &HirBlock, generics: &HashSet<String>, ctx: &mut Ctx) {
     for s in &block.stmts {
@@ -440,7 +557,11 @@ fn verify_expr(e: &HirExpr, generics: &HashSet<String>, ctx: &mut Ctx) {
                 go(s, ctx);
             }
         }
-        HirKind::MethodCall { recv, args, .. } => {
+        HirKind::MethodCall { recv, method, args, .. } => {
+            if args.iter().any(|a| a.name.is_some()) {
+                let function = ctx.0.clone();
+                ctx.1.violations.push(Violation { function, message: format!("method call '.{method}' still has named arguments") });
+            }
             go(recv, ctx);
             for a in args {
                 go(&a.value, ctx);
@@ -451,6 +572,14 @@ fn verify_expr(e: &HirExpr, generics: &HashSet<String>, ctx: &mut Ctx) {
                 if generics.contains(name) && subst.is_none() {
                     let function = ctx.0.clone();
                     ctx.1.violations.push(Violation { function, message: format!("call to generic function '{name}' has no resolved type arguments") });
+                }
+            }
+            if let HirKind::Global(name) = &callee.kind {
+                if let Some(&arity) = ctx.2.get(name) {
+                    if args.len() != arity || args.iter().any(|a| a.name.is_some()) {
+                        let function = ctx.0.clone();
+                        ctx.1.violations.push(Violation { function, message: format!("call to '{name}' has unresolved named/default arguments ({} given, {arity} expected)", args.len()) });
+                    }
                 }
             }
             go(callee, ctx);

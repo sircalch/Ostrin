@@ -289,7 +289,7 @@ fn native_backend_types_agree_with_the_checker() {
 /// (`ostrinc --hir`) may only go down; lower the limits when a gap is closed.
 #[test]
 fn hir_covers_the_examples_with_known_types() {
-    const MAX_UNKNOWN_NODES: usize = 29;
+    const MAX_UNKNOWN_NODES: usize = 26;
     const MAX_VIOLATIONS: usize = 0;
     let (mut nodes, mut unknown, mut violations) = (0usize, 0usize, Vec::<String>::new());
     for path in examples() {

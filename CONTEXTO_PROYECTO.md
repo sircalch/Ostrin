@@ -3513,3 +3513,18 @@ Cierra el aviso de reproducibilidad del §96.
   `--native-type-report`, misma búsqueda por dirección que usa el HIR), no solo contra los que tienen
   rango: **3 173 nodos coinciden, 0 divergencias** (70 no comparables). Test: `node_agreed > 3000`.
 - Trinquetes: HIR ≤ 29 desconocidos / 0 violaciones; suite **114 pruebas**.
+
+---
+
+## 105. HIR: argumentos nombrados y por defecto desazucarados — 2026-09-18
+
+- Al bajar al HIR, toda llamada a una función de usuario, a un método resuelto por el tipo del
+  receptor o a un constructor de variante lleva **exactamente sus argumentos posicionales, en orden
+  de parámetro**: los nombrados se reordenan y los omitidos se sustituyen por su valor por defecto
+  (bajado en el sitio de la llamada, como hace el intérprete). Ejemplo (`--hir`):
+  `area(height: 5, width: 4)` → `area(4, 5)`; `label(1)` → `label<T=Int>(1, "#")`.
+- `HirProgram.arities` y una comprobación nueva del verificador: una llamada a un callee resuelto
+  con nombre superviviente o aridad distinta es una violación. **0 violaciones** en los 4 112
+  nodos de los ejemplos (26 sin tipo). Esta lógica es la que hoy duplica `normalize_call_args` en
+  el backend; desaparecerá de `codegen.rs` cuando el backend genere desde el HIR.
+- Suite: **114 pruebas**.
