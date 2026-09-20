@@ -4654,3 +4654,12 @@ emite al final del callback. El backend nativo ahora:
 La batería se mantiene en **6 pruebas diferenciales y 142 de integración verdes**. Esto
 reduce la deuda de ownership del backend nativo, pero la inserción general de RC por último
 uso sobre la IR, ciclos y escapes complejos todavía queda pendiente.
+
+## 173. Enlace de libm en nativo Unix — 2026-09-19
+
+La matriz de GitHub estaba roja únicamente en Ubuntu, aunque Windows y macOS pasaban. La
+reproducción en Ubuntu 24.04 aisló tres pruebas de paquetes (`autodiff`, `plot` y `tables`):
+el código C generado usaba `sqrt` o `round`, pero el comando de enlace no añadía `libm`, por
+lo que `cc` terminaba con referencias indefinidas. El driver nativo ahora añade `-lm` en
+targets Unix y conserva el enlace anterior en Windows; la suite Linux local vuelve a cubrir
+los mismos 142 ejemplos sin esa diferencia de plataforma.

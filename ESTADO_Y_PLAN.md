@@ -175,7 +175,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Paquetes | `--project` usa `entry`; lockfiles deterministas con rutas relativas; sin registro remoto ni red automática |
 | Rendimiento del intérprete | Tree‑walking simple; sin optimizaciones |
 | `newlines.ostrin`, `advanced.ostrin` | Son muestras de sintaxis, no programas ejecutables |
-| CI | Linux, macOS y Windows; incluye las pruebas diferenciales intérprete↔nativo |
+| CI | Linux, macOS y Windows; incluye las pruebas diferenciales intérprete↔nativo; el backend nativo enlaza `libm` explícitamente en Unix para paquetes con `sqrt`/`round` |
 | Distribución | Workflow WASI reproducible para `ostrinc.wasm`, `hello.wasm` y `pkg_project.wasm`, con toolchain fijado y SHA-256; el runtime C cooperativo generado evita pthreads cuando no se pide `--native-threads`; binarios nativos publicados e instalador siguen pendientes |
 
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y

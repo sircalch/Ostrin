@@ -99,6 +99,9 @@ test
   reference, `join` unregisters completed tasks, and scope/exit draining retires
   task nodes without stale pointers. More complex ownership escapes still await
   complete lowering.
+- Native Unix builds now link `libm` explicitly, so package programs using
+  `sqrt`, `round` or related math builtins link successfully on Linux as well
+  as macOS.
 - Extended native ownership into nested block expressions. Their reference-like
   locals now have a scoped cleanup frame, preserve block results across releases,
   and are covered by a native-thread `spawn_scope` leak-check test; task

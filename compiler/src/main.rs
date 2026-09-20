@@ -562,6 +562,11 @@ fn run_codegen(
         }
     } else {
         command.args((!cfg!(windows)).then_some("-pthread"));
+        // POSIX toolchains keep libm separate from libc.  The generated
+        // runtime and package code use sqrt/round/floor, so native Unix
+        // programs must link it explicitly (Windows math symbols are part
+        // of the platform C runtime).
+        command.args((!cfg!(windows)).then_some("-lm"));
     }
     // No fused multiply-add: results must match the interpreter bit for bit.
     let status = command.arg("-ffp-contract=off").status();
