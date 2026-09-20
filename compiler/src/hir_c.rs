@@ -10,7 +10,7 @@
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 
-use crate::ast::{BinOp, Expr, RangeKind, UnaryOp};
+use crate::ast::{BinOp, Expr, IntKind, RangeKind, UnaryOp};
 use crate::hir::{HirArg, HirBlock, HirExpr, HirFunction, HirKind, HirStmt};
 use crate::types::Ty;
 
@@ -58,7 +58,7 @@ pub struct VariantView {
 }
 
 fn is_scalar(ty: &Ty) -> bool {
-    matches!(ty, Ty::Int | Ty::Float | Ty::Bool | Ty::String)
+    matches!(ty, Ty::Int | Ty::Float | Ty::Float32 | Ty::Sized(_) | Ty::Bool | Ty::String)
 }
 
 /// Scalars compatible in C without a conversion helper (`Int` where a `Float` goes, …).
@@ -88,6 +88,8 @@ impl Emitter<'_> {
         match ty {
             Ty::Int => Ok("int64_t".to_string()),
             Ty::Float => Ok("double".to_string()),
+            Ty::Float32 => Ok("float".to_string()),
+            Ty::Sized(kind) => Ok(kind.c_type().to_string()),
             Ty::Bool => Ok("bool".to_string()),
             Ty::String => Ok("const char*".to_string()),
             Ty::Named(n) if self.world.records.contains_key(n) => Ok(format!("{n}*")),
@@ -126,6 +128,8 @@ impl Emitter<'_> {
         Ok(match ty {
             Ty::Int => "Int".to_string(),
             Ty::Float => "Float".to_string(),
+            Ty::Float32 => "Float32".to_string(),
+            Ty::Sized(kind) => kind.name().to_string(),
             Ty::Bool => "Bool".to_string(),
             Ty::String => "String".to_string(),
             Ty::Void => "Void".to_string(),
@@ -758,6 +762,14 @@ impl Emitter<'_> {
         Ok(match c {
             "int64_t" => Ty::Int,
             "double" => Ty::Float,
+            "float" => Ty::Float32,
+            "int8_t" => Ty::Sized(IntKind::I8),
+            "int16_t" => Ty::Sized(IntKind::I16),
+            "int32_t" => Ty::Sized(IntKind::I32),
+            "uint8_t" => Ty::Sized(IntKind::U8),
+            "uint16_t" => Ty::Sized(IntKind::U16),
+            "uint32_t" => Ty::Sized(IntKind::U32),
+            "uint64_t" => Ty::Sized(IntKind::U64),
             "bool" => Ty::Bool,
             "const char*" => Ty::String,
             other => {
@@ -817,13 +829,82 @@ impl Emitter<'_> {
         Ok(result)
     }
 
+    fn sized_binary(&mut self, op: BinOp, left: &HirExpr, right: &HirExpr) -> Bail<String> {
+        let (Ty::Sized(kind), Ty::Sized(other)) = (&left.ty, &right.ty) else {
+            return Err(());
+        };
+        if kind != other {
+            return Err(());
+        }
+        let (lc, rc) = (self.expr(left)?, self.expr(right)?);
+        let c = kind.c_type();
+        let a = self.next_temp();
+        let b = self.next_temp();
+        let result = self.next_temp();
+        let decl = format!("{c} {a} = {lc}; {c} {b} = {rc};");
+        let overflow = "fprintf(stderr, \"runtime error: integer overflow\\n\"); exit(1);";
+        Ok(match op {
+            BinOp::Add | BinOp::Sub | BinOp::Mul => {
+                let builtin = match op {
+                    BinOp::Add => "__builtin_add_overflow",
+                    BinOp::Sub => "__builtin_sub_overflow",
+                    BinOp::Mul => "__builtin_mul_overflow",
+                    _ => unreachable!(),
+                };
+                format!("({{ {decl} {c} {result}; if ({builtin}({a}, {b}, &{result})) {{ {overflow} }} {result}; }})")
+            }
+            BinOp::Div => format!(
+                "({{ {decl} if ({b} == 0) {{ fprintf(stderr, \"runtime error: division by zero\\n\"); exit(1); }} __int128 __q = (__int128){a} / (__int128){b}; if (__q < (__int128){} || __q > (__int128){}) {{ {overflow} }} ({c})__q; }})",
+                kind.min(),
+                kind.max()
+            ),
+            BinOp::Eq => format!("(({lc}) == ({rc}))"),
+            BinOp::NotEq => format!("(({lc}) != ({rc}))"),
+            BinOp::Lt => format!("(({lc}) < ({rc}))"),
+            BinOp::Gt => format!("(({lc}) > ({rc}))"),
+            BinOp::LtEq => format!("(({lc}) <= ({rc}))"),
+            BinOp::GtEq => format!("(({lc}) >= ({rc}))"),
+            BinOp::And | BinOp::Or => return Err(()),
+        })
+    }
+
+    fn float32_binary(&mut self, op: BinOp, left: &HirExpr, right: &HirExpr) -> Bail<String> {
+        if left.ty != Ty::Float32 || right.ty != Ty::Float32 {
+            return Err(());
+        }
+        let (lc, rc) = (self.expr(left)?, self.expr(right)?);
+        let c_op = match op {
+            BinOp::Add => "+",
+            BinOp::Sub => "-",
+            BinOp::Mul => "*",
+            BinOp::Div => "/",
+            BinOp::Eq => "==",
+            BinOp::NotEq => "!=",
+            BinOp::Lt => "<",
+            BinOp::Gt => ">",
+            BinOp::LtEq => "<=",
+            BinOp::GtEq => ">=",
+            BinOp::And | BinOp::Or => return Err(()),
+        };
+        let result = matches!(op, BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div);
+        Ok(if result { format!("((float)(({lc}) {c_op} ({rc})))") } else { format!("(({lc}) {c_op} ({rc}))") })
+    }
+
     fn expr(&mut self, e: &HirExpr) -> Bail<String> {
         if e.ty != Ty::Void {
             self.c_type(&e.ty)?;
         }
         match &e.kind {
-            HirKind::Int(v) => Ok(format!("INT64_C({v})")),
-            HirKind::Float(v) => Ok(format!("{v:?}")),
+            HirKind::Int(v) => match &e.ty {
+                Ty::Sized(kind) => Ok(format!("(({}){})", kind.c_type(), v)),
+                _ => Ok(format!("INT64_C({v})")),
+            },
+            HirKind::Sized(v, kind) => Ok(format!("(({}){})", kind.c_type(), v)),
+            HirKind::Float(v) => match e.ty {
+                Ty::Float32 => Ok(format!("((float)({v:?}))")),
+                _ => Ok(format!("{v:?}")),
+            },
+            HirKind::Float32(v) => Ok(format!("((float)({v:?}))")),
             HirKind::Bool(v) => Ok(if *v { "true" } else { "false" }.to_string()),
             HirKind::Str(s) => Ok(crate::codegen::c_string_literal(s)),
             HirKind::Local(name) => Ok(name.clone()),
@@ -921,6 +1002,15 @@ impl Emitter<'_> {
                 if is_set(&recv.ty) {
                     return self.set_method(e, recv, method, args);
                 }
+                if args.is_empty() && e.ty == Ty::String {
+                    let recv_code = self.expr(recv)?;
+                    match &recv.ty {
+                        Ty::Float32 => return Ok(format!("ostrin_single_to_string({recv_code})")),
+                        Ty::Sized(kind) if kind.is_signed() => return Ok(format!("ostrin_int_to_string({recv_code})")),
+                        Ty::Sized(_) => return Ok(format!("ostrin_uint_to_string({recv_code})")),
+                        _ => {}
+                    }
+                }
                 let record = self.record_name(&recv.ty)?;
                 let (c_name, params, ret) = self
                     .world
@@ -956,9 +1046,10 @@ impl Emitter<'_> {
                 }
                 let code = self.expr(inner)?;
                 match op {
-                    UnaryOp::Neg if matches!(inner.ty, Ty::Int | Ty::Float) => {
+                    UnaryOp::Neg if matches!(inner.ty, Ty::Int | Ty::Float | Ty::Float32) => {
                         Ok(format!("(-{code})"))
                     }
+                    UnaryOp::Neg if matches!(inner.ty, Ty::Sized(kind) if kind.is_signed()) => Ok(format!("(-{code})")),
                     UnaryOp::Not if inner.ty == Ty::Bool => Ok(format!("(!{code})")),
                     _ => Err(()),
                 }
@@ -966,6 +1057,12 @@ impl Emitter<'_> {
             HirKind::Binary(op, l, r) => {
                 if !is_scalar(&l.ty) || !is_scalar(&r.ty) {
                     return Err(());
+                }
+                if matches!(l.ty, Ty::Sized(_)) || matches!(r.ty, Ty::Sized(_)) {
+                    return self.sized_binary(*op, l, r);
+                }
+                if matches!(l.ty, Ty::Float32) || matches!(r.ty, Ty::Float32) {
+                    return self.float32_binary(*op, l, r);
                 }
                 let (lc, rc) = (self.expr(l)?, self.expr(r)?);
                 if l.ty == Ty::String || r.ty == Ty::String {
@@ -1046,6 +1143,9 @@ impl Emitter<'_> {
                     return match arg.ty {
                         Ty::Int => Ok(format!("printf(\"%lld\\n\", (long long)({code}))")),
                         Ty::Float => Ok(format!("ostrin_print_float({code})")),
+                        Ty::Float32 => Ok(format!("ostrin_print_single({code})")),
+                        Ty::Sized(kind) if kind.is_signed() => Ok(format!("printf(\"%lld\\n\", (long long)({code}))")),
+                        Ty::Sized(_) => Ok(format!("printf(\"%llu\\n\", (unsigned long long)({code}))")),
                         Ty::Bool => Ok(format!(
                             "printf(\"%s\\n\", (({code}) ? \"true\" : \"false\"))"
                         )),
@@ -1088,6 +1188,14 @@ impl Emitter<'_> {
             }
             HirKind::Block(block) => self.block_value(block),
             HirKind::Try(inner, handler) => self.try_expr(inner, handler.as_deref()),
+            HirKind::As(inner, target) => {
+                let code = self.expr(inner)?;
+                match target.as_str() {
+                    "Float" | "Float64" => Ok(format!("((double)({code}))")),
+                    "Float32" => Ok(format!("((float)({code}))")),
+                    _ => Err(()),
+                }
+            }
             _ => Err(()),
         }
     }

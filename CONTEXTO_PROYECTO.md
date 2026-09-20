@@ -4734,3 +4734,22 @@ siguen poseyendo una referencia local:
 La batería queda en **6 pruebas diferenciales y 145 de integración verdes**. Esto cierra
 una ruta concreta de doble liberación durante cancelación, pero el ownership general sobre
 la IR, los escapes complejos y los ciclos siguen siendo trabajo pendiente.
+
+## 177. HIR nativo para escalares científicos y enteros de ancho fijo — 2026-09-20
+
+El backend nativo deja de abandonar al AST funciones HIR que usan `Float32` o enteros
+fijos cuando el resto de su cuerpo ya es representable:
+
+- `hir_c.rs` reconoce `Float32`, `Int8`/`Int16`/`Int32` y `UInt8`/`UInt16`/`UInt32`/`UInt64`
+  en firmas, literales, records, impresión y conversiones hacia flotantes;
+- las operaciones binarias de enteros fijos conservan las comprobaciones de overflow y
+  división por cero del backend AST, en vez de aceptar el wrap silencioso de C;
+- las operaciones `Float32` mantienen el redondeo a `float` y la comparación nativa,
+  mientras que `to_string()` usa las mismas rutinas de formato del runtime;
+- el trinquete de generación HIR sube de 115 a **127 funciones** y la prueba diferencial
+  conserva cero divergencias entre checker, intérprete y backend nativo.
+
+La batería local queda en **6 pruebas diferenciales y 146 de integración verdes**. El
+fallback AST continúa siendo necesario para cantidades, arrays y otras familias complejas;
+la siguiente deuda estructural sigue siendo hacer que la IR de ownership sea consumida por
+el backend, no solo inspeccionada.

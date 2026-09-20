@@ -1,10 +1,10 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-20 · rama `main` · 6 pruebas diferenciales y 145 de integración en verde.*
+*Corte: 2026-09-20 · rama `main` · 6 pruebas diferenciales y 146 de integración en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
-Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–175); para el diseño
-del lenguaje, `docs/design/` (20 documentos).
+Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–177); para el diseño
+del lenguaje, `docs/design/` (21 documentos).
 
 ---
 
@@ -30,7 +30,7 @@ Implementación: compilador + intérprete + herramientas de editor, todo en Rust
 | Léxico / parser | `lexer/`, `parser/mod.rs` | Tokens, AST con rangos de origen |
 | Módulos y paquetes | `modules.rs`, `package.rs`, `ostrin.toml` | Imports, `--project`, dependencias locales y lockfile portable |
 | Verificador de tipos | `typeck/mod.rs` (~3 500 l.) | Tipos, dimensiones, traits, exhaustividad, genéricos |
-| HIR/IR | `hir.rs`, `hir_c.rs`, `ir.rs` | HIR verificado, primera CFG con temporales explícitos y generación C por familias, con fallback AST |
+| HIR/IR | `hir.rs`, `hir_c.rs`, `ir.rs` | HIR verificado, CFG con temporales explícitos y generación C por familias, con fallback AST acotado |
 | Intérprete | `interpreter/mod.rs` | Ejecución tree‑walking y scheduler cooperativo; referencia semántica |
 | Servidor de lenguaje | `lsp.rs`, `symbols.rs`, `protocol.rs` | LSP sobre stdio |
 | Adaptador de depuración | `dap.rs` + hooks del intérprete | DAP sobre stdio |
@@ -181,9 +181,9 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
 convendría dividirlos; el backend nativo no comparte el sistema de tipos del checker
 (ya consume los tipos del checker y compara cada nodo; **119 funciones/métodos de los ejemplos
-ya se generan desde el HIR** —escalares, records, enums, `match`, `Option`/`Result`,
+ya se generan desde el HIR** —escalares, `Float32`, enteros de ancho fijo, records, enums, `match`, `Option`/`Result`,
 listas/colecciones, cierres, instancias concretas de genéricos, records/enums aplicados y métodos
-genéricos centrales, módulo `hir_c.rs`—, con un trinquete mínimo de 115; el resto sigue por el AST;
+genéricos centrales, módulo `hir_c.rs`—, con un trinquete mínimo de 127; el resto sigue por el AST;
 ver documento 20 y secciones 123–133 de `CONTEXTO_PROYECTO.md`);
 Las claves/elementos compuestos ya pueden usar el índice interno cuando su contrato `Hash`/`Eq`
 es compatible; si contienen estado mutable se reindexan antes de buscar y los comparadores
@@ -266,7 +266,7 @@ Decisiones que necesito de ti para afinar el plan:
 
 ```powershell
 cd compiler
-cargo test                                   # 6 diferenciales + 145 de integración
+cargo test                                   # 6 diferenciales + 146 de integración
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```

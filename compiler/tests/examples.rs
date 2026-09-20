@@ -1555,6 +1555,49 @@ fn native_hir_handles_option_result_core() {
 }
 
 #[test]
+fn native_hir_handles_scalar_widths() {
+    // Float32 and fixed-width integer functions should use the HIR emitter
+    // without losing single-precision rounding or checked integer overflow.
+    for (file, expected) in [
+        (
+            "float32.ostrin",
+            "0.3\ntrue\n0.30000000000000004\n0.33333334\n16777216\n3\n7\n0.10000000149011612\n25\n[1.5, 2.5]\n-0.1\n1.5\n0.1!\n",
+        ),
+        (
+            "sized_ints.ostrin",
+            "255\n145\n200\ntrue\ntrue\n-100\n100\n-120\n18446744073709551615\n300\n1000\n7\n10\n256\n1073741823\n2147483647\n2147483647!\n",
+        ),
+    ] {
+        let path = example_path(file);
+        let interpreted = run(&["--run", &path]);
+        assert!(interpreted.status.success(), "interpreter failed for {file}: {}", stderr(&interpreted));
+        assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected, "interpreter output for {file}");
+
+        let report = run(&["--native-type-report", &path]);
+        if skip_if_no_c_compiler(&report) {
+            return;
+        }
+        assert!(report.status.success(), "native type report failed for {file}: {}", stderr(&report));
+        let hir_functions = stdout(&report)
+            .lines()
+            .find_map(|line| line.strip_prefix("hir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+            .unwrap_or(0);
+        assert!(hir_functions >= 1, "{file} did not generate any function from HIR");
+
+        let exe = temp_artifact(&format!("hir_{file}.exe"));
+        let compile = run(&["--compile", "--out", &exe, &path]);
+        if skip_if_no_c_compiler(&compile) {
+            return;
+        }
+        assert!(compile.status.success(), "compile failed for {file}: {}", stderr(&compile));
+        let native = Command::new(&exe).output().expect("failed to run scalar HIR binary");
+        let _ = fs::remove_file(&exe);
+        assert!(native.status.success(), "native run failed for {file}: {}", String::from_utf8_lossy(&native.stderr));
+        assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected, "native output for {file}");
+    }
+}
+
+#[test]
 fn native_hir_handles_collections_core() {
     // Collection literals, indexing, iteration and the non-closure methods
     // are now emitted directly from HIR. Closure combinators remain an AST
