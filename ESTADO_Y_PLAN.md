@@ -166,7 +166,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Memoria en nativo | Registro, destructores tipados para records/colecciones, `clone`/`drop`, limpieza automática de locales directos y de bloques anidados, y `--leak-check`; ARC completa sobre IR sigue pendiente |
 | IR de bloques | HIR→CFG disponible con `--ir`; `if/while/for/match/try/spawn/channel` ya tienen operaciones explícitas, aún no reemplaza el backend C |
 | Ownership/último uso | `--ownership-report`, `--ownership-check` y `--ownership-ir`; el backend C ya aplica retain/release lineal en locales directos, pero la IR aún no es la fuente única |
-| Biblioteca estándar | Mínima: `args`, entorno/rutas, `format`, E/S, `hash` estable y `Map` hash para claves escalares; faltan `Hash` para tipos de usuario, fechas, JSON y red |
+| Biblioteca estándar | Mínima: `args`, entorno/rutas, `format`, E/S y `hash` estructural para escalares, colecciones y tipos con `derive(Hash)`; faltan fechas, JSON y red |
 | Mensajes de error de E/S | `strerror` ≠ texto de Rust (difieren entre backends) |
 | `Result<Void,E>` | Campo de valor de relleno (`char`) en C |
 | Migración HIR | Escalares, records, enums/match, Option/Result, colecciones, cierres, instancias concretas de genéricos, llamadas anidadas, records/enums genéricos aplicados y métodos genéricos centrales migrados; formas complejas restantes siguen con fallback |
@@ -183,8 +183,9 @@ ya se generan desde el HIR** —escalares, records, enums, `match`, `Option`/`Re
 listas/colecciones, cierres, instancias concretas de genéricos, records/enums aplicados y métodos
 genéricos centrales, módulo `hir_c.rs`—, con un trinquete mínimo de 115; el resto sigue por el AST;
 ver documento 20 y secciones 123–133 de `CONTEXTO_PROYECTO.md`);
-Las claves/elementos compuestos aún usan búsqueda lineal; el siguiente paso es formalizar `Hash + Eq`
-en el checker y extender el índice a tipos de usuario.
+Las claves/elementos compuestos aún pueden caer en búsqueda lineal para el índice interno;
+el contrato `Hash` ya está formalizado para los valores soportados y el siguiente paso es
+conectarlo con el índice de `Map`/`Set` junto con `Eq` de usuario.
 
 ---
 
