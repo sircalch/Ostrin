@@ -1610,6 +1610,8 @@ fn cli_exposes_help_and_version() {
     assert!(stdout(&help).contains("--symbols"));
     assert!(stdout(&help).contains("--members"));
     assert!(stdout(&help).contains("--types"));
+    assert!(stdout(&help).contains("--project"));
+    assert!(stdout(&help).contains("--native-threads"));
 }
 
 #[test]
@@ -2068,6 +2070,18 @@ fn path_dependency_resolves_and_runs() {
     let out = run(&["--run", &example_path("pkg_project/main_app/main.ostrin")]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     assert_eq!(stdout(&out).trim(), "hola, Ostrin");
+}
+
+#[test]
+fn project_manifest_selects_entry_and_writes_portable_lockfile() {
+    let project = example_path("pkg_project/main_app");
+    let out = run(&["--run", "--project", &project]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    assert_eq!(stdout(&out).trim(), "hola, Ostrin");
+
+    let lockfile = fs::read_to_string(format!("{project}/ostrin.lock")).expect("project build should write ostrin.lock");
+    assert!(lockfile.contains("resolved_path = \"../shared_lib\""), "lockfile should use a project-relative path: {lockfile}");
+    assert!(!lockfile.contains("Lenguaje nuevo"), "lockfile should not embed this checkout's absolute path: {lockfile}");
 }
 
 #[test]

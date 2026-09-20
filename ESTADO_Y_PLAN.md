@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-19 · rama `main` · 6 pruebas diferenciales y 126 de integración en verde.*
+*Corte: 2026-09-19 · rama `main` · 6 pruebas diferenciales y 127 de integración en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
 Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–149); para el diseño
@@ -28,7 +28,7 @@ Implementación: compilador + intérprete + herramientas de editor, todo en Rust
 | Componente | Archivo(s) | Función |
 |---|---|---|
 | Léxico / parser | `lexer/`, `parser/mod.rs` | Tokens, AST con rangos de origen |
-| Módulos y paquetes | `modules.rs`, `package.rs`, `ostrin.toml` | Imports, resolución, dependencias |
+| Módulos y paquetes | `modules.rs`, `package.rs`, `ostrin.toml` | Imports, `--project`, dependencias locales y lockfile portable |
 | Verificador de tipos | `typeck/mod.rs` (~3 500 l.) | Tipos, dimensiones, traits, exhaustividad, genéricos |
 | HIR/IR | `hir.rs`, `hir_c.rs`, `ir.rs` | HIR verificado, primera CFG con temporales explícitos y generación C por familias, con fallback AST |
 | Intérprete | `interpreter/mod.rs` | Ejecución tree‑walking y scheduler cooperativo; referencia semántica |
@@ -167,7 +167,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Mensajes de error de E/S | `strerror` ≠ texto de Rust (difieren entre backends) |
 | `Result<Void,E>` | Campo de valor de relleno (`char`) en C |
 | Migración HIR | Escalares, records, enums/match, Option/Result, colecciones, cierres, instancias concretas de genéricos, llamadas anidadas, records/enums genéricos aplicados y métodos genéricos centrales migrados; formas complejas restantes siguen con fallback |
-| Paquetes | Diseño y lockfile básicos; sin registro remoto (decisión: **no** añadir red automática al compilador) |
+| Paquetes | `--project` usa `entry`; lockfiles deterministas con rutas relativas; sin registro remoto ni red automática |
 | Rendimiento del intérprete | Tree‑walking simple; sin optimizaciones |
 | `newlines.ostrin`, `advanced.ostrin` | Son muestras de sintaxis, no programas ejecutables |
 | CI | Linux, macOS y Windows; incluye las pruebas diferenciales intérprete↔nativo |

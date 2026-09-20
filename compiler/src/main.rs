@@ -82,9 +82,9 @@ fn real_main() -> ExitCode {
         return check_stdin(&source_file, json);
     }
 
-    let value_flags = ["--file", "--out"];
+    let value_flags = ["--file", "--out", "--project"];
     let mut skip_next = false;
-    let Some(path) = args.iter().skip(1).find(|a| {
+    let positional = args.iter().skip(1).find(|a| {
         if skip_next {
             skip_next = false;
             return false;
@@ -94,10 +94,22 @@ fn real_main() -> ExitCode {
             return false;
         }
         !a.starts_with("--")
-    }) else {
-        eprintln!("usage: ostrinc [--check|--ast|--tokens|--symbols|--members|--types|--hir|--ir|--ownership-report|--ownership-ir|--ownership-check|--run] [--json] <entry_file.ostrin>");
+    }).cloned();
+    let path_owned = if let Some(path) = positional {
+        path
+    } else if let Some(project) = argument_value(&args, "--project") {
+        match project_entry_path(&project) {
+            Ok(path) => path,
+            Err(error) => {
+                eprintln!("{error}");
+                return ExitCode::FAILURE;
+            }
+        }
+    } else {
+        eprintln!("usage: ostrinc [OPTIONS] [entry_file.ostrin] (or --project DIR)");
         return ExitCode::FAILURE;
     };
+    let path = path_owned.as_str();
 
     if tokens_only {
         let source = match fs::read_to_string(path) {
@@ -547,7 +559,7 @@ fn run_codegen(
 fn print_help() {
     println!("ostrinc 0.1.0 — compiler and interpreter for Ostrin");
     println!();
-    println!("Usage:\n  ostrinc [OPTIONS] <entry_file.ostrin>");
+    println!("Usage:\n  ostrinc [OPTIONS] [entry_file.ostrin]");
     println!();
     println!("Options:");
     println!("  --check       Type-check the project (the default)");
@@ -570,6 +582,7 @@ fn print_help() {
     println!("  --native-threads   Use OS threads and blocking native channels (with --emit-c/--compile)");
     println!("  --emit-c      Transpile to C (a supported subset only; see docs) instead of running");
     println!("  --compile     Transpile to C and compile it to a native executable");
+    println!("  --project DIR Compile the entry declared by DIR/ostrin.toml");
     println!("  --out PATH    Output path for --emit-c/--compile (defaults: stdout / <entry>.exe next to the source)");
     println!("  --json        Emit machine-readable diagnostics as JSON Lines");
     println!("  -h, --help    Print this help");
@@ -580,6 +593,14 @@ fn argument_value(args: &[String], flag: &str) -> Option<String> {
     args.windows(2)
         .find(|pair| pair[0] == flag)
         .map(|pair| pair[1].clone())
+}
+
+fn project_entry_path(project: &str) -> Result<String, String> {
+    let candidate = Path::new(project);
+    let manifest_path = if candidate.is_file() { candidate.to_path_buf() } else { candidate.join("ostrin.toml") };
+    let manifest = package::load_manifest(&manifest_path)?;
+    let root = manifest_path.parent().unwrap_or_else(|| Path::new("."));
+    Ok(root.join(manifest.entry).display().to_string())
 }
 
 fn check_stdin(source_file: &str, json: bool) -> ExitCode {

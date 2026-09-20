@@ -91,10 +91,20 @@ pub fn resolve_dependency_roots(manifest: &PackageManifest) -> Result<HashMap<St
 pub fn write_lockfile(manifest_dir: &Path, manifest: &PackageManifest, roots: &HashMap<String, PathBuf>) -> Result<(), String> {
     let mut out = String::new();
     out.push_str(&format!("# generado por ostrinc — no editar a mano\npackage = \"{}\"\nversion = \"{}\"\n\n", manifest.name, manifest.version));
-    for (name, root) in roots {
+    let base = manifest_dir.canonicalize().unwrap_or_else(|_| manifest_dir.to_path_buf());
+    let mut names: Vec<&String> = roots.keys().collect();
+    names.sort();
+    for name in names {
+        let root = &roots[name];
         let abs = root.canonicalize().unwrap_or_else(|_| root.clone());
-        let display = abs.display().to_string().replace('\\', "/");
-        let display = display.strip_prefix("//?/").unwrap_or(&display);
+        let relative = root.strip_prefix(manifest_dir).ok();
+        let display = relative
+            .or_else(|| abs.strip_prefix(&base).ok())
+            .unwrap_or(&abs)
+            .display()
+            .to_string()
+            .replace('\\', "/");
+        let display = if display.is_empty() { "." } else { &display };
         out.push_str(&format!("[[dependency]]\nname = \"{name}\"\nresolved_path = \"{display}\"\n\n"));
     }
     let lock_path = manifest_dir.join("ostrin.lock");

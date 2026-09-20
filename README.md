@@ -42,9 +42,12 @@ language has enough public usage and its syntax/tooling are stable.
 
 Ostrin is not yet a production compiler. The current implementation includes a
 lexer, parser, static checker, interpreter, modules, packages, collections,
-traits, pattern matching, quantities and a simulated concurrency model.
+traits, pattern matching, quantities and two concurrency modes: deterministic
+cooperative scheduling by default, plus opt-in native threads for compiled
+programs.
 
-The compiler suite currently passes **93 integration tests**. Function calls
+The compiler suite currently passes **127 integration tests and 6 differential
+interpreter↔native tests**. Function calls
 support named/default arguments, collection lookups preserve `Option<T>`, and
 record fields are checked statically. The CLI also exposes JSON Lines
 diagnostics with source locations for editor integrations, plus a compiler
@@ -77,9 +80,9 @@ Methods (including generic ones and trait defaults) work on records, enums and
 quantities; generic records/enums, `Map`/`Set`, operators and `derive`, named
 and default arguments, custom iterators, `Option`/`Result` combinators, the
 built-in file/parse functions and synchronous `spawn`/channels all compile too.
-Only a few things still run solely through the interpreter (first-class
-function values, sending a record through a channel). The runtime is still
-synchronous and the standard library is small.
+The default native scheduler remains deterministic for differential testing;
+`--native-threads` enables OS threads and blocking channels. The standard
+library is still intentionally small.
 
 ## Quick start
 
@@ -108,6 +111,8 @@ ostrinc --ast file.ostrin       # print the AST
 ostrinc --tokens file.ostrin   # print lexer tokens
 ostrinc --emit-c file.ostrin       # transpile a supported subset to C
 ostrinc --compile file.ostrin      # transpile and compile to a native executable
+ostrinc --compile --native-threads file.ostrin # compile with OS threads and blocking channels
+ostrinc --run --project path/to/project # use the entry declared by ostrin.toml
 ```
 
 ## Visual Studio Code
@@ -170,8 +175,8 @@ when GitHub Pages is enabled.
 2. Expand source spans and complete the LSP workspace semantic service.
 3. Grow the standard library and runtime.
 4. Finish semantic tokens, workspace resolution and debugging in the VS Code client.
-5. Package applications as `.exe` files, then add native code generation.
-6. Implement real concurrency, WebAssembly and platform bindings.
+5. Package applications as `.exe` files and make project lockfiles reproducible.
+6. Extend real concurrency with `select`/cancellation, then add WebAssembly and platform bindings.
 
 See [`CONTEXTO_PROYECTO.md`](CONTEXTO_PROYECTO.md) for the complete project
 history and current implementation notes.

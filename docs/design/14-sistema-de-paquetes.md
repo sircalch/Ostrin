@@ -43,19 +43,21 @@ Una dependencia puede fijarse a un tag exacto (`tag = "v2.1.0"`, la forma recome
 ## 3. Resolución de dependencias y `ostrin.lock`
 
 ```bash
-ostrin build
+ostrinc --project path/to/project
 ```
 
-- La primera vez (o cuando `ostrin.toml` cambió de forma que afecta a las dependencias), el compilador **resuelve** el grafo completo de dependencias (incluidas las transitivas — las dependencias de las dependencias), eligiendo una versión concreta para cada una, y escribe el resultado en `ostrin.lock`.
-- `ostrin.lock` registra, para cada dependencia (directa o transitiva), la **URL exacta y el commit exacto** resuelto — no el rango ni el tag, sino el commit real al que ese tag apuntaba en el momento de resolver. Esto es intencional: un tag Git técnicamente puede volver a apuntarse a otro commit más adelante (a diferencia de un paquete inmutable en un registro central); fijar el commit exacto en el lock es lo que realmente garantiza que un build de hoy compile exactamente igual dentro de un año, sin depender de que nadie mueva un tag en el origen.
-- **Builds posteriores usan `ostrin.lock` tal cual**, sin volver a resolver ni consultar la red, hasta que se pida explícitamente lo contrario:
+- `ostrinc --project DIR` lee `DIR/ostrin.toml`, toma su campo `entry` como punto de entrada
+  y sigue resolviendo los imports desde el mismo árbol de proyecto. También acepta la ruta
+  directa al manifiesto (`--project DIR/ostrin.toml`).
+- La resolución local escribe `ostrin.lock` con las dependencias ordenadas por nombre y rutas
+  relativas al manifiesto cuando es posible. Así, clonar el proyecto en otro directorio no cambia
+  el lockfile por diferencias de máquina.
+- Las dependencias `path` se validan localmente; las dependencias `git` se reconocen pero no se
+  descargan de forma implícita. Esto mantiene el compilador sin efectos de red durante una
+  compilación normal; el clon debe hacerse explícitamente y luego declararse como `path`.
 
-```bash
-ostrin update                # vuelve a resolver todo dentro de los rangos permitidos, reescribe el lock
-ostrin update physics        # vuelve a resolver solo esa dependencia
-```
-
-- `ostrin.lock` se versiona en control de versiones (se commitea), igual que `Cargo.lock` de Rust o `package-lock.json` de npm — es lo que hace que "clonar el repo y compilar" dé el mismo resultado en cualquier máquina.
+- `ostrin.lock` se versiona en control de versiones. Con rutas relativas y orden estable, clonar
+  el proyecto y compilarlo desde otro directorio conserva el mismo lockfile.
 
 ### 3.1 Conflictos de versión (dependencias en diamante)
 

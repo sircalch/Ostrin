@@ -66,6 +66,10 @@
   scheduler remains the default. Captured task environments are retained for the
   thread lifetime and released on completion; the native test covers a blocking
   receive and `live_allocations=0`.
+- Added `--project DIR` package entry-point selection. The compiler now reads the
+  manifest's `entry` field when no source path is supplied, and generated
+  `ostrin.lock` files sort dependencies and store project-relative paths where
+  possible, avoiding checkout-specific absolute paths.
 - Added the first HIR-to-IR lowering pass and `ostrinc --ir`. Functions now expose
   explicit temporaries, basic blocks, branches, loop edges, calls, aggregates, phi
   nodes and named opaque instructions for constructs awaiting semantic lowering.

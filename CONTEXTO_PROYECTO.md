@@ -4281,3 +4281,19 @@ determinista que usa la suite diferencial:
 La batería queda en **6 pruebas diferenciales y 126 de integración verdes**. Quedan para el
 siguiente bloque de concurrencia `select`, cancelación y un administrador de grupos nativos
 para que `spawn_scope` tenga garantías completas también en el modo con hilos.
+
+## 152. Entrada de proyecto y lockfiles portables — 2026-09-19
+
+El flujo de paquetes local deja de depender de pasar siempre el archivo de entrada a mano:
+
+- `ostrinc --project DIR` lee `DIR/ostrin.toml` y usa el campo `entry`; también acepta la
+  ruta directa al manifiesto.
+- `write_lockfile` ordena las dependencias por nombre para que la salida sea determinista.
+- Las dependencias locales se escriben como rutas relativas al directorio del manifiesto cuando
+  la relación es representable; se evita incrustar la ruta absoluta del checkout.
+- Las dependencias `git` siguen siendo reconocidas pero no se descargan automáticamente, de
+  modo que una compilación normal no introduce efectos de red.
+- La prueba de proyecto ejecuta `examples/pkg_project/main_app` solo con `--project` y
+  verifica la ruta `../shared_lib` en el lockfile.
+
+La batería queda en **6 pruebas diferenciales y 127 de integración verdes**.
