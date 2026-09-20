@@ -1153,6 +1153,8 @@ pub struct NativeTypeReport {
     pub sends_records: bool,
     /// Functions whose C body was generated from the HIR (see `hir_c.rs`) instead of the AST.
     pub hir_generated: usize,
+    /// Functions whose C body was generated from the explicit IR (see `ir_c.rs`).
+    pub ir_generated: usize,
     /// The same comparison, but for *every* expression node (operands included), by node address.
     pub node_agreed: usize,
     pub node_unchecked: usize,
@@ -6346,6 +6348,15 @@ fn generate_impl(
     let enum_names: HashSet<String> = enums.iter().map(|e| e.name.clone()).collect();
     let trait_names: HashSet<String> = traits.iter().map(|t| t.name.clone()).collect();
     let hir = typed.map(|t| crate::hir::lower(items, t));
+    // The first IR-backed C emitter is deliberately conservative. It receives
+    // the ownership-lowered IR, so the backend already has a single place to
+    // consume future retain/release facts as managed families are migrated.
+    let ir = hir.as_ref().map(|program| crate::ownership::lower_linear(&crate::ir::lower(program)).0);
+    let ir_functions: HashSet<String> = ir
+        .as_ref()
+        .into_iter()
+        .flat_map(|program| program.functions.iter().map(|function| function.name.clone()))
+        .collect();
     let mut codegen = Codegen {
         signatures: HashMap::new(),
         generic_functions: HashMap::new(),
@@ -6586,21 +6597,39 @@ fn generate_impl(
         let signature = format!("{} {}({})", c_type_name(&return_type), c_function_name(&f.name), params);
         let mut body = String::new();
         codegen.current_file = f.source_file.clone();
-        // Scalar functions are generated from the HIR; everything else still goes through the AST.
-        let from_hir = match (&hir, std::env::var_os("OSTRIN_NO_HIR_CODEGEN")) {
+        let from_ir = match (&ir, std::env::var_os("OSTRIN_NO_IR_CODEGEN")) {
+            (Some(program), None) => program
+                .functions
+                .iter()
+                .find(|function| function.name == f.name)
+                .and_then(|function| crate::ir_c::generate(function, &ir_functions)),
+            _ => None,
+        };
+        // Functions not yet representable by IR keep the HIR emitter as the
+        // next fallback; the AST path remains the final compatibility layer.
+        let from_hir = if from_ir.is_none() {
+            match (&hir, std::env::var_os("OSTRIN_NO_HIR_CODEGEN")) {
             (Some(h), None) => h
                 .functions
                 .iter()
                 .find(|hf| hf.name == f.name)
                 .and_then(|hf| crate::hir_c::generate(hf, &hir_world)),
             _ => None,
+            }
+        } else {
+            None
         };
-        if std::env::var_os("OSTRIN_HIR_DEBUG").is_some() {
-            eprintln!("hir-codegen {}: {}", f.name, if from_hir.is_some() { "yes" } else { "no" });
+        if std::env::var_os("OSTRIN_HIR_DEBUG").is_some() || std::env::var_os("OSTRIN_IR_DEBUG").is_some() {
+            eprintln!("native-codegen {}: ir={} hir={}", f.name, from_ir.is_some(), from_hir.is_some());
         }
-        match from_hir {
+        let used_ir = from_ir.is_some();
+        match from_ir.or(from_hir) {
             Some(text) => {
-                codegen.type_report.hir_generated += 1;
+                if used_ir {
+                    codegen.type_report.ir_generated += 1;
+                } else {
+                    codegen.type_report.hir_generated += 1;
+                }
                 body = text;
             }
             None => codegen.gen_function_body(f, &return_type, &mut body)?,

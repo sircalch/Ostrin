@@ -5,6 +5,7 @@ mod hir;
 mod hir_c;
 mod interpreter;
 mod ir;
+mod ir_c;
 mod lexer;
 mod lsp;
 mod modules;
@@ -226,6 +227,7 @@ fn real_main() -> ExitCode {
                 println!("agreed: {}", report.agreed);
                 println!("node-agreed: {}", report.node_agreed);
                 println!("node-unchecked: {}", report.node_unchecked);
+                println!("ir-generated: {}", report.ir_generated);
                 println!("hir-generated: {}", report.hir_generated);
                 println!("partial: {}", report.partial);
                 println!("completed: {}", report.completed);

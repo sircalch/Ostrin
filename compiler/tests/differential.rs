@@ -248,6 +248,7 @@ fn typed_expression_table_does_not_regress() {
 #[test]
 fn native_backend_types_agree_with_the_checker() {
     let mut hir_generated = 0usize;
+    let mut ir_generated = 0usize;
     let (mut agreed, mut partial, mut completed, mut unchecked, mut node_agreed, mut divergences) = (0usize, 0usize, 0usize, 0usize, 0usize, Vec::<String>::new());
     for path in examples() {
         let file = path.to_string_lossy().to_string();
@@ -267,6 +268,8 @@ fn native_backend_types_agree_with_the_checker() {
                 partial += n.trim().parse::<usize>().unwrap();
             } else if let Some(n) = line.strip_prefix("hir-generated: ") {
                 hir_generated += n.trim().parse::<usize>().unwrap();
+            } else if let Some(n) = line.strip_prefix("ir-generated: ") {
+                ir_generated += n.trim().parse::<usize>().unwrap();
             } else if let Some(n) = line.strip_prefix("unchecked: ") {
                 unchecked += n.trim().parse::<usize>().unwrap();
             } else if let Some(n) = line.strip_prefix("completed: ") {
@@ -280,9 +283,11 @@ fn native_backend_types_agree_with_the_checker() {
     // The same comparison over *every* AST node (operands included), by node address.
     assert!(node_agreed > 3000, "only {node_agreed} AST nodes were compared with the checker's per-node types");
     // Ratchet: expressions the backend cannot compare (the checker has no type).
-    // Ratchet: functions whose C is generated from the HIR (the migration of the native backend).
-    assert!(hir_generated >= 127, "only {hir_generated} functions were generated from the HIR (expected at least 127)");
-    println!("functions generated from the HIR: {hir_generated}");
+    // Ratchet: functions whose C is generated from the typed HIR or its
+    // explicit IR lowering (the migration of the native backend).
+    let native_generated = hir_generated + ir_generated;
+    assert!(native_generated >= 127, "only {native_generated} functions were generated from HIR/IR (expected at least 127)");
+    println!("functions generated from HIR/IR: {native_generated} (HIR {hir_generated}, IR {ir_generated})");
     assert!(unchecked <= 4, "{unchecked} expressions have no checker type (limit 4)");
     // Every partial literal the backend meets is completed from the checker's type.
     assert_eq!(partial, completed, "{} partial literal(s) were not completed from the checker's type", partial - completed);

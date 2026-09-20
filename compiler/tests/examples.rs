@@ -1578,11 +1578,16 @@ fn native_hir_handles_scalar_widths() {
             return;
         }
         assert!(report.status.success(), "native type report failed for {file}: {}", stderr(&report));
-        let hir_functions = stdout(&report)
+        let report_text = stdout(&report);
+        let hir_functions = report_text
             .lines()
             .find_map(|line| line.strip_prefix("hir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
             .unwrap_or(0);
-        assert!(hir_functions >= 1, "{file} did not generate any function from HIR");
+        let ir_functions = report_text
+            .lines()
+            .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+            .unwrap_or(0);
+        assert!(hir_functions + ir_functions >= 1, "{file} did not generate any function from HIR/IR");
 
         let exe = temp_artifact(&format!("hir_{file}.exe"));
         let compile = run(&["--compile", "--out", &exe, &path]);
@@ -1595,6 +1600,37 @@ fn native_hir_handles_scalar_widths() {
         assert!(native.status.success(), "native run failed for {file}: {}", String::from_utf8_lossy(&native.stderr));
         assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected, "native output for {file}");
     }
+}
+
+#[test]
+fn native_ir_emitter_handles_scalar_functions() {
+    let file = example_path("int_division.ostrin");
+    let expected = "3\n3\n";
+    let interpreted = run(&["--run", &file]);
+    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    let ir_functions = stdout(&report)
+        .lines()
+        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .unwrap_or(0);
+    assert!(ir_functions >= 1, "scalar example did not exercise the IR native emitter: {}", stdout(&report));
+
+    let exe = temp_artifact("native_ir_scalar.exe");
+    let compile = run(&["--compile", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+    let native = Command::new(&exe).output().expect("failed to run IR scalar binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native run failed: {}", String::from_utf8_lossy(&native.stderr));
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
 }
 
 #[test]
@@ -1647,11 +1683,16 @@ fn native_hir_handles_closures_core() {
         return;
     }
     assert!(report.status.success(), "native type report failed: {}", stderr(&report));
-    let hir_functions = stdout(&report)
+    let report_text = stdout(&report);
+    let hir_functions = report_text
         .lines()
         .find_map(|line| line.strip_prefix("hir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
         .unwrap_or(0);
-    assert!(hir_functions >= 2, "closure example generated only {hir_functions} HIR functions");
+    let ir_functions = report_text
+        .lines()
+        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .unwrap_or(0);
+    assert!(hir_functions + ir_functions >= 2, "closure example generated only {} HIR/IR functions", hir_functions + ir_functions);
 
     let exe = temp_artifact("native_hir_closures.exe");
     let compile = run(&["--compile", "--out", &exe, &file]);

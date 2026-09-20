@@ -424,7 +424,7 @@ impl Builder {
     fn lower_expr(&mut self, expression: &HirExpr) -> ValueId {
         match &expression.kind {
             HirKind::Int(value) => self.const_value(value.to_string(), expression.ty.clone()),
-            HirKind::Sized(value, kind) => self.const_value(format!("{value}{}", kind.name()), expression.ty.clone()),
+            HirKind::Sized(value, _) => self.const_value(value.to_string(), expression.ty.clone()),
             HirKind::Float(value) => self.const_value(format!("{value:?}"), expression.ty.clone()),
             HirKind::Float32(value) => self.const_value(format!("{value:?}f32"), expression.ty.clone()),
             HirKind::Str(value) => self.const_value(format!("{value:?}"), expression.ty.clone()),

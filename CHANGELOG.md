@@ -19,6 +19,12 @@
   group-by), `plot` (SVG scatter/line) and `autodiff` (forward-mode dual numbers).
 
 ### Compiler
+- Added the first native C emitter backed by the explicit HIR→IR lowering. Straight-line
+  scalar functions now become C from SSA temporaries in `ir_c.rs`, including integer
+  division and scalar printing; checked fixed-width arithmetic, unsupported control flow
+  and managed values keep the verified HIR/AST fallback. `--native-type-report` now separates `ir-generated` from
+  `hir-generated`, and the migration ratchet counts both paths without weakening the
+  interpreter/native differential tests.
 - Extended the stable hash builtin to structural Option and Result values when
   their payloads are hashable; interpreter and native tags/payload combination
   remain identical.

@@ -4753,3 +4753,25 @@ La batería local queda en **6 pruebas diferenciales y 146 de integración verde
 fallback AST continúa siendo necesario para cantidades, arrays y otras familias complejas;
 la siguiente deuda estructural sigue siendo hacer que la IR de ownership sea consumida por
 el backend, no solo inspeccionada.
+
+## 178. Primer emisor C consumiendo la IR explícita — 2026-09-20
+
+La IR deja de ser únicamente una representación observable y pasa a alimentar una familia
+real del backend nativo. `compiler/src/ir_c.rs` consume funciones HIR→IR de un solo bloque
+con valores escalares, materializa sus temporales SSA como temporales C y conserva las
+operaciones propias del runtime, incluida la división entera y la impresión numérica.
+
+La integración en `codegen.rs` mantiene una cadena de fallback medible: IR primero, HIR
+después y AST al final. `--native-type-report` distingue ahora `ir-generated` de
+`hir-generated`; el trinquete diferencial suma ambas rutas para que migrar una función de
+HIR a IR cuente como avance sin ocultar regresiones. La prueba
+`native_ir_emitter_handles_scalar_functions` compara `int_division.ostrin` en intérprete y
+binario nativo, y la suite completa conserva cero divergencias.
+
+La frontera es deliberadamente conservadora: cualquier temporal gestionado, bloque de
+control aún no emitido o entero de ancho fijo cae al camino HIR/AST, porque la IR todavía no
+tiene intrínsecos de overflow comprobado ni lowering completo de `retain/release`. Esto
+evita que la migración cambie la semántica; el siguiente paso es extender el emisor a
+control de flujo y luego hacer que consuma de verdad la IR de ownership.
+
+La batería queda en **6 pruebas diferenciales y 147 de integración verdes**.
