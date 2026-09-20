@@ -1,9 +1,9 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-20 · rama `main` · 6 pruebas diferenciales y 147 de integración en verde.*
+*Corte: 2026-09-20 · rama `main` · 6 pruebas diferenciales y 148 de integración en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
-Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–178); para el diseño
+Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–179); para el diseño
 del lenguaje, `docs/design/` (21 documentos).
 
 ---
@@ -114,11 +114,11 @@ paridad entre intérprete y nativo; funciones, arrays, canales y tareas siguen f
 Transpila a C con expresiones‑sentencia GNU (`({ … })`); compilador vía `OSTRIN_CC`.
 Monomorfización bajo demanda (funciones, records, enums, métodos, vtables, listas, mapas…).
 
-La primera familia de funciones ya se emite desde la IR explícita: funciones lineales de
-escalares convierten temporales SSA en temporales C, preservan división entera y salida
-numérica, y se cuentan por separado en `--native-type-report` como `ir-generated`. Si una
-función usa control de flujo, valores gestionados o una operación todavía no modelada, cae
-de forma verificable a HIR y después al AST.
+La primera familia de funciones ya se emite desde la IR explícita: funciones escalares
+convierten temporales SSA en temporales C, preservan división entera y salida numérica,
+emiten ramas, recursión, bucles con estado y `phi`, y se cuentan por separado en
+`--native-type-report` como `ir-generated`. Si una función usa valores gestionados, iteradores
+o una operación todavía no modelada, cae de forma verificable a HIR y después al AST.
 
 El runtime C generado centraliza las reservas en `ostrin_alloc`/`ostrin_calloc`/
 `ostrin_realloc`, registra cada bloque y lo libera mediante `atexit` al terminar el
@@ -172,7 +172,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Chequeo «movido tras enviar» (E1101) | Integrado por defecto en `--check`, `--run`, `--emit-c` y `--compile`; `--ownership-check` conserva el informe explícito |
 | Paralelismo nativo (`--native-threads`, canales bloqueantes, `select`) | Hilos del SO, mutexes/condiciones, canales bloqueantes y `select(List<Channel<T>>)` implementados de forma opt-in; `select` conserva prioridad determinista y cede el hilo nativo entre intentos; `Task.cancel()` cancela pendientes, propaga a grupos activos de `spawn_scope` o solicita cancelación a tareas `Running`, observada en checkpoints seguros; `receive()` vuelve periódicamente al runtime sin conservar el mutex durante el checkpoint |
 | Memoria en nativo | Registro, destructores tipados para records/colecciones y entornos de tareas, `clone`/`drop`, cleanup automático de locales directos, bloques anidados, ramas, loops y cancelación de tareas en AST/HIR, y `--leak-check`; ARC completa sobre IR sigue pendiente |
-| IR de bloques | HIR→CFG disponible con `--ir`; `if/while/for/match/try/spawn/channel` ya tienen operaciones explícitas; el emisor C cubre primero funciones lineales escalares y aún no reemplaza el backend C completo |
+| IR de bloques | HIR→CFG disponible con `--ir`; el emisor C cubre ramas y bucles escalares con `phi`; `for`/iteradores, valores gestionados y otras familias aún no reemplazan el backend C completo |
 | Ownership/último uso | `--ownership-report`, `--ownership-check` y `--ownership-ir`; el backend C ya aplica retain/release lineal en locales directos, pero la IR aún no es la fuente única |
 | Biblioteca estándar | Mínima: `args`, entorno/rutas, `format`, E/S y `hash` estructural para escalares, colecciones y tipos con `derive(Hash)`; faltan fechas, JSON y red |
 | Mensajes de error de E/S | `strerror` ≠ texto de Rust (difieren entre backends) |
@@ -187,7 +187,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
 convendría dividirlos; el backend nativo no comparte el sistema de tipos del checker
 (ya consume los tipos del checker y compara cada nodo; **119 funciones/métodos de los ejemplos
-ya se generan desde el HIR y las primeras funciones lineales ya se generan desde la IR** —escalares, `Float32`, enteros de ancho fijo, records, enums, `match`, `Option`/`Result`,
+ya se generan desde el HIR y las primeras funciones escalares con CFG ya se generan desde la IR** —escalares, `Float32`, enteros de ancho fijo, records, enums, `match`, `Option`/`Result`,
 listas/colecciones, cierres, instancias concretas de genéricos, records/enums aplicados y métodos
 genéricos centrales, módulo `hir_c.rs`—, con un trinquete mínimo de 127; el resto sigue por el AST;
 ver documento 20 y secciones 123–133 de `CONTEXTO_PROYECTO.md`);
@@ -272,7 +272,7 @@ Decisiones que necesito de ti para afinar el plan:
 
 ```powershell
 cd compiler
-cargo test                                   # 6 diferenciales + 147 de integración
+cargo test                                   # 6 diferenciales + 148 de integración
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```

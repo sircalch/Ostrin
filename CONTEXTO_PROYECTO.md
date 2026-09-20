@@ -4775,3 +4775,28 @@ evita que la migración cambie la semántica; el siguiente paso es extender el e
 control de flujo y luego hacer que consuma de verdad la IR de ownership.
 
 La batería queda en **6 pruebas diferenciales y 147 de integración verdes**.
+
+## 179. CFG escalar nativo desde la IR — 2026-09-20
+
+La emisión C desde IR deja de estar limitada a funciones lineales. `ir_c.rs` ahora consume
+CFGs escalares completos con etiquetas y saltos explícitos: ramas, `if` anidados, llamadas
+recursivas, bucles `while` y selección de valores mediante `phi` usan temporales SSA
+declarados en el marco C y un registro del bloque predecesor.
+
+La bajada HIR→IR también se hizo semánticamente correcta para este bloque:
+
+- los `while` crean `phi` para los bindings visibles que sobreviven entre iteraciones y
+  actualizan sus entradas con el valor producido por el backedge;
+- `if` anidados y handlers de `try` registran el bloque que realmente conecta con el merge,
+  no el bloque sintáctico de entrada;
+- el verificador de IR calcula predecesores y rechaza `phi` vacíos, duplicados, incompletos o
+  que apunten a bloques que no son aristas CFG reales.
+
+`examples/native_ir_control_flow.ostrin` prueba una clasificación con ramas anidadas y una
+suma con estado de bucle. La salida del intérprete y del binario nativo coincide (`-1`, `0`,
+`1`, `15`), mientras que valores gestionados, iteradores, `match` y aritmética de enteros de
+ancho fijo permanecen en el fallback verificado hasta tener sus contratos completos.
+
+La batería queda en **6 pruebas diferenciales y 148 de integración verdes**. La siguiente
+frontera es conectar ownership/último uso de la IR a este emisor sin perder el contrato de
+destructores y `retain/release` del backend actual.

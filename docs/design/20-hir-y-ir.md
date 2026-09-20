@@ -2,8 +2,9 @@
 
 *Estado: HIR implementado y primera bajada HIR→CFG ejecutable. `--ir`, `--ownership-check` y
 `--ownership-ir` consumen temporales y bloques verificados; además, `ir_c.rs` ya genera C
-para funciones escalares lineales desde esa IR. El backend mantiene HIR/AST como fallback
-verificado para control de flujo, valores gestionados y escapes mientras la migración crece.*
+para funciones escalares con ramas, recursión, bucles y `phi` desde esa IR. El backend
+mantiene HIR/AST como fallback verificado para valores gestionados, iteradores y escapes
+mientras la migración crece.*
 
 ## 1. Qué existe ya (comprobado en el código)
 
@@ -14,7 +15,7 @@ verificado para control de flujo, valores gestionados y escapes mientras la migr
 | `TypedProgram.literal_kinds` | `typeck` | Tipo elegido para cada literal numérico |
 | `NativeTypeReport` | `codegen` | Detecta divergencias checker↔backend (0 hoy, en ~1 350 expresiones) |
 | `IrProgram` / `IrFunction` / `IrBlock` | `ir.rs` | Primera CFG con temporales explícitos, terminadores y verificador de destinos |
-| Emisor IR escalar | `ir_c.rs` | Genera C desde SSA para funciones lineales escalares; deja fallback seguro para lo demás |
+| Emisor IR escalar | `ir_c.rs` | Genera C desde SSA/CFG para funciones escalares con ramas, bucles y `phi`; deja fallback seguro para lo demás |
 | Intérprete como oráculo | `interpreter` | Semántica de referencia; pruebas diferenciales automáticas |
 
 Por tanto el backend **ya no infiere solo**: la reinferencia que queda (`bind_type`, `expected`, `settle_literal`) es respaldo verificado.
@@ -66,7 +67,7 @@ Sobre este IR se hacen los análisis que el texto C no permite:
 
 1. **HIR + verificador + `--hir`** para *todo* lo que el checker tipa; medida de cobertura por ejemplo (ratchet).
 2. Migrar el backend C por **familias de nodos** al HIR (literales/operadores → llamadas → records/enums → patrones → colecciones → genéricos), eliminando la reinferencia correspondiente en cada paso.
-3. **IR de bloques básicos** y generación de C desde el IR (el HIR deja de generar C directamente). La primera CFG observable ya existe en `--ir` y el emisor escalar inicial ya consume funciones lineales; faltan control de flujo, valores gestionados y la retirada progresiva del fallback.
+3. **IR de bloques básicos** y generación de C desde el IR (el HIR deja de generar C directamente). La primera CFG observable ya existe en `--ir` y el emisor escalar ya consume ramas, recursión y bucles con `phi`; faltan iteradores, valores gestionados y la retirada progresiva del fallback.
 4. **RC + último uso** sobre el IR (`--leak-check`: los ejemplos deben terminar sin objetos vivos).
    El runtime ya expone `ostrin_retain`/`ostrin_release`; el emisor C cubre la primera subetapa
    de forma lineal en locales directos: aliases y campos prestados retienen, las reasignaciones

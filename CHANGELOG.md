@@ -25,6 +25,11 @@
   and managed values keep the verified HIR/AST fallback. `--native-type-report` now separates `ir-generated` from
   `hir-generated`, and the migration ratchet counts both paths without weakening the
   interpreter/native differential tests.
+- Extended that IR C emitter to verified scalar CFGs: branches, nested `if`, recursive calls,
+  loop-carried locals and `phi` selection now lower through C labels and predecessor edges.
+  The IR builder emits loop phis, records the real predecessor after nested lowering, and the
+  verifier rejects missing, duplicated or non-CFG phi inputs; managed values, iterators and
+  checked fixed-width arithmetic still use the safe fallback.
 - Extended the stable hash builtin to structural Option and Result values when
   their payloads are hashable; interpreter and native tags/payload combination
   remain identical.

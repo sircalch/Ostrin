@@ -702,6 +702,19 @@ fn skip_if_no_c_compiler(compile: &Output) -> bool {
 
 #[test]
 fn native_backend_compiles_and_runs_fibonacci() {
+    let report = run(&["--native-type-report", &example_path("native_fibonacci.ostrin")]);
+    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    let ir_functions = stdout(&report)
+        .lines()
+        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .unwrap_or(0);
+    assert!(ir_functions >= 1, "recursive scalar function did not use the IR emitter: {}", stdout(&report));
+
+    let emitted = run(&["--emit-c", &example_path("native_fibonacci.ostrin")]);
+    assert!(emitted.status.success(), "IR C emission failed: {}", stderr(&emitted));
+    assert!(stdout(&emitted).contains("__ostrin_ir_bb3:"), "expected CFG labels in IR output");
+    assert!(stdout(&emitted).contains("__ostrin_ir_pred"), "expected predecessor tracking for phi lowering");
+
     let exe = temp_artifact("fibonacci.exe");
     let compile = run(&["--compile", "--out", &exe, &example_path("native_fibonacci.ostrin")]);
     if skip_if_no_c_compiler(&compile) {
@@ -1628,6 +1641,39 @@ fn native_ir_emitter_handles_scalar_functions() {
     }
     assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
     let native = Command::new(&exe).output().expect("failed to run IR scalar binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native run failed: {}", String::from_utf8_lossy(&native.stderr));
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+}
+
+#[test]
+fn native_ir_emitter_handles_cfg_control_flow() {
+    let file = example_path("native_ir_control_flow.ostrin");
+    let expected = "-1\n0\n1\n15\n";
+    let interpreted = run(&["--run", &file]);
+    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    let ir_functions = stdout(&report)
+        .lines()
+        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .unwrap_or(0);
+    assert!(ir_functions >= 3, "branch/loop example did not use the IR emitter: {}", stdout(&report));
+
+    let emitted = run(&["--emit-c", &file]);
+    assert!(emitted.status.success(), "IR CFG emission failed: {}", stderr(&emitted));
+    assert!(stdout(&emitted).contains("__ostrin_ir_pred"), "expected phi predecessor tracking");
+    assert!(stdout(&emitted).contains("__ostrin_ir_bb3:"), "expected branch merge label");
+
+    let exe = temp_artifact("native_ir_control_flow.exe");
+    let compile = run(&["--compile", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+    let native = Command::new(&exe).output().expect("failed to run IR CFG binary");
     let _ = fs::remove_file(&exe);
     assert!(native.status.success(), "native run failed: {}", String::from_utf8_lossy(&native.stderr));
     assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
