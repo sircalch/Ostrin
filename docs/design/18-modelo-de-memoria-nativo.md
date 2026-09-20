@@ -1,8 +1,9 @@
 # 18. Modelo de memoria del backend nativo
 
-*Estado: runtime con registro de allocations, callbacks de destrucción tipados para records y
-colecciones, primitivas `clone`/`drop`, primer lowering conservador de ownership y ABI
-`retain`/`release`. La inserción automática de RC por último uso todavía no está completa.*
+*Estado: runtime con registro de allocations, callbacks de destrucción tipados para records,
+colecciones y entornos de tareas, primitivas `clone`/`drop`, primer lowering conservador de
+ownership y ABI `retain`/`release`. La inserción automática de RC por último uso todavía no
+está completa.*
 
 ## 1. Punto de partida (semántica ya fijada por el lenguaje)
 
@@ -37,7 +38,9 @@ Sin fugas en programas de larga duración; sin doble liberación ni uso tras lib
 La primera etapa ya implementada centraliza las reservas en `ostrin_alloc`, `ostrin_calloc`,
 `ostrin_realloc` y `ostrin_free`, registra los bloques para liberarlos al salir y expone
 `ostrin_retain`/`ostrin_release` como ABI del futuro lowering. Los objetos compuestos registran
-además un callback de destrucción que libera sus buffers y referencias hijas; `clone`/`drop`
+además un callback de destrucción que libera sus buffers y referencias hijas. Los entornos
+capturados por tareas tienen un destructor separado que se ejecuta al terminar normalmente,
+al cancelar en un checkpoint o al descartar una tarea pendiente; `clone`/`drop`
 permiten ejercitar el contrato de forma explícita. `--leak-check` imprime las asignaciones
 vivas, el pico y el total antes de la limpieza. Esto resuelve la destrucción tipada de los
 casos explícitos, pero todavía no inserta RC por cada copia, retorno, phi o salida de ámbito.
@@ -60,7 +63,7 @@ El RC sobre el generador actual (texto C con expresiones‑sentencia) exigiría 
 
 1. HIR → IR con valores temporales explícitos (Etapas 2–4 de `docs/ARQUITECTURA_Y_VISION.md`).
 2. Runtime C: registro de objeto con contador; `ostrin_retain`/`ostrin_release`; destructores por tipo.
-   Esta base ya cubre records, listas, mapas, sets y canales generados.
+   Esta base ya cubre records, listas, mapas, sets, canales y entornos de tareas generados.
 3. Inserción de retain/release + optimización de último uso. Ya existe una primera pasada
    (`--ownership-ir`) que marca transferencias lineales conocidas y el runtime ofrece el ABI;
    aún falta que el backend C consuma la IR transformada.

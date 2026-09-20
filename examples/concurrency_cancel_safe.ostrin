@@ -1,7 +1,9 @@
 fn main() -> Void {
     spawn_scope {
+        values = [1]
         first = spawn {
             print("started")
+            print(values.length())
             yield()
             print("must-not-run")
         }

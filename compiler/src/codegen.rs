@@ -441,7 +441,7 @@ static void ostrin_thread_join(OstrinThread* thread) {\n\
 #endif\n\
 }\n\
 #endif\n\
-typedef struct { void* run; void* env; int status; atomic_bool cancel_requested; } OstrinTaskHeader;\n\
+typedef struct { void* run; void* env; void (*drop_env)(void*); int status; atomic_bool cancel_requested; } OstrinTaskHeader;\n\
 typedef struct OstrinTaskExecution { OstrinTaskHeader* task; jmp_buf* jump; struct OstrinTaskExecution* previous; } OstrinTaskExecution;\n\
 #if defined(OSTRIN_NATIVE_THREADS)\n\
 static _Thread_local OstrinTaskExecution* ostrin_current_execution = NULL;\n\
@@ -2162,32 +2162,36 @@ impl<'a> Codegen<'a> {
                 fn_body.push_str(&format!("    {} {n} = __e->{n};\n", c_type_name(t)));
             }
         }
-        let env_cleanup: String = frame
-            .captures
-            .iter()
-            .filter(|(_, t)| is_reference_type(t))
-            .map(|(n, _)| format!("    ostrin_release((void*)__e->{n});\n"))
-            .collect::<String>();
-        let env_cleanup = if frame.captures.is_empty() {
-            String::new()
-        } else {
-            format!("{env_cleanup}    ostrin_release((void*)__env);\n")
-        };
         if ret == CType::Void {
             fn_body.push_str(&format!("    {body_code};\n"));
-            fn_body.push_str(&env_cleanup);
         } else {
             let result_temp = self.next_temp();
             fn_body.push_str(&format!("    {} {result_temp} = {body_code};\n", c_type_name(&ret)));
             if body.tail.as_ref().is_some_and(|tail| is_reference_type(&ret) && borrowed_reference_expr(tail)) {
                 fn_body.push_str(&format!("    ostrin_retain((void*){result_temp});\n"));
             }
-            fn_body.push_str(&env_cleanup);
             fn_body.push_str(&format!("    return {result_temp};\n"));
         }
         if !frame.captures.is_empty() {
             self.closure_protos.push(format!("typedef struct {{ {env_struct}}} OstrinEnv_{id};"));
         }
+        let drop_env = if frame.captures.is_empty() {
+            "NULL".to_string()
+        } else {
+            let drop_name = format!("ostrin_task_env_drop_{id}");
+            let releases: String = frame
+                .captures
+                .iter()
+                .filter(|(_, t)| is_reference_type(t))
+                .map(|(n, _)| format!("    ostrin_release((void*)__e->{n});\n"))
+                .collect();
+            self.closure_protos.push(format!("static void {drop_name}(void* __env);"));
+            self.closure_bodies.push((
+                format!("static void {drop_name}(void* __env)"),
+                format!("    OstrinEnv_{id}* __e = __env;\n{releases}    ostrin_release((void*)__env);\n"),
+            ));
+            drop_name
+        };
         self.closure_protos.push(format!("{signature};"));
         self.closure_bodies.push((signature, fn_body));
 
@@ -2215,7 +2219,7 @@ impl<'a> Codegen<'a> {
         let allocation = if self.native_threads {
             format!("ostrin_calloc_with_drop(1, sizeof *{temp}, (void (*)(void*)){name}_drop)")
         } else {
-            format!("ostrin_calloc(1, sizeof *{temp})")
+            format!("ostrin_calloc_with_drop(1, sizeof *{temp}, (void (*)(void*)){name}_drop)")
         };
         let start = if self.native_threads {
             format!("ostrin_register_task({temp}, {name}_poll); {name}_start({temp});")
@@ -2224,7 +2228,7 @@ impl<'a> Codegen<'a> {
         };
         Ok((
             format!(
-                "({{ {name}* {temp} = ({name}*){allocation}; {temp}->run = {fn_name}; {temp}->env = {env}; {start} {temp}; }})"
+                "({{ {name}* {temp} = ({name}*){allocation}; {temp}->run = {fn_name}; {temp}->env = {env}; {temp}->drop_env = {drop_env}; {start} {temp}; }})"
             ),
             task_ty,
         ))
@@ -6729,19 +6733,21 @@ fn generate_impl(
                     let ret = c_type_name(t);
                     let value = field_c_type(t);
                      if codegen.native_threads {
-                         list_type_decls.push_str(&format!("typedef {} (*{name}_Run)(void*);\nstruct {name} {{\n    {name}_Run run;\n    void* env;\n    int status;\n    atomic_bool cancel_requested;\n    bool thread_started;\n    bool thread_joined;\n    bool join_in_progress;\n    {value} value;\n    OstrinMutex mutex;\n    OstrinCond ready;\n    OstrinThread thread;\n}};\n\n", ret));
+                         list_type_decls.push_str(&format!("typedef {} (*{name}_Run)(void*);\nstruct {name} {{\n    {name}_Run run;\n    void* env;\n    void (*drop_env)(void*);\n    int status;\n    atomic_bool cancel_requested;\n    bool thread_started;\n    bool thread_joined;\n    bool join_in_progress;\n    {value} value;\n    OstrinMutex mutex;\n    OstrinCond ready;\n    OstrinThread thread;\n}};\n\n", ret));
                          let result_release = if is_reference_type(t) { "    if (task->status == 2) ostrin_release((void*)task->value);\n" } else { "" };
-                         funcs.push((format!("static void {name}_drop({name}* task)"), format!("    if (!task) return;\n    if (task->thread_started && !task->thread_joined) {name}_join(task);\n{result_release}    ostrin_mutex_destroy(&task->mutex);\n    ostrin_cond_destroy(&task->ready);\n")));
-                         funcs.push((format!("static void {name}_thread_entry(void* raw)"), format!("    {name}* task = ({name}*)raw;\n    jmp_buf cancel_jump;\n    OstrinTaskExecution execution;\n    ostrin_task_enter(&execution, task, &cancel_jump);\n    if (setjmp(cancel_jump) == 0) {{\n{run}\n    }}\n    ostrin_task_leave(&execution);\n    ostrin_mutex_lock(&task->mutex);\n    task->status = atomic_load(&task->cancel_requested) ? 3 : 2;\n    ostrin_cond_broadcast(&task->ready);\n    ostrin_mutex_unlock(&task->mutex);\n", run = if **t == CType::Void { "        task->run(task->env); task->value = 0;".to_string() } else { "        task->value = task->run(task->env);".to_string() })));
+                         funcs.push((format!("static void {name}_wait({name}* task)"), format!("    ostrin_mutex_lock(&task->mutex);\n    while ((task->status != 2 && task->status != 3) || task->join_in_progress) ostrin_cond_wait(&task->ready, &task->mutex);\n    if (!task->thread_joined && task->thread_started) {{ task->join_in_progress = true; ostrin_mutex_unlock(&task->mutex); ostrin_thread_join(&task->thread); ostrin_mutex_lock(&task->mutex); task->thread_joined = true; task->join_in_progress = false; ostrin_cond_broadcast(&task->ready); }}\n    ostrin_mutex_unlock(&task->mutex);\n")));
+                         funcs.push((format!("static void {name}_drop({name}* task)"), format!("    if (!task) return;\n    if (task->thread_started && !task->thread_joined) {name}_wait(task);\n    if (task->drop_env && task->env) {{ task->drop_env(task->env); task->env = NULL; }}\n{result_release}    ostrin_mutex_destroy(&task->mutex);\n    ostrin_cond_destroy(&task->ready);\n")));
+                         funcs.push((format!("static void {name}_thread_entry(void* raw)"), format!("    {name}* task = ({name}*)raw;\n    jmp_buf cancel_jump;\n    OstrinTaskExecution execution;\n    ostrin_task_enter(&execution, task, &cancel_jump);\n    if (setjmp(cancel_jump) == 0) {{\n{run}\n    }}\n    if (task->drop_env && task->env) {{ task->drop_env(task->env); task->env = NULL; }}\n    ostrin_task_leave(&execution);\n    ostrin_mutex_lock(&task->mutex);\n    task->status = atomic_load(&task->cancel_requested) ? 3 : 2;\n    ostrin_cond_broadcast(&task->ready);\n    ostrin_mutex_unlock(&task->mutex);\n", run = if **t == CType::Void { "        task->run(task->env); task->value = 0;".to_string() } else { "        task->value = task->run(task->env);".to_string() })));
                          funcs.push((format!("static void {name}_start({name}* task)"), format!("    ostrin_mutex_init(&task->mutex);\n    ostrin_cond_init(&task->ready);\n    task->status = 1;\n    task->thread_started = true;\n    ostrin_thread_start(&task->thread, {name}_thread_entry, task);\n")));
-                         funcs.push((format!("static bool {name}_poll(void* raw)"), format!("    {name}* task = ({name}*)raw;\n    if (task->status == 2 || task->status == 3) return false;\n    {name}_join(task);\n    return true;\n")));
+                         funcs.push((format!("static bool {name}_poll(void* raw)"), format!("    {name}* task = ({name}*)raw;\n    if (task->status == 2 || task->status == 3) return false;\n    {name}_wait(task);\n    bool cancelled = task->status == 3;\n    ostrin_unregister_task(task);\n    return !cancelled;\n")));
                          funcs.push((format!("static bool {name}_cancel({name}* task)"), format!("    ostrin_mutex_lock(&task->mutex);\n    bool cancelled = false;\n    if (task->status == 0) {{ task->status = 3; cancelled = true; ostrin_cond_broadcast(&task->ready); }}\n    else if (task->status == 1) {{ atomic_store(&task->cancel_requested, true); cancelled = true; }}\n    ostrin_mutex_unlock(&task->mutex);\n    return cancelled;\n")));
                          let result = if **t == CType::Void { "    return;".to_string() } else if is_reference_type(t) { "    ostrin_retain((void*)task->value);\n    return task->value;".to_string() } else { "    return task->value;".to_string() };
-                         funcs.push((format!("static {ret} {name}_join({name}* task)"), format!("    ostrin_mutex_lock(&task->mutex);\n    while ((task->status != 2 && task->status != 3) || task->join_in_progress) ostrin_cond_wait(&task->ready, &task->mutex);\n    if (!task->thread_joined && task->thread_started) {{ task->join_in_progress = true; ostrin_mutex_unlock(&task->mutex); ostrin_thread_join(&task->thread); ostrin_mutex_lock(&task->mutex); task->thread_joined = true; task->join_in_progress = false; ostrin_cond_broadcast(&task->ready); }}\n    bool cancelled = task->status == 3;\n    ostrin_mutex_unlock(&task->mutex);\n    ostrin_unregister_task(task);\n    if (cancelled) OSTRIN_FAIL(\"task was cancelled\");\n{result}\n")));
+                         funcs.push((format!("static {ret} {name}_join({name}* task)"), format!("    {name}_wait(task);\n    bool cancelled = task->status == 3;\n    ostrin_unregister_task(task);\n    if (cancelled) OSTRIN_FAIL(\"task was cancelled\");\n{result}\n")));
                      } else {
-                     list_type_decls.push_str(&format!("typedef {} (*{name}_Run)(void*);\nstruct {name} {{\n    {name}_Run run;\n    void* env;\n    int status;\n    atomic_bool cancel_requested;\n    {value} value;\n}};\n\n", ret));
+                     list_type_decls.push_str(&format!("typedef {} (*{name}_Run)(void*);\nstruct {name} {{\n    {name}_Run run;\n    void* env;\n    void (*drop_env)(void*);\n    int status;\n    atomic_bool cancel_requested;\n    {value} value;\n}};\n\n", ret));
+                     funcs.push((format!("static void {name}_drop({name}* task)"), "    if (!task) return;\n    if (task->drop_env && task->env) { task->drop_env(task->env); task->env = NULL; }\n".to_string()));
                      funcs.push((format!("static bool {name}_poll(void* raw)"), format!(
-                        "    {name}* task = ({name}*)raw;\n    if (task->status != 0) return false;\n    task->status = 1;\n    jmp_buf cancel_jump;\n    OstrinTaskExecution execution;\n    ostrin_task_enter(&execution, task, &cancel_jump);\n    if (setjmp(cancel_jump) == 0) {{\n{run}\n    }}\n    ostrin_task_leave(&execution);\n    task->status = atomic_load(&task->cancel_requested) ? 3 : 2;\n    return true;\n",
+                        "    {name}* task = ({name}*)raw;\n    if (task->status != 0) return false;\n    task->status = 1;\n    jmp_buf cancel_jump;\n    OstrinTaskExecution execution;\n    ostrin_task_enter(&execution, task, &cancel_jump);\n    if (setjmp(cancel_jump) == 0) {{\n{run}\n    }}\n    if (task->drop_env && task->env) {{ task->drop_env(task->env); task->env = NULL; }}\n    ostrin_task_leave(&execution);\n    task->status = atomic_load(&task->cancel_requested) ? 3 : 2;\n    return true;\n",
                         run = if **t == CType::Void {
                             "    task->run(task->env); task->value = 0;".to_string()
                         } else {

@@ -4634,3 +4634,23 @@ La cancelación de tareas ya no se limita a tareas que todavía no empezaron:
 La batería queda en **6 pruebas diferenciales y 142 de integración verdes**. La siguiente
 brecha de concurrencia es completar la propagación y administración de grupos en `spawn_scope`;
 la cancelación sigue siendo cooperativa y no interrumpe tareas bloqueadas sin un checkpoint.
+
+## 172. Ownership de entornos capturados en tareas — 2026-09-19
+
+La cancelación cooperativa reveló una ruta de ownership que no podía depender del cuerpo de
+la tarea: un `longjmp` desde `yield()` puede saltar por encima del cleanup que normalmente se
+emite al final del callback. El backend nativo ahora:
+
+- genera un destructor separado para cada entorno capturado, que libera sus referencias hijas
+  y el propio entorno;
+- guarda ese destructor en el header de `Task<T>` y lo ejecuta desde el wrapper del runtime
+  después de un callback normal o cancelado;
+- usa el mismo destructor desde el destructor de la tarea cuando una tarea pendiente se
+  cancela y se descarta sin llegar a ejecutarse;
+- aplica el contrato a los dos modos de tareas y lo protege con una prueba que cancela una
+  tarea que captura una `List`, además del `live_allocations=0` y la comparación
+  intérprete↔nativo ya existentes.
+
+La batería se mantiene en **6 pruebas diferenciales y 142 de integración verdes**. Esto
+reduce la deuda de ownership del backend nativo, pero la inserción general de RC por último
+uso sobre la IR, ciclos y escapes complejos todavía queda pendiente.

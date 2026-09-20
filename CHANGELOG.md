@@ -118,6 +118,9 @@ test
   interpreter checks at statement boundaries, while generated C checks at `yield()` using
   a scoped jump context; cancellation never preempts arbitrary code. Added a parity and
   leak-check example covering a running task that is cancelled before its next statement.
+- Hardened task ownership around cancellation: captured environments now have a dedicated
+  destructor invoked on normal completion, cooperative cancellation, or pending-task
+  disposal. This prevents retained lists, records, and other managed captures from leaking.
 - Made the generated cooperative C runtime portable across threadless toolchains:
   `pthread`/Windows thread headers and implementations are now guarded behind
   `OSTRIN_NATIVE_THREADS`, while the default scheduler uses no-op synchronization
