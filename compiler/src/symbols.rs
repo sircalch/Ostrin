@@ -226,6 +226,7 @@ fn core_members() -> Vec<MemberSymbol> {
         ("Result", "map_err", "map_err(transform: fn(E) -> F) -> Result<T, F>", "Result<T, F>", &["T", "E"]),
         ("Result", "then", "then(transform: fn(T) -> Result<U, E>) -> Result<U, E>", "Result<U, E>", &["T", "E"]),
         ("Task", "join", "join() -> T", "T", &["T"]),
+        ("Task", "cancel", "cancel() -> Bool", "Bool", &["T"]),
         ("Channel", "send", "send(value: T) -> Void", "Void", &["T"]),
         ("Channel", "receive", "receive() -> Option<T>", "Option<T>", &["T"]),
         ("Channel", "close", "close() -> Void", "Void", &["T"]),

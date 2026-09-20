@@ -1,0 +1,9 @@
+fn main() -> Void {
+    spawn_scope {
+        task = spawn {
+            print("must-not-run")
+        }
+        print(task.cancel())
+        print(task.cancel())
+    }
+}

@@ -1918,6 +1918,31 @@ fn concurrency_scheduler_defers_tasks_and_drains_scopes() {
 }
 
 #[test]
+fn pending_tasks_can_be_cancelled_before_they_run() {
+    let file = example_path("concurrency_cancel.ostrin");
+    let interpreted = run(&["--run", &file]);
+    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), "true\nfalse\n");
+
+    let exe = temp_artifact("cancel.exe");
+    let compiled = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compiled) {
+        return;
+    }
+    assert!(compiled.status.success(), "native cancellation compile failed: {}", stderr(&compiled));
+    let native = Command::new(&exe).output().expect("run native cancellation binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native cancellation binary failed: {}", String::from_utf8_lossy(&native.stderr));
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), "true\nfalse\n");
+    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "cancellation leaked: {}", String::from_utf8_lossy(&native.stderr));
+
+    let threaded_exe = temp_artifact("cancel-native-threads.exe");
+    let threaded_compile = run(&["--compile", "--native-threads", "--out", &threaded_exe, &file]);
+    assert!(threaded_compile.status.success(), "native-thread cancellation compile failed: {}", stderr(&threaded_compile));
+    let _ = fs::remove_file(&threaded_exe);
+}
+
+#[test]
 fn concurrency_select_matches_between_interpreter_and_native_modes() {
     let file = example_path("concurrency_select.ostrin");
     let interpreted = run(&["--run", &file]);

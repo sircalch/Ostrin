@@ -3806,7 +3806,7 @@ fn check_concurrency_method(
     let Some(element_type) = type_args.first().cloned() else { return None };
 
     let expected_count = match (type_name.as_str(), method) {
-        ("Task", "join") | ("Channel", "receive") | ("Channel", "close") => Some(0),
+        ("Task", "join") | ("Task", "cancel") | ("Channel", "receive") | ("Channel", "close") => Some(0),
         ("Channel", "send") => Some(1),
         _ => None,
     }?;
@@ -3827,6 +3827,7 @@ fn check_concurrency_method(
 
     match (type_name.as_str(), method) {
         ("Task", "join") => Some(element_type),
+        ("Task", "cancel") => Some(Ty::Bool),
         ("Channel", "receive") => Some(Ty::Applied(
             "Option".to_string(),
             vec![element_type],

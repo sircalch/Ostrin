@@ -5057,12 +5057,16 @@ impl<'a> Codegen<'a> {
                 }
             }
             CType::Task(t) => {
-                if method_name != "join" || !args.is_empty() {
+                if !matches!(method_name, "join" | "cancel") || !args.is_empty() {
                     return Err(format!("Task has no method '{method_name}' the native backend supports"));
                 }
                 self.register_list_types(&obj_ty);
                 let name = mangle_ctype(&obj_ty);
-                Ok((format!("{name}_join({obj_code})"), if **t == CType::Void { CType::Void } else { (**t).clone() }))
+                if method_name == "cancel" {
+                    Ok((format!("{name}_cancel({obj_code})"), CType::Bool))
+                } else {
+                    Ok((format!("{name}_join({obj_code})"), if **t == CType::Void { CType::Void } else { (**t).clone() }))
+                }
             }
             CType::Channel(t) => {
                 let t = (**t).clone();
@@ -6691,21 +6695,23 @@ fn generate_impl(
                          funcs.push((format!("static void {name}_drop({name}* task)"), format!("    if (!task) return;\n    if (task->thread_started && !task->thread_joined) {name}_join(task);\n{result_release}    ostrin_mutex_destroy(&task->mutex);\n    ostrin_cond_destroy(&task->ready);\n")));
                          funcs.push((format!("static void {name}_thread_entry(void* raw)"), format!("    {name}* task = ({name}*)raw;\n{run}\n    ostrin_mutex_lock(&task->mutex);\n    task->status = 2;\n    ostrin_cond_broadcast(&task->ready);\n    ostrin_mutex_unlock(&task->mutex);\n", run = if **t == CType::Void { "    task->run(task->env); task->value = 0;".to_string() } else { "    task->value = task->run(task->env);".to_string() })));
                          funcs.push((format!("static void {name}_start({name}* task)"), format!("    ostrin_mutex_init(&task->mutex);\n    ostrin_cond_init(&task->ready);\n    task->status = 1;\n    task->thread_started = true;\n    ostrin_thread_start(&task->thread, {name}_thread_entry, task);\n")));
-                         funcs.push((format!("static bool {name}_poll(void* raw)"), format!("    {name}* task = ({name}*)raw;\n    if (task->status == 2) return false;\n    {name}_join(task);\n    return true;\n")));
+                         funcs.push((format!("static bool {name}_poll(void* raw)"), format!("    {name}* task = ({name}*)raw;\n    if (task->status == 2 || task->status == 3) return false;\n    {name}_join(task);\n    return true;\n")));
+                         funcs.push((format!("static bool {name}_cancel({name}* task)"), format!("    ostrin_mutex_lock(&task->mutex);\n    bool cancelled = false;\n    if (task->status == 0) {{ task->status = 3; cancelled = true; ostrin_cond_broadcast(&task->ready); }}\n    ostrin_mutex_unlock(&task->mutex);\n    return cancelled;\n")));
                          let result = if **t == CType::Void { "    return;".to_string() } else if is_reference_type(t) { "    ostrin_retain((void*)task->value);\n    return task->value;".to_string() } else { "    return task->value;".to_string() };
-                         funcs.push((format!("static {ret} {name}_join({name}* task)"), format!("    ostrin_mutex_lock(&task->mutex);\n    while (task->status != 2 || task->join_in_progress) ostrin_cond_wait(&task->ready, &task->mutex);\n    if (!task->thread_joined) {{ task->join_in_progress = true; ostrin_mutex_unlock(&task->mutex); ostrin_thread_join(&task->thread); ostrin_mutex_lock(&task->mutex); task->thread_joined = true; task->join_in_progress = false; ostrin_cond_broadcast(&task->ready); }}\n    ostrin_mutex_unlock(&task->mutex);\n    ostrin_unregister_task(task);\n{result}\n")));
+                         funcs.push((format!("static {ret} {name}_join({name}* task)"), format!("    ostrin_mutex_lock(&task->mutex);\n    while ((task->status != 2 && task->status != 3) || task->join_in_progress) ostrin_cond_wait(&task->ready, &task->mutex);\n    if (!task->thread_joined && task->thread_started) {{ task->join_in_progress = true; ostrin_mutex_unlock(&task->mutex); ostrin_thread_join(&task->thread); ostrin_mutex_lock(&task->mutex); task->thread_joined = true; task->join_in_progress = false; ostrin_cond_broadcast(&task->ready); }}\n    bool cancelled = task->status == 3;\n    ostrin_mutex_unlock(&task->mutex);\n    ostrin_unregister_task(task);\n    if (cancelled) OSTRIN_FAIL(\"task was cancelled\");\n{result}\n")));
                      } else {
                      list_type_decls.push_str(&format!("typedef {} (*{name}_Run)(void*);\nstruct {name} {{\n    {name}_Run run;\n    void* env;\n    int status;\n    {value} value;\n}};\n\n", ret));
-                    funcs.push((format!("static bool {name}_poll(void* raw)"), format!(
+                     funcs.push((format!("static bool {name}_poll(void* raw)"), format!(
                         "    {name}* task = ({name}*)raw;\n    if (task->status != 0) return false;\n    task->status = 1;\n    {run}\n    task->status = 2;\n    return true;\n",
                         run = if **t == CType::Void {
                             "    task->run(task->env); task->value = 0;".to_string()
                         } else {
                             "    task->value = task->run(task->env);".to_string()
                         },
-                    )));
+                     )));
+                     funcs.push((format!("static bool {name}_cancel({name}* task)"), "    if (task->status != 0) return false;\n    task->status = 3;\n    return true;\n".to_string()));
                      funcs.push((format!("static {ret} {name}_join({name}* task)"), format!(
-                         "    while (task->status == 0) {{\n        if (!ostrin_poll_all()) OSTRIN_FAIL(\"task join would block: no runnable task remains\");\n    }}\n    if (task->status == 1) OSTRIN_FAIL(\"cyclic task join would deadlock\");\n    ostrin_unregister_task(task);\n    {result}\n",
+                         "    while (task->status == 0) {{\n        if (!ostrin_poll_all()) OSTRIN_FAIL(\"task join would block: no runnable task remains\");\n    }}\n    if (task->status == 1) OSTRIN_FAIL(\"cyclic task join would deadlock\");\n    if (task->status == 3) OSTRIN_FAIL(\"task was cancelled\");\n    ostrin_unregister_task(task);\n    {result}\n",
                         result = if **t == CType::Void {
                             "    return;".to_string()
                         } else {

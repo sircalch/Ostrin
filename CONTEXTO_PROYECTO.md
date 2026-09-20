@@ -4524,3 +4524,23 @@ gramática nueva:
 La batería queda en **6 pruebas diferenciales y 136 de integración verdes**. La próxima
 brecha de concurrencia es cancelación explícita y grupos nativos completos; la distribución
 WASM del backend de programas sigue pendiente después del compilador WASI.
+
+## 166. Cancelación segura de tareas pendientes — 2026-09-19
+
+La API de tareas deja de tener la cancelación solo como pregunta de diseño, con una
+semántica deliberadamente acotada:
+
+- `task.cancel() -> Bool` solo puede cambiar una tarea en estado `Pending` a `Cancelled`;
+  devuelve `true` si la transición ocurrió y `false` si la tarea ya empezó o terminó;
+- `join()` sobre una tarea cancelada produce `task was cancelled`, sin inventar un valor
+  de retorno ni ocultar la razón de que el trabajo no se ejecutó;
+- el intérprete y el scheduler nativo cooperativo comparten la transición determinista;
+  `--native-threads` protege la transición con el mutex del `Task<T>`, pero no intenta
+  detener un hilo que ya está ejecutando código arbitrario;
+- `examples/concurrency_cancel.ostrin` cubre cancelación idempotente (`true`, luego
+  `false`), ausencia de ejecución del cuerpo y `live_allocations=0`; la prueba también
+  verifica que la rama `--native-threads` compile.
+
+La batería queda en **6 pruebas diferenciales y 137 de integración verdes**. La siguiente
+ampliación de concurrencia es introducir puntos seguros de cancelación y grupos nativos
+para que `spawn_scope` pueda propagar cancelación sin detener hilos de forma insegura.

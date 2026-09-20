@@ -236,6 +236,7 @@ enum TaskStatus {
     Running,
     Completed,
     Failed,
+    Cancelled,
 }
 
 pub(crate) struct TaskState {
@@ -300,6 +301,7 @@ impl fmt::Display for Value {
                     (TaskStatus::Completed, Some(Ok(value))) => write!(f, "Task({value})"),
                     (TaskStatus::Failed, Some(Err(error))) => write!(f, "Task(error: {error})"),
                     (TaskStatus::Running, _) => write!(f, "Task(running)"),
+                    (TaskStatus::Cancelled, _) => write!(f, "Task(cancelled)"),
                     _ => write!(f, "Task(pending)"),
                 }
             }
@@ -687,6 +689,9 @@ impl Interpreter {
                         Some(Err(error)) => Err(RuntimeError::Error(format!("task failed: {error}"))),
                         _ => Err(RuntimeError::Error("failed task has no error".to_string())),
                     };
+                }
+                TaskStatus::Cancelled => {
+                    return Err(RuntimeError::Error("task was cancelled".to_string()));
                 }
             }
         };
@@ -2785,8 +2790,25 @@ impl Interpreter {
                 }
             }
             if let Value::Task(result) = &receiver {
-                if method == "join" {
-                    return self.run_task(result.clone());
+                match method.as_str() {
+                    "join" => return self.run_task(result.clone()),
+                    "cancel" if args.is_empty() => {
+                        let cancelled = {
+                            let mut state = result.borrow_mut();
+                            if state.status == TaskStatus::Pending {
+                                state.status = TaskStatus::Cancelled;
+                                state.result = Some(Err("task was cancelled".to_string()));
+                                true
+                            } else {
+                                false
+                            }
+                        };
+                        return Ok(Value::Bool(cancelled));
+                    }
+                    "cancel" => {
+                        return Err(RuntimeError::Error("Method 'cancel' expects 0 argument(s)".to_string()));
+                    }
+                    _ => {}
                 }
             }
             if let Value::Channel(state) = &receiver {

@@ -108,6 +108,9 @@ test
   `--native-threads` uses mutex-protected nonblocking receives and yields between
   attempts. Closed empty channels return `None`, and the checker requires a
   homogeneous `List<Channel<T>>`.
+- Added `Task.cancel() -> Bool` for safe cancellation of pending tasks. It is
+  deterministic in the cooperative scheduler, returns `false` after a task has
+  started, and deliberately does not force-stop an already-running native thread.
 - Added `--project DIR` package entry-point selection. The compiler now reads the
   manifest's `entry` field when no source path is supplied, and generated
   `ostrin.lock` files sort dependencies and store project-relative paths where

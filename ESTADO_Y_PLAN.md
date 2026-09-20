@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-19 · rama `main` · 6 pruebas diferenciales y 136 de integración en verde.*
+*Corte: 2026-09-19 · rama `main` · 6 pruebas diferenciales y 137 de integración en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
 Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–165); para el diseño
@@ -67,7 +67,7 @@ propios con `next`), `match` con guardas, patrones anidados, rangos y destructur
 **Concurrencia**: el intérprete conserva el scheduler cooperativo determinista con `spawn`,
 `join`, `spawn_scope`, `channel<T>()` y `select([channels])`. El backend nativo mantiene ese modo por defecto
 para la paridad reproducible, y `--native-threads` habilita hilos del SO, mutexes/condiciones,
-canales bloqueantes y selección entre canales con la misma API. Se verifica en el checker que no se capturen bindings
+canales bloqueantes, selección entre canales y cancelación segura de tareas pendientes con la misma API. Se verifica en el checker que no se capturen bindings
 `mut` (E1100) y el análisis HIR/IR rechaza por defecto reutilizar un valor movible después de
 enviarlo (E1101); `--ownership-check` conserva el informe detallado.
 
@@ -164,7 +164,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 |---|---|
 | Cierres en nativo | Captura **por valor** (una variable `mut` cambiada después no se ve dentro); lambda sin contexto de tipos exige anotación |
 | Chequeo «movido tras enviar» (E1101) | Integrado por defecto en `--check`, `--run`, `--emit-c` y `--compile`; `--ownership-check` conserva el informe explícito |
-| Paralelismo nativo (`--native-threads`, canales bloqueantes, `select`) | Hilos del SO, mutexes/condiciones, canales bloqueantes y `select(List<Channel<T>>)` implementados de forma opt-in; `select` conserva prioridad determinista y cede el hilo nativo entre intentos; cancelación sigue pendiente |
+| Paralelismo nativo (`--native-threads`, canales bloqueantes, `select`) | Hilos del SO, mutexes/condiciones, canales bloqueantes y `select(List<Channel<T>>)` implementados de forma opt-in; `select` conserva prioridad determinista y cede el hilo nativo entre intentos; `Task.cancel()` cancela solo tareas aún pendientes, y la cancelación por puntos seguros sigue pendiente |
 | Memoria en nativo | Registro, destructores tipados para records/colecciones, `clone`/`drop`, cleanup automático de locales directos, bloques anidados, ramas y loops en AST/HIR, y `--leak-check`; ARC completa sobre IR sigue pendiente |
 | IR de bloques | HIR→CFG disponible con `--ir`; `if/while/for/match/try/spawn/channel` ya tienen operaciones explícitas, aún no reemplaza el backend C |
 | Ownership/último uso | `--ownership-report`, `--ownership-check` y `--ownership-ir`; el backend C ya aplica retain/release lineal en locales directos, pero la IR aún no es la fuente única |
@@ -208,8 +208,9 @@ Ordenadas por mi recomendación (valor / riesgo). Cada una es independiente.
 El primer bloque ya está implementado detrás de `--native-threads`: hilos del sistema
 operativo, mutexes/condiciones y canales bloqueantes, sin romper E1100/E1101 ni la paridad
 determinista por defecto. `select(List<Channel<T>>)` ya está cerrado con prioridad
-determinista y polling no bloqueante; el siguiente paso es cerrar `spawn_scope` con grupos
-de tareas nativos y cancelación (esbozados en `docs/design/09`).
+determinista y polling no bloqueante; `Task.cancel()` cubre la transición segura de
+tareas pendientes. El siguiente paso es cerrar `spawn_scope` con grupos de tareas nativos
+y cancelación por puntos seguros (esbozados en `docs/design/09`).
 
 ### C. Biblioteca estándar y ecosistema
 Cadenas (split/trim/format), fechas, JSON, argumentos y entorno, `HashMap` real,
@@ -259,7 +260,7 @@ Decisiones que necesito de ti para afinar el plan:
 
 ```powershell
 cd compiler
-cargo test                                   # 6 diferenciales + 136 de integración
+cargo test                                   # 6 diferenciales + 137 de integración
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```

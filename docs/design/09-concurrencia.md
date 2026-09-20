@@ -13,8 +13,9 @@ determinista. El backend C conserva ese modo por defecto para mantener la parida
 y añade `--native-threads` como modo explícito de ejecución real: cada `spawn` arranca un
 hilo del sistema operativo, `join` espera con mutex/condición y los canales usan un buffer
 protegido con espera bloqueante y despiertan a los receptores al enviar o cerrar. La API del
-lenguaje no cambia y E1100/E1101 siguen aplicándose. `select` ya está implementado; la
-cancelación explícita y los grupos nativos completos todavía no.
+lenguaje no cambia y E1100/E1101 siguen aplicándose. `select` ya está implementado y
+`Task.cancel()` cubre la cancelación segura de tareas aún pendientes; la cancelación por
+puntos seguros de tareas ya ejecutándose y los grupos nativos completos todavía no.
 
 La idea central de este documento es que Ostrin **no necesita un borrow checker al estilo Rust** para ser seguro en concurrencia, porque ya partimos de "inmutable por defecto" (documento 01). Un dato inmutable nunca puede tener una condición de carrera — no importa cuántas tareas lo lean a la vez. El único lugar donde hace falta una regla especial es en el manejo de datos `mut`, y ahí basta una regla simple y local (no un sistema de ownership/lifetimes que atraviese todo el lenguaje).
 
@@ -101,6 +102,23 @@ Error OSTRIN-E1101
 
 Esta es la única forma de seguimiento de "movido" que existe en Ostrin, y solo aplica a valores mutables enviados por un canal o capturados en un `spawn` — no es un sistema de ownership general como en Rust (los bindings inmutables, que son el caso por defecto y la mayoría del código, nunca están sujetos a esta regla).
 
+### 1.2 Cancelación segura de una tarea pendiente
+
+```ostrin
+task = spawn { expensive_step() }
+if task.cancel() {
+    print("cancelled before start")
+}
+```
+
+`task.cancel() -> Bool` solo cambia una tarea que todavía está en estado `Pending`;
+devuelve `true` en ese caso y `false` si la tarea ya empezó o terminó. La cancelación no
+interrumpe código arbitrario a mitad de una operación: `join()` sobre una tarea cancelada
+produce un error de runtime. En el scheduler cooperativo esta transición es determinista;
+en `--native-threads` una tarea se marca `Running` al arrancar su hilo, por lo que esta
+API no promete detener un hilo que ya comenzó. La cancelación por puntos seguros queda
+como la siguiente ampliación del runtime.
+
 ### 2.2 Backend nativo con hilos reales
 
 El backend C ofrece dos modos deliberados:
@@ -116,8 +134,8 @@ memoria protege su tabla global contra accesos concurrentes. El registro de tare
 además un mutex propio: cada nodo conserva viva su tarea mientras está registrada,
 el scheduler toma una referencia temporal durante el polling, y `join`/el drenado del
 scope retiran nodos terminados antes de liberar sus referencias. Esta primera entrega
-cubre `spawn`, `join`, `send`, `receive`, `close` y `select`; no promete todavía
-cancelación cooperativa.
+cubre `spawn`, `join`, `send`, `receive`, `close`, `select` y la cancelación de tareas
+pendientes; no promete todavía cancelación cooperativa de hilos ya ejecutándose.
 
 ### 2.3 Selección determinista entre canales
 
