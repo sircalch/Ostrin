@@ -120,9 +120,12 @@ interrumpe código arbitrario a mitad de una operación: `join()` sobre una tare
 produce un error de runtime.
 
 En el intérprete, cada frontera de sentencia es un punto de comprobación. En el backend C
-cooperativo, `yield()` es el punto explícito de comprobación; en `--native-threads`, la
-misma operación permite salir de forma cooperativa del callback actual, sin prometer
-preempción arbitraria ni detener código que no ceda el control.
+cooperativo, `yield()` y las esperas de `select` son puntos explícitos de comprobación; en
+`--native-threads`, la misma operación permite salir de forma cooperativa del callback
+actual, sin prometer preempción arbitraria ni detener código que no ceda el control.
+Cuando se cancela una tarea que tiene `spawn_scope` activo, sus grupos anidados reciben la
+solicitud inmediatamente y cancelan sus tareas hijas; el scope termina de drenar esas
+tareas antes de liberar su frame.
 
 ### 2.2 Backend nativo con hilos reales
 
@@ -140,8 +143,9 @@ además un mutex propio: cada nodo conserva viva su tarea mientras está registr
 el scheduler toma una referencia temporal durante el polling, y `join`/el drenado del
 scope retiran nodos terminados antes de liberar sus referencias. Esta primera entrega
 cubre `spawn`, `join`, `send`, `receive`, `close`, `select` y la cancelación cooperativa
-en puntos seguros; no promete todavía propagación automática de cancelación entre grupos
-`spawn_scope` ni preempción de hilos que nunca alcanzan un checkpoint.
+en puntos seguros, incluida la propagación a grupos activos de `spawn_scope`; no promete
+preempción de hilos que nunca alcanzan un checkpoint ni interrupción segura de una E/S
+bloqueante sin cooperación del runtime.
 
 ### 2.3 Selección determinista entre canales
 
@@ -164,8 +168,9 @@ intérprete, nativo cooperativo y nativo con hilos.
 
 `yield() -> Void` cede explícitamente el turno. En el intérprete y el backend cooperativo
 ejecuta como máximo una tarea pendiente; en `--native-threads` llama a la cesión del
-sistema operativo. Es una herramienta de coordinación, no una garantía de fairness ni
-un punto de cancelación forzada.
+sistema operativo. Tanto `yield()` como la espera de `select` alcanzan el checkpoint de
+cancelación después de liberar sus temporales; son herramientas de coordinación, no una
+garantía de fairness ni una interrupción forzada de código arbitrario.
 
 ## 3. Concurrencia estructurada — `spawn_scope`
 
@@ -180,7 +185,7 @@ results = spawn_scope {
 }
 ```
 
-- `spawn_scope { ... }` garantiza que **ninguna tarea lanzada dentro del bloque sigue viva al salir de él** — si el bloque termina (normalmente o por panic) con tareas todavía sin `.join()`, el propio `spawn_scope` espera a que terminen (o las cancela, según se decida en el diseño de cancelación, pendiente en §5) antes de propagar la salida.
+- `spawn_scope { ... }` garantiza que **ninguna tarea lanzada dentro del bloque sigue viva al salir de él** — si el bloque termina normalmente, espera a que terminen; si el cuerpo o la tarea propietaria se cancela, propaga la solicitud a los grupos anidados, cancela sus tareas hijas y drena el scope antes de propagar la salida.
 - Se recomienda `spawn_scope` como la forma por defecto de paralelizar trabajo (por ejemplo, repartir un cálculo científico entre N tareas y esperar todos los resultados); `spawn` suelto queda para el caso explícito de una tarea de fondo de vida más larga que el scope que la creó (un logger, un servidor).
 
 La sincronización del registro se complementa con frames de ownership para los bloques

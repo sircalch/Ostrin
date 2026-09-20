@@ -441,17 +441,29 @@ static void ostrin_thread_join(OstrinThread* thread) {\n\
 #endif\n\
 }\n\
 #endif\n\
-typedef struct { void* run; void* env; void (*drop_env)(void*); int status; atomic_bool cancel_requested; } OstrinTaskHeader;\n\
-typedef struct OstrinTaskExecution { OstrinTaskHeader* task; jmp_buf* jump; struct OstrinTaskExecution* previous; } OstrinTaskExecution;\n\
+typedef struct OstrinTaskGroup { atomic_bool cancel_requested; } OstrinTaskGroup;\n\
+typedef struct OstrinTaskScopeFrame { OstrinTaskGroup group; struct OstrinTaskScopeFrame* previous; } OstrinTaskScopeFrame;\n\
+typedef struct OstrinTaskOwnedHandle { void* task; struct OstrinTaskOwnedHandle* next; } OstrinTaskOwnedHandle;\n\
+typedef struct OstrinTaskExecution OstrinTaskExecution;\n\
+typedef struct { void* run; void* env; void (*drop_env)(void*); int status; atomic_bool cancel_requested; OstrinTaskGroup* group; _Atomic(OstrinTaskExecution*) execution; } OstrinTaskHeader;\n\
+struct OstrinTaskExecution { OstrinTaskHeader* task; jmp_buf* jump; OstrinTaskExecution* previous; OstrinTaskScopeFrame* scopes; OstrinTaskScopeFrame* previous_scopes; OstrinTaskOwnedHandle* owned_handles; };\n\
 #if defined(OSTRIN_NATIVE_THREADS)\n\
 static _Thread_local OstrinTaskExecution* ostrin_current_execution = NULL;\n\
+static _Thread_local OstrinTaskScopeFrame* ostrin_scope_stack = NULL;\n\
 #else\n\
 static OstrinTaskExecution* ostrin_current_execution = NULL;\n\
+static OstrinTaskScopeFrame* ostrin_scope_stack = NULL;\n\
 #endif\n\
-static void ostrin_task_enter(OstrinTaskExecution* execution, void* task, jmp_buf* jump) { execution->task = (OstrinTaskHeader*)task; execution->jump = jump; execution->previous = ostrin_current_execution; ostrin_current_execution = execution; }\n\
-static void ostrin_task_leave(OstrinTaskExecution* execution) { if (ostrin_current_execution == execution) ostrin_current_execution = execution->previous; }\n\
+static void ostrin_task_enter(OstrinTaskExecution* execution, void* task, jmp_buf* jump) { execution->task = (OstrinTaskHeader*)task; execution->jump = jump; execution->previous = ostrin_current_execution; execution->scopes = NULL; execution->previous_scopes = ostrin_scope_stack; execution->owned_handles = NULL; atomic_store(&execution->task->execution, execution); ostrin_scope_stack = NULL; ostrin_current_execution = execution; }\n\
+static void ostrin_task_leave(OstrinTaskExecution* execution) { if (atomic_load(&execution->task->execution) == execution) atomic_store(&execution->task->execution, NULL); if (ostrin_current_execution == execution) { ostrin_scope_stack = execution->previous_scopes; ostrin_current_execution = execution->previous; } }\n\
+static bool ostrin_cancellation_requested(void) {\n\
+    if (!ostrin_current_execution) return false;\n\
+    bool cancelled = atomic_load(&ostrin_current_execution->task->cancel_requested);\n\
+    if (!cancelled && ostrin_current_execution->task->group) cancelled = atomic_load(&ostrin_current_execution->task->group->cancel_requested);\n\
+    return cancelled;\n\
+}\n\
 static void ostrin_task_checkpoint(void) {\n\
-    if (ostrin_current_execution && atomic_load(&ostrin_current_execution->task->cancel_requested) && ostrin_current_execution->jump) longjmp(*ostrin_current_execution->jump, 1);\n\
+    if (ostrin_current_execution && ostrin_current_execution->jump && ostrin_cancellation_requested()) longjmp(*ostrin_current_execution->jump, 1);\n\
 }\n\
 #if defined(_WIN32)\n\
 #include <direct.h>\n\
@@ -484,9 +496,12 @@ static void ostrin_runtime_init(void) { ostrin_mutex_init(&ostrin_heap_mutex); o
 static void ostrin_heap_lock(void) { if (!ostrin_heap_mutex_ready) ostrin_runtime_init(); ostrin_mutex_lock(&ostrin_heap_mutex); }\n\
 static void ostrin_heap_unlock(void) { ostrin_mutex_unlock(&ostrin_heap_mutex); }\n\
 typedef bool (*OstrinTaskPoll)(void*);\n\
+typedef void (*OstrinTaskCancel)(void*);\n\
 typedef struct OstrinTaskNode {\n\
     void* task;\n\
     OstrinTaskPoll poll;\n\
+    OstrinTaskCancel cancel;\n\
+    OstrinTaskGroup* group;\n\
     size_t ordinal;\n\
     struct OstrinTaskNode* next;\n\
 } OstrinTaskNode;\n\
@@ -494,12 +509,14 @@ typedef struct OstrinTaskNode {\n\
 static OstrinTaskNode* ostrin_tasks = NULL;\n\
 static size_t ostrin_next_task_ordinal = 0;\n\
 \n\
-static void ostrin_register_task(void* task, OstrinTaskPoll poll) {\n\
+static void ostrin_register_task(void* task, OstrinTaskPoll poll, OstrinTaskCancel cancel) {\n\
     OstrinTaskNode* node = (OstrinTaskNode*)malloc(sizeof *node);\n\
     if (!node) OSTRIN_OOM();\n\
     ostrin_retain(task);\n\
     node->task = task;\n\
     node->poll = poll;\n\
+    node->cancel = cancel;\n\
+    node->group = ((OstrinTaskHeader*)task)->group;\n\
     ostrin_mutex_lock(&ostrin_tasks_mutex);\n\
     node->ordinal = ostrin_next_task_ordinal++;\n\
     node->next = ostrin_tasks;\n\
@@ -555,6 +572,144 @@ static bool ostrin_poll_all(void) {\n\
     return ostrin_poll_tasks_from(0);\n\
 }\n\
 \n\
+static bool ostrin_poll_one(void) {\n\
+    void* task = NULL;\n\
+    OstrinTaskPoll poll = NULL;\n\
+    ostrin_mutex_lock(&ostrin_tasks_mutex);\n\
+    size_t selected = SIZE_MAX;\n\
+    for (OstrinTaskNode* node = ostrin_tasks; node; node = node->next) {\n\
+        if (((OstrinTaskHeader*)node->task)->status == 0 && node->ordinal < selected) {\n\
+            selected = node->ordinal;\n\
+            task = node->task;\n\
+            poll = node->poll;\n\
+        }\n\
+    }\n\
+    if (task) ostrin_retain(task);\n\
+    ostrin_mutex_unlock(&ostrin_tasks_mutex);\n\
+    if (!task) return false;\n\
+    (void)poll(task);\n\
+    ostrin_release(task);\n\
+    return true;\n\
+}\n\
+\n\
+static void ostrin_cancel_group(OstrinTaskGroup* group) {\n\
+    if (!group) return;\n\
+    atomic_store(&group->cancel_requested, true);\n\
+    typedef struct OstrinCancelEntry { void* task; OstrinTaskCancel cancel; struct OstrinCancelEntry* next; } OstrinCancelEntry;\n\
+    OstrinCancelEntry* entries = NULL;\n\
+    ostrin_mutex_lock(&ostrin_tasks_mutex);\n\
+    for (OstrinTaskNode* node = ostrin_tasks; node; node = node->next) {\n\
+        if (node->group == group && node->cancel) {\n\
+            OstrinCancelEntry* entry = (OstrinCancelEntry*)malloc(sizeof *entry);\n\
+            if (!entry) { ostrin_mutex_unlock(&ostrin_tasks_mutex); OSTRIN_OOM(); }\n\
+            ostrin_retain(node->task);\n\
+            entry->task = node->task;\n\
+            entry->cancel = node->cancel;\n\
+            entry->next = entries;\n\
+            entries = entry;\n\
+        }\n\
+    }\n\
+    ostrin_mutex_unlock(&ostrin_tasks_mutex);\n\
+    while (entries) {\n\
+        OstrinCancelEntry* entry = entries;\n\
+        entries = entry->next;\n\
+        entry->cancel(entry->task);\n\
+        ostrin_release(entry->task);\n\
+        free(entry);\n\
+    }\n\
+}\n\
+\n\
+static bool ostrin_poll_group(OstrinTaskGroup* group) {\n\
+    bool progress = false;\n\
+    size_t next_ordinal = 0;\n\
+    for (;;) {\n\
+        void* task = NULL;\n\
+        OstrinTaskPoll poll = NULL;\n\
+        size_t selected = SIZE_MAX;\n\
+        ostrin_mutex_lock(&ostrin_tasks_mutex);\n\
+        for (OstrinTaskNode* node = ostrin_tasks; node; node = node->next) {\n\
+            if (node->group == group && node->ordinal >= next_ordinal && node->ordinal < selected) {\n\
+                selected = node->ordinal;\n\
+                task = node->task;\n\
+                poll = node->poll;\n\
+            }\n\
+        }\n\
+        if (task) ostrin_retain(task);\n\
+        ostrin_mutex_unlock(&ostrin_tasks_mutex);\n\
+        if (!task) break;\n\
+        next_ordinal = selected + 1;\n\
+        if (poll(task)) progress = true;\n\
+        ostrin_release(task);\n\
+    }\n\
+    return progress;\n\
+}\n\
+\n\
+static void ostrin_drain_group(OstrinTaskGroup* group) {\n\
+    while (ostrin_poll_group(group)) {}\n\
+    OstrinTaskNode* retired = NULL;\n\
+    ostrin_mutex_lock(&ostrin_tasks_mutex);\n\
+    OstrinTaskNode** link = &ostrin_tasks;\n\
+    while (*link) {\n\
+        OstrinTaskNode* node = *link;\n\
+        if (node->group == group) {\n\
+            *link = node->next;\n\
+            node->next = retired;\n\
+            retired = node;\n\
+        } else {\n\
+            link = &node->next;\n\
+        }\n\
+    }\n\
+    ostrin_mutex_unlock(&ostrin_tasks_mutex);\n\
+    while (retired) {\n\
+        OstrinTaskNode* node = retired;\n\
+        retired = node->next;\n\
+        ostrin_release(node->task);\n\
+        free(node);\n\
+    }\n\
+}\n\
+\n\
+static OstrinTaskGroup* ostrin_current_group(void) {\n\
+    if (ostrin_scope_stack) return &ostrin_scope_stack->group;\n\
+    return ostrin_current_execution ? ostrin_current_execution->task->group : NULL;\n\
+}\n\
+\n\
+static OstrinTaskGroup* ostrin_scope_begin(void) {\n\
+    OstrinTaskScopeFrame* frame = (OstrinTaskScopeFrame*)calloc(1, sizeof *frame);\n\
+    if (!frame) OSTRIN_OOM();\n\
+    atomic_init(&frame->group.cancel_requested, false);\n\
+    frame->previous = ostrin_scope_stack;\n\
+    ostrin_scope_stack = frame;\n\
+    if (ostrin_current_execution) ostrin_current_execution->scopes = ostrin_scope_stack;\n\
+    return &frame->group;\n\
+}\n\
+\n\
+static void ostrin_scope_end(OstrinTaskGroup* group) {\n\
+    OstrinTaskScopeFrame* frame = ostrin_scope_stack;\n\
+    if (!frame || &frame->group != group) OSTRIN_FAIL(\"task scope stack corruption\");\n\
+    ostrin_drain_group(group);\n\
+    ostrin_scope_stack = frame->previous;\n\
+    if (ostrin_current_execution) ostrin_current_execution->scopes = ostrin_scope_stack;\n\
+    free(frame);\n\
+}\n\
+\n\
+static void ostrin_scope_cancel_all(void) {\n\
+    while (ostrin_scope_stack) {\n\
+        OstrinTaskScopeFrame* frame = ostrin_scope_stack;\n\
+        ostrin_cancel_group(&frame->group);\n\
+        ostrin_drain_group(&frame->group);\n\
+        ostrin_scope_stack = frame->previous;\n\
+        if (ostrin_current_execution) ostrin_current_execution->scopes = ostrin_scope_stack;\n\
+        free(frame);\n\
+    }\n\
+}\n\
+\n\
+static void ostrin_cancel_active_scopes(OstrinTaskHeader* task) {\n\
+    OstrinTaskExecution* execution = task ? atomic_load(&task->execution) : NULL;\n\
+    for (OstrinTaskScopeFrame* frame = execution ? execution->scopes : NULL; frame; frame = frame->previous) {\n\
+        ostrin_cancel_group(&frame->group);\n\
+    }\n\
+}\n\
+\n\
 static size_t ostrin_task_mark(void) {\n\
     ostrin_mutex_lock(&ostrin_tasks_mutex);\n\
     size_t mark = ostrin_next_task_ordinal;\n\
@@ -586,6 +741,26 @@ static void ostrin_drain_tasks(size_t minimum_ordinal) {\n\
     }\n\
 }\n\
 \n\
+\n\
+static void ostrin_track_task_handle(void* task) {\n\
+    if (!ostrin_current_execution) return;\n\
+    OstrinTaskOwnedHandle* handle = (OstrinTaskOwnedHandle*)malloc(sizeof *handle);\n\
+    if (!handle) OSTRIN_OOM();\n\
+    handle->task = task;\n\
+    handle->next = ostrin_current_execution->owned_handles;\n\
+    ostrin_current_execution->owned_handles = handle;\n\
+}\n\
+\n\
+static void ostrin_clear_task_handles(OstrinTaskExecution* execution, bool release_handles) {\n\
+    OstrinTaskOwnedHandle* handles = execution->owned_handles;\n\
+    execution->owned_handles = NULL;\n\
+    while (handles) {\n\
+        OstrinTaskOwnedHandle* next = handles->next;\n\
+        if (release_handles) ostrin_release(handles->task);\n\
+        free(handles);\n\
+        handles = next;\n\
+    }\n\
+}\n\
 \n\
 static void ostrin_register_allocation_with_drop(void* ptr, void (*drop)(void*)) {\n\
     ostrin_heap_lock();\n\
@@ -2222,13 +2397,13 @@ impl<'a> Codegen<'a> {
             format!("ostrin_calloc_with_drop(1, sizeof *{temp}, (void (*)(void*)){name}_drop)")
         };
         let start = if self.native_threads {
-            format!("ostrin_register_task({temp}, {name}_poll); {name}_start({temp});")
+            format!("ostrin_register_task({temp}, {name}_poll, {name}_cancel_adapter); ostrin_track_task_handle({temp}); {name}_start({temp});")
         } else {
-            format!("ostrin_register_task({temp}, {name}_poll);")
+            format!("ostrin_register_task({temp}, {name}_poll, {name}_cancel_adapter); ostrin_track_task_handle({temp});")
         };
         Ok((
             format!(
-                "({{ {name}* {temp} = ({name}*){allocation}; {temp}->run = {fn_name}; {temp}->env = {env}; {temp}->drop_env = {drop_env}; {start} {temp}; }})"
+                "({{ {name}* {temp} = ({name}*){allocation}; {temp}->run = {fn_name}; {temp}->env = {env}; {temp}->drop_env = {drop_env}; {temp}->group = ostrin_current_group(); {start} {temp}; }})"
             ),
             task_ty,
         ))
@@ -3366,16 +3541,16 @@ impl<'a> Codegen<'a> {
             }
             Expr::SpawnScope(block) => {
                 let (code, ty) = self.gen_block_expr(block)?;
-                let mark = self.next_temp();
+                let group = self.next_temp();
                 if ty == CType::Void {
                     Ok((
-                        format!("({{ size_t {mark} = ostrin_task_mark(); (void){code}; ostrin_drain_tasks({mark}); (void)0; }})"),
+                        format!("({{ OstrinTaskGroup* {group} = ostrin_scope_begin(); (void){code}; ostrin_scope_end({group}); (void)0; }})"),
                         CType::Void,
                     ))
                 } else {
                     let result = self.next_temp();
                     Ok((
-                        format!("({{ size_t {mark} = ostrin_task_mark(); {} {result} = {code}; ostrin_drain_tasks({mark}); {result}; }})", c_type_name(&ty)),
+                        format!("({{ OstrinTaskGroup* {group} = ostrin_scope_begin(); {} {result} = {code}; ostrin_scope_end({group}); {result}; }})", c_type_name(&ty)),
                         ty,
                     ))
                 }
@@ -5539,7 +5714,7 @@ impl<'a> Codegen<'a> {
                 )))
             }
             "yield" => {
-                let step = if self.native_threads { "ostrin_select_wait();" } else { "(void)ostrin_poll_all();" };
+                let step = if self.native_threads { "ostrin_select_wait();" } else { "(void)ostrin_poll_one();" };
                 Ok(Some((format!("({{ {step} ostrin_task_checkpoint(); (void)0; }})"), CType::Void)))
             }
             "env" => {
@@ -5614,7 +5789,7 @@ impl<'a> Codegen<'a> {
                 };
                 Ok(Some((
                     format!(
-                        "({{ {list_ty} {list} = {input}; {result_c} {selected}; memset(&{selected}, 0, sizeof {selected}); bool {ready} = false; if (!{list} || {list}->length == 0) OSTRIN_FAIL(\"select expects at least one channel\"); while (!{ready}) {{ for (int64_t {index} = 0; {index} < {list}->length; {index}++) {{ {element_c} {value}; int {status} = {channel_name}_try_receive({list}->items[{index}], &{value}); if ({status} > 0) {{ {selected}.has = true; {selected}.value = {value}; {ready} = true; break; }} if ({status} < 0) {{ {ready} = true; break; }} }} if (!{ready}) {{ {wait} }} }}{release_input} {selected}; }})",
+                        "({{ {list_ty} {list} = {input}; {result_c} {selected}; memset(&{selected}, 0, sizeof {selected}); bool {ready} = false; if (!{list} || {list}->length == 0) OSTRIN_FAIL(\"select expects at least one channel\"); while (!{ready}) {{ if (ostrin_cancellation_requested()) {{ {ready} = true; }} else {{ for (int64_t {index} = 0; {index} < {list}->length; {index}++) {{ {element_c} {value}; int {status} = {channel_name}_try_receive({list}->items[{index}], &{value}); if ({status} > 0) {{ {selected}.has = true; {selected}.value = {value}; {ready} = true; break; }} if ({status} < 0) {{ {ready} = true; break; }} }} if (!{ready}) {{ {wait} }} }} }}{release_input} ostrin_task_checkpoint(); {selected}; }})",
                         input = codes[0],
                     ),
                     result,
@@ -6733,28 +6908,30 @@ fn generate_impl(
                     let ret = c_type_name(t);
                     let value = field_c_type(t);
                      if codegen.native_threads {
-                         list_type_decls.push_str(&format!("typedef {} (*{name}_Run)(void*);\nstruct {name} {{\n    {name}_Run run;\n    void* env;\n    void (*drop_env)(void*);\n    int status;\n    atomic_bool cancel_requested;\n    bool thread_started;\n    bool thread_joined;\n    bool join_in_progress;\n    {value} value;\n    OstrinMutex mutex;\n    OstrinCond ready;\n    OstrinThread thread;\n}};\n\n", ret));
+                          list_type_decls.push_str(&format!("typedef {} (*{name}_Run)(void*);\nstruct {name} {{\n    {name}_Run run;\n    void* env;\n    void (*drop_env)(void*);\n    int status;\n    atomic_bool cancel_requested;\n    OstrinTaskGroup* group;\n    _Atomic(OstrinTaskExecution*) execution;\n    bool thread_started;\n    bool thread_joined;\n    bool join_in_progress;\n    {value} value;\n    OstrinMutex mutex;\n    OstrinCond ready;\n    OstrinThread thread;\n}};\n\n", ret));
                          let result_release = if is_reference_type(t) { "    if (task->status == 2) ostrin_release((void*)task->value);\n" } else { "" };
                          funcs.push((format!("static void {name}_wait({name}* task)"), format!("    ostrin_mutex_lock(&task->mutex);\n    while ((task->status != 2 && task->status != 3) || task->join_in_progress) ostrin_cond_wait(&task->ready, &task->mutex);\n    if (!task->thread_joined && task->thread_started) {{ task->join_in_progress = true; ostrin_mutex_unlock(&task->mutex); ostrin_thread_join(&task->thread); ostrin_mutex_lock(&task->mutex); task->thread_joined = true; task->join_in_progress = false; ostrin_cond_broadcast(&task->ready); }}\n    ostrin_mutex_unlock(&task->mutex);\n")));
                          funcs.push((format!("static void {name}_drop({name}* task)"), format!("    if (!task) return;\n    if (task->thread_started && !task->thread_joined) {name}_wait(task);\n    if (task->drop_env && task->env) {{ task->drop_env(task->env); task->env = NULL; }}\n{result_release}    ostrin_mutex_destroy(&task->mutex);\n    ostrin_cond_destroy(&task->ready);\n")));
-                         funcs.push((format!("static void {name}_thread_entry(void* raw)"), format!("    {name}* task = ({name}*)raw;\n    jmp_buf cancel_jump;\n    OstrinTaskExecution execution;\n    ostrin_task_enter(&execution, task, &cancel_jump);\n    if (setjmp(cancel_jump) == 0) {{\n{run}\n    }}\n    if (task->drop_env && task->env) {{ task->drop_env(task->env); task->env = NULL; }}\n    ostrin_task_leave(&execution);\n    ostrin_mutex_lock(&task->mutex);\n    task->status = atomic_load(&task->cancel_requested) ? 3 : 2;\n    ostrin_cond_broadcast(&task->ready);\n    ostrin_mutex_unlock(&task->mutex);\n", run = if **t == CType::Void { "        task->run(task->env); task->value = 0;".to_string() } else { "        task->value = task->run(task->env);".to_string() })));
+                          funcs.push((format!("static void {name}_thread_entry(void* raw)"), format!("    {name}* task = ({name}*)raw;\n    jmp_buf cancel_jump;\n    OstrinTaskExecution execution;\n    ostrin_task_enter(&execution, task, &cancel_jump);\n    if (setjmp(cancel_jump) == 0) {{\n{run}\n    }}\n    bool task_cancelled = atomic_load(&task->cancel_requested) || (task->group && atomic_load(&task->group->cancel_requested));\n    if (task_cancelled) ostrin_scope_cancel_all();\n    ostrin_clear_task_handles(&execution, task_cancelled);\n    if (task->drop_env && task->env) {{ task->drop_env(task->env); task->env = NULL; }}\n    ostrin_task_leave(&execution);\n    ostrin_mutex_lock(&task->mutex);\n    task->status = atomic_load(&task->cancel_requested) ? 3 : 2;\n    ostrin_cond_broadcast(&task->ready);\n    ostrin_mutex_unlock(&task->mutex);\n", run = if **t == CType::Void { "        task->run(task->env); task->value = 0;".to_string() } else { "        task->value = task->run(task->env);".to_string() })));
                          funcs.push((format!("static void {name}_start({name}* task)"), format!("    ostrin_mutex_init(&task->mutex);\n    ostrin_cond_init(&task->ready);\n    task->status = 1;\n    task->thread_started = true;\n    ostrin_thread_start(&task->thread, {name}_thread_entry, task);\n")));
                          funcs.push((format!("static bool {name}_poll(void* raw)"), format!("    {name}* task = ({name}*)raw;\n    if (task->status == 2 || task->status == 3) return false;\n    {name}_wait(task);\n    bool cancelled = task->status == 3;\n    ostrin_unregister_task(task);\n    return !cancelled;\n")));
-                         funcs.push((format!("static bool {name}_cancel({name}* task)"), format!("    ostrin_mutex_lock(&task->mutex);\n    bool cancelled = false;\n    if (task->status == 0) {{ task->status = 3; cancelled = true; ostrin_cond_broadcast(&task->ready); }}\n    else if (task->status == 1) {{ atomic_store(&task->cancel_requested, true); cancelled = true; }}\n    ostrin_mutex_unlock(&task->mutex);\n    return cancelled;\n")));
+                          funcs.push((format!("static bool {name}_cancel({name}* task)"), format!("    ostrin_mutex_lock(&task->mutex);\n    bool cancelled = false;\n    if (task->status == 0) {{ task->status = 3; cancelled = true; ostrin_cond_broadcast(&task->ready); }}\n    else if (task->status == 1) {{ atomic_store(&task->cancel_requested, true); cancelled = true; }}\n    ostrin_mutex_unlock(&task->mutex);\n    if (cancelled) ostrin_cancel_active_scopes((OstrinTaskHeader*)task);\n    return cancelled;\n")));
+                          funcs.push((format!("static void {name}_cancel_adapter(void* raw)"), format!("    (void){name}_cancel(({name}*)raw);\n")));
                          let result = if **t == CType::Void { "    return;".to_string() } else if is_reference_type(t) { "    ostrin_retain((void*)task->value);\n    return task->value;".to_string() } else { "    return task->value;".to_string() };
                          funcs.push((format!("static {ret} {name}_join({name}* task)"), format!("    {name}_wait(task);\n    bool cancelled = task->status == 3;\n    ostrin_unregister_task(task);\n    if (cancelled) OSTRIN_FAIL(\"task was cancelled\");\n{result}\n")));
                      } else {
-                     list_type_decls.push_str(&format!("typedef {} (*{name}_Run)(void*);\nstruct {name} {{\n    {name}_Run run;\n    void* env;\n    void (*drop_env)(void*);\n    int status;\n    atomic_bool cancel_requested;\n    {value} value;\n}};\n\n", ret));
+                      list_type_decls.push_str(&format!("typedef {} (*{name}_Run)(void*);\nstruct {name} {{\n    {name}_Run run;\n    void* env;\n    void (*drop_env)(void*);\n    int status;\n    atomic_bool cancel_requested;\n    OstrinTaskGroup* group;\n    _Atomic(OstrinTaskExecution*) execution;\n    {value} value;\n}};\n\n", ret));
                      funcs.push((format!("static void {name}_drop({name}* task)"), "    if (!task) return;\n    if (task->drop_env && task->env) { task->drop_env(task->env); task->env = NULL; }\n".to_string()));
                      funcs.push((format!("static bool {name}_poll(void* raw)"), format!(
-                        "    {name}* task = ({name}*)raw;\n    if (task->status != 0) return false;\n    task->status = 1;\n    jmp_buf cancel_jump;\n    OstrinTaskExecution execution;\n    ostrin_task_enter(&execution, task, &cancel_jump);\n    if (setjmp(cancel_jump) == 0) {{\n{run}\n    }}\n    if (task->drop_env && task->env) {{ task->drop_env(task->env); task->env = NULL; }}\n    ostrin_task_leave(&execution);\n    task->status = atomic_load(&task->cancel_requested) ? 3 : 2;\n    return true;\n",
+                         "    {name}* task = ({name}*)raw;\n    if (task->status != 0) return false;\n    task->status = 1;\n    jmp_buf cancel_jump;\n    OstrinTaskExecution execution;\n    ostrin_task_enter(&execution, task, &cancel_jump);\n    if (setjmp(cancel_jump) == 0) {{\n{run}\n    }}\n    bool task_cancelled = atomic_load(&task->cancel_requested) || (task->group && atomic_load(&task->group->cancel_requested));\n    if (task_cancelled) ostrin_scope_cancel_all();\n    ostrin_clear_task_handles(&execution, task_cancelled);\n    if (task->drop_env && task->env) {{ task->drop_env(task->env); task->env = NULL; }}\n    ostrin_task_leave(&execution);\n    task->status = atomic_load(&task->cancel_requested) ? 3 : 2;\n    return true;\n",
                         run = if **t == CType::Void {
                             "    task->run(task->env); task->value = 0;".to_string()
                         } else {
                             "    task->value = task->run(task->env);".to_string()
                         },
                      )));
-                     funcs.push((format!("static bool {name}_cancel({name}* task)"), "    if (task->status == 0) { task->status = 3; return true; }\n    if (task->status == 1) { atomic_store(&task->cancel_requested, true); return true; }\n    return false;\n".to_string()));
+                     funcs.push((format!("static bool {name}_cancel({name}* task)"), "    bool cancelled = false;\n    if (task->status == 0) { task->status = 3; cancelled = true; }\n    else if (task->status == 1) { atomic_store(&task->cancel_requested, true); cancelled = true; }\n    if (cancelled) ostrin_cancel_active_scopes((OstrinTaskHeader*)task);\n    return cancelled;\n".to_string()));
+                     funcs.push((format!("static void {name}_cancel_adapter(void* raw)"), format!("    (void){name}_cancel(({name}*)raw);\n")));
                      funcs.push((format!("static {ret} {name}_join({name}* task)"), format!(
                          "    while (task->status == 0) {{\n        if (!ostrin_poll_all()) OSTRIN_FAIL(\"task join would block: no runnable task remains\");\n    }}\n    if (task->status == 1) OSTRIN_FAIL(\"cyclic task join would deadlock\");\n    if (task->status == 3) OSTRIN_FAIL(\"task was cancelled\");\n    ostrin_unregister_task(task);\n    {result}\n",
                         result = if **t == CType::Void {

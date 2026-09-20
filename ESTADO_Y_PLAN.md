@@ -1,9 +1,9 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-19 · rama `main` · 6 pruebas diferenciales y 142 de integración en verde.*
+*Corte: 2026-09-19 · rama `main` · 6 pruebas diferenciales y 143 de integración en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
-Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–171); para el diseño
+Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–174); para el diseño
 del lenguaje, `docs/design/` (20 documentos).
 
 ---
@@ -67,7 +67,7 @@ propios con `next`), `match` con guardas, patrones anidados, rangos y destructur
 **Concurrencia**: el intérprete conserva el scheduler cooperativo determinista con `spawn`,
 `join`, `spawn_scope`, `channel<T>()`, `select([channels])` y `yield()`. El backend nativo mantiene ese modo por defecto
 para la paridad reproducible, y `--native-threads` habilita hilos del SO, mutexes/condiciones,
-canales bloqueantes, selección entre canales y cancelación cooperativa en puntos seguros con la misma API. Se verifica en el checker que no se capturen bindings
+canales bloqueantes, selección entre canales y cancelación cooperativa en puntos seguros con la misma API; `spawn_scope` propaga cancelación a sus grupos activos y drena las tareas hijas. Se verifica en el checker que no se capturen bindings
 `mut` (E1100) y el análisis HIR/IR rechaza por defecto reutilizar un valor movible después de
 enviarlo (E1101); `--ownership-check` conserva el informe detallado.
 
@@ -164,7 +164,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 |---|---|
 | Cierres en nativo | Captura **por valor** (una variable `mut` cambiada después no se ve dentro); lambda sin contexto de tipos exige anotación |
 | Chequeo «movido tras enviar» (E1101) | Integrado por defecto en `--check`, `--run`, `--emit-c` y `--compile`; `--ownership-check` conserva el informe explícito |
-| Paralelismo nativo (`--native-threads`, canales bloqueantes, `select`) | Hilos del SO, mutexes/condiciones, canales bloqueantes y `select(List<Channel<T>>)` implementados de forma opt-in; `select` conserva prioridad determinista y cede el hilo nativo entre intentos; `Task.cancel()` cancela pendientes o solicita cancelación a tareas `Running`, observada en checkpoints seguros |
+| Paralelismo nativo (`--native-threads`, canales bloqueantes, `select`) | Hilos del SO, mutexes/condiciones, canales bloqueantes y `select(List<Channel<T>>)` implementados de forma opt-in; `select` conserva prioridad determinista y cede el hilo nativo entre intentos; `Task.cancel()` cancela pendientes, propaga a grupos activos de `spawn_scope` o solicita cancelación a tareas `Running`, observada en checkpoints seguros |
 | Memoria en nativo | Registro, destructores tipados para records/colecciones y entornos de tareas, `clone`/`drop`, cleanup automático de locales directos, bloques anidados, ramas, loops y cancelación de tareas en AST/HIR, y `--leak-check`; ARC completa sobre IR sigue pendiente |
 | IR de bloques | HIR→CFG disponible con `--ir`; `if/while/for/match/try/spawn/channel` ya tienen operaciones explícitas, aún no reemplaza el backend C |
 | Ownership/último uso | `--ownership-report`, `--ownership-check` y `--ownership-ir`; el backend C ya aplica retain/release lineal en locales directos, pero la IR aún no es la fuente única |
@@ -209,9 +209,10 @@ El primer bloque ya está implementado detrás de `--native-threads`: hilos del 
 operativo, mutexes/condiciones y canales bloqueantes, sin romper E1100/E1101 ni la paridad
 determinista por defecto. `select(List<Channel<T>>)` ya está cerrado con prioridad
 determinista y polling no bloqueante; `Task.cancel()` cubre la transición segura de
-tareas pendientes y las solicitudes de cancelación de tareas `Running` se consumen en
-checkpoints cooperativos. El siguiente paso es cerrar `spawn_scope` con grupos de tareas
-nativos y propagación de cancelación (esbozados en `docs/design/09`).
+tareas pendientes, propaga cancelación a los grupos activos de `spawn_scope` y consume
+las solicitudes de tareas `Running` en checkpoints cooperativos. El siguiente hueco es
+despertar de forma cancelable las E/S bloqueantes y completar la administración de
+recursos del runtime (esbozado en `docs/design/09`).
 
 ### C. Biblioteca estándar y ecosistema
 Cadenas (split/trim/format), fechas, JSON, argumentos y entorno, `HashMap` real,
@@ -263,7 +264,7 @@ Decisiones que necesito de ti para afinar el plan:
 
 ```powershell
 cd compiler
-cargo test                                   # 6 diferenciales + 142 de integración
+cargo test                                   # 6 diferenciales + 143 de integración
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```

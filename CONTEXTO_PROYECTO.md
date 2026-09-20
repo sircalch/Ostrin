@@ -4663,3 +4663,27 @@ el código C generado usaba `sqrt` o `round`, pero el comando de enlace no añad
 lo que `cc` terminaba con referencias indefinidas. El driver nativo ahora añade `-lm` en
 targets Unix y conserva el enlace anterior en Windows; la suite Linux local vuelve a cubrir
 los mismos 142 ejemplos sin esa diferencia de plataforma.
+
+## 174. Grupos estructurados y cancelación propagada — 2026-09-19
+
+`spawn_scope` deja de ser únicamente una marca ordinal del scheduler y pasa a tener grupos
+explícitos en los tres caminos de ejecución:
+
+- el intérprete asocia cada tarea con su grupo y registra los scopes activos de la tarea;
+  cancelar una tarea `Running` marca también sus grupos anidados, cancela hijos pendientes
+  y permite que los hijos activos observen `TaskCancelled` en sus fronteras;
+- el runtime C mantiene `OstrinTaskGroup` y frames anidados por ejecución, propaga una
+  cancelación a los grupos activos del padre y drena sus nodos antes de liberar los frames;
+  el registro usa adaptadores de cancelación tipados, evitando conversiones incompatibles
+  de punteros de función en GCC;
+- la espera de `select` comprueba la cancelación después de liberar su lista temporal de
+  canales, evitando que el `longjmp` salte el cleanup y deje referencias vivas; los handles
+  creados dentro de callbacks cancelados se limpian junto con el entorno capturado;
+- `examples/concurrency_scope_cancel.ostrin` comprueba la propagación padre→hijo, el orden
+  observable y `live_allocations=0` en intérprete, C cooperativo y `--native-threads`.
+
+La prueba se ejecutó cuatro veces para descartar la carrera nativa y después la suite
+completa quedó en **6 pruebas diferenciales y 143 de integración verdes**. La brecha
+restante de concurrencia es despertar de forma cancelable una E/S bloqueante; el backend
+WASM/distribución y la bitácora de cada bloque continúan formando parte de la ruta de
+producción.

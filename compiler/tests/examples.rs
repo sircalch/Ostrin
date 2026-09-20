@@ -2013,6 +2013,39 @@ fn running_tasks_honor_cancellation_at_cooperative_checkpoints() {
 }
 
 #[test]
+fn cancelling_a_parent_task_cancels_its_spawn_scope_group() {
+    let file = example_path("concurrency_scope_cancel.ostrin");
+    let interpreted = run(&["--run", &file]);
+    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), "parent-started\ntrue\n");
+
+    let exe = temp_artifact("scope-cancel.exe");
+    let compiled = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compiled) {
+        return;
+    }
+    assert!(compiled.status.success(), "scope cancellation compile failed: {}", stderr(&compiled));
+    let native = Command::new(&exe).output().expect("run scope cancellation binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "scope cancellation binary failed: {}", String::from_utf8_lossy(&native.stderr));
+    let native_stdout = String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n");
+    assert!(!native_stdout.contains("parent-must-not-run"), "parent continued after cancellation: {native_stdout}");
+    assert!(!native_stdout.contains("child-must-not-run"), "child escaped its cancelled scope: {native_stdout}");
+    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "scope cancellation leaked: {}", String::from_utf8_lossy(&native.stderr));
+
+    let threaded_exe = temp_artifact("scope-cancel-native-threads.exe");
+    let threaded_compile = run(&["--compile", "--native-threads", "--leak-check", "--out", &threaded_exe, &file]);
+    assert!(threaded_compile.status.success(), "native-thread scope cancellation compile failed: {}", stderr(&threaded_compile));
+    let threaded_native = Command::new(&threaded_exe).output().expect("run native-thread scope cancellation binary");
+    let _ = fs::remove_file(&threaded_exe);
+    assert!(threaded_native.status.success(), "native-thread scope cancellation failed: {}", String::from_utf8_lossy(&threaded_native.stderr));
+    let threaded_stdout = String::from_utf8_lossy(&threaded_native.stdout);
+    assert!(!threaded_stdout.contains("parent-must-not-run"), "native parent continued after cancellation: {threaded_stdout}");
+    assert!(!threaded_stdout.contains("child-must-not-run"), "native child escaped its cancelled scope: {threaded_stdout}");
+    assert!(String::from_utf8_lossy(&threaded_native.stderr).contains("live_allocations=0"), "native-thread scope cancellation leaked: {}", String::from_utf8_lossy(&threaded_native.stderr));
+}
+
+#[test]
 fn yield_advances_the_cooperative_scheduler_and_compiles_with_threads() {
     let file = example_path("concurrency_yield.ostrin");
     let interpreted = run(&["--run", &file]);

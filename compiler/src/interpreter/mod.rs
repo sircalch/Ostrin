@@ -239,11 +239,17 @@ enum TaskStatus {
     Cancelled,
 }
 
+struct TaskGroup {
+    cancel_requested: bool,
+}
+
 pub(crate) struct TaskState {
     body: Rc<Block>,
     env: Env,
     status: TaskStatus,
     cancel_requested: bool,
+    group: Option<Rc<RefCell<TaskGroup>>>,
+    active_scope_groups: Vec<Rc<RefCell<TaskGroup>>>,
     result: Option<Result<Value, String>>,
 }
 
@@ -562,6 +568,10 @@ pub struct Interpreter {
     /// Cooperative tasks currently executing. Nested progress from
     /// `yield()` temporarily pushes another task and restores the parent.
     active_tasks: Vec<Rc<RefCell<TaskState>>>,
+    /// Structured scope groups active in the currently executing task.
+    /// `run_task` saves and restores this stack when cooperative `yield()`
+    /// enters another task.
+    scope_groups: Vec<Rc<RefCell<TaskGroup>>>,
     /// Integer literals the checker typed as fixed-width (see `TypedProgram::literal_kinds`).
     literal_kinds: HashMap<crate::typeck::ExprKey, LitKind>,
 }
@@ -642,6 +652,7 @@ impl Interpreter {
             terminated: false,
             tasks: Vec::new(),
             active_tasks: Vec::new(),
+            scope_groups: Vec::new(),
         }
     }
 
@@ -705,7 +716,9 @@ impl Interpreter {
             }
         };
 
+        let outer_scope_groups = std::mem::take(&mut self.scope_groups);
         self.active_tasks.push(task.clone());
+        task.borrow_mut().active_scope_groups.clear();
         let outcome = match self.eval_block(&body, &env) {
             Ok(value) => Ok(value),
             Err(RuntimeError::Return(value)) => Ok(value),
@@ -713,6 +726,8 @@ impl Interpreter {
             Err(error) => Err(RuntimeError::Error(Self::task_error(error))),
         };
         self.active_tasks.pop();
+        self.scope_groups = outer_scope_groups;
+        task.borrow_mut().active_scope_groups.clear();
         let status = match &outcome {
             Err(RuntimeError::TaskCancelled) => TaskStatus::Cancelled,
             Ok(_) => TaskStatus::Completed,
@@ -750,19 +765,6 @@ impl Interpreter {
             Ok(_) => {}
         }
         Ok(true)
-    }
-
-    fn drain_tasks_from(&mut self, start: usize) -> Result<(), RuntimeError> {
-        loop {
-            let task = self.tasks.iter().skip(start).find_map(|candidate| {
-                (candidate.borrow().status == TaskStatus::Pending).then(|| candidate.clone())
-            });
-            let Some(task) = task else { return Ok(()) };
-            match self.run_task(task) {
-                Err(RuntimeError::TaskCancelled) | Ok(_) => {}
-                Err(error) => return Err(error),
-            }
-        }
     }
 
     fn has_derive(&self, type_name: &str, trait_name: &str) -> bool {
@@ -835,6 +837,45 @@ impl Interpreter {
                 Some(hash)
             }
             _ => stable_hash_value(value),
+        }
+    }
+
+    fn current_task_group(&self) -> Option<Rc<RefCell<TaskGroup>>> {
+        self.scope_groups.last().cloned().or_else(|| self.active_tasks.last().and_then(|task| task.borrow().group.clone()))
+    }
+
+    fn same_task_group(task: &Rc<RefCell<TaskState>>, group: &Rc<RefCell<TaskGroup>>) -> bool {
+        task.borrow().group.as_ref().is_some_and(|candidate| Rc::ptr_eq(candidate, group))
+    }
+
+    fn cancel_task_group(&mut self, group: &Rc<RefCell<TaskGroup>>) {
+        group.borrow_mut().cancel_requested = true;
+        for task in &self.tasks {
+            if !Self::same_task_group(task, group) {
+                continue;
+            }
+            let mut state = task.borrow_mut();
+            match state.status {
+                TaskStatus::Pending => {
+                    state.status = TaskStatus::Cancelled;
+                    state.result = Some(Err("task was cancelled".to_string()));
+                }
+                TaskStatus::Running => state.cancel_requested = true,
+                TaskStatus::Completed | TaskStatus::Failed | TaskStatus::Cancelled => {}
+            }
+        }
+    }
+
+    fn drain_task_group(&mut self, group: &Rc<RefCell<TaskGroup>>) -> Result<(), RuntimeError> {
+        loop {
+            let task = self.tasks.iter().find_map(|candidate| {
+                (Self::same_task_group(candidate, group) && candidate.borrow().status == TaskStatus::Pending).then(|| candidate.clone())
+            });
+            let Some(task) = task else { return Ok(()) };
+            match self.run_task(task) {
+                Err(RuntimeError::TaskCancelled) | Ok(_) => {}
+                Err(error) => return Err(error),
+            }
         }
     }
 
@@ -1512,7 +1553,10 @@ impl Interpreter {
     }
 
     fn check_task_cancellation(&self) -> Result<(), RuntimeError> {
-        if self.active_tasks.last().is_some_and(|task| task.borrow().cancel_requested) {
+        if self.active_tasks.last().is_some_and(|task| {
+            let state = task.borrow();
+            state.cancel_requested || state.group.as_ref().is_some_and(|group| group.borrow().cancel_requested)
+        }) {
             return Err(RuntimeError::TaskCancelled);
         }
         Ok(())
@@ -2212,24 +2256,34 @@ impl Interpreter {
                     env: env.clone(),
                     status: TaskStatus::Pending,
                     cancel_requested: false,
+                    group: self.current_task_group(),
+                    active_scope_groups: Vec::new(),
                     result: None,
                 }));
                 self.tasks.push(task.clone());
                 Ok(Value::Task(task))
             }
             Expr::SpawnScope(block) => {
-                let first_task = self.tasks.len();
+                let group = Rc::new(RefCell::new(TaskGroup { cancel_requested: false }));
+                self.scope_groups.push(group.clone());
+                if let Some(task) = self.active_tasks.last() {
+                    task.borrow_mut().active_scope_groups.push(group.clone());
+                }
                 let body_result = self.eval_block(block, env);
-                let drain_result = self.drain_tasks_from(first_task);
+                self.scope_groups.pop();
+                if let Some(task) = self.active_tasks.last() {
+                    task.borrow_mut().active_scope_groups.pop();
+                }
                 match body_result {
                     Ok(value) => {
-                        drain_result?;
+                        self.drain_task_group(&group)?;
                         Ok(value)
                     }
                     Err(error) => {
-                        // A structured scope still gives its children a chance
-                        // to finish before propagating the body's control flow.
-                        let _ = drain_result;
+                        // A cancelled or failed scope actively cancels its
+                        // children before propagating the control flow error.
+                        self.cancel_task_group(&group);
+                        let _ = self.drain_task_group(&group);
                         Err(error)
                     }
                 }
@@ -2407,6 +2461,7 @@ impl Interpreter {
                         return Err(RuntimeError::Error("'select' expects at least one channel".to_string()));
                     }
                     loop {
+                        self.check_task_cancellation()?;
                         for channel in &channels {
                             let Value::Channel(state) = channel else {
                                 return Err(RuntimeError::Error("'select' expects a List<Channel<T>>".to_string()));
@@ -2847,6 +2902,11 @@ impl Interpreter {
                                 }
                                 TaskStatus::Running => {
                                     state.cancel_requested = true;
+                                    let active_groups = state.active_scope_groups.clone();
+                                    drop(state);
+                                    for group in active_groups {
+                                        self.cancel_task_group(&group);
+                                    }
                                     true
                                 }
                                 TaskStatus::Completed | TaskStatus::Failed | TaskStatus::Cancelled => false,

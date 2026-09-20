@@ -1,0 +1,29 @@
+fn main() -> Void {
+    ready = channel<Int>()
+    acknowledgement = channel<Int>()
+    gate = channel<Int>()
+    spawn_scope {
+        parent = spawn {
+            print("parent-started")
+            spawn_scope {
+                child = spawn {
+                    print("child-started")
+                    select([gate])
+                    print("child-must-not-run")
+                }
+                ready.send(1)
+                acknowledgement.receive()
+                yield()
+                print("parent-must-not-run")
+            }
+        }
+
+        controller = spawn {
+            ready.receive()
+            print(parent.cancel())
+            acknowledgement.send(1)
+        }
+
+        yield()
+    }
+}
