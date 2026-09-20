@@ -1,9 +1,9 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-19 · rama `main` · 6 pruebas diferenciales y 138 de integración en verde.*
+*Corte: 2026-09-19 · rama `main` · 6 pruebas diferenciales y 139 de integración en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
-Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–165); para el diseño
+Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–168); para el diseño
 del lenguaje, `docs/design/` (20 documentos).
 
 ---
@@ -176,7 +176,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Rendimiento del intérprete | Tree‑walking simple; sin optimizaciones |
 | `newlines.ostrin`, `advanced.ostrin` | Son muestras de sintaxis, no programas ejecutables |
 | CI | Linux, macOS y Windows; incluye las pruebas diferenciales intérprete↔nativo |
-| Distribución | Workflow WASI reproducible para `ostrinc.wasm` con SHA-256; binarios nativos publicados e instalador siguen pendientes |
+| Distribución | Workflow WASI reproducible para `ostrinc.wasm` con SHA-256; el runtime C cooperativo generado evita pthreads cuando no se pide `--native-threads`; binarios nativos publicados e instalador siguen pendientes |
 
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
 convendría dividirlos; el backend nativo no comparte el sistema de tipos del checker
@@ -224,9 +224,10 @@ CI de GitHub con matriz Windows/Linux/macOS, binarios de release.
 
 ### E. Backends adicionales
 El compilador ya puede distribuirse como `wasm32-wasip1` mediante el workflow WASI, con
-checksum reproducible. El backend de programas sigue emitiendo C; el siguiente paso es aislar
-un runtime WASI portable y producir un smoke test de un programa Ostrin en WASM, antes de un
-playground de navegador o de LLVM IR.
+checksum reproducible. El backend de programas sigue emitiendo C; su runtime cooperativo ya
+separa los headers y primitivas de `--native-threads`, reduciendo la dependencia del toolchain.
+El siguiente paso es seleccionar un toolchain C/WASI y producir un smoke test de un programa
+Ostrin en WASM, antes de un playground de navegador o de LLVM IR.
 
 ### F. Calidad y confianza
 Fuzzing del parser, pruebas diferenciales automáticas intérprete↔nativo sobre programas
@@ -260,7 +261,7 @@ Decisiones que necesito de ti para afinar el plan:
 
 ```powershell
 cd compiler
-cargo test                                   # 6 diferenciales + 138 de integración
+cargo test                                   # 6 diferenciales + 139 de integración
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```

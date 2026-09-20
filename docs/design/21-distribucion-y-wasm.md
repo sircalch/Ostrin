@@ -12,6 +12,12 @@ WASI debe proporcionar la interfaz de sistema de archivos y argumentos que usa l
 superficie de LSP/DAP y el backend C no se presentan como compatibles con navegador en esta
 etapa.
 
+El runtime C generado separa ahora sus dos superficies: el modo cooperativo por defecto usa
+locks no-op y no incluye headers de pthread/Windows para hilos; solo `--native-threads` define
+`OSTRIN_NATIVE_THREADS` y activa mutexes, condiciones y threads del sistema operativo. Esto
+reduce la dependencia del C generado para un futuro toolchain WASI, sin afirmar todavía que
+ese toolchain esté configurado ni que `ostrinc --compile` produzca WASM.
+
 ## Reproducir localmente
 
 ```powershell
@@ -36,7 +42,7 @@ La misma comprobación local puede ejecutarse, después de compilar, con:
 ## Siguiente etapa
 
 El backend de programas Ostrin todavía emite C; no se debe afirmar que
-`ostrinc --compile` produzca WASM. El siguiente bloque de esta línea es aislar un runtime C
-portable sin pthreads ni APIs de proceso, seleccionar una interfaz de archivos WASI y añadir
-un smoke test de un programa Ostrin compilado a WASM. Después se puede construir un adaptador
-de navegador/playground sobre una API de compilación sin filesystem implícito.
+`ostrinc --compile` produzca WASM. El siguiente bloque de esta línea es seleccionar un
+toolchain C/WASI, aislar las APIs de proceso y archivos que aún usa el runtime, y añadir un
+smoke test de un programa Ostrin compilado a WASM. Después se puede construir un adaptador de
+navegador/playground sobre una API de compilación sin filesystem implícito.

@@ -114,6 +114,10 @@ test
 - Added the `yield() -> Void` standard builtin. It advances one pending task in
   the interpreter and cooperative native scheduler, while `--native-threads`
   yields the current OS thread; the behavior is covered by a parity and leak-check test.
+- Made the generated cooperative C runtime portable across threadless toolchains:
+  `pthread`/Windows thread headers and implementations are now guarded behind
+  `OSTRIN_NATIVE_THREADS`, while the default scheduler uses no-op synchronization
+  primitives. The generated source has an explicit test for both modes.
 - Added `--project DIR` package entry-point selection. The compiler now reads the
   manifest's `entry` field when no source path is supplied, and generated
   `ostrin.lock` files sort dependencies and store project-relative paths where

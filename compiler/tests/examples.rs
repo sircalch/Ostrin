@@ -752,6 +752,21 @@ fn native_backend_emit_c_writes_readable_c_source() {
 }
 
 #[test]
+fn cooperative_c_runtime_guards_thread_only_headers() {
+    let cooperative = run(&["--emit-c", &example_path("native_fibonacci.ostrin")]);
+    assert!(cooperative.status.success(), "cooperative emit failed: {}", stderr(&cooperative));
+    let source = stdout(&cooperative);
+    assert!(source.contains("#if defined(OSTRIN_NATIVE_THREADS) && defined(_WIN32)"));
+    assert!(source.contains("typedef int OstrinMutex;"), "cooperative runtime should provide no-op locks: {source}");
+    assert!(!source.contains("#define OSTRIN_NATIVE_THREADS"));
+
+    let threaded = run(&["--emit-c", "--native-threads", &example_path("native_threads.ostrin")]);
+    assert!(threaded.status.success(), "threaded emit failed: {}", stderr(&threaded));
+    assert!(stdout(&threaded).contains("#define OSTRIN_NATIVE_THREADS"));
+    assert!(stdout(&threaded).contains("#include <pthread.h>") || stdout(&threaded).contains("#include <windows.h>"));
+}
+
+#[test]
 fn program_arguments_match_between_interpreter_and_native() {
     let file = example_path("args.ostrin");
     let interpreted = run(&["--run", &file, "--", "uno", "dos"]);

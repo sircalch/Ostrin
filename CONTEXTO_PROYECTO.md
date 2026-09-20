@@ -4561,3 +4561,20 @@ explícitamente el turno:
 La batería queda en **6 pruebas diferenciales y 138 de integración verdes**. `yield()` es
 también el punto de coordinación visible para programas mientras la cancelación por
 puntos seguros y los grupos nativos siguen pendientes.
+
+## 168. Runtime C cooperativo portable para la siguiente etapa WASI — 2026-09-19
+
+El emisor C separa ahora la superficie de hilos reales de la que necesita el scheduler
+cooperativo:
+
+- solo `--native-threads` define `OSTRIN_NATIVE_THREADS` y activa `pthread`/Windows,
+  `OstrinMutex`, condiciones y `OstrinThread` reales;
+- el modo por defecto conserva los mismos nombres de runtime con tipos enteros y funciones
+  no-op, de forma que heap, registro de tareas y `yield()` no requieren headers de threads;
+- `native_backend` conserva pruebas de ejecución para ambos modos y una prueba de emisión
+  comprueba que los headers quedan guardados por el macro correcto.
+
+Esto no convierte todavía `ostrinc --compile` en un backend WASM: siguen pendientes el
+toolchain C/WASI, la sustitución de APIs de proceso/archivos y el smoke test de un programa
+Ostrin compilado a WASM. La batería queda en **6 pruebas diferenciales y 139 de integración
+verdes**.

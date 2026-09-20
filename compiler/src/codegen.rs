@@ -355,7 +355,7 @@ const PRELUDE: &str = "#include <stdint.h>\n\
 #include <string.h>\n\
 #include <errno.h>\n\
 #include <math.h>\n\
-#if defined(_WIN32)\n\
+#if defined(OSTRIN_NATIVE_THREADS) && defined(_WIN32)\n\
 #include <windows.h>\n\
 typedef CRITICAL_SECTION OstrinMutex;\n\
 typedef CONDITION_VARIABLE OstrinCond;\n\
@@ -370,7 +370,7 @@ static void ostrin_cond_wait(OstrinCond* cond, OstrinMutex* mutex) { SleepCondit
 static void ostrin_cond_signal(OstrinCond* cond) { WakeConditionVariable(cond); }\n\
 static void ostrin_cond_broadcast(OstrinCond* cond) { WakeAllConditionVariable(cond); }\n\
 static void ostrin_select_wait(void) { Sleep(0); }\n\
-#else\n\
+#elif defined(OSTRIN_NATIVE_THREADS)\n\
 #include <pthread.h>\n\
 #include <sched.h>\n\
 typedef pthread_mutex_t OstrinMutex;\n\
@@ -386,7 +386,22 @@ static void ostrin_cond_wait(OstrinCond* cond, OstrinMutex* mutex) { pthread_con
 static void ostrin_cond_signal(OstrinCond* cond) { pthread_cond_signal(cond); }\n\
 static void ostrin_cond_broadcast(OstrinCond* cond) { pthread_cond_broadcast(cond); }\n\
 static void ostrin_select_wait(void) { sched_yield(); }\n\
+#else\n\
+typedef int OstrinMutex;\n\
+typedef int OstrinCond;\n\
+typedef int OstrinThread;\n\
+static void ostrin_mutex_init(OstrinMutex* mutex) { (void)mutex; }\n\
+static void ostrin_mutex_destroy(OstrinMutex* mutex) { (void)mutex; }\n\
+static void ostrin_mutex_lock(OstrinMutex* mutex) { (void)mutex; }\n\
+static void ostrin_mutex_unlock(OstrinMutex* mutex) { (void)mutex; }\n\
+static void ostrin_cond_init(OstrinCond* cond) { (void)cond; }\n\
+static void ostrin_cond_destroy(OstrinCond* cond) { (void)cond; }\n\
+static void ostrin_cond_wait(OstrinCond* cond, OstrinMutex* mutex) { (void)cond; (void)mutex; }\n\
+static void ostrin_cond_signal(OstrinCond* cond) { (void)cond; }\n\
+static void ostrin_cond_broadcast(OstrinCond* cond) { (void)cond; }\n\
+static void ostrin_select_wait(void) {}\n\
 #endif\n\
+#if defined(OSTRIN_NATIVE_THREADS)\n\
 typedef struct { void (*entry)(void*); void* arg; } OstrinThreadStart;\n\
 #if defined(_WIN32)\n\
 static DWORD WINAPI ostrin_thread_boot(void* raw) {\n\
@@ -423,6 +438,7 @@ static void ostrin_thread_join(OstrinThread* thread) {\n\
     pthread_join(*thread, NULL);\n\
 #endif\n\
 }\n\
+#endif\n\
 #if defined(_WIN32)\n\
 #include <direct.h>\n\
 #define OSTRIN_GETCWD _getcwd\n\
@@ -6280,7 +6296,11 @@ fn generate_impl(
 
     codegen.flush_instances()?;
 
-    let mut out = String::from(PRELUDE);
+    let mut out = String::new();
+    if native_threads {
+        out.push_str("#define OSTRIN_NATIVE_THREADS\n");
+    }
+    out.push_str(PRELUDE);
     let _ = &mut out;
     // Bodies are generated *before* any prototype is written out, because a
     // generic function's instantiations aren't known until something is
