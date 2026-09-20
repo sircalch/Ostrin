@@ -99,6 +99,7 @@ pub struct Checker {
     enum_generics: HashMap<String, Vec<GenericParam>>,
     record_fields: HashMap<String, Vec<(String, Type)>>,
     record_field_mutability: HashMap<String, HashMap<String, bool>>,
+    record_derives: HashMap<String, Vec<String>>,
     record_generics: HashMap<String, Vec<GenericParam>>,
     current_generic_bounds: HashMap<String, Vec<String>>,
     current_return_type: Option<Ty>,
@@ -168,6 +169,7 @@ impl Checker {
             enum_generics,
             record_fields: HashMap::new(),
             record_field_mutability: HashMap::new(),
+            record_derives: HashMap::new(),
             record_generics: HashMap::new(),
             current_generic_bounds: HashMap::new(),
             current_return_type: None,
@@ -239,6 +241,7 @@ impl Checker {
                 Item::Record(record) => {
                     self.type_origins.insert(record.name.clone(), record.module_path.clone());
                     self.record_generics.insert(record.name.clone(), record.generics.clone());
+                    self.record_derives.insert(record.name.clone(), record.derives.clone());
                     self.record_fields.insert(
                         record.name.clone(),
                         record
@@ -2560,7 +2563,7 @@ impl Checker {
             .collect();
 
         if let Expr::Ident(name) = callee.unlocated() {
-            if let Some(return_type) = check_builtin_call(name, &arg_types, &mut self.errors) {
+            if let Some(return_type) = check_builtin_call(name, &arg_types, &mut self.errors, &self.record_derives, &self.record_fields) {
                 return return_type;
             }
             if self.variant_owners.contains_key(name) {
@@ -3922,18 +3925,41 @@ fn function_return_type(ty: Option<&Ty>) -> Option<Ty> {
     }
 }
 
-fn is_builtin_hashable(ty: &Ty) -> bool {
+fn is_builtin_hashable(
+    ty: &Ty,
+    record_derives: &HashMap<String, Vec<String>>,
+    record_fields: &HashMap<String, Vec<(String, Type)>>,
+) -> bool {
     match ty {
         Ty::Int | Ty::Sized(_) | Ty::Float | Ty::Float32 | Ty::Bool | Ty::String | Ty::Unknown => true,
-        Ty::Applied(name, args) if name == "Option" && args.len() == 1 => is_builtin_hashable(&args[0]),
+        Ty::Applied(name, args) if name == "Option" && args.len() == 1 => {
+            is_builtin_hashable(&args[0], record_derives, record_fields)
+        }
         Ty::Applied(name, args) if name == "Result" && args.len() == 2 => {
-            is_builtin_hashable(&args[0]) && is_builtin_hashable(&args[1])
+            is_builtin_hashable(&args[0], record_derives, record_fields)
+                && is_builtin_hashable(&args[1], record_derives, record_fields)
+        }
+        Ty::Named(name) => {
+            record_derives
+                .get(name)
+                .is_some_and(|derives| derives.iter().any(|derive| derive == "Hash"))
+                && record_fields.get(name).is_some_and(|fields| {
+                    fields.iter().all(|(_, field)| {
+                        is_builtin_hashable(&resolve_type(field), record_derives, record_fields)
+                    })
+                })
         }
         _ => false,
     }
 }
 
-fn check_builtin_call(name: &str, arg_types: &[Ty], errors: &mut Vec<TypeError>) -> Option<Ty> {
+fn check_builtin_call(
+    name: &str,
+    arg_types: &[Ty],
+    errors: &mut Vec<TypeError>,
+    record_derives: &HashMap<String, Vec<String>>,
+    record_fields: &HashMap<String, Vec<(String, Type)>>,
+) -> Option<Ty> {
     let expected_args = match name {
         "args" => vec![],
         "env" => vec![Ty::String],
@@ -3992,12 +4018,14 @@ fn check_builtin_call(name: &str, arg_types: &[Ty], errors: &mut Vec<TypeError>)
         "cwd" => Some(Ty::String),
         "file_exists" => Some(Ty::Bool),
         "hash" => {
-            let supported = arg_types.first().is_some_and(is_builtin_hashable);
+            let supported = arg_types
+                .first()
+                .is_some_and(|ty| is_builtin_hashable(ty, record_derives, record_fields));
             if !supported {
                 errors.push(TypeError {
                     code: "E1041",
                     message: format!(
-                        "Builtin 'hash' supports scalar values and hashable Option/Result values, got '{}'.",
+                        "Builtin 'hash' supports scalar values, hashable Option/Result values, or records with derive(Hash), got '{}'.",
                         arg_types[0].describe()
                     ),
                     span: None,

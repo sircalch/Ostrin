@@ -4401,5 +4401,20 @@ El builtin hash amplía su contrato más allá de escalares:
 
 examples/hash_builtin.ostrin cubre cuatro valores estructurales adicionales y la
 prueba existente de paridad intérprete↔nativo los ejecuta en ambos backends. El
-siguiente paso de stdlib es formalizar derive(Hash) para records/enums. La batería
+siguiente paso de stdlib es formalizar Hash para enums y colecciones. La batería
 queda en 6 pruebas diferenciales y 130 de integración verdes.
+
+## 159. derive(Hash) para records — 2026-09-19
+
+El contrato Hash de usuario queda abierto para records:
+
+- un record puede declarar derive(Hash);
+- el checker comprueba recursivamente sus campos y solo acepta escalares,
+  Option/Result hashables u otros records con derive(Hash);
+- el intérprete combina Record::<nombre> con los hashes de los campos en orden de
+  declaración;
+- el backend C emite la misma combinación estable y rechaza records no hashables.
+
+hash_builtin.ostrin ahora cubre HashPoint y un HashEnvelope con un campo Option<Int>.
+La prueba negativa confirma que un record sin derive(Hash) no puede pasarse al
+builtin. Enums, listas, mapas y sets siguen fuera del contrato de Hash de usuario.

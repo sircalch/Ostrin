@@ -707,6 +707,32 @@ impl Interpreter {
         self.derives.get(type_name).is_some_and(|d| d.iter().any(|t| t == trait_name))
     }
 
+    fn hash_value(&self, value: &Value) -> Option<u64> {
+        match value {
+            Value::Record(type_name, data) if self.has_derive(type_name, "Hash") => {
+                let declaration = self.records.get(type_name)?;
+                let mut hash = stable_hash_string(&format!("Record::{type_name}"));
+                let fields = data.borrow();
+                for field in &declaration.fields {
+                    let value = fields_get(&fields, &field.name)?;
+                    hash = stable_hash_combine(hash, self.hash_value(value)?);
+                }
+                Some(hash)
+            }
+            Value::EnumInstance(type_name, variant, fields, _)
+                if type_name == "Option" || type_name == "Result" =>
+            {
+                let tag = stable_hash_string(&format!("{type_name}::{variant}"));
+                if let Some(inner) = fields.get("0") {
+                    Some(stable_hash_combine(tag, self.hash_value(inner)?))
+                } else {
+                    Some(tag)
+                }
+            }
+            _ => stable_hash_value(value),
+        }
+    }
+
     /// Genera 'equals' campo por campo, en el orden de declaración del
     /// 'record' (documento 12, §2.1: 'derive(Eq)') — para 'enum', compara
     /// primero la variante y luego sus campos.
@@ -2121,8 +2147,8 @@ impl Interpreter {
                 }
                 "hash" => {
                     let value = self.eval_arg(&args[0], env)?;
-                    let hash = stable_hash_value(&value).ok_or_else(|| {
-                        RuntimeError::Error("'hash' supports scalar values and hashable Option/Result values".to_string())
+                    let hash = self.hash_value(&value).ok_or_else(|| {
+                        RuntimeError::Error("'hash' supports scalar values, hashable Option/Result values, or records with derive(Hash)".to_string())
                     })?;
                     return Ok(Value::Int(hash as i64));
                 }

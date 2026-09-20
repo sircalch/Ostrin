@@ -23,6 +23,10 @@ test
 - Extended the stable hash builtin to structural Option and Result values when
   their payloads are hashable; interpreter and native tags/payload combination
   remain identical.
+- Added the first user-defined hash contract: records marked `derive(Hash)` may
+  be hashed when every field is recursively hashable, with matching field-order
+  hashing in the interpreter and native backend. Records without the derive and
+  unsupported fields remain compile-time errors.
 - The WASI distribution workflow now runs the release compiler under Node WASI
   before packaging it, checking an Ostrin source file through a preopened
   filesystem and validating the module's CLI exit code.

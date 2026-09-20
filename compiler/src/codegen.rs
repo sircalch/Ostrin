@@ -3847,8 +3847,8 @@ impl<'a> Codegen<'a> {
         }
     }
 
-    /// Returns a stable runtime hash for scalar values and structural
-    /// Option/Result values accepted by the standard hash builtin.
+    /// Returns a stable runtime hash for scalar values, structural
+    /// Option/Result values, and records with derive(Hash).
     fn hash_expr(&self, value: &str, ty: &CType) -> Option<String> {
         match ty {
             CType::Str => Some(format!("ostrin_hash_string({value})")),
@@ -3867,6 +3867,14 @@ impl<'a> Codegen<'a> {
                 Some(format!(
                     "(({value}.ok) ? ostrin_hash_combine(ostrin_hash_string(\"Result::Ok\"), {ok}) : ostrin_hash_combine(ostrin_hash_string(\"Result::Err\"), {err}))"
                 ))
+            }
+            CType::Record(name) if self.has_derive(name, "Hash") => {
+                let mut hash = format!("ostrin_hash_string(\"Record::{name}\")");
+                for (field, field_ty) in self.record_fields(name).to_vec() {
+                    let field_hash = self.hash_expr(&format!("{value}->{field}"), &field_ty)?;
+                    hash = format!("ostrin_hash_combine({hash}, {field_hash})");
+                }
+                Some(hash)
             }
             _ => None,
         }
@@ -5326,7 +5334,7 @@ impl<'a> Codegen<'a> {
             "file_exists" => Ok(Some((format!("ostrin_file_exists({})", codes[0]), CType::Bool))),
             "hash" => {
                 let hash = self.hash_expr(&codes[0], &types[0]).ok_or_else(|| {
-                    "'hash' supports scalar values and hashable Option/Result values".to_string()
+                    "'hash' supports scalar values, hashable Option/Result values, or records with derive(Hash)".to_string()
                 })?;
                 Ok(Some((format!("(int64_t)({hash})"), CType::Int)))
             }
@@ -6734,6 +6742,18 @@ fn generate_impl(
             emit_enum(&mut out, name, &codegen.instance_variants[name]);
         }
     }
+    // Option/Result values are embedded by value in records, so their
+    // complete typedefs must follow any enum bodies they embed and precede
+    // record bodies. Their payloads can refer to records through the forward
+    // typedefs above and to list instances through the list forward typedefs.
+    for (ok, err) in std::mem::take(&mut result_pairs) {
+        let name = format!("Result_{}_{}", mangle_ctype(&ok), mangle_ctype(&err));
+        out.push_str(&format!("typedef struct {{ bool ok; {} value; {} error; }} {name};\n\n", field_c_type(&ok), field_c_type(&err)));
+    }
+    for inner in std::mem::take(&mut option_inners) {
+        let name = format!("Option_{}", mangle_ctype(&inner));
+        out.push_str(&format!("typedef struct {{ bool has; {} value; }} {name};\n\n", c_type_name(&inner)));
+    }
     let emit_record = |out: &mut String, name: &str, fields: &[(String, CType)]| {
         out.push_str(&format!("struct {name} {{\n"));
         for (field_name, field_ty) in fields {
@@ -6770,18 +6790,6 @@ fn generate_impl(
     // by this point), a `List`'s element type is only known once the drain
     // loop above has finished discovering it from actual usage.
     out.push_str(&list_type_decls);
-    for (ok, err) in std::mem::take(&mut result_pairs) {
-        let name = format!("Result_{}_{}", mangle_ctype(&ok), mangle_ctype(&err));
-        out.push_str(&format!("typedef struct {{ bool ok; {} value; {} error; }} {name};
-
-", field_c_type(&ok), field_c_type(&err)));
-    }
-    for inner in std::mem::take(&mut option_inners) {
-        let name = format!("Option_{}", mangle_ctype(&inner));
-        out.push_str(&format!("typedef struct {{ bool has; {} value; }} {name};
-
-", c_type_name(&inner)));
-    }
 
     // Record instances own any direct reference fields they contain. The
     // callback is registered with the allocation table and releases children

@@ -876,12 +876,12 @@ fn hash_builtin_matches_between_interpreter_and_native() {
 fn hash_rejects_unhashable_composite_payloads() {
     let out = run_stdin(
         &["--stdin", "--check", "--file", "C:/workspace/hash_error.ostrin"],
-        "fn main() -> Void {\n    print(hash([1, 2]))\n}\n",
+        "record NoHash {\n    value: Int\n}\nfn main() -> Void {\n    print(hash([1, 2]))\n    print(hash(NoHash { value: 1 }))\n}\n",
     );
     assert!(!out.status.success());
     let text = stderr(&out);
     assert!(text.contains("E1041"), "missing hash diagnostic: {text}");
-    assert!(text.contains("hashable Option/Result"), "missing hash contract: {text}");
+    assert!(text.contains("derive(Hash)"), "missing hash contract: {text}");
 }
 
 #[test]

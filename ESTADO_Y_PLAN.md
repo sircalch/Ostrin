@@ -87,9 +87,9 @@ orden de inserción.
 `format`, `sum`, `panic`, `read_file`, `write_file`, `parse_int`, métodos de `List`
 (`map/filter/fold/any/all/find/push/remove_at/length`),
 `Map` (`get/set/remove/contains_key/count/keys/values`), `Set`, `Option`, `Result`.
-`hash` ofrece hashes estables para escalares y `Option`/`Result` cuyos payloads sean
-hashables, con paridad entre intérprete y nativo; los tipos de usuario todavía esperan
-un contrato `Hash` formal.
+`hash` ofrece hashes estables para escalares, `Option`/`Result` y records con
+`derive(Hash)` cuyos campos sean recursivamente hashables, con paridad entre intérprete
+y nativo; enums y colecciones compuestas todavía esperan un contrato completo.
 
 **Diagnósticos**: códigos `OSTRIN-Exxxx` con ubicación; salida JSON Lines para editores.
 

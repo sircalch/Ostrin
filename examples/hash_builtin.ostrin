@@ -1,3 +1,12 @@
+record HashPoint: Hash {
+    x: Int
+    y: Int
+}
+
+record HashEnvelope: Hash {
+    value: Option<Int>
+}
+
 fn main() -> Void {
     print(hash(42))
     print(hash(255 as UInt8))
@@ -14,4 +23,9 @@ fn main() -> Void {
     print(hash(empty))
     print(hash(success))
     print(hash(failure))
+
+    point = HashPoint { x: 3, y: 4 }
+    print(hash(point))
+    envelope = HashEnvelope { value: Some(5) }
+    print(hash(envelope))
 }
