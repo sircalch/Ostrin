@@ -1,0 +1,18 @@
+fn main() -> Void {
+    mut total = 0
+    for i in 0 until 3 {
+        values = [i]
+        if i == 1 {
+            continue
+        }
+        total = total + values.length()
+    }
+    print(total)
+    mut n = 0
+    while n < 2 {
+        scratch = [n]
+        n = n + 1
+    }
+    maybe: Option<Int> = None
+    print(maybe)
+}

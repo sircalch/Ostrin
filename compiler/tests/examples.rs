@@ -947,6 +947,56 @@ fn native_ownership_automatically_releases_aliases_reassignments_and_returns() {
 }
 
 #[test]
+fn native_ownership_releases_loop_and_branch_locals() {
+    let exe = temp_artifact("ownership-loops.exe");
+    let compile = run(&[
+        "--compile",
+        "--leak-check",
+        "--out",
+        &exe,
+        &example_path("ownership_loops.ostrin"),
+    ]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "ownership loop compile failed: {}", stderr(&compile));
+    let native = Command::new(&exe).output().expect("run loop ownership binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "ownership loop binary failed: {}", String::from_utf8_lossy(&native.stderr));
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), "3\n");
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "loop and branch locals should be released per iteration: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn native_ownership_releases_ast_loop_locals() {
+    let exe = temp_artifact("ownership-loops-ast.exe");
+    let compile = run(&[
+        "--compile",
+        "--leak-check",
+        "--out",
+        &exe,
+        &example_path("ownership_loops_ast.ostrin"),
+    ]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "AST ownership loop compile failed: {}", stderr(&compile));
+    let native = Command::new(&exe).output().expect("run AST loop ownership binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "AST ownership loop binary failed: {}", String::from_utf8_lossy(&native.stderr));
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), "2\nNone\n");
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "AST loop locals should be released per iteration: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn native_threads_use_os_thread_and_blocking_channel_runtime() {
     let exe = temp_artifact("native-threads.exe");
     let compile = run(&[

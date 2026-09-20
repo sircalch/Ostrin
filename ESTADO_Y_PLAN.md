@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-19 · rama `main` · 6 pruebas diferenciales y 127 de integración en verde.*
+*Corte: 2026-09-19 · rama `main` · 6 pruebas diferenciales y 132 de integración en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
 Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–149); para el diseño
@@ -123,8 +123,8 @@ retienen al almacenarse y se liberan al destruir el contenedor. El backend inser
 propietarios directos al retornar; el mismo contrato se aplica al emisor HIR y al fallback AST.
 `clone(x)` y `drop(x)` siguen disponibles para probar explícitamente el contrato en programas
 nativos. El emisor también limpia bindings de referencia creados por expresiones de bloque
-anidadas; los escapes complejos, loops y la bajada completa de ownership sobre la IR siguen
-pendientes.
+anidadas y por ramas/iteraciones de `while`/`for`, incluyendo `break`/`continue`; los escapes
+complejos y la bajada completa de ownership sobre la IR siguen pendientes.
 
 **Soportado** (todos los ejemplos ejecutables del repo, salvo lo listado en §6):
 - Escalares, strings, recursión, `if/while/for`, `match` (con guardas y patrones anidados).
@@ -163,7 +163,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Cierres en nativo | Captura **por valor** (una variable `mut` cambiada después no se ve dentro); lambda sin contexto de tipos exige anotación |
 | Chequeo «movido tras enviar» (E1101) | Integrado por defecto en `--check`, `--run`, `--emit-c` y `--compile`; `--ownership-check` conserva el informe explícito |
 | Paralelismo nativo (`--native-threads`, canales bloqueantes, `select`) | Hilos del SO, mutexes/condiciones y canales bloqueantes implementados de forma opt-in; el registro de tareas tiene mutex, referencias temporales, desregistro en `join` y drenado de nodos; `select` y cancelación siguen pendientes |
-| Memoria en nativo | Registro, destructores tipados para records/colecciones, `clone`/`drop`, limpieza automática de locales directos y de bloques anidados, y `--leak-check`; ARC completa sobre IR sigue pendiente |
+| Memoria en nativo | Registro, destructores tipados para records/colecciones, `clone`/`drop`, cleanup automático de locales directos, bloques anidados, ramas y loops en AST/HIR, y `--leak-check`; ARC completa sobre IR sigue pendiente |
 | IR de bloques | HIR→CFG disponible con `--ir`; `if/while/for/match/try/spawn/channel` ya tienen operaciones explícitas, aún no reemplaza el backend C |
 | Ownership/último uso | `--ownership-report`, `--ownership-check` y `--ownership-ir`; el backend C ya aplica retain/release lineal en locales directos, pero la IR aún no es la fuente única |
 | Biblioteca estándar | Mínima: `args`, entorno/rutas, `format`, E/S y `hash` estructural para escalares, colecciones y tipos con `derive(Hash)`; faltan fechas, JSON y red |
@@ -255,7 +255,7 @@ Decisiones que necesito de ti para afinar el plan:
 
 ```powershell
 cd compiler
-cargo test                                   # 6 diferenciales + 130 de integración
+cargo test                                   # 6 diferenciales + 132 de integración
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```

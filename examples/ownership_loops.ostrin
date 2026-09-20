@@ -1,0 +1,20 @@
+fn main() -> Void {
+    mut total = 0
+    for i in 0 until 5 {
+        values = [i]
+        if i == 2 {
+            continue
+        }
+        if i == 4 {
+            break
+        }
+        total = total + values.length()
+    }
+
+    mut n = 0
+    while n < 3 {
+        scratch = [n, n + 1]
+        n = n + 1
+    }
+    print(total)
+}

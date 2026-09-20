@@ -4449,3 +4449,19 @@ recursivamente hashables:
 hash_builtin.ostrin verifica también que dos mapas y dos sets con inserciones
 invertidas tengan el mismo hash. Funciones, arrays, canales, tareas y colecciones
 con payload no hashable siguen rechazadas por el checker.
+
+## 162. Ownership por iteración y rama en AST/HIR — 2026-09-19
+
+El cleanup nativo de valores gestionados deja de limitarse al scope lineal y a bloques
+de expresión:
+
+- el emisor AST abre frames de ownership para cada `while`/`for` y para cada rama;
+- el emisor HIR aplica el mismo contrato a sus bloques anidados;
+- `break` y `continue` liberan los frames que abandonan antes de saltar;
+- los elementos gestionados de iteraciones sobre listas/canales reciben el retain/release
+  correspondiente al préstamo o transferencia que representa la iteración.
+
+Se añadieron `ownership_loops.ostrin` para la ruta HIR y `ownership_loops_ast.ostrin`
+para forzar el fallback AST. Ambos verifican salida estable y `live_allocations=0`; la
+batería queda en 6 pruebas diferenciales y 132 de integración verdes. Escapes complejos,
+dominadores y ownership completo sobre la IR siguen pendientes.

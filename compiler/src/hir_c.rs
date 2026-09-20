@@ -74,9 +74,10 @@ struct Emitter<'a> {
     ret: Ty,
     temp: usize,
     /// Direct locals in the current callable that own one native reference.
-    /// Nested HIR blocks remain conservative until block-exit cleanup is
-    /// represented explicitly.
+    /// Nested HIR blocks use `owned_block_locals` and are cleaned at block exit.
     owned_locals: Vec<(String, Ty)>,
+    owned_block_locals: Vec<Vec<(String, Ty)>>,
+    ownership_control_frames: Vec<usize>,
 }
 
 impl Emitter<'_> {
@@ -229,6 +230,8 @@ pub fn generate(f: &HirFunction, world: &World) -> Option<String> {
         ret: f.ret.clone(),
         temp: 0,
         owned_locals: Vec::new(),
+        owned_block_locals: Vec::new(),
+        ownership_control_frames: Vec::new(),
     };
     if !f.generics.is_empty() || f.params.iter().any(|(_, t)| e.c_type(t).is_err()) {
         return None;
@@ -261,7 +264,11 @@ impl Emitter<'_> {
     }
 
     fn owned_local(&self, name: &str) -> bool {
-        self.owned_locals.iter().any(|(owned, _)| owned == name)
+        self.owned_block_locals
+            .iter()
+            .rev()
+            .any(|frame| frame.iter().any(|(owned, _)| owned == name))
+            || self.owned_locals.iter().any(|(owned, _)| owned == name)
     }
 
     fn owned_local_expr(&self, expr: &HirExpr) -> Option<String> {
@@ -270,24 +277,68 @@ impl Emitter<'_> {
     }
 
     fn track_owned_local(&mut self, name: &str, ty: &Ty, borrowed: bool, out: &mut String) {
-        if self.scopes.len() != 1 || !self.managed(ty) {
+        if !self.managed(ty) {
             return;
         }
         if borrowed {
             out.push_str(&format!("    ostrin_retain((void*){name});\n"));
         }
-        if !self.owned_local(name) {
+        if self.scopes.len() == 1 {
+            if !self.owned_local(name) {
+                self.owned_locals.push((name.to_string(), ty.clone()));
+            }
+        } else if let Some(frame) = self.owned_block_locals.last_mut() {
+            if !frame.iter().any(|(owned, _)| owned == name) {
+                frame.push((name.to_string(), ty.clone()));
+            }
+        } else if !self.owned_local(name) {
             self.owned_locals.push((name.to_string(), ty.clone()));
         }
     }
 
     fn cleanup(&self, out: &mut String, transfer: Option<&str>) {
+        for frame in self.owned_block_locals.iter().rev() {
+            for (name, ty) in frame.iter().rev() {
+                if transfer == Some(name.as_str()) || !self.managed(ty) {
+                    continue;
+                }
+                out.push_str(&format!("    ostrin_release((void*){name});\n"));
+            }
+        }
         for (name, ty) in self.owned_locals.iter().rev() {
             if transfer == Some(name.as_str()) || !self.managed(ty) {
                 continue;
             }
             out.push_str(&format!("    ostrin_release((void*){name});\n"));
         }
+    }
+
+    fn emit_control_cleanup(&self, out: &mut String) {
+        let Some(&start) = self.ownership_control_frames.last() else { return };
+        for frame in self.owned_block_locals[start..].iter().rev() {
+            for (name, ty) in frame.iter().rev() {
+                if self.managed(ty) {
+                    out.push_str(&format!("    ostrin_release((void*){name});\n"));
+                }
+            }
+        }
+    }
+
+    fn begin_loop(&mut self) -> usize {
+        let frame = self.owned_block_locals.len();
+        self.owned_block_locals.push(Vec::new());
+        self.ownership_control_frames.push(frame);
+        frame
+    }
+
+    fn end_loop(&mut self, frame: usize, out: &mut String) {
+        for (name, ty) in self.owned_block_locals[frame].iter().rev() {
+            if self.managed(ty) {
+                out.push_str(&format!("    ostrin_release((void*){name});\n"));
+            }
+        }
+        self.owned_block_locals.pop().expect("loop ownership frame must exist");
+        self.ownership_control_frames.pop().expect("loop control frame must exist");
     }
 
     fn emit_return(&mut self, expr: Option<&HirExpr>, code: String, ty: &Ty, out: &mut String) -> Bail<()> {
@@ -336,6 +387,8 @@ impl Emitter<'_> {
     }
 
     fn scoped_stmts(&mut self, block: &HirBlock, out: &mut String) -> Bail<()> {
+        let frame = self.owned_block_locals.len();
+        self.owned_block_locals.push(Vec::new());
         self.scopes.push(HashSet::new());
         for stmt in &block.stmts {
             self.stmt(stmt, out)?;
@@ -344,6 +397,12 @@ impl Emitter<'_> {
             self.expr_stmt(tail, out)?;
         }
         self.scopes.pop();
+        for (name, ty) in self.owned_block_locals[frame].iter().rev() {
+            if self.managed(ty) {
+                out.push_str(&format!("    ostrin_release((void*){name});\n"));
+            }
+        }
+        self.owned_block_locals.pop().expect("statement ownership frame must exist");
         Ok(())
     }
 
@@ -410,12 +469,20 @@ impl Emitter<'_> {
                 self.cleanup(out, None);
                 out.push_str("    return;\n");
             }
-            HirStmt::Break(None) => out.push_str("    break;\n"),
-            HirStmt::Continue => out.push_str("    continue;\n"),
+            HirStmt::Break(None) => {
+                self.emit_control_cleanup(out);
+                out.push_str("    break;\n");
+            }
+            HirStmt::Continue => {
+                self.emit_control_cleanup(out);
+                out.push_str("    continue;\n");
+            }
             HirStmt::While { cond, body } => {
                 let c = self.expr(cond)?;
                 out.push_str(&format!("    while ({c}) {{\n"));
+                let frame = self.begin_loop();
                 self.scoped_stmts(body, out)?;
+                self.end_loop(frame, out);
                 out.push_str("    }\n");
             }
             HirStmt::For { var, iter, body } => {
@@ -428,9 +495,11 @@ impl Emitter<'_> {
                     out.push_str(&format!(
                         "    for (int64_t {var} = {s}; {var} {cmp} {e}; {var}++) {{\n"
                     ));
+                    let frame = self.begin_loop();
                     self.scopes.push(HashSet::from([var.clone()]));
                     self.scoped_stmts(body, out)?;
                     self.scopes.pop();
+                    self.end_loop(frame, out);
                     out.push_str("    }\n");
                     return Ok(());
                 }
@@ -446,9 +515,12 @@ impl Emitter<'_> {
                 out.push_str(&format!(
                     "    {{ {list_c} {list_temp} = {iter_code}; for (int64_t {index_temp} = 0; {index_temp} < {list_temp}->length; {index_temp}++) {{ {elem_c} {var} = {list_temp}->items[{index_temp}];\n"
                 ));
+                let frame = self.begin_loop();
                 self.scopes.push(HashSet::from([var.clone()]));
+                self.track_owned_local(var, elem, true, out);
                 self.scoped_stmts(body, out)?;
                 self.scopes.pop();
+                self.end_loop(frame, out);
                 out.push_str("    } }\n");
             }
             HirStmt::Expr(e) => self.expr_stmt(e, out)?,
@@ -1126,6 +1198,8 @@ impl Emitter<'_> {
             ret: (**ret).clone(),
             temp: 0,
             owned_locals: Vec::new(),
+            owned_block_locals: Vec::new(),
+            ownership_control_frames: Vec::new(),
         };
         let mut body_c = String::new();
         lambda_emitter.body(body, &mut body_c)?;

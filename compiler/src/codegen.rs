@@ -1095,6 +1095,9 @@ struct Codegen<'a> {
     /// the current callable. They are released when the block expression
     /// finishes, before its value is yielded to the enclosing expression.
     owned_block_locals: Vec<Vec<(String, CType)>>,
+    /// Starting frame for each active loop, used to release loop-body locals
+    /// before a generated `break` or `continue`.
+    ownership_control_frames: Vec<usize>,
     ownership_active: bool,
     native_threads: bool,
 }
@@ -1938,6 +1941,48 @@ impl<'a> Codegen<'a> {
         Self::emit_owned_bindings_cleanup(&self.owned_locals, transfer, out);
     }
 
+    fn emit_owned_control_cleanup(&self, out: &mut String) {
+        let Some(&start) = self.ownership_control_frames.last() else { return };
+        for frame in self.owned_block_locals[start..].iter().rev() {
+            Self::emit_owned_bindings_cleanup(frame, None, out);
+        }
+    }
+
+    fn begin_owned_loop(&mut self) -> Option<usize> {
+        if !self.ownership_active || self.lambda_depth != 0 {
+            return None;
+        }
+        let frame = self.owned_block_locals.len();
+        self.owned_block_locals.push(Vec::new());
+        self.ownership_control_frames.push(frame);
+        Some(frame)
+    }
+
+    fn end_owned_loop(&mut self, frame: Option<usize>, out: &mut String) {
+        let Some(frame) = frame else { return };
+        Self::emit_owned_bindings_cleanup(&self.owned_block_locals[frame], None, out);
+        self.owned_block_locals.pop().expect("loop ownership frame must exist");
+        self.ownership_control_frames.pop().expect("loop control frame must exist");
+    }
+
+    fn gen_scoped_block_stmts(&mut self, block: &Block, out: &mut String) -> Result<(), String> {
+        let frame = if self.ownership_active && self.lambda_depth == 0 {
+            let frame = self.owned_block_locals.len();
+            self.owned_block_locals.push(Vec::new());
+            Some(frame)
+        } else {
+            None
+        };
+        self.push_scope();
+        let result = self.gen_block_stmts(block, out);
+        self.pop_scope();
+        if let Some(frame) = frame {
+            Self::emit_owned_bindings_cleanup(&self.owned_block_locals[frame], None, out);
+            self.owned_block_locals.pop().expect("statement ownership frame must exist");
+        }
+        result
+    }
+
     /// Emits a return through a temporary when the value is reference-like.
     /// That evaluates the expression before local cleanup, then retains only
     /// borrowed expressions (parameters, fields and indexes). A directly
@@ -2220,6 +2265,8 @@ impl<'a> Codegen<'a> {
         self.compare_enabled = true;
         self.push_scope();
         self.owned_locals.clear();
+        self.owned_block_locals.clear();
+        self.ownership_control_frames.clear();
         self.ownership_active = true;
         self.subst_stack.push(subst.clone());
         self.current_return.push(return_type.clone());
@@ -2250,6 +2297,8 @@ impl<'a> Codegen<'a> {
         }
         self.ownership_active = false;
         self.owned_locals.clear();
+        self.owned_block_locals.clear();
+        self.ownership_control_frames.clear();
         self.current_return.pop();
         self.subst_stack.pop();
         self.pop_scope();
@@ -2424,15 +2473,21 @@ impl<'a> Codegen<'a> {
                 if value.is_some() {
                     return Err("'break' with a value isn't supported by the native backend yet".to_string());
                 }
+                self.emit_owned_control_cleanup(out);
                 out.push_str("    break;\n");
             }
-            Stmt::Continue => out.push_str("    continue;\n"),
+            Stmt::Continue => {
+                self.emit_owned_control_cleanup(out);
+                out.push_str("    continue;\n");
+            }
             Stmt::While { cond, body } => {
                 let (cond_code, _) = self.gen_expr(cond)?;
                 out.push_str(&format!("    while ({cond_code}) {{\n"));
+                let frame = self.begin_owned_loop();
                 self.push_scope();
                 self.gen_block_stmts(body, out)?;
                 self.pop_scope();
+                self.end_owned_loop(frame, out);
                 out.push_str("    }\n");
             }
             Stmt::For { pattern, iter, body } => self.gen_for(pattern, iter, body, out)?,
@@ -2464,15 +2519,11 @@ impl<'a> Codegen<'a> {
                 if let Expr::If(cond, then_b, else_b) = e.unlocated() {
                     let (cond_code, _) = self.gen_expr(cond)?;
                     out.push_str(&format!("    if ({cond_code}) {{\n"));
-                    self.push_scope();
-                    self.gen_block_stmts(then_b, out)?;
-                    self.pop_scope();
+                    self.gen_scoped_block_stmts(then_b, out)?;
                     out.push_str("    }\n");
                     if let Some(else_b) = else_b {
                         out.push_str("    else {\n");
-                        self.push_scope();
-                        self.gen_block_stmts(else_b, out)?;
-                        self.pop_scope();
+                        self.gen_scoped_block_stmts(else_b, out)?;
                         out.push_str("    }\n");
                     }
                 } else {
@@ -2499,10 +2550,12 @@ impl<'a> Codegen<'a> {
                 RangeKind::Until => "<",
             };
             out.push_str(&format!("    for (int64_t {pattern} = {start_code}; {pattern} {cmp} {end_code}; {pattern}++) {{\n"));
+            let frame = self.begin_owned_loop();
             self.push_scope();
             self.define(pattern, CType::Int);
             self.gen_block_stmts(body, out)?;
             self.pop_scope();
+            self.end_owned_loop(frame, out);
             out.push_str("    }\n");
             return Ok(());
         }
@@ -2514,10 +2567,13 @@ impl<'a> Codegen<'a> {
             let option = c_type_name(&CType::Option(elem_ty.clone()));
             out.push_str(&format!("    {{\n        {} {ch} = {iter_code};\n", c_type_name(&iter_ty)));
             out.push_str(&format!("        for (;;) {{\n            {option} {item} = {}_receive({ch});\n            if (!{item}.has) break;\n            {} {pattern} = {item}.value;\n", mangle_ctype(&iter_ty), c_type_name(elem_ty)));
+            let frame = self.begin_owned_loop();
             self.push_scope();
             self.define(pattern, (**elem_ty).clone());
+            self.track_owned_local(pattern, elem_ty, false, out);
             self.gen_block_stmts(body, out)?;
             self.pop_scope();
+            self.end_owned_loop(frame, out);
             out.push_str("        }\n    }\n");
             return Ok(());
         }
@@ -2538,10 +2594,13 @@ impl<'a> Codegen<'a> {
 "));
                 out.push_str(&format!("            {} {pattern} = {item_temp}.value;
 ", c_type_name(&elem_ty)));
+                let frame = self.begin_owned_loop();
                 self.push_scope();
-                self.define(pattern, *elem_ty);
+                self.define(pattern, (*elem_ty).clone());
+                self.track_owned_local(pattern, &elem_ty, false, out);
                 self.gen_block_stmts(body, out)?;
                 self.pop_scope();
+                self.end_owned_loop(frame, out);
                 out.push_str("        }
     }
 ");
@@ -2560,10 +2619,13 @@ impl<'a> Codegen<'a> {
             "        for (int64_t {index_temp} = 0; {index_temp} < {list_temp}->length; {index_temp}++) {{\n"
         ));
         out.push_str(&format!("            {} {pattern} = {list_temp}->items[{index_temp}];\n", c_type_name(&elem_ty)));
+        let frame = self.begin_owned_loop();
         self.push_scope();
-        self.define(pattern, elem_ty);
+        self.define(pattern, elem_ty.clone());
+        self.track_owned_local(pattern, &elem_ty, true, out);
         self.gen_block_stmts(body, out)?;
         self.pop_scope();
+        self.end_owned_loop(frame, out);
         out.push_str("        }\n    }\n");
         Ok(())
     }
@@ -5990,6 +6052,7 @@ fn generate_impl(
         temp_counter: 0,
         owned_locals: Vec::new(),
         owned_block_locals: Vec::new(),
+        ownership_control_frames: Vec::new(),
         ownership_active: false,
         native_threads,
     };

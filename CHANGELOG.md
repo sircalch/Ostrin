@@ -33,6 +33,8 @@ test
 - Added structural hashing for `List`, `Map`, and `Set`; list order is significant,
   while map/set insertion order is deliberately ignored and nested payloads are
   checked recursively.
+- Extended native ownership cleanup through `while`/`for` iterations and branch
+  exits, including `break`/`continue`, in both the AST and HIR emitters.
 - The WASI distribution workflow now runs the release compiler under Node WASI
   before packaging it, checking an Ostrin source file through a preopened
   filesystem and validating the module's CLI exit code.
