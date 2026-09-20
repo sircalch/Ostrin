@@ -4432,4 +4432,20 @@ El contrato Hash de usuario cubre también enums no genéricos:
 
 hash_builtin.ostrin cubre una variante vacía y otra posicional. La prueba negativa
 confirma que un enum sin derive(Hash) se rechaza en compilación. Los enums genéricos,
-listas, mapas y sets siguen fuera de este contrato.
+listas, mapas y sets siguen fuera de este contrato de usuario.
+
+## 161. Hash estructural para colecciones — 2026-09-19
+
+El builtin hash acepta ahora colecciones compuestas cuando sus elementos son
+recursivamente hashables:
+
+- `List<T>` combina la etiqueta `List` y los elementos en orden;
+- `Map<K, V>` combina cada par clave/valor con acumulación independiente del
+  orden de inserción y del tamaño;
+- `Set<T>` aplica la misma acumulación independiente del orden a sus elementos;
+- intérprete y backend C comparten las etiquetas, la mezcla y el tratamiento de
+  los valores anidados.
+
+hash_builtin.ostrin verifica también que dos mapas y dos sets con inserciones
+invertidas tengan el mismo hash. Funciones, arrays, canales, tareas y colecciones
+con payload no hashable siguen rechazadas por el checker.

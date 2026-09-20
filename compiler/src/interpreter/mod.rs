@@ -709,6 +709,37 @@ impl Interpreter {
 
     fn hash_value(&self, value: &Value) -> Option<u64> {
         match value {
+            Value::List(state) => {
+                let mut hash = stable_hash_string("List");
+                let items = state.borrow().clone();
+                for item in &items {
+                    hash = stable_hash_combine(hash, self.hash_value(item)?);
+                }
+                Some(hash)
+            }
+            Value::Map(state) => {
+                let entries = state.borrow().entries.clone();
+                let mut sum = 0u64;
+                for (key, value) in &entries {
+                    let entry = stable_hash_combine(self.hash_value(key)?, self.hash_value(value)?);
+                    sum = sum.wrapping_add(entry.rotate_left(17));
+                }
+                Some(stable_hash_combine(
+                    stable_hash_string("Map"),
+                    stable_hash_u64(sum ^ entries.len() as u64),
+                ))
+            }
+            Value::Set(state) => {
+                let entries = state.borrow().entries.clone();
+                let mut sum = 0u64;
+                for item in &entries {
+                    sum = sum.wrapping_add(self.hash_value(item)?.rotate_left(17));
+                }
+                Some(stable_hash_combine(
+                    stable_hash_string("Set"),
+                    stable_hash_u64(sum ^ entries.len() as u64),
+                ))
+            }
             Value::Record(type_name, data) if self.has_derive(type_name, "Hash") => {
                 let declaration = self.records.get(type_name)?;
                 let mut hash = stable_hash_string(&format!("Record::{type_name}"));
@@ -2160,7 +2191,7 @@ impl Interpreter {
                 "hash" => {
                     let value = self.eval_arg(&args[0], env)?;
                     let hash = self.hash_value(&value).ok_or_else(|| {
-                        RuntimeError::Error("'hash' supports scalar values, hashable Option/Result values, or records/enums with derive(Hash)".to_string())
+                        RuntimeError::Error("'hash' supports scalar values, hashable Option/Result/collection values, or records/enums with derive(Hash)".to_string())
                     })?;
                     return Ok(Value::Int(hash as i64));
                 }

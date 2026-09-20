@@ -30,6 +30,9 @@ test
 - Extended the user-defined hash contract to non-generic enums: every variant
   receives a stable type/variant tag and its fields are combined in declaration
   order, with interpreter/native parity and compile-time rejection otherwise.
+- Added structural hashing for `List`, `Map`, and `Set`; list order is significant,
+  while map/set insertion order is deliberately ignored and nested payloads are
+  checked recursively.
 - The WASI distribution workflow now runs the release compiler under Node WASI
   before packaging it, checking an Ostrin source file through a preopened
   filesystem and validating the module's CLI exit code.

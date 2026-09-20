@@ -3847,8 +3847,8 @@ impl<'a> Codegen<'a> {
         }
     }
 
-    /// Returns a stable runtime hash for scalar values, structural
-    /// Option/Result values, and records/enums with derive(Hash).
+    /// Returns a stable runtime hash for scalar and collection values,
+    /// structural Option/Result values, and records/enums with derive(Hash).
     fn hash_expr(&self, value: &str, ty: &CType) -> Option<String> {
         match ty {
             CType::Str => Some(format!("ostrin_hash_string({value})")),
@@ -3894,6 +3894,28 @@ impl<'a> Codegen<'a> {
                     });
                 }
                 expression
+            }
+            CType::List(inner) => {
+                let item_hash = self.hash_expr("__ostrin_hash_collection->items[__ostrin_hash_i]", inner)?;
+                Some(format!(
+                    "({{ const {} __ostrin_hash_collection = ({value}); uint64_t __ostrin_hash = ostrin_hash_string(\"List\"); if (__ostrin_hash_collection != NULL) {{ for (int64_t __ostrin_hash_i = 0; __ostrin_hash_i < __ostrin_hash_collection->length; __ostrin_hash_i++) {{ __ostrin_hash = ostrin_hash_combine(__ostrin_hash, {item_hash}); }} }} __ostrin_hash; }})",
+                    c_type_name(ty),
+                ))
+            }
+            CType::Map(key, value_ty) => {
+                let key_hash = self.hash_expr("__ostrin_hash_collection->keys[__ostrin_hash_i]", key)?;
+                let value_hash = self.hash_expr("__ostrin_hash_collection->vals[__ostrin_hash_i]", value_ty)?;
+                Some(format!(
+                    "({{ const {} __ostrin_hash_collection = ({value}); uint64_t __ostrin_hash_sum = 0; int64_t __ostrin_hash_len = __ostrin_hash_collection == NULL ? 0 : __ostrin_hash_collection->length; if (__ostrin_hash_collection != NULL) {{ for (int64_t __ostrin_hash_i = 0; __ostrin_hash_i < __ostrin_hash_collection->length; __ostrin_hash_i++) {{ uint64_t __ostrin_hash_entry = ostrin_hash_combine({key_hash}, {value_hash}); __ostrin_hash_sum += (__ostrin_hash_entry << 17) | (__ostrin_hash_entry >> 47); }} }} ostrin_hash_combine(ostrin_hash_string(\"Map\"), ostrin_hash_u64(__ostrin_hash_sum ^ (uint64_t)__ostrin_hash_len)); }})",
+                    c_type_name(ty),
+                ))
+            }
+            CType::Set(inner) => {
+                let item_hash = self.hash_expr("__ostrin_hash_collection->items[__ostrin_hash_i]", inner)?;
+                Some(format!(
+                    "({{ const {} __ostrin_hash_collection = ({value}); uint64_t __ostrin_hash_sum = 0; int64_t __ostrin_hash_len = __ostrin_hash_collection == NULL ? 0 : __ostrin_hash_collection->length; if (__ostrin_hash_collection != NULL) {{ for (int64_t __ostrin_hash_i = 0; __ostrin_hash_i < __ostrin_hash_collection->length; __ostrin_hash_i++) {{ uint64_t __ostrin_hash_entry = {item_hash}; __ostrin_hash_sum += (__ostrin_hash_entry << 17) | (__ostrin_hash_entry >> 47); }} }} ostrin_hash_combine(ostrin_hash_string(\"Set\"), ostrin_hash_u64(__ostrin_hash_sum ^ (uint64_t)__ostrin_hash_len)); }})",
+                    c_type_name(ty),
+                ))
             }
             _ => None,
         }
@@ -5353,7 +5375,7 @@ impl<'a> Codegen<'a> {
             "file_exists" => Ok(Some((format!("ostrin_file_exists({})", codes[0]), CType::Bool))),
             "hash" => {
                 let hash = self.hash_expr(&codes[0], &types[0]).ok_or_else(|| {
-                    "'hash' supports scalar values, hashable Option/Result values, or records/enums with derive(Hash)".to_string()
+                    "'hash' supports scalar values, hashable Option/Result/collection values, or records/enums with derive(Hash)".to_string()
                 })?;
                 Ok(Some((format!("(int64_t)({hash})"), CType::Int)))
             }

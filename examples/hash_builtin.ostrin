@@ -36,4 +36,25 @@ fn main() -> Void {
 
     shape = Point(3, 4)
     print(hash(shape))
+
+    numbers = [1, 2, 3]
+    print(hash(numbers))
+
+    mut scores = Map<String, Int>()
+    scores.set("a", 1)
+    scores.set("b", 2)
+    print(hash(scores))
+    mut reversed_scores = Map<String, Int>()
+    reversed_scores.set("b", 2)
+    reversed_scores.set("a", 1)
+    assert_eq(hash(scores), hash(reversed_scores))
+
+    mut flags = Set<Int>()
+    flags.add(1)
+    flags.add(2)
+    print(hash(flags))
+    mut reversed_flags = Set<Int>()
+    reversed_flags.add(2)
+    reversed_flags.add(1)
+    assert_eq(hash(flags), hash(reversed_flags))
 }

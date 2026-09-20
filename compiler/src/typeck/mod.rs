@@ -3956,6 +3956,13 @@ fn is_builtin_hashable(
     ) -> bool {
     match ty {
         Ty::Int | Ty::Sized(_) | Ty::Float | Ty::Float32 | Ty::Bool | Ty::String | Ty::Unknown => true,
+        Ty::List(inner) | Ty::Set(inner) => {
+            visit(inner, record_derives, record_fields, enum_derives, enum_variants, variant_fields, visiting)
+        }
+        Ty::Map(key, value) => {
+            visit(key, record_derives, record_fields, enum_derives, enum_variants, variant_fields, visiting)
+                && visit(value, record_derives, record_fields, enum_derives, enum_variants, variant_fields, visiting)
+        }
         Ty::Applied(name, args) if name == "Option" && args.len() == 1 => {
             visit(&args[0], record_derives, record_fields, enum_derives, enum_variants, variant_fields, visiting)
         }
@@ -4081,7 +4088,7 @@ fn check_builtin_call(
                 errors.push(TypeError {
                     code: "E1041",
                     message: format!(
-                        "Builtin 'hash' supports scalar values, hashable Option/Result values, or records/enums with derive(Hash), got '{}'.",
+                        "Builtin 'hash' supports scalar values, hashable Option/Result/collection values, or records/enums with derive(Hash), got '{}'.",
                         arg_types[0].describe()
                     ),
                     span: None,
