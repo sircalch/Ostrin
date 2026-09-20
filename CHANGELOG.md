@@ -33,6 +33,10 @@ test
 - Added structural hashing for `List`, `Map`, and `Set`; list order is significant,
   while map/set insertion order is deliberately ignored and nested payloads are
   checked recursively.
+- Connected the same structural hash to `Map`/`Set` bucket lookup in the interpreter
+  and native backend, including composite collection keys. User records/enums use
+  buckets only with derived `Hash + Eq` and no custom equality method; other cases
+  retain a correct linear fallback.
 - Extended native ownership cleanup through `while`/`for` iterations and branch
   exits, including `break`/`continue`, in both the AST and HIR emitters.
 - HIR block expressions now release managed locals while preserving returned owned

@@ -873,6 +873,26 @@ fn hash_builtin_matches_between_interpreter_and_native() {
 }
 
 #[test]
+fn composite_collection_keys_match_between_interpreter_and_native() {
+    let file = example_path("hash_map_composite.ostrin");
+    let interpreted = run(&["--run", &file]);
+    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    let expected = stdout(&interpreted).replace("\r\n", "\n");
+    assert_eq!(expected, "Some(ok)\nfalse\nSome(updated)\n1\ntrue\nfalse\n1\nSome(eleven)\ntrue\n1\nSome(stable)\ntrue\n");
+
+    let exe = temp_artifact("hash-map-composite.exe");
+    let compile = run(&["--compile", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "native compile failed: {}", stderr(&compile));
+    let native = Command::new(&exe).output().expect("run composite hash map binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native binary failed: {}", String::from_utf8_lossy(&native.stderr));
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+}
+
+#[test]
 fn hash_rejects_unhashable_composite_payloads() {
     let out = run_stdin(
         &["--stdin", "--check", "--file", "C:/workspace/hash_error.ostrin"],

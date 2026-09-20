@@ -110,7 +110,7 @@ enum CType {
     /// the expected instance is known.
     GenLit(String, String),
     /// `Map<K, V>` / `Set<T>`: heap-allocated, by reference, insertion-ordered
-    /// arrays searched linearly (like the interpreter's `Vec` state).
+    /// arrays with hash buckets for compatible keys and a linear fallback.
     Map(Box<CType>, Box<CType>),
     Set(Box<CType>),
     /// `channel<T>()`: a FIFO queue in the heap, by reference. Channels pump
@@ -3909,6 +3909,81 @@ impl<'a> Codegen<'a> {
         }
     }
 
+    /// A hash is safe for a collection's bucket index only when the equality
+    /// operation has the same structural contract. User-defined `equals`
+    /// methods are intentionally excluded: a custom equality relation may be
+    /// broader than the derived hash, so the collection must use its linear
+    /// fallback rather than risk a false negative lookup.
+    fn is_indexable_hash_type(&self, ty: &CType) -> bool {
+        fn visit(codegen: &Codegen<'_>, ty: &CType, visiting: &mut HashSet<String>) -> bool {
+            match ty {
+                CType::Int | CType::Float | CType::Float32 | CType::Bool | CType::Str | CType::Sized(_) => true,
+                CType::Option(inner) | CType::Set(inner) | CType::List(inner) => visit(codegen, inner, visiting),
+                CType::Result(ok, err) => visit(codegen, ok, visiting) && visit(codegen, err, visiting),
+                CType::Map(key, value) => visit(codegen, key, visiting) && visit(codegen, value, visiting),
+                CType::Record(name) => {
+                    if !codegen.has_derive(name, "Hash")
+                        || !codegen.has_derive(name, "Eq")
+                        || codegen.methods.get(name).and_then(|methods| methods.get("equals")).is_some()
+                        || !visiting.insert(name.clone())
+                    {
+                        return false;
+                    }
+                    let result = codegen
+                        .record_fields(name)
+                        .iter()
+                        .all(|(_, field_ty)| visit(codegen, field_ty, visiting));
+                    visiting.remove(name);
+                    result
+                }
+                CType::Enum(name) => {
+                    if !codegen.has_derive(name, "Hash")
+                        || !codegen.has_derive(name, "Eq")
+                        || codegen.methods.get(name).and_then(|methods| methods.get("equals")).is_some()
+                        || !visiting.insert(name.clone())
+                    {
+                        return false;
+                    }
+                    let variants: Vec<VariantInfo> = match codegen.instance_variants.get(name) {
+                        Some(variants) => variants.clone(),
+                        None => codegen.variants.values().filter(|variant| &variant.enum_name == name).cloned().collect(),
+                    };
+                    let result = variants
+                        .iter()
+                        .all(|variant| variant.fields.iter().all(|(_, field_ty)| visit(codegen, field_ty, visiting)));
+                    visiting.remove(name);
+                    result
+                }
+                _ => false,
+            }
+        }
+
+        visit(self, ty, &mut HashSet::new())
+    }
+
+    /// Reference-backed keys can change through an alias after insertion.
+    /// Their buckets are therefore rebuilt immediately before lookup; scalar
+    /// keys retain the O(1) bucket path without this refresh.
+    fn index_key_may_mutate(&self, ty: &CType) -> bool {
+        match ty {
+            CType::Record(_) | CType::List(_) | CType::Map(..) | CType::Set(_) => true,
+            CType::Option(inner) => self.index_key_may_mutate(inner),
+            CType::Result(ok, err) => self.index_key_may_mutate(ok) || self.index_key_may_mutate(err),
+            CType::Enum(name) => {
+                let variants: Vec<VariantInfo> = match self.instance_variants.get(name) {
+                    Some(variants) => variants.clone(),
+                    None => self.variants.values().filter(|variant| &variant.enum_name == name).cloned().collect(),
+                };
+                variants.iter().any(|variant| variant.fields.iter().any(|(_, field_ty)| self.index_key_may_mutate(field_ty)))
+            }
+            _ => false,
+        }
+    }
+
+    fn index_hash_expr(&self, value: &str, ty: &CType) -> Option<String> {
+        self.is_indexable_hash_type(ty).then(|| self.hash_expr(value, ty)).flatten()
+    }
+
     /// Returns a stable runtime hash for scalar and collection values,
     /// structural Option/Result values, and records/enums with derive(Hash).
     fn hash_expr(&self, value: &str, ty: &CType) -> Option<String> {
@@ -6497,8 +6572,13 @@ fn generate_impl(
                     let list_v = c_type_name(&CType::List(v.clone()));
                     let (lk, lv) = (list_struct_name(k), list_struct_name(v));
                     let eq = codegen.eq_expr("m->keys[i]", "key", k)?;
-                    let hashable = codegen.hash_expr("key", k);
-                    let hash_entry = codegen.hash_expr("m->keys[i]", k);
+                    let hashable = codegen.index_hash_expr("key", k);
+                    let hash_entry = codegen.index_hash_expr("m->keys[i]", k);
+                    let refresh_before_find = if hashable.is_some() && codegen.index_key_may_mutate(k) {
+                        format!("    if (m->buckets) {name}_rehash(m, m->bucket_capacity);\n")
+                    } else {
+                        String::new()
+                    };
                     let fields = if hashable.is_some() {
                         "    int64_t* buckets;\n    int64_t bucket_capacity;\n"
                     } else {
@@ -6522,7 +6602,7 @@ fn generate_impl(
                     let linear_find = format!("for (int64_t i = 0; i < m->length; i++) {{ if ({eq}) return i; }}\n    return -1;");
                     let find_body = match &hashable {
                         Some(hash) => format!(
-                            "    if (!m->buckets || m->bucket_capacity == 0) {{ {linear_find} }}\n    uint64_t hash = {hash};\n    int64_t slot = (int64_t)(hash % (uint64_t)m->bucket_capacity);\n    for (int64_t step = 0; step < m->bucket_capacity; step++) {{ int64_t i = m->buckets[slot]; if (i < 0) return -1; if ({eq}) return i; slot = (slot + 1) % m->bucket_capacity; }}\n    return -1;\n"
+                            "{refresh_before_find}    if (!m->buckets || m->bucket_capacity == 0) {{ {linear_find} }}\n    uint64_t hash = {hash};\n    int64_t slot = (int64_t)(hash % (uint64_t)m->bucket_capacity);\n    for (int64_t step = 0; step < m->bucket_capacity; step++) {{ int64_t i = m->buckets[slot]; if (i < 0) return -1; if ({eq}) return i; slot = (slot + 1) % m->bucket_capacity; }}\n    return -1;\n"
                         ),
                         None => format!("    {linear_find}\n"),
                     };
@@ -6618,8 +6698,13 @@ fn generate_impl(
                 CType::Set(t) => {
                     let tc = c_type_name(t);
                     let eq = codegen.eq_expr("s->items[i]", "item", t)?;
-                    let hashable = codegen.hash_expr("item", t);
-                    let hash_entry = codegen.hash_expr("s->items[i]", t);
+                    let hashable = codegen.index_hash_expr("item", t);
+                    let hash_entry = codegen.index_hash_expr("s->items[i]", t);
+                    let refresh_before_find = if hashable.is_some() && codegen.index_key_may_mutate(t) {
+                        format!("    if (s->buckets) {name}_rehash(s, s->bucket_capacity);\n")
+                    } else {
+                        String::new()
+                    };
                     let fields = if hashable.is_some() {
                         "    int64_t* buckets;\n    int64_t bucket_capacity;\n"
                     } else {
@@ -6637,7 +6722,7 @@ fn generate_impl(
                     let linear_find = format!("for (int64_t i = 0; i < s->length; i++) {{ if ({eq}) return i; }}\n    return -1;");
                     let find_body = match &hashable {
                         Some(hash) => format!(
-                            "    if (!s->buckets || s->bucket_capacity == 0) {{ {linear_find} }}\n    uint64_t hash = {hash};\n    int64_t slot = (int64_t)(hash % (uint64_t)s->bucket_capacity);\n    for (int64_t step = 0; step < s->bucket_capacity; step++) {{ int64_t i = s->buckets[slot]; if (i < 0) return -1; if ({eq}) return i; slot = (slot + 1) % s->bucket_capacity; }}\n    return -1;\n"
+                            "{refresh_before_find}    if (!s->buckets || s->bucket_capacity == 0) {{ {linear_find} }}\n    uint64_t hash = {hash};\n    int64_t slot = (int64_t)(hash % (uint64_t)s->bucket_capacity);\n    for (int64_t step = 0; step < s->bucket_capacity; step++) {{ int64_t i = s->buckets[slot]; if (i < 0) return -1; if ({eq}) return i; slot = (slot + 1) % s->bucket_capacity; }}\n    return -1;\n"
                         ),
                         None => format!("    {linear_find}\n"),
                     };

@@ -65,11 +65,14 @@ empty: Map<String, Int> = Map<String, Int>()
 - El caso vacío **no** tiene forma literal (evita inventar un token especial tipo `[:]`): se construye con el constructor explícito `Map<K, V>()`, siempre con los tipos anotados porque no hay elementos de los que inferirlos.
 - Requiere que `K` implemente `Hash + Eq` (ver §5). `V` no tiene restricción.
 
-La primera implementación operativa usa una representación híbrida: las claves escalares de
-`Map` y los elementos escalares de `Set` tienen índice hash con direccionamiento abierto y
-mantienen las entradas en orden de inserción para que `keys()`/`values()` y la iteración sean
-deterministas; las claves/elementos compuestos usan temporalmente el fallback lineal hasta que el
-checker haga cumplir y el compilador genere `Hash` para tipos de usuario.
+La implementación operativa usa una representación híbrida: las claves y elementos con un
+contrato de hash/igualdad compatible tienen índice hash con direccionamiento abierto y mantienen
+las entradas en orden de inserción para que `keys()`/`values()` y la iteración sean deterministas.
+`List`/`Map`/`Set` y tipos definidos por el usuario con `derive(Hash)` + `derive(Eq)` pueden usar
+el hash estructural; una igualdad personalizada usa el fallback lineal. Como esas claves pueden
+mutar a través de aliases, el intérprete y el backend nativo reconstruyen sus buckets justo antes
+de buscar. Así se conserva la corrección aunque el coste sea lineal para claves mutables, mientras
+que las claves escalares estables mantienen el camino O(1).
 
 ### 3.1 Operaciones
 

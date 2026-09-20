@@ -21,29 +21,39 @@ use crate::types::{dim_div, dim_is_dimensionless, dim_mul, dim_pow, dim_to_strin
 #[derive(Clone)]
 pub(crate) struct MapState {
     entries: Vec<(Value, Value)>,
-    /// Hash buckets store entry indexes so iteration remains insertion-ordered
-    /// while ordinary lookups are expected O(1) for scalar keys.
+    /// Hash buckets store entry indexes so iteration remains insertion-ordered;
+    /// scalar-key lookups stay O(1), while mutable reference-backed keys are
+    /// reindexed immediately before lookup.
     index: HashMap<u64, Vec<usize>>,
+    refresh_before_lookup: bool,
 }
 
 impl MapState {
     fn new(entries: Vec<(Value, Value)>) -> Self {
-        let mut state = Self { entries, index: HashMap::new() };
+        let mut state = Self { entries, index: HashMap::new(), refresh_before_lookup: false };
         state.rebuild_index();
         state
     }
 
     fn rebuild_index(&mut self) {
+        self.rebuild_index_with(map_key_hash);
+    }
+
+    fn rebuild_index_with<F>(&mut self, hash_value: F)
+    where
+        F: Fn(&Value) -> Option<u64>,
+    {
         self.index.clear();
         for (position, (key, _)) in self.entries.iter().enumerate() {
-            if let Some(hash) = map_key_hash(key) {
+            if let Some(hash) = hash_value(key) {
                 self.index.entry(hash).or_default().push(position);
             }
         }
+        self.refresh_before_lookup = self.entries.iter().any(|(key, _)| value_may_mutate(key));
     }
 
-    fn candidates(&self, key: &Value) -> Vec<usize> {
-        match map_key_hash(key).and_then(|hash| self.index.get(&hash)) {
+    fn candidates_with_hash(&self, hash: Option<u64>) -> Vec<usize> {
+        match hash.and_then(|hash| self.index.get(&hash)) {
             Some(indexes) => indexes.clone(),
             None => (0..self.entries.len()).collect(),
         }
@@ -71,26 +81,35 @@ impl IntoIterator for MapState {
 pub(crate) struct SetState {
     entries: Vec<Value>,
     index: HashMap<u64, Vec<usize>>,
+    refresh_before_lookup: bool,
 }
 
 impl SetState {
     fn new(entries: Vec<Value>) -> Self {
-        let mut state = Self { entries, index: HashMap::new() };
+        let mut state = Self { entries, index: HashMap::new(), refresh_before_lookup: false };
         state.rebuild_index();
         state
     }
 
     fn rebuild_index(&mut self) {
+        self.rebuild_index_with(map_key_hash);
+    }
+
+    fn rebuild_index_with<F>(&mut self, hash_value: F)
+    where
+        F: Fn(&Value) -> Option<u64>,
+    {
         self.index.clear();
         for (position, value) in self.entries.iter().enumerate() {
-            if let Some(hash) = map_key_hash(value) {
+            if let Some(hash) = hash_value(value) {
                 self.index.entry(hash).or_default().push(position);
             }
         }
+        self.refresh_before_lookup = self.entries.iter().any(value_may_mutate);
     }
 
-    fn candidates(&self, value: &Value) -> Vec<usize> {
-        match map_key_hash(value).and_then(|hash| self.index.get(&hash)) {
+    fn candidates_with_hash(&self, hash: Option<u64>) -> Vec<usize> {
+        match hash.and_then(|hash| self.index.get(&hash)) {
             Some(indexes) => indexes.clone(),
             None => (0..self.entries.len()).collect(),
         }
@@ -146,6 +165,14 @@ pub enum Value {
 
 fn map_key_hash(value: &Value) -> Option<u64> {
     stable_hash_value(value)
+}
+
+fn value_may_mutate(value: &Value) -> bool {
+    match value {
+        Value::List(_) | Value::Map(_) | Value::Set(_) | Value::Record(_, _) => true,
+        Value::EnumInstance(_, _, fields, _) => fields.values().any(value_may_mutate),
+        _ => false,
+    }
 }
 
 fn stable_hash_u64(mut value: u64) -> u64 {
@@ -776,6 +803,92 @@ impl Interpreter {
         }
     }
 
+    /// Hashes values for collection indexes only when the equality contract
+    /// is known to match. Built-in collections and sum types use their
+    /// structural equality; user types require both derives and no custom
+    /// `equals` method, otherwise lookup safely falls back to a linear scan.
+    fn index_hash(&self, value: &Value) -> Option<u64> {
+        match value {
+            Value::List(state) => {
+                let mut hash = stable_hash_string("List");
+                for item in &state.borrow().clone() {
+                    hash = stable_hash_combine(hash, self.index_hash(item)?);
+                }
+                Some(hash)
+            }
+            Value::Map(state) => {
+                let entries = state.borrow().entries.clone();
+                let mut sum = 0u64;
+                for (key, value) in &entries {
+                    let entry = stable_hash_combine(self.index_hash(key)?, self.index_hash(value)?);
+                    sum = sum.wrapping_add(entry.rotate_left(17));
+                }
+                Some(stable_hash_combine(
+                    stable_hash_string("Map"),
+                    stable_hash_u64(sum ^ entries.len() as u64),
+                ))
+            }
+            Value::Set(state) => {
+                let entries = state.borrow().entries.clone();
+                let mut sum = 0u64;
+                for item in &entries {
+                    sum = sum.wrapping_add(self.index_hash(item)?.rotate_left(17));
+                }
+                Some(stable_hash_combine(
+                    stable_hash_string("Set"),
+                    stable_hash_u64(sum ^ entries.len() as u64),
+                ))
+            }
+            Value::EnumInstance(type_name, variant, fields, _)
+                if type_name == "Option" || type_name == "Result" =>
+            {
+                let tag = stable_hash_string(&format!("{type_name}::{variant}"));
+                if let Some(inner) = fields.get("0") {
+                    Some(stable_hash_combine(tag, self.index_hash(inner)?))
+                } else {
+                    Some(tag)
+                }
+            }
+            Value::Record(type_name, data)
+                if self.has_derive(type_name, "Hash")
+                    && self.has_derive(type_name, "Eq")
+                    && self.find_method_for_value(value, "equals").is_none() =>
+            {
+                let declaration = self.records.get(type_name)?;
+                let mut hash = stable_hash_string(&format!("Record::{type_name}"));
+                let fields = data.borrow();
+                for field in &declaration.fields {
+                    let value = fields_get(&fields, &field.name)?;
+                    hash = stable_hash_combine(hash, self.index_hash(value)?);
+                }
+                Some(hash)
+            }
+            Value::EnumInstance(type_name, variant_name, fields, _)
+                if self.has_derive(type_name, "Hash")
+                    && self.has_derive(type_name, "Eq")
+                    && self.find_method_for_value(value, "equals").is_none() =>
+            {
+                let declaration = self.enums.get(type_name)?;
+                let variant = declaration.variants.iter().find(|candidate| candidate.name == *variant_name)?;
+                let mut hash = stable_hash_string(&format!("Enum::{type_name}::{variant_name}"));
+                for (index, field) in variant.fields.iter().enumerate() {
+                    let key = field.name.clone().unwrap_or_else(|| index.to_string());
+                    hash = stable_hash_combine(hash, self.index_hash(fields.get(&key)?)?);
+                }
+                Some(hash)
+            }
+            _ => stable_hash_value(value),
+        }
+    }
+
+    fn reindex_map(&self, state: &Rc<RefCell<MapState>>) {
+        state.borrow_mut().rebuild_index_with(|value| self.index_hash(value));
+    }
+
+    fn reindex_set(&self, state: &Rc<RefCell<SetState>>) {
+        state.borrow_mut().rebuild_index_with(|value| self.index_hash(value));
+    }
+
     /// Genera 'equals' campo por campo, en el orden de declaración del
     /// 'record' (documento 12, §2.1: 'derive(Eq)') — para 'enum', compara
     /// primero la variante y luego sus campos.
@@ -870,7 +983,10 @@ impl Interpreter {
     }
 
     fn map_find(&mut self, state: &Rc<RefCell<MapState>>, key: &Value, env: &Env) -> Result<Option<usize>, RuntimeError> {
-        let candidates = state.borrow().candidates(key);
+        if state.borrow().refresh_before_lookup {
+            self.reindex_map(state);
+        }
+        let candidates = state.borrow().candidates_with_hash(self.index_hash(key));
         for index in candidates {
             let existing = state.borrow().entries[index].0.clone();
             if truthy(&self.eval_binary(BinOp::Eq, existing, key.clone(), env)?) {
@@ -881,7 +997,10 @@ impl Interpreter {
     }
 
     fn set_find(&mut self, state: &Rc<RefCell<SetState>>, value: &Value, env: &Env) -> Result<Option<usize>, RuntimeError> {
-        let candidates = state.borrow().candidates(value);
+        if state.borrow().refresh_before_lookup {
+            self.reindex_set(state);
+        }
+        let candidates = state.borrow().candidates_with_hash(self.index_hash(value));
         for index in candidates {
             let existing = state.borrow().entries[index].clone();
             if truthy(&self.eval_binary(BinOp::Eq, existing, value.clone(), env)?) {
@@ -1870,13 +1989,21 @@ impl Interpreter {
                     }
                     if !dup { values.push(v); }
                 }
-                Ok(Value::Set(Rc::new(RefCell::new(SetState::new(values)))))
+                let state = Rc::new(RefCell::new(SetState::new(values)));
+                self.reindex_set(&state);
+                Ok(Value::Set(state))
             }
-            Expr::EmptyCollection(name, _) => Ok(if name == "Map" {
-                Value::Map(Rc::new(RefCell::new(MapState::new(Vec::new()))))
-            } else {
-                Value::Set(Rc::new(RefCell::new(SetState::new(Vec::new()))))
-            }),
+            Expr::EmptyCollection(name, _) => {
+                if name == "Map" {
+                    let state = Rc::new(RefCell::new(MapState::new(Vec::new())));
+                    self.reindex_map(&state);
+                    Ok(Value::Map(state))
+                } else {
+                    let state = Rc::new(RefCell::new(SetState::new(Vec::new())));
+                    self.reindex_set(&state);
+                    Ok(Value::Set(state))
+                }
+            }
             Expr::MapLiteral(pairs) => {
                 let mut values: Vec<(Value, Value)> = Vec::with_capacity(pairs.len());
                 for (k, v) in pairs {
@@ -1892,7 +2019,9 @@ impl Interpreter {
                     }
                     if !replaced { values.push((kv, vv)); }
                 }
-                Ok(Value::Map(Rc::new(RefCell::new(MapState::new(values)))))
+                let state = Rc::new(RefCell::new(MapState::new(values)));
+                self.reindex_map(&state);
+                Ok(Value::Map(state))
             }
             Expr::Try(inner, catch) => {
                 let value = self.eval_expr(inner, env)?;
@@ -2473,7 +2602,7 @@ impl Interpreter {
                             Some(i) => state.borrow_mut().entries[i] = (k, v),
                             None => state.borrow_mut().entries.push((k, v)),
                         }
-                        state.borrow_mut().rebuild_index();
+                        self.reindex_map(state);
                         return Ok(Value::Void);
                     }
                     "remove" => {
@@ -2481,7 +2610,7 @@ impl Interpreter {
                         let Some(index) = self.map_find(state, &k, env)? else { return Ok(none_value()) };
                         let value = state.borrow().entries[index].1.clone();
                         state.borrow_mut().entries.remove(index);
-                        state.borrow_mut().rebuild_index();
+                        self.reindex_map(state);
                         return Ok(some_value(value));
                     }
                     _ => {}
@@ -2523,7 +2652,7 @@ impl Interpreter {
                         let x = self.eval_arg(&args[0], env)?;
                         if self.set_find(state, &x, env)?.is_none() {
                             state.borrow_mut().entries.push(x);
-                            state.borrow_mut().rebuild_index();
+                            self.reindex_set(state);
                         }
                         return Ok(Value::Void);
                     }
@@ -2531,7 +2660,7 @@ impl Interpreter {
                         let x = self.eval_arg(&args[0], env)?;
                         if let Some(index) = self.set_find(state, &x, env)? {
                             state.borrow_mut().entries.remove(index);
-                            state.borrow_mut().rebuild_index();
+                            self.reindex_set(state);
                         }
                         return Ok(Value::Void);
                     }

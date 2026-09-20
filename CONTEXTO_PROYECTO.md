@@ -4467,3 +4467,24 @@ Se añadieron `ownership_loops.ostrin` para la ruta HIR y `ownership_loops_ast.o
 para forzar el fallback AST. Ambos verifican salida estable y `live_allocations=0`; la
 batería queda en 6 pruebas diferenciales y 132 de integración verdes. Escapes complejos,
 dominadores y ownership completo sobre la IR siguen pendientes.
+
+## 163. Índices de Map/Set para claves compuestas — 2026-09-19
+
+El hash estructural deja de ser solo una operación del builtin `hash` y pasa a alimentar
+los índices internos de `Map` y `Set` en ambos backends:
+
+- el intérprete reindexa cada colección después de construirla o mutarla y calcula de forma
+  recursiva los hashes de `List`, `Map`, `Set`, `Option` y `Result`;
+- el backend nativo conserva su tabla de buckets para colecciones anidadas, con las mismas
+  etiquetas y mezcla que el intérprete; si una clave puede mutar por alias, reconstruye los
+  buckets antes de buscar para no dejar hashes obsoletos;
+- records y enums definidos por el usuario solo usan buckets cuando tienen `derive(Hash)` y
+  `derive(Eq)` compatibles y no declaran un `equals` personalizado; en los demás casos la
+  búsqueda cae a un recorrido lineal correcto, evitando falsos negativos;
+- `examples/hash_map_composite.ostrin` verifica `Map<List<Int>, String>`, `Set<List<Int>>`,
+  actualización/deduplicación y una igualdad personalizada más amplia que el hash, en modo
+  intérprete y nativo.
+
+La batería queda en **6 pruebas diferenciales y 133 de integración verdes**. Sigue pendiente
+formalizar restricciones `Hash`/`Eq` en los tipos de colección y extender la distribución WASM
+al backend de programas Ostrin.

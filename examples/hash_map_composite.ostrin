@@ -1,0 +1,48 @@
+fn main() -> Void {
+    mut pairs = Map<List<Int>, String>()
+    pairs.set([1, 2], "ok")
+    print(pairs.get([1, 2]))
+    print(pairs.contains_key([2, 1]))
+
+    pairs.set([1, 2], "updated")
+    print(pairs.get([1, 2]))
+    print(pairs.count())
+
+    mut seen = Set<List<Int>>()
+    seen.add([1, 2])
+    seen.add([1, 2])
+    print(seen.contains([1, 2]))
+    print(seen.contains([2, 1]))
+    print(seen.count())
+
+    mut buckets = Map<HashBucket, String>()
+    buckets.set(HashBucket { value: 11 }, "eleven")
+    print(buckets.get(HashBucket { value: 19 }))
+
+    mut grouped = Set<HashBucket>()
+    grouped.add(HashBucket { value: 11 })
+    grouped.add(HashBucket { value: 19 })
+    print(grouped.contains(HashBucket { value: 18 }))
+    print(grouped.count())
+
+    mut mutable_key = [1, 2]
+    mut moving = Map<List<Int>, String>()
+    moving.set(mutable_key, "stable")
+    mutable_key.push(3)
+    print(moving.get(mutable_key))
+
+    mut moving_set = Set<List<Int>>()
+    moving_set.add(mutable_key)
+    mutable_key.push(4)
+    print(moving_set.contains(mutable_key))
+}
+
+record HashBucket: Hash {
+    value: Int
+}
+
+impl Eq for HashBucket {
+    fn equals(self, other: Self) -> Bool {
+        self.value / 10 == other.value / 10
+    }
+}
