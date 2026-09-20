@@ -4687,3 +4687,27 @@ completa quedó en **6 pruebas diferenciales y 143 de integración verdes**. La 
 restante de concurrencia es despertar de forma cancelable una E/S bloqueante; el backend
 WASM/distribución y la bitácora de cada bloque continúan formando parte de la ruta de
 producción.
+
+## 175. Recepción de canal cancelable en hilos nativos — 2026-09-19
+
+La espera bloqueante de `Channel<T>.receive()` ya no puede dejar una tarea nativa dormida
+indefinidamente después de que otra tarea solicite su cancelación:
+
+- Windows usa una espera de condición con timeout corto y POSIX usa
+  `pthread_cond_timedwait`; ambos caminos conservan la señalización inmediata de
+  `send`/`close`, pero también vuelven periódicamente al runtime.
+- El receptor libera el mutex del canal antes de llamar a
+  `ostrin_task_checkpoint()`. Si la tarea o su grupo fueron cancelados, el checkpoint
+  puede salir del callback sin saltarse una sección crítica ni dejar el canal bloqueado.
+- El intérprete comprueba la cancelación al entrar y después de ejecutar una tarea
+  pendiente mientras espera una recepción o itera un canal, manteniendo la misma
+  semántica observable.
+- `examples/concurrency_cancel_blocked_receive.ostrin` cubre `receive()` vacío,
+  cancelación desde otra tarea, ausencia de ejecución posterior y
+  `live_allocations=0` en el intérprete, C cooperativo y `--native-threads`; la prueba
+  también exige que el C emitido contenga el timeout y el checkpoint.
+
+La batería queda en **6 pruebas diferenciales y 144 de integración verdes** después de
+esta ampliación. La cancelación de E/S externa arbitraria, como archivos o red, sigue
+requiriendo un runtime de I/O cooperativo; no se pretende preemptar llamadas del sistema
+que no regresan al runtime.

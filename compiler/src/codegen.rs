@@ -369,6 +369,7 @@ static void ostrin_mutex_unlock(OstrinMutex* mutex) { LeaveCriticalSection(mutex
 static void ostrin_cond_init(OstrinCond* cond) { InitializeConditionVariable(cond); }\n\
 static void ostrin_cond_destroy(OstrinCond* cond) { (void)cond; }\n\
 static void ostrin_cond_wait(OstrinCond* cond, OstrinMutex* mutex) { SleepConditionVariableCS(cond, mutex, INFINITE); }\n\
+static void ostrin_cond_wait_timeout(OstrinCond* cond, OstrinMutex* mutex) { (void)SleepConditionVariableCS(cond, mutex, 10); }\n\
 static void ostrin_cond_signal(OstrinCond* cond) { WakeConditionVariable(cond); }\n\
 static void ostrin_cond_broadcast(OstrinCond* cond) { WakeAllConditionVariable(cond); }\n\
 static void ostrin_select_wait(void) { Sleep(0); }\n\
@@ -385,6 +386,13 @@ static void ostrin_mutex_unlock(OstrinMutex* mutex) { pthread_mutex_unlock(mutex
 static void ostrin_cond_init(OstrinCond* cond) { pthread_cond_init(cond, NULL); }\n\
 static void ostrin_cond_destroy(OstrinCond* cond) { pthread_cond_destroy(cond); }\n\
 static void ostrin_cond_wait(OstrinCond* cond, OstrinMutex* mutex) { pthread_cond_wait(cond, mutex); }\n\
+static void ostrin_cond_wait_timeout(OstrinCond* cond, OstrinMutex* mutex) {\n\
+    struct timespec deadline;\n\
+    timespec_get(&deadline, TIME_UTC);\n\
+    deadline.tv_nsec += 10000000L;\n\
+    if (deadline.tv_nsec >= 1000000000L) { deadline.tv_sec += 1; deadline.tv_nsec -= 1000000000L; }\n\
+    (void)pthread_cond_timedwait(cond, mutex, &deadline);\n\
+}\n\
 static void ostrin_cond_signal(OstrinCond* cond) { pthread_cond_signal(cond); }\n\
 static void ostrin_cond_broadcast(OstrinCond* cond) { pthread_cond_broadcast(cond); }\n\
 static void ostrin_select_wait(void) { sched_yield(); }\n\
@@ -6963,14 +6971,14 @@ fn generate_impl(
                      }
                      if codegen.native_threads {
                          funcs.push((format!("static void {name}_send({name}* c, {tc} item)"), format!("    ostrin_mutex_lock(&c->mutex);\n    if (c->closed) {{ ostrin_mutex_unlock(&c->mutex); OSTRIN_FAIL(\"send on closed channel\"); }}\n    if (c->length >= c->capacity) {{\n        c->capacity = c->capacity == 0 ? 4 : c->capacity * 2;\n        c->items = ({tc}*)ostrin_realloc(c->items, sizeof({tc}) * (size_t)c->capacity);\n    }}\n    c->items[c->length] = item;\n{retain}    c->length = c->length + 1;\n    ostrin_cond_signal(&c->ready);\n    ostrin_mutex_unlock(&c->mutex);\n", retain = if is_reference_type(t) { "    ostrin_retain((void*)item);\n" } else { "" })));
-                         funcs.push((format!("static {opt} {name}_receive({name}* c)"), format!("    {opt} r;\n    memset(&r, 0, sizeof r);\n    ostrin_mutex_lock(&c->mutex);\n    while (c->head >= c->length && !c->closed) ostrin_cond_wait(&c->ready, &c->mutex);\n    if (c->head < c->length) {{ r.has = true; r.value = c->items[c->head++]; }}\n    ostrin_mutex_unlock(&c->mutex);\n    return r;\n")));
+                         funcs.push((format!("static {opt} {name}_receive({name}* c)"), format!("    {opt} r;\n    memset(&r, 0, sizeof r);\n    ostrin_task_checkpoint();\n    ostrin_mutex_lock(&c->mutex);\n    while (c->head >= c->length && !c->closed) {{\n        ostrin_cond_wait_timeout(&c->ready, &c->mutex);\n        ostrin_mutex_unlock(&c->mutex);\n        ostrin_task_checkpoint();\n        ostrin_mutex_lock(&c->mutex);\n    }}\n    if (c->head < c->length) {{ r.has = true; r.value = c->items[c->head++]; }}\n    ostrin_mutex_unlock(&c->mutex);\n    return r;\n")));
                          funcs.push((format!("static void {name}_close({name}* c)"), format!("    ostrin_mutex_lock(&c->mutex);\n    c->closed = true;\n    ostrin_cond_broadcast(&c->ready);\n    ostrin_mutex_unlock(&c->mutex);\n")));
                      } else {
                          funcs.push((format!("static void {name}_send({name}* c, {tc} item)"), format!(
                              "    if (c->length >= c->capacity) {{\n        c->capacity = c->capacity == 0 ? 4 : c->capacity * 2;\n        c->items = ({tc}*)ostrin_realloc(c->items, sizeof({tc}) * (size_t)c->capacity);\n    }}\n    c->items[c->length] = item;\n{retain}    c->length = c->length + 1;\n",
                              retain = if is_reference_type(t) { "    ostrin_retain((void*)item);\n" } else { "" }
                          )));
-                         funcs.push((format!("static {opt} {name}_receive({name}* c)"), format!("    {opt} r;\n    memset(&r, 0, sizeof r);\n    while (c->head >= c->length && !c->closed) {{\n        if (!ostrin_poll_all()) break;\n    }}\n    if (c->head < c->length) {{ r.has = true; r.value = c->items[c->head++]; }}\n    return r;\n")));
+                         funcs.push((format!("static {opt} {name}_receive({name}* c)"), format!("    {opt} r;\n    memset(&r, 0, sizeof r);\n    ostrin_task_checkpoint();\n    while (c->head >= c->length && !c->closed) {{\n        bool progress = ostrin_poll_all();\n        ostrin_task_checkpoint();\n        if (!progress) break;\n    }}\n    if (c->head < c->length) {{ r.has = true; r.value = c->items[c->head++]; }}\n    return r;\n")));
                          funcs.push((format!("static void {name}_close({name}* c)"), "    c->closed = true;\n".to_string()));
                      }
                 }

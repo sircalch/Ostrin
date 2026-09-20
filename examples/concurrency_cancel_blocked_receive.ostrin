@@ -1,0 +1,26 @@
+fn main() -> Void {
+    ready = channel<Int>()
+    blocked = channel<Int>()
+
+    spawn_scope {
+        parent = spawn {
+            print("blocked-started")
+            ready.send(1)
+            blocked.receive()
+            print("must-not-run")
+        }
+
+        controller = spawn {
+            ready.receive()
+            // Give the parent time to enter the empty native receive before
+            // requesting cancellation. In the interpreter these are no-op
+            // scheduler yields once the parent is already running.
+            for i in 0 to 1000 {
+                yield()
+            }
+            print(parent.cancel())
+        }
+
+        yield()
+    }
+}

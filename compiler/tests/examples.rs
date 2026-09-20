@@ -2046,6 +2046,40 @@ fn cancelling_a_parent_task_cancels_its_spawn_scope_group() {
 }
 
 #[test]
+fn cancelling_a_task_wakes_a_blocked_channel_receive() {
+    let file = example_path("concurrency_cancel_blocked_receive.ostrin");
+    let interpreted = run(&["--run", &file]);
+    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), "blocked-started\ntrue\n");
+
+    let exe = temp_artifact("cancel-blocked-receive.exe");
+    let compiled = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compiled) {
+        return;
+    }
+    assert!(compiled.status.success(), "blocked receive compile failed: {}", stderr(&compiled));
+    let native = Command::new(&exe).output().expect("run blocked receive binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "blocked receive binary failed: {}", String::from_utf8_lossy(&native.stderr));
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), "blocked-started\ntrue\n");
+    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "blocked receive leaked: {}", String::from_utf8_lossy(&native.stderr));
+
+    let threaded_exe = temp_artifact("cancel-blocked-receive-native-threads.exe");
+    let threaded_compile = run(&["--compile", "--native-threads", "--leak-check", "--out", &threaded_exe, &file]);
+    assert!(threaded_compile.status.success(), "native-thread blocked receive compile failed: {}", stderr(&threaded_compile));
+    let threaded_native = Command::new(&threaded_exe).output().expect("run native-thread blocked receive binary");
+    let _ = fs::remove_file(&threaded_exe);
+    assert!(threaded_native.status.success(), "native-thread blocked receive failed: {}", String::from_utf8_lossy(&threaded_native.stderr));
+    assert_eq!(String::from_utf8_lossy(&threaded_native.stdout).replace("\r\n", "\n"), "blocked-started\ntrue\n");
+    assert!(String::from_utf8_lossy(&threaded_native.stderr).contains("live_allocations=0"), "native-thread blocked receive leaked: {}", String::from_utf8_lossy(&threaded_native.stderr));
+
+    let emitted = run(&["--emit-c", "--native-threads", &file]);
+    assert!(emitted.status.success(), "native-thread blocked receive emission failed: {}", stderr(&emitted));
+    assert!(stdout(&emitted).contains("ostrin_cond_wait_timeout"));
+    assert!(stdout(&emitted).contains("ostrin_task_checkpoint"));
+}
+
+#[test]
 fn yield_advances_the_cooperative_scheduler_and_compiles_with_threads() {
     let file = example_path("concurrency_yield.ostrin");
     let interpreted = run(&["--run", &file]);

@@ -98,6 +98,11 @@
   reference, `join` unregisters completed tasks, and scope/exit draining retires
   task nodes without stale pointers. More complex ownership escapes still await
   complete lowering.
+- Native blocking channel receives now use a short timed condition wait, release
+  the channel mutex before the cancellation checkpoint, and retry only when the
+  task is still live. This lets `Task.cancel()` wake a task waiting on an empty
+  channel without pretending to preempt arbitrary external I/O; the interpreter,
+  cooperative C backend and `--native-threads` path remain covered by one example.
 - Native Unix builds now link `libm` explicitly, so package programs using
   `sqrt`, `round` or related math builtins link successfully on Linux as well
   as macOS.

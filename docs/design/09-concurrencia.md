@@ -16,7 +16,8 @@ protegido con espera bloqueante y despiertan a los receptores al enviar o cerrar
 lenguaje no cambia y E1100/E1101 siguen aplicándose. `select` ya está implementado y
 `Task.cancel()` cubre la cancelación segura de tareas pendientes y solicita cancelación
 cooperativa a tareas que ya están ejecutándose; la cancelación solo se observa en puntos
-seguros y los grupos nativos completos todavía no.
+seguros, incluidos los intervalos de una espera bloqueante de canal. Los grupos nativos
+propagan ya la solicitud y drenan sus tareas hijas.
 
 La idea central de este documento es que Ostrin **no necesita un borrow checker al estilo Rust** para ser seguro en concurrencia, porque ya partimos de "inmutable por defecto" (documento 01). Un dato inmutable nunca puede tener una condición de carrera — no importa cuántas tareas lo lean a la vez. El único lugar donde hace falta una regla especial es en el manejo de datos `mut`, y ahí basta una regla simple y local (no un sistema de ownership/lifetimes que atraviese todo el lenguaje).
 
@@ -125,7 +126,11 @@ cooperativo, `yield()` y las esperas de `select` son puntos explícitos de compr
 actual, sin prometer preempción arbitraria ni detener código que no ceda el control.
 Cuando se cancela una tarea que tiene `spawn_scope` activo, sus grupos anidados reciben la
 solicitud inmediatamente y cancelan sus tareas hijas; el scope termina de drenar esas
-tareas antes de liberar su frame.
+tareas antes de liberar su frame. En el intérprete, una recepción vuelve al scheduler; en
+`--native-threads`, una recepción vacía usa una espera temporizada corta, libera el mutex
+y alcanza el checkpoint antes de volver a esperar. Así una cancelación no deja dormida
+indefinidamente a una tarea en un canal; la operación sigue siendo cooperativa y no
+interrumpe E/S arbitraria del sistema operativo.
 
 ### 2.2 Backend nativo con hilos reales
 
@@ -143,9 +148,10 @@ además un mutex propio: cada nodo conserva viva su tarea mientras está registr
 el scheduler toma una referencia temporal durante el polling, y `join`/el drenado del
 scope retiran nodos terminados antes de liberar sus referencias. Esta primera entrega
 cubre `spawn`, `join`, `send`, `receive`, `close`, `select` y la cancelación cooperativa
-en puntos seguros, incluida la propagación a grupos activos de `spawn_scope`; no promete
-preempción de hilos que nunca alcanzan un checkpoint ni interrupción segura de una E/S
-bloqueante sin cooperación del runtime.
+en puntos seguros, incluida la propagación a grupos activos de `spawn_scope`. Las esperas
+de canal son cancelables mediante un checkpoint temporizado; no promete preempción de
+hilos que nunca alcanzan un checkpoint ni interrupción segura de una E/S arbitraria
+bloqueante.
 
 ### 2.3 Selección determinista entre canales
 
@@ -213,6 +219,8 @@ Como `T` y `U` no están restringidos a ser inmutables aquí, esta función solo
 
 ## 5. Preguntas abiertas para la siguiente sesión de diseño
 
-1. **Cancelación de tareas**: si `spawn_scope` debe poder cancelar tareas hijas activamente (no solo esperarlas) cuando una falla o el scope se interrumpe — pendiente de diseño concreto.
+1. **Cancelación de tareas**: resuelto con grupos explícitos, propagación a scopes anidados,
+   checkpoints cooperativos y espera temporizada de canales; la cancelación no intenta
+   preemptar código arbitrario ni E/S externa.
 2. **Relación con E/S**: si operaciones de E/S (leer un archivo, una petición de red) bloquean la tarea completa o se manejan con un mecanismo de espera eficiente a nivel de runtime — es una decisión de implementación del runtime más que del lenguaje, pero afecta si `spawn` es "barato" de usar en masa (miles de tareas) o no.
 3. ~~`as D`~~ y ~~`dyn Trait`~~ — resueltos en los documentos 16 y 15 respectivamente.

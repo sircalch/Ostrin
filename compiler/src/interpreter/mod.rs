@@ -1800,6 +1800,7 @@ impl Interpreter {
                 let source = self.eval_expr(iter, env)?;
                 match source {
                     Value::Channel(state) => loop {
+                        self.check_task_cancellation()?;
                         let popped = state.borrow_mut().queue.pop_front();
                         match popped {
                             Some(item) => {
@@ -1819,6 +1820,7 @@ impl Interpreter {
                                         "channel receive would block: no runnable task remains".to_string(),
                                     ));
                                 }
+                                self.check_task_cancellation()?;
                             }
                         }
                     },
@@ -2937,6 +2939,7 @@ impl Interpreter {
                     }
                     "receive" => {
                         loop {
+                            self.check_task_cancellation()?;
                             let popped = state.borrow_mut().queue.pop_front();
                             if let Some(v) = popped {
                                 return Ok(Value::EnumInstance(
@@ -2959,6 +2962,7 @@ impl Interpreter {
                                     "channel receive would block: no runnable task remains".to_string(),
                                 ));
                             }
+                            self.check_task_cancellation()?;
                         }
                     }
                     "close" => {
