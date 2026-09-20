@@ -4486,5 +4486,20 @@ los índices internos de `Map` y `Set` en ambos backends:
   intérprete y nativo.
 
 La batería queda en **6 pruebas diferenciales y 133 de integración verdes**. Sigue pendiente
-formalizar restricciones `Hash`/`Eq` en los tipos de colección y extender la distribución WASM
-al backend de programas Ostrin.
+extender la distribución WASM al backend de programas Ostrin.
+
+## 164. Restricciones Hash + Eq en Map/Set — 2026-09-19
+
+El contrato de las colecciones deja de ser solo una convención de los backends:
+
+- el checker exige `Hash + Eq` para cada clave de `Map` y cada elemento de `Set`;
+- la comprobación recorre recursivamente `List`, `Map`, `Set`, `Option`, `Result` y los campos
+  de records/enums derivados, respetando los bounds de parámetros genéricos;
+- `derive(Hash)` más `derive(Eq)` o un `impl Eq` explícito habilitan tipos definidos por el usuario;
+  una igualdad personalizada sigue usando el fallback lineal seguro del runtime;
+- `native_collections.ostrin` declara ahora `Hash` para su `Point`, y una prueba negativa cubre
+  por separado la falta de `Hash` y de `Eq`.
+
+La batería queda en **6 pruebas diferenciales y 134 de integración verdes**. La próxima brecha
+grande continúa siendo el backend de programas Ostrin para WASM, después de la distribución WASI
+ya disponible para el compilador.

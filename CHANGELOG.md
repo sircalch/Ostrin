@@ -37,6 +37,9 @@ test
   and native backend, including composite collection keys. User records/enums use
   buckets only with derived `Hash + Eq` and no custom equality method; other cases
   retain a correct linear fallback.
+- Enforced `Hash + Eq` statically for every `Map` key and `Set` element, including
+  recursive collection payloads and generic bounds; invalid collection types now
+  fail in the checker before either backend is selected.
 - Extended native ownership cleanup through `while`/`for` iterations and branch
   exits, including `break`/`continue`, in both the AST and HIR emitters.
 - HIR block expressions now release managed locals while preserving returned owned

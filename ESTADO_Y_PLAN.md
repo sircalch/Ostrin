@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-19 · rama `main` · 6 pruebas diferenciales y 133 de integración en verde.*
+*Corte: 2026-09-19 · rama `main` · 6 pruebas diferenciales y 134 de integración en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
 Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–149); para el diseño
@@ -187,8 +187,8 @@ genéricos centrales, módulo `hir_c.rs`—, con un trinquete mínimo de 115; el
 ver documento 20 y secciones 123–133 de `CONTEXTO_PROYECTO.md`);
 Las claves/elementos compuestos ya pueden usar el índice interno cuando su contrato `Hash`/`Eq`
 es compatible; si contienen estado mutable se reindexan antes de buscar y los comparadores
-personalizados conservan el fallback lineal. Sigue pendiente hacer cumplir `Hash + Eq` como
-restricción estática de `Map`/`Set` en lugar de resolverlo únicamente en cada backend.
+personalizados conservan el fallback lineal. El checker exige ahora `Hash + Eq` de forma estática
+para `Map`/`Set`, también dentro de colecciones anidadas y bounds genéricos.
 
 ---
 
@@ -258,7 +258,7 @@ Decisiones que necesito de ti para afinar el plan:
 
 ```powershell
 cd compiler
-cargo test                                   # 6 diferenciales + 133 de integración
+cargo test                                   # 6 diferenciales + 134 de integración
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```

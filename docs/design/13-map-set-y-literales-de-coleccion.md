@@ -142,7 +142,9 @@ trait Hash {
 ```
 
 - Se añade a la lista de traits derivables del documento 12: `derive(Hash)` combina el hash de todos los campos (misma filosofía que `derive(Eq)`/`derive(Ord)`: recorre los campos en orden de declaración, cada uno debe implementar `Hash` a su vez).
-- `Map<K, V>` y `Set<T>` exigen `K`/`T`: `Hash + Eq` como trait bound — si se intenta usar un tipo que no los implementa, error de compilación señalando cuál de los dos falta, igual que cualquier otro trait bound (documento 03, §3).
+- `Map<K, V>` y `Set<T>` exigen `K`/`T`: `Hash + Eq` como trait bound. El checker rechaza
+  una colección que no cumple la restricción e indica cuál de los dos traits falta, antes de
+  seleccionar el intérprete o el backend nativo.
 
 ```ostrin
 record Point: Eq, Hash {

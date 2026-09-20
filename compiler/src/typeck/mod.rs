@@ -117,6 +117,7 @@ pub struct Checker {
     call_substs_by_node: HashMap<usize, CallSubst>,
     call_node_stack: Vec<usize>,
     call_key_stack: Vec<ExprKey>,
+    collection_bound_diagnostics: HashSet<String>,
     errors: Vec<TypeError>,
 }
 
@@ -188,6 +189,7 @@ impl Checker {
             call_substs_by_node: HashMap::new(),
             call_node_stack: Vec::new(),
             call_key_stack: Vec::new(),
+            collection_bound_diagnostics: HashSet::new(),
             errors: Vec::new(),
         }
     }
@@ -280,6 +282,23 @@ impl Checker {
             }
         }
         for item in items {
+            match item {
+                Item::Record(record) => {
+                    for field in &record.fields {
+                        self.validate_declared_collection_type(&field.ty, &record.generics);
+                    }
+                }
+                Item::Enum(enumeration) => {
+                    for variant in &enumeration.variants {
+                        for field in &variant.fields {
+                            self.validate_declared_collection_type(&field.ty, &enumeration.generics);
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        for item in items {
             if let Item::Trait(trait_decl) = item {
                 self.validate_trait_decl(trait_decl);
             }
@@ -364,6 +383,7 @@ impl Checker {
         let mut scope: Scope = HashMap::new();
         for p in &f.params {
             let parameter_type = self.resolve_type_in_context(&p.ty);
+            self.validate_collection_bounds(&parameter_type);
             self.editor_bindings.push(EditorBinding {
                 name: p.name.clone(),
                 type_name: parameter_type.describe(),
@@ -375,6 +395,7 @@ impl Checker {
             scope.insert(p.name.clone(), (parameter_type, p.is_mut));
         }
         let expected = self.resolve_type_in_context(&f.return_type);
+        self.validate_collection_bounds(&expected);
         for param in &f.params {
             let Some(default) = &param.default else { continue };
             let actual = self.infer_expr(default, &mut scope);
@@ -1651,12 +1672,16 @@ impl Checker {
                     let t = self.infer_expr(it, scope);
                     if elem == Ty::Unknown { elem = t; }
                 }
-                Ty::Set(Box::new(elem))
+                let ty = Ty::Set(Box::new(elem));
+                self.validate_collection_bounds(&ty);
+                ty
             }
             Expr::EmptyCollection(name, type_args) => {
                 // The written type arguments are the collection's real type.
                 let arg = |index: usize| type_args.get(index).map_or(Ty::Unknown, |t| self.resolve_type_in_context(t));
-                if name == "Map" { Ty::Map(Box::new(arg(0)), Box::new(arg(1))) } else { Ty::Set(Box::new(arg(0))) }
+                let ty = if name == "Map" { Ty::Map(Box::new(arg(0)), Box::new(arg(1))) } else { Ty::Set(Box::new(arg(0))) };
+                self.validate_collection_bounds(&ty);
+                ty
             }
             Expr::MapLiteral(pairs) => {
                 let mut key = Ty::Unknown;
@@ -1667,7 +1692,9 @@ impl Checker {
                     if key == Ty::Unknown { key = kt; }
                     if value == Ty::Unknown { value = vt; }
                 }
-                Ty::Map(Box::new(key), Box::new(value))
+                let ty = Ty::Map(Box::new(key), Box::new(value));
+                self.validate_collection_bounds(&ty);
+                ty
             }
             Expr::Try(inner, catch) => {
                 let inner_ty = self.infer_expr(inner, scope);
@@ -3364,6 +3391,135 @@ impl Checker {
                         .is_some_and(|bounds| bounds.iter().any(|candidate| candidate == "Dimension")));
         }
         self.type_satisfies_trait(actual_ty, bound)
+    }
+
+    fn validate_collection_bounds(&mut self, ty: &Ty) {
+        match ty {
+            Ty::Map(key, value) => {
+                self.require_collection_bound(key, "Map key");
+                self.validate_collection_bounds(key);
+                self.validate_collection_bounds(value);
+            }
+            Ty::Set(element) => {
+                self.require_collection_bound(element, "Set element");
+                self.validate_collection_bounds(element);
+            }
+            Ty::List(element) => self.validate_collection_bounds(element),
+            Ty::Applied(_, args) => {
+                for arg in args {
+                    self.validate_collection_bounds(arg);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn validate_declared_collection_type(&mut self, ty: &Type, generics: &[GenericParam]) {
+        let substitutions: HashMap<String, Ty> = generics
+            .iter()
+            .map(|generic| (generic.name.clone(), Ty::Generic(generic.name.clone())))
+            .collect();
+        let resolved = resolve_type_with_type_subst(ty, &substitutions, &HashMap::new());
+        self.validate_collection_bounds(&resolved);
+    }
+
+    fn require_collection_bound(&mut self, ty: &Ty, role: &str) {
+        if ty == &Ty::Unknown
+            || (self.collection_trait_satisfied(ty, "Hash", &mut HashSet::new())
+                && self.collection_trait_satisfied(ty, "Eq", &mut HashSet::new()))
+        {
+            return;
+        }
+        let missing: Vec<&str> = ["Hash", "Eq"]
+            .into_iter()
+            .filter(|trait_name| !self.collection_trait_satisfied(ty, trait_name, &mut HashSet::new()))
+            .collect();
+        let key = format!("{role}:{}", ty.describe());
+        if self.collection_bound_diagnostics.insert(key) {
+            self.push(
+                "E1042",
+                format!(
+                    "{role} type '{}' must satisfy Hash + Eq; missing {}.",
+                    ty.describe(),
+                    missing.join(" + ")
+                ),
+            );
+        }
+    }
+
+    fn collection_trait_satisfied(&self, ty: &Ty, trait_name: &str, visiting: &mut HashSet<String>) -> bool {
+        if ty == &Ty::Unknown {
+            return true;
+        }
+        if let Ty::Generic(name) = ty {
+            return self
+                .current_generic_bounds
+                .get(name)
+                .is_some_and(|bounds| bounds.iter().any(|bound| bound == trait_name));
+        }
+        match (trait_name, ty) {
+            ("Hash" | "Eq", Ty::Int | Ty::Float | Ty::Bool | Ty::String | Ty::Sized(_) | Ty::Float32) => true,
+            (_, Ty::List(element) | Ty::Set(element)) => self.collection_trait_satisfied(element, trait_name, visiting),
+            (_, Ty::Map(key, value)) => {
+                self.collection_trait_satisfied(key, trait_name, visiting)
+                    && self.collection_trait_satisfied(value, trait_name, visiting)
+            }
+            (_, Ty::Applied(name, args)) if name == "Option" && args.len() == 1 => {
+                self.collection_trait_satisfied(&args[0], trait_name, visiting)
+            }
+            (_, Ty::Applied(name, args)) if name == "Result" && args.len() == 2 => {
+                self.collection_trait_satisfied(&args[0], trait_name, visiting)
+                    && self.collection_trait_satisfied(&args[1], trait_name, visiting)
+            }
+            ("Hash" | "Eq", Ty::Named(name) | Ty::Applied(name, _)) => {
+                let visit_key = format!("{trait_name}:{name}");
+                if !visiting.insert(visit_key.clone()) {
+                    return false;
+                }
+                let derives = self
+                    .record_derives
+                    .get(name)
+                    .or_else(|| self.enum_derives.get(name));
+                let direct = match trait_name {
+                    "Hash" => derives.is_some_and(|traits| traits.iter().any(|candidate| candidate == "Hash")),
+                    "Eq" => {
+                        derives.is_some_and(|traits| traits.iter().any(|candidate| candidate == "Eq"))
+                            || self.type_satisfies_trait(ty, "Eq")
+                    }
+                    _ => false,
+                };
+                let generic_subst: HashMap<String, Ty> = match ty {
+                    Ty::Applied(_, args) => self
+                        .record_generics
+                        .get(name)
+                        .into_iter()
+                        .flat_map(|generics| generics.iter().zip(args.iter()))
+                        .map(|(generic, arg)| (generic.name.clone(), arg.clone()))
+                        .collect(),
+                    _ => HashMap::new(),
+                };
+                let field_types: Vec<Ty> = if let Some(fields) = self.record_fields.get(name) {
+                    fields
+                        .iter()
+                        .map(|(_, field)| resolve_type_with_type_subst(field, &generic_subst, &HashMap::new()))
+                        .collect()
+                } else if let Some(variants) = self.enum_variants.get(name) {
+                    variants
+                        .iter()
+                        .flat_map(|variant| self.variant_fields.get(&(name.clone(), variant.clone())).into_iter().flatten())
+                        .map(|field| resolve_type_with_type_subst(field, &generic_subst, &HashMap::new()))
+                        .collect()
+                } else {
+                    Vec::new()
+                };
+                let fields_satisfy = field_types
+                    .iter()
+                    .all(|field| self.collection_trait_satisfied(field, trait_name, visiting));
+                visiting.remove(&visit_key);
+                direct && fields_satisfy
+            }
+            _ => false,
+        }
     }
 
     fn is_concrete_user_type(&self, receiver_ty: &Ty) -> bool {

@@ -1,4 +1,4 @@
-record Point: Eq {
+record Point: Eq, Hash {
     x: Int
     y: Int
 }

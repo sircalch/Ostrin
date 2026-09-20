@@ -905,6 +905,19 @@ fn hash_rejects_unhashable_composite_payloads() {
 }
 
 #[test]
+fn map_and_set_require_hash_and_eq_bounds() {
+    let out = run_stdin(
+        &["--stdin", "--check", "--file", "C:/workspace/collection_bounds.ostrin"],
+        "record HashOnly: Hash {\n    value: Int\n}\nrecord EqOnly: Eq {\n    value: Int\n}\nfn main() -> Void {\n    mut values = Map<HashOnly, Int>()\n    mut seen = Set<EqOnly>()\n}\n",
+    );
+    assert!(!out.status.success());
+    let text = stderr(&out);
+    assert!(text.contains("Map key type 'HashOnly' must satisfy Hash + Eq"), "missing Map bound diagnostic: {text}");
+    assert!(text.contains("Set element type 'EqOnly' must satisfy Hash + Eq"), "missing Set bound diagnostic: {text}");
+    assert!(text.contains("missing Eq") && text.contains("missing Hash"), "missing individual bounds: {text}");
+}
+
+#[test]
 fn native_backend_exposes_ownership_runtime_and_leak_check() {
     let out = run(&["--emit-c", "--leak-check", &example_path("native_fibonacci.ostrin")]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
