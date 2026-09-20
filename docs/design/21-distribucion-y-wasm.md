@@ -24,6 +24,15 @@ El resultado queda en
 WASI 0.2 compatible; el workflow conserva el checksum para que una descarga se pueda verificar
 antes de ejecutarla.
 
+## Verificación ejecutable
+
+El workflow también arranca ostrinc.wasm bajo Node WASI preview1 con
+--check examples/hello.ostrin y un preopen del workspace. Esto verifica que el módulo
+acepta argumentos, puede leer un archivo Ostrin y devuelve código de salida cero.
+La misma comprobación local puede ejecutarse, después de compilar, con:
+
+    node --input-type=module -e "import { WASI } from 'node:wasi'; import { readFileSync } from 'node:fs'; const wasi = new WASI({ version: 'preview1', args: ['ostrinc', '--check', 'examples/hello.ostrin'], preopens: { '.': process.cwd() }, returnOnExit: true }); const mod = await WebAssembly.compile(readFileSync('compiler/target/wasm32-wasip1/release/ostrinc.wasm')); const instance = await WebAssembly.instantiate(mod, wasi.getImportObject()); const code = wasi.start(instance); if (code !== 0) process.exit(code);"
+
 ## Siguiente etapa
 
 El backend de programas Ostrin todavía emite C; no se debe afirmar que

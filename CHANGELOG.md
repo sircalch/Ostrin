@@ -20,6 +20,9 @@ test
   group-by), `plot` (SVG scatter/line) and `autodiff` (forward-mode dual numbers).
 
 ### Compiler
+- The WASI distribution workflow now runs the release compiler under Node WASI
+  before packaging it, checking an Ostrin source file through a preopened
+  filesystem and validating the module's CLI exit code.
 - Native backend: closures, moved-after-send (E1101), strings, arrays, math, `Rng`,
   module-qualified names; interpreter and native output are compared on every example.
 - Typed HIR with a verifier (`--hir`), per-node checker/backend type agreement,

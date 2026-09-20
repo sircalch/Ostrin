@@ -4372,3 +4372,18 @@ La prueba `native_threads_scope_drain_releases_nested_task_handles` verifica
 `live_allocations=0`. La batería queda en **6 pruebas diferenciales y 129 de
 integración verdes**. La ARC completa sobre la IR, escapes complejos y cancelación
 siguen pendientes.
+
+## 157. Smoke test del compilador WASI — 2026-09-19
+
+La distribución WASI ya no solo compila el módulo: el workflow wasi.yml lo arranca
+bajo la API node:wasi de Node con --check examples/hello.ostrin y un preopen del
+workspace. Esto verifica simultáneamente:
+
+- que ostrinc.wasm exporta un entrypoint ejecutable en WASI preview1;
+- que recibe argumentos de CLI;
+- que puede leer un archivo Ostrin mediante el filesystem preabierto;
+- que devuelve código de salida cero después del type-check.
+
+La misma prueba se ejecutó localmente sobre el artefacto wasm32-wasip1 y produjo
+OK — no se encontraron errores de tipo (2 elemento(s)). La etapa sigue siendo
+distribución del compilador WASI, no compilación de programas Ostrin a WASM.
