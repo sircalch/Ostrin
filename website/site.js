@@ -1,4 +1,18 @@
 (function () {
+  document.querySelectorAll('.version').forEach(function (label) {
+    label.textContent = 'development / 0.1.0';
+  });
+
+  document.querySelectorAll('.site-footer > span').forEach(function (label) {
+    label.textContent = 'Open development · MIT License';
+  });
+
+  document.querySelectorAll('h2').forEach(function (heading) {
+    if (heading.textContent.trim() === 'Seventeen documents, one language.') {
+      heading.textContent = 'Twenty-one documents, one language.';
+    }
+  });
+
   const header = document.querySelector('.site-header');
   const menuButton = document.querySelector('.menu-toggle');
 

@@ -4,9 +4,9 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#080a10">
-    <meta name="description" content="Ostrin is an experimental programming language for meaningful, typed software.">
+    <meta name="description" content="Ostrin is a scientific-first programming language with typed quantities, explicit ownership and native execution.">
     <meta property="og:title" content="Ostrin — a language for meaningful software">
-    <meta property="og:description" content="Physical quantities, explicit state and safe-by-default design.">
+    <meta property="og:description" content="Scientific meaning, explicit ownership and native execution in a language built in the open.">
     <meta property="og:type" content="website">
     <link rel="icon" href="assets/ostrin-logo.png">
     <link rel="stylesheet" href="styles.css">
@@ -17,7 +17,7 @@
     <header class="site-header">
       <a class="brand" href="index.html" aria-label="Ostrin home"><img src="assets/ostrin-logo.png" alt="" width="36" height="36"><span>OSTRIN</span></a>
       <div class="header-right">
-        <span class="version">prototype / 0.1</span>
+        <span class="version">development / 0.1.0</span>
         <button class="menu-toggle" aria-label="Open navigation" aria-expanded="false"><span></span><span></span></button>
         <nav class="site-nav" aria-label="Main navigation">
           <a href="language.html">Language</a>
@@ -35,12 +35,12 @@
         <div class="hero-copy">
           <p class="eyebrow">A programming language in the open</p>
           <h1>Make the meaning of code <em>impossible</em> to miss.</h1>
-          <p class="lede">Ostrin makes units, state and intent visible in the code. It is being designed from first principles and tested by a working Rust compiler.</p>
+          <p class="lede">Ostrin makes units, state and intent visible in the code. It is a scientific-first language being built from first principles, with a working Rust compiler, native C backend and reproducible WASI path.</p>
           <div class="button-row">
             <a class="button" href="docs.html">Start with Ostrin <span>→</span></a>
             <a class="button-quiet" href="examples.html">Browse examples <span>↗</span></a>
           </div>
-          <div class="hero-meta"><span>.ostrin</span><span>Rust implementation</span><span>MIT licensed</span></div>
+          <div class="hero-meta"><span>.ostrin</span><span>native C + WASI</span><span>MIT licensed</span></div>
         </div>
         <div class="code-window" aria-label="Ostrin code example">
           <div class="window-bar"><span class="window-dots"><i></i><i></i><i></i></span><span>physics.ostrin</span><span class="window-state">checked</span></div>
@@ -58,9 +58,9 @@
       </section>
 
       <section class="fact-strip shell" aria-label="Project facts">
-        <div class="fact"><strong>17</strong><span>design specifications</span></div>
-        <div class="fact"><strong>65</strong><span>compiler tests passing</span></div>
-        <div class="fact"><strong>68</strong><span>source examples</span></div>
+        <div class="fact"><strong>21</strong><span>design specifications</span></div>
+        <div class="fact"><strong>151</strong><span>verified test cases</span></div>
+        <div class="fact"><strong>153</strong><span>source examples</span></div>
         <div class="fact"><strong>.ostrin</strong><span>source file extension</span></div>
       </section>
 
@@ -103,14 +103,14 @@
 
       <section class="section shell">
         <div class="split-callout">
-          <div><p class="eyebrow">The project surface</p><h2>A language is more than its parser.</h2><p>Ostrin is growing as a complete toolchain: compiler, examples, editor support, documentation and eventually a package ecosystem.</p><a class="button-quiet" href="ecosystem.html">Explore the ecosystem <span>↗</span></a></div>
-          <ul class="mini-list"><li>Rust compiler and interpreter</li><li>`.ostrin` examples that exercise the semantic core</li><li>VS Code extension with syntax support and commands</li><li>Design documents that explain the decisions</li><li>Future paths to native executables and WebAssembly</li></ul>
+          <div><p class="eyebrow">The project surface</p><h2>A language is more than its parser.</h2><p>Ostrin is growing as a complete scientific toolchain: compiler, interpreter, native backend, editor support, documentation and the first package experiments.</p><a class="button-quiet" href="ecosystem.html">Explore the ecosystem <span>↗</span></a></div>
+          <ul class="mini-list"><li>Rust compiler and deterministic interpreter</li><li>Native C execution and OS threads</li><li>WASI distribution with reproducible checksums</li><li>VS Code LSP and DAP support</li><li>Scientific packages for tables, plots and autodiff</li></ul>
         </div>
       </section>
 
       <section class="closing shell"><div class="closing-rule"></div><img src="assets/ostrin-logo.png" alt="Ostrin logo" width="74" height="74"><p class="eyebrow">Follow the work</p><h2>Read the decisions.<br>Run the examples.</h2><a class="button" href="https://github.com/sircalch/Ostrin">Open the repository <span>↗</span></a></section>
     </main>
 
-    <footer class="site-footer shell"><a class="brand" href="index.html"><img src="assets/ostrin-logo.png" alt="" width="30" height="30"><span>OSTRIN</span></a><span>Design-validation prototype · MIT License</span><div class="footer-links"><a href="docs.html">Docs</a><a href="roadmap.html">Roadmap</a><a href="https://github.com/sircalch/Ostrin">GitHub ↗</a></div></footer>
+    <footer class="site-footer shell"><a class="brand" href="index.html"><img src="assets/ostrin-logo.png" alt="" width="30" height="30"><span>OSTRIN</span></a><span>Open development · MIT License</span><div class="footer-links"><a href="docs.html">Docs</a><a href="roadmap.html">Roadmap</a><a href="https://github.com/sircalch/Ostrin">GitHub ↗</a></div></footer>
   </body>
 </html>
