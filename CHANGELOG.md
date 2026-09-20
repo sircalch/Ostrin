@@ -133,6 +133,9 @@
   before the scope frame is released, and task handles created inside cancelled callbacks
   are reclaimed. `select` now checks cancellation after releasing its temporary channel
   list, with a deterministic interpreter/cooperative/native-thread leak-check regression.
+- Hardened task-handle ownership during cancellation: each handle tracked inside a running
+  task records whether its local reference was already released, so explicit `drop(handle)`
+  cannot be released again when a `longjmp`-based cancellation cleanup drains the task.
 - Made the generated cooperative C runtime portable across threadless toolchains:
   `pthread`/Windows thread headers and implementations are now guarded behind
   `OSTRIN_NATIVE_THREADS`, while the default scheduler uses no-op synchronization

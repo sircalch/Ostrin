@@ -2080,6 +2080,40 @@ fn cancelling_a_task_wakes_a_blocked_channel_receive() {
 }
 
 #[test]
+fn cancelled_tasks_do_not_release_dropped_child_handles_twice() {
+    let file = example_path("concurrency_cancel_after_drop.ostrin");
+    let interpreted = run(&["--run", &file]);
+    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), "parent-started\ntrue\n");
+
+    let exe = temp_artifact("cancel-after-drop.exe");
+    let compiled = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compiled) {
+        return;
+    }
+    assert!(compiled.status.success(), "cancel-after-drop compile failed: {}", stderr(&compiled));
+    let native = Command::new(&exe).output().expect("run cancel-after-drop binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "cancel-after-drop binary failed: {}", String::from_utf8_lossy(&native.stderr));
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), "parent-started\ntrue\n");
+    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "dropped child handle leaked or was released twice: {}", String::from_utf8_lossy(&native.stderr));
+
+    let threaded_exe = temp_artifact("cancel-after-drop-native-threads.exe");
+    let threaded_compile = run(&["--compile", "--native-threads", "--leak-check", "--out", &threaded_exe, &file]);
+    assert!(threaded_compile.status.success(), "native-thread cancel-after-drop compile failed: {}", stderr(&threaded_compile));
+    let threaded_native = Command::new(&threaded_exe).output().expect("run native-thread cancel-after-drop binary");
+    let _ = fs::remove_file(&threaded_exe);
+    assert!(threaded_native.status.success(), "native-thread cancel-after-drop failed: {}", String::from_utf8_lossy(&threaded_native.stderr));
+    assert_eq!(String::from_utf8_lossy(&threaded_native.stdout).replace("\r\n", "\n"), "parent-started\ntrue\n");
+    assert!(String::from_utf8_lossy(&threaded_native.stderr).contains("live_allocations=0"), "native-thread dropped child handle leaked or was released twice: {}", String::from_utf8_lossy(&threaded_native.stderr));
+
+    let emitted = run(&["--emit-c", "--native-threads", &file]);
+    assert!(emitted.status.success(), "cancel-after-drop emission failed: {}", stderr(&emitted));
+    assert!(stdout(&emitted).contains("released"));
+    assert!(stdout(&emitted).contains("ostrin_release_owned"));
+}
+
+#[test]
 fn yield_advances_the_cooperative_scheduler_and_compiles_with_threads() {
     let file = example_path("concurrency_yield.ostrin");
     let interpreted = run(&["--run", &file]);

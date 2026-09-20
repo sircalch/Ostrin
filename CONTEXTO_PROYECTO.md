@@ -4711,3 +4711,26 @@ La batería queda en **6 pruebas diferenciales y 144 de integración verdes** de
 esta ampliación. La cancelación de E/S externa arbitraria, como archivos o red, sigue
 requiriendo un runtime de I/O cooperativo; no se pretende preemptar llamadas del sistema
 que no regresan al runtime.
+
+## 176. Ownership idempotente de handles de tareas — 2026-09-20
+
+La limpieza de cancelación del backend C deja de asumir que todos los handles registrados
+siguen poseyendo una referencia local:
+
+- cada nodo temporal de `OstrinTaskExecution.owned_handles` conserva una marca `released`;
+  los cleanup normales y `drop()` pasan por `ostrin_release_owned()`, que marca el nodo
+  antes de liberar la referencia local;
+- si una cancelación salta por encima del cleanup léxico, el drenado solo libera los
+  handles que aún no habían sido soltados, mientras que la referencia del registro de
+  tareas continúa separada y válida;
+- las liberaciones internas del registro, destructores de entornos y destructores de
+  colecciones siguen usando `ostrin_release()` y no consumen por accidente la marca de
+  una referencia local distinta;
+- `examples/concurrency_cancel_after_drop.ostrin` fuerza un hijo creado dentro de un
+  `spawn_scope`, descarta explícitamente su handle y cancela el padre mientras espera un
+  acuse. La prueba compara intérprete, C cooperativo y `--native-threads`, exige
+  `live_allocations=0` y verifica la nueva rutina en el C emitido.
+
+La batería queda en **6 pruebas diferenciales y 145 de integración verdes**. Esto cierra
+una ruta concreta de doble liberación durante cancelación, pero el ownership general sobre
+la IR, los escapes complejos y los ciclos siguen siendo trabajo pendiente.

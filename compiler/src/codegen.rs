@@ -451,7 +451,7 @@ static void ostrin_thread_join(OstrinThread* thread) {\n\
 #endif\n\
 typedef struct OstrinTaskGroup { atomic_bool cancel_requested; } OstrinTaskGroup;\n\
 typedef struct OstrinTaskScopeFrame { OstrinTaskGroup group; struct OstrinTaskScopeFrame* previous; } OstrinTaskScopeFrame;\n\
-typedef struct OstrinTaskOwnedHandle { void* task; struct OstrinTaskOwnedHandle* next; } OstrinTaskOwnedHandle;\n\
+typedef struct OstrinTaskOwnedHandle { void* task; bool released; struct OstrinTaskOwnedHandle* next; } OstrinTaskOwnedHandle;\n\
 typedef struct OstrinTaskExecution OstrinTaskExecution;\n\
 typedef struct { void* run; void* env; void (*drop_env)(void*); int status; atomic_bool cancel_requested; OstrinTaskGroup* group; _Atomic(OstrinTaskExecution*) execution; } OstrinTaskHeader;\n\
 struct OstrinTaskExecution { OstrinTaskHeader* task; jmp_buf* jump; OstrinTaskExecution* previous; OstrinTaskScopeFrame* scopes; OstrinTaskScopeFrame* previous_scopes; OstrinTaskOwnedHandle* owned_handles; };\n\
@@ -755,8 +755,16 @@ static void ostrin_track_task_handle(void* task) {\n\
     OstrinTaskOwnedHandle* handle = (OstrinTaskOwnedHandle*)malloc(sizeof *handle);\n\
     if (!handle) OSTRIN_OOM();\n\
     handle->task = task;\n\
+    handle->released = false;\n\
     handle->next = ostrin_current_execution->owned_handles;\n\
     ostrin_current_execution->owned_handles = handle;\n\
+}\n\
+\
+static void ostrin_mark_task_handle_released(void* task) {\n\
+    if (!ostrin_current_execution) return;\n\
+    for (OstrinTaskOwnedHandle* handle = ostrin_current_execution->owned_handles; handle; handle = handle->next) {\n\
+        if (handle->task == task) { handle->released = true; return; }\n\
+    }\n\
 }\n\
 \n\
 static void ostrin_clear_task_handles(OstrinTaskExecution* execution, bool release_handles) {\n\
@@ -764,7 +772,7 @@ static void ostrin_clear_task_handles(OstrinTaskExecution* execution, bool relea
     execution->owned_handles = NULL;\n\
     while (handles) {\n\
         OstrinTaskOwnedHandle* next = handles->next;\n\
-        if (release_handles) ostrin_release(handles->task);\n\
+        if (release_handles && !handles->released) ostrin_release(handles->task);\n\
         free(handles);\n\
         handles = next;\n\
     }\n\
@@ -903,7 +911,12 @@ static void ostrin_release(void* ptr) {\n\
     ostrin_heap_unlock();\n\
 }\n\
 \n\
-static void ostrin_mem_report(void) {\n\
+static void ostrin_release_owned(void* ptr) {\n\
+    if (!ptr) return;\n\
+    ostrin_mark_task_handle_released(ptr);\n\
+    ostrin_release(ptr);\n\
+}\n\
+\nstatic void ostrin_mem_report(void) {\n\
     ostrin_heap_lock();\n\
     fprintf(stderr, \"ostrin memory: live_allocations=%zu peak_allocations=%zu total_allocations=%zu\\n\",\n\
             ostrin_allocation_count, ostrin_peak_allocation_count, ostrin_total_allocations);\n\
@@ -2143,7 +2156,7 @@ impl<'a> Codegen<'a> {
             if transfer == Some(name.as_str()) || !is_reference_type(ty) {
                 continue;
             }
-            out.push_str(&format!("    ostrin_release((void*){name});\n"));
+            out.push_str(&format!("    ostrin_release_owned((void*){name});\n"));
         }
     }
 
@@ -2663,7 +2676,7 @@ impl<'a> Codegen<'a> {
                         if borrowed_reference_expr(value) {
                             out.push_str(&format!("    ostrin_retain((void*){temp});\n"));
                         }
-                        out.push_str(&format!("    ostrin_release((void*){name}); {name} = {temp};\n"));
+                        out.push_str(&format!("    ostrin_release_owned((void*){name}); {name} = {temp};\n"));
                     } else {
                         out.push_str(&format!("    {name} = {code};\n"));
                     }
@@ -2728,7 +2741,7 @@ impl<'a> Codegen<'a> {
                 if is_reference_type(&field_ty) {
                     let temp = self.next_temp();
                     out.push_str(&format!(
-                        "    {} {temp} = {value_code}; ostrin_retain((void*){temp}); ostrin_release((void*){obj_code}->{field_name}); {obj_code}->{field_name} = {temp};\n",
+                        "    {} {temp} = {value_code}; ostrin_retain((void*){temp}); ostrin_release_owned((void*){obj_code}->{field_name}); {obj_code}->{field_name} = {temp};\n",
                         c_type_name(&field_ty)
                     ));
                 } else {
@@ -5707,7 +5720,7 @@ impl<'a> Codegen<'a> {
             "drop" => {
                 let ty = types.first().cloned().unwrap_or(CType::Void);
                 if is_reference_type(&ty) {
-                    Ok(Some((format!("({{ ostrin_release((void*){}); (void)0; }})", codes[0]), CType::Void)))
+                    Ok(Some((format!("({{ ostrin_release_owned((void*){}); (void)0; }})", codes[0]), CType::Void)))
                 } else {
                     Ok(Some(("(void)0".to_string(), CType::Void)))
                 }
