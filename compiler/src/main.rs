@@ -59,6 +59,7 @@ fn real_main() -> ExitCode {
     let test_mode = args.iter().any(|a| a == "--test");
     let json = args.iter().any(|a| a == "--json");
     let fetch_packages = args.iter().any(|a| a == "--fetch");
+    let locked_packages = args.iter().any(|a| a == "--locked");
     let help = args.iter().any(|a| a == "--help" || a == "-h");
     let version = args.iter().any(|a| a == "--version" || a == "-V");
 
@@ -154,6 +155,7 @@ fn real_main() -> ExitCode {
             &manifest,
             manifest_path.parent().unwrap_or_else(|| Path::new(".")),
             fetch_packages,
+            locked_packages,
         ) {
             Ok(r) => r,
             Err(e) => {
@@ -161,8 +163,10 @@ fn real_main() -> ExitCode {
                 return ExitCode::FAILURE;
             }
         };
-        if let Err(e) = package::write_lockfile(manifest_path.parent().unwrap(), &manifest, &roots) {
-            eprintln!("warning: could not write ostrin.lock: {e}");
+        if !locked_packages {
+            if let Err(e) = package::write_lockfile(manifest_path.parent().unwrap(), &manifest, &roots) {
+                eprintln!("warning: could not write ostrin.lock: {e}");
+            }
         }
         roots
     } else {
@@ -623,6 +627,7 @@ fn print_help() {
     println!("  --target NAME Select native (default) or wasm32-wasi for --emit-c/--compile");
     println!("  --project DIR Compile the entry declared by DIR/ostrin.toml");
     println!("  --fetch       Explicitly clone/update Git dependencies for this project");
+    println!("  --locked      Require the existing ostrin.lock without rewriting it");
     println!("  --out PATH    Output path for --emit-c/--compile (defaults: stdout / target-specific entry output)");
     println!("  --json        Emit machine-readable diagnostics as JSON Lines");
     println!("  -h, --help    Print this help");

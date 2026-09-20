@@ -179,7 +179,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Mensajes de error de E/S | `strerror` ≠ texto de Rust (difieren entre backends) |
 | `Result<Void,E>` | Campo de valor de relleno (`char`) en C |
 | Migración HIR | Escalares, records, enums/match, Option/Result, colecciones, cierres, instancias concretas de genéricos, llamadas anidadas, records/enums genéricos aplicados y métodos genéricos centrales migrados; formas complejas restantes siguen con fallback |
-| Paquetes | `--project` usa `entry`; lockfiles deterministas con rutas relativas; Git solo mediante `--fetch`, con caché local y commit resuelto; sin registro remoto |
+| Paquetes | `--project` usa `entry`; lockfiles deterministas con rutas relativas; Git solo mediante `--fetch`, con caché local y commit resuelto; builds normales reutilizan el lock y `--locked` lo exige; sin registro remoto |
 | Rendimiento del intérprete | Tree‑walking simple; sin optimizaciones |
 | `newlines.ostrin`, `advanced.ostrin` | Son muestras de sintaxis, no programas ejecutables |
 | CI | Linux, macOS y Windows; incluye las pruebas diferenciales intérprete↔nativo; el backend nativo enlaza `libm` explícitamente en Unix para paquetes con `sqrt`/`round` |

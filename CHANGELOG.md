@@ -23,7 +23,9 @@
   builds remain offline; an explicit fetch clones or updates a deterministic
   project-local cache, checks out the requested tag/revision, and records the
   resolved commit, source, package version, and portable cache path in
-  `ostrin.lock`.
+  `ostrin.lock`. Existing lockfiles are now read and validated, normal builds
+  reuse their exact cached revisions without network access, and `--locked`
+  rejects missing or stale cache entries without rewriting the lockfile.
 - Added the first native C emitter backed by the explicit HIR→IR lowering. Straight-line
   scalar functions now become C from SSA temporaries in `ir_c.rs`, including integer
   division and scalar printing; unsupported control flow, checked fixed-width arithmetic

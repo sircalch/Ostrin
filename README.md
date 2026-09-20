@@ -123,6 +123,7 @@ ostrinc --compile file.ostrin      # transpile and compile to a native executabl
 ostrinc --compile --native-threads file.ostrin # compile with OS threads and blocking channels
 ostrinc --run --project path/to/project # use the entry declared by ostrin.toml
 ostrinc --fetch --run --project path/to/project # explicitly fetch Git dependencies
+ostrinc --locked --run --project path/to/project # require the existing lockfile/cache
 ```
 
 ## Visual Studio Code

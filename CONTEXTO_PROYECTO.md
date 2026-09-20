@@ -4860,3 +4860,22 @@ El sistema de paquetes deja de reconocer las dependencias Git únicamente para r
 La batería queda en **6 pruebas diferenciales y 150 de integración verdes**. La verificación
 criptográfica del contenido del checkout y la resolución transitiva siguen pendientes; el
 commit fijado en `ostrin.lock` ya hace explícita la identidad de la revisión usada.
+
+## 183. El lockfile gobierna la resolución — 2026-09-20
+
+La primera implementación de `--fetch` ya no deja el lockfile como un artefacto meramente
+informativo:
+
+- `ostrinc` lee `ostrin.lock` antes de resolver dependencias y rechaza entradas extra,
+  fuentes cambiadas, rutas path divergentes, versiones modificadas y URLs o ratchets Git
+  distintos del manifiesto;
+- una entrada Git válida se reutiliza desde la caché y se comprueba con
+  `git rev-parse HEAD`, sin ejecutar `fetch` ni tocar la red durante una build normal;
+- `--locked` exige un lockfile completo y una caché válida, y no escribe ningún lockfile;
+- `--fetch` puede restaurar una caché Git ausente o desactualizada, tras lo cual vuelve a
+  registrar la revisión resultante.
+
+La prueba de integración deja el clon sin remoto, ejecuta una build normal y otra `--locked`,
+comprueba que el lockfile no cambia, verifica el fallo ante una caché ausente y finalmente
+comprueba su restauración con `--fetch`. Hash de contenido y resolución transitiva siguen siendo
+los siguientes huecos del sistema de paquetes.

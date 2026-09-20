@@ -19,6 +19,21 @@ pub enum DependencySpec {
     Git { url: String, ratchet: String },
 }
 
+#[derive(Debug, Clone)]
+struct LockedDependency {
+    source: String,
+    resolved_path: PathBuf,
+    git: Option<String>,
+    requested: Option<String>,
+    resolved_rev: Option<String>,
+    package_version: Option<String>,
+}
+
+#[derive(Debug, Clone, Default)]
+struct Lockfile {
+    dependencies: HashMap<String, LockedDependency>,
+}
+
 pub fn load_manifest(manifest_path: &Path) -> Result<PackageManifest, String> {
     let source = fs::read_to_string(manifest_path)
         .map_err(|e| format!("could not read '{}': {e}", manifest_path.display()))?;
@@ -71,31 +86,226 @@ pub fn resolve_dependency_roots(
     manifest: &PackageManifest,
     manifest_dir: &Path,
     fetch_git: bool,
+    locked_mode: bool,
 ) -> Result<HashMap<String, PathBuf>, String> {
-    let mut roots = HashMap::new();
-    for (name, spec) in &manifest.dependencies {
-        match spec {
-            DependencySpec::Path(p) => {
-                if !p.is_dir() {
-                    return Err(format!(
-                        "dependency '{name}': path '{}' does not exist or is not a directory",
-                        p.display()
-                    ));
-                }
-                roots.insert(name.clone(), p.clone());
-            }
-            DependencySpec::Git { url, ratchet } if !fetch_git => {
+    let lockfile = load_lockfile(manifest_dir)?;
+    if locked_mode && lockfile.is_none() && !manifest.dependencies.is_empty() {
+        return Err(format!(
+            "project '{}' has dependencies but no ostrin.lock; run without --locked once to resolve them",
+            manifest.name
+        ));
+    }
+    if let Some(lockfile) = &lockfile {
+        for name in lockfile.dependencies.keys() {
+            if !manifest.dependencies.contains_key(name) {
                 return Err(format!(
-                    "dependency '{name}' uses 'git = \"{url}\"' (@ {ratchet}), but ostrinc does not fetch git dependencies automatically.\nPass --fetch explicitly to allow the compiler to clone/update it, or clone it yourself and reference it with a 'path' dependency instead."
+                    "ostrin.lock contains dependency '{name}' which is not present in ostrin.toml; regenerate the lockfile"
                 ));
             }
+        }
+    }
+
+    let mut roots = HashMap::new();
+    for (name, spec) in &manifest.dependencies {
+        let locked = lockfile.as_ref().and_then(|file| file.dependencies.get(name));
+        match spec {
+            DependencySpec::Path(p) => {
+                let root = if let Some(entry) = locked {
+                    validate_locked_path(name, p, entry, manifest_dir)?
+                } else {
+                    if locked_mode {
+                        return Err(format!(
+                            "dependency '{name}' is missing from ostrin.lock; run without --locked to regenerate it"
+                        ));
+                    }
+                    p.clone()
+                };
+                if !root.is_dir() {
+                    return Err(format!(
+                        "dependency '{name}': path '{}' does not exist or is not a directory",
+                        root.display()
+                    ));
+                }
+                validate_package_version(name, &root, locked)?;
+                roots.insert(name.clone(), root);
+            }
+            DependencySpec::Git { url, ratchet } if !fetch_git => {
+                if let Some(entry) = locked {
+                    let root = validate_locked_git(name, url, ratchet, entry, manifest_dir)?;
+                    validate_package_version(name, &root, Some(entry))?;
+                    roots.insert(name.clone(), root);
+                } else {
+                    return Err(format!(
+                        "dependency '{name}' uses 'git = \"{url}\"' (@ {ratchet}), but ostrinc does not fetch git dependencies automatically.\nPass --fetch explicitly to resolve it, or clone it yourself and reference it with a 'path' dependency instead."
+                    ));
+                }
+            }
             DependencySpec::Git { url, ratchet } => {
-                let root = fetch_git_dependency(manifest_dir, name, url, ratchet)?;
+                let root = if let Some(entry) = locked {
+                    match validate_locked_git(name, url, ratchet, entry, manifest_dir) {
+                        Ok(root) => root,
+                        Err(error) if !locked_mode => fetch_git_dependency(manifest_dir, name, url, ratchet).map_err(|fetch_error| format!("{error}; fetching dependency also failed: {fetch_error}"))?,
+                        Err(error) => return Err(error),
+                    }
+                } else {
+                    if locked_mode {
+                        return Err(format!(
+                            "dependency '{name}' is missing from ostrin.lock; run without --locked to resolve it"
+                        ));
+                    }
+                    fetch_git_dependency(manifest_dir, name, url, ratchet)?
+                };
+                validate_package_version(name, &root, locked)?;
                 roots.insert(name.clone(), root);
             }
         }
     }
     Ok(roots)
+}
+
+fn load_lockfile(manifest_dir: &Path) -> Result<Option<Lockfile>, String> {
+    let path = manifest_dir.join("ostrin.lock");
+    if !path.is_file() {
+        return Ok(None);
+    }
+    let source = fs::read_to_string(&path)
+        .map_err(|e| format!("could not read '{}': {e}", path.display()))?;
+    let table: toml::Table = source
+        .parse()
+        .map_err(|e| format!("'{}' is not valid TOML: {e}", path.display()))?;
+    let version = table
+        .get("lockfile_version")
+        .and_then(|value| value.as_integer())
+        .ok_or_else(|| format!("'{}' has no supported lockfile_version", path.display()))?;
+    if version != 1 {
+        return Err(format!(
+            "'{}' uses unsupported lockfile_version {version}; expected 1",
+            path.display()
+        ));
+    }
+
+    let mut dependencies = HashMap::new();
+    if let Some(entries) = table.get("dependency").and_then(|value| value.as_array()) {
+        for entry in entries {
+            let Some(entry) = entry.as_table() else {
+                return Err(format!("'{}' contains a non-table dependency entry", path.display()));
+            };
+            let name = required_lock_string(entry, "name", &path)?;
+            if dependencies.contains_key(&name) {
+                return Err(format!("'{}' contains duplicate dependency '{name}'", path.display()));
+            }
+            let source = required_lock_string(entry, "source", &path)?;
+            let resolved_path = PathBuf::from(required_lock_string(entry, "resolved_path", &path)?);
+            dependencies.insert(
+                name,
+                LockedDependency {
+                    source,
+                    resolved_path,
+                    git: optional_lock_string(entry, "git"),
+                    requested: optional_lock_string(entry, "requested"),
+                    resolved_rev: optional_lock_string(entry, "resolved_rev"),
+                    package_version: optional_lock_string(entry, "package_version"),
+                },
+            );
+        }
+    }
+    Ok(Some(Lockfile { dependencies }))
+}
+
+fn required_lock_string(table: &toml::value::Table, key: &str, path: &Path) -> Result<String, String> {
+    table
+        .get(key)
+        .and_then(|value| value.as_str())
+        .map(str::to_string)
+        .ok_or_else(|| format!("'{}' has a dependency entry without string '{key}'", path.display()))
+}
+
+fn optional_lock_string(table: &toml::value::Table, key: &str) -> Option<String> {
+    table.get(key).and_then(|value| value.as_str()).map(str::to_string)
+}
+
+fn lock_root(manifest_dir: &Path, entry: &LockedDependency) -> PathBuf {
+    if entry.resolved_path.is_absolute() {
+        entry.resolved_path.clone()
+    } else {
+        manifest_dir.join(&entry.resolved_path)
+    }
+}
+
+fn validate_locked_path(
+    name: &str,
+    declared: &Path,
+    entry: &LockedDependency,
+    manifest_dir: &Path,
+) -> Result<PathBuf, String> {
+    if entry.source != "path" {
+        return Err(format!(
+            "dependency '{name}' is declared as path but ostrin.lock records source '{}'; regenerate the lockfile",
+            entry.source
+        ));
+    }
+    let locked = lock_root(manifest_dir, entry);
+    let declared = declared.canonicalize().unwrap_or_else(|_| declared.to_path_buf());
+    let locked_canonical = locked.canonicalize().unwrap_or_else(|_| locked.clone());
+    if declared != locked_canonical {
+        return Err(format!(
+            "dependency '{name}' path changed from '{}' to '{}'; regenerate the lockfile",
+            locked.display(),
+            declared.display()
+        ));
+    }
+    Ok(locked)
+}
+
+fn validate_locked_git(
+    name: &str,
+    url: &str,
+    ratchet: &str,
+    entry: &LockedDependency,
+    manifest_dir: &Path,
+) -> Result<PathBuf, String> {
+    if entry.source != "git"
+        || entry.git.as_deref() != Some(url)
+        || entry.requested.as_deref() != Some(ratchet)
+    {
+        return Err(format!(
+            "dependency '{name}' no longer matches its ostrin.lock Git source or requested revision; regenerate the lockfile"
+        ));
+    }
+    let expected = entry.resolved_rev.as_deref().ok_or_else(|| {
+        format!("dependency '{name}' has no resolved_rev in ostrin.lock; regenerate the lockfile")
+    })?;
+    let root = lock_root(manifest_dir, entry);
+    if !root.join(".git").is_dir() {
+        return Err(format!(
+            "dependency '{name}' checkout '{}' is missing; run with --fetch to restore it",
+            root.display()
+        ));
+    }
+    let actual = git_output(&root, &["rev-parse", "HEAD"])
+        .map_err(|error| format!("could not inspect locked dependency '{name}': {error}"))?;
+    if actual != expected {
+        return Err(format!(
+            "dependency '{name}' checkout is at {actual}, but ostrin.lock requires {expected}; run with --fetch to restore it"
+        ));
+    }
+    Ok(root)
+}
+
+fn validate_package_version(
+    name: &str,
+    root: &Path,
+    entry: Option<&LockedDependency>,
+) -> Result<(), String> {
+    let Some(entry) = entry else { return Ok(()); };
+    let Some(expected) = &entry.package_version else { return Ok(()); };
+    let actual = package_version(root)?;
+    if &actual != expected {
+        return Err(format!(
+            "dependency '{name}' changed package version from '{expected}' to '{actual}'; regenerate the lockfile"
+        ));
+    }
+    Ok(())
 }
 
 fn fetch_git_dependency(manifest_dir: &Path, name: &str, url: &str, ratchet: &str) -> Result<PathBuf, String> {

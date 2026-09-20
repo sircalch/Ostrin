@@ -2740,6 +2740,29 @@ fn git_dependency_can_be_fetched_only_with_explicit_flag() {
     assert!(lockfile.contains("requested = \"HEAD\""), "lockfile lost requested revision: {lockfile}");
     assert!(lockfile.lines().any(|line| line.starts_with("resolved_rev = \"") && line.len() >= 56), "lockfile did not record a resolved commit: {lockfile}");
     assert!(lockfile.contains("resolved_path = \".ostrin/packages/"), "lockfile did not use the project cache: {lockfile}");
+    let resolved_path = lockfile
+        .lines()
+        .find_map(|line| line.strip_prefix("resolved_path = \"").and_then(|value| value.strip_suffix('"')))
+        .expect("Git lockfile should contain a resolved path");
+    let cache_path = project.join(resolved_path);
+    let cache_path_text = cache_path.display().to_string();
+    let remove_remote = Command::new("git")
+        .args(["-C", &cache_path_text, "remote", "remove", "origin"])
+        .output()
+        .unwrap();
+    assert!(remove_remote.status.success(), "could not make the cache offline: {}", String::from_utf8_lossy(&remove_remote.stderr));
+    let locked = run(&["--locked", "--run", "--project", &project_text]);
+    assert!(locked.status.success(), "locked build should use the cached commit: {}", stderr(&locked));
+    assert_eq!(stdout(&locked).trim(), "git package");
+    assert_eq!(fs::read_to_string(project.join("ostrin.lock")).unwrap(), lockfile, "--locked must not rewrite the lockfile");
+    let normal = run(&["--run", "--project", &project_text]);
+    assert!(normal.status.success(), "normal build should reuse a valid lockfile without network: {}", stderr(&normal));
+    let _ = fs::remove_dir_all(&cache_path);
+    let missing = run(&["--locked", "--run", "--project", &project_text]);
+    assert!(!missing.status.success(), "--locked should reject a missing cached checkout");
+    assert!(stderr(&missing).contains("checkout") && stderr(&missing).contains("missing"), "unexpected missing-cache error: {}", stderr(&missing));
+    let restored = run(&["--fetch", "--run", "--project", &project_text]);
+    assert!(restored.status.success(), "--fetch should restore a missing locked checkout: {}", stderr(&restored));
     let _ = fs::remove_dir_all(&root);
 }
 

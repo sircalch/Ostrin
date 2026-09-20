@@ -56,6 +56,10 @@ ostrinc --project path/to/project
   implícita: `ostrinc --fetch --project DIR` habilita explícitamente el clon o actualización en
   `DIR/.ostrin/packages/`, selecciona el `tag`/`rev` pedido y registra el commit resuelto en el
   lockfile. Una compilación normal sigue sin efectos de red.
+- Si existe `ostrin.lock`, la resolución lo lee: una dependencia debe conservar su fuente, URL,
+  ratchet, ruta y versión fijados. Los checkouts Git se validan con `git rev-parse HEAD` sin
+  contactar el remoto; si falta la caché, solo `--fetch` puede restaurarla. `--locked` exige que
+  todas las entradas existan y sean válidas, y además impide reescribir el lockfile.
 
 - `ostrin.lock` se versiona en control de versiones. Con rutas relativas y orden estable, clonar
   el proyecto y compilarlo desde otro directorio conserva el mismo lockfile.
