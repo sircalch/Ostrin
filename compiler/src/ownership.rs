@@ -390,6 +390,7 @@ fn safe_release_site(instruction: &IrInstr) -> bool {
                 | "ends_with"
                 | "replace"
                 | "contains_key"
+                | "get"
                 | "set"
                 | "keys"
                 | "values"
@@ -489,9 +490,14 @@ fn analyze_function(function: &crate::ir::IrFunction, report: &mut OwnershipRepo
 fn requires_management(ty: &Ty) -> bool {
     match ty {
         Ty::String | Ty::List(_) | Ty::Map(_, _) | Ty::Set(_) | Ty::Dyn(_) | Ty::Fn(_, _) => true,
+        Ty::Applied(name, args) if name == "Option" && args.len() == 1 && option_value_payload(&args[0]) => false,
         Ty::Named(_) | Ty::Applied(_, _) => true,
         Ty::Quantity(_) | Ty::Int | Ty::Float | Ty::Bool | Ty::Char | Ty::Void | Ty::Sized(_) | Ty::Float32 | Ty::Generic(_) | Ty::Unknown => false,
     }
+}
+
+fn option_value_payload(ty: &Ty) -> bool {
+    matches!(ty, Ty::Int | Ty::Float | Ty::Float32 | Ty::Sized(_) | Ty::Bool)
 }
 
 fn defined_value(instruction: &IrInstr) -> Option<(ValueId, Ty)> {

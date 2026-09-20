@@ -1,0 +1,21 @@
+fn lookup(table: Map<String, Int>, key: String) -> Option<Int> {
+    table.get(key)
+}
+
+fn take(table: Map<String, Int>, key: String) -> Option<Int> {
+    mut owned = table
+    owned.remove(key)
+}
+
+fn main() -> Void {
+    mut scores = ["ann": 3, "bob": 5]
+    print(scores.get("ann").unwrap_or(0))
+    print(scores.get("zed").unwrap_or(-1))
+    print(scores.get("bob").is_some())
+    print(scores.get("zed").is_none())
+    print(scores.get("ann").unwrap())
+    print(lookup(scores, "bob").unwrap_or(0))
+    print(scores.count())
+    print(take(scores, "bob").unwrap_or(-1))
+    print(scores.count())
+}

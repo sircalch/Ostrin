@@ -4952,3 +4952,31 @@ queda en **6 pruebas diferenciales y 153 de integración verdes**.
 Los lookups `get`/`remove` que devuelven `Option`, listas de records y valores compuestos aún
 conservan el fallback HIR/AST; migrar la representación estructural de `Option` a esta misma
 IR es el siguiente paso.
+
+## 187. `Option` escalar y lookups de `Map` desde la IR — 2026-09-20
+
+La representación de `Option<T>` generada por el backend ya está cerrada como un struct C por
+valor (`has` más `value`). El siguiente bloque la conectó con la IR para payloads escalares no
+gestionados: `Int`, `Float`, `Float32`, enteros de ancho fijo y `Bool`.
+
+`ir_c.rs` ahora emite `None` como un `Option_<T>` con `has = false`, `Some(x)` como un
+compound literal con `has = true`, y los métodos `is_some`, `is_none`, `unwrap` y `unwrap_or`
+como expresiones C sobre ese struct. Al ser un valor escalar, `Option<T>` no recibe
+`retain/release`; el análisis de ownership lo excluye de las familias gestionadas. `Option`
+con `String`, records, colecciones u otros payloads gestionados conserva el fallback hasta que
+se defina su contrato de copia y destrucción.
+
+El mismo emisor consume ahora `Map_<K>_<V>_get` y `Map_<K>_<V>_remove` cuando `V` es escalar,
+por lo que `Map<String, Int>.get/remove` devuelven directamente `Option_Int` nativo. Las
+claves siguen siendo préstamos al helper y la pasada de último uso libera las claves de
+`String` en los puntos seguros, mientras el mapa mantiene la propiedad de sus entradas.
+
+`examples/native_ir_map_options.ostrin` cubre consultas presentes y ausentes, `unwrap_or`,
+`is_some`, `is_none`, `unwrap`, llamadas a funciones que retornan `Option<Int>` y la extracción
+con `Map.remove`. `native_ir_emitter_handles_scalar_map_options` exige tres funciones IR,
+inspecciona `Option_Int` y los helpers de mapa en el C generado, compara nueve líneas entre
+intérprete y binario nativo y comprueba `live_allocations=0`. La suite queda en **6 pruebas
+diferenciales y 154 de integración verdes**.
+
+La siguiente frontera sigue siendo `Option` con payload gestionado, patrones sobre `Option`,
+listas de records y llamadas que transfieren ownership de forma no lineal.

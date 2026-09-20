@@ -1770,6 +1770,48 @@ fn native_ir_emitter_handles_scalar_maps_and_sets() {
 }
 
 #[test]
+fn native_ir_emitter_handles_scalar_map_options() {
+    let file = example_path("native_ir_map_options.ostrin");
+    let expected = "3\n-1\ntrue\ntrue\n3\n5\n2\n5\n1\n";
+    let interpreted = run(&["--run", &file]);
+    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    let ir_functions = stdout(&report)
+        .lines()
+        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .unwrap_or(0);
+    assert!(ir_functions >= 3, "map Option example did not use the IR emitter: {}", stdout(&report));
+
+    let emitted = run(&["--emit-c", &file]);
+    assert!(emitted.status.success(), "map Option IR emission failed: {}", stderr(&emitted));
+    let source = stdout(&emitted);
+    for helper in [
+        "typedef struct { bool has; int64_t value; } Option_Int;",
+        "Map_String_Int_get",
+        "Map_String_Int_remove",
+        ".has",
+        "ostrin: unwrap on None",
+    ] {
+        assert!(source.contains(helper), "expected scalar Option support '{helper}' in generated C: {source}");
+    }
+
+    let exe = temp_artifact("native_ir_map_options.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+    let native = Command::new(&exe).output().expect("failed to run map Option IR binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native run failed: {}", String::from_utf8_lossy(&native.stderr));
+    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "map Option IR ownership leaked: {}", String::from_utf8_lossy(&native.stderr));
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+}
+
+#[test]
 fn native_ir_emitter_preserves_checked_fixed_width_arithmetic() {
     let file = example_path("native_ir_sized.ostrin");
     let expected = "120\n-4\n-7\n";

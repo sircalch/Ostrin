@@ -2,10 +2,11 @@
 
 *Estado: runtime con registro de allocations, callbacks de destrucción tipados para records,
 colecciones y entornos de tareas, primitivas `clone`/`drop`, primer lowering conservador de
-ownership y ABI `retain`/`release`. Las familias `String`, `List<T>` escalar y los núcleos
-escalares de `Map<K,V>`/`Set<T>` ya consumen ownership desde la IR y terminan sin allocations
-vivas en las pruebas nativas; la inserción automática de RC por último uso sobre records,
-lookups que devuelven `Option` y agregados complejos todavía no está completa.*
+ownership y ABI `retain`/`release`. Las familias `String`, `List<T>` escalar, los núcleos
+escalares de `Map<K,V>`/`Set<T>` y `Option<T>` escalar ya consumen ownership desde la IR y
+terminan sin allocations vivas en las pruebas nativas; la inserción automática de RC por
+último uso sobre records, payloads gestionados de `Option` y agregados complejos todavía no
+está completa.*
 
 ## 1. Punto de partida (semántica ya fijada por el lenguaje)
 
@@ -45,10 +46,11 @@ capturados por tareas tienen un destructor separado que se ejecuta al terminar n
 al cancelar en un checkpoint o al descartar una tarea pendiente; `clone`/`drop`
 permiten ejercitar el contrato de forma explícita. `--leak-check` imprime las asignaciones
 vivas, el pico y el total antes de la limpieza. Esto resuelve la destrucción tipada de los
-casos explícitos, y las primeras familias IR de `String`/`List<T>`/`Map`/`Set` ya
+casos explícitos, y las primeras familias IR de `String`/`List<T>`/`Map`/`Set`/`Option` ya
 insertan/consumen `retain/release` en retornos, aliases, `phi`, `print` y elementos retenidos
-por los helpers de colecciones; todavía no inserta RC por cada copia, retorno, phi o salida de
-ámbito de records y colecciones complejas.
+por los helpers de colecciones. `Option<T>` con payload escalar es un struct C por valor y no
+requiere RC; `Option` con payload gestionado, patrones y agregados complejos todavía no
+insertan RC por cada copia, retorno, phi o salida de ámbito.
 
 - Todo valor por referencia lleva un contador. `retain`/`release` los inserta el compilador **sobre el IR** (no sobre el texto C), en copias de variable, paso a funciones, campos y salida de ámbito.
 - **Análisis de último uso / movimiento** en el IR: si el compilador prueba que un valor no se vuelve a usar, transfiere la propiedad sin tocar el contador (así se recupera el coste cero en el caso común, sin sintaxis nueva).
@@ -71,9 +73,9 @@ El RC sobre el generador actual (texto C con expresiones‑sentencia) exigiría 
    Esta base ya cubre records, listas, mapas, sets, canales y entornos de tareas generados.
 3. Inserción de retain/release + optimización de último uso. Ya existe una primera pasada
    (`--ownership-ir`) que marca transferencias lineales conocidas y el runtime ofrece el ABI;
-   el backend C ya consume esa IR transformada para `String`, el núcleo escalar de `List<T>` y
-   las operaciones escalares de `Map`/`Set`; aún falta extenderla a records, lookups con
-   `Option`, loops, scopes y escapes complejos.
+   el backend C ya consume esa IR transformada para `String`, el núcleo escalar de `List<T>`,
+   las operaciones escalares de `Map`/`Set` y `Option` escalar; aún falta extenderla a records,
+   `Option` con payload gestionado, patrones, loops, scopes y escapes complejos.
 4. `--leak-check` y pruebas: los programas que usan ownership explícito deben terminar con cero
    objetos vivos; convertir ese objetivo en automático requiere el lowering de último uso.
 5. E1101 estático integrado; mantener la comprobación dinámica del intérprete y nativo como red

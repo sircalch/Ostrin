@@ -30,6 +30,9 @@ fn c_type(ty: &Ty) -> Bail<String> {
             format!("Map_{}_{}*", mangle_scalar(key), mangle_scalar(value))
         }
         Ty::Set(element) if set_supported(element) => format!("Set_{}*", mangle_scalar(element)),
+        Ty::Applied(name, args) if name == "Option" && args.len() == 1 && option_supported(&args[0]) => {
+            format!("Option_{}", mangle_scalar(&args[0]))
+        }
         Ty::Void => "void".to_string(),
         _ => return Err(()),
     })
@@ -47,6 +50,7 @@ fn supported(ty: &Ty) -> bool {
         || matches!(ty, Ty::List(element) if list_element_supported(element))
         || matches!(ty, Ty::Map(key, value) if map_supported(key, value))
         || matches!(ty, Ty::Set(element) if set_supported(element))
+        || matches!(ty, Ty::Applied(name, args) if name == "Option" && args.len() == 1 && option_supported(&args[0]))
 }
 
 fn list_element_supported(ty: &Ty) -> bool {
@@ -59,6 +63,14 @@ fn map_supported(key: &Ty, value: &Ty) -> bool {
 
 fn set_supported(element: &Ty) -> bool {
     list_element_supported(element)
+}
+
+fn option_supported(element: &Ty) -> bool {
+    matches!(element, Ty::Int | Ty::Float | Ty::Float32 | Ty::Sized(_) | Ty::Bool)
+}
+
+fn option_type(element: &Ty) -> Ty {
+    Ty::Applied("Option".to_string(), vec![element.clone()])
 }
 
 fn mangle_scalar(ty: &Ty) -> String {
@@ -297,6 +309,17 @@ fn emit_instruction(
             }
             out.push_str(&format!("    {} = {name};\n", value_name(*dst)));
         }
+        IrInstr::Global { dst, name, ty } => {
+            let Ty::Applied(option_name, args) = ty else { return Err(()) };
+            if name != "None" || option_name != "Option" || args.len() != 1 || !option_supported(&args[0]) {
+                return Err(());
+            }
+            let c_name = format!("Option_{}", mangle_scalar(&args[0]));
+            out.push_str(&format!(
+                "    {} = (({c_name}){{ .has = false }});\n",
+                value_name(*dst)
+            ));
+        }
         IrInstr::Const { dst, value, ty } => {
             if !scalar(ty) {
                 return Err(());
@@ -469,6 +492,14 @@ fn emit_instruction(
                         "contains_key" if args.len() == 1 && *ty == Ty::Bool && value_ty(values, args[0])? == *key => {
                             format!("{map_name}_contains_key({receiver}, {})", value_code(values, args[0])?)
                         }
+                        "get" | "remove"
+                            if args.len() == 1
+                                && option_supported(value.as_ref())
+                                && *ty == option_type(value.as_ref())
+                                && value_ty(values, args[0])? == *key =>
+                        {
+                            format!("{map_name}_{method}({receiver}, {})", value_code(values, args[0])?)
+                        }
                         "count" if args.is_empty() && *ty == Ty::Int => format!("{map_name}_count({receiver})"),
                         "set" if args.len() == 2 && *ty == Ty::Void && value_ty(values, args[0])? == *key && value_ty(values, args[1])? == *value => {
                             format!("{map_name}_set({receiver}, {}, {})", value_code(values, args[0])?, value_code(values, args[1])?)
@@ -478,6 +509,30 @@ fn emit_instruction(
                         }
                         "values" if args.is_empty() && *ty == Ty::List(value.clone()) => {
                             format!("{map_name}_values({receiver})")
+                        }
+                        _ => return Err(()),
+                    }
+                }
+                Ty::Applied(name, option_args)
+                    if name == "Option" && option_args.len() == 1 && option_supported(&option_args[0]) =>
+                {
+                    let inner = option_args[0].clone();
+                    let option_name = format!("Option_{}", mangle_scalar(&inner));
+                    match method.as_str() {
+                        "is_some" if args.is_empty() && *ty == Ty::Bool => format!("({receiver}).has"),
+                        "is_none" if args.is_empty() && *ty == Ty::Bool => format!("!({receiver}).has"),
+                        "unwrap" if args.is_empty() && *ty == inner => format!(
+                            "({{ {option_name} __ostrin_option = {receiver}; if (!__ostrin_option.has) {{ fprintf(stderr, \"ostrin: unwrap on None\\n\"); exit(1); }} __ostrin_option.value; }})"
+                        ),
+                        "unwrap_or"
+                            if args.len() == 1
+                                && *ty == inner
+                                && value_ty(values, args[0])? == inner =>
+                        {
+                            format!(
+                                "({{ {option_name} __ostrin_option = {receiver}; __ostrin_option.has ? __ostrin_option.value : {}; }})",
+                                value_code(values, args[0])?
+                            )
                         }
                         _ => return Err(()),
                     }
@@ -522,7 +577,14 @@ fn emit_instruction(
                 .iter()
                 .map(|value| value_code(values, *value))
                 .collect::<Bail<Vec<_>>>()?;
-            let call = if callee == "print" && args.len() == 1 {
+            let call = if callee == "Some" && args.len() == 1 {
+                let inner = value_ty(values, args[0])?;
+                if !option_supported(&inner) || *ty != option_type(&inner) {
+                    return Err(());
+                }
+                let option_name = format!("Option_{}", mangle_scalar(&inner));
+                format!("(({option_name}){{ .has = true, .value = {} }})", codes[0])
+            } else if callee == "print" && args.len() == 1 {
                 if *ty != Ty::Void {
                     return Err(());
                 }
