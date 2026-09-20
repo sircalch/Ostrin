@@ -3922,6 +3922,17 @@ fn function_return_type(ty: Option<&Ty>) -> Option<Ty> {
     }
 }
 
+fn is_builtin_hashable(ty: &Ty) -> bool {
+    match ty {
+        Ty::Int | Ty::Sized(_) | Ty::Float | Ty::Float32 | Ty::Bool | Ty::String | Ty::Unknown => true,
+        Ty::Applied(name, args) if name == "Option" && args.len() == 1 => is_builtin_hashable(&args[0]),
+        Ty::Applied(name, args) if name == "Result" && args.len() == 2 => {
+            is_builtin_hashable(&args[0]) && is_builtin_hashable(&args[1])
+        }
+        _ => false,
+    }
+}
+
 fn check_builtin_call(name: &str, arg_types: &[Ty], errors: &mut Vec<TypeError>) -> Option<Ty> {
     let expected_args = match name {
         "args" => vec![],
@@ -3981,15 +3992,12 @@ fn check_builtin_call(name: &str, arg_types: &[Ty], errors: &mut Vec<TypeError>)
         "cwd" => Some(Ty::String),
         "file_exists" => Some(Ty::Bool),
         "hash" => {
-            let supported = matches!(
-                arg_types.first(),
-                Some(Ty::Int | Ty::Sized(_) | Ty::Float | Ty::Float32 | Ty::Bool | Ty::String | Ty::Unknown)
-            );
+            let supported = arg_types.first().is_some_and(is_builtin_hashable);
             if !supported {
                 errors.push(TypeError {
                     code: "E1041",
                     message: format!(
-                        "Builtin 'hash' supports Int, fixed-width integers, Bool, Float, Float32 and String, got '{}'.",
+                        "Builtin 'hash' supports scalar values and hashable Option/Result values, got '{}'.",
                         arg_types[0].describe()
                     ),
                     span: None,

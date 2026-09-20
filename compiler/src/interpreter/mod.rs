@@ -165,16 +165,30 @@ fn stable_hash_string(value: &str) -> u64 {
     hash
 }
 
+fn stable_hash_combine(left: u64, right: u64) -> u64 {
+    stable_hash_u64(left ^ right.rotate_left(17))
+}
+
 fn stable_hash_value(value: &Value) -> Option<u64> {
-    Some(match value {
-        Value::Int(n) => stable_hash_u64(*n as u64),
-        Value::Sized(n, _) => stable_hash_u64(*n as u64),
-        Value::F32(n) => stable_hash_u64(u64::from(n.to_bits())),
-        Value::Float(n) => stable_hash_u64(n.to_bits()),
-        Value::Bool(value) => stable_hash_u64(u64::from(*value)),
-        Value::String(value) => stable_hash_string(value),
-        _ => return None,
-    })
+    match value {
+        Value::Int(n) => Some(stable_hash_u64(*n as u64)),
+        Value::Sized(n, _) => Some(stable_hash_u64(*n as u64)),
+        Value::F32(n) => Some(stable_hash_u64(u64::from(n.to_bits()))),
+        Value::Float(n) => Some(stable_hash_u64(n.to_bits())),
+        Value::Bool(value) => Some(stable_hash_u64(u64::from(*value))),
+        Value::String(value) => Some(stable_hash_string(value)),
+        Value::EnumInstance(type_name, variant, fields, _)
+            if type_name == "Option" || type_name == "Result" =>
+        {
+            let tag = stable_hash_string(&format!("{type_name}::{variant}"));
+            if let Some(inner) = fields.get("0") {
+                Some(stable_hash_combine(tag, stable_hash_value(inner)?))
+            } else {
+                Some(tag)
+            }
+        }
+        _ => None,
+    }
 }
 
 struct RuntimeImpl {
@@ -2108,7 +2122,7 @@ impl Interpreter {
                 "hash" => {
                     let value = self.eval_arg(&args[0], env)?;
                     let hash = stable_hash_value(&value).ok_or_else(|| {
-                        RuntimeError::Error("'hash' supports Int, fixed-width integers, Bool, Float, Float32 and String".to_string())
+                        RuntimeError::Error("'hash' supports scalar values and hashable Option/Result values".to_string())
                     })?;
                     return Ok(Value::Int(hash as i64));
                 }

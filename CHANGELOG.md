@@ -20,6 +20,9 @@ test
   group-by), `plot` (SVG scatter/line) and `autodiff` (forward-mode dual numbers).
 
 ### Compiler
+- Extended the stable hash builtin to structural Option and Result values when
+  their payloads are hashable; interpreter and native tags/payload combination
+  remain identical.
 - The WASI distribution workflow now runs the release compiler under Node WASI
   before packaging it, checking an Ostrin source file through a preopened
   filesystem and validating the module's CLI exit code.

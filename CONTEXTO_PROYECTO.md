@@ -4387,3 +4387,19 @@ workspace. Esto verifica simultáneamente:
 La misma prueba se ejecutó localmente sobre el artefacto wasm32-wasip1 y produjo
 OK — no se encontraron errores de tipo (2 elemento(s)). La etapa sigue siendo
 distribución del compilador WASI, no compilación de programas Ostrin a WASM.
+
+## 158. Hash estructural para Option y Result — 2026-09-19
+
+El builtin hash amplía su contrato más allá de escalares:
+
+- Option<T> combina una etiqueta estable (Some/None) con el hash del payload;
+- Result<T, E> combina la etiqueta (Ok/Err) con el hash del valor activo;
+- el checker acepta estas formas solo cuando sus payloads son recursivamente
+  hashables; listas, mapas, sets, records y otros valores de identidad siguen
+  rechazados hasta definir el trait Hash de usuario;
+- el intérprete y el backend C comparten la misma mezcla splitmix64 y los mismos tags.
+
+examples/hash_builtin.ostrin cubre cuatro valores estructurales adicionales y la
+prueba existente de paridad intérprete↔nativo los ejecuta en ambos backends. El
+siguiente paso de stdlib es formalizar derive(Hash) para records/enums. La batería
+queda en 6 pruebas diferenciales y 130 de integración verdes.

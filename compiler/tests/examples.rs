@@ -873,6 +873,18 @@ fn hash_builtin_matches_between_interpreter_and_native() {
 }
 
 #[test]
+fn hash_rejects_unhashable_composite_payloads() {
+    let out = run_stdin(
+        &["--stdin", "--check", "--file", "C:/workspace/hash_error.ostrin"],
+        "fn main() -> Void {\n    print(hash([1, 2]))\n}\n",
+    );
+    assert!(!out.status.success());
+    let text = stderr(&out);
+    assert!(text.contains("E1041"), "missing hash diagnostic: {text}");
+    assert!(text.contains("hashable Option/Result"), "missing hash contract: {text}");
+}
+
+#[test]
 fn native_backend_exposes_ownership_runtime_and_leak_check() {
     let out = run(&["--emit-c", "--leak-check", &example_path("native_fibonacci.ostrin")]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));

@@ -87,8 +87,9 @@ orden de inserción.
 `format`, `sum`, `panic`, `read_file`, `write_file`, `parse_int`, métodos de `List`
 (`map/filter/fold/any/all/find/push/remove_at/length`),
 `Map` (`get/set/remove/contains_key/count/keys/values`), `Set`, `Option`, `Result`.
-`hash` ofrece hashes estables para escalares soportados por `Map`/`Set`
-(`Int`, enteros fijos, `Bool`, `Float`, `Float32` y `String`) con paridad entre intérprete y nativo.
+`hash` ofrece hashes estables para escalares y `Option`/`Result` cuyos payloads sean
+hashables, con paridad entre intérprete y nativo; los tipos de usuario todavía esperan
+un contrato `Hash` formal.
 
 **Diagnósticos**: códigos `OSTRIN-Exxxx` con ubicación; salida JSON Lines para editores.
 
@@ -253,7 +254,7 @@ Decisiones que necesito de ti para afinar el plan:
 
 ```powershell
 cd compiler
-cargo test                                   # 6 diferenciales + 129 de integración
+cargo test                                   # 6 diferenciales + 130 de integración
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```

@@ -5,4 +5,13 @@ fn main() -> Void {
     print(hash(1.5))
     print(hash(1.5 as Float32))
     print(hash("Ostrin"))
+
+    maybe: Option<Int> = Some(42)
+    empty: Option<Int> = None
+    success: Result<Int, String> = Ok(7)
+    failure: Result<Int, String> = Err("bad")
+    print(hash(maybe))
+    print(hash(empty))
+    print(hash(success))
+    print(hash(failure))
 }

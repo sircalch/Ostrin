@@ -734,6 +734,10 @@ static uint64_t ostrin_hash_u64(uint64_t value) {\n\
     value *= UINT64_C(0x94d049bb133111eb);\n\
     return value ^ (value >> 31);\n\
 }\n\
+static uint64_t ostrin_hash_combine(uint64_t left, uint64_t right) {\n\
+    uint64_t rotated = (right << 17) | (right >> 47);\n\
+    return ostrin_hash_u64(left ^ rotated);\n\
+}\n\
 \
 static uint64_t ostrin_hash_string(const char* value) {\n\
     uint64_t hash = UINT64_C(1469598103934665603);\n\
@@ -3843,17 +3847,29 @@ impl<'a> Codegen<'a> {
         }
     }
 
-    /// Returns a stable runtime hash for the scalar keys currently supported
-    /// by the native Map implementation. Composite keys keep the verified
-    /// equality fallback until the user-facing `Hash` trait is enforced.
+    /// Returns a stable runtime hash for scalar values and structural
+    /// Option/Result values accepted by the standard hash builtin.
     fn hash_expr(&self, value: &str, ty: &CType) -> Option<String> {
-        Some(match ty {
-            CType::Str => format!("ostrin_hash_string({value})"),
-            CType::Int | CType::Bool | CType::Sized(_) => format!("ostrin_hash_u64((uint64_t)({value}))"),
-            CType::Float => format!("ostrin_hash_float((double)({value}))"),
-            CType::Float32 => format!("ostrin_hash_float32((float)({value}))"),
-            _ => return None,
-        })
+        match ty {
+            CType::Str => Some(format!("ostrin_hash_string({value})")),
+            CType::Int | CType::Bool | CType::Sized(_) => Some(format!("ostrin_hash_u64((uint64_t)({value}))")),
+            CType::Float => Some(format!("ostrin_hash_float((double)({value}))")),
+            CType::Float32 => Some(format!("ostrin_hash_float32((float)({value}))")),
+            CType::Option(inner) => {
+                let inner = self.hash_expr(&format!("{value}.value"), inner)?;
+                Some(format!(
+                    "(({value}.has) ? ostrin_hash_combine(ostrin_hash_string(\"Option::Some\"), {inner}) : ostrin_hash_string(\"Option::None\"))"
+                ))
+            }
+            CType::Result(ok, err) => {
+                let ok = self.hash_expr(&format!("{value}.value"), ok)?;
+                let err = self.hash_expr(&format!("{value}.error"), err)?;
+                Some(format!(
+                    "(({value}.ok) ? ostrin_hash_combine(ostrin_hash_string(\"Result::Ok\"), {ok}) : ostrin_hash_combine(ostrin_hash_string(\"Result::Err\"), {err}))"
+                ))
+            }
+            _ => None,
+        }
     }
 
     /// A C `int` expression: negative, zero or positive, like `compare`.
@@ -5310,7 +5326,7 @@ impl<'a> Codegen<'a> {
             "file_exists" => Ok(Some((format!("ostrin_file_exists({})", codes[0]), CType::Bool))),
             "hash" => {
                 let hash = self.hash_expr(&codes[0], &types[0]).ok_or_else(|| {
-                    "'hash' supports Int, fixed-width integers, Bool, Float, Float32 and String".to_string()
+                    "'hash' supports scalar values and hashable Option/Result values".to_string()
                 })?;
                 Ok(Some((format!("(int64_t)({hash})"), CType::Int)))
             }
