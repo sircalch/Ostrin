@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+test
 
 ### Language and libraries
 - First-class function values and closures (`fn(Int) -> Int` types, lambdas that
@@ -66,6 +67,11 @@
   scheduler remains the default. Captured task environments are retained for the
   thread lifetime and released on completion; the native test covers a blocking
   receive and `live_allocations=0`.
+- Synchronized the native task registry with its own mutex. Registered tasks now
+  hold a runtime reference while they are schedulable, polling takes a temporary
+  reference, `join` unregisters completed tasks, and scope/exit draining retires
+  task nodes without stale pointers. Nested scope locals still await complete
+  ownership lowering.
 - Added `--project DIR` package entry-point selection. The compiler now reads the
   manifest's `entry` field when no source path is supplied, and generated
   `ostrin.lock` files sort dependencies and store project-relative paths where

@@ -443,8 +443,11 @@ static size_t ostrin_total_allocations = 0;\n\
 static int ostrin_argc = 0;\n\
 static char** ostrin_argv = NULL;\n\
 static OstrinMutex ostrin_heap_mutex;\n\
+static OstrinMutex ostrin_tasks_mutex;\n\
 static bool ostrin_heap_mutex_ready = false;\n\
-static void ostrin_runtime_init(void) { ostrin_mutex_init(&ostrin_heap_mutex); ostrin_heap_mutex_ready = true; }\n\
+static void ostrin_retain(void* ptr);\n\
+static void ostrin_release(void* ptr);\n\
+static void ostrin_runtime_init(void) { ostrin_mutex_init(&ostrin_heap_mutex); ostrin_mutex_init(&ostrin_tasks_mutex); ostrin_heap_mutex_ready = true; }\n\
 static void ostrin_heap_lock(void) { if (!ostrin_heap_mutex_ready) ostrin_runtime_init(); ostrin_mutex_lock(&ostrin_heap_mutex); }\n\
 static void ostrin_heap_unlock(void) { ostrin_mutex_unlock(&ostrin_heap_mutex); }\n\
 typedef bool (*OstrinTaskPoll)(void*);\n\
@@ -461,17 +464,56 @@ static size_t ostrin_next_task_ordinal = 0;\n\
 static void ostrin_register_task(void* task, OstrinTaskPoll poll) {\n\
     OstrinTaskNode* node = (OstrinTaskNode*)malloc(sizeof *node);\n\
     if (!node) OSTRIN_OOM();\n\
+    ostrin_retain(task);\n\
     node->task = task;\n\
     node->poll = poll;\n\
+    ostrin_mutex_lock(&ostrin_tasks_mutex);\n\
     node->ordinal = ostrin_next_task_ordinal++;\n\
     node->next = ostrin_tasks;\n\
     ostrin_tasks = node;\n\
+    ostrin_mutex_unlock(&ostrin_tasks_mutex);\n\
+}\n\
+\n\
+static void ostrin_unregister_task(void* task) {\n\
+    OstrinTaskNode* removed = NULL;\n\
+    ostrin_mutex_lock(&ostrin_tasks_mutex);\n\
+    OstrinTaskNode** link = &ostrin_tasks;\n\
+    while (*link) {\n\
+        if ((*link)->task == task) {\n\
+            removed = *link;\n\
+            *link = removed->next;\n\
+            break;\n\
+        }\n\
+        link = &(*link)->next;\n\
+    }\n\
+    ostrin_mutex_unlock(&ostrin_tasks_mutex);\n\
+    if (removed) {\n\
+        ostrin_release(removed->task);\n\
+        free(removed);\n\
+    }\n\
 }\n\
 \n\
 static bool ostrin_poll_tasks_from(size_t minimum_ordinal) {\n\
     bool progress = false;\n\
-    for (OstrinTaskNode* node = ostrin_tasks; node; node = node->next) {\n\
-        if (node->ordinal >= minimum_ordinal && node->poll(node->task)) progress = true;\n\
+    size_t next_ordinal = minimum_ordinal;\n\
+    for (;;) {\n\
+        void* task = NULL;\n\
+        OstrinTaskPoll poll = NULL;\n\
+        size_t selected = SIZE_MAX;\n\
+        ostrin_mutex_lock(&ostrin_tasks_mutex);\n\
+        for (OstrinTaskNode* node = ostrin_tasks; node; node = node->next) {\n\
+            if (node->ordinal >= next_ordinal && node->ordinal < selected) {\n\
+                selected = node->ordinal;\n\
+                task = node->task;\n\
+                poll = node->poll;\n\
+            }\n\
+        }\n\
+        if (task) ostrin_retain(task);\n\
+        ostrin_mutex_unlock(&ostrin_tasks_mutex);\n\
+        if (!task) break;\n\
+        next_ordinal = selected + 1;\n\
+        if (poll(task)) progress = true;\n\
+        ostrin_release(task);\n\
     }\n\
     return progress;\n\
 }\n\
@@ -481,11 +523,34 @@ static bool ostrin_poll_all(void) {\n\
 }\n\
 \n\
 static size_t ostrin_task_mark(void) {\n\
-    return ostrin_next_task_ordinal;\n\
+    ostrin_mutex_lock(&ostrin_tasks_mutex);\n\
+    size_t mark = ostrin_next_task_ordinal;\n\
+    ostrin_mutex_unlock(&ostrin_tasks_mutex);\n\
+    return mark;\n\
 }\n\
 \n\
 static void ostrin_drain_tasks(size_t minimum_ordinal) {\n\
     while (ostrin_poll_tasks_from(minimum_ordinal)) {}\n\
+    OstrinTaskNode* retired = NULL;\n\
+    ostrin_mutex_lock(&ostrin_tasks_mutex);\n\
+    OstrinTaskNode** link = &ostrin_tasks;\n\
+    while (*link) {\n\
+        OstrinTaskNode* node = *link;\n\
+        if (node->ordinal >= minimum_ordinal) {\n\
+            *link = node->next;\n\
+            node->next = retired;\n\
+            retired = node;\n\
+        } else {\n\
+            link = &node->next;\n\
+        }\n\
+    }\n\
+    ostrin_mutex_unlock(&ostrin_tasks_mutex);\n\
+    while (retired) {\n\
+        OstrinTaskNode* node = retired;\n\
+        retired = node->next;\n\
+        ostrin_release(node->task);\n\
+        free(node);\n\
+    }\n\
 }\n\
 \n\
 \n\
@@ -630,12 +695,18 @@ static void ostrin_mem_report(void) {\n\
 }\n\
 \n\
 static void ostrin_mem_cleanup(void) {\n\
-    ostrin_heap_lock();\n\
-    while (ostrin_tasks) {\n\
-        OstrinTaskNode* node = ostrin_tasks;\n\
-        ostrin_tasks = node->next;\n\
+    OstrinTaskNode* retired = NULL;\n\
+    ostrin_mutex_lock(&ostrin_tasks_mutex);\n\
+    retired = ostrin_tasks;\n\
+    ostrin_tasks = NULL;\n\
+    ostrin_mutex_unlock(&ostrin_tasks_mutex);\n\
+    while (retired) {\n\
+        OstrinTaskNode* node = retired;\n\
+        retired = node->next;\n\
+        ostrin_release(node->task);\n\
         free(node);\n\
     }\n\
+    ostrin_heap_lock();\n\
     while (ostrin_allocations) {\n\
         OstrinAllocation* entry = ostrin_allocations;\n\
         ostrin_allocations = entry->next;\n\
@@ -6310,7 +6381,7 @@ fn generate_impl(
                          funcs.push((format!("static void {name}_start({name}* task)"), format!("    ostrin_mutex_init(&task->mutex);\n    ostrin_cond_init(&task->ready);\n    task->status = 1;\n    task->thread_started = true;\n    ostrin_thread_start(&task->thread, {name}_thread_entry, task);\n")));
                          funcs.push((format!("static bool {name}_poll(void* raw)"), format!("    {name}* task = ({name}*)raw;\n    if (task->status == 2) return false;\n    {name}_join(task);\n    return true;\n")));
                          let result = if **t == CType::Void { "    return;".to_string() } else if is_reference_type(t) { "    ostrin_retain((void*)task->value);\n    return task->value;".to_string() } else { "    return task->value;".to_string() };
-                         funcs.push((format!("static {ret} {name}_join({name}* task)"), format!("    ostrin_mutex_lock(&task->mutex);\n    while (task->status != 2 || task->join_in_progress) ostrin_cond_wait(&task->ready, &task->mutex);\n    if (!task->thread_joined) {{ task->join_in_progress = true; ostrin_mutex_unlock(&task->mutex); ostrin_thread_join(&task->thread); ostrin_mutex_lock(&task->mutex); task->thread_joined = true; task->join_in_progress = false; ostrin_cond_broadcast(&task->ready); }}\n    ostrin_mutex_unlock(&task->mutex);\n{result}\n")));
+                         funcs.push((format!("static {ret} {name}_join({name}* task)"), format!("    ostrin_mutex_lock(&task->mutex);\n    while (task->status != 2 || task->join_in_progress) ostrin_cond_wait(&task->ready, &task->mutex);\n    if (!task->thread_joined) {{ task->join_in_progress = true; ostrin_mutex_unlock(&task->mutex); ostrin_thread_join(&task->thread); ostrin_mutex_lock(&task->mutex); task->thread_joined = true; task->join_in_progress = false; ostrin_cond_broadcast(&task->ready); }}\n    ostrin_mutex_unlock(&task->mutex);\n    ostrin_unregister_task(task);\n{result}\n")));
                      } else {
                      list_type_decls.push_str(&format!("typedef {} (*{name}_Run)(void*);\nstruct {name} {{\n    {name}_Run run;\n    void* env;\n    int status;\n    {value} value;\n}};\n\n", ret));
                     funcs.push((format!("static bool {name}_poll(void* raw)"), format!(
@@ -6322,7 +6393,7 @@ fn generate_impl(
                         },
                     )));
                      funcs.push((format!("static {ret} {name}_join({name}* task)"), format!(
-                         "    while (task->status == 0) {{\n        if (!ostrin_poll_all()) OSTRIN_FAIL(\"task join would block: no runnable task remains\");\n    }}\n    if (task->status == 1) OSTRIN_FAIL(\"cyclic task join would deadlock\");\n    {result}\n",
+                         "    while (task->status == 0) {{\n        if (!ostrin_poll_all()) OSTRIN_FAIL(\"task join would block: no runnable task remains\");\n    }}\n    if (task->status == 1) OSTRIN_FAIL(\"cyclic task join would deadlock\");\n    ostrin_unregister_task(task);\n    {result}\n",
                         result = if **t == CType::Void {
                             "    return;".to_string()
                         } else {

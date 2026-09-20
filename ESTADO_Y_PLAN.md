@@ -161,7 +161,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 |---|---|
 | Cierres en nativo | Captura **por valor** (una variable `mut` cambiada después no se ve dentro); lambda sin contexto de tipos exige anotación |
 | Chequeo «movido tras enviar» (E1101) | Integrado por defecto en `--check`, `--run`, `--emit-c` y `--compile`; `--ownership-check` conserva el informe explícito |
-| Paralelismo nativo (`--native-threads`, canales bloqueantes, `select`) | Hilos del SO, mutexes/condiciones y canales bloqueantes implementados de forma opt-in en el backend C; `select`, cancelación y grupos de tareas robustos siguen pendientes |
+| Paralelismo nativo (`--native-threads`, canales bloqueantes, `select`) | Hilos del SO, mutexes/condiciones y canales bloqueantes implementados de forma opt-in; el registro de tareas tiene mutex, referencias temporales, desregistro en `join` y drenado de nodos; `select` y cancelación siguen pendientes |
 | Memoria en nativo | Registro, destructores tipados para records/colecciones, `clone`/`drop`, limpieza automática de locales directos y `--leak-check`; scopes anidados y ARC completa sobre IR siguen pendientes |
 | IR de bloques | HIR→CFG disponible con `--ir`; `if/while/for/match/try/spawn/channel` ya tienen operaciones explícitas, aún no reemplaza el backend C |
 | Ownership/último uso | `--ownership-report`, `--ownership-check` y `--ownership-ir`; el backend C ya aplica retain/release lineal en locales directos, pero la IR aún no es la fuente única |

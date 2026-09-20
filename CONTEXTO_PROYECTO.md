@@ -4330,3 +4330,25 @@ el índice hash de `Map` y `Set`:
   conserva los bits.
 
 La batería queda en **6 pruebas diferenciales y 128 de integración verdes**.
+
+## 155. Registro nativo de tareas sincronizado y drenado seguro — 2026-09-19
+
+El runtime C del backend nativo separa ahora la sincronización del heap y la del
+registro global de tareas:
+
+- `ostrin_tasks_mutex` protege la lista y el ordinal del scheduler cuando hay hilos
+  reales;
+- cada tarea registrada conserva una referencia propia, y el polling conserva una
+  referencia temporal mientras invoca el callback;
+- `join` desregistra la tarea terminada, mientras que `spawn_scope` y la limpieza de
+  salida retiran y liberan los nodos restantes sin dejar punteros obsoletos;
+- la prueba de hilos nativos y la suite diferencial siguen verdes: **128 pruebas de
+  integración y 6 diferenciales**.
+
+La verificación manual de `examples/concurrency_scheduler.ostrin` con
+`--native-threads --leak-check` mantiene la salida observable correcta (`main`, `task`,
+`42`, `scope-body`, `scope-task`, `7`). Todavía reporta una asignación viva: es el
+binding local `child` del scope anidado, porque la emisión de ownership cubre locales
+directos de funciones pero aún no todos los bindings creados dentro de regiones
+anidadas. Se conserva como brecha explícita de la siguiente etapa de lowering de
+ownership, no como un problema del registro concurrente.

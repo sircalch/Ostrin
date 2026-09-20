@@ -112,8 +112,11 @@ El backend C ofrece dos modos deliberados:
 
 El flag solo es válido con `--emit-c` o `--compile`. Las tareas nativas conservan su
 entorno capturado mientras el hilo puede usarlo y lo liberan al terminar; el runtime de
-memoria protege su tabla global contra accesos concurrentes. Esta primera entrega cubre
-`spawn`, `join`, `send`, `receive` y `close`; no promete todavía `select` ni
+memoria protege su tabla global contra accesos concurrentes. El registro de tareas usa
+además un mutex propio: cada nodo conserva viva su tarea mientras está registrada,
+el scheduler toma una referencia temporal durante el polling, y `join`/el drenado del
+scope retiran nodos terminados antes de liberar sus referencias. Esta primera entrega
+cubre `spawn`, `join`, `send`, `receive` y `close`; no promete todavía `select` ni
 cancelación cooperativa.
 
 ## 3. Concurrencia estructurada — `spawn_scope`
@@ -131,6 +134,11 @@ results = spawn_scope {
 
 - `spawn_scope { ... }` garantiza que **ninguna tarea lanzada dentro del bloque sigue viva al salir de él** — si el bloque termina (normalmente o por panic) con tareas todavía sin `.join()`, el propio `spawn_scope` espera a que terminen (o las cancela, según se decida en el diseño de cancelación, pendiente en §5) antes de propagar la salida.
 - Se recomienda `spawn_scope` como la forma por defecto de paralelizar trabajo (por ejemplo, repartir un cálculo científico entre N tareas y esperar todos los resultados); `spawn` suelto queda para el caso explícito de una tarea de fondo de vida más larga que el scope que la creó (un logger, un servidor).
+
+La sincronización del registro no sustituye todavía la bajada completa de ownership:
+un binding de tarea creado dentro de un scope anidado puede requerir limpieza adicional
+del emisor nativo aunque la tarea ya haya terminado. Ese caso queda cubierto como brecha
+de memoria/IR en el plan de producción.
 
 ## 4. Ejemplo completo — map paralelo
 
