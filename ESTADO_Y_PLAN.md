@@ -87,6 +87,8 @@ orden de inserción.
 `format`, `sum`, `panic`, `read_file`, `write_file`, `parse_int`, métodos de `List`
 (`map/filter/fold/any/all/find/push/remove_at/length`),
 `Map` (`get/set/remove/contains_key/count/keys/values`), `Set`, `Option`, `Result`.
+`hash` ofrece hashes estables para escalares soportados por `Map`/`Set`
+(`Int`, enteros fijos, `Bool`, `Float`, `Float32` y `String`) con paridad entre intérprete y nativo.
 
 **Diagnósticos**: códigos `OSTRIN-Exxxx` con ubicación; salida JSON Lines para editores.
 
@@ -163,7 +165,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Memoria en nativo | Registro, destructores tipados para records/colecciones, `clone`/`drop`, limpieza automática de locales directos y `--leak-check`; scopes anidados y ARC completa sobre IR siguen pendientes |
 | IR de bloques | HIR→CFG disponible con `--ir`; `if/while/for/match/try/spawn/channel` ya tienen operaciones explícitas, aún no reemplaza el backend C |
 | Ownership/último uso | `--ownership-report`, `--ownership-check` y `--ownership-ir`; el backend C ya aplica retain/release lineal en locales directos, pero la IR aún no es la fuente única |
-| Biblioteca estándar | Mínima: `args`, entorno/rutas, `format`, E/S y `Map` hash para claves escalares; faltan `Hash` formal, fechas, JSON y red |
+| Biblioteca estándar | Mínima: `args`, entorno/rutas, `format`, E/S, `hash` estable y `Map` hash para claves escalares; faltan `Hash` para tipos de usuario, fechas, JSON y red |
 | Mensajes de error de E/S | `strerror` ≠ texto de Rust (difieren entre backends) |
 | `Result<Void,E>` | Campo de valor de relleno (`char`) en C |
 | Migración HIR | Escalares, records, enums/match, Option/Result, colecciones, cierres, instancias concretas de genéricos, llamadas anidadas, records/enums genéricos aplicados y métodos genéricos centrales migrados; formas complejas restantes siguen con fallback |

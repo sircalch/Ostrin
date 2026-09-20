@@ -74,6 +74,10 @@
   `wasm32-wasip1` release builds are packaged with a SHA-256 checksum on manual
   runs and version tags. This distributes `ostrinc` itself; program-to-WASM
   code generation remains a separate runtime milestone.
+- Added the `hash(value)` standard builtin for scalar keys. The interpreter and
+  native backend share stable splitmix/FNV hashing for integers, fixed-width
+  integers, booleans, floats, Float32 and strings; unsupported composite values
+  are rejected by the checker.
 - Added the first HIR-to-IR lowering pass and `ostrinc --ir`. Functions now expose
   explicit temporaries, basic blocks, branches, loop edges, calls, aggregates, phi
   nodes and named opaque instructions for constructs awaiting semantic lowering.

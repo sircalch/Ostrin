@@ -2,7 +2,6 @@ use std::cell::RefCell;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt;
 use std::fs;
-use std::hash::{Hash, Hasher};
 use std::io::{BufRead, Write};
 use std::rc::Rc;
 
@@ -146,21 +145,36 @@ pub enum Value {
 }
 
 fn map_key_hash(value: &Value) -> Option<u64> {
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    match value {
-        Value::Int(n) => n.hash(&mut hasher),
-        Value::Sized(n, kind) => {
-            n.hash(&mut hasher);
-            kind.hash(&mut hasher);
-        }
-        Value::F32(n) => n.to_bits().hash(&mut hasher),
-        Value::Float(n) => n.to_bits().hash(&mut hasher),
-        Value::Bool(value) => value.hash(&mut hasher),
-        Value::Char(value) => value.hash(&mut hasher),
-        Value::String(value) => value.hash(&mut hasher),
-        _ => return None,
+    stable_hash_value(value)
+}
+
+fn stable_hash_u64(mut value: u64) -> u64 {
+    value ^= value >> 30;
+    value = value.wrapping_mul(0xbf58476d1ce4e5b9);
+    value ^= value >> 27;
+    value = value.wrapping_mul(0x94d049bb133111eb);
+    value ^ (value >> 31)
+}
+
+fn stable_hash_string(value: &str) -> u64 {
+    let mut hash = 1469598103934665603u64;
+    for byte in value.as_bytes() {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(1099511628211);
     }
-    Some(hasher.finish())
+    hash
+}
+
+fn stable_hash_value(value: &Value) -> Option<u64> {
+    Some(match value {
+        Value::Int(n) => stable_hash_u64(*n as u64),
+        Value::Sized(n, _) => stable_hash_u64(*n as u64),
+        Value::F32(n) => stable_hash_u64(u64::from(n.to_bits())),
+        Value::Float(n) => stable_hash_u64(n.to_bits()),
+        Value::Bool(value) => stable_hash_u64(u64::from(*value)),
+        Value::String(value) => stable_hash_string(value),
+        _ => return None,
+    })
 }
 
 struct RuntimeImpl {
@@ -2090,6 +2104,13 @@ impl Interpreter {
                         return Err(RuntimeError::Error("'file_exists' expects a String path".to_string()));
                     };
                     return Ok(Value::Bool(std::path::Path::new(&path).is_file()));
+                }
+                "hash" => {
+                    let value = self.eval_arg(&args[0], env)?;
+                    let hash = stable_hash_value(&value).ok_or_else(|| {
+                        RuntimeError::Error("'hash' supports Int, fixed-width integers, Bool, Float, Float32 and String".to_string())
+                    })?;
+                    return Ok(Value::Int(hash as i64));
                 }
                 "format" => {
                     let template = self.eval_arg(&args[0], env)?;

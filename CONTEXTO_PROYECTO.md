@@ -4312,3 +4312,21 @@ La frontera se documenta explícitamente: es distribución del compilador para h
 todavía compilación de programas Ostrin a WASM ni un playground de navegador. El backend de
 programas sigue generando C, y el próximo paso WASM es separar un runtime sin pthreads ni APIs
 de proceso para poder probar un programa pequeño sobre WASI.
+
+## 154. Hash estable como builtin de stdlib — 2026-09-19
+
+La biblioteca estándar expone `hash(value) -> Int` para las claves escalares que ya soportan
+el índice hash de `Map` y `Set`:
+
+- El checker acepta `Int`, enteros fijos, `Bool`, `Float`, `Float32` y `String`, y
+  rechaza colecciones, records y otros valores compuestos hasta que exista un contrato
+  `Hash` formal para tipos de usuario.
+- El intérprete sustituyó `DefaultHasher` por splitmix64 para números y FNV-1a para cadenas,
+  eliminando una dependencia del hasher interno de Rust.
+- El backend C usa los mismos algoritmos y trata `Float32` por sus bits de 32 bits, no por
+  una conversión accidental a `double`.
+- `examples/hash_builtin.ostrin` y la prueba diferencial comparan seis valores entre ambos
+  backends; la salida incluye hashes negativos para confirmar que la conversión `u64 -> Int`
+  conserva los bits.
+
+La batería queda en **6 pruebas diferenciales y 128 de integración verdes**.

@@ -1,0 +1,8 @@
+fn main() -> Void {
+    print(hash(42))
+    print(hash(255 as UInt8))
+    print(hash(true))
+    print(hash(1.5))
+    print(hash(1.5 as Float32))
+    print(hash("Ostrin"))
+}

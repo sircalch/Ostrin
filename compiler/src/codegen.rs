@@ -677,6 +677,10 @@ static uint64_t ostrin_hash_float(double value) {\n\
     union { double value; uint64_t bits; } bits = { value };\n\
     return ostrin_hash_u64(bits.bits);\n\
 }\n\
+static uint64_t ostrin_hash_float32(float value) {\n\
+    union { float value; uint32_t bits; } bits = { value };\n\
+    return ostrin_hash_u64((uint64_t)bits.bits);\n\
+}\n\
 \
 static const char* ostrin_cwd(void) {\n\
     size_t capacity = 256;\n\
@@ -3718,7 +3722,8 @@ impl<'a> Codegen<'a> {
         Some(match ty {
             CType::Str => format!("ostrin_hash_string({value})"),
             CType::Int | CType::Bool | CType::Sized(_) => format!("ostrin_hash_u64((uint64_t)({value}))"),
-            CType::Float | CType::Float32 => format!("ostrin_hash_float((double)({value}))"),
+            CType::Float => format!("ostrin_hash_float((double)({value}))"),
+            CType::Float32 => format!("ostrin_hash_float32((float)({value}))"),
             _ => return None,
         })
     }
@@ -5109,7 +5114,7 @@ impl<'a> Codegen<'a> {
             "env" => 1,
             "path_join" => 2,
             "cwd" => 0,
-            "file_exists" => 1,
+            "file_exists" | "hash" => 1,
             "format" => 2,
             "clone" | "drop" => 1,
             "norm" | "eigvals" | "det" | "inv" | "trace" | "eye" | "read_file" | "parse_int" | "parse_csv" | "sum" | "panic" | "assert" | "array" | "zeros" | "ones" | "abs" => 1,
@@ -5175,6 +5180,12 @@ impl<'a> Codegen<'a> {
             ))),
             "cwd" => Ok(Some(("ostrin_cwd()".to_string(), CType::Str))),
             "file_exists" => Ok(Some((format!("ostrin_file_exists({})", codes[0]), CType::Bool))),
+            "hash" => {
+                let hash = self.hash_expr(&codes[0], &types[0]).ok_or_else(|| {
+                    "'hash' supports Int, fixed-width integers, Bool, Float, Float32 and String".to_string()
+                })?;
+                Ok(Some((format!("(int64_t)({hash})"), CType::Int)))
+            }
             "format" => {
                 let CType::List(elem) = &types[1] else {
                     return Err("'format' expects a List<String> as its second argument".to_string());

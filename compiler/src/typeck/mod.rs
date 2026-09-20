@@ -3929,6 +3929,7 @@ fn check_builtin_call(name: &str, arg_types: &[Ty], errors: &mut Vec<TypeError>)
         "path_join" => vec![Ty::String, Ty::String],
         "cwd" => vec![],
         "file_exists" => vec![Ty::String],
+        "hash" => vec![Ty::Unknown],
         "format" => vec![Ty::String, Ty::List(Box::new(Ty::String))],
         // Ownership primitives are intentionally generic. `clone` creates a
         // new native reference to the same identity-managed value; `drop`
@@ -3979,6 +3980,24 @@ fn check_builtin_call(name: &str, arg_types: &[Ty], errors: &mut Vec<TypeError>)
         "path_join" => Some(Ty::String),
         "cwd" => Some(Ty::String),
         "file_exists" => Some(Ty::Bool),
+        "hash" => {
+            let supported = matches!(
+                arg_types.first(),
+                Some(Ty::Int | Ty::Sized(_) | Ty::Float | Ty::Float32 | Ty::Bool | Ty::String | Ty::Unknown)
+            );
+            if !supported {
+                errors.push(TypeError {
+                    code: "E1041",
+                    message: format!(
+                        "Builtin 'hash' supports Int, fixed-width integers, Bool, Float, Float32 and String, got '{}'.",
+                        arg_types[0].describe()
+                    ),
+                    span: None,
+                    source_file: None,
+                });
+            }
+            Some(Ty::Int)
+        }
         "format" => Some(Ty::String),
         "clone" => Some(arg_types.first().cloned().unwrap_or(Ty::Unknown)),
         "drop" => Some(Ty::Void),
