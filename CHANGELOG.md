@@ -21,15 +21,19 @@
 ### Compiler
 - Added the first native C emitter backed by the explicit HIR→IR lowering. Straight-line
   scalar functions now become C from SSA temporaries in `ir_c.rs`, including integer
-  division and scalar printing; checked fixed-width arithmetic, unsupported control flow
-  and managed values keep the verified HIR/AST fallback. `--native-type-report` now separates `ir-generated` from
+  division and scalar printing; unsupported control flow, checked fixed-width arithmetic
+  and managed values initially kept the verified HIR/AST fallback. `--native-type-report` now separates `ir-generated` from
   `hir-generated`, and the migration ratchet counts both paths without weakening the
   interpreter/native differential tests.
 - Extended that IR C emitter to verified scalar CFGs: branches, nested `if`, recursive calls,
   loop-carried locals and `phi` selection now lower through C labels and predecessor edges.
   The IR builder emits loop phis, records the real predecessor after nested lowering, and the
-  verifier rejects missing, duplicated or non-CFG phi inputs; managed values, iterators and
-  checked fixed-width arithmetic still use the safe fallback.
+  verifier rejects missing, duplicated or non-CFG phi inputs; managed values and iterators
+  still use the safe fallback.
+- Moved checked fixed-width integer arithmetic into the IR C emitter. `Int8`/`Int16`/`Int32`
+  and `UInt8`/`UInt16`/`UInt32`/`UInt64` preserve overflow checks, division-by-zero checks,
+  signed `min / -1` checks, checked negation, comparisons and printing when generated from
+  IR; `native_ir_sized.ostrin` locks interpreter/native parity for this family.
 - Extended the stable hash builtin to structural Option and Result values when
   their payloads are hashable; interpreter and native tags/payload combination
   remain identical.

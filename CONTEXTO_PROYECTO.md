@@ -4800,3 +4800,28 @@ ancho fijo permanecen en el fallback verificado hasta tener sus contratos comple
 La batería queda en **6 pruebas diferenciales y 148 de integración verdes**. La siguiente
 frontera es conectar ownership/último uso de la IR a este emisor sin perder el contrato de
 destructores y `retain/release` del backend actual.
+
+## 180. Aritmética de ancho fijo comprobada desde la IR — 2026-09-20
+
+La familia escalar del emisor IR ya no necesita abandonar al HIR para los enteros de ancho
+fijo. `ir_c.rs` conserva las mismas reglas que los emisores anteriores:
+
+- `Int8`/`Int16`/`Int32` y `UInt8`/`UInt16`/`UInt32`/`UInt64` usan
+  `__builtin_add_overflow`, `__builtin_sub_overflow` y `__builtin_mul_overflow` sobre el
+  tipo C exacto;
+- la división comprueba cero y el caso `min / -1` con un cociente temporal `__int128`;
+- la negación con signo rechaza `min` antes de calcular, y las comparaciones, constantes y
+  `print` mantienen el tipo y el formato del intérprete;
+- tipos fijos incompatibles u operaciones no soportadas siguen provocando el fallback
+  verificable, no una conversión silenciosa a C con wraparound.
+
+`examples/native_ir_sized.ostrin` cubre llamadas entre funciones escalares, suma `UInt8`,
+división y negación `Int32`; el binario nativo produce `120`, `-4`, `-7`, igual que el
+intérprete. La prueba existente de overflow continúa fallando con el mismo diagnóstico y
+ahora también atraviesa el camino IR cuando la función es elegible. El trinquete sube de
+127 a **131 funciones HIR/IR** y la batería queda en **6 pruebas diferenciales y 149 de
+integración verdes**.
+
+La deuda siguiente sigue siendo ownership/último uso sobre la IR: los valores gestionados,
+iteradores y releases alrededor de `phi`, loops, scopes y escapes aún deben migrarse sin
+romper destructores ni `retain/release`.

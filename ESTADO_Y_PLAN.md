@@ -1,9 +1,9 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-20 · rama `main` · 6 pruebas diferenciales y 148 de integración en verde.*
+*Corte: 2026-09-20 · rama `main` · 6 pruebas diferenciales y 149 de integración en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
-Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–179); para el diseño
+Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–180); para el diseño
 del lenguaje, `docs/design/` (21 documentos).
 
 ---
@@ -30,7 +30,7 @@ Implementación: compilador + intérprete + herramientas de editor, todo en Rust
 | Léxico / parser | `lexer/`, `parser/mod.rs` | Tokens, AST con rangos de origen |
 | Módulos y paquetes | `modules.rs`, `package.rs`, `ostrin.toml` | Imports, `--project`, dependencias locales y lockfile portable |
 | Verificador de tipos | `typeck/mod.rs` (~3 500 l.) | Tipos, dimensiones, traits, exhaustividad, genéricos |
-| HIR/IR | `hir.rs`, `hir_c.rs`, `ir.rs`, `ir_c.rs` | HIR verificado, CFG con temporales explícitos y primer emisor C desde IR para escalares, con fallback HIR/AST acotado |
+| HIR/IR | `hir.rs`, `hir_c.rs`, `ir.rs`, `ir_c.rs` | HIR verificado, CFG con temporales explícitos y emisor C desde IR para escalares, enteros de ancho fijo y control de flujo, con fallback HIR/AST acotado |
 | Intérprete | `interpreter/mod.rs` | Ejecución tree‑walking y scheduler cooperativo; referencia semántica |
 | Servidor de lenguaje | `lsp.rs`, `symbols.rs`, `protocol.rs` | LSP sobre stdio |
 | Adaptador de depuración | `dap.rs` + hooks del intérprete | DAP sobre stdio |
@@ -115,10 +115,11 @@ Transpila a C con expresiones‑sentencia GNU (`({ … })`); compilador vía `OS
 Monomorfización bajo demanda (funciones, records, enums, métodos, vtables, listas, mapas…).
 
 La primera familia de funciones ya se emite desde la IR explícita: funciones escalares
-convierten temporales SSA en temporales C, preservan división entera y salida numérica,
-emiten ramas, recursión, bucles con estado y `phi`, y se cuentan por separado en
-`--native-type-report` como `ir-generated`. Si una función usa valores gestionados, iteradores
-o una operación todavía no modelada, cae de forma verificable a HIR y después al AST.
+convierten temporales SSA en temporales C, preservan división entera, aritmética comprobada
+de enteros de ancho fijo y salida numérica, emiten ramas, recursión, bucles con estado y
+`phi`, y se cuentan por separado en `--native-type-report` como `ir-generated`. Si una
+función usa valores gestionados, iteradores o una operación todavía no modelada, cae de
+forma verificable a HIR y después al AST.
 
 El runtime C generado centraliza las reservas en `ostrin_alloc`/`ostrin_calloc`/
 `ostrin_realloc`, registra cada bloque y lo libera mediante `atexit` al terminar el
@@ -272,7 +273,7 @@ Decisiones que necesito de ti para afinar el plan:
 
 ```powershell
 cd compiler
-cargo test                                   # 6 diferenciales + 148 de integración
+cargo test                                   # 6 diferenciales + 149 de integración
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```

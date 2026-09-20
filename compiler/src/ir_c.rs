@@ -3,9 +3,8 @@
 //! The emitter is intentionally limited to scalar values, but it consumes the
 //! explicit CFG rather than walking HIR a second time. SSA values become named
 //! C temporaries, branches become labels/gotos, and phi nodes select the
-//! incoming value using the predecessor edge. Unsupported instructions,
-//! managed values and checked arithmetic families return `None`, preserving
-//! the verified HIR/AST fallback.
+//! incoming value using the predecessor edge. Unsupported instructions and
+//! managed values return `None`, preserving the verified HIR/AST fallback.
 
 use std::collections::{HashMap, HashSet};
 
@@ -29,9 +28,10 @@ fn c_type(ty: &Ty) -> Bail<&'static str> {
 }
 
 fn scalar(ty: &Ty) -> bool {
-    // Fixed-width integers keep checked overflow and division semantics in
-    // the HIR/AST emitters until the IR has checked arithmetic intrinsics.
-    matches!(ty, Ty::Int | Ty::Float | Ty::Float32 | Ty::Bool | Ty::Void)
+    matches!(
+        ty,
+        Ty::Int | Ty::Float | Ty::Float32 | Ty::Sized(_) | Ty::Bool | Ty::Void
+    )
 }
 
 fn value_name(value: ValueId) -> String {
@@ -125,16 +125,80 @@ fn const_code(value: &str, ty: &Ty) -> Bail<String> {
     })
 }
 
+fn c_int_literal(value: i128) -> String {
+    if value > i64::MAX as i128 {
+        format!("{value}ULL")
+    } else if value == i64::MIN as i128 {
+        "(-9223372036854775807LL - 1)".to_string()
+    } else if value < 0 {
+        format!("(-{}LL)", -value)
+    } else {
+        format!("{value}LL")
+    }
+}
+
+const OVERFLOW_ABORT: &str = "fprintf(stderr, \"runtime error: integer overflow\\n\"); exit(1);";
+
 fn unary_code(op: UnaryOp, operand: &str, ty: &Ty) -> Bail<String> {
     match (op, ty) {
         (UnaryOp::Neg, Ty::Int | Ty::Float | Ty::Float32) => Ok(format!("(-{operand})")),
-        (UnaryOp::Neg, Ty::Sized(kind)) if kind.is_signed() => Ok(format!("(-{operand})")),
+        (UnaryOp::Neg, Ty::Sized(kind)) if kind.is_signed() => Ok(format!(
+            "({{ {c} __ostrin_ir_neg = {operand}; if (__ostrin_ir_neg == ({c}){min}) {{ {OVERFLOW_ABORT} }} ({c})(-(__int128)__ostrin_ir_neg); }})",
+            c = kind.c_type(),
+            min = c_int_literal(kind.min()),
+        )),
         (UnaryOp::Not, Ty::Bool) => Ok(format!("(!{operand})")),
         _ => Err(()),
     }
 }
 
-fn binary_code(op: BinOp, left: &str, right: &str, ty: &Ty) -> Bail<String> {
+fn sized_binary_code(
+    op: BinOp,
+    left: &str,
+    right: &str,
+    kind: crate::ast::IntKind,
+) -> Bail<String> {
+    let c = kind.c_type();
+    let a = "__ostrin_ir_a";
+    let b = "__ostrin_ir_b";
+    let checked = |builtin: &str| {
+        format!(
+            "({{ {c} {a} = {left}; {c} {b} = {right}; {c} __ostrin_ir_result; if ({builtin}({a}, {b}, &__ostrin_ir_result)) {{ {OVERFLOW_ABORT} }} __ostrin_ir_result; }})"
+        )
+    };
+    Ok(match op {
+        BinOp::Add => checked("__builtin_add_overflow"),
+        BinOp::Sub => checked("__builtin_sub_overflow"),
+        BinOp::Mul => checked("__builtin_mul_overflow"),
+        BinOp::Div => format!(
+            "({{ {c} {a} = {left}; {c} {b} = {right}; if ({b} == 0) {{ fprintf(stderr, \"runtime error: division by zero\\n\"); exit(1); }} __int128 __ostrin_ir_q = (__int128){a} / (__int128){b}; if (__ostrin_ir_q < (__int128){min} || __ostrin_ir_q > (__int128){max}) {{ {OVERFLOW_ABORT} }} ({c})__ostrin_ir_q; }})",
+            min = c_int_literal(kind.min()),
+            max = c_int_literal(kind.max()),
+        ),
+        BinOp::Eq => format!("(({left}) == ({right}))"),
+        BinOp::NotEq => format!("(({left}) != ({right}))"),
+        BinOp::Lt => format!("(({left}) < ({right}))"),
+        BinOp::Gt => format!("(({left}) > ({right}))"),
+        BinOp::LtEq => format!("(({left}) <= ({right}))"),
+        BinOp::GtEq => format!("(({left}) >= ({right}))"),
+        BinOp::And | BinOp::Or => return Err(()),
+    })
+}
+
+fn binary_code(
+    op: BinOp,
+    left: &str,
+    left_ty: &Ty,
+    right: &str,
+    right_ty: &Ty,
+    ty: &Ty,
+) -> Bail<String> {
+    if let (Ty::Sized(left_kind), Ty::Sized(right_kind)) = (left_ty, right_ty) {
+        if left_kind != right_kind {
+            return Err(());
+        }
+        return sized_binary_code(op, left, right, *left_kind);
+    }
     if *ty == Ty::Int && op == BinOp::Div {
         return Ok(format!("ostrin_idiv({left}, {right})"));
     }
@@ -239,7 +303,9 @@ fn emit_instruction(
             let code = binary_code(
                 *op,
                 &value_code(values, *left)?,
+                &left_ty,
                 &value_code(values, *right)?,
+                &right_ty,
                 ty,
             )?;
             out.push_str(&format!("    {} = {code};\n", value_name(*dst)));

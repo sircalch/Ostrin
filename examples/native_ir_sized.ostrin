@@ -1,0 +1,17 @@
+fn add_byte(a: UInt8, b: UInt8) -> UInt8 {
+    a + b
+}
+
+fn divide_word(a: Int32, b: Int32) -> Int32 {
+    a / b
+}
+
+fn negate_word(a: Int32) -> Int32 {
+    -a
+}
+
+fn main() -> Void {
+    print(add_byte(100, 20))
+    print(divide_word(-9, 2))
+    print(negate_word(7))
+}

@@ -286,7 +286,7 @@ fn native_backend_types_agree_with_the_checker() {
     // Ratchet: functions whose C is generated from the typed HIR or its
     // explicit IR lowering (the migration of the native backend).
     let native_generated = hir_generated + ir_generated;
-    assert!(native_generated >= 127, "only {native_generated} functions were generated from HIR/IR (expected at least 127)");
+    assert!(native_generated >= 131, "only {native_generated} functions were generated from HIR/IR (expected at least 131)");
     println!("functions generated from HIR/IR: {native_generated} (HIR {hir_generated}, IR {ir_generated})");
     assert!(unchecked <= 4, "{unchecked} expressions have no checker type (limit 4)");
     // Every partial literal the backend meets is completed from the checker's type.
