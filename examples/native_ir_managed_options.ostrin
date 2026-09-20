@@ -1,0 +1,27 @@
+fn choose(flag: Bool) -> Option<String> {
+    if flag {
+        Some("na" + "tive")
+    } else {
+        None
+    }
+}
+
+fn describe(value: Option<String>) -> String {
+    match value {
+        Some(text) => text,
+        None => "empty",
+    }
+}
+
+fn main() -> Void {
+    value = choose(true)
+    print(describe(value))
+    print(value.is_none())
+    print(describe(choose(false)))
+
+    mut labels = ["a": "al" + "pha", "b": "be" + "ta"]
+    print(labels.get("a").unwrap_or("missing"))
+    print(labels.get("z").is_none())
+    print(labels.remove("b").unwrap())
+    print(labels.count())
+}

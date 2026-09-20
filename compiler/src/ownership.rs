@@ -374,7 +374,7 @@ fn safe_release_site(instruction: &IrInstr) -> bool {
         | IrInstr::ChannelSend { .. }
         | IrInstr::Aggregate { .. }
         | IrInstr::Index { .. } => true,
-        IrInstr::Call { callee, args, .. } => callee == "print" && args.len() == 1,
+        IrInstr::Call { callee, args, .. } => (callee == "print" || callee == "Some") && args.len() == 1,
         IrInstr::MethodCall { method, .. } => matches!(
             method.as_str(),
             "length"
@@ -391,6 +391,8 @@ fn safe_release_site(instruction: &IrInstr) -> bool {
                 | "replace"
                 | "contains_key"
                 | "get"
+                | "is_some"
+                | "is_none"
                 | "set"
                 | "keys"
                 | "values"

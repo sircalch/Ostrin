@@ -66,7 +66,11 @@ fn set_supported(element: &Ty) -> bool {
 }
 
 fn option_supported(element: &Ty) -> bool {
-    matches!(element, Ty::Int | Ty::Float | Ty::Float32 | Ty::Sized(_) | Ty::Bool)
+    matches!(element, Ty::Int | Ty::Float | Ty::Float32 | Ty::Sized(_) | Ty::Bool | Ty::String)
+}
+
+fn option_managed_payload(element: &Ty) -> bool {
+    matches!(element, Ty::String)
 }
 
 fn option_type(element: &Ty) -> Ty {
@@ -583,7 +587,14 @@ fn emit_instruction(
                     return Err(());
                 }
                 let option_name = format!("Option_{}", mangle_scalar(&inner));
-                format!("(({option_name}){{ .has = true, .value = {} }})", codes[0])
+                if !option_managed_payload(&inner) {
+                    format!("(({option_name}){{ .has = true, .value = {} }})", codes[0])
+                } else {
+                    format!(
+                        "({{ {option_name} __ostrin_option = (({option_name}){{ .has = true, .value = {} }}); ostrin_retain((void*)__ostrin_option.value); __ostrin_option; }})",
+                        codes[0]
+                    )
+                }
             } else if callee == "print" && args.len() == 1 {
                 if *ty != Ty::Void {
                     return Err(());
@@ -620,6 +631,37 @@ fn emit_instruction(
                 out.push_str(&format!("    {call};\n"));
             }
         }
+        IrInstr::PatternTest { dst, subject, pattern } => {
+            let Ty::Applied(name, args) = value_ty(values, *subject)? else { return Err(()) };
+            if name != "Option" || args.len() != 1 || !option_supported(&args[0]) {
+                return Err(());
+            }
+            let subject = value_code(values, *subject)?;
+            let test = if pattern == "Ident(\"None\")" {
+                format!("!({subject}).has")
+            } else if pattern.starts_with("Variant(\"Some\",") {
+                format!("({subject}).has")
+            } else {
+                return Err(());
+            };
+            out.push_str(&format!("    {} = {test};\n", value_name(*dst)));
+        }
+        IrInstr::PatternBind { dst, subject, path, ty, .. } => {
+            let subject_ty = value_ty(values, *subject)?;
+            let (code, bound_ty) = if path.is_empty() {
+                (value_code(values, *subject)?, subject_ty)
+            } else {
+                let Ty::Applied(name, args) = subject_ty else { return Err(()) };
+                if name != "Option" || args.len() != 1 || !option_supported(&args[0]) || path.len() != 1 {
+                    return Err(());
+                }
+                (format!("({}).value", value_code(values, *subject)?), args[0].clone())
+            };
+            if bound_ty != *ty {
+                return Err(());
+            }
+            out.push_str(&format!("    {} = {code};\n", value_name(*dst)));
+        }
         IrInstr::Phi { dst, incoming, ty } => {
             if !supported(ty) || *ty == Ty::Void || incoming.is_empty() {
                 return Err(());
@@ -639,16 +681,34 @@ fn emit_instruction(
             out.push_str("    else { abort(); }\n");
         }
         IrInstr::Retain { value } => {
-            if !matches!(value_ty(values, *value)?, Ty::String | Ty::List(_) | Ty::Map(_, _) | Ty::Set(_)) {
-                return Err(());
+            let ty = value_ty(values, *value)?;
+            match ty {
+                Ty::String | Ty::List(_) | Ty::Map(_, _) | Ty::Set(_) => {
+                    out.push_str(&format!("    ostrin_retain((void*){});\n", value_code(values, *value)?));
+                }
+                Ty::Applied(name, args)
+                    if name == "Option" && args.len() == 1 && option_managed_payload(&args[0]) =>
+                {
+                    let code = value_code(values, *value)?;
+                    out.push_str(&format!("    if ({code}.has) ostrin_retain((void*){code}.value);\n"));
+                }
+                _ => return Err(()),
             }
-            out.push_str(&format!("    ostrin_retain((void*){});\n", value_code(values, *value)?));
         }
         IrInstr::Release { value } => {
-            if !matches!(value_ty(values, *value)?, Ty::String | Ty::List(_) | Ty::Map(_, _) | Ty::Set(_)) {
-                return Err(());
+            let ty = value_ty(values, *value)?;
+            match ty {
+                Ty::String | Ty::List(_) | Ty::Map(_, _) | Ty::Set(_) => {
+                    out.push_str(&format!("    ostrin_release((void*){});\n", value_code(values, *value)?));
+                }
+                Ty::Applied(name, args)
+                    if name == "Option" && args.len() == 1 && option_managed_payload(&args[0]) =>
+                {
+                    let code = value_code(values, *value)?;
+                    out.push_str(&format!("    if ({code}.has) ostrin_release((void*){code}.value);\n"));
+                }
+                _ => return Err(()),
             }
-            out.push_str(&format!("    ostrin_release((void*){});\n", value_code(values, *value)?));
         }
         _ => return Err(()),
     }

@@ -6352,10 +6352,21 @@ fn generate_impl(
     // the ownership-lowered IR, so the backend already has a single place to
     // consume future retain/release facts as managed families are migrated.
     let ir = hir.as_ref().map(|program| crate::ownership::lower_linear(&crate::ir::lower(program)).0);
+    let non_generic_function_names: HashSet<String> = functions
+        .iter()
+        .filter(|function| function.generics.is_empty())
+        .map(|function| function.name.clone())
+        .collect();
     let ir_functions: HashSet<String> = ir
         .as_ref()
         .into_iter()
-        .flat_map(|program| program.functions.iter().map(|function| function.name.clone()))
+        .flat_map(|program| {
+            program
+                .functions
+                .iter()
+                .filter(|function| non_generic_function_names.contains(&function.name))
+                .map(|function| function.name.clone())
+        })
         .collect();
     let mut codegen = Codegen {
         signatures: HashMap::new(),
@@ -6947,7 +6958,7 @@ fn generate_impl(
                             None => String::new(),
                         }
                     )));
-                    funcs.push((format!("static {opt} {name}_get({name}* m, {kc} key)"), format!("    {opt} r;\n    memset(&r, 0, sizeof r);\n    int64_t i = {name}_find(m, key);\n    if (i >= 0) {{ r.has = true; r.value = m->vals[i]; }}\n    return r;\n")));
+                    funcs.push((format!("static {opt} {name}_get({name}* m, {kc} key)"), format!("    {opt} r;\n    memset(&r, 0, sizeof r);\n    int64_t i = {name}_find(m, key);\n    if (i >= 0) {{ r.has = true; r.value = m->vals[i];{retain_value} }}\n    return r;\n", retain_value = if is_reference_type(v) { " ostrin_retain((void*)r.value);" } else { "" })));
                     funcs.push((format!("static bool {name}_contains_key({name}* m, {kc} key)"), format!("    return {name}_find(m, key) >= 0;\n")));
                     funcs.push((format!("static int64_t {name}_count({name}* m)"), "    return m->length;\n".to_string()));
                     funcs.push((format!("static {opt} {name}_remove({name}* m, {kc} key)"), format!("    {opt} r;\n    memset(&r, 0, sizeof r);\n    int64_t i = {name}_find(m, key);\n    if (i < 0) return r;\n    r.has = true;\n    r.value = m->vals[i];\n{release_key}    for (int64_t j = i; j < m->length - 1; j++) {{ m->keys[j] = m->keys[j + 1]; m->vals[j] = m->vals[j + 1]; }}\n    m->length = m->length - 1;\n{rehash_after}    return r;\n", release_key = if is_reference_type(k) { "    ostrin_release((void*)m->keys[i]);\n" } else { "" }, rehash_after = if hashable.is_some() { format!("    if (m->buckets) {name}_rehash(m, m->bucket_capacity);\n") } else { String::new() })));

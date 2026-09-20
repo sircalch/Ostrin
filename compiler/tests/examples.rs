@@ -1812,6 +1812,48 @@ fn native_ir_emitter_handles_scalar_map_options() {
 }
 
 #[test]
+fn native_ir_emitter_handles_managed_options_and_patterns() {
+    let file = example_path("native_ir_managed_options.ostrin");
+    let expected = "native\nfalse\nempty\nalpha\ntrue\nbeta\n1\n";
+    let interpreted = run(&["--run", &file]);
+    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    let ir_functions = stdout(&report)
+        .lines()
+        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .unwrap_or(0);
+    assert!(ir_functions >= 3, "managed Option example did not use the IR emitter: {}", stdout(&report));
+
+    let emitted = run(&["--emit-c", &file]);
+    assert!(emitted.status.success(), "managed Option IR emission failed: {}", stderr(&emitted));
+    let source = stdout(&emitted);
+    for helper in [
+        "typedef struct { bool has; const char* value; } Option_String;",
+        "Map_String_String_get",
+        "Map_String_String_remove",
+        "ostrin_retain((void*)__ostrin_option.value)",
+        ".has",
+    ] {
+        assert!(source.contains(helper), "expected managed Option support '{helper}' in generated C: {source}");
+    }
+
+    let exe = temp_artifact("native_ir_managed_options.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+    let native = Command::new(&exe).output().expect("failed to run managed Option IR binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native run failed: {}", String::from_utf8_lossy(&native.stderr));
+    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "managed Option IR ownership leaked: {}", String::from_utf8_lossy(&native.stderr));
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+}
+
+#[test]
 fn native_ir_emitter_preserves_checked_fixed_width_arithmetic() {
     let file = example_path("native_ir_sized.ostrin");
     let expected = "120\n-4\n-7\n";

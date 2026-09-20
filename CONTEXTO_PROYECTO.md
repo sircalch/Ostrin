@@ -4980,3 +4980,35 @@ diferenciales y 154 de integración verdes**.
 
 La siguiente frontera sigue siendo `Option` con payload gestionado, patrones sobre `Option`,
 listas de records y llamadas que transfieren ownership de forma no lineal.
+
+## 188. `Option<String>` y patrones `Some`/`None` desde la IR — 2026-09-20
+
+El bloque siguiente amplió la representación anterior sin convertir todos los agregados en
+casos especiales. `Option<String>` usa el mismo struct C por valor (`has` más puntero `value`),
+pero ahora la IR conoce que su payload participa en el conteo de referencias:
+
+- `Some(text)` retiene el string al construir el `Option`; el último uso del argumento libera
+  la referencia original, de modo que el `Option` conserva una referencia propia.
+- `Map.get` retiene el valor gestionado que copia al `Option`; `Map.remove` transfiere la
+  referencia que antes pertenecía al mapa. El destructor del mapa sigue siendo responsable
+  únicamente de las entradas que permanecen en él.
+- `Retain` y `Release` sobre `Option<String>` comprueban `has` y aplican la operación al
+  puntero solo cuando existe payload. `Option` escalar continúa siendo una copia por valor y
+  no genera llamadas al runtime.
+
+La bajada HIR→IR ahora tipa los binds de `Some(name)` y omite el falso bind que antes creaba
+`None` como si fuera una variable. `ir_c.rs` consume `PatternTest` para `Some`/`None` y
+`PatternBind` para el payload, por lo que `match` simple sobre `Option<String>` puede emitirse
+desde CFG/SSA. Las funciones genéricas no se anuncian como llamadas directas del emisor IR:
+si necesitan monomorfización, conservan el camino HIR que registra la instancia C correcta.
+
+`examples/native_ir_managed_options.ostrin` usa strings concatenados dinámicamente, funciones
+que producen/consumen `Option<String>`, un `match`, `Map<String,String>.get/remove`,
+`unwrap_or`, `is_none` y `unwrap`. `native_ir_emitter_handles_managed_options_and_patterns`
+compara siete líneas entre intérprete y binario, comprueba `Option_String`, los helpers de mapa,
+los retains condicionales y termina con `live_allocations=0`. La suite queda en **6 pruebas
+diferenciales y 155 de integración verdes**.
+
+Quedan fuera de esta porción `Option` de records, listas, mapas, sets o payloads anidados,
+patrones anidados y el análisis completo de llamadas que almacenan o devuelven aliases
+gestionados de forma no lineal.

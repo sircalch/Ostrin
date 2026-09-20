@@ -57,8 +57,12 @@
 - Extended the IR C emitter with by-value scalar `Option<T>` (`None`, `Some`,
   `is_some`/`is_none`, `unwrap` and `unwrap_or`) and connected `Map.get`/`Map.remove` to
   their `Option_<T>` helpers for scalar payloads. `native_ir_map_options.ostrin` compares
-  interpreter/native output and finishes with zero live allocations; managed Option payloads,
-  patterns and complex aggregates remain on the verified fallback.
+  interpreter/native output and finishes with zero live allocations.
+- Extended the IR C emitter to managed `Option<String>` values and `Some`/`None` patterns;
+  `Map<String,String>.get/remove` now retain or transfer string payloads correctly. The
+  `native_ir_managed_options.ostrin` regression covers dynamic strings, pattern bindings,
+  map lookups and `--leak-check`; generic calls that need monomorphization remain on the HIR
+  path rather than being emitted as unresolved IR calls.
 - Extended the stable hash builtin to structural Option and Result values when
   their payloads are hashable; interpreter and native tags/payload combination
   remain identical.

@@ -684,14 +684,24 @@ impl Builder {
 
     fn bind_pattern(&mut self, subject: ValueId, pattern: &crate::ast::Pattern, path: Vec<String>) {
         match pattern {
+            crate::ast::Pattern::Ident(name) if name == "None" => {}
             crate::ast::Pattern::Ident(name) => {
+                let subject_ty = self.known_value_type(subject).unwrap_or(Ty::Unknown);
+                let ty = if path.is_empty() {
+                    subject_ty
+                } else {
+                    match subject_ty {
+                        Ty::Applied(name, args) if name == "Option" && args.len() == 1 && path.len() == 1 => args[0].clone(),
+                        _ => Ty::Unknown,
+                    }
+                };
                 let dst = self.fresh();
                 self.emit(IrInstr::PatternBind {
                     dst,
                     subject,
                     name: name.clone(),
                     path,
-                    ty: Ty::Unknown,
+                    ty,
                 });
                 self.locals
                     .last_mut()
