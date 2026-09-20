@@ -4611,3 +4611,26 @@ Esto establece una primera garantía de que la selección de entrada y las depen
 son compatibles con los dos backends compilados. Git y el registro remoto siguen fuera del
 alcance: las dependencias Git continúan requiriendo clonación explícita y conversión a `path`.
 La batería queda en **6 pruebas diferenciales y 141 de integración verdes**.
+
+## 171. Cancelación cooperativa en puntos seguros — 2026-09-19
+
+La cancelación de tareas ya no se limita a tareas que todavía no empezaron:
+
+- `Task.cancel()` mantiene la transición inmediata `Pending → Cancelled`, pero en una tarea
+  `Running` registra una solicitud y devuelve `true`; devuelve `false` únicamente para tareas
+  terminadas o ya canceladas;
+- el intérprete comprueba la solicitud en cada frontera de sentencia y conserva
+  `TaskCancelled` como señal interna del scheduler, de modo que la tarea termina sin ejecutar
+  su siguiente operación y `join()` conserva el error `task was cancelled`;
+- el backend C cooperativo y el modo `--native-threads` usan un contexto de checkpoint basado
+  en `setjmp`/`longjmp`. `yield()` comprueba la solicitud después de ceder el turno, restaura
+  el contexto anidado y marca la tarea como cancelada; no hay preempción arbitraria de código
+  que no alcance un punto seguro;
+- `examples/concurrency_cancel_safe.ostrin` cubre una tarea que imprime `started`, cede,
+  recibe una cancelación desde otra tarea y no llega a imprimir `must-not-run`. La prueba
+  compara intérprete y C cooperativo, verifica `live_allocations=0` y comprueba que el modo
+  de hilos reales emite el checkpoint.
+
+La batería queda en **6 pruebas diferenciales y 142 de integración verdes**. La siguiente
+brecha de concurrencia es completar la propagación y administración de grupos en `spawn_scope`;
+la cancelación sigue siendo cooperativa y no interrumpe tareas bloqueadas sin un checkpoint.

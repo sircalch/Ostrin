@@ -1,0 +1,17 @@
+fn main() -> Void {
+    spawn_scope {
+        first = spawn {
+            print("started")
+            yield()
+            print("must-not-run")
+        }
+
+        controller = spawn {
+            print(first.cancel())
+        }
+
+        yield()
+        print("controller-finished")
+        print(first.cancel())
+    }
+}

@@ -243,6 +243,7 @@ pub(crate) struct TaskState {
     body: Rc<Block>,
     env: Env,
     status: TaskStatus,
+    cancel_requested: bool,
     result: Option<Result<Value, String>>,
 }
 
@@ -356,6 +357,9 @@ pub enum RuntimeError {
     Return(Value),
     Break(Option<Value>),
     Continue,
+    /// A cooperative task observed a cancellation request at a statement
+    /// boundary; the scheduler consumes this internally.
+    TaskCancelled,
     /// Unwinds the whole program when a connected debugger sends
     /// `disconnect`/`terminate` while execution is paused (see `dap.rs`).
     Terminated,
@@ -555,6 +559,9 @@ pub struct Interpreter {
     /// interpreter deterministic while giving `spawn` real deferred
     /// semantics before the native thread backend is introduced.
     tasks: Vec<Rc<RefCell<TaskState>>>,
+    /// Cooperative tasks currently executing. Nested progress from
+    /// `yield()` temporarily pushes another task and restores the parent.
+    active_tasks: Vec<Rc<RefCell<TaskState>>>,
     /// Integer literals the checker typed as fixed-width (see `TypedProgram::literal_kinds`).
     literal_kinds: HashMap<crate::typeck::ExprKey, LitKind>,
 }
@@ -634,6 +641,7 @@ impl Interpreter {
             literal_kinds: HashMap::new(),
             terminated: false,
             tasks: Vec::new(),
+            active_tasks: Vec::new(),
         }
     }
 
@@ -659,6 +667,7 @@ impl Interpreter {
             RuntimeError::Return(_) => "task returned through an invalid control-flow path".to_string(),
             RuntimeError::Break(_) => "task escaped with break".to_string(),
             RuntimeError::Continue => "task escaped with continue".to_string(),
+            RuntimeError::TaskCancelled => "task was cancelled".to_string(),
             RuntimeError::Terminated => "task was terminated by the debugger".to_string(),
         }
     }
@@ -696,20 +705,34 @@ impl Interpreter {
             }
         };
 
+        self.active_tasks.push(task.clone());
         let outcome = match self.eval_block(&body, &env) {
             Ok(value) => Ok(value),
             Err(RuntimeError::Return(value)) => Ok(value),
-            Err(error) => Err(Self::task_error(error)),
+            Err(RuntimeError::TaskCancelled) => Err(RuntimeError::TaskCancelled),
+            Err(error) => Err(RuntimeError::Error(Self::task_error(error))),
         };
-        let status = if outcome.is_ok() { TaskStatus::Completed } else { TaskStatus::Failed };
+        self.active_tasks.pop();
+        let status = match &outcome {
+            Err(RuntimeError::TaskCancelled) => TaskStatus::Cancelled,
+            Ok(_) => TaskStatus::Completed,
+            Err(_) => TaskStatus::Failed,
+        };
         {
             let mut state = task.borrow_mut();
             state.status = status;
-            state.result = Some(outcome.clone());
+            state.result = Some(match &outcome {
+                Ok(value) => Ok(value.clone()),
+                Err(RuntimeError::TaskCancelled) => Err("task was cancelled".to_string()),
+                Err(RuntimeError::Error(error)) => Err(error.clone()),
+                Err(_) => Err("task failed".to_string()),
+            });
         }
         match outcome {
             Ok(value) => Ok(value),
-            Err(error) => Err(RuntimeError::Error(format!("task failed: {error}"))),
+            Err(RuntimeError::TaskCancelled) => Err(RuntimeError::TaskCancelled),
+            Err(RuntimeError::Error(error)) => Err(RuntimeError::Error(format!("task failed: {error}"))),
+            Err(error) => Err(RuntimeError::Error(format!("task failed: {}", Self::task_error(error)))),
         }
     }
 
@@ -721,7 +744,11 @@ impl Interpreter {
             (candidate.borrow().status == TaskStatus::Pending).then(|| candidate.clone())
         });
         let Some(task) = task else { return Ok(false) };
-        self.run_task(task)?;
+        match self.run_task(task) {
+            Err(RuntimeError::TaskCancelled) => {}
+            Err(error) => return Err(error),
+            Ok(_) => {}
+        }
         Ok(true)
     }
 
@@ -731,7 +758,10 @@ impl Interpreter {
                 (candidate.borrow().status == TaskStatus::Pending).then(|| candidate.clone())
             });
             let Some(task) = task else { return Ok(()) };
-            self.run_task(task)?;
+            match self.run_task(task) {
+                Err(RuntimeError::TaskCancelled) | Ok(_) => {}
+                Err(error) => return Err(error),
+            }
         }
     }
 
@@ -1337,6 +1367,7 @@ impl Interpreter {
             Err(RuntimeError::Return(v)) => Ok(v),
             Err(RuntimeError::Break(_)) => Err("'break' outside a loop".to_string()),
             Err(RuntimeError::Continue) => Err("'continue' outside a loop".to_string()),
+            Err(RuntimeError::TaskCancelled) => Err("task was cancelled".to_string()),
             Err(RuntimeError::Terminated) => Err("debug session terminated".to_string()),
         }
     }
@@ -1476,6 +1507,13 @@ impl Interpreter {
         }
         if self.terminated {
             return Err(RuntimeError::Terminated);
+        }
+        self.check_task_cancellation()
+    }
+
+    fn check_task_cancellation(&self) -> Result<(), RuntimeError> {
+        if self.active_tasks.last().is_some_and(|task| task.borrow().cancel_requested) {
+            return Err(RuntimeError::TaskCancelled);
         }
         Ok(())
     }
@@ -2173,6 +2211,7 @@ impl Interpreter {
                     body: Rc::new(block.clone()),
                     env: env.clone(),
                     status: TaskStatus::Pending,
+                    cancel_requested: false,
                     result: None,
                 }));
                 self.tasks.push(task.clone());
@@ -2288,6 +2327,7 @@ impl Interpreter {
                 }
                 "yield" => {
                     let _ = self.run_one_pending_task()?;
+                    self.check_task_cancellation()?;
                     return Ok(Value::Void);
                 }
                 "env" => {
@@ -2799,12 +2839,17 @@ impl Interpreter {
                     "cancel" if args.is_empty() => {
                         let cancelled = {
                             let mut state = result.borrow_mut();
-                            if state.status == TaskStatus::Pending {
-                                state.status = TaskStatus::Cancelled;
-                                state.result = Some(Err("task was cancelled".to_string()));
-                                true
-                            } else {
-                                false
+                            match state.status {
+                                TaskStatus::Pending => {
+                                    state.status = TaskStatus::Cancelled;
+                                    state.result = Some(Err("task was cancelled".to_string()));
+                                    true
+                                }
+                                TaskStatus::Running => {
+                                    state.cancel_requested = true;
+                                    true
+                                }
+                                TaskStatus::Completed | TaskStatus::Failed | TaskStatus::Cancelled => false,
                             }
                         };
                         return Ok(Value::Bool(cancelled));

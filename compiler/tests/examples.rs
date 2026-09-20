@@ -1978,6 +1978,33 @@ fn pending_tasks_can_be_cancelled_before_they_run() {
 }
 
 #[test]
+fn running_tasks_honor_cancellation_at_cooperative_checkpoints() {
+    let file = example_path("concurrency_cancel_safe.ostrin");
+    let interpreted = run(&["--run", &file]);
+    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    let expected = "started\ntrue\ncontroller-finished\nfalse\n";
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let exe = temp_artifact("cancel-safe.exe");
+    let compiled = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compiled) {
+        return;
+    }
+    assert!(compiled.status.success(), "safe cancellation compile failed: {}", stderr(&compiled));
+    let native = Command::new(&exe).output().expect("run native safe cancellation binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native safe cancellation failed: {}", String::from_utf8_lossy(&native.stderr));
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "safe cancellation leaked: {}", String::from_utf8_lossy(&native.stderr));
+
+    let threaded = run(&["--emit-c", "--native-threads", &file]);
+    assert!(threaded.status.success(), "native-thread safe cancellation emission failed: {}", stderr(&threaded));
+    let source = stdout(&threaded);
+    assert!(source.contains("cancel_requested"));
+    assert!(source.contains("ostrin_task_checkpoint"));
+}
+
+#[test]
 fn yield_advances_the_cooperative_scheduler_and_compiles_with_threads() {
     let file = example_path("concurrency_yield.ostrin");
     let interpreted = run(&["--run", &file]);

@@ -114,6 +114,10 @@ test
 - Added the `yield() -> Void` standard builtin. It advances one pending task in
   the interpreter and cooperative native scheduler, while `--native-threads`
   yields the current OS thread; the behavior is covered by a parity and leak-check test.
+- Extended `Task.cancel()` to request cooperative cancellation from running tasks. The
+  interpreter checks at statement boundaries, while generated C checks at `yield()` using
+  a scoped jump context; cancellation never preempts arbitrary code. Added a parity and
+  leak-check example covering a running task that is cancelled before its next statement.
 - Made the generated cooperative C runtime portable across threadless toolchains:
   `pthread`/Windows thread headers and implementations are now guarded behind
   `OSTRIN_NATIVE_THREADS`, while the default scheduler uses no-op synchronization
