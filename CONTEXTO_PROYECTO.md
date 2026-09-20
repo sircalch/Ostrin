@@ -4503,3 +4503,24 @@ El contrato de las colecciones deja de ser solo una convención de los backends:
 La batería queda en **6 pruebas diferenciales y 134 de integración verdes**. La próxima brecha
 grande continúa siendo el backend de programas Ostrin para WASM, después de la distribución WASI
 ya disponible para el compilador.
+
+## 165. Select determinista y paridad de canales — 2026-09-19
+
+La superficie de concurrencia incorpora selección entre varios canales sin añadir una
+gramática nueva:
+
+- `select([channel1, channel2, ...]) -> Option<T>` exige en el checker una lista homogénea
+  de `Channel<T>` y devuelve el primer valor disponible en el orden de la lista;
+- un canal cerrado y vacío cuenta como listo y devuelve `None`, mientras que los valores
+  pendientes se consumen antes de observar el cierre;
+- el intérprete mantiene el scheduler cooperativo determinista: si ningún canal está listo,
+  ejecuta una tarea pendiente y vuelve a inspeccionar la lista;
+- el backend C genera `Channel<T>_try_receive`, con mutex en `--native-threads`, y el
+  builtin cede el hilo entre intentos; el modo nativo cooperativo usa `ostrin_poll_all()`;
+- `examples/concurrency_select.ostrin` verifica un productor que despierta la selección,
+  prioridad de lista y equivalencia intérprete↔nativo, incluyendo `--native-threads`. La
+  prueba negativa confirma que una lista de valores no se acepta como canales.
+
+La batería queda en **6 pruebas diferenciales y 136 de integración verdes**. La próxima
+brecha de concurrencia es cancelación explícita y grupos nativos completos; la distribución
+WASM del backend de programas sigue pendiente después del compilador WASI.

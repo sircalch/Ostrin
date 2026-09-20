@@ -13,8 +13,8 @@ determinista. El backend C conserva ese modo por defecto para mantener la parida
 y añade `--native-threads` como modo explícito de ejecución real: cada `spawn` arranca un
 hilo del sistema operativo, `join` espera con mutex/condición y los canales usan un buffer
 protegido con espera bloqueante y despiertan a los receptores al enviar o cerrar. La API del
-lenguaje no cambia y E1100/E1101 siguen aplicándose; `select`, cancelación y grupos nativos
-completos todavía no están implementados.
+lenguaje no cambia y E1100/E1101 siguen aplicándose. `select` ya está implementado; la
+cancelación explícita y los grupos nativos completos todavía no.
 
 La idea central de este documento es que Ostrin **no necesita un borrow checker al estilo Rust** para ser seguro en concurrencia, porque ya partimos de "inmutable por defecto" (documento 01). Un dato inmutable nunca puede tener una condición de carrera — no importa cuántas tareas lo lean a la vez. El único lugar donde hace falta una regla especial es en el manejo de datos `mut`, y ahí basta una regla simple y local (no un sistema de ownership/lifetimes que atraviese todo el lenguaje).
 
@@ -116,8 +116,27 @@ memoria protege su tabla global contra accesos concurrentes. El registro de tare
 además un mutex propio: cada nodo conserva viva su tarea mientras está registrada,
 el scheduler toma una referencia temporal durante el polling, y `join`/el drenado del
 scope retiran nodos terminados antes de liberar sus referencias. Esta primera entrega
-cubre `spawn`, `join`, `send`, `receive` y `close`; no promete todavía `select` ni
+cubre `spawn`, `join`, `send`, `receive`, `close` y `select`; no promete todavía
 cancelación cooperativa.
+
+### 2.3 Selección determinista entre canales
+
+```ostrin
+first = select([updates, shutdown])
+match first {
+    Some(value) => print(value),
+    None => print("closed")
+}
+```
+
+`select(channels: List<Channel<T>>) -> Option<T>` inspecciona los canales en el orden
+de la lista. Devuelve el primer valor disponible; un canal cerrado y vacío está listo y
+produce `None`. Si ningún canal está listo, el intérprete y el backend nativo cooperativo
+avanzan una tarea pendiente. Con `--native-threads`, el backend usa una operación de
+recepción no bloqueante protegida por mutex por canal y cede el hilo entre intentos.
+Una lista vacía es un error de ejecución. El checker exige estáticamente una lista
+homogénea de `Channel<T>`, y la semántica de prioridad queda así reproducible entre
+intérprete, nativo cooperativo y nativo con hilos.
 
 ## 3. Concurrencia estructurada — `spawn_scope`
 
@@ -161,6 +180,5 @@ Como `T` y `U` no están restringidos a ser inmutables aquí, esta función solo
 ## 5. Preguntas abiertas para la siguiente sesión de diseño
 
 1. **Cancelación de tareas**: si `spawn_scope` debe poder cancelar tareas hijas activamente (no solo esperarlas) cuando una falla o el scope se interrumpe — pendiente de diseño concreto.
-2. **Selección sobre múltiples canales** (`select` estilo Go, para reaccionar al primero de varios canales que tenga un valor disponible) — no cubierto en este documento.
-3. **Relación con E/S**: si operaciones de E/S (leer un archivo, una petición de red) bloquean la tarea completa o se manejan con un mecanismo de espera eficiente a nivel de runtime — es una decisión de implementación del runtime más que del lenguaje, pero afecta si `spawn` es "barato" de usar en masa (miles de tareas) o no.
-4. ~~`as D`~~ y ~~`dyn Trait`~~ — resueltos en los documentos 16 y 15 respectivamente.
+2. **Relación con E/S**: si operaciones de E/S (leer un archivo, una petición de red) bloquean la tarea completa o se manejan con un mecanismo de espera eficiente a nivel de runtime — es una decisión de implementación del runtime más que del lenguaje, pero afecta si `spawn` es "barato" de usar en masa (miles de tareas) o no.
+3. ~~`as D`~~ y ~~`dyn Trait`~~ — resueltos en los documentos 16 y 15 respectivamente.

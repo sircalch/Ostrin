@@ -1,0 +1,23 @@
+fn main() -> Void {
+    waiting = channel<Int>()
+    ready = channel<Int>()
+
+    producer = spawn {
+        ready.send(9)
+        ready.close()
+    }
+
+    print(select([waiting, ready]).unwrap())
+    producer.join()
+
+    priority_a = channel<Int>()
+    priority_b = channel<Int>()
+    priority_b.send(7)
+    print(select([priority_a, priority_b]).unwrap())
+    priority_a.close()
+    priority_b.close()
+
+    closed = channel<Int>()
+    closed.close()
+    print(select([closed]))
+}

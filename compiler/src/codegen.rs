@@ -369,8 +369,10 @@ static void ostrin_cond_destroy(OstrinCond* cond) { (void)cond; }\n\
 static void ostrin_cond_wait(OstrinCond* cond, OstrinMutex* mutex) { SleepConditionVariableCS(cond, mutex, INFINITE); }\n\
 static void ostrin_cond_signal(OstrinCond* cond) { WakeConditionVariable(cond); }\n\
 static void ostrin_cond_broadcast(OstrinCond* cond) { WakeAllConditionVariable(cond); }\n\
+static void ostrin_select_wait(void) { Sleep(0); }\n\
 #else\n\
 #include <pthread.h>\n\
+#include <sched.h>\n\
 typedef pthread_mutex_t OstrinMutex;\n\
 typedef pthread_cond_t OstrinCond;\n\
 typedef pthread_t OstrinThread;\n\
@@ -383,6 +385,7 @@ static void ostrin_cond_destroy(OstrinCond* cond) { pthread_cond_destroy(cond); 
 static void ostrin_cond_wait(OstrinCond* cond, OstrinMutex* mutex) { pthread_cond_wait(cond, mutex); }\n\
 static void ostrin_cond_signal(OstrinCond* cond) { pthread_cond_signal(cond); }\n\
 static void ostrin_cond_broadcast(OstrinCond* cond) { pthread_cond_broadcast(cond); }\n\
+static void ostrin_select_wait(void) { sched_yield(); }\n\
 #endif\n\
 typedef struct { void (*entry)(void*); void* arg; } OstrinThreadStart;\n\
 #if defined(_WIN32)\n\
@@ -4557,7 +4560,11 @@ impl<'a> Codegen<'a> {
             return self.gen_print(&arg_codes, &arg_types);
         }
         if !self.function_decls.contains_key(name) {
-            if let Some(result) = self.gen_builtin(name, &arg_codes, &arg_types)? {
+            let select_owns_input = name == "select"
+                && args.first().is_some_and(|arg| match arg {
+                    Arg::Positional(expr) | Arg::Named(_, expr) => !borrowed_reference_expr(expr),
+                });
+            if let Some(result) = self.gen_builtin(name, &arg_codes, &arg_types, select_owns_input)? {
                 return Ok(result);
             }
         }
@@ -4750,7 +4757,7 @@ impl<'a> Codegen<'a> {
                 let list_c = list_struct_name(&CType::Str);
                 Ok((format!("({{ int64_t {count}; const char** {items} = ostrin_s_lines({s}, &{count}); {list_c}_new_from_array({items}, {count}); }})"), ty))
             }
-            "to_int" if strings(0) => Ok(self.gen_builtin("parse_int", &[s.to_string()], &[CType::Str])?.expect("parse_int is a builtin")),
+            "to_int" if strings(0) => Ok(self.gen_builtin("parse_int", &[s.to_string()], &[CType::Str], false)?.expect("parse_int is a builtin")),
             "to_float" if strings(0) => {
                 let ty = CType::Result(Box::new(CType::Float), Box::new(CType::Str));
                 self.register_list_types(&ty);
@@ -5438,13 +5445,14 @@ impl<'a> Codegen<'a> {
 
     /// The interpreter's built-in functions beyond `print`: `read_file`,
     /// `write_file`, `parse_int`, `sum` and `panic`.
-    fn gen_builtin(&mut self, name: &str, codes: &[String], types: &[CType]) -> Result<Option<(String, CType)>, String> {
+    fn gen_builtin(&mut self, name: &str, codes: &[String], types: &[CType], select_owns_input: bool) -> Result<Option<(String, CType)>, String> {
         let arity = match name {
             "args" => 0,
             "env" => 1,
             "path_join" => 2,
             "cwd" => 0,
             "file_exists" | "hash" => 1,
+            "select" => 1,
             "format" => 2,
             "clone" | "drop" => 1,
             "norm" | "eigvals" | "det" | "inv" | "trace" | "eye" | "read_file" | "parse_int" | "parse_csv" | "sum" | "panic" | "assert" | "array" | "zeros" | "ones" | "abs" => 1,
@@ -5529,6 +5537,44 @@ impl<'a> Codegen<'a> {
                 Ok(Some((
                     format!("({{ {list_ty} {list} = {}; ostrin_s_format({}, {list}->items, {list}->length); }})", codes[1], codes[0]),
                     CType::Str,
+                )))
+            }
+            "select" => {
+                let CType::List(channel_ty) = &types[0] else {
+                    return Err("'select' expects a List<Channel<T>>".to_string());
+                };
+                let CType::Channel(element_ty) = channel_ty.as_ref() else {
+                    return Err("'select' expects a List<Channel<T>>".to_string());
+                };
+                self.register_list_types(&types[0]);
+                let result = CType::Option(element_ty.clone());
+                self.register_list_types(&result);
+                let list_ty = c_type_name(&types[0]);
+                let channel_name = mangle_ctype(channel_ty);
+                let element_c = c_type_name(element_ty);
+                let result_c = c_type_name(&result);
+                let list = self.next_temp();
+                let selected = self.next_temp();
+                let index = self.next_temp();
+                let value = self.next_temp();
+                let status = self.next_temp();
+                let ready = self.next_temp();
+                let wait = if self.native_threads {
+                    "ostrin_select_wait();".to_string()
+                } else {
+                    "if (!ostrin_poll_all()) OSTRIN_FAIL(\"select would block: no runnable task remains\");".to_string()
+                };
+                let release_input = if select_owns_input {
+                    format!(" ostrin_release((void*){list});")
+                } else {
+                    String::new()
+                };
+                Ok(Some((
+                    format!(
+                        "({{ {list_ty} {list} = {input}; {result_c} {selected}; memset(&{selected}, 0, sizeof {selected}); bool {ready} = false; if (!{list} || {list}->length == 0) OSTRIN_FAIL(\"select expects at least one channel\"); while (!{ready}) {{ for (int64_t {index} = 0; {index} < {list}->length; {index}++) {{ {element_c} {value}; int {status} = {channel_name}_try_receive({list}->items[{index}], &{value}); if ({status} > 0) {{ {selected}.has = true; {selected}.value = {value}; {ready} = true; break; }} if ({status} < 0) {{ {ready} = true; break; }} }} if (!{ready}) {{ {wait} }} }}{release_input} {selected}; }})",
+                        input = codes[0],
+                    ),
+                    result,
                 )))
             }
             "parse_csv" => {
@@ -6682,6 +6728,11 @@ fn generate_impl(
                      funcs.push((drop_sig, drop_body));
                      let sync_init = if codegen.native_threads { "    ostrin_mutex_init(&c->mutex); ostrin_cond_init(&c->ready);\n" } else { "" };
                      funcs.push((format!("static {name}* {name}_new(void)"), format!("    {name}* c = ({name}*)ostrin_calloc_with_drop(1, sizeof({name}), (void (*)(void*)){name}_drop);\n{sync_init}    return c;\n")));
+                     if codegen.native_threads {
+                         funcs.push((format!("static int {name}_try_receive({name}* c, {tc}* out)"), format!("    ostrin_mutex_lock(&c->mutex);\n    if (c->head < c->length) {{ *out = c->items[c->head++]; ostrin_mutex_unlock(&c->mutex); return 1; }}\n    if (c->closed) {{ ostrin_mutex_unlock(&c->mutex); return -1; }}\n    ostrin_mutex_unlock(&c->mutex);\n    return 0;\n")));
+                     } else {
+                         funcs.push((format!("static int {name}_try_receive({name}* c, {tc}* out)"), "    if (c->head < c->length) { *out = c->items[c->head++]; return 1; }\n    if (c->closed) return -1;\n    return 0;\n".to_string()));
+                     }
                      if codegen.native_threads {
                          funcs.push((format!("static void {name}_send({name}* c, {tc} item)"), format!("    ostrin_mutex_lock(&c->mutex);\n    if (c->closed) {{ ostrin_mutex_unlock(&c->mutex); OSTRIN_FAIL(\"send on closed channel\"); }}\n    if (c->length >= c->capacity) {{\n        c->capacity = c->capacity == 0 ? 4 : c->capacity * 2;\n        c->items = ({tc}*)ostrin_realloc(c->items, sizeof({tc}) * (size_t)c->capacity);\n    }}\n    c->items[c->length] = item;\n{retain}    c->length = c->length + 1;\n    ostrin_cond_signal(&c->ready);\n    ostrin_mutex_unlock(&c->mutex);\n", retain = if is_reference_type(t) { "    ostrin_retain((void*)item);\n" } else { "" })));
                          funcs.push((format!("static {opt} {name}_receive({name}* c)"), format!("    {opt} r;\n    memset(&r, 0, sizeof r);\n    ostrin_mutex_lock(&c->mutex);\n    while (c->head >= c->length && !c->closed) ostrin_cond_wait(&c->ready, &c->mutex);\n    if (c->head < c->length) {{ r.has = true; r.value = c->items[c->head++]; }}\n    ostrin_mutex_unlock(&c->mutex);\n    return r;\n")));

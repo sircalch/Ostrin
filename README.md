@@ -46,7 +46,7 @@ traits, pattern matching, quantities and two concurrency modes: deterministic
 cooperative scheduling by default, plus opt-in native threads for compiled
 programs.
 
-The compiler suite currently passes **134 integration tests and 6 differential
+The compiler suite currently passes **136 integration tests and 6 differential
 interpreter↔native tests**. Function calls
 support named/default arguments, collection lookups preserve `Option<T>`, and
 record fields are checked statically. The CLI also exposes JSON Lines
@@ -81,7 +81,8 @@ quantities; generic records/enums, `Map`/`Set`, operators and `derive`, named
 and default arguments, custom iterators, `Option`/`Result` combinators, the
 built-in file/parse functions and synchronous `spawn`/channels all compile too.
 The default native scheduler remains deterministic for differential testing;
-`--native-threads` enables OS threads and blocking channels. The standard
+`--native-threads` enables OS threads, blocking channels and deterministic-priority
+`select([channels])`. The standard
 library is still intentionally small.
 
 The compiler itself also has a reproducible `wasm32-wasip1` release workflow with a checksum;
@@ -179,7 +180,7 @@ when GitHub Pages is enabled.
 3. Grow the standard library and runtime.
 4. Finish semantic tokens, workspace resolution and debugging in the VS Code client.
 5. Package applications as `.exe` files and make project lockfiles reproducible.
-6. Extend real concurrency with `select`/cancellation, then add WebAssembly and platform bindings.
+6. Extend real concurrency with cancellation, then add WebAssembly and platform bindings.
 
 See [`CONTEXTO_PROYECTO.md`](CONTEXTO_PROYECTO.md) for the complete project
 history and current implementation notes.

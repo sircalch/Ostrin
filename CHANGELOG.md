@@ -103,6 +103,11 @@ test
   locals now have a scoped cleanup frame, preserve block results across releases,
   and are covered by a native-thread `spawn_scope` leak-check test; task
   registration now happens before a native thread starts.
+- Added `select([channel1, channel2, ...]) -> Option<T>` for deterministic channel
+  selection. The interpreter and cooperative native runtime poll in list order;
+  `--native-threads` uses mutex-protected nonblocking receives and yields between
+  attempts. Closed empty channels return `None`, and the checker requires a
+  homogeneous `List<Channel<T>>`.
 - Added `--project DIR` package entry-point selection. The compiler now reads the
   manifest's `entry` field when no source path is supplied, and generated
   `ostrin.lock` files sort dependencies and store project-relative paths where

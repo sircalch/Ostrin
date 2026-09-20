@@ -2348,6 +2348,35 @@ impl Interpreter {
                     }
                     return Ok(Value::String(rendered));
                 }
+                "select" => {
+                    let channels = self.eval_arg(&args[0], env)?;
+                    let Value::List(channels) = channels else {
+                        return Err(RuntimeError::Error("'select' expects a List<Channel<T>>".to_string()));
+                    };
+                    let channels = channels.borrow().clone();
+                    if channels.is_empty() {
+                        return Err(RuntimeError::Error("'select' expects at least one channel".to_string()));
+                    }
+                    loop {
+                        for channel in &channels {
+                            let Value::Channel(state) = channel else {
+                                return Err(RuntimeError::Error("'select' expects a List<Channel<T>>".to_string()));
+                            };
+                            let mut state = state.borrow_mut();
+                            if let Some(value) = state.queue.pop_front() {
+                                return Ok(some_value(value));
+                            }
+                            if state.closed {
+                                return Ok(none_value());
+                            }
+                        }
+                        if !self.run_one_pending_task()? {
+                            return Err(RuntimeError::Error(
+                                "select would block: no runnable task remains".to_string(),
+                            ));
+                        }
+                    }
+                }
                 // The interpreter already uses Rc-backed identity for
                 // records and collections. Cloning a Value therefore creates
                 // the same logical alias as native retain; drop is a

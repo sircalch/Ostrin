@@ -1918,6 +1918,48 @@ fn concurrency_scheduler_defers_tasks_and_drains_scopes() {
 }
 
 #[test]
+fn concurrency_select_matches_between_interpreter_and_native_modes() {
+    let file = example_path("concurrency_select.ostrin");
+    let interpreted = run(&["--run", &file]);
+    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    let expected = stdout(&interpreted).replace("\r\n", "\n");
+    assert_eq!(expected, "9\n7\nNone\n");
+
+    for (label, extra) in [("cooperative", Vec::<&str>::new()), ("native-threads", vec!["--native-threads"])] {
+        let exe = temp_artifact(&format!("concurrency-select-{label}.exe"));
+        let mut args = vec!["--compile", "--leak-check", "--out", exe.as_str()];
+        args.extend(extra);
+        args.push(&file);
+        let compile = run(&args);
+        if skip_if_no_c_compiler(&compile) {
+            return;
+        }
+        assert!(compile.status.success(), "{label} native compile failed: {}", stderr(&compile));
+        let native = Command::new(&exe).output().expect("run native select binary");
+        let _ = fs::remove_file(&exe);
+        assert!(native.status.success(), "{label} native binary failed: {}", String::from_utf8_lossy(&native.stderr));
+        assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected, "{label} output differs");
+        assert!(
+            String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+            "{label} select runtime leaked allocations: {}",
+            String::from_utf8_lossy(&native.stderr)
+        );
+    }
+}
+
+#[test]
+fn select_requires_a_homogeneous_channel_list() {
+    let out = run_stdin(
+        &["--stdin", "--check", "--file", "C:/workspace/select_error.ostrin"],
+        "fn main() -> Void {\n    print(select([1, 2]))\n}\n",
+    );
+    assert!(!out.status.success());
+    let text = stderr(&out);
+    assert!(text.contains("E1041"), "missing select type diagnostic: {text}");
+    assert!(text.contains("List<Channel<T>>"), "missing select contract: {text}");
+}
+
+#[test]
 fn spawn_capturing_mut_is_rejected() {
     let out = run(&[&example_path("concurrency_errors.ostrin")]);
     assert!(!out.status.success());

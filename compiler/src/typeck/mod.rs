@@ -4178,6 +4178,7 @@ fn check_builtin_call(
         "file_exists" => vec![Ty::String],
         "hash" => vec![Ty::Unknown],
         "format" => vec![Ty::String, Ty::List(Box::new(Ty::String))],
+        "select" => vec![Ty::Unknown],
         // Ownership primitives are intentionally generic. `clone` creates a
         // new native reference to the same identity-managed value; `drop`
         // releases one native reference and returns unit.
@@ -4254,6 +4255,42 @@ fn check_builtin_call(
             Some(Ty::Int)
         }
         "format" => Some(Ty::String),
+        "select" => {
+            let Some(Ty::List(channel_ty)) = arg_types.first() else {
+                errors.push(TypeError {
+                    code: "E1041",
+                    message: "Builtin 'select' expects a List<Channel<T>>.".to_string(),
+                    span: None,
+                    source_file: None,
+                });
+                return Some(Ty::Unknown);
+            };
+            let Ty::Applied(channel_name, channel_args) = channel_ty.as_ref() else {
+                errors.push(TypeError {
+                    code: "E1041",
+                    message: format!(
+                        "Builtin 'select' expects a List<Channel<T>>, got List<{}>.",
+                        channel_ty.describe()
+                    ),
+                    span: None,
+                    source_file: None,
+                });
+                return Some(Ty::Unknown);
+            };
+            if channel_name != "Channel" || channel_args.len() != 1 {
+                errors.push(TypeError {
+                    code: "E1041",
+                    message: format!(
+                        "Builtin 'select' expects a List<Channel<T>>, got List<{}>.",
+                        channel_ty.describe()
+                    ),
+                    span: None,
+                    source_file: None,
+                });
+                return Some(Ty::Unknown);
+            }
+            Some(Ty::Applied("Option".to_string(), vec![channel_args[0].clone()]))
+        }
         "clone" => Some(arg_types.first().cloned().unwrap_or(Ty::Unknown)),
         "drop" => Some(Ty::Void),
         "print" | "panic" | "assert" | "assert_eq" => Some(Ty::Void),
