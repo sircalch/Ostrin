@@ -3848,7 +3848,7 @@ impl<'a> Codegen<'a> {
     }
 
     /// Returns a stable runtime hash for scalar values, structural
-    /// Option/Result values, and records with derive(Hash).
+    /// Option/Result values, and records/enums with derive(Hash).
     fn hash_expr(&self, value: &str, ty: &CType) -> Option<String> {
         match ty {
             CType::Str => Some(format!("ostrin_hash_string({value})")),
@@ -3875,6 +3875,25 @@ impl<'a> Codegen<'a> {
                     hash = format!("ostrin_hash_combine({hash}, {field_hash})");
                 }
                 Some(hash)
+            }
+            CType::Enum(name) if self.has_derive(name, "Hash") => {
+                let variants: Vec<VariantInfo> = match self.instance_variants.get(name) {
+                    Some(variants) => variants.clone(),
+                    None => self.variants.values().filter(|variant| &variant.enum_name == name).cloned().collect(),
+                };
+                let mut expression = None;
+                for variant in variants.into_iter().rev() {
+                    let mut hash = format!("ostrin_hash_string(\"Enum::{name}::{}\")", variant.name);
+                    for (field, field_ty) in &variant.fields {
+                        let field_hash = self.hash_expr(&format!("{value}.data.{}.{field}", variant.name), field_ty)?;
+                        hash = format!("ostrin_hash_combine({hash}, {field_hash})");
+                    }
+                    expression = Some(match expression {
+                        Some(previous) => format!("(({value}.tag == {}) ? {hash} : {previous})", variant.tag),
+                        None => format!("(({value}.tag == {}) ? {hash} : 0)", variant.tag),
+                    });
+                }
+                expression
             }
             _ => None,
         }
@@ -5334,7 +5353,7 @@ impl<'a> Codegen<'a> {
             "file_exists" => Ok(Some((format!("ostrin_file_exists({})", codes[0]), CType::Bool))),
             "hash" => {
                 let hash = self.hash_expr(&codes[0], &types[0]).ok_or_else(|| {
-                    "'hash' supports scalar values, hashable Option/Result values, or records with derive(Hash)".to_string()
+                    "'hash' supports scalar values, hashable Option/Result values, or records/enums with derive(Hash)".to_string()
                 })?;
                 Ok(Some((format!("(int64_t)({hash})"), CType::Int)))
             }

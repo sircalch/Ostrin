@@ -729,6 +729,18 @@ impl Interpreter {
                     Some(tag)
                 }
             }
+            Value::EnumInstance(type_name, variant_name, fields, _)
+                if self.has_derive(type_name, "Hash") =>
+            {
+                let declaration = self.enums.get(type_name)?;
+                let variant = declaration.variants.iter().find(|candidate| candidate.name == *variant_name)?;
+                let mut hash = stable_hash_string(&format!("Enum::{type_name}::{variant_name}"));
+                for (index, field) in variant.fields.iter().enumerate() {
+                    let key = field.name.clone().unwrap_or_else(|| index.to_string());
+                    hash = stable_hash_combine(hash, self.hash_value(fields.get(&key)?)?);
+                }
+                Some(hash)
+            }
             _ => stable_hash_value(value),
         }
     }
@@ -2148,7 +2160,7 @@ impl Interpreter {
                 "hash" => {
                     let value = self.eval_arg(&args[0], env)?;
                     let hash = self.hash_value(&value).ok_or_else(|| {
-                        RuntimeError::Error("'hash' supports scalar values, hashable Option/Result values, or records with derive(Hash)".to_string())
+                        RuntimeError::Error("'hash' supports scalar values, hashable Option/Result values, or records/enums with derive(Hash)".to_string())
                     })?;
                     return Ok(Value::Int(hash as i64));
                 }

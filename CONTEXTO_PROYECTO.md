@@ -4395,13 +4395,13 @@ El builtin hash amplía su contrato más allá de escalares:
 - Option<T> combina una etiqueta estable (Some/None) con el hash del payload;
 - Result<T, E> combina la etiqueta (Ok/Err) con el hash del valor activo;
 - el checker acepta estas formas solo cuando sus payloads son recursivamente
-  hashables; listas, mapas, sets, records y otros valores de identidad siguen
-  rechazados hasta definir el trait Hash de usuario;
+  hashables; listas, mapas, sets y otros valores de identidad siguen rechazados
+  hasta definir el trait Hash de usuario;
 - el intérprete y el backend C comparten la misma mezcla splitmix64 y los mismos tags.
 
 examples/hash_builtin.ostrin cubre cuatro valores estructurales adicionales y la
 prueba existente de paridad intérprete↔nativo los ejecuta en ambos backends. El
-siguiente paso de stdlib es formalizar Hash para enums y colecciones. La batería
+siguiente paso de stdlib es formalizar Hash para colecciones. La batería
 queda en 6 pruebas diferenciales y 130 de integración verdes.
 
 ## 159. derive(Hash) para records — 2026-09-19
@@ -4418,3 +4418,18 @@ El contrato Hash de usuario queda abierto para records:
 hash_builtin.ostrin ahora cubre HashPoint y un HashEnvelope con un campo Option<Int>.
 La prueba negativa confirma que un record sin derive(Hash) no puede pasarse al
 builtin. Enums, listas, mapas y sets siguen fuera del contrato de Hash de usuario.
+
+## 160. derive(Hash) para enums — 2026-09-19
+
+El contrato Hash de usuario cubre también enums no genéricos:
+
+- un enum puede declarar derive(Hash);
+- el checker exige que todos los campos de todas sus variantes sean
+  recursivamente hashables, incluyendo records/enums derivados;
+- el intérprete combina `Enum::<tipo>::<variante>` con los campos en orden de
+  declaración;
+- el backend C genera la misma cadena de variante, etiqueta y combinación estable.
+
+hash_builtin.ostrin cubre una variante vacía y otra posicional. La prueba negativa
+confirma que un enum sin derive(Hash) se rechaza en compilación. Los enums genéricos,
+listas, mapas y sets siguen fuera de este contrato.

@@ -7,6 +7,11 @@ record HashEnvelope: Hash {
     value: Option<Int>
 }
 
+enum HashShape: Hash {
+    Empty
+    Point(Int, Int)
+}
+
 fn main() -> Void {
     print(hash(42))
     print(hash(255 as UInt8))
@@ -28,4 +33,7 @@ fn main() -> Void {
     print(hash(point))
     envelope = HashEnvelope { value: Some(5) }
     print(hash(envelope))
+
+    shape = Point(3, 4)
+    print(hash(shape))
 }

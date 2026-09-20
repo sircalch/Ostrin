@@ -27,6 +27,9 @@ test
   be hashed when every field is recursively hashable, with matching field-order
   hashing in the interpreter and native backend. Records without the derive and
   unsupported fields remain compile-time errors.
+- Extended the user-defined hash contract to non-generic enums: every variant
+  receives a stable type/variant tag and its fields are combined in declaration
+  order, with interpreter/native parity and compile-time rejection otherwise.
 - The WASI distribution workflow now runs the release compiler under Node WASI
   before packaging it, checking an Ostrin source file through a preopened
   filesystem and validating the module's CLI exit code.

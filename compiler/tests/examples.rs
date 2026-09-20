@@ -876,7 +876,7 @@ fn hash_builtin_matches_between_interpreter_and_native() {
 fn hash_rejects_unhashable_composite_payloads() {
     let out = run_stdin(
         &["--stdin", "--check", "--file", "C:/workspace/hash_error.ostrin"],
-        "record NoHash {\n    value: Int\n}\nfn main() -> Void {\n    print(hash([1, 2]))\n    print(hash(NoHash { value: 1 }))\n}\n",
+        "record NoHash {\n    value: Int\n}\nenum NoHashEnum {\n    Value(Int)\n}\nfn main() -> Void {\n    print(hash([1, 2]))\n    print(hash(NoHash { value: 1 }))\n    print(hash(Value(1)))\n}\n",
     );
     assert!(!out.status.success());
     let text = stderr(&out);
