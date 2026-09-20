@@ -776,16 +776,45 @@ impl Emitter<'_> {
 
     fn block_value(&mut self, block: &HirBlock) -> Bail<String> {
         let mut body = String::new();
+        let frame = self.owned_block_locals.len();
+        self.owned_block_locals.push(Vec::new());
         self.scopes.push(HashSet::new());
         for stmt in &block.stmts {
             self.stmt(stmt, &mut body)?;
         }
-        let tail = match &block.tail {
+        let tail_expr = block.tail.as_ref();
+        let tail = match tail_expr {
             Some(t) => self.expr(t)?,
             None => "(void)0".to_string(),
         };
+        let transfer = tail_expr.and_then(|value| self.owned_local_expr(value));
+        let tail_ty = tail_expr.map(|value| value.ty.clone()).unwrap_or(Ty::Void);
         self.scopes.pop();
-        Ok(format!("({{ {body} {tail}; }})"))
+        let result = if self.managed(&tail_ty) {
+            let cty = self.c_type(&tail_ty)?;
+            let temp = self.next_temp();
+            body.push_str(&format!("    {cty} {temp} = {tail};\n"));
+            if transfer.is_none() && tail_expr.is_some_and(|value| Self::borrowed_expr(value)) {
+                body.push_str(&format!("    ostrin_retain((void*){temp});\n"));
+            }
+            for (name, ty) in self.owned_block_locals[frame].iter().rev() {
+                if transfer == Some(name.clone()) || !self.managed(ty) {
+                    continue;
+                }
+                body.push_str(&format!("    ostrin_release((void*){name});\n"));
+            }
+            format!("({{ {body} {temp}; }})")
+        } else {
+            for (name, ty) in self.owned_block_locals[frame].iter().rev() {
+                if !self.managed(ty) {
+                    continue;
+                }
+                body.push_str(&format!("    ostrin_release((void*){name});\n"));
+            }
+            format!("({{ {body} {tail}; }})")
+        };
+        self.owned_block_locals.pop().expect("block ownership frame must exist");
+        Ok(result)
     }
 
     fn expr(&mut self, e: &HirExpr) -> Bail<String> {

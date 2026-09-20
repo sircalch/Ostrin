@@ -4457,6 +4457,8 @@ de expresión:
 
 - el emisor AST abre frames de ownership para cada `while`/`for` y para cada rama;
 - el emisor HIR aplica el mismo contrato a sus bloques anidados;
+- los bloques de expresión conservan la transferencia de una cola gestionada o hacen
+  `retain` cuando esa cola es un préstamo externo antes de liberar sus locales;
 - `break` y `continue` liberan los frames que abandonan antes de saltar;
 - los elementos gestionados de iteraciones sobre listas/canales reciben el retain/release
   correspondiente al préstamo o transferencia que representa la iteración.

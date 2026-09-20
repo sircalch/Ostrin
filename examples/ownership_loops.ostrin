@@ -16,5 +16,11 @@ fn main() -> Void {
         scratch = [n, n + 1]
         n = n + 1
     }
+    result = if total > 0 {
+        [total]
+    } else {
+        [0]
+    }
     print(total)
+    print(result.length())
 }

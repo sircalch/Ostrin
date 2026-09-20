@@ -963,7 +963,7 @@ fn native_ownership_releases_loop_and_branch_locals() {
     let native = Command::new(&exe).output().expect("run loop ownership binary");
     let _ = fs::remove_file(&exe);
     assert!(native.status.success(), "ownership loop binary failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), "3\n");
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), "3\n1\n");
     assert!(
         String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
         "loop and branch locals should be released per iteration: {}",

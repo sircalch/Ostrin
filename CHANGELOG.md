@@ -35,6 +35,8 @@ test
   checked recursively.
 - Extended native ownership cleanup through `while`/`for` iterations and branch
   exits, including `break`/`continue`, in both the AST and HIR emitters.
+- HIR block expressions now release managed locals while preserving returned owned
+  tails and retaining borrowed tails when necessary.
 - The WASI distribution workflow now runs the release compiler under Node WASI
   before packaging it, checking an Ostrin source file through a preopened
   filesystem and validating the module's CLI exit code.
