@@ -171,7 +171,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Rendimiento del intérprete | Tree‑walking simple; sin optimizaciones |
 | `newlines.ostrin`, `advanced.ostrin` | Son muestras de sintaxis, no programas ejecutables |
 | CI | Linux, macOS y Windows; incluye las pruebas diferenciales intérprete↔nativo |
-| Distribución | Sin instalador ni binarios publicados; `.exe` de aplicación pendiente |
+| Distribución | Workflow WASI reproducible para `ostrinc.wasm` con SHA-256; binarios nativos publicados e instalador siguen pendientes |
 
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
 convendría dividirlos; el backend nativo no comparte el sistema de tipos del checker
@@ -214,8 +214,10 @@ código en LSP (quick fixes), inlay hints, publicación de la extensión en el M
 CI de GitHub con matriz Windows/Linux/macOS, binarios de release.
 
 ### E. Backends adicionales
-WebAssembly (desde el mismo C con clang/emscripten, o generación directa), LLVM IR.
-El plan de la hoja de ruta original lista WebAssembly y bindings de plataforma.
+El compilador ya puede distribuirse como `wasm32-wasip1` mediante el workflow WASI, con
+checksum reproducible. El backend de programas sigue emitiendo C; el siguiente paso es aislar
+un runtime WASI portable y producir un smoke test de un programa Ostrin en WASM, antes de un
+playground de navegador o de LLVM IR.
 
 ### F. Calidad y confianza
 Fuzzing del parser, pruebas diferenciales automáticas intérprete↔nativo sobre programas

@@ -4297,3 +4297,18 @@ El flujo de paquetes local deja de depender de pasar siempre el archivo de entra
   verifica la ruta `../shared_lib` en el lockfile.
 
 La batería queda en **6 pruebas diferenciales y 127 de integración verdes**.
+
+## 153. Distribución reproducible del compilador como WASI — 2026-09-19
+
+Se verificó que `ostrinc` compila en release para `wasm32-wasip1` con el toolchain actual.
+El nuevo workflow `.github/workflows/wasi.yml`:
+
+- instala el target WASI en Ubuntu;
+- construye `compiler/Cargo.toml` con `cargo build --target wasm32-wasip1 --release`;
+- empaqueta `ostrinc.wasm`, un README de runtime y su SHA-256 en un tarball;
+- publica el tarball como artifact en ejecuciones manuales y en tags `v*`.
+
+La frontera se documenta explícitamente: es distribución del compilador para hosts WASI, no
+todavía compilación de programas Ostrin a WASM ni un playground de navegador. El backend de
+programas sigue generando C, y el próximo paso WASM es separar un runtime sin pthreads ni APIs
+de proceso para poder probar un programa pequeño sobre WASI.

@@ -1,0 +1,41 @@
+name: Build Ostrin WASI compiler
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  wasi:
+    name: ostrinc wasm32-wasip1
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust with WASI target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip1
+
+      - name: Build release compiler
+        run: cargo build --manifest-path compiler/Cargo.toml --target wasm32-wasip1 --release
+
+      - name: Package and checksum artifact
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp compiler/target/wasm32-wasip1/release/ostrinc dist/ostrinc.wasm
+          printf '%s\n' 'Ostrin compiler distribution' 'target = wasm32-wasip1' 'runner = WASI 0.2-compatible host' > dist/README.txt
+          sha256sum dist/ostrinc.wasm > dist/ostrinc.wasm.sha256
+          tar -czf ostrinc-wasm32-wasip1.tar.gz -C dist ostrinc.wasm ostrinc.wasm.sha256 README.txt
+
+      - name: Upload WASI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ostrinc-wasm32-wasip1
+          path: ostrinc-wasm32-wasip1.tar.gz

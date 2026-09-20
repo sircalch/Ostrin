@@ -70,6 +70,10 @@
   manifest's `entry` field when no source path is supplied, and generated
   `ostrin.lock` files sort dependencies and store project-relative paths where
   possible, avoiding checkout-specific absolute paths.
+- Added a reproducible WASI distribution workflow for the compiler:
+  `wasm32-wasip1` release builds are packaged with a SHA-256 checksum on manual
+  runs and version tags. This distributes `ostrinc` itself; program-to-WASM
+  code generation remains a separate runtime milestone.
 - Added the first HIR-to-IR lowering pass and `ostrinc --ir`. Functions now expose
   explicit temporaries, basic blocks, branches, loop edges, calls, aggregates, phi
   nodes and named opaque instructions for constructs awaiting semantic lowering.

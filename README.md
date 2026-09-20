@@ -84,6 +84,9 @@ The default native scheduler remains deterministic for differential testing;
 `--native-threads` enables OS threads and blocking channels. The standard
 library is still intentionally small.
 
+The compiler itself also has a reproducible `wasm32-wasip1` release workflow with a checksum;
+this is a WASI distribution artifact, not yet a browser backend for Ostrin programs.
+
 ## Quick start
 
 Requirements: Rust and Cargo.
