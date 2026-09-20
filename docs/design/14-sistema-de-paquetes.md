@@ -52,9 +52,10 @@ ostrinc --project path/to/project
 - La resolución local escribe `ostrin.lock` con las dependencias ordenadas por nombre y rutas
   relativas al manifiesto cuando es posible. Así, clonar el proyecto en otro directorio no cambia
   el lockfile por diferencias de máquina.
-- Las dependencias `path` se validan localmente; las dependencias `git` se reconocen pero no se
-  descargan de forma implícita. Esto mantiene el compilador sin efectos de red durante una
-  compilación normal; el clon debe hacerse explícitamente y luego declararse como `path`.
+- Las dependencias `path` se validan localmente. Las dependencias `git` no se descargan de forma
+  implícita: `ostrinc --fetch --project DIR` habilita explícitamente el clon o actualización en
+  `DIR/.ostrin/packages/`, selecciona el `tag`/`rev` pedido y registra el commit resuelto en el
+  lockfile. Una compilación normal sigue sin efectos de red.
 
 - `ostrin.lock` se versiona en control de versiones. Con rutas relativas y orden estable, clonar
   el proyecto y compilarlo desde otro directorio conserva el mismo lockfile.
@@ -108,6 +109,6 @@ Como no existe un registro central donde "reservar" un nombre, la identidad real
 ## 6. Preguntas abiertas para la siguiente sesión de diseño
 
 1. **Índice/registro de descubrimiento opcional** (no de publicación obligatoria, solo de búsqueda: "¿qué librerías Ostrin existen para X?") — se puede construir después, como una capa encima de este esquema descentralizado, sin cambiar cómo se referencian las dependencias (mismo camino que siguió el ecosistema de Go con sus proxies de módulos).
-2. **Verificación de integridad** (hashes de contenido además del commit, para detectar manipulación del historial de un repositorio tras fijar el lock) — relevante para cadena de suministro segura, no diseñado aún.
+2. **Verificación de integridad** (hashes de contenido además del commit, para detectar manipulación del historial de un repositorio tras fijar el lock) — el lockfile ya conserva el commit resuelto, pero el hash de contenido sigue pendiente.
 3. **Workspaces** (varios paquetes Ostrin relacionados en un mismo repositorio, compartiendo un `ostrin.lock`) — útil para proyectos grandes, no cubierto en este documento.
 4. Pendientes previos siguen abiertos: `dyn Trait`, `select` sobre canales, elisión de ARC, operadores bit a bit, ordenación general.

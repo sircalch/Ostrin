@@ -46,7 +46,7 @@ traits, pattern matching, quantities and two concurrency modes: deterministic
 cooperative scheduling by default, plus opt-in native threads for compiled
 programs.
 
-The compiler suite currently passes **149 integration tests and 6 differential
+The compiler suite currently passes **150 integration tests and 6 differential
 interpreter↔native tests**. Function calls
 support named/default arguments, collection lookups preserve `Option<T>`, and
 record fields are checked statically. The CLI also exposes JSON Lines
@@ -122,6 +122,7 @@ ostrinc --emit-c file.ostrin       # transpile a supported subset to C
 ostrinc --compile file.ostrin      # transpile and compile to a native executable
 ostrinc --compile --native-threads file.ostrin # compile with OS threads and blocking channels
 ostrinc --run --project path/to/project # use the entry declared by ostrin.toml
+ostrinc --fetch --run --project path/to/project # explicitly fetch Git dependencies
 ```
 
 ## Visual Studio Code

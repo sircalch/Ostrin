@@ -58,6 +58,7 @@ fn real_main() -> ExitCode {
     let run = args.iter().any(|a| a == "--run");
     let test_mode = args.iter().any(|a| a == "--test");
     let json = args.iter().any(|a| a == "--json");
+    let fetch_packages = args.iter().any(|a| a == "--fetch");
     let help = args.iter().any(|a| a == "--help" || a == "-h");
     let version = args.iter().any(|a| a == "--version" || a == "-V");
 
@@ -149,7 +150,11 @@ fn real_main() -> ExitCode {
                 return ExitCode::FAILURE;
             }
         };
-        let roots = match package::resolve_dependency_roots(&manifest) {
+        let roots = match package::resolve_dependency_roots(
+            &manifest,
+            manifest_path.parent().unwrap_or_else(|| Path::new(".")),
+            fetch_packages,
+        ) {
             Ok(r) => r,
             Err(e) => {
                 if json { emit_json_diagnostic(None, &e, Some(path), None, None); } else { eprintln!("{e}"); }
@@ -617,6 +622,7 @@ fn print_help() {
     println!("  --compile     Transpile to C and compile it to a native executable or WASI module");
     println!("  --target NAME Select native (default) or wasm32-wasi for --emit-c/--compile");
     println!("  --project DIR Compile the entry declared by DIR/ostrin.toml");
+    println!("  --fetch       Explicitly clone/update Git dependencies for this project");
     println!("  --out PATH    Output path for --emit-c/--compile (defaults: stdout / target-specific entry output)");
     println!("  --json        Emit machine-readable diagnostics as JSON Lines");
     println!("  -h, --help    Print this help");

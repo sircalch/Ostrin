@@ -2673,6 +2673,9 @@ fn project_manifest_selects_entry_and_writes_portable_lockfile() {
     assert_eq!(stdout(&out).trim(), "hola, Ostrin");
 
     let lockfile = fs::read_to_string(format!("{project}/ostrin.lock")).expect("project build should write ostrin.lock");
+    assert!(lockfile.contains("lockfile_version = 1"), "lockfile should declare its schema: {lockfile}");
+    assert!(lockfile.contains("source = \"path\""), "lockfile should identify path dependencies: {lockfile}");
+    assert!(lockfile.contains("package_version = \"0.0.0\""), "lockfile should record the dependency version: {lockfile}");
     assert!(lockfile.contains("resolved_path = \"../shared_lib\""), "lockfile should use a project-relative path: {lockfile}");
     assert!(!lockfile.contains("Lenguaje nuevo"), "lockfile should not embed this checkout's absolute path: {lockfile}");
 }
@@ -2683,6 +2686,61 @@ fn git_dependency_fails_clearly_without_network_access() {
     assert!(!out.status.success());
     let err = stderr(&out);
     assert!(err.contains("does not fetch git dependencies automatically"), "unexpected message: {err}");
+}
+
+#[test]
+fn git_dependency_can_be_fetched_only_with_explicit_flag() {
+    if Command::new("git").arg("--version").output().is_err() {
+        eprintln!("skipping explicit Git package test: git is not installed");
+        return;
+    }
+
+    let root = std::env::temp_dir().join(format!("ostrin_git_package_{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    let dependency = root.join("dependency");
+    let project = root.join("project");
+    fs::create_dir_all(&dependency).unwrap();
+    fs::create_dir_all(&project).unwrap();
+    fs::write(
+        dependency.join("helpers.ostrin"),
+        "pub fn greet() -> String { \"git package\" }\n",
+    )
+    .unwrap();
+    let dependency_text = dependency.display().to_string().replace('\\', "/");
+    let init = Command::new("git").args(["-C", &dependency_text, "init"]).output().unwrap();
+    assert!(init.status.success(), "git init failed: {}", String::from_utf8_lossy(&init.stderr));
+    let add = Command::new("git").args(["-C", &dependency_text, "add", "."]).output().unwrap();
+    assert!(add.status.success(), "git add failed: {}", String::from_utf8_lossy(&add.stderr));
+    let commit = Command::new("git")
+        .args(["-C", &dependency_text, "-c", "user.name=Ostrin Tests", "-c", "user.email=ostrinc-tests@example.invalid", "commit", "-m", "initial"])
+        .output()
+        .unwrap();
+    assert!(commit.status.success(), "git commit failed: {}", String::from_utf8_lossy(&commit.stderr));
+
+    let git_url = format!("file:///{dependency_text}");
+    fs::write(
+        project.join("ostrin.toml"),
+        format!(
+            "[package]\nname = \"git_app\"\nversion = \"0.1.0\"\nentry = \"main.ostrin\"\n\n[dependencies]\nshared = {{ git = \"{git_url}\", rev = \"HEAD\" }}\n"
+        ),
+    )
+    .unwrap();
+    fs::write(
+        project.join("main.ostrin"),
+        "import shared.helpers\n\nfn main() -> Void {\n    print(helpers.greet())\n}\n",
+    )
+    .unwrap();
+
+    let project_text = project.display().to_string();
+    let out = run(&["--fetch", "--run", "--project", &project_text]);
+    assert!(out.status.success(), "explicit Git fetch failed: {}", stderr(&out));
+    assert_eq!(stdout(&out).trim(), "git package");
+    let lockfile = fs::read_to_string(project.join("ostrin.lock")).unwrap();
+    assert!(lockfile.contains("source = \"git\""), "lockfile lost Git source: {lockfile}");
+    assert!(lockfile.contains("requested = \"HEAD\""), "lockfile lost requested revision: {lockfile}");
+    assert!(lockfile.lines().any(|line| line.starts_with("resolved_rev = \"") && line.len() >= 56), "lockfile did not record a resolved commit: {lockfile}");
+    assert!(lockfile.contains("resolved_path = \".ostrin/packages/"), "lockfile did not use the project cache: {lockfile}");
+    let _ = fs::remove_dir_all(&root);
 }
 
 #[test]

@@ -1,9 +1,9 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-20 · rama `main` · 6 pruebas diferenciales y 149 de integración en verde.*
+*Corte: 2026-09-20 · rama `main` · 6 pruebas diferenciales y 150 de integración en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
-Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–181); para el diseño
+Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–182); para el diseño
 del lenguaje, `docs/design/` (21 documentos).
 
 ---
@@ -179,7 +179,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Mensajes de error de E/S | `strerror` ≠ texto de Rust (difieren entre backends) |
 | `Result<Void,E>` | Campo de valor de relleno (`char`) en C |
 | Migración HIR | Escalares, records, enums/match, Option/Result, colecciones, cierres, instancias concretas de genéricos, llamadas anidadas, records/enums genéricos aplicados y métodos genéricos centrales migrados; formas complejas restantes siguen con fallback |
-| Paquetes | `--project` usa `entry`; lockfiles deterministas con rutas relativas; sin registro remoto ni red automática |
+| Paquetes | `--project` usa `entry`; lockfiles deterministas con rutas relativas; Git solo mediante `--fetch`, con caché local y commit resuelto; sin registro remoto |
 | Rendimiento del intérprete | Tree‑walking simple; sin optimizaciones |
 | `newlines.ostrin`, `advanced.ostrin` | Son muestras de sintaxis, no programas ejecutables |
 | CI | Linux, macOS y Windows; incluye las pruebas diferenciales intérprete↔nativo; el backend nativo enlaza `libm` explícitamente en Unix para paquetes con `sqrt`/`round` |
@@ -273,7 +273,7 @@ Decisiones que necesito de ti para afinar el plan:
 
 ```powershell
 cd compiler
-cargo test                                   # 6 diferenciales + 149 de integración
+cargo test                                   # 6 diferenciales + 150 de integración
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```

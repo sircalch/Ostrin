@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 pub struct PackageManifest {
     pub name: String,
@@ -60,12 +61,17 @@ pub fn load_manifest(manifest_path: &Path) -> Result<PackageManifest, String> {
     Ok(PackageManifest { name, version, entry, dependencies })
 }
 
-/// Resuelve cada dependencia a un directorio raíz local ya existente en disco.
-/// Las dependencias 'git' se reconocen y quedan registradas en el manifiesto,
-/// pero esta build de ostrinc no clona repositorios automáticamente — sería
-/// una operación de red no solicitada explícitamente en cada compilación. Usa
-/// una dependencia 'path' apuntando a un clon ya hecho a mano mientras tanto.
-pub fn resolve_dependency_roots(manifest: &PackageManifest) -> Result<HashMap<String, PathBuf>, String> {
+/// Resuelve cada dependencia a un directorio raíz local.
+///
+/// Las dependencias Git siguen siendo opt-in: una compilación normal no hace
+/// red. `--fetch` habilita el clon/actualización explícitos y deja el checkout
+/// en `.ostrin/packages/`, de modo que el lockfile puede apuntar a una ruta
+/// estable dentro del proyecto.
+pub fn resolve_dependency_roots(
+    manifest: &PackageManifest,
+    manifest_dir: &Path,
+    fetch_git: bool,
+) -> Result<HashMap<String, PathBuf>, String> {
     let mut roots = HashMap::new();
     for (name, spec) in &manifest.dependencies {
         match spec {
@@ -78,19 +84,119 @@ pub fn resolve_dependency_roots(manifest: &PackageManifest) -> Result<HashMap<St
                 }
                 roots.insert(name.clone(), p.clone());
             }
-            DependencySpec::Git { url, ratchet } => {
+            DependencySpec::Git { url, ratchet } if !fetch_git => {
                 return Err(format!(
-                    "dependency '{name}' uses 'git = \"{url}\"' (@ {ratchet}), but this build of ostrinc does not fetch git dependencies automatically (no network access is performed as a side effect of compiling).\nClone it yourself and reference it with a 'path' dependency instead."
+                    "dependency '{name}' uses 'git = \"{url}\"' (@ {ratchet}), but ostrinc does not fetch git dependencies automatically.\nPass --fetch explicitly to allow the compiler to clone/update it, or clone it yourself and reference it with a 'path' dependency instead."
                 ));
+            }
+            DependencySpec::Git { url, ratchet } => {
+                let root = fetch_git_dependency(manifest_dir, name, url, ratchet)?;
+                roots.insert(name.clone(), root);
             }
         }
     }
     Ok(roots)
 }
 
+fn fetch_git_dependency(manifest_dir: &Path, name: &str, url: &str, ratchet: &str) -> Result<PathBuf, String> {
+    let cache = manifest_dir.join(".ostrin").join("packages");
+    fs::create_dir_all(&cache).map_err(|e| format!("could not create package cache '{}': {e}", cache.display()))?;
+    let key = stable_key(&format!("{name}\n{url}\n{ratchet}"));
+    let safe_name = name.chars().map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '_' }).collect::<String>();
+    let destination = cache.join(format!("{safe_name}-{key:016x}"));
+
+    if destination.join(".git").is_dir() {
+        run_git(&destination, &["fetch", "--tags", "--prune", "origin"])
+            .map_err(|e| format!("could not update git dependency '{name}': {e}"))?;
+    } else {
+        if destination.exists() {
+            return Err(format!(
+                "git dependency '{name}' cache path '{}' exists but is not a Git checkout; remove it and retry",
+                destination.display()
+            ));
+        }
+        let destination_text = destination.to_string_lossy().into_owned();
+        let output = Command::new("git")
+            .args(["clone", "--no-checkout", url, &destination_text])
+            .output()
+            .map_err(|e| format!("could not start git: {e}"))?;
+        if !output.status.success() {
+            return Err(format!("git clone failed: {}", command_error(&output.stderr, output.status.code())));
+        }
+    }
+
+    run_git(&destination, &["checkout", "--detach", ratchet])
+        .map_err(|e| format!("could not checkout '{ratchet}' for git dependency '{name}': {e}"))?;
+    let revision = git_output(&destination, &["rev-parse", "HEAD"])
+        .map_err(|e| format!("could not resolve the commit for git dependency '{name}': {e}"))?;
+    if revision.is_empty() {
+        return Err(format!("git dependency '{name}' resolved to an empty commit"));
+    }
+    Ok(destination)
+}
+
+fn run_git(directory: &Path, args: &[&str]) -> Result<(), String> {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(directory)
+        .args(args)
+        .output()
+        .map_err(|e| format!("could not start git: {e}"))?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(command_error(&output.stderr, output.status.code()))
+    }
+}
+
+fn git_output(directory: &Path, args: &[&str]) -> Result<String, String> {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(directory)
+        .args(args)
+        .output()
+        .map_err(|e| format!("could not start git: {e}"))?;
+    if output.status.success() {
+        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+    } else {
+        Err(command_error(&output.stderr, output.status.code()))
+    }
+}
+
+fn command_error(stderr: &[u8], code: Option<i32>) -> String {
+    let detail = String::from_utf8_lossy(stderr).trim().to_string();
+    if detail.is_empty() {
+        format!("process exited with {}", code.map_or_else(|| "no status".to_string(), |n| n.to_string()))
+    } else {
+        detail
+    }
+}
+
+/// FNV-1a is only a cache-key namespace, not a package integrity claim.
+fn stable_key(text: &str) -> u64 {
+    let mut hash = 0xcbf29ce484222325u64;
+    for byte in text.as_bytes() {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    hash
+}
+
+fn toml_string(value: &str) -> String {
+    format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n"))
+}
+
+fn package_version(root: &Path) -> Result<String, String> {
+    let manifest = root.join("ostrin.toml");
+    if !manifest.is_file() {
+        return Ok("0.0.0".to_string());
+    }
+    Ok(load_manifest(&manifest)?.version)
+}
+
 pub fn write_lockfile(manifest_dir: &Path, manifest: &PackageManifest, roots: &HashMap<String, PathBuf>) -> Result<(), String> {
     let mut out = String::new();
-    out.push_str(&format!("# generado por ostrinc — no editar a mano\npackage = \"{}\"\nversion = \"{}\"\n\n", manifest.name, manifest.version));
+    out.push_str(&format!("# generado por ostrinc — no editar a mano\nlockfile_version = 1\npackage = {}\nversion = {}\n\n", toml_string(&manifest.name), toml_string(&manifest.version)));
     let base = manifest_dir.canonicalize().unwrap_or_else(|_| manifest_dir.to_path_buf());
     let mut names: Vec<&String> = roots.keys().collect();
     names.sort();
@@ -105,7 +211,21 @@ pub fn write_lockfile(manifest_dir: &Path, manifest: &PackageManifest, roots: &H
             .to_string()
             .replace('\\', "/");
         let display = if display.is_empty() { "." } else { &display };
-        out.push_str(&format!("[[dependency]]\nname = \"{name}\"\nresolved_path = \"{display}\"\n\n"));
+        out.push_str(&format!("[[dependency]]\nname = {}\n", toml_string(name)));
+        match manifest.dependencies.get(name) {
+            Some(DependencySpec::Path(_)) => {
+                out.push_str("source = \"path\"\n");
+                out.push_str(&format!("resolved_path = {}\n", toml_string(&display)));
+            }
+            Some(DependencySpec::Git { url, ratchet }) => {
+                let revision = git_output(root, &["rev-parse", "HEAD"])
+                    .map_err(|e| format!("could not record resolved commit for dependency '{name}': {e}"))?;
+                out.push_str("source = \"git\"\n");
+                out.push_str(&format!("git = {}\nrequested = {}\nresolved_rev = {}\nresolved_path = {}\n", toml_string(url), toml_string(ratchet), toml_string(&revision), toml_string(&display)));
+            }
+            None => return Err(format!("dependency '{name}' was resolved but is not in the manifest")),
+        }
+        out.push_str(&format!("package_version = {}\n\n", toml_string(&package_version(root)?)));
     }
     let lock_path = manifest_dir.join("ostrin.lock");
     fs::write(&lock_path, out).map_err(|e| format!("could not write '{}': {e}", lock_path.display()))

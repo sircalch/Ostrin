@@ -1,8 +1,11 @@
 # generado por ostrinc — no editar a mano
+lockfile_version = 1
 package = "main_app"
 version = "0.1.0"
 
 [[dependency]]
 name = "local_utils"
+source = "path"
 resolved_path = "../shared_lib"
+package_version = "0.0.0"
 

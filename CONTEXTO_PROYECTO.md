@@ -4843,3 +4843,20 @@ repositorio, no una fotografía anterior del prototipo:
 
 README y sitio quedan alineados con `ESTADO_Y_PLAN.md`; la suite de código no cambia porque
 este bloque es documental y de presentación.
+
+## 182. Dependencias Git opt-in y lockfile resoluble — 2026-09-20
+
+El sistema de paquetes deja de reconocer las dependencias Git únicamente para rechazarlas:
+
+- una compilación normal sigue siendo offline y conserva el diagnóstico claro para un
+  `git = ...` sin autorización explícita;
+- `ostrinc --fetch --project DIR` clona o actualiza cada dependencia en
+  `DIR/.ostrin/packages/`, usando una clave estable derivada del alias, URL y ratchet;
+- el checkout se separa (`detached HEAD`) en el `tag` o `rev` pedido y el lockfile registra
+  `source`, URL, ratchet solicitado, commit resuelto, versión del paquete y ruta portable;
+- el cache local queda ignorado por Git y la prueba de integración usa un repositorio local
+  temporal para verificar el flujo completo sin depender de un servicio externo.
+
+La batería queda en **6 pruebas diferenciales y 150 de integración verdes**. La verificación
+criptográfica del contenido del checkout y la resolución transitiva siguen pendientes; el
+commit fijado en `ostrin.lock` ya hace explícita la identidad de la revisión usada.

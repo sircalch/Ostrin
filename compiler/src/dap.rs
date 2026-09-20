@@ -107,7 +107,7 @@ pub fn run() -> ExitCode {
     let manifest_path = entry_path.parent().unwrap_or_else(|| std::path::Path::new(".")).join("ostrin.toml");
     let deps = if manifest_path.is_file() {
         package::load_manifest(&manifest_path)
-            .and_then(|manifest| package::resolve_dependency_roots(&manifest))
+            .and_then(|manifest| package::resolve_dependency_roots(&manifest, manifest_path.parent().unwrap_or_else(|| std::path::Path::new(".")), false))
             .unwrap_or_default()
     } else {
         HashMap::new()

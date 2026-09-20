@@ -19,6 +19,11 @@
   group-by), `plot` (SVG scatter/line) and `autodiff` (forward-mode dual numbers).
 
 ### Compiler
+- Package resolution now supports explicit `--fetch` for Git dependencies. Normal
+  builds remain offline; an explicit fetch clones or updates a deterministic
+  project-local cache, checks out the requested tag/revision, and records the
+  resolved commit, source, package version, and portable cache path in
+  `ostrin.lock`.
 - Added the first native C emitter backed by the explicit HIR→IR lowering. Straight-line
   scalar functions now become C from SSA temporaries in `ir_c.rs`, including integer
   division and scalar printing; unsupported control flow, checked fixed-width arithmetic

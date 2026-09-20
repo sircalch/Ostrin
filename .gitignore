@@ -17,3 +17,6 @@ examples/data_project/app/ostrin.lock
 examples/plot_project/app/ostrin.lock
 examples/autodiff_project/app/ostrin.lock
 examples/*/*/ostrin.lock
+
+# Explicit Git package fetch cache
+.ostrin/
