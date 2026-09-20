@@ -1,9 +1,9 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-20 · rama `main` · 6 pruebas diferenciales y 150 de integración en verde.*
+*Corte: 2026-09-20 · rama `main` · 6 pruebas diferenciales y 151 de integración en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
-Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–182); para el diseño
+Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–184); para el diseño
 del lenguaje, `docs/design/` (21 documentos).
 
 ---
@@ -30,7 +30,7 @@ Implementación: compilador + intérprete + herramientas de editor, todo en Rust
 | Léxico / parser | `lexer/`, `parser/mod.rs` | Tokens, AST con rangos de origen |
 | Módulos y paquetes | `modules.rs`, `package.rs`, `ostrin.toml` | Imports, `--project`, dependencias locales y lockfile portable |
 | Verificador de tipos | `typeck/mod.rs` (~3 500 l.) | Tipos, dimensiones, traits, exhaustividad, genéricos |
-| HIR/IR | `hir.rs`, `hir_c.rs`, `ir.rs`, `ir_c.rs` | HIR verificado, CFG con temporales explícitos y emisor C desde IR para escalares, enteros de ancho fijo y control de flujo, con fallback HIR/AST acotado |
+| HIR/IR | `hir.rs`, `hir_c.rs`, `ir.rs`, `ir_c.rs` | HIR verificado, CFG con temporales explícitos y emisor C desde IR para escalares, `String`, enteros de ancho fijo y control de flujo, con fallback HIR/AST acotado |
 | Intérprete | `interpreter/mod.rs` | Ejecución tree‑walking y scheduler cooperativo; referencia semántica |
 | Servidor de lenguaje | `lsp.rs`, `symbols.rs`, `protocol.rs` | LSP sobre stdio |
 | Adaptador de depuración | `dap.rs` + hooks del intérprete | DAP sobre stdio |
@@ -114,18 +114,22 @@ paridad entre intérprete y nativo; funciones, arrays, canales y tareas siguen f
 Transpila a C con expresiones‑sentencia GNU (`({ … })`); compilador vía `OSTRIN_CC`.
 Monomorfización bajo demanda (funciones, records, enums, métodos, vtables, listas, mapas…).
 
-La primera familia de funciones ya se emite desde la IR explícita: funciones escalares
-convierten temporales SSA en temporales C, preservan división entera, aritmética comprobada
-de enteros de ancho fijo y salida numérica, emiten ramas, recursión, bucles con estado y
-`phi`, y se cuentan por separado en `--native-type-report` como `ir-generated`. Si una
-función usa valores gestionados, iteradores o una operación todavía no modelada, cae de
-forma verificable a HIR y después al AST.
+La primera familia de funciones ya se emite desde la IR explícita: funciones escalares y la
+familia gestionada `String` convierten temporales SSA en temporales C, preservan división
+entera, aritmética comprobada de enteros de ancho fijo, concatenación/comparación/impresión
+de texto y salida numérica, emiten ramas, recursión, bucles con estado y `phi`, y se cuentan
+por separado en `--native-type-report` como `ir-generated`. Los marcadores de ownership de
+`String` también se consumen al generar C; agregados, iteradores u operaciones todavía no
+modeladas caen de forma verificable a HIR y después al AST.
 
 El runtime C generado centraliza las reservas en `ostrin_alloc`/`ostrin_calloc`/
 `ostrin_realloc`, registra cada bloque y lo libera mediante `atexit` al terminar el
 programa. Expone ya el ABI `ostrin_retain`/`ostrin_release` y `--leak-check` reporta
 asignaciones vivas, pico y total antes de la limpieza. Los buffers temporales de arrays, CSV,
-strings, cantidades, RNG y el detector E1101 también usan esa API. Records y colecciones
+strings, cantidades, RNG y el detector E1101 también usan esa API. La primera familia
+gestionada migrada a la IR es `String`: literales, concatenación, igualdad, llamadas, ramas
+con `phi`, `print` y marcadores `retain/release` ya se prueban en el emisor nativo con
+`--leak-check`. Records y colecciones
 registran callbacks de destrucción tipados; sus campos/elementos por referencia se
 retienen al almacenarse y se liberan al destruir el contenedor. El backend inserta ahora
 `retain` para aliases y valores prestados, libera valores reemplazados y limpia los locales
@@ -172,9 +176,9 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Cierres en nativo | Captura **por valor** (una variable `mut` cambiada después no se ve dentro); lambda sin contexto de tipos exige anotación |
 | Chequeo «movido tras enviar» (E1101) | Integrado por defecto en `--check`, `--run`, `--emit-c` y `--compile`; `--ownership-check` conserva el informe explícito |
 | Paralelismo nativo (`--native-threads`, canales bloqueantes, `select`) | Hilos del SO, mutexes/condiciones, canales bloqueantes y `select(List<Channel<T>>)` implementados de forma opt-in; `select` conserva prioridad determinista y cede el hilo nativo entre intentos; `Task.cancel()` cancela pendientes, propaga a grupos activos de `spawn_scope` o solicita cancelación a tareas `Running`, observada en checkpoints seguros; `receive()` vuelve periódicamente al runtime sin conservar el mutex durante el checkpoint |
-| Memoria en nativo | Registro, destructores tipados para records/colecciones y entornos de tareas, `clone`/`drop`, cleanup automático de locales directos, bloques anidados, ramas, loops y cancelación de tareas en AST/HIR, y `--leak-check`; ARC completa sobre IR sigue pendiente |
-| IR de bloques | HIR→CFG disponible con `--ir`; el emisor C cubre ramas y bucles escalares con `phi`; `for`/iteradores, valores gestionados y otras familias aún no reemplazan el backend C completo |
-| Ownership/último uso | `--ownership-report`, `--ownership-check` y `--ownership-ir`; el backend C ya aplica retain/release lineal en locales directos, pero la IR aún no es la fuente única |
+| Memoria en nativo | Registro, destructores tipados para records/colecciones y entornos de tareas, `clone`/`drop`, cleanup automático de locales directos, bloques anidados, ramas, loops y cancelación de tareas en AST/HIR, y `--leak-check`; `String` ya consume ownership desde IR, pero ARC completa de agregados sigue pendiente |
+| IR de bloques | HIR→CFG disponible con `--ir`; el emisor C cubre ramas, bucles escalares con `phi` y la familia `String`; `for`/iteradores, records y colecciones aún no reemplazan el backend C completo |
+| Ownership/último uso | `--ownership-report`, `--ownership-check` y `--ownership-ir`; la IR ya inserta y consume retain/release lineal para `String`, mientras agregados, loops, scopes y escapes complejos siguen conservadores |
 | Biblioteca estándar | Mínima: `args`, entorno/rutas, `format`, E/S y `hash` estructural para escalares, colecciones y tipos con `derive(Hash)`; faltan fechas, JSON y red |
 | Mensajes de error de E/S | `strerror` ≠ texto de Rust (difieren entre backends) |
 | `Result<Void,E>` | Campo de valor de relleno (`char`) en C |
@@ -188,7 +192,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
 convendría dividirlos; el backend nativo no comparte el sistema de tipos del checker
 (ya consume los tipos del checker y compara cada nodo; **119 funciones/métodos de los ejemplos
-ya se generan desde el HIR y las primeras funciones escalares con CFG ya se generan desde la IR** —escalares, `Float32`, enteros de ancho fijo, records, enums, `match`, `Option`/`Result`,
+ya se generan desde el HIR y las primeras funciones escalares y gestionadas con CFG ya se generan desde la IR** —escalares, `String`, `Float32`, enteros de ancho fijo, records, enums, `match`, `Option`/`Result`,
 listas/colecciones, cierres, instancias concretas de genéricos, records/enums aplicados y métodos
 genéricos centrales, módulo `hir_c.rs`—, con un trinquete mínimo de 127; el resto sigue por el AST;
 ver documento 20 y secciones 123–133 de `CONTEXTO_PROYECTO.md`);
@@ -273,7 +277,7 @@ Decisiones que necesito de ti para afinar el plan:
 
 ```powershell
 cd compiler
-cargo test                                   # 6 diferenciales + 150 de integración
+cargo test                                   # 6 diferenciales + 151 de integración
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```

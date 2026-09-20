@@ -719,7 +719,11 @@ impl Builder {
             HirKind::Float32(value) => {
                 self.const_value(format!("{value:?}f32"), expression.ty.clone())
             }
-            HirKind::Str(value) => self.const_value(format!("{value:?}"), expression.ty.clone()),
+            // Keep the source string unescaped in the IR. Each backend owns
+            // the final literal encoding; the C emitter uses the same helper
+            // as the HIR emitter instead of assuming Rust debug escaping is
+            // valid C for every Unicode/control character.
+            HirKind::Str(value) => self.const_value(value.clone(), expression.ty.clone()),
             HirKind::Char(value) => self.const_value(format!("{value:?}"), expression.ty.clone()),
             HirKind::Bool(value) => self.const_value(value.to_string(), expression.ty.clone()),
             HirKind::Unit(value, unit) => {

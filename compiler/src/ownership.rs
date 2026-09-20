@@ -113,6 +113,7 @@ pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
         let mut retain_before: HashMap<(usize, usize), Vec<ValueId>> = HashMap::new();
         let mut retain_after: HashMap<(usize, usize), Vec<ValueId>> = HashMap::new();
         let mut release_after: HashMap<(usize, usize), Vec<ValueId>> = HashMap::new();
+        let mut release_before_terminator: HashMap<usize, Vec<ValueId>> = HashMap::new();
         for (value, (ty, definition_block, definition_instruction)) in &definitions {
             if !requires_management(ty) {
                 continue;
@@ -152,7 +153,23 @@ pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
                     }
                 }
                 if let Some((value, _)) = alias_destination(instruction).filter(|(_, ty)| requires_management(ty)) {
-                    retain_after.entry((block.id, index + 1)).or_default().push(value);
+                    let transfers_return = matches!(instruction, IrInstr::Phi { .. }) && is_single_return_use(function, value, &uses);
+                    if !transfers_return {
+                        retain_after.entry((block.id, index + 1)).or_default().push(value);
+                    }
+                    if let IrInstr::Phi { incoming, .. } = instruction {
+                        if !transfers_return {
+                            for (predecessor, incoming_value) in incoming {
+                                if definitions
+                                    .get(incoming_value)
+                                    .is_some_and(|(incoming_ty, _, _)| requires_management(incoming_ty))
+                                    && is_single_phi_use(*incoming_value, block.id, index, &uses)
+                                {
+                                    release_before_terminator.entry(*predecessor).or_default().push(*incoming_value);
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -182,6 +199,12 @@ pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
                 }
             }
             block.instructions = instructions;
+            if let Some(values) = release_before_terminator.remove(&block.id) {
+                for value in values {
+                    block.instructions.push(IrInstr::Release { value });
+                    summary.inserted_releases += 1;
+                }
+            }
         }
     }
 
@@ -326,11 +349,32 @@ fn type_contains_movable(ty: &Type, movable: &HashSet<String>) -> bool {
 }
 
 fn safe_release_site(instruction: &IrInstr) -> bool {
-    // These are the only ownership transfers modeled by this first pass:
-    // binding a value into a local with no later read, or moving it into a
-    // channel. Calls, aggregates, fields and phis remain unresolved until
-    // their retain/borrow contract is explicit in the IR.
-    matches!(instruction, IrInstr::StoreLocal { .. } | IrInstr::ChannelSend { .. })
+    // These are the ownership transfers modeled by this first pass: binding a
+    // value into a local with no later read, moving it into a channel, or
+    // passing it to print, which borrows for the duration of the call.
+    match instruction {
+        IrInstr::StoreLocal { .. } | IrInstr::ChannelSend { .. } => true,
+        IrInstr::Call { callee, args, .. } => callee == "print" && args.len() == 1,
+        _ => false,
+    }
+}
+
+fn is_single_phi_use(value: ValueId, phi_block: usize, phi_instruction: usize, uses: &HashMap<ValueId, Vec<UsePoint>>) -> bool {
+    let Some(points) = uses.get(&value) else { return false };
+    points.len() == 1 && points[0].block == phi_block && points[0].instruction == phi_instruction
+}
+
+fn is_single_return_use(function: &crate::ir::IrFunction, value: ValueId, uses: &HashMap<ValueId, Vec<UsePoint>>) -> bool {
+    let Some(points) = uses.get(&value) else { return false };
+    if points.len() != 1 {
+        return false;
+    }
+    let point = points[0];
+    point.instruction == function.blocks[point.block].instructions.len()
+        && matches!(
+            function.blocks[point.block].terminator,
+            Some(IrTerminator::Return(Some(returned))) if returned == value
+        )
 }
 
 fn alias_destination(instruction: &IrInstr) -> Option<(ValueId, Ty)> {
@@ -403,9 +447,9 @@ fn analyze_function(function: &crate::ir::IrFunction, report: &mut OwnershipRepo
 
 fn requires_management(ty: &Ty) -> bool {
     match ty {
-        Ty::List(_) | Ty::Map(_, _) | Ty::Set(_) | Ty::Dyn(_) | Ty::Fn(_, _) => true,
+        Ty::String | Ty::List(_) | Ty::Map(_, _) | Ty::Set(_) | Ty::Dyn(_) | Ty::Fn(_, _) => true,
         Ty::Named(_) | Ty::Applied(_, _) => true,
-        Ty::Quantity(_) | Ty::Int | Ty::Float | Ty::Bool | Ty::Char | Ty::String | Ty::Void | Ty::Sized(_) | Ty::Float32 | Ty::Generic(_) | Ty::Unknown => false,
+        Ty::Quantity(_) | Ty::Int | Ty::Float | Ty::Bool | Ty::Char | Ty::Void | Ty::Sized(_) | Ty::Float32 | Ty::Generic(_) | Ty::Unknown => false,
     }
 }
 

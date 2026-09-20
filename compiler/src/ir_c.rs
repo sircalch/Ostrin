@@ -1,10 +1,11 @@
 //! Conservative C emission for the first IR-backed native functions.
 //!
-//! The emitter is intentionally limited to scalar values, but it consumes the
-//! explicit CFG rather than walking HIR a second time. SSA values become named
-//! C temporaries, branches become labels/gotos, and phi nodes select the
-//! incoming value using the predecessor edge. Unsupported instructions and
-//! managed values return `None`, preserving the verified HIR/AST fallback.
+//! The emitter consumes the explicit CFG rather than walking HIR a second time.
+//! SSA values become named C temporaries, branches become labels/gotos, and
+//! phi nodes select the incoming value using the predecessor edge. The first
+//! managed family supported here is `String`; its ownership markers are
+//! emitted directly into the generated C while larger aggregates retain the
+//! verified HIR/AST fallback.
 
 use std::collections::{HashMap, HashSet};
 
@@ -22,6 +23,7 @@ fn c_type(ty: &Ty) -> Bail<&'static str> {
         Ty::Float32 => "float",
         Ty::Sized(kind) => kind.c_type(),
         Ty::Bool => "bool",
+        Ty::String => "const char*",
         Ty::Void => "void",
         _ => return Err(()),
     })
@@ -30,7 +32,7 @@ fn c_type(ty: &Ty) -> Bail<&'static str> {
 fn scalar(ty: &Ty) -> bool {
     matches!(
         ty,
-        Ty::Int | Ty::Float | Ty::Float32 | Ty::Sized(_) | Ty::Bool | Ty::Void
+        Ty::Int | Ty::Float | Ty::Float32 | Ty::Sized(_) | Ty::Bool | Ty::String | Ty::Void
     )
 }
 
@@ -120,6 +122,7 @@ fn const_code(value: &str, ty: &Ty) -> Bail<String> {
             format!("(({}){value})", kind.c_type())
         }
         Ty::Bool => value.to_string(),
+        Ty::String => crate::codegen::c_string_literal(value),
         Ty::Void if value == "unit" => "(void)0".to_string(),
         _ => return Err(()),
     })
@@ -199,6 +202,16 @@ fn binary_code(
         }
         return sized_binary_code(op, left, right, *left_kind);
     }
+    if *ty == Ty::String && op == BinOp::Add && *left_ty == Ty::String && *right_ty == Ty::String {
+        return Ok(format!("ostrin_str_concat({left}, {right})"));
+    }
+    if (*left_ty == Ty::String || *right_ty == Ty::String)
+        && matches!(op, BinOp::Eq | BinOp::NotEq)
+        && *left_ty == *right_ty
+    {
+        let comparison = if op == BinOp::Eq { "== 0" } else { "!= 0" };
+        return Ok(format!("(strcmp({left}, {right}) {comparison})"));
+    }
     if *ty == Ty::Int && op == BinOp::Div {
         return Ok(format!("ostrin_idiv({left}, {right})"));
     }
@@ -229,6 +242,7 @@ fn print_code(value: &str, ty: &Ty) -> Bail<String> {
         }
         Ty::Sized(_) => format!("printf(\"%llu\\n\", (unsigned long long)({value}))"),
         Ty::Bool => format!("printf(\"%s\\n\", (({value}) ? \"true\" : \"false\"))"),
+        Ty::String => format!("printf(\"%s\\n\", {value})"),
         _ => return Err(()),
     })
 }
@@ -376,6 +390,18 @@ fn emit_instruction(
                 ));
             }
             out.push_str("    else { abort(); }\n");
+        }
+        IrInstr::Retain { value } => {
+            if value_ty(values, *value)? != Ty::String {
+                return Err(());
+            }
+            out.push_str(&format!("    ostrin_retain((void*){});\n", value_code(values, *value)?));
+        }
+        IrInstr::Release { value } => {
+            if value_ty(values, *value)? != Ty::String {
+                return Err(());
+            }
+            out.push_str(&format!("    ostrin_release((void*){});\n", value_code(values, *value)?));
         }
         _ => return Err(()),
     }

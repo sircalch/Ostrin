@@ -4879,3 +4879,26 @@ La prueba de integración deja el clon sin remoto, ejecuta una build normal y ot
 comprueba que el lockfile no cambia, verifica el fallo ante una caché ausente y finalmente
 comprueba su restauración con `--fetch`. Hash de contenido y resolución transitiva siguen siendo
 los siguientes huecos del sistema de paquetes.
+
+## 184. `String` gestionado desde la IR — 2026-09-20
+
+La primera familia de valores gestionados deja de depender exclusivamente del fallback HIR/AST
+para llegar al backend nativo. La bajada HIR→IR conserva ahora el contenido fuente de los
+literales `String` y el emisor C aplica el escape común de `codegen`, de modo que las comillas,
+backslashes y caracteres de control no dependen del formato de depuración de Rust.
+
+`ir_c.rs` genera C para `String` en constantes, parámetros, llamadas, concatenación,
+igualdad/desigualdad con `strcmp`, `print`, ramas y `phi`. La pasada de ownership clasifica
+`String` como tipo gestionado, consume sus marcadores `retain`/`release` y trata dos casos de
+transferencia de forma explícita: un `phi` que retorna directamente conserva la propiedad para
+el caller, mientras que un alias usado por `print` retiene el destino y libera la referencia
+fuente en el bloque predecesor.
+
+`examples/native_ir_strings.ostrin` y `native_ir_emitter_handles_strings_and_ownership_markers`
+comparan intérprete y binario nativo, exigen que el informe use al menos seis funciones IR,
+inspeccionan los marcadores generados y ejecutan `--leak-check` con `live_allocations=0`. La
+suite queda en **6 pruebas diferenciales y 151 de integración verdes**.
+
+El siguiente frente de memoria sigue siendo extender este contrato a records, colecciones,
+loops, scopes y escapes complejos; los ciclos y la destrucción completa de agregados no se
+consideran cerrados por esta migración.

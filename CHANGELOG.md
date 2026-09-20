@@ -41,6 +41,11 @@
   and `UInt8`/`UInt16`/`UInt32`/`UInt64` preserve overflow checks, division-by-zero checks,
   signed `min / -1` checks, checked negation, comparisons and printing when generated from
   IR; `native_ir_sized.ostrin` locks interpreter/native parity for this family.
+- Migrated the first managed family through the IR C emitter: `String` literals, concatenation,
+  equality/inequality, calls, branches, `phi`, printing and explicit `retain`/`release`
+  markers now generate native C. `native_ir_strings.ostrin` compares interpreter/native output
+  and requires `--leak-check` to finish with zero live allocations; aggregates remain on the
+  verified HIR/AST fallback.
 - Extended the stable hash builtin to structural Option and Result values when
   their payloads are hashable; interpreter and native tags/payload combination
   remain identical.

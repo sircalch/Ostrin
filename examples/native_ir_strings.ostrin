@@ -1,0 +1,38 @@
+fn greet(name: String) -> String {
+    "Hello, " + name
+}
+
+fn same(left: String, right: String) -> Bool {
+    left == right
+}
+
+fn choose(flag: Bool) -> String {
+    if flag {
+        greet("Ostrin")
+    } else {
+        "fallback"
+    }
+}
+
+fn discard_temporary() -> Void {
+    unused = "temporary"
+}
+
+fn show(flag: Bool) -> Void {
+    selected = if flag {
+        greet("Alias")
+    } else {
+        "alias-fallback"
+    }
+    print(selected)
+}
+
+fn main() -> Void {
+    discard_temporary()
+    print(same("same", "same"))
+    print(same("same", "other"))
+    print(choose(true))
+    print(choose(false))
+    show(true)
+    show(false)
+}
