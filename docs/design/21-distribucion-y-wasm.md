@@ -2,10 +2,11 @@
 
 ## Estado actual
 
-La primera superficie WASM distribuible es el propio compilador `ostrinc` compilado para
-`wasm32-wasip1`. El workflow `.github/workflows/wasi.yml` lo construye en modo release,
-lo empaqueta con su SHA-256 y publica un artefacto `ostrinc-wasm32-wasip1` en ejecuciones
-manuales o al crear un tag `v*`.
+La superficie WASM distribuible incluye el propio compilador `ostrinc` y un programa Ostrin
+de smoke test, ambos compilados para `wasm32-wasip1`. El workflow
+`.github/workflows/wasi.yml` instala una versión fijada de `wasi-sdk`, compila los dos
+artefactos, los ejecuta bajo Node WASI, conserva sus SHA-256 y publica un artefacto
+`ostrinc-wasm32-wasip1` en ejecuciones manuales o al crear un tag `v*`.
 
 Esto es un binario WASI, no un módulo para ejecutar directamente en una página web. Un host
 WASI debe proporcionar la interfaz de sistema de archivos y argumentos que usa la CLI. La
@@ -14,15 +15,19 @@ etapa.
 
 El runtime C generado separa ahora sus dos superficies: el modo cooperativo por defecto usa
 locks no-op y no incluye headers de pthread/Windows para hilos; solo `--native-threads` define
-`OSTRIN_NATIVE_THREADS` y activa mutexes, condiciones y threads del sistema operativo. Esto
-reduce la dependencia del C generado para un futuro toolchain WASI, sin afirmar todavía que
-ese toolchain esté configurado ni que `ostrinc --compile` produzca WASM.
+`OSTRIN_NATIVE_THREADS` y activa mutexes, condiciones y threads del sistema operativo.
+Esto permite que el mismo backend C produzca un módulo WASI cooperativo; `--native-threads`
+continúa siendo incompatible con ese target.
 
 ## Reproducir localmente
 
 ```powershell
 rustup target add wasm32-wasip1
 cargo build --manifest-path compiler/Cargo.toml --target wasm32-wasip1 --release
+
+# Con wasi-sdk instalado y sus rutas exportadas:
+cargo run --manifest-path compiler/Cargo.toml -- `
+  --compile --target wasm32-wasi --out hello.wasm examples/hello.ostrin
 ```
 
 El resultado queda en
@@ -32,17 +37,17 @@ antes de ejecutarla.
 
 ## Verificación ejecutable
 
-El workflow también arranca ostrinc.wasm bajo Node WASI preview1 con
---check examples/hello.ostrin y un preopen del workspace. Esto verifica que el módulo
-acepta argumentos, puede leer un archivo Ostrin y devuelve código de salida cero.
+El workflow arranca `ostrinc.wasm` bajo Node WASI preview1 con
+`--check examples/hello.ostrin` y un preopen del workspace. Después arranca `hello.wasm`
+con el mismo host. Esto verifica que la distribución acepta argumentos, puede leer un archivo
+Ostrin y que el backend de programas produce un comando WASI ejecutable.
 La misma comprobación local puede ejecutarse, después de compilar, con:
 
     node --input-type=module -e "import { WASI } from 'node:wasi'; import { readFileSync } from 'node:fs'; const wasi = new WASI({ version: 'preview1', args: ['ostrinc', '--check', 'examples/hello.ostrin'], preopens: { '.': process.cwd() }, returnOnExit: true }); const mod = await WebAssembly.compile(readFileSync('compiler/target/wasm32-wasip1/release/ostrinc.wasm')); const instance = await WebAssembly.instantiate(mod, wasi.getImportObject()); const code = wasi.start(instance); if (code !== 0) process.exit(code);"
 
 ## Siguiente etapa
 
-El backend de programas Ostrin todavía emite C; no se debe afirmar que
-`ostrinc --compile` produzca WASM. El siguiente bloque de esta línea es seleccionar un
-toolchain C/WASI, aislar las APIs de proceso y archivos que aún usa el runtime, y añadir un
-smoke test de un programa Ostrin compilado a WASM. Después se puede construir un adaptador de
-navegador/playground sobre una API de compilación sin filesystem implícito.
+La ruta WASI ya existe para el runtime cooperativo básico. El siguiente bloque es ampliar la
+matriz de programas (I/O y paquetes), aislar APIs de proceso/archivos con contratos WASI
+explícitos y después construir un adaptador de navegador/playground sobre una API de compilación
+sin filesystem implícito.

@@ -4578,3 +4578,19 @@ Esto no convierte todavía `ostrinc --compile` en un backend WASM: siguen pendie
 toolchain C/WASI, la sustitución de APIs de proceso/archivos y el smoke test de un programa
 Ostrin compilado a WASM. La batería queda en **6 pruebas diferenciales y 139 de integración
 verdes**.
+
+## 169. Compilación de programas hacia WASI — 2026-09-19
+
+La ruta de distribución WASM dejó de cubrir únicamente al compilador. La CLI acepta ahora
+`--target wasm32-wasi` junto con `--compile` o `--emit-c`:
+
+- `--compile` selecciona `OSTRIN_WASI_CC` o `clang`, añade `--target=wasm32-wasi` y usa
+  `OSTRIN_WASI_SYSROOT` cuando está definido;
+- el nombre de salida por defecto es `<entrada>.wasm`, y `--native-threads` se rechaza para
+  este target porque WASI todavía usa el runtime cooperativo sin pthreads;
+- el workflow descarga una versión y SHA-256 fijados de wasi-sdk, compila `hello.ostrin`,
+  ejecuta `hello.wasm` bajo Node WASI y empaqueta el programa junto con `ostrinc.wasm`.
+
+La prueba unitaria de la CLI verifica la emisión cooperativa y la incompatibilidad explícita
+con hilos nativos. La batería local queda en **6 pruebas diferenciales y 140 de integración
+verdes**; la ejecución del toolchain WASI queda verificada por el workflow de GitHub.

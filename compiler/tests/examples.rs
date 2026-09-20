@@ -767,6 +767,25 @@ fn cooperative_c_runtime_guards_thread_only_headers() {
 }
 
 #[test]
+fn wasm_target_emits_cooperative_c_and_rejects_native_threads() {
+    let wasm = run(&["--emit-c", "--target", "wasm32-wasi", &example_path("hello.ostrin")]);
+    assert!(wasm.status.success(), "WASI C emission failed: {}", stderr(&wasm));
+    let source = stdout(&wasm);
+    assert!(!source.contains("#define OSTRIN_NATIVE_THREADS"));
+    assert!(source.contains("typedef int OstrinMutex;"));
+
+    let threaded = run(&[
+        "--emit-c",
+        "--target",
+        "wasm32-wasi",
+        "--native-threads",
+        &example_path("hello.ostrin"),
+    ]);
+    assert!(!threaded.status.success());
+    assert!(stderr(&threaded).contains("--native-threads is not supported for target wasm32-wasi"));
+}
+
+#[test]
 fn program_arguments_match_between_interpreter_and_native() {
     let file = example_path("args.ostrin");
     let interpreted = run(&["--run", &file, "--", "uno", "dos"]);
@@ -1780,6 +1799,7 @@ fn cli_exposes_help_and_version() {
     assert!(stdout(&help).contains("--types"));
     assert!(stdout(&help).contains("--project"));
     assert!(stdout(&help).contains("--native-threads"));
+    assert!(stdout(&help).contains("wasm32-wasi"));
 }
 
 #[test]

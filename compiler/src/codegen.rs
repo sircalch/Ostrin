@@ -7203,7 +7203,28 @@ pub fn find_c_compiler() -> Option<String> {
     if let Ok(cc) = std::env::var("OSTRIN_CC") {
         return Some(cc);
     }
-    for candidate in ["cc", "gcc", "clang"] {
+    find_available_compiler(["cc", "gcc", "clang"])
+}
+
+/// Finds the C compiler for an explicit output target. WASI intentionally has
+/// a separate override: a host `clang` without wasi-libc can parse the target
+/// flag but cannot link a runnable command module.
+pub fn find_c_compiler_for_target(target: &str) -> Option<String> {
+    match target {
+        "native" => find_c_compiler(),
+        "wasm32-wasi" => {
+            if let Ok(cc) = std::env::var("OSTRIN_WASI_CC") {
+                Some(cc)
+            } else {
+                find_available_compiler(["clang"])
+            }
+        }
+        _ => None,
+    }
+}
+
+fn find_available_compiler<const N: usize>(candidates: [&str; N]) -> Option<String> {
+    for candidate in candidates {
         let works = std::process::Command::new(candidate)
             .arg("--version")
             .output()

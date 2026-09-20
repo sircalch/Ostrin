@@ -13,6 +13,9 @@ jobs:
   wasi:
     name: ostrinc wasm32-wasip1
     runs-on: ubuntu-latest
+    env:
+      WASI_SDK_VERSION: "34.0"
+      WASI_SDK_SHA256: "b761e3a0721dbae9c09a0059e5fdb2bf917d1b4a8a7b430fb3b5aafb0984b2c4"
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -21,6 +24,19 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-wasip1
+
+      - name: Install pinned WASI C toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="wasi-sdk-${WASI_SDK_VERSION}-x86_64-linux.tar.gz"
+          curl --fail --location --retry 3 --output "$archive" \
+            "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-${WASI_SDK_VERSION}/$archive"
+          printf '%s  %s\n' "$WASI_SDK_SHA256" "$archive" | sha256sum --check
+          tar -xzf "$archive"
+          sdk="$PWD/wasi-sdk-${WASI_SDK_VERSION}-x86_64-linux"
+          echo "OSTRIN_WASI_CC=$sdk/bin/clang" >> "$GITHUB_ENV"
+          echo "OSTRIN_WASI_SYSROOT=$sdk/share/wasi-sysroot" >> "$GITHUB_ENV"
 
       - name: Build release compiler
         run: cargo build --manifest-path compiler/Cargo.toml --target wasm32-wasip1 --release
@@ -48,14 +64,45 @@ jobs:
           if (exitCode !== 0) process.exit(exitCode);
           NODE
 
+      - name: Compile Ostrin program to WASI
+        shell: bash
+        run: |
+          mkdir -p dist
+          cargo run --manifest-path compiler/Cargo.toml -- \
+            --compile --target wasm32-wasi --out dist/hello.wasm examples/hello.ostrin
+
+      - name: Smoke test Ostrin program under Node WASI
+        shell: bash
+        env:
+          NODE_NO_WARNINGS: "1"
+        run: |
+          output="$(node --input-type=module <<'NODE'
+          import { WASI } from 'node:wasi';
+          import { readFileSync } from 'node:fs';
+
+          const wasi = new WASI({
+            version: 'preview1',
+            args: ['hello.wasm'],
+            preopens: { '.': process.cwd() },
+            returnOnExit: true,
+          });
+          const module = await WebAssembly.compile(readFileSync('dist/hello.wasm'));
+          const instance = await WebAssembly.instantiate(module, wasi.getImportObject());
+          const exitCode = wasi.start(instance);
+          if (exitCode !== 0) process.exit(exitCode);
+          NODE
+          )"
+          printf '%s\n' "$output"
+          grep --fixed-strings --quiet 'hola desde Ostrin' <<< "$output"
+
       - name: Package and checksum artifact
         shell: bash
         run: |
           mkdir -p dist
           cp compiler/target/wasm32-wasip1/release/ostrinc dist/ostrinc.wasm
-          printf '%s\n' 'Ostrin compiler distribution' 'target = wasm32-wasip1' 'runner = WASI 0.2-compatible host' > dist/README.txt
-          sha256sum dist/ostrinc.wasm > dist/ostrinc.wasm.sha256
-          tar -czf ostrinc-wasm32-wasip1.tar.gz -C dist ostrinc.wasm ostrinc.wasm.sha256 README.txt
+          printf '%s\n' 'Ostrin WASI distribution' 'compiler = ostrinc.wasm' 'program smoke test = hello.wasm' 'target = wasm32-wasip1' 'runner = WASI 0.2-compatible host' > dist/README.txt
+          sha256sum dist/ostrinc.wasm dist/hello.wasm > dist/SHA256SUMS
+          tar -czf ostrinc-wasm32-wasip1.tar.gz -C dist ostrinc.wasm hello.wasm SHA256SUMS README.txt
 
       - name: Upload WASI artifact
         uses: actions/upload-artifact@v4

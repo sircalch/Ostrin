@@ -82,7 +82,7 @@ fn real_main() -> ExitCode {
         return check_stdin(&source_file, json);
     }
 
-    let value_flags = ["--file", "--out", "--project"];
+    let value_flags = ["--file", "--out", "--project", "--target"];
     let mut skip_next = false;
     let positional = args.iter().skip(1).find(|a| {
         if skip_next {
@@ -422,8 +422,21 @@ fn real_main() -> ExitCode {
     let compile_native = args.iter().any(|a| a == "--compile");
     let leak_check = args.iter().any(|a| a == "--leak-check");
     let native_threads = args.iter().any(|a| a == "--native-threads");
+    let target = argument_value(&args, "--target").unwrap_or_else(|| "native".to_string());
+    if target != "native" && target != "wasm32-wasi" {
+        eprintln!("error: unsupported compilation target '{target}' (expected native or wasm32-wasi)");
+        return ExitCode::FAILURE;
+    }
+    if target != "native" && !(emit_c || compile_native) {
+        eprintln!("error: --target requires --emit-c or --compile");
+        return ExitCode::FAILURE;
+    }
+    if target == "wasm32-wasi" && native_threads {
+        eprintln!("error: --native-threads is not supported for target wasm32-wasi");
+        return ExitCode::FAILURE;
+    }
     if emit_c || compile_native {
-        return run_codegen(&items, &typed_program, entry_path, path, &args, emit_c, json, leak_check, native_threads);
+        return run_codegen(&items, &typed_program, entry_path, path, &args, emit_c, json, leak_check, native_threads, &target);
     }
     if leak_check || native_threads {
         eprintln!("error: --leak-check and --native-threads require --emit-c or --compile");
@@ -472,9 +485,8 @@ test result: {}. {} passed; {failed} failed", if failed == 0 { "ok" } else { "FA
 
 /// Handles `--emit-c` and `--compile` once the program has already
 /// type-checked cleanly. `--emit-c` just writes the generated C (to `--out`
-/// or stdout); `--compile` additionally hands that source to whatever C
-/// compiler `codegen::find_c_compiler` finds, producing a real native
-/// executable.
+/// or stdout); `--compile` additionally hands that source to a target-specific
+/// C compiler, producing either a native executable or a WASI command module.
 fn run_codegen(
     items: &[ast::Item],
     typed: &typeck::TypedProgram,
@@ -485,6 +497,7 @@ fn run_codegen(
     json: bool,
     leak_check: bool,
     native_threads: bool,
+    target: &str,
 ) -> ExitCode {
     let source = match codegen::generate_with_native_options(items, typed, leak_check, native_threads) {
         Ok((source, _)) => source,
@@ -514,14 +527,24 @@ fn run_codegen(
         };
     }
 
-    let Some(compiler) = codegen::find_c_compiler() else {
-        eprintln!("error: no GNU-compatible C compiler found (checked $OSTRIN_CC, cc, gcc, clang)");
+    let Some(compiler) = codegen::find_c_compiler_for_target(target) else {
+        if target == "wasm32-wasi" {
+            eprintln!("error: no WASI C compiler found (set $OSTRIN_WASI_CC or install clang/wasi-sdk)");
+        } else {
+            eprintln!("error: no GNU-compatible C compiler found (checked $OSTRIN_CC, cc, gcc, clang)");
+        }
         return ExitCode::FAILURE;
     };
     let output_path = argument_value(args, "--out").unwrap_or_else(|| {
         let stem = entry_path.file_stem().and_then(|s| s.to_str()).unwrap_or("a");
         let dir = entry_path.parent().unwrap_or_else(|| Path::new("."));
-        let exe_name = if cfg!(windows) { format!("{stem}.exe") } else { stem.to_string() };
+        let exe_name = if target == "wasm32-wasi" {
+            format!("{stem}.wasm")
+        } else if cfg!(windows) {
+            format!("{stem}.exe")
+        } else {
+            stem.to_string()
+        };
         dir.join(exe_name).display().to_string()
     });
     let c_source_id = NEXT_C_SOURCE_ID.fetch_add(1, Ordering::Relaxed);
@@ -530,15 +553,18 @@ fn run_codegen(
         eprintln!("error: could not write temporary C source: {e}");
         return ExitCode::FAILURE;
     }
-    let status = std::process::Command::new(&compiler)
-        .arg(&c_path)
-        .arg("-o")
-        .arg(&output_path)
-        .arg("-O2")
-        .args((!cfg!(windows)).then_some("-pthread"))
-        // No fused multiply-add: results must match the interpreter bit for bit.
-        .arg("-ffp-contract=off")
-        .status();
+    let mut command = std::process::Command::new(&compiler);
+    command.arg(&c_path).arg("-o").arg(&output_path).arg("-O2");
+    if target == "wasm32-wasi" {
+        command.arg("--target=wasm32-wasi");
+        if let Ok(sysroot) = env::var("OSTRIN_WASI_SYSROOT") {
+            command.arg(format!("--sysroot={sysroot}"));
+        }
+    } else {
+        command.args((!cfg!(windows)).then_some("-pthread"));
+    }
+    // No fused multiply-add: results must match the interpreter bit for bit.
+    let status = command.arg("-ffp-contract=off").status();
     let _ = fs::remove_file(&c_path);
     match status {
         Ok(status) if status.success() => {
@@ -581,9 +607,10 @@ fn print_help() {
     println!("  --leak-check       Report native allocations before process cleanup (with --emit-c/--compile)");
     println!("  --native-threads   Use OS threads and blocking native channels (with --emit-c/--compile)");
     println!("  --emit-c      Transpile to C (a supported subset only; see docs) instead of running");
-    println!("  --compile     Transpile to C and compile it to a native executable");
+    println!("  --compile     Transpile to C and compile it to a native executable or WASI module");
+    println!("  --target NAME Select native (default) or wasm32-wasi for --emit-c/--compile");
     println!("  --project DIR Compile the entry declared by DIR/ostrin.toml");
-    println!("  --out PATH    Output path for --emit-c/--compile (defaults: stdout / <entry>.exe next to the source)");
+    println!("  --out PATH    Output path for --emit-c/--compile (defaults: stdout / target-specific entry output)");
     println!("  --json        Emit machine-readable diagnostics as JSON Lines");
     println!("  -h, --help    Print this help");
     println!("  -V, --version Print the compiler version");

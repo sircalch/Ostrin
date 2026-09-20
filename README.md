@@ -46,7 +46,7 @@ traits, pattern matching, quantities and two concurrency modes: deterministic
 cooperative scheduling by default, plus opt-in native threads for compiled
 programs.
 
-The compiler suite currently passes **139 integration tests and 6 differential
+The compiler suite currently passes **140 integration tests and 6 differential
 interpreter↔native tests**. Function calls
 support named/default arguments, collection lookups preserve `Option<T>`, and
 record fields are checked statically. The CLI also exposes JSON Lines
@@ -87,9 +87,10 @@ The default native scheduler remains deterministic for differential testing;
 The standard
 library is still intentionally small.
 
-The compiler itself also has a reproducible `wasm32-wasip1` release workflow with a checksum;
-the cooperative C runtime now avoids thread-only headers unless `--native-threads` is requested.
-This is still a WASI distribution artifact, not yet a browser backend for Ostrin programs.
+The compiler itself also has a reproducible `wasm32-wasip1` release workflow with a pinned
+WASI C toolchain, checksums, and a program smoke test. The cooperative runtime avoids
+thread-only headers unless `--native-threads` is requested. This is still a WASI distribution
+artifact, not yet a browser backend for Ostrin programs.
 
 ## Quick start
 
