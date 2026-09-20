@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-19 · rama `main` · 6 pruebas diferenciales y 137 de integración en verde.*
+*Corte: 2026-09-19 · rama `main` · 6 pruebas diferenciales y 138 de integración en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
 Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–165); para el diseño
@@ -65,7 +65,7 @@ escalar a la izquierda (`rmul`, `radd`, …).
 propios con `next`), `match` con guardas, patrones anidados, rangos y destructuración.
 
 **Concurrencia**: el intérprete conserva el scheduler cooperativo determinista con `spawn`,
-`join`, `spawn_scope`, `channel<T>()` y `select([channels])`. El backend nativo mantiene ese modo por defecto
+`join`, `spawn_scope`, `channel<T>()`, `select([channels])` y `yield()`. El backend nativo mantiene ese modo por defecto
 para la paridad reproducible, y `--native-threads` habilita hilos del SO, mutexes/condiciones,
 canales bloqueantes, selección entre canales y cancelación segura de tareas pendientes con la misma API. Se verifica en el checker que no se capturen bindings
 `mut` (E1100) y el análisis HIR/IR rechaza por defecto reutilizar un valor movible después de
@@ -85,7 +85,7 @@ lineal. Paquetes de ejemplo en Ostrin: `tables`
 `Result` por valor en el intérprete y en el backend nativo; mapas y conjuntos no dependen del
 orden de inserción.
 
-**Biblioteca estándar** (pequeña): `print`, `args`, `env`, `path_join`, `cwd`, `file_exists`,
+**Biblioteca estándar** (pequeña): `print`, `args`, `yield`, `env`, `path_join`, `cwd`, `file_exists`,
 `format`, `sum`, `panic`, `read_file`, `write_file`, `parse_int`, métodos de `List`
 (`map/filter/fold/any/all/find/push/remove_at/length`),
 `Map` (`get/set/remove/contains_key/count/keys/values`), `Set`, `Option`, `Result`.
@@ -260,7 +260,7 @@ Decisiones que necesito de ti para afinar el plan:
 
 ```powershell
 cd compiler
-cargo test                                   # 6 diferenciales + 137 de integración
+cargo test                                   # 6 diferenciales + 138 de integración
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```

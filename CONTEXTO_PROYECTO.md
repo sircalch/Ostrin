@@ -4544,3 +4544,20 @@ semántica deliberadamente acotada:
 La batería queda en **6 pruebas diferenciales y 137 de integración verdes**. La siguiente
 ampliación de concurrencia es introducir puntos seguros de cancelación y grupos nativos
 para que `spawn_scope` pueda propagar cancelación sin detener hilos de forma insegura.
+
+## 167. `yield()` como primitiva de coordinación — 2026-09-19
+
+La biblioteca estándar expone `yield() -> Void` para que un programa pueda ceder
+explícitamente el turno:
+
+- en el intérprete y el backend C cooperativo ejecuta como máximo una tarea pendiente y
+  conserva el orden determinista del scheduler;
+- con `--native-threads` llama a la operación de cesión del sistema operativo (`Sleep(0)`
+  en Windows y `sched_yield()` en POSIX), sin prometer fairness ni sincronización por sí
+  misma;
+- `examples/concurrency_yield.ostrin` y su prueba comparan `main`, `task`, `after`,
+  verifican `live_allocations=0` y comprueban que el modo de hilos reales compila.
+
+La batería queda en **6 pruebas diferenciales y 138 de integración verdes**. `yield()` es
+también el punto de coordinación visible para programas mientras la cancelación por
+puntos seguros y los grupos nativos siguen pendientes.

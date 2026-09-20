@@ -46,7 +46,7 @@ traits, pattern matching, quantities and two concurrency modes: deterministic
 cooperative scheduling by default, plus opt-in native threads for compiled
 programs.
 
-The compiler suite currently passes **137 integration tests and 6 differential
+The compiler suite currently passes **138 integration tests and 6 differential
 interpreter↔native tests**. Function calls
 support named/default arguments, collection lookups preserve `Option<T>`, and
 record fields are checked statically. The CLI also exposes JSON Lines
@@ -82,7 +82,8 @@ and default arguments, custom iterators, `Option`/`Result` combinators, the
 built-in file/parse functions and synchronous `spawn`/channels all compile too.
 The default native scheduler remains deterministic for differential testing;
 `--native-threads` enables OS threads, blocking channels and deterministic-priority
-`select([channels])`; `Task.cancel()` safely cancels tasks that have not started.
+`select([channels])`; `yield()` advances the cooperative scheduler, and
+`Task.cancel()` safely cancels tasks that have not started.
 The standard
 library is still intentionally small.
 

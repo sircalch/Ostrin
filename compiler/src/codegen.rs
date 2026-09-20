@@ -5452,6 +5452,7 @@ impl<'a> Codegen<'a> {
     fn gen_builtin(&mut self, name: &str, codes: &[String], types: &[CType], select_owns_input: bool) -> Result<Option<(String, CType)>, String> {
         let arity = match name {
             "args" => 0,
+            "yield" => 0,
             "env" => 1,
             "path_join" => 2,
             "cwd" => 0,
@@ -5502,6 +5503,10 @@ impl<'a> Codegen<'a> {
                     format!("({{ {list}* {r} = {list}_new_from_array((const char**)ostrin_argv, (int64_t)ostrin_argc); {r}; }})"),
                     ty,
                 )))
+            }
+            "yield" => {
+                let step = if self.native_threads { "ostrin_select_wait();" } else { "(void)ostrin_poll_all();" };
+                Ok(Some((format!("({{ {step} (void)0; }})"), CType::Void)))
             }
             "env" => {
                 let ty = CType::Option(Box::new(CType::Str));

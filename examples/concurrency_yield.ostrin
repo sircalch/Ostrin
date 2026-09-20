@@ -1,0 +1,10 @@
+fn main() -> Void {
+    task = spawn {
+        print("task")
+    }
+
+    print("main")
+    yield()
+    print("after")
+    task.join()
+}

@@ -156,6 +156,11 @@ Una lista vacía es un error de ejecución. El checker exige estáticamente una 
 homogénea de `Channel<T>`, y la semántica de prioridad queda así reproducible entre
 intérprete, nativo cooperativo y nativo con hilos.
 
+`yield() -> Void` cede explícitamente el turno. En el intérprete y el backend cooperativo
+ejecuta como máximo una tarea pendiente; en `--native-threads` llama a la cesión del
+sistema operativo. Es una herramienta de coordinación, no una garantía de fairness ni
+un punto de cancelación forzada.
+
 ## 3. Concurrencia estructurada — `spawn_scope`
 
 Un `spawn` "suelto" puede quedar corriendo en segundo plano si nadie llama `.join()` — útil a veces, pero también una fuente común de bugs ("tareas huérfanas" que seguían vivas sin que nadie se acordara). Para el caso común de "lanzar varias tareas y esperar a que todas terminen antes de seguir", Ostrin ofrece un bloque que lo garantiza:

@@ -1943,6 +1943,32 @@ fn pending_tasks_can_be_cancelled_before_they_run() {
 }
 
 #[test]
+fn yield_advances_the_cooperative_scheduler_and_compiles_with_threads() {
+    let file = example_path("concurrency_yield.ostrin");
+    let interpreted = run(&["--run", &file]);
+    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    let expected = stdout(&interpreted).replace("\r\n", "\n");
+    assert_eq!(expected, "main\ntask\nafter\n");
+
+    let exe = temp_artifact("yield.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "native yield compile failed: {}", stderr(&compile));
+    let native = Command::new(&exe).output().expect("run native yield binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native yield binary failed: {}", String::from_utf8_lossy(&native.stderr));
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "yield leaked: {}", String::from_utf8_lossy(&native.stderr));
+
+    let threaded_exe = temp_artifact("yield-native-threads.exe");
+    let threaded_compile = run(&["--compile", "--native-threads", "--out", &threaded_exe, &file]);
+    assert!(threaded_compile.status.success(), "native-thread yield compile failed: {}", stderr(&threaded_compile));
+    let _ = fs::remove_file(&threaded_exe);
+}
+
+#[test]
 fn concurrency_select_matches_between_interpreter_and_native_modes() {
     let file = example_path("concurrency_select.ostrin");
     let interpreted = run(&["--run", &file]);

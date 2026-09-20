@@ -111,6 +111,9 @@ test
 - Added `Task.cancel() -> Bool` for safe cancellation of pending tasks. It is
   deterministic in the cooperative scheduler, returns `false` after a task has
   started, and deliberately does not force-stop an already-running native thread.
+- Added the `yield() -> Void` standard builtin. It advances one pending task in
+  the interpreter and cooperative native scheduler, while `--native-threads`
+  yields the current OS thread; the behavior is covered by a parity and leak-check test.
 - Added `--project DIR` package entry-point selection. The compiler now reads the
   manifest's `entry` field when no source path is supplied, and generated
   `ostrin.lock` files sort dependencies and store project-relative paths where

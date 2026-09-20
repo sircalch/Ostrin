@@ -4173,6 +4173,7 @@ fn check_builtin_call(
 ) -> Option<Ty> {
     let expected_args = match name {
         "args" => vec![],
+        "yield" => vec![],
         "env" => vec![Ty::String],
         "path_join" => vec![Ty::String, Ty::String],
         "cwd" => vec![],
@@ -4225,6 +4226,7 @@ fn check_builtin_call(
     }
     match name {
         "args" => Some(Ty::List(Box::new(Ty::String))),
+        "yield" => Some(Ty::Void),
         "env" => Some(Ty::Applied("Option".to_string(), vec![Ty::String])),
         "path_join" => Some(Ty::String),
         "cwd" => Some(Ty::String),

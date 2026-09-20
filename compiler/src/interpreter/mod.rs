@@ -2286,6 +2286,10 @@ impl Interpreter {
                         .collect();
                     return Ok(Value::List(Rc::new(RefCell::new(values))));
                 }
+                "yield" => {
+                    let _ = self.run_one_pending_task()?;
+                    return Ok(Value::Void);
+                }
                 "env" => {
                     let key = self.eval_arg(&args[0], env)?;
                     let Value::String(key) = key else {
