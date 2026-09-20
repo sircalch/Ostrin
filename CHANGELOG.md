@@ -46,6 +46,10 @@
   markers now generate native C. `native_ir_strings.ostrin` compares interpreter/native output
   and requires `--leak-check` to finish with zero live allocations; aggregates remain on the
   verified HIR/AST fallback.
+- Extended the IR C emitter to the scalar-element `List<T>` core: list literals (including
+  empty lists), borrowed parameters, calls, indexing, `length`/`count`, `push` and
+  `remove_at` now use the generated native list helpers. `native_ir_lists.ostrin` covers both
+  `List<Int>` and managed `List<String>` values and finishes with zero live allocations.
 - Extended the stable hash builtin to structural Option and Result values when
   their payloads are hashable; interpreter and native tags/payload combination
   remain identical.

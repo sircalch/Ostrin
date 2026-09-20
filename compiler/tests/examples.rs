@@ -1684,6 +1684,45 @@ fn native_ir_emitter_handles_strings_and_ownership_markers() {
 }
 
 #[test]
+fn native_ir_emitter_handles_lists_and_ownership_markers() {
+    let file = example_path("native_ir_lists.ostrin");
+    let expected = "4\n4\n5\n4\n4\n0\n2\nA-one\n1\n";
+    let interpreted = run(&["--run", &file]);
+    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    let ir_functions = stdout(&report)
+        .lines()
+        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .unwrap_or(0);
+    assert!(ir_functions >= 4, "list example did not use the IR emitter: {}", stdout(&report));
+
+    let emitted = run(&["--emit-c", &file]);
+    assert!(emitted.status.success(), "list IR emission failed: {}", stderr(&emitted));
+    let source = stdout(&emitted);
+    assert!(source.contains("List_Int_new_from_array"), "list construction did not come from IR: {source}");
+    assert!(source.contains("List_String_new_from_array"), "managed string list construction did not come from IR: {source}");
+    assert!(source.contains("List_Int_push"), "list push did not come from IR: {source}");
+    assert!(source.contains("List_Int_get"), "list indexing did not come from IR: {source}");
+    assert!(source.contains("List_Int_remove_at"), "list removal did not come from IR: {source}");
+    assert!(source.contains("ostrin_release((void*)__ir_v"), "IR list ownership release marker was not emitted: {source}");
+
+    let exe = temp_artifact("native_ir_lists.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+    let native = Command::new(&exe).output().expect("failed to run list IR binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native run failed: {}", String::from_utf8_lossy(&native.stderr));
+    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "list IR ownership leaked: {}", String::from_utf8_lossy(&native.stderr));
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+}
+
+#[test]
 fn native_ir_emitter_preserves_checked_fixed_width_arithmetic() {
     let file = example_path("native_ir_sized.ostrin");
     let expected = "120\n-4\n-7\n";

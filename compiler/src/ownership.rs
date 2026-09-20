@@ -85,11 +85,15 @@ pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
         let mut definitions: HashMap<ValueId, (Ty, usize, usize)> = HashMap::new();
         let mut uses: HashMap<ValueId, Vec<UsePoint>> = HashMap::new();
         let mut opaque_values = HashSet::new();
+        let mut borrowed_values = HashSet::new();
 
         for block in &function.blocks {
             for (index, instruction) in block.instructions.iter().enumerate() {
                 if let Some((value, ty)) = defined_value(instruction) {
                     definitions.insert(value, (ty, block.id, index));
+                    if matches!(instruction, IrInstr::Param { .. }) {
+                        borrowed_values.insert(value);
+                    }
                 }
                 for value in used_values(instruction) {
                     uses.entry(value).or_default().push(UsePoint { block: block.id, instruction: index });
@@ -116,6 +120,12 @@ pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
         let mut release_before_terminator: HashMap<usize, Vec<ValueId>> = HashMap::new();
         for (value, (ty, definition_block, definition_instruction)) in &definitions {
             if !requires_management(ty) {
+                continue;
+            }
+            // Function parameters are borrowed C arguments. The caller owns
+            // their reference, so a callee must not release a parameter just
+            // because its last local use is visible in this function.
+            if borrowed_values.contains(value) {
                 continue;
             }
             let value_uses = uses.get(&value).cloned().unwrap_or_default();
@@ -145,10 +155,16 @@ pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
 
         for block in &function.blocks {
             for (index, instruction) in block.instructions.iter().enumerate() {
-                if let IrInstr::Aggregate { fields, .. } = instruction {
-                    for value in fields {
-                        if definitions.get(value).is_some_and(|(ty, _, _)| requires_management(ty)) {
-                            retain_before.entry((block.id, index)).or_default().push(*value);
+                if let IrInstr::Aggregate { fields, ty, .. } = instruction {
+                    // The native List constructors and mutators retain their
+                    // reference elements themselves. Other aggregate paths
+                    // still need the explicit IR retain until their backend
+                    // contracts are migrated.
+                    if !matches!(ty, Ty::List(_)) {
+                        for value in fields {
+                            if definitions.get(value).is_some_and(|(ty, _, _)| requires_management(ty)) {
+                                retain_before.entry((block.id, index)).or_default().push(*value);
+                            }
                         }
                     }
                 }
@@ -350,11 +366,30 @@ fn type_contains_movable(ty: &Type, movable: &HashSet<String>) -> bool {
 
 fn safe_release_site(instruction: &IrInstr) -> bool {
     // These are the ownership transfers modeled by this first pass: binding a
-    // value into a local with no later read, moving it into a channel, or
-    // passing it to print, which borrows for the duration of the call.
+    // value into a local with no later read, moving it into a channel, passing
+    // it to a borrowing print/method call, or consuming it through an
+    // aggregate/index operation whose native helper retains borrowed values.
     match instruction {
-        IrInstr::StoreLocal { .. } | IrInstr::ChannelSend { .. } => true,
+        IrInstr::StoreLocal { .. }
+        | IrInstr::ChannelSend { .. }
+        | IrInstr::Aggregate { .. }
+        | IrInstr::Index { .. } => true,
         IrInstr::Call { callee, args, .. } => callee == "print" && args.len() == 1,
+        IrInstr::MethodCall { method, .. } => matches!(
+            method.as_str(),
+            "length"
+                | "count"
+                | "push"
+                | "remove_at"
+                | "is_empty"
+                | "trim"
+                | "to_upper"
+                | "to_lower"
+                | "contains"
+                | "starts_with"
+                | "ends_with"
+                | "replace"
+        ),
         _ => false,
     }
 }

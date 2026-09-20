@@ -1,0 +1,31 @@
+fn build(seed: Int) -> List<Int> {
+    mut values = [seed, seed + 1, seed + 2]
+    values.push(10)
+    values
+}
+
+fn build_strings() -> List<String> {
+    mut words = ["A" + "-one"]
+    words.push("B" + "-two")
+    words
+}
+
+fn size(values: List<Int>) -> Int {
+    values.length()
+}
+
+fn main() -> Void {
+    mut values = build(4)
+    print(values.length())
+    print(size(values))
+    print(values[1])
+    values.push(9)
+    print(values.remove_at(0))
+    print(values.count())
+    mut empty: List<Int> = []
+    print(empty.length())
+    mut words = build_strings()
+    print(words.length())
+    print(words.remove_at(0))
+    print(words.length())
+}

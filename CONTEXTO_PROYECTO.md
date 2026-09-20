@@ -4902,3 +4902,29 @@ suite queda en **6 pruebas diferenciales y 151 de integración verdes**.
 El siguiente frente de memoria sigue siendo extender este contrato a records, colecciones,
 loops, scopes y escapes complejos; los ciclos y la destrucción completa de agregados no se
 consideran cerrados por esta migración.
+
+## 185. Núcleo de `List<T>` consumido desde la IR — 2026-09-20
+
+La segunda familia gestionada que llega al emisor IR es el núcleo de listas con elementos
+escalares (`Int`, `Float`, `Bool`, `String` y enteros de ancho fijo). `ir_c.rs` ya materializa
+el tipo `List_<T>*` que generan los helpers del backend y consume estas operaciones:
+
+- literales de lista y listas vacías mediante `List_<T>_new_from_array`;
+- parámetros prestados y llamadas a funciones que reciben/devuelven listas;
+- indexación, `length`/`count`, `push` y `remove_at`;
+- `List<String>` con elementos gestionados, cuyos helpers retienen al almacenar y transfieren
+  ownership al extraer un elemento.
+
+La pasada de ownership distingue parámetros prestados de valores producidos localmente, libera
+listas en su último uso y no duplica los `retain` de elementos que ya ejecutan los constructores
+o mutadores nativos. Para un `Aggregate` de lista el lowering conserva el release del valor
+fuente, mientras el helper C conserva la referencia almacenada; esto evita la fuga encontrada
+durante la prueba de `List<String>`.
+
+`examples/native_ir_lists.ostrin` y `native_ir_emitter_handles_lists_and_ownership_markers`
+comparan intérprete y nativo, exigen cuatro funciones IR, verifican los helpers emitidos y
+ejecutan `--leak-check` con `live_allocations=0`. La suite queda en **6 pruebas diferenciales y
+152 de integración verdes**.
+
+Mapas, sets, combinadores, listas de records y ownership de llamadas que transfieren alias
+siguen deliberadamente en el fallback verificado; son el siguiente bloque de colecciones.
