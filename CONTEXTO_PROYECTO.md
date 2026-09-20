@@ -4825,3 +4825,21 @@ integración verdes**.
 La deuda siguiente sigue siendo ownership/último uso sobre la IR: los valores gestionados,
 iteradores y releases alrededor de `phi`, loops, scopes y escapes aún deben migrarse sin
 romper destructores ni `retain/release`.
+
+## 181. Sitio y documentación pública sincronizados — 2026-09-20
+
+La superficie pública de GitHub Pages se actualizó para reflejar el estado real del
+repositorio, no una fotografía anterior del prototipo:
+
+- `website/index.html`, `examples.html`, `ecosystem.html` y `roadmap.html` muestran los
+  **155** programas `.ostrin` y las **149 pruebas de integración + 6 diferenciales**;
+- `website/docs.html` enlaza ahora el archivo completo de **21 documentos**, incluido el
+  diseño de distribución/WASI, HIR/IR y la jerarquía numérica;
+- se retiró el parche de JavaScript que corregía en tiempo de ejecución el texto antiguo de
+  “seventeen documents”; el contenido fuente queda correcto y accesible sin JavaScript;
+- el sitio mantiene explícita la frontera de producto: paquetes locales y artefactos WASI
+  existen, mientras que el registro público, instaladores de release y playground de
+  navegador siguen en construcción.
+
+README y sitio quedan alineados con `ESTADO_Y_PLAN.md`; la suite de código no cambia porque
+este bloque es documental y de presentación.

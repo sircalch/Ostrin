@@ -7,12 +7,6 @@
     label.textContent = 'Open development · MIT License';
   });
 
-  document.querySelectorAll('h2').forEach(function (heading) {
-    if (heading.textContent.trim() === 'Seventeen documents, one language.') {
-      heading.textContent = 'Twenty-one documents, one language.';
-    }
-  });
-
   const header = document.querySelector('.site-header');
   const menuButton = document.querySelector('.menu-toggle');
 

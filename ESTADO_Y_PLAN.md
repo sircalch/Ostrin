@@ -3,7 +3,7 @@
 *Corte: 2026-09-20 · rama `main` · 6 pruebas diferenciales y 149 de integración en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
-Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–180); para el diseño
+Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–181); para el diseño
 del lenguaje, `docs/design/` (21 documentos).
 
 ---
