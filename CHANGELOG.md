@@ -121,6 +121,8 @@ test
 - Added target-aware C compilation for `--target wasm32-wasi`. The pinned WASI workflow
   now compiles and runs both `ostrinc.wasm` and a real `hello.wasm` program under Node WASI,
   packaging both modules with a checksums file.
+- Added native and WASI smoke coverage for a manifest-selected project with a relative `path`
+  dependency; the package module is now included in the WASI distribution artifact.
 - Added `--project DIR` package entry-point selection. The compiler now reads the
   manifest's `entry` field when no source path is supplied, and generated
   `ostrin.lock` files sort dependencies and store project-relative paths where

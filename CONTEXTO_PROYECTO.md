@@ -4594,3 +4594,20 @@ La ruta de distribución WASM dejó de cubrir únicamente al compilador. La CLI 
 La prueba unitaria de la CLI verifica la emisión cooperativa y la incompatibilidad explícita
 con hilos nativos. La batería local queda en **6 pruebas diferenciales y 140 de integración
 verdes**; la ejecución del toolchain WASI queda verificada por el workflow de GitHub.
+
+## 170. Paquetes locales en el backend nativo y WASI — 2026-09-19
+
+El proyecto de ejemplo con `ostrin.toml`, `entry = "main.ostrin"` y una dependencia relativa
+`path = "../shared_lib"` ya no se valida únicamente con el intérprete:
+
+- una prueba de integración compila el proyecto completo con `--compile --project` y ejecuta
+  el binario nativo, comprobando que el import de `helpers.greet` conserva su salida;
+- el workflow WASI produce además `pkg_project.wasm`, lo ejecuta bajo Node WASI y exige la
+  salida `hola, Ostrin`;
+- el artefacto de distribución contiene `ostrinc.wasm`, `hello.wasm` y `pkg_project.wasm`,
+  todos incluidos en un único archivo de checksums.
+
+Esto establece una primera garantía de que la selección de entrada y las dependencias locales
+son compatibles con los dos backends compilados. Git y el registro remoto siguen fuera del
+alcance: las dependencias Git continúan requiriendo clonación explícita y conversión a `path`.
+La batería queda en **6 pruebas diferenciales y 141 de integración verdes**.

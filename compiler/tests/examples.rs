@@ -2354,6 +2354,21 @@ fn path_dependency_resolves_and_runs() {
 }
 
 #[test]
+fn native_backend_compiles_project_manifest_and_path_dependency() {
+    let project = example_path("pkg_project/main_app");
+    let exe = temp_artifact("pkg_project.exe");
+    let compile = run(&["--compile", "--project", &project, "--out", &exe]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "package compile failed: {}", stderr(&compile));
+    let native = Command::new(&exe).output().expect("compiled package should run");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "compiled package exited unsuccessfully: {}", stderr(&native));
+    assert_eq!(String::from_utf8_lossy(&native.stdout).trim(), "hola, Ostrin");
+}
+
+#[test]
 fn project_manifest_selects_entry_and_writes_portable_lockfile() {
     let project = example_path("pkg_project/main_app");
     let out = run(&["--run", "--project", &project]);
