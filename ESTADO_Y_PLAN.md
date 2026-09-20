@@ -121,9 +121,9 @@ retienen al almacenarse y se liberan al destruir el contenedor. El backend inser
 `retain` para aliases y valores prestados, libera valores reemplazados y limpia los locales
 propietarios directos al retornar; el mismo contrato se aplica al emisor HIR y al fallback AST.
 `clone(x)` y `drop(x)` siguen disponibles para probar explícitamente el contrato en programas
-nativos. El alcance deliberado de esta etapa es el camino lineal/directo de cada función:
-los bindings creados dentro de bloques anidados y los escapes complejos siguen pendientes de
-la bajada completa de ownership sobre la IR.
+nativos. El emisor también limpia bindings de referencia creados por expresiones de bloque
+anidadas; los escapes complejos, loops y la bajada completa de ownership sobre la IR siguen
+pendientes.
 
 **Soportado** (todos los ejemplos ejecutables del repo, salvo lo listado en §6):
 - Escalares, strings, recursión, `if/while/for`, `match` (con guardas y patrones anidados).
@@ -162,7 +162,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Cierres en nativo | Captura **por valor** (una variable `mut` cambiada después no se ve dentro); lambda sin contexto de tipos exige anotación |
 | Chequeo «movido tras enviar» (E1101) | Integrado por defecto en `--check`, `--run`, `--emit-c` y `--compile`; `--ownership-check` conserva el informe explícito |
 | Paralelismo nativo (`--native-threads`, canales bloqueantes, `select`) | Hilos del SO, mutexes/condiciones y canales bloqueantes implementados de forma opt-in; el registro de tareas tiene mutex, referencias temporales, desregistro en `join` y drenado de nodos; `select` y cancelación siguen pendientes |
-| Memoria en nativo | Registro, destructores tipados para records/colecciones, `clone`/`drop`, limpieza automática de locales directos y `--leak-check`; scopes anidados y ARC completa sobre IR siguen pendientes |
+| Memoria en nativo | Registro, destructores tipados para records/colecciones, `clone`/`drop`, limpieza automática de locales directos y de bloques anidados, y `--leak-check`; ARC completa sobre IR sigue pendiente |
 | IR de bloques | HIR→CFG disponible con `--ir`; `if/while/for/match/try/spawn/channel` ya tienen operaciones explícitas, aún no reemplaza el backend C |
 | Ownership/último uso | `--ownership-report`, `--ownership-check` y `--ownership-ir`; el backend C ya aplica retain/release lineal en locales directos, pero la IR aún no es la fuente única |
 | Biblioteca estándar | Mínima: `args`, entorno/rutas, `format`, E/S, `hash` estable y `Map` hash para claves escalares; faltan `Hash` para tipos de usuario, fechas, JSON y red |

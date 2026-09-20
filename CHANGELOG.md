@@ -70,8 +70,12 @@ test
 - Synchronized the native task registry with its own mutex. Registered tasks now
   hold a runtime reference while they are schedulable, polling takes a temporary
   reference, `join` unregisters completed tasks, and scope/exit draining retires
-  task nodes without stale pointers. Nested scope locals still await complete
-  ownership lowering.
+  task nodes without stale pointers. More complex ownership escapes still await
+  complete lowering.
+- Extended native ownership into nested block expressions. Their reference-like
+  locals now have a scoped cleanup frame, preserve block results across releases,
+  and are covered by a native-thread `spawn_scope` leak-check test; task
+  registration now happens before a native thread starts.
 - Added `--project DIR` package entry-point selection. The compiler now reads the
   manifest's `entry` field when no source path is supplied, and generated
   `ostrin.lock` files sort dependencies and store project-relative paths where

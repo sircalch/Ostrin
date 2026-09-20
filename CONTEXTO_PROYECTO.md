@@ -4352,3 +4352,23 @@ binding local `child` del scope anidado, porque la emisión de ownership cubre l
 directos de funciones pero aún no todos los bindings creados dentro de regiones
 anidadas. Se conserva como brecha explícita de la siguiente etapa de lowering de
 ownership, no como un problema del registro concurrente.
+
+## 156. Ownership de bloques anidados — 2026-09-19
+
+La bajada nativa añade frames de ownership para cada expresión de bloque anidado
+generada dentro de una función:
+
+- los bindings locales de referencia se registran en el frame del bloque, no en el
+  frame de la función;
+- antes de devolver el valor del bloque, el emisor lo guarda en un temporal, retiene
+  los resultados prestados y libera los locales que no escapan;
+- el mecanismo cubre el handle `child` creado dentro de `spawn_scope` y conserva el
+  orden observable del scheduler nativo;
+- además, `spawn` registra la tarea antes de arrancar el hilo del SO, eliminando la
+  ventana en la que un hilo podía terminar antes de entrar al registro.
+
+La prueba `native_threads_scope_drain_releases_nested_task_handles` verifica
+`concurrency_scheduler.ostrin` con `--native-threads --leak-check`: salida idéntica y
+`live_allocations=0`. La batería queda en **6 pruebas diferenciales y 129 de
+integración verdes**. La ARC completa sobre la IR, escapes complejos y cancelación
+siguen pendientes.

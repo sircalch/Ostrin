@@ -135,10 +135,11 @@ results = spawn_scope {
 - `spawn_scope { ... }` garantiza que **ninguna tarea lanzada dentro del bloque sigue viva al salir de él** — si el bloque termina (normalmente o por panic) con tareas todavía sin `.join()`, el propio `spawn_scope` espera a que terminen (o las cancela, según se decida en el diseño de cancelación, pendiente en §5) antes de propagar la salida.
 - Se recomienda `spawn_scope` como la forma por defecto de paralelizar trabajo (por ejemplo, repartir un cálculo científico entre N tareas y esperar todos los resultados); `spawn` suelto queda para el caso explícito de una tarea de fondo de vida más larga que el scope que la creó (un logger, un servidor).
 
-La sincronización del registro no sustituye todavía la bajada completa de ownership:
-un binding de tarea creado dentro de un scope anidado puede requerir limpieza adicional
-del emisor nativo aunque la tarea ya haya terminado. Ese caso queda cubierto como brecha
-de memoria/IR en el plan de producción.
+La sincronización del registro se complementa con frames de ownership para los bloques
+anidados que generan handles de tarea: el emisor conserva el resultado del bloque,
+libera sus bindings locales al salir y el smoke test nativo termina con cero
+asignaciones vivas. La bajada completa de ownership sobre la IR —incluyendo todos los
+escapes, loops y control de cancelación— sigue siendo una etapa posterior.
 
 ## 4. Ejemplo completo — map paralelo
 

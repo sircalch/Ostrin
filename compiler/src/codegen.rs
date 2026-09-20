@@ -1087,6 +1087,10 @@ struct Codegen<'a> {
     /// callable. This intentionally starts with the straight-line function
     /// scope; nested blocks remain a later CFG/IR phase.
     owned_locals: Vec<(String, CType)>,
+    /// Owned reference-like locals introduced by nested block expressions in
+    /// the current callable. They are released when the block expression
+    /// finishes, before its value is yielded to the enclosing expression.
+    owned_block_locals: Vec<Vec<(String, CType)>>,
     ownership_active: bool,
     native_threads: bool,
 }
@@ -1872,36 +1876,62 @@ impl<'a> Codegen<'a> {
     fn track_owned_local(&mut self, name: &str, ty: &CType, borrowed: bool, out: &mut String) {
         // `scopes[0]` is the generator's outer frame; a callable's direct
         // locals live in the frame pushed by `gen_callable_body`.
-        if !self.ownership_active || self.scopes.len() != 2 || !is_reference_type(ty) {
+        if !self.ownership_active || self.lambda_depth != 0 || !is_reference_type(ty) {
             return;
         }
         if borrowed {
             out.push_str(&format!("    ostrin_retain((void*){name});\n"));
         }
-        if !self.owned_locals.iter().any(|(existing, _)| existing == name) {
-            self.owned_locals.push((name.to_string(), ty.clone()));
+        if self.scopes.len() == 2 {
+            if !self.owned_locals.iter().any(|(existing, _)| existing == name) {
+                self.owned_locals.push((name.to_string(), ty.clone()));
+            }
+        } else if let Some(frame) = self.owned_block_locals.last_mut() {
+            if !frame.iter().any(|(existing, _)| existing == name) {
+                frame.push((name.to_string(), ty.clone()));
+            }
         }
     }
 
     fn owned_local_name(&self, expr: &Expr) -> Option<String> {
         let Expr::Ident(name) = expr.unlocated() else { return None };
+        if self
+            .owned_block_locals
+            .iter()
+            .rev()
+            .any(|frame| frame.iter().any(|(owned, _)| owned == name))
+        {
+            return Some(name.clone());
+        }
         self.owned_locals.iter().any(|(owned, _)| owned == name).then(|| name.clone())
     }
 
     fn owned_local_name_by_str(&self, name: &str) -> Option<&CType> {
+        for frame in self.owned_block_locals.iter().rev() {
+            if let Some((_, ty)) = frame.iter().find(|(owned, _)| owned == name) {
+                return Some(ty);
+            }
+        }
         self.owned_locals.iter().find_map(|(owned, ty)| (owned == name).then_some(ty))
+    }
+
+    fn emit_owned_bindings_cleanup(bindings: &[(String, CType)], transfer: Option<&str>, out: &mut String) {
+        for (name, ty) in bindings.iter().rev() {
+            if transfer == Some(name.as_str()) || !is_reference_type(ty) {
+                continue;
+            }
+            out.push_str(&format!("    ostrin_release((void*){name});\n"));
+        }
     }
 
     fn emit_owned_cleanup(&self, out: &mut String, transfer: Option<&str>) {
         if !self.ownership_active {
             return;
         }
-        for (name, ty) in self.owned_locals.iter().rev() {
-            if transfer == Some(name.as_str()) || !is_reference_type(ty) {
-                continue;
-            }
-            out.push_str(&format!("    ostrin_release((void*){name});\n"));
+        for frame in self.owned_block_locals.iter().rev() {
+            Self::emit_owned_bindings_cleanup(frame, transfer, out);
         }
+        Self::emit_owned_bindings_cleanup(&self.owned_locals, transfer, out);
     }
 
     /// Emits a return through a temporary when the value is reference-like.
@@ -2106,7 +2136,7 @@ impl<'a> Codegen<'a> {
             format!("ostrin_calloc(1, sizeof *{temp})")
         };
         let start = if self.native_threads {
-            format!("{name}_start({temp}); ostrin_register_task({temp}, {name}_poll);")
+            format!("ostrin_register_task({temp}, {name}_poll); {name}_start({temp});")
         } else {
             format!("ostrin_register_task({temp}, {name}_poll);")
         };
@@ -2241,6 +2271,10 @@ impl<'a> Codegen<'a> {
 
     fn gen_block_expr(&mut self, block: &Block) -> Result<(String, CType), String> {
         let mut body = String::new();
+        let tracks_ownership = self.ownership_active && self.lambda_depth == 0;
+        if tracks_ownership {
+            self.owned_block_locals.push(Vec::new());
+        }
         self.push_scope();
         for stmt in &block.stmts {
             self.gen_stmt(&stmt.stmt, &mut body)?;
@@ -2249,8 +2283,31 @@ impl<'a> Codegen<'a> {
             Some(e) => self.gen_expr(e)?,
             None => ("(void)0".to_string(), CType::Void),
         };
+        let transfer = block.tail.as_ref().and_then(|value| self.owned_local_name(value));
+        let owned = if tracks_ownership {
+            self.owned_block_locals.pop().expect("block ownership frame must exist")
+        } else {
+            Vec::new()
+        };
         self.pop_scope();
-        Ok((format!("({{ {body} {tail_code}; }})"), tail_ty))
+        if tail_ty == CType::Void {
+            let mut code = format!("({{ {body} {tail_code};\n");
+            Self::emit_owned_bindings_cleanup(&owned, transfer.as_deref(), &mut code);
+            code.push_str("    (void)0; })");
+            return Ok((code, tail_ty));
+        }
+
+        let result = self.next_temp();
+        let mut code = format!("({{ {body} {} {result} = {tail_code};\n", c_type_name(&tail_ty));
+        if is_reference_type(&tail_ty)
+            && transfer.is_none()
+            && block.tail.as_ref().is_some_and(|value| borrowed_reference_expr(value))
+        {
+            code.push_str(&format!("    ostrin_retain((void*){result});\n"));
+        }
+        Self::emit_owned_bindings_cleanup(&owned, transfer.as_deref(), &mut code);
+        code.push_str(&format!("    {result}; }})"));
+        Ok((code, tail_ty))
     }
 
     /// A bare `Ok(x)` / `Err(e)` / `None` bound to a name with no annotation
@@ -5867,6 +5924,7 @@ fn generate_impl(
         scopes: vec![HashMap::new()],
         temp_counter: 0,
         owned_locals: Vec::new(),
+        owned_block_locals: Vec::new(),
         ownership_active: false,
         native_threads,
     };

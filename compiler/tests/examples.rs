@@ -961,6 +961,45 @@ fn native_threads_use_os_thread_and_blocking_channel_runtime() {
 }
 
 #[test]
+fn native_threads_scope_drain_releases_nested_task_handles() {
+    let exe = temp_artifact("native-scope-ownership.exe");
+    let compile = run(&[
+        "--compile",
+        "--native-threads",
+        "--leak-check",
+        "--out",
+        &exe,
+        &example_path("concurrency_scheduler.ostrin"),
+    ]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "native scope compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run native scope binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "native scope binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        "main\ntask\n42\nscope-body\nscope-task\n7\n"
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "nested spawn_scope task handles should be released: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn compiler_lowers_hir_to_verified_cfg_ir() {
     let out = run(&["--ir", &example_path("native_fibonacci.ostrin")]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
