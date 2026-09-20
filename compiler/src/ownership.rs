@@ -156,11 +156,11 @@ pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
         for block in &function.blocks {
             for (index, instruction) in block.instructions.iter().enumerate() {
                 if let IrInstr::Aggregate { fields, ty, .. } = instruction {
-                    // The native List constructors and mutators retain their
+                    // Native collection constructors and mutators retain
                     // reference elements themselves. Other aggregate paths
                     // still need the explicit IR retain until their backend
                     // contracts are migrated.
-                    if !matches!(ty, Ty::List(_)) {
+                    if !matches!(ty, Ty::List(_) | Ty::Map(_, _) | Ty::Set(_)) {
                         for value in fields {
                             if definitions.get(value).is_some_and(|(ty, _, _)| requires_management(ty)) {
                                 retain_before.entry((block.id, index)).or_default().push(*value);
@@ -389,6 +389,12 @@ fn safe_release_site(instruction: &IrInstr) -> bool {
                 | "starts_with"
                 | "ends_with"
                 | "replace"
+                | "contains_key"
+                | "set"
+                | "keys"
+                | "values"
+                | "add"
+                | "remove"
         ),
         _ => false,
     }

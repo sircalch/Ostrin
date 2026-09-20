@@ -1,9 +1,9 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-20 · rama `main` · 6 pruebas diferenciales y 152 de integración en verde.*
+*Corte: 2026-09-20 · rama `main` · 6 pruebas diferenciales y 153 de integración en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
-Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–185); para el diseño
+Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–186); para el diseño
 del lenguaje, `docs/design/` (21 documentos).
 
 ---
@@ -30,7 +30,7 @@ Implementación: compilador + intérprete + herramientas de editor, todo en Rust
 | Léxico / parser | `lexer/`, `parser/mod.rs` | Tokens, AST con rangos de origen |
 | Módulos y paquetes | `modules.rs`, `package.rs`, `ostrin.toml` | Imports, `--project`, dependencias locales y lockfile portable |
 | Verificador de tipos | `typeck/mod.rs` (~3 500 l.) | Tipos, dimensiones, traits, exhaustividad, genéricos |
-| HIR/IR | `hir.rs`, `hir_c.rs`, `ir.rs`, `ir_c.rs` | HIR verificado, CFG con temporales explícitos y emisor C desde IR para escalares, `String`, listas escalares, enteros de ancho fijo y control de flujo, con fallback HIR/AST acotado |
+| HIR/IR | `hir.rs`, `hir_c.rs`, `ir.rs`, `ir_c.rs` | HIR verificado, CFG con temporales explícitos y emisor C desde IR para escalares, `String`, listas escalares, mapas/conjuntos escalares, enteros de ancho fijo y control de flujo, con fallback HIR/AST acotado |
 | Intérprete | `interpreter/mod.rs` | Ejecución tree‑walking y scheduler cooperativo; referencia semántica |
 | Servidor de lenguaje | `lsp.rs`, `symbols.rs`, `protocol.rs` | LSP sobre stdio |
 | Adaptador de depuración | `dap.rs` + hooks del intérprete | DAP sobre stdio |
@@ -119,16 +119,18 @@ familia gestionada `String` convierten temporales SSA en temporales C, preservan
 entera, aritmética comprobada de enteros de ancho fijo, concatenación/comparación/impresión
 de texto y salida numérica, emiten ramas, recursión, bucles con estado y `phi`, y se cuentan
 por separado en `--native-type-report` como `ir-generated`. Los marcadores de ownership de
-`String` y `List<T>` también se consumen al generar C; agregados, iteradores u operaciones todavía no
-modeladas caen de forma verificable a HIR y después al AST.
+`String`, `List<T>` y los núcleos escalares de `Map<K,V>`/`Set<T>` también se consumen al
+generar C; agregados complejos, iteradores u operaciones todavía no modeladas caen de forma
+verificable a HIR y después al AST.
 
 El runtime C generado centraliza las reservas en `ostrin_alloc`/`ostrin_calloc`/
 `ostrin_realloc`, registra cada bloque y lo libera mediante `atexit` al terminar el
 programa. Expone ya el ABI `ostrin_retain`/`ostrin_release` y `--leak-check` reporta
 asignaciones vivas, pico y total antes de la limpieza. Los buffers temporales de arrays, CSV,
 strings, cantidades, RNG y el detector E1101 también usan esa API. La primera familia
-gestionada migrada a la IR es `String`, seguida por el núcleo escalar de `List<T>`: literales,
-concatenación, igualdad, llamadas, ramas con `phi`, indexación, mutación, `print` y marcadores
+gestionada migrada a la IR es `String`, seguida por los núcleos escalares de `List<T>`,
+`Map<K,V>` y `Set<T>`: literales, concatenación, igualdad, llamadas, ramas con `phi`,
+indexación, mutación, consultas hash, `print` y marcadores
 `retain/release` ya se prueban en el emisor nativo con `--leak-check`. Records y colecciones
 registran callbacks de destrucción tipados; sus campos/elementos por referencia se
 retienen al almacenarse y se liberan al destruir el contenedor. El backend inserta ahora
@@ -137,7 +139,8 @@ propietarios directos al retornar; el mismo contrato se aplica al emisor HIR y a
 `clone(x)` y `drop(x)` siguen disponibles para probar explícitamente el contrato en programas
 nativos. El emisor también limpia bindings de referencia creados por expresiones de bloque
 anidadas y por ramas/iteraciones de `while`/`for`, incluyendo `break`/`continue`; los escapes
-complejos y la bajada completa de ownership sobre la IR siguen pendientes.
+complejos, las búsquedas que devuelven `Option` y la bajada completa de ownership sobre la IR
+siguen pendientes.
 
 **Soportado** (todos los ejemplos ejecutables del repo, salvo lo listado en §6):
 - Escalares, strings, recursión, `if/while/for`, `match` (con guardas y patrones anidados).
@@ -176,9 +179,9 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Cierres en nativo | Captura **por valor** (una variable `mut` cambiada después no se ve dentro); lambda sin contexto de tipos exige anotación |
 | Chequeo «movido tras enviar» (E1101) | Integrado por defecto en `--check`, `--run`, `--emit-c` y `--compile`; `--ownership-check` conserva el informe explícito |
 | Paralelismo nativo (`--native-threads`, canales bloqueantes, `select`) | Hilos del SO, mutexes/condiciones, canales bloqueantes y `select(List<Channel<T>>)` implementados de forma opt-in; `select` conserva prioridad determinista y cede el hilo nativo entre intentos; `Task.cancel()` cancela pendientes, propaga a grupos activos de `spawn_scope` o solicita cancelación a tareas `Running`, observada en checkpoints seguros; `receive()` vuelve periódicamente al runtime sin conservar el mutex durante el checkpoint |
-| Memoria en nativo | Registro, destructores tipados para records/colecciones y entornos de tareas, `clone`/`drop`, cleanup automático de locales directos, bloques anidados, ramas, loops y cancelación de tareas en AST/HIR, y `--leak-check`; `String` y listas escalares ya consumen ownership desde IR, pero ARC completa de agregados sigue pendiente |
-| IR de bloques | HIR→CFG disponible con `--ir`; el emisor C cubre ramas, bucles escalares con `phi`, `String` y el núcleo `List<T>` escalar; `for`/iteradores, mapas/sets, records y colecciones complejas aún no reemplazan el backend C completo |
-| Ownership/último uso | `--ownership-report`, `--ownership-check` y `--ownership-ir`; la IR ya inserta y consume retain/release lineal para `String` y listas escalares, mientras llamadas transferentes, agregados complejos, loops, scopes y escapes siguen conservadores |
+| Memoria en nativo | Registro, destructores tipados para records/colecciones y entornos de tareas, `clone`/`drop`, cleanup automático de locales directos, bloques anidados, ramas, loops y cancelación de tareas en AST/HIR, y `--leak-check`; `String`, listas escalares y mapas/conjuntos escalares ya consumen ownership desde IR, pero ARC completa de agregados sigue pendiente |
+| IR de bloques | HIR→CFG disponible con `--ir`; el emisor C cubre ramas, bucles escalares con `phi`, `String`, listas escalares y operaciones hash escalares; `for`/iteradores, records y colecciones complejas aún no reemplazan el backend C completo |
+| Ownership/último uso | `--ownership-report`, `--ownership-check` y `--ownership-ir`; la IR ya inserta y consume retain/release lineal para `String`, listas escalares y mapas/conjuntos escalares, mientras llamadas transferentes, agregados complejos, loops, scopes y escapes siguen conservadores |
 | Biblioteca estándar | Mínima: `args`, entorno/rutas, `format`, E/S y `hash` estructural para escalares, colecciones y tipos con `derive(Hash)`; faltan fechas, JSON y red |
 | Mensajes de error de E/S | `strerror` ≠ texto de Rust (difieren entre backends) |
 | `Result<Void,E>` | Campo de valor de relleno (`char`) en C |
@@ -277,7 +280,7 @@ Decisiones que necesito de ti para afinar el plan:
 
 ```powershell
 cd compiler
-cargo test                                   # 6 diferenciales + 152 de integración
+cargo test                                   # 6 diferenciales + 153 de integración
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```

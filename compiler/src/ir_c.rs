@@ -3,10 +3,10 @@
 //! The emitter consumes the explicit CFG rather than walking HIR a second time.
 //! SSA values become named C temporaries, branches become labels/gotos, and
 //! phi nodes select the incoming value using the predecessor edge. The first
-//! managed families supported here are `String` and the scalar-element core of
-//! `List<T>`; their ownership markers and native helpers are emitted directly
-//! into C while maps, sets and larger aggregates retain the verified HIR/AST
-//! fallback.
+//! managed families supported here are `String`, scalar-element `List<T>`, and
+//! the scalar-key/value core of `Map<K,V>`/`Set<T>`; their ownership markers
+//! and native helpers are emitted directly into C while option-returning
+//! lookups and larger aggregates retain the verified HIR/AST fallback.
 
 use std::collections::{HashMap, HashSet};
 
@@ -26,6 +26,10 @@ fn c_type(ty: &Ty) -> Bail<String> {
         Ty::Bool => "bool".to_string(),
         Ty::String => "const char*".to_string(),
         Ty::List(element) if list_element_supported(element) => format!("List_{}*", mangle_scalar(element)),
+        Ty::Map(key, value) if map_supported(key, value) => {
+            format!("Map_{}_{}*", mangle_scalar(key), mangle_scalar(value))
+        }
+        Ty::Set(element) if set_supported(element) => format!("Set_{}*", mangle_scalar(element)),
         Ty::Void => "void".to_string(),
         _ => return Err(()),
     })
@@ -39,11 +43,22 @@ fn scalar(ty: &Ty) -> bool {
 }
 
 fn supported(ty: &Ty) -> bool {
-    scalar(ty) || matches!(ty, Ty::List(element) if list_element_supported(element))
+    scalar(ty)
+        || matches!(ty, Ty::List(element) if list_element_supported(element))
+        || matches!(ty, Ty::Map(key, value) if map_supported(key, value))
+        || matches!(ty, Ty::Set(element) if set_supported(element))
 }
 
 fn list_element_supported(ty: &Ty) -> bool {
     scalar(ty) && *ty != Ty::Void
+}
+
+fn map_supported(key: &Ty, value: &Ty) -> bool {
+    list_element_supported(key) && list_element_supported(value)
+}
+
+fn set_supported(element: &Ty) -> bool {
+    list_element_supported(element)
 }
 
 fn mangle_scalar(ty: &Ty) -> String {
@@ -346,33 +361,70 @@ fn emit_instruction(
             )?;
             out.push_str(&format!("    {} = {code};\n", value_name(*dst)));
         }
-        IrInstr::Aggregate { dst, kind, fields, ty } => {
-            let Ty::List(element) = ty else { return Err(()) };
-            if !list_element_supported(element) || (kind != "collection" && !kind.starts_with("empty_")) {
-                return Err(());
+        IrInstr::Aggregate { dst, kind, fields, ty } => match ty {
+            Ty::List(element) => {
+                if !list_element_supported(element) || (kind != "collection" && !kind.starts_with("empty_")) {
+                    return Err(());
+                }
+                let element_c = c_type(element)?;
+                let list_name = format!("List_{}", mangle_scalar(element));
+                let values = fields
+                    .iter()
+                    .map(|value| {
+                        if value_ty(values, *value)? != **element {
+                            return Err(());
+                        }
+                        value_code(values, *value)
+                    })
+                    .collect::<Bail<Vec<_>>>()?;
+                let source = if values.is_empty() {
+                    "NULL".to_string()
+                } else {
+                    format!("({element_c}[]){{ {} }}", values.join(", "))
+                };
+                out.push_str(&format!(
+                    "    {} = {list_name}_new_from_array({source}, {});\n",
+                    value_name(*dst),
+                    values.len()
+                ));
             }
-            let element_c = c_type(element)?;
-            let list_name = format!("List_{}", mangle_scalar(element));
-            let values = fields
-                .iter()
-                .map(|value| {
+            Ty::Set(element) => {
+                if !set_supported(element) || (kind != "collection" && !kind.starts_with("empty_")) {
+                    return Err(());
+                }
+                let set_name = format!("Set_{}", mangle_scalar(element));
+                out.push_str(&format!("    {} = {set_name}_new();\n", value_name(*dst)));
+                for value in fields {
                     if value_ty(values, *value)? != **element {
                         return Err(());
                     }
-                    value_code(values, *value)
-                })
-                .collect::<Bail<Vec<_>>>()?;
-            let source = if values.is_empty() {
-                "NULL".to_string()
-            } else {
-                format!("({element_c}[]){{ {} }}", values.join(", "))
-            };
-            out.push_str(&format!(
-                "    {} = {list_name}_new_from_array({source}, {});\n",
-                value_name(*dst),
-                values.len()
-            ));
-        }
+                    out.push_str(&format!(
+                        "    {set_name}_add({}, {});\n",
+                        value_name(*dst),
+                        value_code(values, *value)?
+                    ));
+                }
+            }
+            Ty::Map(key, value) => {
+                if !map_supported(key, value) || (kind != "map" && !kind.starts_with("empty_")) || fields.len() % 2 != 0 {
+                    return Err(());
+                }
+                let map_name = format!("Map_{}_{}", mangle_scalar(key), mangle_scalar(value));
+                out.push_str(&format!("    {} = {map_name}_new();\n", value_name(*dst)));
+                for pair in fields.chunks_exact(2) {
+                    if value_ty(values, pair[0])? != **key || value_ty(values, pair[1])? != **value {
+                        return Err(());
+                    }
+                    out.push_str(&format!(
+                        "    {map_name}_set({}, {}, {});\n",
+                        value_name(*dst),
+                        value_code(values, pair[0])?,
+                        value_code(values, pair[1])?
+                    ));
+                }
+            }
+            _ => return Err(()),
+        },
         IrInstr::Index { dst, object, index, ty } => {
             let Ty::List(element) = value_ty(values, *object)? else { return Err(()) };
             if !list_element_supported(&element) || value_ty(values, *index)? != Ty::Int || *ty != *element {
@@ -393,21 +445,55 @@ fn emit_instruction(
             args,
             ty,
         } => {
-            let Ty::List(element) = value_ty(values, *receiver)? else { return Err(()) };
-            if !list_element_supported(&element) {
-                return Err(());
-            }
-            let list_name = format!("List_{}", mangle_scalar(&element));
+            let receiver_ty = value_ty(values, *receiver)?;
             let receiver = value_code(values, *receiver)?;
-            let call = match method.as_str() {
-                "length" | "count" if args.is_empty() && *ty == Ty::Int => {
-                    format!("{list_name}_length({receiver})")
+            let call = match receiver_ty {
+                Ty::List(element) if list_element_supported(&element) => {
+                    let list_name = format!("List_{}", mangle_scalar(&element));
+                    match method.as_str() {
+                        "length" | "count" if args.is_empty() && *ty == Ty::Int => {
+                            format!("{list_name}_length({receiver})")
+                        }
+                        "push" if args.len() == 1 && *ty == Ty::Void && value_ty(values, args[0])? == *element => {
+                            format!("{list_name}_push({receiver}, {})", value_code(values, args[0])?)
+                        }
+                        "remove_at" if args.len() == 1 && *ty == *element && value_ty(values, args[0])? == Ty::Int => {
+                            format!("{list_name}_remove_at({receiver}, {})", value_code(values, args[0])?)
+                        }
+                        _ => return Err(()),
+                    }
                 }
-                "push" if args.len() == 1 && *ty == Ty::Void && value_ty(values, args[0])? == *element => {
-                    format!("{list_name}_push({receiver}, {})", value_code(values, args[0])?)
+                Ty::Map(key, value) if map_supported(&key, &value) => {
+                    let map_name = format!("Map_{}_{}", mangle_scalar(&key), mangle_scalar(&value));
+                    match method.as_str() {
+                        "contains_key" if args.len() == 1 && *ty == Ty::Bool && value_ty(values, args[0])? == *key => {
+                            format!("{map_name}_contains_key({receiver}, {})", value_code(values, args[0])?)
+                        }
+                        "count" if args.is_empty() && *ty == Ty::Int => format!("{map_name}_count({receiver})"),
+                        "set" if args.len() == 2 && *ty == Ty::Void && value_ty(values, args[0])? == *key && value_ty(values, args[1])? == *value => {
+                            format!("{map_name}_set({receiver}, {}, {})", value_code(values, args[0])?, value_code(values, args[1])?)
+                        }
+                        "keys" if args.is_empty() && *ty == Ty::List(key.clone()) => {
+                            format!("{map_name}_keys({receiver})")
+                        }
+                        "values" if args.is_empty() && *ty == Ty::List(value.clone()) => {
+                            format!("{map_name}_values({receiver})")
+                        }
+                        _ => return Err(()),
+                    }
                 }
-                "remove_at" if args.len() == 1 && *ty == *element && value_ty(values, args[0])? == Ty::Int => {
-                    format!("{list_name}_remove_at({receiver}, {})", value_code(values, args[0])?)
+                Ty::Set(element) if set_supported(&element) => {
+                    let set_name = format!("Set_{}", mangle_scalar(&element));
+                    match method.as_str() {
+                        "contains" if args.len() == 1 && *ty == Ty::Bool && value_ty(values, args[0])? == *element => {
+                            format!("{set_name}_contains({receiver}, {})", value_code(values, args[0])?)
+                        }
+                        "add" | "remove" if args.len() == 1 && *ty == Ty::Void && value_ty(values, args[0])? == *element => {
+                            format!("{set_name}_{method}({receiver}, {})", value_code(values, args[0])?)
+                        }
+                        "count" if args.is_empty() && *ty == Ty::Int => format!("{set_name}_count({receiver})"),
+                        _ => return Err(()),
+                    }
                 }
                 _ => return Err(()),
             };
@@ -491,13 +577,13 @@ fn emit_instruction(
             out.push_str("    else { abort(); }\n");
         }
         IrInstr::Retain { value } => {
-            if !matches!(value_ty(values, *value)?, Ty::String | Ty::List(_)) {
+            if !matches!(value_ty(values, *value)?, Ty::String | Ty::List(_) | Ty::Map(_, _) | Ty::Set(_)) {
                 return Err(());
             }
             out.push_str(&format!("    ostrin_retain((void*){});\n", value_code(values, *value)?));
         }
         IrInstr::Release { value } => {
-            if !matches!(value_ty(values, *value)?, Ty::String | Ty::List(_)) {
+            if !matches!(value_ty(values, *value)?, Ty::String | Ty::List(_) | Ty::Map(_, _) | Ty::Set(_)) {
                 return Err(());
             }
             out.push_str(&format!("    ostrin_release((void*){});\n", value_code(values, *value)?));
@@ -568,9 +654,9 @@ fn emit_terminator(
     Ok(())
 }
 
-/// Emits an IR function when all of its values use a supported scalar/list
-/// representation and its CFG can be represented with ordinary C labels and
-/// gotos.
+/// Emits an IR function when all of its values use a supported scalar or
+/// collection representation and its CFG can be represented with ordinary C
+/// labels and gotos.
 pub fn generate(function: &IrFunction, known_functions: &HashSet<String>) -> Option<String> {
     if function.entry >= function.blocks.len()
         || function

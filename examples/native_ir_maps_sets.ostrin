@@ -1,0 +1,37 @@
+fn map_count(scores: Map<String, Int>) -> Int {
+    scores.count()
+}
+
+fn set_count(values: Set<String>) -> Int {
+    values.count()
+}
+
+fn main() -> Void {
+    mut scores = ["ann": 3, "bob": 5]
+    scores.set("ann", 4)
+    scores.set("cara", 6)
+    print(scores.count())
+    print(scores.contains_key("bob"))
+    print(scores.contains_key("zed"))
+    print(scores.keys().length())
+    print(scores.values().length())
+
+    mut empty: Map<String, Int> = Map<String, Int>()
+    empty.set("only", 1)
+    print(empty.count())
+    print(map_count(scores))
+    print(scores.count())
+
+    mut seen = {"a", "b", "a"}
+    seen.add("c")
+    seen.remove("b")
+    print(seen.count())
+    print(seen.contains("a"))
+    print(seen.contains("b"))
+
+    mut empty_set: Set<String> = Set<String>()
+    empty_set.add("z")
+    print(empty_set.count())
+    print(set_count(seen))
+    print(seen.count())
+}

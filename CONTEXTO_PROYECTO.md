@@ -4928,3 +4928,27 @@ ejecutan `--leak-check` con `live_allocations=0`. La suite queda en **6 pruebas 
 
 Mapas, sets, combinadores, listas de records y ownership de llamadas que transfieren alias
 siguen deliberadamente en el fallback verificado; son el siguiente bloque de colecciones.
+
+## 186. Núcleo escalar de `Map`/`Set` consumido desde la IR — 2026-09-20
+
+La siguiente porción migra a `ir_c.rs` las colecciones hash cuyos elementos son escalares
+(`Int`, `Float`, `Float32`, `Bool`, `String` o enteros de ancho fijo). El emisor C ya
+materializa los tipos monomorfizados `Map_<K>_<V>*` y `Set_<T>*` que genera el runtime y
+consume estas operaciones:
+
+- literales y colecciones vacías mediante los constructores nativos;
+- parámetros prestados y llamadas a funciones que reciben mapas o conjuntos;
+- `set`, `add`, `remove`, `contains_key`, `contains` y `count`;
+- `keys()` y `values()`, cuyos resultados vuelven al núcleo de listas escalares.
+
+Los helpers de hash retienen las claves y valores gestionados al almacenarlos, por lo que el
+lowering de ownership no inserta un `retain` duplicado antes de un agregado. Los releases de
+los valores fuente se colocan después de los agregados y métodos de transferencia; los
+destructores tipados de `Map`/`Set` liberan sus buffers y sus strings hijas. La prueba
+`examples/native_ir_maps_sets.ostrin` compara intérprete y binario nativo, exige que los tres
+cuerpos se emitan desde la IR y comprueba `--leak-check` con `live_allocations=0`. La suite
+queda en **6 pruebas diferenciales y 153 de integración verdes**.
+
+Los lookups `get`/`remove` que devuelven `Option`, listas de records y valores compuestos aún
+conservan el fallback HIR/AST; migrar la representación estructural de `Option` a esta misma
+IR es el siguiente paso.
