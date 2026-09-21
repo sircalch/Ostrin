@@ -5141,3 +5141,11 @@ Ejemplos `native_ir_branch_merge`, `native_ir_break_continue`, `rem_operator`; l
 
 Siguiente: liveness entre bloques en el pase de ownership (liberación en aristas) para quitar
 las compuertas (1) y (2); después `for` sobre rangos.
+
+## 195. Workflow de release multiplataforma — 2026-09-20
+
+`.github/workflows/release.yml`: al empujar una etiqueta `v*` (o lanzarlo a mano) compila y
+prueba `ostrinc` en Linux x86_64, macOS arm64 y Windows x64, empaqueta el binario con
+`LICENSE`, `README.md` y `examples/`, genera `*.sha256` y, solo con etiqueta, publica una
+release con `gh release create --generate-notes`. No se ha publicado ninguna release desde
+esta sesión; el workflow queda listo para la primera etiqueta que decida el mantenedor.
