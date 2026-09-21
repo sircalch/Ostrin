@@ -5512,3 +5512,25 @@ La Fase D inicial queda implementada sobre evidencia existente, sin simular una 
 Se preservaron el logo, los estilos, el playground, la infraestructura de Pages y las superficies
 existentes. Quedan para el siguiente bloque el tutorial guiado y una mejora de diagnósticos/learning
 funnel, además de ampliar la experiencia científica solo cuando las APIs reales lo soporten.
+
+## 217. Ruta guiada de aprendizaje — 2026-09-21
+
+La documentación pública deja de ser únicamente un índice de decisiones y ahora ofrece una primera
+ruta de aprendizaje enlazada con evidencia del repositorio:
+
+- `website/docs.html` añade catorce pasos, desde ejecutar Ostrin y sus fundamentos hasta colecciones,
+  records/enums, `Option`/`Result`, patrones, cantidades, estadística, concurrencia, paquetes,
+  compilación nativa y un proyecto completo. Cada paso apunta a un ejemplo real, una sección de
+  referencia, el playground o el showcase; no se inventan capítulos para capacidades ausentes.
+- Las etiquetas `available` y `early` distinguen lo que ya tiene una superficie ejecutable y lo que
+  existe pero aún necesita una historia de tutorial o distribución más madura. El texto explica cómo
+  usar cada paso y conserva la advertencia de que el estado describe implementación actual.
+- El CSS mantiene la composición visual del sitio, añade una cuadrícula responsive para la ruta y
+  conserva el comportamiento de una columna en pantallas pequeñas. El showcase expone anclas
+  estables para las tarjetas de cantidades y tablas.
+- `scripts/website-check.mjs` comprueba la sección guiada, las fuentes clave y los enlaces de
+  referencia. El check completo queda en **9 páginas públicas**, y la suite del compilador sigue en
+  **6 diferenciales, 176 integraciones y 2 unitarias** en verde.
+
+La mejora se limita a documentación respaldada por código existente; los diagnósticos enriquecidos y
+la distribución instalable quedan como el siguiente incremento del learning funnel.

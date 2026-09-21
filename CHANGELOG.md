@@ -15,6 +15,9 @@
   explicit maturity labels and links to protecting compiler tests.
 - Added `community.html`, a good-first-contribution path, GitHub issue/PR templates and a proposed
   label taxonomy without claiming external chat, Discussions, registry users or community projects.
+- Added a 14-step guided learning path to `docs.html`, linking each chapter to real examples, language
+  reference anchors, the browser playground or the verified showcase; `available` and `early` labels
+  make current implementation maturity explicit.
 
 ### Language and libraries
 - Standard library written in Ostrin and embedded in the compiler: `import std.math`, `std.lists`,

@@ -49,6 +49,15 @@ check(homepage.includes('id="try-ostrin"'), "index.html: missing homepage playgr
 check(homepage.includes('type="module" src="playground.js"'), "index.html: missing real playground module");
 check(homepage.includes('data-site-value="examples"'), "index.html: missing centralized project facts");
 
+const docs = read("website/docs.html");
+check(docs.includes('id="learn"'), "docs.html: missing guided learning path");
+for (const marker of ["examples/hello.ostrin", "examples/collections.ostrin", "examples/option_result.ostrin", "examples/statistics.ostrin", "examples/match_nested.ostrin"]) {
+  check(docs.includes(marker), `docs.html: missing learning source ${marker}`);
+}
+for (const marker of ["language.html#quantities", "language.html#errors", "language.html#concurrency", "showcase.html#tables"]) {
+  check(docs.includes(`href="${marker}"`), `docs.html: missing learning link ${marker}`);
+}
+
 const examples = read("website/examples.html");
 check(examples.includes('type="module" src="playground.js"'), "examples.html: missing live example module");
 for (const key of ["quantities", "standard", "records", "concurrency"]) {

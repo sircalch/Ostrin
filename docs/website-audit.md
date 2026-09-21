@@ -72,3 +72,7 @@ GitHub Pages architecture while making the next public claims evidence-based.
 - `website/community.html`, `CONTRIBUTING.md`, issue templates, the pull-request template and
   `docs/community-labels.md` prepare contribution without asserting that unverified channels or
   external projects exist.
+- `website/docs.html` now contains a 14-step guided learning path from first run through real projects.
+  It links to source-backed examples and existing reference/playground/showcase surfaces, labels
+  concurrency/packages/native compilation as early where the implementation or distribution story is
+  still growing, and is covered by `scripts/website-check.mjs`.

@@ -3,7 +3,7 @@
 *Corte: 2026-09-21 · rama `main` · 6 pruebas diferenciales, 176 de integración y 2 unitarias en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
-Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–214); para el diseño
+Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–217); para el diseño
 del lenguaje, `docs/design/` (22 documentos). La auditoría del sitio vive en
 `docs/website-audit.md`.
 
@@ -284,7 +284,9 @@ El catálogo ya tiene demos live para cantidades, biblioteca estándar, records/
 con Run/Check/Reset/Copy sobre el mismo módulo WASM. CI valida ahora enlaces, metadata, sitemap,
 robots y el artefacto WASM generado por Pages. `showcase.html` expone programas source-backed de
 cantidades, tablas, SVG y autodiff; `community.html` y las plantillas de GitHub preparan la
-contribución sin inventar canales externos. Siguiente: tutorial guiado y mejora de diagnósticos.
+contribución sin inventar canales externos. `docs.html` añade una ruta guiada de 14 pasos con
+enlaces a fuentes, referencia, playground y showcase; los pasos distinguen `available` de `early`
+sin prometer capacidades no implementadas. Siguiente: mejora de diagnósticos y del learning funnel.
 La gramática para Linguist queda separada porque requiere uso público suficiente.
 
 ---
