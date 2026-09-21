@@ -30,7 +30,7 @@ Implementación: compilador + intérprete + herramientas de editor, todo en Rust
 | Léxico / parser | `lexer/`, `parser/mod.rs` | Tokens, AST con rangos de origen |
 | Módulos y paquetes | `modules.rs`, `package.rs`, `ostrin.toml` | Imports, `--project`, dependencias locales y lockfile portable |
 | Verificador de tipos | `typeck/mod.rs` (~3 500 l.) | Tipos, dimensiones, traits, exhaustividad, genéricos |
-| HIR/IR | `hir.rs`, `hir_c.rs`, `ir.rs`, `ir_c.rs` | HIR verificado, CFG con temporales explícitos y emisor C desde IR para escalares, `String`, `Result<Int, String>`/`Result<Float, String>` con `try`, records concretos, `Option<Record>`, listas escalares, mapas/conjuntos escalares, enteros de ancho fijo y control de flujo, con fallback HIR/AST acotado |
+| HIR/IR | `hir.rs`, `hir_c.rs`, `ir.rs`, `ir_c.rs` | HIR verificado, CFG con temporales explícitos y emisor C desde IR para escalares, `String`, `Result<Int, String>`/`Result<Float, String>` con `try` y `try catch` inline, records concretos, `Option<Record>`, listas escalares, mapas/conjuntos escalares, enteros de ancho fijo y control de flujo, con fallback HIR/AST acotado |
 | Intérprete | `interpreter/mod.rs` | Ejecución tree‑walking y scheduler cooperativo; referencia semántica |
 | Servidor de lenguaje | `lsp.rs`, `symbols.rs`, `protocol.rs` | LSP sobre stdio |
 | Adaptador de depuración | `dap.rs` + hooks del intérprete | DAP sobre stdio |
@@ -130,8 +130,9 @@ La misma ruta ya cubre la familia escalar de `Result`: `String.to_int()` y `to_f
 de variantes, `is_ok`, `is_err`, `unwrap_or`, `ok` y `try` sin `catch`. La rama de error construye
 el `Result` de retorno y termina la función; la de éxito extrae el payload. El discriminante se
 conserva en el path del binding y el ownership libera condicionalmente el payload activo.
-`try catch`, combinadores y payloads compuestos de `Result` siguen en HIR/AST hasta tener el
-mismo contrato.
+`try catch` con lambda inline ya expande el handler en la rama de error y retorna un `Err` del
+tipo envolvente; combinadores y payloads compuestos de `Result` siguen en HIR/AST hasta tener
+el mismo contrato.
 
 El runtime C generado centraliza las reservas en `ostrin_alloc`/`ostrin_calloc`/
 `ostrin_realloc`, registra cada bloque y lo libera mediante `atexit` al terminar el
@@ -160,13 +161,15 @@ complejos, los patrones anidados, los payloads gestionados dentro de `Option` qu
 - Records (heap, por referencia) y enums (unión etiquetada por valor), ambos genéricos;
   métodos estáticos y genéricos; métodos por defecto de traits.
 - `dyn Trait` con vtable real (único punto de despacho en tiempo de ejecución).
-- `List/Map/Set/Option/Result`, combinadores con lambdas expandidas en línea, `try`.
+- `List/Map/Set/Option/Result`, combinadores con lambdas expandidas en línea, `try` y `try catch`
+  inline para `Result` escalar con error `String`.
 - Funciones genéricas monomorfizadas por uso: sus instancias concretas elegibles también
   pueden generar el cuerpo desde el HIR ya especializado (`identity<T>`, `List<T>`,
   `Option<T>` y métodos estructurales), manteniendo AST como fallback para familias no migradas.
 - `Option`/`Result` estructurales también se generan desde HIR: `Some`/`None`, `Ok`/`Err`,
   `match`, `is_some`/`is_none`, `is_ok`/`is_err`, `unwrap`, `unwrap_or`, `ok`/`ok_or` y
-  propagación con `try`; los combinadores con lambdas y `catch` siguen usando el fallback AST.
+  propagación con `try`; `try catch` con lambda inline ya usa IR para `Result` escalar y los
+  combinadores, handlers no inline y payloads compuestos siguen usando el fallback AST.
 - `Quantity` (dimensión estática, unidad como cadena en ejecución) e `impl` sobre cantidades.
 - Operadores de usuario, `derive(Eq/Ord)`, `Ordering` incorporado.
 - `print` de records, enums, listas, mapas, sets, `Option`, `Result` (mismo formato que el intérprete).
@@ -193,7 +196,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Chequeo «movido tras enviar» (E1101) | Integrado por defecto en `--check`, `--run`, `--emit-c` y `--compile`; `--ownership-check` conserva el informe explícito |
 | Paralelismo nativo (`--native-threads`, canales bloqueantes, `select`) | Hilos del SO, mutexes/condiciones, canales bloqueantes y `select(List<Channel<T>>)` implementados de forma opt-in; `select` conserva prioridad determinista y cede el hilo nativo entre intentos; `Task.cancel()` cancela pendientes, propaga a grupos activos de `spawn_scope` o solicita cancelación a tareas `Running`, observada en checkpoints seguros; `receive()` vuelve periódicamente al runtime sin conservar el mutex durante el checkpoint |
 | Memoria en nativo | Registro, destructores tipados para records/colecciones y entornos de tareas, `clone`/`drop`, cleanup automático de locales directos, bloques anidados, ramas, loops y cancelación de tareas en AST/HIR, y `--leak-check`; `String`, `String.split/lines`, `Result<Int, String>`, `Result<Float, String>`, records concretos, `Option<Record>`, listas escalares/String, mapas/conjuntos escalares y `Option<String>` ya consumen ownership desde IR, pero ARC completa de agregados sigue pendiente |
-| IR de bloques | HIR→CFG disponible con `--ir`; el emisor C cubre ramas, bucles escalares con `phi`, `String` (incluidos `split/lines`), `Result` escalar de parseo con `match`/consultas y `try` sin `catch`, records concretos con campos anidados, `Option<Record>`, listas escalares/String, operaciones hash escalares y `Option` escalar/String con patrones `Some/None`; `for`/iteradores, `try catch`, combinadores, patrones anidados y colecciones complejas aún no reemplazan el backend C completo |
+| IR de bloques | HIR→CFG disponible con `--ir`; el emisor C cubre ramas, bucles escalares con `phi`, `String` (incluidos `split/lines`), `Result` escalar de parseo con `match`/consultas, `try` y `try catch` inline, records concretos con campos anidados, `Option<Record>`, listas escalares/String, operaciones hash escalares y `Option` escalar/String con patrones `Some/None`; `for`/iteradores, combinadores, handlers no inline, patrones anidados y colecciones complejas aún no reemplazan el backend C completo |
 | Ownership/último uso | `--ownership-report`, `--ownership-check` y `--ownership-ir`; la IR ya inserta y consume retain/release lineal para `String`, `Result` con payload `String`, records concretos, `Option<Record>`, listas escalares/String, mapas/conjuntos escalares y `Option<String>`, con transferencia en `Phi` simples y liberación de `Phi` de bucle en backedges probados; los buffers temporales de `split/lines` transfieren y liberan sus strings, y `Result` libera condicionalmente `value`/`error`; `Option` escalar es por valor, mientras llamadas transferentes no lineales, agregados complejos, scopes y escapes siguen conservadores |
 | Biblioteca estándar | Mínima: `args`, entorno/rutas, `format`, E/S y `hash` estructural para escalares, colecciones y tipos con `derive(Hash)`; faltan fechas, JSON y red |
 | Mensajes de error de E/S | `strerror` ≠ texto de Rust (difieren entre backends) |

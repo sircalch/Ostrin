@@ -151,6 +151,11 @@ pub enum IrInstr {
         value: ValueId,
         ty: Ty,
     },
+    TryErrorValue {
+        dst: ValueId,
+        value: ValueId,
+        ty: Ty,
+    },
     Spawn {
         dst: ValueId,
         region: BlockId,
@@ -1118,12 +1123,30 @@ impl Builder {
                 let left = self.lower_expr(left);
                 let right = self.lower_expr(right);
                 let dst = self.fresh();
+                // Handler lambdas can introduce a parameter whose type is
+                // known to the enclosing `Result`, while the HIR expression
+                // itself still carries `Unknown`. Recover the scalar result
+                // here so the native emitter can keep the handler in IR.
+                let ty = if expression.ty != Ty::Unknown {
+                    expression.ty.clone()
+                } else {
+                    let left_ty = self.known_value_type(left).unwrap_or(Ty::Unknown);
+                    let right_ty = self.known_value_type(right).unwrap_or(Ty::Unknown);
+                    match op {
+                        BinOp::Eq | BinOp::NotEq | BinOp::Lt | BinOp::Gt | BinOp::LtEq | BinOp::GtEq
+                            if left_ty == right_ty && left_ty != Ty::Unknown => Ty::Bool,
+                        BinOp::Add if left_ty == Ty::String && right_ty == Ty::String => Ty::String,
+                        BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Rem
+                            if left_ty == right_ty && left_ty != Ty::Unknown => left_ty,
+                        _ => Ty::Unknown,
+                    }
+                };
                 self.emit(IrInstr::Binary {
                     dst,
                     op: *op,
                     left,
                     right,
-                    ty: expression.ty.clone(),
+                    ty,
                 });
                 dst
             }
@@ -1387,17 +1410,47 @@ impl Builder {
 
         self.current = catch_block;
         let catch_incoming = if let Some(handler) = handler {
-            let caught = self.lower_expr(handler);
-            let catch_predecessor = self.current;
-            let catch_open = !self.terminated();
-            if catch_open {
-                self.terminate(IrTerminator::Goto(merge_block));
-            }
-            if catch_open {
-                Some((catch_predecessor, caught))
+            let error_ty = match self.known_value_type(value) {
+                Some(Ty::Applied(name, args)) if name == "Result" && args.len() == 2 => args[1].clone(),
+                _ => Ty::Unknown,
+            };
+            let error = self.fresh();
+            self.emit(IrInstr::TryErrorValue {
+                dst: error,
+                value,
+                ty: error_ty,
+            });
+            let mapped = if let HirKind::Lambda(params, body) = &handler.kind {
+                if let Some(parameter) = params.first() {
+                    self.locals.push(HashMap::new());
+                    self.locals
+                        .last_mut()
+                        .expect("handler scope")
+                        .insert(parameter.clone(), error);
+                    let mapped = match self.lower_block(body) {
+                        Some(mapped) => mapped,
+                        None if self.terminated() => self.fresh(),
+                        None => self.unit(),
+                    };
+                    self.locals.pop();
+                    mapped
+                } else {
+                    self.lower_expr(handler)
+                }
             } else {
-                None
+                self.lower_expr(handler)
+            };
+            if !self.terminated() {
+                let propagated = self.fresh();
+                self.emit(IrInstr::Call {
+                    dst: Some(propagated),
+                    callee: "Err".to_string(),
+                    args: vec![mapped],
+                    ty: self.function.ret.clone(),
+                });
+                self.terminate(IrTerminator::Return(Some(propagated)));
             }
+            None
         } else {
             let propagated = self.fresh();
             self.emit(IrInstr::TryError {
@@ -1464,6 +1517,7 @@ fn defined_value_type(instruction: &IrInstr) -> Option<(ValueId, Ty)> {
         | IrInstr::PatternBind { dst, ty, .. }
         | IrInstr::TryValue { dst, ty, .. }
         | IrInstr::TryError { dst, ty, .. }
+        | IrInstr::TryErrorValue { dst, ty, .. }
         | IrInstr::Spawn { dst, ty, .. }
         | IrInstr::ChannelNew { dst, ty, .. }
         | IrInstr::ChannelReceive { dst, ty, .. }
@@ -1712,6 +1766,7 @@ fn display_instruction(instruction: &IrInstr) -> String {
         IrInstr::TryCheck { dst, value } => format!("%{dst} = try_check %{value}"),
         IrInstr::TryValue { dst, value, .. } => format!("%{dst} = try_value %{value}"),
         IrInstr::TryError { dst, value, .. } => format!("%{dst} = try_error %{value}"),
+        IrInstr::TryErrorValue { dst, value, .. } => format!("%{dst} = try_error_value %{value}"),
         IrInstr::Spawn {
             dst,
             region,

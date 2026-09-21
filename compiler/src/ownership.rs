@@ -425,7 +425,8 @@ fn safe_release_site(instruction: &IrInstr) -> bool {
         | IrInstr::PatternBind { .. }
         | IrInstr::TryCheck { .. }
         | IrInstr::TryValue { .. }
-        | IrInstr::TryError { .. } => true,
+        | IrInstr::TryError { .. }
+        | IrInstr::TryErrorValue { .. } => true,
         // Ordinary function parameters borrow reference-like values for the
         // duration of the call; the caller can therefore release its last
         // local ownership after any direct call. `Some` is included here as
@@ -452,6 +453,8 @@ fn safe_release_site(instruction: &IrInstr) -> bool {
                 | "to_float"
                 | "contains_key"
                 | "get"
+                | "is_ok"
+                | "is_err"
                 | "is_some"
                 | "is_none"
                 | "set"
@@ -663,7 +666,8 @@ fn alias_destination(instruction: &IrInstr) -> Option<(ValueId, Ty)> {
         IrInstr::Field { dst, ty, .. }
         | IrInstr::Index { dst, ty, .. }
         | IrInstr::PatternBind { dst, ty, .. }
-        | IrInstr::TryValue { dst, ty, .. } => Some((*dst, ty.clone())),
+        | IrInstr::TryValue { dst, ty, .. }
+        | IrInstr::TryErrorValue { dst, ty, .. } => Some((*dst, ty.clone())),
         _ => None,
     }
 }
@@ -755,6 +759,7 @@ fn defined_value(instruction: &IrInstr) -> Option<(ValueId, Ty)> {
         | IrInstr::PatternBind { dst, ty, .. }
         | IrInstr::TryValue { dst, ty, .. }
         | IrInstr::TryError { dst, ty, .. }
+        | IrInstr::TryErrorValue { dst, ty, .. }
         | IrInstr::Spawn { dst, ty, .. }
         | IrInstr::ChannelNew { dst, ty, .. }
         | IrInstr::ChannelReceive { dst, ty, .. }
@@ -789,7 +794,10 @@ fn used_values(instruction: &IrInstr) -> Vec<ValueId> {
         IrInstr::IterInit { source, .. } => vec![*source],
         IrInstr::IterHasNext { iter, .. } | IrInstr::IterNext { iter, .. } => vec![*iter],
         IrInstr::PatternTest { subject, .. } | IrInstr::PatternBind { subject, .. } => vec![*subject],
-        IrInstr::TryCheck { value, .. } | IrInstr::TryValue { value, .. } | IrInstr::TryError { value, .. } => vec![*value],
+        IrInstr::TryCheck { value, .. }
+        | IrInstr::TryValue { value, .. }
+        | IrInstr::TryError { value, .. }
+        | IrInstr::TryErrorValue { value, .. } => vec![*value],
         IrInstr::Spawn { .. } => Vec::new(),
         IrInstr::ChannelNew { capacity, .. } => capacity.iter().copied().collect(),
         IrInstr::ChannelSend { channel, value } => vec![*channel, *value],

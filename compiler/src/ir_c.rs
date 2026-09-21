@@ -162,6 +162,7 @@ fn defined_value(instruction: &IrInstr) -> Option<(ValueId, Ty)> {
         | IrInstr::PatternBind { dst, ty, .. }
         | IrInstr::TryValue { dst, ty, .. }
         | IrInstr::TryError { dst, ty, .. }
+        | IrInstr::TryErrorValue { dst, ty, .. }
         | IrInstr::Spawn { dst, ty, .. }
         | IrInstr::ChannelNew { dst, ty, .. }
         | IrInstr::ChannelReceive { dst, ty, .. }
@@ -536,6 +537,17 @@ fn emit_instruction(
                 }
                 _ => return Err(()),
             }
+        }
+        IrInstr::TryErrorValue { dst, value, ty } => {
+            let Ty::Applied(name, args) = value_ty(values, *value)? else { return Err(()) };
+            if name != "Result" || args.len() != 2 || *ty != args[1] || !result_supported(&args[0], &args[1], records) {
+                return Err(());
+            }
+            out.push_str(&format!(
+                "    {} = ({}).error;\n",
+                value_name(*dst),
+                value_code(values, *value)?
+            ));
         }
         IrInstr::Aggregate {
             dst,

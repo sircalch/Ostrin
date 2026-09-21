@@ -1551,7 +1551,7 @@ fn native_hir_handles_option_result_core() {
         ("native_option.ostrin", 2usize),
         ("native_hir_option_locals.ostrin", 1usize),
         ("native_result.ostrin", 6usize),
-        ("native_result_catch.ostrin", 2usize),
+        ("native_result_catch.ostrin", 3usize),
         ("try_result.ostrin", 5usize),
     ] {
         let report = run(&["--native-type-report", &example_path(file)]);
@@ -1913,7 +1913,7 @@ fn native_ir_string_methods_cross_block_ownership_and_short_circuit() {
     for (file, expected, minimum_ir) in [
         ("native_ir_string_methods.ostrin", "OSTRIN!\nmixed\na+b+c\n0\n30\n5\ntrue\n4\n2\n", 3usize),
         ("native_ir_string_results.ostrin", "41\nfalse\n0\n3.25\nfalse\n0\ntrue\ntrue\n9\n7\n8\n", 3usize),
-        ("native_ir_try_strings.ostrin", "VALUE!\nFAILURE\n", 5usize),
+        ("native_ir_try_strings.ostrin", "VALUE!\ntrue\nrecovered: FAILURE\n", 5usize),
         ("native_ir_cross_block_ownership.ostrin", "item-x\nitem-x!\n9\n2\n4\n24\n", 7usize),
         ("short_circuit.ostrin", "false\ntrue\ntrue\nfalse\n", 3usize),
         ("native_ir_param_ownership.ostrin", "abcd\nabcd\n", 3usize),

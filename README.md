@@ -52,7 +52,8 @@ support named/default arguments, scalar and `String` collection lookups preserve
 through the native IR path; concrete records and simple `Option<Record>` values
 now use the same IR path with ownership markers, and record fields are checked
 statically. `String.to_int()` and `to_float()` now also lower through the IR as
-scalar `Result` values, including `Ok`/`Err` matching, core queries and `try` propagation.
+scalar `Result` values, including `Ok`/`Err` matching, core queries, `try` propagation and
+inline `try catch` handlers.
 The CLI also exposes JSON Lines
 diagnostics with source locations for editor integrations, plus a compiler
 index of type members, local bindings and inferred expression types for editor

@@ -5333,11 +5333,14 @@ el payload de una función con el wrapper que debe retornar.
 
 La transferencia de ownership acompaña ambos caminos: `TryValue` retiene un payload gestionado
 prestado antes de liberar el wrapper fuente, mientras `TryError` retiene el error activo antes de
-liberar el `Result` fuente. `examples/native_ir_try_strings.ostrin` verifica los dos caminos con
-`Result<String,String>` y strings dinámicos; el intérprete y el binario nativo imprimen `VALUE!`
-y `FAILURE`, y el binario termina con `live_allocations=0`.
+liberar el `Result` fuente. `try catch` inline añade `TryErrorValue`, baja el handler con su
+parámetro ligado al error y construye el `Err` del tipo envolvente. `examples/native_ir_try_strings.ostrin`
+verifica propagación, consulta `is_err` y recuperación con `Result<String,String>` y strings
+dinámicos; el intérprete y el binario nativo imprimen `VALUE!`, `true` y `recovered: FAILURE`,
+y el binario termina con `live_allocations=0`.
 
 `native_result.ostrin` pasó de 4 funciones IR + 2 HIR a **6 funciones generadas desde IR**;
-`try_result.ostrin` conserva el fallback únicamente para su `catch` y mantiene paridad. La
-suite sigue en **6 diferenciales, 170 de integración y 2 unitarias**. La siguiente frontera es
-migrar `try catch`, combinadores de `Result` y payloads compuestos con el mismo contrato.
+`native_result_catch.ostrin` ya genera sus 3 funciones desde IR y `try_result.ostrin` conserva
+solo un fallback no relacionado con la propagación. La suite sigue en **6 diferenciales, 170
+de integración y 2 unitarias**. La siguiente frontera es migrar combinadores de `Result`,
+handlers no inline y payloads compuestos con el mismo contrato.

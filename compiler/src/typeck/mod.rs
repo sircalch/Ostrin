@@ -1736,11 +1736,11 @@ impl Checker {
                             );
                         }
                         if let Some(catch_expr) = catch {
-                            let catch_ty = self.infer_expr(catch_expr, scope);
                             let expected_catch = Ty::Fn(
                                 vec![args[1].clone()],
                                 Box::new(expected_args[1].clone()),
                             );
+                            let catch_ty = self.infer_expr_with_expected(catch_expr, Some(&expected_catch), scope);
                             if !compatible(&expected_catch, &catch_ty) {
                                 self.push(
                                     "E1041",

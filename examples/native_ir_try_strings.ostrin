@@ -16,12 +16,18 @@ fn propagate() -> Result<String, String> {
     Ok(value)
 }
 
+fn recover() -> Result<String, String> {
+    value = try fail() catch fn(error) { "recovered: " + error }
+    Ok(value)
+}
+
 fn main() -> Void {
     match extract() {
         Ok(value) => print(value),
         Err(error) => print(error),
     }
-    match propagate() {
+    print(propagate().is_err())
+    match recover() {
         Ok(value) => print(value),
         Err(error) => print(error),
     }
