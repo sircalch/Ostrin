@@ -58,8 +58,10 @@ ostrinc --project path/to/project
   lockfile. Una compilación normal sigue sin efectos de red.
 - Si existe `ostrin.lock`, la resolución lo lee: una dependencia debe conservar su fuente, URL,
   ratchet, ruta y versión fijados. Los checkouts Git se validan con `git rev-parse HEAD` sin
-  contactar el remoto; si falta la caché, solo `--fetch` puede restaurarla. `--locked` exige que
-  todas las entradas existan y sean válidas, y además impide reescribir el lockfile.
+  contactar el remoto; además, `content_sha256` verifica el contenido local de `ostrin.toml` y
+  todos los archivos `.ostrin` ordenados por ruta. Si falta la caché, solo `--fetch` puede
+  restaurarla. `--locked` exige que todas las entradas existan, sean válidas y conserven su
+  hash de contenido, y además impide reescribir el lockfile.
 
 - `ostrin.lock` se versiona en control de versiones. Con rutas relativas y orden estable, clonar
   el proyecto y compilarlo desde otro directorio conserva el mismo lockfile.
@@ -113,6 +115,9 @@ Como no existe un registro central donde "reservar" un nombre, la identidad real
 ## 6. Preguntas abiertas para la siguiente sesión de diseño
 
 1. **Índice/registro de descubrimiento opcional** (no de publicación obligatoria, solo de búsqueda: "¿qué librerías Ostrin existen para X?") — se puede construir después, como una capa encima de este esquema descentralizado, sin cambiar cómo se referencian las dependencias (mismo camino que siguió el ecosistema de Go con sus proxies de módulos).
-2. **Verificación de integridad** (hashes de contenido además del commit, para detectar manipulación del historial de un repositorio tras fijar el lock) — el lockfile ya conserva el commit resuelto, pero el hash de contenido sigue pendiente.
+2. ~~**Verificación de integridad**~~ — resuelta: `ostrin.lock` conserva `content_sha256`, un
+   SHA-256 determinista (con finales de línea normalizados a LF) de `ostrin.toml` y todos los
+   archivos `.ostrin`; las compilaciones normales y `--locked` rechazan el contenido modificado
+   y piden regenerar el lockfile.
 3. **Workspaces** (varios paquetes Ostrin relacionados en un mismo repositorio, compartiendo un `ostrin.lock`) — útil para proyectos grandes, no cubierto en este documento.
 4. Pendientes previos siguen abiertos: `dyn Trait`, `select` sobre canales, elisión de ARC, operadores bit a bit, ordenación general.

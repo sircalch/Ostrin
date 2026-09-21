@@ -3,6 +3,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use sha2::{Digest, Sha256};
+
 pub struct PackageManifest {
     pub name: String,
     pub version: String,
@@ -27,6 +29,7 @@ struct LockedDependency {
     requested: Option<String>,
     resolved_rev: Option<String>,
     package_version: Option<String>,
+    content_sha256: Option<String>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -205,6 +208,7 @@ fn load_lockfile(manifest_dir: &Path) -> Result<Option<Lockfile>, String> {
                     requested: optional_lock_string(entry, "requested"),
                     resolved_rev: optional_lock_string(entry, "resolved_rev"),
                     package_version: optional_lock_string(entry, "package_version"),
+                    content_sha256: optional_lock_string(entry, "content_sha256"),
                 },
             );
         }
@@ -254,6 +258,7 @@ fn validate_locked_path(
             declared.display()
         ));
     }
+    validate_content_hash(name, &locked, entry)?;
     Ok(locked)
 }
 
@@ -289,6 +294,7 @@ fn validate_locked_git(
             "dependency '{name}' checkout is at {actual}, but ostrin.lock requires {expected}; run with --fetch to restore it"
         ));
     }
+    validate_content_hash(name, &root, entry)?;
     Ok(root)
 }
 
@@ -404,6 +410,89 @@ fn package_version(root: &Path) -> Result<String, String> {
     Ok(load_manifest(&manifest)?.version)
 }
 
+fn validate_content_hash(name: &str, root: &Path, entry: &LockedDependency) -> Result<(), String> {
+    let expected = entry.content_sha256.as_deref().ok_or_else(|| {
+        format!("dependency '{name}' has no content_sha256 in ostrin.lock; regenerate the lockfile")
+    })?;
+    let actual = package_content_sha256(root)?;
+    if actual != expected {
+        return Err(format!(
+            "dependency '{name}' content hash changed from '{expected}' to '{actual}'; regenerate the lockfile"
+        ));
+    }
+    Ok(())
+}
+
+fn package_content_sha256(root: &Path) -> Result<String, String> {
+    let mut files = Vec::new();
+    collect_package_sources(root, root, &mut files)?;
+    files.sort();
+
+    let mut hasher = Sha256::new();
+    for relative in files {
+        let normalized = relative.to_string_lossy().replace('\\', "/");
+        let bytes = fs::read(root.join(&relative)).map_err(|e| {
+            format!(
+                "could not read package source '{}' for integrity hashing: {e}",
+                root.join(&relative).display()
+            )
+        })?;
+        let bytes = canonical_package_bytes(&bytes);
+        hasher.update(b"ostrin-package-file\0");
+        hasher.update(normalized.as_bytes());
+        hasher.update([0]);
+        hasher.update((bytes.len() as u64).to_le_bytes());
+        hasher.update(bytes);
+    }
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+fn canonical_package_bytes(bytes: &[u8]) -> Vec<u8> {
+    let mut canonical = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] == b'\r' {
+            if bytes.get(index + 1) == Some(&b'\n') {
+                index += 1;
+            }
+            canonical.push(b'\n');
+        } else {
+            canonical.push(bytes[index]);
+        }
+        index += 1;
+    }
+    canonical
+}
+
+fn collect_package_sources(root: &Path, directory: &Path, files: &mut Vec<PathBuf>) -> Result<(), String> {
+    let entries = fs::read_dir(directory)
+        .map_err(|e| format!("could not read package directory '{}': {e}", directory.display()))?;
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("could not inspect package directory '{}': {e}", directory.display()))?;
+        let path = entry.path();
+        let file_type = entry
+            .file_type()
+            .map_err(|e| format!("could not inspect package path '{}': {e}", path.display()))?;
+        if file_type.is_dir() {
+            if matches!(entry.file_name().to_str(), Some(".git" | ".ostrin")) {
+                continue;
+            }
+            collect_package_sources(root, &path, files)?;
+        } else if file_type.is_file() {
+            let relative = path
+                .strip_prefix(root)
+                .map_err(|_| format!("package source '{}' is outside package root", path.display()))?
+                .to_path_buf();
+            let is_manifest = relative.file_name().and_then(|name| name.to_str()) == Some("ostrin.toml");
+            let is_source = relative.extension().and_then(|extension| extension.to_str()) == Some("ostrin");
+            if is_manifest || is_source {
+                files.push(relative);
+            }
+        }
+    }
+    Ok(())
+}
+
 pub fn write_lockfile(manifest_dir: &Path, manifest: &PackageManifest, roots: &HashMap<String, PathBuf>) -> Result<(), String> {
     let mut out = String::new();
     out.push_str(&format!("# generado por ostrinc — no editar a mano\nlockfile_version = 1\npackage = {}\nversion = {}\n\n", toml_string(&manifest.name), toml_string(&manifest.version)));
@@ -421,6 +510,7 @@ pub fn write_lockfile(manifest_dir: &Path, manifest: &PackageManifest, roots: &H
             .to_string()
             .replace('\\', "/");
         let display = if display.is_empty() { "." } else { &display };
+        let content_sha256 = package_content_sha256(root)?;
         out.push_str(&format!("[[dependency]]\nname = {}\n", toml_string(name)));
         match manifest.dependencies.get(name) {
             Some(DependencySpec::Path(_)) => {
@@ -435,7 +525,11 @@ pub fn write_lockfile(manifest_dir: &Path, manifest: &PackageManifest, roots: &H
             }
             None => return Err(format!("dependency '{name}' was resolved but is not in the manifest")),
         }
-        out.push_str(&format!("package_version = {}\n\n", toml_string(&package_version(root)?)));
+        out.push_str(&format!(
+            "package_version = {}\ncontent_sha256 = {}\n\n",
+            toml_string(&package_version(root)?),
+            toml_string(&content_sha256)
+        ));
     }
     let lock_path = manifest_dir.join("ostrin.lock");
     fs::write(&lock_path, out).map_err(|e| format!("could not write '{}': {e}", lock_path.display()))

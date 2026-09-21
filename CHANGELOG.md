@@ -29,6 +29,9 @@
   and each native archive is checksum-verified and executed after extraction. The smoke contract covers
   `--version`, `examples/hello.ostrin`, and the packaged local-path dependency project on Linux x86_64,
   macOS arm64 and Windows x64. Manual runs now sanitize branch names in archive paths.
+- Package lockfiles now record and validate a deterministic SHA-256 of each dependency's
+  `ostrin.toml` and `.ostrin` sources. Locked and normal builds reject local content tampering;
+  the decentralized Git/path model remains unchanged.
 
 ### Language and libraries
 - Added the embedded `std.time` module: a deterministic proleptic-Gregorian `Date` record with leap-year

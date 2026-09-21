@@ -5619,3 +5619,20 @@ ordinales, parseo y fechas inválidas; `examples/time_library.ostrin` comprueba 
 paridad de ambos backends. La prueba nativa con `--leak-check` termina con `live_allocations=0`,
 incluidas las temporales de `iso`; la suite pasa ahora **7 pruebas propias de std**, además de los
 checks existentes. JSON y red permanecen deliberadamente fuera de este bloque.
+
+## 222. Integridad de dependencias en lockfiles — 2026-09-21
+
+El sistema de paquetes deja de confiar únicamente en la ruta, versión y commit resueltos:
+
+- `compiler/src/package.rs` calcula un SHA-256 determinista sobre `ostrin.toml` y todos los archivos
+  `.ostrin`, con finales de línea normalizados a LF, ordenados por ruta relativa y excluyendo
+  `.git`/`.ostrin` de caché;
+- cada entrada de `ostrin.lock` conserva `content_sha256` junto a `source`, `resolved_path`, versión
+  y, para Git, `resolved_rev`;
+- las dependencias `path` y Git verifican el hash en builds normales y con `--locked`, sin red nueva;
+  si falta o cambia el contenido, el compilador exige regenerar el lockfile;
+- `compiler/tests/examples.rs` comprueba el campo SHA-256 y rechaza una modificación posterior de
+  una dependencia local. El fixture `examples/pkg_project/main_app/ostrin.lock` ya usa el nuevo campo.
+
+La medida resuelve la pregunta abierta de integridad del diseño de paquetes sin crear todavía un
+registro remoto ni cambiar la resolución explícita existente.

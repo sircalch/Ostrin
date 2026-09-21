@@ -8,4 +8,5 @@ name = "local_utils"
 source = "path"
 resolved_path = "../shared_lib"
 package_version = "0.0.0"
+content_sha256 = "a03171f22be4bb921d4c4e313b6917a17c8eb592756e281dca15e81c29d8aa9a"
 

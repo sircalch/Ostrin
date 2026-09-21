@@ -3716,8 +3716,56 @@ fn project_manifest_selects_entry_and_writes_portable_lockfile() {
     assert!(lockfile.contains("lockfile_version = 1"), "lockfile should declare its schema: {lockfile}");
     assert!(lockfile.contains("source = \"path\""), "lockfile should identify path dependencies: {lockfile}");
     assert!(lockfile.contains("package_version = \"0.0.0\""), "lockfile should record the dependency version: {lockfile}");
+    assert!(
+        lockfile.lines().any(|line| {
+            line.strip_prefix("content_sha256 = \"")
+                .and_then(|value| value.strip_suffix('"'))
+                .is_some_and(|hash| hash.len() == 64 && hash.chars().all(|ch| ch.is_ascii_hexdigit()))
+        }),
+        "lockfile should record a SHA-256 content hash: {lockfile}"
+    );
     assert!(lockfile.contains("resolved_path = \"../shared_lib\""), "lockfile should use a project-relative path: {lockfile}");
     assert!(!lockfile.contains("Lenguaje nuevo"), "lockfile should not embed this checkout's absolute path: {lockfile}");
+}
+
+#[test]
+fn locked_path_dependency_rejects_content_tampering() {
+    let root = std::env::temp_dir().join(format!("ostrin_package_integrity_{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    let dependency = root.join("shared");
+    let project = root.join("project");
+    fs::create_dir_all(&dependency).unwrap();
+    fs::create_dir_all(&project).unwrap();
+    fs::write(
+        dependency.join("ostrin.toml"),
+        "[package]\nname = \"shared\"\nversion = \"0.1.0\"\nentry = \"helpers.ostrin\"\n",
+    )
+    .unwrap();
+    fs::write(dependency.join("helpers.ostrin"), "pub fn greet() -> String { \"before\" }\n").unwrap();
+    fs::write(
+        project.join("ostrin.toml"),
+        "[package]\nname = \"integrity_app\"\nversion = \"0.1.0\"\nentry = \"main.ostrin\"\n\n[dependencies]\nshared = { path = \"../shared\" }\n",
+    )
+    .unwrap();
+    fs::write(
+        project.join("main.ostrin"),
+        "import shared.helpers\n\nfn main() -> Void {\n    print(helpers.greet())\n}\n",
+    )
+    .unwrap();
+
+    let project_text = project.display().to_string();
+    let first = run(&["--run", "--project", &project_text]);
+    assert!(first.status.success(), "initial package run failed: {}", stderr(&first));
+    let locked = run(&["--locked", "--run", "--project", &project_text]);
+    assert!(locked.status.success(), "locked package run failed: {}", stderr(&locked));
+    fs::write(dependency.join("helpers.ostrin"), "pub fn greet() -> String { \"after\" }\n").unwrap();
+
+    let tampered = run(&["--locked", "--run", "--project", &project_text]);
+    assert!(!tampered.status.success(), "locked package run should reject source tampering");
+    let error = stderr(&tampered);
+    assert!(error.contains("content hash changed"), "unexpected integrity error: {error}");
+    assert!(error.contains("shared"), "integrity error should name the dependency: {error}");
+    let _ = fs::remove_dir_all(&root);
 }
 
 #[test]
