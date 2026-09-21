@@ -1,0 +1,44 @@
+fn some_text() -> Option<String> {
+    Some("value".to_upper())
+}
+
+fn none_text() -> Option<String> {
+    None
+}
+
+fn map_some() -> Option<String> {
+    some_text().map(fn(text) { "mapped: " + text })
+}
+
+fn map_none() -> Option<String> {
+    none_text().map(fn(text) { "mapped: " + text })
+}
+
+fn then_some() -> Option<Int> {
+    some_text().then(fn(text) { Some(text.length()) })
+}
+
+fn then_none() -> Option<Int> {
+    none_text().then(fn(text) { Some(text.length()) })
+}
+
+fn print_text(value: Option<String>) -> Void {
+    match value {
+        Some(text) => print(text),
+        None => print("none"),
+    }
+}
+
+fn print_int(value: Option<Int>) -> Void {
+    match value {
+        Some(number) => print(number),
+        None => print("none"),
+    }
+}
+
+fn main() -> Void {
+    print_text(map_some())
+    print_text(map_none())
+    print_int(then_some())
+    print_int(then_none())
+}

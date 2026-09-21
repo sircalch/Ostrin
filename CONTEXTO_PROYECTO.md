@@ -5361,3 +5361,17 @@ transformación de éxito, propagación de error, `map_err` en ambas variantes y
 La ownership IR queda sin valores ni funciones irresueltos en ese ejemplo. Siguen pendientes los
 combinadores de `Option`, handlers no inline, payloads compuestos y la expansión completa de
 closures que escapan del sitio de llamada.
+
+## 208. Combinadores de `Option` inline desde la IR — 2026-09-21
+
+`Option.map` y `Option.then` con lambdas inline ya comparten el mismo lowering CFG que `Result`.
+La rama `Some` extrae el payload con `TryValue`, ejecuta la lambda y construye el nuevo `Some`
+cuando corresponde; la rama `None` usa `TryError` para conservar el vacío con el tipo de salida.
+Ambas ramas se reúnen con `Phi`, y los payloads `String` siguen las retenciones/liberaciones
+del runtime nativo.
+
+`examples/native_ir_option_combinators.ostrin` cubre `Some` y `None` para `map` y `then`, tanto
+con `Option<String>` como con `Option<Int>`. Sus 9 funciones se generan desde IR, el intérprete
+y el binario nativo imprimen `mapped: VALUE`, `none`, `5`, `none`, y `--leak-check` termina con
+`live_allocations=0`. Quedan para una siguiente etapa los handlers no inline, payloads compuestos
+que no tengan lowering completo y closures que escapen del sitio de llamada.

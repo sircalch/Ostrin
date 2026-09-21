@@ -1545,8 +1545,9 @@ fn native_backend_compiles_and_runs_result_and_try() {
 fn native_hir_handles_option_result_core() {
     // The structural Option/Result family now comes from HIR: constructors,
     // match, basic queries, unwrap/unwrap_or, ok/ok_or and propagation with
-    // `try`. Result combinators with inline lambdas are migrating through the
-    // IR; Option combinators and non-inline handlers remain fallback paths.
+    // `try`. Result and scalar/String Option combinators with inline lambdas
+    // are covered by the native IR tests; non-inline handlers remain fallback
+    // paths.
     for (file, minimum_hir_functions) in [
         ("native_option.ostrin", 2usize),
         ("native_hir_option_locals.ostrin", 1usize),
@@ -1944,6 +1945,36 @@ fn native_ir_string_methods_cross_block_ownership_and_short_circuit() {
         assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "{file} leaked: {}", String::from_utf8_lossy(&native.stderr));
         assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected, "native output for {file}");
     }
+}
+
+#[test]
+fn native_ir_option_combinators_preserve_some_none_and_ownership() {
+    let file = "native_ir_option_combinators.ostrin";
+    let path = example_path(file);
+    let expected = "mapped: VALUE\nnone\n5\nnone\n";
+    let interpreted = run(&["--run", &path]);
+    assert!(interpreted.status.success(), "interpreter failed for {file}: {}", stderr(&interpreted));
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    assert!(report.status.success(), "native type report failed for {file}: {}", stderr(&report));
+    let ir_functions = stdout(&report)
+        .lines()
+        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .unwrap_or(0);
+    assert!(ir_functions >= 9, "{file} generated only {ir_functions} IR function(s): {}", stdout(&report));
+
+    let exe = temp_artifact("native_ir_option_combinators.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+    assert!(compile.status.success(), "compile failed for {file}: {}", stderr(&compile));
+    let native = Command::new(&exe).output().expect("failed to run Option combinator binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native run failed for {file}");
+    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "{file} leaked: {}", String::from_utf8_lossy(&native.stderr));
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
 }
 
 /// Deterministic generator of small programs (integer arithmetic, `%`, `if`, `while`, `for`,

@@ -1108,6 +1108,105 @@ impl Builder {
         Some(dst)
     }
 
+    /// The `Option` counterpart of `lower_result_combinator`. `TryError`
+    /// materializes the `None` branch with the output element type, so the
+    /// same ownership machinery covers both `Option<T>` and `Option<String>`.
+    fn lower_option_combinator(
+        &mut self,
+        receiver: ValueId,
+        receiver_ty: &Ty,
+        method: &str,
+        callback: &HirExpr,
+        option_ty: &Ty,
+    ) -> Option<ValueId> {
+        let Ty::Applied(receiver_name, receiver_args) = receiver_ty else { return None };
+        let Ty::Applied(option_name, option_args) = option_ty else { return None };
+        if receiver_name != "Option"
+            || option_name != "Option"
+            || receiver_args.len() != 1
+            || option_args.len() != 1
+            || !matches!(method, "map" | "then")
+        {
+            return None;
+        }
+        let HirKind::Lambda(params, body) = &callback.kind else { return None };
+        if params.len() != 1 {
+            return None;
+        }
+
+        let some_block = self.new_block();
+        let none_block = self.new_block();
+        let merge_block = self.new_block();
+        let check = self.fresh();
+        self.emit(IrInstr::TryCheck { dst: check, value: receiver });
+        self.terminate(IrTerminator::Branch {
+            condition: check,
+            then_block: some_block,
+            else_block: none_block,
+        });
+
+        self.current = some_block;
+        let payload = self.fresh();
+        self.emit(IrInstr::TryValue {
+            dst: payload,
+            value: receiver,
+            ty: receiver_args[0].clone(),
+        });
+        let some_value = self.lower_inline_lambda(params, body, payload);
+        let mapped = if method == "map" {
+            let dst = self.fresh();
+            self.emit(IrInstr::Call {
+                dst: Some(dst),
+                callee: "Some".to_string(),
+                args: vec![some_value],
+                ty: option_ty.clone(),
+            });
+            dst
+        } else {
+            some_value
+        };
+        let some_predecessor = self.current;
+        let some_open = !self.terminated();
+        if some_open {
+            self.terminate(IrTerminator::Goto(merge_block));
+        }
+
+        self.current = none_block;
+        let none_value = self.fresh();
+        self.emit(IrInstr::TryError {
+            dst: none_value,
+            value: receiver,
+            ty: option_ty.clone(),
+        });
+        let none_predecessor = self.current;
+        let none_open = !self.terminated();
+        if none_open {
+            self.terminate(IrTerminator::Goto(merge_block));
+        }
+
+        self.current = merge_block;
+        let mut incoming = Vec::new();
+        if some_open {
+            incoming.push((some_predecessor, mapped));
+        }
+        if none_open {
+            incoming.push((none_predecessor, none_value));
+        }
+        if incoming.is_empty() {
+            return Some(self.unit());
+        }
+        if incoming.len() == 1 {
+            return Some(incoming[0].1);
+        }
+        let dst = self.fresh();
+        self.emit(IrInstr::Phi {
+            dst,
+            incoming,
+            ty: option_ty.clone(),
+        });
+        Some(dst)
+    }
+
     fn lower_inline_lambda(&mut self, params: &[String], body: &HirBlock, argument: ValueId) -> ValueId {
         self.locals.push(HashMap::new());
         self.locals
@@ -1340,6 +1439,9 @@ impl Builder {
             } => {
                 let receiver = self.lower_expr(recv);
                 if args.len() == 1 && args[0].name.is_none() && matches!(method.as_str(), "map" | "map_err" | "then") {
+                    if let Some(value) = self.lower_option_combinator(receiver, &recv.ty, method, &args[0].value, &expression.ty) {
+                        return value;
+                    }
                     if let Some(value) = self.lower_result_combinator(receiver, &recv.ty, method, &args[0].value, &expression.ty) {
                         return value;
                     }
