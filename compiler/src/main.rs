@@ -1,6 +1,7 @@
 mod ast;
 mod codegen;
 mod dap;
+mod fmt;
 mod hir;
 mod hir_c;
 mod interpreter;
@@ -41,6 +42,7 @@ fn main() -> ExitCode {
 fn real_main() -> ExitCode {
     let args: Vec<String> = env::args().collect();
     let tokens_only = args.iter().any(|a| a == "--tokens");
+    let fmt_mode = args.iter().any(|a| a == "--fmt");
     let ast_only = args.iter().any(|a| a == "--ast");
     let symbols_only = args.iter().any(|a| a == "--symbols");
     let members_only = args.iter().any(|a| a == "--members");
@@ -113,6 +115,10 @@ fn real_main() -> ExitCode {
         return ExitCode::FAILURE;
     };
     let path = path_owned.as_str();
+
+    if fmt_mode {
+        return format_file(path, args.iter().any(|a| a == "--write"), args.iter().any(|a| a == "--check"));
+    }
 
     if tokens_only {
         let source = match fs::read_to_string(path) {
@@ -598,6 +604,44 @@ fn run_codegen(
     }
 }
 
+/// `--fmt`: print the formatted file; `--write` rewrites it; `--check` fails if
+/// it is not already formatted.
+fn format_file(path: &str, write: bool, check: bool) -> ExitCode {
+    let source = match fs::read_to_string(path) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("error: could not read '{path}': {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let formatted = match fmt::format_source(&source) {
+        Ok(text) => text,
+        Err(error) => {
+            eprintln!("error: cannot format '{path}': {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let changed = formatted != source.replace("\r\n", "\n");
+    if check {
+        if changed {
+            eprintln!("{path}: needs formatting");
+            return ExitCode::FAILURE;
+        }
+        return ExitCode::SUCCESS;
+    }
+    if write {
+        if changed {
+            if let Err(e) = fs::write(path, &formatted) {
+                eprintln!("error: could not write '{path}': {e}");
+                return ExitCode::FAILURE;
+            }
+        }
+        return ExitCode::SUCCESS;
+    }
+    print!("{formatted}");
+    ExitCode::SUCCESS
+}
+
 fn print_help() {
     println!("ostrinc 0.1.0 — compiler and interpreter for Ostrin");
     println!();
@@ -608,6 +652,7 @@ fn print_help() {
     println!("  --run         Type-check and run the entry file");
     println!("  --ast         Print the parsed AST");
     println!("  --tokens      Print lexer tokens");
+    println!("  --fmt         Print the formatted file (--write to rewrite, --check to verify)");
     println!("  --symbols     Print source symbols and signatures");
     println!("  --members     Print type members and local bindings for editor tools");
     println!("  --types       Print inferred expression types for editor tools");

@@ -5092,3 +5092,18 @@ bucle. `examples/native_ir_for_lists.ostrin` (suma de `List<Int>` y concatenaci�
 funciones HIR o IR porque su función pasó a la IR. Suite: **6 diferenciales y 159 de integración**.
 
 Siguiente: `break`/`continue` con `Phi` correcto, `for` sobre rangos y `Option<List>`.
+
+## 193. Formateador oficial `--fmt` — 2026-09-20
+
+Nuevo módulo `fmt.rs` y flags `--fmt` (stdout), `--fmt --write` y `--fmt --check`. Es un
+formateador de *layout*: sangría por profundidad de `{ ( [`, recorte de espacios finales,
+colapso de líneas en blanco (ninguna tras `{` ni antes de `}`), fin de línea LF y salto
+final. Comentarios de bloque y strings multilínea se conservan tal cual. Antes de devolver
+el texto, `format_source` compara el flujo de tokens del lexer antes y después y se niega
+a formatear si difiere, de modo que un fallo del formateador nunca cambia el programa.
+
+Verificado sobre los 154 ejemplos del repositorio (todos formatean, idempotente; solo 2
+necesitaban cambios), con 2 pruebas unitarias y `fmt_normalizes_layout_and_supports_write_and_check`.
+Suite: **6 diferenciales y 160 de integración** (+2 unitarias del binario).
+
+Siguiente en D: `ostrinc test` como subcomando, docs generadas, CI multiplataforma de release.

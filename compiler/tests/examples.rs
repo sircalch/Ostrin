@@ -1829,6 +1829,29 @@ ab
 }
 
 #[test]
+fn fmt_normalizes_layout_and_supports_write_and_check() {
+    let messy = "fn main() -> Void {\r\nprint(\"{\")   \n\n\n    if true {\nprint(1)\n}\n}\n\n";
+    let clean = "fn main() -> Void {\n    print(\"{\")\n\n    if true {\n        print(1)\n    }\n}\n";
+    let path = temp_artifact("fmt_messy.ostrin");
+    fs::write(&path, messy).unwrap();
+
+    let printed = run(&["--fmt", &path]);
+    assert!(printed.status.success(), "fmt failed: {}", stderr(&printed));
+    assert_eq!(stdout(&printed).replace("\r\n", "\n"), clean);
+
+    let check = run(&["--fmt", "--check", &path]);
+    assert!(!check.status.success(), "--check must fail on unformatted input");
+
+    let write = run(&["--fmt", "--write", &path]);
+    assert!(write.status.success(), "fmt --write failed: {}", stderr(&write));
+    assert_eq!(fs::read_to_string(&path).unwrap(), clean);
+
+    let check = run(&["--fmt", "--check", &path]);
+    assert!(check.status.success(), "--check must pass after --write: {}", stderr(&check));
+    let _ = fs::remove_file(&path);
+}
+
+#[test]
 fn native_ir_emitter_handles_scalar_maps_and_sets() {
     let file = example_path("native_ir_maps_sets.ostrin");
     let expected = "3\ntrue\nfalse\n3\n3\n1\n3\n3\n2\ntrue\nfalse\n1\n2\n2\n";

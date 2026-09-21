@@ -19,6 +19,8 @@
   group-by), `plot` (SVG scatter/line) and `autodiff` (forward-mode dual numbers).
 
 ### Compiler
+- Official formatter: `ostrinc --fmt FILE` prints the formatted source, `--write` rewrites it and
+  `--check` fails when it is not formatted. Layout-only and token-verified (idempotent).
 - Package resolution now supports explicit `--fetch` for Git dependencies. Normal
   builds remain offline; an explicit fetch clones or updates a deterministic
   project-local cache, checks out the requested tag/revision, and records the
