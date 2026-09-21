@@ -71,6 +71,16 @@ for (const id of ["run", "check", "test", "format", "share", "source", "output"]
   check(playground.includes(`id="${id}"`), `playground.html: missing control ${id}`);
 }
 
+const showcase = read("website/showcase.html");
+for (const marker of ["examples/physics.ostrin", "examples/data_project", "examples/plot_project", "examples/autodiff_project"]) {
+  check(showcase.includes(marker), `showcase.html: missing evidence link ${marker}`);
+}
+
+const community = read("website/community.html");
+for (const marker of ["issues/new/choose", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md", "community-labels.md"]) {
+  check(community.includes(marker), `community.html: missing contribution link ${marker}`);
+}
+
 const sitemap = read("website/sitemap.xml");
 for (const page of publicPages) {
   const location = page === "index.html"

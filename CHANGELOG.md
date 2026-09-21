@@ -11,6 +11,10 @@
   concurrency. They share the compiled WASM module and expose real Run, Check, Reset and Copy actions.
 - Added `scripts/website-check.mjs` to CI and Pages deployment for local-reference/anchor, metadata,
   sitemap, playground-wiring, source-drift and generated-WASM checks.
+- Added a source-backed `showcase.html` for quantities, tables, deterministic SVG and autodiff, with
+  explicit maturity labels and links to protecting compiler tests.
+- Added `community.html`, a good-first-contribution path, GitHub issue/PR templates and a proposed
+  label taxonomy without claiming external chat, Discussions, registry users or community projects.
 
 ### Language and libraries
 - Standard library written in Ostrin and embedded in the compiler: `import std.math`, `std.lists`,

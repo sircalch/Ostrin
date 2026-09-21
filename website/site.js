@@ -39,6 +39,24 @@
     });
   });
 
+  const nav = document.querySelector('.site-nav');
+  const githubLink = nav && nav.querySelector('a[href^="https://github.com"]');
+  const ecosystemLink = nav && nav.querySelector('a[href="ecosystem.html"]');
+  if (nav && githubLink) {
+    [['showcase.html', 'Showcase'], ['community.html', 'Community']].forEach(function (item) {
+      if (!nav.querySelector('a[href="' + item[0] + '"]')) {
+        const link = document.createElement('a');
+        link.href = item[0];
+        link.textContent = item[1];
+        link.addEventListener('click', function () {
+          if (header) header.classList.remove('menu-active');
+          document.body.classList.remove('menu-open');
+        });
+        nav.insertBefore(link, ecosystemLink || githubLink);
+      }
+    });
+  }
+
   document.querySelectorAll('.filter-button').forEach(function (button) {
     button.addEventListener('click', function () {
       const filter = button.dataset.filter;

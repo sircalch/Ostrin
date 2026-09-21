@@ -67,3 +67,8 @@ GitHub Pages architecture while making the next public claims evidence-based.
   sitemap, robots, playground wiring and drift between live source strings and their validated
   repository examples. `ci.yml` runs the static check; `pages.yml` runs it again after generating
   and copying the WASM artifact.
+- `website/showcase.html` now presents four repository-backed programs with links to source and
+  protecting tests; SVG is explicitly marked early and no interactive graph is claimed.
+- `website/community.html`, `CONTRIBUTING.md`, issue templates, the pull-request template and
+  `docs/community-labels.md` prepare contribution without asserting that unverified channels or
+  external projects exist.

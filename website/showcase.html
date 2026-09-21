@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#080a10">
+    <meta name="description" content="Real scientific, data, visualization and automatic-differentiation programs built and tested in Ostrin.">
+    <link rel="canonical" href="https://sircalch.github.io/Ostrin/showcase.html">
+    <meta property="og:site_name" content="Ostrin">
+    <meta property="og:title" content="Made with Ostrin — Verified Programs and Packages">
+    <meta property="og:description" content="Explore real Ostrin programs for quantities, tables, deterministic SVG and automatic differentiation.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://sircalch.github.io/Ostrin/showcase.html">
+    <meta property="og:image" content="https://sircalch.github.io/Ostrin/assets/ostrin-logo.png">
+    <meta name="twitter:card" content="summary">
+    <link rel="icon" href="assets/ostrin-logo.png">
+    <link rel="stylesheet" href="styles.css">
+    <script src="site.js" defer></script>
+    <title>Made with Ostrin — Verified Programs and Packages</title>
+  </head>
+  <body>
+    <header class="site-header"><a class="brand" href="index.html"><img src="assets/ostrin-logo.png" alt="" width="36" height="36"><span>OSTRIN</span></a><div class="header-right"><span class="version">prototype / 0.1</span><button class="menu-toggle" aria-label="Open navigation" aria-expanded="false"><span></span><span></span></button><nav class="site-nav" aria-label="Main navigation"><a href="language.html">Language</a><a href="examples.html">Examples</a><a href="playground.html">Playground</a><a href="showcase.html" aria-current="page">Showcase</a><a href="community.html">Community</a><a href="ecosystem.html">Ecosystem</a><a href="docs.html">Docs</a><a href="roadmap.html">Roadmap</a><a href="https://github.com/sircalch/Ostrin">GitHub ↗</a></nav></div></header>
+    <main>
+      <section class="page-hero shell"><p class="eyebrow">Made with Ostrin</p><h1>Real programs.<br><em>Current capability.</em></h1><p class="lede">This is a small evidence gallery, not a promise wall. Every entry points to source in the repository and to the compiler test that protects the behavior.</p><div class="page-meta"><span>source-backed</span><span>interpreter + native where marked</span><span>honest maturity</span></div></section>
+
+      <section class="section shell"><div class="section-header"><p class="eyebrow">Verified work</p><div><h2>From meaningful values to scientific packages.</h2><p class="lede">Ostrin already has more than syntax examples: complete programs exercise quantities, tabular data, SVG generation and automatic differentiation.</p></div></div>
+        <div class="showcase-grid">
+          <article class="showcase-card">
+            <div class="showcase-card-head"><span class="tag">scientific / quantities</span><span class="status-label available">verified</span></div>
+            <h3>Physical quantity calculator</h3>
+            <p><span class="mono">physics.ostrin</span> carries dimensions through arithmetic, generic quantities and a small loop. The checker rejects incompatible dimensions before execution.</p>
+            <pre class="showcase-output"><span class="ok">2000000004.9999998 nm
+5 m/s
+6 kg
+400000000
+15</span></pre>
+            <div class="showcase-links"><a href="https://github.com/sircalch/Ostrin/blob/main/examples/physics.ostrin">Source ↗</a><a href="https://github.com/sircalch/Ostrin/blob/main/compiler/tests/examples.rs#L3070">Protecting test ↗</a><a href="examples.html#live-examples">Run a live variant ↗</a></div>
+          </article>
+          <article class="showcase-card">
+            <div class="showcase-card-head"><span class="tag">data / tables</span><span class="status-label available">verified</span></div>
+            <h3>CSV table summary</h3>
+            <p>The <span class="mono">data_project</span> parses CSV text, filters rows, groups cities and computes descriptive statistics through a local Ostrin package.</p>
+            <pre class="showcase-output"><span class="ok">Lima: n=2 media=22.5
+Cusco: n=2 media=11
+Quito: n=1 media=15.5</span></pre>
+            <div class="showcase-links"><a href="https://github.com/sircalch/Ostrin/tree/main/examples/data_project">Project source ↗</a><a href="https://github.com/sircalch/Ostrin/blob/main/compiler/tests/examples.rs#L3932">Interpreter/native test ↗</a></div>
+          </article>
+          <article class="showcase-card">
+            <div class="showcase-card-head"><span class="tag">visualization / SVG</span><span class="status-label">early</span></div>
+            <h3>Deterministic scientific SVG</h3>
+            <p>The <span class="mono">plot</span> package emits line and scatter SVG from arrays in Ostrin. Today this is a deterministic text artifact, not an interactive browser chart.</p>
+            <pre class="showcase-output"><span class="ok">&lt;svg ... width="400" height="300"&gt;
+&lt;polyline points="..." /&gt;
+&lt;/svg&gt;</span></pre>
+            <div class="showcase-links"><a href="https://github.com/sircalch/Ostrin/tree/main/examples/plot_project">Project source ↗</a><a href="https://github.com/sircalch/Ostrin/blob/main/compiler/tests/examples.rs#L3950">Interpreter/native test ↗</a><a href="roadmap.html">Plotting roadmap ↗</a></div>
+          </article>
+          <article class="showcase-card">
+            <div class="showcase-card-head"><span class="tag">scientific / autodiff</span><span class="status-label available">verified</span></div>
+            <h3>Automatic differentiation</h3>
+            <p>The <span class="mono">autodiff</span> package uses dual numbers and function values for derivatives, gradients and a Newton step.</p>
+            <pre class="showcase-output"><span class="ok">f(2) = -1
+f'(2) = 10
+gradient = (-51, 50)
+root = 2.0945514815423265</span></pre>
+            <div class="showcase-links"><a href="https://github.com/sircalch/Ostrin/tree/main/examples/autodiff_project">Project source ↗</a><a href="https://github.com/sircalch/Ostrin/blob/main/compiler/tests/examples.rs#L3968">Interpreter/native test ↗</a></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="dark-band"><div class="section shell"><div class="split-callout"><div><p class="eyebrow">What is next</p><h2>Make the evidence easier to use.</h2><p>These projects currently run from the repository or the browser playground where their dependencies fit in the in-memory host. A future showcase can add richer previews after the underlying APIs and distribution story are ready.</p><a class="text-link violet" href="examples.html">Open the live catalogue <span>↗</span></a></div><ul class="mini-list"><li>More runnable statistics and data examples</li><li>Interactive plotting only after a real browser API exists</li><li>External projects only when contributors submit them</li><li>Every entry keeps a source link and validation path</li></ul></div></div></section>
+    </main>
+    <footer class="site-footer shell"><a class="brand" href="index.html"><img src="assets/ostrin-logo.png" alt="" width="30" height="30"><span>OSTRIN</span></a><span>Open development · MIT License</span><div class="footer-links"><a href="examples.html">Examples</a><a href="community.html">Community</a><a href="https://github.com/sircalch/Ostrin">GitHub ↗</a></div></footer>
+  </body>
+</html>

@@ -5490,3 +5490,25 @@ No se añadió un framework ni un backend de snippets: las demos siguen siendo e
 pero la ejecución ocurre dentro del navegador con el compilador real. El siguiente paso de producto es
 un showcase honesto y la preparación de comunidad; el siguiente paso técnico es mejorar diagnósticos
 y conectar los metadatos de demos con los ejemplos validados por la suite.
+
+## 216. Showcase source-backed y preparación de comunidad — 2026-09-21
+
+La Fase D inicial queda implementada sobre evidencia existente, sin simular una comunidad madura:
+
+- `website/showcase.html` presenta cuatro programas reales del repositorio: cantidades físicas,
+  tablas/CSV, SVG determinista y autodiff. Cada tarjeta enlaza al código y al test que protege el
+  comportamiento; el paquete de plotting se marca como `early` y no se anuncia como gráfico web
+  interactivo.
+- `website/community.html` ofrece rutas concretas hacia GitHub, issues, contributing, diseño,
+  roadmap y code of conduct. Declara explícitamente que Issues/PRs son las superficies activas y
+  que chat, Discussions, registry y proyectos externos no se anuncian hasta existir.
+- `CONTRIBUTING.md` añade `Good first contribution`; `.github/ISSUE_TEMPLATE/` añade bug, feature,
+  language proposal, package proposal y documentation; `.github/pull_request_template.md` conecta
+  cambios con evidencia y checks; `docs/community-labels.md` deja la taxonomía como propuesta para
+  mantenedores, sin crear labels remotamente.
+- La navegación pública y el sitemap incluyen Showcase y Community; `site.js` agrega esos enlaces
+  a las páginas antiguas que conservan su markup estático.
+
+Se preservaron el logo, los estilos, el playground, la infraestructura de Pages y las superficies
+existentes. Quedan para el siguiente bloque el tutorial guiado y una mejora de diagnósticos/learning
+funnel, además de ampliar la experiencia científica solo cuando las APIs reales lo soporten.

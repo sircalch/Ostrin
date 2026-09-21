@@ -23,6 +23,23 @@ cargo test
 Keep the compiler free of warnings and preserve existing behavior unless a
 documented language decision intentionally changes it.
 
+## Good first contribution
+
+New contributors do not need to begin in the type checker. Useful first changes
+include:
+
+- add or improve a positive or negative `.ostrin` example;
+- document an existing compiler, standard-library or package behavior;
+- improve the static website, live examples or website validation;
+- make a diagnostic clearer while preserving its error code;
+- reproduce an issue with the smallest source file possible.
+
+For website changes, run `node scripts/website-check.mjs` and use the local
+WASM playground when the change affects browser execution. For compiler changes,
+run `cargo fmt --check` and `cargo test --manifest-path compiler/Cargo.toml`.
+Do not claim a feature is available until its source, tests and documentation
+agree about the current behavior.
+
 ## Pull requests
 
 Please include a concise description, the relevant design decision, tests or
