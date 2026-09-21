@@ -489,7 +489,49 @@ typedef struct OstrinAllocation {\n\
     void (*drop)(void*);\n\
     struct OstrinAllocation* next;\n\
 } OstrinAllocation;\n\
-static OstrinAllocation* ostrin_allocations = NULL;\n\
+/* Live allocations live in a chained hash table keyed by pointer, so retain/release/free are O(1)\n\
+   on average instead of a scan over every live allocation. All accesses hold the heap mutex. */\n\
+static OstrinAllocation** ostrin_buckets = NULL;\n\
+static size_t ostrin_bucket_count = 0;\n\
+static size_t ostrin_hash_ptr(const void* ptr) {\n\
+    uintptr_t x = (uintptr_t)ptr;\n\
+    x ^= x >> 33;\n\
+    x *= (uintptr_t)0xff51afd7ed558ccdULL;\n\
+    x ^= x >> 33;\n\
+    return (size_t)x;\n\
+}\n\
+static void ostrin_table_insert(OstrinAllocation* entry) {\n\
+    size_t slot = ostrin_hash_ptr(entry->ptr) & (ostrin_bucket_count - 1);\n\
+    entry->next = ostrin_buckets[slot];\n\
+    ostrin_buckets[slot] = entry;\n\
+}\n\
+static void ostrin_table_grow(void) {\n\
+    size_t new_count = ostrin_bucket_count ? ostrin_bucket_count * 2 : 1024;\n\
+    OstrinAllocation** grown = (OstrinAllocation**)calloc(new_count, sizeof *grown);\n\
+    if (!grown) OSTRIN_OOM();\n\
+    OstrinAllocation** old = ostrin_buckets;\n\
+    size_t old_count = ostrin_bucket_count;\n\
+    ostrin_buckets = grown;\n\
+    ostrin_bucket_count = new_count;\n\
+    for (size_t i = 0; i < old_count; i++) {\n\
+        OstrinAllocation* entry = old[i];\n\
+        while (entry) {\n\
+            OstrinAllocation* next = entry->next;\n\
+            ostrin_table_insert(entry);\n\
+            entry = next;\n\
+        }\n\
+    }\n\
+    free(old);\n\
+}\n\
+static OstrinAllocation** ostrin_table_link(const void* ptr) {\n\
+    if (!ostrin_bucket_count) return NULL;\n\
+    OstrinAllocation** link = &ostrin_buckets[ostrin_hash_ptr(ptr) & (ostrin_bucket_count - 1)];\n\
+    while (*link) {\n\
+        if ((*link)->ptr == ptr) return link;\n\
+        link = &(*link)->next;\n\
+    }\n\
+    return NULL;\n\
+}\n\
 static size_t ostrin_allocation_count = 0;\n\
 static size_t ostrin_peak_allocation_count = 0;\n\
 static size_t ostrin_total_allocations = 0;\n\
@@ -785,8 +827,8 @@ static void ostrin_register_allocation_with_drop(void* ptr, void (*drop)(void*))
     entry->ptr = ptr;\n\
     entry->refs = 1;\n\
     entry->drop = drop;\n\
-    entry->next = ostrin_allocations;\n\
-    ostrin_allocations = entry;\n\
+    if ((ostrin_allocation_count + 1) * 4 >= ostrin_bucket_count * 3) ostrin_table_grow();\n\
+    ostrin_table_insert(entry);\n\
     ostrin_allocation_count++;\n\
     ostrin_total_allocations++;\n\
     if (ostrin_allocation_count > ostrin_peak_allocation_count) {\n\
@@ -836,13 +878,20 @@ static void* ostrin_realloc(void* old_ptr, size_t size) {\n\
     ostrin_heap_lock();\n\
     void* ptr = realloc(old_ptr, size == 0 ? 1 : size);\n\
     if (!ptr) { ostrin_heap_unlock(); OSTRIN_OOM(); }\n\
-    for (OstrinAllocation* entry = ostrin_allocations; entry; entry = entry->next) {\n\
-        if (entry->ptr == old_ptr) { entry->ptr = ptr; ostrin_heap_unlock(); return ptr; }\n\
+    OstrinAllocation** old_link = ostrin_table_link(old_ptr);\n\
+    if (old_link) {\n\
+        OstrinAllocation* moved = *old_link;\n\
+        *old_link = moved->next;\n\
+        moved->ptr = ptr;\n\
+        ostrin_table_insert(moved);\n\
+        ostrin_heap_unlock();\n\
+        return ptr;\n\
     }\n\
     OstrinAllocation* entry = (OstrinAllocation*)malloc(sizeof *entry);\n\
     if (!entry) { ostrin_heap_unlock(); free(ptr); OSTRIN_OOM(); }\n\
-    entry->ptr = ptr; entry->refs = 1; entry->drop = NULL; entry->next = ostrin_allocations;\n\
-    ostrin_allocations = entry; ostrin_allocation_count++; ostrin_total_allocations++;\n\
+    entry->ptr = ptr; entry->refs = 1; entry->drop = NULL;\n\
+    if ((ostrin_allocation_count + 1) * 4 >= ostrin_bucket_count * 3) ostrin_table_grow();\n\
+    ostrin_table_insert(entry); ostrin_allocation_count++; ostrin_total_allocations++;\n\
     if (ostrin_allocation_count > ostrin_peak_allocation_count) ostrin_peak_allocation_count = ostrin_allocation_count;\n\
     ostrin_heap_unlock();\n\
     return ptr;\n\
@@ -851,18 +900,15 @@ static void* ostrin_realloc(void* old_ptr, size_t size) {\n\
 static void ostrin_free(void* ptr) {\n\
     if (!ptr) return;\n\
     ostrin_heap_lock();\n\
-    OstrinAllocation** link = &ostrin_allocations;\n\
-    while (*link) {\n\
+    OstrinAllocation** link = ostrin_table_link(ptr);\n\
+    if (link) {\n\
         OstrinAllocation* entry = *link;\n\
-        if (entry->ptr == ptr) {\n\
-            *link = entry->next;\n\
-            free(entry->ptr);\n\
-            free(entry);\n\
-            ostrin_allocation_count--;\n\
-            ostrin_heap_unlock();\n\
-            return;\n\
-        }\n\
-        link = &entry->next;\n\
+        *link = entry->next;\n\
+        free(entry->ptr);\n\
+        free(entry);\n\
+        ostrin_allocation_count--;\n\
+        ostrin_heap_unlock();\n\
+        return;\n\
     }\n\
     ostrin_heap_unlock();\n\
     free(ptr);\n\
@@ -874,39 +920,29 @@ static void ostrin_free(void* ptr) {\n\
 static void ostrin_retain(void* ptr) {\n\
     if (!ptr) return;\n\
     ostrin_heap_lock();\n\
-    for (OstrinAllocation* entry = ostrin_allocations; entry; entry = entry->next) {\n\
-        if (entry->ptr == ptr) {\n\
-            if (entry->refs != SIZE_MAX) entry->refs++;\n\
-            ostrin_heap_unlock();\n\
-            return;\n\
-        }\n\
-    }\n\
+    OstrinAllocation** link = ostrin_table_link(ptr);\n\
+    if (link && (*link)->refs != SIZE_MAX) (*link)->refs++;\n\
     ostrin_heap_unlock();\n\
 }\n\
 \n\
 static void ostrin_release(void* ptr) {\n\
     if (!ptr) return;\n\
     ostrin_heap_lock();\n\
-    OstrinAllocation** link = &ostrin_allocations;\n\
-    while (*link) {\n\
+    OstrinAllocation** link = ostrin_table_link(ptr);\n\
+    if (link) {\n\
         OstrinAllocation* entry = *link;\n\
-        if (entry->ptr == ptr) {\n\
-            if (entry->refs > 1) {\n\
-                entry->refs--;\n\
-            } else {\n\
-                *link = entry->next;\n\
-                ostrin_allocation_count--;\n\
-                void (*drop)(void*) = entry->drop;\n\
-                free(entry);\n\
-                ostrin_heap_unlock();\n\
-                if (drop) drop(ptr);\n\
-                free(ptr);\n\
-                return;\n\
-            }\n\
+        if (entry->refs > 1) {\n\
+            entry->refs--;\n\
+        } else {\n\
+            *link = entry->next;\n\
+            ostrin_allocation_count--;\n\
+            void (*drop)(void*) = entry->drop;\n\
+            free(entry);\n\
             ostrin_heap_unlock();\n\
+            if (drop) drop(ptr);\n\
+            free(ptr);\n\
             return;\n\
         }\n\
-        link = &entry->next;\n\
     }\n\
     ostrin_heap_unlock();\n\
 }\n\
@@ -936,11 +972,15 @@ static void ostrin_mem_cleanup(void) {\n\
         free(node);\n\
     }\n\
     ostrin_heap_lock();\n\
-    while (ostrin_allocations) {\n\
-        OstrinAllocation* entry = ostrin_allocations;\n\
-        ostrin_allocations = entry->next;\n\
-        free(entry->ptr);\n\
-        free(entry);\n\
+    for (size_t i = 0; i < ostrin_bucket_count; i++) {\n\
+        OstrinAllocation* entry = ostrin_buckets[i];\n\
+        while (entry) {\n\
+            OstrinAllocation* next = entry->next;\n\
+            free(entry->ptr);\n\
+            free(entry);\n\
+            entry = next;\n\
+        }\n\
+        ostrin_buckets[i] = NULL;\n\
     }\n\
     ostrin_allocation_count = 0;\n\
     ostrin_heap_unlock();\n\

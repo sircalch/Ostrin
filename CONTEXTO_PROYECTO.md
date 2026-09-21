@@ -5240,3 +5240,12 @@ Para que funcionara hubo que arreglar cuatro cosas del lenguaje/compilador:
    `if` como sentencia.
 
 Suite: **6 diferenciales, 168 de integración y 2 unitarias**.
+
+## 200. Asignador nativo O(1): tabla hash de asignaciones — 2026-09-20
+
+El runtime C guardaba las asignaciones vivas en una lista enlazada y `ostrin_retain`,
+`ostrin_release`, `ostrin_free` y `ostrin_realloc` la recorrían entera: con 40 000 strings vivos
+el binario tardaba ~6 s (cuadrático). Ahora hay una tabla hash encadenada por puntero
+(`ostrin_table_link`, crecimiento al 75 % de carga, todo bajo el mutex del heap): el mismo programa
+tarda 0,07 s. `native_allocator_scales_linearly_with_live_allocations` construye 60 000 strings y
+exige < 5 s y `live_allocations=0`. Suite: **6 diferenciales, 169 de integración y 2 unitarias**.

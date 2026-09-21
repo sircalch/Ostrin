@@ -2257,6 +2257,30 @@ fn functions_ending_in_return_type_check_and_run_natively() {
 }
 
 #[test]
+fn native_allocator_scales_linearly_with_live_allocations() {
+    // The runtime used to keep live allocations in a linked list scanned on every retain/release,
+    // making 60 000 live strings take ~15 s; a hash table makes it a few milliseconds.
+    let source = "fn build(n: Int) -> Int {\n    mut words: List<String> = []\n    mut i = 0\n    while i < n {\n        words.push(\"w\" + \"x\")\n        i = i + 1\n    }\n    words.length()\n}\n\nfn main() -> Void {\n    print(build(60000))\n}\n";
+    let path = temp_artifact("allocator_scale.ostrin");
+    fs::write(&path, source).unwrap();
+    let exe = temp_artifact("allocator_scale.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "native compile failed: {}", stderr(&compile));
+    let started = std::time::Instant::now();
+    let native = Command::new(&exe).output().expect("failed to run binary");
+    let elapsed = started.elapsed();
+    let _ = fs::remove_file(&exe);
+    let _ = fs::remove_file(&path);
+    assert!(native.status.success());
+    assert_eq!(String::from_utf8_lossy(&native.stdout).trim(), "60000");
+    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"));
+    assert!(elapsed.as_secs_f64() < 5.0, "allocator is superlinear again: {elapsed:?}");
+}
+
+#[test]
 fn native_ir_emitter_handles_scalar_maps_and_sets() {
     let file = example_path("native_ir_maps_sets.ostrin");
     let expected = "3\ntrue\nfalse\n3\n3\n1\n3\n3\n2\ntrue\nfalse\n1\n2\n2\n";
