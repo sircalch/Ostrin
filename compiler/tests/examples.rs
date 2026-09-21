@@ -1915,6 +1915,7 @@ fn native_ir_string_methods_cross_block_ownership_and_short_circuit() {
         ("native_ir_cross_block_ownership.ostrin", "item-x\nitem-x!\n9\n2\n4\n24\n", 7usize),
         ("short_circuit.ostrin", "false\ntrue\ntrue\nfalse\n", 3usize),
         ("native_ir_param_ownership.ostrin", "abcd\nabcd\n", 3usize),
+        ("native_ir_print_compound.ostrin", "[ab, c]\nPoint { x: 3, label: pt }\nSome(yes)\nNone\n[1, 2, 3]\n[k: vw]\n", 4usize),
     ] {
         let path = example_path(file);
         let interpreted = run(&["--run", &path]);

@@ -5249,3 +5249,16 @@ el binario tardaba ~6 s (cuadrático). Ahora hay una tabla hash encadenada por p
 (`ostrin_table_link`, crecimiento al 75 % de carga, todo bajo el mutex del heap): el mismo programa
 tarda 0,07 s. `native_allocator_scales_linearly_with_live_allocations` construye 60 000 strings y
 exige < 5 s y `live_allocations=0`. Suite: **6 diferenciales, 169 de integración y 2 unitarias**.
+
+## 201. `print` de compuestos desde la IR y helpers de `show` sin fugas — 2026-09-20
+
+`ir_c::generate` recibe ahora un gancho `show` que registra en el backend el helper
+`ostrin_show_<Tipo>` y devuelve la expresión C, de modo que listas, mapas, sets, `Option`,
+records y enums se imprimen desde la IR (`main` ya no cae al camino AST por un `print(lista)`).
+El texto renderizado es una asignación propia: tanto la IR como el camino AST lo imprimen y lo
+liberan. Además los propios helpers `ostrin_show_*` filtraban todas las cadenas intermedias
+(`s = concat(s, x)` perdía el acumulador anterior y los `int_to_string`); ahora usan
+`ostrin_show_cat`/`ostrin_show_catf`, que consumen el acumulador y el fragmento temporal (los
+`String` de un contenedor son prestados y no se liberan). `native_ir_print_compound` imprime
+lista, record, `Option` y mapa con `live_allocations=0`. Suite: **6 diferenciales, 169 de
+integración y 2 unitarias**.
