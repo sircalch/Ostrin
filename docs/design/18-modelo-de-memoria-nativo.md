@@ -3,10 +3,10 @@
 *Estado: runtime con registro de allocations, callbacks de destrucción tipados para records,
 colecciones y entornos de tareas, primitivas `clone`/`drop`, primer lowering conservador de
 ownership y ABI `retain`/`release`. Las familias `String`, `Result` con payload escalar y
-error `String`, `List<T>` escalar, los núcleos
-escalares de `Map<K,V>`/`Set<T>`, records concretos y `Option<T>` escalar/`Option<String>`/
-`Option<Record>` ya consumen ownership desde la IR y terminan sin allocations vivas en las
-pruebas nativas. Los `Phi` simples transfieren la referencia entrante sin retenerla de nuevo,
+error `String`, `List<T>` escalar, `Option<List<T>>`/`Result<List<T>,E>`, los núcleos escalares
+de `Map<K,V>`/`Set<T>`, records concretos y `Option<T>` escalar/`Option<String>`/`Option<Record>`
+ya consumen ownership desde la IR y terminan sin allocations vivas en las pruebas nativas.
+Los `Phi` simples transfieren la referencia entrante sin retenerla de nuevo,
 y los `Phi` de bucle liberan el valor corriente después de su último uso seguro en el backedge;
 la inserción automática de RC por último uso sobre otros payloads gestionados de `Option` y
 agregados complejos todavía no está completa.*
@@ -55,8 +55,10 @@ por los helpers de colecciones. Los `Phi` simples transfieren la referencia entr
 retenerla de nuevo; los `Phi` de bucle liberan el valor corriente tras su último uso seguro en
 el backedge. `Option<T>` con payload escalar es un struct C por valor y no
 requiere RC; `Option<String>` retiene/libera condicionalmente su puntero y ya cubre
-`Some`/`None` simples; los records concretos pueden anidarse y vivir dentro de `Option` con
-el mismo contrato. `Result<Int,String>` y `Result<Float,String>` también retienen/liberan
+`Some`/`None` simples; las listas con elementos escalares o records pueden vivir dentro de
+`Option<List<T>>` y `Result<List<T>,E>` con el mismo retain/release condicional del puntero.
+Los records concretos pueden anidarse y vivir dentro de `Option` con el mismo contrato.
+`Result<Int,String>` y `Result<Float,String>` también retienen/liberan
 condicionalmente el campo activo y cubren los consumidores básicos de `String.to_int()` y
 `to_float()`, además de `try` y `try catch` inline, desde la IR. Otros payloads gestionados,
 patrones anidados y agregados complejos todavía no insertan RC por cada copia, retorno, phi o
@@ -85,7 +87,7 @@ El RC sobre el generador actual (texto C con expresiones‑sentencia) exigiría 
    (`--ownership-ir`) que marca transferencias lineales conocidas y el runtime ofrece el ABI;
    el backend C ya consume esa IR transformada para `String`, el núcleo escalar de `List<T>`,
    las operaciones escalares de `Map`/`Set`, records concretos y `Option` escalar/`Option<String>`/
-   `Option<Record>`, así como `Result` escalar con error `String`, `try`, `try catch` inline,
+   `Option<Record>`, `Option/List` y `Result/List`, así como `Result` escalar con error `String`, `try`, `try catch` inline,
    `map`/`map_err`/`then`, `Option.map`/`then` con lambdas inline y handlers globales de
    `try catch`; aún falta extenderla a otros payloads gestionados, handlers locales/closures
    no inline, patrones anidados, scopes, escapes complejos y payloads todavía no cubiertos por

@@ -5389,3 +5389,17 @@ las 6 funciones generan IR, el intérprete y el binario nativo imprimen `VALUE!`
 `handled: FAILURE`, y `--leak-check` termina con `live_allocations=0`. Siguen pendientes los
 handlers locales/closures no inline y los payloads compuestos que aún no tengan representación
 completa en el emisor IR.
+
+## 210. Payloads compuestos gestionados en `Option`/`Result` — 2026-09-21
+
+La IR nativa ya representa una capa de agregados gestionados dentro de los wrappers: listas
+escalares o de records pueden viajar como `Option<List<T>>` y como payload activo de
+`Result<List<T>, E>`. El mangle recursivo produce los mismos nombres ABI que el generador C
+genérico (`Option_List_String`, `Result_List_String_String`), y `Some`/`Ok`/`Err`, `match`,
+`TryValue`/`TryErrorValue`, `Phi` y los marcadores de ownership retienen o liberan la lista
+en el punto correcto.
+
+`examples/native_ir_option_list.ostrin` cubre `Some`/`None`, `Ok`/`Err`, indexación y métodos
+de `List<String>`. Sus 5 funciones se generan desde IR, coinciden con el intérprete y el
+binario nativo termina con `live_allocations=0`. Mapas/sets anidados y wrappers compuestos
+recursivos siguen fuera de este bloque hasta fijar su contrato de ownership específico.

@@ -1,0 +1,40 @@
+fn some_words() -> Option<List<String>> {
+    Some(["alpha", "beta"])
+}
+
+fn none_words() -> Option<List<String>> {
+    None
+}
+
+fn ok_words() -> Result<List<String>, String> {
+    Ok(["gamma", "delta"])
+}
+
+fn err_words() -> Result<List<String>, String> {
+    Err("bad")
+}
+
+fn main() -> Void {
+    match some_words() {
+        Some(words) => {
+            print(words.length())
+            print(words[0])
+        },
+        None => print("none")
+    }
+    match none_words() {
+        Some(words) => print(words.length()),
+        None => print("none")
+    }
+    match ok_words() {
+        Ok(words) => {
+            print(words.length())
+            print(words[0])
+        },
+        Err(error) => print(error)
+    }
+    match err_words() {
+        Ok(words) => print(words.length()),
+        Err(error) => print(error)
+    }
+}

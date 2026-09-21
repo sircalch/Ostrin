@@ -6,9 +6,9 @@
 //! managed families supported here are `String`, scalar-element `List<T>`
 //! (including the `List<String>` values produced by `String.split()`/`lines()`),
 //! and the scalar-key/value core of `Map<K,V>`/`Set<T>`, plus scalar-payload
-//! `Result<T,E>` values such as `String.to_int()`/`to_float()`; their ownership
-//! markers and native helpers are emitted directly into C while larger
-//! aggregates retain the verified HIR/AST fallback.
+//! `Result<T,E>` values such as `String.to_int()`/`to_float()`; `Option<List<T>>`
+//! and `Result<List<T>, E>` extend that native path to one managed aggregate
+//! layer while larger aggregates retain the verified HIR/AST fallback.
 
 use std::collections::{HashMap, HashSet};
 
@@ -88,15 +88,19 @@ fn set_supported(element: &Ty) -> bool {
 
 fn option_supported(element: &Ty, records: &RecordFields) -> bool {
     matches!(element, Ty::Int | Ty::Float | Ty::Float32 | Ty::Sized(_) | Ty::Bool | Ty::String)
+        || matches!(element, Ty::List(inner) if list_supported(inner, records))
         || matches!(element, Ty::Named(name) if records.contains_key(name))
 }
 
 fn option_managed_payload(element: &Ty, records: &RecordFields) -> bool {
-    matches!(element, Ty::String) || matches!(element, Ty::Named(name) if records.contains_key(name))
+    matches!(element, Ty::String | Ty::List(_))
+        || matches!(element, Ty::Named(name) if records.contains_key(name))
 }
 
 fn result_payload_supported(ty: &Ty, records: &RecordFields) -> bool {
-    (scalar(ty) && *ty != Ty::Void) || matches!(ty, Ty::Named(name) if records.contains_key(name))
+    (scalar(ty) && *ty != Ty::Void)
+        || matches!(ty, Ty::List(inner) if list_supported(inner, records))
+        || matches!(ty, Ty::Named(name) if records.contains_key(name))
 }
 
 fn result_supported(ok: &Ty, err: &Ty, records: &RecordFields) -> bool {
@@ -104,7 +108,8 @@ fn result_supported(ok: &Ty, err: &Ty, records: &RecordFields) -> bool {
 }
 
 fn result_managed_payload(ty: &Ty, records: &RecordFields) -> bool {
-    matches!(ty, Ty::String) || matches!(ty, Ty::Named(name) if records.contains_key(name))
+    matches!(ty, Ty::String | Ty::List(_))
+        || matches!(ty, Ty::Named(name) if records.contains_key(name))
 }
 
 fn option_type(element: &Ty) -> Ty {
@@ -126,6 +131,9 @@ fn mangle_scalar(ty: &Ty) -> String {
 fn mangle_option_payload(ty: &Ty, records: &RecordFields) -> String {
     match ty {
         Ty::Named(name) if records.contains_key(name) => name.clone(),
+        Ty::List(element) if list_supported(element, records) => {
+            format!("List_{}", mangle_option_payload(element, records))
+        }
         _ => mangle_scalar(ty),
     }
 }
