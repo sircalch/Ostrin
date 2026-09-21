@@ -5107,3 +5107,37 @@ necesitaban cambios), con 2 pruebas unitarias y `fmt_normalizes_layout_and_suppo
 Suite: **6 diferenciales y 160 de integración** (+2 unitarias del binario).
 
 Siguiente en D: `ostrinc test` como subcomando, docs generadas, CI multiplataforma de release.
+
+## 194. `%`, `break`/`continue` con `Phi` y fusión de ramas en la IR — 2026-09-20
+
+**Operador `%`.** Nuevo `BinOp::Rem` (parser, checker E1041 para tipos inválidos, intérprete,
+codegen AST, HIR→C e IR→C). `Int % Int` trunca como C (`ostrin_irem`, `x % -1 == 0`),
+`Float`/`Float32` usan `fmod`/`fmodf`, los enteros de ancho fijo comprueban divisor cero y usan
+`__int128`. Dividir por cero es error de ejecución en ambos backends.
+
+**Corrección de la IR.** Al probar `break`/`continue` apareció un fallo latente: `lower_if` y
+`lower_match` no fusionaban las variables asignadas en las ramas (`if c { r = 5 }; r` devolvía
+el valor anterior). No se manifestaba porque el `Phi` de tipo `Void` hacía que `ir_c` rechazara
+esas funciones. Ahora ambos crean un `Phi` por variable reasignada (`merge_branch_bindings`), el
+resultado `Void` es una constante unit, `match` restaura los bindings entre brazos, y el orden
+de los `Phi` de bucle es determinista (nombres ordenados).
+
+**`break`/`continue`.** Cada bucle registra sus aristas (`LoopEdges`): los `continue` aportan
+entradas a los `Phi` de cabecera (`while`) o de un bloque `step` (`for` sobre lista, solo si
+el cuerpo contiene `continue`; si no, el incremento queda en línea para que el pase de
+ownership vea el backedge donde están los últimos usos), y los `break` aportan un `Phi` de
+salida por variable asignada.
+
+**Límites de ownership (compuertas).** El pase lineal solo libera valores gestionados usados en
+un único bloque. Por eso: (1) una fusión gestionada en `if`/`match`/`break`/`continue` marca la
+función con un `Opaque("managed_join")` y (2) iterar con `for` una lista propia (no parámetro)
+marca `owned_loop_source`; en ambos casos la función sigue por el camino HIR verificado. Además
+el HIR liberaba mal: `for x in <temporal>` nunca liberaba la lista y la reasignación de un local
+gestionado en un ámbito anidado no liberaba el valor viejo; ambos casos quedan corregidos.
+
+Ejemplos `native_ir_branch_merge`, `native_ir_break_continue`, `rem_operator`; la prueba
+`native_ir_merges_branch_and_loop_bindings_and_supports_rem` compara intérprete y binario con
+`live_allocations=0`. Suite: **6 diferenciales, 162 de integración y 2 unitarias**.
+
+Siguiente: liveness entre bloques en el pase de ownership (liberación en aristas) para quitar
+las compuertas (1) y (2); después `for` sobre rangos.

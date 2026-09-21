@@ -220,12 +220,19 @@ pub struct VerifyReport {
     pub violations: Vec<String>,
 }
 
+#[derive(Default)]
+struct LoopEdges {
+    breaks: Vec<(BlockId, HashMap<String, ValueId>)>,
+    continues: Vec<(BlockId, HashMap<String, ValueId>)>,
+}
+
 struct Builder {
     function: IrFunction,
     current: BlockId,
     next_value: ValueId,
     locals: Vec<HashMap<String, ValueId>>,
     break_targets: Vec<(BlockId, BlockId)>,
+    loop_edges: Vec<LoopEdges>,
     region_depth: usize,
 }
 
@@ -248,6 +255,7 @@ impl Builder {
             next_value: 0,
             locals: vec![HashMap::new()],
             break_targets: Vec::new(),
+            loop_edges: Vec::new(),
             region_depth: 0,
         }
     }
@@ -439,6 +447,7 @@ impl Builder {
                             ty: Ty::Void,
                         });
                     }
+                    self.record_loop_edge(true);
                     self.terminate(IrTerminator::Goto(break_block));
                 } else {
                     self.terminate(IrTerminator::Unreachable);
@@ -446,6 +455,7 @@ impl Builder {
             }
             HirStmt::Continue => {
                 if let Some((_, continue_block)) = self.break_targets.last().copied() {
+                    self.record_loop_edge(false);
                     self.terminate(IrTerminator::Goto(continue_block));
                 } else {
                     self.terminate(IrTerminator::Unreachable);
@@ -459,6 +469,78 @@ impl Builder {
         }
     }
 
+    /// Records a `break`/`continue` edge with the visible bindings at that point,
+    /// so the loop can give its `Phi`s one incoming value per edge.
+    fn record_loop_edge(&mut self, is_break: bool) {
+        let block = self.current;
+        let visible = self.snapshot_visible();
+        if let Some(edges) = self.loop_edges.last_mut() {
+            if is_break {
+                edges.breaks.push((block, visible));
+            } else {
+                edges.continues.push((block, visible));
+            }
+        }
+    }
+
+    /// Emits one `Phi` per assigned variable at loop entry. Returns
+    /// `(name, phi, initial)` triples; incoming backedges are patched later.
+    fn loop_entry_phis(
+        &mut self,
+        visible_before: &HashMap<String, ValueId>,
+        body_text: &str,
+        preheader: BlockId,
+        backedge_placeholder: BlockId,
+    ) -> Vec<(String, ValueId, ValueId)> {
+        let mut loop_phis = Vec::new();
+        let mut ordered: Vec<(&String, &ValueId)> = visible_before.iter().collect();
+        ordered.sort();
+        for (name, initial) in ordered {
+            if !assigned_in(body_text, name) {
+                continue;
+            }
+            let ty = self.known_value_type(*initial).unwrap_or(Ty::Unknown);
+            let destination = self.fresh();
+            self.emit(IrInstr::Phi {
+                dst: destination,
+                incoming: vec![(preheader, *initial), (backedge_placeholder, *initial)],
+                ty,
+            });
+            self.bind(name, destination);
+            loop_phis.push((name.clone(), destination, *initial));
+        }
+        loop_phis
+    }
+
+    /// Emits the loop-exit block contents: when the loop has `break`s, every
+    /// assigned variable is merged between the normal exit and each break.
+    fn loop_exit_bindings(
+        &mut self,
+        loop_phis: &[(String, ValueId, ValueId)],
+        exit_block: BlockId,
+        breaks: &[(BlockId, HashMap<String, ValueId>)],
+    ) {
+        for (name, destination, _) in loop_phis {
+            if breaks.is_empty() {
+                self.bind(name, *destination);
+                continue;
+            }
+            let ty = self.known_value_type(*destination).unwrap_or(Ty::Unknown);
+            self.guard_managed_join(&ty);
+            let merged = self.fresh();
+            let mut incoming = vec![(exit_block, *destination)];
+            for (block, values) in breaks {
+                incoming.push((*block, values.get(name).copied().unwrap_or(*destination)));
+            }
+            self.emit(IrInstr::Phi {
+                dst: merged,
+                incoming,
+                ty,
+            });
+            self.bind(name, merged);
+        }
+    }
+
     fn lower_while(&mut self, condition: &HirExpr, body: &HirBlock) {
         self.ensure_open();
         let preheader = self.current;
@@ -469,22 +551,8 @@ impl Builder {
         self.terminate(IrTerminator::Goto(condition_block));
 
         self.current = condition_block;
-        let mut loop_phis = Vec::new();
         let body_text = format!("{body:?}");
-        for (name, initial) in &visible_before {
-            if !assigned_in(&body_text, name) {
-                continue;
-            }
-            let ty = self.known_value_type(*initial).unwrap_or(Ty::Unknown);
-            let destination = self.fresh();
-            self.emit(IrInstr::Phi {
-                dst: destination,
-                incoming: vec![(preheader, *initial), (body_block, *initial)],
-                ty,
-            });
-            self.bind(name, destination);
-            loop_phis.push((name.clone(), destination, *initial));
-        }
+        let loop_phis = self.loop_entry_phis(&visible_before, &body_text, preheader, body_block);
         let condition_value = self.lower_expr(condition);
         self.terminate(IrTerminator::Branch {
             condition: condition_value,
@@ -494,30 +562,60 @@ impl Builder {
 
         self.current = body_block;
         self.break_targets.push((after_block, condition_block));
+        self.loop_edges.push(LoopEdges::default());
         let _ = self.lower_block(body);
         self.break_targets.pop();
+        let edges = self.loop_edges.pop().unwrap_or_default();
         let body_open = !self.terminated();
         let backedge_block = self.current;
         let body_values = self.snapshot_visible();
         if body_open {
             self.terminate(IrTerminator::Goto(condition_block));
         }
-        self.current = after_block;
-        for (name, destination, initial) in loop_phis {
-            let mut incoming = vec![(preheader, initial)];
-            if body_open {
-                let value = body_values.get(&name).copied().unwrap_or(initial);
-                incoming.push((backedge_block, value));
-            }
-            self.patch_phi(destination, incoming);
-            self.bind(&name, destination);
+        let mut backedges = Vec::new();
+        if body_open {
+            backedges.push((backedge_block, body_values));
         }
+        backedges.extend(edges.continues);
+        if backedges.len() > 1 {
+            for (_, destination, _) in &loop_phis {
+                let ty = self.known_value_type(*destination).unwrap_or(Ty::Unknown);
+                self.guard_managed_join(&ty);
+            }
+        }
+        for (name, destination, initial) in &loop_phis {
+            let mut incoming = vec![(preheader, *initial)];
+            for (block, values) in &backedges {
+                incoming.push((*block, values.get(name).copied().unwrap_or(*initial)));
+            }
+            self.patch_phi(*destination, incoming);
+        }
+        self.current = after_block;
+        self.loop_exit_bindings(&loop_phis, condition_block, &edges.breaks);
     }
 
     /// `for x in list` as an index-driven SSA loop (same phi scheme as `while`).
-    /// Bodies with `break`/`continue` keep the opaque iterator form.
+    /// `continue` and the end of the body meet in a `step` block that advances
+    /// the index.
     fn lower_for_list(&mut self, var: &str, iter: &HirExpr, element: &Ty, body: &HirBlock) {
         let source = self.lower_expr(iter);
+        // The ownership pass cannot yet release a value that lives across the
+        // loop's blocks, so only a borrowed parameter may be iterated natively;
+        // an owned list keeps the function on the verified HIR path.
+        let borrowed = self
+            .function
+            .blocks
+            .iter()
+            .flat_map(|block| block.instructions.iter())
+            .any(|instruction| matches!(instruction, IrInstr::Param { dst, .. } if *dst == source));
+        if !borrowed && crate::ownership::requires_management(&iter.ty) {
+            self.emit(IrInstr::Opaque {
+                dst: None,
+                op: "owned_loop_source".to_string(),
+                inputs: Vec::new(),
+                ty: Ty::Void,
+            });
+        }
         let length = self.fresh();
         self.emit(IrInstr::MethodCall {
             dst: Some(length),
@@ -531,6 +629,12 @@ impl Builder {
         let visible_before = self.snapshot_visible();
         let condition_block = self.new_block();
         let body_block = self.new_block();
+        // A separate `step` block is only needed when `continue` must rejoin the
+        // body's fall-through; otherwise the increment stays at the end of the
+        // body so the loop's backedge block is the block holding the last uses.
+        let body_text = format!("{body:?}");
+        let needs_step = body_text.contains("Continue");
+        let step_block = if needs_step { self.new_block() } else { body_block };
         let after_block = self.new_block();
         self.terminate(IrTerminator::Goto(condition_block));
 
@@ -538,25 +642,10 @@ impl Builder {
         let index = self.fresh();
         self.emit(IrInstr::Phi {
             dst: index,
-            incoming: vec![(preheader, zero), (body_block, zero)],
+            incoming: vec![(preheader, zero), (step_block, zero)],
             ty: Ty::Int,
         });
-        let mut loop_phis = Vec::new();
-        let body_text = format!("{body:?}");
-        for (name, initial) in &visible_before {
-            if !assigned_in(&body_text, name) {
-                continue;
-            }
-            let ty = self.known_value_type(*initial).unwrap_or(Ty::Unknown);
-            let destination = self.fresh();
-            self.emit(IrInstr::Phi {
-                dst: destination,
-                incoming: vec![(preheader, *initial), (body_block, *initial)],
-                ty,
-            });
-            self.bind(name, destination);
-            loop_phis.push((name.clone(), destination, *initial));
-        }
+        let loop_phis = self.loop_entry_phis(&visible_before, &body_text, preheader, step_block);
         let has_next = self.fresh();
         self.emit(IrInstr::Binary {
             dst: has_next,
@@ -572,6 +661,8 @@ impl Builder {
         });
 
         self.current = body_block;
+        self.break_targets.push((after_block, step_block));
+        self.loop_edges.push(LoopEdges::default());
         self.locals.push(HashMap::new());
         let item = self.fresh();
         self.emit(IrInstr::Index {
@@ -586,12 +677,52 @@ impl Builder {
             .insert(var.to_string(), item);
         let _ = self.lower_block_contents(body);
         self.locals.pop();
+        self.break_targets.pop();
+        let edges = self.loop_edges.pop().unwrap_or_default();
         let body_open = !self.terminated();
-        let backedge_block = self.current;
-        let body_values = self.snapshot_visible();
-        let one = self.const_value("1", Ty::Int);
-        let next_index = self.fresh();
+        let mut step_preds = Vec::new();
         if body_open {
+            let values = self.snapshot_visible();
+            step_preds.push((self.current, values));
+            if needs_step {
+                self.terminate(IrTerminator::Goto(step_block));
+            }
+        }
+        step_preds.extend(edges.continues);
+
+        // Step: merge the incoming bindings, then advance the index. Without
+        // `continue` this runs inline at the end of the body block.
+        let step_block = if needs_step { step_block } else { self.current };
+        if needs_step {
+            self.current = step_block;
+        }
+        let mut step_values: HashMap<String, ValueId> = HashMap::new();
+        if step_preds.len() == 1 {
+            step_values = step_preds[0].1.clone();
+        } else {
+            for (name, destination, initial) in &loop_phis {
+                if step_preds.is_empty() {
+                    break;
+                }
+                let ty = self.known_value_type(*destination).unwrap_or(Ty::Unknown);
+                self.guard_managed_join(&ty);
+                let merged = self.fresh();
+                let incoming = step_preds
+                    .iter()
+                    .map(|(block, values)| (*block, values.get(name).copied().unwrap_or(*initial)))
+                    .collect();
+                self.emit(IrInstr::Phi {
+                    dst: merged,
+                    incoming,
+                    ty,
+                });
+                step_values.insert(name.clone(), merged);
+            }
+        }
+        let reachable = !step_preds.is_empty();
+        if reachable {
+            let one = self.const_value("1", Ty::Int);
+            let next_index = self.fresh();
             self.emit(IrInstr::Binary {
                 dst: next_index,
                 op: BinOp::Add,
@@ -600,32 +731,29 @@ impl Builder {
                 ty: Ty::Int,
             });
             self.terminate(IrTerminator::Goto(condition_block));
+            self.patch_phi(index, vec![(preheader, zero), (step_block, next_index)]);
+        } else {
+            if !self.terminated() {
+                self.terminate(IrTerminator::Unreachable);
+            }
+            self.patch_phi(index, vec![(preheader, zero)]);
+        }
+        for (name, destination, initial) in &loop_phis {
+            let mut incoming = vec![(preheader, *initial)];
+            if reachable {
+                incoming.push((step_block, step_values.get(name).copied().unwrap_or(*initial)));
+            }
+            self.patch_phi(*destination, incoming);
         }
         self.current = after_block;
-        let mut index_incoming = vec![(preheader, zero)];
-        if body_open {
-            index_incoming.push((backedge_block, next_index));
-        }
-        self.patch_phi(index, index_incoming);
-        for (name, destination, initial) in loop_phis {
-            let mut incoming = vec![(preheader, initial)];
-            if body_open {
-                let value = body_values.get(&name).copied().unwrap_or(initial);
-                incoming.push((backedge_block, value));
-            }
-            self.patch_phi(destination, incoming);
-            self.bind(&name, destination);
-        }
+        self.loop_exit_bindings(&loop_phis, condition_block, &edges.breaks);
     }
 
     fn lower_for(&mut self, var: &str, iter: &HirExpr, body: &HirBlock) {
         if let Ty::List(element) = &iter.ty {
-            let text = format!("{body:?}");
-            if !text.contains("Break") && !text.contains("Continue") {
-                let element = (**element).clone();
-                self.lower_for_list(var, iter, &element, body);
-                return;
-            }
+            let element = (**element).clone();
+            self.lower_for_list(var, iter, &element, body);
+            return;
         }
         let source = self.lower_expr(iter);
         let iterator = self.fresh();
@@ -654,6 +782,7 @@ impl Builder {
 
         self.current = body_block;
         self.break_targets.push((after_block, condition_block));
+        self.loop_edges.push(LoopEdges::default());
         self.locals.push(HashMap::new());
         let item = self.fresh();
         self.emit(IrInstr::IterNext {
@@ -668,10 +797,68 @@ impl Builder {
         let _ = self.lower_block_contents(body);
         self.locals.pop();
         self.break_targets.pop();
+        self.loop_edges.pop();
         if !self.terminated() {
             self.terminate(IrTerminator::Goto(condition_block));
         }
         self.current = after_block;
+    }
+
+    /// The ownership pass only understands managed `Phi`s at simple joins.
+    /// A managed value merged across branches/`break`/`continue` marks the
+    /// function as not lowerable natively from IR (the verified HIR path
+    /// takes over) instead of risking a leak or double release.
+    fn guard_managed_join(&mut self, ty: &Ty) {
+        if crate::ownership::requires_management(ty) {
+            self.emit(IrInstr::Opaque {
+                dst: None,
+                op: "managed_join".to_string(),
+                inputs: Vec::new(),
+                ty: Ty::Void,
+            });
+        }
+    }
+
+    /// Names visible before a branch construct that some branch re-binds.
+    fn assigned_names(before: &HashMap<String, ValueId>, texts: &[String]) -> Vec<String> {
+        let mut names: Vec<String> = before
+            .keys()
+            .filter(|name| texts.iter().any(|text| assigned_in(text, name)))
+            .cloned()
+            .collect();
+        names.sort();
+        names
+    }
+
+    /// At a join block: give every re-bound variable a `Phi` over the branches
+    /// that reach it (or reuse the single/common value).
+    fn merge_branch_bindings(
+        &mut self,
+        names: &[String],
+        before: &HashMap<String, ValueId>,
+        edges: &[(BlockId, HashMap<String, ValueId>)],
+    ) {
+        for name in names {
+            let Some(initial) = before.get(name).copied() else { continue };
+            let incoming: Vec<(BlockId, ValueId)> = edges
+                .iter()
+                .map(|(block, values)| (*block, values.get(name).copied().unwrap_or(initial)))
+                .collect();
+            let Some(&(_, first)) = incoming.first() else { continue };
+            if incoming.iter().all(|(_, value)| *value == first) {
+                self.bind(name, first);
+                continue;
+            }
+            let ty = self.known_value_type(initial).unwrap_or(Ty::Unknown);
+            self.guard_managed_join(&ty);
+            let merged = self.fresh();
+            self.emit(IrInstr::Phi {
+                dst: merged,
+                incoming,
+                ty,
+            });
+            self.bind(name, merged);
+        }
     }
 
     fn lower_if(
@@ -692,10 +879,13 @@ impl Builder {
         });
 
         let visible_before = self.snapshot_visible();
+        let branch_texts = [format!("{then_block:?}"), format!("{else_block:?}")];
+        let assigned = Self::assigned_names(&visible_before, &branch_texts);
         self.current = then_id;
         let then_result = self.lower_block(then_block);
         let then_open = !self.terminated();
         let then_predecessor = self.current;
+        let then_values = self.snapshot_visible();
         let then_value =
             then_result.unwrap_or_else(|| if then_open { self.unit() } else { self.fresh() });
         if then_open {
@@ -707,6 +897,7 @@ impl Builder {
         let else_result = else_block.and_then(|block| self.lower_block(block));
         let else_open = !self.terminated();
         let else_predecessor = self.current;
+        let else_values = self.snapshot_visible();
         let else_value =
             else_result.unwrap_or_else(|| if else_open { self.unit() } else { self.fresh() });
         if else_open {
@@ -715,11 +906,18 @@ impl Builder {
 
         self.current = merge_id;
         let mut incoming = Vec::new();
+        let mut edges = Vec::new();
         if then_open {
             incoming.push((then_predecessor, then_value));
+            edges.push((then_predecessor, then_values));
         }
         if else_open {
             incoming.push((else_predecessor, else_value));
+            edges.push((else_predecessor, else_values));
+        }
+        self.merge_branch_bindings(&assigned, &visible_before, &edges);
+        if *ty == Ty::Void {
+            return self.unit();
         }
         let dst = self.fresh();
         self.emit(IrInstr::Phi {
@@ -735,6 +933,10 @@ impl Builder {
         let merge_block = self.new_block();
         let mut test_block = self.current;
         let mut incoming = Vec::new();
+        let mut edges = Vec::new();
+        let visible_before = self.snapshot_visible();
+        let arm_texts: Vec<String> = arms.iter().map(|arm| format!("{:?}", arm.body)).collect();
+        let assigned = Self::assigned_names(&visible_before, &arm_texts);
 
         for arm in arms {
             let arm_block = self.new_block();
@@ -779,8 +981,10 @@ impl Builder {
             let body_open = !self.terminated();
             if body_open {
                 incoming.push((self.current, body_value));
+                edges.push((self.current, self.snapshot_visible()));
                 self.terminate(IrTerminator::Goto(merge_block));
             }
+            self.restore_visible(&visible_before);
             self.locals.pop();
             test_block = next_test;
         }
@@ -790,6 +994,10 @@ impl Builder {
             self.terminate(IrTerminator::Unreachable);
         }
         self.current = merge_block;
+        self.merge_branch_bindings(&assigned, &visible_before, &edges);
+        if *ty == Ty::Void {
+            return self.unit();
+        }
         let dst = self.fresh();
         self.emit(IrInstr::Phi {
             dst,

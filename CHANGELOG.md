@@ -3,6 +3,8 @@
 ## Unreleased
 
 ### Language and libraries
+- Remainder operator `%` for `Int`, `Float`, `Float32` and fixed-width integers (truncating, like C;
+  division by zero is a runtime error in both backends; not defined for quantities or arrays).
 - First-class function values and closures (`fn(Int) -> Int` types, lambdas that
   capture, named functions as values, closures returned from functions), in the
   interpreter, the checker (lambda parameter types inferred from context) and the

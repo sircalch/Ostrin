@@ -1559,10 +1559,15 @@ fn native_hir_handles_option_result_core() {
             return;
         }
         assert!(report.status.success(), "native type report failed for {file}: {}", stderr(&report));
-        let hir_functions = stdout(&report)
+        // Functions migrate from HIR to the IR emitter over time; count both.
+        let hir_functions: usize = stdout(&report)
             .lines()
-            .find_map(|line| line.strip_prefix("hir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
-            .unwrap_or(0);
+            .filter_map(|line| {
+                line.strip_prefix("hir-generated: ")
+                    .or_else(|| line.strip_prefix("ir-generated: "))
+                    .and_then(|n| n.trim().parse::<usize>().ok())
+            })
+            .sum();
         assert!(hir_functions >= minimum_hir_functions, "{file} generated only {hir_functions} HIR function(s), expected at least {minimum_hir_functions}");
     }
 }
@@ -1849,6 +1854,57 @@ fn fmt_normalizes_layout_and_supports_write_and_check() {
     let check = run(&["--fmt", "--check", &path]);
     assert!(check.status.success(), "--check must pass after --write: {}", stderr(&check));
     let _ = fs::remove_file(&path);
+}
+
+#[test]
+fn native_ir_merges_branch_and_loop_bindings_and_supports_rem() {
+    // (file, expected stdout, minimum IR-generated functions)
+    for (file, expected, minimum_ir) in [
+        ("native_ir_branch_merge.ostrin", "5\n0\n5\n7\n", 3usize),
+        ("native_ir_break_continue.ostrin", "9\n9\nab\n802\n", 4usize),
+        ("rem_operator.ostrin", "1\n-1\n1\n1.5\n4\n12\n", 1usize),
+    ] {
+        let path = example_path(file);
+        let interpreted = run(&["--run", &path]);
+        assert!(interpreted.status.success(), "interpreter failed for {file}: {}", stderr(&interpreted));
+        assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected, "interpreter output for {file}");
+
+        let report = run(&["--native-type-report", &path]);
+        if skip_if_no_c_compiler(&report) {
+            return;
+        }
+        let ir_functions = stdout(&report)
+            .lines()
+            .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+            .unwrap_or(0);
+        assert!(ir_functions >= minimum_ir, "{file} generated only {ir_functions} IR function(s): {}", stdout(&report));
+
+        let exe = temp_artifact(&format!("merge_{file}.exe"));
+        let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+        assert!(compile.status.success(), "compile failed for {file}: {}", stderr(&compile));
+        let native = Command::new(&exe).output().expect("failed to run native binary");
+        let _ = fs::remove_file(&exe);
+        assert!(native.status.success(), "native run failed for {file}");
+        assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "{file} leaked: {}", String::from_utf8_lossy(&native.stderr));
+        assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected, "native output for {file}");
+    }
+}
+
+#[test]
+fn rem_operator_reports_zero_divisor_and_type_errors() {
+    let zero = temp_artifact("rem_zero.ostrin");
+    fs::write(&zero, "fn main() -> Void {\n    z = 0\n    print(5 % z)\n}\n").unwrap();
+    let output = run(&["--run", &zero]);
+    assert!(!output.status.success(), "division by zero must fail");
+    assert!(stderr(&output).contains("division by zero"), "unexpected stderr: {}", stderr(&output));
+    let _ = fs::remove_file(&zero);
+
+    let bad = temp_artifact("rem_type.ostrin");
+    fs::write(&bad, "fn main() -> Void {\n    print(\"a\" % 2)\n}\n").unwrap();
+    let output = run(&[&bad]);
+    assert!(!output.status.success());
+    assert!(stdout(&output).contains("E1041") || stderr(&output).contains("E1041"), "expected E1041");
+    let _ = fs::remove_file(&bad);
 }
 
 #[test]

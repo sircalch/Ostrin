@@ -620,7 +620,7 @@ fn analyze_function(function: &crate::ir::IrFunction, report: &mut OwnershipRepo
     }
 }
 
-fn requires_management(ty: &Ty) -> bool {
+pub(crate) fn requires_management(ty: &Ty) -> bool {
     match ty {
         Ty::String | Ty::List(_) | Ty::Map(_, _) | Ty::Set(_) | Ty::Dyn(_) | Ty::Fn(_, _) => true,
         Ty::Applied(name, args) if name == "Option" && args.len() == 1 && option_value_payload(&args[0]) => false,

@@ -1,0 +1,18 @@
+fn wrap(n: Int, size: Int) -> Int {
+    (n % size + size) % size
+}
+
+fn main() -> Void {
+    print(7 % 3)
+    print(-7 % 3)
+    print(7 % -3)
+    print(7.5 % 2.0)
+    print(wrap(-1, 5))
+    mut total = 0
+    for i in [1, 2, 3, 4, 5, 6] {
+        if i % 2 == 0 {
+            total = total + i
+        }
+    }
+    print(total)
+}

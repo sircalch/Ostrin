@@ -1,0 +1,22 @@
+fn pick(c: Bool) -> Int {
+    mut r = 0
+    if c {
+        r = 5
+    }
+    r
+}
+fn pick2(c: Bool) -> Int {
+    mut r = 0
+    if c {
+        r = 5
+    } else {
+        r = 7
+    }
+    r
+}
+fn main() -> Void {
+    print(pick(true))
+    print(pick(false))
+    print(pick2(true))
+    print(pick2(false))
+}

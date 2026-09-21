@@ -956,6 +956,12 @@ static int64_t ostrin_idiv(int64_t a, int64_t b) {\n\
     return a / b;\n\
 }\n\
 \n\
+static int64_t ostrin_irem(int64_t a, int64_t b) {\n\
+    if (b == 0) { fprintf(stderr, \"runtime error: division by zero\\n\"); exit(1); }\n\
+    if (b == -1) return 0;\n\
+    return a % b;\n\
+}\n\
+\n\
 static uint64_t ostrin_hash_u64(uint64_t value) {\n\
     value ^= value >> 30;\n\
     value *= UINT64_C(0xbf58476d1ce4e5b9);\n\
@@ -4433,6 +4439,12 @@ impl<'a> Codegen<'a> {
                 ),
                 lt.clone(),
             ),
+            BinOp::Rem => (
+                format!(
+                    "({{ {decl} if ({b} == 0) {{ fprintf(stderr, \"runtime error: division by zero\\n\"); exit(1); }} ({c})((__int128){a} % (__int128){b}); }})"
+                ),
+                lt.clone(),
+            ),
             BinOp::Eq => (format!("(({lc}) == ({rc}))"), CType::Bool),
             BinOp::NotEq => (format!("(({lc}) != ({rc}))"), CType::Bool),
             BinOp::Lt => (format!("(({lc}) < ({rc}))"), CType::Bool),
@@ -4547,6 +4559,7 @@ impl<'a> Codegen<'a> {
                 BinOp::Sub => ("-", CType::Float32),
                 BinOp::Mul => ("*", CType::Float32),
                 BinOp::Div => ("/", CType::Float32),
+                BinOp::Rem => return Ok((format!("fmodf({lc}, {rc})"), CType::Float32)),
                 BinOp::Eq => ("==", CType::Bool),
                 BinOp::NotEq => ("!=", CType::Bool),
                 BinOp::Lt => ("<", CType::Bool),
@@ -4594,6 +4607,13 @@ impl<'a> Codegen<'a> {
             BinOp::Sub => "-",
             BinOp::Mul => "*",
             BinOp::Div => "/",
+            BinOp::Rem => {
+                return Ok(if lt == CType::Int && rt == CType::Int {
+                    (format!("ostrin_irem({lc}, {rc})"), CType::Int)
+                } else {
+                    (format!("fmod({lc}, {rc})"), CType::Float)
+                });
+            }
             BinOp::Eq => "==",
             BinOp::NotEq => "!=",
             BinOp::Lt => "<",

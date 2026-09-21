@@ -433,7 +433,7 @@ impl Emitter<'_> {
             HirStmt::Assign { name, value } => {
                 let code = self.expr(value)?;
                 if self.declared(name) {
-                    if self.scopes.len() == 1 && self.owned_local(name) && self.managed(&value.ty) {
+                    if self.owned_local(name) && self.managed(&value.ty) {
                         let temp = self.next_temp();
                         let ty = self.c_type(&value.ty)?;
                         out.push_str(&format!("    {ty} {temp} = {code};\n"));
@@ -525,7 +525,12 @@ impl Emitter<'_> {
                 self.scoped_stmts(body, out)?;
                 self.scopes.pop();
                 self.end_loop(frame, out);
-                out.push_str("    } }\n");
+                out.push_str("    }\n");
+                // A temporary list (literal or call result) is owned by the loop.
+                if !Self::borrowed_expr(iter) {
+                    out.push_str(&format!("    ostrin_release((void*){list_temp});\n"));
+                }
+                out.push_str("    }\n");
             }
             HirStmt::Expr(e) => self.expr_stmt(e, out)?,
             _ => return Err(()),
@@ -858,6 +863,9 @@ impl Emitter<'_> {
                 kind.min(),
                 kind.max()
             ),
+            BinOp::Rem => format!(
+                "({{ {decl} if ({b} == 0) {{ fprintf(stderr, \"runtime error: division by zero\\n\"); exit(1); }} ({c})((__int128){a} % (__int128){b}); }})"
+            ),
             BinOp::Eq => format!("(({lc}) == ({rc}))"),
             BinOp::NotEq => format!("(({lc}) != ({rc}))"),
             BinOp::Lt => format!("(({lc}) < ({rc}))"),
@@ -878,6 +886,7 @@ impl Emitter<'_> {
             BinOp::Sub => "-",
             BinOp::Mul => "*",
             BinOp::Div => "/",
+            BinOp::Rem => return Ok(format!("fmodf({lc}, {rc})")),
             BinOp::Eq => "==",
             BinOp::NotEq => "!=",
             BinOp::Lt => "<",
@@ -1078,11 +1087,19 @@ impl Emitter<'_> {
                 if *op == BinOp::Div && l.ty == Ty::Int && r.ty == Ty::Int {
                     return Ok(format!("ostrin_idiv({lc}, {rc})"));
                 }
+                if *op == BinOp::Rem {
+                    return Ok(if l.ty == Ty::Int && r.ty == Ty::Int {
+                        format!("ostrin_irem({lc}, {rc})")
+                    } else {
+                        format!("fmod({lc}, {rc})")
+                    });
+                }
                 let c_op = match op {
                     BinOp::Add => "+",
                     BinOp::Sub => "-",
                     BinOp::Mul => "*",
                     BinOp::Div => "/",
+                    BinOp::Rem => unreachable!("handled above"),
                     BinOp::Eq => "==",
                     BinOp::NotEq => "!=",
                     BinOp::Lt => "<",

@@ -248,6 +248,9 @@ fn sized_binary_code(
             min = c_int_literal(kind.min()),
             max = c_int_literal(kind.max()),
         ),
+        BinOp::Rem => format!(
+            "({{ {c} {a} = {left}; {c} {b} = {right}; if ({b} == 0) {{ fprintf(stderr, \"runtime error: division by zero\\n\"); exit(1); }} ({c})((__int128){a} % (__int128){b}); }})"
+        ),
         BinOp::Eq => format!("(({left}) == ({right}))"),
         BinOp::NotEq => format!("(({left}) != ({right}))"),
         BinOp::Lt => format!("(({left}) < ({right}))"),
@@ -285,11 +288,21 @@ fn binary_code(
     if *ty == Ty::Int && op == BinOp::Div {
         return Ok(format!("ostrin_idiv({left}, {right})"));
     }
+    if op == BinOp::Rem {
+        return Ok(if *left_ty == Ty::Int && *right_ty == Ty::Int {
+            format!("ostrin_irem({left}, {right})")
+        } else if *left_ty == Ty::Float32 {
+            format!("fmodf({left}, {right})")
+        } else {
+            format!("fmod({left}, {right})")
+        });
+    }
     let symbol = match op {
         BinOp::Add => "+",
         BinOp::Sub => "-",
         BinOp::Mul => "*",
         BinOp::Div => "/",
+        BinOp::Rem => unreachable!("handled above"),
         BinOp::Eq => "==",
         BinOp::NotEq => "!=",
         BinOp::Lt => "<",

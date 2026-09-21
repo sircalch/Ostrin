@@ -3300,6 +3300,13 @@ fn sized_binary(op: BinOp, lv: Value, rv: Value) -> EvalResult {
                 checked(a.checked_div(b), "/")
             }
         }
+        Rem => {
+            if b == 0 {
+                Err(RuntimeError::Error("division by zero".to_string()))
+            } else {
+                checked(a.checked_rem(b), "%")
+            }
+        }
         Eq => Ok(Value::Bool(a == b)),
         NotEq => Ok(Value::Bool(a != b)),
         Lt => Ok(Value::Bool(a < b)),
@@ -3378,6 +3385,7 @@ fn f32_binary(op: BinOp, lv: Value, rv: Value) -> EvalResult {
         Sub => Value::F32(a - b),
         Mul => Value::F32(a * b),
         Div => Value::F32(a / b),
+        Rem => Value::F32(a % b),
         Eq => Value::Bool(a == b),
         NotEq => Value::Bool(a != b),
         Lt => Value::Bool(a < b),
@@ -3466,6 +3474,19 @@ fn eval_binary_builtin(op: BinOp, lv: Value, rv: Value) -> EvalResult {
                 let b = as_f64(&rv)?;
                 Ok(Value::Float(if op == Mul { a * b } else { a / b }))
             }
+        },
+        Rem => match (&lv, &rv) {
+            (Value::Quantity(..), _) | (_, Value::Quantity(..)) => {
+                Err(RuntimeError::Error("the '%' operator does not apply to quantities".to_string()))
+            }
+            (Value::Int(a), Value::Int(b)) => {
+                if *b == 0 {
+                    Err(RuntimeError::Error("division by zero".to_string()))
+                } else {
+                    Ok(Value::Int(a.wrapping_rem(*b)))
+                }
+            }
+            _ => Ok(Value::Float(as_f64(&lv)? % as_f64(&rv)?)),
         },
         Eq | NotEq | Lt | Gt | LtEq | GtEq => {
             let ordering = compare(&lv, &rv)?;

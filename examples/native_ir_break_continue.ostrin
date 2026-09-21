@@ -1,0 +1,58 @@
+fn first_over(xs: List<Int>, limit: Int) -> Int {
+    mut found = 0
+    for x in xs {
+        if x > limit {
+            found = x
+            break
+        }
+    }
+    found
+}
+
+fn sum_odd(xs: List<Int>) -> Int {
+    mut total = 0
+    for x in xs {
+        if x % 2 == 0 {
+            continue
+        }
+        total = total + x
+    }
+    total
+}
+
+fn collect(xs: List<String>, stop: String) -> String {
+    mut out = ""
+    for w in xs {
+        if w == "skip" {
+            continue
+        }
+        if w == stop {
+            break
+        }
+        out = out + w
+    }
+    out
+}
+
+fn count_until(limit: Int) -> Int {
+    mut i = 0
+    mut skipped = 0
+    while true {
+        i = i + 1
+        if i % 3 == 0 {
+            skipped = skipped + 1
+            continue
+        }
+        if i > limit {
+            break
+        }
+    }
+    i * 100 + skipped
+}
+
+fn main() -> Void {
+    print(first_over([1, 5, 9, 12], 6))
+    print(sum_odd([1, 2, 3, 4, 5]))
+    print(collect(["a", "skip", "b", "stop", "c"], "stop"))
+    print(count_until(7))
+}

@@ -2318,6 +2318,14 @@ impl Checker {
                     Ty::Unknown
                 }
             },
+            Rem => match (&lt, &rt) {
+                (Ty::Int, Ty::Int) => Ty::Int,
+                (a, b) if a.is_numeric_scalar() && b.is_numeric_scalar() => Ty::Float,
+                _ => {
+                    self.push("E1041", format!("Cannot apply '%' to '{}' and '{}'.", lt.describe(), rt.describe()));
+                    Ty::Unknown
+                }
+            },
             Eq | NotEq | Lt | Gt | LtEq | GtEq => {
                 if let (Ty::Quantity(d1), Ty::Quantity(d2)) = (&lt, &rt) {
                     if d1 != d2 {
