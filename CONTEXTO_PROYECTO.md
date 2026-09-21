@@ -5341,6 +5341,23 @@ y el binario termina con `live_allocations=0`.
 
 `native_result.ostrin` pasó de 4 funciones IR + 2 HIR a **6 funciones generadas desde IR**;
 `native_result_catch.ostrin` ya genera sus 3 funciones desde IR y `try_result.ostrin` conserva
-solo un fallback no relacionado con la propagación. La suite sigue en **6 diferenciales, 170
-de integración y 2 unitarias**. La siguiente frontera es migrar combinadores de `Result`,
-handlers no inline y payloads compuestos con el mismo contrato.
+solo un fallback no relacionado con la propagación. La siguiente frontera identificada fue
+migrar combinadores de `Result`, handlers no inline y payloads compuestos con el mismo contrato.
+
+## 207. Combinadores de `Result` inline desde la IR — 2026-09-21
+
+`Result.map`, `Result.map_err` y `Result.then` con lambdas inline ya se expanden en CFG nativo.
+Cada operación inspecciona el discriminante con `TryCheck`, extrae el payload activo mediante
+`TryValue`/`TryErrorValue`, ejecuta el cuerpo de la lambda en la rama correspondiente y combina
+los dos resultados con `Phi`; las ramas que no transforman el payload reconstruyen `Ok`/`Err`
+con el tipo de retorno concreto.
+
+El typechecker ahora propaga el tipo contextual parcial dentro de constructores como `Ok(x)` y
+`Err(e)`, de modo que un `then` que devuelve `Result<U,E>` conserva el `E` del receptor aunque
+`U` se infiera dentro de la lambda. `examples/native_ir_result_combinators.ostrin` cubre
+transformación de éxito, propagación de error, `map_err` en ambas variantes y `then`; genera sus
+9 funciones desde IR, coincide con el intérprete y termina con `live_allocations=0`.
+
+La ownership IR queda sin valores ni funciones irresueltos en ese ejemplo. Siguen pendientes los
+combinadores de `Option`, handlers no inline, payloads compuestos y la expansión completa de
+closures que escapan del sitio de llamada.

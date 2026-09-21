@@ -1,0 +1,58 @@
+fn ok_text() -> Result<String, String> {
+    Ok("value".to_upper())
+}
+
+fn err_text() -> Result<String, String> {
+    Err("bad".to_upper())
+}
+
+fn map_ok() -> Result<String, String> {
+    ok_text().map(fn(text) { text + "!" })
+}
+
+fn map_err_passthrough() -> Result<String, String> {
+    err_text().map(fn(text) { text + "!" })
+}
+
+fn map_err_rewrite() -> Result<String, String> {
+    err_text().map_err(fn(error) { "wrapped: " + error })
+}
+
+fn map_err_ok_passthrough() -> Result<String, String> {
+    ok_text().map_err(fn(error) { "unused: " + error })
+}
+
+fn then_ok() -> Result<Int, String> {
+    ok_text().then(fn(text) { Ok(text.length()) })
+}
+
+fn then_err() -> Result<Int, String> {
+    err_text().then(fn(text) { Ok(text.length()) })
+}
+
+fn main() -> Void {
+    match map_ok() {
+        Ok(value) => print(value),
+        Err(error) => print(error),
+    }
+    match map_err_passthrough() {
+        Ok(value) => print(value),
+        Err(error) => print(error),
+    }
+    match map_err_rewrite() {
+        Ok(value) => print(value),
+        Err(error) => print(error),
+    }
+    match map_err_ok_passthrough() {
+        Ok(value) => print(value),
+        Err(error) => print(error),
+    }
+    match then_ok() {
+        Ok(value) => print(value),
+        Err(error) => print(error),
+    }
+    match then_err() {
+        Ok(value) => print(value),
+        Err(error) => print(error),
+    }
+}

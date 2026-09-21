@@ -2508,7 +2508,9 @@ impl Checker {
         scope: &mut Scope,
     ) -> Ty {
         if let (Expr::Lambda(params, body), Some(Ty::Fn(expected_params, expected_ret))) = (expr.unlocated(), expected) {
-            let ty = self.infer_lambda(params, body, Some(expected_params), Some(expected_ret.as_ref()), scope);
+            let inferred = self.infer_lambda(params, body, Some(expected_params), Some(expected_ret.as_ref()), scope);
+            let expected_type = Ty::Fn(expected_params.clone(), expected_ret.clone());
+            let ty = refine_expected_type(&inferred, &expected_type);
             // This path bypasses `infer_expr`, so record the lambda's type here (every layer around it).
             let mut layer = expr;
             loop {
@@ -2524,7 +2526,25 @@ impl Checker {
             }
             return ty;
         }
-        self.infer_expr(expr, scope)
+        let inferred = self.infer_expr(expr, scope);
+        let Some(expected) = expected else { return inferred };
+        let refined = refine_expected_type(&inferred, expected);
+        if refined != inferred {
+            self.set_node_type_layers(expr, &refined);
+            let mut layer = expr;
+            loop {
+                if let Expr::Located(_, range) = layer {
+                    let key = ExprKey { file: self.current_source_file.clone(), start: range.start, end: range.end };
+                    self.expr_types.insert(key, refined.clone());
+                    if let Expr::Located(inner, _) = layer {
+                        layer = inner;
+                        continue;
+                    }
+                }
+                break;
+            }
+        }
+        refined
     }
 
     fn infer_lambda(
@@ -4867,6 +4887,44 @@ fn array_elem(ty: &Ty) -> Option<Ty> {
 
 fn is_array_scalar(ty: &Ty) -> bool {
     matches!(ty, Ty::Int | Ty::Float | Ty::Float32 | Ty::Sized(_) | Ty::Bool)
+}
+
+/// Merge a partially inferred expression with a contextual type. Generic
+/// constructors such as `Ok(value)` often know their success payload before
+/// their surrounding `Result` supplies the error type; preserving the known
+/// side while filling only `Unknown` slots keeps callbacks fully typed.
+fn refine_expected_type(actual: &Ty, expected: &Ty) -> Ty {
+    if !compatible(expected, actual) {
+        return actual.clone();
+    }
+    match (actual, expected) {
+        (Ty::Unknown, expected) => expected.clone(),
+        (Ty::List(actual), Ty::List(expected)) => Ty::List(Box::new(refine_expected_type(actual, expected))),
+        (Ty::Set(actual), Ty::Set(expected)) => Ty::Set(Box::new(refine_expected_type(actual, expected))),
+        (Ty::Map(actual_key, actual_value), Ty::Map(expected_key, expected_value)) => Ty::Map(
+            Box::new(refine_expected_type(actual_key, expected_key)),
+            Box::new(refine_expected_type(actual_value, expected_value)),
+        ),
+        (Ty::Applied(actual_name, actual_args), Ty::Applied(expected_name, expected_args))
+            if actual_name == expected_name && actual_args.len() == expected_args.len() => Ty::Applied(
+                actual_name.clone(),
+                actual_args
+                    .iter()
+                    .zip(expected_args)
+                    .map(|(actual, expected)| refine_expected_type(actual, expected))
+                    .collect(),
+            ),
+        (Ty::Fn(actual_params, actual_return), Ty::Fn(expected_params, expected_return))
+            if actual_params.len() == expected_params.len() => Ty::Fn(
+                actual_params
+                    .iter()
+                    .zip(expected_params)
+                    .map(|(actual, expected)| refine_expected_type(actual, expected))
+                    .collect(),
+                Box::new(refine_expected_type(actual_return, expected_return)),
+            ),
+        _ => actual.clone(),
+    }
 }
 
 fn compatible(expected: &Ty, actual: &Ty) -> bool {

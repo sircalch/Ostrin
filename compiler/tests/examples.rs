@@ -1545,13 +1545,14 @@ fn native_backend_compiles_and_runs_result_and_try() {
 fn native_hir_handles_option_result_core() {
     // The structural Option/Result family now comes from HIR: constructors,
     // match, basic queries, unwrap/unwrap_or, ok/ok_or and propagation with
-    // `try`. Lambda-based combinators and `catch` remain AST responsibilities
-    // until the closure family is migrated.
+    // `try`. Result combinators with inline lambdas are migrating through the
+    // IR; Option combinators and non-inline handlers remain fallback paths.
     for (file, minimum_hir_functions) in [
         ("native_option.ostrin", 2usize),
         ("native_hir_option_locals.ostrin", 1usize),
         ("native_result.ostrin", 6usize),
         ("native_result_catch.ostrin", 3usize),
+        ("native_ir_result_combinators.ostrin", 9usize),
         ("try_result.ostrin", 5usize),
     ] {
         let report = run(&["--native-type-report", &example_path(file)]);

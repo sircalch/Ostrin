@@ -971,6 +971,154 @@ impl Builder {
         dst
     }
 
+    /// Lowers the scalar `Result` combinators whose callback is an inline
+    /// lambda. The callback is expanded into the corresponding success/error
+    /// CFG branch instead of becoming an opaque closure value. This keeps the
+    /// ownership boundary identical to `try`: the source wrapper is inspected
+    /// once, its active payload is borrowed through `TryValue` or
+    /// `TryErrorValue`, and the selected result is joined with a `Phi`.
+    fn lower_result_combinator(
+        &mut self,
+        receiver: ValueId,
+        receiver_ty: &Ty,
+        method: &str,
+        callback: &HirExpr,
+        result_ty: &Ty,
+    ) -> Option<ValueId> {
+        let Ty::Applied(receiver_name, receiver_args) = receiver_ty else { return None };
+        let Ty::Applied(result_name, result_args) = result_ty else { return None };
+        if receiver_name != "Result"
+            || result_name != "Result"
+            || receiver_args.len() != 2
+            || result_args.len() != 2
+        {
+            return None;
+        }
+        let HirKind::Lambda(params, body) = &callback.kind else { return None };
+        if params.len() != 1 {
+            return None;
+        }
+
+        let normal_block = self.new_block();
+        let error_block = self.new_block();
+        let merge_block = self.new_block();
+        let check = self.fresh();
+        self.emit(IrInstr::TryCheck { dst: check, value: receiver });
+        self.terminate(IrTerminator::Branch {
+            condition: check,
+            then_block: normal_block,
+            else_block: error_block,
+        });
+
+        self.current = normal_block;
+        let normal_payload = self.fresh();
+        self.emit(IrInstr::TryValue {
+            dst: normal_payload,
+            value: receiver,
+            ty: receiver_args[0].clone(),
+        });
+        let normal_value = match method {
+            "map" => {
+                let mapped = self.lower_inline_lambda(params, body, normal_payload);
+                let dst = self.fresh();
+                self.emit(IrInstr::Call {
+                    dst: Some(dst),
+                    callee: "Ok".to_string(),
+                    args: vec![mapped],
+                    ty: result_ty.clone(),
+                });
+                dst
+            }
+            "map_err" => {
+                let dst = self.fresh();
+                self.emit(IrInstr::Call {
+                    dst: Some(dst),
+                    callee: "Ok".to_string(),
+                    args: vec![normal_payload],
+                    ty: result_ty.clone(),
+                });
+                dst
+            }
+            "then" => self.lower_inline_lambda(params, body, normal_payload),
+            _ => return None,
+        };
+        let normal_predecessor = self.current;
+        let normal_open = !self.terminated();
+        if normal_open {
+            self.terminate(IrTerminator::Goto(merge_block));
+        }
+
+        self.current = error_block;
+        let error_payload = self.fresh();
+        self.emit(IrInstr::TryErrorValue {
+            dst: error_payload,
+            value: receiver,
+            ty: receiver_args[1].clone(),
+        });
+        let error_value = match method {
+            "map" | "then" => {
+                let dst = self.fresh();
+                self.emit(IrInstr::Call {
+                    dst: Some(dst),
+                    callee: "Err".to_string(),
+                    args: vec![error_payload],
+                    ty: result_ty.clone(),
+                });
+                dst
+            }
+            "map_err" => {
+                let mapped = self.lower_inline_lambda(params, body, error_payload);
+                let dst = self.fresh();
+                self.emit(IrInstr::Call {
+                    dst: Some(dst),
+                    callee: "Err".to_string(),
+                    args: vec![mapped],
+                    ty: result_ty.clone(),
+                });
+                dst
+            }
+            _ => return None,
+        };
+        let error_predecessor = self.current;
+        let error_open = !self.terminated();
+        if error_open {
+            self.terminate(IrTerminator::Goto(merge_block));
+        }
+
+        self.current = merge_block;
+        let mut incoming = Vec::new();
+        if normal_open {
+            incoming.push((normal_predecessor, normal_value));
+        }
+        if error_open {
+            incoming.push((error_predecessor, error_value));
+        }
+        if incoming.is_empty() {
+            return Some(self.unit());
+        }
+        if incoming.len() == 1 {
+            return Some(incoming[0].1);
+        }
+        let dst = self.fresh();
+        self.emit(IrInstr::Phi {
+            dst,
+            incoming,
+            ty: result_ty.clone(),
+        });
+        Some(dst)
+    }
+
+    fn lower_inline_lambda(&mut self, params: &[String], body: &HirBlock, argument: ValueId) -> ValueId {
+        self.locals.push(HashMap::new());
+        self.locals
+            .last_mut()
+            .expect("inline lambda scope")
+            .insert(params[0].clone(), argument);
+        let value = self.lower_block(body).unwrap_or_else(|| self.unit());
+        self.locals.pop();
+        value
+    }
+
     fn bind_pattern(&mut self, subject: ValueId, pattern: &crate::ast::Pattern, path: Vec<String>) {
         match pattern {
             crate::ast::Pattern::Ident(name) if name == "None" => {}
@@ -1191,6 +1339,11 @@ impl Builder {
                 recv, method, args, ..
             } => {
                 let receiver = self.lower_expr(recv);
+                if args.len() == 1 && args[0].name.is_none() && matches!(method.as_str(), "map" | "map_err" | "then") {
+                    if let Some(value) = self.lower_result_combinator(receiver, &recv.ty, method, &args[0].value, &expression.ty) {
+                        return value;
+                    }
+                }
                 let args: Vec<ValueId> =
                     args.iter().map(|arg| self.lower_expr(&arg.value)).collect();
                 match (method.as_str(), args.as_slice()) {
