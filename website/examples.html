@@ -4,16 +4,24 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#080a10">
-    <meta name="description" content="Working Ostrin examples for quantities, concurrency, traits and pattern matching.">
+    <meta name="description" content="Real Ostrin source examples for physical quantities, statistics, collections, concurrency, traits and pattern matching.">
+    <link rel="canonical" href="https://sircalch.github.io/Ostrin/examples.html">
+    <meta property="og:site_name" content="Ostrin">
+    <meta property="og:title" content="Ostrin Examples — Scientific Computing and General Programming">
+    <meta property="og:description" content="Browse source programs that validate the Ostrin language and run them in the browser playground.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://sircalch.github.io/Ostrin/examples.html">
+    <meta property="og:image" content="https://sircalch.github.io/Ostrin/assets/ostrin-logo.png">
+    <meta name="twitter:card" content="summary">
     <link rel="icon" href="assets/ostrin-logo.png">
     <link rel="stylesheet" href="styles.css">
     <script src="site.js" defer></script>
-    <title>Ostrin examples</title>
+    <title>Ostrin Examples — Scientific Computing and General Programming</title>
   </head>
   <body>
     <header class="site-header"><a class="brand" href="index.html"><img src="assets/ostrin-logo.png" alt="" width="36" height="36"><span>OSTRIN</span></a><div class="header-right"><span class="version">prototype / 0.1</span><button class="menu-toggle" aria-label="Open navigation" aria-expanded="false"><span></span><span></span></button><nav class="site-nav" aria-label="Main navigation"><a href="language.html">Language</a><a href="examples.html" aria-current="page">Examples</a><a href="playground.html">Playground</a><a href="ecosystem.html">Ecosystem</a><a href="docs.html">Docs</a><a href="roadmap.html">Roadmap</a><a href="https://github.com/sircalch/Ostrin">GitHub ↗</a></nav></div></header>
     <main>
-      <section class="page-hero shell"><p class="eyebrow">The example lab</p><h1>See the ideas<br><em>under pressure.</em></h1><p class="lede">These are not decorative snippets. They are small programs and semantic tests inside the Ostrin repository, used to validate what the language accepts and rejects.</p><div class="page-meta"><span>161 source files</span><span>156 + 6 verified tests</span><span>copy and inspect</span></div></section>
+      <section class="page-hero shell"><p class="eyebrow">The example lab</p><h1>See the ideas<br><em>under pressure.</em></h1><p class="lede">These are not decorative snippets. They are small programs and semantic tests inside the Ostrin repository, used to validate what the language accepts and rejects.</p><div class="page-meta"><span><span data-site-value="examples">183</span> source programs</span><span><span data-site-value="integrationTests">176</span> + <span data-site-value="differentialTests">6</span> verified tests</span><span>copy and inspect</span></div></section>
       <section class="section shell" id="catalog"><div class="section-header"><p class="eyebrow">Browse the catalogue</p><div><h2>From hello world to the type system.</h2><p class="lede">Start with the small programs, then look at the examples that exercise generics, traits, pattern matching and the concurrency model.</p></div></div>
         <div class="filter-bar" role="toolbar" aria-label="Filter examples"><button class="filter-button active" data-filter="all">All</button><button class="filter-button" data-filter="language">Language</button><button class="filter-button" data-filter="types">Types</button><button class="filter-button" data-filter="runtime">Runtime</button><button class="filter-button" data-filter="errors">Errors</button></div>
         <div class="example-grid">
@@ -28,7 +36,7 @@
           <article class="example-card" data-category="errors"><span class="example-tag">checker / diagnostics</span><h3>match_non_exhaustive.ostrin</h3><p>A deliberately incomplete match used to make a missing case visible.</p><a class="example-link" href="https://github.com/sircalch/Ostrin/blob/main/examples/match_non_exhaustive.ostrin">View source ↗</a></article>
         </div>
 
-        <div class="lab" id="lab"><div class="lab-header"><div><p class="eyebrow">Read the output</p><h2>Three examples, one mental model.</h2></div><p>The browser preview is static for now. To execute these files, clone the repository and run <span class="mono violet">cargo run</span> through the compiler.</p></div>
+        <div class="lab" id="lab"><div class="lab-header"><div><p class="eyebrow">Read the output</p><h2>Three examples, one mental model.</h2></div><p>These panels summarize real repository programs. <a class="violet" href="playground.html">Run an editable copy in the browser playground</a>, or clone the repository to execute the source through <span class="mono violet">ostrinc</span>.</p></div>
           <div class="tab-list" role="tablist" aria-label="Example previews"><button class="tab-button active" data-tab="physics-tab" role="tab">physics</button><button class="tab-button" data-tab="concurrency-tab" role="tab">concurrency</button><button class="tab-button" data-tab="errors-tab" role="tab">errors</button></div>
           <div id="physics-tab" class="tab-panel active" role="tabpanel"><div class="lab-grid"><div class="code-window"><div class="window-bar"><span class="window-dots"><i></i><i></i><i></i></span><span>physics.ostrin</span><button class="copy-button" data-copy="physics-code">copy</button></div><pre class="code" id="physics-code"><code><span class="line"><span class="number">01</span>a = <span class="fn">5</span> nm</span>
 <span class="line"><span class="number">02</span>b = <span class="fn">2</span> m</span>

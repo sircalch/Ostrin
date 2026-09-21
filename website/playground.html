@@ -4,20 +4,28 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#080a10">
-    <meta name="description" content="Run Ostrin programs in your browser with the compiler built to WebAssembly.">
+    <meta name="description" content="Run real Ostrin programs in your browser with the compiler built to WebAssembly and WASI.">
+    <link rel="canonical" href="https://sircalch.github.io/Ostrin/playground.html">
+    <meta property="og:site_name" content="Ostrin">
+    <meta property="og:title" content="Ostrin Playground — Run the Language in Your Browser">
+    <meta property="og:description" content="Edit, check, test and run real Ostrin source locally through the WebAssembly compiler.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://sircalch.github.io/Ostrin/playground.html">
+    <meta property="og:image" content="https://sircalch.github.io/Ostrin/assets/ostrin-logo.png">
+    <meta name="twitter:card" content="summary">
     <link rel="icon" href="assets/ostrin-logo.png">
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="playground.css">
     <script src="site.js" defer></script>
     <script type="module" src="playground.js"></script>
-    <title>Ostrin playground</title>
+    <title>Ostrin Playground — Run the Language in Your Browser</title>
   </head>
   <body>
     <header class="site-header"><a class="brand" href="index.html"><img src="assets/ostrin-logo.png" alt="" width="36" height="36"><span>OSTRIN</span></a><div class="header-right"><span class="version">prototype / 0.1</span><button class="menu-toggle" aria-label="Open navigation" aria-expanded="false"><span></span><span></span></button><nav class="site-nav" aria-label="Main navigation"><a href="language.html">Language</a><a href="examples.html">Examples</a><a href="playground.html" aria-current="page">Playground</a><a href="ecosystem.html">Ecosystem</a><a href="docs.html">Docs</a><a href="roadmap.html">Roadmap</a><a href="https://github.com/sircalch/Ostrin">GitHub ↗</a></nav></div></header>
     <main>
       <section class="page-hero shell"><p class="eyebrow">Playground</p><h1>Run Ostrin<br><em>in your browser.</em></h1><p class="lede">The real compiler, built to WebAssembly (<span class="inline-code">wasm32-wasip1</span>), running the interpreter locally in this page. Nothing is uploaded.</p><div class="page-meta"><span>ostrinc.wasm</span><span>std library included</span><span>Ctrl + Enter to run</span></div></section>
       <section class="shell playground">
-        <div class="playground-bar">
+    <div class="playground-bar">
           <label for="example">Example</label>
           <select id="example" aria-label="Example program"></select>
           <span class="spacer"></span>
@@ -25,6 +33,7 @@
           <button id="check" class="button-quiet" type="button">Check</button>
           <button id="test" class="button-quiet" type="button">Test</button>
           <button id="format" class="button-quiet" type="button">Format</button>
+          <button id="share" class="button-quiet" type="button">Share</button>
         </div>
         <div class="playground-panes">
           <div class="pane"><div class="code-title">main.ostrin</div><textarea id="source" spellcheck="false" autocomplete="off" aria-label="Ostrin source"></textarea></div>

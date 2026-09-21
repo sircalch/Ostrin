@@ -1,6 +1,20 @@
 (function () {
+  const SITE_FACTS = Object.freeze({
+    version: '0.1.0',
+    designDocs: '22',
+    examples: '183',
+    integrationTests: '176',
+    differentialTests: '6',
+    unitTests: '2',
+  });
+
   document.querySelectorAll('.version').forEach(function (label) {
-    label.textContent = 'development / 0.1.0';
+    label.textContent = 'development / ' + SITE_FACTS.version;
+  });
+
+  document.querySelectorAll('[data-site-value]').forEach(function (node) {
+    const value = SITE_FACTS[node.dataset.siteValue];
+    if (value !== undefined) node.textContent = value;
   });
 
   document.querySelectorAll('.site-footer > span').forEach(function (label) {

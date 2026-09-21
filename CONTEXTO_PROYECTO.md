@@ -5448,3 +5448,26 @@ funciones generan IR, el intérprete y el binario nativo imprimen `VALUE!` y `ha
 `--leak-check` termina con `live_allocations=0`. La batería queda en **6 pruebas diferenciales,
 176 de integración y 2 unitarias**. El siguiente frente de esta línea son llamadas indirectas y
 handlers locales que sean closures con entorno.
+
+## 214. Base de descubrimiento y playground vivo en la web — 2026-09-21
+
+La primera fase del plan de website 2.0 queda aterrizada sin sustituir la infraestructura actual:
+
+- `docs/website-audit.md` registra la auditoría del sitio, sus cifras comprobadas y el orden de
+  entrega. La fuente sigue siendo el repositorio: 183 programas `.ostrin`, 22 documentos de
+  diseño y la suite actual de 176 integraciones, 6 diferenciales y 2 unitarias.
+- La portada reutiliza `website/playground.js` y el `ostrinc.wasm` real que construye `pages.yml`;
+  ahora ofrece Run, Check, Test, Format y Share desde una sección compacta. No hay resultados
+  simulados: el programa se ejecuta en el navegador a través del host WASI en memoria.
+- El playground acepta `?code=...` y puede copiar una URL compartible. La compilación del módulo
+  WASM sigue siendo compartida dentro de cada página y el backend C no se anuncia como disponible
+  en navegador.
+- Todas las páginas públicas tienen títulos/descripciones más claros y canonical/OG básicos;
+  `robots.txt`, `sitemap.xml` y JSON-LD de `WebSite`/`SoftwareSourceCode` preparan el descubrimiento
+  sin afirmar una distribución instalable o un registro de paquetes que todavía no existe.
+- Se corrigieron contadores y textos que aún llamaban futuro al playground. Se añadió una sección
+  explícita “Beyond science” para records, colecciones, `Result` y concurrencia reales.
+
+Se preservaron las páginas estáticas, el estilo visual, el logo, el flujo GitHub Pages y el
+compilador WASM existente. Quedan para bloques posteriores el showcase, la comunidad, los demos
+live del catálogo y la validación automática de enlaces/metadata en CI.

@@ -4,14 +4,45 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#080a10">
-    <meta name="description" content="Ostrin is a scientific-first programming language with typed quantities, explicit ownership and native execution.">
-    <meta property="og:title" content="Ostrin — a language for meaningful software">
-    <meta property="og:description" content="Scientific meaning, explicit ownership and native execution in a language built in the open.">
+    <meta name="description" content="Ostrin is an open-source scientific-first, general-purpose programming language for scientific computing, reproducible software, safe concurrency and native execution.">
+    <link rel="canonical" href="https://sircalch.github.io/Ostrin/">
+    <meta property="og:site_name" content="Ostrin">
+    <meta property="og:title" content="Ostrin Programming Language — Scientific-First, General-Purpose">
+    <meta property="og:description" content="Scientific meaning, reproducible software and native execution in a programming language built in the open.">
     <meta property="og:type" content="website">
+    <meta property="og:url" content="https://sircalch.github.io/Ostrin/">
+    <meta property="og:image" content="https://sircalch.github.io/Ostrin/assets/ostrin-logo.png">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Ostrin Programming Language — Scientific-First, General-Purpose">
+    <meta name="twitter:description" content="Try a real Ostrin compiler in your browser.">
+    <meta name="twitter:image" content="https://sircalch.github.io/Ostrin/assets/ostrin-logo.png">
     <link rel="icon" href="assets/ostrin-logo.png">
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="playground.css">
     <script src="site.js" defer></script>
-    <title>Ostrin — a language for meaningful software</title>
+    <script type="module" src="playground.js"></script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "name": "Ostrin",
+            "url": "https://sircalch.github.io/Ostrin/",
+            "description": "Scientific-first, general-purpose programming language."
+          },
+          {
+            "@type": "SoftwareSourceCode",
+            "name": "Ostrin programming language",
+            "codeRepository": "https://github.com/sircalch/Ostrin",
+            "programmingLanguage": "Ostrin",
+            "license": "https://opensource.org/license/mit/",
+            "runtimePlatform": "WebAssembly, native C"
+          }
+        ]
+      }
+    </script>
+    <title>Ostrin Programming Language — Scientific-First, General-Purpose</title>
   </head>
   <body>
     <header class="site-header">
@@ -35,10 +66,11 @@
         <div class="hero-copy">
           <p class="eyebrow">A programming language in the open</p>
           <h1>Make the meaning of code <em>impossible</em> to miss.</h1>
-          <p class="lede">Ostrin makes units, state and intent visible in the code. It is a scientific-first language being built from first principles, with a working Rust compiler, native C backend and reproducible WASI path.</p>
+          <p class="lede">Ostrin makes units, state and intent visible in the code. It is a scientific-first, general-purpose language being built from first principles, with a working compiler, native C backend and reproducible WASI path.</p>
           <div class="button-row">
-            <a class="button" href="docs.html">Start with Ostrin <span>→</span></a>
-            <a class="button-quiet" href="examples.html">Browse examples <span>↗</span></a>
+            <a class="button" href="#try-ostrin">Try Ostrin <span>→</span></a>
+            <a class="button-quiet" href="docs.html">Get started <span>↗</span></a>
+            <a class="button-quiet" href="https://github.com/sircalch/Ostrin">GitHub <span>↗</span></a>
           </div>
           <div class="hero-meta"><span>.ostrin</span><span>native C + WASI</span><span>MIT licensed</span></div>
         </div>
@@ -57,10 +89,33 @@
         </div>
       </section>
 
+      <section class="live-demo-band" id="try-ostrin">
+        <div class="shell live-demo">
+          <div class="section-header"><p class="eyebrow">Try Ostrin</p><div><h2>Run the real language in your browser.</h2><p class="lede">Edit a program, check it and run it locally through the same compiler-backed WebAssembly playground used by the full tool.</p></div></div>
+          <div class="playground home-playground">
+            <div class="playground-bar">
+              <label for="example">Example</label>
+              <select id="example" aria-label="Example program"></select>
+              <span class="spacer"></span>
+              <button id="run" class="button-quiet" type="button">Run</button>
+              <button id="check" class="button-quiet" type="button">Check</button>
+              <button id="test" class="button-quiet" type="button">Test</button>
+              <button id="format" class="button-quiet" type="button">Format</button>
+              <button id="share" class="button-quiet" type="button">Share</button>
+            </div>
+            <div class="playground-panes">
+              <div class="pane"><div class="code-title">main.ostrin</div><textarea id="source" spellcheck="false" autocomplete="off" aria-label="Ostrin source"></textarea></div>
+              <div class="pane"><div class="code-title">output <span id="status" class="status"></span></div><pre id="output" class="output" aria-live="polite">Loading the compiler…</pre></div>
+            </div>
+            <p class="playground-note">Real Ostrin compiler · runs locally in your browser · <a href="playground.html">open the full playground →</a></p>
+          </div>
+        </div>
+      </section>
+
       <section class="fact-strip shell" aria-label="Project facts">
-        <div class="fact"><strong>21</strong><span>design specifications</span></div>
-        <div class="fact"><strong>159</strong><span>verified source examples</span></div>
-        <div class="fact"><strong>156 + 6</strong><span>integration + differential tests</span></div>
+        <div class="fact"><strong data-site-value="designDocs">22</strong><span>design specifications</span></div>
+        <div class="fact"><strong data-site-value="examples">183</strong><span>source programs in the repository</span></div>
+        <div class="fact"><strong><span data-site-value="integrationTests">176</span> + <span data-site-value="differentialTests">6</span></strong><span>integration + differential tests</span></div>
         <div class="fact"><strong>.ostrin</strong><span>source file extension</span></div>
       </section>
 
@@ -86,6 +141,17 @@
           </div>
           <div class="button-row"><a class="text-link violet" href="language.html">See the language principles <span>↗</span></a><a class="text-link" href="docs.html">Open the reference <span>↗</span></a></div>
         </div>
+      </section>
+
+      <section class="section shell" id="beyond-science">
+        <div class="section-header"><p class="eyebrow">Beyond science</p><div><h2>Built for science. Capable far beyond it.</h2><p class="lede">The same language models ordinary application code with records, collections, explicit errors and concurrency that can be checked, tested and compiled.</p></div></div>
+        <div class="feature-page-grid">
+          <article class="feature-page-card"><span class="tag">application logic</span><h3>Model real domains</h3><p>Records and enums give data a shape that pattern matching can inspect exhaustively.</p></article>
+          <article class="feature-page-card"><span class="tag">collections</span><h3>Process useful data</h3><p>Lists, maps, sets, CSV parsing and the early table package support ordinary workflows.</p></article>
+          <article class="feature-page-card"><span class="tag">error handling</span><h3>Keep failure visible</h3><p><span class="mono">Option</span>, <span class="mono">Result</span> and <span class="mono">try</span> make expected failure part of the program.</p></article>
+          <article class="feature-page-card"><span class="tag">concurrency</span><h3>Coordinate safely</h3><p>Channels, deterministic scheduling, cancellation and optional native threads share one API.</p></article>
+        </div>
+        <div class="button-row"><a class="text-link violet" href="examples.html">Explore general-purpose examples <span>↗</span></a><a class="text-link" href="ecosystem.html">See the current ecosystem <span>↗</span></a></div>
       </section>
 
       <section class="paper-band">

@@ -4,11 +4,19 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#080a10">
-    <meta name="description" content="Explore the design principles of the Ostrin programming language.">
+    <meta name="description" content="Explore Ostrin's meaningful types, physical quantities, Result values, safe concurrency and general-purpose programming model.">
+    <link rel="canonical" href="https://sircalch.github.io/Ostrin/language.html">
+    <meta property="og:site_name" content="Ostrin">
+    <meta property="og:title" content="Ostrin Programming Language — Meaningful Types and Safe Concurrency">
+    <meta property="og:description" content="The design principles behind a scientific-first, general-purpose programming language.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://sircalch.github.io/Ostrin/language.html">
+    <meta property="og:image" content="https://sircalch.github.io/Ostrin/assets/ostrin-logo.png">
+    <meta name="twitter:card" content="summary">
     <link rel="icon" href="assets/ostrin-logo.png">
     <link rel="stylesheet" href="styles.css">
     <script src="site.js" defer></script>
-    <title>The Ostrin language</title>
+    <title>Ostrin Programming Language — Meaningful Types and Safe Concurrency</title>
   </head>
   <body>
     <header class="site-header"><a class="brand" href="index.html"><img src="assets/ostrin-logo.png" alt="" width="36" height="36"><span>OSTRIN</span></a><div class="header-right"><span class="version">prototype / 0.1</span><button class="menu-toggle" aria-label="Open navigation" aria-expanded="false"><span></span><span></span></button><nav class="site-nav" aria-label="Main navigation"><a href="language.html" aria-current="page">Language</a><a href="examples.html">Examples</a><a href="playground.html">Playground</a><a href="ecosystem.html">Ecosystem</a><a href="docs.html">Docs</a><a href="roadmap.html">Roadmap</a><a href="https://github.com/sircalch/Ostrin">GitHub ↗</a></nav></div></header>
@@ -46,7 +54,7 @@
 <span class="line"><span class="number">03</span>    channel.send(<span class="fn">1</span>)</span>
 <span class="line"><span class="number">04</span>    channel.close()</span>
 <span class="line"><span class="number">05</span>}</span>
-<span class="line"><span class="number">06</span><span class="kw">for</span> value <span class="kw">in</span> channel { print(value) }</span></code></pre></div><div class="callout"><strong>Current status:</strong> deterministic execution, native threads, structured cancellation and cancelable channel waits are implemented. Async external I/O, GPU execution and a browser playground remain roadmap work.</div></section>
+<span class="line"><span class="number">06</span><span class="kw">for</span> value <span class="kw">in</span> channel { print(value) }</span></code></pre></div><div class="callout"><strong>Current status:</strong> deterministic execution, native threads, structured cancellation and cancelable channel waits are implemented. The browser playground is available; async external I/O and GPU execution remain roadmap work.</div></section>
         </div>
       </div>
     </main>

@@ -8,10 +8,11 @@ independiente y un proyecto con dependencia local `path`, todos compilados para 
 artefactos, los ejecuta bajo Node WASI, conserva sus SHA-256 y publica un artefacto
 `ostrinc-wasm32-wasip1` en ejecuciones manuales o al crear un tag `v*`.
 
-Esto es un binario WASI, no un módulo para ejecutar directamente en una página web. Un host
-WASI debe proporcionar la interfaz de sistema de archivos y argumentos que usa la CLI. La
-superficie de LSP/DAP y el backend C no se presentan como compatibles con navegador en esta
-etapa.
+El compilador WASI también se adapta a una página web mediante `website/playground.js`: el host
+usa `@bjorn3/browser_wasi_shim`, un directorio preabierto en memoria y la misma CLI para ejecutar
+`--run`, `--check`, `--test` y `--fmt` sin subir el programa. Un host WASI externo debe seguir
+proporcionando la interfaz de sistema de archivos y argumentos que usa la CLI. La superficie de
+LSP/DAP y el backend C no se presentan como compatibles con navegador en esta etapa.
 
 El runtime C generado separa ahora sus dos superficies: el modo cooperativo por defecto usa
 locks no-op y no incluye headers de pthread/Windows para hilos; solo `--native-threads` define
@@ -63,7 +64,7 @@ La compilación nativa (C) no está disponible en el navegador: no hay toolchain
 
 ## Siguiente etapa
 
-La ruta WASI ya existe para el runtime cooperativo básico y paquetes locales. El siguiente
-bloque es ampliar la matriz de programas (I/O), aislar APIs de proceso/archivos con contratos WASI
-explícitos y después construir un adaptador de navegador/playground sobre una API de compilación
-sin filesystem implícito.
+La ruta WASI ya existe para el runtime cooperativo básico, paquetes locales y el playground del
+sitio. El siguiente bloque es ampliar la matriz de programas (I/O), aislar APIs de proceso/
+archivos con contratos WASI explícitos y mejorar la experiencia del playground (compartir código,
+diagnósticos y ejemplos) sin convertirlo en una simulación JavaScript.

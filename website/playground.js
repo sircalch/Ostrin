@@ -77,6 +77,7 @@ const source = $("source");
 const output = $("output");
 const status = $("status");
 const buttons = ["run", "check", "test", "format"].map($);
+const shareButton = $("share");
 
 let modulePromise;
 function loadModule() {
@@ -141,12 +142,29 @@ select.addEventListener("change", () => {
   output.textContent = "";
   status.textContent = "";
 });
-source.value = EXAMPLES[select.value];
+const sharedCode = new URLSearchParams(location.search).get("code");
+if (sharedCode !== null) {
+  source.value = sharedCode;
+  output.textContent = "Shared source loaded. Press Run (Ctrl + Enter).";
+} else {
+  source.value = EXAMPLES[select.value];
+}
 
 $("run").addEventListener("click", () => execute("--run"));
 $("check").addEventListener("click", () => execute("--check"));
 $("test").addEventListener("click", () => execute("--test"));
 $("format").addEventListener("click", () => execute("--fmt"));
+shareButton?.addEventListener("click", async () => {
+  const url = new URL(location.href);
+  url.search = "";
+  url.searchParams.set("code", source.value);
+  try {
+    await navigator.clipboard.writeText(url.href);
+    status.textContent = "link copied";
+  } catch (_) {
+    window.prompt("Copy this playground link", url.href);
+  }
+});
 source.addEventListener("keydown", (event) => {
   if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
     event.preventDefault();

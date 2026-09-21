@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Website and discovery
+- Added the first website 2.0 foundation without replacing the static site: a real compiler-backed
+  playground on the homepage, `?code=` share links, centralized public counters, explicit
+  scientific/general-purpose positioning, canonical/OG metadata, JSON-LD, `robots.txt`, `sitemap.xml`
+  and a versioned website audit. Existing Pages/WASI infrastructure and visual identity are preserved.
+
 ### Language and libraries
 - Standard library written in Ostrin and embedded in the compiler: `import std.math`, `std.lists`,
   `std.strings` (`min max clamp gcd sorted reversed contains ...`). Scalars now satisfy `Eq`/`Ord`/

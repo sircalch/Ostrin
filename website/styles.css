@@ -147,6 +147,10 @@ h4 { font-size: .86rem; }
 
 .dark-band { background: var(--night-2); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .dark-band .section { padding-top: 120px; padding-bottom: 120px; }
+.live-demo-band { padding: 120px 0; background: var(--night-2); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.live-demo .playground { margin-top: 65px; padding-bottom: 0; }
+.home-playground #source, .home-playground .output { min-height: 17rem; }
+.home-playground .playground-note a { color: var(--violet-2); }
 .feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin-top: 65px; background: var(--line); border: 1px solid var(--line); }
 .feature-card { min-height: 245px; padding: 28px; background: var(--night-2); }
 .feature-number { display: block; margin-bottom: 48px; color: var(--violet); font: .7rem var(--mono); }

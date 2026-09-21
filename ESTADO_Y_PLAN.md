@@ -3,8 +3,9 @@
 *Corte: 2026-09-21 · rama `main` · 6 pruebas diferenciales, 176 de integración y 2 unitarias en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
-Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–190); para el diseño
-del lenguaje, `docs/design/` (21 documentos).
+Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–214); para el diseño
+del lenguaje, `docs/design/` (22 documentos). La auditoría del sitio vive en
+`docs/website-audit.md`.
 
 ---
 
@@ -277,8 +278,10 @@ Fuzzing del parser, pruebas diferenciales automáticas intérprete↔nativo sobr
 generados, cobertura de mensajes de error, benchmarks (nativo vs intérprete).
 
 ### G. Producto
-Sitio web/playground (WASM), tutorial guiado, gramática para Linguist (para que GitHub
-reconozca Ostrin; requiere uso público suficiente).
+El sitio web y el playground real WASM ya están publicados; la primera base de descubrimiento
+añade SEO técnico, cifras centralizadas, una demo viva en la portada y enlaces compartibles.
+Siguiente: catálogo live, showcase, comunidad y tutorial guiado. La gramática para Linguist
+queda separada porque requiere uso público suficiente.
 
 ---
 
@@ -304,7 +307,7 @@ Decisiones que necesito de ti para afinar el plan:
 
 ```powershell
 cd compiler
-    cargo test                                   # 6 diferenciales + 170 de integración + 2 unitarias
+    cargo test                                   # 6 diferenciales + 176 de integración + 2 unitarias
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```
