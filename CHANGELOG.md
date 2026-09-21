@@ -76,6 +76,10 @@
   from IR without leaks. A differential generator (`OSTRIN_FUZZ_SEEDS`) checks interpreter vs native.
 - Fixed a use-after-release in the AST native path (`return words.length()` released `words` before
   evaluating the expression) and leaks for temporary lists in `for` and for reassigned nested locals.
+- Closed the remaining temporary-reference leak at the AST/native boundary: fresh managed arguments
+  to ordinary and generic calls are released after borrowing, `print` releases temporary managed
+  values after rendering, and field reads release temporary records safely. The standard-library
+  native regression now runs with `--leak-check` and requires `live_allocations=0`.
 - Official formatter: `ostrinc --fmt FILE` prints the formatted source, `--write` rewrites it and
   `--check` fails when it is not formatted. Layout-only and token-verified (idempotent).
 - Package resolution now supports explicit `--fetch` for Git dependencies. Normal

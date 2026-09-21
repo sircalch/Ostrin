@@ -1572,6 +1572,32 @@ fn borrowed_reference_expr(expr: &Expr) -> bool {
     }
 }
 
+/// A call argument is borrowed by the callee, so a fresh native reference
+/// produced at the call site must be released by the caller afterwards. A
+/// local/field/index is already owned elsewhere and must stay borrowed.
+fn owned_call_argument(expr: &Expr, ty: &CType) -> bool {
+    if !is_reference_type(ty) {
+        return false;
+    }
+    matches!(
+        expr.unlocated(),
+        Expr::Call(..)
+            | Expr::GenericCall(..)
+            | Expr::ListLiteral(..)
+            | Expr::SetLiteral(..)
+            | Expr::MapLiteral(..)
+            | Expr::EmptyCollection(..)
+            | Expr::RecordLiteral(..)
+            | Expr::GenericRecordLiteral(..)
+            | Expr::Binary(BinOp::Add, ..)
+    )
+}
+
+struct OwnedCallArgs {
+    codes: Vec<String>,
+    temporaries: Vec<(String, String, String)>,
+}
+
 impl<'a> Codegen<'a> {
     fn is_movable_record_type(&self, ty: &CType) -> bool {
         matches!(ty, CType::Record(name) if self.movable_records.contains(name))
@@ -2605,6 +2631,9 @@ impl<'a> Codegen<'a> {
                 let (code, ty) = self.gen_expr_hint(e, Some(return_type.clone()))?;
                 if *return_type == CType::Void {
                     out.push_str(&format!("    {code};\n"));
+                    if owned_call_argument(e, &ty) {
+                        out.push_str(&format!("    ostrin_release_owned((void*){code});\n"));
+                    }
                     self.emit_owned_cleanup(out, None);
                     out.push_str("    return;\n");
                 } else {
@@ -2638,8 +2667,11 @@ impl<'a> Codegen<'a> {
             self.gen_stmt(&stmt.stmt, out)?;
         }
         if let Some(e) = &block.tail {
-            let (code, _) = self.gen_expr(e)?;
+            let (code, ty) = self.gen_expr(e)?;
             out.push_str(&format!("    {code};\n"));
+            if owned_call_argument(e, &ty) {
+                out.push_str(&format!("    ostrin_release_owned((void*){code});\n"));
+            }
         }
         Ok(())
     }
@@ -2849,8 +2881,11 @@ impl<'a> Codegen<'a> {
                         out.push_str("    }\n");
                     }
                 } else {
-                    let (code, _) = self.gen_expr(e)?;
+                    let (code, ty) = self.gen_expr(e)?;
                     out.push_str(&format!("    {code};\n"));
+                    if owned_call_argument(e, &ty) {
+                        out.push_str(&format!("    ostrin_release_owned((void*){code});\n"));
+                    }
                 }
             }
         }
@@ -3616,7 +3651,24 @@ impl<'a> Codegen<'a> {
                 let field_ty = self
                     .field_type(record_name, field_name)
                     .ok_or_else(|| format!("record '{record_name}' has no field '{field_name}'"))?;
-                Ok((format!("{obj_code}->{field_name}"), field_ty))
+                if owned_call_argument(obj, &obj_ty) {
+                    let object = self.next_temp();
+                    let value = self.next_temp();
+                    let mut body = format!(
+                        "({{ {} {object} = {obj_code}; {} {value} = {object}->{field_name}; ",
+                        c_type_name(&obj_ty),
+                        c_type_name(&field_ty),
+                    );
+                    if is_reference_type(&field_ty) {
+                        body.push_str(&format!("ostrin_retain((void*){value}); "));
+                    }
+                    body.push_str(&format!(
+                        "ostrin_release_owned((void*){object}); {value}; }})"
+                    ));
+                    Ok((body, field_ty))
+                } else {
+                    Ok((format!("{obj_code}->{field_name}"), field_ty))
+                }
             }
             Expr::RecordLiteral(name, fields) if self.generic_records.contains_key(name) => {
                 self.gen_generic_record_literal(name, None, fields, hint)
@@ -4794,6 +4846,70 @@ impl<'a> Codegen<'a> {
         }
     }
 
+    /// Materializes fresh managed call arguments so their ownership can be
+    /// released after the callee returns. Keeping the temporary in a named C
+    /// variable also prevents a nested expression from being evaluated twice.
+    fn materialize_owned_call_args(
+        &mut self,
+        args: &[Arg],
+        codes: &[String],
+        types: &[CType],
+    ) -> OwnedCallArgs {
+        let mut owned = OwnedCallArgs {
+            codes: codes.to_vec(),
+            temporaries: Vec::new(),
+        };
+        for (index, arg) in args.iter().enumerate() {
+            let expr = match arg {
+                Arg::Positional(expr) => expr,
+                Arg::Named(_, _) => continue,
+            };
+            let Some(ty) = types.get(index) else { continue };
+            if !owned_call_argument(expr, ty) {
+                continue;
+            }
+            let code = owned.codes[index].clone();
+            let temp = self.next_temp();
+            owned.temporaries.push((c_type_name(ty), temp.clone(), code));
+            owned.codes[index] = temp;
+        }
+        owned
+    }
+
+    /// Wraps a call that has fresh managed arguments in a statement
+    /// expression. The return value remains owned by the surrounding
+    /// expression; only the caller-created argument references are released.
+    fn finish_owned_call(
+        &mut self,
+        owned: OwnedCallArgs,
+        call: String,
+        return_type: CType,
+    ) -> (String, CType) {
+        if owned.temporaries.is_empty() {
+            return (call, return_type);
+        }
+        let mut body = String::new();
+        for (ctype, temp, code) in &owned.temporaries {
+            body.push_str(&format!("{ctype} {temp} = {code}; "));
+        }
+        if return_type == CType::Void {
+            body.push_str(&format!("{call}; "));
+        } else {
+            let result = self.next_temp();
+            body.push_str(&format!("{} {result} = {call}; ", c_type_name(&return_type)));
+            for (_, temp, _) in owned.temporaries.iter().rev() {
+                body.push_str(&format!("ostrin_release_owned((void*){temp}); "));
+            }
+            body.push_str(&format!("{result};"));
+            return (format!("({{ {body} }})"), return_type);
+        }
+        for (_, temp, _) in owned.temporaries.iter().rev() {
+            body.push_str(&format!("ostrin_release_owned((void*){temp}); "));
+        }
+        body.push_str("(void)0;");
+        (format!("({{ {body} }})"), return_type)
+    }
+
     fn gen_call(&mut self, callee: &Expr, type_args: Option<&[Type]>, args: &[Arg], hint: Option<CType>) -> Result<(String, CType), String> {
         match callee.unlocated() {
             Expr::Ident(name) => self.gen_function_call(name, type_args, args, hint),
@@ -4898,29 +5014,41 @@ impl<'a> Codegen<'a> {
         }
         let hints = self.signatures.get(name).map(|(params, _)| params.clone()).unwrap_or_default();
         let (arg_codes, arg_types) = self.gen_args_hinted(args, &hints)?;
+        // `drop` and native `select` intentionally consume their input; all
+        // other calls borrow reference-like parameters for the call duration.
+        // Fresh managed arguments therefore need a caller-owned temporary so
+        // it can be released after the call without touching named locals.
+        let owned = if matches!(name, "drop" | "select") {
+            OwnedCallArgs { codes: arg_codes.clone(), temporaries: Vec::new() }
+        } else {
+            self.materialize_owned_call_args(args, &arg_codes, &arg_types)
+        };
         if name == "print" {
-            return self.gen_print(&arg_codes, &arg_types);
+            let (code, ty) = self.gen_print(&owned.codes, &arg_types)?;
+            return Ok(self.finish_owned_call(owned, code, ty));
         }
         if !self.function_decls.contains_key(name) {
             let select_owns_input = name == "select"
                 && args.first().is_some_and(|arg| match arg {
                     Arg::Positional(expr) | Arg::Named(_, expr) => !borrowed_reference_expr(expr),
                 });
-            if let Some(result) = self.gen_builtin(name, &arg_codes, &arg_types, select_owns_input)? {
-                return Ok(result);
+            if let Some((code, ty)) = self.gen_builtin(name, &owned.codes, &arg_types, select_owns_input)? {
+                return Ok(self.finish_owned_call(owned, code, ty));
             }
         }
         if let Some(decl) = self.generic_functions.get(name).copied() {
-            return self.gen_generic_call(decl, type_args, call_key, &arg_codes, &arg_types);
+            let (code, ty) = self.gen_generic_call(decl, type_args, call_key, &owned.codes, &arg_types)?;
+            return Ok(self.finish_owned_call(owned, code, ty));
         }
         let Some((param_types, return_type)) = self.signatures.get(name).cloned() else {
             return Err(format!("unknown function '{name}' (the native backend only sees other top-level 'fn' declarations)"));
         };
-        if param_types.len() != arg_codes.len() {
-            return Err(format!("function '{name}' expects {} argument(s), got {}", param_types.len(), arg_codes.len()));
+        if param_types.len() != owned.codes.len() {
+            return Err(format!("function '{name}' expects {} argument(s), got {}", param_types.len(), owned.codes.len()));
         }
-        let coerced_codes = self.coerce_args(&arg_codes, &arg_types, &param_types)?;
-        Ok((format!("{}({})", c_function_name(name), coerced_codes.join(", ")), return_type))
+        let coerced_codes = self.coerce_args(&owned.codes, &arg_types, &param_types)?;
+        let code = format!("{}({})", c_function_name(name), coerced_codes.join(", "));
+        Ok(self.finish_owned_call(owned, code, return_type))
     }
 
     /// Boxes each argument whose declared parameter type differs from what

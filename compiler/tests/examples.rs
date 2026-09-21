@@ -2401,7 +2401,7 @@ fn std_library_modules_agree_between_backends_and_pass_their_own_tests() {
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
 
     let exe = temp_artifact("std_library.exe");
-    let compile = run(&["--compile", "--out", &exe, &path]);
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
@@ -2410,6 +2410,11 @@ fn std_library_modules_agree_between_backends_and_pass_their_own_tests() {
     let _ = fs::remove_file(&exe);
     assert!(native.status.success(), "native run failed: {}", String::from_utf8_lossy(&native.stderr));
     assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "std library native ownership leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
 
     let missing = temp_artifact("std_missing.ostrin");
     fs::write(&missing, "import std.nope\nfn main() -> Void {\n    print(1)\n}\n").unwrap();

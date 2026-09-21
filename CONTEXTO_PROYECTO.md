@@ -5636,3 +5636,25 @@ El sistema de paquetes deja de confiar únicamente en la ruta, versión y commit
 
 La medida resuelve la pregunta abierta de integridad del diseño de paquetes sin crear todavía un
 registro remoto ni cambiar la resolución explícita existente.
+
+## 223. Temporales gestionados en el fallback nativo — 2026-09-21
+
+La ruta AST que todavía cubre consumidores no representables por la IR ya aplica ownership explícito
+en el borde de las llamadas:
+
+- los argumentos frescos gestionados de llamadas ordinarias y genéricas se materializan en temporales C;
+  el callee los toma prestados y el caller libera la referencia al volver, sin tocar locales nombrados;
+- `print` libera el valor gestionado temporal después de construir y liberar su representación textual;
+- un acceso a campo desde un record temporal conserva el campo si es gestionado y libera el record
+  después de leerlo, cubriendo expresiones como `parse_iso(...).unwrap().day`;
+- expresiones gestionadas descartadas en statements, tails de bloques y cuerpos `Void` también se
+  liberan cuando su origen es una construcción fresca.
+
+La regresión `std_library_modules_agree_between_backends_and_pass_their_own_tests` ejecuta ahora el
+ejemplo completo con `--leak-check` y exige `live_allocations=0`; el caso incluye listas genéricas,
+strings, records de fechas y resultados. `native_ir_lists.ostrin` sigue verificando que reutilizar
+un local nombrado no provoque una liberación prematura.
+
+La IR continúa siendo el destino de ownership de largo plazo; esta capa evita que la frontera AST
+introduzca fugas mientras permanecen pendientes los consumidores complejos, escapes y llamadas
+indirectas.
