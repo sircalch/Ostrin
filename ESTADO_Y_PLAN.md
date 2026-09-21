@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-21 · rama `main` · 6 pruebas diferenciales, 175 de integración y 2 unitarias en verde.*
+*Corte: 2026-09-21 · rama `main` · 6 pruebas diferenciales, 176 de integración y 2 unitarias en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
 Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–190); para el diseño
@@ -30,7 +30,7 @@ Implementación: compilador + intérprete + herramientas de editor, todo en Rust
 | Léxico / parser | `lexer/`, `parser/mod.rs` | Tokens, AST con rangos de origen |
 | Módulos y paquetes | `modules.rs`, `package.rs`, `ostrin.toml` | Imports, `--project`, dependencias locales y lockfile portable |
 | Verificador de tipos | `typeck/mod.rs` (~3 500 l.) | Tipos, dimensiones, traits, exhaustividad, genéricos |
-| HIR/IR | `hir.rs`, `hir_c.rs`, `ir.rs`, `ir_c.rs` | HIR verificado, CFG con temporales explícitos y emisor C para escalares, `String`, `Result<Int, String>`/`Result<Float, String>` con `try`, `try catch` inline y handlers globales, wrappers `Option`/`Result` sobre `List`, `Map` y `Set` con payload gestionado, records concretos, `Option<Record>`, listas escalares, mapas/conjuntos escalares, enteros de ancho fijo y control de flujo, con fallback HIR/AST acotado |
+| HIR/IR | `hir.rs`, `hir_c.rs`, `ir.rs`, `ir_c.rs` | HIR verificado, CFG con temporales explícitos y emisor C para escalares, `String`, `Result<Int, String>`/`Result<Float, String>` con `try`, `try catch` inline, handlers globales y aliases locales de handlers globales, wrappers `Option`/`Result` sobre `List`, `Map` y `Set` con payload gestionado, records concretos, `Option<Record>`, listas escalares, mapas/conjuntos escalares, enteros de ancho fijo y control de flujo, con fallback HIR/AST acotado |
 | Intérprete | `interpreter/mod.rs` | Ejecución tree‑walking y scheduler cooperativo; referencia semántica |
 | Servidor de lenguaje | `lsp.rs`, `symbols.rs`, `protocol.rs` | LSP sobre stdio |
 | Adaptador de depuración | `dap.rs` + hooks del intérprete | DAP sobre stdio |
@@ -130,7 +130,7 @@ La misma ruta ya cubre la familia escalar de `Result`: `String.to_int()` y `to_f
 de variantes, `is_ok`, `is_err`, `unwrap_or`, `ok` y `try` sin `catch`. La rama de error construye
 el `Result` de retorno y termina la función; la de éxito extrae el payload. El discriminante se
 conserva en el path del binding y el ownership libera condicionalmente el payload activo.
-`try catch` con lambda inline o handler global ya expande la rama de error y retorna un `Err`
+`try catch` con lambda inline, handler global o alias local de un handler global ya expande la rama de error y retorna un `Err`
 del tipo envolvente. `Option<List<T>>` y `Result<List<T>, E>` ya cruzan la IR cuando la lista
 usa elementos escalares o records, con ownership condicional del payload. También cruzan la IR
 `Option<Map<Int,String>>` y `Result<Set<Int>,String>`, y los wrappers anidados conservan su
@@ -175,8 +175,9 @@ sobre la IR siguen pendientes fuera de las colecciones escalares ya cubiertas.
   `match`, `is_some`/`is_none`, `is_ok`/`is_err`, `unwrap`, `unwrap_or`, `ok`/`ok_or` y
   propagación con `try`; `try catch` con lambda inline ya usa IR para `Result` escalar y los
   combinadores `Result.map`, `Result.map_err`, `Result.then` y `Option.map`/`Option.then` con
-  lambda inline también usan IR; handlers no inline y consumidores complejos de wrappers
-  anidados siguen usando el fallback AST.
+  lambda inline también usan IR; aliases locales de funciones globales sin entorno se resuelven a
+  llamadas estáticas, mientras handlers no inline con captura, llamadas indirectas y consumidores
+  complejos de wrappers anidados siguen usando el fallback AST.
 - `Quantity` (dimensión estática, unidad como cadena en ejecución) e `impl` sobre cantidades.
 - Operadores de usuario, `derive(Eq/Ord)`, `Ordering` incorporado.
 - `print` de records, enums, listas, mapas, sets, `Option`, `Result` (mismo formato que el intérprete).
@@ -203,7 +204,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Chequeo «movido tras enviar» (E1101) | Integrado por defecto en `--check`, `--run`, `--emit-c` y `--compile`; `--ownership-check` conserva el informe explícito |
 | Paralelismo nativo (`--native-threads`, canales bloqueantes, `select`) | Hilos del SO, mutexes/condiciones, canales bloqueantes y `select(List<Channel<T>>)` implementados de forma opt-in; `select` conserva prioridad determinista y cede el hilo nativo entre intentos; `Task.cancel()` cancela pendientes, propaga a grupos activos de `spawn_scope` o solicita cancelación a tareas `Running`, observada en checkpoints seguros; `receive()` vuelve periódicamente al runtime sin conservar el mutex durante el checkpoint |
 | Memoria en nativo | Registro, destructores tipados para records/colecciones y entornos de tareas, `clone`/`drop`, cleanup automático de locales directos, bloques anidados, ramas, loops y cancelación de tareas en AST/HIR, y `--leak-check`; `String`, `String.split/lines`, `Result<Int, String>`, `Result<Float, String>`, records concretos, `Option<Record>`, listas escalares/String, mapas/conjuntos escalares, wrappers sobre `List`/`Map`/`Set` y wrappers `Option`/`Result` anidados ya consumen ownership desde IR, pero consumidores complejos y escapes siguen pendientes |
-| IR de bloques | HIR→CFG disponible con `--ir`; el emisor C cubre ramas, bucles escalares con `phi`, `String` (incluidos `split/lines`), `Result` escalar de parseo con `match`/consultas, `try`, `try catch` inline y handlers globales, `map`/`map_err`/`then` de `Result`, `Option.map`/`then` escalar/String, records concretos con campos anidados, `Option<Record>`, listas escalares/String, operaciones hash escalares, wrappers de una capa sobre `List`/`Map`/`Set` y wrappers `Option`/`Result` anidados con `match`; `for`/iteradores, handlers locales/closures no inline y consumidores complejos aún no reemplazan el backend C completo |
+| IR de bloques | HIR→CFG disponible con `--ir`; el emisor C cubre ramas, bucles escalares con `phi`, `String` (incluidos `split/lines`), `Result` escalar de parseo con `match`/consultas, `try`, `try catch` inline, handlers globales y aliases locales de handlers globales, `map`/`map_err`/`then` de `Result`, `Option.map`/`then` escalar/String, records concretos con campos anidados, `Option<Record>`, listas escalares/String, operaciones hash escalares, wrappers de una capa sobre `List`/`Map`/`Set` y wrappers `Option`/`Result` anidados con `match`; `for`/iteradores, llamadas indirectas, handlers locales/closures con entorno y consumidores complejos aún no reemplazan el backend C completo |
 | Ownership/último uso | `--ownership-report`, `--ownership-check` y `--ownership-ir`; la IR ya inserta y consume retain/release lineal para `String`, `Result` con payload `String`, records concretos, `Option<Record>`, listas escalares/String, mapas/conjuntos escalares y `Option<String>`, con transferencia en `Phi` simples y liberación de `Phi` de bucle en backedges probados; los buffers temporales de `split/lines` transfieren y liberan sus strings, y `Result` libera condicionalmente `value`/`error`; `Option` escalar es por valor, mientras llamadas transferentes no lineales, agregados complejos, scopes y escapes siguen conservadores |
 | Biblioteca estándar | Mínima: `args`, entorno/rutas, `format`, E/S y `hash` estructural para escalares, colecciones y tipos con `derive(Hash)`; faltan fechas, JSON y red |
 | Mensajes de error de E/S | `strerror` ≠ texto de Rust (difieren entre backends) |

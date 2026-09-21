@@ -36,6 +36,7 @@ fn c_type(ty: &Ty, records: &RecordFields) -> Bail<String> {
             format!("Map_{}_{}*", mangle_scalar(key), mangle_scalar(value))
         }
         Ty::Set(element) if set_supported(element) => format!("Set_{}*", mangle_scalar(element)),
+        Ty::Fn(_, _) => "void*".to_string(),
         Ty::Named(name) if records.contains_key(name) => format!("{name}*"),
         Ty::Applied(name, args) if name == "Option" && args.len() == 1 && option_supported(&args[0], records) => {
             format!("Option_{}", mangle_option_payload(&args[0], records))
@@ -67,6 +68,7 @@ fn supported(ty: &Ty, records: &RecordFields) -> bool {
         || matches!(ty, Ty::List(element) if list_supported(element, records))
         || matches!(ty, Ty::Map(key, value) if map_supported(key, value))
         || matches!(ty, Ty::Set(element) if set_supported(element))
+        || matches!(ty, Ty::Fn(_, _))
         || matches!(ty, Ty::Applied(name, args) if name == "Option" && args.len() == 1 && option_supported(&args[0], records))
         || matches!(ty, Ty::Applied(name, args) if name == "Result" && args.len() == 2 && result_supported(&args[0], &args[1], records))
 }
@@ -478,15 +480,28 @@ fn emit_instruction(
             out.push_str(&format!("    {} = {name};\n", value_name(*dst)));
         }
         IrInstr::Global { dst, name, ty } => {
-            let Ty::Applied(option_name, args) = ty else { return Err(()) };
-            if name != "None" || option_name != "Option" || args.len() != 1 || !option_supported(&args[0], records) {
-                return Err(());
+            match ty {
+                Ty::Applied(option_name, args)
+                    if name == "None"
+                        && option_name == "Option"
+                        && args.len() == 1
+                        && option_supported(&args[0], records) =>
+                {
+                    let c_name = format!("Option_{}", mangle_option_payload(&args[0], records));
+                    out.push_str(&format!(
+                        "    {} = (({c_name}){{ .has = false }});\n",
+                        value_name(*dst)
+                    ));
+                }
+                Ty::Fn(_, _) if known_functions.contains(name) => {
+                    out.push_str(&format!(
+                        "    {} = (void*){};\n",
+                        value_name(*dst),
+                        crate::codegen::c_function_name(name)
+                    ));
+                }
+                _ => return Err(()),
             }
-            let c_name = format!("Option_{}", mangle_option_payload(&args[0], records));
-            out.push_str(&format!(
-                "    {} = (({c_name}){{ .has = false }});\n",
-                value_name(*dst)
-            ));
         }
         IrInstr::Const { dst, value, ty } => {
             if !scalar(ty) {
@@ -931,6 +946,14 @@ fn emit_instruction(
             if !supported(ty, records) {
                 return Err(());
             }
+            // Function values still use the closure ABI in the HIR/AST emitters.
+            // The IR path only keeps a static function's provenance so a local
+            // `try catch` alias can lower to a direct call; passing or returning
+            // a function value requires an indirect closure call and must fall
+            // back until that ABI exists in this emitter.
+            if matches!(ty, Ty::Fn(_, _)) || args.iter().any(|value| matches!(value_ty(values, *value), Ok(Ty::Fn(_, _)))) {
+                return Err(());
+            }
             let codes = args
                 .iter()
                 .map(|value| value_code(values, *value))
@@ -1113,6 +1136,7 @@ fn emit_instruction(
                         ));
                     }
                 }
+                Ty::Fn(_, _) => {}
                 _ => return Err(()),
             }
         }
@@ -1146,6 +1170,7 @@ fn emit_instruction(
                         ));
                     }
                 }
+                Ty::Fn(_, _) => {}
                 _ => return Err(()),
             }
         }

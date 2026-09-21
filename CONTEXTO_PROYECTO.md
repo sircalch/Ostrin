@@ -5430,3 +5430,21 @@ wrapper conserva únicamente el payload gestionado que está activo.
 coinciden con el intérprete y terminan con `live_allocations=0`. Consumidores como `unwrap` de
 un wrapper gestionado anidado y handlers locales/closures no inline siguen siendo el siguiente
 frente porque requieren transferencias adicionales o llamadas indirectas.
+
+## 213. Aliases locales de handlers globales en `try catch` — 2026-09-21
+
+El lowering de la IR conserva ahora el origen estático de un valor de función global cuando se
+asigna a un binding local. Así, `handler = recover; try fail() catch handler` reconoce que el
+alias apunta a `recover` y emite la misma llamada estática que el handler escrito directamente;
+no crea una función-valor opaca ni degrada la función completa a HIR/AST.
+
+Para este primer tramo, los valores `Fn` se representan en el C de la IR como punteros estáticos
+`void*` solo para conservar la procedencia y el bookkeeping del alias; las operaciones de
+ownership sobre ellos son no-op. Esto no pretende habilitar todavía llamadas indirectas, aliasing
+a través de `Phi` ni closures con entorno capturado.
+
+`examples/native_ir_try_local_handler.ostrin` cubre aliases en las ramas de éxito y error. Sus 6
+funciones generan IR, el intérprete y el binario nativo imprimen `VALUE!` y `handled: FAILURE`, y
+`--leak-check` termina con `live_allocations=0`. La batería queda en **6 pruebas diferenciales,
+176 de integración y 2 unitarias**. El siguiente frente de esta línea son llamadas indirectas y
+handlers locales que sean closures con entorno.

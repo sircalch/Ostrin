@@ -236,6 +236,7 @@ struct Builder {
     current: BlockId,
     next_value: ValueId,
     locals: Vec<HashMap<String, ValueId>>,
+    function_globals: HashMap<ValueId, String>,
     break_targets: Vec<(BlockId, BlockId)>,
     loop_edges: Vec<LoopEdges>,
     region_depth: usize,
@@ -259,6 +260,7 @@ impl Builder {
             current: 0,
             next_value: 0,
             locals: vec![HashMap::new()],
+            function_globals: HashMap::new(),
             break_targets: Vec::new(),
             loop_edges: Vec::new(),
             region_depth: 0,
@@ -1321,6 +1323,9 @@ impl Builder {
                     name: name.clone(),
                     ty: expression.ty.clone(),
                 });
+                if matches!(expression.ty, Ty::Fn(_, _)) {
+                    self.function_globals.insert(dst, name.clone());
+                }
                 dst
             }
             HirKind::Unary(op, operand) => {
@@ -1705,6 +1710,22 @@ impl Builder {
                     ty: mapped_ty,
                 });
                 mapped
+            } else if let HirKind::Local(name) = &handler.kind {
+                let callee = self
+                    .lookup(name)
+                    .and_then(|value| self.function_globals.get(&value).cloned());
+                if let Some(callee) = callee {
+                    let mapped = self.fresh();
+                    self.emit(IrInstr::Call {
+                        dst: Some(mapped),
+                        callee,
+                        args: vec![error],
+                        ty: mapped_ty,
+                    });
+                    mapped
+                } else {
+                    self.lower_expr(handler)
+                }
             } else {
                 self.lower_expr(handler)
             };

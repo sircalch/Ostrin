@@ -21,7 +21,7 @@ iteradores, agregados complejos y escapes mientras la migración crece.*
 | `TypedProgram.literal_kinds` | `typeck` | Tipo elegido para cada literal numérico |
 | `NativeTypeReport` | `codegen` | Detecta divergencias checker↔backend (0 hoy, en ~1 350 expresiones) |
 | `IrProgram` / `IrFunction` / `IrBlock` | `ir.rs` | Primera CFG con temporales explícitos, terminadores y verificador de destinos |
-| Emisor IR | `ir_c.rs` | Genera C desde SSA/CFG para funciones escalares, `String`, records concretos, `Option<Record>`, `List<T>` escalar, operaciones hash escalares de `Map`/`Set`, wrappers sobre `List`/`Map`/`Set` y wrappers `Option`/`Result` anidados con `match`, `Option<T>` escalar/`String` con `Some`/`None`, ramas, bucles, `phi` y enteros de ancho fijo comprobados; emite ownership para las familias migradas y deja fallback seguro para lo demás |
+| Emisor IR | `ir_c.rs` | Genera C desde SSA/CFG para funciones escalares, `String`, records concretos, `Option<Record>`, `List<T>` escalar, operaciones hash escalares de `Map`/`Set`, wrappers sobre `List`/`Map`/`Set` y wrappers `Option`/`Result` anidados con `match`, `Option<T>` escalar/`String` con `Some`/`None`, `try catch` con handlers globales y aliases locales sin entorno, ramas, bucles, `phi` y enteros de ancho fijo comprobados; emite ownership para las familias migradas y deja fallback seguro para lo demás |
 | Intérprete como oráculo | `interpreter` | Semántica de referencia; pruebas diferenciales automáticas |
 
 Por tanto el backend **ya no infiere solo**: la reinferencia que queda (`bind_type`, `expected`, `settle_literal`) es respaldo verificado.
@@ -66,7 +66,7 @@ Sobre este IR se hacen los análisis que el texto C no permite:
    de compilación en `--check`, `--run`, `--emit-c` y `--compile`. Records inmutables quedan
    fuera de la regla; las comprobaciones dinámicas se conservan como red de seguridad.
 3. **Escape** (para arenas): un valor que no sale de su función puede vivir en una arena.
-4. **Cierres**: capturas explícitas → estructura `{ fn_ptr, entorno }` (funciones como valores de primera clase).
+4. **Cierres**: capturas explícitas → estructura `{ fn_ptr, entorno }` (funciones como valores de primera clase). Mientras no haya llamada indirecta en la IR, los aliases locales de funciones globales se conservan como procedencia estática y se emiten como llamadas directas.
 5. Optimización: inlining, plegado de constantes, eliminación de código muerto, fusión de bucles sobre `Array`.
 
 ## 4. Orden de implementación (cada paso mantiene verdes las pruebas diferenciales)
@@ -89,8 +89,9 @@ Sobre este IR se hacen los análisis que el texto C no permite:
    binds simples; la IR aún deja
    barreras explícitas para otros `Option` gestionados, patrones anidados, llamadas que
    transfieren ownership, scopes anidados y escapes complejos.
-5. **Cierres y funciones como valores**; retirar la comprobación dinámica de E1101 cuando el
-   backend consuma la IR transformada de forma completa.
+5. **Cierres y funciones como valores**: añadir llamadas indirectas y transferencias de ownership
+   para cierres con entorno; retirar la comprobación dinámica de E1101 cuando el backend consuma
+   la IR transformada de forma completa.
 6. Optimizador y, después, otros backends (LLVM, WASM, GPU) que consumen el mismo IR.
 
 ## 5. Riesgos y mitigaciones
