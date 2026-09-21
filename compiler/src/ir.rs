@@ -526,7 +526,6 @@ impl Builder {
                 continue;
             }
             let ty = self.known_value_type(*destination).unwrap_or(Ty::Unknown);
-            self.guard_managed_join(&ty);
             let merged = self.fresh();
             let mut incoming = vec![(exit_block, *destination)];
             for (block, values) in breaks {
@@ -577,12 +576,6 @@ impl Builder {
             backedges.push((backedge_block, body_values));
         }
         backedges.extend(edges.continues);
-        if backedges.len() > 1 {
-            for (_, destination, _) in &loop_phis {
-                let ty = self.known_value_type(*destination).unwrap_or(Ty::Unknown);
-                self.guard_managed_join(&ty);
-            }
-        }
         for (name, destination, initial) in &loop_phis {
             let mut incoming = vec![(preheader, *initial)];
             for (block, values) in &backedges {
@@ -688,8 +681,7 @@ impl Builder {
                     break;
                 }
                 let ty = self.known_value_type(*destination).unwrap_or(Ty::Unknown);
-                self.guard_managed_join(&ty);
-                let merged = self.fresh();
+                    let merged = self.fresh();
                 let incoming = step_preds
                     .iter()
                     .map(|(block, values)| (*block, values.get(name).copied().unwrap_or(*initial)))
@@ -787,21 +779,6 @@ impl Builder {
         self.current = after_block;
     }
 
-    /// The ownership pass only understands managed `Phi`s at simple joins.
-    /// A managed value merged across branches/`break`/`continue` marks the
-    /// function as not lowerable natively from IR (the verified HIR path
-    /// takes over) instead of risking a leak or double release.
-    fn guard_managed_join(&mut self, ty: &Ty) {
-        if crate::ownership::requires_management(ty) {
-            self.emit(IrInstr::Opaque {
-                dst: None,
-                op: "managed_join".to_string(),
-                inputs: Vec::new(),
-                ty: Ty::Void,
-            });
-        }
-    }
-
     /// Names visible before a branch construct that some branch re-binds.
     fn assigned_names(before: &HashMap<String, ValueId>, texts: &[String]) -> Vec<String> {
         let mut names: Vec<String> = before
@@ -833,7 +810,6 @@ impl Builder {
                 continue;
             }
             let ty = self.known_value_type(initial).unwrap_or(Ty::Unknown);
-            self.guard_managed_join(&ty);
             let merged = self.fresh();
             self.emit(IrInstr::Phi {
                 dst: merged,

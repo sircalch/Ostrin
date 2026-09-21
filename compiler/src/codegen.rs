@@ -6382,7 +6382,10 @@ fn generate_impl(
     // The first IR-backed C emitter is deliberately conservative. It receives
     // the ownership-lowered IR, so the backend already has a single place to
     // consume future retain/release facts as managed families are migrated.
-    let ir = hir.as_ref().map(|program| crate::ownership::lower_linear(&crate::ir::lower(program)).0);
+    let (ir, ir_unresolved) = match hir.as_ref().map(|program| crate::ownership::lower_linear(&crate::ir::lower(program))) {
+        Some((program, summary)) => (Some(program), summary.unresolved_functions),
+        None => (None, HashSet::new()),
+    };
     let non_generic_function_names: HashSet<String> = functions
         .iter()
         .filter(|function| function.generics.is_empty())
@@ -6648,7 +6651,7 @@ fn generate_impl(
             (Some(program), None) => program
                 .functions
                 .iter()
-                .find(|function| function.name == f.name)
+                .find(|function| function.name == f.name && !ir_unresolved.contains(&function.name))
                 .and_then(|function| crate::ir_c::generate(function, &ir_functions, &ir_records)),
             _ => None,
         };

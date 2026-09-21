@@ -23,6 +23,10 @@
   group-by), `plot` (SVG scatter/line) and `autodiff` (forward-mode dual numbers).
 
 ### Compiler
+- Fixed a use-after-release in the native IR path: returning a `String`/`List` parameter (or merging
+  parameters through `if`) did not retain it. The IR ownership pass now uses CFG liveness (releases on
+  dying edges, retains for `Phi` inputs) and `if`/`match`/`break`/`continue` with managed values compile
+  from IR without leaks. A differential generator (`OSTRIN_FUZZ_SEEDS`) checks interpreter vs native.
 - Fixed a use-after-release in the AST native path (`return words.length()` released `words` before
   evaluating the expression) and leaks for temporary lists in `for` and for reassigned nested locals.
 - Official formatter: `ostrinc --fmt FILE` prints the formatted source, `--write` rewrites it and

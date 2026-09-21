@@ -1914,6 +1914,7 @@ fn native_ir_string_methods_cross_block_ownership_and_short_circuit() {
         ("native_ir_string_methods.ostrin", "OSTRIN!\nmixed\na+b+c\n0\n30\n5\ntrue\n", 3usize),
         ("native_ir_cross_block_ownership.ostrin", "item-x\nitem-x!\n9\n2\n4\n24\n", 7usize),
         ("short_circuit.ostrin", "false\ntrue\ntrue\nfalse\n", 3usize),
+        ("native_ir_param_ownership.ostrin", "abcd\nabcd\n", 3usize),
     ] {
         let path = example_path(file);
         let interpreted = run(&["--run", &path]);
@@ -1938,6 +1939,180 @@ fn native_ir_string_methods_cross_block_ownership_and_short_circuit() {
         assert!(native.status.success(), "native run failed for {file}");
         assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "{file} leaked: {}", String::from_utf8_lossy(&native.stderr));
         assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected, "native output for {file}");
+    }
+}
+
+/// Deterministic generator of small programs (integer arithmetic, `%`, `if`, `while`, `for`,
+/// `break`/`continue`, `and`/`or`, plus a `String` and a `List<Int>` per function) used to compare
+/// the interpreter with the native backend, including leak checks on the managed values.
+struct ProgramGen {
+    state: u64,
+    loop_id: usize,
+}
+
+impl ProgramGen {
+    fn new(seed: u64) -> Self {
+        Self { state: seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407), loop_id: 0 }
+    }
+
+    fn next(&mut self, bound: u64) -> u64 {
+        self.state = self.state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        (self.state >> 33) % bound
+    }
+
+    fn int_expr(&mut self, vars: &[String], depth: u32) -> String {
+        if depth == 0 || self.next(4) == 0 {
+            return match self.next(6) {
+                0 => format!("{}", self.next(30)),
+                1 => "s.length()".to_string(),
+                2 => "l.length()".to_string(),
+                _ => vars[self.next(vars.len() as u64) as usize].clone(),
+            };
+        }
+        let left = self.int_expr(vars, depth - 1);
+        let right = self.int_expr(vars, depth - 1);
+        match self.next(6) {
+            0 | 1 => format!("({left} + {right})"),
+            2 => format!("({left} - {right})"),
+            3 => format!("(({left} * {right}) % 1000)"),
+            4 => format!("({left} / {})", 1 + self.next(9)),
+            _ => format!("({left} % {})", 1 + self.next(9)),
+        }
+    }
+
+    fn bool_expr(&mut self, vars: &[String], depth: u32) -> String {
+        if depth > 0 && self.next(3) == 0 {
+            let left = self.bool_expr(vars, depth - 1);
+            let right = self.bool_expr(vars, depth - 1);
+            let op = if self.next(2) == 0 { "and" } else { "or" };
+            return format!("({left} {op} {right})");
+        }
+        let ops = ["<", ">", "==", "!=", "<=", ">="];
+        let left = self.int_expr(vars, 2);
+        let right = self.int_expr(vars, 2);
+        format!("{left} {} {right}", ops[self.next(6) as usize])
+    }
+
+    fn assignment(&mut self, vars: &[String], pad: &str) -> String {
+        let target = ["a", "b", "c"][self.next(3) as usize];
+        let value = self.int_expr(vars, 3);
+        format!("{pad}{target} = ({value}) % 100000\n")
+    }
+
+    fn block(&mut self, vars: &mut Vec<String>, depth: u32, in_loop: bool, indent: usize) -> String {
+        let pad = "    ".repeat(indent);
+        let mut out = String::new();
+        for _ in 0..(1 + self.next(3)) {
+            let choices = if depth >= 3 { 4 } else { 10 };
+            match self.next(choices) {
+                0 | 1 => out.push_str(&self.assignment(vars, &pad)),
+                2 => {
+                    let piece = ["\"ab\"", "\"c\"", "\"xyz\""][self.next(3) as usize];
+                    let line = match self.next(3) {
+                        0 => format!("s = s + {piece}"),
+                        1 => format!("s = {piece} + s"),
+                        _ => "s = s.to_upper()".to_string(),
+                    };
+                    out.push_str(&format!("{pad}{line}\n"));
+                }
+                3 => {
+                    let value = self.int_expr(vars, 2);
+                    out.push_str(&format!("{pad}l.push({value})\n"));
+                }
+                4 if in_loop => {
+                    let keyword = if self.next(2) == 0 { "break" } else { "continue" };
+                    let cond = self.bool_expr(vars, 1);
+                    out.push_str(&format!("{pad}if {cond} {{\n{pad}    {keyword}\n{pad}}}\n"));
+                }
+                4 | 5 | 6 => {
+                    let cond = self.bool_expr(vars, 2);
+                    let then_body = self.block(vars, depth + 1, in_loop, indent + 1);
+                    out.push_str(&format!("{pad}if {cond} {{\n{then_body}{pad}}}"));
+                    if self.next(2) == 0 {
+                        let else_body = self.block(vars, depth + 1, in_loop, indent + 1);
+                        out.push_str(&format!(" else {{\n{else_body}{pad}}}"));
+                    }
+                    out.push('\n');
+                }
+                7 | 8 => {
+                    self.loop_id += 1;
+                    let counter = format!("i{}", self.loop_id);
+                    let limit = 1 + self.next(5);
+                    out.push_str(&format!("{pad}mut {counter} = 0\n{pad}while {counter} < {limit} {{\n"));
+                    out.push_str(&format!("{pad}    {counter} = {counter} + 1\n"));
+                    vars.push(counter);
+                    let body = self.block(vars, depth + 1, true, indent + 1);
+                    vars.pop();
+                    out.push_str(&format!("{body}{pad}}}\n"));
+                }
+                _ => {
+                    self.loop_id += 1;
+                    let item = format!("x{}", self.loop_id);
+                    let items: Vec<String> = (0..(1 + self.next(4))).map(|_| format!("{}", self.next(20))).collect();
+                    out.push_str(&format!("{pad}for {item} in [{}] {{\n", items.join(", ")));
+                    vars.push(item);
+                    let body = self.block(vars, depth + 1, true, indent + 1);
+                    vars.pop();
+                    out.push_str(&format!("{body}{pad}}}\n"));
+                }
+            }
+        }
+        out
+    }
+
+    fn program(&mut self, functions: usize) -> String {
+        let mut source = String::new();
+        for index in 0..functions {
+            let mut vars: Vec<String> = ["a", "b", "c", "n"].iter().map(|v| v.to_string()).collect();
+            let body = self.block(&mut vars, 0, false, 1);
+            source.push_str(&format!(
+                "fn f{index}(n: Int) -> Int {{\n    mut a = n\n    mut b = 1\n    mut c = 2\n    mut s = \"\"\n    mut l = [n]\n{body}    (a + b + c + s.length() + l.length()) % 1000003\n}}\n\n"
+            ));
+        }
+        source.push_str("fn main() -> Void {\n");
+        for index in 0..functions {
+            for arg in ["0", "1", "7", "-3"] {
+                source.push_str(&format!("    print(f{index}({arg}))\n"));
+            }
+        }
+        source.push_str("}\n");
+        source
+    }
+}
+
+#[test]
+fn generated_programs_agree_between_interpreter_and_native_backend() {
+    // `OSTRIN_FUZZ_SEEDS=200 cargo test generated_programs` widens the search.
+    let seed_count: u64 = std::env::var("OSTRIN_FUZZ_SEEDS").ok().and_then(|v| v.parse().ok()).unwrap_or(4);
+    for seed in 1..=seed_count {
+        let source = ProgramGen::new(seed).program(10);
+        let path = temp_artifact(&format!("generated_{seed}.ostrin"));
+        fs::write(&path, &source).unwrap();
+
+        let interpreted = run(&["--run", &path]);
+        assert!(interpreted.status.success(), "interpreter failed for seed {seed}: {}\n{source}", stderr(&interpreted));
+
+        let exe = temp_artifact(&format!("generated_{seed}.exe"));
+        let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+        if skip_if_no_c_compiler(&compile) {
+            let _ = fs::remove_file(&path);
+            return;
+        }
+        assert!(compile.status.success(), "native compile failed for seed {seed}: {}\n{source}", stderr(&compile));
+        let native = Command::new(&exe).output().expect("failed to run generated binary");
+        let _ = fs::remove_file(&exe);
+        assert!(native.status.success(), "native run failed for seed {seed}: {}\n{source}", String::from_utf8_lossy(&native.stderr));
+        assert_eq!(
+            String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+            stdout(&interpreted).replace("\r\n", "\n"),
+            "interpreter and native output differ for seed {seed}\n{source}"
+        );
+        assert!(
+            String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+            "native binary leaked for seed {seed}: {}\n{source}",
+            String::from_utf8_lossy(&native.stderr)
+        );
+        let _ = fs::remove_file(&path);
     }
 }
 

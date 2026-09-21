@@ -1,0 +1,16 @@
+fn ident(s: String) -> String {
+    s
+}
+fn pick(a: String, b: String, first: Bool) -> String {
+    if first {
+        a
+    } else {
+        b
+    }
+}
+fn main() -> Void {
+    x = "ab" + "cd"
+    y = ident(x)
+    print(y)
+    print(pick(x, y, false))
+}

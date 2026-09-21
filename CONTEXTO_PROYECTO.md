@@ -5175,3 +5175,34 @@ Suite: **6 diferenciales, 163 de integración y 2 unitarias**.
 Frontera conocida: el camino AST sigue fugando los temporales al construir listas con valores
 dinámicos (`[a + b]`) cuando la función no puede ir por IR; se cierra al migrar las familias
 restantes a HIR/IR.
+
+## 197. Ownership por liveness con `Phi`, retornos de parámetros y fuzzing diferencial — 2026-09-20
+
+**Fuzzing diferencial.** `generated_programs_agree_between_interpreter_and_native_backend` genera
+programas deterministas (aritmética, `%`, `if`/`else`, `while`/`for`, `break`/`continue`,
+`and`/`or`, un `String` y una `List<Int>` por función) y compara intérprete y binario nativo,
+exigiendo además `live_allocations=0`. Por defecto 4 semillas; `OSTRIN_FUZZ_SEEDS=N` la amplía
+(120 semillas × 10 funciones verdes en esta sesión). Encontró: fugas de listas temporales
+definidas en una sola ruta, bucles con strings reasignados y el fallo siguiente.
+
+**Bug de seguridad de memoria corregido.** Un parámetro gestionado devuelto directamente
+(`fn ident(s: String) -> String { s }`, o un `Phi` de parámetros) se devolvía sin retener: el
+llamador liberaba un valor que no era suyo (uso tras liberar; el segundo `print` mostraba
+basura). Ahora los parámetros ganan un `retain` al devolverse y en cada arista `Phi`.
+
+**Pase de ownership reescrito sobre liveness.** `plan_cross_block_releases` calcula la vida de
+cada valor gestionado en el CFG y decide: liberar tras el último uso en cada bloque donde muere,
+`release` en la arista cuando el destino ya no lo necesita, o un `retain` por cada `Phi` que lo
+consume mientras sigue vivo (si muere en la arista, la referencia se transfiere al `Phi`). Las
+aristas críticas se dividen con un bloque nuevo (`apply_edge_ops`). Se eliminaron las heurísticas
+antiguas de `Phi` y la compuerta `managed_join` del constructor de IR: `if`/`match`/`break`/
+`continue`/bucles con strings, listas y records ya se compilan desde IR sin fugas. Una función con
+un valor propio que el pase no puede resolver (`unresolved_functions`, visible en
+`--ownership-ir`) cae al camino HIR verificado; los envoltorios `Option`/`Result` y los literales
+quedan exentos.
+
+Suite: **6 diferenciales, 164 de integración y 2 unitarias**.
+
+Pendiente: `unwrap`/`unwrap_or` y otros consumidores de `Option` sin modelar en el pase; métodos
+de `String` restantes (`split`, `lines`, `to_int`, `to_float`) en HIR/IR; ampliar el generador con
+records, `Option` y closures.

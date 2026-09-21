@@ -41,6 +41,9 @@ pub struct LoweringSummary {
     pub inserted_releases: usize,
     pub unresolved_values: usize,
     pub functions: usize,
+    /// Functions with a managed value the pass could not place a release for;
+    /// the native backend keeps those on the verified HIR path.
+    pub unresolved_functions: HashSet<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -92,6 +95,7 @@ pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
         let mut uses: HashMap<ValueId, Vec<UsePoint>> = HashMap::new();
         let mut opaque_values = HashSet::new();
         let mut borrowed_values = HashSet::new();
+        let mut phi_edges: HashMap<ValueId, Vec<(usize, usize)>> = HashMap::new();
 
         for block in &function.blocks {
             for (index, instruction) in block.instructions.iter().enumerate() {
@@ -99,6 +103,11 @@ pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
                     definitions.insert(value, (ty, block.id, index));
                     if matches!(instruction, IrInstr::Param { .. }) {
                         borrowed_values.insert(value);
+                    }
+                }
+                if let IrInstr::Phi { incoming, .. } = instruction {
+                    for (predecessor, value) in incoming {
+                        phi_edges.entry(*value).or_default().push((*predecessor, block.id));
                     }
                 }
                 for value in used_values(instruction) {
@@ -123,47 +132,84 @@ pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
         let mut retain_before: HashMap<(usize, usize), Vec<ValueId>> = HashMap::new();
         let mut retain_after: HashMap<(usize, usize), Vec<ValueId>> = HashMap::new();
         let mut release_after: HashMap<(usize, usize), Vec<ValueId>> = HashMap::new();
-        let mut release_before_terminator: HashMap<usize, Vec<ValueId>> = HashMap::new();
+        let mut edge_ops: HashMap<(usize, usize), Vec<EdgeOp>> = HashMap::new();
+        let mut return_retains: HashMap<usize, Vec<ValueId>> = HashMap::new();
         for (value, (ty, definition_block, definition_instruction)) in &definitions {
             if !requires_management(ty) {
                 continue;
             }
-            // Function parameters are borrowed C arguments. The caller owns
-            // their reference, so a callee must not release a parameter just
-            // because its last local use is visible in this function.
+            let edges = phi_edges.get(value).cloned().unwrap_or_default();
+            // Function parameters are borrowed C arguments: the callee never releases
+            // them, but a `Phi` input or a returned parameter needs its own reference.
             if borrowed_values.contains(value) {
+                for edge in &edges {
+                    edge_ops.entry(*edge).or_default().push(EdgeOp::Retain(*value));
+                }
+                for block in &function.blocks {
+                    if matches!(block.terminator, Some(IrTerminator::Return(Some(returned))) if returned == *value) {
+                        return_retains.entry(block.id).or_default().push(*value);
+                    }
+                }
                 continue;
             }
-            let value_uses = uses.get(&value).cloned().unwrap_or_default();
+            let value_uses: Vec<UsePoint> = uses
+                .get(value)
+                .cloned()
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|point| !matches!(function.blocks[point.block].instructions.get(point.instruction), Some(IrInstr::Phi { .. })))
+                .collect();
             let blocks: HashSet<usize> = value_uses.iter().map(|point| point.block).collect();
-            let candidate = !value_uses.is_empty() && blocks.len() == 1 && !opaque_values.contains(&value);
-            if candidate {
+            let single_block = edges.is_empty() && !value_uses.is_empty() && blocks.len() == 1 && !opaque_values.contains(value);
+            if single_block {
                 let last = value_uses
                     .iter()
                     .max_by_key(|point| point.instruction)
                     .copied()
-                    .expect("candidate has a use");
+                    .expect("a used value has a last use");
                 // A return transfers the value to the caller; releasing after
-                // its terminator would be a use-after-release. All other
-                // terminators are treated as unresolved for now.
+                // its terminator would be a use-after-release.
                 let block = &function.blocks[last.block];
-                if last.instruction < block.instructions.len() && safe_release_site(&block.instructions[last.instruction]) {
-                    release_after.entry((last.block, last.instruction + 1)).or_default().push(*value);
-                } else {
+                if last.instruction < block.instructions.len() {
+                    if safe_release_site(&block.instructions[last.instruction]) {
+                        release_after.entry((last.block, last.instruction + 1)).or_default().push(*value);
+                    } else {
+                        summary.unresolved_values += 1;
+                        note_unresolved(
+                        &mut summary,
+                        &function.name,
+                        ty,
+                        matches!(function.blocks[*definition_block].instructions.get(*definition_instruction), Some(IrInstr::Const { .. })),
+                    );
+                    }
+                } else if !matches!(block.terminator, Some(IrTerminator::Return(Some(returned))) if returned == *value) {
                     summary.unresolved_values += 1;
+                    note_unresolved(
+                        &mut summary,
+                        &function.name,
+                        ty,
+                        matches!(function.blocks[*definition_block].instructions.get(*definition_instruction), Some(IrInstr::Const { .. })),
+                    );
                 }
-            } else if value_uses.is_empty() {
+            } else if value_uses.is_empty() && edges.is_empty() {
                 release_after.entry((*definition_block, definition_instruction + 1)).or_default().push(*value);
-            } else if let Some(returns) =
-                release_points_at_returns(function, *definition_block, *value, &value_uses, &opaque_values)
+            } else if let Some(plan) =
+                plan_cross_block_releases(function, *definition_block, *value, &value_uses, &edges, &opaque_values)
             {
-                // Live across several blocks and never transferred: hold it until
-                // every function exit (its block dominates them all, outside loops).
-                for block in returns {
-                    release_before_terminator.entry(block).or_default().push(*value);
+                for (block, index) in plan.after {
+                    release_after.entry((block, index + 1)).or_default().push(*value);
+                }
+                for (edge, op) in plan.edge_ops {
+                    edge_ops.entry(edge).or_default().push(op);
                 }
             } else {
                 summary.unresolved_values += 1;
+                note_unresolved(
+                        &mut summary,
+                        &function.name,
+                        ty,
+                        matches!(function.blocks[*definition_block].instructions.get(*definition_instruction), Some(IrInstr::Const { .. })),
+                    );
             }
         }
 
@@ -183,34 +229,7 @@ pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
                     }
                 }
                 if let Some((value, _)) = alias_destination(instruction).filter(|(_, ty)| requires_management(ty)) {
-                    let transfers_phi = matches!(instruction, IrInstr::Phi { incoming, .. }
-                        if phi_transfers_ownership(function, block.id, index, incoming, &definitions, &uses, &opaque_values));
-                    let transfers_return = matches!(instruction, IrInstr::Phi { .. }) && is_single_return_use(function, value, &uses);
-                    if !transfers_phi && !transfers_return {
-                        retain_after.entry((block.id, index + 1)).or_default().push(value);
-                    }
-                    if let IrInstr::Phi { incoming, .. } = instruction {
-                        if transfers_phi {
-                            insert_loop_phi_release(
-                                function,
-                                block.id,
-                                index,
-                                value,
-                                &uses,
-                                &mut release_after,
-                            );
-                        } else if !transfers_return {
-                            for (predecessor, incoming_value) in incoming {
-                                if definitions
-                                    .get(incoming_value)
-                                    .is_some_and(|(incoming_ty, _, _)| requires_management(incoming_ty))
-                                    && is_single_phi_use(*incoming_value, block.id, index, &uses)
-                                {
-                                    release_before_terminator.entry(*predecessor).or_default().push(*incoming_value);
-                                }
-                            }
-                        }
-                    }
+                    retain_after.entry((block.id, index + 1)).or_default().push(value);
                 }
             }
         }
@@ -240,13 +259,14 @@ pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
                 }
             }
             block.instructions = instructions;
-            if let Some(values) = release_before_terminator.remove(&block.id) {
+            if let Some(values) = return_retains.remove(&block.id) {
                 for value in values {
-                    block.instructions.push(IrInstr::Release { value });
-                    summary.inserted_releases += 1;
+                    block.instructions.push(IrInstr::Retain { value });
+                    summary.inserted_retains += 1;
                 }
             }
         }
+        apply_edge_ops(function, edge_ops, &mut summary);
     }
 
     (lowered, summary)
@@ -435,216 +455,205 @@ fn safe_release_site(instruction: &IrInstr) -> bool {
     }
 }
 
-fn phi_transfers_ownership(
-    function: &crate::ir::IrFunction,
-    phi_block: usize,
-    phi_instruction: usize,
-    incoming: &[(usize, ValueId)],
-    definitions: &HashMap<ValueId, (Ty, usize, usize)>,
-    uses: &HashMap<ValueId, Vec<UsePoint>>,
-    opaque_values: &HashSet<ValueId>,
-) -> bool {
-    if incoming.is_empty() {
-        return false;
-    }
-    incoming.iter().all(|(_, value)| {
-        let Some((ty, _, _)) = definitions.get(value) else { return false };
-        if !requires_management(ty) || opaque_values.contains(value) {
-            return false;
-        }
-        uses.get(value).is_some_and(|points| {
-            points.iter().all(|point| {
-                if point.block == phi_block && point.instruction == phi_instruction {
-                    return true;
-                }
-                let Some(instruction) = function.blocks[point.block].instructions.get(point.instruction) else {
-                    return false;
-                };
-                matches!(instruction, IrInstr::StoreLocal { value: stored, .. } if stored == value)
-            })
-        })
-    })
-}
-
-fn insert_loop_phi_release(
-    function: &crate::ir::IrFunction,
-    phi_block: usize,
-    phi_instruction: usize,
-    phi_value: ValueId,
-    uses: &HashMap<ValueId, Vec<UsePoint>>,
-    release_after: &mut HashMap<(usize, usize), Vec<ValueId>>,
-) {
-    let Some(points) = uses.get(&phi_value) else { return };
-    let mut predecessors = Vec::new();
-    if let IrInstr::Phi { incoming, .. } = &function.blocks[phi_block].instructions[phi_instruction] {
-        predecessors.extend(incoming.iter().map(|(predecessor, _)| *predecessor));
-    }
-    for predecessor in predecessors {
-        if predecessor == phi_block || !block_reaches(function, phi_block, predecessor) {
-            continue;
-        }
-        let predecessor_points: Vec<UsePoint> = points
-            .iter()
-            .copied()
-            .filter(|point| point.block == predecessor)
-            .collect();
-        if predecessor_points.is_empty()
-            || points.iter().any(|point| {
-                point.block != phi_block
-                    && point.block != predecessor
-                    && !is_return_use(function, phi_value, *point)
-            })
-        {
-            continue;
-        }
-        let Some(last) = predecessor_points.iter().max_by_key(|point| point.instruction).copied() else {
-            continue;
-        };
-        let Some(instruction) = function.blocks[predecessor].instructions.get(last.instruction) else {
-            continue;
-        };
-        if safe_release_site(instruction) {
-            release_after.entry((predecessor, last.instruction + 1)).or_default().push(phi_value);
-        }
+/// `Option`/`Result` wrappers (`get(..).unwrap_or(..)`, `remove(..).unwrap()`) are consumed by
+/// methods this pass does not model; they are counted but do not force a fallback.
+fn note_unresolved(summary: &mut LoweringSummary, function: &str, ty: &Ty, literal: bool) {
+    // String literals are static: an unreleased literal cannot leak.
+    if !literal && !matches!(ty, Ty::Applied(_, _)) {
+        summary.unresolved_functions.insert(function.to_string());
     }
 }
 
-fn is_return_use(function: &crate::ir::IrFunction, value: ValueId, point: UsePoint) -> bool {
-    point.instruction == function.blocks[point.block].instructions.len()
-        && matches!(
-            function.blocks[point.block].terminator,
-            Some(IrTerminator::Return(Some(returned)) | IrTerminator::RegionReturn(Some(returned))) if returned == value
-        )
+#[derive(Debug, Clone, Copy)]
+enum EdgeOp {
+    Retain(ValueId),
+    Release(ValueId),
 }
 
-/// Return blocks where a value that spans several blocks can be released, or
-/// `None` when that is not provably safe: the value flows into a `Phi`, an
-/// opaque instruction or a return; its definition sits in a cycle (one value
-/// per iteration); a region return exists; or an exit is reachable without
-/// passing through the defining block.
-fn release_points_at_returns(
+/// Where the reference of a managed value that spans several blocks (or feeds a
+/// `Phi`) is released or duplicated, from a liveness analysis of the CFG: after
+/// its last use in every block where it dies, and on each CFG edge either a
+/// `release` (the target no longer needs it) or one `retain` per `Phi` that
+/// consumes it while it is still live. When the value dies on a `Phi` edge its
+/// reference is transferred to the `Phi`.
+struct CrossBlockPlan {
+    after: Vec<(usize, usize)>,
+    edge_ops: Vec<((usize, usize), EdgeOp)>,
+}
+
+fn plan_cross_block_releases(
     function: &crate::ir::IrFunction,
     definition_block: usize,
     value: ValueId,
     value_uses: &[UsePoint],
+    phi_edges: &[(usize, usize)],
     opaque_values: &HashSet<ValueId>,
-) -> Option<Vec<usize>> {
+) -> Option<CrossBlockPlan> {
     if opaque_values.contains(&value) {
         return None;
     }
+    let count = function.blocks.len();
+    let mut used_in = vec![false; count];
+    let mut last_use: Vec<Option<usize>> = vec![None; count];
     for point in value_uses {
         let block = function.blocks.get(point.block)?;
         match block.instructions.get(point.instruction) {
-            Some(IrInstr::Phi { .. }) | Some(IrInstr::Opaque { .. }) => return None,
+            Some(IrInstr::Opaque { .. }) => return None,
             Some(_) => {}
             None => {
-                // A terminator use: branch conditions are harmless, and a return of
-                // the value itself transfers it (that exit simply is not released).
+                // A terminator use: branch conditions are harmless, and returning
+                // the value itself transfers it to the caller.
                 let transfers = matches!(block.terminator, Some(IrTerminator::Return(Some(returned))) if returned == value);
                 if !transfers && !matches!(block.terminator, Some(IrTerminator::Branch { .. })) {
                     return None;
                 }
             }
         }
+        used_in[point.block] = true;
+        last_use[point.block] = Some(last_use[point.block].map_or(point.instruction, |last| last.max(point.instruction)));
     }
-    let mut returns: Vec<usize> = Vec::new();
-    for block in &function.blocks {
-        match block.terminator {
-            Some(IrTerminator::Return(_)) => returns.push(block.id),
-            Some(IrTerminator::RegionReturn(_)) => return None,
-            _ => {}
-        }
+    // A `Phi` input is consumed when control leaves the predecessor.
+    let mut end_use = vec![false; count];
+    for (pred, _) in phi_edges {
+        used_in[*pred] = true;
+        end_use[*pred] = true;
     }
-    if returns.is_empty() {
+    if function
+        .blocks
+        .iter()
+        .any(|block| matches!(block.terminator, Some(IrTerminator::RegionReturn(_))))
+    {
         return None;
     }
-    let exits = returns.clone();
-    returns.retain(|block| {
-        !matches!(function.blocks[*block].terminator, Some(IrTerminator::Return(Some(returned))) if returned == value)
-    });
-    // The definition must not be inside a cycle.
     let successors = |block: usize| -> Vec<usize> {
-        match function.blocks.get(block).and_then(|b| b.terminator.as_ref()) {
-            Some(IrTerminator::Goto(next)) => vec![*next],
+        let mut next = match function.blocks.get(block).and_then(|b| b.terminator.as_ref()) {
+            Some(IrTerminator::Goto(target)) => vec![*target],
             Some(IrTerminator::Branch { then_block, else_block, .. }) => vec![*then_block, *else_block],
             _ => Vec::new(),
-        }
-    };
-    let mut pending = successors(definition_block);
-    let mut seen = HashSet::new();
-    while let Some(block) = pending.pop() {
-        if block == definition_block {
-            return None;
-        }
-        if seen.insert(block) {
-            pending.extend(successors(block));
-        }
-    }
-    // Every exit must be dominated by the definition block: walking from the
-    // entry without entering it may not reach a return.
-    let mut pending = vec![function.entry];
-    let mut seen = HashSet::new();
-    while let Some(block) = pending.pop() {
-        if block == definition_block || !seen.insert(block) {
-            continue;
-        }
-        if exits.contains(&block) {
-            return None;
-        }
-        pending.extend(successors(block));
-    }
-    Some(returns)
-}
-
-fn block_reaches(function: &crate::ir::IrFunction, start: usize, target: usize) -> bool {
-    let mut pending = vec![start];
-    let mut seen = HashSet::new();
-    while let Some(block) = pending.pop() {
-        if !seen.insert(block) {
-            continue;
-        }
-        if block == target {
-            return true;
-        }
-        let Some(terminator) = function.blocks.get(block).and_then(|block| block.terminator.as_ref()) else {
-            continue;
         };
-        match terminator {
-            IrTerminator::Goto(next) => pending.push(*next),
-            IrTerminator::Branch { then_block, else_block, .. } => {
-                pending.push(*then_block);
-                pending.push(*else_block);
+        next.dedup();
+        next
+    };
+
+    // Backward liveness of a single SSA value: it is born in `definition_block`.
+    let mut live_in = vec![false; count];
+    let mut live_out = vec![false; count];
+    loop {
+        let mut changed = false;
+        for block in (0..count).rev() {
+            let out = successors(block).into_iter().any(|next| live_in[next]);
+            let inn = block != definition_block && (used_in[block] || out);
+            if out != live_out[block] || inn != live_in[block] {
+                live_out[block] = out;
+                live_in[block] = inn;
+                changed = true;
             }
-            IrTerminator::Return(_) | IrTerminator::RegionReturn(_) | IrTerminator::Unreachable => {}
+        }
+        if !changed {
+            break;
         }
     }
-    false
-}
 
-fn is_single_phi_use(value: ValueId, phi_block: usize, phi_instruction: usize, uses: &HashMap<ValueId, Vec<UsePoint>>) -> bool {
-    let Some(points) = uses.get(&value) else { return false };
-    points.len() == 1 && points[0].block == phi_block && points[0].instruction == phi_instruction
-}
-
-fn is_single_return_use(function: &crate::ir::IrFunction, value: ValueId, uses: &HashMap<ValueId, Vec<UsePoint>>) -> bool {
-    let Some(points) = uses.get(&value) else { return false };
-    if points.len() != 1 {
-        return false;
+    let mut plan = CrossBlockPlan { after: Vec::new(), edge_ops: Vec::new() };
+    for block in 0..count {
+        if block != definition_block && !live_in[block] {
+            continue;
+        }
+        if live_out[block] || end_use[block] {
+            for next in successors(block) {
+                let consumers = phi_edges.iter().filter(|edge| **edge == (block, next)).count();
+                let needed_after = live_in[next];
+                let (retains, release) = match (needed_after, consumers) {
+                    (true, m) => (m, false),
+                    (false, 0) => (0, true),
+                    (false, m) => (m - 1, false),
+                };
+                for _ in 0..retains {
+                    plan.edge_ops.push(((block, next), EdgeOp::Retain(value)));
+                }
+                if release {
+                    plan.edge_ops.push(((block, next), EdgeOp::Release(value)));
+                }
+            }
+        } else if used_in[block] {
+            let index = last_use[block].expect("a used block has a last use");
+            let instructions = &function.blocks[block].instructions;
+            if index < instructions.len() {
+                if !safe_release_site(&instructions[index]) {
+                    return None;
+                }
+                plan.after.push((block, index));
+            }
+            // A use by the terminator is a return (transfer) or a branch condition.
+        } else {
+            return None;
+        }
     }
-    let point = points[0];
-    point.instruction == function.blocks[point.block].instructions.len()
-        && matches!(
-            function.blocks[point.block].terminator,
-            Some(IrTerminator::Return(Some(returned))) if returned == value
-        )
+    Some(plan)
+}
+
+/// Applies edge retains/releases: at the end of the predecessor when it has a
+/// single successor, otherwise on a fresh block that splits the edge (also
+/// retargeting the successor's `Phi` inputs).
+fn apply_edge_ops(
+    function: &mut crate::ir::IrFunction,
+    edge_ops: HashMap<(usize, usize), Vec<EdgeOp>>,
+    summary: &mut LoweringSummary,
+) {
+    let mut edges: Vec<_> = edge_ops.into_iter().collect();
+    edges.sort_by_key(|(edge, _)| *edge);
+    for ((pred, succ), ops) in edges {
+        let materialize = |ops: Vec<EdgeOp>, summary: &mut LoweringSummary| -> Vec<IrInstr> {
+            ops.into_iter()
+                .map(|op| match op {
+                    EdgeOp::Retain(value) => {
+                        summary.inserted_retains += 1;
+                        IrInstr::Retain { value }
+                    }
+                    EdgeOp::Release(value) => {
+                        summary.inserted_releases += 1;
+                        IrInstr::Release { value }
+                    }
+                })
+                .collect()
+        };
+        if matches!(function.blocks[pred].terminator, Some(IrTerminator::Goto(target)) if target == succ) {
+            let instructions = materialize(ops, summary);
+            function.blocks[pred].instructions.extend(instructions);
+            continue;
+        }
+        let new_id = function.blocks.len();
+        let instructions = materialize(ops, summary);
+        function.blocks.push(crate::ir::IrBlock {
+            id: new_id,
+            instructions,
+            terminator: Some(IrTerminator::Goto(succ)),
+        });
+        if let Some(IrTerminator::Branch { then_block, else_block, .. }) = function.blocks[pred].terminator.as_mut() {
+            if *then_block == succ {
+                *then_block = new_id;
+            }
+            if *else_block == succ {
+                *else_block = new_id;
+            }
+        }
+        for instruction in &mut function.blocks[succ].instructions {
+            if let IrInstr::Phi { incoming, .. } = instruction {
+                for (block, _) in incoming.iter_mut() {
+                    if *block == pred {
+                        *block = new_id;
+                    }
+                }
+            }
+        }
+    }
 }
 
 fn alias_destination(instruction: &IrInstr) -> Option<(ValueId, Ty)> {
     match instruction {
         IrInstr::Field { dst, ty, .. }
         | IrInstr::Index { dst, ty, .. }
-        | IrInstr::PatternBind { dst, ty, .. }
-        | IrInstr::Phi { dst, ty, .. } => Some((*dst, ty.clone())),
+        | IrInstr::PatternBind { dst, ty, .. } => Some((*dst, ty.clone())),
         _ => None,
     }
 }
@@ -834,8 +843,14 @@ pub fn dump_moves(violations: &[MoveViolation]) -> String {
 }
 
 pub fn dump_lowering(summary: &LoweringSummary) -> String {
+    let mut unresolved: Vec<&str> = summary.unresolved_functions.iter().map(|name| name.as_str()).collect();
+    unresolved.sort();
     format!(
-        "ownership-ir functions: {}\nownership-ir inserted-retains: {}\nownership-ir inserted-releases: {}\nownership-ir unresolved-values: {}\n",
-        summary.functions, summary.inserted_retains, summary.inserted_releases, summary.unresolved_values
+        "ownership-ir functions: {}\nownership-ir inserted-retains: {}\nownership-ir inserted-releases: {}\nownership-ir unresolved-values: {}\nownership-ir unresolved-functions: {}\n",
+        summary.functions,
+        summary.inserted_retains,
+        summary.inserted_releases,
+        summary.unresolved_values,
+        unresolved.join(", ")
     )
 }
