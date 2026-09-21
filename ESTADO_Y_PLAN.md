@@ -155,8 +155,8 @@ propietarios directos al retornar; el mismo contrato se aplica al emisor HIR y a
 `clone(x)` y `drop(x)` siguen disponibles para probar explícitamente el contrato en programas
 nativos. El emisor también limpia bindings de referencia creados por expresiones de bloque
 anidadas y por ramas/iteraciones de `while`/`for`, incluyendo `break`/`continue`; los escapes
-complejos, los patrones anidados, los payloads gestionados dentro de `Option` que no sean
-`String` o records concretos y la bajada completa de ownership sobre la IR siguen pendientes.
+complejos, los patrones anidados, los wrappers anidados y la bajada completa de ownership
+sobre la IR siguen pendientes fuera de las colecciones escalares ya cubiertas.
 
 **Soportado** (todos los ejemplos ejecutables del repo, salvo lo listado en §6):
 - Escalares, strings, recursión, `if/while/for`, `match` (con guardas y patrones anidados).
@@ -165,7 +165,8 @@ complejos, los patrones anidados, los payloads gestionados dentro de `Option` qu
 - `dyn Trait` con vtable real (único punto de despacho en tiempo de ejecución).
 - `List/Map/Set/Option/Result`, combinadores con lambdas expandidas en línea, `try` y `try catch`
   inline para `Result` escalar con error `String`; `Option.map`/`then` para payloads
-  escalares y `String` también usan IR.
+  escalares y `String` también usan IR. Wrappers de una capa sobre `List`, `Map` y `Set`
+  escalares conservan sus marcadores de ownership en la IR.
 - Funciones genéricas monomorfizadas por uso: sus instancias concretas elegibles también
   pueden generar el cuerpo desde el HIR ya especializado (`identity<T>`, `List<T>`,
   `Option<T>` y métodos estructurales), manteniendo AST como fallback para familias no migradas.
@@ -173,7 +174,7 @@ complejos, los patrones anidados, los payloads gestionados dentro de `Option` qu
   `match`, `is_some`/`is_none`, `is_ok`/`is_err`, `unwrap`, `unwrap_or`, `ok`/`ok_or` y
   propagación con `try`; `try catch` con lambda inline ya usa IR para `Result` escalar y los
   combinadores `Result.map`, `Result.map_err`, `Result.then` y `Option.map`/`Option.then` con
-  lambda inline también usan IR; handlers no inline y payloads compuestos siguen usando el
+  lambda inline también usan IR; handlers no inline y wrappers anidados siguen usando el
   fallback AST.
 - `Quantity` (dimensión estática, unidad como cadena en ejecución) e `impl` sobre cantidades.
 - Operadores de usuario, `derive(Eq/Ord)`, `Ordering` incorporado.
@@ -200,8 +201,8 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Cierres en nativo | Captura **por valor** (una variable `mut` cambiada después no se ve dentro); lambda sin contexto de tipos exige anotación |
 | Chequeo «movido tras enviar» (E1101) | Integrado por defecto en `--check`, `--run`, `--emit-c` y `--compile`; `--ownership-check` conserva el informe explícito |
 | Paralelismo nativo (`--native-threads`, canales bloqueantes, `select`) | Hilos del SO, mutexes/condiciones, canales bloqueantes y `select(List<Channel<T>>)` implementados de forma opt-in; `select` conserva prioridad determinista y cede el hilo nativo entre intentos; `Task.cancel()` cancela pendientes, propaga a grupos activos de `spawn_scope` o solicita cancelación a tareas `Running`, observada en checkpoints seguros; `receive()` vuelve periódicamente al runtime sin conservar el mutex durante el checkpoint |
-| Memoria en nativo | Registro, destructores tipados para records/colecciones y entornos de tareas, `clone`/`drop`, cleanup automático de locales directos, bloques anidados, ramas, loops y cancelación de tareas en AST/HIR, y `--leak-check`; `String`, `String.split/lines`, `Result<Int, String>`, `Result<Float, String>`, records concretos, `Option<Record>`, listas escalares/String, mapas/conjuntos escalares y `Option<String>` ya consumen ownership desde IR, pero ARC completa de agregados sigue pendiente |
-| IR de bloques | HIR→CFG disponible con `--ir`; el emisor C cubre ramas, bucles escalares con `phi`, `String` (incluidos `split/lines`), `Result` escalar de parseo con `match`/consultas, `try`, `try catch` inline y handlers globales, `map`/`map_err`/`then` de `Result`, `Option.map`/`then` escalar/String, records concretos con campos anidados, `Option<Record>`, listas escalares/String, operaciones hash escalares y `Option` escalar/String con patrones `Some/None`; `for`/iteradores, handlers locales/closures no inline, patrones anidados y colecciones complejas aún no reemplazan el backend C completo |
+| Memoria en nativo | Registro, destructores tipados para records/colecciones y entornos de tareas, `clone`/`drop`, cleanup automático de locales directos, bloques anidados, ramas, loops y cancelación de tareas en AST/HIR, y `--leak-check`; `String`, `String.split/lines`, `Result<Int, String>`, `Result<Float, String>`, records concretos, `Option<Record>`, listas escalares/String, mapas/conjuntos escalares y wrappers sobre `List`/`Map`/`Set` ya consumen ownership desde IR, pero ARC completa de agregados anidados sigue pendiente |
+| IR de bloques | HIR→CFG disponible con `--ir`; el emisor C cubre ramas, bucles escalares con `phi`, `String` (incluidos `split/lines`), `Result` escalar de parseo con `match`/consultas, `try`, `try catch` inline y handlers globales, `map`/`map_err`/`then` de `Result`, `Option.map`/`then` escalar/String, records concretos con campos anidados, `Option<Record>`, listas escalares/String, operaciones hash escalares y wrappers de una capa sobre `List`/`Map`/`Set`; `for`/iteradores, handlers locales/closures no inline, patrones anidados y wrappers recursivos aún no reemplazan el backend C completo |
 | Ownership/último uso | `--ownership-report`, `--ownership-check` y `--ownership-ir`; la IR ya inserta y consume retain/release lineal para `String`, `Result` con payload `String`, records concretos, `Option<Record>`, listas escalares/String, mapas/conjuntos escalares y `Option<String>`, con transferencia en `Phi` simples y liberación de `Phi` de bucle en backedges probados; los buffers temporales de `split/lines` transfieren y liberan sus strings, y `Result` libera condicionalmente `value`/`error`; `Option` escalar es por valor, mientras llamadas transferentes no lineales, agregados complejos, scopes y escapes siguen conservadores |
 | Biblioteca estándar | Mínima: `args`, entorno/rutas, `format`, E/S y `hash` estructural para escalares, colecciones y tipos con `derive(Hash)`; faltan fechas, JSON y red |
 | Mensajes de error de E/S | `strerror` ≠ texto de Rust (difieren entre backends) |
