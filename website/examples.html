@@ -15,7 +15,9 @@
     <meta name="twitter:card" content="summary">
     <link rel="icon" href="assets/ostrin-logo.png">
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="playground.css">
     <script src="site.js" defer></script>
+    <script type="module" src="playground.js"></script>
     <title>Ostrin Examples — Scientific Computing and General Programming</title>
   </head>
   <body>
@@ -35,6 +37,44 @@
           <article class="example-card" data-category="types"><span class="example-tag">types / generics</span><h3>generics.ostrin</h3><p>Generic functions, bounds and the type information they preserve.</p><a class="example-link" href="https://github.com/sircalch/Ostrin/blob/main/examples/generics.ostrin">View source ↗</a></article>
           <article class="example-card" data-category="errors"><span class="example-tag">checker / diagnostics</span><h3>match_non_exhaustive.ostrin</h3><p>A deliberately incomplete match used to make a missing case visible.</p><a class="example-link" href="https://github.com/sircalch/Ostrin/blob/main/examples/match_non_exhaustive.ostrin">View source ↗</a></article>
         </div>
+
+        <section class="live-examples" id="live-examples" aria-labelledby="live-examples-title">
+          <div class="section-header"><p class="eyebrow">Run the catalogue</p><div><h2 id="live-examples-title">Small programs. Real output.</h2><p class="lede">These demos use the same compiler WebAssembly module as the full playground. Edit them, check them, run them, reset them or copy them without leaving the catalogue.</p></div></div>
+          <div class="live-example-grid">
+            <article class="live-example" data-live-example="quantities">
+              <div class="live-example-heading"><div><span class="example-tag">scientific / quantities</span><h3>Meaningful units</h3></div><span class="live-example-status" data-live-status></span></div>
+              <p>Physical quantities make an invalid combination visible before execution.</p>
+              <textarea data-live-source spellcheck="false" aria-label="Editable quantities example"></textarea>
+              <div class="live-example-actions"><button class="button-quiet" data-live-action="run" type="button">Run</button><button class="button-quiet" data-live-action="check" type="button">Check</button><button class="button-quiet" data-live-action="reset" type="button">Reset</button><button class="button-quiet" data-live-action="copy" type="button">Copy</button></div>
+              <pre class="live-example-output" data-live-output aria-live="polite">Loading the compiler…</pre>
+              <div class="live-example-links"><a href="https://github.com/sircalch/Ostrin/blob/main/examples/physics.ostrin">Source ↗</a><a href="language.html#quantities">Related language design ↗</a></div>
+            </article>
+            <article class="live-example" data-live-example="standard">
+              <div class="live-example-heading"><div><span class="example-tag">general / standard library</span><h3>Useful data operations</h3></div><span class="live-example-status" data-live-status></span></div>
+              <p>Lists, math helpers, formatting and ordinary application logic belong here too.</p>
+              <textarea data-live-source spellcheck="false" aria-label="Editable standard library example"></textarea>
+              <div class="live-example-actions"><button class="button-quiet" data-live-action="run" type="button">Run</button><button class="button-quiet" data-live-action="check" type="button">Check</button><button class="button-quiet" data-live-action="reset" type="button">Reset</button><button class="button-quiet" data-live-action="copy" type="button">Copy</button></div>
+              <pre class="live-example-output" data-live-output aria-live="polite">Loading the compiler…</pre>
+              <div class="live-example-links"><a href="https://github.com/sircalch/Ostrin/blob/main/examples/collections.ostrin">Source ↗</a><a href="docs.html#reference">Related docs ↗</a></div>
+            </article>
+            <article class="live-example" data-live-example="records">
+              <div class="live-example-heading"><div><span class="example-tag">language / records and enums</span><h3>Model application data</h3></div><span class="live-example-status" data-live-status></span></div>
+              <p>Records, enums and exhaustive matching are useful beyond scientific code.</p>
+              <textarea data-live-source spellcheck="false" aria-label="Editable records example"></textarea>
+              <div class="live-example-actions"><button class="button-quiet" data-live-action="run" type="button">Run</button><button class="button-quiet" data-live-action="check" type="button">Check</button><button class="button-quiet" data-live-action="reset" type="button">Reset</button><button class="button-quiet" data-live-action="copy" type="button">Copy</button></div>
+              <pre class="live-example-output" data-live-output aria-live="polite">Loading the compiler…</pre>
+              <div class="live-example-links"><a href="https://github.com/sircalch/Ostrin/blob/main/examples/match_nested.ostrin">Source ↗</a><a href="language.html#abstractions">Related language design ↗</a></div>
+            </article>
+            <article class="live-example" data-live-example="concurrency">
+              <div class="live-example-heading"><div><span class="example-tag">runtime / concurrency</span><h3>Coordinate work</h3></div><span class="live-example-status" data-live-status></span></div>
+              <p>Channels and spawned tasks share one checked API across the runtime modes.</p>
+              <textarea data-live-source spellcheck="false" aria-label="Editable concurrency example"></textarea>
+              <div class="live-example-actions"><button class="button-quiet" data-live-action="run" type="button">Run</button><button class="button-quiet" data-live-action="check" type="button">Check</button><button class="button-quiet" data-live-action="reset" type="button">Reset</button><button class="button-quiet" data-live-action="copy" type="button">Copy</button></div>
+              <pre class="live-example-output" data-live-output aria-live="polite">Loading the compiler…</pre>
+              <div class="live-example-links"><a href="https://github.com/sircalch/Ostrin/blob/main/examples/concurrency.ostrin">Source ↗</a><a href="language.html#concurrency">Related language design ↗</a></div>
+            </article>
+          </div>
+        </section>
 
         <div class="lab" id="lab"><div class="lab-header"><div><p class="eyebrow">Read the output</p><h2>Three examples, one mental model.</h2></div><p>These panels summarize real repository programs. <a class="violet" href="playground.html">Run an editable copy in the browser playground</a>, or clone the repository to execute the source through <span class="mono violet">ostrinc</span>.</p></div>
           <div class="tab-list" role="tablist" aria-label="Example previews"><button class="tab-button active" data-tab="physics-tab" role="tab">physics</button><button class="tab-button" data-tab="concurrency-tab" role="tab">concurrency</button><button class="tab-button" data-tab="errors-tab" role="tab">errors</button></div>

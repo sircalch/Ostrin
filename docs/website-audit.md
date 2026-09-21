@@ -56,3 +56,14 @@ existing implementation.
 
 This sequence preserves the current visual identity, compiler-backed playground and static
 GitHub Pages architecture while making the next public claims evidence-based.
+
+## Follow-up delivered in the next increment
+
+- `website/examples.html` now has four editable live examples backed by the same WASM module:
+  quantities, standard library, records/enums and concurrency.
+- `website/playground.js` shares its invocation and loading path between the full playground and
+  the catalogue cards, with Run, Check, Reset and Copy actions for each card.
+- `scripts/website-check.mjs` validates public HTML, metadata, local references and anchors,
+  sitemap, robots, playground wiring and drift between live source strings and their validated
+  repository examples. `ci.yml` runs the static check; `pages.yml` runs it again after generating
+  and copying the WASM artifact.

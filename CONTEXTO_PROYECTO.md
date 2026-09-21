@@ -5469,5 +5469,24 @@ La primera fase del plan de website 2.0 queda aterrizada sin sustituir la infrae
   explícita “Beyond science” para records, colecciones, `Result` y concurrencia reales.
 
 Se preservaron las páginas estáticas, el estilo visual, el logo, el flujo GitHub Pages y el
-compilador WASM existente. Quedan para bloques posteriores el showcase, la comunidad, los demos
-live del catálogo y la validación automática de enlaces/metadata en CI.
+compilador WASM existente. Quedan para bloques posteriores el showcase, la comunidad y el
+fortalecimiento de la experiencia documental.
+
+## 215. Catálogo live y validación del sitio — 2026-09-21
+
+La siguiente fase convierte el catálogo en una superficie ejecutable y deja sus invariantes en CI:
+
+- `website/playground.js` ahora tiene una ruta común para el playground completo y componentes
+  `data-live-example`, compartiendo la promesa de ejecución y el módulo WebAssembly compilado.
+- `website/examples.html` incorpora cuatro demos editables y reales: cantidades, biblioteca estándar,
+  records/enums y concurrencia. Cada una permite Run, Check, Reset y Copy, además de enlaces a fuente
+  y documentación relacionada.
+- `scripts/website-check.mjs` valida páginas públicas, títulos/canonical/OG/Twitter, referencias
+  locales y anclas, wiring del playground, sitemap/robots y que las cuatro fuentes live no se
+  separen de sus ejemplos validados. `ci.yml` lo ejecuta en cada cambio y `pages.yml` lo repite
+  después de generar `ostrinc.wasm`, incluyendo un umbral básico de tamaño del artefacto.
+
+No se añadió un framework ni un backend de snippets: las demos siguen siendo estáticas en su entrega,
+pero la ejecución ocurre dentro del navegador con el compilador real. El siguiente paso de producto es
+un showcase honesto y la preparación de comunidad; el siguiente paso técnico es mejorar diagnósticos
+y conectar los metadatos de demos con los ejemplos validados por la suite.

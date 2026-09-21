@@ -7,6 +7,10 @@
   playground on the homepage, `?code=` share links, centralized public counters, explicit
   scientific/general-purpose positioning, canonical/OG metadata, JSON-LD, `robots.txt`, `sitemap.xml`
   and a versioned website audit. Existing Pages/WASI infrastructure and visual identity are preserved.
+- Added reusable live catalogue demos for quantities, standard-library operations, records/enums and
+  concurrency. They share the compiled WASM module and expose real Run, Check, Reset and Copy actions.
+- Added `scripts/website-check.mjs` to CI and Pages deployment for local-reference/anchor, metadata,
+  sitemap, playground-wiring, source-drift and generated-WASM checks.
 
 ### Language and libraries
 - Standard library written in Ostrin and embedded in the compiler: `import std.math`, `std.lists`,

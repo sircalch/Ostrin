@@ -6,6 +6,7 @@ on:
     paths:
       - 'website/**'
       - 'compiler/**'
+      - 'scripts/website-check.mjs'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -35,6 +36,8 @@ jobs:
         run: |
           cargo build --manifest-path compiler/Cargo.toml --target wasm32-wasip1 --release
           cp compiler/target/wasm32-wasip1/release/ostrinc.wasm website/ostrinc.wasm
+      - name: Validate website and WASM artifact
+        run: node scripts/website-check.mjs --wasm
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload website artifact

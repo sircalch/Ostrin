@@ -10,6 +10,15 @@ permissions:
   contents: read
 
 jobs:
+  website:
+    name: Website checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Validate pages, links and playground wiring
+        run: node scripts/website-check.mjs
+
   compiler:
     name: Compiler tests (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
