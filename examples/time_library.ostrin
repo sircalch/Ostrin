@@ -1,0 +1,13 @@
+import std.time
+
+fn main() -> Void {
+    leap = time.date(2024, 2, 29)
+    print(time.is_leap_year(2024))
+    print(time.is_leap_year(1900))
+    print(time.is_valid(leap))
+    print(time.day_of_year(leap))
+    print(time.day_of_week(time.date(2024, 1, 1)))
+    print(time.iso(leap))
+    print(time.from_day_of_year(2024, 60).unwrap().day)
+    print(time.parse_iso("2024-02-29").unwrap().month)
+}

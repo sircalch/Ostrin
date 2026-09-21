@@ -1,6 +1,7 @@
 import std.math
 import std.lists
 import std.strings
+import std.time
 
 fn main() -> Void {
     print(math.min(3, 9))
@@ -22,4 +23,7 @@ fn main() -> Void {
     print(strings.repeat("ab", 3))
     print(strings.pad_left("7", 3, "0"))
     print(strings.count_of("a,b,c", ","))
+    print(time.iso(time.date(2024, 2, 29)))
+    print(time.day_of_week(time.date(2024, 1, 1)))
+    print(time.parse_iso("2024-02-29").unwrap().day)
 }

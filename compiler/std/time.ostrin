@@ -1,0 +1,115 @@
+// std.time: deterministic civil-calendar helpers.
+// Dates are proleptic Gregorian values; no system clock or timezone is involved.
+
+import std.strings
+
+pub record Date {
+    year: Int
+    month: Int
+    day: Int
+}
+
+pub fn date(year: Int, month: Int, day: Int) -> Date {
+    Date { year: year, month: month, day: day }
+}
+
+pub fn is_leap_year(year: Int) -> Bool {
+    year % 400 == 0 or (year % 4 == 0 and year % 100 != 0)
+}
+
+pub fn days_in_year(year: Int) -> Int {
+    if is_leap_year(year) { 366 } else { 365 }
+}
+
+pub fn days_in_month(year: Int, month: Int) -> Int {
+    if month == 2 {
+        if is_leap_year(year) { 29 } else { 28 }
+    } else if month == 4 or month == 6 or month == 9 or month == 11 {
+        30
+    } else if month == 1 or month == 3 or month == 5 or month == 7 or month == 8 or month == 10 or month == 12 {
+        31
+    } else {
+        0
+    }
+}
+
+pub fn is_valid(value: Date) -> Bool {
+    value.year >= 1 and value.month >= 1 and value.month <= 12 and value.day >= 1 and value.day <= days_in_month(value.year, value.month)
+}
+
+pub fn day_of_year(value: Date) -> Int {
+    if not is_valid(value) {
+        return -1
+    }
+    mut total = value.day
+    mut month = 1
+    while month < value.month {
+        total = total + days_in_month(value.year, month)
+        month = month + 1
+    }
+    total
+}
+
+// ISO weekday: Monday = 1, ..., Sunday = 7.
+pub fn day_of_week(value: Date) -> Int {
+    if not is_valid(value) {
+        return -1
+    }
+    mut year = value.year
+    mut month = value.month
+    if month < 3 {
+        year = year - 1
+        month = month + 12
+    }
+    k = year % 100
+    century = year / 100
+    h = (value.day + (13 * (month + 1)) / 5 + k + k / 4 + century / 4 + 5 * century) % 7
+    (h + 5) % 7 + 1
+}
+
+pub fn from_day_of_year(year: Int, ordinal: Int) -> Option<Date> {
+    if year < 1 or ordinal < 1 or ordinal > days_in_year(year) {
+        return None
+    }
+    mut remaining = ordinal
+    mut month = 1
+    while remaining > days_in_month(year, month) {
+        remaining = remaining - days_in_month(year, month)
+        month = month + 1
+    }
+    Some(date(year, month, remaining))
+}
+
+pub fn iso(value: Date) -> String {
+    if not is_valid(value) {
+        return ""
+    }
+    year_text = value.year.to_string()
+    month_text = value.month.to_string()
+    day_text = value.day.to_string()
+    mut out = strings.pad_left(year_text, 4, "0")
+    out = out + "-"
+    month_padded = strings.pad_left(month_text, 2, "0")
+    out = out + month_padded
+    out = out + "-"
+    day_padded = strings.pad_left(day_text, 2, "0")
+    out + day_padded
+}
+
+pub fn parse_iso(text: String) -> Result<Date, String> {
+    parts = text.split("-")
+    if parts.length() != 3 or parts[0].length() != 4 or parts[1].length() != 2 or parts[2].length() != 2 {
+        return Err("expected YYYY-MM-DD")
+    }
+    year_result = parts[0].to_int()
+    month_result = parts[1].to_int()
+    day_result = parts[2].to_int()
+    if year_result.is_err() or month_result.is_err() or day_result.is_err() {
+        return Err("date components must be integers")
+    }
+    value = date(year_result.unwrap(), month_result.unwrap(), day_result.unwrap())
+    if not is_valid(value) {
+        return Err("date is outside the proleptic Gregorian calendar")
+    }
+    Ok(value)
+}

@@ -2392,12 +2392,12 @@ fn deeply_nested_input_does_not_crash_the_front_end() {
 fn std_library_modules_agree_between_backends_and_pass_their_own_tests() {
     let tests = run(&["--test", &example_path("std_tests.ostrin")]);
     assert!(tests.status.success(), "std tests failed: {}{}", stdout(&tests), stderr(&tests));
-    assert!(stdout(&tests).contains("6 passed"), "unexpected std test output: {}", stdout(&tests));
+    assert!(stdout(&tests).contains("7 passed"), "unexpected std test output: {}", stdout(&tests));
 
     let path = example_path("std_library.ostrin");
     let interpreted = run(&["--run", &path]);
     assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
-    let expected = "3\n2.5\n10\n6\n12\n1024\ntrue\n1\n[3, 2, 1]\n[1, 2, 3, 4, 5]\n[apple, fig, pear]\n[1, 2]\n[1, 2, 3]\n[2, 3, 4, 5]\nSome(9)\nSome(2)\nababab\n007\n2\n";
+    let expected = "3\n2.5\n10\n6\n12\n1024\ntrue\n1\n[3, 2, 1]\n[1, 2, 3, 4, 5]\n[apple, fig, pear]\n[1, 2]\n[1, 2, 3]\n[2, 3, 4, 5]\nSome(9)\nSome(2)\nababab\n007\n2\n2024-02-29\n1\n29\n";
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
 
     let exe = temp_artifact("std_library.exe");
@@ -2416,8 +2416,24 @@ fn std_library_modules_agree_between_backends_and_pass_their_own_tests() {
     let output = run(&[&missing]);
     assert!(!output.status.success());
     let text = format!("{}{}", stdout(&output), stderr(&output));
-    assert!(text.contains("no module 'nope'") && text.contains("math, lists, strings"), "unhelpful message: {text}");
+    assert!(text.contains("no module 'nope'") && text.contains("math, lists, strings, time"), "unhelpful message: {text}");
     let _ = fs::remove_file(&missing);
+}
+
+#[test]
+fn std_time_native_example_is_leak_free() {
+    let path = example_path("time_library.ostrin");
+    let exe = temp_artifact("time_library_leak.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "native compile failed: {}", stderr(&compile));
+    let native = Command::new(&exe).output().expect("failed to run time binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native run failed: {}", String::from_utf8_lossy(&native.stderr));
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), "true\nfalse\ntrue\n60\n1\n2024-02-29\n29\n2\n");
+    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "native leak report: {}", String::from_utf8_lossy(&native.stderr));
 }
 
 #[test]

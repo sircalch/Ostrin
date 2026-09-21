@@ -31,6 +31,11 @@
   macOS arm64 and Windows x64. Manual runs now sanitize branch names in archive paths.
 
 ### Language and libraries
+- Added the embedded `std.time` module: a deterministic proleptic-Gregorian `Date` record with leap-year
+  and month validation, day-of-year and ISO-weekday calculations, ordinal conversion, ISO formatting and
+  `Result<Date, String>` parsing. `examples/std_tests.ostrin` and `time_library.ostrin` exercise it in both
+  the interpreter and native backend; its native leak-check example reports zero live allocations; it does
+  not read the system clock or timezone.
 - Standard library written in Ostrin and embedded in the compiler: `import std.math`, `std.lists`,
   `std.strings` (`min max clamp gcd sorted reversed contains ...`). Scalars now satisfy `Eq`/`Ord`/
   `Add`... generic bounds, `String` supports `< > <= >=` natively, and functions ending in `return`

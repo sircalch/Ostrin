@@ -14,6 +14,7 @@ fn main() -> Void {
 `,
   "Standard library": `import std.math
 import std.lists
+import std.time
 
 fn main() -> Void {
     numbers = [5, 3, 9, 1]
@@ -21,6 +22,7 @@ fn main() -> Void {
     print(math.max(2.5, 1.5))
     print(math.gcd(12, 18))
     print(17 % 5)
+    print(time.iso(time.date(2024, 2, 29)))
 }
 `,
   "Records and match": `record Point {
@@ -281,6 +283,7 @@ fn main() -> Void {
   standard: { code: `import std.math
 import std.lists
 import std.strings
+import std.time
 
 fn main() -> Void {
     print(math.min(3, 9))
@@ -302,6 +305,9 @@ fn main() -> Void {
     print(strings.repeat("ab", 3))
     print(strings.pad_left("7", 3, "0"))
     print(strings.count_of("a,b,c", ","))
+    print(time.iso(time.date(2024, 2, 29)))
+    print(time.day_of_week(time.date(2024, 1, 1)))
+    print(time.parse_iso("2024-02-29").unwrap().day)
 }
 ` },
   records: { code: `enum Inner {

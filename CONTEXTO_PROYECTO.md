@@ -5600,3 +5600,22 @@ Verificación local de esta modificación: `git diff --check`, `cargo test --man
 compiler/Cargo.toml` (2 unitarias, 6 diferenciales y 176 integraciones en verde), además de los
 checks existentes del sitio y del WASM. El cambio queda preparado para que la primera etiqueta de
 release falle de forma explícita ante una inconsistencia de versión, checksum o contenido ejecutable.
+
+## 221. Biblioteca estándar de fechas deterministas — 2026-09-21
+
+La biblioteca estándar embebida gana su primer módulo de calendario con `compiler/std/time.ostrin`:
+
+- `Date` es un `record` público con `year`, `month` y `day`, construido mediante `time.date`;
+- `is_leap_year`, `days_in_year`, `days_in_month` e `is_valid` implementan el calendario gregoriano
+  proléptico y rechazan años no positivos o días imposibles;
+- `day_of_year`, `from_day_of_year` y `day_of_week` cubren ordinales, conversión inversa y día ISO
+  (lunes = 1, domingo = 7);
+- `iso` formatea `YYYY-MM-DD` y `parse_iso` devuelve `Result<Date, String>` con errores explícitos,
+  sin consultar el reloj ni la zona horaria del sistema.
+
+El módulo se registra en el cargador virtual `std`, por lo que el mismo código Ostrin se ejecuta en el
+intérprete y en el backend nativo. `examples/std_tests.ostrin` añade la validación de años bisiestos,
+ordinales, parseo y fechas inválidas; `examples/time_library.ostrin` comprueba la salida pública y la
+paridad de ambos backends. La prueba nativa con `--leak-check` termina con `live_allocations=0`,
+incluidas las temporales de `iso`; la suite pasa ahora **7 pruebas propias de std**, además de los
+checks existentes. JSON y red permanecen deliberadamente fuera de este bloque.
