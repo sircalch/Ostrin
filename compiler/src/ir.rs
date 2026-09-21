@@ -976,6 +976,12 @@ impl Builder {
                 } else {
                     match subject_ty {
                         Ty::Applied(name, args) if name == "Option" && args.len() == 1 && path.len() == 1 => args[0].clone(),
+                        Ty::Applied(name, args)
+                            if name == "Result" && args.len() == 2 && path.len() == 2 => match path[0].as_str() {
+                                "Ok" => args[0].clone(),
+                                "Err" => args[1].clone(),
+                                _ => Ty::Unknown,
+                            },
                         _ => Ty::Unknown,
                     }
                 };
@@ -993,8 +999,23 @@ impl Builder {
                     .insert(name.clone(), dst);
             }
             crate::ast::Pattern::Variant(_, fields) => {
+                let result_variant = if path.is_empty() {
+                    matches!(
+                        self.known_value_type(subject),
+                        Some(Ty::Applied(name, args)) if name == "Result" && args.len() == 2
+                    )
+                } else {
+                    false
+                };
+                let variant_name = match pattern {
+                    crate::ast::Pattern::Variant(name, _) if result_variant => Some(name.clone()),
+                    _ => None,
+                };
                 for (field, subpattern) in fields {
                     let mut nested = path.clone();
+                    if let Some(variant) = &variant_name {
+                        nested.push(variant.clone());
+                    }
                     nested.push(field.clone());
                     self.bind_pattern(subject, subpattern, nested);
                 }

@@ -2,7 +2,8 @@
 
 *Estado: runtime con registro de allocations, callbacks de destrucción tipados para records,
 colecciones y entornos de tareas, primitivas `clone`/`drop`, primer lowering conservador de
-ownership y ABI `retain`/`release`. Las familias `String`, `List<T>` escalar, los núcleos
+ownership y ABI `retain`/`release`. Las familias `String`, `Result` con payload escalar y
+error `String`, `List<T>` escalar, los núcleos
 escalares de `Map<K,V>`/`Set<T>`, records concretos y `Option<T>` escalar/`Option<String>`/
 `Option<Record>` ya consumen ownership desde la IR y terminan sin allocations vivas en las
 pruebas nativas. Los `Phi` simples transfieren la referencia entrante sin retenerla de nuevo,
@@ -55,8 +56,10 @@ retenerla de nuevo; los `Phi` de bucle liberan el valor corriente tras su últim
 el backedge. `Option<T>` con payload escalar es un struct C por valor y no
 requiere RC; `Option<String>` retiene/libera condicionalmente su puntero y ya cubre
 `Some`/`None` simples; los records concretos pueden anidarse y vivir dentro de `Option` con
-el mismo contrato. Otros payloads gestionados, patrones anidados y agregados complejos todavía
-no insertan RC por cada copia, retorno, phi o salida de ámbito.
+el mismo contrato. `Result<Int,String>` y `Result<Float,String>` también retienen/liberan
+condicionalmente el campo activo y cubren los consumidores básicos de `String.to_int()` y
+`to_float()` desde la IR. Otros payloads gestionados, patrones anidados y agregados complejos
+todavía no insertan RC por cada copia, retorno, phi o salida de ámbito.
 
 - Todo valor por referencia lleva un contador. `retain`/`release` los inserta el compilador **sobre el IR** (no sobre el texto C), en copias de variable, paso a funciones, campos y salida de ámbito.
 - **Análisis de último uso / movimiento** en el IR: si el compilador prueba que un valor no se vuelve a usar, transfiere la propiedad sin tocar el contador (así se recupera el coste cero en el caso común, sin sintaxis nueva).
@@ -81,9 +84,9 @@ El RC sobre el generador actual (texto C con expresiones‑sentencia) exigiría 
    (`--ownership-ir`) que marca transferencias lineales conocidas y el runtime ofrece el ABI;
    el backend C ya consume esa IR transformada para `String`, el núcleo escalar de `List<T>`,
    las operaciones escalares de `Map`/`Set`, records concretos y `Option` escalar/`Option<String>`/
-   `Option<Record>`; aún falta extenderla a otros payloads gestionados de `Option`, patrones
-   anidados, scopes, escapes complejos y payloads gestionados todavía no cubiertos por el
-   análisis de `Phi`.
+   `Option<Record>`, así como `Result` escalar con error `String`; aún falta extenderla a `try`,
+   combinadores, otros payloads gestionados, patrones anidados, scopes, escapes complejos y
+   payloads todavía no cubiertos por el análisis de `Phi`.
 4. `--leak-check` y pruebas: los programas que usan ownership explícito deben terminar con cero
    objetos vivos; convertir ese objetivo en automático requiere el lowering de último uso.
 5. E1101 estático integrado; mantener la comprobación dinámica del intérprete y nativo como red

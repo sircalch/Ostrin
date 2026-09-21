@@ -1,0 +1,33 @@
+fn parse_int_or_default(text: String) -> Int {
+    match text.to_int() {
+        Ok(value) => value,
+        Err(error) => {
+            print(error.is_empty())
+            0
+        }
+    }
+}
+
+fn parse_float_or_default(text: String) -> Float {
+    match text.to_float() {
+        Ok(value) => value,
+        Err(error) => {
+            print(error.is_empty())
+            0.0
+        }
+    }
+}
+
+fn main() -> Void {
+    print(parse_int_or_default("41"))
+    print(parse_int_or_default("nope"))
+    print(parse_float_or_default("3.25"))
+    print(parse_float_or_default("nope"))
+    print("12".to_int().is_ok())
+    print("nope".to_float().is_err())
+    print("nope".to_int().unwrap_or(9))
+    success: Result<Int, String> = Ok(7)
+    failure: Result<Int, String> = Err("bad")
+    print(success.unwrap_or(0))
+    print(failure.unwrap_or(8))
+}

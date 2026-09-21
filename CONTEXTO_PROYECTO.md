@@ -5298,6 +5298,27 @@ pasó junto con la ejecución nativa bajo `--leak-check`; el informe publica `ir
 binario termina con `live_allocations=0`. La suite de referencia queda en **6 diferenciales, 170
 de integración y 2 unitarias**.
 
-La siguiente frontera de esta familia sigue siendo llevar `String.to_int()`/`to_float()` y los
-consumidores de `Result` a la IR, además de ampliar el generador diferencial con records,
-`Option` y closures.
+La siguiente frontera de esta familia será ampliar `Result` a `try`, combinadores y payloads
+compuestos, además de ampliar el generador diferencial con records, `Option` y closures.
+
+## 205. `String.to_int/to_float` y `Result` escalar desde la IR — 2026-09-21
+
+La frontera anterior ya está cerrada para la familia escalar: `String.to_int()` y
+`String.to_float()` generan `Result<Int,String>`/`Result<Float,String>` directamente en el
+emisor C de la IR, reutilizando las mismas reglas de parseo y los mensajes del backend HIR.
+También se migraron los consumidores que hacen falta para usar esos valores sin fallback:
+constructores `Ok`/`Err`, `match` sobre las variantes, bindings de `Ok(v)`/`Err(e)`,
+`is_ok`, `is_err`, `unwrap_or` y `ok`.
+
+El lowering ya conserva el discriminante de `Result` en el path del binding (`Ok.v`/`Err.e`),
+en vez de reducir ambos campos a un nombre ambiguo. La ownership IR trata el wrapper como un
+valor C con payloads condicionalmente gestionados: libera o retiene `value` cuando `ok` es
+verdadero y `error` en caso contrario. `examples/native_ir_string_results.ostrin` cubre éxito,
+error, binding, consultas y fallback, y su binario nativo coincide con el intérprete con
+`live_allocations=0`.
+
+Verificación: la prueba `native_ir_string_methods_cross_block_ownership_and_short_circuit`
+pasó con **3 funciones generadas desde IR** para este ejemplo; la suite queda en **6
+diferenciales, 170 de integración y 2 unitarias**. La próxima frontera concreta es ampliar
+esta representación a `try`, combinadores de `Result` y payloads compuestos, manteniendo el
+fallback verificable para las formas que aún no tengan contrato de ownership completo.

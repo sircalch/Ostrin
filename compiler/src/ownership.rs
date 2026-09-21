@@ -420,7 +420,9 @@ fn safe_release_site(instruction: &IrInstr) -> bool {
         | IrInstr::Aggregate { .. }
         | IrInstr::Index { .. }
         | IrInstr::Field { .. }
-        | IrInstr::Binary { .. } => true,
+        | IrInstr::Binary { .. }
+        | IrInstr::PatternTest { .. }
+        | IrInstr::PatternBind { .. } => true,
         // Ordinary function parameters borrow reference-like values for the
         // duration of the call; the caller can therefore release its last
         // local ownership after any direct call. `Some` is included here as
@@ -443,6 +445,8 @@ fn safe_release_site(instruction: &IrInstr) -> bool {
                 | "replace"
                 | "split"
                 | "lines"
+                | "to_int"
+                | "to_float"
                 | "contains_key"
                 | "get"
                 | "is_some"

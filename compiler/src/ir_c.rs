@@ -5,9 +5,10 @@
 //! phi nodes select the incoming value using the predecessor edge. The first
 //! managed families supported here are `String`, scalar-element `List<T>`
 //! (including the `List<String>` values produced by `String.split()`/`lines()`),
-//! and the scalar-key/value core of `Map<K,V>`/`Set<T>`; their ownership markers
-//! and native helpers are emitted directly into C while option-returning
-//! lookups and larger aggregates retain the verified HIR/AST fallback.
+//! and the scalar-key/value core of `Map<K,V>`/`Set<T>`, plus scalar-payload
+//! `Result<T,E>` values such as `String.to_int()`/`to_float()`; their ownership
+//! markers and native helpers are emitted directly into C while larger
+//! aggregates retain the verified HIR/AST fallback.
 
 use std::collections::{HashMap, HashSet};
 
@@ -38,6 +39,15 @@ fn c_type(ty: &Ty, records: &RecordFields) -> Bail<String> {
         Ty::Applied(name, args) if name == "Option" && args.len() == 1 && option_supported(&args[0], records) => {
             format!("Option_{}", mangle_option_payload(&args[0], records))
         }
+        Ty::Applied(name, args)
+            if name == "Result" && args.len() == 2 && result_supported(&args[0], &args[1], records) =>
+        {
+            format!(
+                "Result_{}_{}",
+                mangle_result_payload(&args[0], records),
+                mangle_result_payload(&args[1], records)
+            )
+        }
         Ty::Void => "void".to_string(),
         _ => return Err(()),
     })
@@ -57,6 +67,7 @@ fn supported(ty: &Ty, records: &RecordFields) -> bool {
         || matches!(ty, Ty::Map(key, value) if map_supported(key, value))
         || matches!(ty, Ty::Set(element) if set_supported(element))
         || matches!(ty, Ty::Applied(name, args) if name == "Option" && args.len() == 1 && option_supported(&args[0], records))
+        || matches!(ty, Ty::Applied(name, args) if name == "Result" && args.len() == 2 && result_supported(&args[0], &args[1], records))
 }
 
 fn list_element_supported(ty: &Ty) -> bool {
@@ -84,6 +95,18 @@ fn option_managed_payload(element: &Ty, records: &RecordFields) -> bool {
     matches!(element, Ty::String) || matches!(element, Ty::Named(name) if records.contains_key(name))
 }
 
+fn result_payload_supported(ty: &Ty, records: &RecordFields) -> bool {
+    (scalar(ty) && *ty != Ty::Void) || matches!(ty, Ty::Named(name) if records.contains_key(name))
+}
+
+fn result_supported(ok: &Ty, err: &Ty, records: &RecordFields) -> bool {
+    result_payload_supported(ok, records) && result_payload_supported(err, records)
+}
+
+fn result_managed_payload(ty: &Ty, records: &RecordFields) -> bool {
+    matches!(ty, Ty::String) || matches!(ty, Ty::Named(name) if records.contains_key(name))
+}
+
 fn option_type(element: &Ty) -> Ty {
     Ty::Applied("Option".to_string(), vec![element.clone()])
 }
@@ -105,6 +128,10 @@ fn mangle_option_payload(ty: &Ty, records: &RecordFields) -> String {
         Ty::Named(name) if records.contains_key(name) => name.clone(),
         _ => mangle_scalar(ty),
     }
+}
+
+fn mangle_result_payload(ty: &Ty, records: &RecordFields) -> String {
+    mangle_option_payload(ty, records)
 }
 
 fn value_name(value: ValueId) -> String {
@@ -336,6 +363,20 @@ fn print_code(value: &str, ty: &Ty) -> Bail<String> {
         Ty::String => format!("printf(\"%s\\n\", {value})"),
         _ => return Err(()),
     })
+}
+
+fn parse_int_result_code(receiver: &str) -> String {
+    "({ Result_Int_String __ostrin_result; memset(&__ostrin_result, 0, sizeof __ostrin_result); const char* __ostrin_text = "
+        .to_string()
+        + receiver
+        + "; if (*__ostrin_text == 0) { __ostrin_result.error = \"cannot parse integer from empty string\"; } else if (*__ostrin_text == ' ' || (*__ostrin_text >= 9 && *__ostrin_text <= 13)) { __ostrin_result.error = \"invalid digit found in string\"; } else { char* __ostrin_end; errno = 0; long long __ostrin_value = strtoll(__ostrin_text, &__ostrin_end, 10); if (errno == ERANGE) { __ostrin_result.error = __ostrin_value < 0 ? \"number too small to fit in target type\" : \"number too large to fit in target type\"; } else if (*__ostrin_end != 0 || __ostrin_end == __ostrin_text) { __ostrin_result.error = \"invalid digit found in string\"; } else { __ostrin_result.ok = true; __ostrin_result.value = (int64_t)__ostrin_value; } } __ostrin_result; })"
+}
+
+fn parse_float_result_code(receiver: &str) -> String {
+    "({ Result_Float_String __ostrin_result; memset(&__ostrin_result, 0, sizeof __ostrin_result); const char* __ostrin_text = "
+        .to_string()
+        + receiver
+        + "; int __ostrin_check = ostrin_s_float_check(__ostrin_text); if (__ostrin_check == 1) { __ostrin_result.error = \"cannot parse float from empty string\"; } else if (__ostrin_check == 2) { __ostrin_result.error = \"invalid float literal\"; } else { __ostrin_result.ok = true; __ostrin_result.value = strtod(__ostrin_text, NULL); } __ostrin_result; })"
 }
 
 fn emit_instruction(
@@ -585,6 +626,10 @@ fn emit_instruction(
                         ("lines", [], Ty::List(element)) if **element == Ty::String => format!(
                             "({{ int64_t __ostrin_lines_count; const char** __ostrin_lines_items = ostrin_s_lines({receiver}, &__ostrin_lines_count); List_String* __ostrin_lines_result = List_String_new_from_array(__ostrin_lines_items, __ostrin_lines_count); for (int64_t __ostrin_lines_i = 0; __ostrin_lines_i < __ostrin_lines_count; __ostrin_lines_i++) ostrin_release((void*)__ostrin_lines_items[__ostrin_lines_i]); ostrin_free((void*)__ostrin_lines_items); __ostrin_lines_result; }})"
                         ),
+                        ("to_int", [], Ty::Applied(name, args))
+                            if name == "Result" && args == &vec![Ty::Int, Ty::String] => parse_int_result_code(&receiver),
+                        ("to_float", [], Ty::Applied(name, args))
+                            if name == "Result" && args == &vec![Ty::Float, Ty::String] => parse_float_result_code(&receiver),
                         _ => return Err(()),
                     }
                 }
@@ -654,6 +699,42 @@ fn emit_instruction(
                         _ => return Err(()),
                     }
                 }
+                Ty::Applied(name, result_args)
+                    if name == "Result"
+                        && result_args.len() == 2
+                        && result_supported(&result_args[0], &result_args[1], records) =>
+                {
+                    let ok = result_args[0].clone();
+                    let err = result_args[1].clone();
+                    let result_name = format!(
+                        "Result_{}_{}",
+                        mangle_result_payload(&ok, records),
+                        mangle_result_payload(&err, records)
+                    );
+                    match method.as_str() {
+                        "is_ok" if args.is_empty() && *ty == Ty::Bool => format!("({receiver}).ok"),
+                        "is_err" if args.is_empty() && *ty == Ty::Bool => format!("!({receiver}).ok"),
+                        "unwrap" if args.is_empty() && *ty == ok => format!(
+                            "({{ {result_name} __ostrin_result = {receiver}; if (!__ostrin_result.ok) {{ fprintf(stderr, \"ostrin: unwrap on Err\\n\"); exit(1); }} __ostrin_result.value; }})"
+                        ),
+                        "unwrap_or"
+                            if args.len() == 1 && *ty == ok && value_ty(values, args[0])? == ok => format!(
+                                "({{ {result_name} __ostrin_result = {receiver}; __ostrin_result.ok ? __ostrin_result.value : {}; }})",
+                                value_code(values, args[0])?
+                            ),
+                        "ok" if args.is_empty() && *ty == option_type(&ok) => {
+                            let option_name = format!("Option_{}", mangle_option_payload(&ok, records));
+                            if option_managed_payload(&ok, records) {
+                                format!(
+                                    "({{ {option_name} __ostrin_option = (({option_name}){{ .has = {receiver}.ok, .value = {receiver}.value }}); if (__ostrin_option.has) ostrin_retain((void*)__ostrin_option.value); __ostrin_option; }})"
+                                )
+                            } else {
+                                format!("(({option_name}){{ .has = {receiver}.ok, .value = {receiver}.value }})")
+                            }
+                        }
+                        _ => return Err(()),
+                    }
+                }
                 Ty::Set(element) if set_supported(&element) => {
                     let set_name = format!("Set_{}", mangle_scalar(&element));
                     match method.as_str() {
@@ -708,6 +789,30 @@ fn emit_instruction(
                         codes[0]
                     )
                 }
+            } else if (callee == "Ok" || callee == "Err") && args.len() == 1 {
+                let Ty::Applied(name, result_args) = ty else { return Err(()) };
+                if name != "Result" || result_args.len() != 2 || !result_supported(&result_args[0], &result_args[1], records) {
+                    return Err(());
+                }
+                let expected = if callee == "Ok" { &result_args[0] } else { &result_args[1] };
+                if value_ty(values, args[0])? != *expected {
+                    return Err(());
+                }
+                let result_name = format!(
+                    "Result_{}_{}",
+                    mangle_result_payload(&result_args[0], records),
+                    mangle_result_payload(&result_args[1], records)
+                );
+                let field = if callee == "Ok" { "value" } else { "error" };
+                let active = if callee == "Ok" { ".ok = true" } else { ".ok = false" };
+                if result_managed_payload(expected, records) {
+                    format!(
+                        "({{ {result_name} __ostrin_result = (({result_name}){{ {active}, .{field} = {} }}); ostrin_retain((void*)__ostrin_result.{field}); __ostrin_result; }})",
+                        codes[0]
+                    )
+                } else {
+                    format!("(({result_name}){{ {active}, .{field} = {} }})", codes[0])
+                }
             } else if callee == "print" && args.len() == 1 {
                 if *ty != Ty::Void {
                     return Err(());
@@ -752,14 +857,23 @@ fn emit_instruction(
         }
         IrInstr::PatternTest { dst, subject, pattern } => {
             let Ty::Applied(name, args) = value_ty(values, *subject)? else { return Err(()) };
-            if name != "Option" || args.len() != 1 || !option_supported(&args[0], records) {
-                return Err(());
-            }
             let subject = value_code(values, *subject)?;
-            let test = if pattern == "Ident(\"None\")" {
-                format!("!({subject}).has")
-            } else if pattern.starts_with("Variant(\"Some\",") {
-                format!("({subject}).has")
+            let test = if name == "Option" && args.len() == 1 && option_supported(&args[0], records) {
+                if pattern == "Ident(\"None\")" {
+                    format!("!({subject}).has")
+                } else if pattern.starts_with("Variant(\"Some\",") {
+                    format!("({subject}).has")
+                } else {
+                    return Err(());
+                }
+            } else if name == "Result" && args.len() == 2 && result_supported(&args[0], &args[1], records) {
+                if pattern.starts_with("Variant(\"Ok\",") {
+                    format!("({subject}).ok")
+                } else if pattern.starts_with("Variant(\"Err\",") {
+                    format!("!({subject}).ok")
+                } else {
+                    return Err(());
+                }
             } else {
                 return Err(());
             };
@@ -771,10 +885,18 @@ fn emit_instruction(
                 (value_code(values, *subject)?, subject_ty)
             } else {
                 let Ty::Applied(name, args) = subject_ty else { return Err(()) };
-                if name != "Option" || args.len() != 1 || !option_supported(&args[0], records) || path.len() != 1 {
+                if name == "Option" && args.len() == 1 && option_supported(&args[0], records) && path.len() == 1 {
+                    (format!("({}).value", value_code(values, *subject)?), args[0].clone())
+                } else if name == "Result" && args.len() == 2 && result_supported(&args[0], &args[1], records) && path.len() == 2 {
+                    let field = match path[0].as_str() {
+                        "Ok" => ("value", args[0].clone()),
+                        "Err" => ("error", args[1].clone()),
+                        _ => return Err(()),
+                    };
+                    (format!("({}).{}", value_code(values, *subject)?, field.0), field.1)
+                } else {
                     return Err(());
                 }
-                (format!("({}).value", value_code(values, *subject)?), args[0].clone())
             };
             if bound_ty != *ty {
                 return Err(());
@@ -814,6 +936,20 @@ fn emit_instruction(
                     let code = value_code(values, *value)?;
                     out.push_str(&format!("    if ({code}.has) ostrin_retain((void*){code}.value);\n"));
                 }
+                Ty::Applied(name, args)
+                    if name == "Result" && args.len() == 2 && result_supported(&args[0], &args[1], records) =>
+                {
+                    let code = value_code(values, *value)?;
+                    let ok = result_managed_payload(&args[0], records);
+                    let err = result_managed_payload(&args[1], records);
+                    if ok && err {
+                        out.push_str(&format!("    if ({code}.ok) ostrin_retain((void*){code}.value); else ostrin_retain((void*){code}.error);\n"));
+                    } else if ok {
+                        out.push_str(&format!("    if ({code}.ok) ostrin_retain((void*){code}.value);\n"));
+                    } else if err {
+                        out.push_str(&format!("    if (!{code}.ok) ostrin_retain((void*){code}.error);\n"));
+                    }
+                }
                 _ => return Err(()),
             }
         }
@@ -831,6 +967,20 @@ fn emit_instruction(
                 {
                     let code = value_code(values, *value)?;
                     out.push_str(&format!("    if ({code}.has) ostrin_release((void*){code}.value);\n"));
+                }
+                Ty::Applied(name, args)
+                    if name == "Result" && args.len() == 2 && result_supported(&args[0], &args[1], records) =>
+                {
+                    let code = value_code(values, *value)?;
+                    let ok = result_managed_payload(&args[0], records);
+                    let err = result_managed_payload(&args[1], records);
+                    if ok && err {
+                        out.push_str(&format!("    if ({code}.ok) ostrin_release((void*){code}.value); else ostrin_release((void*){code}.error);\n"));
+                    } else if ok {
+                        out.push_str(&format!("    if ({code}.ok) ostrin_release((void*){code}.value);\n"));
+                    } else if err {
+                        out.push_str(&format!("    if (!{code}.ok) ostrin_release((void*){code}.error);\n"));
+                    }
                 }
                 _ => return Err(()),
             }
