@@ -9,10 +9,18 @@
 .pane { display: flex; flex-direction: column; min-width: 0; border: 1px solid #263045; border-radius: 10px; overflow: hidden; background: #0b0e15; }
 .pane .code-title { padding: .55rem .9rem; border-bottom: 1px solid #263045; display: flex; justify-content: space-between; gap: 1rem; }
 #source, .output { margin: 0; padding: 1rem; min-height: 22rem; font: 14px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: transparent; color: #e6e9f0; border: 0; resize: vertical; tab-size: 4; white-space: pre; overflow: auto; }
+#output { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; white-space: pre-wrap; overflow-x: hidden; overflow-wrap: anywhere; word-break: break-word; }
 #source { outline: none; }
 .output .err { color: #ff8a8a; }
 .output .ok { color: #7ee2a8; }
 .output .dim { color: #7c869a; }
+.output .diagnostic { display: block; width: 100%; max-width: 100%; min-width: 0; padding: .55rem 0; border-bottom: 1px solid rgba(38, 48, 69, .75); white-space: normal !important; overflow-wrap: anywhere; word-break: break-all; }
+.output .diagnostic:last-child { border-bottom: 0; }
+.output .diagnostic-head { display: block; color: #ffb4b4; }
+.output .diagnostic.warning .diagnostic-head { color: #f0c674; }
+.output .diagnostic-code { font-weight: 700; }
+.output .diagnostic-location { color: #98a2b3; font-weight: 400; }
+.output .diagnostic-message { display: block; padding: .28rem 0 0 1rem; color: #e6e9f0; }
 .status { font-size: .8rem; color: #98a2b3; }
 .playground-note { color: #98a2b3; font-size: .9rem; margin-top: 1rem; }
 @media (max-width: 800px) { .playground-panes { grid-template-columns: 1fr; } }

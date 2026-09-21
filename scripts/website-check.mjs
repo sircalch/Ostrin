@@ -48,6 +48,7 @@ const homepage = read("website/index.html");
 check(homepage.includes('id="try-ostrin"'), "index.html: missing homepage playground anchor");
 check(homepage.includes('type="module" src="playground.js"'), "index.html: missing real playground module");
 check(homepage.includes('data-site-value="examples"'), "index.html: missing centralized project facts");
+check(homepage.includes('id="output" class="output" role="status"'), "index.html: output is missing accessible status semantics");
 
 const docs = read("website/docs.html");
 check(docs.includes('id="learn"'), "docs.html: missing guided learning path");
@@ -65,6 +66,9 @@ for (const key of ["quantities", "standard", "records", "concurrency"]) {
 }
 
 const playgroundScript = read("website/playground.js").replaceAll("\r\n", "\n");
+for (const marker of ["[flag, \"--json\"]", "parseDiagnostic", "diagnostic-location"]) {
+  check(playgroundScript.includes(marker), `playground.js: missing structured diagnostics marker ${marker}`);
+}
 for (const [key, sourceFile] of Object.entries({
   quantities: "examples/physics.ostrin",
   standard: "examples/std_library.ostrin",
@@ -79,6 +83,7 @@ const playground = read("website/playground.html");
 for (const id of ["run", "check", "test", "format", "share", "source", "output"]) {
   check(playground.includes(`id="${id}"`), `playground.html: missing control ${id}`);
 }
+check(playground.includes('id="output" class="output" role="status"'), "playground.html: output is missing accessible status semantics");
 
 const showcase = read("website/showcase.html");
 for (const marker of ["examples/physics.ostrin", "examples/data_project", "examples/plot_project", "examples/autodiff_project"]) {

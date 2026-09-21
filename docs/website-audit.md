@@ -76,3 +76,6 @@ GitHub Pages architecture while making the next public claims evidence-based.
   It links to source-backed examples and existing reference/playground/showcase surfaces, labels
   concurrency/packages/native compilation as early where the implementation or distribution story is
   still growing, and is covered by `scripts/website-check.mjs`.
+- The playground now requests structured JSON diagnostics for checks and failed runs, renders their
+  code/location/message fields in an accessible status output, and keeps a plain-text fallback for
+  non-JSON runtime output. The homepage and catalogue reuse the same module and output contract.

@@ -5534,3 +5534,25 @@ ruta de aprendizaje enlazada con evidencia del repositorio:
 
 La mejora se limita a documentación respaldada por código existente; los diagnósticos enriquecidos y
 la distribución instalable quedan como el siguiente incremento del learning funnel.
+
+## 218. Diagnósticos estructurados en el playground — 2026-09-21
+
+El siguiente incremento del learning funnel mejora la primera experiencia de error sin modificar el
+checker ni ocultar su salida real:
+
+- `website/playground.js` solicita `--json` junto con `--check` y `--run`. El parser acepta JSON Lines
+  emitidos por stdout o stderr porque el binario WASI puede dirigirlos por cualquiera de los dos
+  canales según la ruta de diagnóstico.
+- Los diagnósticos estructurados se muestran como filas legibles con código `OSTRIN-Exxxx`, archivo,
+  línea, columna, severidad y mensaje. Traps y salida no estructurada conservan el fallback textual.
+  El encabezado resume la cantidad de errores/advertencias y el tiempo de ejecución.
+- La salida completa del playground y la portada usa ahora un contenedor `role="status"`; los estilos
+  permiten wrapping en pantallas estrechas. Los live examples comparten el renderizado de diagnósticos
+  sin perder sus outputs normales.
+- `scripts/website-check.mjs` protege el wiring de `--json`, el parser y la semántica accesible del
+  output. En el navegador, un programa inválido produjo el diagnóstico real
+  `OSTRIN-E1024 main.ostrin:4:11 Invalid dimensional operation. Cannot add/subtract Length and Time.`;
+  el programa válido siguió devolviendo `5 m/s`.
+
+No se añadió una capa de mensajes inventados ni se reemplazó el compilador WASM. Quedan para próximos
+bloques el resaltado de línea en el editor y una prueba responsive móvil con un viewport dedicado.

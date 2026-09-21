@@ -89,7 +89,8 @@ function escapeHtml(text) {
   return text.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
 }
 
-async function invoke(sourceText, flag) {
+async function invoke(sourceText, flags) {
+  const normalizedFlags = Array.isArray(flags) ? flags : [flags];
   const lines = [];
   const files = new Map([["main.ostrin", new File(new TextEncoder().encode(sourceText))]]);
   const fds = [
@@ -98,7 +99,7 @@ async function invoke(sourceText, flag) {
     ConsoleStdout.lineBuffered((line) => lines.push(["err", line])),
     new PreopenDirectory(".", files),
   ];
-  const wasi = new WASI(["ostrinc", flag, "main.ostrin"], [], fds);
+  const wasi = new WASI(["ostrinc", ...normalizedFlags, "main.ostrin"], [], fds);
   const instance = await WebAssembly.instantiate(await loadModule(), { wasi_snapshot_preview1: wasi.wasiImport });
   let code = 0;
   try {
@@ -110,14 +111,52 @@ async function invoke(sourceText, flag) {
   return { code, lines };
 }
 
+function parseDiagnostic(text) {
+  try {
+    const value = JSON.parse(text);
+    if (value && typeof value === "object" && typeof value.message === "string") return value;
+  } catch (_) {
+    // Compiler output from runtime traps and older builds can still be plain text.
+  }
+  return null;
+}
+
+function renderDiagnostic(diagnostic) {
+  const severity = diagnostic.severity === "warning" ? "warning" : "error";
+  const code = diagnostic.code ? `OSTRIN-${diagnostic.code}` : "Ostrin diagnostic";
+  const file = typeof diagnostic.file === "string" ? diagnostic.file : "main.ostrin";
+  const position = [diagnostic.line, diagnostic.column]
+    .filter((value) => Number.isInteger(value))
+    .join(":");
+  const location = position ? `${file}:${position}` : file;
+  return `<span class="diagnostic ${severity}"><span class="diagnostic-head"><span class="diagnostic-code">${escapeHtml(code)}</span> <span class="diagnostic-location">${escapeHtml(location)}</span></span><br><span class="diagnostic-message">${escapeHtml(diagnostic.message)}</span></span>`;
+}
+
+function renderLine([kind, text]) {
+  const diagnostic = parseDiagnostic(text);
+  if (diagnostic) return renderDiagnostic(diagnostic);
+  return `<span class="${kind === "err" ? "err" : ""}">${escapeHtml(text)}</span>`;
+}
+
+function diagnosticSummary(diagnostics) {
+  const errors = diagnostics.filter(({ severity }) => severity !== "warning").length;
+  const warnings = diagnostics.length - errors;
+  const parts = [];
+  if (errors) parts.push(`${errors} error${errors === 1 ? "" : "s"}`);
+  if (warnings) parts.push(`${warnings} warning${warnings === 1 ? "" : "s"}`);
+  return parts.join(", ");
+}
+
 async function execute(flag, sourceNode = source, outputNode = output, statusNode = status, controls = buttons) {
   if (!sourceNode || !outputNode || !statusNode) return;
   controls.forEach((b) => (b.disabled = true));
   statusNode.textContent = "running…";
   const started = performance.now();
   try {
-    const { code, lines } = await invoke(sourceNode.value, flag);
-    let html = lines.map(([kind, text]) => `<span class="${kind === "err" ? "err" : ""}">${escapeHtml(text)}</span>`).join("\n");
+    const flags = ["--check", "--run"].includes(flag) ? [flag, "--json"] : [flag];
+    const { code, lines } = await invoke(sourceNode.value, flags);
+    const diagnostics = lines.map(([, text]) => parseDiagnostic(text)).filter(Boolean);
+    let html = lines.map(renderLine).join("\n");
     if (flag === "--fmt" && code === 0) {
       // --fmt prints the formatted source: put it back in the editor.
       sourceNode.value = lines.filter(([kind]) => kind === "out").map(([, text]) => text).join("\n") + "\n";
@@ -127,7 +166,8 @@ async function execute(flag, sourceNode = source, outputNode = output, statusNod
     }
     outputNode.innerHTML = html || '<span class="dim">(no output)</span>';
     const elapsed = Math.round(performance.now() - started);
-    statusNode.textContent = `${code === 0 ? "ok" : "exit " + code} · ${elapsed} ms`;
+    const summary = diagnostics.length ? diagnosticSummary(diagnostics) : (code === 0 ? "ok" : "exit " + code);
+    statusNode.textContent = `${summary} · ${elapsed} ms`;
   } catch (error) {
     outputNode.innerHTML = `<span class="err">${escapeHtml(String(error))}</span>`;
     statusNode.textContent = "failed to start";

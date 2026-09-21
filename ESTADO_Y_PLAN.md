@@ -286,7 +286,9 @@ robots y el artefacto WASM generado por Pages. `showcase.html` expone programas 
 cantidades, tablas, SVG y autodiff; `community.html` y las plantillas de GitHub preparan la
 contribución sin inventar canales externos. `docs.html` añade una ruta guiada de 14 pasos con
 enlaces a fuentes, referencia, playground y showcase; los pasos distinguen `available` de `early`
-sin prometer capacidades no implementadas. Siguiente: mejora de diagnósticos y del learning funnel.
+sin prometer capacidades no implementadas. El playground y sus live examples renderizan ahora
+diagnósticos JSON reales con código, ubicación, severidad y mensaje. Siguiente: resaltado de línea
+en el editor, prueba responsive móvil y mejora incremental del learning funnel.
 La gramática para Linguist queda separada porque requiere uso público suficiente.
 
 ---

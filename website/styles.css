@@ -247,6 +247,13 @@ h4 { font-size: .86rem; }
 .live-example-output .err { color: #ff8a8a; }
 .live-example-output .ok { color: var(--green); }
 .live-example-output .dim { color: var(--muted-2); }
+.live-example-output .diagnostic { display: block; padding: 7px 0; border-bottom: 1px solid rgba(38, 48, 69, .75); white-space: normal; overflow-wrap: anywhere; word-break: break-all; }
+.live-example-output .diagnostic:last-child { border-bottom: 0; }
+.live-example-output .diagnostic-head { display: block; color: #ffb4b4; }
+.live-example-output .diagnostic.warning .diagnostic-head { color: #f0c674; }
+.live-example-output .diagnostic-code { font-weight: 700; }
+.live-example-output .diagnostic-location { color: var(--muted); font-weight: 400; }
+.live-example-output .diagnostic-message { display: block; padding: 4px 0 0 1rem; color: var(--white); }
 .live-example-links { display: flex; flex-wrap: wrap; gap: 12px 20px; margin-top: 15px; font-size: .73rem; }
 .live-example-links a { color: var(--violet-2); }
 .lab { margin-top: 85px; padding-top: 80px; border-top: 1px solid var(--line); }

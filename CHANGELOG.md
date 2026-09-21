@@ -18,6 +18,9 @@
 - Added a 14-step guided learning path to `docs.html`, linking each chapter to real examples, language
   reference anchors, the browser playground or the verified showcase; `available` and `early` labels
   make current implementation maturity explicit.
+- Improved the browser playground's real diagnostics: `Check` and failed `Run` request JSON Lines and
+  render `OSTRIN-Exxxx`, file, line, column, severity and message accessibly, with a plain-text fallback
+  for runtime traps and older output paths. The homepage and live examples share the same behavior.
 
 ### Language and libraries
 - Standard library written in Ostrin and embedded in the compiler: `import std.math`, `std.lists`,
