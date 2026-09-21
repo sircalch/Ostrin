@@ -5206,3 +5206,16 @@ Suite: **6 diferenciales, 164 de integración y 2 unitarias**.
 Pendiente: `unwrap`/`unwrap_or` y otros consumidores de `Option` sin modelar en el pase; métodos
 de `String` restantes (`split`, `lines`, `to_int`, `to_float`) en HIR/IR; ampliar el generador con
 records, `Option` y closures.
+
+## 198. Robustez del front end: parser exponencial corregido y fuzzing por mutación — 2026-09-20
+
+`front_end_never_panics_on_mutated_sources` toma los ejemplos reales, borra/duplica/trunca/
+intercambia tramos y exige que `--check` termine con diagnóstico (código 0 o 1), nunca con
+pánico (101) ni desbordamiento de pila. `deeply_nested_input_does_not_crash_the_front_end`
+cubre 3 000 paréntesis, 1 500 `if` anidados y corchetes sin cerrar.
+
+Hallazgo: 1 500 `if` anidados colgaban el compilador. `parse_statement` intentaba parsear cada
+sentencia como objetivo de asignación (`a.b = v`), la descartaba y la reparseaba como expresión,
+de modo que cada nivel de anidamiento duplicaba el trabajo (2ⁿ; 20 niveles ≈ 3,5 s). Ahora hay un
+único parseo y se decide por el `=` posterior. Con `OSTRIN_FUZZ_SEEDS=25` se ejecutaron unas
+3 700 mutaciones sin pánicos. Suite: **6 diferenciales, 166 de integración y 2 unitarias**.

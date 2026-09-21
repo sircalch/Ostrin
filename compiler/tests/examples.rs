@@ -2116,6 +2116,93 @@ fn generated_programs_agree_between_interpreter_and_native_backend() {
     }
 }
 
+/// Mutates real programs (deleting, duplicating, truncating and swapping spans) and checks that the
+/// front end reports diagnostics instead of crashing. A Rust panic exits with code 101 and prints
+/// "panicked at"; a stack overflow kills the process without an exit code.
+#[test]
+fn front_end_never_panics_on_mutated_sources() {
+    let mut state: u64 = 0x9E3779B97F4A7C15;
+    let mut next = |bound: usize| -> usize {
+        state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        ((state >> 33) as usize) % bound.max(1)
+    };
+    let mut files: Vec<_> = fs::read_dir(example_path(""))
+        .unwrap()
+        .filter_map(|entry| entry.ok().map(|e| e.path()))
+        .filter(|path| path.extension().is_some_and(|ext| ext == "ostrin"))
+        .collect();
+    files.sort();
+    let path = temp_artifact("mutated.ostrin");
+    let mut checked = 0;
+    // `OSTRIN_FUZZ_SEEDS=N` mutates every example N times instead of every third one 3 times.
+    let widened: Option<usize> = std::env::var("OSTRIN_FUZZ_SEEDS").ok().and_then(|v| v.parse().ok());
+    let rounds = widened.unwrap_or(3);
+    for file in files.iter().step_by(if widened.is_some() { 1 } else { 3 }) {
+        let source: Vec<char> = fs::read_to_string(file).unwrap().chars().collect();
+        if source.len() < 20 {
+            continue;
+        }
+        for round in 0..rounds {
+            let mut mutated = source.clone();
+            let start = next(mutated.len() - 1);
+            let span = 1 + next(40.min(mutated.len() - start));
+            match (round + next(3)) % 4 {
+                0 => {
+                    mutated.drain(start..start + span);
+                }
+                1 => {
+                    let copy: Vec<char> = mutated[start..start + span].to_vec();
+                    let at = next(mutated.len());
+                    for (offset, ch) in copy.into_iter().enumerate() {
+                        mutated.insert(at + offset, ch);
+                    }
+                }
+                2 => mutated.truncate(start),
+                _ => {
+                    let other = next(mutated.len() - span);
+                    for offset in 0..span {
+                        mutated.swap(start + offset, other + offset);
+                    }
+                }
+            }
+            let text: String = mutated.into_iter().collect();
+            fs::write(&path, &text).unwrap();
+            let output = run(&["--check", &path]);
+            let code = output.status.code();
+            assert!(
+                matches!(code, Some(0) | Some(1)) && !stderr(&output).contains("panicked at"),
+                "front end crashed (exit {code:?}) on a mutation of {}:\n{}\n--- stderr ---\n{}",
+                file.display(),
+                text,
+                stderr(&output)
+            );
+            checked += 1;
+        }
+    }
+    let _ = fs::remove_file(&path);
+    assert!(checked > 60, "expected to check many mutations, checked {checked}");
+}
+
+#[test]
+fn deeply_nested_input_does_not_crash_the_front_end() {
+    let path = temp_artifact("deep_nesting.ostrin");
+    for (label, source) in [
+        ("parens", format!("fn main() -> Void {{\n    print({}1{})\n}}\n", "(".repeat(3000), ")".repeat(3000))),
+        ("blocks", format!("fn main() -> Void {{\n{}{}}}\n", "    if true {\n".repeat(1500), "    }\n".repeat(1500))),
+        ("unclosed", format!("fn main() -> Void {{\n    print({}\n", "[".repeat(3000))),
+    ] {
+        fs::write(&path, source).unwrap();
+        let output = run(&["--check", &path]);
+        let code = output.status.code();
+        assert!(
+            matches!(code, Some(0) | Some(1)) && !stderr(&output).contains("panicked at"),
+            "nesting case '{label}' crashed the front end (exit {code:?}): {}",
+            stderr(&output)
+        );
+    }
+    let _ = fs::remove_file(&path);
+}
+
 #[test]
 fn native_ir_emitter_handles_scalar_maps_and_sets() {
     let file = example_path("native_ir_maps_sets.ostrin");

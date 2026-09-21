@@ -23,6 +23,8 @@
   group-by), `plot` (SVG scatter/line) and `autodiff` (forward-mode dual numbers).
 
 ### Compiler
+- The parser no longer takes exponential time on deeply nested blocks (statements were parsed twice
+  per nesting level); mutation and deep-nesting tests guard the front end against panics.
 - Fixed a use-after-release in the native IR path: returning a `String`/`List` parameter (or merging
   parameters through `if`) did not retain it. The IR ownership pass now uses CFG liveness (releases on
   dying edges, retains for `Phi` inputs) and `if`/`match`/`break`/`continue` with managed values compile

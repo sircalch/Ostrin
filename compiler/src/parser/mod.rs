@@ -426,18 +426,19 @@ impl Parser {
             let value = self.parse_expr()?;
             return Ok(self.located(Stmt::Assign { name, value }, span));
         }
-        {
-            let checkpoint = self.pos;
-            if let Ok(target) = self.parse_postfix() {
-                if self.check(&TokenKind::Eq) && is_assignable_target(&target) {
-                    self.advance();
-                    let value = self.parse_expr()?;
-                    return Ok(self.located(Stmt::FieldAssign { target, value }, span));
-                }
-            }
-            self.pos = checkpoint;
-        }
+        // One parse only: re-parsing a statement as an expression after trying it as an
+        // assignment target doubled the work at every nesting level (exponential time on
+        // deeply nested blocks).
         let expr = self.parse_expr()?;
+        if self.check(&TokenKind::Eq) && is_assignable_target(&expr) {
+            self.advance();
+            let target = match expr {
+                Expr::Located(inner, _) => *inner,
+                other => other,
+            };
+            let value = self.parse_expr()?;
+            return Ok(self.located(Stmt::FieldAssign { target, value }, span));
+        }
         Ok(self.located(Stmt::Expr(expr), span))
     }
 
