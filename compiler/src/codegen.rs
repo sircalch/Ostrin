@@ -137,6 +137,16 @@ fn field_c_type(ty: &CType) -> String {
 /// `Str` is included deliberately: string literals are static and therefore
 /// ignored by the runtime, while strings returned by the standard library
 /// are registered allocations and can participate in the same ownership ABI.
+/// Which appender renders `ty` into a `print` string: a `String` element is borrowed from its
+/// container, every other rendering is a fresh allocation that the appender must release.
+fn show_cat(ty: &CType) -> &'static str {
+    if matches!(ty, CType::Str) {
+        "ostrin_show_cat"
+    } else {
+        "ostrin_show_catf"
+    }
+}
+
 fn is_reference_type(ty: &CType) -> bool {
     matches!(
         ty,
@@ -1148,6 +1158,19 @@ static char* ostrin_str_concat(const char* a, const char* b) {\n\
     char* out = (char*)ostrin_alloc(len);\n\
     snprintf(out, len, \"%s%s\", a, b);\n\
     return out;\n\
+}\n\
+/* Appenders used by the generated `ostrin_show_*` helpers: the accumulator is consumed (literals\n\
+   are untracked, so releasing them is a no-op); `catf` also consumes a freshly rendered `right`. */\n\
+static const char* ostrin_show_cat(const char* left, const char* right) {\n\
+    const char* joined = ostrin_str_concat(left, right);\n\
+    ostrin_release((void*)left);\n\
+    return joined;\n\
+}\n\
+static const char* ostrin_show_catf(const char* left, const char* right) {\n\
+    const char* joined = ostrin_str_concat(left, right);\n\
+    ostrin_release((void*)left);\n\
+    ostrin_release((void*)right);\n\
+    return joined;\n\
 }\n\
 \n";
 
@@ -5687,41 +5710,46 @@ impl<'a> Codegen<'a> {
                 out.push_str(&format!("    return {}_show_rec(v, 0, 0);\n", mangle_ctype(ty)));
             }
             CType::List(elem) => {
+                let cat = show_cat(elem);
                 let shown = self.show_expr("v->items[i]", elem)?;
                 out.push_str("    const char* s = \"[\";\n");
                 out.push_str(&format!(
-                    "    for (int64_t i = 0; i < v->length; i++) {{\n        if (i > 0) s = ostrin_str_concat(s, \", \");\n        s = ostrin_str_concat(s, {shown});\n    }}\n"
+                    "    for (int64_t i = 0; i < v->length; i++) {{\n        if (i > 0) s = ostrin_show_cat(s, \", \");\n        s = {cat}(s, {shown});\n    }}\n"
                 ));
-                out.push_str("    return ostrin_str_concat(s, \"]\");\n");
+                out.push_str("    return ostrin_show_cat(s, \"]\");\n");
             }
             CType::Set(elem) => {
+                let cat = show_cat(elem);
                 let shown = self.show_expr("v->items[i]", elem)?;
                 out.push_str("    const char* s = \"{\";\n");
                 out.push_str(&format!(
-                    "    for (int64_t i = 0; i < v->length; i++) {{\n        if (i > 0) s = ostrin_str_concat(s, \", \");\n        s = ostrin_str_concat(s, {shown});\n    }}\n"
+                    "    for (int64_t i = 0; i < v->length; i++) {{\n        if (i > 0) s = ostrin_show_cat(s, \", \");\n        s = {cat}(s, {shown});\n    }}\n"
                 ));
-                out.push_str("    return ostrin_str_concat(s, \"}\");\n");
+                out.push_str("    return ostrin_show_cat(s, \"}\");\n");
             }
             CType::Map(k, val) => {
+                let (key_cat, value_cat) = (show_cat(k), show_cat(val));
                 let ks = self.show_expr("v->keys[i]", k)?;
                 let vs = self.show_expr("v->vals[i]", val)?;
                 out.push_str("    const char* s = \"[\";\n");
                 out.push_str(&format!(
-                    "    for (int64_t i = 0; i < v->length; i++) {{\n        if (i > 0) s = ostrin_str_concat(s, \", \");\n        s = ostrin_str_concat(s, {ks});\n        s = ostrin_str_concat(s, \": \");\n        s = ostrin_str_concat(s, {vs});\n    }}\n"
+                    "    for (int64_t i = 0; i < v->length; i++) {{\n        if (i > 0) s = ostrin_show_cat(s, \", \");\n        s = {key_cat}(s, {ks});\n        s = ostrin_show_cat(s, \": \");\n        s = {value_cat}(s, {vs});\n    }}\n"
                 ));
-                out.push_str("    return ostrin_str_concat(s, \"]\");\n");
+                out.push_str("    return ostrin_show_cat(s, \"]\");\n");
             }
             CType::Result(ok, err) => {
+                let (ok_cat, err_cat) = (show_cat(ok), show_cat(err));
                 let ok_shown = self.show_expr("v.value", ok)?;
                 let err_shown = self.show_expr("v.error", err)?;
                 out.push_str(&format!(
-                    "    if (v.ok) return ostrin_str_concat(ostrin_str_concat(\"Ok(\", {ok_shown}), \")\");\n    return ostrin_str_concat(ostrin_str_concat(\"Err(\", {err_shown}), \")\");\n"
+                    "    if (v.ok) return ostrin_show_cat({ok_cat}(\"Ok(\", {ok_shown}), \")\");\n    return ostrin_show_cat({err_cat}(\"Err(\", {err_shown}), \")\");\n"
                 ));
             }
             CType::Option(inner) => {
+                let cat = show_cat(inner);
                 let shown = self.show_expr("v.value", inner)?;
                 out.push_str(&format!(
-                    "    if (!v.has) return \"None\";\n    return ostrin_str_concat(ostrin_str_concat(\"Some(\", {shown}), \")\");\n"
+                    "    if (!v.has) return \"None\";\n    return ostrin_show_cat({cat}(\"Some(\", {shown}), \")\");\n"
                 ));
             }
             CType::Enum(name) => {
@@ -5733,16 +5761,17 @@ impl<'a> Codegen<'a> {
                     out.push_str(&format!("    if (v.tag == {}) {{\n        const char* s = {};\n", v.tag, c_string_literal(&if v.fields.is_empty() { v.name.clone() } else { format!("{}(", v.name) })));
                     for (i, (field_name, field_ty)) in v.fields.iter().enumerate() {
                         if i > 0 {
-                            out.push_str("        s = ostrin_str_concat(s, \", \");\n");
+                            out.push_str("        s = ostrin_show_cat(s, \", \");\n");
                         }
                         if *field_name != format!("f{i}") {
-                            out.push_str(&format!("        s = ostrin_str_concat(s, {});\n", c_string_literal(&format!("{field_name}: "))));
+                            out.push_str(&format!("        s = ostrin_show_cat(s, {});\n", c_string_literal(&format!("{field_name}: "))));
                         }
+                        let cat = show_cat(field_ty);
                         let shown = self.show_expr(&format!("v.data.{}.{field_name}", v.name), field_ty)?;
-                        out.push_str(&format!("        s = ostrin_str_concat(s, {shown});\n"));
+                        out.push_str(&format!("        s = {cat}(s, {shown});\n"));
                     }
                     if !v.fields.is_empty() {
-                        out.push_str("        s = ostrin_str_concat(s, \")\");\n");
+                        out.push_str("        s = ostrin_show_cat(s, \")\");\n");
                     }
                     out.push_str("        return s;\n    }\n");
                 }
@@ -5753,13 +5782,14 @@ impl<'a> Codegen<'a> {
                 out.push_str(&format!("    const char* s = {};\n", c_string_literal(&format!("{base} {{ "))));
                 for (i, (field_name, field_ty)) in self.record_fields(name).to_vec().iter().enumerate() {
                     if i > 0 {
-                        out.push_str("    s = ostrin_str_concat(s, \", \");\n");
+                        out.push_str("    s = ostrin_show_cat(s, \", \");\n");
                     }
-                    out.push_str(&format!("    s = ostrin_str_concat(s, {});\n", c_string_literal(&format!("{field_name}: "))));
+                    out.push_str(&format!("    s = ostrin_show_cat(s, {});\n", c_string_literal(&format!("{field_name}: "))));
+                    let cat = show_cat(field_ty);
                     let shown = self.show_expr(&format!("v->{field_name}"), field_ty)?;
-                    out.push_str(&format!("    s = ostrin_str_concat(s, {shown});\n"));
+                    out.push_str(&format!("    s = {cat}(s, {shown});\n"));
                 }
-                out.push_str("    return ostrin_str_concat(s, \" }\");\n");
+                out.push_str("    return ostrin_show_cat(s, \" }\");\n");
             }
             _ => unreachable!("only records and enums are queued"),
         }
@@ -6188,14 +6218,15 @@ impl<'a> Codegen<'a> {
             CType::Bool => ("%s\\n", format!("(({}) ? \"true\" : \"false\")", arg_codes[0])),
             CType::Str => ("%s\\n", arg_codes[0].clone()),
             CType::Void => return Err("cannot 'print' a Void value".to_string()),
-            CType::Record(_) | CType::Enum(_) => {
-                let shown = self.show_expr(&arg_codes[0], &arg_types[0].clone())?;
-                ("%s\\n", shown)
-            }
             CType::DynTrait(name) => return Err(format!("cannot 'print' a 'dyn {name}' value")),
-            CType::List(_) | CType::Map(..) | CType::Set(_) | CType::Option(_) | CType::Result(..) | CType::Array(_) => {
+            CType::Record(_) | CType::Enum(_) | CType::List(_) | CType::Map(..) | CType::Set(_) | CType::Option(_) | CType::Result(..) | CType::Array(_) => {
+                // The rendered text is a fresh allocation: print it, then release it.
                 let shown = self.show_expr(&arg_codes[0], &arg_types[0].clone())?;
-                ("%s\\n", shown)
+                let temp = self.next_temp();
+                return Ok((
+                    format!("({{ const char* {temp} = {shown}; printf(\"%s\\n\", {temp}); ostrin_release((void*){temp}); }})"),
+                    CType::Void,
+                ));
             }
             CType::Quantity(_) => return Ok((format!("ostrin_print_qty({})", arg_codes[0]), CType::Void)),
             CType::GenLit(..) => return Err("cannot infer the enum instance to print here".to_string()),
@@ -6708,7 +6739,12 @@ fn generate_impl(
                 .functions
                 .iter()
                 .find(|function| function.name == f.name && !ir_unresolved.contains(&function.name))
-                .and_then(|function| crate::ir_c::generate(function, &ir_functions, &ir_records)),
+                .and_then(|function| {
+                    crate::ir_c::generate(function, &ir_functions, &ir_records, &mut |code, ty| {
+                        let ctype = codegen.ty_to_ctype(ty)?;
+                        codegen.show_expr(code, &ctype).ok()
+                    })
+                }),
             _ => None,
         };
         // Functions not yet representable by IR keep the HIR emitter as the

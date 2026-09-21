@@ -342,6 +342,7 @@ fn emit_instruction(
     values: &Values,
     known_functions: &HashSet<String>,
     records: &RecordFields,
+    show: &mut dyn FnMut(&str, &Ty) -> Option<String>,
     out: &mut String,
 ) -> Bail<()> {
     match instruction {
@@ -705,10 +706,16 @@ fn emit_instruction(
                     return Err(());
                 }
                 let arg_ty = value_ty(values, args[0])?;
-                if !scalar(&arg_ty) {
+                if scalar(&arg_ty) {
+                    print_code(&codes[0], &arg_ty)?
+                } else if supported(&arg_ty, records) {
+                    // Collections, options and records print through the generated
+                    // `ostrin_show_*` helper; the rendered text is an owned string.
+                    let shown = show(&codes[0], &arg_ty).ok_or(())?;
+                    format!("({{ const char* __ostrin_shown = {shown}; printf(\"%s\\n\", __ostrin_shown); ostrin_release((void*)__ostrin_shown); }})")
+                } else {
                     return Err(());
                 }
-                print_code(&codes[0], &arg_ty)?
             } else {
                 if !known_functions.contains(callee) {
                     return Err(());
@@ -890,7 +897,12 @@ fn emit_terminator(
 /// Emits an IR function when all of its values use a supported scalar or
 /// collection representation and its CFG can be represented with ordinary C
 /// labels and gotos.
-pub fn generate(function: &IrFunction, known_functions: &HashSet<String>, records: &RecordFields) -> Option<String> {
+pub fn generate(
+    function: &IrFunction,
+    known_functions: &HashSet<String>,
+    records: &RecordFields,
+    show: &mut dyn FnMut(&str, &Ty) -> Option<String>,
+) -> Option<String> {
     if function.entry >= function.blocks.len()
         || function
             .params
@@ -929,7 +941,7 @@ pub fn generate(function: &IrFunction, known_functions: &HashSet<String>, record
     for block in &function.blocks {
         out.push_str(&format!("{}:\n", block_label(block.id)));
         for instruction in &block.instructions {
-            emit_instruction(instruction, &values, known_functions, records, &mut out).ok()?;
+            emit_instruction(instruction, &values, known_functions, records, show, &mut out).ok()?;
         }
         emit_terminator(
             function,

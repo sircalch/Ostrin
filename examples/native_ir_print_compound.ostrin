@@ -1,0 +1,30 @@
+record Point {
+    x: Int
+    label: String
+}
+
+fn words() -> List<String> {
+    ["a" + "b", "c"]
+}
+
+fn pt(n: Int) -> Point {
+    Point { x: n, label: "p" + "t" }
+}
+
+fn maybe(flag: Bool) -> Option<String> {
+    if flag {
+        Some("y" + "es")
+    } else {
+        None
+    }
+}
+
+fn main() -> Void {
+    print(words())
+    print(pt(3))
+    print(maybe(true))
+    print(maybe(false))
+    print([1, 2, 3])
+    mut m = ["k": "v" + "w"]
+    print(m)
+}
