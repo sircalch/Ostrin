@@ -24,6 +24,12 @@
 - Added native editor feedback for the first structured diagnostic: the playground selects the offending
   source line, shows its line/column in the editor header and clears the marker after a valid execution.
 
+### Distribution
+- Hardened `.github/workflows/release.yml`: tagged releases must match the compiler package version,
+  and each native archive is checksum-verified and executed after extraction. The smoke contract covers
+  `--version`, `examples/hello.ostrin`, and the packaged local-path dependency project on Linux x86_64,
+  macOS arm64 and Windows x64. Manual runs now sanitize branch names in archive paths.
+
 ### Language and libraries
 - Standard library written in Ostrin and embedded in the compiler: `import std.math`, `std.lists`,
   `std.strings` (`min max clamp gcd sorted reversed contains ...`). Scalars now satisfy `Eq`/`Ord`/

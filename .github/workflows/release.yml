@@ -38,10 +38,29 @@ jobs:
         run: cargo test --release --manifest-path compiler/Cargo.toml --target ${{ matrix.target }}
       - name: Build
         run: cargo build --release --manifest-path compiler/Cargo.toml --target ${{ matrix.target }}
-      - name: Package
+      - name: Smoke test compiler
         shell: bash
         run: |
-          name="ostrinc-${{ github.ref_name }}-${{ matrix.target }}"
+          set -euo pipefail
+          version="$(cargo metadata --no-deps --format-version 1 --manifest-path compiler/Cargo.toml | node -e 'let input=""; process.stdin.on("data", chunk => input += chunk).on("end", () => console.log(JSON.parse(input).packages.find(pkg => pkg.name === "ostrinc").version));')"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            test "${GITHUB_REF_NAME#v}" = "$version" || {
+              echo "release tag $GITHUB_REF_NAME does not match compiler version $version" >&2
+              exit 1
+            }
+          fi
+          binary="compiler/target/${{ matrix.target }}/release/${{ matrix.exe }}"
+          test -f "$binary"
+          test "$("$binary" --version)" = "ostrinc $version"
+          "$binary" --check examples/hello.ostrin
+          output="$("$binary" --run examples/hello.ostrin)"
+          grep -Fqx "hola desde Ostrin" <<< "$output"
+      - name: Package and verify archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          safe_ref="${GITHUB_REF_NAME//[^A-Za-z0-9._-]/-}"
+          name="ostrinc-${safe_ref}-${{ matrix.target }}"
           mkdir "$name"
           cp "compiler/target/${{ matrix.target }}/release/${{ matrix.exe }}" "$name/"
           cp LICENSE README.md "$name/"
@@ -54,6 +73,23 @@ jobs:
             archive="$name.tar.gz"
           fi
           if command -v sha256sum > /dev/null; then sha256sum "$archive" > "$archive.sha256"; else shasum -a 256 "$archive" > "$archive.sha256"; fi
+          if command -v sha256sum > /dev/null; then sha256sum --check "$archive.sha256"; else shasum -a 256 --check "$archive.sha256"; fi
+
+          verify_dir="$(mktemp -d)"
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            7z x "$archive" -o"$verify_dir" -y > /dev/null
+          else
+            tar xzf "$archive" -C "$verify_dir"
+          fi
+          packaged_binary="$verify_dir/$name/${{ matrix.exe }}"
+          test -f "$packaged_binary"
+          version="$(cargo metadata --no-deps --format-version 1 --manifest-path compiler/Cargo.toml | node -e 'let input=""; process.stdin.on("data", chunk => input += chunk).on("end", () => console.log(JSON.parse(input).packages.find(pkg => pkg.name === "ostrinc").version));')"
+          test "$("$packaged_binary" --version)" = "ostrinc $version"
+          packaged_output="$("$packaged_binary" --run "$verify_dir/$name/examples/hello.ostrin")"
+          grep -Fqx "hola desde Ostrin" <<< "$packaged_output"
+          package_output="$("$packaged_binary" --locked --run --project "$verify_dir/$name/examples/pkg_project/main_app")"
+          grep -Fqx "hola, Ostrin" <<< "$package_output"
+          rm -rf "$verify_dir"
           echo "ARCHIVE=$archive" >> "$GITHUB_ENV"
       - uses: actions/upload-artifact@v4
         with:

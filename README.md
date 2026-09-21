@@ -95,11 +95,17 @@ The standard
 library is still intentionally small.
 
 The compiler itself also has a reproducible `wasm32-wasip1` release workflow with a pinned
-WASI C toolchain, checksums, and smoke tests for a standalone and a path-dependent program. The cooperative runtime avoids
-thread-only headers unless `--native-threads` is requested. The same compiler is also deployed as
-`ostrinc.wasm` for the browser playground, where it runs the interpreter locally through an
-in-memory WASI directory. Native C compilation remains a desktop/WASI toolchain feature rather
-than a browser capability.
+WASI C toolchain, checksums, and smoke tests for a standalone and a path-dependent program. The
+native release workflow targets Linux x86_64, macOS arm64 and Windows x64; before upload it checks
+the tag/version contract, runs `ostrinc --version`, executes `examples/hello.ostrin`, verifies the
+archive checksum, and runs both the extracted example and the packaged path-dependency project.
+There is still no installer or published release by default: a maintainer must push a matching
+`v<compiler-version>` tag.
+
+The cooperative runtime avoids thread-only headers unless `--native-threads` is requested. The
+same compiler is also deployed as `ostrinc.wasm` for the browser playground, where it runs the
+interpreter locally through an in-memory WASI directory. Native C compilation remains a desktop/
+WASI toolchain feature rather than a browser capability.
 
 ## Quick start
 
@@ -194,7 +200,7 @@ when GitHub Pages is enabled.
 2. Expand source spans and complete the LSP workspace semantic service.
 3. Grow the standard library and runtime.
 4. Finish semantic tokens, workspace resolution and debugging in the VS Code client.
-5. Package applications as `.exe` files and make project lockfiles reproducible.
+5. Publish verified native archives/installers and make project lockfiles reproducible.
 6. Extend real concurrency with cancellation, then add WebAssembly and platform bindings.
 
 See [`CONTEXTO_PROYECTO.md`](CONTEXTO_PROYECTO.md) for the complete project

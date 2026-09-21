@@ -5575,3 +5575,28 @@ La experiencia de diagnóstico da un paso más sin incorporar CodeMirror, Monaco
 La mejora sigue siendo nativa del navegador y no altera la semántica del compilador. La validación de
 un viewport móvil dedicado queda pendiente porque la superficie CUA disponible no expone un override
 de viewport; la regla responsive de una columna permanece en CSS.
+
+## 220. Contrato verificable de los artefactos nativos de release — 2026-09-21
+
+El workflow `.github/workflows/release.yml` ya no se limita a compilar, comprimir y calcular un
+checksum. Antes de subir cada artefacto comprueba el contrato completo del paquete:
+
+- obtiene la versión desde `compiler/Cargo.toml` mediante `cargo metadata` y rechaza una etiqueta
+  `v<version>` que no coincida;
+- ejecuta el binario construido con `--version`, `--check examples/hello.ostrin` y `--run`,
+  verificando la salida `hola desde Ostrin`;
+- valida el `*.sha256`, extrae el archivo a un directorio temporal y vuelve a ejecutar el binario
+  extraído con `--version` y `examples/hello.ostrin`;
+- ejecuta desde el paquete extraído `examples/pkg_project/main_app` con `--locked --run`, comprobando la
+  dependencia local `path` y la salida `hola, Ostrin`;
+- normaliza el nombre derivado de la rama en ejecuciones manuales para que una rama con `/` no rompa
+  la creación del archivo.
+
+La matriz continúa cubriendo Linux x86_64, macOS arm64 y Windows x64. Esto hace que el workflow sea
+una verificación reproducible de los archivos entregados, aunque todavía no publica una release por
+sí mismo sin una etiqueta válida y tampoco sustituye el trabajo pendiente de un instalador.
+
+Verificación local de esta modificación: `git diff --check`, `cargo test --manifest-path
+compiler/Cargo.toml` (2 unitarias, 6 diferenciales y 176 integraciones en verde), además de los
+checks existentes del sitio y del WASM. El cambio queda preparado para que la primera etiqueta de
+release falle de forma explícita ante una inconsistencia de versión, checksum o contenido ejecutable.
