@@ -21,6 +21,8 @@
 - Improved the browser playground's real diagnostics: `Check` and failed `Run` request JSON Lines and
   render `OSTRIN-Exxxx`, file, line, column, severity and message accessibly, with a plain-text fallback
   for runtime traps and older output paths. The homepage and live examples share the same behavior.
+- Added native editor feedback for the first structured diagnostic: the playground selects the offending
+  source line, shows its line/column in the editor header and clears the marker after a valid execution.
 
 ### Language and libraries
 - Standard library written in Ostrin and embedded in the compiler: `import std.math`, `std.lists`,

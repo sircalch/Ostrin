@@ -5556,3 +5556,22 @@ checker ni ocultar su salida real:
 
 No se añadió una capa de mensajes inventados ni se reemplazó el compilador WASM. Quedan para próximos
 bloques el resaltado de línea en el editor y una prueba responsive móvil con un viewport dedicado.
+
+## 219. Selección de línea diagnosticada — 2026-09-21
+
+La experiencia de diagnóstico da un paso más sin incorporar CodeMirror, Monaco ni dependencias nuevas:
+
+- `website/playground.js` calcula el rango de la primera ubicación JSON válida, enfoca el `textarea` y
+  selecciona toda la línea diagnosticada. La cabecera del editor muestra `line N · column M`, y un
+  diagnóstico ausente o una ejecución válida limpia el estado visual.
+- `website/index.html` y `website/playground.html` comparten el nuevo indicador accesible de ubicación;
+  `playground.css` marca el editor con una línea lateral y conserva el wrapping del output. Los live
+  examples también seleccionan la primera línea cuando su `Check` devuelve un error.
+- `scripts/website-check.mjs` protege el indicador de ubicación y el contrato accesible del output.
+  En el navegador, el error dimensional real seleccionó `print(distance + time)` en la línea 4,
+  mostró `line 4 · column 11` y mantuvo el mensaje `OSTRIN-E1024`; al recargar, el ejemplo válido
+  limpió el marcador y devolvió `5 m/s`.
+
+La mejora sigue siendo nativa del navegador y no altera la semántica del compilador. La validación de
+un viewport móvil dedicado queda pendiente porque la superficie CUA disponible no expone un override
+de viewport; la regla responsive de una columna permanece en CSS.

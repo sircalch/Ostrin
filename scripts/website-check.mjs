@@ -48,6 +48,7 @@ const homepage = read("website/index.html");
 check(homepage.includes('id="try-ostrin"'), "index.html: missing homepage playground anchor");
 check(homepage.includes('type="module" src="playground.js"'), "index.html: missing real playground module");
 check(homepage.includes('data-site-value="examples"'), "index.html: missing centralized project facts");
+check(homepage.includes('id="source-status" class="source-status"'), "index.html: source location status is missing");
 check(homepage.includes('id="output" class="output" role="status"'), "index.html: output is missing accessible status semantics");
 
 const docs = read("website/docs.html");
@@ -83,6 +84,7 @@ const playground = read("website/playground.html");
 for (const id of ["run", "check", "test", "format", "share", "source", "output"]) {
   check(playground.includes(`id="${id}"`), `playground.html: missing control ${id}`);
 }
+check(playground.includes('id="source-status" class="source-status"'), "playground.html: source location status is missing");
 check(playground.includes('id="output" class="output" role="status"'), "playground.html: output is missing accessible status semantics");
 
 const showcase = read("website/showcase.html");

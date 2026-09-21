@@ -8,9 +8,12 @@
 .playground-panes { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 .pane { display: flex; flex-direction: column; min-width: 0; border: 1px solid #263045; border-radius: 10px; overflow: hidden; background: #0b0e15; }
 .pane .code-title { padding: .55rem .9rem; border-bottom: 1px solid #263045; display: flex; justify-content: space-between; gap: 1rem; }
+.source-status { color: #ffb4b4; font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 #source, .output { margin: 0; padding: 1rem; min-height: 22rem; font: 14px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: transparent; color: #e6e9f0; border: 0; resize: vertical; tab-size: 4; white-space: pre; overflow: auto; }
 #output { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; white-space: pre-wrap; overflow-x: hidden; overflow-wrap: anywhere; word-break: break-word; }
 #source { outline: none; }
+#source.has-diagnostic { box-shadow: inset 3px 0 #ff8a8a; }
+#source.has-diagnostic:focus { outline: 1px solid rgba(255, 138, 138, .45); outline-offset: -1px; }
 .output .err { color: #ff8a8a; }
 .output .ok { color: #7ee2a8; }
 .output .dim { color: #7c869a; }

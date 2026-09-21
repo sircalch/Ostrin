@@ -74,6 +74,7 @@ fn test_negative() -> Void {
 
 const $ = (id) => document.getElementById(id);
 const source = $("source");
+const sourceStatus = $("source-status");
 const output = $("output");
 const status = $("status");
 const buttons = ["run", "check", "test", "format"].map($).filter(Boolean);
@@ -147,6 +148,27 @@ function diagnosticSummary(diagnostics) {
   return parts.join(", ");
 }
 
+function clearSourceDiagnostic(sourceNode, locationNode = null) {
+  sourceNode?.classList.remove("has-diagnostic");
+  if (locationNode) locationNode.textContent = "";
+}
+
+function focusDiagnosticLine(sourceNode, diagnostic, locationNode = null) {
+  if (!sourceNode || !Number.isInteger(diagnostic.line) || diagnostic.line < 1) return;
+  const lines = sourceNode.value.split("\n");
+  const lineIndex = diagnostic.line - 1;
+  if (lineIndex >= lines.length) return;
+  const start = lines.slice(0, lineIndex).reduce((offset, line) => offset + line.length + 1, 0);
+  const end = start + lines[lineIndex].length;
+  sourceNode.classList.add("has-diagnostic");
+  sourceNode.focus({ preventScroll: true });
+  sourceNode.setSelectionRange(start, end);
+  if (locationNode) {
+    const column = Number.isInteger(diagnostic.column) ? ` · column ${diagnostic.column}` : "";
+    locationNode.textContent = `line ${diagnostic.line}${column}`;
+  }
+}
+
 async function execute(flag, sourceNode = source, outputNode = output, statusNode = status, controls = buttons) {
   if (!sourceNode || !outputNode || !statusNode) return;
   controls.forEach((b) => (b.disabled = true));
@@ -168,9 +190,12 @@ async function execute(flag, sourceNode = source, outputNode = output, statusNod
     const elapsed = Math.round(performance.now() - started);
     const summary = diagnostics.length ? diagnosticSummary(diagnostics) : (code === 0 ? "ok" : "exit " + code);
     statusNode.textContent = `${summary} · ${elapsed} ms`;
+    if (diagnostics.length) focusDiagnosticLine(sourceNode, diagnostics[0], sourceNode === source ? sourceStatus : null);
+    else clearSourceDiagnostic(sourceNode, sourceNode === source ? sourceStatus : null);
   } catch (error) {
     outputNode.innerHTML = `<span class="err">${escapeHtml(String(error))}</span>`;
     statusNode.textContent = "failed to start";
+    clearSourceDiagnostic(sourceNode, sourceNode === source ? sourceStatus : null);
   } finally {
     controls.forEach((b) => (b.disabled = false));
   }
@@ -183,6 +208,7 @@ if (select && source) {
     source.value = EXAMPLES[select.value];
     if (output) output.textContent = "";
     if (status) status.textContent = "";
+    clearSourceDiagnostic(source, sourceStatus);
   });
   const sharedCode = new URLSearchParams(location.search).get("code");
   if (sharedCode !== null) {
@@ -191,6 +217,7 @@ if (select && source) {
   } else {
     source.value = EXAMPLES[select.value];
   }
+  clearSourceDiagnostic(source, sourceStatus);
 }
 
 $("run")?.addEventListener("click", () => execute("--run"));
@@ -353,6 +380,7 @@ for (const card of document.querySelectorAll("[data-live-example]")) {
     liveSource.value = definition.code;
     liveOutput.innerHTML = '<span class="dim">Ready. Press Run.</span>';
     liveStatus.textContent = "";
+    clearSourceDiagnostic(liveSource);
   });
   copy?.addEventListener("click", async () => {
     try {

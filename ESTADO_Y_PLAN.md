@@ -287,8 +287,9 @@ cantidades, tablas, SVG y autodiff; `community.html` y las plantillas de GitHub 
 contribución sin inventar canales externos. `docs.html` añade una ruta guiada de 14 pasos con
 enlaces a fuentes, referencia, playground y showcase; los pasos distinguen `available` de `early`
 sin prometer capacidades no implementadas. El playground y sus live examples renderizan ahora
-diagnósticos JSON reales con código, ubicación, severidad y mensaje. Siguiente: resaltado de línea
-en el editor, prueba responsive móvil y mejora incremental del learning funnel.
+diagnósticos JSON reales con código, ubicación, severidad y mensaje, y seleccionan la línea
+diagnosticada en el editor. Siguiente: prueba responsive móvil con viewport dedicado y mejora
+incremental del learning funnel.
 La gramática para Linguist queda separada porque requiere uso público suficiente.
 
 ---

@@ -79,3 +79,6 @@ GitHub Pages architecture while making the next public claims evidence-based.
 - The playground now requests structured JSON diagnostics for checks and failed runs, renders their
   code/location/message fields in an accessible status output, and keeps a plain-text fallback for
   non-JSON runtime output. The homepage and catalogue reuse the same module and output contract.
+- The first structured diagnostic now selects its source line and exposes `line N · column M` in the
+  editor header without adding a heavyweight editor dependency. A dedicated mobile viewport remains
+  untested in the current CUA surface, while the existing one-column responsive rule is preserved.
