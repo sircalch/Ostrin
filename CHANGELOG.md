@@ -27,6 +27,8 @@
   group-by), `plot` (SVG scatter/line) and `autodiff` (forward-mode dual numbers).
 
 ### Compiler
+- Browser playground (`website/playground.html`) running the compiler as WebAssembly; the Pages workflow
+  builds `ostrinc.wasm` on each deploy.
 - `ostrinc --new DIR` scaffolds a project (manifest, entry module with a test, `.gitignore`).
 - Native runtime: live allocations are tracked in a hash table instead of a linked list, so retain/
   release are O(1) (40k live strings: 6 s -> 0.07 s).

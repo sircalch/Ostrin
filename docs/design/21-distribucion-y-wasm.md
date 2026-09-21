@@ -47,6 +47,20 @@ La misma comprobación local puede ejecutarse, después de compilar, con:
 
     node --input-type=module -e "import { WASI } from 'node:wasi'; import { readFileSync } from 'node:fs'; const wasi = new WASI({ version: 'preview1', args: ['ostrinc', '--check', 'examples/hello.ostrin'], preopens: { '.': process.cwd() }, returnOnExit: true }); const mod = await WebAssembly.compile(readFileSync('compiler/target/wasm32-wasip1/release/ostrinc.wasm')); const instance = await WebAssembly.instantiate(mod, wasi.getImportObject()); const code = wasi.start(instance); if (code !== 0) process.exit(code);"
 
+## Playground en el navegador
+
+`website/playground.html` ejecuta el `ostrinc.wasm` real en la página con el intérprete
+(`--run`), más `--check`, `--test` y `--fmt`. Usa `@bjorn3/browser_wasi_shim` (desde jsDelivr)
+como capa WASI y un directorio en memoria con un único archivo `main.ostrin`; no hay red ni
+sistema de archivos del usuario. `pages.yml` compila `ostrinc.wasm` (`wasm32-wasip1`, release)
+y lo copia a `website/` antes de desplegar (el binario no se versiona). Para probarlo en local:
+
+    cargo build --manifest-path compiler/Cargo.toml --target wasm32-wasip1 --release
+    cp compiler/target/wasm32-wasip1/release/ostrinc.wasm website/
+    python -m http.server --directory website 8765
+
+La compilación nativa (C) no está disponible en el navegador: no hay toolchain C ahí.
+
 ## Siguiente etapa
 
 La ruta WASI ya existe para el runtime cooperativo básico y paquetes locales. El siguiente

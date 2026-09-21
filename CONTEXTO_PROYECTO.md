@@ -5270,3 +5270,13 @@ Crea un proyecto listo para usar: `ostrin.toml` (nombre validado, `entry = "main
 tocar un directorio no vacío y a usar nombres no válidos. Flujo: `ostrinc --new hola`,
 `ostrinc --project hola --run`, `ostrinc --test hola/main.ostrin`. Cubierto por
 `new_scaffolds_a_project_that_runs_and_passes_its_own_test`.
+
+## 203. Playground en el navegador (WASM) — 2026-09-20
+
+`website/playground.{html,css,js}`: editor + salida que ejecutan el `ostrinc.wasm` real
+(`wasm32-wasip1`) con `browser_wasi_shim` y un `PreopenDirectory` en memoria. Botones Run/Check/
+Test/Format (`--run`, `--check`, `--test`, `--fmt`), selector de ejemplos (cuánticos, `std`,
+records/enums, tests, concurrencia) y Ctrl+Enter. `pages.yml` construye el WASM en cada despliegue.
+Verificado en el navegador integrado: los 5 ejemplos, un error de tipo (E1041), un error de
+ejecución (división por cero) y el formateador; `--fmt` reescribe el editor. Navegación actualizada
+en todas las páginas y textos de ecosistema/roadmap corregidos (el playground ya no es «futuro»).

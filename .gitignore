@@ -20,3 +20,6 @@ examples/*/*/ostrin.lock
 
 # Explicit Git package fetch cache
 .ostrin/
+
+# Built by CI for the playground
+/website/ostrinc.wasm

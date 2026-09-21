@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'website/**'
+      - 'compiler/**'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -26,6 +27,14 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+      - name: Install Rust with the WASI target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip1
+      - name: Build the compiler to WebAssembly for the playground
+        run: |
+          cargo build --manifest-path compiler/Cargo.toml --target wasm32-wasip1 --release
+          cp compiler/target/wasm32-wasip1/release/ostrinc.wasm website/ostrinc.wasm
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload website artifact
