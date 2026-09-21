@@ -419,7 +419,7 @@ impl Checker {
             Some(tail) => self.adapt_literals(tail, &expected, &actual),
             None => false,
         };
-        if !tail_adapted && !compatible(&expected, &actual) {
+        if !tail_adapted && !block_always_returns(body) && !compatible(&expected, &actual) {
             self.push(
                 "E1041",
                 format!(
@@ -3550,6 +3550,9 @@ impl Checker {
         if trait_name == "Dimension" {
             return matches!(actual_ty, Ty::Named(name) if is_dimension_name(name));
         }
+        if builtin_type_satisfies_trait(actual_ty, trait_name) {
+            return true;
+        }
         self.implementations.iter().any(|implementation| {
             implementation.trait_name.as_deref() == Some(trait_name)
                 && implementation_type_substitutions(actual_ty, implementation)
@@ -3769,6 +3772,42 @@ fn unify_generic_type(
             _ => Err(format!("Expected function, got '{}'.", actual.describe())),
         },
         Type::Mul(_, _) | Type::Div(_, _) | Type::Pow(_, _) | Type::Dyn(_) => Ok(()),
+    }
+}
+
+/// The scalar types implement the operator traits themselves, so `fn max<T: Ord>(a: T, b: T)`
+/// accepts `Int`, `Float`, `String`, ... without user `impl`s.
+fn builtin_type_satisfies_trait(ty: &Ty, trait_name: &str) -> bool {
+    let numeric = matches!(ty, Ty::Int | Ty::Float | Ty::Float32 | Ty::Sized(_));
+    match trait_name {
+        "Add" => numeric || *ty == Ty::String,
+        "Sub" | "Mul" | "Div" => numeric,
+        "Ord" => numeric || matches!(ty, Ty::String | Ty::Char),
+        "Eq" | "Hash" | "Printable" => numeric || matches!(ty, Ty::String | Ty::Char | Ty::Bool),
+        _ => false,
+    }
+}
+
+/// A block that ends in `return` (or in an `if`/`else` whose branches all end in `return`) never
+/// falls off its end, so its missing tail value is not a type mismatch.
+fn block_always_returns(block: &Block) -> bool {
+    if block.tail.as_deref().is_some_and(expr_always_returns) {
+        return true;
+    }
+    if block.tail.is_some() {
+        return false;
+    }
+    match block.stmts.last().map(|located| &located.stmt) {
+        Some(Stmt::Return(_)) => true,
+        Some(Stmt::Expr(expr)) => expr_always_returns(expr),
+        _ => false,
+    }
+}
+
+pub(crate) fn expr_always_returns(expr: &Expr) -> bool {
+    match expr.unlocated() {
+        Expr::If(_, then_block, Some(else_block)) => block_always_returns(then_block) && block_always_returns(else_block),
+        _ => false,
     }
 }
 

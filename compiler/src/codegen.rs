@@ -2531,6 +2531,13 @@ impl<'a> Codegen<'a> {
             self.gen_stmt(&stmt.stmt, out)?;
         }
         match &body.tail {
+            // `if c { return a } else { return b }` as the last expression never yields a
+            // value: generate it as a statement.
+            Some(e) if *return_type != CType::Void && crate::typeck::expr_always_returns(e) => {
+                self.gen_stmt(&Stmt::Expr((**e).clone()), out)?;
+                out.push_str("    abort();
+");
+            }
             Some(e) => {
                 let (code, ty) = self.gen_expr_hint(e, Some(return_type.clone()))?;
                 if *return_type == CType::Void {
@@ -4610,6 +4617,15 @@ impl<'a> Codegen<'a> {
                 BinOp::Add if lt == CType::Str && rt == CType::Str => Ok((format!("ostrin_str_concat({lc}, {rc})"), CType::Str)),
                 BinOp::Eq if lt == CType::Str && rt == CType::Str => Ok((format!("(strcmp({lc}, {rc}) == 0)"), CType::Bool)),
                 BinOp::NotEq if lt == CType::Str && rt == CType::Str => Ok((format!("(strcmp({lc}, {rc}) != 0)"), CType::Bool)),
+                BinOp::Lt | BinOp::Gt | BinOp::LtEq | BinOp::GtEq if lt == CType::Str && rt == CType::Str => {
+                    let c_op = match op {
+                        BinOp::Lt => "<",
+                        BinOp::Gt => ">",
+                        BinOp::LtEq => "<=",
+                        _ => ">=",
+                    };
+                    Ok((format!("(strcmp({lc}, {rc}) {c_op} 0)"), CType::Bool))
+                }
                 _ => Err("this operator isn't supported for String by the native backend yet".to_string()),
             };
         }
@@ -7457,6 +7473,9 @@ fn generate_impl(
             Item::Record(r) => Some(r.name.as_str()),
             Item::Enum(e) => Some(e.name.as_str()),
             Item::Trait(t) => Some(t.name.as_str()),
+            // Specializations of generic functions keep the module-qualified name as a prefix
+            // (`lists::sorted__Int`), which is not a C identifier either.
+            Item::Function(f) if !f.generics.is_empty() => Some(f.name.as_str()),
             _ => None,
         })
         .filter(|name| name.chars().any(|c| !(c.is_ascii_alphanumeric() || c == '_')))

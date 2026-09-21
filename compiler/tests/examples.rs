@@ -2204,6 +2204,59 @@ fn deeply_nested_input_does_not_crash_the_front_end() {
 }
 
 #[test]
+fn std_library_modules_agree_between_backends_and_pass_their_own_tests() {
+    let tests = run(&["--test", &example_path("std_tests.ostrin")]);
+    assert!(tests.status.success(), "std tests failed: {}{}", stdout(&tests), stderr(&tests));
+    assert!(stdout(&tests).contains("6 passed"), "unexpected std test output: {}", stdout(&tests));
+
+    let path = example_path("std_library.ostrin");
+    let interpreted = run(&["--run", &path]);
+    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    let expected = "3\n2.5\n10\n6\n12\n1024\ntrue\n1\n[3, 2, 1]\n[1, 2, 3, 4, 5]\n[apple, fig, pear]\n[1, 2]\n[1, 2, 3]\n[2, 3, 4, 5]\nSome(9)\nSome(2)\nababab\n007\n2\n";
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let exe = temp_artifact("std_library.exe");
+    let compile = run(&["--compile", "--out", &exe, &path]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "native compile failed: {}", stderr(&compile));
+    let native = Command::new(&exe).output().expect("failed to run std binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native run failed: {}", String::from_utf8_lossy(&native.stderr));
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+
+    let missing = temp_artifact("std_missing.ostrin");
+    fs::write(&missing, "import std.nope\nfn main() -> Void {\n    print(1)\n}\n").unwrap();
+    let output = run(&[&missing]);
+    assert!(!output.status.success());
+    let text = format!("{}{}", stdout(&output), stderr(&output));
+    assert!(text.contains("no module 'nope'") && text.contains("math, lists, strings"), "unhelpful message: {text}");
+    let _ = fs::remove_file(&missing);
+}
+
+#[test]
+fn functions_ending_in_return_type_check_and_run_natively() {
+    let source = "fn f() -> Int {\n    return 1\n}\nfn g(x: Int) -> Int {\n    y = x + 1\n    return y + 2\n}\nfn h(c: Bool) -> Int {\n    if c {\n        return 1\n    } else {\n        return 2\n    }\n}\nfn main() -> Void {\n    print(f())\n    print(g(1))\n    print(h(true))\n    print(h(false))\n}\n";
+    let path = temp_artifact("ends_in_return.ostrin");
+    fs::write(&path, source).unwrap();
+    let interpreted = run(&["--run", &path]);
+    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), "1\n4\n1\n2\n");
+    let exe = temp_artifact("ends_in_return.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "native compile failed: {}", stderr(&compile));
+    let native = Command::new(&exe).output().expect("failed to run binary");
+    let _ = fs::remove_file(&exe);
+    let _ = fs::remove_file(&path);
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), "1\n4\n1\n2\n");
+    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"));
+}
+
+#[test]
 fn native_ir_emitter_handles_scalar_maps_and_sets() {
     let file = example_path("native_ir_maps_sets.ostrin");
     let expected = "3\ntrue\nfalse\n3\n3\n1\n3\n3\n2\ntrue\nfalse\n1\n2\n2\n";

@@ -1,0 +1,38 @@
+// std.strings: helpers built on the String methods.
+
+pub fn repeat(text: String, count: Int) -> String {
+    mut out = ""
+    mut i = 0
+    while i < count {
+        out = out + text
+        i = i + 1
+    }
+    out
+}
+
+pub fn pad_left(text: String, width: Int, fill: String) -> String {
+    mut out = text
+    while out.length() < width {
+        out = fill + out
+    }
+    out
+}
+
+pub fn pad_right(text: String, width: Int, fill: String) -> String {
+    mut out = text
+    while out.length() < width {
+        out = out + fill
+    }
+    out
+}
+
+pub fn count_of(text: String, part: String) -> Int {
+    if part.length() == 0 {
+        return 0
+    }
+    text.split(part).length() - 1
+}
+
+pub fn join_with(items: List<String>, separator: String) -> String {
+    items.join(separator)
+}

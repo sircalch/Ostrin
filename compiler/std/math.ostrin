@@ -1,0 +1,65 @@
+// std.math: generic helpers over the scalar types.
+
+pub fn min<T: Ord>(a: T, b: T) -> T {
+    if a < b {
+        a
+    } else {
+        b
+    }
+}
+
+pub fn max<T: Ord>(a: T, b: T) -> T {
+    if a > b {
+        a
+    } else {
+        b
+    }
+}
+
+pub fn clamp<T: Ord>(value: T, low: T, high: T) -> T {
+    if value < low {
+        return low
+    }
+    if value > high {
+        return high
+    }
+    value
+}
+
+pub fn sign(n: Int) -> Int {
+    if n < 0 {
+        return -1
+    }
+    if n > 0 {
+        return 1
+    }
+    0
+}
+
+pub fn gcd(a: Int, b: Int) -> Int {
+    mut x = abs(a)
+    mut y = abs(b)
+    while y != 0 {
+        t = x % y
+        x = y
+        y = t
+    }
+    x
+}
+
+pub fn lcm(a: Int, b: Int) -> Int {
+    if a == 0 or b == 0 {
+        return 0
+    }
+    abs(a / gcd(a, b) * b)
+}
+
+pub fn pow_int(base: Int, exponent: Int) -> Int {
+    mut result = 1
+    mut i = 0
+    while i < exponent {
+        result = result * base
+        i = i + 1
+    }
+    result
+}

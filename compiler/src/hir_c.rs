@@ -1081,6 +1081,15 @@ impl Emitter<'_> {
                         }
                         BinOp::Eq if l.ty == r.ty => Ok(format!("(strcmp({lc}, {rc}) == 0)")),
                         BinOp::NotEq if l.ty == r.ty => Ok(format!("(strcmp({lc}, {rc}) != 0)")),
+                        BinOp::Lt | BinOp::Gt | BinOp::LtEq | BinOp::GtEq if l.ty == r.ty => {
+                            let c_op = match op {
+                                BinOp::Lt => "<",
+                                BinOp::Gt => ">",
+                                BinOp::LtEq => "<=",
+                                _ => ">=",
+                            };
+                            Ok(format!("(strcmp({lc}, {rc}) {c_op} 0)"))
+                        }
                         _ => Err(()),
                     };
                 }

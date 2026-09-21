@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### Language and libraries
+- Standard library written in Ostrin and embedded in the compiler: `import std.math`, `std.lists`,
+  `std.strings` (`min max clamp gcd sorted reversed contains ...`). Scalars now satisfy `Eq`/`Ord`/
+  `Add`... generic bounds, `String` supports `< > <= >=` natively, and functions ending in `return`
+  (or an `if`/`else` of returns) type-check.
 - `and`/`or` now short-circuit on booleans in the interpreter and the native IR path (masks stay
   elementwise). Previously `x != 0 and 10 / x > 1` failed with a division by zero.
 - Remainder operator `%` for `Int`, `Float`, `Float32` and fixed-width integers (truncating, like C;

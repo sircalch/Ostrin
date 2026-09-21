@@ -1,0 +1,68 @@
+import std.math
+import std.lists
+import std.strings
+
+fn test_min_max_clamp() -> Void {
+    assert_eq(math.min(3, 9), 3)
+    assert_eq(math.max(-4, -9), -4)
+    assert_eq(math.max(2.5, 1.5), 2.5)
+    assert_eq(math.min("pear", "apple"), "apple")
+    assert_eq(math.clamp(15, 0, 10), 10)
+    assert_eq(math.clamp(-5, 0, 10), 0)
+    assert_eq(math.clamp(7, 0, 10), 7)
+}
+
+fn test_integer_helpers() -> Void {
+    assert_eq(math.sign(-8), -1)
+    assert_eq(math.sign(0), 0)
+    assert_eq(math.sign(12), 1)
+    assert_eq(math.gcd(12, 18), 6)
+    assert_eq(math.gcd(0, 5), 5)
+    assert_eq(math.gcd(-12, 18), 6)
+    assert_eq(math.lcm(4, 6), 12)
+    assert_eq(math.lcm(0, 3), 0)
+    assert_eq(math.pow_int(2, 10), 1024)
+    assert_eq(math.pow_int(3, 0), 1)
+}
+
+fn test_search() -> Void {
+    assert(lists.contains([1, 2, 3], 2))
+    assert(not lists.contains([1, 2, 3], 9))
+    none: List<Int> = []
+    assert(not lists.contains(none, 1))
+    assert_eq(lists.index_of(["a", "b", "c"], "c"), 2)
+    assert_eq(lists.index_of(["a"], "z"), -1)
+}
+
+fn test_construction() -> Void {
+    assert_eq(lists.reversed([1, 2, 3]), [3, 2, 1])
+    assert_eq(lists.take([1, 2, 3, 4], 2), [1, 2])
+    assert_eq(lists.take([1, 2], 10), [1, 2])
+    assert_eq(lists.drop_first([1, 2, 3, 4], 3), [4])
+    assert_eq(lists.concat([1], [2, 3]), [1, 2, 3])
+    assert_eq(lists.repeat("x", 3), ["x", "x", "x"])
+    assert_eq(lists.range_list(2, 6), [2, 3, 4, 5])
+    nothing: List<Int> = []
+    assert_eq(lists.range_list(5, 5), nothing)
+}
+
+fn test_sorting_and_extremes() -> Void {
+    assert_eq(lists.sorted([3, 1, 2, 5, 4]), [1, 2, 3, 4, 5])
+    assert_eq(lists.sorted([2, 2, 1, 1]), [1, 1, 2, 2])
+    assert_eq(lists.sorted(["pear", "apple", "fig"]), ["apple", "fig", "pear"])
+    empty: List<Int> = []
+    assert_eq(lists.sorted(empty), empty)
+    assert_eq(lists.max_of([4, 9, 2]), Some(9))
+    assert_eq(lists.min_of([4, 9, 2]), Some(2))
+    assert(lists.max_of(empty).is_none())
+}
+
+fn test_strings() -> Void {
+    assert_eq(strings.repeat("ab", 3), "ababab")
+    assert_eq(strings.repeat("ab", 0), "")
+    assert_eq(strings.pad_left("7", 3, "0"), "007")
+    assert_eq(strings.pad_left("1234", 3, "0"), "1234")
+    assert_eq(strings.pad_right("ab", 4, "."), "ab..")
+    assert_eq(strings.count_of("a,b,c", ","), 2)
+    assert_eq(strings.count_of("abc", ""), 0)
+}

@@ -5219,3 +5219,24 @@ sentencia como objetivo de asignación (`a.b = v`), la descartaba y la reparseab
 de modo que cada nivel de anidamiento duplicaba el trabajo (2ⁿ; 20 niveles ≈ 3,5 s). Ahora hay un
 único parseo y se decide por el `=` posterior. Con `OSTRIN_FUZZ_SEEDS=25` se ejecutaron unas
 3 700 mutaciones sin pánicos. Suite: **6 diferenciales, 166 de integración y 2 unitarias**.
+
+## 199. Biblioteca estándar en Ostrin (`std`) y correcciones del lenguaje — 2026-09-20
+
+`compiler/std/{math,lists,strings}.ostrin` se embeben con `include_str!` y se resuelven como el
+módulo virtual `<ostrin-std>` cuando el primer segmento del import es `std` (salvo que el proyecto
+declare una dependencia `std`). Detalle en `docs/design/22-biblioteca-estandar.md`. Las 24 funciones
+compilan por intérprete y nativo con salida idéntica; `examples/std_tests.ostrin` (6 pruebas
+`--test`) y `examples/std_library.ostrin` las verifican.
+
+Para que funcionara hubo que arreglar cuatro cosas del lenguaje/compilador:
+
+1. **Los escalares satisfacen los bounds `Eq/Ord/Add/...`** (`builtin_type_satisfies_trait`); antes
+   `fn max<T: Ord>` rechazaba `Int`, `Float` y `String`.
+2. **Comparación de `String` (`< > <= >=`)** en el backend nativo (AST, HIR e IR, con `strcmp`).
+3. **Especializaciones de funciones genéricas de módulos** (`lists::sorted__Int`) producían C
+   inválido; se reescriben igual que los nombres de tipos calificados.
+4. **Una función que termina en `return expr` (o en `if/else` con `return` en ambas ramas) daba
+   E1041** («body evaluates to Void»); `block_always_returns` lo acepta y el backend AST emite el
+   `if` como sentencia.
+
+Suite: **6 diferenciales, 168 de integración y 2 unitarias**.

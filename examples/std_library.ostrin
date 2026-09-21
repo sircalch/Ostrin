@@ -1,0 +1,25 @@
+import std.math
+import std.lists
+import std.strings
+
+fn main() -> Void {
+    print(math.min(3, 9))
+    print(math.max(2.5, 1.5))
+    print(math.clamp(15, 0, 10))
+    print(math.gcd(12, 18))
+    print(math.lcm(4, 6))
+    print(math.pow_int(2, 10))
+    print(lists.contains([1, 2, 3], 2))
+    print(lists.index_of(["a", "b"], "b"))
+    print(lists.reversed([1, 2, 3]))
+    print(lists.sorted([3, 1, 2, 5, 4]))
+    print(lists.sorted(["pear", "apple", "fig"]))
+    print(lists.take([1, 2, 3, 4], 2))
+    print(lists.concat([1], [2, 3]))
+    print(lists.range_list(2, 6))
+    print(lists.max_of([4, 9, 2]))
+    print(lists.min_of([4, 9, 2]))
+    print(strings.repeat("ab", 3))
+    print(strings.pad_left("7", 3, "0"))
+    print(strings.count_of("a,b,c", ","))
+}

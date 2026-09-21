@@ -279,10 +279,17 @@ fn binary_code(
         return Ok(format!("ostrin_str_concat({left}, {right})"));
     }
     if (*left_ty == Ty::String || *right_ty == Ty::String)
-        && matches!(op, BinOp::Eq | BinOp::NotEq)
+        && matches!(op, BinOp::Eq | BinOp::NotEq | BinOp::Lt | BinOp::Gt | BinOp::LtEq | BinOp::GtEq)
         && *left_ty == *right_ty
     {
-        let comparison = if op == BinOp::Eq { "== 0" } else { "!= 0" };
+        let comparison = match op {
+            BinOp::Eq => "== 0",
+            BinOp::NotEq => "!= 0",
+            BinOp::Lt => "< 0",
+            BinOp::Gt => "> 0",
+            BinOp::LtEq => "<= 0",
+            _ => ">= 0",
+        };
         return Ok(format!("(strcmp({left}, {right}) {comparison})"));
     }
     if *ty == Ty::Int && op == BinOp::Div {

@@ -95,6 +95,14 @@ pub fn load_project(
 /// transparente que importar un módulo propio.
 fn file_path_of(module_path: &[String], root: &Path, deps: &HashMap<String, PathBuf>) -> PathBuf {
     if let Some((first, rest)) = module_path.split_first() {
+        if first == "std" && !deps.contains_key("std") {
+            let mut p = PathBuf::from(STD_ROOT);
+            for segment in rest {
+                p.push(segment);
+            }
+            p.set_extension("ostrin");
+            return p;
+        }
         if let Some(dep_root) = deps.get(first) {
             let mut p = dep_root.clone();
             if rest.is_empty() {
@@ -114,7 +122,37 @@ fn file_path_of(module_path: &[String], root: &Path, deps: &HashMap<String, Path
     p
 }
 
+/// Virtual directory of the standard library. Its modules are written in Ostrin, embedded in the
+/// compiler and imported like any other module (`import std.math`).
+const STD_ROOT: &str = "<ostrin-std>";
+
+const STD_MODULES: &[(&str, &str)] = &[
+    ("math", include_str!("../std/math.ostrin")),
+    ("lists", include_str!("../std/lists.ostrin")),
+    ("strings", include_str!("../std/strings.ostrin")),
+];
+
+fn std_module_source(file_path: &Path) -> Option<io::Result<String>> {
+    if !file_path.starts_with(STD_ROOT) {
+        return None;
+    }
+    let name = file_path.file_stem()?.to_str()?;
+    Some(match STD_MODULES.iter().find(|(module, _)| *module == name) {
+        Some((_, source)) => Ok((*source).to_string()),
+        None => {
+            let available: Vec<&str> = STD_MODULES.iter().map(|(module, _)| *module).collect();
+            Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                format!("the standard library has no module '{name}' (available: {})", available.join(", ")),
+            ))
+        }
+    })
+}
+
 fn read_module_source(file_path: &Path, overrides: &HashMap<PathBuf, String>) -> io::Result<String> {
+    if let Some(source) = std_module_source(file_path) {
+        return source;
+    }
     let canonical = fs::canonicalize(file_path).unwrap_or_else(|_| file_path.to_path_buf());
     if let Some(text) = overrides.get(&canonical) {
         return Ok(text.clone());

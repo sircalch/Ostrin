@@ -1,0 +1,139 @@
+// std.lists: generic list helpers. Every function returns a new list.
+
+pub fn contains<T: Eq>(items: List<T>, target: T) -> Bool {
+    for item in items {
+        if item == target {
+            return true
+        }
+    }
+    false
+}
+
+pub fn index_of<T: Eq>(items: List<T>, target: T) -> Int {
+    mut i = 0
+    while i < items.length() {
+        if items[i] == target {
+            return i
+        }
+        i = i + 1
+    }
+    -1
+}
+
+pub fn reversed<T>(items: List<T>) -> List<T> {
+    mut out: List<T> = []
+    mut i = items.length() - 1
+    while i >= 0 {
+        out.push(items[i])
+        i = i - 1
+    }
+    out
+}
+
+pub fn take<T>(items: List<T>, count: Int) -> List<T> {
+    mut out: List<T> = []
+    mut i = 0
+    while i < count and i < items.length() {
+        out.push(items[i])
+        i = i + 1
+    }
+    out
+}
+
+pub fn drop_first<T>(items: List<T>, count: Int) -> List<T> {
+    mut out: List<T> = []
+    mut i = count
+    while i < items.length() {
+        if i >= 0 {
+            out.push(items[i])
+        }
+        i = i + 1
+    }
+    out
+}
+
+pub fn concat<T>(left: List<T>, right: List<T>) -> List<T> {
+    mut out: List<T> = []
+    for item in left {
+        out.push(item)
+    }
+    for item in right {
+        out.push(item)
+    }
+    out
+}
+
+pub fn repeat<T>(value: T, count: Int) -> List<T> {
+    mut out: List<T> = []
+    mut i = 0
+    while i < count {
+        out.push(value)
+        i = i + 1
+    }
+    out
+}
+
+pub fn range_list(start: Int, end: Int) -> List<Int> {
+    mut out: List<Int> = []
+    mut i = start
+    while i < end {
+        out.push(i)
+        i = i + 1
+    }
+    out
+}
+
+pub fn max_of<T: Ord>(items: List<T>) -> Option<T> {
+    if items.length() == 0 {
+        return None
+    }
+    mut best = items[0]
+    for item in items {
+        if item > best {
+            best = item
+        }
+    }
+    Some(best)
+}
+
+pub fn min_of<T: Ord>(items: List<T>) -> Option<T> {
+    if items.length() == 0 {
+        return None
+    }
+    mut best = items[0]
+    for item in items {
+        if item < best {
+            best = item
+        }
+    }
+    Some(best)
+}
+
+// Stable insertion sort: O(n^2) but allocation-light and fine for typical script-sized lists.
+pub fn sorted<T: Ord>(items: List<T>) -> List<T> {
+    mut out: List<T> = []
+    for item in items {
+        mut position = out.length()
+        while position > 0 and out[position - 1] > item {
+            position = position - 1
+        }
+        mut tail: List<T> = []
+        mut i = position
+        while i < out.length() {
+            tail.push(out[i])
+            i = i + 1
+        }
+        mut head: List<T> = []
+        mut j = 0
+        while j < position {
+            head.push(out[j])
+            j = j + 1
+        }
+        head.push(item)
+        for rest in tail {
+            head.push(rest)
+        }
+        out = head
+    }
+    out
+}
