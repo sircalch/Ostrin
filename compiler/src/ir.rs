@@ -599,23 +599,6 @@ impl Builder {
     /// the index.
     fn lower_for_list(&mut self, var: &str, iter: &HirExpr, element: &Ty, body: &HirBlock) {
         let source = self.lower_expr(iter);
-        // The ownership pass cannot yet release a value that lives across the
-        // loop's blocks, so only a borrowed parameter may be iterated natively;
-        // an owned list keeps the function on the verified HIR path.
-        let borrowed = self
-            .function
-            .blocks
-            .iter()
-            .flat_map(|block| block.instructions.iter())
-            .any(|instruction| matches!(instruction, IrInstr::Param { dst, .. } if *dst == source));
-        if !borrowed && crate::ownership::requires_management(&iter.ty) {
-            self.emit(IrInstr::Opaque {
-                dst: None,
-                op: "owned_loop_source".to_string(),
-                inputs: Vec::new(),
-                ty: Ty::Void,
-            });
-        }
         let length = self.fresh();
         self.emit(IrInstr::MethodCall {
             dst: Some(length),
@@ -1099,6 +1082,38 @@ impl Builder {
                     op: *op,
                     operand,
                     ty: expression.ty.clone(),
+                });
+                dst
+            }
+            HirKind::Binary(op, left_expr, right_expr)
+                if matches!(op, BinOp::And | BinOp::Or) && left_expr.ty == Ty::Bool && right_expr.ty == Ty::Bool =>
+            {
+                // Short-circuit: the right operand only runs when the left one
+                // does not already decide the result.
+                let left = self.lower_expr(left_expr);
+                let left_block = self.current;
+                let right_block = self.new_block();
+                let merge_block = self.new_block();
+                let (then_block, else_block) = if *op == BinOp::And {
+                    (right_block, merge_block)
+                } else {
+                    (merge_block, right_block)
+                };
+                self.terminate(IrTerminator::Branch {
+                    condition: left,
+                    then_block,
+                    else_block,
+                });
+                self.current = right_block;
+                let right = self.lower_expr(right_expr);
+                let right_end = self.current;
+                self.terminate(IrTerminator::Goto(merge_block));
+                self.current = merge_block;
+                let dst = self.fresh();
+                self.emit(IrInstr::Phi {
+                    dst,
+                    incoming: vec![(left_block, left), (right_end, right)],
+                    ty: Ty::Bool,
                 });
                 dst
             }

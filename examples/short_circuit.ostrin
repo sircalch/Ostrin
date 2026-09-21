@@ -1,0 +1,12 @@
+fn safe(x: Int) -> Bool {
+    x != 0 and 10 / x > 1
+}
+fn either(x: Int) -> Bool {
+    x == 0 or 10 / x > 1
+}
+fn main() -> Void {
+    print(safe(0))
+    print(safe(2))
+    print(either(0))
+    print(either(20))
+}

@@ -2234,10 +2234,21 @@ impl<'a> Codegen<'a> {
             }
             self.emit_owned_cleanup(out, transfer.as_deref());
             out.push_str(&format!("    return {temp};\n"));
-        } else {
+        } else if ty == CType::Void || !self.has_owned_locals() {
             self.emit_owned_cleanup(out, None);
             out.push_str(&format!("    return {code};\n"));
+        } else {
+            // Evaluate before releasing: `return words.length()` reads a local
+            // that the cleanup is about to release.
+            let temp = self.next_temp();
+            out.push_str(&format!("    {} {temp} = {code};\n", c_type_name(&ty)));
+            self.emit_owned_cleanup(out, None);
+            out.push_str(&format!("    return {temp};\n"));
         }
+    }
+
+    fn has_owned_locals(&self) -> bool {
+        !self.owned_locals.is_empty() || self.owned_block_locals.iter().any(|frame| !frame.is_empty())
     }
 
     fn define(&mut self, name: &str, ty: CType) {

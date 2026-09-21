@@ -1908,6 +1908,40 @@ fn rem_operator_reports_zero_divisor_and_type_errors() {
 }
 
 #[test]
+fn native_ir_string_methods_cross_block_ownership_and_short_circuit() {
+    // (file, expected stdout, minimum IR-generated functions)
+    for (file, expected, minimum_ir) in [
+        ("native_ir_string_methods.ostrin", "OSTRIN!\nmixed\na+b+c\n0\n30\n5\ntrue\n", 3usize),
+        ("native_ir_cross_block_ownership.ostrin", "item-x\nitem-x!\n9\n2\n4\n24\n", 7usize),
+        ("short_circuit.ostrin", "false\ntrue\ntrue\nfalse\n", 3usize),
+    ] {
+        let path = example_path(file);
+        let interpreted = run(&["--run", &path]);
+        assert!(interpreted.status.success(), "interpreter failed for {file}: {}", stderr(&interpreted));
+        assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected, "interpreter output for {file}");
+
+        let report = run(&["--native-type-report", &path]);
+        if skip_if_no_c_compiler(&report) {
+            return;
+        }
+        let ir_functions = stdout(&report)
+            .lines()
+            .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+            .unwrap_or(0);
+        assert!(ir_functions >= minimum_ir, "{file} generated only {ir_functions} IR function(s): {}", stdout(&report));
+
+        let exe = temp_artifact(&format!("xblock_{file}.exe"));
+        let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+        assert!(compile.status.success(), "compile failed for {file}: {}", stderr(&compile));
+        let native = Command::new(&exe).output().expect("failed to run native binary");
+        let _ = fs::remove_file(&exe);
+        assert!(native.status.success(), "native run failed for {file}");
+        assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "{file} leaked: {}", String::from_utf8_lossy(&native.stderr));
+        assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected, "native output for {file}");
+    }
+}
+
+#[test]
 fn native_ir_emitter_handles_scalar_maps_and_sets() {
     let file = example_path("native_ir_maps_sets.ostrin");
     let expected = "3\ntrue\nfalse\n3\n3\n1\n3\n3\n2\ntrue\nfalse\n1\n2\n2\n";

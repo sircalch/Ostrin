@@ -1,0 +1,66 @@
+record Item {
+    name: String
+    qty: Int
+}
+
+fn label(n: Int) -> String {
+    "item-" + "x"
+}
+
+fn describe(n: Int) -> String {
+    base = label(n)
+    if n > 2 {
+        return base + "!"
+    }
+    if n < 0 {
+        print(base)
+    }
+    base
+}
+
+fn total(items: List<Item>) -> Int {
+    mut t = 0
+    for it in items {
+        t = t + it.qty
+    }
+    t
+}
+
+fn build(n: Int) -> List<Item> {
+    mut out = [Item { name: label(n), qty: n }]
+    out.push(Item { name: "b" + "c", qty: n * 2 })
+    out
+}
+
+fn early(flag: Bool) -> Int {
+    words = ["a" + "1", "b" + "2"]
+    if flag {
+        return words.length()
+    }
+    mut n = 0
+    for w in words {
+        n = n + w.length()
+    }
+    n
+}
+
+fn loopy(n: Int) -> Int {
+    mut i = 0
+    mut acc = 0
+    while i < n {
+        s = label(i)
+        acc = acc + s.length()
+        i = i + 1
+    }
+    acc
+}
+
+fn main() -> Void {
+    print(describe(1))
+    print(describe(5))
+    items = build(3)
+    print(total(items))
+    print(early(true))
+    print(early(false))
+    print(loopy(4))
+}

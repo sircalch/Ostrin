@@ -554,6 +554,25 @@ fn emit_instruction(
             let receiver_ty = value_ty(values, *receiver)?;
             let receiver = value_code(values, *receiver)?;
             let call = match receiver_ty {
+                Ty::String => {
+                    let string_args = args
+                        .iter()
+                        .map(|arg| (value_ty(values, *arg) == Ok(Ty::String)).then(|| value_code(values, *arg)))
+                        .collect::<Option<Bail<Vec<_>>>>()
+                        .ok_or(())??;
+                    match (method.as_str(), string_args.as_slice(), ty) {
+                        ("length", [], Ty::Int) => format!("ostrin_s_length({receiver})"),
+                        ("is_empty", [], Ty::Bool) => format!("(*({receiver}) == 0)"),
+                        ("trim", [], Ty::String) => format!("ostrin_s_trim({receiver})"),
+                        ("to_upper", [], Ty::String) => format!("ostrin_s_upper({receiver})"),
+                        ("to_lower", [], Ty::String) => format!("ostrin_s_lower({receiver})"),
+                        ("contains", [pattern], Ty::Bool) => format!("(strstr({receiver}, {pattern}) != NULL)"),
+                        ("starts_with", [pattern], Ty::Bool) => format!("ostrin_s_starts_with({receiver}, {pattern})"),
+                        ("ends_with", [pattern], Ty::Bool) => format!("ostrin_s_ends_with({receiver}, {pattern})"),
+                        ("replace", [from, to], Ty::String) => format!("ostrin_s_replace({receiver}, {from}, {to})"),
+                        _ => return Err(()),
+                    }
+                }
                 Ty::List(element) if list_supported(&element, records) => {
                     let list_name = format!("List_{}", mangle_option_payload(&element, records));
                     match method.as_str() {

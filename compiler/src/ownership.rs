@@ -154,6 +154,14 @@ pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
                 }
             } else if value_uses.is_empty() {
                 release_after.entry((*definition_block, definition_instruction + 1)).or_default().push(*value);
+            } else if let Some(returns) =
+                release_points_at_returns(function, *definition_block, *value, &value_uses, &opaque_values)
+            {
+                // Live across several blocks and never transferred: hold it until
+                // every function exit (its block dominates them all, outside loops).
+                for block in returns {
+                    release_before_terminator.entry(block).or_default().push(*value);
+                }
             } else {
                 summary.unresolved_values += 1;
             }
@@ -507,6 +515,85 @@ fn is_return_use(function: &crate::ir::IrFunction, value: ValueId, point: UsePoi
             function.blocks[point.block].terminator,
             Some(IrTerminator::Return(Some(returned)) | IrTerminator::RegionReturn(Some(returned))) if returned == value
         )
+}
+
+/// Return blocks where a value that spans several blocks can be released, or
+/// `None` when that is not provably safe: the value flows into a `Phi`, an
+/// opaque instruction or a return; its definition sits in a cycle (one value
+/// per iteration); a region return exists; or an exit is reachable without
+/// passing through the defining block.
+fn release_points_at_returns(
+    function: &crate::ir::IrFunction,
+    definition_block: usize,
+    value: ValueId,
+    value_uses: &[UsePoint],
+    opaque_values: &HashSet<ValueId>,
+) -> Option<Vec<usize>> {
+    if opaque_values.contains(&value) {
+        return None;
+    }
+    for point in value_uses {
+        let block = function.blocks.get(point.block)?;
+        match block.instructions.get(point.instruction) {
+            Some(IrInstr::Phi { .. }) | Some(IrInstr::Opaque { .. }) => return None,
+            Some(_) => {}
+            None => {
+                // A terminator use: branch conditions are harmless, and a return of
+                // the value itself transfers it (that exit simply is not released).
+                let transfers = matches!(block.terminator, Some(IrTerminator::Return(Some(returned))) if returned == value);
+                if !transfers && !matches!(block.terminator, Some(IrTerminator::Branch { .. })) {
+                    return None;
+                }
+            }
+        }
+    }
+    let mut returns: Vec<usize> = Vec::new();
+    for block in &function.blocks {
+        match block.terminator {
+            Some(IrTerminator::Return(_)) => returns.push(block.id),
+            Some(IrTerminator::RegionReturn(_)) => return None,
+            _ => {}
+        }
+    }
+    if returns.is_empty() {
+        return None;
+    }
+    let exits = returns.clone();
+    returns.retain(|block| {
+        !matches!(function.blocks[*block].terminator, Some(IrTerminator::Return(Some(returned))) if returned == value)
+    });
+    // The definition must not be inside a cycle.
+    let successors = |block: usize| -> Vec<usize> {
+        match function.blocks.get(block).and_then(|b| b.terminator.as_ref()) {
+            Some(IrTerminator::Goto(next)) => vec![*next],
+            Some(IrTerminator::Branch { then_block, else_block, .. }) => vec![*then_block, *else_block],
+            _ => Vec::new(),
+        }
+    };
+    let mut pending = successors(definition_block);
+    let mut seen = HashSet::new();
+    while let Some(block) = pending.pop() {
+        if block == definition_block {
+            return None;
+        }
+        if seen.insert(block) {
+            pending.extend(successors(block));
+        }
+    }
+    // Every exit must be dominated by the definition block: walking from the
+    // entry without entering it may not reach a return.
+    let mut pending = vec![function.entry];
+    let mut seen = HashSet::new();
+    while let Some(block) = pending.pop() {
+        if block == definition_block || !seen.insert(block) {
+            continue;
+        }
+        if exits.contains(&block) {
+            return None;
+        }
+        pending.extend(successors(block));
+    }
+    Some(returns)
 }
 
 fn block_reaches(function: &crate::ir::IrFunction, start: usize, target: usize) -> bool {

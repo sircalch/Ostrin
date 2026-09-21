@@ -1,0 +1,24 @@
+fn shout(name: String) -> String {
+    trimmed = name.trim()
+    trimmed.to_upper() + "!"
+}
+
+fn describe(text: String) -> Int {
+    if text.is_empty() {
+        return 0
+    }
+    if text.contains("ab") and text.starts_with("x") {
+        return text.length() * 10
+    }
+    text.length()
+}
+
+fn main() -> Void {
+    print(shout("  ostrin  "))
+    print("MiXeD".to_lower())
+    print("a-b-c".replace("-", "+"))
+    print(describe(""))
+    print(describe("xab"))
+    print(describe("hello"))
+    print("file.ostrin".ends_with(".ostrin"))
+}

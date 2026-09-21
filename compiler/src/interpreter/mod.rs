@@ -2009,6 +2009,14 @@ impl Interpreter {
             }
             Expr::Binary(op, l, r) => {
                 let lv = self.eval_expr(l, env)?;
+                // `and`/`or` short-circuit on plain booleans (masks stay elementwise).
+                if let Value::Bool(left) = &lv {
+                    match op {
+                        BinOp::And if !*left => return Ok(Value::Bool(false)),
+                        BinOp::Or if *left => return Ok(Value::Bool(true)),
+                        _ => {}
+                    }
+                }
                 let rv = self.eval_expr(r, env)?;
                 self.eval_binary(*op, lv, rv, env)
             }

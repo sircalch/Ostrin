@@ -3,6 +3,8 @@
 ## Unreleased
 
 ### Language and libraries
+- `and`/`or` now short-circuit on booleans in the interpreter and the native IR path (masks stay
+  elementwise). Previously `x != 0 and 10 / x > 1` failed with a division by zero.
 - Remainder operator `%` for `Int`, `Float`, `Float32` and fixed-width integers (truncating, like C;
   division by zero is a runtime error in both backends; not defined for quantities or arrays).
 - First-class function values and closures (`fn(Int) -> Int` types, lambdas that
@@ -21,6 +23,8 @@
   group-by), `plot` (SVG scatter/line) and `autodiff` (forward-mode dual numbers).
 
 ### Compiler
+- Fixed a use-after-release in the AST native path (`return words.length()` released `words` before
+  evaluating the expression) and leaks for temporary lists in `for` and for reassigned nested locals.
 - Official formatter: `ostrinc --fmt FILE` prints the formatted source, `--write` rewrites it and
   `--check` fails when it is not formatted. Layout-only and token-verified (idempotent).
 - Package resolution now supports explicit `--fetch` for Git dependencies. Normal

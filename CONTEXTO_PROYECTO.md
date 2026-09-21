@@ -5149,3 +5149,29 @@ prueba `ostrinc` en Linux x86_64, macOS arm64 y Windows x64, empaqueta el binari
 `LICENSE`, `README.md` y `examples/`, genera `*.sha256` y, solo con etiqueta, publica una
 release con `gh release create --generate-notes`. No se ha publicado ninguna release desde
 esta sesión; el workflow queda listo para la primera etiqueta que decida el mantenedor.
+
+## 196. Liberación entre bloques, métodos de `String` en IR y `and`/`or` con cortocircuito — 2026-09-20
+
+**Ownership entre bloques.** `release_points_at_returns` (en `ownership.rs`) ya libera valores
+gestionados propios usados en varios bloques: se sueltan antes de cada `Return` cuando su bloque
+de definición domina todas las salidas y no está en un ciclo; una salida que devuelve el propio
+valor lo transfiere y no se libera. Se excluyen valores que entran en `Phi`/`Opaque`, regiones
+(`RegionReturn`) y definiciones dentro de bucles. Con ello se elimina la compuerta
+`owned_loop_source`: `for x in <lista propia>` vuelve a la IR sin fugas.
+
+**Métodos de `String` en la IR** (`length is_empty trim to_upper to_lower contains starts_with
+ends_with replace`), con los mismos helpers de `strings_runtime.c`.
+
+**Corrección de semántica.** `and`/`or` evaluaban siempre ambos lados en el intérprete y en la IR
+(`x != 0 and 10 / x > 1` abortaba). El intérprete corta cuando el lado izquierdo es `Bool`
+(las máscaras `Array<Bool>` siguen siendo elemento a elemento) y la IR baja a control de flujo con
+un `Phi`. El camino AST liberaba los locales *antes* de evaluar `return <expr>` de tipo escalar
+(uso tras liberar); ahora evalúa a un temporal primero.
+
+Ejemplos `native_ir_string_methods`, `native_ir_cross_block_ownership` (7 funciones, 0 fugas) y
+`short_circuit`; prueba `native_ir_string_methods_cross_block_ownership_and_short_circuit`.
+Suite: **6 diferenciales, 163 de integración y 2 unitarias**.
+
+Frontera conocida: el camino AST sigue fugando los temporales al construir listas con valores
+dinámicos (`[a + b]`) cuando la función no puede ir por IR; se cierra al migrar las familias
+restantes a HIR/IR.
