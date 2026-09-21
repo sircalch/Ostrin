@@ -27,6 +27,7 @@
   group-by), `plot` (SVG scatter/line) and `autodiff` (forward-mode dual numbers).
 
 ### Compiler
+- `ostrinc --new DIR` scaffolds a project (manifest, entry module with a test, `.gitignore`).
 - Native runtime: live allocations are tracked in a hash table instead of a linked list, so retain/
   release are O(1) (40k live strings: 6 s -> 0.07 s).
 - The parser no longer takes exponential time on deeply nested blocks (statements were parsed twice

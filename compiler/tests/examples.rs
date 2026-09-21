@@ -2282,6 +2282,33 @@ fn native_allocator_scales_linearly_with_live_allocations() {
 }
 
 #[test]
+fn new_scaffolds_a_project_that_runs_and_passes_its_own_test() {
+    let root = temp_artifact("scaffold_project");
+    let _ = fs::remove_dir_all(&root);
+    let created = run(&["--new", &root]);
+    assert!(created.status.success(), "--new failed: {}", stderr(&created));
+    for file in ["ostrin.toml", "main.ostrin", ".gitignore"] {
+        assert!(std::path::Path::new(&root).join(file).exists(), "missing {file}");
+    }
+
+    let output = run(&["--project", &root, "--run"]);
+    assert!(output.status.success(), "project run failed: {}", stderr(&output));
+    assert_eq!(stdout(&output).replace("\r\n", "\n"), "Hello, Ostrin!\n3\n");
+
+    let entry = format!("{root}/main.ostrin");
+    let tests = run(&["--test", &entry]);
+    assert!(tests.status.success(), "project test failed: {}{}", stdout(&tests), stderr(&tests));
+    assert!(stdout(&tests).contains("1 passed"), "unexpected test output: {}", stdout(&tests));
+
+    let again = run(&["--new", &root]);
+    assert!(!again.status.success(), "--new must not overwrite an existing project");
+    let _ = fs::remove_dir_all(&root);
+
+    let invalid = run(&["--new", &format!("{root}/bad name!")]);
+    assert!(!invalid.status.success());
+}
+
+#[test]
 fn native_ir_emitter_handles_scalar_maps_and_sets() {
     let file = example_path("native_ir_maps_sets.ostrin");
     let expected = "3\ntrue\nfalse\n3\n3\n1\n3\n3\n2\ntrue\nfalse\n1\n2\n2\n";

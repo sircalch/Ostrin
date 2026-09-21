@@ -5262,3 +5262,11 @@ liberan. Además los propios helpers `ostrin_show_*` filtraban todas las cadenas
 `String` de un contenedor son prestados y no se liberan). `native_ir_print_compound` imprime
 lista, record, `Option` y mapa con `live_allocations=0`. Suite: **6 diferenciales, 169 de
 integración y 2 unitarias**.
+
+## 202. `ostrinc --new DIR` — 2026-09-20
+
+Crea un proyecto listo para usar: `ostrin.toml` (nombre validado, `entry = "main.ostrin"`),
+`main.ostrin` (importa `std.math`, una función y un `test_greet`) y `.gitignore`. Se niega a
+tocar un directorio no vacío y a usar nombres no válidos. Flujo: `ostrinc --new hola`,
+`ostrinc --project hola --run`, `ostrinc --test hola/main.ostrin`. Cubierto por
+`new_scaffolds_a_project_that_runs_and_passes_its_own_test`.

@@ -74,6 +74,10 @@ fn real_main() -> ExitCode {
         return ExitCode::SUCCESS;
     }
 
+    if let Some(directory) = argument_value(&args, "--new") {
+        return scaffold_project(&directory);
+    }
+
     if lsp_server {
         return lsp::run();
     }
@@ -87,7 +91,7 @@ fn real_main() -> ExitCode {
         return check_stdin(&source_file, json);
     }
 
-    let value_flags = ["--file", "--out", "--project", "--target"];
+    let value_flags = ["--file", "--out", "--project", "--target", "--new"];
     let mut skip_next = false;
     let positional = args.iter().skip(1).find(|a| {
         if skip_next {
@@ -642,6 +646,59 @@ fn format_file(path: &str, write: bool, check: bool) -> ExitCode {
     ExitCode::SUCCESS
 }
 
+/// `--new DIR`: create a project (manifest, entry module with a test, `.gitignore`).
+fn scaffold_project(directory: &str) -> ExitCode {
+    let root = Path::new(directory);
+    let name = root.file_name().and_then(|n| n.to_str()).unwrap_or("");
+    if name.is_empty() || !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-') {
+        eprintln!("error: '{directory}' does not end in a valid project name (letters, digits, '-' and '_')");
+        return ExitCode::FAILURE;
+    }
+    if root.exists() && fs::read_dir(root).map(|mut entries| entries.next().is_some()).unwrap_or(true) {
+        eprintln!("error: '{directory}' already exists and is not empty");
+        return ExitCode::FAILURE;
+    }
+    let manifest = format!("[package]
+name = \"{name}\"
+version = \"0.1.0\"
+entry = \"main.ostrin\"
+
+[dependencies]
+");
+    let entry = "import std.math
+
+fn greet(name: String) -> String {
+    \"Hello, \" + name + \"!\"
+}
+
+fn main() -> Void {
+    print(greet(\"Ostrin\"))
+    print(math.max(2, 3))
+}
+
+fn test_greet() -> Void {
+    assert_eq(greet(\"you\"), \"Hello, you!\")
+}
+";
+    let files = [("ostrin.toml", manifest.as_str()), ("main.ostrin", entry), (".gitignore", "*.exe
+*.c
+")];
+    if let Err(error) = fs::create_dir_all(root) {
+        eprintln!("error: could not create '{directory}': {error}");
+        return ExitCode::FAILURE;
+    }
+    for (file, content) in files {
+        if let Err(error) = fs::write(root.join(file), content) {
+            eprintln!("error: could not write '{}': {error}", root.join(file).display());
+            return ExitCode::FAILURE;
+        }
+    }
+    println!("created project '{name}' in {directory}");
+    println!("  cd {directory} && ostrinc --project . --run");
+    println!("  ostrinc --test {directory}/main.ostrin");
+    ExitCode::SUCCESS
+}
+
 fn print_help() {
     println!("ostrinc 0.1.0 — compiler and interpreter for Ostrin");
     println!();
@@ -652,6 +709,7 @@ fn print_help() {
     println!("  --run         Type-check and run the entry file");
     println!("  --ast         Print the parsed AST");
     println!("  --tokens      Print lexer tokens");
+    println!("  --new DIR     Create a new project in DIR (manifest, main.ostrin with a test)");
     println!("  --fmt         Print the formatted file (--write to rewrite, --check to verify)");
     println!("  --symbols     Print source symbols and signatures");
     println!("  --members     Print type members and local bindings for editor tools");
