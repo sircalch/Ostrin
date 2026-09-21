@@ -5414,5 +5414,19 @@ entradas y valores a los callbacks de `Map`/`Set`. El patrón `match` y las cons
 
 `examples/native_ir_compound_collections.ostrin` genera sus 5 funciones desde IR, coincide
 con el intérprete y termina con `live_allocations=0` (7 allocations totales en el escenario
-de prueba). Quedan para otro bloque los wrappers anidados entre sí y los handlers locales o
-closures no inline.
+de prueba). Quedan para otro bloque los handlers locales o closures no inline y consumidores
+complejos de wrappers anidados.
+
+## 212. Ownership recursivo para wrappers anidados — 2026-09-21
+
+`Option` y `Result` ya pueden contener otros wrappers por valor en la IR nativa, por ejemplo
+`Option<Option<String>>` y `Result<Option<String>,String>`. El emisor calcula los typedefs en
+orden topológico cuando un `Result` depende de un `Option`, y los helpers de ownership recorren
+el discriminante interno antes de llamar a `ostrin_retain`/`ostrin_release`; así una copia del
+wrapper conserva únicamente el payload gestionado que está activo.
+
+`examples/native_ir_nested_wrappers.ostrin` verifica constructores anidados, `match` anidado,
+`Some`/`None`, `Ok`/`Err`, strings dinámicos y cleanup nativo. Sus 5 funciones generan IR,
+coinciden con el intérprete y terminan con `live_allocations=0`. Consumidores como `unwrap` de
+un wrapper gestionado anidado y handlers locales/closures no inline siguen siendo el siguiente
+frente porque requieren transferencias adicionales o llamadas indirectas.

@@ -7410,13 +7410,51 @@ fn generate_impl(
     // complete typedefs must follow any enum bodies they embed and precede
     // record bodies. Their payloads can refer to records through the forward
     // typedefs above and to list instances through the list forward typedefs.
+    // Nested wrappers add a by-value dependency (`Result<Option<T>, E>` needs
+    // `Option_T` first), so emit this small graph in dependency order instead
+    // of relying on the order in which the discovery queues were drained.
+    let mut wrapper_types = Vec::new();
     for (ok, err) in std::mem::take(&mut result_pairs) {
-        let name = format!("Result_{}_{}", mangle_ctype(&ok), mangle_ctype(&err));
-        out.push_str(&format!("typedef struct {{ bool ok; {} value; {} error; }} {name};\n\n", field_c_type(&ok), field_c_type(&err)));
+        wrapper_types.push(CType::Result(Box::new(ok), Box::new(err)));
     }
     for inner in std::mem::take(&mut option_inners) {
-        let name = format!("Option_{}", mangle_ctype(&inner));
-        out.push_str(&format!("typedef struct {{ bool has; {} value; }} {name};\n\n", c_type_name(&inner)));
+        wrapper_types.push(CType::Option(Box::new(inner)));
+    }
+    let mut emitted_wrappers = HashSet::new();
+    while !wrapper_types.is_empty() {
+        let ready = wrapper_types.iter().position(|ty| {
+            let dependencies = match ty {
+                CType::Option(inner) => vec![inner.as_ref()],
+                CType::Result(ok, err) => vec![ok.as_ref(), err.as_ref()],
+                _ => Vec::new(),
+            };
+            dependencies.iter().all(|dependency| {
+                !matches!(dependency, CType::Option(_) | CType::Result(..))
+                    || emitted_wrappers.contains(&mangle_ctype(dependency))
+            })
+        });
+        let Some(index) = ready else {
+            // Recursive by-value wrappers cannot be represented by C structs;
+            // keep the generated output deterministic so the C compiler can
+            // report the unsupported recursive shape rather than silently
+            // changing its representation.
+            break;
+        };
+        let wrapper = wrapper_types.remove(index);
+        let name = mangle_ctype(&wrapper);
+        match &wrapper {
+            CType::Option(inner) => out.push_str(&format!(
+                "typedef struct {{ bool has; {} value; }} {name};\n\n",
+                c_type_name(inner)
+            )),
+            CType::Result(ok, err) => out.push_str(&format!(
+                "typedef struct {{ bool ok; {} value; {} error; }} {name};\n\n",
+                field_c_type(ok),
+                field_c_type(err)
+            )),
+            _ => unreachable!("wrapper queue only contains Option and Result"),
+        }
+        emitted_wrappers.insert(name);
     }
     let emit_record = |out: &mut String, name: &str, fields: &[(String, CType)]| {
         out.push_str(&format!("struct {name} {{\n"));

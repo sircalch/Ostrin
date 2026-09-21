@@ -2038,6 +2038,36 @@ fn native_ir_compound_collections_preserve_payload_and_ownership() {
 }
 
 #[test]
+fn native_ir_nested_wrappers_preserve_recursive_ownership() {
+    let file = "native_ir_nested_wrappers.ostrin";
+    let path = example_path(file);
+    let expected = "nested\ninner none\nok\nnested error\n";
+    let interpreted = run(&["--run", &path]);
+    assert!(interpreted.status.success(), "interpreter failed for {file}: {}", stderr(&interpreted));
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &path]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    assert!(report.status.success(), "native type report failed for {file}: {}", stderr(&report));
+    let ir_functions = stdout(&report)
+        .lines()
+        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .unwrap_or(0);
+    assert!(ir_functions >= 5, "{file} generated only {ir_functions} IR function(s): {}", stdout(&report));
+
+    let exe = temp_artifact("native_ir_nested_wrappers.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+    assert!(compile.status.success(), "compile failed for {file}: {}", stderr(&compile));
+    let native = Command::new(&exe).output().expect("failed to run nested wrapper binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native run failed for {file}: {}", stderr(&compile));
+    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "{file} leaked: {}", String::from_utf8_lossy(&native.stderr));
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+}
+
+#[test]
 fn native_ir_try_global_handler_preserves_error_ownership() {
     let file = "native_ir_try_handler.ostrin";
     let path = example_path(file);

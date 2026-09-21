@@ -6,9 +6,10 @@
 //! managed families supported here are `String`, scalar-element `List<T>`
 //! (including the `List<String>` values produced by `String.split()`/`lines()`),
 //! and the scalar-key/value core of `Map<K,V>`/`Set<T>`, plus scalar-payload
-//! `Result<T,E>` values such as `String.to_int()`/`to_float()`; `Option<List<T>>`
-//! and `Result<List<T>, E>` extend that native path to one managed aggregate
-//! layer while larger aggregates retain the verified HIR/AST fallback.
+//! `Result<T,E>` values such as `String.to_int()`/`to_float()`; wrappers can
+//! now compose over scalar collections and over other `Option`/`Result` values
+//! with recursive ownership markers while larger aggregates retain the
+//! verified HIR/AST fallback.
 
 use std::collections::{HashMap, HashSet};
 
@@ -91,12 +92,13 @@ fn option_supported(element: &Ty, records: &RecordFields) -> bool {
         || matches!(element, Ty::List(inner) if list_supported(inner, records))
         || matches!(element, Ty::Map(key, value) if map_supported(key, value))
         || matches!(element, Ty::Set(inner) if set_supported(inner))
+        || matches!(element, Ty::Applied(name, args) if name == "Option" && args.len() == 1 && option_supported(&args[0], records))
+        || matches!(element, Ty::Applied(name, args) if name == "Result" && args.len() == 2 && result_supported(&args[0], &args[1], records))
         || matches!(element, Ty::Named(name) if records.contains_key(name))
 }
 
 fn option_managed_payload(element: &Ty, records: &RecordFields) -> bool {
-    matches!(element, Ty::String | Ty::List(_) | Ty::Map(_, _) | Ty::Set(_))
-        || matches!(element, Ty::Named(name) if records.contains_key(name))
+    managed_payload(element, records)
 }
 
 fn result_payload_supported(ty: &Ty, records: &RecordFields) -> bool {
@@ -104,6 +106,8 @@ fn result_payload_supported(ty: &Ty, records: &RecordFields) -> bool {
         || matches!(ty, Ty::List(inner) if list_supported(inner, records))
         || matches!(ty, Ty::Map(key, value) if map_supported(key, value))
         || matches!(ty, Ty::Set(inner) if set_supported(inner))
+        || matches!(ty, Ty::Applied(name, args) if name == "Option" && args.len() == 1 && option_supported(&args[0], records))
+        || matches!(ty, Ty::Applied(name, args) if name == "Result" && args.len() == 2 && result_supported(&args[0], &args[1], records))
         || matches!(ty, Ty::Named(name) if records.contains_key(name))
 }
 
@@ -112,8 +116,22 @@ fn result_supported(ok: &Ty, err: &Ty, records: &RecordFields) -> bool {
 }
 
 fn result_managed_payload(ty: &Ty, records: &RecordFields) -> bool {
-    matches!(ty, Ty::String | Ty::List(_) | Ty::Map(_, _) | Ty::Set(_))
-        || matches!(ty, Ty::Named(name) if records.contains_key(name))
+    managed_payload(ty, records)
+}
+
+fn managed_payload(ty: &Ty, records: &RecordFields) -> bool {
+    match ty {
+        Ty::String | Ty::List(_) | Ty::Map(_, _) | Ty::Set(_) => true,
+        Ty::Named(name) => records.contains_key(name),
+        Ty::Applied(name, args) if name == "Option" && args.len() == 1 => {
+            option_supported(&args[0], records) && managed_payload(&args[0], records)
+        }
+        Ty::Applied(name, args) if name == "Result" && args.len() == 2 => {
+            result_supported(&args[0], &args[1], records)
+                && (managed_payload(&args[0], records) || managed_payload(&args[1], records))
+        }
+        _ => false,
+    }
 }
 
 fn option_type(element: &Ty) -> Ty {
@@ -144,12 +162,58 @@ fn mangle_option_payload(ty: &Ty, records: &RecordFields) -> String {
         Ty::Set(element) if set_supported(element) => {
             format!("Set_{}", mangle_scalar(element))
         }
+        Ty::Applied(name, args)
+            if name == "Option" && args.len() == 1 && option_supported(&args[0], records) =>
+        {
+            format!("Option_{}", mangle_option_payload(&args[0], records))
+        }
+        Ty::Applied(name, args)
+            if name == "Result" && args.len() == 2 && result_supported(&args[0], &args[1], records) =>
+        {
+            format!(
+                "Result_{}_{}",
+                mangle_result_payload(&args[0], records),
+                mangle_result_payload(&args[1], records)
+            )
+        }
         _ => mangle_scalar(ty),
     }
 }
 
 fn mangle_result_payload(ty: &Ty, records: &RecordFields) -> String {
     mangle_option_payload(ty, records)
+}
+
+fn retain_payload(access: &str, ty: &Ty, records: &RecordFields) -> Option<String> {
+    match ty {
+        Ty::String | Ty::List(_) | Ty::Map(_, _) | Ty::Set(_) => {
+            Some(format!("ostrin_retain((void*){access})"))
+        }
+        Ty::Named(name) if records.contains_key(name) => {
+            Some(format!("ostrin_retain((void*){access})"))
+        }
+        Ty::Applied(name, args)
+            if name == "Option"
+                && args.len() == 1
+                && option_supported(&args[0], records)
+                && option_managed_payload(&args[0], records) => retain_payload(&format!("({access}).value"), &args[0], records)
+            .map(|body| format!("if (({access}).has) {{ {body}; }}")),
+        Ty::Applied(name, args)
+            if name == "Result"
+                && args.len() == 2
+                && result_supported(&args[0], &args[1], records)
+                && result_managed_payload(ty, records) =>
+        {
+            let ok = retain_payload(&format!("({access}).value"), &args[0], records).unwrap_or_default();
+            let err = retain_payload(&format!("({access}).error"), &args[1], records).unwrap_or_default();
+            Some(format!("if (({access}).ok) {{ {ok}; }} else {{ {err}; }}"))
+        }
+        _ => None,
+    }
+}
+
+fn release_payload(access: &str, ty: &Ty, records: &RecordFields) -> Option<String> {
+    retain_payload(access, ty, records).map(|body| body.replace("ostrin_retain", "ostrin_release"))
 }
 
 fn value_name(value: ValueId) -> String {
@@ -546,11 +610,8 @@ fn emit_instruction(
                         value_name(*dst),
                         source
                     ));
-                    if result_managed_payload(&args[1], records) {
-                        out.push_str(&format!(
-                            "    ostrin_retain((void*)({}).error);\n",
-                            source
-                        ));
+                    if let Some(retain) = retain_payload(&format!("({source}).error"), &args[1], records) {
+                        out.push_str(&format!("    {retain};\n"));
                     }
                 }
                 _ => return Err(()),
@@ -823,11 +884,12 @@ fn emit_instruction(
                         "ok" if args.is_empty() && *ty == option_type(&ok) => {
                             let option_name = format!("Option_{}", mangle_option_payload(&ok, records));
                             if option_managed_payload(&ok, records) {
+                                let retain = retain_payload("__ostrin_option.value", &ok, records).ok_or(())?;
                                 format!(
-                                    "({{ {option_name} __ostrin_option = (({option_name}){{ .has = {receiver}.ok, .value = {receiver}.value }}); if (__ostrin_option.has) ostrin_retain((void*)__ostrin_option.value); __ostrin_option; }})"
+                                    "({{ {option_name} __ostrin_option = (({option_name}){{ .has = ({receiver}).ok, .value = ({receiver}).value }}); if (__ostrin_option.has) {{ {retain}; }} __ostrin_option; }})"
                                 )
                             } else {
-                                format!("(({option_name}){{ .has = {receiver}.ok, .value = {receiver}.value }})")
+                                format!("(({option_name}){{ .has = ({receiver}).ok, .value = ({receiver}).value }})")
                             }
                         }
                         _ => return Err(()),
@@ -882,8 +944,9 @@ fn emit_instruction(
                 if !option_managed_payload(&inner, records) {
                     format!("(({option_name}){{ .has = true, .value = {} }})", codes[0])
                 } else {
+                    let retain = retain_payload("__ostrin_option.value", &inner, records).ok_or(())?;
                     format!(
-                        "({{ {option_name} __ostrin_option = (({option_name}){{ .has = true, .value = {} }}); ostrin_retain((void*)__ostrin_option.value); __ostrin_option; }})",
+                        "({{ {option_name} __ostrin_option = (({option_name}){{ .has = true, .value = {} }}); {retain}; __ostrin_option; }})",
                         codes[0]
                     )
                 }
@@ -904,8 +967,9 @@ fn emit_instruction(
                 let field = if callee == "Ok" { "value" } else { "error" };
                 let active = if callee == "Ok" { ".ok = true" } else { ".ok = false" };
                 if result_managed_payload(expected, records) {
+                    let retain = retain_payload(&format!("__ostrin_result.{field}"), expected, records).ok_or(())?;
                     format!(
-                        "({{ {result_name} __ostrin_result = (({result_name}){{ {active}, .{field} = {} }}); ostrin_retain((void*)__ostrin_result.{field}); __ostrin_result; }})",
+                        "({{ {result_name} __ostrin_result = (({result_name}){{ {active}, .{field} = {} }}); {retain}; __ostrin_result; }})",
                         codes[0]
                     )
                 } else {
@@ -1032,20 +1096,21 @@ fn emit_instruction(
                     if name == "Option" && args.len() == 1 && option_managed_payload(&args[0], records) =>
                 {
                     let code = value_code(values, *value)?;
-                    out.push_str(&format!("    if ({code}.has) ostrin_retain((void*){code}.value);\n"));
+                    let retain = retain_payload(&format!("({code}).value"), &args[0], records).ok_or(())?;
+                    out.push_str(&format!("    if (({code}).has) {{ {retain}; }}\n"));
                 }
                 Ty::Applied(name, args)
                     if name == "Result" && args.len() == 2 && result_supported(&args[0], &args[1], records) =>
                 {
                     let code = value_code(values, *value)?;
-                    let ok = result_managed_payload(&args[0], records);
-                    let err = result_managed_payload(&args[1], records);
-                    if ok && err {
-                        out.push_str(&format!("    if ({code}.ok) ostrin_retain((void*){code}.value); else ostrin_retain((void*){code}.error);\n"));
-                    } else if ok {
-                        out.push_str(&format!("    if ({code}.ok) ostrin_retain((void*){code}.value);\n"));
-                    } else if err {
-                        out.push_str(&format!("    if (!{code}.ok) ostrin_retain((void*){code}.error);\n"));
+                    let ok = retain_payload(&format!("({code}).value"), &args[0], records);
+                    let err = retain_payload(&format!("({code}).error"), &args[1], records);
+                    if ok.is_some() || err.is_some() {
+                        out.push_str(&format!(
+                            "    if (({code}).ok) {{ {}; }} else {{ {}; }}\n",
+                            ok.unwrap_or_default(),
+                            err.unwrap_or_default()
+                        ));
                     }
                 }
                 _ => return Err(()),
@@ -1064,20 +1129,21 @@ fn emit_instruction(
                     if name == "Option" && args.len() == 1 && option_managed_payload(&args[0], records) =>
                 {
                     let code = value_code(values, *value)?;
-                    out.push_str(&format!("    if ({code}.has) ostrin_release((void*){code}.value);\n"));
+                    let release = release_payload(&format!("({code}).value"), &args[0], records).ok_or(())?;
+                    out.push_str(&format!("    if (({code}).has) {{ {release}; }}\n"));
                 }
                 Ty::Applied(name, args)
                     if name == "Result" && args.len() == 2 && result_supported(&args[0], &args[1], records) =>
                 {
                     let code = value_code(values, *value)?;
-                    let ok = result_managed_payload(&args[0], records);
-                    let err = result_managed_payload(&args[1], records);
-                    if ok && err {
-                        out.push_str(&format!("    if ({code}.ok) ostrin_release((void*){code}.value); else ostrin_release((void*){code}.error);\n"));
-                    } else if ok {
-                        out.push_str(&format!("    if ({code}.ok) ostrin_release((void*){code}.value);\n"));
-                    } else if err {
-                        out.push_str(&format!("    if (!{code}.ok) ostrin_release((void*){code}.error);\n"));
+                    let ok = release_payload(&format!("({code}).value"), &args[0], records);
+                    let err = release_payload(&format!("({code}).error"), &args[1], records);
+                    if ok.is_some() || err.is_some() {
+                        out.push_str(&format!(
+                            "    if (({code}).ok) {{ {}; }} else {{ {}; }}\n",
+                            ok.unwrap_or_default(),
+                            err.unwrap_or_default()
+                        ));
                     }
                 }
                 _ => return Err(()),

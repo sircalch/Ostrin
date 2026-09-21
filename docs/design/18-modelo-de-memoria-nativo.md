@@ -3,8 +3,8 @@
 *Estado: runtime con registro de allocations, callbacks de destrucción tipados para records,
 colecciones y entornos de tareas, primitivas `clone`/`drop`, primer lowering conservador de
 ownership y ABI `retain`/`release`. Las familias `String`, `Result` con payload escalar y
-error `String`, `List<T>` escalar, `Option<List<T>>`/`Result<List<T>,E>`,
-`Option<Map<Int,String>>`/`Result<Set<Int>,String>`, los núcleos escalares de `Map<K,V>`/`Set<T>`,
+error `String`, `List<T>` escalar, wrappers `Option`/`Result` sobre listas, mapas, conjuntos y
+otros wrappers, `Option<Map<Int,String>>`/`Result<Set<Int>,String>`, los núcleos escalares de `Map<K,V>`/`Set<T>`,
 records concretos y `Option<T>` escalar/`Option<String>`/`Option<Record>`
 ya consumen ownership desde la IR y terminan sin allocations vivas en las pruebas nativas.
 Los `Phi` simples transfieren la referencia entrante sin retenerla de nuevo,
@@ -63,9 +63,10 @@ destrucción de sus contenedores. Los records concretos pueden anidarse y vivir 
 `Option` con el mismo contrato.
 `Result<Int,String>` y `Result<Float,String>` también retienen/liberan
 condicionalmente el campo activo y cubren los consumidores básicos de `String.to_int()` y
-`to_float()`, además de `try` y `try catch` inline, desde la IR. Otros payloads gestionados,
-patrones anidados y agregados complejos todavía no insertan RC por cada copia, retorno, phi o
-salida de ámbito.
+`to_float()`, además de `try` y `try catch` inline, desde la IR. Los wrappers anidados cubren
+constructores y `match` con retain/release recursivo; `unwrap` anidado, patrones más profundos,
+escapes complejos y handlers locales/closures no inline todavía no insertan RC completo por
+cada copia, retorno, phi o salida de ámbito.
 
 - Todo valor por referencia lleva un contador. `retain`/`release` los inserta el compilador **sobre el IR** (no sobre el texto C), en copias de variable, paso a funciones, campos y salida de ámbito.
 - **Análisis de último uso / movimiento** en el IR: si el compilador prueba que un valor no se vuelve a usar, transfiere la propiedad sin tocar el contador (así se recupera el coste cero en el caso común, sin sintaxis nueva).
@@ -90,7 +91,7 @@ El RC sobre el generador actual (texto C con expresiones‑sentencia) exigiría 
    (`--ownership-ir`) que marca transferencias lineales conocidas y el runtime ofrece el ABI;
    el backend C ya consume esa IR transformada para `String`, el núcleo escalar de `List<T>`,
    las operaciones escalares de `Map`/`Set`, records concretos y `Option` escalar/`Option<String>`/
-   `Option<Record>`, `Option/List`, `Result/List`, `Option/Map` y `Result/Set`, así como `Result` escalar con error `String`, `try`, `try catch` inline,
+   `Option<Record>`, `Option/List`, `Result/List`, `Option/Map`, `Result/Set` y wrappers anidados con `match`, así como `Result` escalar con error `String`, `try`, `try catch` inline,
    `map`/`map_err`/`then`, `Option.map`/`then` con lambdas inline y handlers globales de
    `try catch`; aún falta extenderla a otros payloads gestionados, handlers locales/closures
    no inline, patrones anidados, scopes, escapes complejos y payloads todavía no cubiertos por

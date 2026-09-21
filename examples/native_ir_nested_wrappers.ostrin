@@ -1,0 +1,43 @@
+fn some_nested() -> Option<Option<String>> {
+    Some(Some("ne" + "sted"))
+}
+
+fn none_inner() -> Option<Option<String>> {
+    Some(None)
+}
+
+fn result_nested() -> Result<Option<String>, String> {
+    Ok(Some("o" + "k"))
+}
+
+fn result_nested_err() -> Result<Option<String>, String> {
+    Err("nested " + "error")
+}
+
+fn main() -> Void {
+    match some_nested() {
+        Some(inner) => match inner {
+            Some(text) => print(text),
+            None => print("inner none")
+        },
+        None => print("outer none")
+    }
+    match none_inner() {
+        Some(inner) => match inner {
+            Some(text) => print(text),
+            None => print("inner none")
+        },
+        None => print("outer none")
+    }
+    match result_nested() {
+        Ok(inner) => match inner {
+            Some(text) => print(text),
+            None => print("result none")
+        },
+        Err(error) => print(error)
+    }
+    match result_nested_err() {
+        Ok(inner) => print(inner.is_some()),
+        Err(error) => print(error)
+    }
+}

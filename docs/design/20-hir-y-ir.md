@@ -5,8 +5,8 @@
 para funciones escalares con ramas, recursión, bucles, `phi` y aritmética comprobada de
 enteros de ancho fijo desde esa IR. Las familias gestionadas `String`, el núcleo de `List<T>`
 con elementos escalares, las operaciones escalares de `Map<K,V>`/`Set<T>`, records concretos
-y `Option`/`Result` con payload escalar, `String`, `Record` o una colección escalar
-(`List`/`Map`/`Set`) también atraviesan ya el emisor IR,
+y `Option`/`Result` con payload escalar, `String`, `Record`, una colección escalar
+(`List`/`Map`/`Set`) u otro wrapper `Option`/`Result` también atraviesan ya el emisor IR,
 incluidos sus marcadores de ownership, transferencia de `Phi` simples y patrones simples
 `Some`/`None`; el backend mantiene
 HIR/AST como fallback verificado para otros payloads gestionados, patrones anidados,
@@ -21,7 +21,7 @@ iteradores, agregados complejos y escapes mientras la migración crece.*
 | `TypedProgram.literal_kinds` | `typeck` | Tipo elegido para cada literal numérico |
 | `NativeTypeReport` | `codegen` | Detecta divergencias checker↔backend (0 hoy, en ~1 350 expresiones) |
 | `IrProgram` / `IrFunction` / `IrBlock` | `ir.rs` | Primera CFG con temporales explícitos, terminadores y verificador de destinos |
-| Emisor IR | `ir_c.rs` | Genera C desde SSA/CFG para funciones escalares, `String`, records concretos, `Option<Record>`, `List<T>` escalar, operaciones hash escalares de `Map`/`Set`, wrappers de una capa sobre `List`/`Map`/`Set`, `Option<T>` escalar/`String` con `Some`/`None`, ramas, bucles, `phi` y enteros de ancho fijo comprobados; emite ownership para las familias migradas y deja fallback seguro para lo demás |
+| Emisor IR | `ir_c.rs` | Genera C desde SSA/CFG para funciones escalares, `String`, records concretos, `Option<Record>`, `List<T>` escalar, operaciones hash escalares de `Map`/`Set`, wrappers sobre `List`/`Map`/`Set` y wrappers `Option`/`Result` anidados con `match`, `Option<T>` escalar/`String` con `Some`/`None`, ramas, bucles, `phi` y enteros de ancho fijo comprobados; emite ownership para las familias migradas y deja fallback seguro para lo demás |
 | Intérprete como oráculo | `interpreter` | Semántica de referencia; pruebas diferenciales automáticas |
 
 Por tanto el backend **ya no infiere solo**: la reinferencia que queda (`bind_type`, `expected`, `settle_literal`) es respaldo verificado.
