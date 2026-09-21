@@ -5403,3 +5403,16 @@ en el punto correcto.
 de `List<String>`. Sus 5 funciones se generan desde IR, coinciden con el intérprete y el
 binario nativo termina con `live_allocations=0`. Mapas/sets anidados y wrappers compuestos
 recursivos siguen fuera de este bloque hasta fijar su contrato de ownership específico.
+
+## 211. Mapas y conjuntos dentro de wrappers nativos — 2026-09-21
+
+La misma capa de ownership ya cubre `Option<Map<Int,String>>` y `Result<Set<Int>,String>`.
+El emisor IR reconoce sus mangles (`Option_Map_Int_String` y `Result_Set_Int_String`),
+conserva el puntero del contenedor activo en `Some`/`Ok`/`Err` y delega la destrucción de
+entradas y valores a los callbacks de `Map`/`Set`. El patrón `match` y las consultas
+`count` se mantienen en IR sin degradar a HIR.
+
+`examples/native_ir_compound_collections.ostrin` genera sus 5 funciones desde IR, coincide
+con el intérprete y termina con `live_allocations=0` (7 allocations totales en el escenario
+de prueba). Quedan para otro bloque los wrappers anidados entre sí y los handlers locales o
+closures no inline.

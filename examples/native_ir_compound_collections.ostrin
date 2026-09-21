@@ -1,0 +1,34 @@
+fn some_map() -> Option<Map<Int, String>> {
+    Some([1: "one", 2: "two"])
+}
+
+fn none_map() -> Option<Map<Int, String>> {
+    None
+}
+
+fn ok_set() -> Result<Set<Int>, String> {
+    Ok({1, 2, 3})
+}
+
+fn err_set() -> Result<Set<Int>, String> {
+    Err("bad set")
+}
+
+fn main() -> Void {
+    match some_map() {
+        Some(values) => print(values.count()),
+        None => print("none")
+    }
+    match none_map() {
+        Some(values) => print(values.count()),
+        None => print("none")
+    }
+    match ok_set() {
+        Ok(values) => print(values.count()),
+        Err(error) => print(error)
+    }
+    match err_set() {
+        Ok(values) => print(values.count()),
+        Err(error) => print(error)
+    }
+}

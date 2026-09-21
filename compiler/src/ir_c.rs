@@ -89,17 +89,21 @@ fn set_supported(element: &Ty) -> bool {
 fn option_supported(element: &Ty, records: &RecordFields) -> bool {
     matches!(element, Ty::Int | Ty::Float | Ty::Float32 | Ty::Sized(_) | Ty::Bool | Ty::String)
         || matches!(element, Ty::List(inner) if list_supported(inner, records))
+        || matches!(element, Ty::Map(key, value) if map_supported(key, value))
+        || matches!(element, Ty::Set(inner) if set_supported(inner))
         || matches!(element, Ty::Named(name) if records.contains_key(name))
 }
 
 fn option_managed_payload(element: &Ty, records: &RecordFields) -> bool {
-    matches!(element, Ty::String | Ty::List(_))
+    matches!(element, Ty::String | Ty::List(_) | Ty::Map(_, _) | Ty::Set(_))
         || matches!(element, Ty::Named(name) if records.contains_key(name))
 }
 
 fn result_payload_supported(ty: &Ty, records: &RecordFields) -> bool {
     (scalar(ty) && *ty != Ty::Void)
         || matches!(ty, Ty::List(inner) if list_supported(inner, records))
+        || matches!(ty, Ty::Map(key, value) if map_supported(key, value))
+        || matches!(ty, Ty::Set(inner) if set_supported(inner))
         || matches!(ty, Ty::Named(name) if records.contains_key(name))
 }
 
@@ -108,7 +112,7 @@ fn result_supported(ok: &Ty, err: &Ty, records: &RecordFields) -> bool {
 }
 
 fn result_managed_payload(ty: &Ty, records: &RecordFields) -> bool {
-    matches!(ty, Ty::String | Ty::List(_))
+    matches!(ty, Ty::String | Ty::List(_) | Ty::Map(_, _) | Ty::Set(_))
         || matches!(ty, Ty::Named(name) if records.contains_key(name))
 }
 
@@ -133,6 +137,12 @@ fn mangle_option_payload(ty: &Ty, records: &RecordFields) -> String {
         Ty::Named(name) if records.contains_key(name) => name.clone(),
         Ty::List(element) if list_supported(element, records) => {
             format!("List_{}", mangle_option_payload(element, records))
+        }
+        Ty::Map(key, value) if map_supported(key, value) => {
+            format!("Map_{}_{}", mangle_scalar(key), mangle_scalar(value))
+        }
+        Ty::Set(element) if set_supported(element) => {
+            format!("Set_{}", mangle_scalar(element))
         }
         _ => mangle_scalar(ty),
     }

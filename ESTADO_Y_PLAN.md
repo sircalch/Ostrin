@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-21 · rama `main` · 6 pruebas diferenciales, 173 de integración y 2 unitarias en verde.*
+*Corte: 2026-09-21 · rama `main` · 6 pruebas diferenciales, 174 de integración y 2 unitarias en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
 Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–190); para el diseño
@@ -30,7 +30,7 @@ Implementación: compilador + intérprete + herramientas de editor, todo en Rust
 | Léxico / parser | `lexer/`, `parser/mod.rs` | Tokens, AST con rangos de origen |
 | Módulos y paquetes | `modules.rs`, `package.rs`, `ostrin.toml` | Imports, `--project`, dependencias locales y lockfile portable |
 | Verificador de tipos | `typeck/mod.rs` (~3 500 l.) | Tipos, dimensiones, traits, exhaustividad, genéricos |
-| HIR/IR | `hir.rs`, `hir_c.rs`, `ir.rs`, `ir_c.rs` | HIR verificado, CFG con temporales explícitos y emisor C para escalares, `String`, `Result<Int, String>`/`Result<Float, String>` con `try`, `try catch` inline y handlers globales, `Option/List` y `Result<List, E>` con payload gestionado, records concretos, `Option<Record>`, listas escalares, mapas/conjuntos escalares, enteros de ancho fijo y control de flujo, con fallback HIR/AST acotado |
+| HIR/IR | `hir.rs`, `hir_c.rs`, `ir.rs`, `ir_c.rs` | HIR verificado, CFG con temporales explícitos y emisor C para escalares, `String`, `Result<Int, String>`/`Result<Float, String>` con `try`, `try catch` inline y handlers globales, wrappers `Option`/`Result` sobre `List`, `Map` y `Set` con payload gestionado, records concretos, `Option<Record>`, listas escalares, mapas/conjuntos escalares, enteros de ancho fijo y control de flujo, con fallback HIR/AST acotado |
 | Intérprete | `interpreter/mod.rs` | Ejecución tree‑walking y scheduler cooperativo; referencia semántica |
 | Servidor de lenguaje | `lsp.rs`, `symbols.rs`, `protocol.rs` | LSP sobre stdio |
 | Adaptador de depuración | `dap.rs` + hooks del intérprete | DAP sobre stdio |
@@ -132,8 +132,9 @@ el `Result` de retorno y termina la función; la de éxito extrae el payload. El
 conserva en el path del binding y el ownership libera condicionalmente el payload activo.
 `try catch` con lambda inline o handler global ya expande la rama de error y retorna un `Err`
 del tipo envolvente. `Option<List<T>>` y `Result<List<T>, E>` ya cruzan la IR cuando la lista
-usa elementos escalares o records, con ownership condicional del payload; wrappers anidados,
-mapas y sets dentro de estos contenedores siguen en HIR/AST.
+usa elementos escalares o records, con ownership condicional del payload. También cruzan la IR
+`Option<Map<Int,String>>` y `Result<Set<Int>,String>`; wrappers anidados entre sí siguen en
+HIR/AST.
 
 El runtime C generado centraliza las reservas en `ostrin_alloc`/`ostrin_calloc`/
 `ostrin_realloc`, registra cada bloque y lo libera mediante `atexit` al terminar el
