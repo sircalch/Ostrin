@@ -73,6 +73,9 @@
   empty lists), borrowed parameters, calls, indexing, `length`/`count`, `push` and
   `remove_at` now use the generated native list helpers. `native_ir_lists.ostrin` covers both
   `List<Int>` and managed `List<String>` values and finishes with zero live allocations.
+- Migrated `String.split()` and `String.lines()` into the IR C emitter. The temporary arrays and
+  freshly allocated pieces are released after the native `List<String>` copies them, and the
+  differential string-method regression now requires zero live allocations under `--leak-check`.
 - Extended the IR C emitter to scalar-key/value `Map<K,V>` and `Set<T>` cores: literals,
   empty collections, borrowed parameters, `set`/`add`/`remove`, membership/count queries,
   and `keys`/`values` now use the generated native hash helpers. `native_ir_maps_sets.ostrin`

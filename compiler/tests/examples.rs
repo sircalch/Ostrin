@@ -1911,7 +1911,7 @@ fn rem_operator_reports_zero_divisor_and_type_errors() {
 fn native_ir_string_methods_cross_block_ownership_and_short_circuit() {
     // (file, expected stdout, minimum IR-generated functions)
     for (file, expected, minimum_ir) in [
-        ("native_ir_string_methods.ostrin", "OSTRIN!\nmixed\na+b+c\n0\n30\n5\ntrue\n", 3usize),
+        ("native_ir_string_methods.ostrin", "OSTRIN!\nmixed\na+b+c\n0\n30\n5\ntrue\n4\n2\n", 3usize),
         ("native_ir_cross_block_ownership.ostrin", "item-x\nitem-x!\n9\n2\n4\n24\n", 7usize),
         ("short_circuit.ostrin", "false\ntrue\ntrue\nfalse\n", 3usize),
         ("native_ir_param_ownership.ostrin", "abcd\nabcd\n", 3usize),

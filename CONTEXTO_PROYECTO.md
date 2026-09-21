@@ -5280,3 +5280,24 @@ records/enums, tests, concurrencia) y Ctrl+Enter. `pages.yml` construye el WASM 
 Verificado en el navegador integrado: los 5 ejemplos, un error de tipo (E1041), un error de
 ejecución (división por cero) y el formateador; `--fmt` reescribe el editor. Navegación actualizada
 en todas las páginas y textos de ecosistema/roadmap corregidos (el playground ya no es «futuro»).
+
+## 204. `String.split/lines` desde la IR y transferencia de ownership — 2026-09-21
+
+Se cerró otro tramo de la migración del backend nativo: `String.split()` y `String.lines()` ya
+se emiten desde `ir_c.rs` cuando producen `List<String>`, en lugar de forzar el fallback HIR/AST.
+El emisor llama al runtime C, copia los fragmentos al `List_String` gestionado y después libera
+tanto cada string temporal como el array auxiliar. La misma corrección se aplicó al camino AST,
+que tenía el mismo patrón de retención sin liberar el buffer de entrada.
+
+`ownership.rs` reconoce ambos métodos como consumidores que toman prestado el receptor, por lo
+que el último uso de la cadena se libera después de la llamada. `examples/native_ir_string_methods.ostrin`
+ahora compara también los tamaños de `"a,b,,c".split(",")` y de una cadena con saltos CRLF.
+
+Verificación: la prueba diferencial `native_ir_string_methods_cross_block_ownership_and_short_circuit`
+pasó junto con la ejecución nativa bajo `--leak-check`; el informe publica `ir-generated: 3` y el
+binario termina con `live_allocations=0`. La suite de referencia queda en **6 diferenciales, 170
+de integración y 2 unitarias**.
+
+La siguiente frontera de esta familia sigue siendo llevar `String.to_int()`/`to_float()` y los
+consumidores de `Result` a la IR, además de ampliar el generador diferencial con records,
+`Option` y closures.

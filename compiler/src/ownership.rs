@@ -441,6 +441,8 @@ fn safe_release_site(instruction: &IrInstr) -> bool {
                 | "starts_with"
                 | "ends_with"
                 | "replace"
+                | "split"
+                | "lines"
                 | "contains_key"
                 | "get"
                 | "is_some"

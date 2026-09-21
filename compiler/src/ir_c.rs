@@ -3,8 +3,9 @@
 //! The emitter consumes the explicit CFG rather than walking HIR a second time.
 //! SSA values become named C temporaries, branches become labels/gotos, and
 //! phi nodes select the incoming value using the predecessor edge. The first
-//! managed families supported here are `String`, scalar-element `List<T>`, and
-//! the scalar-key/value core of `Map<K,V>`/`Set<T>`; their ownership markers
+//! managed families supported here are `String`, scalar-element `List<T>`
+//! (including the `List<String>` values produced by `String.split()`/`lines()`),
+//! and the scalar-key/value core of `Map<K,V>`/`Set<T>`; their ownership markers
 //! and native helpers are emitted directly into C while option-returning
 //! lookups and larger aggregates retain the verified HIR/AST fallback.
 
@@ -578,6 +579,12 @@ fn emit_instruction(
                         ("starts_with", [pattern], Ty::Bool) => format!("ostrin_s_starts_with({receiver}, {pattern})"),
                         ("ends_with", [pattern], Ty::Bool) => format!("ostrin_s_ends_with({receiver}, {pattern})"),
                         ("replace", [from, to], Ty::String) => format!("ostrin_s_replace({receiver}, {from}, {to})"),
+                        ("split", [separator], Ty::List(element)) if **element == Ty::String => format!(
+                            "({{ int64_t __ostrin_split_count; const char** __ostrin_split_items = ostrin_s_split({receiver}, {separator}, &__ostrin_split_count); List_String* __ostrin_split_result = List_String_new_from_array(__ostrin_split_items, __ostrin_split_count); for (int64_t __ostrin_split_i = 0; __ostrin_split_i < __ostrin_split_count; __ostrin_split_i++) ostrin_release((void*)__ostrin_split_items[__ostrin_split_i]); ostrin_free((void*)__ostrin_split_items); __ostrin_split_result; }})"
+                        ),
+                        ("lines", [], Ty::List(element)) if **element == Ty::String => format!(
+                            "({{ int64_t __ostrin_lines_count; const char** __ostrin_lines_items = ostrin_s_lines({receiver}, &__ostrin_lines_count); List_String* __ostrin_lines_result = List_String_new_from_array(__ostrin_lines_items, __ostrin_lines_count); for (int64_t __ostrin_lines_i = 0; __ostrin_lines_i < __ostrin_lines_count; __ostrin_lines_i++) ostrin_release((void*)__ostrin_lines_items[__ostrin_lines_i]); ostrin_free((void*)__ostrin_lines_items); __ostrin_lines_result; }})"
+                        ),
                         _ => return Err(()),
                     }
                 }

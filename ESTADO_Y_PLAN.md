@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-20 · rama `main` · 6 pruebas diferenciales y 157 de integración en verde.*
+*Corte: 2026-09-21 · rama `main` · 6 pruebas diferenciales, 170 de integración y 2 unitarias en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
 Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–190); para el diseño
@@ -184,9 +184,9 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Cierres en nativo | Captura **por valor** (una variable `mut` cambiada después no se ve dentro); lambda sin contexto de tipos exige anotación |
 | Chequeo «movido tras enviar» (E1101) | Integrado por defecto en `--check`, `--run`, `--emit-c` y `--compile`; `--ownership-check` conserva el informe explícito |
 | Paralelismo nativo (`--native-threads`, canales bloqueantes, `select`) | Hilos del SO, mutexes/condiciones, canales bloqueantes y `select(List<Channel<T>>)` implementados de forma opt-in; `select` conserva prioridad determinista y cede el hilo nativo entre intentos; `Task.cancel()` cancela pendientes, propaga a grupos activos de `spawn_scope` o solicita cancelación a tareas `Running`, observada en checkpoints seguros; `receive()` vuelve periódicamente al runtime sin conservar el mutex durante el checkpoint |
-| Memoria en nativo | Registro, destructores tipados para records/colecciones y entornos de tareas, `clone`/`drop`, cleanup automático de locales directos, bloques anidados, ramas, loops y cancelación de tareas en AST/HIR, y `--leak-check`; `String`, records concretos, `Option<Record>`, listas escalares, mapas/conjuntos escalares y `Option<String>` ya consumen ownership desde IR, pero ARC completa de agregados sigue pendiente |
-| IR de bloques | HIR→CFG disponible con `--ir`; el emisor C cubre ramas, bucles escalares con `phi`, `String`, records concretos con campos anidados, `Option<Record>`, listas escalares, operaciones hash escalares y `Option` escalar/String con patrones `Some/None`; `for`/iteradores, patrones anidados y colecciones complejas aún no reemplazan el backend C completo |
-| Ownership/último uso | `--ownership-report`, `--ownership-check` y `--ownership-ir`; la IR ya inserta y consume retain/release lineal para `String`, records concretos, `Option<Record>`, listas escalares, mapas/conjuntos escalares y `Option<String>`, con transferencia en `Phi` simples y liberación de `Phi` de bucle en backedges probados; `Option` escalar es por valor, mientras llamadas transferentes no lineales, agregados complejos, scopes y escapes siguen conservadores |
+| Memoria en nativo | Registro, destructores tipados para records/colecciones y entornos de tareas, `clone`/`drop`, cleanup automático de locales directos, bloques anidados, ramas, loops y cancelación de tareas en AST/HIR, y `--leak-check`; `String`, `String.split/lines`, records concretos, `Option<Record>`, listas escalares/String, mapas/conjuntos escalares y `Option<String>` ya consumen ownership desde IR, pero ARC completa de agregados sigue pendiente |
+| IR de bloques | HIR→CFG disponible con `--ir`; el emisor C cubre ramas, bucles escalares con `phi`, `String` (incluidos `split/lines`), records concretos con campos anidados, `Option<Record>`, listas escalares/String, operaciones hash escalares y `Option` escalar/String con patrones `Some/None`; `for`/iteradores, patrones anidados y colecciones complejas aún no reemplazan el backend C completo |
+| Ownership/último uso | `--ownership-report`, `--ownership-check` y `--ownership-ir`; la IR ya inserta y consume retain/release lineal para `String`, records concretos, `Option<Record>`, listas escalares/String, mapas/conjuntos escalares y `Option<String>`, con transferencia en `Phi` simples y liberación de `Phi` de bucle en backedges probados; los buffers temporales de `split/lines` transfieren y liberan sus strings; `Option` escalar es por valor, mientras llamadas transferentes no lineales, agregados complejos, scopes y escapes siguen conservadores |
 | Biblioteca estándar | Mínima: `args`, entorno/rutas, `format`, E/S y `hash` estructural para escalares, colecciones y tipos con `derive(Hash)`; faltan fechas, JSON y red |
 | Mensajes de error de E/S | `strerror` ≠ texto de Rust (difieren entre backends) |
 | `Result<Void,E>` | Campo de valor de relleno (`char`) en C |
@@ -195,7 +195,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Rendimiento del intérprete | Tree‑walking simple; sin optimizaciones |
 | `newlines.ostrin`, `advanced.ostrin` | Son muestras de sintaxis, no programas ejecutables |
 | CI | Linux, macOS y Windows; incluye las pruebas diferenciales intérprete↔nativo; el backend nativo enlaza `libm` explícitamente en Unix para paquetes con `sqrt`/`round` |
-| Distribución | Workflow WASI reproducible para `ostrinc.wasm`, `hello.wasm` y `pkg_project.wasm`, con toolchain fijado y SHA-256; el runtime C cooperativo generado evita pthreads cuando no se pide `--native-threads`; binarios nativos publicados e instalador siguen pendientes |
+| Distribución | Workflow WASI reproducible para `ostrinc.wasm`, `hello.wasm` y `pkg_project.wasm`, con toolchain fijado y SHA-256; playground de navegador sobre el compilador WASM; el runtime C cooperativo generado evita pthreads cuando no se pide `--native-threads`; binarios nativos publicados e instalador siguen pendientes |
 
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
 convendría dividirlos; el backend nativo no comparte el sistema de tipos del checker
@@ -250,8 +250,8 @@ El compilador, un programa Ostrin independiente y un proyecto con dependencia `p
 construyen como `wasm32-wasip1` mediante el workflow WASI, con toolchain fijado, ejecución bajo
 Node WASI y checksums reproducibles. El backend de programas conserva C como representación
 intermedia y su runtime cooperativo separa los headers y primitivas de `--native-threads`. El
-siguiente paso es ampliar la matriz de programas (I/O), antes de un playground de navegador o
-de LLVM IR.
+playground de navegador ya ejecuta el compilador WASM; el siguiente paso es ampliar la matriz de
+programas (I/O) y aislar contratos WASI explícitos antes de LLVM IR.
 
 ### F. Calidad y confianza
 Fuzzing del parser, pruebas diferenciales automáticas intérprete↔nativo sobre programas
@@ -285,7 +285,7 @@ Decisiones que necesito de ti para afinar el plan:
 
 ```powershell
 cd compiler
-    cargo test                                   # 6 diferenciales + 157 de integración
+    cargo test                                   # 6 diferenciales + 170 de integración + 2 unitarias
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```

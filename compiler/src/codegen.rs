@@ -5086,18 +5086,22 @@ impl<'a> Codegen<'a> {
             "split" if strings(1) => {
                 let count = self.next_temp();
                 let items = self.next_temp();
+                let index = self.next_temp();
+                let result = self.next_temp();
                 let ty = CType::List(Box::new(CType::Str));
                 self.register_list_types(&ty);
                 let list_c = list_struct_name(&CType::Str);
-                Ok((format!("({{ int64_t {count}; const char** {items} = ostrin_s_split({s}, {}, &{count}); {list_c}_new_from_array({items}, {count}); }})", codes[0]), ty))
+                Ok((format!("({{ int64_t {count}; const char** {items} = ostrin_s_split({s}, {}, &{count}); {list_c}* {result} = {list_c}_new_from_array({items}, {count}); for (int64_t {index} = 0; {index} < {count}; {index}++) ostrin_release((void*){items}[{index}]); ostrin_free((void*){items}); {result}; }})", codes[0]), ty))
             }
             "lines" if strings(0) => {
                 let count = self.next_temp();
                 let items = self.next_temp();
+                let index = self.next_temp();
+                let result = self.next_temp();
                 let ty = CType::List(Box::new(CType::Str));
                 self.register_list_types(&ty);
                 let list_c = list_struct_name(&CType::Str);
-                Ok((format!("({{ int64_t {count}; const char** {items} = ostrin_s_lines({s}, &{count}); {list_c}_new_from_array({items}, {count}); }})"), ty))
+                Ok((format!("({{ int64_t {count}; const char** {items} = ostrin_s_lines({s}, &{count}); {list_c}* {result} = {list_c}_new_from_array({items}, {count}); for (int64_t {index} = 0; {index} < {count}; {index}++) ostrin_release((void*){items}[{index}]); ostrin_free((void*){items}); {result}; }})"), ty))
             }
             "to_int" if strings(0) => Ok(self.gen_builtin("parse_int", &[s.to_string()], &[CType::Str], false)?.expect("parse_int is a builtin")),
             "to_float" if strings(0) => {

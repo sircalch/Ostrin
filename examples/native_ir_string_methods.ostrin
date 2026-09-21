@@ -21,4 +21,6 @@ fn main() -> Void {
     print(describe("xab"))
     print(describe("hello"))
     print("file.ostrin".ends_with(".ostrin"))
+    print("a,b,,c".split(",").length())
+    print("l1\nl2\r\n".lines().length())
 }
