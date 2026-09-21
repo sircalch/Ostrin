@@ -5076,3 +5076,19 @@ transferencia en `remove_at`) se aplica sin cambios. Maps y sets siguen limitado
 `live_allocations=0`. Suite: **6 diferenciales y 158 de integración**.
 
 Siguiente frontera: `Option<List>`/listas anidadas, patrones anidados y bucles `for` sobre listas.
+
+## 192. `for` sobre listas como bucle SSA en la IR — 2026-09-20
+
+`lower_for` reconoce iteradores `List<T>` y genera un bucle con `Phi` de índice, `length`,
+`Index` y `+ 1`, en lugar del iterador opaco que el emisor C no sabía traducir. Los bucles
+con `break`/`continue` conservan la forma anterior (siguen en el fallback) porque sus
+aristas no aportan entradas de `Phi` correctas.
+
+Además, `while` y `for` solo crean `Phi` de bucle para variables realmente asignadas en el
+cuerpo (`assigned_in`). Antes, cada variable visible —incluida la lista iterada— recibía un
+`Phi` cuyo `retain` de cabecera no se liberaba en la salida, filtrando una referencia por
+bucle. `examples/native_ir_for_lists.ostrin` (suma de `List<Int>` y concatenación de
+`List<String>`) termina con `live_allocations=0`. El test de colecciones HIR cuenta ahora
+funciones HIR o IR porque su función pasó a la IR. Suite: **6 diferenciales y 159 de integración**.
+
+Siguiente: `break`/`continue` con `Phi` correcto, `for` sobre rangos y `Option<List>`.

@@ -470,7 +470,11 @@ impl Builder {
 
         self.current = condition_block;
         let mut loop_phis = Vec::new();
+        let body_text = format!("{body:?}");
         for (name, initial) in &visible_before {
+            if !assigned_in(&body_text, name) {
+                continue;
+            }
             let ty = self.known_value_type(*initial).unwrap_or(Ty::Unknown);
             let destination = self.fresh();
             self.emit(IrInstr::Phi {
@@ -510,7 +514,119 @@ impl Builder {
         }
     }
 
+    /// `for x in list` as an index-driven SSA loop (same phi scheme as `while`).
+    /// Bodies with `break`/`continue` keep the opaque iterator form.
+    fn lower_for_list(&mut self, var: &str, iter: &HirExpr, element: &Ty, body: &HirBlock) {
+        let source = self.lower_expr(iter);
+        let length = self.fresh();
+        self.emit(IrInstr::MethodCall {
+            dst: Some(length),
+            method: "length".to_string(),
+            receiver: source,
+            args: Vec::new(),
+            ty: Ty::Int,
+        });
+        let zero = self.const_value("0", Ty::Int);
+        let preheader = self.current;
+        let visible_before = self.snapshot_visible();
+        let condition_block = self.new_block();
+        let body_block = self.new_block();
+        let after_block = self.new_block();
+        self.terminate(IrTerminator::Goto(condition_block));
+
+        self.current = condition_block;
+        let index = self.fresh();
+        self.emit(IrInstr::Phi {
+            dst: index,
+            incoming: vec![(preheader, zero), (body_block, zero)],
+            ty: Ty::Int,
+        });
+        let mut loop_phis = Vec::new();
+        let body_text = format!("{body:?}");
+        for (name, initial) in &visible_before {
+            if !assigned_in(&body_text, name) {
+                continue;
+            }
+            let ty = self.known_value_type(*initial).unwrap_or(Ty::Unknown);
+            let destination = self.fresh();
+            self.emit(IrInstr::Phi {
+                dst: destination,
+                incoming: vec![(preheader, *initial), (body_block, *initial)],
+                ty,
+            });
+            self.bind(name, destination);
+            loop_phis.push((name.clone(), destination, *initial));
+        }
+        let has_next = self.fresh();
+        self.emit(IrInstr::Binary {
+            dst: has_next,
+            op: BinOp::Lt,
+            left: index,
+            right: length,
+            ty: Ty::Bool,
+        });
+        self.terminate(IrTerminator::Branch {
+            condition: has_next,
+            then_block: body_block,
+            else_block: after_block,
+        });
+
+        self.current = body_block;
+        self.locals.push(HashMap::new());
+        let item = self.fresh();
+        self.emit(IrInstr::Index {
+            dst: item,
+            object: source,
+            index,
+            ty: element.clone(),
+        });
+        self.locals
+            .last_mut()
+            .expect("loop scope")
+            .insert(var.to_string(), item);
+        let _ = self.lower_block_contents(body);
+        self.locals.pop();
+        let body_open = !self.terminated();
+        let backedge_block = self.current;
+        let body_values = self.snapshot_visible();
+        let one = self.const_value("1", Ty::Int);
+        let next_index = self.fresh();
+        if body_open {
+            self.emit(IrInstr::Binary {
+                dst: next_index,
+                op: BinOp::Add,
+                left: index,
+                right: one,
+                ty: Ty::Int,
+            });
+            self.terminate(IrTerminator::Goto(condition_block));
+        }
+        self.current = after_block;
+        let mut index_incoming = vec![(preheader, zero)];
+        if body_open {
+            index_incoming.push((backedge_block, next_index));
+        }
+        self.patch_phi(index, index_incoming);
+        for (name, destination, initial) in loop_phis {
+            let mut incoming = vec![(preheader, initial)];
+            if body_open {
+                let value = body_values.get(&name).copied().unwrap_or(initial);
+                incoming.push((backedge_block, value));
+            }
+            self.patch_phi(destination, incoming);
+            self.bind(&name, destination);
+        }
+    }
+
     fn lower_for(&mut self, var: &str, iter: &HirExpr, body: &HirBlock) {
+        if let Ty::List(element) = &iter.ty {
+            let text = format!("{body:?}");
+            if !text.contains("Break") && !text.contains("Continue") {
+                let element = (**element).clone();
+                self.lower_for_list(var, iter, &element, body);
+                return;
+            }
+        }
         let source = self.lower_expr(iter);
         let iterator = self.fresh();
         self.emit(IrInstr::IterInit {
@@ -1148,6 +1264,12 @@ fn defined_value_type(instruction: &IrInstr) -> Option<(ValueId, Ty)> {
         | IrInstr::Retain { .. }
         | IrInstr::Release { .. } => None,
     }
+}
+
+/// Conservative check (via the HIR debug form) that `name` is re-bound by an
+/// assignment somewhere in `text`; unassigned variables need no loop `Phi`.
+fn assigned_in(text: &str, name: &str) -> bool {
+    text.contains(&format!("Assign {{ name: {name:?}"))
 }
 
 pub fn lower(program: &HirProgram) -> IrProgram {

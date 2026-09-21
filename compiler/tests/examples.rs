@@ -1792,6 +1792,43 @@ fn native_ir_emitter_handles_record_lists() {
 }
 
 #[test]
+fn native_ir_emitter_handles_for_lists() {
+    let file = example_path("native_ir_for_lists.ostrin");
+    let expected = "6
+ab
+";
+    let interpreted = run(&["--run", &file]);
+    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    let ir_functions = stdout(&report)
+        .lines()
+        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .unwrap_or(0);
+    assert!(ir_functions >= 3, "for list example did not use the IR emitter: {}", stdout(&report));
+
+    let emitted = run(&["--emit-c", &file]);
+    assert!(emitted.status.success(), "for list IR emission failed: {}", stderr(&emitted));
+    let source = stdout(&emitted);
+    assert!(source.contains("List_Int_length"), "for list construction missing: {source}");
+    assert!(source.contains("List_String_get"), "for list removal missing: {source}");
+
+    let exe = temp_artifact("native_ir_for_lists.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+    let native = Command::new(&exe).output().expect("failed to run for list binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native run failed: {}", String::from_utf8_lossy(&native.stderr));
+    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "for list leaked: {}", String::from_utf8_lossy(&native.stderr));
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+}
+
+#[test]
 fn native_ir_emitter_handles_scalar_maps_and_sets() {
     let file = example_path("native_ir_maps_sets.ostrin");
     let expected = "3\ntrue\nfalse\n3\n3\n1\n3\n3\n2\ntrue\nfalse\n1\n2\n2\n";
@@ -2045,11 +2082,15 @@ fn native_hir_handles_collections_core() {
         return;
     }
     assert!(report.status.success(), "native type report failed: {}", stderr(&report));
-    let hir_functions = stdout(&report)
+    let generated: usize = stdout(&report)
         .lines()
-        .find_map(|line| line.strip_prefix("hir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
-        .unwrap_or(0);
-    assert!(hir_functions >= 1, "collections example did not use the HIR backend");
+        .filter_map(|line| {
+            line.strip_prefix("hir-generated: ")
+                .or_else(|| line.strip_prefix("ir-generated: "))
+                .and_then(|n| n.trim().parse::<usize>().ok())
+        })
+        .sum();
+    assert!(generated >= 1, "collections example did not use the HIR/IR backends");
 
     let exe = temp_artifact("native_hir_collections.exe");
     let compile = run(&["--compile", "--out", &exe, &file]);

@@ -1,0 +1,20 @@
+fn total(xs: List<Int>) -> Int {
+    mut s = 0
+    for x in xs {
+        s = s + x
+    }
+    s
+}
+
+fn words(xs: List<String>) -> String {
+    mut out = ""
+    for w in xs {
+        out = out + w
+    }
+    out
+}
+
+fn main() -> Void {
+    print(total([1, 2, 3]))
+    print(words(["a", "b"]))
+}
