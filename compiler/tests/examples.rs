@@ -1668,7 +1668,7 @@ fn native_ir_emitter_handles_strings_and_ownership_markers() {
     assert!(source.contains("ostrin_str_concat(__ir_v"), "string concatenation did not come from IR: {source}");
     assert!(source.contains("strcmp(__ir_v"), "string equality did not come from IR: {source}");
     assert!(source.contains("ostrin_release((void*)__ir_v"), "IR ownership release marker was not emitted: {source}");
-    assert!(source.contains("ostrin_retain((void*)__ir_v"), "IR ownership retain marker was not emitted: {source}");
+    assert!(!source.contains("ostrin_retain((void*)__ir_v"), "Phi ownership transfer should not retain the incoming branch value: {source}");
 
     let exe = temp_artifact("native_ir_strings.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
@@ -1681,6 +1681,40 @@ fn native_ir_emitter_handles_strings_and_ownership_markers() {
     assert!(native.status.success(), "native run failed: {}", String::from_utf8_lossy(&native.stderr));
     assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "string IR ownership leaked: {}", String::from_utf8_lossy(&native.stderr));
     assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+}
+
+#[test]
+fn native_ir_emitter_releases_managed_loop_phi_values() {
+    let file = example_path("native_ir_managed_loop.ostrin");
+    let expected = "startxxx\n";
+    let interpreted = run(&["--run", &file]);
+    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let ownership = run(&["--ownership-ir", &file]);
+    assert!(ownership.status.success(), "ownership lowering failed: {}", stderr(&ownership));
+    let ownership_source = stdout(&ownership);
+    assert!(ownership_source.contains("phi"), "managed loop did not lower through a Phi: {ownership_source}");
+    assert!(
+        ownership_source.lines().filter(|line| line.trim_start().starts_with("release %")).count() >= 2,
+        "loop-carried String was not released on its backedge: {ownership_source}"
+    );
+
+    let exe = temp_artifact("native_ir_managed_loop.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+    let native = Command::new(&exe).output().expect("failed to run managed loop binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native run failed: {}", String::from_utf8_lossy(&native.stderr));
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "managed loop Phi ownership leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
 }
 
 #[test]

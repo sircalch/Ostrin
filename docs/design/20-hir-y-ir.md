@@ -6,7 +6,8 @@ para funciones escalares con ramas, recursión, bucles, `phi` y aritmética comp
 enteros de ancho fijo desde esa IR. Las familias gestionadas `String`, el núcleo de `List<T>`
 con elementos escalares, las operaciones escalares de `Map<K,V>`/`Set<T>`, records concretos
 y `Option<T>` con payload escalar, `String` o `Record` también atraviesan ya el emisor IR,
-incluidos sus marcadores de ownership y patrones simples `Some`/`None`; el backend mantiene
+incluidos sus marcadores de ownership, transferencia de `Phi` simples y patrones simples
+`Some`/`None`; el backend mantiene
 HIR/AST como fallback verificado para otros payloads gestionados, patrones anidados,
 iteradores, agregados complejos y escapes mientras la migración crece.*
 
@@ -78,13 +79,15 @@ Sobre este IR se hacen los análisis que el texto C no permite:
    liberan el valor anterior y los retornos transfieren o retienen según su origen. `String` es
    la primera familia gestionada consumida por el emisor IR: concatena, imprime y compara desde
    temporales C, y prueba `retain/release` alrededor de aliases, `phi` y elementos de listas
-   con `--leak-check`. Las listas escalares y las operaciones hash escalares usan los helpers C
+   con `--leak-check`; los `Phi` simples transfieren la referencia entrante sin un `retain`
+   duplicado y los `Phi` de bucle liberan el valor corriente en backedges con último uso seguro.
+   Las listas escalares y las operaciones hash escalares usan los helpers C
    que retienen sus elementos; records construidos desde HIR o IR registran además destructores
    tipados y retienen sus campos. `Option` escalar se copia por valor y `Option<String>`/
    `Option<Record>` retienen/liberan condicionalmente su payload en constructores, lookups y
    binds simples; la IR aún deja
    barreras explícitas para otros `Option` gestionados, patrones anidados, llamadas que
-   transfieren ownership, loops, scopes anidados y escapes.
+   transfieren ownership, scopes anidados y escapes complejos.
 5. **Cierres y funciones como valores**; retirar la comprobación dinámica de E1101 cuando el
    backend consuma la IR transformada de forma completa.
 6. Optimizador y, después, otros backends (LLVM, WASM, GPU) que consumen el mismo IR.

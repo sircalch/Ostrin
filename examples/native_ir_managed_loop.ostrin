@@ -1,0 +1,13 @@
+fn loop_text(n: Int) -> String {
+    mut i = 0
+    mut value = "start"
+    while i < n {
+        value = value + "x"
+        i = i + 1
+    }
+    value
+}
+
+fn main() -> Void {
+    print(loop_text(3))
+}

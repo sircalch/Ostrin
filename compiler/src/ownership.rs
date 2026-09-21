@@ -1,9 +1,10 @@
 //! Conservative ownership facts over the explicit IR.
 //!
-//! This pass reports where retain/release insertion is safe to start. It does
-//! not mutate the program yet: a value used across blocks or through an opaque
-//! instruction must first go through the CFG/data-flow work that will make
-//! automatic release correct at joins and loops.
+//! This pass inserts only ownership operations whose transfer points are
+//! explicit in the IR. Straight-line last uses are handled locally; simple
+//! `Phi` joins additionally transfer an incoming owned value into the join,
+//! and loop-carried `Phi` values are released on a proven backedge after their
+//! final body use. More general CFG liveness remains deliberately unresolved.
 #![allow(dead_code)]
 
 use std::collections::{HashMap, HashSet};
@@ -73,10 +74,15 @@ pub fn analyze(program: &IrProgram) -> OwnershipReport {
     report
 }
 
-/// Adds only releases whose last use is provably in one straight-line block.
-/// The returned program is still an analysis artifact: the native backend does
-/// not consume it yet, so this pass cannot accidentally change executable
-/// behavior while the ownership contract is being completed.
+/// Adds ownership markers for proven straight-line uses and simple CFG joins.
+///
+/// A managed `Phi` can transfer ownership when every managed incoming value is
+/// used only by that `Phi` (apart from the no-op local stores produced while
+/// building the SSA graph). In that case the join must not retain the result
+/// or release the incoming value on the predecessor edge: the incoming owned
+/// reference becomes the `Phi` value. For a loop backedge, the current `Phi`
+/// value is released after its final safe use in the loop body; the exit edge
+/// can still return it to the caller.
 pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
     let mut lowered = program.clone();
     let mut summary = LoweringSummary { functions: lowered.functions.len(), ..LoweringSummary::default() };
@@ -169,12 +175,23 @@ pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
                     }
                 }
                 if let Some((value, _)) = alias_destination(instruction).filter(|(_, ty)| requires_management(ty)) {
+                    let transfers_phi = matches!(instruction, IrInstr::Phi { incoming, .. }
+                        if phi_transfers_ownership(function, block.id, index, incoming, &definitions, &uses, &opaque_values));
                     let transfers_return = matches!(instruction, IrInstr::Phi { .. }) && is_single_return_use(function, value, &uses);
-                    if !transfers_return {
+                    if !transfers_phi && !transfers_return {
                         retain_after.entry((block.id, index + 1)).or_default().push(value);
                     }
                     if let IrInstr::Phi { incoming, .. } = instruction {
-                        if !transfers_return {
+                        if transfers_phi {
+                            insert_loop_phi_release(
+                                function,
+                                block.id,
+                                index,
+                                value,
+                                &uses,
+                                &mut release_after,
+                            );
+                        } else if !transfers_return {
                             for (predecessor, incoming_value) in incoming {
                                 if definitions
                                     .get(incoming_value)
@@ -374,7 +391,8 @@ fn safe_release_site(instruction: &IrInstr) -> bool {
         | IrInstr::ChannelSend { .. }
         | IrInstr::Aggregate { .. }
         | IrInstr::Index { .. }
-        | IrInstr::Field { .. } => true,
+        | IrInstr::Field { .. }
+        | IrInstr::Binary { .. } => true,
         // Ordinary function parameters borrow reference-like values for the
         // duration of the call; the caller can therefore release its last
         // local ownership after any direct call. `Some` is included here as
@@ -407,6 +425,113 @@ fn safe_release_site(instruction: &IrInstr) -> bool {
         ),
         _ => false,
     }
+}
+
+fn phi_transfers_ownership(
+    function: &crate::ir::IrFunction,
+    phi_block: usize,
+    phi_instruction: usize,
+    incoming: &[(usize, ValueId)],
+    definitions: &HashMap<ValueId, (Ty, usize, usize)>,
+    uses: &HashMap<ValueId, Vec<UsePoint>>,
+    opaque_values: &HashSet<ValueId>,
+) -> bool {
+    if incoming.is_empty() {
+        return false;
+    }
+    incoming.iter().all(|(_, value)| {
+        let Some((ty, _, _)) = definitions.get(value) else { return false };
+        if !requires_management(ty) || opaque_values.contains(value) {
+            return false;
+        }
+        uses.get(value).is_some_and(|points| {
+            points.iter().all(|point| {
+                if point.block == phi_block && point.instruction == phi_instruction {
+                    return true;
+                }
+                let Some(instruction) = function.blocks[point.block].instructions.get(point.instruction) else {
+                    return false;
+                };
+                matches!(instruction, IrInstr::StoreLocal { value: stored, .. } if stored == value)
+            })
+        })
+    })
+}
+
+fn insert_loop_phi_release(
+    function: &crate::ir::IrFunction,
+    phi_block: usize,
+    phi_instruction: usize,
+    phi_value: ValueId,
+    uses: &HashMap<ValueId, Vec<UsePoint>>,
+    release_after: &mut HashMap<(usize, usize), Vec<ValueId>>,
+) {
+    let Some(points) = uses.get(&phi_value) else { return };
+    let mut predecessors = Vec::new();
+    if let IrInstr::Phi { incoming, .. } = &function.blocks[phi_block].instructions[phi_instruction] {
+        predecessors.extend(incoming.iter().map(|(predecessor, _)| *predecessor));
+    }
+    for predecessor in predecessors {
+        if predecessor == phi_block || !block_reaches(function, phi_block, predecessor) {
+            continue;
+        }
+        let predecessor_points: Vec<UsePoint> = points
+            .iter()
+            .copied()
+            .filter(|point| point.block == predecessor)
+            .collect();
+        if predecessor_points.is_empty()
+            || points.iter().any(|point| {
+                point.block != phi_block
+                    && point.block != predecessor
+                    && !is_return_use(function, phi_value, *point)
+            })
+        {
+            continue;
+        }
+        let Some(last) = predecessor_points.iter().max_by_key(|point| point.instruction).copied() else {
+            continue;
+        };
+        let Some(instruction) = function.blocks[predecessor].instructions.get(last.instruction) else {
+            continue;
+        };
+        if safe_release_site(instruction) {
+            release_after.entry((predecessor, last.instruction + 1)).or_default().push(phi_value);
+        }
+    }
+}
+
+fn is_return_use(function: &crate::ir::IrFunction, value: ValueId, point: UsePoint) -> bool {
+    point.instruction == function.blocks[point.block].instructions.len()
+        && matches!(
+            function.blocks[point.block].terminator,
+            Some(IrTerminator::Return(Some(returned)) | IrTerminator::RegionReturn(Some(returned))) if returned == value
+        )
+}
+
+fn block_reaches(function: &crate::ir::IrFunction, start: usize, target: usize) -> bool {
+    let mut pending = vec![start];
+    let mut seen = HashSet::new();
+    while let Some(block) = pending.pop() {
+        if !seen.insert(block) {
+            continue;
+        }
+        if block == target {
+            return true;
+        }
+        let Some(terminator) = function.blocks.get(block).and_then(|block| block.terminator.as_ref()) else {
+            continue;
+        };
+        match terminator {
+            IrTerminator::Goto(next) => pending.push(*next),
+            IrTerminator::Branch { then_block, else_block, .. } => {
+                pending.push(*then_block);
+                pending.push(*else_block);
+            }
+            IrTerminator::Return(_) | IrTerminator::RegionReturn(_) | IrTerminator::Unreachable => {}
+        }
+    }
+    false
 }
 
 fn is_single_phi_use(value: ValueId, phi_block: usize, phi_instruction: usize, uses: &HashMap<ValueId, Vec<UsePoint>>) -> bool {

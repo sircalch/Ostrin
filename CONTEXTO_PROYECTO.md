@@ -5042,3 +5042,23 @@ verdes**.
 La siguiente frontera es completar el análisis de ownership en joins/loops/scopes y extender
 la misma representación a otros payloads gestionados de `Option`, colecciones de records y
 patrones anidados.
+
+## 190. Ownership de `Phi` en joins y bucles — 2026-09-20
+
+La pasada `--ownership-ir` deja de tratar todos los `Phi` gestionados como aliases que deben
+retenerse. Cuando cada entrada gestionada solo llega al `Phi` (salvo los `StoreLocal` no-op que
+conserva la construcción SSA), la entrada transfiere su referencia al resultado del join. Esto
+evita liberar una entrada antes de que el bloque de convergencia pueda leerla y elimina el
+`retain` duplicado de ramas como `if` que producen un `String` dinámico.
+
+Para `Phi` de bucle, el lowering reconoce un backedge alcanzable desde el bloque de convergencia.
+Si el valor corriente tiene su último uso seguro en el bloque que vuelve al encabezado, inserta
+el `release` después de ese uso. La salida del bucle puede conservar la referencia y retornarla,
+por lo que el caso mantiene la transferencia normal al caller sin liberar en la rama de salida.
+El análisis sigue siendo deliberadamente conservador para scopes anidados, escapes, llamadas
+transferentes y uses repartidos por CFGs más complejos.
+
+`examples/native_ir_managed_loop.ostrin` concatena una cadena en un `while` nativo tres veces;
+la prueba diferencial `native_ir_emitter_releases_managed_loop_phi_values` verifica `startxxx`,
+la presencia de releases en la IR y `live_allocations=0` en el binario. La suite queda en
+**6 pruebas diferenciales y 157 de integración verdes**.

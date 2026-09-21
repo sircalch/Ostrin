@@ -5,8 +5,10 @@ colecciones y entornos de tareas, primitivas `clone`/`drop`, primer lowering con
 ownership y ABI `retain`/`release`. Las familias `String`, `List<T>` escalar, los núcleos
 escalares de `Map<K,V>`/`Set<T>`, records concretos y `Option<T>` escalar/`Option<String>`/
 `Option<Record>` ya consumen ownership desde la IR y terminan sin allocations vivas en las
-pruebas nativas; la inserción automática de RC por último uso sobre otros payloads gestionados
-de `Option` y agregados complejos todavía no está completa.*
+pruebas nativas. Los `Phi` simples transfieren la referencia entrante sin retenerla de nuevo,
+y los `Phi` de bucle liberan el valor corriente después de su último uso seguro en el backedge;
+la inserción automática de RC por último uso sobre otros payloads gestionados de `Option` y
+agregados complejos todavía no está completa.*
 
 ## 1. Punto de partida (semántica ya fijada por el lenguaje)
 
@@ -48,7 +50,9 @@ permiten ejercitar el contrato de forma explícita. `--leak-check` imprime las a
 vivas, el pico y el total antes de la limpieza. Esto resuelve la destrucción tipada de los
 casos explícitos, y las primeras familias IR de `String`/records/`List<T>`/`Map`/`Set`/`Option` ya
 insertan/consumen `retain/release` en retornos, aliases, `phi`, `print` y elementos retenidos
-por los helpers de colecciones. `Option<T>` con payload escalar es un struct C por valor y no
+por los helpers de colecciones. Los `Phi` simples transfieren la referencia entrante sin
+retenerla de nuevo; los `Phi` de bucle liberan el valor corriente tras su último uso seguro en
+el backedge. `Option<T>` con payload escalar es un struct C por valor y no
 requiere RC; `Option<String>` retiene/libera condicionalmente su puntero y ya cubre
 `Some`/`None` simples; los records concretos pueden anidarse y vivir dentro de `Option` con
 el mismo contrato. Otros payloads gestionados, patrones anidados y agregados complejos todavía
@@ -78,7 +82,8 @@ El RC sobre el generador actual (texto C con expresiones‑sentencia) exigiría 
    el backend C ya consume esa IR transformada para `String`, el núcleo escalar de `List<T>`,
    las operaciones escalares de `Map`/`Set`, records concretos y `Option` escalar/`Option<String>`/
    `Option<Record>`; aún falta extenderla a otros payloads gestionados de `Option`, patrones
-   anidados, loops, scopes y escapes complejos.
+   anidados, scopes, escapes complejos y payloads gestionados todavía no cubiertos por el
+   análisis de `Phi`.
 4. `--leak-check` y pruebas: los programas que usan ownership explícito deben terminar con cero
    objetos vivos; convertir ese objetivo en automático requiere el lowering de último uso.
 5. E1101 estático integrado; mantener la comprobación dinámica del intérprete y nativo como red

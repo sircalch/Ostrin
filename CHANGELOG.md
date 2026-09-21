@@ -68,6 +68,11 @@
   `retain/release` markers. `native_ir_records.ostrin` compares interpreter/native output
   and finishes with zero live allocations; unsupported generic records and complex nested
   patterns still use the verified fallback.
+- Completed the next ownership-IR slice for managed control flow: simple `Phi` joins now
+  transfer an incoming owned reference without an unsafe predecessor release, and proven
+  loop-carried `Phi` values release their current iteration value after the final safe body
+  use. Added `native_ir_managed_loop.ostrin`, which compares interpreter/native output and
+  finishes with `live_allocations=0` after repeated dynamic string concatenation.
 - Extended the stable hash builtin to structural Option and Result values when
   their payloads are hashable; interpreter and native tags/payload combination
   remain identical.

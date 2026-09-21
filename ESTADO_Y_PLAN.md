@@ -1,9 +1,9 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-20 · rama `main` · 6 pruebas diferenciales y 156 de integración en verde.*
+*Corte: 2026-09-20 · rama `main` · 6 pruebas diferenciales y 157 de integración en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
-Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–189); para el diseño
+Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–190); para el diseño
 del lenguaje, `docs/design/` (21 documentos).
 
 ---
@@ -133,7 +133,9 @@ strings, cantidades, RNG y el detector E1101 también usan esa API. La primera f
 gestionada migrada a la IR es `String`, seguida por los núcleos escalares de `List<T>`,
 `Map<K,V>` y `Set<T>`: literales, concatenación, igualdad, llamadas, ramas con `phi`,
 indexación, mutación, consultas hash, `print` y marcadores
-`retain/release` ya se prueban en el emisor nativo con `--leak-check`. Records concretos,
+`retain/release` ya se prueban en el emisor nativo con `--leak-check`. Los `Phi` simples de
+ramas transfieren la referencia entrante sin retenerla de nuevo y los `Phi` de bucle liberan
+el valor corriente tras su último uso seguro en el backedge. Records concretos,
 campos anidados y `Option<Record>` ya atraviesan también la IR; records y colecciones
 registran callbacks de destrucción tipados; sus campos/elementos por referencia se
 retienen al almacenarse y se liberan al destruir el contenedor. El backend inserta ahora
@@ -184,7 +186,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Paralelismo nativo (`--native-threads`, canales bloqueantes, `select`) | Hilos del SO, mutexes/condiciones, canales bloqueantes y `select(List<Channel<T>>)` implementados de forma opt-in; `select` conserva prioridad determinista y cede el hilo nativo entre intentos; `Task.cancel()` cancela pendientes, propaga a grupos activos de `spawn_scope` o solicita cancelación a tareas `Running`, observada en checkpoints seguros; `receive()` vuelve periódicamente al runtime sin conservar el mutex durante el checkpoint |
 | Memoria en nativo | Registro, destructores tipados para records/colecciones y entornos de tareas, `clone`/`drop`, cleanup automático de locales directos, bloques anidados, ramas, loops y cancelación de tareas en AST/HIR, y `--leak-check`; `String`, records concretos, `Option<Record>`, listas escalares, mapas/conjuntos escalares y `Option<String>` ya consumen ownership desde IR, pero ARC completa de agregados sigue pendiente |
 | IR de bloques | HIR→CFG disponible con `--ir`; el emisor C cubre ramas, bucles escalares con `phi`, `String`, records concretos con campos anidados, `Option<Record>`, listas escalares, operaciones hash escalares y `Option` escalar/String con patrones `Some/None`; `for`/iteradores, patrones anidados y colecciones complejas aún no reemplazan el backend C completo |
-| Ownership/último uso | `--ownership-report`, `--ownership-check` y `--ownership-ir`; la IR ya inserta y consume retain/release lineal para `String`, records concretos, `Option<Record>`, listas escalares, mapas/conjuntos escalares y `Option<String>`; `Option` escalar es por valor, mientras llamadas transferentes no lineales, agregados complejos, loops, scopes y escapes siguen conservadores |
+| Ownership/último uso | `--ownership-report`, `--ownership-check` y `--ownership-ir`; la IR ya inserta y consume retain/release lineal para `String`, records concretos, `Option<Record>`, listas escalares, mapas/conjuntos escalares y `Option<String>`, con transferencia en `Phi` simples y liberación de `Phi` de bucle en backedges probados; `Option` escalar es por valor, mientras llamadas transferentes no lineales, agregados complejos, scopes y escapes siguen conservadores |
 | Biblioteca estándar | Mínima: `args`, entorno/rutas, `format`, E/S y `hash` estructural para escalares, colecciones y tipos con `derive(Hash)`; faltan fechas, JSON y red |
 | Mensajes de error de E/S | `strerror` ≠ texto de Rust (difieren entre backends) |
 | `Result<Void,E>` | Campo de valor de relleno (`char`) en C |
@@ -283,7 +285,7 @@ Decisiones que necesito de ti para afinar el plan:
 
 ```powershell
 cd compiler
-    cargo test                                   # 6 diferenciales + 156 de integración
+    cargo test                                   # 6 diferenciales + 157 de integración
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```
