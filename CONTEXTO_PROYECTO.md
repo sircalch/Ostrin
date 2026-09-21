@@ -5375,3 +5375,17 @@ con `Option<String>` como con `Option<Int>`. Sus 9 funciones se generan desde IR
 y el binario nativo imprimen `mapped: VALUE`, `none`, `5`, `none`, y `--leak-check` termina con
 `live_allocations=0`. Quedan para una siguiente etapa los handlers no inline, payloads compuestos
 que no tengan lowering completo y closures que escapen del sitio de llamada.
+
+## 209. Handlers globales de `try catch` desde la IR — 2026-09-21
+
+Un `try catch` cuyo handler es una función global compatible (`catch recover`) ya se baja sin
+crear una función-valor opaca: la rama de error extrae el `String` con `TryErrorValue`, emite
+`call recover(error)` y construye el `Err` del resultado envolvente. El handler recibe el
+parámetro como argumento prestado y el resultado nuevo conserva el contrato normal de
+`Result`/ownership.
+
+`examples/native_ir_try_handler.ostrin` cubre el camino de éxito y el de recuperación de error;
+las 6 funciones generan IR, el intérprete y el binario nativo imprimen `VALUE!` y
+`handled: FAILURE`, y `--leak-check` termina con `live_allocations=0`. Siguen pendientes los
+handlers locales/closures no inline y los payloads compuestos que aún no tengan representación
+completa en el emisor IR.

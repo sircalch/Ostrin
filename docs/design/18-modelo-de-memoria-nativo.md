@@ -86,9 +86,10 @@ El RC sobre el generador actual (texto C con expresiones‑sentencia) exigiría 
    el backend C ya consume esa IR transformada para `String`, el núcleo escalar de `List<T>`,
    las operaciones escalares de `Map`/`Set`, records concretos y `Option` escalar/`Option<String>`/
    `Option<Record>`, así como `Result` escalar con error `String`, `try`, `try catch` inline,
-   `map`/`map_err`/`then` y `Option.map`/`then` con lambdas inline; aún falta extenderla a
-   otros payloads gestionados, handlers no inline, patrones anidados, scopes, escapes complejos
-   y payloads todavía no cubiertos por el análisis de `Phi`.
+   `map`/`map_err`/`then`, `Option.map`/`then` con lambdas inline y handlers globales de
+   `try catch`; aún falta extenderla a otros payloads gestionados, handlers locales/closures
+   no inline, patrones anidados, scopes, escapes complejos y payloads todavía no cubiertos por
+   el análisis de `Phi`.
 4. `--leak-check` y pruebas: los programas que usan ownership explícito deben terminar con cero
    objetos vivos; convertir ese objetivo en automático requiere el lowering de último uso.
 5. E1101 estático integrado; mantener la comprobación dinámica del intérprete y nativo como red

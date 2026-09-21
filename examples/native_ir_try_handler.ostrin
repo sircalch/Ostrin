@@ -1,0 +1,32 @@
+fn succeed() -> Result<String, String> {
+    Ok("value".to_upper())
+}
+
+fn fail() -> Result<String, String> {
+    Err("failure".to_upper())
+}
+
+fn recover(error: String) -> String {
+    "handled: " + error
+}
+
+fn success() -> Result<String, String> {
+    value = try succeed() catch recover
+    Ok(value + "!")
+}
+
+fn failure() -> Result<String, String> {
+    value = try fail() catch recover
+    Ok(value)
+}
+
+fn main() -> Void {
+    match success() {
+        Ok(value) => print(value),
+        Err(error) => print(error),
+    }
+    match failure() {
+        Ok(value) => print(value),
+        Err(error) => print(error),
+    }
+}

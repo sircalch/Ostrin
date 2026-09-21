@@ -1675,6 +1675,10 @@ impl Builder {
                 value,
                 ty: error_ty,
             });
+            let mapped_ty = match &self.function.ret {
+                Ty::Applied(name, args) if name == "Result" && args.len() == 2 => args[1].clone(),
+                _ => Ty::Unknown,
+            };
             let mapped = if let HirKind::Lambda(params, body) = &handler.kind {
                 if let Some(parameter) = params.first() {
                     self.locals.push(HashMap::new());
@@ -1692,6 +1696,15 @@ impl Builder {
                 } else {
                     self.lower_expr(handler)
                 }
+            } else if let HirKind::Global(name) = &handler.kind {
+                let mapped = self.fresh();
+                self.emit(IrInstr::Call {
+                    dst: Some(mapped),
+                    callee: name.clone(),
+                    args: vec![error],
+                    ty: mapped_ty,
+                });
+                mapped
             } else {
                 self.lower_expr(handler)
             };
