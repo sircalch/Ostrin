@@ -6599,6 +6599,11 @@ fn generate_impl(
         codegen.register_hir_types(program);
         codegen.sync_hir_instances(&mut hir_world);
     }
+    let ir_records: crate::ir_c::RecordFields = codegen
+        .records
+        .iter()
+        .map(|(name, fields)| (name.clone(), fields.iter().map(|(field, _)| field.clone()).collect()))
+        .collect();
     for f in &functions {
         if !f.generics.is_empty() {
             continue;
@@ -6613,7 +6618,7 @@ fn generate_impl(
                 .functions
                 .iter()
                 .find(|function| function.name == f.name)
-                .and_then(|function| crate::ir_c::generate(function, &ir_functions)),
+                .and_then(|function| crate::ir_c::generate(function, &ir_functions, &ir_records)),
             _ => None,
         };
         // Functions not yet representable by IR keep the HIR emitter as the

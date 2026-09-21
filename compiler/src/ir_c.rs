@@ -16,8 +16,9 @@ use crate::types::Ty;
 
 type Bail<T> = Result<T, ()>;
 type Values = HashMap<ValueId, (String, Ty)>;
+pub type RecordFields = HashMap<String, Vec<String>>;
 
-fn c_type(ty: &Ty) -> Bail<String> {
+fn c_type(ty: &Ty, records: &RecordFields) -> Bail<String> {
     Ok(match ty {
         Ty::Int => "int64_t".to_string(),
         Ty::Float => "double".to_string(),
@@ -30,8 +31,9 @@ fn c_type(ty: &Ty) -> Bail<String> {
             format!("Map_{}_{}*", mangle_scalar(key), mangle_scalar(value))
         }
         Ty::Set(element) if set_supported(element) => format!("Set_{}*", mangle_scalar(element)),
-        Ty::Applied(name, args) if name == "Option" && args.len() == 1 && option_supported(&args[0]) => {
-            format!("Option_{}", mangle_scalar(&args[0]))
+        Ty::Named(name) if records.contains_key(name) => format!("{name}*"),
+        Ty::Applied(name, args) if name == "Option" && args.len() == 1 && option_supported(&args[0], records) => {
+            format!("Option_{}", mangle_option_payload(&args[0], records))
         }
         Ty::Void => "void".to_string(),
         _ => return Err(()),
@@ -45,12 +47,13 @@ fn scalar(ty: &Ty) -> bool {
     )
 }
 
-fn supported(ty: &Ty) -> bool {
+fn supported(ty: &Ty, records: &RecordFields) -> bool {
     scalar(ty)
+        || matches!(ty, Ty::Named(name) if records.contains_key(name))
         || matches!(ty, Ty::List(element) if list_element_supported(element))
         || matches!(ty, Ty::Map(key, value) if map_supported(key, value))
         || matches!(ty, Ty::Set(element) if set_supported(element))
-        || matches!(ty, Ty::Applied(name, args) if name == "Option" && args.len() == 1 && option_supported(&args[0]))
+        || matches!(ty, Ty::Applied(name, args) if name == "Option" && args.len() == 1 && option_supported(&args[0], records))
 }
 
 fn list_element_supported(ty: &Ty) -> bool {
@@ -65,12 +68,13 @@ fn set_supported(element: &Ty) -> bool {
     list_element_supported(element)
 }
 
-fn option_supported(element: &Ty) -> bool {
+fn option_supported(element: &Ty, records: &RecordFields) -> bool {
     matches!(element, Ty::Int | Ty::Float | Ty::Float32 | Ty::Sized(_) | Ty::Bool | Ty::String)
+        || matches!(element, Ty::Named(name) if records.contains_key(name))
 }
 
-fn option_managed_payload(element: &Ty) -> bool {
-    matches!(element, Ty::String)
+fn option_managed_payload(element: &Ty, records: &RecordFields) -> bool {
+    matches!(element, Ty::String) || matches!(element, Ty::Named(name) if records.contains_key(name))
 }
 
 fn option_type(element: &Ty) -> Ty {
@@ -86,6 +90,13 @@ fn mangle_scalar(ty: &Ty) -> String {
         Ty::Bool => "Bool".to_string(),
         Ty::String => "String".to_string(),
         _ => unreachable!("mangle_scalar only accepts scalar IR types"),
+    }
+}
+
+fn mangle_option_payload(ty: &Ty, records: &RecordFields) -> String {
+    match ty {
+        Ty::Named(name) if records.contains_key(name) => name.clone(),
+        _ => mangle_scalar(ty),
     }
 }
 
@@ -145,12 +156,12 @@ fn defined_value(instruction: &IrInstr) -> Option<(ValueId, Ty)> {
     }
 }
 
-fn collect_values(function: &IrFunction) -> Bail<Values> {
+fn collect_values(function: &IrFunction, records: &RecordFields) -> Bail<Values> {
     let mut values = HashMap::new();
     for block in &function.blocks {
         for instruction in &block.instructions {
             if let Some((value, ty)) = defined_value(instruction) {
-                if !supported(&ty) {
+                if !supported(&ty, records) {
                     return Err(());
                 }
                 if values.insert(value, (value_name(value), ty)).is_some() {
@@ -304,21 +315,22 @@ fn emit_instruction(
     instruction: &IrInstr,
     values: &Values,
     known_functions: &HashSet<String>,
+    records: &RecordFields,
     out: &mut String,
 ) -> Bail<()> {
     match instruction {
         IrInstr::Param { dst, name, ty, .. } => {
-            if !supported(ty) || *ty == Ty::Void {
+            if !supported(ty, records) || *ty == Ty::Void {
                 return Err(());
             }
             out.push_str(&format!("    {} = {name};\n", value_name(*dst)));
         }
         IrInstr::Global { dst, name, ty } => {
             let Ty::Applied(option_name, args) = ty else { return Err(()) };
-            if name != "None" || option_name != "Option" || args.len() != 1 || !option_supported(&args[0]) {
+            if name != "None" || option_name != "Option" || args.len() != 1 || !option_supported(&args[0], records) {
                 return Err(());
             }
-            let c_name = format!("Option_{}", mangle_scalar(&args[0]));
+            let c_name = format!("Option_{}", mangle_option_payload(&args[0], records));
             out.push_str(&format!(
                 "    {} = (({c_name}){{ .has = false }});\n",
                 value_name(*dst)
@@ -337,7 +349,7 @@ fn emit_instruction(
             }
         }
         IrInstr::Move { dst, source, ty } => {
-            if !supported(ty) || *ty == Ty::Void {
+            if !supported(ty, records) || *ty == Ty::Void {
                 return Err(());
             }
             out.push_str(&format!(
@@ -388,12 +400,48 @@ fn emit_instruction(
             )?;
             out.push_str(&format!("    {} = {code};\n", value_name(*dst)));
         }
-        IrInstr::Aggregate { dst, kind, fields, ty } => match ty {
+        IrInstr::Aggregate {
+            dst,
+            kind,
+            fields,
+            field_names,
+            ty,
+        } => match ty {
+            Ty::Named(name) => {
+                let expected_kind = format!("record<{name}>");
+                let Some(declared_fields) = records.get(name) else { return Err(()) };
+                if kind != &expected_kind
+                    || fields.len() != field_names.len()
+                    || fields.len() != declared_fields.len()
+                    || field_names.iter().any(|field| !declared_fields.contains(field))
+                    || field_names.iter().collect::<HashSet<_>>().len() != field_names.len()
+                {
+                    return Err(());
+                }
+                for value in fields {
+                    if !supported(&value_ty(values, *value)?, records) {
+                        return Err(());
+                    }
+                }
+                let code = value_name(*dst);
+                out.push_str(&format!(
+                    "    {code} = ({name}*)ostrin_calloc_with_drop(1, sizeof({name}), (void (*)(void*))(ostrin_drop_{name}));\n"
+                ));
+                out.push_str(&format!(
+                    "    if (!{code}) {{ fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); }}\n"
+                ));
+                for (field, value) in field_names.iter().zip(fields) {
+                    out.push_str(&format!(
+                        "    {code}->{field} = {};\n",
+                        value_code(values, *value)?
+                    ));
+                }
+            }
             Ty::List(element) => {
                 if !list_element_supported(element) || (kind != "collection" && !kind.starts_with("empty_")) {
                     return Err(());
                 }
-                let element_c = c_type(element)?;
+                let element_c = c_type(element, records)?;
                 let list_name = format!("List_{}", mangle_scalar(element));
                 let values = fields
                     .iter()
@@ -452,6 +500,18 @@ fn emit_instruction(
             }
             _ => return Err(()),
         },
+        IrInstr::Field { dst, object, field, ty } => {
+            let Ty::Named(record) = value_ty(values, *object)? else { return Err(()) };
+            if !records.contains_key(&record) || !supported(ty, records) {
+                return Err(());
+            }
+            out.push_str(&format!(
+                "    {} = ({})->{};\n",
+                value_name(*dst),
+                value_code(values, *object)?,
+                field
+            ));
+        }
         IrInstr::Index { dst, object, index, ty } => {
             let Ty::List(element) = value_ty(values, *object)? else { return Err(()) };
             if !list_element_supported(&element) || value_ty(values, *index)? != Ty::Int || *ty != *element {
@@ -498,7 +558,7 @@ fn emit_instruction(
                         }
                         "get" | "remove"
                             if args.len() == 1
-                                && option_supported(value.as_ref())
+                                && option_supported(value.as_ref(), records)
                                 && *ty == option_type(value.as_ref())
                                 && value_ty(values, args[0])? == *key =>
                         {
@@ -518,10 +578,10 @@ fn emit_instruction(
                     }
                 }
                 Ty::Applied(name, option_args)
-                    if name == "Option" && option_args.len() == 1 && option_supported(&option_args[0]) =>
+                    if name == "Option" && option_args.len() == 1 && option_supported(&option_args[0], records) =>
                 {
                     let inner = option_args[0].clone();
-                    let option_name = format!("Option_{}", mangle_scalar(&inner));
+                    let option_name = format!("Option_{}", mangle_option_payload(&inner, records));
                     match method.as_str() {
                         "is_some" if args.is_empty() && *ty == Ty::Bool => format!("({receiver}).has"),
                         "is_none" if args.is_empty() && *ty == Ty::Bool => format!("!({receiver}).has"),
@@ -574,7 +634,7 @@ fn emit_instruction(
             args,
             ty,
         } => {
-            if !supported(ty) {
+            if !supported(ty, records) {
                 return Err(());
             }
             let codes = args
@@ -583,11 +643,11 @@ fn emit_instruction(
                 .collect::<Bail<Vec<_>>>()?;
             let call = if callee == "Some" && args.len() == 1 {
                 let inner = value_ty(values, args[0])?;
-                if !option_supported(&inner) || *ty != option_type(&inner) {
+                if !option_supported(&inner, records) || *ty != option_type(&inner) {
                     return Err(());
                 }
-                let option_name = format!("Option_{}", mangle_scalar(&inner));
-                if !option_managed_payload(&inner) {
+                let option_name = format!("Option_{}", mangle_option_payload(&inner, records));
+                if !option_managed_payload(&inner, records) {
                     format!("(({option_name}){{ .has = true, .value = {} }})", codes[0])
                 } else {
                     format!(
@@ -609,7 +669,7 @@ fn emit_instruction(
                     return Err(());
                 }
                 for value in args {
-                    if !supported(&value_ty(values, *value)?) {
+                    if !supported(&value_ty(values, *value)?, records) {
                         return Err(());
                     }
                 }
@@ -633,7 +693,7 @@ fn emit_instruction(
         }
         IrInstr::PatternTest { dst, subject, pattern } => {
             let Ty::Applied(name, args) = value_ty(values, *subject)? else { return Err(()) };
-            if name != "Option" || args.len() != 1 || !option_supported(&args[0]) {
+            if name != "Option" || args.len() != 1 || !option_supported(&args[0], records) {
                 return Err(());
             }
             let subject = value_code(values, *subject)?;
@@ -652,7 +712,7 @@ fn emit_instruction(
                 (value_code(values, *subject)?, subject_ty)
             } else {
                 let Ty::Applied(name, args) = subject_ty else { return Err(()) };
-                if name != "Option" || args.len() != 1 || !option_supported(&args[0]) || path.len() != 1 {
+                if name != "Option" || args.len() != 1 || !option_supported(&args[0], records) || path.len() != 1 {
                     return Err(());
                 }
                 (format!("({}).value", value_code(values, *subject)?), args[0].clone())
@@ -663,7 +723,7 @@ fn emit_instruction(
             out.push_str(&format!("    {} = {code};\n", value_name(*dst)));
         }
         IrInstr::Phi { dst, incoming, ty } => {
-            if !supported(ty) || *ty == Ty::Void || incoming.is_empty() {
+            if !supported(ty, records) || *ty == Ty::Void || incoming.is_empty() {
                 return Err(());
             }
             for (index, (predecessor, value)) in incoming.iter().enumerate() {
@@ -686,8 +746,11 @@ fn emit_instruction(
                 Ty::String | Ty::List(_) | Ty::Map(_, _) | Ty::Set(_) => {
                     out.push_str(&format!("    ostrin_retain((void*){});\n", value_code(values, *value)?));
                 }
+                Ty::Named(name) if records.contains_key(&name) => {
+                    out.push_str(&format!("    ostrin_retain((void*){});\n", value_code(values, *value)?));
+                }
                 Ty::Applied(name, args)
-                    if name == "Option" && args.len() == 1 && option_managed_payload(&args[0]) =>
+                    if name == "Option" && args.len() == 1 && option_managed_payload(&args[0], records) =>
                 {
                     let code = value_code(values, *value)?;
                     out.push_str(&format!("    if ({code}.has) ostrin_retain((void*){code}.value);\n"));
@@ -701,8 +764,11 @@ fn emit_instruction(
                 Ty::String | Ty::List(_) | Ty::Map(_, _) | Ty::Set(_) => {
                     out.push_str(&format!("    ostrin_release((void*){});\n", value_code(values, *value)?));
                 }
+                Ty::Named(name) if records.contains_key(&name) => {
+                    out.push_str(&format!("    ostrin_release((void*){});\n", value_code(values, *value)?));
+                }
                 Ty::Applied(name, args)
-                    if name == "Option" && args.len() == 1 && option_managed_payload(&args[0]) =>
+                    if name == "Option" && args.len() == 1 && option_managed_payload(&args[0], records) =>
                 {
                     let code = value_code(values, *value)?;
                     out.push_str(&format!("    if ({code}.has) ostrin_release((void*){code}.value);\n"));
@@ -779,13 +845,13 @@ fn emit_terminator(
 /// Emits an IR function when all of its values use a supported scalar or
 /// collection representation and its CFG can be represented with ordinary C
 /// labels and gotos.
-pub fn generate(function: &IrFunction, known_functions: &HashSet<String>) -> Option<String> {
+pub fn generate(function: &IrFunction, known_functions: &HashSet<String>, records: &RecordFields) -> Option<String> {
     if function.entry >= function.blocks.len()
         || function
             .params
             .iter()
-        .any(|(_, ty)| !supported(ty) || *ty == Ty::Void)
-        || !supported(&function.ret)
+        .any(|(_, ty)| !supported(ty, records) || *ty == Ty::Void)
+        || !supported(&function.ret, records)
     {
         return None;
     }
@@ -798,7 +864,7 @@ pub fn generate(function: &IrFunction, known_functions: &HashSet<String>) -> Opt
         return None;
     }
 
-    let values = collect_values(function).ok()?;
+    let values = collect_values(function, records).ok()?;
     let mut out = String::new();
     out.push_str("    int __ostrin_ir_pred = -1;\n");
     let mut declarations: Vec<(ValueId, Ty)> = values
@@ -809,7 +875,7 @@ pub fn generate(function: &IrFunction, known_functions: &HashSet<String>) -> Opt
     for (value, ty) in declarations {
         out.push_str(&format!(
             "    {} {};\n",
-            c_type(&ty).ok()?,
+            c_type(&ty, records).ok()?,
             value_name(value)
         ));
     }
@@ -818,7 +884,7 @@ pub fn generate(function: &IrFunction, known_functions: &HashSet<String>) -> Opt
     for block in &function.blocks {
         out.push_str(&format!("{}:\n", block_label(block.id)));
         for instruction in &block.instructions {
-            emit_instruction(instruction, &values, known_functions, &mut out).ok()?;
+            emit_instruction(instruction, &values, known_functions, records, &mut out).ok()?;
         }
         emit_terminator(
             function,

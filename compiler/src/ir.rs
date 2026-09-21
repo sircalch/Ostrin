@@ -108,6 +108,7 @@ pub enum IrInstr {
         dst: ValueId,
         kind: String,
         fields: Vec<ValueId>,
+        field_names: Vec<String>,
         ty: Ty,
     },
     IterInit {
@@ -926,6 +927,7 @@ impl Builder {
                     dst,
                     kind: "collection".to_string(),
                     fields,
+                    field_names: Vec::new(),
                     ty: expression.ty.clone(),
                 });
                 dst
@@ -940,6 +942,7 @@ impl Builder {
                     dst,
                     kind: "map".to_string(),
                     fields,
+                    field_names: Vec::new(),
                     ty: expression.ty.clone(),
                 });
                 dst
@@ -950,6 +953,7 @@ impl Builder {
                     dst,
                     kind: format!("empty_{name}"),
                     fields: Vec::new(),
+                    field_names: Vec::new(),
                     ty: expression.ty.clone(),
                 });
                 dst
@@ -995,15 +999,14 @@ impl Builder {
                 dst
             }
             HirKind::Record { name, fields, .. } => {
-                let fields = fields
-                    .iter()
-                    .map(|(_, value)| self.lower_expr(value))
-                    .collect();
+                let field_names = fields.iter().map(|(name, _)| name.clone()).collect();
+                let fields = fields.iter().map(|(_, value)| self.lower_expr(value)).collect();
                 let dst = self.fresh();
                 self.emit(IrInstr::Aggregate {
                     dst,
                     kind: format!("record<{name}>"),
                     fields,
+                    field_names,
                     ty: expression.ty.clone(),
                 });
                 dst

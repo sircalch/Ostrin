@@ -373,8 +373,14 @@ fn safe_release_site(instruction: &IrInstr) -> bool {
         IrInstr::StoreLocal { .. }
         | IrInstr::ChannelSend { .. }
         | IrInstr::Aggregate { .. }
-        | IrInstr::Index { .. } => true,
-        IrInstr::Call { callee, args, .. } => (callee == "print" || callee == "Some") && args.len() == 1,
+        | IrInstr::Index { .. }
+        | IrInstr::Field { .. } => true,
+        // Ordinary function parameters borrow reference-like values for the
+        // duration of the call; the caller can therefore release its last
+        // local ownership after any direct call. `Some` is included here as
+        // well because its constructor retains the payload before returning
+        // the option value.
+        IrInstr::Call { .. } => true,
         IrInstr::MethodCall { method, .. } => matches!(
             method.as_str(),
             "length"

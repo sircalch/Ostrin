@@ -63,6 +63,11 @@
   `native_ir_managed_options.ostrin` regression covers dynamic strings, pattern bindings,
   map lookups and `--leak-check`; generic calls that need monomorphization remain on the HIR
   path rather than being emitted as unresolved IR calls.
+- Extended the IR C emitter to concrete heap records and `Option<Record>` values, including
+  nested field access, `Some`/`None` pattern binds, record destructors and linear
+  `retain/release` markers. `native_ir_records.ostrin` compares interpreter/native output
+  and finishes with zero live allocations; unsupported generic records and complex nested
+  patterns still use the verified fallback.
 - Extended the stable hash builtin to structural Option and Result values when
   their payloads are hashable; interpreter and native tags/payload combination
   remain identical.

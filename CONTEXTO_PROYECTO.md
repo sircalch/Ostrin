@@ -5012,3 +5012,33 @@ diferenciales y 155 de integración verdes**.
 Quedan fuera de esta porción `Option` de records, listas, mapas, sets o payloads anidados,
 patrones anidados y el análisis completo de llamadas que almacenan o devuelven aliases
 gestionados de forma no lineal.
+
+## 189. Records concretos y `Option<Record>` desde la IR — 2026-09-20
+
+El siguiente bloque llevó al emisor C de la IR la representación que el backend ya tenía
+para records concretos: punteros con identidad, callbacks `ostrin_drop_<Record>` y campos
+que pueden contener otros records o referencias gestionadas. `Aggregate` conserva ahora los
+nombres de campos, de modo que la construcción desde CFG no depende del orden accidental del
+literal; el emisor valida el conjunto de campos y asigna cada valor sobre la estructura C
+registrada.
+
+También se habilitó `Option<Record>` como payload gestionado:
+
+- `Some(record)` retiene el puntero y el último uso libera la referencia original; `None`,
+  `PatternTest` y `PatternBind` usan el struct `Option_<Record>` por valor.
+- Los accesos a campos retienen aliases prestados y liberan el alias cuando el campo ya no
+  vuelve a usarse; los records y opciones reciben `retain/release` condicionales desde la IR.
+- Las funciones no genéricas que reciben o devuelven records pueden permanecer enteramente
+  en IR; enums, records genéricos, patrones anidados y escapes no lineales conservan el
+  fallback HIR/AST verificado.
+
+`examples/native_ir_records.ostrin` cubre records anidados, strings dentro de records,
+`Option<Record>`, patrones `Some`/`None`, llamadas entre funciones y extracción de campos.
+`native_ir_emitter_handles_records_and_option_record_ownership` compara cuatro líneas entre
+intérprete y binario nativo, exige cinco funciones IR, inspecciona los destructores y termina
+con `live_allocations=0`. La suite queda en **6 pruebas diferenciales y 156 de integración
+verdes**.
+
+La siguiente frontera es completar el análisis de ownership en joins/loops/scopes y extender
+la misma representación a otros payloads gestionados de `Option`, colecciones de records y
+patrones anidados.

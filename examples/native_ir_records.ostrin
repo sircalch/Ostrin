@@ -1,0 +1,41 @@
+record Point {
+    x: Int
+    label: String
+}
+
+record Box {
+    point: Point
+}
+
+fn make_point(value: Int, label: String) -> Point {
+    Point { x: value, label: label }
+}
+
+fn choose(flag: Bool) -> Option<Point> {
+    if flag {
+        Some(make_point(7, "seven"))
+    } else {
+        None
+    }
+}
+
+fn read(value: Point) -> Int {
+    value.x
+}
+
+fn describe(value: Option<Point>) -> String {
+    match value {
+        Some(point) => point.label,
+        None => "empty",
+    }
+}
+
+fn main() -> Void {
+    point = make_point(3, "three")
+    print(read(point))
+    print(describe(choose(true)))
+    print(describe(choose(false)))
+
+    box = Box { point: point }
+    print(box.point.label)
+}

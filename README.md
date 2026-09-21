@@ -46,11 +46,12 @@ traits, pattern matching, quantities and two concurrency modes: deterministic
 cooperative scheduling by default, plus opt-in native threads for compiled
 programs.
 
-The compiler suite currently passes **155 integration tests and 6 differential
+The compiler suite currently passes **156 integration tests and 6 differential
 interpreter↔native tests**. Function calls
 support named/default arguments, scalar and `String` collection lookups preserve `Option<T>`
-through the native IR path, and
-record fields are checked statically. The CLI also exposes JSON Lines
+through the native IR path; concrete records and simple `Option<Record>` values
+now use the same IR path with ownership markers, and record fields are checked
+statically. The CLI also exposes JSON Lines
 diagnostics with source locations for editor integrations, plus a compiler
 index of type members, local bindings and inferred expression types for editor
 tooling. A persistent language server (`--lsp`) resolves a document's real
