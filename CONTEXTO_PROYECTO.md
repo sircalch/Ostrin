@@ -5322,3 +5322,22 @@ pasó con **3 funciones generadas desde IR** para este ejemplo; la suite queda e
 diferenciales, 170 de integración y 2 unitarias**. La próxima frontera concreta es ampliar
 esta representación a `try`, combinadores de `Result` y payloads compuestos, manteniendo el
 fallback verificable para las formas que aún no tengan contrato de ownership completo.
+
+## 206. Propagación de `Result`/`Option` con `try` desde la IR — 2026-09-21
+
+La IR ya consume la propagación sin `catch` que antes solo emitía el backend HIR. `try` se
+representa como CFG explícito: `TryCheck` inspecciona `ok`/`has`, `TryValue` extrae el payload
+en la rama normal y `TryError` construye el contenedor de error del tipo de retorno y termina
+la función en la rama de propagación. Esto cubre `Result` y `Option` escalares, y no confunde
+el payload de una función con el wrapper que debe retornar.
+
+La transferencia de ownership acompaña ambos caminos: `TryValue` retiene un payload gestionado
+prestado antes de liberar el wrapper fuente, mientras `TryError` retiene el error activo antes de
+liberar el `Result` fuente. `examples/native_ir_try_strings.ostrin` verifica los dos caminos con
+`Result<String,String>` y strings dinámicos; el intérprete y el binario nativo imprimen `VALUE!`
+y `FAILURE`, y el binario termina con `live_allocations=0`.
+
+`native_result.ostrin` pasó de 4 funciones IR + 2 HIR a **6 funciones generadas desde IR**;
+`try_result.ostrin` conserva el fallback únicamente para su `catch` y mantiene paridad. La
+suite sigue en **6 diferenciales, 170 de integración y 2 unitarias**. La siguiente frontera es
+migrar `try catch`, combinadores de `Result` y payloads compuestos con el mismo contrato.

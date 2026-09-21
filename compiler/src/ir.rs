@@ -1386,27 +1386,33 @@ impl Builder {
         self.terminate(IrTerminator::Goto(merge_block));
 
         self.current = catch_block;
-        let caught = if let Some(handler) = handler {
-            self.lower_expr(handler)
+        let catch_incoming = if let Some(handler) = handler {
+            let caught = self.lower_expr(handler);
+            let catch_predecessor = self.current;
+            let catch_open = !self.terminated();
+            if catch_open {
+                self.terminate(IrTerminator::Goto(merge_block));
+            }
+            if catch_open {
+                Some((catch_predecessor, caught))
+            } else {
+                None
+            }
         } else {
-            let error = self.fresh();
+            let propagated = self.fresh();
             self.emit(IrInstr::TryError {
-                dst: error,
+                dst: propagated,
                 value,
-                ty: ty.clone(),
+                ty: self.function.ret.clone(),
             });
-            error
+            self.terminate(IrTerminator::Return(Some(propagated)));
+            None
         };
-        let catch_predecessor = self.current;
-        let catch_open = !self.terminated();
-        if catch_open {
-            self.terminate(IrTerminator::Goto(merge_block));
-        }
 
         self.current = merge_block;
         let dst = self.fresh();
         let mut incoming = vec![(normal_block, normal)];
-        if catch_open {
+        if let Some((catch_predecessor, caught)) = catch_incoming {
             incoming.push((catch_predecessor, caught));
         }
         self.emit(IrInstr::Phi {

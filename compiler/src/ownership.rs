@@ -422,7 +422,10 @@ fn safe_release_site(instruction: &IrInstr) -> bool {
         | IrInstr::Field { .. }
         | IrInstr::Binary { .. }
         | IrInstr::PatternTest { .. }
-        | IrInstr::PatternBind { .. } => true,
+        | IrInstr::PatternBind { .. }
+        | IrInstr::TryCheck { .. }
+        | IrInstr::TryValue { .. }
+        | IrInstr::TryError { .. } => true,
         // Ordinary function parameters borrow reference-like values for the
         // duration of the call; the caller can therefore release its last
         // local ownership after any direct call. `Some` is included here as
@@ -659,7 +662,8 @@ fn alias_destination(instruction: &IrInstr) -> Option<(ValueId, Ty)> {
     match instruction {
         IrInstr::Field { dst, ty, .. }
         | IrInstr::Index { dst, ty, .. }
-        | IrInstr::PatternBind { dst, ty, .. } => Some((*dst, ty.clone())),
+        | IrInstr::PatternBind { dst, ty, .. }
+        | IrInstr::TryValue { dst, ty, .. } => Some((*dst, ty.clone())),
         _ => None,
     }
 }

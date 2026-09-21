@@ -469,6 +469,74 @@ fn emit_instruction(
             )?;
             out.push_str(&format!("    {} = {code};\n", value_name(*dst)));
         }
+        IrInstr::TryCheck { dst, value } => {
+            let Ty::Applied(name, args) = value_ty(values, *value)? else { return Err(()) };
+            let source = value_code(values, *value)?;
+            let check = match (name.as_str(), args.as_slice()) {
+                ("Option", [inner]) if option_supported(inner, records) => format!("({source}).has"),
+                ("Result", [ok, err]) if result_supported(ok, err, records) => format!("({source}).ok"),
+                _ => return Err(()),
+            };
+            out.push_str(&format!("    {} = {check};\n", value_name(*dst)));
+        }
+        IrInstr::TryValue { dst, value, ty } => {
+            let Ty::Applied(name, args) = value_ty(values, *value)? else { return Err(()) };
+            let inner = match (name.as_str(), args.as_slice()) {
+                ("Option", [inner]) if option_supported(inner, records) => inner,
+                ("Result", [ok, err]) if result_supported(ok, err, records) => ok,
+                _ => return Err(()),
+            };
+            if *ty != *inner || !supported(ty, records) {
+                return Err(());
+            }
+            out.push_str(&format!(
+                "    {} = ({}).value;\n",
+                value_name(*dst),
+                value_code(values, *value)?
+            ));
+        }
+        IrInstr::TryError { dst, value, ty } => {
+            let Ty::Applied(source_name, source_args) = value_ty(values, *value)? else { return Err(()) };
+            let source = value_code(values, *value)?;
+            match ty {
+                Ty::Applied(name, args) if name == "Option" && args.len() == 1 => {
+                    if source_name != "Option" || source_args.len() != 1 || !option_supported(&args[0], records) {
+                        return Err(());
+                    }
+                    let option_name = format!("Option_{}", mangle_option_payload(&args[0], records));
+                    out.push_str(&format!(
+                        "    {} = (({option_name}){{ .has = false }});\n",
+                        value_name(*dst)
+                    ));
+                }
+                Ty::Applied(name, args) if name == "Result" && args.len() == 2 => {
+                    if source_name != "Result"
+                        || source_args.len() != 2
+                        || source_args[1] != args[1]
+                        || !result_supported(&args[0], &args[1], records)
+                    {
+                        return Err(());
+                    }
+                    let result_name = format!(
+                        "Result_{}_{}",
+                        mangle_result_payload(&args[0], records),
+                        mangle_result_payload(&args[1], records)
+                    );
+                    out.push_str(&format!(
+                        "    {} = (({result_name}){{ .ok = false, .error = ({}).error }});\n",
+                        value_name(*dst),
+                        source
+                    ));
+                    if result_managed_payload(&args[1], records) {
+                        out.push_str(&format!(
+                            "    ostrin_retain((void*)({}).error);\n",
+                            source
+                        ));
+                    }
+                }
+                _ => return Err(()),
+            }
+        }
         IrInstr::Aggregate {
             dst,
             kind,

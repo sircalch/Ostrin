@@ -1,0 +1,28 @@
+fn succeed() -> Result<String, String> {
+    Ok("value".to_upper())
+}
+
+fn fail() -> Result<String, String> {
+    Err("failure".to_upper())
+}
+
+fn extract() -> Result<String, String> {
+    value = try succeed()
+    Ok(value + "!")
+}
+
+fn propagate() -> Result<String, String> {
+    value = try fail()
+    Ok(value)
+}
+
+fn main() -> Void {
+    match extract() {
+        Ok(value) => print(value),
+        Err(error) => print(error),
+    }
+    match propagate() {
+        Ok(value) => print(value),
+        Err(error) => print(error),
+    }
+}
