@@ -1,0 +1,25 @@
+record Point {
+    x: Int
+    label: String
+}
+
+fn make(n: Int) -> Point {
+    Point { x: n, label: "p" + "t" }
+}
+
+fn build() -> List<Point> {
+    mut pts = [make(1), make(2)]
+    pts.push(make(3))
+    pts
+}
+
+fn main() -> Void {
+    mut pts = build()
+    print(pts.length())
+    p = pts[1]
+    print(p.x)
+    print(p.label)
+    q = pts.remove_at(0)
+    print(q.x)
+    print(pts.length())
+}

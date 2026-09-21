@@ -26,7 +26,9 @@ fn c_type(ty: &Ty, records: &RecordFields) -> Bail<String> {
         Ty::Sized(kind) => kind.c_type().to_string(),
         Ty::Bool => "bool".to_string(),
         Ty::String => "const char*".to_string(),
-        Ty::List(element) if list_element_supported(element) => format!("List_{}*", mangle_scalar(element)),
+        Ty::List(element) if list_supported(element, records) => {
+            format!("List_{}*", mangle_option_payload(element, records))
+        }
         Ty::Map(key, value) if map_supported(key, value) => {
             format!("Map_{}_{}*", mangle_scalar(key), mangle_scalar(value))
         }
@@ -50,7 +52,7 @@ fn scalar(ty: &Ty) -> bool {
 fn supported(ty: &Ty, records: &RecordFields) -> bool {
     scalar(ty)
         || matches!(ty, Ty::Named(name) if records.contains_key(name))
-        || matches!(ty, Ty::List(element) if list_element_supported(element))
+        || matches!(ty, Ty::List(element) if list_supported(element, records))
         || matches!(ty, Ty::Map(key, value) if map_supported(key, value))
         || matches!(ty, Ty::Set(element) if set_supported(element))
         || matches!(ty, Ty::Applied(name, args) if name == "Option" && args.len() == 1 && option_supported(&args[0], records))
@@ -58,6 +60,10 @@ fn supported(ty: &Ty, records: &RecordFields) -> bool {
 
 fn list_element_supported(ty: &Ty) -> bool {
     scalar(ty) && *ty != Ty::Void
+}
+
+fn list_supported(ty: &Ty, records: &RecordFields) -> bool {
+    list_element_supported(ty) || matches!(ty, Ty::Named(name) if records.contains_key(name))
 }
 
 fn map_supported(key: &Ty, value: &Ty) -> bool {
@@ -438,11 +444,11 @@ fn emit_instruction(
                 }
             }
             Ty::List(element) => {
-                if !list_element_supported(element) || (kind != "collection" && !kind.starts_with("empty_")) {
+                if !list_supported(element, records) || (kind != "collection" && !kind.starts_with("empty_")) {
                     return Err(());
                 }
                 let element_c = c_type(element, records)?;
-                let list_name = format!("List_{}", mangle_scalar(element));
+                let list_name = format!("List_{}", mangle_option_payload(element, records));
                 let values = fields
                     .iter()
                     .map(|value| {
@@ -514,10 +520,10 @@ fn emit_instruction(
         }
         IrInstr::Index { dst, object, index, ty } => {
             let Ty::List(element) = value_ty(values, *object)? else { return Err(()) };
-            if !list_element_supported(&element) || value_ty(values, *index)? != Ty::Int || *ty != *element {
+            if !list_supported(&element, records) || value_ty(values, *index)? != Ty::Int || *ty != *element {
                 return Err(());
             }
-            let list_name = format!("List_{}", mangle_scalar(&element));
+            let list_name = format!("List_{}", mangle_option_payload(&element, records));
             out.push_str(&format!(
                 "    {} = {list_name}_get({}, {});\n",
                 value_name(*dst),
@@ -535,8 +541,8 @@ fn emit_instruction(
             let receiver_ty = value_ty(values, *receiver)?;
             let receiver = value_code(values, *receiver)?;
             let call = match receiver_ty {
-                Ty::List(element) if list_element_supported(&element) => {
-                    let list_name = format!("List_{}", mangle_scalar(&element));
+                Ty::List(element) if list_supported(&element, records) => {
+                    let list_name = format!("List_{}", mangle_option_payload(&element, records));
                     match method.as_str() {
                         "length" | "count" if args.is_empty() && *ty == Ty::Int => {
                             format!("{list_name}_length({receiver})")

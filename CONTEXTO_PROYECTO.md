@@ -5062,3 +5062,17 @@ transferentes y uses repartidos por CFGs más complejos.
 la prueba diferencial `native_ir_emitter_releases_managed_loop_phi_values` verifica `startxxx`,
 la presencia de releases en la IR y `live_allocations=0` en el binario. La suite queda en
 **6 pruebas diferenciales y 157 de integración verdes**.
+
+## 191. `List<Record>` desde la IR — 2026-09-20
+
+El emisor C de la IR acepta ahora listas cuyo elemento es un record concreto: tipos
+`List_<Record>*`, construcción con `new_from_array`, indexado, `push`, `remove_at`,
+`length`/`count` y vacíos tipados, reutilizando los helpers y destructores que el backend ya
+registra para el record. El ownership por tipo existente (retain de aliases prestados,
+transferencia en `remove_at`) se aplica sin cambios. Maps y sets siguen limitados a escalares.
+
+`examples/native_ir_record_lists.ostrin` mueve las tres funciones al camino IR (antes solo
+`make`); `native_ir_emitter_handles_record_lists` compara intérprete y binario y exige
+`live_allocations=0`. Suite: **6 diferenciales y 158 de integración**.
+
+Siguiente frontera: `Option<List>`/listas anidadas, patrones anidados y bucles `for` sobre listas.
