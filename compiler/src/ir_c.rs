@@ -8,8 +8,9 @@
 //! and the scalar-key/value core of `Map<K,V>`/`Set<T>`, plus scalar-payload
 //! `Result<T,E>` values such as `String.to_int()`/`to_float()`; wrappers can
 //! now compose over scalar collections and over other `Option`/`Result` values
-//! with recursive ownership markers while larger aggregates retain the
-//! verified HIR/AST fallback.
+//! with recursive ownership markers. Straight-line tasks additionally use a
+//! generated C environment for immutable captures while larger aggregates,
+//! branching task bodies and scopes retain the verified HIR/AST fallback.
 
 use std::collections::{HashMap, HashSet};
 
@@ -19,9 +20,18 @@ use crate::types::Ty;
 
 type Bail<T> = Result<T, ()>;
 type Values = HashMap<ValueId, (String, Ty)>;
-type SpawnHelpers = HashMap<BlockId, String>;
 pub type RecordFields = HashMap<String, Vec<String>>;
 pub type MethodNames = HashMap<(String, String), String>;
+
+#[derive(Clone)]
+struct SpawnHelper {
+    callback: String,
+    env_type: Option<String>,
+    drop_env: Option<String>,
+    captures: Vec<(ValueId, Ty)>,
+}
+
+type SpawnHelpers = HashMap<BlockId, SpawnHelper>;
 
 fn c_type(ty: &Ty, records: &RecordFields) -> Bail<String> {
     Ok(match ty {
@@ -1176,11 +1186,32 @@ fn emit_instruction(
             let helper = spawn_helpers.get(region).ok_or(())?;
             let task_name = format!("Task_{}", mangle_task_payload(&args[0], records));
             let task = value_name(*dst);
+            let env = if helper.captures.is_empty() {
+                "NULL".to_string()
+            } else {
+                let env_type = helper.env_type.as_ref().ok_or(())?;
+                let mut init = String::new();
+                for (value, capture_ty) in &helper.captures {
+                    init.push_str(&format!(
+                        "__ce->__ir_v{value} = {}; ",
+                        value_code(values, *value)?
+                    ));
+                    if let Some(retain) = retain_payload(&format!("__ce->__ir_v{value}"), capture_ty, records) {
+                        init.push_str(&retain);
+                        init.push_str("; ");
+                    }
+                }
+                format!(
+                    "({{ {env_type}* __ce = ({env_type}*)ostrin_alloc(sizeof *__ce); {init}(void*)__ce; }})"
+                )
+            };
             out.push_str(&format!(
                 "    {task} = ({task_name}*)ostrin_calloc_with_drop(1, sizeof *{task}, (void (*)(void*)){task_name}_drop);\n"
             ));
             out.push_str(&format!(
-                "    {task}->run = {helper}; {task}->env = NULL; {task}->drop_env = NULL; {task}->group = ostrin_current_group();\n"
+                "    {task}->run = {}; {task}->env = {env}; {task}->drop_env = {}; {task}->group = ostrin_current_group();\n",
+                helper.callback,
+                helper.drop_env.as_deref().unwrap_or("NULL")
             ));
             out.push_str(&format!(
                 "    ostrin_register_task({task}, {task_name}_poll, {task_name}_cancel_adapter); ostrin_track_task_handle({task});\n"
@@ -1428,6 +1459,7 @@ fn terminator_values(terminator: &IrTerminator) -> Vec<ValueId> {
 
 pub struct Generated {
     pub body: String,
+    pub declarations: Vec<String>,
     pub helpers: Vec<(String, String)>,
 }
 
@@ -1439,7 +1471,7 @@ fn build_spawn_helpers(
     records: &RecordFields,
     spawn_helpers: &mut SpawnHelpers,
     show: &mut dyn FnMut(&str, &Ty) -> Option<String>,
-) -> Bail<Vec<(String, String)>> {
+) -> Bail<(Vec<String>, Vec<(String, String)>)> {
     let mut specs = Vec::new();
     for block in &function.blocks {
         for instruction in &block.instructions {
@@ -1448,13 +1480,23 @@ fn build_spawn_helpers(
             if name != "Task" || args.len() != 1 || *scoped || !task_supported(&args[0], records) {
                 return Err(());
             }
-            if spawn_helpers.insert(*region, String::new()).is_some() {
+            if spawn_helpers.contains_key(region) {
                 return Err(());
             }
+            spawn_helpers.insert(
+                *region,
+                SpawnHelper {
+                    callback: String::new(),
+                    env_type: None,
+                    drop_env: None,
+                    captures: Vec::new(),
+                },
+            );
             specs.push((*region, args[0].clone()));
         }
     }
 
+    let mut declarations = Vec::new();
     let mut helpers = Vec::with_capacity(specs.len());
     for (region, result_ty) in specs {
         let block = function.blocks.get(region).ok_or(())?;
@@ -1471,12 +1513,28 @@ fn build_spawn_helpers(
                     return Err(());
                 }
             }
-            if used_values(instruction).iter().any(|value| !definitions.contains(value)) {
-                return Err(());
+        }
+        let mut captured_values = HashSet::new();
+        for instruction in &block.instructions {
+            for value in used_values(instruction) {
+                if !definitions.contains(&value) {
+                    captured_values.insert(value);
+                }
             }
         }
         let terminator = block.terminator.as_ref().ok_or(())?;
-        if terminator_values(terminator).iter().any(|value| !definitions.contains(value)) {
+        for value in terminator_values(terminator) {
+            if !definitions.contains(&value) {
+                captured_values.insert(value);
+            }
+        }
+        captured_values.retain(|value| !definitions.contains(value));
+        let mut captures: Vec<(ValueId, Ty)> = captured_values
+            .into_iter()
+            .map(|value| values.get(&value).map(|(_, ty)| (value, ty.clone())).ok_or(()))
+            .collect::<Bail<Vec<_>>>()?;
+        captures.sort_by_key(|(value, _)| *value);
+        if captures.iter().any(|(_, ty)| *ty == Ty::Void || !supported(ty, records)) {
             return Err(());
         }
         match terminator {
@@ -1490,9 +1548,60 @@ fn build_spawn_helpers(
             crate::codegen::c_function_name(&function.name),
             region
         );
-        spawn_helpers.insert(region, helper_name.clone());
+        let env_type = (!captures.is_empty()).then(|| {
+            format!(
+                "OstrinIrTaskEnv_{}_{}",
+                crate::codegen::c_function_name(&function.name),
+                region
+            )
+        });
+        let drop_name = env_type.as_ref().map(|_| {
+            format!(
+                "ostrin_ir_task_env_drop_{}_{}",
+                crate::codegen::c_function_name(&function.name),
+                region
+            )
+        });
+        if let Some(env_type) = &env_type {
+            let fields = captures
+                .iter()
+                .map(|(value, ty)| c_type(ty, records).map(|ctype| format!("{ctype} __ir_v{value};")))
+                .collect::<Bail<Vec<_>>>()?;
+            declarations.push(format!("typedef struct {{ {} }} {env_type};", fields.join(" ")));
+            declarations.push(format!("static void {}(void* __env);", drop_name.as_deref().ok_or(())?));
+            let mut drop_body = format!("    {env_type}* __e = __env;\n");
+            for (value, ty) in &captures {
+                if let Some(release) = release_payload(&format!("__e->__ir_v{value}"), ty, records) {
+                    drop_body.push_str("    ");
+                    drop_body.push_str(&release);
+                    drop_body.push_str(";\n");
+                }
+            }
+            drop_body.push_str("    ostrin_release((void*)__env);\n");
+            helpers.push((
+                format!("static void {}(void* __env)", drop_name.as_deref().ok_or(())?),
+                drop_body,
+            ));
+        }
+        spawn_helpers.insert(
+            region,
+            SpawnHelper {
+                callback: helper_name.clone(),
+                env_type: env_type.clone(),
+                drop_env: drop_name.clone(),
+                captures: captures.clone(),
+            },
+        );
         let signature = format!("static {} {helper_name}(void* __env)", c_type(&result_ty, records)?);
-        let mut body = String::from("    (void)__env;\n");
+        let mut helper_values = values.clone();
+        for (value, ty) in &captures {
+            helper_values.insert(*value, (format!("__e->__ir_v{value}"), ty.clone()));
+        }
+        let mut body = if let Some(env_type) = &env_type {
+            format!("    {env_type}* __e = __env;\n")
+        } else {
+            String::from("    (void)__env;\n")
+        };
         let mut declarations: Vec<(ValueId, Ty)> = definitions
             .iter()
             .filter_map(|value| values.get(value).map(|(_, ty)| (*value, ty.clone())))
@@ -1505,7 +1614,7 @@ fn build_spawn_helpers(
         for instruction in &block.instructions {
             emit_instruction(
                 instruction,
-                values,
+                &helper_values,
                 known_functions,
                 methods,
                 records,
@@ -1516,13 +1625,21 @@ fn build_spawn_helpers(
         }
         match terminator {
             IrTerminator::RegionReturn(Some(value)) if result_ty == Ty::Void => body.push_str("    return;\n"),
-            IrTerminator::RegionReturn(Some(value)) => body.push_str(&format!("    return {};\n", value_code(values, *value)?)),
+            IrTerminator::RegionReturn(Some(value)) => {
+                let return_code = value_code(&helper_values, *value)?;
+                if captures.iter().any(|(captured, _)| *captured == *value)
+                    && retain_payload(&return_code, &result_ty, records).is_some()
+                {
+                    body.push_str(&format!("    {} ;\n", retain_payload(&return_code, &result_ty, records).ok_or(())?));
+                }
+                body.push_str(&format!("    return {return_code};\n"));
+            }
             IrTerminator::RegionReturn(None) => body.push_str("    return;\n"),
             _ => return Err(()),
         }
         helpers.push((signature, body));
     }
-    Ok(helpers)
+    Ok((declarations, helpers))
 }
 
 /// Emits an IR function when all of its values use a supported scalar or
@@ -1566,7 +1683,7 @@ pub fn generate_with_helpers(
 
     let values = collect_values(function, records).ok()?;
     let mut spawn_helpers = SpawnHelpers::new();
-    let helpers = build_spawn_helpers(
+    let (helper_declarations, helpers) = build_spawn_helpers(
         function,
         &values,
         known_functions,
@@ -1616,5 +1733,9 @@ pub fn generate_with_helpers(
     // Every legal edge above terminates, but keep the C function well-formed
     // even if a future IR terminator gains a fall-through representation.
     out.push_str("    abort();\n");
-    Some(Generated { body: out, helpers })
+    Some(Generated {
+        body: out,
+        declarations: helper_declarations,
+        helpers,
+    })
 }

@@ -5728,3 +5728,23 @@ La migración no declara resuelta toda la concurrencia: faltan la ABI de entorno
 la bajada de scopes y las regiones con ramas o loops. Esas formas permanecen observables como
 fallback HIR/AST hasta que ownership, cancelación y escape puedan expresarse en la IR sin perder
 la semántica del intérprete.
+
+## 228. Capturas inmutables en tareas IR — 2026-09-21
+
+La siguiente extensión de la concurrencia nativa conserva la semántica de captura por valor sin
+hacer que el callback dependa de temporales del llamador:
+
+- una región lineal puede leer valores inmutables definidos en la función padre; el emisor detecta
+  esos usos, genera un `OstrinIrTaskEnv_*` con campos C tipados y sustituye las lecturas por campos
+  del entorno dentro del callback;
+- la creación de la tarea reserva el entorno con el allocator registrado, copia los campos y
+  retiene los payloads gestionados. El destructor del entorno libera cada campo y después el propio
+  entorno, también si una tarea se cancela antes de ejecutarse;
+- cuando el resultado es una referencia capturada directamente, el callback retiene el valor antes
+  de que el runtime destruya el entorno. La regresión `native_ir_spawn_join.ostrin` cubre capturas
+  escalares, una captura `String`, una tarea sin capturas, `Task_Int_join` y `Task_String_join` en
+  scheduler cooperativo y en hilos nativos, con `live_allocations=0`.
+
+La frontera sigue siendo intencionalmente estrecha: las capturas mutables ya son rechazadas por el
+checker, y una tarea con ramas, loops, otra tarea anidada o `spawn_scope` permanece en HIR/AST
+hasta que la IR pueda representar su CFG, cancelación y ownership de escape de forma equivalente.

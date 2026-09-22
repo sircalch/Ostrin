@@ -1,6 +1,20 @@
 fn main() -> Void {
-    task = spawn {
+    base = 3
+    captured = spawn {
+        base + 4
+    }
+    plain = spawn {
         3 + 4
     }
-    print(task.join())
+    label = "cap" + "tured"
+    text_task = spawn {
+        label
+    }
+    built_task = spawn {
+        "inside" + " task"
+    }
+    print(captured.join())
+    print(plain.join())
+    print(text_task.join())
+    print(built_task.join())
 }

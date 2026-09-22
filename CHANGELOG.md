@@ -34,9 +34,10 @@
   the decentralized Git/path model remains unchanged.
 
 ### Language and libraries
-- Non-capturing, straight-line `spawn {}` blocks now lower through the native IR/C backend and
-  `Task.join()` calls the real cooperative or native-thread runtime helper. Capturing tasks,
-  internal control flow and `spawn_scope` remain on the verified HIR/AST fallback; the new
+- Straight-line `spawn {}` blocks now lower through the native IR/C backend, including immutable
+  by-value captures in a generated environment with retain/release; `Task.join()` calls the real
+  cooperative or native-thread runtime helper. Internal control flow and `spawn_scope` remain on
+  the verified HIR/AST fallback; the new
   `native_ir_spawn_join.ostrin` regression checks both modes and `live_allocations=0`.
 - Channel iteration over concrete payloads now lowers through native CFG/IR: `send`, `close`,
   `receive` and `for` use the generated `Channel_*` runtime helpers, with last-use release of the

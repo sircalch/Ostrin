@@ -6892,6 +6892,9 @@ fn generate_impl(
                         let ctype = codegen.ty_to_ctype(ty)?;
                         codegen.show_expr(code, &ctype).ok()
                     }).map(|generated| {
+                        for declaration in generated.declarations {
+                            ir_helper_prototypes.push(declaration);
+                        }
                         for (helper_signature, helper_body) in generated.helpers {
                             ir_helper_prototypes.push(format!("{helper_signature};"));
                             bodies.push((helper_signature, helper_body));

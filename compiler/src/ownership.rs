@@ -97,6 +97,44 @@ pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
         let mut borrowed_values = HashSet::new();
         let mut phi_edges: HashMap<ValueId, Vec<(usize, usize)>> = HashMap::new();
 
+        // A spawned region is represented as an otherwise disconnected IR
+        // block. Values read there are captured by the task environment, so
+        // ownership must model the Spawn instruction as their transfer point
+        // instead of treating the RegionReturn as an ordinary CFG use.
+        let mut region_captures: HashMap<usize, HashSet<ValueId>> = HashMap::new();
+        let mut capture_sites: Vec<(usize, usize, ValueId)> = Vec::new();
+        for parent in function.blocks.iter() {
+            for (index, instruction) in parent.instructions.iter().enumerate() {
+                let IrInstr::Spawn { region, .. } = instruction else { continue };
+                let Some(region_block) = function.blocks.get(*region) else { continue };
+                let local_definitions: HashSet<ValueId> = region_block
+                    .instructions
+                    .iter()
+                    .filter_map(defined_value)
+                    .map(|(value, _)| value)
+                    .collect();
+                let mut captured = HashSet::new();
+                for nested in &region_block.instructions {
+                    for value in used_values(nested) {
+                        if !local_definitions.contains(&value) {
+                            captured.insert(value);
+                        }
+                    }
+                }
+                if let Some(terminator) = &region_block.terminator {
+                    for value in terminator_values(terminator) {
+                        if !local_definitions.contains(&value) {
+                            captured.insert(value);
+                        }
+                    }
+                }
+                for value in &captured {
+                    capture_sites.push((parent.id, index, *value));
+                }
+                region_captures.insert(*region, captured);
+            }
+        }
+
         for block in &function.blocks {
             for (index, instruction) in block.instructions.iter().enumerate() {
                 if let Some((value, ty)) = defined_value(instruction) {
@@ -111,6 +149,12 @@ pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
                     }
                 }
                 for value in used_values(instruction) {
+                    if region_captures
+                        .get(&block.id)
+                        .is_some_and(|captured| captured.contains(&value))
+                    {
+                        continue;
+                    }
                     uses.entry(value).or_default().push(UsePoint { block: block.id, instruction: index });
                 }
                 if matches!(instruction, IrInstr::Opaque { .. }) {
@@ -121,12 +165,21 @@ pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
             }
             if let Some(terminator) = &block.terminator {
                 for value in terminator_values(terminator) {
+                    if region_captures
+                        .get(&block.id)
+                        .is_some_and(|captured| captured.contains(&value))
+                    {
+                        continue;
+                    }
                     uses.entry(value).or_default().push(UsePoint {
                         block: block.id,
                         instruction: block.instructions.len(),
                     });
                 }
             }
+        }
+        for (block, instruction, value) in capture_sites {
+            uses.entry(value).or_default().push(UsePoint { block, instruction });
         }
 
         let mut retain_before: HashMap<(usize, usize), Vec<ValueId>> = HashMap::new();
@@ -182,7 +235,10 @@ pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
                         matches!(function.blocks[*definition_block].instructions.get(*definition_instruction), Some(IrInstr::Const { .. })),
                     );
                     }
-                } else if !matches!(block.terminator, Some(IrTerminator::Return(Some(returned))) if returned == *value) {
+                } else if !matches!(
+                    block.terminator,
+                    Some(IrTerminator::Return(Some(returned)) | IrTerminator::RegionReturn(Some(returned))) if returned == *value
+                ) {
                     summary.unresolved_values += 1;
                     note_unresolved(
                         &mut summary,
@@ -416,6 +472,7 @@ fn safe_release_site(instruction: &IrInstr) -> bool {
     // aggregate/index operation whose native helper retains borrowed values.
     match instruction {
         IrInstr::StoreLocal { .. }
+        | IrInstr::Spawn { .. }
         | IrInstr::ChannelSend { .. }
         | IrInstr::ChannelReceive { .. }
         | IrInstr::ChannelClose { .. }
@@ -518,7 +575,10 @@ fn plan_cross_block_releases(
             None => {
                 // A terminator use: branch conditions are harmless, and returning
                 // the value itself transfers it to the caller.
-                let transfers = matches!(block.terminator, Some(IrTerminator::Return(Some(returned))) if returned == value);
+                let transfers = matches!(
+                    block.terminator,
+                    Some(IrTerminator::Return(Some(returned)) | IrTerminator::RegionReturn(Some(returned))) if returned == value
+                );
                 if !transfers && !matches!(block.terminator, Some(IrTerminator::Branch { .. })) {
                     return None;
                 }

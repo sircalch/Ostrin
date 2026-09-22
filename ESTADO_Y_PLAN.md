@@ -3,7 +3,7 @@
 *Corte: 2026-09-21 · rama `main` · 6 pruebas diferenciales, 182 de integración y 2 unitarias en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
-Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–227); para el diseño
+Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–228); para el diseño
 del lenguaje, `docs/design/` (22 documentos). La auditoría del sitio vive en
 `docs/website-audit.md`.
 
@@ -31,7 +31,7 @@ Implementación: compilador + intérprete + herramientas de editor, todo en Rust
 | Léxico / parser | `lexer/`, `parser/mod.rs` | Tokens, AST con rangos de origen |
 | Módulos y paquetes | `modules.rs`, `package.rs`, `ostrin.toml` | Imports, `--project`, dependencias locales y lockfile portable |
 | Verificador de tipos | `typeck/mod.rs` (~3 500 l.) | Tipos, dimensiones, traits, exhaustividad, genéricos |
-| HIR/IR | `hir.rs`, `hir_c.rs`, `ir.rs`, `ir_c.rs` | HIR verificado, CFG con temporales explícitos y emisor C para escalares, `String`, `Result<Int, String>`/`Result<Float, String>` con `try`, `try catch` inline, handlers globales y aliases locales de handlers globales, wrappers `Option`/`Result` sobre `List`, `Map` y `Set` con payload gestionado, records concretos, iteradores de records concretos (`next() -> Option<T>`), iteración de canales mediante `receive() -> Option<T>`, `spawn {}` lineal sin capturas y `Task.join()`, `Option<Record>`, listas escalares, mapas/conjuntos escalares, enteros de ancho fijo y control de flujo, con fallback HIR/AST acotado |
+| HIR/IR | `hir.rs`, `hir_c.rs`, `ir.rs`, `ir_c.rs` | HIR verificado, CFG con temporales explícitos y emisor C para escalares, `String`, `Result<Int, String>`/`Result<Float, String>` con `try`, `try catch` inline, handlers globales y aliases locales de handlers globales, wrappers `Option`/`Result` sobre `List`, `Map` y `Set` con payload gestionado, records concretos, iteradores de records concretos (`next() -> Option<T>`), iteración de canales mediante `receive() -> Option<T>`, `spawn {}` lineal con capturas inmutables soportadas y `Task.join()`, `Option<Record>`, listas escalares, mapas/conjuntos escalares, enteros de ancho fijo y control de flujo, con fallback HIR/AST acotado |
 | Intérprete | `interpreter/mod.rs` | Ejecución tree‑walking y scheduler cooperativo; referencia semántica |
 | Servidor de lenguaje | `lsp.rs`, `symbols.rs`, `protocol.rs` | LSP sobre stdio |
 | Adaptador de depuración | `dap.rs` + hooks del intérprete | DAP sobre stdio |
@@ -72,10 +72,10 @@ canales bloqueantes, selección entre canales y cancelación cooperativa en punt
 `mut` (E1100) y el análisis HIR/IR rechaza por defecto reutilizar un valor movible después de
 enviarlo (E1101); `--ownership-check` conserva el informe detallado.
 
-La primera tarea que cruza completamente HIR→IR→C es `spawn {}` sin capturas y de cuerpo lineal,
-con `Task.join()` cooperativo o sobre hilos nativos; capturas, control de flujo interno y
-`spawn_scope` conservan el fallback verificado hasta que exista una ABI de entorno y cancelación
-equivalente en la IR.
+La primera tarea que cruza completamente HIR→IR→C es `spawn {}` de cuerpo lineal, incluyendo
+capturas inmutables por valor mediante un entorno C con retain/release, y `Task.join()` cooperativo
+o sobre hilos nativos; control de flujo interno, tareas anidadas y `spawn_scope` conservan el
+fallback verificado hasta que exista una ABI de CFG, entorno y cancelación equivalente en la IR.
 
 **Numérico/científico**: enteros de ancho fijo, `Float32`, `Array<T>` (difusión, máscaras,
 rebanadas, `@`), estadística, regresión, `det/inv/eigvals/norm`, `Rng` reproducible,
@@ -130,7 +130,7 @@ escalar o `String` también se consumen al generar C; `Map.get/remove` producen 
 `Option_<T>` por valor y retienen/transfieren sus strings correctamente. Los `for` sobre rangos
 enteros también se bajan a CFG con dirección derivada del signo del paso: `to`/`until`, pasos
 positivos/negativos y paso cero conservan la semántica del intérprete, incluyendo `break`/`continue`.
-Agregados complejos, iteradores propios genéricos o indirectos, capturas/control de flujo dentro de `spawn`,
+Agregados complejos, iteradores propios genéricos o indirectos, control de flujo o tareas anidadas dentro de `spawn`,
 `spawn_scope` y patrones distintos de `Some/None` y
 payloads gestionados que no sean `String` caen de forma verificable a HIR y después al AST. Los
 iteradores de records concretos con `Iterator<T>` y `next() -> Option<T>` ya cruzan la IR, incluida
@@ -216,7 +216,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Chequeo «movido tras enviar» (E1101) | Integrado por defecto en `--check`, `--run`, `--emit-c` y `--compile`; `--ownership-check` conserva el informe explícito |
 | Paralelismo nativo (`--native-threads`, canales bloqueantes, `select`) | Hilos del SO, mutexes/condiciones, canales bloqueantes y `select(List<Channel<T>>)` implementados de forma opt-in; `select` conserva prioridad determinista y cede el hilo nativo entre intentos; `Task.cancel()` cancela pendientes, propaga a grupos activos de `spawn_scope` o solicita cancelación a tareas `Running`, observada en checkpoints seguros; `receive()` vuelve periódicamente al runtime sin conservar el mutex durante el checkpoint |
 | Memoria en nativo | Registro, destructores tipados para records/colecciones y entornos de tareas, `clone`/`drop`, cleanup automático de locales directos, bloques anidados, ramas, loops y cancelación de tareas en AST/HIR, y `--leak-check`; `String`, `String.split/lines`, `Result<Int, String>`, `Result<Float, String>`, records concretos, canales, `Option<Record>`, listas escalares/String, mapas/conjuntos escalares, wrappers sobre `List`/`Map`/`Set` y wrappers `Option`/`Result` anidados ya consumen ownership desde IR; el fallback AST ahora materializa y libera temporales gestionados de argumentos/`print` y campos de registros, pero consumidores complejos y escapes siguen pendientes |
-| IR de bloques | HIR→CFG disponible con `--ir`; el emisor C cubre ramas, bucles escalares con `phi`, rangos enteros direccionales (`to`/`until`, pasos y `break`/`continue`), `String` (incluidos `split/lines`), `Result` escalar de parseo con `match`/consultas, `try`, `try catch` inline, handlers globales y aliases locales de handlers globales, `map`/`map_err`/`then` de `Result`, `Option.map`/`then` escalar/String, records concretos con campos anidados, iteradores de records concretos cuyo elemento sea un payload soportado y cuyo `next` esté registrado, canales con `send`/`close`/`receive` y `for` sobre `Option<T>`, `spawn {}` lineal sin capturas con `Task.join()`, listas escalares/String, operaciones hash escalares, wrappers de una capa sobre `List`/`Map`/`Set` y wrappers `Option`/`Result` anidados con `match`; iteradores genéricos/indirectos, tareas con capturas o scopes, llamadas indirectas, handlers locales/closures con entorno y consumidores complejos aún no reemplazan el backend C completo |
+| IR de bloques | HIR→CFG disponible con `--ir`; el emisor C cubre ramas, bucles escalares con `phi`, rangos enteros direccionales (`to`/`until`, pasos y `break`/`continue`), `String` (incluidos `split/lines`), `Result` escalar de parseo con `match`/consultas, `try`, `try catch` inline, handlers globales y aliases locales de handlers globales, `map`/`map_err`/`then` de `Result`, `Option.map`/`then` escalar/String, records concretos con campos anidados, iteradores de records concretos cuyo elemento sea un payload soportado y cuyo `next` esté registrado, canales con `send`/`close`/`receive` y `for` sobre `Option<T>`, `spawn {}` lineal con capturas inmutables y `Task.join()`, listas escalares/String, operaciones hash escalares, wrappers de una capa sobre `List`/`Map`/`Set` y wrappers `Option`/`Result` anidados con `match`; iteradores genéricos/indirectos, tareas con CFG interno o scopes, llamadas indirectas, handlers locales/closures no lineales y consumidores complejos aún no reemplazan el backend C completo |
 | Ownership/último uso | `--ownership-report`, `--ownership-check` y `--ownership-ir`; la IR ya inserta y consume retain/release lineal para `String`, `Result` con payload `String`, records concretos, `Option<Record>`, listas escalares/String, mapas/conjuntos escalares y `Option<String>`, con transferencia en `Phi` simples y liberación de `Phi` de bucle en backedges probados; los buffers temporales de `split/lines` transfieren y liberan sus strings, y `Result` libera condicionalmente `value`/`error`; la ruta AST conserva la misma regla para temporales frescos en llamadas genéricas, `print` y acceso a campos; `Option` escalar es por valor, mientras llamadas transferentes no lineales, agregados complejos, scopes y escapes siguen conservadores |
 | Biblioteca estándar | Incluye `std.math`, `std.lists`, `std.strings` y ahora `std.time` (calendario gregoriano determinista, validación, ordinales, día de semana, ISO y `Result` de parseo); siguen faltando JSON y red |
 | Mensajes de error de E/S | `strerror` ≠ texto de Rust (difieren entre backends) |
