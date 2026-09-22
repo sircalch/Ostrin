@@ -5940,3 +5940,22 @@ intérprete y el backend nativo:
 La red y un registro remoto de paquetes siguen fuera de este bloque. El siguiente avance debe
 conservar la misma regla: cada superficie nueva entra con programa ejecutable, paridad de backend,
 prueba negativa cuando corresponda, documentación y publicación sincronizada.
+
+## 240. Igualdad estructural dentro de la IR nativa — 2026-09-21
+
+La semántica de `==`/`!=` para colecciones y wrappers ya no obliga al backend nativo a abandonar
+la IR cuando aparece en una función con CFG:
+
+- `ir_c` acepta ahora comparaciones estructurales de `List`, `Map`, `Set`, `Option` y `Result`
+  cuando sus payloads tienen una representación soportada. El callback de helpers reutiliza los
+  mismos `ostrin_eq_*` que el emisor C existente, por lo que los valores anidados, records con
+  `derive(Eq)` y strings conservan una sola implementación de igualdad;
+- el constructor `None` quedó cubierto en la misma ruta de llamadas IR, evitando que una opción
+  vacía fuerce el fallback aunque se compare dentro del CFG;
+- `examples/structural_equality.ostrin` conserva siete resultados idénticos entre intérprete y
+  nativo, exige `ir-generated: 1` y ejecuta el binario con `--leak-check`, que termina en
+  `live_allocations=0`.
+
+La semántica de `Array` sigue siendo deliberadamente elemento a elemento y devuelve una máscara;
+no se mezcla con la igualdad booleana estructural de las colecciones. Los consumidores complejos
+que aún no tienen representación IR permanecen en el fallback verificado.

@@ -23,6 +23,14 @@ type Values = HashMap<ValueId, (String, Ty)>;
 pub type RecordFields = HashMap<String, Vec<String>>;
 pub type MethodNames = HashMap<(String, String), String>;
 
+#[derive(Clone, Copy)]
+pub enum HelperRequest {
+    Show,
+    Equality,
+}
+
+type HelperGenerator<'a> = dyn FnMut(HelperRequest, &str, &str, &Ty) -> Option<String> + 'a;
+
 #[derive(Clone)]
 struct SpawnHelper {
     callback: String,
@@ -434,6 +442,7 @@ fn binary_code(
     right: &str,
     right_ty: &Ty,
     ty: &Ty,
+    equality: &mut HelperGenerator<'_>,
 ) -> Bail<String> {
     if let (Ty::Sized(left_kind), Ty::Sized(right_kind)) = (left_ty, right_ty) {
         if left_kind != right_kind {
@@ -443,6 +452,14 @@ fn binary_code(
     }
     if *ty == Ty::String && op == BinOp::Add && *left_ty == Ty::String && *right_ty == Ty::String {
         return Ok(format!("ostrin_str_concat({left}, {right})"));
+    }
+    if matches!(op, BinOp::Eq | BinOp::NotEq) && left_ty == right_ty && !scalar(left_ty) {
+        let expression = equality(HelperRequest::Equality, left, right, left_ty).ok_or(())?;
+        return Ok(if op == BinOp::NotEq {
+            format!("(!({expression}))")
+        } else {
+            expression
+        });
     }
     if (*left_ty == Ty::String || *right_ty == Ty::String)
         && matches!(op, BinOp::Eq | BinOp::NotEq | BinOp::Lt | BinOp::Gt | BinOp::LtEq | BinOp::GtEq)
@@ -524,7 +541,7 @@ fn emit_instruction(
     methods: &MethodNames,
     records: &RecordFields,
     spawn_helpers: &SpawnHelpers,
-    show: &mut dyn FnMut(&str, &Ty) -> Option<String>,
+    helper: &mut HelperGenerator<'_>,
     out: &mut String,
 ) -> Bail<()> {
     match instruction {
@@ -609,7 +626,10 @@ fn emit_instruction(
             }
             let left_ty = value_ty(values, *left)?;
             let right_ty = value_ty(values, *right)?;
-            if !scalar(&left_ty) || !scalar(&right_ty) {
+            let structural_equality = matches!(op, BinOp::Eq | BinOp::NotEq)
+                && left_ty == right_ty
+                && supported(&left_ty, records);
+            if (!scalar(&left_ty) || !scalar(&right_ty)) && !structural_equality {
                 return Err(());
             }
             let code = binary_code(
@@ -619,6 +639,7 @@ fn emit_instruction(
                 &value_code(values, *right)?,
                 &right_ty,
                 ty,
+                helper,
             )?;
             out.push_str(&format!("    {} = {code};\n", value_name(*dst)));
         }
@@ -1077,6 +1098,13 @@ fn emit_instruction(
                         codes[0]
                     )
                 }
+            } else if callee == "None" && args.is_empty() {
+                let Ty::Applied(name, option_args) = ty else { return Err(()) };
+                if name != "Option" || option_args.len() != 1 || !option_supported(&option_args[0], records) {
+                    return Err(());
+                }
+                let option_name = format!("Option_{}", mangle_option_payload(&option_args[0], records));
+                format!("(({option_name}){{ .has = false }})")
             } else if (callee == "Ok" || callee == "Err") && args.len() == 1 {
                 let Ty::Applied(name, result_args) = ty else { return Err(()) };
                 if name != "Result" || result_args.len() != 2 || !result_supported(&result_args[0], &result_args[1], records) {
@@ -1112,7 +1140,7 @@ fn emit_instruction(
                 } else if supported(&arg_ty, records) {
                     // Collections, options and records print through the generated
                     // `ostrin_show_*` helper; the rendered text is an owned string.
-                    let shown = show(&codes[0], &arg_ty).ok_or(())?;
+                    let shown = helper(HelperRequest::Show, &codes[0], "", &arg_ty).ok_or(())?;
                     format!("({{ const char* __ostrin_shown = {shown}; printf(\"%s\\n\", __ostrin_shown); ostrin_release((void*)__ostrin_shown); }})")
                 } else {
                     return Err(());
@@ -1619,7 +1647,7 @@ fn build_spawn_helpers(
     methods: &MethodNames,
     records: &RecordFields,
     spawn_helpers: &mut SpawnHelpers,
-    show: &mut dyn FnMut(&str, &Ty) -> Option<String>,
+    helper: &mut HelperGenerator<'_>,
 ) -> Bail<(Vec<String>, Vec<(String, String)>)> {
     let mut specs = Vec::new();
     for block in &function.blocks {
@@ -1804,7 +1832,7 @@ fn build_spawn_helpers(
                     methods,
                     records,
                     spawn_helpers,
-                    show,
+                    helper,
                     &mut body,
                 )?;
             }
@@ -1836,7 +1864,11 @@ pub fn generate(
     records: &RecordFields,
     show: &mut dyn FnMut(&str, &Ty) -> Option<String>,
 ) -> Option<String> {
-    generate_with_helpers(function, known_functions, methods, records, show).map(|generated| generated.body)
+    let mut helper = |request: HelperRequest, left: &str, _right: &str, ty: &Ty| match request {
+        HelperRequest::Show => show(left, ty),
+        HelperRequest::Equality => None,
+    };
+    generate_with_helpers(function, known_functions, methods, records, &mut helper).map(|generated| generated.body)
 }
 
 pub fn generate_with_helpers(
@@ -1844,7 +1876,7 @@ pub fn generate_with_helpers(
     known_functions: &HashSet<String>,
     methods: &MethodNames,
     records: &RecordFields,
-    show: &mut dyn FnMut(&str, &Ty) -> Option<String>,
+    helper: &mut HelperGenerator<'_>,
 ) -> Option<Generated> {
     if function.entry >= function.blocks.len()
         || function
@@ -1873,7 +1905,7 @@ pub fn generate_with_helpers(
         methods,
         records,
         &mut spawn_helpers,
-        show,
+        helper,
     ).ok()?;
     let mut region_blocks = HashSet::new();
     for root in spawn_helpers.keys().copied() {
@@ -1923,7 +1955,7 @@ pub fn generate_with_helpers(
         }
         out.push_str(&format!("{}:\n", block_label(block.id)));
         for instruction in &block.instructions {
-            emit_instruction(instruction, &values, known_functions, methods, records, &spawn_helpers, show, &mut out).ok()?;
+            emit_instruction(instruction, &values, known_functions, methods, records, &spawn_helpers, helper, &mut out).ok()?;
         }
         emit_terminator(
             function,

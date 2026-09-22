@@ -848,16 +848,25 @@ fn structural_equality_matches_between_interpreter_and_native() {
     let expected = stdout(&interpreted).replace("\r\n", "\n");
     assert_eq!(expected, "true\ntrue\ntrue\ntrue\ntrue\ntrue\ntrue\n");
 
-    let exe = temp_artifact("structural-equality.exe");
-    let compile = run(&["--compile", "--out", &exe, &file]);
-    if skip_if_no_c_compiler(&compile) {
+    let report = run(&["--native-type-report", &file]);
+    if skip_if_no_c_compiler(&report) {
         return;
     }
+    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    let ir_functions = stdout(&report)
+        .lines()
+        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|value| value.trim().parse::<usize>().ok()))
+        .unwrap_or(0);
+    assert!(ir_functions >= 1, "structural equality still falls back from IR: {}", stdout(&report));
+
+    let exe = temp_artifact("structural-equality.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
     assert!(compile.status.success(), "native compile failed: {}", stderr(&compile));
     let native = Command::new(&exe).output().expect("run structural equality binary");
     let _ = fs::remove_file(&exe);
     assert!(native.status.success(), "native binary failed: {}", String::from_utf8_lossy(&native.stderr));
     assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "structural equality leaked: {}", String::from_utf8_lossy(&native.stderr));
 }
 
 #[test]

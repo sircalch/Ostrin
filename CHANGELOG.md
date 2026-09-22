@@ -48,6 +48,10 @@
   lists, string concatenation consumed intermediate buffers, and `String.codepoint()` releases a
   fresh receiver without releasing borrowed bindings. The standard-library suite now covers eight
   tests and keeps the native leak report at zero.
+- Moved structural `==`/`!=` for supported `List`, `Map`, `Set`, `Option` and `Result` values into
+  the native IR/C path. `structural_equality.ostrin` now reports `ir-generated: 1`, keeps exact
+  interpreter/native output and finishes with `live_allocations=0`; array comparisons retain their
+  separate element-wise scientific semantics.
 
 ### Language and libraries
 - Supported `spawn {}` blocks now lower through the native IR/C backend, including immutable

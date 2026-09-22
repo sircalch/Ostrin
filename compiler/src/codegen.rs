@@ -6907,9 +6907,12 @@ fn generate_impl(
                 .iter()
                 .find(|function| function.name == f.name && !ir_unresolved.contains(&function.name))
                 .and_then(|function| {
-                    crate::ir_c::generate_with_helpers(function, &ir_functions, &ir_methods, &ir_records, &mut |code, ty| {
+                    crate::ir_c::generate_with_helpers(function, &ir_functions, &ir_methods, &ir_records, &mut |request, left, right, ty| {
                         let ctype = codegen.ty_to_ctype(ty)?;
-                        codegen.show_expr(code, &ctype).ok()
+                        match request {
+                            crate::ir_c::HelperRequest::Show => codegen.show_expr(left, &ctype).ok(),
+                            crate::ir_c::HelperRequest::Equality => codegen.eq_expr(left, right, &ctype).ok(),
+                        }
                     }).map(|generated| {
                         for declaration in generated.declarations {
                             ir_helper_prototypes.push(declaration);
