@@ -34,6 +34,9 @@
   the decentralized Git/path model remains unchanged.
 
 ### Language and libraries
+- User-defined concrete record iterators with `Iterator<T>` and `next() -> Option<T>` now lower
+  through the native CFG/IR backend, resolve their registered C method and pass differential
+  output plus `--leak-check` coverage in `examples/fibonacci.ostrin`.
 - Added the embedded `std.time` module: a deterministic proleptic-Gregorian `Date` record with leap-year
   and month validation, day-of-year and ISO-weekday calculations, ordinal conversion, ISO formatting and
   `Result<Date, String>` parsing. `examples/std_tests.ostrin` and `time_library.ostrin` exercise it in both

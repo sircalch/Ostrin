@@ -6857,6 +6857,15 @@ fn generate_impl(
         .iter()
         .map(|(name, fields)| (name.clone(), fields.iter().map(|(field, _)| field.clone()).collect()))
         .collect();
+    let ir_methods: crate::ir_c::MethodNames = codegen
+        .methods
+        .iter()
+        .flat_map(|(record, methods)| {
+            methods
+                .iter()
+                .map(move |(method, info)| ((record.clone(), method.clone()), info.c_name.clone()))
+        })
+        .collect();
     for f in &functions {
         if !f.generics.is_empty() {
             continue;
@@ -6872,7 +6881,7 @@ fn generate_impl(
                 .iter()
                 .find(|function| function.name == f.name && !ir_unresolved.contains(&function.name))
                 .and_then(|function| {
-                    crate::ir_c::generate(function, &ir_functions, &ir_records, &mut |code, ty| {
+                    crate::ir_c::generate(function, &ir_functions, &ir_methods, &ir_records, &mut |code, ty| {
                         let ctype = codegen.ty_to_ctype(ty)?;
                         codegen.show_expr(code, &ctype).ok()
                     })

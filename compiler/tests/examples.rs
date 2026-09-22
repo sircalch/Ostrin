@@ -1685,6 +1685,40 @@ fn native_ir_emitter_handles_directional_integer_ranges() {
 }
 
 #[test]
+fn native_ir_emitter_handles_user_iterator_protocol() {
+    let file = example_path("fibonacci.ostrin");
+    let expected = "0\n1\n1\n2\n3\n5\n8\n13\n21\n34\n";
+    let interpreted = run(&["--run", &file]);
+    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    let report_text = stdout(&report);
+    let ir_functions = report_text
+        .lines()
+        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .unwrap_or(0);
+    assert!(ir_functions >= 1, "iterator consumer did not use the IR emitter: {report_text}");
+
+    let emitted = run(&["--emit-c", &file]);
+    assert!(emitted.status.success(), "iterator IR emission failed: {}", stderr(&emitted));
+    assert!(stdout(&emitted).contains("Fibonacci__next(__ir_v"), "iterator method call missing from IR C: {}", stdout(&emitted));
+
+    let exe = temp_artifact("native_ir_user_iterator.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+    let native = Command::new(&exe).output().expect("failed to run user iterator IR binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native run failed: {}", String::from_utf8_lossy(&native.stderr));
+    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "user iterator leaked: {}", String::from_utf8_lossy(&native.stderr));
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+}
+
+#[test]
 fn native_ir_emitter_handles_strings_and_ownership_markers() {
     let file = example_path("native_ir_strings.ostrin");
     let expected = "true\nfalse\nHello, Ostrin\nfallback\nHello, Alias\nalias-fallback\n";

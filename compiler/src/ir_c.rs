@@ -20,6 +20,7 @@ use crate::types::Ty;
 type Bail<T> = Result<T, ()>;
 type Values = HashMap<ValueId, (String, Ty)>;
 pub type RecordFields = HashMap<String, Vec<String>>;
+pub type MethodNames = HashMap<(String, String), String>;
 
 fn c_type(ty: &Ty, records: &RecordFields) -> Bail<String> {
     Ok(match ty {
@@ -468,6 +469,7 @@ fn emit_instruction(
     instruction: &IrInstr,
     values: &Values,
     known_functions: &HashSet<String>,
+    methods: &MethodNames,
     records: &RecordFields,
     show: &mut dyn FnMut(&str, &Ty) -> Option<String>,
     out: &mut String,
@@ -923,6 +925,21 @@ fn emit_instruction(
                         _ => return Err(()),
                     }
                 }
+                Ty::Named(record) if records.contains_key(&record) => {
+                    let c_name = methods.get(&(record, method.clone())).ok_or(())?;
+                    if !supported(ty, records) {
+                        return Err(());
+                    }
+                    let mut call_args = Vec::with_capacity(args.len() + 1);
+                    call_args.push(receiver.clone());
+                    for arg in args {
+                        if !supported(&value_ty(values, *arg)?, records) {
+                            return Err(());
+                        }
+                        call_args.push(value_code(values, *arg)?);
+                    }
+                    format!("{c_name}({})", call_args.join(", "))
+                }
                 _ => return Err(()),
             };
             if let Some(dst) = dst {
@@ -1246,6 +1263,7 @@ fn emit_terminator(
 pub fn generate(
     function: &IrFunction,
     known_functions: &HashSet<String>,
+    methods: &MethodNames,
     records: &RecordFields,
     show: &mut dyn FnMut(&str, &Ty) -> Option<String>,
 ) -> Option<String> {
@@ -1287,7 +1305,7 @@ pub fn generate(
     for block in &function.blocks {
         out.push_str(&format!("{}:\n", block_label(block.id)));
         for instruction in &block.instructions {
-            emit_instruction(instruction, &values, known_functions, records, show, &mut out).ok()?;
+            emit_instruction(instruction, &values, known_functions, methods, records, show, &mut out).ok()?;
         }
         emit_terminator(
             function,

@@ -21,6 +21,10 @@ pub struct HirProgram {
     /// Parameter count of every user function and every enum variant constructor: after
     /// lowering, a call to one of these carries exactly this many positional arguments.
     pub arities: std::collections::HashMap<String, usize>,
+    /// Element type yielded by each concrete user-defined `Iterator<T>` impl.
+    /// The IR uses this metadata to lower `for` without re-inferring the
+    /// protocol from the AST.
+    pub iterator_items: HashMap<String, Ty>,
 }
 
 #[derive(Debug, Clone)]
@@ -471,7 +475,17 @@ pub fn lower<'a>(items: &'a [Item], typed: &'a TypedProgram) -> HirProgram {
             _ => {}
         }
     }
-    HirProgram { functions, arities }
+    let iterator_items = items
+        .iter()
+        .filter_map(|item| match item {
+            Item::Impl(im) if im.trait_name.as_deref() == Some("Iterator") => im
+                .trait_args
+                .first()
+                .map(|item| (im.type_name.clone(), crate::typeck::resolve_type(item))),
+            _ => None,
+        })
+        .collect();
+    HirProgram { functions, arities, iterator_items }
 }
 
 /// Creates the concrete HIR body of one monomorphized generic function.

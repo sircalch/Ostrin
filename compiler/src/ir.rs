@@ -236,6 +236,7 @@ struct Builder {
     current: BlockId,
     next_value: ValueId,
     locals: Vec<HashMap<String, ValueId>>,
+    iterator_items: HashMap<String, Ty>,
     function_globals: HashMap<ValueId, String>,
     break_targets: Vec<(BlockId, BlockId)>,
     loop_edges: Vec<LoopEdges>,
@@ -243,7 +244,7 @@ struct Builder {
 }
 
 impl Builder {
-    fn new(function: &HirFunction) -> Self {
+    fn new(function: &HirFunction, iterator_items: &HashMap<String, Ty>) -> Self {
         let entry = IrBlock {
             id: 0,
             instructions: Vec::new(),
@@ -260,6 +261,7 @@ impl Builder {
             current: 0,
             next_value: 0,
             locals: vec![HashMap::new()],
+            iterator_items: iterator_items.clone(),
             function_globals: HashMap::new(),
             break_targets: Vec::new(),
             loop_edges: Vec::new(),
@@ -916,6 +918,81 @@ impl Builder {
         self.loop_exit_bindings(&loop_phis, normal_exit_block, &edges.breaks);
     }
 
+    fn iterator_element_type(&self, ty: &Ty) -> Option<Ty> {
+        match ty {
+            Ty::Named(name) | Ty::Applied(name, _) => self.iterator_items.get(name).cloned(),
+            _ => None,
+        }
+    }
+
+    /// Lowers a concrete record iterator through its `next() -> Option<T>`
+    /// protocol. Generic/indirect iterators continue through the legacy IR
+    /// nodes until their ABI is made explicit.
+    fn lower_for_iterator(&mut self, var: &str, iter: &HirExpr, element: &Ty, body: &HirBlock) {
+        let source = self.lower_expr(iter);
+        let option_ty = Ty::Applied("Option".to_string(), vec![element.clone()]);
+        let preheader = self.current;
+        let visible_before = self.snapshot_visible();
+        let condition_block = self.new_block();
+        let body_block = self.new_block();
+        let after_block = self.new_block();
+        self.terminate(IrTerminator::Goto(condition_block));
+
+        self.current = condition_block;
+        let body_text = format!("{body:?}");
+        let loop_phis = self.loop_entry_phis(&visible_before, &body_text, preheader, condition_block);
+        let next = self.fresh();
+        self.emit(IrInstr::MethodCall {
+            dst: Some(next),
+            method: "next".to_string(),
+            receiver: source,
+            args: Vec::new(),
+            ty: option_ty,
+        });
+        let has_next = self.fresh();
+        self.emit(IrInstr::TryCheck { dst: has_next, value: next });
+        self.terminate(IrTerminator::Branch {
+            condition: has_next,
+            then_block: body_block,
+            else_block: after_block,
+        });
+
+        self.current = body_block;
+        self.break_targets.push((after_block, condition_block));
+        self.loop_edges.push(LoopEdges::default());
+        self.locals.push(HashMap::new());
+        let item = self.fresh();
+        self.emit(IrInstr::TryValue {
+            dst: item,
+            value: next,
+            ty: element.clone(),
+        });
+        self.locals
+            .last_mut()
+            .expect("iterator loop scope")
+            .insert(var.to_string(), item);
+        let _ = self.lower_block_contents(body);
+        self.locals.pop();
+        self.break_targets.pop();
+        let edges = self.loop_edges.pop().unwrap_or_default();
+        let body_open = !self.terminated();
+        let mut backedges = Vec::new();
+        if body_open {
+            backedges.push((self.current, self.snapshot_visible()));
+            self.terminate(IrTerminator::Goto(condition_block));
+        }
+        backedges.extend(edges.continues);
+        for (name, destination, initial) in &loop_phis {
+            let mut incoming = vec![(preheader, *initial)];
+            for (block, values) in &backedges {
+                incoming.push((*block, values.get(name).copied().unwrap_or(*initial)));
+            }
+            self.patch_phi(*destination, incoming);
+        }
+        self.current = after_block;
+        self.loop_exit_bindings(&loop_phis, condition_block, &edges.breaks);
+    }
+
     fn lower_for(&mut self, var: &str, iter: &HirExpr, body: &HirBlock) {
         if let HirKind::Range(start, kind, end, step) = &iter.kind {
             if start.ty == Ty::Int && end.ty == Ty::Int && iter.ty == Ty::Int {
@@ -926,6 +1003,10 @@ impl Builder {
         if let Ty::List(element) = &iter.ty {
             let element = (**element).clone();
             self.lower_for_list(var, iter, &element, body);
+            return;
+        }
+        if let Some(element) = self.iterator_element_type(&iter.ty) {
+            self.lower_for_iterator(var, iter, &element, body);
             return;
         }
         let source = self.lower_expr(iter);
@@ -2034,12 +2115,16 @@ fn assigned_in(text: &str, name: &str) -> bool {
 
 pub fn lower(program: &HirProgram) -> IrProgram {
     IrProgram {
-        functions: program.functions.iter().map(lower_function).collect(),
+        functions: program
+            .functions
+            .iter()
+            .map(|function| lower_function(function, &program.iterator_items))
+            .collect(),
     }
 }
 
-fn lower_function(function: &HirFunction) -> IrFunction {
-    let mut builder = Builder::new(function);
+fn lower_function(function: &HirFunction, iterator_items: &HashMap<String, Ty>) -> IrFunction {
+    let mut builder = Builder::new(function, iterator_items);
     for (index, (name, ty)) in function.params.iter().enumerate() {
         let value = builder.fresh();
         builder.emit(IrInstr::Param {

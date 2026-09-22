@@ -5672,5 +5672,22 @@ La migración del backend nativo cierra ahora la familia de `for` sobre rangos e
   El intérprete y el binario nativo producen `25`, `20`, `19`, `0`; el reporte marca sus cinco
   funciones como `ir-generated` y ninguna como HIR, y `--leak-check` informa cero asignaciones vivas.
 
-Esto retira un `Opaque` concreto de la ruta de rangos sin alterar los rangos con cantidades ni el
-protocolo de iteradores propios, que siguen en las capas de fallback verificadas.
+Esto retira un `Opaque` concreto de la ruta de rangos sin alterar los rangos con cantidades ni los
+iteradores propios genéricos/indirectos, que siguen en las capas de fallback verificadas.
+
+## 225. Iteradores de records concretos en la IR nativa — 2026-09-21
+
+La migración del backend nativo cubre ahora el protocolo de iteradores definido por el usuario para
+records concretos:
+
+- `HirProgram` conserva la asociación `record -> T` de cada `impl Iterator<T>` y la bajada IR usa esa
+  metadata para construir el `for` como un CFG con condición, extracción `TryValue` y edges de
+  `break`/`continue`, sin volver a inferir el tipo desde el AST;
+- `ir_c.rs` resuelve `next()` contra la tabla de métodos C registrada por `codegen`, de modo que el
+  consumidor emite una llamada estática como `Fibonacci__next` y mantiene `Option<T>` por valor;
+- `examples/fibonacci.ostrin` compara intérprete y nativo, exige que el consumidor sea `ir-generated`,
+  inspecciona la llamada C emitida y ejecuta `--leak-check` con `live_allocations=0`.
+
+Los iteradores genéricos, indirectos o con payloads que el emisor aún no soporta conservan el fallback
+HIR/AST. La frontera es deliberada: añade una familia real de consumidores a la IR sin afirmar que el
+protocolo de iteración completo ya esté migrado.
