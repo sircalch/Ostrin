@@ -34,6 +34,9 @@
   the decentralized Git/path model remains unchanged.
 
 ### Language and libraries
+- Channel iteration over concrete payloads now lowers through native CFG/IR: `send`, `close`,
+  `receive` and `for` use the generated `Channel_*` runtime helpers, with last-use release of the
+  channel handle covered by `examples/native_ir_channel_iterator.ostrin`.
 - User-defined concrete record iterators with `Iterator<T>` and `next() -> Option<T>` now lower
   through the native CFG/IR backend, resolve their registered C method and pass differential
   output plus `--leak-check` coverage in `examples/fibonacci.ostrin`.

@@ -1,0 +1,17 @@
+fn main() -> Void {
+    ch = channel<Int>()
+    ch.send(2)
+    ch.send(3)
+    ch.close()
+
+    mut total = 0
+    for value in ch {
+        if value == 2 {
+            continue
+        }
+        total = total + value
+    }
+
+    print(total)
+    print(ch.receive().is_none())
+}

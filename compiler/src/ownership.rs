@@ -417,6 +417,8 @@ fn safe_release_site(instruction: &IrInstr) -> bool {
     match instruction {
         IrInstr::StoreLocal { .. }
         | IrInstr::ChannelSend { .. }
+        | IrInstr::ChannelReceive { .. }
+        | IrInstr::ChannelClose { .. }
         | IrInstr::Aggregate { .. }
         | IrInstr::Index { .. }
         | IrInstr::Field { .. }

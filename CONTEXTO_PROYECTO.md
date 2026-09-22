@@ -5691,3 +5691,20 @@ records concretos:
 Los iteradores genéricos, indirectos o con payloads que el emisor aún no soporta conservan el fallback
 HIR/AST. La frontera es deliberada: añade una familia real de consumidores a la IR sin afirmar que el
 protocolo de iteración completo ya esté migrado.
+
+## 226. Iteración de canales en la IR nativa — 2026-09-21
+
+El backend nativo ya no necesita abandonar la IR para el caso síncrono de canales sin tareas:
+
+- `for value in channel` se baja al mismo CFG de polling `Option<T>` que los iteradores de records,
+  usando `ChannelReceive`, `TryCheck`, `TryValue` y edges explícitos de `continue`/salida;
+- `ChannelNew`, `ChannelSend`, `ChannelReceive` y `ChannelClose` tienen ahora una representación C
+  conservadora para los helpers ya existentes del runtime (`Channel_<T>_*`), incluidos canales de
+  strings y records cuando el payload tiene representación soportada;
+- la pasada de ownership trata el handle como referencia gestionada y acepta `send`, `receive` y
+  `close` como usos prestados, colocando `release` después del último receive. El ejemplo
+  `native_ir_channel_iterator.ostrin` compara ambos backends, exige `ir-generated` y termina con
+  `live_allocations=0`.
+
+`spawn`/`Task` y la coordinación entre tareas siguen en HIR/AST; este bloque migra el consumidor de
+`Channel<T>` y su contrato de memoria sin confundirlo con la migración completa de concurrencia.

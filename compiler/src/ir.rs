@@ -925,11 +925,10 @@ impl Builder {
         }
     }
 
-    /// Lowers a concrete record iterator through its `next() -> Option<T>`
-    /// protocol. Generic/indirect iterators continue through the legacy IR
-    /// nodes until their ABI is made explicit.
-    fn lower_for_iterator(&mut self, var: &str, iter: &HirExpr, element: &Ty, body: &HirBlock) {
-        let source = self.lower_expr(iter);
+    /// Lowers a source whose iteration protocol yields `Option<T>` into an
+    /// explicit polling CFG. `channel` selects the runtime receive operation;
+    /// otherwise the source is a concrete record with `next()`.
+    fn lower_for_option_source(&mut self, var: &str, source: ValueId, element: &Ty, body: &HirBlock, channel: bool) {
         let option_ty = Ty::Applied("Option".to_string(), vec![element.clone()]);
         let preheader = self.current;
         let visible_before = self.snapshot_visible();
@@ -942,13 +941,17 @@ impl Builder {
         let body_text = format!("{body:?}");
         let loop_phis = self.loop_entry_phis(&visible_before, &body_text, preheader, condition_block);
         let next = self.fresh();
-        self.emit(IrInstr::MethodCall {
-            dst: Some(next),
-            method: "next".to_string(),
-            receiver: source,
-            args: Vec::new(),
-            ty: option_ty,
-        });
+        if channel {
+            self.emit(IrInstr::ChannelReceive { dst: next, channel: source, ty: option_ty });
+        } else {
+            self.emit(IrInstr::MethodCall {
+                dst: Some(next),
+                method: "next".to_string(),
+                receiver: source,
+                args: Vec::new(),
+                ty: option_ty,
+            });
+        }
         let has_next = self.fresh();
         self.emit(IrInstr::TryCheck { dst: has_next, value: next });
         self.terminate(IrTerminator::Branch {
@@ -993,6 +996,19 @@ impl Builder {
         self.loop_exit_bindings(&loop_phis, condition_block, &edges.breaks);
     }
 
+    /// Lowers a concrete record iterator through its `next() -> Option<T>`
+    /// protocol. Generic/indirect iterators continue through the legacy IR
+    /// nodes until their ABI is made explicit.
+    fn lower_for_iterator(&mut self, var: &str, iter: &HirExpr, element: &Ty, body: &HirBlock) {
+        let source = self.lower_expr(iter);
+        self.lower_for_option_source(var, source, element, body, false);
+    }
+
+    fn lower_for_channel(&mut self, var: &str, iter: &HirExpr, element: &Ty, body: &HirBlock) {
+        let source = self.lower_expr(iter);
+        self.lower_for_option_source(var, source, element, body, true);
+    }
+
     fn lower_for(&mut self, var: &str, iter: &HirExpr, body: &HirBlock) {
         if let HirKind::Range(start, kind, end, step) = &iter.kind {
             if start.ty == Ty::Int && end.ty == Ty::Int && iter.ty == Ty::Int {
@@ -1004,6 +1020,12 @@ impl Builder {
             let element = (**element).clone();
             self.lower_for_list(var, iter, &element, body);
             return;
+        }
+        if let Ty::Applied(name, args) = &iter.ty {
+            if name == "Channel" && args.len() == 1 {
+                self.lower_for_channel(var, iter, &args[0], body);
+                return;
+            }
         }
         if let Some(element) = self.iterator_element_type(&iter.ty) {
             self.lower_for_iterator(var, iter, &element, body);

@@ -39,6 +39,9 @@ fn c_type(ty: &Ty, records: &RecordFields) -> Bail<String> {
         Ty::Set(element) if set_supported(element) => format!("Set_{}*", mangle_scalar(element)),
         Ty::Fn(_, _) => "void*".to_string(),
         Ty::Named(name) if records.contains_key(name) => format!("{name}*"),
+        Ty::Applied(name, args) if name == "Channel" && args.len() == 1 && channel_supported(&args[0], records) => {
+            format!("Channel_{}*", mangle_option_payload(&args[0], records))
+        }
         Ty::Applied(name, args) if name == "Option" && args.len() == 1 && option_supported(&args[0], records) => {
             format!("Option_{}", mangle_option_payload(&args[0], records))
         }
@@ -70,6 +73,7 @@ fn supported(ty: &Ty, records: &RecordFields) -> bool {
         || matches!(ty, Ty::Map(key, value) if map_supported(key, value))
         || matches!(ty, Ty::Set(element) if set_supported(element))
         || matches!(ty, Ty::Fn(_, _))
+        || matches!(ty, Ty::Applied(name, args) if name == "Channel" && args.len() == 1 && channel_supported(&args[0], records))
         || matches!(ty, Ty::Applied(name, args) if name == "Option" && args.len() == 1 && option_supported(&args[0], records))
         || matches!(ty, Ty::Applied(name, args) if name == "Result" && args.len() == 2 && result_supported(&args[0], &args[1], records))
 }
@@ -88,6 +92,10 @@ fn map_supported(key: &Ty, value: &Ty) -> bool {
 
 fn set_supported(element: &Ty) -> bool {
     list_element_supported(element)
+}
+
+fn channel_supported(element: &Ty, records: &RecordFields) -> bool {
+    option_supported(element, records)
 }
 
 fn option_supported(element: &Ty, records: &RecordFields) -> bool {
@@ -126,6 +134,7 @@ fn managed_payload(ty: &Ty, records: &RecordFields) -> bool {
     match ty {
         Ty::String | Ty::List(_) | Ty::Map(_, _) | Ty::Set(_) => true,
         Ty::Named(name) => records.contains_key(name),
+        Ty::Applied(name, args) if name == "Channel" && args.len() == 1 => channel_supported(&args[0], records),
         Ty::Applied(name, args) if name == "Option" && args.len() == 1 => {
             option_supported(&args[0], records) && managed_payload(&args[0], records)
         }
@@ -1123,6 +1132,58 @@ fn emit_instruction(
             }
             out.push_str("    else { abort(); }\n");
         }
+        IrInstr::ChannelNew { dst, capacity, ty } => {
+            let Ty::Applied(name, args) = ty else { return Err(()) };
+            if name != "Channel" || args.len() != 1 || !channel_supported(&args[0], records) {
+                return Err(());
+            }
+            if let Some(capacity) = capacity {
+                if value_ty(values, *capacity)? != Ty::Int {
+                    return Err(());
+                }
+            }
+            let channel_name = format!("Channel_{}", mangle_option_payload(&args[0], records));
+            out.push_str(&format!("    {} = {channel_name}_new();\n", value_name(*dst)));
+        }
+        IrInstr::ChannelSend { channel, value } => {
+            let Ty::Applied(name, args) = value_ty(values, *channel)? else { return Err(()) };
+            if name != "Channel" || args.len() != 1 || !channel_supported(&args[0], records) || value_ty(values, *value)? != args[0] {
+                return Err(());
+            }
+            let channel_name = format!("Channel_{}", mangle_option_payload(&args[0], records));
+            out.push_str(&format!(
+                "    {channel_name}_send({}, {});\n",
+                value_code(values, *channel)?,
+                value_code(values, *value)?
+            ));
+        }
+        IrInstr::ChannelReceive { dst, channel, ty } => {
+            let Ty::Applied(channel_name, channel_args) = value_ty(values, *channel)? else { return Err(()) };
+            let Ty::Applied(option_name, option_args) = ty else { return Err(()) };
+            if channel_name != "Channel"
+                || channel_args.len() != 1
+                || option_name != "Option"
+                || option_args.len() != 1
+                || channel_args[0] != option_args[0]
+                || !channel_supported(&channel_args[0], records)
+            {
+                return Err(());
+            }
+            let channel_c_name = format!("Channel_{}", mangle_option_payload(&channel_args[0], records));
+            out.push_str(&format!(
+                "    {} = {channel_c_name}_receive({});\n",
+                value_name(*dst),
+                value_code(values, *channel)?
+            ));
+        }
+        IrInstr::ChannelClose { channel } => {
+            let Ty::Applied(name, args) = value_ty(values, *channel)? else { return Err(()) };
+            if name != "Channel" || args.len() != 1 || !channel_supported(&args[0], records) {
+                return Err(());
+            }
+            let channel_name = format!("Channel_{}", mangle_option_payload(&args[0], records));
+            out.push_str(&format!("    {channel_name}_close({});\n", value_code(values, *channel)?));
+        }
         IrInstr::Retain { value } => {
             let ty = value_ty(values, *value)?;
             match ty {
@@ -1130,6 +1191,9 @@ fn emit_instruction(
                     out.push_str(&format!("    ostrin_retain((void*){});\n", value_code(values, *value)?));
                 }
                 Ty::Named(name) if records.contains_key(&name) => {
+                    out.push_str(&format!("    ostrin_retain((void*){});\n", value_code(values, *value)?));
+                }
+                Ty::Applied(name, args) if name == "Channel" && args.len() == 1 && channel_supported(&args[0], records) => {
                     out.push_str(&format!("    ostrin_retain((void*){});\n", value_code(values, *value)?));
                 }
                 Ty::Applied(name, args)
@@ -1164,6 +1228,9 @@ fn emit_instruction(
                     out.push_str(&format!("    ostrin_release((void*){});\n", value_code(values, *value)?));
                 }
                 Ty::Named(name) if records.contains_key(&name) => {
+                    out.push_str(&format!("    ostrin_release((void*){});\n", value_code(values, *value)?));
+                }
+                Ty::Applied(name, args) if name == "Channel" && args.len() == 1 && channel_supported(&args[0], records) => {
                     out.push_str(&format!("    ostrin_release((void*){});\n", value_code(values, *value)?));
                 }
                 Ty::Applied(name, args)

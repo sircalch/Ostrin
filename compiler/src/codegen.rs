@@ -3113,6 +3113,9 @@ impl<'a> Codegen<'a> {
             Ty::Fn(params, ret) => CType::Fn(params.iter().map(|p| self.ty_to_ctype(p)).collect::<Option<Vec<_>>>()?, Box::new(self.ty_to_ctype(ret)?)),
             Ty::Set(t) => CType::Set(Box::new(self.ty_to_ctype(t)?)),
             Ty::Map(k, v) => CType::Map(Box::new(self.ty_to_ctype(k)?), Box::new(self.ty_to_ctype(v)?)),
+            Ty::Applied(n, args) if n == "Channel" && args.len() == 1 => {
+                CType::Channel(Box::new(self.ty_to_ctype(&args[0])?))
+            }
             Ty::Applied(n, args) if n == "Option" && args.len() == 1 => CType::Option(Box::new(self.ty_to_ctype(&args[0])?)),
             Ty::Applied(n, args) if n == "Result" && args.len() == 2 => {
                 CType::Result(Box::new(self.ty_to_ctype(&args[0])?), Box::new(self.ty_to_ctype(&args[1])?))
