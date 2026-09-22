@@ -5976,3 +5976,21 @@ runtime por backend:
 
 El registro remoto y la red siguen deliberadamente fuera de este bloque: estos módulos sólo
 estabilizan APIs locales ya implementadas y no introducen acceso externo implícito.
+
+## 242. Builtins de proceso y rutas dentro de la IR nativa — 2026-09-21
+
+La superficie que `std.args` y `std.env` delegan ya no fuerza por sí misma el fallback HIR/AST:
+
+- `ir_c` baja `args()` como una `List<String>` fresca, `env()` como `Option<String>` con una
+  copia gestionada del valor de `getenv`, y `cwd()`, `path_join()` y `file_exists()` con sus
+  helpers C existentes;
+- `clone` y `drop` tienen lowering explícito para familias gestionadas, de modo que
+  `std.args.at()` puede clonar un argumento antes de liberar la lista temporal y `count()` puede
+  consumirla sin fuga;
+- `examples/std_args_env.ostrin` exige `ir-generated: 8`, `hir-generated: 0`, cubre índices fuera
+  de rango por ambos extremos, compara salida con el intérprete y termina con
+  `live_allocations=0`.
+
+El bloque no convierte todavía `read_file`/`write_file` en E/S cancelable: esas operaciones
+externas bloqueantes siguen siendo la siguiente frontera de concurrencia y requieren un contrato
+de runtime separado, especialmente para WASI y `--native-threads`.

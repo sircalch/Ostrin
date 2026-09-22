@@ -7,6 +7,7 @@ fn main() -> Void {
     print(args.at(0).unwrap())
     print(args.at(1).unwrap())
     print(args.at(2).is_none())
+    print(args.at(-1).is_none())
     print(env.get("OSTRIN_TEST_VALUE").unwrap())
     print(env.current_dir().length() > 0)
     print(env.join("src", "main.ostrin"))

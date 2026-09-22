@@ -55,6 +55,10 @@
 - Added the embedded `std.args` and `std.env` modules. They provide portable wrappers for program
   arguments, environment lookup, current directory, path joining and file existence; the
   `std_args_env.ostrin` regression compares interpreter/native output and finishes leak-free.
+- Lowered the portable process/path builtins (`args`, `env`, `cwd`, `path_join`, `file_exists`) and
+  the `clone`/`drop` ownership primitives through native IR/C. The standard process example now
+  reports eight IR-generated functions with no HIR fallback, including managed `List<String>` and
+  `Option<String>` values.
 
 ### Language and libraries
 - Supported `spawn {}` blocks now lower through the native IR/C backend, including immutable

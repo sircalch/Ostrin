@@ -46,7 +46,7 @@ traits, pattern matching, quantities and two concurrency modes: deterministic
 cooperative scheduling by default, plus opt-in native threads for compiled
 programs.
 
-The compiler suite currently passes **186 integration tests, 2 unit tests and 6 differential
+The compiler suite currently passes **188 integration tests, 2 unit tests and 6 differential
 interpreter↔native tests**. Function calls
 support named/default arguments, scalar and `String` collection lookups preserve `Option<T>`
 through the native IR path; concrete records and simple `Option<Record>` values
@@ -92,7 +92,8 @@ The default native scheduler remains deterministic for differential testing;
 `Task.cancel()` cancels pending tasks immediately and requests cooperative cancellation
 for running tasks at safe checkpoints; `yield()` is the explicit native checkpoint.
 The standard library is still intentionally small, but now includes embedded Ostrin modules
-for math, collections, strings, deterministic dates and portable JSON parsing/serialization.
+for math, collections, strings, deterministic dates, portable JSON parsing/serialization,
+program arguments and process/environment helpers.
 
 The compiler itself also has a reproducible `wasm32-wasip1` release workflow with a pinned
 WASI C toolchain, checksums, and smoke tests for a standalone and a path-dependent program. The

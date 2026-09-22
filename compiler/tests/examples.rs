@@ -848,8 +848,21 @@ fn standard_args_and_env_modules_match_between_interpreter_and_native() {
     let expected = stdout(&interpreted).replace("\r\n", "\n");
     assert_eq!(
         expected,
-        "2\nuno\ndos\ntrue\nOstrin\ntrue\nsrc/main.ostrin\ntrue\n"
+        "2\nuno\ndos\ntrue\ntrue\nOstrin\ntrue\nsrc/main.ostrin\ntrue\n"
     );
+
+    let report = run(&["--native-type-report", &file]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    let report_text = stdout(&report);
+    let ir_functions = report_text
+        .lines()
+        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|value| value.trim().parse::<usize>().ok()))
+        .unwrap_or(0);
+    assert!(ir_functions >= 8, "std args/env modules still fall back from IR: {report_text}");
+    assert!(report_text.contains("hir-generated: 0"), "std args/env modules left a HIR fallback: {report_text}");
 
     let exe = temp_artifact("std-args-env.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);

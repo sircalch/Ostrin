@@ -1062,7 +1062,52 @@ fn emit_instruction(
                 .iter()
                 .map(|value| value_code(values, *value))
                 .collect::<Bail<Vec<_>>>()?;
-            let call = if callee == "yield" && args.is_empty() && *ty == Ty::Void {
+            let call = if callee == "clone" && args.len() == 1 && *ty == value_ty(values, args[0])? {
+                let arg_ty = value_ty(values, args[0])?;
+                if !supported(&arg_ty, records) || arg_ty == Ty::Void {
+                    return Err(());
+                }
+                if let Some(retain) = retain_payload("__ostrin_clone", &arg_ty, records) {
+                    let ctype = c_type(&arg_ty, records)?;
+                    format!(
+                        "({{ {ctype} __ostrin_clone = {}; {retain}; __ostrin_clone; }})",
+                        codes[0]
+                    )
+                } else {
+                    codes[0].clone()
+                }
+            } else if callee == "drop" && args.len() == 1 && *ty == Ty::Void {
+                let arg_ty = value_ty(values, args[0])?;
+                if !supported(&arg_ty, records) {
+                    return Err(());
+                }
+                if let Some(release) = release_payload(&codes[0], &arg_ty, records) {
+                    format!("({{ {release}; (void)0; }})")
+                } else {
+                    "(void)0".to_string()
+                }
+            } else if callee == "args" && args.is_empty() && *ty == Ty::List(Box::new(Ty::String)) {
+                "({ List_String* __ostrin_args = List_String_new_from_array((const char**)ostrin_argv, (int64_t)ostrin_argc); __ostrin_args; })".to_string()
+            } else if callee == "env" && args.len() == 1 && value_ty(values, args[0])? == Ty::String {
+                let Ty::Applied(name, option_args) = ty else { return Err(()) };
+                if name != "Option" || option_args.as_slice() != [Ty::String] {
+                    return Err(());
+                }
+                format!(
+                    "({{ const char* __ostrin_env = getenv({}); Option_String __ostrin_option; memset(&__ostrin_option, 0, sizeof __ostrin_option); if (__ostrin_env) {{ __ostrin_option.has = true; __ostrin_option.value = ostrin_s_dup(__ostrin_env, strlen(__ostrin_env)); }} __ostrin_option; }})",
+                    codes[0]
+                )
+            } else if callee == "cwd" && args.is_empty() && *ty == Ty::String {
+                "ostrin_cwd()".to_string()
+            } else if callee == "path_join"
+                && args.len() == 2
+                && args.iter().all(|value| value_ty(values, *value) == Ok(Ty::String))
+                && *ty == Ty::String
+            {
+                format!("ostrin_s_path_join({}, {})", codes[0], codes[1])
+            } else if callee == "file_exists" && args.len() == 1 && value_ty(values, args[0])? == Ty::String && *ty == Ty::Bool {
+                format!("ostrin_file_exists({})", codes[0])
+            } else if callee == "yield" && args.is_empty() && *ty == Ty::Void {
                 "({\n#if defined(OSTRIN_NATIVE_THREADS)\n    ostrin_select_wait();\n#else\n    (void)ostrin_poll_one();\n#endif\n    ostrin_task_checkpoint();\n    (void)0;\n})"
                     .to_string()
             } else if callee == "select" && args.len() == 1 {

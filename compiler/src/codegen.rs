@@ -6018,7 +6018,7 @@ impl<'a> Codegen<'a> {
                 self.register_list_types(&ty);
                 Ok(Some((
                     format!(
-                        "({{ const char* {a} = getenv({}); Option_String {r}; memset(&{r}, 0, sizeof {r}); if ({a}) {{ {r}.has = true; {r}.value = {a}; }} {r}; }})",
+                        "({{ const char* {a} = getenv({}); Option_String {r}; memset(&{r}, 0, sizeof {r}); if ({a}) {{ {r}.has = true; {r}.value = ostrin_s_dup({a}, strlen({a})); }} {r}; }})",
                         codes[0],
                         a = a,
                         r = r,
