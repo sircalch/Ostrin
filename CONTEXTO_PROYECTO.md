@@ -6125,3 +6125,25 @@ Se mantiene deliberadamente fuera de WASI la interrupción de libc y cualquier p
 actual es cooperativo, con archivos y entorno provistos por los preopens/host WASI. La siguiente
 frontera de plataforma sigue siendo ampliar recursos soportados sin mezclar semántica nativa de
 hilos con el target WASI.
+
+## 249. Fuzzing diferencial de wrappers gestionados — 2026-09-21
+
+El generador diferencial ya cubre una familia independiente de programas con ownership, no sólo
+la regresión manual:
+
+- `ManagedWrapperGen` produce entre tres y cinco casos por semilla, con ramas deterministas de
+  `Some`/`None` y `Ok`/`Err`, textos distintos y funciones que reciben `Option<String>` o
+  `Result<String, String>` como parámetros.
+- `generated_managed_wrappers_agree_between_interpreter_and_native_backend` ejecuta cada programa
+  con el intérprete y el backend C, compara stdout completo y exige que el binario nativo termine
+  con `live_allocations=0`. Cubre `unwrap`, `unwrap_or`, `ok`, `ok_or`, `match` y los fallbacks
+  tanto en éxito como en error; las operaciones inseguras (`unwrap` sobre ausencia) sólo aparecen
+  en la rama que la semilla marca como válida.
+- Usa el mismo `OSTRIN_FUZZ_SEEDS` que el generador escalar: cuatro semillas por defecto y 25
+  semillas verificadas en esta sesión. Así la ampliación de búsqueda no cambia el contrato básico
+  de CI, pero deja una reproducción sencilla para regresiones de ownership.
+
+La suite queda en **6 pruebas diferenciales, 192 de integración y 2 unitarias**. El siguiente
+trabajo de calidad sigue siendo cubrir diagnósticos de error de forma sistemática y añadir
+benchmarks comparables entre intérprete y backend nativo; los consumidores complejos no lineales,
+scopes y escapes siguen fuera del protocolo IR/C.

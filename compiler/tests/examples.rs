@@ -2737,6 +2737,127 @@ fn generated_programs_agree_between_interpreter_and_native_backend() {
     }
 }
 
+/// Generates wrapper-heavy programs independently from the scalar generator above.  Keeping the
+/// values behind functions and passing them through parameters exercises the ownership boundary
+/// that a hand-written example can easily miss: the wrapper itself is consumed while its selected
+/// `String` payload must survive the call and the final `print`.
+struct ManagedWrapperGen {
+    state: u64,
+}
+
+impl ManagedWrapperGen {
+    fn new(seed: u64) -> Self {
+        Self { state: seed.wrapping_mul(2862933555777941757).wrapping_add(3037000493) }
+    }
+
+    fn next(&mut self, bound: u64) -> u64 {
+        self.state = self.state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        (self.state >> 33) % bound.max(1)
+    }
+
+    fn program(&mut self, seed: u64) -> String {
+        let cases = 3 + self.next(3);
+        let mut source = String::new();
+        let mut option_flags = Vec::new();
+        let mut result_flags = Vec::new();
+
+        for case in 0..cases {
+            let option_some = self.next(2) == 0;
+            let result_ok = self.next(2) == 0;
+            option_flags.push(option_some);
+            result_flags.push(result_ok);
+            let option_literal = format!("option-{seed}-{case}");
+            let result_literal = format!("result-{seed}-{case}");
+            source.push_str(&format!(
+                "fn option_{case}() -> Option<String> {{\n\
+    if {option_some} {{\n\
+        Some(\"{option_literal}\")\n\
+    }} else {{\n\
+        None\n\
+    }}\n\
+}}\n\n\
+fn result_{case}() -> Result<String, String> {{\n\
+    if {result_ok} {{\n\
+        Ok(\"{result_literal}\")\n\
+    }} else {{\n\
+        Err(\"error-{seed}-{case}\")\n\
+    }}\n\
+}}\n\n\
+fn consume_option_{case}(value: Option<String>) -> String {{\n\
+    value.unwrap_or(\"option parameter fallback\")\n\
+}}\n\n\
+fn consume_result_{case}(value: Result<String, String>) -> String {{\n\
+    value.unwrap_or(\"result parameter fallback\")\n\
+}}\n\n"
+            ));
+        }
+
+        source.push_str("fn main() -> Void {\n");
+        for case in 0..cases {
+            source.push_str(&format!("    print(option_{case}().unwrap_or(\"option fallback\"))\n"));
+            if option_flags[case as usize] {
+                source.push_str(&format!("    print(option_{case}().unwrap())\n"));
+            } else {
+                source.push_str(&format!("    print(option_{case}().unwrap_or(\"option safe fallback\"))\n"));
+            }
+            source.push_str(&format!(
+                "    match option_{case}().ok_or(\"option error\") {{\n\
+        Ok(value) => print(value),\n\
+        Err(error) => print(error),\n\
+    }}\n"
+            ));
+            source.push_str(&format!("    print(result_{case}().unwrap_or(\"result fallback\"))\n"));
+            if result_flags[case as usize] {
+                source.push_str(&format!("    print(result_{case}().unwrap())\n"));
+            } else {
+                source.push_str(&format!("    print(result_{case}().unwrap_or(\"result safe fallback\"))\n"));
+            }
+            source.push_str(&format!("    print(result_{case}().ok().is_some())\n"));
+            source.push_str(&format!("    print(consume_option_{case}(option_{case}()))\n"));
+            source.push_str(&format!("    print(consume_result_{case}(result_{case}()))\n"));
+        }
+        source.push_str("}\n");
+        source
+    }
+}
+
+#[test]
+fn generated_managed_wrappers_agree_between_interpreter_and_native_backend() {
+    // `OSTRIN_FUZZ_SEEDS=50 cargo test generated_managed_wrappers` widens the search.
+    let seed_count: u64 = std::env::var("OSTRIN_FUZZ_SEEDS").ok().and_then(|v| v.parse().ok()).unwrap_or(4);
+    for seed in 1..=seed_count {
+        let mut generator = ManagedWrapperGen::new(seed);
+        let source = generator.program(seed);
+        let path = temp_artifact(&format!("generated_managed_{seed}.ostrin"));
+        fs::write(&path, &source).unwrap();
+
+        let interpreted = run(&["--run", &path]);
+        assert!(interpreted.status.success(), "interpreter failed for managed seed {seed}: {}\n{source}", stderr(&interpreted));
+
+        let exe = temp_artifact(&format!("generated_managed_{seed}.exe"));
+        let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
+        if skip_if_no_c_compiler(&compile) {
+            let _ = fs::remove_file(&path);
+            return;
+        }
+        assert!(compile.status.success(), "native compile failed for managed seed {seed}: {}\n{source}", stderr(&compile));
+        let native = Command::new(&exe).output().expect("failed to run generated managed binary");
+        let _ = fs::remove_file(&exe);
+        let _ = fs::remove_file(&path);
+        assert!(native.status.success(), "native run failed for managed seed {seed}: {}\n{source}", String::from_utf8_lossy(&native.stderr));
+        assert_eq!(
+            String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+            stdout(&interpreted).replace("\r\n", "\n"),
+            "interpreter and native output differ for managed seed {seed}\n{source}"
+        );
+        assert!(
+            String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+            "native managed wrapper program leaked for seed {seed}: {}\n{source}",
+            String::from_utf8_lossy(&native.stderr)
+        );
+    }
+}
+
 /// Mutates real programs (deleting, duplicating, truncating and swapping spans) and checks that the
 /// front end reports diagnostics instead of crashing. A Rust panic exits with code 101 and prints
 /// "panicked at"; a stack overflow kills the process without an exit code.

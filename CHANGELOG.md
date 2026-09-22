@@ -82,6 +82,10 @@
   `unwrap_or`, `ok` and `ok_or` retain the selected payload or fallback before the wrapper and
   arguments are released. Added `native_ir_managed_consumers.ostrin`, which compares interpreter
   and C output across success/error branches and finishes with `live_allocations=0`.
+- Extended differential generation with independent managed-wrapper programs. The new
+  `generated_managed_wrappers_agree_between_interpreter_and_native_backend` test varies `Some`/`None`
+  and `Ok`/`Err`, exercises `unwrap`, `unwrap_or`, `ok`, `ok_or` and wrapper parameters, and checks
+  exact interpreter/native output plus `live_allocations=0`; `OSTRIN_FUZZ_SEEDS` widens the run.
 
 ### Language and libraries
 - Supported `spawn {}` blocks now lower through the native IR/C backend, including immutable
