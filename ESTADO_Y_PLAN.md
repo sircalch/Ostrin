@@ -3,7 +3,7 @@
 *Corte: 2026-09-21 · rama `main` · 6 pruebas diferenciales, 186 de integración y 2 unitarias en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
-Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–236); para el diseño
+Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–237); para el diseño
 del lenguaje, `docs/design/` (22 documentos). La auditoría del sitio vive en
 `docs/website-audit.md`.
 
@@ -229,7 +229,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Rendimiento del intérprete | Tree‑walking simple; sin optimizaciones |
 | `newlines.ostrin`, `advanced.ostrin` | Son muestras de sintaxis, no programas ejecutables |
 | CI | Linux, macOS y Windows; incluye las pruebas diferenciales intérprete↔nativo; el backend nativo enlaza `libm` explícitamente en Unix para paquetes con `sqrt`/`round` |
-| Distribución | Workflow WASI reproducible para `ostrinc.wasm`, `hello.wasm` y `pkg_project.wasm`, con toolchain fijado y SHA-256; playground de navegador sobre el compilador WASM; release nativo para Linux x86_64, macOS arm64 y Windows x64 que valida versión, checksum, archivo extraído, `hello.ostrin` y un proyecto con dependencia `path`; binarios publicados e instalador siguen pendientes |
+| Distribución | Workflow WASI reproducible para `ostrinc.wasm`, `hello.wasm` y `pkg_project.wasm`, con toolchain fijado y SHA-256; playground de navegador sobre el compilador WASM; release nativo para Linux x86_64, macOS arm64 y Windows x64 que valida versión, checksum, archivo extraído, `hello.ostrin` y un proyecto con dependencia `path`; instaladores Unix/PowerShell y su check contractual ya están preparados, pero todavía no hay una release etiquetada publicada |
 
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
 convendría dividirlos; el backend nativo no comparte el sistema de tipos del checker

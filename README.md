@@ -46,7 +46,7 @@ traits, pattern matching, quantities and two concurrency modes: deterministic
 cooperative scheduling by default, plus opt-in native threads for compiled
 programs.
 
-The compiler suite currently passes **176 integration tests, 2 unit tests and 6 differential
+The compiler suite currently passes **186 integration tests, 2 unit tests and 6 differential
 interpreter↔native tests**. Function calls
 support named/default arguments, scalar and `String` collection lookups preserve `Option<T>`
 through the native IR path; concrete records and simple `Option<Record>` values
@@ -99,8 +99,9 @@ WASI C toolchain, checksums, and smoke tests for a standalone and a path-depende
 native release workflow targets Linux x86_64, macOS arm64 and Windows x64; before upload it checks
 the tag/version contract, runs `ostrinc --version`, executes `examples/hello.ostrin`, verifies the
 archive checksum, and runs both the extracted example and the packaged path-dependency project.
-There is still no installer or published release by default: a maintainer must push a matching
-`v<compiler-version>` tag.
+There is still no published release by default: a maintainer must push a matching
+`v<compiler-version>` tag. Repository installers are prepared, but they cannot install anything
+until such a release exists.
 
 The cooperative runtime avoids thread-only headers unless `--native-threads` is requested. The
 same compiler is also deployed as `ostrinc.wasm` for the browser playground, where it runs the
@@ -116,6 +117,33 @@ cd compiler
 cargo test
 cargo run -- --run ..\\examples\\physics.ostrin
 ```
+
+### Install a published release
+
+Release archives are built for Linux x86_64, macOS arm64 and Windows x64 by
+`.github/workflows/release.yml`. Once a matching `v<compiler-version>` release exists, the
+repository installers download the archive and verify its published SHA-256 before installing
+`ostrinc`. They fail clearly when no release exists; this repository does not claim a release is
+currently published.
+
+Unix (Linux x86_64 or macOS arm64):
+
+```sh
+curl --fail --location https://raw.githubusercontent.com/sircalch/Ostrin/main/scripts/install.sh \
+  --output /tmp/ostrinc-install.sh
+sh /tmp/ostrinc-install.sh --version 0.1.0
+```
+
+Windows PowerShell:
+
+```powershell
+$installer = Join-Path $env:TEMP 'ostrinc-install.ps1'
+Invoke-WebRequest https://raw.githubusercontent.com/sircalch/Ostrin/main/scripts/install.ps1 -OutFile $installer
+powershell -ExecutionPolicy Bypass -File $installer -Version 0.1.0 -AddToPath
+```
+
+Use `--install-dir` on Unix or `-InstallDir` on Windows to choose another destination. The
+scripts are also usable with `OSTRIN_REPOSITORY`/`-Repository` for a compatible fork.
 
 The compiler currently supports:
 

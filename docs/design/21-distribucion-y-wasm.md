@@ -62,9 +62,21 @@ y lo copia a `website/` antes de desplegar (el binario no se versiona). Para pro
 
 La compilación nativa (C) no está disponible en el navegador: no hay toolchain C ahí.
 
+## Instalación de releases nativos
+
+`.github/workflows/release.yml` produce archivos verificables para Linux x86_64, macOS arm64 y
+Windows x64 con un archivo `.sha256` por archive. `scripts/install.sh` y
+`scripts/install.ps1` resuelven una release etiquetada, descargan el archivo correspondiente,
+verifican el SHA-256 antes de extraerlo y comprueban `ostrinc --version` después de instalarlo.
+No descargan código desde una rama ni inventan una versión: si el repositorio aún no tiene una
+release publicada, terminan con un error explícito. La comprobación estática
+`scripts/distribution-check.mjs` mantiene alineados los nombres del workflow, los instaladores y
+la documentación.
+
 ## Siguiente etapa
 
 La ruta WASI ya existe para el runtime cooperativo básico, paquetes locales y el playground del
-sitio. El siguiente bloque es ampliar la matriz de programas (I/O), aislar APIs de proceso/
-archivos con contratos WASI explícitos y mejorar la experiencia del playground (compartir código,
+sitio. El siguiente bloque es publicar una primera release etiquetada después de revisar el
+contrato de mantenimiento, ampliar la matriz de programas (I/O), aislar APIs de proceso/archivos
+con contratos WASI explícitos y mejorar la experiencia del playground (compartir código,
 diagnósticos y ejemplos) sin convertirlo en una simulación JavaScript.

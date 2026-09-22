@@ -5879,3 +5879,25 @@ La resolución de paquetes dejó de limitarse a las dependencias directas del pr
 niveles de dependencias, comprueba el import transitivo, la entrada de ambos nodos en el lockfile,
 la ejecución `--locked` y que el lockfile no se reescriba. La ruta Git, el registro remoto y los
 workspaces siguen fuera de este bloque; no se ha añadido red implícita ni un registro central.
+
+## 237. Instalación verificable de releases nativos — 2026-09-21
+
+La distribución nativa ya tenía un contrato de archivos por plataforma, pero todavía no ofrecía
+una ruta reproducible de instalación para una persona que no quisiera compilar Rust:
+
+- `scripts/install.sh` resuelve la release etiquetada, selecciona Linux x86_64 o macOS arm64,
+  descarga el archive y su `.sha256`, verifica el digest antes de extraerlo y comprueba la salida
+  de `ostrinc --version` después de una instalación atómica en `~/.local/bin` (o el directorio
+  elegido por `--install-dir`);
+- `scripts/install.ps1` hace el mismo recorrido para Windows x64 mediante `Get-FileHash`,
+  `Expand-Archive` y una opción explícita `-AddToPath`; ambos instaladores fallan si no existe
+  una release publicada y no convierten `main` en una fuente de binarios confiable;
+- `scripts/distribution-check.mjs` y el job de CI verifican que la matriz de targets, el naming de
+  archives, los checksums, los instaladores y la documentación sigan describiendo el mismo
+  contrato. La release workflow continúa siendo la autoridad que construye y smoke-testea los
+  binarios.
+
+La publicación de una primera etiqueta `v<version>` sigue siendo una decisión de mantenimiento
+externa al código: hasta entonces la web y los instaladores declaran honestamente que no existe
+una descarga pública. El navegador, el workflow WASI, las páginas existentes y la CLI `ostrinc`
+se conservaron sin introducir un alias o una herramienta nueva incompatible.

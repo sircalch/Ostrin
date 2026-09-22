@@ -35,6 +35,9 @@
 - Package resolution now follows nested `ostrin.toml` manifests, exposes transitive dependency
   aliases to imports, rejects alias collisions and dependency cycles, and records every resolved
   node with portable paths, package versions and content hashes in `ostrin.lock`.
+- Added checksum-verifying Unix and Windows installers for the existing tagged-release contract,
+  plus `scripts/distribution-check.mjs` in CI. They install only published, versioned archives;
+  no release or public download is claimed until a matching tag is actually published.
 
 ### Language and libraries
 - Supported `spawn {}` blocks now lower through the native IR/C backend, including immutable

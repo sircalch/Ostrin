@@ -18,6 +18,8 @@ jobs:
         uses: actions/checkout@v4
       - name: Validate pages, links and playground wiring
         run: node scripts/website-check.mjs
+      - name: Validate release and installer contracts
+        run: node scripts/distribution-check.mjs
 
   compiler:
     name: Compiler tests (${{ matrix.os }})
