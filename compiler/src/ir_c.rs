@@ -958,17 +958,53 @@ fn emit_instruction(
                     match method.as_str() {
                         "is_some" if args.is_empty() && *ty == Ty::Bool => format!("({receiver}).has"),
                         "is_none" if args.is_empty() && *ty == Ty::Bool => format!("!({receiver}).has"),
-                        "unwrap" if args.is_empty() && *ty == inner => format!(
-                            "({{ {option_name} __ostrin_option = {receiver}; if (!__ostrin_option.has) {{ fprintf(stderr, \"ostrin: unwrap on None\\n\"); exit(1); }} __ostrin_option.value; }})"
-                        ),
+                        "unwrap" if args.is_empty() && *ty == inner => {
+                            let inner_c = c_type(&inner, records)?;
+                            let retain = retain_payload("__ostrin_unwrapped", &inner, records).unwrap_or_default();
+                            format!(
+                                "({{ {option_name} __ostrin_option = {receiver}; if (!__ostrin_option.has) {{ fprintf(stderr, \"ostrin: unwrap on None\\n\"); exit(1); }} {inner_c} __ostrin_unwrapped = __ostrin_option.value; {retain}; __ostrin_unwrapped; }})"
+                            )
+                        }
                         "unwrap_or"
                             if args.len() == 1
                                 && *ty == inner
                                 && value_ty(values, args[0])? == inner =>
                         {
+                            let fallback = value_code(values, args[0])?;
+                            if option_managed_payload(&inner, records) {
+                                let inner_c = c_type(&inner, records)?;
+                                let retain_value = retain_payload("__ostrin_unwrapped", &inner, records).unwrap_or_default();
+                                let retain_fallback = retain_payload(&fallback, &inner, records).unwrap_or_default();
+                                format!(
+                                    "({{ {option_name} __ostrin_option = {receiver}; {inner_c} __ostrin_unwrapped; if (__ostrin_option.has) {{ __ostrin_unwrapped = __ostrin_option.value; {retain_value}; }} else {{ __ostrin_unwrapped = {fallback}; {retain_fallback}; }} __ostrin_unwrapped; }})"
+                                )
+                            } else {
+                                format!(
+                                    "({{ {option_name} __ostrin_option = {receiver}; __ostrin_option.has ? __ostrin_option.value : {fallback}; }})"
+                                )
+                            }
+                        }
+                        "ok_or" if args.len() == 1 => {
+                            let error = value_ty(values, args[0])?;
+                            let Ty::Applied(result_name_ty, result_args) = ty else { return Err(()) };
+                            if result_name_ty != "Result"
+                                || result_args.len() != 2
+                                || result_args[0] != inner
+                                || result_args[1] != error
+                                || !result_supported(&result_args[0], &result_args[1], records)
+                            {
+                                return Err(());
+                            }
+                            let result_name = format!(
+                                "Result_{}_{}",
+                                mangle_result_payload(&result_args[0], records),
+                                mangle_result_payload(&result_args[1], records)
+                            );
+                            let error_code = value_code(values, args[0])?;
+                            let retain_value = retain_payload("__ostrin_result.value", &inner, records).unwrap_or_default();
+                            let retain_error = retain_payload("__ostrin_result.error", &error, records).unwrap_or_default();
                             format!(
-                                "({{ {option_name} __ostrin_option = {receiver}; __ostrin_option.has ? __ostrin_option.value : {}; }})",
-                                value_code(values, args[0])?
+                                "({{ {option_name} __ostrin_option = {receiver}; {result_name} __ostrin_result; memset(&__ostrin_result, 0, sizeof __ostrin_result); if (__ostrin_option.has) {{ __ostrin_result.ok = true; __ostrin_result.value = __ostrin_option.value; {retain_value}; }} else {{ __ostrin_result.ok = false; __ostrin_result.error = {error_code}; {retain_error}; }} __ostrin_result; }})"
                             )
                         }
                         _ => return Err(()),
@@ -989,14 +1025,28 @@ fn emit_instruction(
                     match method.as_str() {
                         "is_ok" if args.is_empty() && *ty == Ty::Bool => format!("({receiver}).ok"),
                         "is_err" if args.is_empty() && *ty == Ty::Bool => format!("!({receiver}).ok"),
-                        "unwrap" if args.is_empty() && *ty == ok => format!(
-                            "({{ {result_name} __ostrin_result = {receiver}; if (!__ostrin_result.ok) {{ fprintf(stderr, \"ostrin: unwrap on Err\\n\"); exit(1); }} __ostrin_result.value; }})"
-                        ),
-                        "unwrap_or"
-                            if args.len() == 1 && *ty == ok && value_ty(values, args[0])? == ok => format!(
-                                "({{ {result_name} __ostrin_result = {receiver}; __ostrin_result.ok ? __ostrin_result.value : {}; }})",
-                                value_code(values, args[0])?
-                            ),
+                        "unwrap" if args.is_empty() && *ty == ok => {
+                            let ok_c = c_type(&ok, records)?;
+                            let retain = retain_payload("__ostrin_unwrapped", &ok, records).unwrap_or_default();
+                            format!(
+                                "({{ {result_name} __ostrin_result = {receiver}; if (!__ostrin_result.ok) {{ fprintf(stderr, \"ostrin: unwrap on Err\\n\"); exit(1); }} {ok_c} __ostrin_unwrapped = __ostrin_result.value; {retain}; __ostrin_unwrapped; }})"
+                            )
+                        }
+                        "unwrap_or" if args.len() == 1 && *ty == ok && value_ty(values, args[0])? == ok => {
+                            let fallback = value_code(values, args[0])?;
+                            if result_managed_payload(&ok, records) {
+                                let ok_c = c_type(&ok, records)?;
+                                let retain_value = retain_payload("__ostrin_unwrapped", &ok, records).unwrap_or_default();
+                                let retain_fallback = retain_payload(&fallback, &ok, records).unwrap_or_default();
+                                format!(
+                                    "({{ {result_name} __ostrin_result = {receiver}; {ok_c} __ostrin_unwrapped; if (__ostrin_result.ok) {{ __ostrin_unwrapped = __ostrin_result.value; {retain_value}; }} else {{ __ostrin_unwrapped = {fallback}; {retain_fallback}; }} __ostrin_unwrapped; }})"
+                                )
+                            } else {
+                                format!(
+                                    "({{ {result_name} __ostrin_result = {receiver}; __ostrin_result.ok ? __ostrin_result.value : {fallback}; }})"
+                                )
+                            }
+                        }
                         "ok" if args.is_empty() && *ty == option_type(&ok) => {
                             let option_name = format!("Option_{}", mangle_option_payload(&ok, records));
                             if option_managed_payload(&ok, records) {

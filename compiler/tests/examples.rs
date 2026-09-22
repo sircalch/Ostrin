@@ -3087,6 +3087,49 @@ fn native_ir_emitter_handles_managed_options_and_patterns() {
 }
 
 #[test]
+fn native_ir_managed_option_result_consumers_preserve_ownership() {
+    let file = example_path("native_ir_managed_consumers.ostrin");
+    let expected = "native option\nnative option\noption fallback\nnative option\noption error\nnative result\nnative result\nresult fallback\ntrue\n";
+    let interpreted = run(&["--run", &file]);
+    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    let report_text = stdout(&report);
+    let ir_functions = report_text
+        .lines()
+        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .unwrap_or(0);
+    assert!(ir_functions >= 10, "managed Option/Result consumers did not migrate to IR: {report_text}");
+
+    let emitted = run(&["--emit-c", &file]);
+    assert!(emitted.status.success(), "managed consumer IR emission failed: {}", stderr(&emitted));
+    let source = stdout(&emitted);
+    for helper in [
+        "ostrin: unwrap on None",
+        "ostrin: unwrap on Err",
+        "__ostrin_unwrapped",
+        "__ostrin_result.ok = true",
+        "__ostrin_result.ok = false",
+    ] {
+        assert!(source.contains(helper), "expected managed consumer support '{helper}' in generated C: {source}");
+    }
+
+    let exe = temp_artifact("native_ir_managed_consumers.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "managed consumer compile failed: {}", stderr(&compile));
+    let native = Command::new(&exe).output().expect("failed to run managed consumer binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "managed consumer binary failed: {}", String::from_utf8_lossy(&native.stderr));
+    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "managed Option/Result consumers leaked: {}", String::from_utf8_lossy(&native.stderr));
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+}
+
+#[test]
 fn native_ir_emitter_handles_records_and_option_record_ownership() {
     let file = example_path("native_ir_records.ostrin");
     let expected = "3\nseven\nempty\nthree\n";

@@ -73,6 +73,10 @@
   timed checkpoint while the worker finishes and cleans its request; cooperative/WASI execution
   remains synchronous and no libc call is forcibly aborted. The `native_ir_file_io.ostrin`
   regression covers both native modes and finishes with `live_allocations=0`.
+- Completed ownership-aware native IR consumers for `Option`/`Result`: managed `unwrap`,
+  `unwrap_or`, `ok` and `ok_or` retain the selected payload or fallback before the wrapper and
+  arguments are released. Added `native_ir_managed_consumers.ostrin`, which compares interpreter
+  and C output across success/error branches and finishes with `live_allocations=0`.
 
 ### Language and libraries
 - Supported `spawn {}` blocks now lower through the native IR/C backend, including immutable

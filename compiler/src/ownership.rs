@@ -597,6 +597,10 @@ fn safe_release_site(instruction: &IrInstr) -> bool {
                 | "is_err"
                 | "is_some"
                 | "is_none"
+                | "unwrap"
+                | "unwrap_or"
+                | "ok"
+                | "ok_or"
                 | "cancel"
                 | "set"
                 | "keys"
@@ -609,7 +613,8 @@ fn safe_release_site(instruction: &IrInstr) -> bool {
 }
 
 /// `Option`/`Result` wrappers (`get(..).unwrap_or(..)`, `remove(..).unwrap()`) are consumed by
-/// methods this pass does not model; they are counted but do not force a fallback.
+/// native methods that retain an extracted managed payload before this pass releases the
+/// receiver and arguments.
 fn note_unresolved(summary: &mut LoweringSummary, function: &str, ty: &Ty, literal: bool) {
     // String literals are static: an unreleased literal cannot leak.
     if !literal && !matches!(ty, Ty::Applied(_, _)) {

@@ -6077,3 +6077,27 @@ sin afirmar preempción de llamadas C:
 Quedan fuera de este cierre la E/S de red, un pool global de workers y una política de apagado que
   espere operaciones de larga duración al finalizar el proceso. Esas decisiones requieren un
   contrato de recursos más amplio que el de archivos locales.
+
+## 247. Consumidores gestionados de `Option`/`Result` desde la IR — 2026-09-21
+
+La migración nativa ya no deja sin contrato de ownership a los consumidores estructurales que
+extraen un payload gestionado:
+
+- `Option<T>.unwrap()` y `Result<T,E>.unwrap()` copian el payload activo a un temporal C y lo
+  retienen antes de que la IR libere el wrapper. `unwrap_or` aplica la misma regla tanto al valor
+  activo como al fallback; la rama seleccionada se evalúa una sola vez desde sus valores SSA.
+- `Option<T>.ok_or(E)` construye el `Result<T,E>` por valor y retiene el payload de `Some` o el
+  error elegido en la rama `None`. `Result<T,E>.ok()` ya tenía la retención de `Some`, y ahora el
+  análisis de último uso reconoce ambos lados como sitios seguros de liberación.
+- La expansión es recursiva para los tipos que el emisor ya representa (`String`, listas/mapas/
+  conjuntos soportados, records concretos y wrappers anidados). Los payloads escalares siguen
+  usando la expresión compacta sin coste de referencia.
+
+`examples/native_ir_managed_consumers.ostrin` cubre `unwrap`, `unwrap_or`, `ok_or` y `ok` en
+éxito y error para `Option<String>` y `Result<String,String>`. La prueba compara intérprete y C,
+exige al menos diez funciones `ir-generated`, inspecciona el C emitido y ejecuta con
+`--leak-check`, terminando en `live_allocations=0`.
+
+Este bloque reduce otra fuente concreta de fallback y cierra el contrato de extracción; todavía
+quedan consumidores complejos no lineales, scopes/escapes y tipos compuestos que no tienen un
+protocolo completo en IR/C.

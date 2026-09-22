@@ -1,0 +1,69 @@
+fn option_value(flag: Bool) -> Option<String> {
+    if flag {
+        Some("native option")
+    } else {
+        None
+    }
+}
+
+fn result_value(flag: Bool) -> Result<String, String> {
+    if flag {
+        Ok("native result")
+    } else {
+        Err("result error")
+    }
+}
+
+fn option_unwrap() -> String {
+    option_value(true).unwrap()
+}
+
+fn option_unwrap_or_some() -> String {
+    option_value(true).unwrap_or("option fallback")
+}
+
+fn option_unwrap_or_none() -> String {
+    option_value(false).unwrap_or("option fallback")
+}
+
+fn option_ok_or_some() -> Result<String, String> {
+    option_value(true).ok_or("option error")
+}
+
+fn option_ok_or_none() -> Result<String, String> {
+    option_value(false).ok_or("option error")
+}
+
+fn result_unwrap() -> String {
+    result_value(true).unwrap()
+}
+
+fn result_unwrap_or_ok() -> String {
+    result_value(true).unwrap_or("result fallback")
+}
+
+fn result_unwrap_or_err() -> String {
+    result_value(false).unwrap_or("result fallback")
+}
+
+fn result_ok() -> Option<String> {
+    result_value(true).ok()
+}
+
+fn main() -> Void {
+    print(option_unwrap())
+    print(option_unwrap_or_some())
+    print(option_unwrap_or_none())
+    match option_ok_or_some() {
+        Ok(value) => print(value),
+        Err(error) => print(error),
+    }
+    match option_ok_or_none() {
+        Ok(value) => print(value),
+        Err(error) => print(error),
+    }
+    print(result_unwrap())
+    print(result_unwrap_or_ok())
+    print(result_unwrap_or_err())
+    print(result_ok().is_some())
+}
