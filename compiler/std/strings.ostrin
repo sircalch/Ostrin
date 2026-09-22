@@ -36,3 +36,23 @@ pub fn count_of(text: String, part: String) -> Int {
 pub fn join_with(items: List<String>, separator: String) -> String {
     items.join(separator)
 }
+
+pub fn trim(text: String) -> String {
+    text.trim()
+}
+
+pub fn split(text: String, separator: String) -> List<String> {
+    text.split(separator)
+}
+
+pub fn lines(text: String) -> List<String> {
+    text.lines()
+}
+
+pub fn is_blank(text: String) -> Bool {
+    text.trim().is_empty()
+}
+
+pub fn format_text(template: String, values: List<String>) -> String {
+    format(template, values)
+}

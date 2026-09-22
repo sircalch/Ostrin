@@ -5901,3 +5901,18 @@ La publicación de una primera etiqueta `v<version>` sigue siendo una decisión 
 externa al código: hasta entonces la web y los instaladores declaran honestamente que no existe
 una descarga pública. El navegador, el workflow WASI, las páginas existentes y la CLI `ostrinc`
 se conservaron sin introducir un alias o una herramienta nueva incompatible.
+
+## 238. Utilidades de texto en `std.strings` — 2026-09-21
+
+La biblioteca estándar amplía su superficie de texto sin añadir una segunda semántica de
+`String`: las funciones libres delegan en los métodos y builtins ya soportados por ambos backends:
+
+- `trim` elimina espacios periféricos, `split` separa por un delimitador y `lines` devuelve las
+  líneas como `List<String>`;
+- `is_blank` expresa el predicado habitual sin repetir `trim().is_empty()` en cada programa;
+- `format_text` expone el formateador de placeholders existente con un nombre de módulo estable,
+  conservando el contrato `String + List<String> -> String`.
+
+`examples/std_tests.ostrin` cubre las cinco funciones y `examples/std_library.ostrin` las muestra
+en la comparación intérprete↔nativo. El caso nativo conserva `live_allocations=0`, y el playground
+reutiliza el mismo programa source-backed; JSON y red siguen explícitamente fuera de esta entrega.

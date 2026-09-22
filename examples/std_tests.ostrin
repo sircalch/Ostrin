@@ -66,6 +66,11 @@ fn test_strings() -> Void {
     assert_eq(strings.pad_right("ab", 4, "."), "ab..")
     assert_eq(strings.count_of("a,b,c", ","), 2)
     assert_eq(strings.count_of("abc", ""), 0)
+    assert_eq(strings.trim("  Ostrin  "), "Ostrin")
+    assert_eq(strings.split("a,b,c", ","), ["a", "b", "c"])
+    assert_eq(strings.lines("a\nb"), ["a", "b"])
+    assert(strings.is_blank("   "))
+    assert_eq(strings.format_text("{} + {} = {}", ["2", "3", "5"]), "2 + 3 = 5")
 }
 
 fn test_time_calendar() -> Void {

@@ -2693,7 +2693,7 @@ fn std_library_modules_agree_between_backends_and_pass_their_own_tests() {
     let path = example_path("std_library.ostrin");
     let interpreted = run(&["--run", &path]);
     assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
-    let expected = "3\n2.5\n10\n6\n12\n1024\ntrue\n1\n[3, 2, 1]\n[1, 2, 3, 4, 5]\n[apple, fig, pear]\n[1, 2]\n[1, 2, 3]\n[2, 3, 4, 5]\nSome(9)\nSome(2)\nababab\n007\n2\n2024-02-29\n1\n29\n";
+    let expected = "3\n2.5\n10\n6\n12\n1024\ntrue\n1\n[3, 2, 1]\n[1, 2, 3, 4, 5]\n[apple, fig, pear]\n[1, 2]\n[1, 2, 3]\n[2, 3, 4, 5]\nSome(9)\nSome(2)\nababab\n007\n2\nOstrin\n[a, b, c]\n[a, b]\ntrue\n2 + 3 = 5\n2024-02-29\n1\n29\n";
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
 
     let exe = temp_artifact("std_library.exe");

@@ -38,6 +38,8 @@
 - Added checksum-verifying Unix and Windows installers for the existing tagged-release contract,
   plus `scripts/distribution-check.mjs` in CI. They install only published, versioned archives;
   no release or public download is claimed until a matching tag is actually published.
+- Expanded `std.strings` with cross-backend helpers for trimming, splitting, line extraction,
+  blank checks and placeholder formatting, covered by the standard-library test program.
 
 ### Language and libraries
 - Supported `spawn {}` blocks now lower through the native IR/C backend, including immutable

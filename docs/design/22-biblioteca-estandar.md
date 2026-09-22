@@ -9,7 +9,7 @@ Compila por los dos backends (intérprete y nativo) sin código especial.
 |---|---|
 | `std.math` | `min`, `max`, `clamp` (genéricas, `T: Ord`), `sign`, `gcd`, `lcm`, `pow_int` |
 | `std.lists` | `contains`, `index_of`, `reversed`, `take`, `drop_first`, `concat`, `repeat`, `range_list`, `max_of`, `min_of`, `sorted` (estable) |
-| `std.strings` | `repeat`, `pad_left`, `pad_right`, `count_of`, `join_with` |
+| `std.strings` | `repeat`, `pad_left`, `pad_right`, `count_of`, `join_with`, `trim`, `split`, `lines`, `is_blank`, `format_text` |
 | `std.time` | `Date`, `date`, `is_leap_year`, `days_in_year`, `days_in_month`, `is_valid`, `day_of_year`, `day_of_week`, `from_day_of_year`, `iso`, `parse_iso` |
 
 Decisiones:
