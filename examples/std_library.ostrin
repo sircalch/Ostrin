@@ -3,6 +3,7 @@ import std.lists
 import std.strings
 import std.time
 import std.json
+import std.maps
 
 fn main() -> Void {
     print(math.min(3, 9))
@@ -40,4 +41,17 @@ fn main() -> Void {
     json_value = json.parse("{\"ok\":true,\"items\":[1,2]}").unwrap()
     print(json.stringify(json_value))
     print(json.object_keys(json_value).unwrap())
+    scores = ["ann": 3, "bob": 5]
+    print(maps.count(scores))
+    print(maps.is_empty(scores))
+    print(maps.contains_key(scores, "ann"))
+    print(maps.contains_key(scores, "zed"))
+    print(maps.get_or(scores, "ann", 0))
+    print(maps.get_or(scores, "zed", 0))
+    map_keys = maps.keys(scores)
+    print(map_keys.length())
+    drop(map_keys)
+    map_values = maps.values(scores)
+    print(map_values.length())
+    drop(map_values)
 }

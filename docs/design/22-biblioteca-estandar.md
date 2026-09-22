@@ -4,7 +4,8 @@ La biblioteca estándar está escrita en Ostrin, embebida en el compilador (`com
 y se importa como cualquier módulo: `import std.math`, `import std.lists`, `import std.strings`,
 `import std.time`, `import std.json`.
 También incluye `import std.args` y `import std.env` para aislar la superficie de proceso y
-filesystem que ya comparten el intérprete y el backend nativo.
+filesystem que ya comparten el intérprete y el backend nativo, y `import std.maps` para consultas
+genéricas sobre mapas.
 Compila por los dos backends (intérprete y nativo) sin código especial.
 
 | Módulo | Funciones |
@@ -16,6 +17,7 @@ Compila por los dos backends (intérprete y nativo) sin código especial.
 | `std.json` | `Kind`, `Value`, `null_value`, `bool_value`, `number_value`, `text_value`, `array_value`, `object_value`, `kind`, `as_bool`, `as_number`, `as_text`, `array_items`, `object_keys`, `object_get`, `parse`, `stringify` |
 | `std.args` | `all`, `count`, `at` (argumentos del programa; `--` separa opciones de `--run`) |
 | `std.env` | `get`, `current_dir`, `join`, `exists` |
+| `std.maps` | `count`, `is_empty`, `contains_key`, `get_or`, `keys`, `values` (`K: Hash + Eq`) |
 
 Decisiones:
 
@@ -36,6 +38,10 @@ Decisiones:
 - **Proceso explícito y delgado.** `std.args` sólo expone los argumentos del programa y la CLI
   del intérprete los recibe después de `--`; `std.env` delega en `env`, `cwd`, `path_join` y
   `file_exists`, sin inventar una semántica distinta por backend.
+- **Mapas sin mutación implícita.** `std.maps` compone los métodos incorporados de `Map<K,V>`
+  sin añadir una segunda representación: `get_or` devuelve un fallback para claves ausentes,
+  `keys`/`values` devuelven listas nuevas y todas las funciones sólo exigen `Hash + Eq` en la
+  clave. La mutación sigue siendo explícita mediante `mut` y `.set`/`.remove`.
 - **Un módulo `std` local o una dependencia llamada `std` tiene prioridad** sobre la biblioteca
   embebida (el `ostrin.toml` del proyecto manda).
 - Las pruebas de la propia biblioteca están en Ostrin (`examples/std_tests.ostrin`, `--test`).

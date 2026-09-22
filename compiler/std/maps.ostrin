@@ -1,0 +1,25 @@
+// std.maps: generic, non-mutating helpers for the built-in Map<K, V>.
+
+pub fn count<K: Hash + Eq, V>(table: Map<K, V>) -> Int {
+    table.count()
+}
+
+pub fn is_empty<K: Hash + Eq, V>(table: Map<K, V>) -> Bool {
+    table.count() == 0
+}
+
+pub fn contains_key<K: Hash + Eq, V>(table: Map<K, V>, key: K) -> Bool {
+    table.contains_key(key)
+}
+
+pub fn get_or<K: Hash + Eq, V>(table: Map<K, V>, key: K, fallback: V) -> V {
+    table.get(key).unwrap_or(fallback)
+}
+
+pub fn keys<K: Hash + Eq, V>(table: Map<K, V>) -> List<K> {
+    table.keys()
+}
+
+pub fn values<K: Hash + Eq, V>(table: Map<K, V>) -> List<V> {
+    table.values()
+}

@@ -3,6 +3,7 @@ import std.lists
 import std.strings
 import std.time
 import std.json
+import std.maps
 
 fn test_min_max_clamp() -> Void {
     assert_eq(math.min(3, 9), 3)
@@ -112,4 +113,20 @@ fn test_json_dom_parser_and_serializer() -> Void {
     assert_eq(json.stringify(json.array_value([json.number_value(1.0), json.bool_value(false)])), "[1,false]")
     assert(json.parse("{\"duplicate\":1,\"duplicate\":2}").is_err())
     assert(json.parse("[1,").is_err())
+}
+
+fn test_maps() -> Void {
+    scores = ["ann": 3, "bob": 5]
+    assert_eq(maps.count(scores), 2)
+    assert(not maps.is_empty(scores))
+    assert(maps.contains_key(scores, "ann"))
+    assert(not maps.contains_key(scores, "zed"))
+    assert_eq(maps.get_or(scores, "ann", 0), 3)
+    assert_eq(maps.get_or(scores, "zed", 0), 0)
+    map_keys = maps.keys(scores)
+    assert_eq(map_keys.length(), 2)
+    drop(map_keys)
+    map_values = maps.values(scores)
+    assert_eq(map_values.length(), 2)
+    drop(map_values)
 }

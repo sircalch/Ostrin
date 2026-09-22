@@ -46,8 +46,12 @@
   and ends with `live_allocations=0`.
 - Closed native ownership gaps exposed by the JSON block: parsed values transferred into recursive
   lists, string concatenation consumed intermediate buffers, and `String.codepoint()` releases a
-  fresh receiver without releasing borrowed bindings. The standard-library suite now covers eight
+  fresh receiver without releasing borrowed bindings. The standard-library suite now covers nine
   tests and keeps the native leak report at zero.
+- Added the embedded `std.maps` module with generic, non-mutating `Map<K,V>` helpers for counts,
+  emptiness, key membership, fallback lookups and key/value collection extraction. Its coverage
+  runs through the interpreter and native backend and explicitly drops extracted lists so the
+  native `--leak-check` report remains at zero.
 - Moved structural `==`/`!=` for supported `List`, `Map`, `Set`, `Option` and `Result` values into
   the native IR/C path. `structural_equality.ostrin` now reports `ir-generated: 1`, keeps exact
   interpreter/native output and finishes with `live_allocations=0`; array comparisons retain their

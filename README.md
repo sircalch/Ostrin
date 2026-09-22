@@ -93,7 +93,7 @@ The default native scheduler remains deterministic for differential testing;
 for running tasks at safe checkpoints; `yield()` is the explicit native checkpoint.
 The standard library is still intentionally small, but now includes embedded Ostrin modules
 for math, collections, strings, deterministic dates, portable JSON parsing/serialization,
-program arguments and process/environment helpers.
+program arguments, process/environment helpers and generic map queries.
 
 The compiler itself also has a reproducible `wasm32-wasip1` release workflow with a pinned
 WASI C toolchain, checksums, and smoke tests for a standalone and a path-dependent program. The

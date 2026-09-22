@@ -6016,3 +6016,22 @@ observa en el checkpoint; una cancelación durante `fopen`/`fread`/`fputs`/`fclo
 libc regrese y se observa en el siguiente punto seguro. No se presenta esta entrega como E/S
 asíncrona ni como preempción de un hilo bloqueado; separar esa E/S en workers o un mecanismo WASI
 es la siguiente decisión de runtime.
+
+## 244. `std.maps` sobre el `Map<K,V>` incorporado — 2026-09-21
+
+La biblioteca estándar ya ofrece una superficie pequeña y reutilizable para consultas de mapas,
+sin introducir una segunda implementación de `HashMap`:
+
+- `compiler/std/maps.ostrin` expone `count`, `is_empty`, `contains_key`, `get_or`, `keys` y
+  `values`. Sus funciones son genéricas y exigen `Hash + Eq` sólo para la clave, de modo que
+  sirven para valores escalares y para valores gestionados sin duplicar las reglas del checker.
+- `get_or` compone `Map.get(...).unwrap_or(...)`; `keys` y `values` devuelven listas nuevas y
+  no mutan el mapa. La mutación permanece en la API incorporada (`mut`, `.set`, `.remove`), lo
+  que evita esconder transferencias de ownership en helpers de alto nivel.
+- `examples/std_library.ostrin` y `examples/std_tests.ostrin` cubren presencia/ausencia,
+  fallback, cardinalidad y extracción de colecciones. La prueba de integración compara la
+  salida del intérprete y del C nativo y compila con `--leak-check`; las listas temporales se
+  descartan explícitamente y el reporte termina en `live_allocations=0`.
+
+El registro remoto y la red siguen fuera de este bloque: `std.maps` sólo estabiliza una API local
+sobre el mapa que ya existe en ambos backends.
