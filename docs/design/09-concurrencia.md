@@ -201,7 +201,9 @@ asignaciones vivas. La bajada completa de ownership sobre la IR —incluyendo to
 escapes, loops y la propagación completa del control de cancelación— sigue siendo una etapa
 posterior; el caso directo `Task.cancel()` para handles representables en la IR ya usa el helper
 tipado del runtime, y `yield()` comparte el polling cooperativo o la espera del backend de hilos
-con su checkpoint de cancelación.
+con su checkpoint de cancelación. `select(List<Channel<T>>)` con payload soportado también
+reutiliza la prioridad determinista y el checkpoint del runtime; las formas indirectas siguen
+en el fallback verificado.
 
 ## 4. Ejemplo completo — map paralelo
 

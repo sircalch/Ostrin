@@ -1907,6 +1907,49 @@ fn native_ir_emitter_handles_yield_with_task_runtime() {
 }
 
 #[test]
+fn native_ir_emitter_handles_select_over_channels() {
+    let file = example_path("native_ir_select.ostrin");
+    let report = run(&["--native-type-report", &file]);
+    assert!(report.status.success(), "select type report failed: {}", stderr(&report));
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ir-generated: 1"), "select did not use the IR emitter: {report_text}");
+    assert!(report_text.contains("hir-generated: 0"), "select fell back to HIR: {report_text}");
+
+    let interpreted = run(&["--run", &file]);
+    assert!(interpreted.status.success(), "interpreter select failed: {}", stderr(&interpreted));
+    let expected = "7\n";
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let exe = temp_artifact("native-ir-select.exe");
+    let compiled = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compiled) {
+        return;
+    }
+    assert!(compiled.status.success(), "native select compile failed: {}", stderr(&compiled));
+    let native = Command::new(&exe).output().expect("run native select binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native select failed: {}", String::from_utf8_lossy(&native.stderr));
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "native select leaked: {}", String::from_utf8_lossy(&native.stderr));
+
+    let threaded_exe = temp_artifact("native-ir-select-threads.exe");
+    let threaded_compile = run(&["--compile", "--native-threads", "--leak-check", "--out", &threaded_exe, &file]);
+    assert!(threaded_compile.status.success(), "native-thread select compile failed: {}", stderr(&threaded_compile));
+    let threaded = Command::new(&threaded_exe).output().expect("run native-thread select binary");
+    let _ = fs::remove_file(&threaded_exe);
+    assert!(threaded.status.success(), "native-thread select failed: {}", String::from_utf8_lossy(&threaded.stderr));
+    assert_eq!(String::from_utf8_lossy(&threaded.stdout).replace("\r\n", "\n"), expected);
+    assert!(String::from_utf8_lossy(&threaded.stderr).contains("live_allocations=0"), "native-thread select leaked: {}", String::from_utf8_lossy(&threaded.stderr));
+
+    let emitted = run(&["--emit-c", "--native-threads", &file]);
+    assert!(emitted.status.success(), "select C emission failed: {}", stderr(&emitted));
+    let source = stdout(&emitted);
+    assert!(source.contains("List_Channel_Int_new_from_array"));
+    assert!(source.contains("Channel_Int_try_receive"));
+    assert!(source.contains("ostrin_task_checkpoint()"));
+}
+
+#[test]
 fn native_ir_emitter_handles_strings_and_ownership_markers() {
     let file = example_path("native_ir_strings.ostrin");
     let expected = "true\nfalse\nHello, Ostrin\nfallback\nHello, Alias\nalias-fallback\n";

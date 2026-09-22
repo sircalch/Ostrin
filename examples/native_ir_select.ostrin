@@ -1,0 +1,6 @@
+fn main() -> Void {
+    updates = channel<Int>()
+    updates.send(7)
+    selected = select([updates])
+    print(selected.unwrap())
+}

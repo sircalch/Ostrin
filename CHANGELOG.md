@@ -50,6 +50,11 @@
   `native_ir_yield.ostrin` regression verifies parity, both execution modes and zero leaks.
 - Completing that IR path also closed an ownership edge exposed by real cancellation programs:
   captured `Channel<T>` handles retain one reference per task environment.
+- `select([channel, ...])` now lowers through native IR/C for supported channel payloads, using
+  the generated `List_Channel_<T>` and `Channel_<T>_try_receive` helpers with the same
+  cancellation checkpoint and cooperative/native-thread wait policy as HIR. The
+  `native_ir_select.ostrin` regression covers a ready channel in both backends and checks zero
+  leaks.
 - Channel iteration over concrete payloads now lowers through native CFG/IR: `send`, `close`,
   `receive` and `for` use the generated `Channel_*` runtime helpers, with last-use release of the
   channel handle covered by `examples/native_ir_channel_iterator.ostrin`.

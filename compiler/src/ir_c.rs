@@ -98,7 +98,9 @@ fn list_element_supported(ty: &Ty) -> bool {
 }
 
 fn list_supported(ty: &Ty, records: &RecordFields) -> bool {
-    list_element_supported(ty) || matches!(ty, Ty::Named(name) if records.contains_key(name))
+    list_element_supported(ty)
+        || matches!(ty, Ty::Named(name) if records.contains_key(name))
+        || matches!(ty, Ty::Applied(name, args) if name == "Channel" && args.len() == 1 && channel_supported(&args[0], records))
 }
 
 fn map_supported(key: &Ty, value: &Ty) -> bool {
@@ -207,6 +209,11 @@ fn mangle_option_payload(ty: &Ty, records: &RecordFields) -> String {
                 mangle_result_payload(&args[0], records),
                 mangle_result_payload(&args[1], records)
             )
+        }
+        Ty::Applied(name, args)
+            if name == "Channel" && args.len() == 1 && channel_supported(&args[0], records) =>
+        {
+            format!("Channel_{}", mangle_option_payload(&args[0], records))
         }
         _ => mangle_scalar(ty),
     }
@@ -1037,6 +1044,24 @@ fn emit_instruction(
             let call = if callee == "yield" && args.is_empty() && *ty == Ty::Void {
                 "({\n#if defined(OSTRIN_NATIVE_THREADS)\n    ostrin_select_wait();\n#else\n    (void)ostrin_poll_one();\n#endif\n    ostrin_task_checkpoint();\n    (void)0;\n})"
                     .to_string()
+            } else if callee == "select" && args.len() == 1 {
+                let Ty::List(element) = value_ty(values, args[0])? else { return Err(()) };
+                let Ty::Applied(channel_name, channel_args) = element.as_ref() else { return Err(()) };
+                if channel_name != "Channel"
+                    || channel_args.len() != 1
+                    || !channel_supported(&channel_args[0], records)
+                    || *ty != option_type(&channel_args[0])
+                {
+                    return Err(());
+                }
+                let list_name = format!("List_{}", mangle_option_payload(&element, records));
+                let channel_name = format!("Channel_{}", mangle_option_payload(&channel_args[0], records));
+                let result_name = format!("Option_{}", mangle_option_payload(&channel_args[0], records));
+                let element_c = c_type(&channel_args[0], records)?;
+                let input = &codes[0];
+                format!(
+                    "({{ {list_name}* __ostrin_select_list = {input}; {result_name} __ostrin_select_result; memset(&__ostrin_select_result, 0, sizeof __ostrin_select_result); bool __ostrin_select_ready = false; if (!__ostrin_select_list || __ostrin_select_list->length == 0) OSTRIN_FAIL(\"select expects at least one channel\"); while (!__ostrin_select_ready) {{ if (ostrin_cancellation_requested()) {{ __ostrin_select_ready = true; }} else {{ for (int64_t __ostrin_select_index = 0; __ostrin_select_index < __ostrin_select_list->length; __ostrin_select_index++) {{ {element_c} __ostrin_select_value; int __ostrin_select_status = {channel_name}_try_receive(__ostrin_select_list->items[__ostrin_select_index], &__ostrin_select_value); if (__ostrin_select_status > 0) {{ __ostrin_select_result.has = true; __ostrin_select_result.value = __ostrin_select_value; __ostrin_select_ready = true; break; }} if (__ostrin_select_status < 0) {{ __ostrin_select_ready = true; break; }} }} if (!__ostrin_select_ready) {{\n#if defined(OSTRIN_NATIVE_THREADS)\n    ostrin_select_wait();\n#else\n    if (!ostrin_poll_all()) OSTRIN_FAIL(\"select would block: no runnable task remains\");\n#endif\n    }} }} }} ostrin_task_checkpoint(); __ostrin_select_result; }})"
+                )
             } else if callee == "Some" && args.len() == 1 {
                 let inner = value_ty(values, args[0])?;
                 if !option_supported(&inner, records) || *ty != option_type(&inner) {

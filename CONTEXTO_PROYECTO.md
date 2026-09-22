@@ -5846,3 +5846,18 @@ accidentalmente del binding del padre.
 
 La regresión de recepción bloqueada ahora cruza la IR, cancela el consumidor, drena el scope y
 termina con `live_allocations=0`; la suite completa conserva la misma paridad con el intérprete.
+
+## 235. `select(List<Channel<T>>)` en la IR nativa — 2026-09-21
+
+La coordinación entre canales ya tiene una primera bajada nativa verificable:
+
+- `List<Channel<T>>` recibe una representación IR-C (`List_Channel_<T>`) y conserva el ownership
+  de cada handle mediante el destructor generado de listas;
+- la llamada `select` valida el payload y el resultado `Option<T>`, recorre los canales en el
+  mismo orden determinista, usa `Channel_<T>_try_receive` y espera con `ostrin_poll_all()` o
+  `ostrin_select_wait()` según el modo, seguido del checkpoint de cancelación;
+- `examples/native_ir_select.ostrin` exige IR puro, compara intérprete y nativo y verifica
+  scheduler cooperativo, hilos nativos y `live_allocations=0`.
+
+La cobertura inicial usa un canal ya listo; selección bloqueante, cancelación durante la espera
+y listas indirectas quedan como la siguiente ampliación verificable.
