@@ -19,6 +19,7 @@ function requireText(text, marker, label) {
 }
 
 const release = read(".github/workflows/release.yml");
+const wasi = read(".github/workflows/wasi.yml");
 for (const target of [
   "x86_64-unknown-linux-gnu",
   "aarch64-apple-darwin",
@@ -31,6 +32,15 @@ for (const marker of ["sha256sum", "shasum", "ARCHIVE=", "gh release create"]) {
 }
 for (const marker of ["safe_ref=", "matrix.target", "archive=\"$name.tar.gz\"", "archive=\"$name.zip\""]) {
   requireText(release, marker, "release archive naming");
+}
+for (const marker of [
+  "scripts/wasi-program-check.mjs",
+  "wasi_io_contract.wasm",
+  "native_ir_file_io.wasm",
+  "native_ir_managed_consumers.wasm",
+  "sha256sum dist/ostrinc.wasm dist/hello.wasm dist/pkg_project.wasm dist/wasi_io_contract.wasm",
+]) {
+  requireText(wasi, marker, "WASI program matrix");
 }
 
 const shell = read("scripts/install.sh");

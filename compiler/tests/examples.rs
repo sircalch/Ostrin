@@ -859,6 +859,32 @@ fn wasm_target_emits_cooperative_c_and_rejects_native_threads() {
 }
 
 #[test]
+fn wasm_program_matrix_emits_without_native_thread_dependencies() {
+    for file in [
+        "hello.ostrin",
+        "wasi_io_contract.ostrin",
+        "native_ir_file_io.ostrin",
+        "native_ir_managed_consumers.ostrin",
+    ] {
+        let wasm = run(&["--emit-c", "--target", "wasm32-wasi", &example_path(file)]);
+        assert!(wasm.status.success(), "WASI C emission failed for {file}: {}", stderr(&wasm));
+        let source = stdout(&wasm);
+        assert!(!source.contains("#define OSTRIN_NATIVE_THREADS"), "WASI program {file} enabled native threads");
+        assert!(source.contains("typedef int OstrinMutex;"), "WASI program {file} did not use the cooperative runtime");
+    }
+
+    let package = run(&[
+        "--emit-c",
+        "--target",
+        "wasm32-wasi",
+        "--project",
+        &example_path("pkg_project/main_app"),
+    ]);
+    assert!(package.status.success(), "WASI package C emission failed: {}", stderr(&package));
+    assert!(!stdout(&package).contains("#define OSTRIN_NATIVE_THREADS"));
+}
+
+#[test]
 fn program_arguments_match_between_interpreter_and_native() {
     let file = example_path("args.ostrin");
     let interpreted = run(&["--run", &file, "--", "uno", "dos"]);

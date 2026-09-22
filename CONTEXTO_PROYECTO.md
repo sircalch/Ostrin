@@ -6101,3 +6101,27 @@ exige al menos diez funciones `ir-generated`, inspecciona el C emitido y ejecuta
 Este bloque reduce otra fuente concreta de fallback y cierra el contrato de extracción; todavía
 quedan consumidores complejos no lineales, scopes/escapes y tipos compuestos que no tienen un
 protocolo completo en IR/C.
+
+## 248. Matriz de programas WASI y contratos de plataforma — 2026-09-21
+
+El workflow WASI deja de probar sólo que el compilador y dos programas se puedan enlazar:
+
+- `scripts/wasi-program-check.mjs` construye con el compilador host cinco módulos
+  `wasm32-wasi`: `hello`, el proyecto con dependencia `path`, `wasi_io_contract`,
+  `native_ir_file_io` y `native_ir_managed_consumers`.
+- Cada módulo se ejecuta bajo Node WASI con `stdout` y `stderr` capturados en descriptores
+  explícitos. La regresión compara salidas completas, argumentos `alpha`/`beta`, la variable
+  `OSTRIN_WASI_TEST`, creación/lectura de un archivo preabierto y los resultados/ownership de
+  `Option`/`Result`; no se reduce a buscar una línea parcial.
+- La matriz limpia sus archivos de prueba, incluye todos los módulos en `SHA256SUMS` y en el
+  tarball WASI. El workflow compila además el `ostrinc` host una sola vez para que la matriz use
+  exactamente el mismo CLI que el usuario local.
+- `wasm_program_matrix_emits_without_native_thread_dependencies` verifica localmente la emisión
+  cooperativa de los programas y del proyecto de paquetes, y rechaza cualquier
+  `OSTRIN_NATIVE_THREADS`. La ejecución final bajo Node WASI queda cubierta por el workflow con
+  el SDK C fijado y checksum verificado.
+
+Se mantiene deliberadamente fuera de WASI la interrupción de libc y cualquier pthread; el contrato
+actual es cooperativo, con archivos y entorno provistos por los preopens/host WASI. La siguiente
+frontera de plataforma sigue siendo ampliar recursos soportados sin mezclar semántica nativa de
+hilos con el target WASI.

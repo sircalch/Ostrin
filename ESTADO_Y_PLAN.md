@@ -235,7 +235,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Rendimiento del intérprete | Tree‑walking simple; sin optimizaciones |
 | `newlines.ostrin`, `advanced.ostrin` | Son muestras de sintaxis, no programas ejecutables |
 | CI | Linux, macOS y Windows; incluye las pruebas diferenciales intérprete↔nativo; el backend nativo enlaza `libm` explícitamente en Unix para paquetes con `sqrt`/`round` |
-| Distribución | Workflow WASI reproducible para `ostrinc.wasm`, `hello.wasm` y `pkg_project.wasm`, con toolchain fijado y SHA-256; playground de navegador sobre el compilador WASM; release nativo para Linux x86_64, macOS arm64 y Windows x64 que valida versión, checksum, archivo extraído, `hello.ostrin` y un proyecto con dependencia `path`; instaladores Unix/PowerShell y su check contractual ya están preparados, pero todavía no hay una release etiquetada publicada |
+| Distribución | Workflow WASI reproducible para `ostrinc.wasm`, `hello.wasm`, `pkg_project.wasm`, un contrato de `args`/`env`, E/S de archivos y ownership gestionado, con toolchain fijado, ejecución bajo Node WASI y SHA-256; el test local de emisión verifica que toda la matriz usa el runtime cooperativo; playground de navegador sobre el compilador WASM; release nativo para Linux x86_64, macOS arm64 y Windows x64 que valida versión, checksum, archivo extraído, `hello.ostrin` y un proyecto con dependencia `path`; instaladores Unix/PowerShell y su check contractual ya están preparados, pero todavía no hay una release etiquetada publicada |
 
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
 convendría dividirlos; el backend nativo no comparte el sistema de tipos del checker
@@ -292,10 +292,13 @@ CI de GitHub con matriz Windows/Linux/macOS, binarios de release.
 ### E. Backends adicionales
 El compilador, un programa Ostrin independiente y un proyecto con dependencia `path` ya se
 construyen como `wasm32-wasip1` mediante el workflow WASI, con toolchain fijado, ejecución bajo
-Node WASI y checksums reproducibles. El backend de programas conserva C como representación
-intermedia y su runtime cooperativo separa los headers y primitivas de `--native-threads`. El
-playground de navegador ya ejecuta el compilador WASM; el siguiente paso es ampliar la matriz de
-programas (I/O) y aislar contratos WASI explícitos antes de LLVM IR.
+Node WASI y checksums reproducibles. La matriz también compila y ejecuta un contrato real de
+`args`/`env`, E/S de archivos y ownership gestionado; un script único captura stdout/stderr,
+compara salidas exactas y limpia los artefactos temporales. El backend de programas conserva C
+como representación intermedia y su runtime cooperativo separa los headers y primitivas de
+`--native-threads`; la emisión local verifica que ningún programa WASI habilita hilos nativos.
+El playground de navegador ya ejecuta el compilador WASM; la siguiente frontera es aislar más
+contratos de plataforma antes de LLVM IR.
 
 ### F. Calidad y confianza
 Fuzzing del parser, pruebas diferenciales automáticas intérprete↔nativo sobre programas

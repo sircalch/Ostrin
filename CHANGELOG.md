@@ -56,6 +56,11 @@
   `Result<String, String>` for precision outside `0..=18`. The interpreter, HIR/C and IR/C share
   the fixed-decimal contract, including the invalid-precision path, and the standard example keeps
   native ownership at zero.
+- Expanded the reproducible WASI program matrix: a single Node WASI checker now compiles and runs
+  the standalone example, path-dependent package, `args`/`env` contract, file I/O contract and
+  managed `Option`/`Result` ownership example with exact stdout/stderr assertions. The artifact
+  checksum covers every program module, while a local emission regression verifies that WASI never
+  enables native threads.
 - Moved structural `==`/`!=` for supported `List`, `Map`, `Set`, `Option` and `Result` values into
   the native IR/C path. `structural_equality.ostrin` now reports `ir-generated: 1`, keeps exact
   interpreter/native output and finishes with `live_allocations=0`; array comparisons retain their

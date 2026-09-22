@@ -1,0 +1,14 @@
+import std.args
+import std.env
+
+fn main() -> Void {
+    path = "target/ostrin-wasi-contract.txt"
+    print(args.count())
+    print(args.at(0).unwrap())
+    print(args.at(1).unwrap())
+    print(env.get("OSTRIN_WASI_TEST").unwrap())
+    print(env.exists(path))
+    print(write_file(path, "wasi file").is_ok())
+    print(env.exists(path))
+    print(read_file(path).unwrap())
+}
