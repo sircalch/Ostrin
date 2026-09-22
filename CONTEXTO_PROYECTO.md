@@ -5785,3 +5785,20 @@ tareas anidadas:
 La frontera sigue siendo deliberada: tareas anidadas dentro de callbacks nativos, scopes que
 escapan por formas de control no modeladas y la cancelación que requiere saltar una ABI de callback
 siguen en HIR/AST hasta que puedan expresar su cleanup estructurado sin perder ownership.
+
+## 231. Tareas anidadas y propagación de entornos en la IR — 2026-09-21
+
+Los callbacks nativos pueden ahora crear otra tarea con la misma ABI cuando la composición es
+estática y verificable:
+
+- los helpers de `spawn` se preparan con nombres estables antes de emitir cuerpos, de modo que un
+  callback padre puede registrar un hijo sin depender del orden de generación de los helpers;
+- las capturas del hijo se propagan hacia el entorno del padre cuando cruzan ese límite. Cada entorno
+  conserva su propio retain/release, destructor y resultado gestionado; el hijo recibe una copia
+  retenida y `join()` conserva el contrato del runtime cooperativo y de hilos nativos;
+- `examples/native_ir_spawn_join.ostrin` cubre ahora un `spawn_scope`, una tarea anidada y una
+  captura `String` que atraviesa ambos entornos, con paridad de salida y `live_allocations=0`.
+
+Scopes anidados dentro de callbacks, control que escape del ámbito y formas indirectas todavía
+conservan el fallback HIR/AST; la propagación sólo se acepta cuando ownership puede expresarse en
+la cadena completa de callbacks.

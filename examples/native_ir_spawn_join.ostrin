@@ -41,4 +41,12 @@ fn main() -> Void {
         scoped_task.join()
     }
     print(scoped)
+    nested = spawn {
+        local_label = label + "!"
+        inner = spawn {
+            local_label
+        }
+        inner.join()
+    }
+    print(nested.join())
 }

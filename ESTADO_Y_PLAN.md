@@ -75,8 +75,8 @@ enviarlo (E1101); `--ownership-check` conserva el informe detallado.
 La primera tarea que cruza completamente HIR→IR→C es `spawn {}` con CFG de bloques soportados,
 incluyendo capturas inmutables por valor mediante un entorno C con retain/release, y `Task.join()`
 cooperativo o sobre hilos nativos. `spawn_scope {}` también baja el grupo estructurado inline
-cuando sus hijos usan la ABI nativa soportada; tareas anidadas y escapes complejos conservan el
-fallback verificado hasta que exista una ABI de cancelación y ownership equivalente en la IR.
+cuando sus hijos usan la ABI nativa soportada; tareas anidadas con capturas propagadas comparten
+esa ABI, mientras scopes anidados y escapes complejos conservan el fallback verificado.
 
 **Numérico/científico**: enteros de ancho fijo, `Float32`, `Array<T>` (difusión, máscaras,
 rebanadas, `@`), estadística, regresión, `det/inv/eigvals/norm`, `Rng` reproducible,

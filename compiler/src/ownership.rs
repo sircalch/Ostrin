@@ -127,40 +127,91 @@ pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
         // instead of treating the RegionReturn as an ordinary CFG use.
         let mut region_captures: HashMap<usize, HashSet<ValueId>> = HashMap::new();
         let mut capture_sites: Vec<(usize, usize, ValueId)> = Vec::new();
+        let mut spawn_sites = Vec::new();
         for parent in function.blocks.iter() {
             for (index, instruction) in parent.instructions.iter().enumerate() {
-                let IrInstr::Spawn { region, .. } = instruction else { continue };
-                let Some(region_blocks) = reachable_region_blocks(function, *region) else { continue };
-                let local_definitions: HashSet<ValueId> = region_blocks
-                    .iter()
-                    .filter_map(|block| function.blocks.get(*block))
-                    .flat_map(|block| block.instructions.iter().filter_map(defined_value))
-                    .map(|(value, _)| value)
-                    .collect();
-                let mut captured = HashSet::new();
-                for region_id in &region_blocks {
-                    let Some(region_block) = function.blocks.get(*region_id) else { continue };
-                    for nested in &region_block.instructions {
-                        for value in used_values(nested) {
-                            if !local_definitions.contains(&value) {
-                                captured.insert(value);
-                            }
+                if let IrInstr::Spawn { region, .. } = instruction {
+                    spawn_sites.push((parent.id, index, *region));
+                }
+            }
+        }
+
+        let mut region_blocks_by_root: HashMap<usize, Vec<usize>> = HashMap::new();
+        let mut region_definitions_by_root: HashMap<usize, HashSet<ValueId>> = HashMap::new();
+        let mut direct_captures_by_root: HashMap<usize, HashSet<ValueId>> = HashMap::new();
+        for (_, _, region) in &spawn_sites {
+            if region_blocks_by_root.contains_key(region) {
+                continue;
+            }
+            let Some(region_blocks) = reachable_region_blocks(function, *region) else { continue };
+            let local_definitions: HashSet<ValueId> = region_blocks
+                .iter()
+                .filter_map(|block| function.blocks.get(*block))
+                .flat_map(|block| block.instructions.iter().filter_map(defined_value))
+                .map(|(value, _)| value)
+                .collect();
+            let mut captured = HashSet::new();
+            for region_id in &region_blocks {
+                let Some(region_block) = function.blocks.get(*region_id) else { continue };
+                for nested in &region_block.instructions {
+                    for value in used_values(nested) {
+                        if !local_definitions.contains(&value) {
+                            captured.insert(value);
                         }
                     }
-                    if let Some(terminator) = &region_block.terminator {
-                        for value in terminator_values(terminator) {
-                            if !local_definitions.contains(&value) {
-                                captured.insert(value);
-                            }
+                }
+                if let Some(terminator) = &region_block.terminator {
+                    for value in terminator_values(terminator) {
+                        if !local_definitions.contains(&value) {
+                            captured.insert(value);
                         }
                     }
                 }
-                for value in &captured {
-                    capture_sites.push((parent.id, index, *value));
+            }
+            region_blocks_by_root.insert(*region, region_blocks);
+            region_definitions_by_root.insert(*region, local_definitions);
+            direct_captures_by_root.insert(*region, captured);
+        }
+
+        let mut roots: Vec<_> = region_blocks_by_root.keys().copied().collect();
+        roots.sort_by_key(|region| std::cmp::Reverse(*region));
+        let mut resolved_captures: HashMap<usize, HashSet<ValueId>> = HashMap::new();
+        for region in roots {
+            let region_blocks = region_blocks_by_root.get(&region).cloned().unwrap_or_default();
+            let local_definitions = region_definitions_by_root.get(&region).cloned().unwrap_or_default();
+            let mut captured = direct_captures_by_root.remove(&region).unwrap_or_default();
+            for region_id in &region_blocks {
+                let Some(region_block) = function.blocks.get(*region_id) else { continue };
+                for instruction in &region_block.instructions {
+                    if let IrInstr::Spawn { region: nested, .. } = instruction {
+                        if let Some(nested_captures) = resolved_captures.get(nested) {
+                            captured.extend(nested_captures.iter().copied());
+                        }
+                    }
                 }
-                for region_id in region_blocks {
-                    region_captures.insert(region_id, captured.clone());
+            }
+            captured.retain(|value| !local_definitions.contains(value));
+            for region_id in region_blocks {
+                region_captures.insert(region_id, captured.clone());
+            }
+            resolved_captures.insert(region, captured);
+        }
+        let mut region_owner_by_block = HashMap::new();
+        for (region, blocks) in &region_blocks_by_root {
+            for block in blocks {
+                region_owner_by_block.insert(*block, *region);
+            }
+        }
+        for (parent, index, region) in &spawn_sites {
+            let Some(captured) = resolved_captures.get(region) else { continue };
+            let inherited = region_owner_by_block
+                .get(parent)
+                .and_then(|owner| resolved_captures.get(owner));
+            for value in captured {
+                if inherited.is_some_and(|values| values.contains(value)) {
+                    continue;
                 }
+                capture_sites.push((*parent, *index, *value));
             }
         }
 

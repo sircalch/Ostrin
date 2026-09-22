@@ -1587,10 +1587,15 @@ fn build_spawn_helpers(
             if spawn_helpers.contains_key(region) {
                 return Err(());
             }
+            let callback = format!(
+                "ostrin_ir_task_{}_{}",
+                crate::codegen::c_function_name(&function.name),
+                region
+            );
             spawn_helpers.insert(
                 *region,
                 SpawnHelper {
-                    callback: String::new(),
+                    callback,
                     env_type: None,
                     drop_env: None,
                     captures: Vec::new(),
@@ -1600,6 +1605,7 @@ fn build_spawn_helpers(
         }
     }
 
+    specs.sort_by_key(|(region, _)| std::cmp::Reverse(*region));
     let mut declarations = Vec::new();
     let mut helpers = Vec::with_capacity(specs.len());
     for (region, result_ty) in specs {
@@ -1610,7 +1616,7 @@ fn build_spawn_helpers(
         for block_id in &region_blocks {
             let block = function.blocks.get(*block_id).ok_or(())?;
             for instruction in &block.instructions {
-                if matches!(instruction, IrInstr::Param { .. } | IrInstr::Spawn { .. }) {
+                if matches!(instruction, IrInstr::Param { .. }) {
                     return Err(());
                 }
                 if matches!(instruction, IrInstr::Opaque { op, .. } if op.starts_with("scope_begin<") || op.starts_with("scope_end<")) {
@@ -1636,6 +1642,14 @@ fn build_spawn_helpers(
                 for value in used_values(instruction) {
                     if !definitions.contains(&value) {
                         captured_values.insert(value);
+                    }
+                }
+                if let IrInstr::Spawn { region: nested, .. } = instruction {
+                    let nested_helper = spawn_helpers.get(nested).ok_or(())?;
+                    for (value, _) in &nested_helper.captures {
+                        if !definitions.contains(value) {
+                            captured_values.insert(*value);
+                        }
                     }
                 }
             }

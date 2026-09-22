@@ -18,7 +18,8 @@ conservan la liberación del record iterador. Los canales bajan a la misma forma
 `Option<T>` para `send`, `close`, `receive` y `for`. `spawn {}` con CFG de bloques soportados,
 con capturas inmutables por valor, genera un callback C nativo con entorno y `Task.join()` consume
 el helper real del runtime; `spawn_scope {}` abre y drena el grupo estructurado mediante la misma
-IR cuando sus hijos usan la ABI soportada; las tareas anidadas y escapes complejos siguen en fallback.*
+IR cuando sus hijos usan la ABI soportada; las tareas anidadas con capturas propagadas ya comparten
+esa ABI, mientras los scopes anidados y escapes complejos siguen en fallback.*
 
 ## 1. Qué existe ya (comprobado en el código)
 
@@ -81,7 +82,7 @@ Sobre este IR se hacen los análisis que el texto C no permite:
 
 1. **HIR + verificador + `--hir`** para *todo* lo que el checker tipa; medida de cobertura por ejemplo (ratchet).
 2. Migrar el backend C por **familias de nodos** al HIR (literales/operadores → llamadas → records/enums → patrones → colecciones → genéricos), eliminando la reinferencia correspondiente en cada paso.
-3. **IR de bloques básicos** y generación de C desde el IR (el HIR deja de generar C directamente). La primera CFG observable ya existe en `--ir` y el emisor consume ramas, recursión, bucles con `phi`, rangos enteros direccionales, aritmética comprobada de ancho fijo, `String`, records concretos con campos anidados, iteradores de records concretos (`next() -> Option<T>`), canales con `send`/`close`/`receive` y `for`, `spawn {}` con CFG soportado, capturas inmutables, `spawn_scope {}` inline con drenado de grupos y `Task.join()`, el núcleo de `List<T>`, operaciones hash escalares de `Map`/`Set` y lookups `Option` escalares/String/Record con `Some`/`None`; faltan rangos con cantidades, iteradores genéricos/indirectos, tareas anidadas, otros `Option` gestionados, patrones anidados, agregados complejos y la retirada progresiva del fallback.
+3. **IR de bloques básicos** y generación de C desde el IR (el HIR deja de generar C directamente). La primera CFG observable ya existe en `--ir` y el emisor consume ramas, recursión, bucles con `phi`, rangos enteros direccionales, aritmética comprobada de ancho fijo, `String`, records concretos con campos anidados, iteradores de records concretos (`next() -> Option<T>`), canales con `send`/`close`/`receive` y `for`, `spawn {}` con CFG soportado, capturas inmutables, `spawn_scope {}` inline con drenado de grupos, tareas anidadas con capturas propagadas y `Task.join()`, el núcleo de `List<T>`, operaciones hash escalares de `Map`/`Set` y lookups `Option` escalares/String/Record con `Some`/`None`; faltan rangos con cantidades, iteradores genéricos/indirectos, scopes anidados, otros `Option` gestionados, patrones anidados, agregados complejos y la retirada progresiva del fallback.
 4. **RC + último uso** sobre el IR (`--leak-check`: los ejemplos deben terminar sin objetos vivos).
    El runtime ya expone `ostrin_retain`/`ostrin_release`; el emisor C cubre la primera subetapa
    de forma lineal en locales directos: aliases y campos prestados retienen, las reasignaciones

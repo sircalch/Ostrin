@@ -1765,9 +1765,9 @@ fn native_ir_emitter_handles_channel_iterator_protocol() {
 }
 
 #[test]
-fn native_ir_emitter_handles_non_capturing_spawn_and_join() {
+fn native_ir_emitter_handles_spawn_cfg_scope_and_nested_join() {
     let file = example_path("native_ir_spawn_join.ostrin");
-    let expected = "7\n7\ncaptured\ninside task\n21\n6\n8\n";
+    let expected = "7\n7\ncaptured\ninside task\n21\n6\n8\ncaptured!\n";
     let interpreted = run(&["--run", &file]);
     assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
@@ -1788,6 +1788,7 @@ fn native_ir_emitter_handles_non_capturing_spawn_and_join() {
     assert!(source.contains("__ostrin_ir_bb6"), "spawn CFG branch target missing from IR C: {source}");
     assert!(source.contains("ostrin_scope_begin()"), "spawn_scope did not lower to the native scope runtime: {source}");
     assert!(source.contains("ostrin_scope_end(__ostrin_ir_scope_0)"), "spawn_scope cleanup missing from IR C: {source}");
+    assert!(source.matches("ostrin_ir_task_ostrin_main_").count() >= 8, "nested native task callbacks missing from IR C: {source}");
     assert!(source.contains("Task_Int_join"), "task join missing from IR C: {source}");
     assert!(source.contains("Task_String_join"), "managed task join missing from IR C: {source}");
 
