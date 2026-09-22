@@ -77,6 +77,30 @@ pub fn analyze(program: &IrProgram) -> OwnershipReport {
     report
 }
 
+fn reachable_region_blocks(function: &crate::ir::IrFunction, root: usize) -> Option<Vec<usize>> {
+    let mut pending = vec![root];
+    let mut seen = HashSet::new();
+    while let Some(block_id) = pending.pop() {
+        if !seen.insert(block_id) {
+            continue;
+        }
+        let block = function.blocks.get(block_id)?;
+        let terminator = block.terminator.as_ref()?;
+        match terminator {
+            IrTerminator::Goto(target) => pending.push(*target),
+            IrTerminator::Branch { then_block, else_block, .. } => {
+                pending.push(*then_block);
+                pending.push(*else_block);
+            }
+            IrTerminator::RegionReturn(_) | IrTerminator::Unreachable => {}
+            IrTerminator::Return(_) => return None,
+        }
+    }
+    let mut blocks: Vec<_> = seen.into_iter().collect();
+    blocks.sort_unstable();
+    Some(blocks)
+}
+
 /// Adds ownership markers for proven straight-line uses and simple CFG joins.
 ///
 /// A managed `Phi` can transfer ownership when every managed incoming value is
@@ -106,32 +130,37 @@ pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
         for parent in function.blocks.iter() {
             for (index, instruction) in parent.instructions.iter().enumerate() {
                 let IrInstr::Spawn { region, .. } = instruction else { continue };
-                let Some(region_block) = function.blocks.get(*region) else { continue };
-                let local_definitions: HashSet<ValueId> = region_block
-                    .instructions
+                let Some(region_blocks) = reachable_region_blocks(function, *region) else { continue };
+                let local_definitions: HashSet<ValueId> = region_blocks
                     .iter()
-                    .filter_map(defined_value)
+                    .filter_map(|block| function.blocks.get(*block))
+                    .flat_map(|block| block.instructions.iter().filter_map(defined_value))
                     .map(|(value, _)| value)
                     .collect();
                 let mut captured = HashSet::new();
-                for nested in &region_block.instructions {
-                    for value in used_values(nested) {
-                        if !local_definitions.contains(&value) {
-                            captured.insert(value);
+                for region_id in &region_blocks {
+                    let Some(region_block) = function.blocks.get(*region_id) else { continue };
+                    for nested in &region_block.instructions {
+                        for value in used_values(nested) {
+                            if !local_definitions.contains(&value) {
+                                captured.insert(value);
+                            }
                         }
                     }
-                }
-                if let Some(terminator) = &region_block.terminator {
-                    for value in terminator_values(terminator) {
-                        if !local_definitions.contains(&value) {
-                            captured.insert(value);
+                    if let Some(terminator) = &region_block.terminator {
+                        for value in terminator_values(terminator) {
+                            if !local_definitions.contains(&value) {
+                                captured.insert(value);
+                            }
                         }
                     }
                 }
                 for value in &captured {
                     capture_sites.push((parent.id, index, *value));
                 }
-                region_captures.insert(*region, captured);
+                for region_id in region_blocks {
+                    region_captures.insert(region_id, captured.clone());
+                }
             }
         }
 
@@ -592,13 +621,6 @@ fn plan_cross_block_releases(
     for (pred, _) in phi_edges {
         used_in[*pred] = true;
         end_use[*pred] = true;
-    }
-    if function
-        .blocks
-        .iter()
-        .any(|block| matches!(block.terminator, Some(IrTerminator::RegionReturn(_))))
-    {
-        return None;
     }
     let successors = |block: usize| -> Vec<usize> {
         let mut next = match function.blocks.get(block).and_then(|b| b.terminator.as_ref()) {

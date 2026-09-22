@@ -13,8 +13,25 @@ fn main() -> Void {
     built_task = spawn {
         "inside" + " task"
     }
+    choose_high = true
+    branched_task = spawn {
+        if choose_high {
+            21
+        } else {
+            42
+        }
+    }
+    loop_task = spawn {
+        mut total = 0
+        for i in 1 to 3 {
+            total = total + i
+        }
+        total
+    }
     print(captured.join())
     print(plain.join())
     print(text_task.join())
     print(built_task.join())
+    print(branched_task.join())
+    print(loop_task.join())
 }

@@ -5746,5 +5746,23 @@ hacer que el callback dependa de temporales del llamador:
   scheduler cooperativo y en hilos nativos, con `live_allocations=0`.
 
 La frontera sigue siendo intencionalmente estrecha: las capturas mutables ya son rechazadas por el
-checker, y una tarea con ramas, loops, otra tarea anidada o `spawn_scope` permanece en HIR/AST
-hasta que la IR pueda representar su CFG, cancelación y ownership de escape de forma equivalente.
+checker, y las tareas anidadas o `spawn_scope` permanecen en HIR/AST hasta que la IR pueda
+representar su cancelación y ownership de escape de forma equivalente.
+
+## 229. CFG interno de tareas en la IR nativa — 2026-09-21
+
+Las regiones de `spawn` ya no están limitadas a un único bloque lineal:
+
+- el emisor descubre el subgrafo alcanzable desde la región de tarea, conserva sus `Goto`,
+  `Branch`, `Phi`, backedges y múltiples `RegionReturn`, y lo emite como un callback C con labels
+  y un predictor local, sin mezclarlo con el CFG de la función padre;
+- las capturas se calculan sobre todos los bloques de la región, no sólo sobre el bloque raíz, y
+  el ownership modela cada lectura externa como transferencia en `Spawn`. Los valores gestionados
+  producidos dentro de la región se transfieren por `RegionReturn` y pueden liberar sus temporales
+  internos en los edges seguros;
+- `examples/native_ir_spawn_join.ostrin` añade una tarea con una condición capturada y dos
+  ramas, exige que el C contenga el entorno y los labels de la región, y mantiene la comparación
+  con el intérprete, los hilos nativos y `live_allocations=0`.
+
+La bajada sigue rechazando tareas anidadas, `spawn_scope`, retornos normales que escapen de la
+región y formas cuya ownership no pueda probarse; esas formas permanecen en el fallback verificado.

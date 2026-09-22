@@ -1767,7 +1767,7 @@ fn native_ir_emitter_handles_channel_iterator_protocol() {
 #[test]
 fn native_ir_emitter_handles_non_capturing_spawn_and_join() {
     let file = example_path("native_ir_spawn_join.ostrin");
-    let expected = "7\n7\ncaptured\ninside task\n";
+    let expected = "7\n7\ncaptured\ninside task\n21\n6\n";
     let interpreted = run(&["--run", &file]);
     assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
@@ -1784,6 +1784,8 @@ fn native_ir_emitter_handles_non_capturing_spawn_and_join() {
     assert!(source.contains("ostrin_ir_task_ostrin_main_"), "spawn callback missing from IR C: {source}");
     assert!(source.contains("OstrinIrTaskEnv_ostrin_main_"), "captured task environment missing from IR C: {source}");
     assert!(source.contains("ostrin_ir_task_env_drop_ostrin_main_"), "captured task drop helper missing from IR C: {source}");
+    assert!(source.contains("__e->__ir_v16"), "spawn CFG did not read its captured branch condition from the environment: {source}");
+    assert!(source.contains("__ostrin_ir_bb6"), "spawn CFG branch target missing from IR C: {source}");
     assert!(source.contains("Task_Int_join"), "task join missing from IR C: {source}");
     assert!(source.contains("Task_String_join"), "managed task join missing from IR C: {source}");
 

@@ -1418,6 +1418,71 @@ fn emit_terminator(
     Ok(())
 }
 
+fn emit_region_terminator(
+    block: BlockId,
+    terminator: &IrTerminator,
+    region_blocks: &HashSet<BlockId>,
+    values: &Values,
+    result_ty: &Ty,
+    captures: &[(ValueId, Ty)],
+    records: &RecordFields,
+    out: &mut String,
+) -> Bail<()> {
+    let valid_target = |target: BlockId| region_blocks.contains(&target);
+    match terminator {
+        IrTerminator::Goto(target) => {
+            if !valid_target(*target) {
+                return Err(());
+            }
+            out.push_str(&format!(
+                "    __ostrin_ir_pred = {block}; goto {};\n",
+                block_label(*target)
+            ));
+        }
+        IrTerminator::Branch {
+            condition,
+            then_block,
+            else_block,
+        } => {
+            if !valid_target(*then_block) || !valid_target(*else_block) || value_ty(values, *condition)? != Ty::Bool {
+                return Err(());
+            }
+            let condition = value_code(values, *condition)?;
+            out.push_str(&format!(
+                "    if ({condition}) {{ __ostrin_ir_pred = {block}; goto {}; }} else {{ __ostrin_ir_pred = {block}; goto {}; }}\n",
+                block_label(*then_block),
+                block_label(*else_block)
+            ));
+        }
+        IrTerminator::RegionReturn(value) => match value {
+            Some(value) => {
+                if value_ty(values, *value)? != *result_ty {
+                    return Err(());
+                }
+                if *result_ty == Ty::Void {
+                    out.push_str("    return;\n");
+                } else {
+                    let return_code = value_code(values, *value)?;
+                    if captures.iter().any(|(captured, _)| *captured == *value)
+                        && retain_payload(&return_code, result_ty, records).is_some()
+                    {
+                        out.push_str(&format!(
+                            "    {};\n",
+                            retain_payload(&return_code, result_ty, records).ok_or(())?
+                        ));
+                    }
+                    out.push_str(&format!("    return {return_code};\n"));
+                }
+            }
+            None if *result_ty == Ty::Void => out.push_str("    return;\n"),
+            None => return Err(()),
+        },
+        IrTerminator::Unreachable => out.push_str("    abort();\n"),
+        IrTerminator::Return(_) => return Err(()),
+    }
+    Ok(())
+}
+
 fn used_values(instruction: &IrInstr) -> Vec<ValueId> {
     match instruction {
         IrInstr::Move { source, .. } => vec![*source],
@@ -1455,6 +1520,30 @@ fn terminator_values(terminator: &IrTerminator) -> Vec<ValueId> {
         IrTerminator::Return(Some(value)) | IrTerminator::RegionReturn(Some(value)) => vec![*value],
         IrTerminator::Goto(_) | IrTerminator::Return(None) | IrTerminator::RegionReturn(None) | IrTerminator::Unreachable => Vec::new(),
     }
+}
+
+fn reachable_region_blocks(function: &IrFunction, root: BlockId) -> Bail<Vec<BlockId>> {
+    let mut pending = vec![root];
+    let mut seen = HashSet::new();
+    while let Some(block_id) = pending.pop() {
+        if !seen.insert(block_id) {
+            continue;
+        }
+        let block = function.blocks.get(block_id).ok_or(())?;
+        let terminator = block.terminator.as_ref().ok_or(())?;
+        match terminator {
+            IrTerminator::Goto(target) => pending.push(*target),
+            IrTerminator::Branch { then_block, else_block, .. } => {
+                pending.push(*then_block);
+                pending.push(*else_block);
+            }
+            IrTerminator::RegionReturn(_) | IrTerminator::Unreachable => {}
+            IrTerminator::Return(_) => return Err(()),
+        }
+    }
+    let mut blocks: Vec<_> = seen.into_iter().collect();
+    blocks.sort_unstable();
+    Ok(blocks)
 }
 
 pub struct Generated {
@@ -1499,33 +1588,44 @@ fn build_spawn_helpers(
     let mut declarations = Vec::new();
     let mut helpers = Vec::with_capacity(specs.len());
     for (region, result_ty) in specs {
-        let block = function.blocks.get(region).ok_or(())?;
-        if block.id != region || !matches!(block.terminator, Some(IrTerminator::RegionReturn(_))) {
-            return Err(());
-        }
+        let region_blocks = reachable_region_blocks(function, region)?;
+        let region_set: HashSet<_> = region_blocks.iter().copied().collect();
         let mut definitions = HashSet::new();
-        for instruction in &block.instructions {
-            if matches!(instruction, IrInstr::Param { .. } | IrInstr::Spawn { .. }) {
-                return Err(());
-            }
-            if let Some((value, ty)) = defined_value(instruction) {
-                if !supported(&ty, records) || !definitions.insert(value) {
+        let mut has_return = false;
+        for block_id in &region_blocks {
+            let block = function.blocks.get(*block_id).ok_or(())?;
+            for instruction in &block.instructions {
+                if matches!(instruction, IrInstr::Param { .. } | IrInstr::Spawn { .. }) {
                     return Err(());
                 }
+                if let Some((value, ty)) = defined_value(instruction) {
+                    if !supported(&ty, records) || !definitions.insert(value) {
+                        return Err(());
+                    }
+                }
+            }
+            if matches!(block.terminator, Some(IrTerminator::RegionReturn(_))) {
+                has_return = true;
             }
         }
+        if !has_return {
+            return Err(());
+        }
         let mut captured_values = HashSet::new();
-        for instruction in &block.instructions {
-            for value in used_values(instruction) {
+        for block_id in &region_blocks {
+            let block = function.blocks.get(*block_id).ok_or(())?;
+            for instruction in &block.instructions {
+                for value in used_values(instruction) {
+                    if !definitions.contains(&value) {
+                        captured_values.insert(value);
+                    }
+                }
+            }
+            let terminator = block.terminator.as_ref().ok_or(())?;
+            for value in terminator_values(terminator) {
                 if !definitions.contains(&value) {
                     captured_values.insert(value);
                 }
-            }
-        }
-        let terminator = block.terminator.as_ref().ok_or(())?;
-        for value in terminator_values(terminator) {
-            if !definitions.contains(&value) {
-                captured_values.insert(value);
             }
         }
         captured_values.retain(|value| !definitions.contains(value));
@@ -1537,10 +1637,13 @@ fn build_spawn_helpers(
         if captures.iter().any(|(_, ty)| *ty == Ty::Void || !supported(ty, records)) {
             return Err(());
         }
-        match terminator {
-            IrTerminator::RegionReturn(Some(value)) if value_ty(values, *value)? != result_ty => return Err(()),
-            IrTerminator::RegionReturn(None) if result_ty != Ty::Void => return Err(()),
-            _ => {}
+        for block_id in &region_blocks {
+            let terminator = function.blocks[*block_id].terminator.as_ref().ok_or(())?;
+            match terminator {
+                IrTerminator::RegionReturn(Some(value)) if value_ty(values, *value)? != result_ty => return Err(()),
+                IrTerminator::RegionReturn(None) if result_ty != Ty::Void => return Err(()),
+                _ => {}
+            }
         }
 
         let helper_name = format!(
@@ -1611,32 +1714,35 @@ fn build_spawn_helpers(
         for (value, ty) in declarations {
             body.push_str(&format!("    {} {};\n", c_type(&ty, records)?, value_name(value)));
         }
-        for instruction in &block.instructions {
-            emit_instruction(
-                instruction,
+        body.push_str("    int __ostrin_ir_pred = -1;\n");
+        body.push_str(&format!("    goto {};\n", block_label(region)));
+        for block_id in &region_blocks {
+            let block = function.blocks.get(*block_id).ok_or(())?;
+            body.push_str(&format!("{}:\n", block_label(block.id)));
+            for instruction in &block.instructions {
+                emit_instruction(
+                    instruction,
+                    &helper_values,
+                    known_functions,
+                    methods,
+                    records,
+                    spawn_helpers,
+                    show,
+                    &mut body,
+                )?;
+            }
+            emit_region_terminator(
+                block.id,
+                block.terminator.as_ref().ok_or(())?,
+                &region_set,
                 &helper_values,
-                known_functions,
-                methods,
+                &result_ty,
+                &captures,
                 records,
-                spawn_helpers,
-                show,
                 &mut body,
             )?;
         }
-        match terminator {
-            IrTerminator::RegionReturn(Some(value)) if result_ty == Ty::Void => body.push_str("    return;\n"),
-            IrTerminator::RegionReturn(Some(value)) => {
-                let return_code = value_code(&helper_values, *value)?;
-                if captures.iter().any(|(captured, _)| *captured == *value)
-                    && retain_payload(&return_code, &result_ty, records).is_some()
-                {
-                    body.push_str(&format!("    {} ;\n", retain_payload(&return_code, &result_ty, records).ok_or(())?));
-                }
-                body.push_str(&format!("    return {return_code};\n"));
-            }
-            IrTerminator::RegionReturn(None) => body.push_str("    return;\n"),
-            _ => return Err(()),
-        }
+        body.push_str("    abort();\n");
         helpers.push((signature, body));
     }
     Ok((declarations, helpers))
@@ -1692,8 +1798,12 @@ pub fn generate_with_helpers(
         &mut spawn_helpers,
         show,
     ).ok()?;
+    let mut region_blocks = HashSet::new();
+    for root in spawn_helpers.keys().copied() {
+        region_blocks.extend(reachable_region_blocks(function, root).ok()?);
+    }
     if function.blocks.iter().any(|block| {
-        matches!(block.terminator, Some(IrTerminator::RegionReturn(_))) && !spawn_helpers.contains_key(&block.id)
+        matches!(block.terminator, Some(IrTerminator::RegionReturn(_))) && !region_blocks.contains(&block.id)
     }) {
         return None;
     }
@@ -1714,7 +1824,7 @@ pub fn generate_with_helpers(
     out.push_str(&format!("    goto {};\n", block_label(function.entry)));
 
     for block in &function.blocks {
-        if spawn_helpers.contains_key(&block.id) {
+        if region_blocks.contains(&block.id) {
             continue;
         }
         out.push_str(&format!("{}:\n", block_label(block.id)));
