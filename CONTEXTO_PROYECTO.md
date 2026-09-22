@@ -5775,9 +5775,11 @@ tareas anidadas:
 - `SpawnScope` deja de representarse como una tarea artificial. La IR abre un grupo con
   `scope_begin`, baja el cuerpo en el CFG de la función y lo cierra con `scope_end`, por lo que
   los `spawn` hijos quedan asociados al grupo real del runtime y se drenan antes de continuar;
-- los retornos explícitos dentro del ámbito cierran primero los grupos activos en la ruta de salida.
-  El emisor C declara los marcos de grupo por función y conserva el comportamiento cooperativo y
-  de `--native-threads` del runtime existente, incluida la cancelación propagada y el drenado;
+- los retornos explícitos dentro del ámbito cierran primero los grupos activos en la ruta de salida;
+  `break` y `continue` llevan la profundidad del loop para cerrar sólo los scopes que realmente
+  atraviesan. El emisor C declara los marcos de grupo por función y conserva el comportamiento
+  cooperativo y de `--native-threads` del runtime existente, incluida la cancelación propagada y
+  el drenado;
 - `examples/native_ir_spawn_join.ostrin` añade un `spawn_scope` con hijo nativo, compara intérprete,
   C cooperativo e hilos nativos, exige `ir-generated: 1`, y mantiene `ownership-ir unresolved-values: 0`
   y `live_allocations=0`.

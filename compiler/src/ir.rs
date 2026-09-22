@@ -238,7 +238,7 @@ struct Builder {
     locals: Vec<HashMap<String, ValueId>>,
     iterator_items: HashMap<String, Ty>,
     function_globals: HashMap<ValueId, String>,
-    break_targets: Vec<(BlockId, BlockId)>,
+    break_targets: Vec<(BlockId, BlockId, usize)>,
     loop_edges: Vec<LoopEdges>,
     region_depth: usize,
     next_scope: usize,
@@ -343,11 +343,19 @@ impl Builder {
         });
     }
 
-    fn close_active_scopes(&mut self) {
-        let scopes: Vec<_> = self.active_scopes.iter().rev().copied().collect();
+    fn close_scopes_to(&mut self, depth: usize) {
+        let scopes: Vec<_> = self.active_scopes[depth.min(self.active_scopes.len())..]
+            .iter()
+            .rev()
+            .copied()
+            .collect();
         for scope in scopes {
             self.emit_scope_end(scope);
         }
+    }
+
+    fn close_active_scopes(&mut self) {
+        self.close_scopes_to(0);
     }
 
     fn lookup(&self, name: &str) -> Option<ValueId> {
@@ -473,7 +481,7 @@ impl Builder {
                 }
             }
             HirStmt::Break(value) => {
-                if let Some((break_block, _)) = self.break_targets.last().copied() {
+                if let Some((break_block, _, scope_depth)) = self.break_targets.last().copied() {
                     if let Some(value) = value {
                         let value = self.lower_expr(value);
                         self.emit(IrInstr::Opaque {
@@ -483,6 +491,7 @@ impl Builder {
                             ty: Ty::Void,
                         });
                     }
+                    self.close_scopes_to(scope_depth);
                     self.record_loop_edge(true);
                     self.terminate(IrTerminator::Goto(break_block));
                 } else {
@@ -490,7 +499,8 @@ impl Builder {
                 }
             }
             HirStmt::Continue => {
-                if let Some((_, continue_block)) = self.break_targets.last().copied() {
+                if let Some((_, continue_block, scope_depth)) = self.break_targets.last().copied() {
+                    self.close_scopes_to(scope_depth);
                     self.record_loop_edge(false);
                     self.terminate(IrTerminator::Goto(continue_block));
                 } else {
@@ -596,7 +606,8 @@ impl Builder {
         });
 
         self.current = body_block;
-        self.break_targets.push((after_block, condition_block));
+        let scope_depth = self.active_scopes.len();
+        self.break_targets.push((after_block, condition_block, scope_depth));
         self.loop_edges.push(LoopEdges::default());
         let _ = self.lower_block(body);
         self.break_targets.pop();
@@ -620,6 +631,7 @@ impl Builder {
             self.patch_phi(*destination, incoming);
         }
         self.current = after_block;
+        self.active_scopes.truncate(scope_depth);
         self.loop_exit_bindings(&loop_phis, condition_block, &edges.breaks);
     }
 
@@ -673,7 +685,8 @@ impl Builder {
         });
 
         self.current = body_block;
-        self.break_targets.push((after_block, step_block));
+        let scope_depth = self.active_scopes.len();
+        self.break_targets.push((after_block, step_block, scope_depth));
         self.loop_edges.push(LoopEdges::default());
         self.locals.push(HashMap::new());
         let item = self.fresh();
@@ -757,6 +770,7 @@ impl Builder {
             self.patch_phi(*destination, incoming);
         }
         self.current = after_block;
+        self.active_scopes.truncate(scope_depth);
         self.loop_exit_bindings(&loop_phis, condition_block, &edges.breaks);
     }
 
@@ -870,7 +884,8 @@ impl Builder {
         self.terminate(IrTerminator::Goto(after_block));
 
         self.current = body_block;
-        self.break_targets.push((after_block, step_block));
+        let scope_depth = self.active_scopes.len();
+        self.break_targets.push((after_block, step_block, scope_depth));
         self.loop_edges.push(LoopEdges::default());
         self.locals.push(HashMap::new());
         let item = self.fresh();
@@ -942,6 +957,7 @@ impl Builder {
             self.patch_phi(*destination, incoming);
         }
         self.current = after_block;
+        self.active_scopes.truncate(scope_depth);
         self.loop_exit_bindings(&loop_phis, normal_exit_block, &edges.breaks);
     }
 
@@ -988,7 +1004,8 @@ impl Builder {
         });
 
         self.current = body_block;
-        self.break_targets.push((after_block, condition_block));
+        let scope_depth = self.active_scopes.len();
+        self.break_targets.push((after_block, condition_block, scope_depth));
         self.loop_edges.push(LoopEdges::default());
         self.locals.push(HashMap::new());
         let item = self.fresh();
@@ -1020,6 +1037,7 @@ impl Builder {
             self.patch_phi(*destination, incoming);
         }
         self.current = after_block;
+        self.active_scopes.truncate(scope_depth);
         self.loop_exit_bindings(&loop_phis, condition_block, &edges.breaks);
     }
 
@@ -1084,7 +1102,8 @@ impl Builder {
         });
 
         self.current = body_block;
-        self.break_targets.push((after_block, condition_block));
+        let scope_depth = self.active_scopes.len();
+        self.break_targets.push((after_block, condition_block, scope_depth));
         self.loop_edges.push(LoopEdges::default());
         self.locals.push(HashMap::new());
         let item = self.fresh();
@@ -1105,6 +1124,7 @@ impl Builder {
             self.terminate(IrTerminator::Goto(condition_block));
         }
         self.current = after_block;
+        self.active_scopes.truncate(scope_depth);
     }
 
     /// Names visible before a branch construct that some branch re-binds.
