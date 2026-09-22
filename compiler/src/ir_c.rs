@@ -142,7 +142,7 @@ fn option_managed_payload(element: &Ty, records: &RecordFields) -> bool {
 }
 
 fn result_payload_supported(ty: &Ty, records: &RecordFields) -> bool {
-    (scalar(ty) && *ty != Ty::Void)
+    scalar(ty)
         || matches!(ty, Ty::List(inner) if list_supported(inner, records))
         || matches!(ty, Ty::Map(key, value) if map_supported(key, value))
         || matches!(ty, Ty::Set(inner) if set_supported(inner))
@@ -228,7 +228,11 @@ fn mangle_option_payload(ty: &Ty, records: &RecordFields) -> String {
 }
 
 fn mangle_result_payload(ty: &Ty, records: &RecordFields) -> String {
-    mangle_option_payload(ty, records)
+    if *ty == Ty::Void {
+        "Void".to_string()
+    } else {
+        mangle_option_payload(ty, records)
+    }
 }
 
 fn mangle_task_payload(ty: &Ty, records: &RecordFields) -> String {
@@ -532,6 +536,21 @@ fn parse_float_result_code(receiver: &str) -> String {
         .to_string()
         + receiver
         + "; int __ostrin_check = ostrin_s_float_check(__ostrin_text); if (__ostrin_check == 1) { __ostrin_result.error = \"cannot parse float from empty string\"; } else if (__ostrin_check == 2) { __ostrin_result.error = \"invalid float literal\"; } else { __ostrin_result.ok = true; __ostrin_result.value = strtod(__ostrin_text, NULL); } __ostrin_result; })"
+}
+
+fn read_file_result_code(path: &str) -> String {
+    format!(
+        "({{ Result_String_String __ostrin_result; memset(&__ostrin_result, 0, sizeof __ostrin_result); ostrin_task_checkpoint(); FILE* __ostrin_file = fopen({path}, \"rb\"); if (!__ostrin_file) {{ int __ostrin_error = errno ? errno : EIO; __ostrin_result.error = ostrin_s_dup(strerror(__ostrin_error), strlen(strerror(__ostrin_error))); }} else if (fseek(__ostrin_file, 0, SEEK_END) != 0) {{ int __ostrin_error = errno ? errno : EIO; fclose(__ostrin_file); __ostrin_result.error = ostrin_s_dup(strerror(__ostrin_error), strlen(strerror(__ostrin_error))); }} else {{ long __ostrin_size = ftell(__ostrin_file); if (__ostrin_size < 0) {{ int __ostrin_error = errno ? errno : EIO; fclose(__ostrin_file); __ostrin_result.error = ostrin_s_dup(strerror(__ostrin_error), strlen(strerror(__ostrin_error))); }} else if (fseek(__ostrin_file, 0, SEEK_SET) != 0) {{ int __ostrin_error = errno ? errno : EIO; fclose(__ostrin_file); __ostrin_result.error = ostrin_s_dup(strerror(__ostrin_error), strlen(strerror(__ostrin_error))); }} else {{ char* __ostrin_buffer = (char*)ostrin_alloc((size_t)__ostrin_size + 1); size_t __ostrin_read = fread(__ostrin_buffer, 1, (size_t)__ostrin_size, __ostrin_file); int __ostrin_read_error = errno ? errno : EIO; if (__ostrin_read != (size_t)__ostrin_size && ferror(__ostrin_file)) {{ fclose(__ostrin_file); ostrin_free(__ostrin_buffer); __ostrin_result.error = ostrin_s_dup(strerror(__ostrin_read_error), strlen(strerror(__ostrin_read_error))); }} else if (__ostrin_read != (size_t)__ostrin_size) {{ fclose(__ostrin_file); ostrin_free(__ostrin_buffer); __ostrin_result.error = ostrin_s_dup(\"short read while reading file\", strlen(\"short read while reading file\")); }} else {{ __ostrin_buffer[__ostrin_read] = 0; errno = 0; if (fclose(__ostrin_file) != 0) {{ int __ostrin_error = errno ? errno : EIO; ostrin_free(__ostrin_buffer); __ostrin_result.error = ostrin_s_dup(strerror(__ostrin_error), strlen(strerror(__ostrin_error))); }} else {{ __ostrin_result.ok = true; __ostrin_result.value = __ostrin_buffer; }} }} }} }} __ostrin_result; }})",
+        path = path
+    )
+}
+
+fn write_file_result_code(path: &str, text: &str) -> String {
+    format!(
+        "({{ Result_Void_String __ostrin_result; memset(&__ostrin_result, 0, sizeof __ostrin_result); ostrin_task_checkpoint(); FILE* __ostrin_file = fopen({path}, \"wb\"); if (!__ostrin_file) {{ int __ostrin_error = errno ? errno : EIO; __ostrin_result.error = ostrin_s_dup(strerror(__ostrin_error), strlen(strerror(__ostrin_error))); }} else {{ errno = 0; if (fputs({text}, __ostrin_file) == EOF) {{ int __ostrin_error = errno ? errno : EIO; fclose(__ostrin_file); __ostrin_result.error = ostrin_s_dup(strerror(__ostrin_error), strlen(strerror(__ostrin_error))); }} else {{ errno = 0; if (fclose(__ostrin_file) != 0) {{ int __ostrin_error = errno ? errno : EIO; __ostrin_result.error = ostrin_s_dup(strerror(__ostrin_error), strlen(strerror(__ostrin_error))); }} else {{ __ostrin_result.ok = true; }} }} }} __ostrin_result; }})",
+        path = path,
+        text = text
+    )
 }
 
 fn emit_instruction(
@@ -1107,6 +1126,18 @@ fn emit_instruction(
                 format!("ostrin_s_path_join({}, {})", codes[0], codes[1])
             } else if callee == "file_exists" && args.len() == 1 && value_ty(values, args[0])? == Ty::String && *ty == Ty::Bool {
                 format!("ostrin_file_exists({})", codes[0])
+            } else if callee == "read_file"
+                && args.len() == 1
+                && value_ty(values, args[0])? == Ty::String
+                && *ty == Ty::Applied("Result".to_string(), vec![Ty::String, Ty::String])
+            {
+                read_file_result_code(&codes[0])
+            } else if callee == "write_file"
+                && args.len() == 2
+                && args.iter().all(|value| value_ty(values, *value) == Ok(Ty::String))
+                && *ty == Ty::Applied("Result".to_string(), vec![Ty::Void, Ty::String])
+            {
+                write_file_result_code(&codes[0], &codes[1])
             } else if callee == "yield" && args.is_empty() && *ty == Ty::Void {
                 "({\n#if defined(OSTRIN_NATIVE_THREADS)\n    ostrin_select_wait();\n#else\n    (void)ostrin_poll_one();\n#endif\n    ostrin_task_checkpoint();\n    (void)0;\n})"
                     .to_string()

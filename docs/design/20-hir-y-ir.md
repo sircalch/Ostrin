@@ -6,8 +6,12 @@ para funciones escalares con ramas, recursión, bucles, `phi` y aritmética comp
 enteros de ancho fijo desde esa IR. Las familias gestionadas `String`, el núcleo de `List<T>`
 con elementos escalares, las operaciones escalares de `Map<K,V>`/`Set<T>`, records concretos
 y `Option`/`Result` con payload escalar, `String`, `Record`, una colección escalar
-(`List`/`Map`/`Set`) u otro wrapper `Option`/`Result` también atraviesan ya el emisor IR,
-incluidos sus marcadores de ownership, transferencia de `Phi` simples y patrones simples
+(`List`/`Map`/`Set`) u otro wrapper `Option`/`Result` también atraviesan ya el emisor IR.
+`read_file`/`write_file` añaden `Result<String, String>` y `Result<Void, String>` con errores
+de archivo administrados, comprobación de lectura/escritura/cierre y un checkpoint de cancelación
+antes de cruzar la libc; la operación de archivo sigue siendo bloqueante mientras está dentro del
+host. Todos estos valores conservan sus marcadores de ownership, transferencia de `Phi` simples y
+patrones simples
 `Some`/`None`; el backend mantiene
 HIR/AST como fallback verificado para otros payloads gestionados e iteradores propios genéricos o indirectos,
 patrones anidados, agregados complejos y escapes mientras la migración crece. Los `for`
@@ -30,7 +34,7 @@ esa ABI, mientras los scopes anidados y escapes complejos siguen en fallback.*
 | `TypedProgram.literal_kinds` | `typeck` | Tipo elegido para cada literal numérico |
 | `NativeTypeReport` | `codegen` | Detecta divergencias checker↔backend (0 hoy, en ~1 350 expresiones) |
 | `IrProgram` / `IrFunction` / `IrBlock` | `ir.rs` | Primera CFG con temporales explícitos, terminadores y verificador de destinos |
-| Emisor IR | `ir_c.rs` | Genera C desde SSA/CFG para funciones escalares, rangos enteros direccionales, `String`, records concretos, iteradores de records concretos mediante métodos registrados, canales (`send`/`close`/`receive`), `Option<Record>`, `List<T>` escalar, operaciones hash escalares de `Map`/`Set`, wrappers sobre `List`/`Map`/`Set` y wrappers `Option`/`Result` anidados con `match`, `Option<T>` escalar/`String` con `Some`/`None`, `try catch` con handlers globales y aliases locales sin entorno, ramas, bucles, `phi` y enteros de ancho fijo comprobados; emite ownership para las familias migradas y deja fallback seguro para lo demás |
+| Emisor IR | `ir_c.rs` | Genera C desde SSA/CFG para funciones escalares, rangos enteros direccionales, `String`, `read_file`/`write_file` (`Result<String,String>`/`Result<Void,String>`), records concretos, iteradores de records concretos mediante métodos registrados, canales (`send`/`close`/`receive`), `Option<Record>`, `List<T>` escalar, operaciones hash escalares de `Map`/`Set`, wrappers sobre `List`/`Map`/`Set` y wrappers `Option`/`Result` anidados con `match`, `Option<T>` escalar/`String` con `Some`/`None`, `try catch` con handlers globales y aliases locales sin entorno, ramas, bucles, `phi` y enteros de ancho fijo comprobados; emite ownership para las familias migradas y deja fallback seguro para lo demás |
 | Intérprete como oráculo | `interpreter` | Semántica de referencia; pruebas diferenciales automáticas |
 
 Por tanto el backend **ya no infiere solo**: la reinferencia que queda (`bind_type`, `expected`, `settle_literal`) es respaldo verificado.

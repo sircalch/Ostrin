@@ -277,6 +277,44 @@ fn standard_library_file_io_and_parsing_work() {
 }
 
 #[test]
+fn native_ir_file_io_preserves_results_and_ownership() {
+    let file = example_path("native_ir_file_io.ostrin");
+    let interpreted = run(&["--run", &file]);
+    let _ = fs::remove_file("target/ostrin-ir-file-io.txt");
+    let _ = fs::remove_file("target/ostrin-ir-file-io-missing.txt");
+    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    let expected = stdout(&interpreted).replace("\r\n", "\n");
+    assert_eq!(expected, "true\ntrue\nhello from IR\ntrue\n");
+
+    let report = run(&["--native-type-report", &file]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    let report_text = stdout(&report);
+    let ir_functions = report_text
+        .lines()
+        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|value| value.trim().parse::<usize>().ok()))
+        .unwrap_or(0);
+    assert!(ir_functions >= 3, "file I/O example did not use the IR emitter: {report_text}");
+    assert!(report_text.contains("hir-generated: 0"), "file I/O example left a HIR fallback: {report_text}");
+
+    let exe = temp_artifact("native-ir-file-io.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "native compile failed: {}", stderr(&compile));
+    let native = Command::new(&exe).output().expect("run native IR file I/O binary");
+    let _ = fs::remove_file(&exe);
+    let _ = fs::remove_file("target/ostrin-ir-file-io.txt");
+    let _ = fs::remove_file("target/ostrin-ir-file-io-missing.txt");
+    assert!(native.status.success(), "native binary failed: {}", String::from_utf8_lossy(&native.stderr));
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "native file I/O leaked: {}", String::from_utf8_lossy(&native.stderr));
+}
+
+#[test]
 fn standard_library_arguments_are_checked() {
     let out = run(&[&example_path("stdlib_io_errors.ostrin")]);
     assert!(!out.status.success());

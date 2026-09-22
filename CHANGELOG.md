@@ -59,6 +59,11 @@
   the `clone`/`drop` ownership primitives through native IR/C. The standard process example now
   reports eight IR-generated functions with no HIR fallback, including managed `List<String>` and
   `Option<String>` values.
+- Lowered `read_file`/`write_file` through native IR/C, including `Result<Void, String>`, owned error
+  strings and checks for seek, short-read, `ferror`, `fputs` and `fclose`. The new
+  `native_ir_file_io.ostrin` regression compares interpreter/native output and finishes with
+  `live_allocations=0`; cancellation is observed at safe boundaries, while the libc file call
+  remains explicitly blocking.
 
 ### Language and libraries
 - Supported `spawn {}` blocks now lower through the native IR/C backend, including immutable

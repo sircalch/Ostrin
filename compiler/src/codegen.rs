@@ -6114,12 +6114,15 @@ impl<'a> Codegen<'a> {
                 self.register_list_types(&ty);
                 Ok(Some((
                     format!(
-                        "({{ Result_String_String {r}; memset(&{r}, 0, sizeof {r}); FILE* {a} = fopen({p}, \"rb\"); \
-                         if (!{a}) {{ {r}.error = strerror(errno); }} else {{ \
-                         fseek({a}, 0, SEEK_END); long {b} = ftell({a}); fseek({a}, 0, SEEK_SET); \
-                         char* {c} = (char*)ostrin_alloc((size_t){b} + 1); \
-                         size_t {r}_n = fread({c}, 1, (size_t){b}, {a}); {c}[{r}_n] = 0; fclose({a}); \
-                         {r}.ok = true; {r}.value = {c}; }} {r}; }})",
+                        "({{ Result_String_String {r}; memset(&{r}, 0, sizeof {r}); ostrin_task_checkpoint(); FILE* {a} = fopen({p}, \"rb\"); \
+                         if (!{a}) {{ int {r}_error = errno ? errno : EIO; {r}.error = ostrin_s_dup(strerror({r}_error), strlen(strerror({r}_error))); }} \
+                         else if (fseek({a}, 0, SEEK_END) != 0) {{ int {r}_error = errno ? errno : EIO; fclose({a}); {r}.error = ostrin_s_dup(strerror({r}_error), strlen(strerror({r}_error))); }} \
+                         else {{ long {b} = ftell({a}); if ({b} < 0) {{ int {r}_error = errno ? errno : EIO; fclose({a}); {r}.error = ostrin_s_dup(strerror({r}_error), strlen(strerror({r}_error))); }} \
+                         else if (fseek({a}, 0, SEEK_SET) != 0) {{ int {r}_error = errno ? errno : EIO; fclose({a}); {r}.error = ostrin_s_dup(strerror({r}_error), strlen(strerror({r}_error))); }} \
+                         else {{ char* {c} = (char*)ostrin_alloc((size_t){b} + 1); errno = 0; size_t {r}_n = fread({c}, 1, (size_t){b}, {a}); int {r}_read_error = errno ? errno : EIO; \
+                         if ({r}_n != (size_t){b} && ferror({a})) {{ fclose({a}); ostrin_free({c}); {r}.error = ostrin_s_dup(strerror({r}_read_error), strlen(strerror({r}_read_error))); }} \
+                         else if ({r}_n != (size_t){b}) {{ fclose({a}); ostrin_free({c}); {r}.error = ostrin_s_dup(\"short read while reading file\", strlen(\"short read while reading file\")); }} \
+                         else {{ {c}[{r}_n] = 0; errno = 0; if (fclose({a}) != 0) {{ int {r}_error = errno ? errno : EIO; ostrin_free({c}); {r}.error = ostrin_s_dup(strerror({r}_error), strlen(strerror({r}_error))); }} else {{ {r}.ok = true; {r}.value = {c}; }} }} }} }} {r}; }})",
                         p = codes[0]
                     ),
                     ty,
@@ -6130,8 +6133,10 @@ impl<'a> Codegen<'a> {
                 self.register_list_types(&ty);
                 Ok(Some((
                     format!(
-                        "({{ Result_Void_String {r}; memset(&{r}, 0, sizeof {r}); FILE* {a} = fopen({p}, \"wb\"); \
-                         if (!{a}) {{ {r}.error = strerror(errno); }} else {{ fputs({t}, {a}); fclose({a}); {r}.ok = true; }} {r}; }})",
+                        "({{ Result_Void_String {r}; memset(&{r}, 0, sizeof {r}); ostrin_task_checkpoint(); FILE* {a} = fopen({p}, \"wb\"); \
+                         if (!{a}) {{ int {r}_error = errno ? errno : EIO; {r}.error = ostrin_s_dup(strerror({r}_error), strlen(strerror({r}_error))); }} \
+                         else {{ errno = 0; if (fputs({t}, {a}) == EOF) {{ int {r}_error = errno ? errno : EIO; fclose({a}); {r}.error = ostrin_s_dup(strerror({r}_error), strlen(strerror({r}_error))); }} \
+                         else {{ errno = 0; if (fclose({a}) != 0) {{ int {r}_error = errno ? errno : EIO; {r}.error = ostrin_s_dup(strerror({r}_error), strlen(strerror({r}_error))); }} else {{ {r}.ok = true; }} }} }} {r}; }})",
                         p = codes[0],
                         t = codes[1]
                     ),

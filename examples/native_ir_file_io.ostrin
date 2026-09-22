@@ -1,0 +1,16 @@
+fn persist(path: String, contents: String) -> Result<Void, String> {
+    write_file(path, contents)
+}
+
+fn load(path: String) -> Result<String, String> {
+    read_file(path)
+}
+
+fn main() -> Void {
+    path = "target/ostrin-ir-file-io.txt"
+    print(persist(path, "hello from IR").is_ok())
+    print(persist("target/ostrin-ir-file-io-missing-dir/file.txt", "nope").is_err())
+    loaded = load(path)
+    print(loaded.unwrap())
+    print(load("target/ostrin-ir-file-io-missing.txt").is_err())
+}

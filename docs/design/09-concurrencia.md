@@ -178,6 +178,17 @@ sistema operativo. Tanto `yield()` como la espera de `select` alcanzan el checkp
 cancelación después de liberar sus temporales; son herramientas de coordinación, no una
 garantía de fairness ni una interrupción forzada de código arbitrario.
 
+### 2.4 E/S externa y cancelación
+
+`read_file(path)` y `write_file(path, contents)` devuelven `Result` y cruzan el backend nativo
+mediante la misma libc/WASI del host. El runtime hace un checkpoint antes de entrar en
+`fopen`/`fread`/`fputs`/`fclose` y comprueba todos los errores de seek, lectura, escritura y cierre.
+Una solicitud de cancelación que llegue durante una de esas llamadas no intenta interrumpirla:
+la operación sigue bloqueando el hilo que la ejecuta y la cancelación se observa cuando la libc
+regresa y se alcanza el siguiente punto seguro. Esta es la semántica actual tanto en el scheduler
+cooperativo como con `--native-threads`; un worker de E/S o una espera WASI especializada queda
+como una decisión posterior del runtime.
+
 ## 3. Concurrencia estructurada — `spawn_scope`
 
 Un `spawn` "suelto" puede quedar corriendo en segundo plano si nadie llama `.join()` — útil a veces, pero también una fuente común de bugs ("tareas huérfanas" que seguían vivas sin que nadie se acordara). Para el caso común de "lanzar varias tareas y esperar a que todas terminen antes de seguir", Ostrin ofrece un bloque que lo garantiza:
@@ -227,5 +238,8 @@ Como `T` y `U` no están restringidos a ser inmutables aquí, esta función solo
 1. **Cancelación de tareas**: resuelto con grupos explícitos, propagación a scopes anidados,
    checkpoints cooperativos y espera temporizada de canales; la cancelación no intenta
    preemptar código arbitrario ni E/S externa.
-2. **Relación con E/S**: si operaciones de E/S (leer un archivo, una petición de red) bloquean la tarea completa o se manejan con un mecanismo de espera eficiente a nivel de runtime — es una decisión de implementación del runtime más que del lenguaje, pero afecta si `spawn` es "barato" de usar en masa (miles de tareas) o no.
+2. **Relación con red y E/S masiva**: los archivos locales ya tienen un contrato explícito de
+   checkpoint en el límite, `Result` y bloqueo honesto durante libc/WASI. Sigue abierta la decisión
+   de mover E/S lenta o de red a workers/esperas eficientes para que miles de tareas no retengan
+   hilos nativos mientras esperan al sistema operativo.
 3. ~~`as D`~~ y ~~`dyn Trait`~~ — resueltos en los documentos 16 y 15 respectivamente.

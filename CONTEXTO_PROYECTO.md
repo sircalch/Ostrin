@@ -5994,3 +5994,25 @@ La superficie que `std.args` y `std.env` delegan ya no fuerza por sí misma el f
 El bloque no convierte todavía `read_file`/`write_file` en E/S cancelable: esas operaciones
 externas bloqueantes siguen siendo la siguiente frontera de concurrencia y requieren un contrato
 de runtime separado, especialmente para WASI y `--native-threads`.
+
+## 243. E/S de archivos en la IR nativa — 2026-09-21
+
+La primera ampliación de esa frontera ya está cerrada sin prometer una interrupción que el runtime
+no puede garantizar:
+
+- `ir_c` representa ahora `Result<Void, String>` además de `Result<String, String>`, por lo que
+  `write_file` y `read_file` pueden cruzar HIR→IR→C en funciones con CFG. El ejemplo
+  `examples/native_ir_file_io.ostrin` exige tres funciones generadas desde IR y cero desde HIR.
+- El lowering nativo hace un checkpoint antes de llamar a la libc, conserva el `Result` por valor y
+  duplica cada texto de error a una asignación administrada. `read_file` valida `fseek`, `ftell`,
+  lectura corta, `ferror` y `fclose`; `write_file` valida `fputs` y `fclose` en lugar de declarar
+  éxito después de abrir el archivo.
+- La regresión compara intérprete y C, usa `--leak-check` y termina con `live_allocations=0`.
+  La misma implementación sigue siendo válida para WASI porque usa la interfaz C de archivos del
+  host, pero los mensajes derivados de `strerror` pueden variar entre plataformas.
+
+El contrato de concurrencia queda explícito: una cancelación solicitada antes de la llamada se
+observa en el checkpoint; una cancelación durante `fopen`/`fread`/`fputs`/`fclose` espera a que la
+libc regrese y se observa en el siguiente punto seguro. No se presenta esta entrega como E/S
+asíncrona ni como preempción de un hilo bloqueado; separar esa E/S en workers o un mecanismo WASI
+es la siguiente decisión de runtime.
