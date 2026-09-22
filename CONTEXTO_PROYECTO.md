@@ -5821,3 +5821,28 @@ representación nativa:
 Esto no declara preempción: la semántica sigue siendo la del runtime existente —cancelación
 inmediata para tareas pendientes y solicitud cooperativa para tareas en ejecución—, mientras
 las formas indirectas o los escapes complejos conservan el fallback verificado.
+
+## 233. `yield()` en la IR nativa — 2026-09-21
+
+La cesión explícita del scheduler ya no fuerza el fallback HIR/AST en funciones IR compatibles:
+
+- el emisor reconoce la llamada builtin sin convertirla en una función Ostrin ficticia y genera
+  una expresión C que selecciona `ostrin_poll_one()` en el scheduler cooperativo o
+  `ostrin_select_wait()` bajo `OSTRIN_NATIVE_THREADS`;
+- ambos caminos ejecutan después `ostrin_task_checkpoint()`, de modo que la cancelación conserva
+  el mismo punto seguro que en el emisor HIR;
+- `examples/native_ir_yield.ostrin` combina `spawn`, `yield()` y `Task.join()`, exige
+  `ir-generated: 1`/`hir-generated: 0`, y verifica los dos modos con `live_allocations=0`.
+
+La selección entre canales sigue siendo un bloque separado: requiere bajar la lista tipada y su
+ownership temporal sin duplicar la lógica de `select` del runtime.
+
+## 234. Ownership de canales en tareas IR — 2026-09-21
+
+La activación de `yield()` sobre programas de concurrencia existentes descubrió una referencia
+que debía expresarse antes de ampliar la cobertura: los entornos C de tareas retienen y liberan
+`Channel<T>` igual que `Task<T>`, permitiendo que varios callbacks compartan un canal sin depender
+accidentalmente del binding del padre.
+
+La regresión de recepción bloqueada ahora cruza la IR, cancela el consumidor, drena el scope y
+termina con `live_allocations=0`; la suite completa conserva la misma paridad con el intérprete.

@@ -45,6 +45,11 @@
   calling the typed runtime cancellation helper while preserving last-use ownership. The
   `native_ir_task_cancel.ostrin` regression checks IR selection, cooperative cancellation,
   native-thread compilation/execution and `live_allocations=0`.
+- `yield()` now lowers through native IR/C with the runtime's cooperative poll or native-thread
+  wait selected at C preprocessing time, followed by the normal cancellation checkpoint. The
+  `native_ir_yield.ostrin` regression verifies parity, both execution modes and zero leaks.
+- Completing that IR path also closed an ownership edge exposed by real cancellation programs:
+  captured `Channel<T>` handles retain one reference per task environment.
 - Channel iteration over concrete payloads now lowers through native CFG/IR: `send`, `close`,
   `receive` and `for` use the generated `Channel_*` runtime helpers, with last-use release of the
   channel handle covered by `examples/native_ir_channel_iterator.ostrin`.

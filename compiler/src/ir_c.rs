@@ -252,6 +252,10 @@ fn retain_payload(access: &str, ty: &Ty, records: &RecordFields) -> Option<Strin
             if name == "Task" && args.len() == 1 && task_supported(&args[0], records) => {
             Some(format!("ostrin_retain((void*){access})"))
         }
+        Ty::Applied(name, args)
+            if name == "Channel" && args.len() == 1 && channel_supported(&args[0], records) => {
+            Some(format!("ostrin_retain((void*){access})"))
+        }
         _ => None,
     }
 }
@@ -1030,7 +1034,10 @@ fn emit_instruction(
                 .iter()
                 .map(|value| value_code(values, *value))
                 .collect::<Bail<Vec<_>>>()?;
-            let call = if callee == "Some" && args.len() == 1 {
+            let call = if callee == "yield" && args.is_empty() && *ty == Ty::Void {
+                "({\n#if defined(OSTRIN_NATIVE_THREADS)\n    ostrin_select_wait();\n#else\n    (void)ostrin_poll_one();\n#endif\n    ostrin_task_checkpoint();\n    (void)0;\n})"
+                    .to_string()
+            } else if callee == "Some" && args.len() == 1 {
                 let inner = value_ty(values, args[0])?;
                 if !option_supported(&inner, records) || *ty != option_type(&inner) {
                     return Err(());

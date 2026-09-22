@@ -200,7 +200,8 @@ libera sus bindings locales al salir y el smoke test nativo termina con cero
 asignaciones vivas. La bajada completa de ownership sobre la IR —incluyendo todos los
 escapes, loops y la propagación completa del control de cancelación— sigue siendo una etapa
 posterior; el caso directo `Task.cancel()` para handles representables en la IR ya usa el helper
-tipado del runtime.
+tipado del runtime, y `yield()` comparte el polling cooperativo o la espera del backend de hilos
+con su checkpoint de cancelación.
 
 ## 4. Ejemplo completo — map paralelo
 

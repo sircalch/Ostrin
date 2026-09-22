@@ -1,0 +1,7 @@
+fn main() -> Void {
+    task = spawn {
+        7
+    }
+    yield()
+    print(task.join())
+}
