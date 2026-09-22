@@ -5834,8 +5834,8 @@ La cesión explícita del scheduler ya no fuerza el fallback HIR/AST en funcione
 - `examples/native_ir_yield.ostrin` combina `spawn`, `yield()` y `Task.join()`, exige
   `ir-generated: 1`/`hir-generated: 0`, y verifica los dos modos con `live_allocations=0`.
 
-La selección entre canales sigue siendo un bloque separado: requiere bajar la lista tipada y su
-ownership temporal sin duplicar la lógica de `select` del runtime.
+La selección entre canales quedó cubierta después en la sección 235, donde la lista tipada y su
+ownership temporal se bajan sin duplicar la lógica de `select` del runtime.
 
 ## 234. Ownership de canales en tareas IR — 2026-09-21
 
