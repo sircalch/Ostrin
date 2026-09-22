@@ -9,8 +9,10 @@ y `Option`/`Result` con payload escalar, `String`, `Record`, una colección esca
 (`List`/`Map`/`Set`) u otro wrapper `Option`/`Result` también atraviesan ya el emisor IR,
 incluidos sus marcadores de ownership, transferencia de `Phi` simples y patrones simples
 `Some`/`None`; el backend mantiene
-HIR/AST como fallback verificado para otros payloads gestionados, patrones anidados,
-iteradores, agregados complejos y escapes mientras la migración crece.*
+HIR/AST como fallback verificado para otros payloads gestionados, iteradores propios,
+patrones anidados, agregados complejos y escapes mientras la migración crece. Los `for`
+sobre rangos enteros —incluidos `to`/`until`, pasos positivos/negativos y paso cero— ya
+se bajan a CFG y se emiten desde IR.*
 
 ## 1. Qué existe ya (comprobado en el código)
 
@@ -21,7 +23,7 @@ iteradores, agregados complejos y escapes mientras la migración crece.*
 | `TypedProgram.literal_kinds` | `typeck` | Tipo elegido para cada literal numérico |
 | `NativeTypeReport` | `codegen` | Detecta divergencias checker↔backend (0 hoy, en ~1 350 expresiones) |
 | `IrProgram` / `IrFunction` / `IrBlock` | `ir.rs` | Primera CFG con temporales explícitos, terminadores y verificador de destinos |
-| Emisor IR | `ir_c.rs` | Genera C desde SSA/CFG para funciones escalares, `String`, records concretos, `Option<Record>`, `List<T>` escalar, operaciones hash escalares de `Map`/`Set`, wrappers sobre `List`/`Map`/`Set` y wrappers `Option`/`Result` anidados con `match`, `Option<T>` escalar/`String` con `Some`/`None`, `try catch` con handlers globales y aliases locales sin entorno, ramas, bucles, `phi` y enteros de ancho fijo comprobados; emite ownership para las familias migradas y deja fallback seguro para lo demás |
+| Emisor IR | `ir_c.rs` | Genera C desde SSA/CFG para funciones escalares, rangos enteros direccionales, `String`, records concretos, `Option<Record>`, `List<T>` escalar, operaciones hash escalares de `Map`/`Set`, wrappers sobre `List`/`Map`/`Set` y wrappers `Option`/`Result` anidados con `match`, `Option<T>` escalar/`String` con `Some`/`None`, `try catch` con handlers globales y aliases locales sin entorno, ramas, bucles, `phi` y enteros de ancho fijo comprobados; emite ownership para las familias migradas y deja fallback seguro para lo demás |
 | Intérprete como oráculo | `interpreter` | Semántica de referencia; pruebas diferenciales automáticas |
 
 Por tanto el backend **ya no infiere solo**: la reinferencia que queda (`bind_type`, `expected`, `settle_literal`) es respaldo verificado.
@@ -73,7 +75,7 @@ Sobre este IR se hacen los análisis que el texto C no permite:
 
 1. **HIR + verificador + `--hir`** para *todo* lo que el checker tipa; medida de cobertura por ejemplo (ratchet).
 2. Migrar el backend C por **familias de nodos** al HIR (literales/operadores → llamadas → records/enums → patrones → colecciones → genéricos), eliminando la reinferencia correspondiente en cada paso.
-3. **IR de bloques básicos** y generación de C desde el IR (el HIR deja de generar C directamente). La primera CFG observable ya existe en `--ir` y el emisor consume ramas, recursión, bucles con `phi`, aritmética comprobada de ancho fijo, `String`, records concretos con campos anidados, el núcleo de `List<T>`, operaciones hash escalares de `Map`/`Set` y lookups `Option` escalares/String/Record con `Some`/`None`; faltan otros `Option` gestionados, patrones anidados, iteradores, agregados complejos y la retirada progresiva del fallback.
+3. **IR de bloques básicos** y generación de C desde el IR (el HIR deja de generar C directamente). La primera CFG observable ya existe en `--ir` y el emisor consume ramas, recursión, bucles con `phi`, rangos enteros direccionales, aritmética comprobada de ancho fijo, `String`, records concretos con campos anidados, el núcleo de `List<T>`, operaciones hash escalares de `Map`/`Set` y lookups `Option` escalares/String/Record con `Some`/`None`; faltan rangos con cantidades, iteradores propios, otros `Option` gestionados, patrones anidados, agregados complejos y la retirada progresiva del fallback.
 4. **RC + último uso** sobre el IR (`--leak-check`: los ejemplos deben terminar sin objetos vivos).
    El runtime ya expone `ostrin_retain`/`ostrin_release`; el emisor C cubre la primera subetapa
    de forma lineal en locales directos: aliases y campos prestados retienen, las reasignaciones

@@ -5658,3 +5658,19 @@ un local nombrado no provoque una liberación prematura.
 La IR continúa siendo el destino de ownership de largo plazo; esta capa evita que la frontera AST
 introduzca fugas mientras permanecen pendientes los consumidores complejos, escapes y llamadas
 indirectas.
+
+## 224. Rangos enteros en la IR nativa — 2026-09-21
+
+La migración del backend nativo cierra ahora la familia de `for` sobre rangos enteros:
+
+- `compiler/src/ir.rs` baja `start to/until end` directamente a un CFG con `phi` para el índice,
+  ramas separadas para pasos positivos y negativos, y una salida común para el paso cero;
+- un `step` se evalúa una sola vez, igual que en el intérprete. La ruta conserva límites inclusivos
+  (`to`) y exclusivos (`until`) y reutiliza los edges de `break`/`continue` y las `phi` de bindings
+  mutados del cuerpo;
+- `examples/native_ir_ranges.ostrin` cubre ascenso, descenso, paso cero, `continue` y `break`.
+  El intérprete y el binario nativo producen `25`, `20`, `19`, `0`; el reporte marca sus cinco
+  funciones como `ir-generated` y ninguna como HIR, y `--leak-check` informa cero asignaciones vivas.
+
+Esto retira un `Opaque` concreto de la ruta de rangos sin alterar los rangos con cantidades ni el
+protocolo de iteradores propios, que siguen en las capas de fallback verificadas.

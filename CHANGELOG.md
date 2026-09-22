@@ -100,6 +100,10 @@
   The IR builder emits loop phis, records the real predecessor after nested lowering, and the
   verifier rejects missing, duplicated or non-CFG phi inputs; managed values and iterators
   still use the safe fallback.
+- Integer `for` ranges now lower directly to the IR C emitter, including inclusive/exclusive
+  bounds, positive and negative `step`, zero-step empty ranges, and `break`/`continue` paths.
+  `native_ir_ranges.ostrin` compares interpreter/native output for all directions and requires
+  zero live allocations under `--leak-check`.
 - Moved checked fixed-width integer arithmetic into the IR C emitter. `Int8`/`Int16`/`Int32`
   and `UInt8`/`UInt16`/`UInt32`/`UInt64` preserve overflow checks, division-by-zero checks,
   signed `min / -1` checks, checked negation, comparisons and printing when generated from

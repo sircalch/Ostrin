@@ -11,7 +11,7 @@
 use std::collections::HashMap;
 use std::fmt::Write as _;
 
-use crate::ast::{BinOp, UnaryOp};
+use crate::ast::{BinOp, RangeKind, UnaryOp};
 use crate::hir::{HirBlock, HirExpr, HirFunction, HirKind, HirProgram, HirStmt};
 use crate::types::Ty;
 
@@ -731,7 +731,198 @@ impl Builder {
         self.loop_exit_bindings(&loop_phis, condition_block, &edges.breaks);
     }
 
+    /// Lowers an integer range directly to an SSA loop. The interpreter's
+    /// range contract is directional: positive steps walk upwards, negative
+    /// steps walk downwards, and a zero step produces no items. Funnel all
+    /// non-body exits through one block so loop-carried bindings can use the
+    /// same phi machinery as list loops.
+    fn lower_for_range(
+        &mut self,
+        var: &str,
+        start: &HirExpr,
+        kind: RangeKind,
+        end: &HirExpr,
+        step: Option<&HirExpr>,
+        body: &HirBlock,
+    ) {
+        let start_value = self.lower_expr(start);
+        let end_value = self.lower_expr(end);
+        let step_value = step
+            .map(|step| self.lower_expr(step))
+            .unwrap_or_else(|| self.const_value("1", Ty::Int));
+        let preheader = self.current;
+        let visible_before = self.snapshot_visible();
+        let condition_block = self.new_block();
+        let positive_block = self.new_block();
+        let negative_sign_block = self.new_block();
+        let negative_block = self.new_block();
+        let body_block = self.new_block();
+        let step_block = self.new_block();
+        let normal_exit_block = self.new_block();
+        let after_block = self.new_block();
+        self.terminate(IrTerminator::Goto(condition_block));
+
+        self.current = condition_block;
+        let index = self.fresh();
+        self.emit(IrInstr::Phi {
+            dst: index,
+            incoming: vec![(preheader, start_value), (step_block, start_value)],
+            ty: Ty::Int,
+        });
+        let body_text = format!("{body:?}");
+        let loop_phis = self.loop_entry_phis(&visible_before, &body_text, preheader, step_block);
+        let zero = self.const_value("0", Ty::Int);
+        let positive = self.fresh();
+        self.emit(IrInstr::Binary {
+            dst: positive,
+            op: BinOp::Gt,
+            left: step_value,
+            right: zero,
+            ty: Ty::Bool,
+        });
+        self.terminate(IrTerminator::Branch {
+            condition: positive,
+            then_block: positive_block,
+            else_block: negative_sign_block,
+        });
+
+        self.current = positive_block;
+        let ascending = self.fresh();
+        self.emit(IrInstr::Binary {
+            dst: ascending,
+            op: match kind {
+                RangeKind::To => BinOp::LtEq,
+                RangeKind::Until => BinOp::Lt,
+            },
+            left: index,
+            right: end_value,
+            ty: Ty::Bool,
+        });
+        self.terminate(IrTerminator::Branch {
+            condition: ascending,
+            then_block: body_block,
+            else_block: normal_exit_block,
+        });
+
+        self.current = negative_sign_block;
+        let negative = self.fresh();
+        self.emit(IrInstr::Binary {
+            dst: negative,
+            op: BinOp::Lt,
+            left: step_value,
+            right: zero,
+            ty: Ty::Bool,
+        });
+        self.terminate(IrTerminator::Branch {
+            condition: negative,
+            then_block: negative_block,
+            else_block: normal_exit_block,
+        });
+
+        self.current = negative_block;
+        let descending = self.fresh();
+        self.emit(IrInstr::Binary {
+            dst: descending,
+            op: match kind {
+                RangeKind::To => BinOp::GtEq,
+                RangeKind::Until => BinOp::Gt,
+            },
+            left: index,
+            right: end_value,
+            ty: Ty::Bool,
+        });
+        self.terminate(IrTerminator::Branch {
+            condition: descending,
+            then_block: body_block,
+            else_block: normal_exit_block,
+        });
+
+        self.current = normal_exit_block;
+        self.terminate(IrTerminator::Goto(after_block));
+
+        self.current = body_block;
+        self.break_targets.push((after_block, step_block));
+        self.loop_edges.push(LoopEdges::default());
+        self.locals.push(HashMap::new());
+        let item = self.fresh();
+        self.emit(IrInstr::Move {
+            dst: item,
+            source: index,
+            ty: Ty::Int,
+        });
+        self.locals
+            .last_mut()
+            .expect("range loop scope")
+            .insert(var.to_string(), item);
+        let _ = self.lower_block_contents(body);
+        self.locals.pop();
+        self.break_targets.pop();
+        let edges = self.loop_edges.pop().unwrap_or_default();
+        let body_open = !self.terminated();
+        let mut step_preds = Vec::new();
+        if body_open {
+            step_preds.push((self.current, self.snapshot_visible()));
+            self.terminate(IrTerminator::Goto(step_block));
+        }
+        step_preds.extend(edges.continues);
+
+        self.current = step_block;
+        let mut step_values = HashMap::new();
+        if step_preds.len() == 1 {
+            step_values = step_preds[0].1.clone();
+        } else {
+            for (name, destination, initial) in &loop_phis {
+                if step_preds.is_empty() {
+                    break;
+                }
+                let ty = self.known_value_type(*destination).unwrap_or(Ty::Unknown);
+                let merged = self.fresh();
+                let incoming = step_preds
+                    .iter()
+                    .map(|(block, values)| (*block, values.get(name).copied().unwrap_or(*initial)))
+                    .collect();
+                self.emit(IrInstr::Phi {
+                    dst: merged,
+                    incoming,
+                    ty,
+                });
+                step_values.insert(name.clone(), merged);
+            }
+        }
+        let reachable = !step_preds.is_empty();
+        if reachable {
+            let next_index = self.fresh();
+            self.emit(IrInstr::Binary {
+                dst: next_index,
+                op: BinOp::Add,
+                left: index,
+                right: step_value,
+                ty: Ty::Int,
+            });
+            self.terminate(IrTerminator::Goto(condition_block));
+            self.patch_phi(index, vec![(preheader, start_value), (step_block, next_index)]);
+        } else {
+            self.terminate(IrTerminator::Unreachable);
+            self.patch_phi(index, vec![(preheader, start_value)]);
+        }
+        for (name, destination, initial) in &loop_phis {
+            let mut incoming = vec![(preheader, *initial)];
+            if reachable {
+                incoming.push((step_block, step_values.get(name).copied().unwrap_or(*initial)));
+            }
+            self.patch_phi(*destination, incoming);
+        }
+        self.current = after_block;
+        self.loop_exit_bindings(&loop_phis, normal_exit_block, &edges.breaks);
+    }
+
     fn lower_for(&mut self, var: &str, iter: &HirExpr, body: &HirBlock) {
+        if let HirKind::Range(start, kind, end, step) = &iter.kind {
+            if start.ty == Ty::Int && end.ty == Ty::Int && iter.ty == Ty::Int {
+                self.lower_for_range(var, start, *kind, end, step.as_deref(), body);
+                return;
+            }
+        }
         if let Ty::List(element) = &iter.ty {
             let element = (**element).clone();
             self.lower_for_list(var, iter, &element, body);
