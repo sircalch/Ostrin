@@ -65,6 +65,11 @@ ostrinc --project path/to/project
 
 - `ostrin.lock` se versiona en control de versiones. Con rutas relativas y orden estable, clonar
   el proyecto y compilarlo desde otro directorio conserva el mismo lockfile.
+- La resolución recorre también los `ostrin.toml` de las dependencias locales o Git ya resueltas.
+  Sus dependencias transitivas quedan disponibles para `import` mediante sus alias declarados,
+  siempre que no colisionen con otro alias del grafo; una colisión o ciclo se rechaza de forma
+  explícita. Cada nodo transitivo recibe su propia entrada, versión y `content_sha256` en el
+  lockfile, y las rutas se relativizan contra el proyecto raíz cuando es posible.
 
 ### 3.1 Conflictos de versión (dependencias en diamante)
 
@@ -120,4 +125,4 @@ Como no existe un registro central donde "reservar" un nombre, la identidad real
    archivos `.ostrin`; las compilaciones normales y `--locked` rechazan el contenido modificado
    y piden regenerar el lockfile.
 3. **Workspaces** (varios paquetes Ostrin relacionados en un mismo repositorio, compartiendo un `ostrin.lock`) — útil para proyectos grandes, no cubierto en este documento.
-4. Pendientes previos siguen abiertos: `dyn Trait`, `select` sobre canales, elisión de ARC, operadores bit a bit, ordenación general.
+4. Pendientes previos siguen abiertos: `dyn Trait`, elisión de ARC, operadores bit a bit y ordenación general.

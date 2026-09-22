@@ -161,7 +161,7 @@ fn real_main() -> ExitCode {
                 return ExitCode::FAILURE;
             }
         };
-        let roots = match package::resolve_dependency_roots(
+        let resolved = match package::resolve_dependency_graph(
             &manifest,
             manifest_path.parent().unwrap_or_else(|| Path::new(".")),
             fetch_packages,
@@ -174,11 +174,11 @@ fn real_main() -> ExitCode {
             }
         };
         if !locked_packages {
-            if let Err(e) = package::write_lockfile(manifest_path.parent().unwrap(), &manifest, &roots) {
+            if let Err(e) = package::write_lockfile(manifest_path.parent().unwrap(), &manifest, &resolved) {
                 eprintln!("warning: could not write ostrin.lock: {e}");
             }
         }
-        roots
+        resolved.roots()
     } else {
         std::collections::HashMap::new()
     };

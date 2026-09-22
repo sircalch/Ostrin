@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 
 use sha2::{Digest, Sha256};
@@ -16,9 +16,30 @@ pub struct PackageManifest {
     pub dependencies: HashMap<String, DependencySpec>,
 }
 
+#[derive(Debug, Clone)]
 pub enum DependencySpec {
     Path(PathBuf),
     Git { url: String, ratchet: String },
+}
+
+#[derive(Debug, Clone)]
+pub struct ResolvedDependency {
+    pub spec: DependencySpec,
+    pub root: PathBuf,
+}
+
+#[derive(Debug, Default)]
+pub struct ResolvedDependencies {
+    pub dependencies: HashMap<String, ResolvedDependency>,
+}
+
+impl ResolvedDependencies {
+    pub fn roots(&self) -> HashMap<String, PathBuf> {
+        self.dependencies
+            .iter()
+            .map(|(name, dependency)| (name.clone(), dependency.root.clone()))
+            .collect()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -91,6 +112,19 @@ pub fn resolve_dependency_roots(
     fetch_git: bool,
     locked_mode: bool,
 ) -> Result<HashMap<String, PathBuf>, String> {
+    Ok(resolve_dependency_graph(manifest, manifest_dir, fetch_git, locked_mode)?.roots())
+}
+
+/// Resuelve el grafo completo de dependencias y aplana los alias que pueden
+/// importar los módulos. Cada paquete puede declarar sus propias
+/// dependencias; los alias deben ser globalmente únicos dentro del proyecto,
+/// porque el cargador de módulos mantiene un espacio de nombres plano.
+pub fn resolve_dependency_graph(
+    manifest: &PackageManifest,
+    manifest_dir: &Path,
+    fetch_git: bool,
+    locked_mode: bool,
+) -> Result<ResolvedDependencies, String> {
     let lockfile = load_lockfile(manifest_dir)?;
     if locked_mode && lockfile.is_none() && !manifest.dependencies.is_empty() {
         return Err(format!(
@@ -98,72 +132,134 @@ pub fn resolve_dependency_roots(
             manifest.name
         ));
     }
+
+    let mut resolved = ResolvedDependencies::default();
+    let mut visiting = Vec::new();
+    for (name, spec) in &manifest.dependencies {
+        resolve_dependency(
+            name,
+            spec,
+            manifest_dir,
+            fetch_git,
+            locked_mode,
+            lockfile.as_ref(),
+            &mut resolved,
+            &mut visiting,
+        )?;
+    }
     if let Some(lockfile) = &lockfile {
         for name in lockfile.dependencies.keys() {
-            if !manifest.dependencies.contains_key(name) {
+            if !resolved.dependencies.contains_key(name) {
                 return Err(format!(
-                    "ostrin.lock contains dependency '{name}' which is not present in ostrin.toml; regenerate the lockfile"
+                    "ostrin.lock contains dependency '{name}' which is not present in the resolved dependency graph; regenerate the lockfile"
                 ));
             }
         }
     }
+    Ok(resolved)
+}
 
-    let mut roots = HashMap::new();
-    for (name, spec) in &manifest.dependencies {
-        let locked = lockfile.as_ref().and_then(|file| file.dependencies.get(name));
-        match spec {
-            DependencySpec::Path(p) => {
-                let root = if let Some(entry) = locked {
-                    validate_locked_path(name, p, entry, manifest_dir)?
-                } else {
-                    if locked_mode {
-                        return Err(format!(
-                            "dependency '{name}' is missing from ostrin.lock; run without --locked to regenerate it"
-                        ));
-                    }
-                    p.clone()
-                };
-                if !root.is_dir() {
+fn resolve_dependency(
+    name: &str,
+    spec: &DependencySpec,
+    project_dir: &Path,
+    fetch_git: bool,
+    locked_mode: bool,
+    lockfile: Option<&Lockfile>,
+    resolved: &mut ResolvedDependencies,
+    visiting: &mut Vec<PathBuf>,
+) -> Result<(), String> {
+    if resolved.dependencies.contains_key(name) {
+        return Err(format!(
+            "dependency alias '{name}' is declared more than once in the resolved package graph; use a unique dependency alias"
+        ));
+    }
+
+    let locked = lockfile.and_then(|file| file.dependencies.get(name));
+    let root = match spec {
+        DependencySpec::Path(path) => {
+            let root = if let Some(entry) = locked {
+                validate_locked_path(name, path, entry, project_dir)?
+            } else {
+                if locked_mode {
                     return Err(format!(
-                        "dependency '{name}': path '{}' does not exist or is not a directory",
-                        root.display()
+                        "dependency '{name}' is missing from ostrin.lock; run without --locked to regenerate it"
                     ));
                 }
-                validate_package_version(name, &root, locked)?;
-                roots.insert(name.clone(), root);
+                path.clone()
+            };
+            if !root.is_dir() {
+                return Err(format!(
+                    "dependency '{name}': path '{}' does not exist or is not a directory",
+                    root.display()
+                ));
             }
-            DependencySpec::Git { url, ratchet } if !fetch_git => {
-                if let Some(entry) = locked {
-                    let root = validate_locked_git(name, url, ratchet, entry, manifest_dir)?;
-                    validate_package_version(name, &root, Some(entry))?;
-                    roots.insert(name.clone(), root);
-                } else {
-                    return Err(format!(
-                        "dependency '{name}' uses 'git = \"{url}\"' (@ {ratchet}), but ostrinc does not fetch git dependencies automatically.\nPass --fetch explicitly to resolve it, or clone it yourself and reference it with a 'path' dependency instead."
-                    ));
-                }
-            }
-            DependencySpec::Git { url, ratchet } => {
-                let root = if let Some(entry) = locked {
-                    match validate_locked_git(name, url, ratchet, entry, manifest_dir) {
-                        Ok(root) => root,
-                        Err(error) if !locked_mode => fetch_git_dependency(manifest_dir, name, url, ratchet).map_err(|fetch_error| format!("{error}; fetching dependency also failed: {fetch_error}"))?,
-                        Err(error) => return Err(error),
-                    }
-                } else {
-                    if locked_mode {
-                        return Err(format!(
-                            "dependency '{name}' is missing from ostrin.lock; run without --locked to resolve it"
-                        ));
-                    }
-                    fetch_git_dependency(manifest_dir, name, url, ratchet)?
-                };
-                validate_package_version(name, &root, locked)?;
-                roots.insert(name.clone(), root);
+            validate_package_version(name, &root, locked)?;
+            root
+        }
+        DependencySpec::Git { url, ratchet } if !fetch_git => {
+            if let Some(entry) = locked {
+                let root = validate_locked_git(name, url, ratchet, entry, project_dir)?;
+                validate_package_version(name, &root, Some(entry))?;
+                root
+            } else {
+                return Err(format!(
+                    "dependency '{name}' uses 'git = \"{url}\"' (@ {ratchet}), but ostrinc does not fetch git dependencies automatically.\nPass --fetch explicitly to resolve it, or clone it yourself and reference it with a 'path' dependency instead."
+                ));
             }
         }
+        DependencySpec::Git { url, ratchet } => {
+            let root = if let Some(entry) = locked {
+                match validate_locked_git(name, url, ratchet, entry, project_dir) {
+                    Ok(root) => root,
+                    Err(error) if !locked_mode => fetch_git_dependency(project_dir, name, url, ratchet)
+                        .map_err(|fetch_error| format!("{error}; fetching dependency also failed: {fetch_error}"))?,
+                    Err(error) => return Err(error),
+                }
+            } else {
+                if locked_mode {
+                    return Err(format!(
+                        "dependency '{name}' is missing from ostrin.lock; run without --locked to resolve it"
+                    ));
+                }
+                fetch_git_dependency(project_dir, name, url, ratchet)?
+            };
+            validate_package_version(name, &root, locked)?;
+            root
+        }
+    };
+
+    let canonical = root.canonicalize().unwrap_or_else(|_| root.clone());
+    if visiting.iter().any(|ancestor| ancestor == &canonical) {
+        return Err(format!(
+            "dependency graph contains a cycle through '{}'",
+            root.display()
+        ));
     }
-    Ok(roots)
+    resolved.dependencies.insert(
+        name.to_string(),
+        ResolvedDependency { spec: spec.clone(), root: root.clone() },
+    );
+
+    let nested_manifest_path = root.join("ostrin.toml");
+    if nested_manifest_path.is_file() {
+        let nested_manifest = load_manifest(&nested_manifest_path)?;
+        visiting.push(canonical);
+        for (child_name, child_spec) in &nested_manifest.dependencies {
+            resolve_dependency(
+                child_name,
+                child_spec,
+                project_dir,
+                fetch_git,
+                locked_mode,
+                lockfile,
+                resolved,
+                visiting,
+            )?;
+        }
+        visiting.pop();
+    }
+    Ok(())
 }
 
 fn load_lockfile(manifest_dir: &Path) -> Result<Option<Lockfile>, String> {
@@ -493,37 +589,59 @@ fn collect_package_sources(root: &Path, directory: &Path, files: &mut Vec<PathBu
     Ok(())
 }
 
-pub fn write_lockfile(manifest_dir: &Path, manifest: &PackageManifest, roots: &HashMap<String, PathBuf>) -> Result<(), String> {
+fn portable_relative_path(from: &Path, to: &Path) -> Option<PathBuf> {
+    let from = from.canonicalize().unwrap_or_else(|_| from.to_path_buf());
+    let to = to.canonicalize().unwrap_or_else(|_| to.to_path_buf());
+    let from: Vec<Component<'_>> = from.components().collect();
+    let to: Vec<Component<'_>> = to.components().collect();
+    let common = from.iter().zip(&to).take_while(|(left, right)| left == right).count();
+    if common == 0 {
+        return None;
+    }
+
+    let mut relative = PathBuf::new();
+    for component in &from[common..] {
+        if matches!(component, Component::Normal(_)) {
+            relative.push("..");
+        }
+    }
+    for component in &to[common..] {
+        relative.push(component.as_os_str());
+    }
+    Some(relative)
+}
+
+pub fn write_lockfile(manifest_dir: &Path, manifest: &PackageManifest, resolved: &ResolvedDependencies) -> Result<(), String> {
     let mut out = String::new();
     out.push_str(&format!("# generado por ostrinc — no editar a mano\nlockfile_version = 1\npackage = {}\nversion = {}\n\n", toml_string(&manifest.name), toml_string(&manifest.version)));
     let base = manifest_dir.canonicalize().unwrap_or_else(|_| manifest_dir.to_path_buf());
-    let mut names: Vec<&String> = roots.keys().collect();
+    let mut names: Vec<&String> = resolved.dependencies.keys().collect();
     names.sort();
     for name in names {
-        let root = &roots[name];
+        let dependency = &resolved.dependencies[name];
+        let root = &dependency.root;
         let abs = root.canonicalize().unwrap_or_else(|_| root.clone());
-        let relative = root.strip_prefix(manifest_dir).ok();
-        let display = relative
-            .or_else(|| abs.strip_prefix(&base).ok())
-            .unwrap_or(&abs)
+        let display = portable_relative_path(manifest_dir, root)
+            .or_else(|| root.strip_prefix(manifest_dir).ok().map(PathBuf::from))
+            .or_else(|| abs.strip_prefix(&base).ok().map(PathBuf::from))
+            .unwrap_or(abs)
             .display()
             .to_string()
             .replace('\\', "/");
         let display = if display.is_empty() { "." } else { &display };
         let content_sha256 = package_content_sha256(root)?;
         out.push_str(&format!("[[dependency]]\nname = {}\n", toml_string(name)));
-        match manifest.dependencies.get(name) {
-            Some(DependencySpec::Path(_)) => {
+        match &dependency.spec {
+            DependencySpec::Path(_) => {
                 out.push_str("source = \"path\"\n");
                 out.push_str(&format!("resolved_path = {}\n", toml_string(&display)));
             }
-            Some(DependencySpec::Git { url, ratchet }) => {
+            DependencySpec::Git { url, ratchet } => {
                 let revision = git_output(root, &["rev-parse", "HEAD"])
                     .map_err(|e| format!("could not record resolved commit for dependency '{name}': {e}"))?;
                 out.push_str("source = \"git\"\n");
                 out.push_str(&format!("git = {}\nrequested = {}\nresolved_rev = {}\nresolved_path = {}\n", toml_string(url), toml_string(ratchet), toml_string(&revision), toml_string(&display)));
             }
-            None => return Err(format!("dependency '{name}' was resolved but is not in the manifest")),
         }
         out.push_str(&format!(
             "package_version = {}\ncontent_sha256 = {}\n\n",

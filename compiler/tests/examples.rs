@@ -3992,6 +3992,60 @@ fn path_dependency_resolves_and_runs() {
 }
 
 #[test]
+fn transitive_path_dependencies_resolve_and_lock_reproducibly() {
+    let root = std::env::temp_dir().join(format!("ostrin_transitive_package_{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    let project = root.join("project");
+    let shared = root.join("shared");
+    let nested = root.join("nested");
+    fs::create_dir_all(&project).unwrap();
+    fs::create_dir_all(&shared).unwrap();
+    fs::create_dir_all(&nested).unwrap();
+
+    fs::write(
+        nested.join("ostrin.toml"),
+        "[package]\nname = \"nested\"\nversion = \"0.2.0\"\nentry = \"value.ostrin\"\n",
+    )
+    .unwrap();
+    fs::write(nested.join("value.ostrin"), "pub fn text() -> String { \"transitive\" }\n").unwrap();
+    fs::write(
+        shared.join("ostrin.toml"),
+        "[package]\nname = \"shared\"\nversion = \"0.1.0\"\nentry = \"helpers.ostrin\"\n\n[dependencies]\nnested_utils = { path = \"../nested\" }\n",
+    )
+    .unwrap();
+    fs::write(
+        shared.join("helpers.ostrin"),
+        "import nested_utils.value\n\npub fn greet() -> String { value.text() }\n",
+    )
+    .unwrap();
+    fs::write(
+        project.join("ostrin.toml"),
+        "[package]\nname = \"transitive_app\"\nversion = \"0.1.0\"\nentry = \"main.ostrin\"\n\n[dependencies]\nshared = { path = \"../shared\" }\n",
+    )
+    .unwrap();
+    fs::write(
+        project.join("main.ostrin"),
+        "import shared.helpers\n\nfn main() -> Void {\n    print(helpers.greet())\n}\n",
+    )
+    .unwrap();
+
+    let project_text = project.display().to_string();
+    let first = run(&["--run", "--project", &project_text]);
+    assert!(first.status.success(), "transitive package run failed: {}", stderr(&first));
+    assert_eq!(stdout(&first).trim(), "transitive");
+
+    let lockfile = fs::read_to_string(project.join("ostrin.lock")).unwrap();
+    assert!(lockfile.contains("name = \"shared\""), "lockfile omitted direct package: {lockfile}");
+    assert!(lockfile.contains("name = \"nested_utils\""), "lockfile omitted transitive package: {lockfile}");
+    assert!(!lockfile.contains(&root.display().to_string()), "lockfile should keep transitive paths portable: {lockfile}");
+    let locked = run(&["--locked", "--run", "--project", &project_text]);
+    assert!(locked.status.success(), "locked transitive package run failed: {}", stderr(&locked));
+    assert_eq!(stdout(&locked).trim(), "transitive");
+    assert_eq!(fs::read_to_string(project.join("ostrin.lock")).unwrap(), lockfile);
+    let _ = fs::remove_dir_all(&root);
+}
+
+#[test]
 fn native_backend_compiles_project_manifest_and_path_dependency() {
     let project = example_path("pkg_project/main_app");
     let exe = temp_artifact("pkg_project.exe");

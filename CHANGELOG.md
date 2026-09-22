@@ -32,6 +32,9 @@
 - Package lockfiles now record and validate a deterministic SHA-256 of each dependency's
   `ostrin.toml` and `.ostrin` sources. Locked and normal builds reject local content tampering;
   the decentralized Git/path model remains unchanged.
+- Package resolution now follows nested `ostrin.toml` manifests, exposes transitive dependency
+  aliases to imports, rejects alias collisions and dependency cycles, and records every resolved
+  node with portable paths, package versions and content hashes in `ostrin.lock`.
 
 ### Language and libraries
 - Supported `spawn {}` blocks now lower through the native IR/C backend, including immutable

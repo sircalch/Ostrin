@@ -5861,3 +5861,21 @@ La coordinación entre canales ya tiene una primera bajada nativa verificable:
 
 La cobertura inicial usa un canal ya listo; selección bloqueante, cancelación durante la espera
 y listas indirectas quedan como la siguiente ampliación verificable.
+
+## 236. Grafo transitivo de paquetes y lockfiles — 2026-09-21
+
+La resolución de paquetes dejó de limitarse a las dependencias directas del proyecto:
+
+- cada dependencia resuelta que contiene `ostrin.toml` se inspecciona recursivamente y sus
+  dependencias quedan disponibles para imports mediante el alias declarado por ese paquete;
+- el espacio de nombres plano del cargador se protege rechazando alias duplicados y ciclos de
+  directorios, en vez de escoger silenciosamente una ruta; dependencias Git transitivas conservan
+  la política existente de red explícita (`--fetch`);
+- `ostrin.lock` registra todos los nodos del grafo con versión, fuente, commit cuando aplica y
+  `content_sha256`. Las rutas se calculan relativas al proyecto raíz incluso cuando el paquete
+  transitivo está fuera de su directorio inmediato.
+
+`transitive_path_dependencies_resolve_and_lock_reproducibly` crea un proyecto temporal con dos
+niveles de dependencias, comprueba el import transitivo, la entrada de ambos nodos en el lockfile,
+la ejecución `--locked` y que el lockfile no se reescriba. La ruta Git, el registro remoto y los
+workspaces siguen fuera de este bloque; no se ha añadido red implícita ni un registro central.
