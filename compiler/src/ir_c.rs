@@ -14,11 +14,12 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::ast::{BinOp, UnaryOp};
-use crate::ir::{IrFunction, IrInstr, IrTerminator, ValueId};
+use crate::ir::{BlockId, IrFunction, IrInstr, IrTerminator, ValueId};
 use crate::types::Ty;
 
 type Bail<T> = Result<T, ()>;
 type Values = HashMap<ValueId, (String, Ty)>;
+type SpawnHelpers = HashMap<BlockId, String>;
 pub type RecordFields = HashMap<String, Vec<String>>;
 pub type MethodNames = HashMap<(String, String), String>;
 
@@ -41,6 +42,9 @@ fn c_type(ty: &Ty, records: &RecordFields) -> Bail<String> {
         Ty::Named(name) if records.contains_key(name) => format!("{name}*"),
         Ty::Applied(name, args) if name == "Channel" && args.len() == 1 && channel_supported(&args[0], records) => {
             format!("Channel_{}*", mangle_option_payload(&args[0], records))
+        }
+        Ty::Applied(name, args) if name == "Task" && args.len() == 1 && task_supported(&args[0], records) => {
+            format!("Task_{}*", mangle_task_payload(&args[0], records))
         }
         Ty::Applied(name, args) if name == "Option" && args.len() == 1 && option_supported(&args[0], records) => {
             format!("Option_{}", mangle_option_payload(&args[0], records))
@@ -74,6 +78,7 @@ fn supported(ty: &Ty, records: &RecordFields) -> bool {
         || matches!(ty, Ty::Set(element) if set_supported(element))
         || matches!(ty, Ty::Fn(_, _))
         || matches!(ty, Ty::Applied(name, args) if name == "Channel" && args.len() == 1 && channel_supported(&args[0], records))
+        || matches!(ty, Ty::Applied(name, args) if name == "Task" && args.len() == 1 && task_supported(&args[0], records))
         || matches!(ty, Ty::Applied(name, args) if name == "Option" && args.len() == 1 && option_supported(&args[0], records))
         || matches!(ty, Ty::Applied(name, args) if name == "Result" && args.len() == 2 && result_supported(&args[0], &args[1], records))
 }
@@ -96,6 +101,10 @@ fn set_supported(element: &Ty) -> bool {
 
 fn channel_supported(element: &Ty, records: &RecordFields) -> bool {
     option_supported(element, records)
+}
+
+fn task_supported(result: &Ty, records: &RecordFields) -> bool {
+    supported(result, records)
 }
 
 fn option_supported(element: &Ty, records: &RecordFields) -> bool {
@@ -135,6 +144,7 @@ fn managed_payload(ty: &Ty, records: &RecordFields) -> bool {
         Ty::String | Ty::List(_) | Ty::Map(_, _) | Ty::Set(_) => true,
         Ty::Named(name) => records.contains_key(name),
         Ty::Applied(name, args) if name == "Channel" && args.len() == 1 => channel_supported(&args[0], records),
+        Ty::Applied(name, args) if name == "Task" && args.len() == 1 => task_supported(&args[0], records),
         Ty::Applied(name, args) if name == "Option" && args.len() == 1 => {
             option_supported(&args[0], records) && managed_payload(&args[0], records)
         }
@@ -196,6 +206,14 @@ fn mangle_result_payload(ty: &Ty, records: &RecordFields) -> String {
     mangle_option_payload(ty, records)
 }
 
+fn mangle_task_payload(ty: &Ty, records: &RecordFields) -> String {
+    if *ty == Ty::Void {
+        "Void".to_string()
+    } else {
+        mangle_option_payload(ty, records)
+    }
+}
+
 fn retain_payload(access: &str, ty: &Ty, records: &RecordFields) -> Option<String> {
     match ty {
         Ty::String | Ty::List(_) | Ty::Map(_, _) | Ty::Set(_) => {
@@ -219,6 +237,10 @@ fn retain_payload(access: &str, ty: &Ty, records: &RecordFields) -> Option<Strin
             let ok = retain_payload(&format!("({access}).value"), &args[0], records).unwrap_or_default();
             let err = retain_payload(&format!("({access}).error"), &args[1], records).unwrap_or_default();
             Some(format!("if (({access}).ok) {{ {ok}; }} else {{ {err}; }}"))
+        }
+        Ty::Applied(name, args)
+            if name == "Task" && args.len() == 1 && task_supported(&args[0], records) => {
+            Some(format!("ostrin_retain((void*){access})"))
         }
         _ => None,
     }
@@ -480,6 +502,7 @@ fn emit_instruction(
     known_functions: &HashSet<String>,
     methods: &MethodNames,
     records: &RecordFields,
+    spawn_helpers: &SpawnHelpers,
     show: &mut dyn FnMut(&str, &Ty) -> Option<String>,
     out: &mut String,
 ) -> Bail<()> {
@@ -1145,6 +1168,27 @@ fn emit_instruction(
             let channel_name = format!("Channel_{}", mangle_option_payload(&args[0], records));
             out.push_str(&format!("    {} = {channel_name}_new();\n", value_name(*dst)));
         }
+        IrInstr::Spawn { dst, region, scoped, ty } => {
+            let Ty::Applied(name, args) = ty else { return Err(()) };
+            if name != "Task" || args.len() != 1 || *scoped || !task_supported(&args[0], records) {
+                return Err(());
+            }
+            let helper = spawn_helpers.get(region).ok_or(())?;
+            let task_name = format!("Task_{}", mangle_task_payload(&args[0], records));
+            let task = value_name(*dst);
+            out.push_str(&format!(
+                "    {task} = ({task_name}*)ostrin_calloc_with_drop(1, sizeof *{task}, (void (*)(void*)){task_name}_drop);\n"
+            ));
+            out.push_str(&format!(
+                "    {task}->run = {helper}; {task}->env = NULL; {task}->drop_env = NULL; {task}->group = ostrin_current_group();\n"
+            ));
+            out.push_str(&format!(
+                "    ostrin_register_task({task}, {task_name}_poll, {task_name}_cancel_adapter); ostrin_track_task_handle({task});\n"
+            ));
+            out.push_str(&format!(
+                "#if defined(OSTRIN_NATIVE_THREADS)\n    {task_name}_start({task});\n#endif\n"
+            ));
+        }
         IrInstr::ChannelSend { channel, value } => {
             let Ty::Applied(name, args) = value_ty(values, *channel)? else { return Err(()) };
             if name != "Channel" || args.len() != 1 || !channel_supported(&args[0], records) || value_ty(values, *value)? != args[0] {
@@ -1184,6 +1228,19 @@ fn emit_instruction(
             let channel_name = format!("Channel_{}", mangle_option_payload(&args[0], records));
             out.push_str(&format!("    {channel_name}_close({});\n", value_code(values, *channel)?));
         }
+        IrInstr::TaskJoin { dst, task, ty } => {
+            let Ty::Applied(name, args) = value_ty(values, *task)? else { return Err(()) };
+            if name != "Task" || args.len() != 1 || args[0] != *ty || !task_supported(&args[0], records) {
+                return Err(());
+            }
+            let task_name = format!("Task_{}", mangle_task_payload(&args[0], records));
+            let call = format!("{task_name}_join({})", value_code(values, *task)?);
+            if *ty == Ty::Void {
+                out.push_str(&format!("    {call};\n"));
+            } else {
+                out.push_str(&format!("    {} = {call};\n", value_name(*dst)));
+            }
+        }
         IrInstr::Retain { value } => {
             let ty = value_ty(values, *value)?;
             match ty {
@@ -1194,6 +1251,9 @@ fn emit_instruction(
                     out.push_str(&format!("    ostrin_retain((void*){});\n", value_code(values, *value)?));
                 }
                 Ty::Applied(name, args) if name == "Channel" && args.len() == 1 && channel_supported(&args[0], records) => {
+                    out.push_str(&format!("    ostrin_retain((void*){});\n", value_code(values, *value)?));
+                }
+                Ty::Applied(name, args) if name == "Task" && args.len() == 1 && task_supported(&args[0], records) => {
                     out.push_str(&format!("    ostrin_retain((void*){});\n", value_code(values, *value)?));
                 }
                 Ty::Applied(name, args)
@@ -1231,6 +1291,9 @@ fn emit_instruction(
                     out.push_str(&format!("    ostrin_release((void*){});\n", value_code(values, *value)?));
                 }
                 Ty::Applied(name, args) if name == "Channel" && args.len() == 1 && channel_supported(&args[0], records) => {
+                    out.push_str(&format!("    ostrin_release((void*){});\n", value_code(values, *value)?));
+                }
+                Ty::Applied(name, args) if name == "Task" && args.len() == 1 && task_supported(&args[0], records) => {
                     out.push_str(&format!("    ostrin_release((void*){});\n", value_code(values, *value)?));
                 }
                 Ty::Applied(name, args)
@@ -1324,9 +1387,148 @@ fn emit_terminator(
     Ok(())
 }
 
+fn used_values(instruction: &IrInstr) -> Vec<ValueId> {
+    match instruction {
+        IrInstr::Move { source, .. } => vec![*source],
+        IrInstr::StoreLocal { value, .. } => vec![*value],
+        IrInstr::Unary { operand, .. } => vec![*operand],
+        IrInstr::Binary { left, right, .. } => vec![*left, *right],
+        IrInstr::Call { args, .. } => args.clone(),
+        IrInstr::MethodCall { receiver, args, .. } => std::iter::once(*receiver).chain(args.iter().copied()).collect(),
+        IrInstr::Field { object, .. } => vec![*object],
+        IrInstr::Index { object, index, .. } => vec![*object, *index],
+        IrInstr::Aggregate { fields, .. } => fields.clone(),
+        IrInstr::IterInit { source, .. } => vec![*source],
+        IrInstr::IterHasNext { iter, .. } | IrInstr::IterNext { iter, .. } => vec![*iter],
+        IrInstr::PatternTest { subject, .. } | IrInstr::PatternBind { subject, .. } => vec![*subject],
+        IrInstr::TryCheck { value, .. }
+        | IrInstr::TryValue { value, .. }
+        | IrInstr::TryError { value, .. }
+        | IrInstr::TryErrorValue { value, .. } => vec![*value],
+        IrInstr::Spawn { .. } => Vec::new(),
+        IrInstr::ChannelNew { capacity, .. } => capacity.iter().copied().collect(),
+        IrInstr::ChannelSend { channel, value } => vec![*channel, *value],
+        IrInstr::ChannelReceive { channel, .. } => vec![*channel],
+        IrInstr::ChannelClose { channel } => vec![*channel],
+        IrInstr::TaskJoin { task, .. } => vec![*task],
+        IrInstr::Phi { incoming, .. } => incoming.iter().map(|(_, value)| *value).collect(),
+        IrInstr::Opaque { inputs, .. } => inputs.clone(),
+        IrInstr::Retain { value } | IrInstr::Release { value } => vec![*value],
+        IrInstr::Param { .. } | IrInstr::Const { .. } | IrInstr::Global { .. } => Vec::new(),
+    }
+}
+
+fn terminator_values(terminator: &IrTerminator) -> Vec<ValueId> {
+    match terminator {
+        IrTerminator::Branch { condition, .. } => vec![*condition],
+        IrTerminator::Return(Some(value)) | IrTerminator::RegionReturn(Some(value)) => vec![*value],
+        IrTerminator::Goto(_) | IrTerminator::Return(None) | IrTerminator::RegionReturn(None) | IrTerminator::Unreachable => Vec::new(),
+    }
+}
+
+pub struct Generated {
+    pub body: String,
+    pub helpers: Vec<(String, String)>,
+}
+
+fn build_spawn_helpers(
+    function: &IrFunction,
+    values: &Values,
+    known_functions: &HashSet<String>,
+    methods: &MethodNames,
+    records: &RecordFields,
+    spawn_helpers: &mut SpawnHelpers,
+    show: &mut dyn FnMut(&str, &Ty) -> Option<String>,
+) -> Bail<Vec<(String, String)>> {
+    let mut specs = Vec::new();
+    for block in &function.blocks {
+        for instruction in &block.instructions {
+            let IrInstr::Spawn { region, scoped, ty, .. } = instruction else { continue };
+            let Ty::Applied(name, args) = ty else { return Err(()) };
+            if name != "Task" || args.len() != 1 || *scoped || !task_supported(&args[0], records) {
+                return Err(());
+            }
+            if spawn_helpers.insert(*region, String::new()).is_some() {
+                return Err(());
+            }
+            specs.push((*region, args[0].clone()));
+        }
+    }
+
+    let mut helpers = Vec::with_capacity(specs.len());
+    for (region, result_ty) in specs {
+        let block = function.blocks.get(region).ok_or(())?;
+        if block.id != region || !matches!(block.terminator, Some(IrTerminator::RegionReturn(_))) {
+            return Err(());
+        }
+        let mut definitions = HashSet::new();
+        for instruction in &block.instructions {
+            if matches!(instruction, IrInstr::Param { .. } | IrInstr::Spawn { .. }) {
+                return Err(());
+            }
+            if let Some((value, ty)) = defined_value(instruction) {
+                if !supported(&ty, records) || !definitions.insert(value) {
+                    return Err(());
+                }
+            }
+            if used_values(instruction).iter().any(|value| !definitions.contains(value)) {
+                return Err(());
+            }
+        }
+        let terminator = block.terminator.as_ref().ok_or(())?;
+        if terminator_values(terminator).iter().any(|value| !definitions.contains(value)) {
+            return Err(());
+        }
+        match terminator {
+            IrTerminator::RegionReturn(Some(value)) if value_ty(values, *value)? != result_ty => return Err(()),
+            IrTerminator::RegionReturn(None) if result_ty != Ty::Void => return Err(()),
+            _ => {}
+        }
+
+        let helper_name = format!(
+            "ostrin_ir_task_{}_{}",
+            crate::codegen::c_function_name(&function.name),
+            region
+        );
+        spawn_helpers.insert(region, helper_name.clone());
+        let signature = format!("static {} {helper_name}(void* __env)", c_type(&result_ty, records)?);
+        let mut body = String::from("    (void)__env;\n");
+        let mut declarations: Vec<(ValueId, Ty)> = definitions
+            .iter()
+            .filter_map(|value| values.get(value).map(|(_, ty)| (*value, ty.clone())))
+            .filter(|(_, ty)| *ty != Ty::Void)
+            .collect();
+        declarations.sort_by_key(|(value, _)| *value);
+        for (value, ty) in declarations {
+            body.push_str(&format!("    {} {};\n", c_type(&ty, records)?, value_name(value)));
+        }
+        for instruction in &block.instructions {
+            emit_instruction(
+                instruction,
+                values,
+                known_functions,
+                methods,
+                records,
+                spawn_helpers,
+                show,
+                &mut body,
+            )?;
+        }
+        match terminator {
+            IrTerminator::RegionReturn(Some(value)) if result_ty == Ty::Void => body.push_str("    return;\n"),
+            IrTerminator::RegionReturn(Some(value)) => body.push_str(&format!("    return {};\n", value_code(values, *value)?)),
+            IrTerminator::RegionReturn(None) => body.push_str("    return;\n"),
+            _ => return Err(()),
+        }
+        helpers.push((signature, body));
+    }
+    Ok(helpers)
+}
+
 /// Emits an IR function when all of its values use a supported scalar or
 /// collection representation and its CFG can be represented with ordinary C
 /// labels and gotos.
+#[allow(dead_code)]
 pub fn generate(
     function: &IrFunction,
     known_functions: &HashSet<String>,
@@ -1334,6 +1536,16 @@ pub fn generate(
     records: &RecordFields,
     show: &mut dyn FnMut(&str, &Ty) -> Option<String>,
 ) -> Option<String> {
+    generate_with_helpers(function, known_functions, methods, records, show).map(|generated| generated.body)
+}
+
+pub fn generate_with_helpers(
+    function: &IrFunction,
+    known_functions: &HashSet<String>,
+    methods: &MethodNames,
+    records: &RecordFields,
+    show: &mut dyn FnMut(&str, &Ty) -> Option<String>,
+) -> Option<Generated> {
     if function.entry >= function.blocks.len()
         || function
             .params
@@ -1353,6 +1565,21 @@ pub fn generate(
     }
 
     let values = collect_values(function, records).ok()?;
+    let mut spawn_helpers = SpawnHelpers::new();
+    let helpers = build_spawn_helpers(
+        function,
+        &values,
+        known_functions,
+        methods,
+        records,
+        &mut spawn_helpers,
+        show,
+    ).ok()?;
+    if function.blocks.iter().any(|block| {
+        matches!(block.terminator, Some(IrTerminator::RegionReturn(_))) && !spawn_helpers.contains_key(&block.id)
+    }) {
+        return None;
+    }
     let mut out = String::new();
     out.push_str("    int __ostrin_ir_pred = -1;\n");
     let mut declarations: Vec<(ValueId, Ty)> = values
@@ -1370,9 +1597,12 @@ pub fn generate(
     out.push_str(&format!("    goto {};\n", block_label(function.entry)));
 
     for block in &function.blocks {
+        if spawn_helpers.contains_key(&block.id) {
+            continue;
+        }
         out.push_str(&format!("{}:\n", block_label(block.id)));
         for instruction in &block.instructions {
-            emit_instruction(instruction, &values, known_functions, methods, records, show, &mut out).ok()?;
+            emit_instruction(instruction, &values, known_functions, methods, records, &spawn_helpers, show, &mut out).ok()?;
         }
         emit_terminator(
             function,
@@ -1386,5 +1616,5 @@ pub fn generate(
     // Every legal edge above terminates, but keep the C function well-formed
     // even if a future IR terminator gains a fall-through representation.
     out.push_str("    abort();\n");
-    Some(out)
+    Some(Generated { body: out, helpers })
 }

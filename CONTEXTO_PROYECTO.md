@@ -5708,3 +5708,23 @@ El backend nativo ya no necesita abandonar la IR para el caso síncrono de canal
 
 `spawn`/`Task` y la coordinación entre tareas siguen en HIR/AST; este bloque migra el consumidor de
 `Channel<T>` y su contrato de memoria sin confundirlo con la migración completa de concurrencia.
+
+## 227. Spawn y Task.join en la IR nativa — 2026-09-21
+
+La frontera HIR→IR→C incorpora ahora una primera forma ejecutable de concurrencia real:
+
+- `spawn {}` sin capturas, `spawn_scope` y control de flujo interno conservan el fallback verificado;
+  una región lineal sin valores prestados del llamador se convierte en un callback C estático con
+  su propio conjunto de temporales, de modo que el backend no inventa una ABI de entorno parcial;
+- `Task<T>` tiene representación nativa gestionada, inicialización mediante el mismo runtime que
+  usa el emisor HIR (`ostrin_register_task`, `ostrin_track_task_handle` y, con
+  `OSTRIN_NATIVE_THREADS`, `Task_<T>_start`), y `Task.join()` llama a `Task_<T>_join`;
+- el análisis de ownership trata el handle como una referencia gestionada y puede liberar el
+  último uso después del `join`. La regresión `examples/native_ir_spawn_join.ostrin` compara
+  intérprete y nativo, exige `ir-generated`, inspecciona el callback y el helper C, y ejecuta
+  tanto el scheduler cooperativo como los hilos nativos con `live_allocations=0`.
+
+La migración no declara resuelta toda la concurrencia: faltan la ABI de entornos para capturas,
+la bajada de scopes y las regiones con ramas o loops. Esas formas permanecen observables como
+fallback HIR/AST hasta que ownership, cancelación y escape puedan expresarse en la IR sin perder
+la semántica del intérprete.

@@ -3116,6 +3116,9 @@ impl<'a> Codegen<'a> {
             Ty::Applied(n, args) if n == "Channel" && args.len() == 1 => {
                 CType::Channel(Box::new(self.ty_to_ctype(&args[0])?))
             }
+            Ty::Applied(n, args) if n == "Task" && args.len() == 1 => {
+                CType::Task(Box::new(self.ty_to_ctype(&args[0])?))
+            }
             Ty::Applied(n, args) if n == "Option" && args.len() == 1 => CType::Option(Box::new(self.ty_to_ctype(&args[0])?)),
             Ty::Applied(n, args) if n == "Result" && args.len() == 2 => {
                 CType::Result(Box::new(self.ty_to_ctype(&args[0])?), Box::new(self.ty_to_ctype(&args[1])?))
@@ -6804,6 +6807,7 @@ fn generate_impl(
     // later-discovered instantiation still compiles: C requires the
     // prototype before use, not the body.
     let mut bodies: Vec<(String, String)> = Vec::new(); // (signature, body)
+    let mut ir_helper_prototypes: Vec<String> = Vec::new();
     // What the HIR emitter may rely on: signatures, records (unless reads are tracked) and methods.
     let mut hir_world = crate::hir_c::World {
         functions: functions
@@ -6884,9 +6888,15 @@ fn generate_impl(
                 .iter()
                 .find(|function| function.name == f.name && !ir_unresolved.contains(&function.name))
                 .and_then(|function| {
-                    crate::ir_c::generate(function, &ir_functions, &ir_methods, &ir_records, &mut |code, ty| {
+                    crate::ir_c::generate_with_helpers(function, &ir_functions, &ir_methods, &ir_records, &mut |code, ty| {
                         let ctype = codegen.ty_to_ctype(ty)?;
                         codegen.show_expr(code, &ctype).ok()
+                    }).map(|generated| {
+                        for (helper_signature, helper_body) in generated.helpers {
+                            ir_helper_prototypes.push(format!("{helper_signature};"));
+                            bodies.push((helper_signature, helper_body));
+                        }
+                        generated.body
                     })
                 }),
             _ => None,
@@ -7679,7 +7689,7 @@ fn generate_impl(
     for (c_name, (param_types, return_type)) in &codegen.instantiations {
         out.push_str(&format!("{} {}({});\n", c_type_name(return_type), c_name, render_params_by_type(param_types)));
     }
-    for prototype in list_helper_prototypes.iter().chain(&thunk_prototypes) {
+    for prototype in ir_helper_prototypes.iter().chain(list_helper_prototypes.iter()).chain(&thunk_prototypes) {
         out.push_str(prototype);
         out.push('\n');
     }

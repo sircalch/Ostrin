@@ -419,6 +419,7 @@ fn safe_release_site(instruction: &IrInstr) -> bool {
         | IrInstr::ChannelSend { .. }
         | IrInstr::ChannelReceive { .. }
         | IrInstr::ChannelClose { .. }
+        | IrInstr::TaskJoin { .. }
         | IrInstr::Aggregate { .. }
         | IrInstr::Index { .. }
         | IrInstr::Field { .. }

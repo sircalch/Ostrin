@@ -1765,6 +1765,51 @@ fn native_ir_emitter_handles_channel_iterator_protocol() {
 }
 
 #[test]
+fn native_ir_emitter_handles_non_capturing_spawn_and_join() {
+    let file = example_path("native_ir_spawn_join.ostrin");
+    let expected = "7\n";
+    let interpreted = run(&["--run", &file]);
+    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ir-generated: 1"), "spawn/join did not use the IR emitter: {report_text}");
+    assert!(report_text.contains("hir-generated: 0"), "spawn/join fell back to HIR: {report_text}");
+
+    let emitted = run(&["--emit-c", &file]);
+    assert!(emitted.status.success(), "spawn/join IR emission failed: {}", stderr(&emitted));
+    let source = stdout(&emitted);
+    assert!(source.contains("ostrin_ir_task_ostrin_main_"), "spawn callback missing from IR C: {source}");
+    assert!(source.contains("Task_Int_join"), "task join missing from IR C: {source}");
+
+    let exe = temp_artifact("native_ir_spawn_join.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+    let native = Command::new(&exe).output().expect("failed to run spawn/join IR binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native run failed: {}", String::from_utf8_lossy(&native.stderr));
+    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "spawn/join leaked: {}", String::from_utf8_lossy(&native.stderr));
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+
+    let threaded_exe = temp_artifact("native_ir_spawn_join_threads.exe");
+    let threaded_compile = run(&["--native-threads", "--compile", "--leak-check", "--out", &threaded_exe, &file]);
+    if skip_if_no_c_compiler(&threaded_compile) {
+        return;
+    }
+    assert!(threaded_compile.status.success(), "native-threads compile failed: {}", stderr(&threaded_compile));
+    let threaded = Command::new(&threaded_exe).output().expect("failed to run threaded spawn/join IR binary");
+    let _ = fs::remove_file(&threaded_exe);
+    assert!(threaded.status.success(), "threaded native run failed: {}", String::from_utf8_lossy(&threaded.stderr));
+    assert!(String::from_utf8_lossy(&threaded.stderr).contains("live_allocations=0"), "threaded spawn/join leaked: {}", String::from_utf8_lossy(&threaded.stderr));
+    assert_eq!(String::from_utf8_lossy(&threaded.stdout).replace("\r\n", "\n"), expected);
+}
+
+#[test]
 fn native_ir_emitter_handles_strings_and_ownership_markers() {
     let file = example_path("native_ir_strings.ostrin");
     let expected = "true\nfalse\nHello, Ostrin\nfallback\nHello, Alias\nalias-fallback\n";
