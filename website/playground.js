@@ -336,6 +336,10 @@ fn main() -> Void {
     map_values = maps.values(scores)
     print(map_values.length())
     drop(map_values)
+    print(strings.format_float(3.14159, 2).unwrap())
+    print(strings.format_float(-0.125, 3).unwrap())
+    print(strings.format_float(2.0, 0).unwrap())
+    print(strings.format_float(1.0, 19).is_err())
 }
 ` },
   records: { code: `enum Inner {

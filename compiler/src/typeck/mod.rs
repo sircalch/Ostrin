@@ -4251,6 +4251,7 @@ fn check_builtin_call(
         "char_from_codepoint" => vec![Ty::Int],
         "hash" => vec![Ty::Unknown],
         "format" => vec![Ty::String, Ty::List(Box::new(Ty::String))],
+        "format_float_value" => vec![Ty::Float, Ty::Int],
         "select" => vec![Ty::Unknown],
         // Ownership primitives are intentionally generic. `clone` creates a
         // new native reference to the same identity-managed value; `drop`
@@ -4330,6 +4331,10 @@ fn check_builtin_call(
             Some(Ty::Int)
         }
         "format" => Some(Ty::String),
+        "format_float_value" => Some(Ty::Applied(
+            "Result".to_string(),
+            vec![Ty::String, Ty::String],
+        )),
         "select" => {
             let Some(Ty::List(channel_ty)) = arg_types.first() else {
                 errors.push(TypeError {

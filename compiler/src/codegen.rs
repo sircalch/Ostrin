@@ -1147,6 +1147,15 @@ static const char* ostrin_float_to_string(double v) {\n\
     return out;\n\
 }\n\
 \n\
+static const char* ostrin_float_format(double v, int64_t digits) {\n\
+    int needed = snprintf(NULL, 0, \"%.*f\", (int)digits, v);\n\
+    if (needed < 0) OSTRIN_FAIL(\"could not format float\");\n\
+    char* out = (char*)ostrin_alloc((size_t)needed + 1);\n\
+    snprintf(out, (size_t)needed + 1, \"%.*f\", (int)digits, v);\n\
+    if (strcmp(out, \"nan\") == 0 || strcmp(out, \"-nan\") == 0) strcpy(out, \"NaN\");\n\
+    return out;\n\
+}\n\
+\n\
 static void ostrin_print_float(double v) {\n\
     char buf[64];\n\
     ostrin_fmt_double(v, buf, sizeof buf);\n\
@@ -5963,7 +5972,7 @@ impl<'a> Codegen<'a> {
             "file_exists" | "hash" => 1,
             "char_from_codepoint" => 1,
             "select" => 1,
-            "format" => 2,
+            "format" | "format_float_value" => 2,
             "clone" | "drop" => 1,
             "norm" | "eigvals" | "det" | "inv" | "trace" | "eye" | "read_file" | "parse_int" | "parse_csv" | "sum" | "panic" | "assert" | "array" | "zeros" | "ones" | "abs" => 1,
             n if ["sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh", "exp", "ln", "log10", "sqrt", "floor", "ceil", "round", "erf"].contains(&n) => 1,
@@ -6052,6 +6061,18 @@ impl<'a> Codegen<'a> {
                 Ok(Some((
                     format!("({{ {list_ty} {list} = {}; ostrin_s_format({}, {list}->items, {list}->length); }})", codes[1], codes[0]),
                     CType::Str,
+                )))
+            }
+            "format_float_value" => {
+                let ty = CType::Result(Box::new(CType::Str), Box::new(CType::Str));
+                self.register_list_types(&ty);
+                Ok(Some((
+                    format!(
+                        "({{ Result_String_String {r}; memset(&{r}, 0, sizeof {r}); if ({d} < 0 || {d} > 18) {{ {r}.error = \"float precision must be between 0 and 18\"; }} else {{ {r}.ok = true; {r}.value = ostrin_float_format({v}, {d}); }} {r}; }})",
+                        v = codes[0],
+                        d = codes[1],
+                    ),
+                    ty,
                 )))
             }
             "select" => {

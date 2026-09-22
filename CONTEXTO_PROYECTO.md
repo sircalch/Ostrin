@@ -6035,3 +6035,20 @@ sin introducir una segunda implementación de `HashMap`:
 
 El registro remoto y la red siguen fuera de este bloque: `std.maps` sólo estabiliza una API local
 sobre el mapa que ya existe en ambos backends.
+
+## 245. Formateo decimal configurable en `std.strings` — 2026-09-21
+
+La biblioteca estándar cubre ahora una necesidad frecuente de salidas científicas y de reportes:
+
+- `std.strings.format_float(value, digits)` devuelve `Result<String, String>` y utiliza notación
+  decimal fija con una precisión explícita de 0 a 18 cifras. Fuera de ese intervalo devuelve un
+  `Err("float precision must be between 0 and 18")`, de forma que el llamador puede usar `try`,
+  `unwrap` o las consultas normales de `Result`.
+- El intérprete usa el formateo dinámico de `f64`; el backend C comparte el contrato mediante
+  `ostrin_float_format`, y tanto la ruta HIR/C como la IR/C generan el mismo `Result<String,String>`.
+  Los errores de precisión son literales estáticos, evitando una reserva gestionada cuando sólo se
+  consulta `is_err()`.
+- La regresión `std_library_modules_agree_between_backends_and_pass_their_own_tests` compara
+  `3.14`, `-0.125`, precisión cero y precisiones inválidas, verifica que el símbolo llegue al C
+  emitido y termina el binario con `live_allocations=0`. El playground mantiene la misma fuente
+  de ejemplo mediante el check de deriva del sitio.

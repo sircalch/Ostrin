@@ -12,7 +12,7 @@ Compila por los dos backends (intérprete y nativo) sin código especial.
 |---|---|
 | `std.math` | `min`, `max`, `clamp` (genéricas, `T: Ord`), `sign`, `gcd`, `lcm`, `pow_int` |
 | `std.lists` | `contains`, `index_of`, `reversed`, `take`, `drop_first`, `concat`, `repeat`, `range_list`, `max_of`, `min_of`, `sorted` (estable) |
-| `std.strings` | `repeat`, `pad_left`, `pad_right`, `count_of`, `join_with`, `trim`, `split`, `lines`, `is_blank`, `format_text`, `char_at`, `slice`, `codepoint` |
+| `std.strings` | `repeat`, `pad_left`, `pad_right`, `count_of`, `join_with`, `trim`, `split`, `lines`, `is_blank`, `format_text`, `format_float`, `char_at`, `slice`, `codepoint` |
 | `std.time` | `Date`, `date`, `is_leap_year`, `days_in_year`, `days_in_month`, `is_valid`, `day_of_year`, `day_of_week`, `from_day_of_year`, `iso`, `parse_iso` |
 | `std.json` | `Kind`, `Value`, `null_value`, `bool_value`, `number_value`, `text_value`, `array_value`, `object_value`, `kind`, `as_bool`, `as_number`, `as_text`, `array_items`, `object_keys`, `object_get`, `parse`, `stringify` |
 | `std.args` | `all`, `count`, `at` (argumentos del programa; `--` separa opciones de `--run`) |
@@ -42,6 +42,10 @@ Decisiones:
   sin añadir una segunda representación: `get_or` devuelve un fallback para claves ausentes,
   `keys`/`values` devuelven listas nuevas y todas las funciones sólo exigen `Hash + Eq` en la
   clave. La mutación sigue siendo explícita mediante `mut` y `.set`/`.remove`.
+- **Formato numérico explícito.** `std.strings.format_float(value, digits)` devuelve un
+  `Result<String, String>` con notación decimal fija y acepta entre 0 y 18 cifras; una precisión
+  inválida es un `Err`, no una salida silenciosamente truncada. La misma operación está disponible
+  en los dos backends mediante el builtin interno `format_float_value`.
 - **Un módulo `std` local o una dependencia llamada `std` tiene prioridad** sobre la biblioteca
   embebida (el `ostrin.toml` del proyecto manda).
 - Las pruebas de la propia biblioteca están en Ostrin (`examples/std_tests.ostrin`, `--test`).

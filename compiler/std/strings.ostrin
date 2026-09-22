@@ -57,6 +57,10 @@ pub fn format_text(template: String, values: List<String>) -> String {
     format(template, values)
 }
 
+pub fn format_float(value: Float, digits: Int) -> Result<String, String> {
+    format_float_value(value, digits)
+}
+
 pub fn char_at(text: String, index: Int) -> String {
     text.char_at(index)
 }

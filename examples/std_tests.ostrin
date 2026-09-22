@@ -130,3 +130,11 @@ fn test_maps() -> Void {
     assert_eq(map_values.length(), 2)
     drop(map_values)
 }
+
+fn test_float_formatting() -> Void {
+    assert_eq(strings.format_float(3.14159, 2).unwrap(), "3.14")
+    assert_eq(strings.format_float(-0.125, 3).unwrap(), "-0.125")
+    assert_eq(strings.format_float(2.0, 0).unwrap(), "2")
+    assert(strings.format_float(1.0, -1).is_err())
+    assert(strings.format_float(1.0, 19).is_err())
+}

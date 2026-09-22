@@ -2468,6 +2468,17 @@ impl Interpreter {
                     }
                     return Ok(Value::String(rendered));
                 }
+                "format_float_value" => {
+                    let value = self.eval_arg(&args[0], env)?;
+                    let digits = as_i64(&self.eval_arg(&args[1], env)?)?;
+                    let Value::Float(value) = value else {
+                        return Err(RuntimeError::Error("'format_float_value' expects a Float and an Int".to_string()));
+                    };
+                    if !(0..=18).contains(&digits) {
+                        return Ok(err_value(Value::String("float precision must be between 0 and 18".to_string())));
+                    }
+                    return Ok(ok_value(Value::String(format!("{value:.precision$}", precision = digits as usize))));
+                }
                 "select" => {
                     let channels = self.eval_arg(&args[0], env)?;
                     let Value::List(channels) = channels else {

@@ -2780,13 +2780,17 @@ fn deeply_nested_input_does_not_crash_the_front_end() {
 fn std_library_modules_agree_between_backends_and_pass_their_own_tests() {
     let tests = run(&["--test", &example_path("std_tests.ostrin")]);
     assert!(tests.status.success(), "std tests failed: {}{}", stdout(&tests), stderr(&tests));
-    assert!(stdout(&tests).contains("9 passed"), "unexpected std test output: {}", stdout(&tests));
+    assert!(stdout(&tests).contains("10 passed"), "unexpected std test output: {}", stdout(&tests));
 
     let path = example_path("std_library.ostrin");
     let interpreted = run(&["--run", &path]);
     assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
-    let expected = "3\n2.5\n10\n6\n12\n1024\ntrue\n1\n[3, 2, 1]\n[1, 2, 3, 4, 5]\n[apple, fig, pear]\n[1, 2]\n[1, 2, 3]\n[2, 3, 4, 5]\nSome(9)\nSome(2)\nababab\n007\n2\nOstrin\n[a, b, c]\n[a, b]\ntrue\n2 + 3 = 5\ns\nstr\n115\n115\n2024-02-29\n1\n29\n{\"ok\":true,\"items\":[1,2]}\n[ok, items]\n2\nfalse\ntrue\nfalse\n3\n0\n2\n2\n";
+    let expected = "3\n2.5\n10\n6\n12\n1024\ntrue\n1\n[3, 2, 1]\n[1, 2, 3, 4, 5]\n[apple, fig, pear]\n[1, 2]\n[1, 2, 3]\n[2, 3, 4, 5]\nSome(9)\nSome(2)\nababab\n007\n2\nOstrin\n[a, b, c]\n[a, b]\ntrue\n2 + 3 = 5\ns\nstr\n115\n115\n2024-02-29\n1\n29\n{\"ok\":true,\"items\":[1,2]}\n[ok, items]\n2\nfalse\ntrue\nfalse\n3\n0\n2\n2\n3.14\n-0.125\n2\ntrue\n";
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let emitted = run(&["--emit-c", &path]);
+    assert!(emitted.status.success(), "std library C emission failed: {}", stderr(&emitted));
+    assert!(stdout(&emitted).contains("ostrin_float_format"), "float formatter did not reach native C: {}", stdout(&emitted));
 
     let exe = temp_artifact("std_library.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);

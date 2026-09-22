@@ -553,6 +553,12 @@ fn write_file_result_code(path: &str, text: &str) -> String {
     )
 }
 
+fn format_float_result_code(value: &str, digits: &str) -> String {
+    format!(
+        "({{ Result_String_String __ostrin_result; memset(&__ostrin_result, 0, sizeof __ostrin_result); if (({digits}) < 0 || ({digits}) > 18) {{ __ostrin_result.error = \"float precision must be between 0 and 18\"; }} else {{ __ostrin_result.ok = true; __ostrin_result.value = ostrin_float_format((double)({value}), (int64_t)({digits})); }} __ostrin_result; }})"
+    )
+}
+
 fn emit_instruction(
     instruction: &IrInstr,
     values: &Values,
@@ -1138,6 +1144,13 @@ fn emit_instruction(
                 && *ty == Ty::Applied("Result".to_string(), vec![Ty::Void, Ty::String])
             {
                 write_file_result_code(&codes[0], &codes[1])
+            } else if callee == "format_float_value"
+                && args.len() == 2
+                && value_ty(values, args[0])? == Ty::Float
+                && value_ty(values, args[1])? == Ty::Int
+                && *ty == Ty::Applied("Result".to_string(), vec![Ty::String, Ty::String])
+            {
+                format_float_result_code(&codes[0], &codes[1])
             } else if callee == "yield" && args.is_empty() && *ty == Ty::Void {
                 "({\n#if defined(OSTRIN_NATIVE_THREADS)\n    ostrin_select_wait();\n#else\n    (void)ostrin_poll_one();\n#endif\n    ostrin_task_checkpoint();\n    (void)0;\n})"
                     .to_string()
