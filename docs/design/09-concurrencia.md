@@ -198,7 +198,9 @@ La sincronización del registro se complementa con frames de ownership para los 
 anidados que generan handles de tarea: el emisor conserva el resultado del bloque,
 libera sus bindings locales al salir y el smoke test nativo termina con cero
 asignaciones vivas. La bajada completa de ownership sobre la IR —incluyendo todos los
-escapes, loops y control de cancelación— sigue siendo una etapa posterior.
+escapes, loops y la propagación completa del control de cancelación— sigue siendo una etapa
+posterior; el caso directo `Task.cancel()` para handles representables en la IR ya usa el helper
+tipado del runtime.
 
 ## 4. Ejemplo completo — map paralelo
 

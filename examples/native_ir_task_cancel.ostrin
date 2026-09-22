@@ -1,0 +1,9 @@
+fn main() -> Void {
+    spawn_scope {
+        task = spawn {
+            42
+        }
+        print(task.cancel())
+        print(task.cancel())
+    }
+}

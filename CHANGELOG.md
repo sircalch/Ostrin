@@ -41,6 +41,10 @@
   tasks with propagated captures use the same callback ABI, while scope escapes still use the
   verified HIR/AST fallback. The new
   `native_ir_spawn_join.ostrin` regression checks both modes and `live_allocations=0`.
+- `Task.cancel()` now also lowers through the native IR/C path for supported `Task<T>` handles,
+  calling the typed runtime cancellation helper while preserving last-use ownership. The
+  `native_ir_task_cancel.ostrin` regression checks IR selection, cooperative cancellation,
+  native-thread compilation/execution and `live_allocations=0`.
 - Channel iteration over concrete payloads now lowers through native CFG/IR: `send`, `close`,
   `receive` and `for` use the generated `Channel_*` runtime helpers, with last-use release of the
   channel handle covered by `examples/native_ir_channel_iterator.ostrin`.

@@ -597,6 +597,7 @@ fn safe_release_site(instruction: &IrInstr) -> bool {
                 | "is_err"
                 | "is_some"
                 | "is_none"
+                | "cancel"
                 | "set"
                 | "keys"
                 | "values"

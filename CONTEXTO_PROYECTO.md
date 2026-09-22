@@ -5804,3 +5804,20 @@ estática y verificable:
 Scopes anidados dentro de callbacks, control que escape del ámbito y formas indirectas todavía
 conservan el fallback HIR/AST; la propagación sólo se acepta cuando ownership puede expresarse en
 la cadena completa de callbacks.
+
+## 232. `Task.cancel()` tipado en la IR nativa — 2026-09-21
+
+La operación explícita de cancelación ya cruza la frontera IR→C para tareas cuyo payload tiene
+representación nativa:
+
+- `HirKind::MethodCall` conserva `Task.cancel()` como una operación de método y el emisor IR-C
+  selecciona `Task_<T>_cancel`, validando payload, aridad y resultado `Bool` antes de generar C;
+- el análisis de ownership reconoce la operación como llamada prestataria: el handle puede
+  liberarse después de su último `cancel()` sin convertir la solicitud en un movimiento;
+- `examples/native_ir_task_cancel.ostrin` exige `ir-generated: 1`, compara el scheduler
+  cooperativo con el intérprete, compila y ejecuta con `--native-threads`, y verifica
+  `live_allocations=0`.
+
+Esto no declara preempción: la semántica sigue siendo la del runtime existente —cancelación
+inmediata para tareas pendientes y solicitud cooperativa para tareas en ejecución—, mientras
+las formas indirectas o los escapes complejos conservan el fallback verificado.

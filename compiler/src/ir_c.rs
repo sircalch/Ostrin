@@ -967,6 +967,19 @@ fn emit_instruction(
                         _ => return Err(()),
                     }
                 }
+                Ty::Applied(name, task_args)
+                    if name == "Task"
+                        && task_args.len() == 1
+                        && task_supported(&task_args[0], records) =>
+                {
+                    match method.as_str() {
+                        "cancel" if args.is_empty() && *ty == Ty::Bool => {
+                            let task_name = format!("Task_{}", mangle_task_payload(&task_args[0], records));
+                            format!("{task_name}_cancel({receiver})")
+                        }
+                        _ => return Err(()),
+                    }
+                }
                 Ty::Named(record) if records.contains_key(&record) => {
                     let c_name = methods.get(&(record, method.clone())).ok_or(())?;
                     if !supported(ty, records) {
