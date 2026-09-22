@@ -20,10 +20,10 @@ existing implementation.
 
 ## Verified inventory
 
-- 183 `.ostrin` source files exist under `examples/`, including the `tables`, `plot` and
+- 192 `.ostrin` source files exist under `examples/`, including the `tables`, `plot` and
   `autodiff` package projects.
 - 22 design documents exist under `docs/design/`.
-- The compiler test suite currently has 2 unit tests, 6 differential tests and 186 example
+- The compiler test suite currently has 2 unit tests, 6 differential tests and 188 example
   integration tests (the last full run is recorded in the development log and is rerun before
   each website change is pushed).
 - The browser playground is not a simulation: it loads the compiler WASM and runs the selected

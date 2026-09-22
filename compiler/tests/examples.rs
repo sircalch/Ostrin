@@ -841,6 +841,38 @@ fn environment_and_paths_match_between_interpreter_and_native() {
 }
 
 #[test]
+fn standard_args_and_env_modules_match_between_interpreter_and_native() {
+    let file = example_path("std_args_env.ostrin");
+    let interpreted = run_with_env(&["--run", &file, "--", "uno", "dos"], "OSTRIN_TEST_VALUE", "Ostrin");
+    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    let expected = stdout(&interpreted).replace("\r\n", "\n");
+    assert_eq!(
+        expected,
+        "2\nuno\ndos\ntrue\nOstrin\ntrue\nsrc/main.ostrin\ntrue\n"
+    );
+
+    let exe = temp_artifact("std-args-env.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "native compile failed: {}", stderr(&compile));
+    let native = Command::new(&exe)
+        .env("OSTRIN_TEST_VALUE", "Ostrin")
+        .args(["uno", "dos"])
+        .output()
+        .expect("run std args/env binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native binary failed: {}", String::from_utf8_lossy(&native.stderr));
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "std args/env native ownership leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn structural_equality_matches_between_interpreter_and_native() {
     let file = example_path("structural_equality.ostrin");
     let interpreted = run(&["--run", &file]);
@@ -2726,7 +2758,10 @@ fn std_library_modules_agree_between_backends_and_pass_their_own_tests() {
     let output = run(&[&missing]);
     assert!(!output.status.success());
     let text = format!("{}{}", stdout(&output), stderr(&output));
-    assert!(text.contains("no module 'nope'") && text.contains("math, lists, strings, time, json"), "unhelpful message: {text}");
+    assert!(
+        text.contains("no module 'nope'") && text.contains("math, lists, strings, time, json, args, env"),
+        "unhelpful message: {text}"
+    );
     let _ = fs::remove_file(&missing);
 }
 

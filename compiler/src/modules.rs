@@ -132,6 +132,8 @@ const STD_MODULES: &[(&str, &str)] = &[
     ("strings", include_str!("../std/strings.ostrin")),
     ("time", include_str!("../std/time.ostrin")),
     ("json", include_str!("../std/json.ostrin")),
+    ("args", include_str!("../std/args.ostrin")),
+    ("env", include_str!("../std/env.ostrin")),
 ];
 
 fn std_module_source(file_path: &Path) -> Option<io::Result<String>> {

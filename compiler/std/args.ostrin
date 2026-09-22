@@ -1,0 +1,21 @@
+// std.args: the program arguments (the interpreter receives them after `--`).
+
+pub fn all() -> List<String> {
+    args()
+}
+
+pub fn count() -> Int {
+    values = args()
+    result = values.length()
+    drop(values)
+    result
+}
+
+pub fn at(index: Int) -> Option<String> {
+    values = args()
+    if index < 0 or index >= values.length() {
+        None
+    } else {
+        Some(clone(values[index]))
+    }
+}

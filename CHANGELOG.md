@@ -52,6 +52,9 @@
   the native IR/C path. `structural_equality.ostrin` now reports `ir-generated: 1`, keeps exact
   interpreter/native output and finishes with `live_allocations=0`; array comparisons retain their
   separate element-wise scientific semantics.
+- Added the embedded `std.args` and `std.env` modules. They provide portable wrappers for program
+  arguments, environment lookup, current directory, path joining and file existence; the
+  `std_args_env.ostrin` regression compares interpreter/native output and finishes leak-free.
 
 ### Language and libraries
 - Supported `spawn {}` blocks now lower through the native IR/C backend, including immutable

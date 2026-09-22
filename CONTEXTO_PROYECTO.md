@@ -5454,7 +5454,7 @@ handlers locales que sean closures con entorno.
 La primera fase del plan de website 2.0 queda aterrizada sin sustituir la infraestructura actual:
 
 - `docs/website-audit.md` registra la auditoría del sitio, sus cifras comprobadas y el orden de
-  entrega. La fuente sigue siendo el repositorio: 183 programas `.ostrin`, 22 documentos de
+  entrega. La fuente sigue siendo el repositorio: 192 programas `.ostrin`, 22 documentos de
   diseño y la suite actual de 176 integraciones, 6 diferenciales y 2 unitarias.
 - La portada reutiliza `website/playground.js` y el `ostrinc.wasm` real que construye `pages.yml`;
   ahora ofrece Run, Check, Test, Format y Share desde una sección compacta. No hay resultados
@@ -5959,3 +5959,20 @@ la IR cuando aparece en una función con CFG:
 La semántica de `Array` sigue siendo deliberadamente elemento a elemento y devuelve una máscara;
 no se mezcla con la igualdad booleana estructural de las colecciones. Los consumidores complejos
 que aún no tienen representación IR permanecen en el fallback verificado.
+
+## 241. `std.args` y `std.env` — 2026-09-21
+
+La biblioteca estándar ya cubre también la frontera de proceso y filesystem sin duplicar el
+runtime por backend:
+
+- `std.args.all()` devuelve los argumentos del programa (`--` los separa de las opciones de
+  `--run` en el intérprete), `count()` expone su cardinalidad y `at()` devuelve `Option<String>`
+  con límites seguros;
+- `std.env.get()` consulta una variable como `Option<String>`, mientras `current_dir()`, `join()` y
+  `exists()` delegan en los builtins portables de directorio, rutas y existencia de archivos;
+- `examples/std_args_env.ostrin` ejecuta la misma fuente con `uno dos` y `OSTRIN_TEST_VALUE` en
+  intérprete y nativo. El binario nativo se compila con `--leak-check` y termina en cero
+  asignaciones vivas.
+
+El registro remoto y la red siguen deliberadamente fuera de este bloque: estos módulos sólo
+estabilizan APIs locales ya implementadas y no introducen acceso externo implícito.
