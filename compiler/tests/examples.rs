@@ -312,6 +312,28 @@ fn native_ir_file_io_preserves_results_and_ownership() {
     assert!(native.status.success(), "native binary failed: {}", String::from_utf8_lossy(&native.stderr));
     assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
     assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "native file I/O leaked: {}", String::from_utf8_lossy(&native.stderr));
+
+    let threaded_source = run(&["--emit-c", "--native-threads", &file]);
+    assert!(threaded_source.status.success(), "native-thread file I/O emission failed: {}", stderr(&threaded_source));
+    let threaded_source = stdout(&threaded_source);
+    assert!(threaded_source.contains("ostrin_file_read_cancelable"), "native file I/O did not lower read_file through the cancelable helper: {threaded_source}");
+    assert!(threaded_source.contains("ostrin_file_write_cancelable"), "native file I/O did not lower write_file through the cancelable helper: {threaded_source}");
+    assert!(threaded_source.contains("ostrin_file_request_wait"), "native file I/O did not use the cancelable request wait: {threaded_source}");
+    assert!(threaded_source.contains("ostrin_thread_start_detached"), "native file I/O did not emit the detached worker runtime: {threaded_source}");
+
+    let threaded_exe = temp_artifact("native-ir-file-io-threads.exe");
+    let threaded_compile = run(&["--compile", "--native-threads", "--leak-check", "--out", &threaded_exe, &file]);
+    if skip_if_no_c_compiler(&threaded_compile) {
+        return;
+    }
+    assert!(threaded_compile.status.success(), "native-thread compile failed: {}", stderr(&threaded_compile));
+    let threaded = Command::new(&threaded_exe).output().expect("run native-thread IR file I/O binary");
+    let _ = fs::remove_file(&threaded_exe);
+    let _ = fs::remove_file("target/ostrin-ir-file-io.txt");
+    let _ = fs::remove_file("target/ostrin-ir-file-io-missing.txt");
+    assert!(threaded.status.success(), "native-thread binary failed: {}", String::from_utf8_lossy(&threaded.stderr));
+    assert_eq!(String::from_utf8_lossy(&threaded.stdout).replace("\r\n", "\n"), expected);
+    assert!(String::from_utf8_lossy(&threaded.stderr).contains("live_allocations=0"), "native-thread file I/O leaked: {}", String::from_utf8_lossy(&threaded.stderr));
 }
 
 #[test]

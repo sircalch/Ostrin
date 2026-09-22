@@ -68,10 +68,11 @@
   reports eight IR-generated functions with no HIR fallback, including managed `List<String>` and
   `Option<String>` values.
 - Lowered `read_file`/`write_file` through native IR/C, including `Result<Void, String>`, owned error
-  strings and checks for seek, short-read, `ferror`, `fputs` and `fclose`. The new
-  `native_ir_file_io.ostrin` regression compares interpreter/native output and finishes with
-  `live_allocations=0`; cancellation is observed at safe boundaries, while the libc file call
-  remains explicitly blocking.
+  strings and checks for seek, short-read, `ferror`, `fputs` and `fclose`. Native-thread tasks now
+  wait through detached, reference-counted file workers, so cancellation releases the task at a
+  timed checkpoint while the worker finishes and cleans its request; cooperative/WASI execution
+  remains synchronous and no libc call is forcibly aborted. The `native_ir_file_io.ostrin`
+  regression covers both native modes and finishes with `live_allocations=0`.
 
 ### Language and libraries
 - Supported `spawn {}` blocks now lower through the native IR/C backend, including immutable

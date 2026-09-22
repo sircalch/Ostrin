@@ -6052,3 +6052,28 @@ La biblioteca estándar cubre ahora una necesidad frecuente de salidas científi
   `3.14`, `-0.125`, precisión cero y precisiones inválidas, verifica que el símbolo llegue al C
   emitido y termina el binario con `live_allocations=0`. El playground mantiene la misma fuente
   de ejemplo mediante el check de deriva del sitio.
+
+## 246. E/S de archivos cancelable en tareas nativas — 2026-09-21
+
+La frontera de concurrencia de archivos ya tiene un contrato ejecutable para `--native-threads`,
+sin afirmar preempción de llamadas C:
+
+- `compiler/src/file_io_runtime.c` conserva la operación bloqueante (`fopen`, `fread`, `fputs` o
+  `fclose`) en un worker nativo desacoplado. La tarea espera la solicitud mediante una condición
+  temporizada y revisa `ostrin_cancellation_requested()` en cada vuelta.
+- La solicitud tiene referencias separadas para la tarea y el worker. Si `Task.cancel()` llega
+  mientras la tarea espera, la tarea libera su referencia antes de saltar al checkpoint; el worker
+  conserva la suya, termina la libc y libera path, contenido, resultado y condición sin tocar
+  memoria administrada por Ostrin. Sólo el resultado que vuelve a una tarea viva se duplica a una
+  `String` rastreada por el runtime.
+- HIR/C e IR/C llaman los mismos helpers `ostrin_file_read_cancelable` y
+  `ostrin_file_write_cancelable`. `examples/native_ir_file_io.ostrin` ahora compara ambos modos,
+  exige la presencia del worker cancelable en el C emitido y mantiene `live_allocations=0`.
+- El runtime cooperativo y `wasm32-wasip1` permanecen síncronos: no se introducen pthreads ni una
+  falsa promesa de interrupción del host WASI. En ningún modo se fuerza la terminación de una
+  llamada libc en curso; en nativo sólo se desacopla la espera de la tarea y se garantiza la
+  limpieza posterior del worker.
+
+Quedan fuera de este cierre la E/S de red, un pool global de workers y una política de apagado que
+  espere operaciones de larga duración al finalizar el proceso. Esas decisiones requieren un
+  contrato de recursos más amplio que el de archivos locales.

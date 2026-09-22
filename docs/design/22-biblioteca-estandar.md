@@ -46,6 +46,12 @@ Decisiones:
   `Result<String, String>` con notación decimal fija y acepta entre 0 y 18 cifras; una precisión
   inválida es un `Err`, no una salida silenciosamente truncada. La misma operación está disponible
   en los dos backends mediante el builtin interno `format_float_value`.
+- **E/S y cancelación separadas.** `read_file` y `write_file` siguen siendo builtins de proceso,
+  no wrappers de `std.strings`. En `--native-threads`, una tarea espera su operación mediante un
+  worker nativo y un checkpoint temporizado, de modo que `Task.cancel()` puede liberar la tarea
+  mientras el worker termina y limpia la llamada libc; el runtime cooperativo/WASI mantiene la
+  operación síncrona. La cancelación no intenta abortar una llamada libc en curso ni inventa una
+  política para red o registro remoto.
 - **Un módulo `std` local o una dependencia llamada `std` tiene prioridad** sobre la biblioteca
   embebida (el `ostrin.toml` del proyecto manda).
 - Las pruebas de la propia biblioteca están en Ostrin (`examples/std_tests.ostrin`, `--test`).

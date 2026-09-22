@@ -358,6 +358,10 @@ const ARRAY_LINALG: &str = include_str!("array_linalg.c");
 /// `Array<T>` runtime template, instantiated per element type (see the header of the file).
 const ARRAY_RUNTIME: &str = include_str!("array_runtime.c");
 
+/// Native file I/O requests are detached from the task so cancellation can
+/// release the task while the underlying libc call finishes and cleans up.
+const FILE_IO_RUNTIME: &str = include_str!("file_io_runtime.c");
+
 const PRELUDE: &str = "#include <stdint.h>\n\
 #include <stdbool.h>\n\
 #include <stdio.h>\n\
@@ -456,6 +460,21 @@ static void ostrin_thread_join(OstrinThread* thread) {\n\
     CloseHandle(*thread);\n\
 #else\n\
     pthread_join(*thread, NULL);\n\
+#endif\n\
+}\n\
+static void ostrin_thread_start_detached(void (*entry)(void*), void* arg) {\n\
+    OstrinThreadStart* start = (OstrinThreadStart*)malloc(sizeof *start);\n\
+    if (!start) { fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); }\n\
+    start->entry = entry;\n\
+    start->arg = arg;\n\
+#if defined(_WIN32)\n\
+    HANDLE thread = CreateThread(NULL, 0, ostrin_thread_boot, start, 0, NULL);\n\
+    if (!thread) { free(start); fprintf(stderr, \"runtime error: could not create native thread\\n\"); exit(1); }\n\
+    CloseHandle(thread);\n\
+#else\n\
+    pthread_t thread;\n\
+    if (pthread_create(&thread, NULL, ostrin_thread_boot, start) != 0) { free(start); fprintf(stderr, \"runtime error: could not create native thread\\n\"); exit(1); }\n\
+    pthread_detach(thread);\n\
 #endif\n\
 }\n\
 #endif\n\
@@ -6135,15 +6154,7 @@ impl<'a> Codegen<'a> {
                 self.register_list_types(&ty);
                 Ok(Some((
                     format!(
-                        "({{ Result_String_String {r}; memset(&{r}, 0, sizeof {r}); ostrin_task_checkpoint(); FILE* {a} = fopen({p}, \"rb\"); \
-                         if (!{a}) {{ int {r}_error = errno ? errno : EIO; {r}.error = ostrin_s_dup(strerror({r}_error), strlen(strerror({r}_error))); }} \
-                         else if (fseek({a}, 0, SEEK_END) != 0) {{ int {r}_error = errno ? errno : EIO; fclose({a}); {r}.error = ostrin_s_dup(strerror({r}_error), strlen(strerror({r}_error))); }} \
-                         else {{ long {b} = ftell({a}); if ({b} < 0) {{ int {r}_error = errno ? errno : EIO; fclose({a}); {r}.error = ostrin_s_dup(strerror({r}_error), strlen(strerror({r}_error))); }} \
-                         else if (fseek({a}, 0, SEEK_SET) != 0) {{ int {r}_error = errno ? errno : EIO; fclose({a}); {r}.error = ostrin_s_dup(strerror({r}_error), strlen(strerror({r}_error))); }} \
-                         else {{ char* {c} = (char*)ostrin_alloc((size_t){b} + 1); errno = 0; size_t {r}_n = fread({c}, 1, (size_t){b}, {a}); int {r}_read_error = errno ? errno : EIO; \
-                         if ({r}_n != (size_t){b} && ferror({a})) {{ fclose({a}); ostrin_free({c}); {r}.error = ostrin_s_dup(strerror({r}_read_error), strlen(strerror({r}_read_error))); }} \
-                         else if ({r}_n != (size_t){b}) {{ fclose({a}); ostrin_free({c}); {r}.error = ostrin_s_dup(\"short read while reading file\", strlen(\"short read while reading file\")); }} \
-                         else {{ {c}[{r}_n] = 0; errno = 0; if (fclose({a}) != 0) {{ int {r}_error = errno ? errno : EIO; ostrin_free({c}); {r}.error = ostrin_s_dup(strerror({r}_error), strlen(strerror({r}_error))); }} else {{ {r}.ok = true; {r}.value = {c}; }} }} }} }} {r}; }})",
+                        "({{ OstrinFileOutcome {a} = ostrin_file_read_cancelable({p}); Result_String_String {r}; memset(&{r}, 0, sizeof {r}); if ({a}.ok) {{ {r}.ok = true; {r}.value = ostrin_s_dup({a}.value, strlen({a}.value)); }} else {{ {r}.error = ostrin_s_dup({a}.error, strlen({a}.error)); }} ostrin_file_outcome_dispose(&{a}); {r}; }})",
                         p = codes[0]
                     ),
                     ty,
@@ -6154,10 +6165,7 @@ impl<'a> Codegen<'a> {
                 self.register_list_types(&ty);
                 Ok(Some((
                     format!(
-                        "({{ Result_Void_String {r}; memset(&{r}, 0, sizeof {r}); ostrin_task_checkpoint(); FILE* {a} = fopen({p}, \"wb\"); \
-                         if (!{a}) {{ int {r}_error = errno ? errno : EIO; {r}.error = ostrin_s_dup(strerror({r}_error), strlen(strerror({r}_error))); }} \
-                         else {{ errno = 0; if (fputs({t}, {a}) == EOF) {{ int {r}_error = errno ? errno : EIO; fclose({a}); {r}.error = ostrin_s_dup(strerror({r}_error), strlen(strerror({r}_error))); }} \
-                         else {{ errno = 0; if (fclose({a}) != 0) {{ int {r}_error = errno ? errno : EIO; {r}.error = ostrin_s_dup(strerror({r}_error), strlen(strerror({r}_error))); }} else {{ {r}.ok = true; }} }} }} {r}; }})",
+                        "({{ OstrinFileOutcome {a} = ostrin_file_write_cancelable({p}, {t}); Result_Void_String {r}; memset(&{r}, 0, sizeof {r}); if ({a}.ok) {{ {r}.ok = true; }} else {{ {r}.error = ostrin_s_dup({a}.error, strlen({a}.error)); }} ostrin_file_outcome_dispose(&{a}); {r}; }})",
                         p = codes[0],
                         t = codes[1]
                     ),
@@ -6841,6 +6849,7 @@ fn generate_impl(
         out.push_str("#define OSTRIN_NATIVE_THREADS\n");
     }
     out.push_str(PRELUDE);
+    out.push_str(FILE_IO_RUNTIME);
     let _ = &mut out;
     // Bodies are generated *before* any prototype is written out, because a
     // generic function's instantiations aren't known until something is

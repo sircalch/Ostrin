@@ -89,8 +89,10 @@ built-in file/parse functions and synchronous `spawn`/channels all compile too.
 The default native scheduler remains deterministic for differential testing;
 `--native-threads` enables OS threads, blocking channels and deterministic-priority
 `select([channels])`; `yield()` advances the cooperative scheduler, and
-`Task.cancel()` cancels pending tasks immediately and requests cooperative cancellation
-for running tasks at safe checkpoints; `yield()` is the explicit native checkpoint.
+`Task.cancel()` cancels pending tasks immediately and requests cancellation for running
+tasks at safe checkpoints; native-thread file I/O waits through a cancelable worker request,
+while the cooperative/WASI runtime remains synchronous. `yield()` is the explicit native
+checkpoint, and cancellation never forcibly aborts a libc call.
 The standard library is still intentionally small, but now includes embedded Ostrin modules
 for math, collections, strings, deterministic dates, portable JSON parsing/serialization,
 program arguments, process/environment helpers, generic map queries and configurable float formatting.
