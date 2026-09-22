@@ -37,7 +37,8 @@
 - Supported `spawn {}` blocks now lower through the native IR/C backend, including immutable
   by-value captures in a generated environment with retain/release; `Task.join()` calls the real
   cooperative or native-thread runtime helper. Supported branch/loop CFGs now use the same callback
-  path; nested tasks and `spawn_scope` remain on the verified HIR/AST fallback. The new
+  path, and `spawn_scope {}` now opens/drains the native structured-task group inline; nested
+  tasks and scope escapes still use the verified HIR/AST fallback. The new
   `native_ir_spawn_join.ostrin` regression checks both modes and `live_allocations=0`.
 - Channel iteration over concrete payloads now lowers through native CFG/IR: `send`, `close`,
   `receive` and `for` use the generated `Channel_*` runtime helpers, with last-use release of the

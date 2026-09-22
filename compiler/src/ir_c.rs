@@ -1352,6 +1352,21 @@ fn emit_instruction(
                 _ => return Err(()),
             }
         }
+        IrInstr::Opaque { dst: None, op, inputs, ty } if inputs.is_empty() && *ty == Ty::Void => {
+            if let Some(scope) = op.strip_prefix("scope_begin<").and_then(|value| value.strip_suffix('>')) {
+                let scope = scope.parse::<usize>().map_err(|_| ())?;
+                out.push_str(&format!(
+                    "    __ostrin_ir_scope_{scope} = ostrin_scope_begin();\n"
+                ));
+            } else if let Some(scope) = op.strip_prefix("scope_end<").and_then(|value| value.strip_suffix('>')) {
+                let scope = scope.parse::<usize>().map_err(|_| ())?;
+                out.push_str(&format!(
+                    "    ostrin_scope_end(__ostrin_ir_scope_{scope});\n"
+                ));
+            } else {
+                return Err(());
+            }
+        }
         _ => return Err(()),
     }
     Ok(())
@@ -1598,6 +1613,9 @@ fn build_spawn_helpers(
                 if matches!(instruction, IrInstr::Param { .. } | IrInstr::Spawn { .. }) {
                     return Err(());
                 }
+                if matches!(instruction, IrInstr::Opaque { op, .. } if op.starts_with("scope_begin<") || op.starts_with("scope_end<")) {
+                    return Err(());
+                }
                 if let Some((value, ty)) = defined_value(instruction) {
                     if !supported(&ty, records) || !definitions.insert(value) {
                         return Err(());
@@ -1809,6 +1827,23 @@ pub fn generate_with_helpers(
     }
     let mut out = String::new();
     out.push_str("    int __ostrin_ir_pred = -1;\n");
+    let mut scopes = HashSet::new();
+    for block in &function.blocks {
+        for instruction in &block.instructions {
+            if let IrInstr::Opaque { dst: None, op, inputs, ty } = instruction {
+                if inputs.is_empty() && *ty == Ty::Void {
+                    if let Some(scope) = op.strip_prefix("scope_begin<").and_then(|value| value.strip_suffix('>')) {
+                        scopes.insert(scope.parse::<usize>().ok()?);
+                    }
+                }
+            }
+        }
+    }
+    let mut scopes: Vec<_> = scopes.into_iter().collect();
+    scopes.sort_unstable();
+    for scope in scopes {
+        out.push_str(&format!("    OstrinTaskGroup* __ostrin_ir_scope_{scope};\n"));
+    }
     let mut declarations: Vec<(ValueId, Ty)> = values
         .iter()
         .filter_map(|(value, (_, ty))| (*ty != Ty::Void).then_some((*value, ty.clone())))

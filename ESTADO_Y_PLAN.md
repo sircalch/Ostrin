@@ -31,7 +31,7 @@ Implementación: compilador + intérprete + herramientas de editor, todo en Rust
 | Léxico / parser | `lexer/`, `parser/mod.rs` | Tokens, AST con rangos de origen |
 | Módulos y paquetes | `modules.rs`, `package.rs`, `ostrin.toml` | Imports, `--project`, dependencias locales y lockfile portable |
 | Verificador de tipos | `typeck/mod.rs` (~3 500 l.) | Tipos, dimensiones, traits, exhaustividad, genéricos |
-| HIR/IR | `hir.rs`, `hir_c.rs`, `ir.rs`, `ir_c.rs` | HIR verificado, CFG con temporales explícitos y emisor C para escalares, `String`, `Result<Int, String>`/`Result<Float, String>` con `try`, `try catch` inline, handlers globales y aliases locales de handlers globales, wrappers `Option`/`Result` sobre `List`, `Map` y `Set` con payload gestionado, records concretos, iteradores de records concretos (`next() -> Option<T>`), iteración de canales mediante `receive() -> Option<T>`, `spawn {}` lineal con capturas inmutables soportadas y `Task.join()`, `Option<Record>`, listas escalares, mapas/conjuntos escalares, enteros de ancho fijo y control de flujo, con fallback HIR/AST acotado |
+| HIR/IR | `hir.rs`, `hir_c.rs`, `ir.rs`, `ir_c.rs` | HIR verificado, CFG con temporales explícitos y emisor C para escalares, `String`, `Result<Int, String>`/`Result<Float, String>` con `try`, `try catch` inline, handlers globales y aliases locales de handlers globales, wrappers `Option`/`Result` sobre `List`, `Map` y `Set` con payload gestionado, records concretos, iteradores de records concretos (`next() -> Option<T>`), iteración de canales mediante `receive() -> Option<T>`, `spawn {}` con CFG y capturas inmutables, `spawn_scope {}` inline con grupos nativos y `Task.join()`, `Option<Record>`, listas escalares, mapas/conjuntos escalares, enteros de ancho fijo y control de flujo, con fallback HIR/AST acotado |
 | Intérprete | `interpreter/mod.rs` | Ejecución tree‑walking y scheduler cooperativo; referencia semántica |
 | Servidor de lenguaje | `lsp.rs`, `symbols.rs`, `protocol.rs` | LSP sobre stdio |
 | Adaptador de depuración | `dap.rs` + hooks del intérprete | DAP sobre stdio |
@@ -74,8 +74,9 @@ enviarlo (E1101); `--ownership-check` conserva el informe detallado.
 
 La primera tarea que cruza completamente HIR→IR→C es `spawn {}` con CFG de bloques soportados,
 incluyendo capturas inmutables por valor mediante un entorno C con retain/release, y `Task.join()`
-cooperativo o sobre hilos nativos; tareas anidadas y `spawn_scope` conservan el fallback verificado
-hasta que exista una ABI de cancelación equivalente en la IR.
+cooperativo o sobre hilos nativos. `spawn_scope {}` también baja el grupo estructurado inline
+cuando sus hijos usan la ABI nativa soportada; tareas anidadas y escapes complejos conservan el
+fallback verificado hasta que exista una ABI de cancelación y ownership equivalente en la IR.
 
 **Numérico/científico**: enteros de ancho fijo, `Float32`, `Array<T>` (difusión, máscaras,
 rebanadas, `@`), estadística, regresión, `det/inv/eigvals/norm`, `Rng` reproducible,

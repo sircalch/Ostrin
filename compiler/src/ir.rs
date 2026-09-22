@@ -241,6 +241,8 @@ struct Builder {
     break_targets: Vec<(BlockId, BlockId)>,
     loop_edges: Vec<LoopEdges>,
     region_depth: usize,
+    next_scope: usize,
+    active_scopes: Vec<usize>,
 }
 
 impl Builder {
@@ -266,6 +268,8 @@ impl Builder {
             break_targets: Vec::new(),
             loop_edges: Vec::new(),
             region_depth: 0,
+            next_scope: 0,
+            active_scopes: Vec::new(),
         }
     }
 
@@ -322,6 +326,28 @@ impl Builder {
 
     fn unit(&mut self) -> ValueId {
         self.const_value("unit", Ty::Void)
+    }
+
+    fn fresh_scope(&mut self) -> usize {
+        let scope = self.next_scope;
+        self.next_scope += 1;
+        scope
+    }
+
+    fn emit_scope_end(&mut self, scope: usize) {
+        self.emit(IrInstr::Opaque {
+            dst: None,
+            op: format!("scope_end<{scope}>"),
+            inputs: Vec::new(),
+            ty: Ty::Void,
+        });
+    }
+
+    fn close_active_scopes(&mut self) {
+        let scopes: Vec<_> = self.active_scopes.iter().rev().copied().collect();
+        for scope in scopes {
+            self.emit_scope_end(scope);
+        }
     }
 
     fn lookup(&self, name: &str) -> Option<ValueId> {
@@ -439,6 +465,7 @@ impl Builder {
             }
             HirStmt::Return(value) => {
                 let value = value.as_ref().map(|value| self.lower_expr(value));
+                self.close_active_scopes();
                 if self.region_depth > 0 {
                     self.terminate(IrTerminator::RegionReturn(value));
                 } else {
@@ -1926,7 +1953,7 @@ impl Builder {
             }
             HirKind::Match(subject, arms) => self.lower_match(subject, arms, &expression.ty),
             HirKind::Spawn(block) => self.lower_spawn(block, false, &expression.ty),
-            HirKind::SpawnScope(block) => self.lower_spawn(block, true, &expression.ty),
+            HirKind::SpawnScope(block) => self.lower_spawn_scope(block, &expression.ty),
             HirKind::Channel(_, capacity) => {
                 let capacity = capacity.as_ref().map(|capacity| self.lower_expr(capacity));
                 let dst = self.fresh();
@@ -2060,6 +2087,7 @@ impl Builder {
     }
 
     fn lower_spawn(&mut self, block: &HirBlock, scoped: bool, ty: &Ty) -> ValueId {
+        debug_assert!(!scoped);
         let caller = self.current;
         let caller_locals = self.locals.clone();
         let region = self.new_block();
@@ -2081,6 +2109,23 @@ impl Builder {
             ty: ty.clone(),
         });
         dst
+    }
+
+    fn lower_spawn_scope(&mut self, block: &HirBlock, ty: &Ty) -> ValueId {
+        let scope = self.fresh_scope();
+        self.emit(IrInstr::Opaque {
+            dst: None,
+            op: format!("scope_begin<{scope}>"),
+            inputs: Vec::new(),
+            ty: Ty::Void,
+        });
+        self.active_scopes.push(scope);
+        let result = self.lower_block(block);
+        self.active_scopes.pop();
+        if !self.terminated() {
+            self.emit_scope_end(scope);
+        }
+        result.unwrap_or_else(|| if *ty == Ty::Void { self.unit() } else { self.fresh() })
     }
 }
 

@@ -34,4 +34,11 @@ fn main() -> Void {
     print(built_task.join())
     print(branched_task.join())
     print(loop_task.join())
+    scoped = spawn_scope {
+        scoped_task = spawn {
+            8
+        }
+        scoped_task.join()
+    }
+    print(scoped)
 }

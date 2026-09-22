@@ -5766,3 +5766,22 @@ Las regiones de `spawn` ya no están limitadas a un único bloque lineal:
 
 La bajada sigue rechazando tareas anidadas, `spawn_scope`, retornos normales que escapen de la
 región y formas cuya ownership no pueda probarse; esas formas permanecen en el fallback verificado.
+
+## 230. `spawn_scope` inline en la IR nativa — 2026-09-21
+
+La concurrencia estructurada cruza ahora la misma frontera HIR→IR→C para el caso que no requiere
+tareas anidadas:
+
+- `SpawnScope` deja de representarse como una tarea artificial. La IR abre un grupo con
+  `scope_begin`, baja el cuerpo en el CFG de la función y lo cierra con `scope_end`, por lo que
+  los `spawn` hijos quedan asociados al grupo real del runtime y se drenan antes de continuar;
+- los retornos explícitos dentro del ámbito cierran primero los grupos activos en la ruta de salida.
+  El emisor C declara los marcos de grupo por función y conserva el comportamiento cooperativo y
+  de `--native-threads` del runtime existente, incluida la cancelación propagada y el drenado;
+- `examples/native_ir_spawn_join.ostrin` añade un `spawn_scope` con hijo nativo, compara intérprete,
+  C cooperativo e hilos nativos, exige `ir-generated: 1`, y mantiene `ownership-ir unresolved-values: 0`
+  y `live_allocations=0`.
+
+La frontera sigue siendo deliberada: tareas anidadas dentro de callbacks nativos, scopes que
+escapan por formas de control no modeladas y la cancelación que requiere saltar una ABI de callback
+siguen en HIR/AST hasta que puedan expresar su cleanup estructurado sin perder ownership.
