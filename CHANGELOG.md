@@ -40,6 +40,14 @@
   no release or public download is claimed until a matching tag is actually published.
 - Expanded `std.strings` with cross-backend helpers for trimming, splitting, line extraction,
   blank checks and placeholder formatting, covered by the standard-library test program.
+- Added the embedded `std.json` module: a pure-Ostrin DOM with strict number/literal parsing,
+  duplicate-key rejection, UTF-16 surrogate decoding, deterministic serialization and explicit
+  rejection of `\\u0000`. The `json_library.ostrin` regression matches interpreter/native output
+  and ends with `live_allocations=0`.
+- Closed native ownership gaps exposed by the JSON block: parsed values transferred into recursive
+  lists, string concatenation consumed intermediate buffers, and `String.codepoint()` releases a
+  fresh receiver without releasing borrowed bindings. The standard-library suite now covers eight
+  tests and keeps the native leak report at zero.
 
 ### Language and libraries
 - Supported `spawn {}` blocks now lower through the native IR/C backend, including immutable

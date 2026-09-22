@@ -1,0 +1,10 @@
+import std.json
+
+fn main() -> Void {
+    source = "{\"name\":\"Ostrin\",\"items\":[true,null,3.5],\"unicode\":\"\\uD83D\\uDE00\"}"
+    value = json.parse(source).unwrap()
+    print(json.stringify(value))
+    print(json.as_text(json.object_get(value, "name").unwrap()).unwrap())
+    print(json.object_keys(value).unwrap())
+    print(json.stringify(json.array_value([json.number_value(1.0), json.bool_value(false)])))
+}

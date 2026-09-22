@@ -1079,6 +1079,9 @@ impl Checker {
         let (expected, result): (Vec<Ty>, Ty) = match method {
             "length" => (vec![], Ty::Int),
             "is_empty" => (vec![], Ty::Bool),
+            "char_at" => (vec![Ty::Int], Ty::String),
+            "slice" => (vec![Ty::Int, Ty::Int], Ty::String),
+            "codepoint" => (vec![], result_of(Ty::Int)),
             "trim" | "to_upper" | "to_lower" => (vec![], Ty::String),
             "contains" | "starts_with" | "ends_with" => (vec![Ty::String], Ty::Bool),
             "replace" => (vec![Ty::String, Ty::String], Ty::String),
@@ -4245,6 +4248,7 @@ fn check_builtin_call(
         "path_join" => vec![Ty::String, Ty::String],
         "cwd" => vec![],
         "file_exists" => vec![Ty::String],
+        "char_from_codepoint" => vec![Ty::Int],
         "hash" => vec![Ty::Unknown],
         "format" => vec![Ty::String, Ty::List(Box::new(Ty::String))],
         "select" => vec![Ty::Unknown],
@@ -4298,6 +4302,7 @@ fn check_builtin_call(
         "path_join" => Some(Ty::String),
         "cwd" => Some(Ty::String),
         "file_exists" => Some(Ty::Bool),
+        "char_from_codepoint" => Some(Ty::String),
         "hash" => {
             let supported = arg_types
                 .first()

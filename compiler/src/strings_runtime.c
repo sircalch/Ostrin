@@ -19,6 +19,81 @@ static int64_t ostrin_s_length(const char* s) {
     return n;
 }
 
+static size_t ostrin_s_utf8_width(unsigned char c) {
+    if ((c & 0x80) == 0) return 1;
+    if ((c & 0xE0) == 0xC0) return 2;
+    if ((c & 0xF0) == 0xE0) return 3;
+    if ((c & 0xF8) == 0xF0) return 4;
+    OSTRIN_FAIL("invalid UTF-8 string");
+}
+
+static size_t ostrin_s_byte_offset(const char* s, int64_t index) {
+    if (index < 0) OSTRIN_FAIL("string index out of bounds");
+    size_t offset = 0;
+    for (int64_t i = 0; i < index; i++) {
+        if (!s[offset]) OSTRIN_FAIL("string index out of bounds");
+        offset += ostrin_s_utf8_width((unsigned char)s[offset]);
+    }
+    return offset;
+}
+
+static const char* ostrin_s_char_at(const char* s, int64_t index) {
+    size_t start = ostrin_s_byte_offset(s, index);
+    if (!s[start]) OSTRIN_FAIL("string index out of bounds");
+    return ostrin_s_dup(s + start, ostrin_s_utf8_width((unsigned char)s[start]));
+}
+
+static const char* ostrin_s_slice(const char* s, int64_t start, int64_t end) {
+    if (end < start) OSTRIN_FAIL("string slice end precedes start");
+    size_t first = ostrin_s_byte_offset(s, start);
+    size_t last = ostrin_s_byte_offset(s, end);
+    return ostrin_s_dup(s + first, last - first);
+}
+
+static int64_t ostrin_s_codepoint(const char* s) {
+    if (!s || !s[0]) return -1;
+    size_t width = ostrin_s_utf8_width((unsigned char)s[0]);
+    if (s[width] != 0) return -1;
+    uint32_t code = 0;
+    if (width == 1) {
+        code = (unsigned char)s[0];
+    } else {
+        unsigned char first = (unsigned char)s[0];
+        code = first & ((1u << (8 - width - 1)) - 1u);
+        for (size_t i = 1; i < width; i++) {
+            unsigned char part = (unsigned char)s[i];
+            if ((part & 0xC0) != 0x80) return -1;
+            code = (code << 6) | (part & 0x3F);
+        }
+    }
+    if (code > 0x10FFFF || (code >= 0xD800 && code <= 0xDFFF)) return -1;
+    return (int64_t)code;
+}
+
+static const char* ostrin_s_from_codepoint(int64_t codepoint) {
+    if (codepoint < 0 || codepoint > 0x10FFFF || (codepoint >= 0xD800 && codepoint <= 0xDFFF)) {
+        OSTRIN_FAIL("invalid Unicode code point");
+    }
+    char bytes[4];
+    size_t n = 0;
+    if (codepoint <= 0x7F) {
+        bytes[n++] = (char)codepoint;
+    } else if (codepoint <= 0x7FF) {
+        bytes[n++] = (char)(0xC0 | (codepoint >> 6));
+        bytes[n++] = (char)(0x80 | (codepoint & 0x3F));
+    } else if (codepoint <= 0xFFFF) {
+        bytes[n++] = (char)(0xE0 | (codepoint >> 12));
+        bytes[n++] = (char)(0x80 | ((codepoint >> 6) & 0x3F));
+        bytes[n++] = (char)(0x80 | (codepoint & 0x3F));
+    } else {
+        bytes[n++] = (char)(0xF0 | (codepoint >> 18));
+        bytes[n++] = (char)(0x80 | ((codepoint >> 12) & 0x3F));
+        bytes[n++] = (char)(0x80 | ((codepoint >> 6) & 0x3F));
+        bytes[n++] = (char)(0x80 | (codepoint & 0x3F));
+    }
+    return ostrin_s_dup(bytes, n);
+}
+
 static const char* ostrin_s_trim(const char* s) {
     while (*s && ostrin_s_space(*s)) s++;
     size_t n = strlen(s);

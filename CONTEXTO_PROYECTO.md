@@ -5913,6 +5913,30 @@ La biblioteca estándar amplía su superficie de texto sin añadir una segunda s
 - `format_text` expone el formateador de placeholders existente con un nombre de módulo estable,
   conservando el contrato `String + List<String> -> String`.
 
-`examples/std_tests.ostrin` cubre las cinco funciones y `examples/std_library.ostrin` las muestra
-en la comparación intérprete↔nativo. El caso nativo conserva `live_allocations=0`, y el playground
-reutiliza el mismo programa source-backed; JSON y red siguen explícitamente fuera de esta entrega.
+`examples/std_tests.ostrin` cubre las funciones y `examples/std_library.ostrin` las muestra en la
+comparación intérprete↔nativo. El caso nativo conserva `live_allocations=0`, y el playground
+reutiliza el mismo programa source-backed; la red sigue explícitamente fuera de esa entrega.
+
+## 239. `std.json` y cierre de ownership en texto — 2026-09-21
+
+La biblioteca estándar incorpora ahora un módulo JSON real, escrito en Ostrin y compartido por el
+intérprete y el backend nativo:
+
+- `std.json` define `Kind` y `Value` como un DOM con valores nulos, booleanos, números, texto,
+  arrays y objetos. Expone constructores, accesores, `object_get`/`object_keys`, `parse` y
+  `stringify`, sin introducir una representación privada distinta para cada backend;
+- el parser valida la gramática de números, literales, separadores, claves duplicadas, escapes y
+  pares sustitutos UTF-16. Convierte los pares a UTF-8 y rechaza `\\u0000`, porque el `String`
+  actual no representa NUL embebido. La serialización es determinista y conserva el orden de las
+  claves recibidas;
+- la primera prueba nativa reveló y permitió cerrar tres transferencias: un `Value` recién
+  parseado debe ceder su referencia al `List<Value>`, las concatenaciones intermedias no deben
+  dejar buffers vivos y `String.codepoint()` debe liberar sólo receptores frescos, no bindings
+  prestados. El arreglo queda cubierto por `--leak-check` y por la prueba de `std.strings`;
+- `examples/std_tests.ostrin` pasa ocho pruebas, `examples/std_library.ostrin` incluye JSON y
+  `json_library.ostrin` compara cuatro líneas exactas entre intérprete y nativo. Ambos ejecutables
+  nativos terminan con `live_allocations=0`; `website/playground.js` reutiliza la fuente validada.
+
+La red y un registro remoto de paquetes siguen fuera de este bloque. El siguiente avance debe
+conservar la misma regla: cada superficie nueva entra con programa ejecutable, paridad de backend,
+prueba negativa cuando corresponda, documentación y publicación sincronizada.

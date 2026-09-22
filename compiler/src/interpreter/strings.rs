@@ -34,6 +34,40 @@ pub fn call_method(text: &str, method: &str, args: &[Value]) -> Option<Result<Va
         match (method, args.len()) {
             ("length", 0) => Ok(Value::Int(text.chars().count() as i64)),
             ("is_empty", 0) => Ok(Value::Bool(text.is_empty())),
+            ("char_at", 1) => {
+                let Value::Int(index) = args[0] else {
+                    return fail("'char_at' expects an Int index");
+                };
+                if index < 0 {
+                    return fail(format!("'char_at' index out of bounds: {index}"));
+                }
+                text.chars()
+                    .nth(index as usize)
+                    .map(|ch| Value::String(ch.to_string()))
+                    .ok_or_else(|| RuntimeError::Error(format!("'char_at' index out of bounds: {index}")))
+            }
+            ("slice", 2) => {
+                let (Value::Int(start), Value::Int(end)) = (&args[0], &args[1]) else {
+                    return fail("'slice' expects two Int indices");
+                };
+                let length = text.chars().count() as i64;
+                if *start < 0 || *end < *start || *end > length {
+                    return fail(format!("'slice' range out of bounds: {start} until {end}"));
+                }
+                Ok(Value::String(
+                    text.chars().skip(*start as usize).take((*end - *start) as usize).collect(),
+                ))
+            }
+            ("codepoint", 0) => {
+                let mut chars = text.chars();
+                let Some(ch) = chars.next() else {
+                    return Ok(err_value(Value::String("codepoint expects exactly one character".to_string())));
+                };
+                if chars.next().is_some() {
+                    return Ok(err_value(Value::String("codepoint expects exactly one character".to_string())));
+                }
+                Ok(ok_value(Value::Int(ch as i64)))
+            }
             ("trim", 0) => Ok(Value::String(text.trim_matches(is_space).to_string())),
             ("to_upper", 0) => Ok(Value::String(text.to_ascii_uppercase())),
             ("to_lower", 0) => Ok(Value::String(text.to_ascii_lowercase())),
@@ -72,7 +106,7 @@ pub fn call_method(text: &str, method: &str, args: &[Value]) -> Option<Result<Va
 }
 
 pub const STRING_METHODS: &[&str] = &[
-    "length", "is_empty", "trim", "to_upper", "to_lower", "contains", "starts_with", "ends_with", "replace", "split", "lines", "to_int", "to_float",
+    "length", "is_empty", "char_at", "slice", "codepoint", "trim", "to_upper", "to_lower", "contains", "starts_with", "ends_with", "replace", "split", "lines", "to_int", "to_float",
 ];
 
 /// `list.join(separator)` for a list of strings.

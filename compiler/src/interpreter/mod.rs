@@ -2430,6 +2430,13 @@ impl Interpreter {
                     };
                     return Ok(Value::Bool(std::path::Path::new(&path).is_file()));
                 }
+                "char_from_codepoint" => {
+                    let codepoint = as_i64(&self.eval_arg(&args[0], env)?)?;
+                    let Some(ch) = char::from_u32(codepoint as u32) else {
+                        return Err(RuntimeError::Error(format!("invalid Unicode code point: {codepoint}")));
+                    };
+                    return Ok(Value::String(ch.to_string()));
+                }
                 "hash" => {
                     let value = self.eval_arg(&args[0], env)?;
                     let hash = self.hash_value(&value).ok_or_else(|| {

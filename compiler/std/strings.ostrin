@@ -56,3 +56,11 @@ pub fn is_blank(text: String) -> Bool {
 pub fn format_text(template: String, values: List<String>) -> String {
     format(template, values)
 }
+
+pub fn char_at(text: String, index: Int) -> String {
+    text.char_at(index)
+}
+
+pub fn slice(text: String, start: Int, end: Int) -> String {
+    text.slice(start, end)
+}

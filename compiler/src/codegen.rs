@@ -5203,13 +5203,29 @@ impl<'a> Codegen<'a> {
     }
 
     /// Methods of `String` (see `strings_runtime.c`).
-    fn gen_string_method(&mut self, s: &str, method: &str, args: &[Arg]) -> Result<(String, CType), String> {
+    fn gen_string_method(&mut self, s: &str, method: &str, args: &[Arg], owned_receiver: bool) -> Result<(String, CType), String> {
         let (codes, types) = self.gen_args(args)?;
         let bad = || format!("String method '{method}' was called with arguments of the wrong number or type");
         let strings = |n: usize| types.len() == n && types.iter().all(|t| *t == CType::Str);
         match method {
             "length" if strings(0) => Ok((format!("ostrin_s_length({s})"), CType::Int)),
             "is_empty" if strings(0) => Ok((format!("(*({s}) == 0)"), CType::Bool)),
+            "char_at" if types.len() == 1 && types[0] == CType::Int => Ok((format!("ostrin_s_char_at({s}, {})", codes[0]), CType::Str)),
+            "slice" if types.len() == 2 && types.iter().all(|t| *t == CType::Int) => Ok((format!("ostrin_s_slice({s}, {}, {})", codes[0], codes[1]), CType::Str)),
+            "codepoint" if strings(0) => {
+                let ty = CType::Result(Box::new(CType::Int), Box::new(CType::Str));
+                self.register_list_types(&ty);
+                let result = self.next_temp();
+                let point = self.next_temp();
+                let receiver = self.next_temp();
+                let release = owned_receiver.then(|| format!("ostrin_release_owned((void*){receiver}); ")).unwrap_or_default();
+                Ok((
+                    format!(
+                        "({{ const char* {receiver} = {s}; Result_Int_String {result}; memset(&{result}, 0, sizeof {result}); int64_t {point} = ostrin_s_codepoint({receiver}); if ({point} < 0) {{ {result}.error = \"codepoint expects exactly one character\"; }} else {{ {result}.ok = true; {result}.value = {point}; }} {release}{result}; }})"
+                    ),
+                    ty,
+                ))
+            }
             "trim" if strings(0) => Ok((format!("ostrin_s_trim({s})"), CType::Str)),
             "to_upper" if strings(0) => Ok((format!("ostrin_s_upper({s})"), CType::Str)),
             "to_lower" if strings(0) => Ok((format!("ostrin_s_lower({s})"), CType::Str)),
@@ -5252,7 +5268,7 @@ impl<'a> Codegen<'a> {
                     ty,
                 ))
             }
-            "length" | "is_empty" | "trim" | "to_upper" | "to_lower" | "contains" | "starts_with" | "ends_with" | "replace" | "split" | "lines" | "to_int" | "to_float" => Err(bad()),
+            "length" | "is_empty" | "char_at" | "slice" | "codepoint" | "trim" | "to_upper" | "to_lower" | "contains" | "starts_with" | "ends_with" | "replace" | "split" | "lines" | "to_int" | "to_float" => Err(bad()),
             other => Err(format!("String has no method '{other}' the native backend supports")),
         }
     }
@@ -5281,7 +5297,8 @@ impl<'a> Codegen<'a> {
             }
         }
         if obj_ty == CType::Str && method_name != "to_string" {
-            return self.gen_string_method(&obj_code, method_name, args);
+            let borrowed_receiver = matches!(obj.unlocated(), Expr::Ident(_) | Expr::FieldAccess(..) | Expr::Index(..));
+            return self.gen_string_method(&obj_code, method_name, args, !borrowed_receiver);
         }
         if matches!(&obj_ty, CType::List(e) if **e == CType::Str) && method_name == "join" {
             let (codes, types) = self.gen_args(args)?;
@@ -5944,6 +5961,7 @@ impl<'a> Codegen<'a> {
             "path_join" => 2,
             "cwd" => 0,
             "file_exists" | "hash" => 1,
+            "char_from_codepoint" => 1,
             "select" => 1,
             "format" => 2,
             "clone" | "drop" => 1,
@@ -6014,6 +6032,7 @@ impl<'a> Codegen<'a> {
             ))),
             "cwd" => Ok(Some(("ostrin_cwd()".to_string(), CType::Str))),
             "file_exists" => Ok(Some((format!("ostrin_file_exists({})", codes[0]), CType::Bool))),
+            "char_from_codepoint" => Ok(Some((format!("ostrin_s_from_codepoint({})", codes[0]), CType::Str))),
             "hash" => {
                 let hash = self.hash_expr(&codes[0], &types[0]).ok_or_else(|| {
                     "'hash' supports scalar values, hashable Option/Result/collection values, or records/enums with derive(Hash)".to_string()

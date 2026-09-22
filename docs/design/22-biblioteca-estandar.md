@@ -2,15 +2,16 @@
 
 La biblioteca estándar está escrita en Ostrin, embebida en el compilador (`compiler/std/*.ostrin`)
 y se importa como cualquier módulo: `import std.math`, `import std.lists`, `import std.strings`,
-`import std.time`.
+`import std.time`, `import std.json`.
 Compila por los dos backends (intérprete y nativo) sin código especial.
 
 | Módulo | Funciones |
 |---|---|
 | `std.math` | `min`, `max`, `clamp` (genéricas, `T: Ord`), `sign`, `gcd`, `lcm`, `pow_int` |
 | `std.lists` | `contains`, `index_of`, `reversed`, `take`, `drop_first`, `concat`, `repeat`, `range_list`, `max_of`, `min_of`, `sorted` (estable) |
-| `std.strings` | `repeat`, `pad_left`, `pad_right`, `count_of`, `join_with`, `trim`, `split`, `lines`, `is_blank`, `format_text` |
+| `std.strings` | `repeat`, `pad_left`, `pad_right`, `count_of`, `join_with`, `trim`, `split`, `lines`, `is_blank`, `format_text`, `char_at`, `slice`, `codepoint` |
 | `std.time` | `Date`, `date`, `is_leap_year`, `days_in_year`, `days_in_month`, `is_valid`, `day_of_year`, `day_of_week`, `from_day_of_year`, `iso`, `parse_iso` |
+| `std.json` | `Kind`, `Value`, `null_value`, `bool_value`, `number_value`, `text_value`, `array_value`, `object_value`, `kind`, `as_bool`, `as_number`, `as_text`, `array_items`, `object_keys`, `object_get`, `parse`, `stringify` |
 
 Decisiones:
 
@@ -24,6 +25,10 @@ Decisiones:
   ni la zona horaria del sistema; `Date` se valida antes de calcular ordinales, día de semana o ISO.
 - **Parseo explícito.** `parse_iso` acepta exactamente `YYYY-MM-DD` y devuelve `Result<Date, String>`;
   no intenta adivinar formatos locales ni convertir zonas horarias.
+- **JSON determinista y portable.** `std.json` implementa el DOM, parseo estricto y serialización
+  estable en Ostrin; rechaza claves duplicadas, números inválidos y escapes Unicode mal formados.
+  Los pares sustitutos UTF-16 se convierten a UTF-8. `\u0000` se rechaza porque el `String` actual
+  no representa NUL embebido.
 - **Un módulo `std` local o una dependencia llamada `std` tiene prioridad** sobre la biblioteca
   embebida (el `ostrin.toml` del proyecto manda).
 - Las pruebas de la propia biblioteca están en Ostrin (`examples/std_tests.ostrin`, `--test`).

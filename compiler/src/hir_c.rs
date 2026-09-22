@@ -356,6 +356,16 @@ impl Emitter<'_> {
             }
             self.cleanup(out, transfer.as_deref());
             out.push_str(&format!("    return {temp};\n"));
+        } else if *ty != Ty::Void
+            && (!self.owned_locals.is_empty() || self.owned_block_locals.iter().any(|frame| !frame.is_empty()))
+        {
+            // Evaluate wrapper returns before releasing managed locals. A
+            // by-value Result/Option may still contain a managed pointer.
+            let cty = self.c_type(ty)?;
+            let temp = self.next_temp();
+            out.push_str(&format!("    {cty} {temp} = {code};\n"));
+            self.cleanup(out, None);
+            out.push_str(&format!("    return {temp};\n"));
         } else {
             self.cleanup(out, None);
             out.push_str(&format!("    return {code};\n"));
@@ -1253,7 +1263,14 @@ impl Emitter<'_> {
             return Err(());
         }
         let value = self.expr(&args[0].value)?;
-        Ok(format!("(({container}){{ {flag}, .{field} = {value} }})"))
+        if self.managed(&expected) && Self::borrowed_expr(&args[0].value) {
+            let temp = self.next_temp();
+            Ok(format!(
+                "({{ {container} {temp} = (({container}){{ {flag}, .{field} = {value} }}); ostrin_retain((void*){temp}.{field}); {temp}; }})"
+            ))
+        } else {
+            Ok(format!("(({container}){{ {flag}, .{field} = {value} }})"))
+        }
     }
 
     fn option_method(

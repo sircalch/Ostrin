@@ -1,0 +1,523 @@
+// std.json: deterministic JSON values, parser and serializer.
+//
+// The DOM is deliberately expressed in Ostrin itself. Arrays are stored as a
+// recursive List<Value>, while objects keep parallel key/value lists so the
+// representation remains available to both the interpreter and native C
+// backend without a second hidden runtime type.
+
+pub enum Kind {
+    Null
+    Bool
+    Number
+    Text
+    Array
+    Object
+}
+
+pub record Value {
+    kind: Kind
+    text: String
+    number: Float
+    flag: Bool
+    items: List<Value>
+    keys: List<String>
+}
+
+record Parser {
+    text: String
+    mut scratch: String
+    mut pos: Int
+}
+
+fn empty_values() -> List<Value> {
+    mut values: List<Value> = []
+    values
+}
+
+fn empty_keys() -> List<String> {
+    mut keys: List<String> = []
+    keys
+}
+
+fn is_digit(ch: String) -> Bool {
+    ch >= "0" and ch <= "9"
+}
+
+fn char_is(text: String, index: Int, expected: String) -> Bool {
+    ch = text.char_at(index)
+    ch == expected
+}
+
+fn append_text(out: String, part: String) -> String {
+    result = out + part
+    drop(out)
+    result
+}
+
+fn append_value(values: List<Value>, value: Value) -> Void {
+    mut list = values
+    list.push(value)
+    drop(value)
+}
+
+pub fn null_value() -> Value {
+    mut items = empty_values()
+    mut keys = empty_keys()
+    Value { kind: Null, text: "", number: 0.0, flag: false, items: items, keys: keys }
+}
+
+pub fn bool_value(value: Bool) -> Value {
+    mut items = empty_values()
+    mut keys = empty_keys()
+    Value { kind: Bool, text: "", number: 0.0, flag: value, items: items, keys: keys }
+}
+
+pub fn number_value(value: Float) -> Value {
+    mut items = empty_values()
+    mut keys = empty_keys()
+    Value { kind: Number, text: "", number: value, flag: false, items: items, keys: keys }
+}
+
+pub fn text_value(value: String) -> Value {
+    mut items = empty_values()
+    mut keys = empty_keys()
+    Value { kind: Text, text: value, number: 0.0, flag: false, items: items, keys: keys }
+}
+
+pub fn array_value(values: List<Value>) -> Value {
+    mut keys = empty_keys()
+    Value { kind: Array, text: "", number: 0.0, flag: false, items: values, keys: keys }
+}
+
+pub fn object_value(keys: List<String>, values: List<Value>) -> Result<Value, String> {
+    if keys.length() != values.length() {
+        return Err("JSON object needs one value for every key" )
+    }
+    mut i = 0
+    while i < keys.length() {
+        mut j = i + 1
+        while j < keys.length() {
+            if keys[i] == keys[j] {
+                return Err("JSON object contains a duplicate key")
+            }
+            j = j + 1
+        }
+        i = i + 1
+    }
+    Ok(Value { kind: Object, text: "", number: 0.0, flag: false, items: values, keys: keys })
+}
+
+pub fn kind(value: Value) -> Kind {
+    value.kind
+}
+
+pub fn as_bool(value: Value) -> Option<Bool> {
+    match value.kind {
+        Bool => Some(value.flag),
+        _ => None,
+    }
+}
+
+pub fn as_number(value: Value) -> Option<Float> {
+    match value.kind {
+        Number => Some(value.number),
+        _ => None,
+    }
+}
+
+pub fn as_text(value: Value) -> Option<String> {
+    match value.kind {
+        Text => Some(value.text),
+        _ => None,
+    }
+}
+
+pub fn array_items(value: Value) -> Option<List<Value>> {
+    match value.kind {
+        Array => Some(value.items),
+        _ => None,
+    }
+}
+
+pub fn object_keys(value: Value) -> Option<List<String>> {
+    match value.kind {
+        Object => Some(value.keys),
+        _ => None,
+    }
+}
+
+pub fn object_get(value: Value, key: String) -> Option<Value> {
+    is_object = match value.kind {
+        Object => true,
+        _ => false,
+    }
+    if not is_object { return None }
+    mut i = 0
+    while i < value.keys.length() {
+        if value.keys[i] == key {
+            return Some(value.items[i])
+        }
+        i = i + 1
+    }
+    None
+}
+
+impl Parser {
+    fn peek(self) -> String {
+        if self.pos >= self.text.length() {
+            ""
+        } else {
+            self.text.char_at(self.pos)
+        }
+    }
+
+    fn consume(mut self) -> String {
+        if self.pos >= self.text.length() {
+            return ""
+        }
+        ch = self.text.char_at(self.pos)
+        self.pos = self.pos + 1
+        ch
+    }
+
+    fn peek_is(self, expected: String) -> Bool {
+        ch = self.peek()
+        ch == expected
+    }
+
+    fn consume_is(mut self, expected: String) -> Bool {
+        ch = self.consume()
+        ch == expected
+    }
+
+    fn peek_digit(self) -> Bool {
+        ch = self.peek()
+        is_digit(ch)
+    }
+
+    fn skip_ws(mut self) -> Void {
+        while self.pos < self.text.length() {
+            ch = self.peek()
+            if ch == " " or ch == "\n" or ch == "\r" or ch == "\t" {
+                self.pos = self.pos + 1
+            } else {
+                break
+            }
+        }
+    }
+
+    fn literal(mut self, expected: String) -> Result<Int, String> {
+        mut i = 0
+        while i < expected.length() {
+            got = self.consume()
+            if not char_is(expected, i, got) {
+                return Err("invalid JSON literal")
+            }
+            i = i + 1
+        }
+        Ok(0)
+    }
+
+    fn parse_hex4(mut self) -> Result<Int, String> {
+        mut value = 0
+        mut i = 0
+        while i < 4 {
+            ch = self.consume()
+            mut digit = 0
+            if ch >= "0" and ch <= "9" {
+                digit = ch.to_int().unwrap()
+            } else if ch == "a" or ch == "A" {
+                digit = 10
+            } else if ch == "b" or ch == "B" {
+                digit = 11
+            } else if ch == "c" or ch == "C" {
+                digit = 12
+            } else if ch == "d" or ch == "D" {
+                digit = 13
+            } else if ch == "e" or ch == "E" {
+                digit = 14
+            } else if ch == "f" or ch == "F" {
+                digit = 15
+            } else {
+                return Err("invalid JSON Unicode escape")
+            }
+            value = value * 16 + digit
+            i = i + 1
+        }
+        Ok(value)
+    }
+
+    fn parse_string(mut self) -> Result<Int, String> {
+        if not self.consume_is("\"") {
+            return Err("expected JSON string")
+        }
+        mut out = ""
+        while self.pos < self.text.length() {
+            ch = self.consume()
+            if ch == "\"" {
+                self.scratch = out
+                return Ok(0)
+            }
+            if ch == "\\" {
+                escape = self.consume()
+                if escape == "\"" or escape == "\\" or escape == "/" {
+                    out = append_text(out, escape)
+                } else if escape == "b" {
+                    out = append_text(out, "\u{8}")
+                } else if escape == "f" {
+                    out = append_text(out, "\u{12}")
+                } else if escape == "n" {
+                    out = append_text(out, "\n")
+                } else if escape == "r" {
+                    out = append_text(out, "\r")
+                } else if escape == "t" {
+                    out = append_text(out, "\t")
+                } else if escape == "u" {
+                    first = try self.parse_hex4()
+                    if first == 0 {
+                        return Err("JSON \\u0000 is not representable by Ostrin String")
+                    }
+                    mut code = first
+                    if first >= 55296 and first <= 56319 {
+                        if not self.consume_is("\\") or not self.consume_is("u") {
+                            return Err("high JSON surrogate must be followed by a low surrogate")
+                        }
+                        second = try self.parse_hex4()
+                        if second < 56320 or second > 57343 {
+                            return Err("invalid JSON surrogate pair")
+                        }
+                        code = 65536 + (first - 55296) * 1024 + second - 56320
+                    } else if first >= 56320 and first <= 57343 {
+                        return Err("unexpected JSON low surrogate")
+                    }
+                    decoded = char_from_codepoint(code)
+                    out = append_text(out, decoded)
+                } else {
+                    return Err("invalid JSON string escape")
+                }
+            } else if ch == "\n" or ch == "\r" or ch == "\t" or ch == "\u{8}" or ch == "\u{12}" {
+                return Err("JSON strings cannot contain raw control characters")
+            } else {
+                out = append_text(out, ch)
+            }
+        }
+        Err("unterminated JSON string")
+    }
+
+    fn parse_number(mut self) -> Result<Value, String> {
+        start = self.pos
+        if self.peek_is("-") {
+            self.pos = self.pos + 1
+        }
+        if self.peek_is("0") {
+            self.pos = self.pos + 1
+            if self.peek_digit() {
+                return Err("JSON numbers cannot have a leading zero")
+            }
+        } else {
+            ch = self.peek()
+            if ch < "1" or ch > "9" {
+                return Err("invalid JSON number")
+            }
+            while self.peek_digit() {
+                self.pos = self.pos + 1
+            }
+        }
+        if self.peek_is(".") {
+            self.pos = self.pos + 1
+            if not self.peek_digit() {
+                return Err("JSON fraction needs at least one digit")
+            }
+            while self.peek_digit() {
+                self.pos = self.pos + 1
+            }
+        }
+        if self.peek_is("e") or self.peek_is("E") {
+            self.pos = self.pos + 1
+            if self.peek_is("+") or self.peek_is("-") {
+                self.pos = self.pos + 1
+            }
+            if not self.peek_digit() {
+                return Err("JSON exponent needs at least one digit")
+            }
+            while self.peek_digit() {
+                self.pos = self.pos + 1
+            }
+        }
+        literal = self.text.slice(start, self.pos)
+        parsed = literal.to_float()
+        if parsed.is_err() {
+            Err("invalid JSON number")
+        } else {
+            Ok(number_value(parsed.unwrap()))
+        }
+    }
+
+    fn parse_array(mut self) -> Result<Value, String> {
+        self.pos = self.pos + 1
+        mut values: List<Value> = []
+        self.skip_ws()
+        if self.peek_is("]") {
+            self.pos = self.pos + 1
+            return Ok(array_value(values))
+        }
+        while true {
+            append_value(values, try self.parse_value())
+            self.skip_ws()
+            delimiter = self.consume()
+            if delimiter == "]" {
+                return Ok(array_value(values))
+            }
+            if delimiter != "," {
+                return Err("expected ',' or ']' in JSON array")
+            }
+            self.skip_ws()
+            if self.peek_is("]") {
+                return Err("JSON arrays cannot have a trailing comma")
+            }
+        }
+        Err("unterminated JSON array")
+    }
+
+    fn parse_object(mut self) -> Result<Value, String> {
+        self.pos = self.pos + 1
+        mut keys: List<String> = []
+        mut values: List<Value> = []
+        self.skip_ws()
+        if self.peek_is("}") {
+            self.pos = self.pos + 1
+            return object_value(keys, values)
+        }
+        while true {
+            if not self.peek_is("\"") {
+                return Err("JSON object keys must be strings")
+            }
+            ignored = try self.parse_string()
+            keys.push(self.scratch)
+            self.skip_ws()
+            if not self.consume_is(":") {
+                return Err("expected ':' after JSON object key")
+            }
+            append_value(values, try self.parse_value())
+            self.skip_ws()
+            delimiter = self.consume()
+            if delimiter == "}" {
+                return object_value(keys, values)
+            }
+            if delimiter != "," {
+                return Err("expected ',' or '}' in JSON object")
+            }
+            self.skip_ws()
+            if self.peek_is("}") {
+                return Err("JSON objects cannot have a trailing comma")
+            }
+        }
+        Err("unterminated JSON object")
+    }
+
+    fn parse_value(mut self) -> Result<Value, String> {
+        self.skip_ws()
+        ch = self.peek()
+        if ch == "n" {
+            ignored = try self.literal("null")
+            return Ok(null_value())
+        }
+        if ch == "t" {
+            ignored = try self.literal("true")
+            return Ok(bool_value(true))
+        }
+        if ch == "f" {
+            ignored = try self.literal("false")
+            return Ok(bool_value(false))
+        }
+        if ch == "\"" {
+            ignored = try self.parse_string()
+            return Ok(text_value(self.scratch))
+        }
+        if ch == "[" {
+            return self.parse_array()
+        }
+        if ch == "{" {
+            return self.parse_object()
+        }
+        self.parse_number()
+    }
+}
+
+pub fn parse(text: String) -> Result<Value, String> {
+    mut parser = Parser { text: text, scratch: "", pos: 0 }
+    value = try parser.parse_value()
+    parser.skip_ws()
+    if parser.pos != parser.text.length() {
+        return Err("unexpected trailing data after JSON value")
+    }
+    Ok(value)
+}
+
+fn quote_string(text: String) -> String {
+    mut out = "\""
+    mut i = 0
+    while i < text.length() {
+        ch = text.char_at(i)
+        if ch == "\"" {
+            out = append_text(out, "\\\"")
+        } else if ch == "\\" {
+            out = append_text(out, "\\\\")
+        } else if ch == "\u{8}" {
+            out = append_text(out, "\\b")
+        } else if ch == "\u{12}" {
+            out = append_text(out, "\\f")
+        } else if ch == "\n" {
+            out = append_text(out, "\\n")
+        } else if ch == "\r" {
+            out = append_text(out, "\\r")
+        } else if ch == "\t" {
+            out = append_text(out, "\\t")
+        } else {
+            out = append_text(out, ch)
+        }
+        i = i + 1
+    }
+    out + "\""
+}
+
+fn render(value: Value) -> String {
+    match value.kind {
+        Null => "null",
+        Bool => if value.flag { "true" } else { "false" },
+        Number => value.number.to_string(),
+        Text => quote_string(value.text),
+        Array => {
+            mut out = "["
+            mut i = 0
+            while i < value.items.length() {
+                if i > 0 { out = append_text(out, ",") }
+                child = render(value.items[i])
+                out = append_text(out, child)
+                drop(child)
+                i = i + 1
+            }
+            out + "]"
+        },
+        Object => {
+            mut out = "{"
+            mut i = 0
+            while i < value.keys.length() {
+                if i > 0 { out = append_text(out, ",") }
+                key = quote_string(value.keys[i])
+                child = render(value.items[i])
+                out = append_text(out, key)
+                out = append_text(out, ":")
+                out = append_text(out, child)
+                drop(key)
+                drop(child)
+                i = i + 1
+            }
+            out + "}"
+        },
+    }
+}
+
+pub fn stringify(value: Value) -> String {
+    render(value)
+}

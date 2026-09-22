@@ -284,6 +284,7 @@ fn main() -> Void {
 import std.lists
 import std.strings
 import std.time
+import std.json
 
 fn main() -> Void {
     print(math.min(3, 9))
@@ -310,9 +311,17 @@ fn main() -> Void {
     print(strings.lines("a\nb"))
     print(strings.is_blank("   "))
     print(strings.format_text("{} + {} = {}", ["2", "3", "5"]))
+    print(strings.char_at("Ostrin", 1))
+    print(strings.slice("Ostrin", 1, 4))
+    print(strings.char_at("Ostrin", 1).codepoint().unwrap())
+    letter = strings.char_at("Ostrin", 1)
+    print(letter.codepoint().unwrap())
     print(time.iso(time.date(2024, 2, 29)))
     print(time.day_of_week(time.date(2024, 1, 1)))
     print(time.parse_iso("2024-02-29").unwrap().day)
+    json_value = json.parse("{\"ok\":true,\"items\":[1,2]}").unwrap()
+    print(json.stringify(json_value))
+    print(json.object_keys(json_value).unwrap())
 }
 ` },
   records: { code: `enum Inner {

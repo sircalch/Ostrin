@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-21 · rama `main` · 6 pruebas diferenciales, 186 de integración y 2 unitarias en verde.*
+*Corte: 2026-09-21 · rama `main` · 6 pruebas diferenciales, 187 de integración y 2 unitarias en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
 Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–238); para el diseño
@@ -100,7 +100,9 @@ orden de inserción.
 `Map` (`get/set/remove/contains_key/count/keys/values`), `Set`, `Option`, `Result`.
 `hash` ofrece hashes estables para escalares, `Option`/`Result`, colecciones y
 records/enums con `derive(Hash)` cuyos campos sean recursivamente hashables, con
-paridad entre intérprete y nativo; funciones, arrays, canales y tareas siguen fuera.
+paridad entre intérprete y nativo; `std.json` añade un DOM, parseo estricto y serialización
+portable con soporte para pares sustitutos UTF-16 y rechazo explícito de `\\u0000`; funciones,
+arrays, canales y tareas siguen fuera.
 
 **Diagnósticos**: códigos `OSTRIN-Exxxx` con ubicación; salida JSON Lines para editores.
 
@@ -221,7 +223,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Memoria en nativo | Registro, destructores tipados para records/colecciones y entornos de tareas, `clone`/`drop`, cleanup automático de locales directos, bloques anidados, ramas, loops y cancelación de tareas en AST/HIR, y `--leak-check`; `String`, `String.split/lines`, `Result<Int, String>`, `Result<Float, String>`, records concretos, canales, `Option<Record>`, listas escalares/String, mapas/conjuntos escalares, wrappers sobre `List`/`Map`/`Set` y wrappers `Option`/`Result` anidados ya consumen ownership desde IR; el fallback AST ahora materializa y libera temporales gestionados de argumentos/`print` y campos de registros, pero consumidores complejos y escapes siguen pendientes |
 | IR de bloques | HIR→CFG disponible con `--ir`; el emisor C cubre ramas, bucles escalares con `phi`, rangos enteros direccionales (`to`/`until`, pasos y `break`/`continue`), `String` (incluidos `split/lines`), `Result` escalar de parseo con `match`/consultas, `try`, `try catch` inline, handlers globales y aliases locales de handlers globales, `map`/`map_err`/`then` de `Result`, `Option.map`/`then` escalar/String, records concretos con campos anidados, iteradores de records concretos cuyo elemento sea un payload soportado y cuyo `next` esté registrado, canales con `send`/`close`/`receive` y `for` sobre `Option<T>`, `select(List<Channel<T>>)` sobre payloads soportados, `spawn {}` con CFG soportado, capturas inmutables, `Task.join()`, `Task.cancel()` y `yield()`, listas escalares/String, operaciones hash escalares, wrappers de una capa sobre `List`/`Map`/`Set` y wrappers `Option`/`Result` anidados con `match`; iteradores genéricos/indirectos, tareas anidadas o scopes, llamadas indirectas, handlers locales/closures no lineales y consumidores complejos aún no reemplazan el backend C completo |
 | Ownership/último uso | `--ownership-report`, `--ownership-check` y `--ownership-ir`; la IR ya inserta y consume retain/release lineal para `String`, `Result` con payload `String`, records concretos, `Option<Record>`, listas escalares/String, mapas/conjuntos escalares y `Option<String>`, con transferencia en `Phi` simples y liberación de `Phi` de bucle en backedges probados; los entornos de tareas retienen también cada `Channel<T>` capturado, los buffers temporales de `split/lines` transfieren y liberan sus strings, y `Result` libera condicionalmente `value`/`error`; la ruta AST conserva la misma regla para temporales frescos en llamadas genéricas, `print` y acceso a campos; `Option` escalar es por valor, mientras llamadas transferentes no lineales, agregados complejos, scopes y escapes siguen conservadores |
-| Biblioteca estándar | Incluye `std.math`, `std.lists`, `std.strings` (incluidos `trim`, `split`, `lines`, `is_blank` y `format_text`) y `std.time` (calendario gregoriano determinista, validación, ordinales, día de semana, ISO y `Result` de parseo); siguen faltando JSON y red |
+| Biblioteca estándar | Incluye `std.math`, `std.lists`, `std.strings` (incluidos `trim`, `split`, `lines`, `is_blank`, `format_text`, `char_at`, `slice` y `codepoint`), `std.time` (calendario gregoriano determinista, validación, ordinales, día de semana, ISO y `Result` de parseo) y `std.json` (DOM, parser/serializer estricto y Unicode); red sigue pendiente |
 | Mensajes de error de E/S | `strerror` ≠ texto de Rust (difieren entre backends) |
 | `Result<Void,E>` | Campo de valor de relleno (`char`) en C |
 | Migración HIR | Escalares, records, enums/match, Option/Result, colecciones, cierres, instancias concretas de genéricos, llamadas anidadas, records/enums genéricos aplicados y métodos genéricos centrales migrados; formas complejas restantes siguen con fallback |
@@ -272,7 +274,8 @@ E/S externa bloqueante y completar la administración de recursos del runtime.
 ### C. Biblioteca estándar y ecosistema
 Cadenas (split/trim/format), fechas, JSON, argumentos y entorno, `HashMap` real,
 formateo de floats configurable; un `std` en Ostrin propio compilable por ambos backends.
-Después: paquetes con registro (con consentimiento explícito del usuario para la red).
+El bloque JSON ya está implementado y verificado; después: red y paquetes con registro (con
+consentimiento explícito del usuario para la red).
 
 ### D. Experiencia de desarrollador
 Formateador oficial (`ostrinc fmt`), `ostrinc test`, documentación generada, acciones de
