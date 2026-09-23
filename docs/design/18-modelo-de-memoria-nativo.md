@@ -79,7 +79,9 @@ con entorno siguen pendientes.
   error de compilación. Un análisis de flujo sobre el CFG alcanzable converge en loops, combina
   conservadoramente los caminos que se juntan y comprueba los operandos `Phi` en su arista de
   entrada seleccionada. La clasificación distingue records/enums con estado mutable, mientras que
-  records inmutables se pueden compartir; las guardas dinámicas quedan como red de seguridad.
+  records inmutables se pueden compartir; las guardas dinámicas quedan como red de seguridad y
+  el estado de movimiento vive exactamente tanto como el allocation gestionado para que una
+  dirección reciclada no herede el movimiento de un objeto destruido.
 - **Arrays científicos** (documento 19) usan buffers con propietario único y vistas prestadas: es el único sitio donde sí hay préstamos, y son internos a la biblioteca.
 - **Concurrencia real**: contadores atómicos solo en valores que cruzan hilos (marcados por el análisis de canales y `spawn`); el resto usa contadores simples.
 

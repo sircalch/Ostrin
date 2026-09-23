@@ -6308,3 +6308,27 @@ Verificación local: `cargo test --manifest-path compiler/Cargo.toml` pasó con 
 `node scripts/wasi-program-check.mjs` compiló y ejecutó los seis módulos con salida exacta;
 `node scripts/distribution-check.mjs` y `git diff --check` también pasaron. La sesión tuvo que
 cargar explícitamente las variables del SDK WASI 34 ya instalado en el perfil de usuario.
+
+## 257. E1101 dinámico sigue el lifetime del record — 2026-09-22
+
+Una prueba de churn reprodujo una falla real de las guardas dinámicas: `--run` enviaba y destruía
+un record dentro de una función, el allocator reciclaba su dirección y el siguiente record nuevo
+era rechazado como movido al enviarlo. El mismo diseño tenía otra brecha: la tabla global C
+acumulaba direcciones sin límite y asumía incorrectamente que los records nunca se liberaban.
+
+- El intérprete guarda `Weak` al identity de cada record movido, conserva el estado mientras el
+  objeto sigue vivo y purga entradas expiradas al consultar o en barridos geométricos durante nuevos
+  envíos; la referencia débil impide ABA de dirección sin retener el objeto.
+- El runtime C ahora lleva el bit `moved` en la entrada del allocation gestionado. Marcar y leer
+  pasan por el mutex de allocations; al liberar el record, la entrada —y el bit— desaparecen juntos.
+  Se elimina la tabla paralela de direcciones que podía crecer y quedar obsoleta.
+- La regresión crea/consume records en 2048 iteraciones dentro de dos tareas, compara el intérprete
+  cooperativo con nativo cooperativo y `--native-threads`, y requiere `live_allocations=0` en ambos
+  ejecutables.
+
+Verificación de este bloque: `cargo test --manifest-path compiler/Cargo.toml` pasó con 2 unitarias,
+6 diferenciales y 196 de integración; `npm test` pasó las cuatro pruebas Playwright sobre el
+compilador WASM real; `node scripts/website-check.mjs --wasm` validó 9 páginas, 195 ejemplos y
+196 pruebas; `node scripts/wasi-program-check.mjs` compiló y ejecutó los seis programas, y
+`node scripts/distribution-check.mjs` validó matriz de release, checksums e instaladores. No hizo
+falta instalar dependencias; se cargaron en la sesión las variables del SDK WASI 34 ya instalado.

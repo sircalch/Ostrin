@@ -1433,6 +1433,99 @@ fn immutable_records_can_be_shared_through_channels() {
 }
 
 #[test]
+fn released_moved_records_do_not_poison_reused_allocation_addresses() {
+    let file = temp_source(
+        "e1101-released-record-reuse.ostrin",
+        r#"
+record Buffer {
+    mut value: Int
+}
+
+fn retire_sent_record() -> Void {
+    ch = channel<Buffer>()
+    payload = Buffer { value: -1 }
+    ch.send(payload)
+    ch.receive()
+    ch.close()
+}
+
+fn churn(seed: Int) -> Int {
+    mut total = 0
+    for index in 0 until 2048 {
+        retire_sent_record()
+        fresh = Buffer { value: seed + index }
+        total = total + fresh.value
+    }
+    total
+}
+
+fn main() -> Void {
+    first = spawn { churn(0) }
+    second = spawn { churn(1) }
+    print(first.join() + second.join())
+}
+"#,
+    );
+    let interpreted = run(&["--run", &file]);
+    let exe = temp_artifact("e1101-released-record-reuse.exe");
+    let compiled = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    let threaded_exe = temp_artifact("e1101-released-record-reuse-threads.exe");
+    let threaded_compile = run(&[
+        "--compile",
+        "--native-threads",
+        "--leak-check",
+        "--out",
+        &threaded_exe,
+        &file,
+    ]);
+    let _ = fs::remove_file(&file);
+
+    assert!(
+        interpreted.status.success(),
+        "a freed record address was treated as moved by the interpreter: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).trim(), "4194304");
+    if skip_if_no_c_compiler(&compiled) {
+        return;
+    }
+    assert!(compiled.status.success(), "native compilation failed: {}", stderr(&compiled));
+    let native = Command::new(&exe).output().expect("run native allocation-reuse test");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native run failed: {}", String::from_utf8_lossy(&native.stderr));
+    assert_eq!(String::from_utf8_lossy(&native.stdout).trim(), "4194304");
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "native move tracking retained released records: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+
+    if skip_if_no_c_compiler(&threaded_compile) {
+        return;
+    }
+    assert!(
+        threaded_compile.status.success(),
+        "native-thread compilation failed: {}",
+        stderr(&threaded_compile)
+    );
+    let threaded = Command::new(&threaded_exe)
+        .output()
+        .expect("run native-thread allocation-reuse test");
+    let _ = fs::remove_file(&threaded_exe);
+    assert!(
+        threaded.status.success(),
+        "native-thread run failed: {}",
+        String::from_utf8_lossy(&threaded.stderr)
+    );
+    assert_eq!(String::from_utf8_lossy(&threaded.stdout).trim(), "4194304");
+    assert!(
+        String::from_utf8_lossy(&threaded.stderr).contains("live_allocations=0"),
+        "threaded move tracking retained released records: {}",
+        String::from_utf8_lossy(&threaded.stderr)
+    );
+}
+
+#[test]
 fn native_backend_compiles_and_runs_records() {
     // Nested, heap-allocated records with a `mut` field mutated through its
     // binding, a record passed by identity into another function, and a

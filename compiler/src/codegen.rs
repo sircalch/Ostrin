@@ -516,6 +516,7 @@ typedef struct OstrinAllocation {\n\
     void* ptr;\n\
     size_t refs;\n\
     void (*drop)(void*);\n\
+    bool moved;\n\
     struct OstrinAllocation* next;\n\
 } OstrinAllocation;\n\
 /* Live allocations live in a chained hash table keyed by pointer, so retain/release/free are O(1)\n\
@@ -864,6 +865,7 @@ static void ostrin_register_allocation_with_drop(void* ptr, void (*drop)(void*))
     entry->ptr = ptr;\n\
     entry->refs = 1;\n\
     entry->drop = drop;\n\
+    entry->moved = false;\n\
     if ((ostrin_allocation_count + 1) * 4 >= ostrin_bucket_count * 3) ostrin_table_grow();\n\
     ostrin_table_insert(entry);\n\
     ostrin_allocation_count++;\n\
@@ -926,7 +928,7 @@ static void* ostrin_realloc(void* old_ptr, size_t size) {\n\
     }\n\
     OstrinAllocation* entry = (OstrinAllocation*)malloc(sizeof *entry);\n\
     if (!entry) { ostrin_heap_unlock(); free(ptr); OSTRIN_OOM(); }\n\
-    entry->ptr = ptr; entry->refs = 1; entry->drop = NULL;\n\
+    entry->ptr = ptr; entry->refs = 1; entry->drop = NULL; entry->moved = false;\n\
     if ((ostrin_allocation_count + 1) * 4 >= ostrin_bucket_count * 3) ostrin_table_grow();\n\
     ostrin_table_insert(entry); ostrin_allocation_count++; ostrin_total_allocations++;\n\
     if (ostrin_allocation_count > ostrin_peak_allocation_count) ostrin_peak_allocation_count = ostrin_allocation_count;\n\

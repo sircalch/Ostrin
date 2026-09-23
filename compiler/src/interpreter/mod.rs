@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt;
 use std::fs;
 use std::io::{BufRead, Write};
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 
 use serde_json::{json, Value as JsonValue};
 
@@ -556,7 +556,8 @@ pub struct Interpreter {
     /// Names of records/enums whose representation contains mutable state.
     /// Immutable records are copy/share-safe when sent through a channel.
     movable_types: HashSet<String>,
-    moved: HashSet<usize>,
+    moved: HashMap<usize, Weak<RefCell<Vec<(String, Value)>>>>,
+    moved_sweep_at: usize,
     call_stack: Vec<CallFrame>,
     debugger: Option<Debugger>,
     terminated: bool,
@@ -645,7 +646,8 @@ impl Interpreter {
             derives,
             runtime_record_type_args: HashMap::new(),
             movable_types,
-            moved: HashSet::new(),
+            moved: HashMap::new(),
+            moved_sweep_at: 256,
             call_stack: Vec::new(),
             debugger: None,
             literal_kinds: HashMap::new(),
@@ -1964,11 +1966,13 @@ impl Interpreter {
             Expr::Ident(name) => {
                 if let Some(v) = env.get(name) {
                     if let Some(ptr) = Self::record_ptr(&v) {
-                        if self.moved.contains(&ptr) {
+                        let is_moved = self.moved.get(&ptr).is_some_and(|record| record.upgrade().is_some());
+                        if is_moved {
                             return Err(RuntimeError::Error(format!(
                                 "'{name}' was moved into a channel send earlier and cannot be used afterwards."
                             )));
                         }
+                        self.moved.remove(&ptr);
                     }
                     return Ok(v);
                 }
@@ -2957,7 +2961,11 @@ impl Interpreter {
                         let v = self.eval_arg(&args[0], env)?;
                         if let Value::Record(name, data) = &v {
                             if self.movable_types.contains(name) {
-                                self.moved.insert(Rc::as_ptr(data) as usize);
+                                if self.moved.len() >= self.moved_sweep_at {
+                                    self.moved.retain(|_, record| record.strong_count() > 0);
+                                    self.moved_sweep_at = self.moved.len().saturating_mul(2).max(256);
+                                }
+                                self.moved.insert(Rc::as_ptr(data) as usize, Rc::downgrade(data));
                             }
                         }
                         state.borrow_mut().queue.push_back(v);
