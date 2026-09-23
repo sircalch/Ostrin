@@ -99,9 +99,11 @@ Sobre este IR se hacen los análisis que el texto C no permite:
    que retienen sus elementos; records construidos desde HIR o IR registran además destructores
    tipados y retienen sus campos. `Option` escalar se copia por valor y `Option<String>`/
    `Option<Record>` retienen/liberan condicionalmente su payload en constructores, lookups y
-   binds simples; la IR aún deja
-   barreras explícitas para otros `Option` gestionados, patrones anidados, llamadas que
-   transfieren ownership, scopes anidados y escapes complejos.
+   binds simples; la IR aún deja barreras explícitas para otros `Option` gestionados, patrones
+   anidados, llamadas que transfieren ownership, scopes anidados y escapes complejos. Las cadenas
+   lineales de `unwrap`/`unwrap_or`/`ok`/`ok_or` sobre `Option<Option<String>>` y
+   `Result<Option<String>, String>` ya extraen y retienen payloads recursivos en IR/C; el ejemplo
+   `native_ir_nested_wrappers.ostrin` comprueba ramas y fallbacks con paridad y cero fugas.
 5. **Cierres y funciones como valores**: añadir llamadas indirectas y transferencias de ownership
    para cierres con entorno; retirar la comprobación dinámica de E1101 cuando el backend consuma
    la IR transformada de forma completa.

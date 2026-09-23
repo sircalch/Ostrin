@@ -159,8 +159,11 @@ usa elementos escalares o records, con ownership condicional del payload. Tambi�
 ownership recursivo en constructores y `match`. Los consumidores estructurales `unwrap`,
 `unwrap_or`, `ok` y `ok_or` ya retienen el payload gestionado elegido antes de liberar el wrapper
 o el argumento fallback; `examples/native_ir_managed_consumers.ostrin` verifica ambas ramas para
-`Option<String>` y `Result<String,String>` desde la IR. Consumidores anidados más complejos
-siguen en HIR/AST.
+`Option<String>` y `Result<String,String>` desde la IR. Cadenas de extracción también cruzan IR/C
+para `Option<Option<String>>` y `Result<Option<String>,String>`; el ejemplo
+`native_ir_nested_wrappers.ostrin` prueba `unwrap`, `unwrap_or`, `ok` y `ok_or`, incluidos fallbacks,
+con `hir-generated: 0` y `live_allocations=0`. Consumidores no lineales y wrappers fuera de los
+tipos representables siguen usando fallback.
 
 El runtime C generado centraliza las reservas en `ostrin_alloc`/`ostrin_calloc`/
 `ostrin_realloc`, registra cada bloque y lo libera mediante `atexit` al terminar el
@@ -181,8 +184,9 @@ propietarios directos al retornar; el mismo contrato se aplica al emisor HIR y a
 `clone(x)` y `drop(x)` siguen disponibles para probar explícitamente el contrato en programas
 nativos. El emisor también limpia bindings de referencia creados por expresiones de bloque
 anidadas y por ramas/iteraciones de `while`/`for`, incluyendo `break`/`continue`; los escapes
-complejos, los patrones anidados, los wrappers anidados y la bajada completa de ownership
-sobre la IR siguen pendientes fuera de las familias y consumidores cubiertos.
+complejos, los patrones anidados y la bajada completa de ownership sobre la IR siguen pendientes
+fuera de las familias y consumidores cubiertos; las cadenas lineales de consumidores sobre los
+wrappers anidados soportados ya tienen cobertura IR/C.
 
 **Soportado** (todos los ejemplos ejecutables del repo, salvo lo listado en §6):
 - Escalares, strings, recursión, `if/while/for`, `match` (con guardas y patrones anidados).
@@ -202,8 +206,9 @@ sobre la IR siguen pendientes fuera de las familias y consumidores cubiertos.
   propagación con `try`; `try catch` con lambda inline ya usa IR para `Result` escalar y los
   combinadores `Result.map`, `Result.map_err`, `Result.then` y `Option.map`/`Option.then` con
   lambda inline también usan IR; aliases locales de funciones globales sin entorno se resuelven a
-  llamadas estáticas, mientras handlers no inline con captura, llamadas indirectas y consumidores
-  complejos de wrappers anidados siguen usando el fallback AST.
+  llamadas estáticas, mientras handlers no inline con captura y llamadas indirectas conservan
+  fallback AST. Las cadenas lineales `unwrap`/`unwrap_or`/`ok`/`ok_or` a través de
+  `Option`/`Result` anidados soportados ya cruzan IR/C.
 - `Quantity` (dimensión estática, unidad como cadena en ejecución) e `impl` sobre cantidades.
 - Operadores de usuario, `derive(Eq/Ord)`, `Ordering` incorporado.
 - `print` de records, enums, listas, mapas, sets, `Option`, `Result` (mismo formato que el intérprete).
@@ -297,8 +302,9 @@ CI de GitHub con matriz Windows/Linux/macOS, binarios de release.
 ### E. Backends adicionales
 El compilador, un programa Ostrin independiente y un proyecto con dependencia `path` ya se
 construyen como `wasm32-wasip1` mediante el workflow WASI, con toolchain fijado, ejecución bajo
-Node WASI y checksums reproducibles. La matriz también compila y ejecuta un contrato real de
-`args`/`env`, E/S de archivos y ownership gestionado; un script único captura stdout/stderr,
+Node WASI y checksums reproducibles. La matriz de seis programas también compila y ejecuta un
+contrato real de `args`/`env`, E/S de archivos, ownership gestionado y consumidores anidados
+`Option`/`Result`; un script único captura stdout/stderr,
 compara salidas exactas y limpia los artefactos temporales. La compilación usa el triple vigente
 `wasm32-wasip1`, mantiene el alias CLI histórico y exige un host con WebAssembly exception
 handling para la cancelación cooperativa basada en SJLJ. El hash de punteros y sus shifts están

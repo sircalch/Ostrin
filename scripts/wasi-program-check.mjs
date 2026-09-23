@@ -49,6 +49,12 @@ const programs = [
     args: ["native_ir_managed_consumers.wasm"],
     expected: "native option\nnative option\noption fallback\nnative option\noption error\nnative result\nnative result\nresult fallback\ntrue\n",
   },
+  {
+    name: "native_ir_nested_wrappers",
+    source: "examples/native_ir_nested_wrappers.ostrin",
+    args: ["native_ir_nested_wrappers.wasm"],
+    expected: "nested\ninner none\nok\nnested error\nnested\nouter fallback\nok\nok fallback\nnested\n",
+  },
 ];
 
 function fail(message) {

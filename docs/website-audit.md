@@ -24,8 +24,9 @@ tests or an explicitly labeled early-stage surface.
   intentional error cases.
 - **22** Markdown design documents under `docs/design/`.
 - Compiler suite: **192 integration**, **6 differential** and **2 unit** tests.
-- WASI release smoke matrix: five program modules covering the hello program, a local-path
-  package, arguments/environment, file I/O and managed ownership; compiler and program modules
+- WASI release smoke matrix: six program modules covering the hello program, a local-path
+  package, arguments/environment, file I/O, managed ownership and nested `Option`/`Result`
+  consumers; compiler and program modules
   are executed under Node WASI.
 - The browser playground uses the generated compiler WASM and the real CLI in an in-memory WASI
   filesystem; it is not a JavaScript reimplementation of the language.

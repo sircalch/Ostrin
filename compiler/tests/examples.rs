@@ -2477,7 +2477,7 @@ fn native_ir_compound_collections_preserve_payload_and_ownership() {
 fn native_ir_nested_wrappers_preserve_recursive_ownership() {
     let file = "native_ir_nested_wrappers.ostrin";
     let path = example_path(file);
-    let expected = "nested\ninner none\nok\nnested error\n";
+    let expected = "nested\ninner none\nok\nnested error\nnested\nouter fallback\nok\nok fallback\nnested\n";
     let interpreted = run(&["--run", &path]);
     assert!(interpreted.status.success(), "interpreter failed for {file}: {}", stderr(&interpreted));
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
@@ -2491,7 +2491,8 @@ fn native_ir_nested_wrappers_preserve_recursive_ownership() {
         .lines()
         .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
         .unwrap_or(0);
-    assert!(ir_functions >= 5, "{file} generated only {ir_functions} IR function(s): {}", stdout(&report));
+    assert!(ir_functions >= 10, "{file} generated only {ir_functions} IR function(s): {}", stdout(&report));
+    assert!(stdout(&report).contains("hir-generated: 0"), "{file} unexpectedly used a HIR fallback: {}", stdout(&report));
 
     let exe = temp_artifact("native_ir_nested_wrappers.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);

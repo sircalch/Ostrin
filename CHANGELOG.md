@@ -35,6 +35,8 @@
   table's pointer hash for 32-bit targets and made the smoke matrix reject over-width shifts.
 - Installed and verified the pinned WASI toolchain locally; all five end-to-end program modules
   compiled and ran under Node WASI with exact output checks.
+- Extended the executable WASI matrix to six modules with nested `Option`/`Result` consumer chains;
+  the same regression requires zero HIR fallback and `live_allocations=0` in native execution.
 - Hardened `.github/workflows/release.yml`: tagged releases must match the compiler package version,
   and each native archive is checksum-verified and executed after extraction. The smoke contract covers
   `--version`, `examples/hello.ostrin`, and the packaged local-path dependency project on Linux x86_64,

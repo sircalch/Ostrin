@@ -6,12 +6,36 @@ fn none_inner() -> Option<Option<String>> {
     Some(None)
 }
 
+fn none_outer() -> Option<Option<String>> {
+    None
+}
+
 fn result_nested() -> Result<Option<String>, String> {
     Ok(Some("o" + "k"))
 }
 
 fn result_nested_err() -> Result<Option<String>, String> {
     Err("nested " + "error")
+}
+
+fn option_unwrap_nested() -> String {
+    some_nested().unwrap().unwrap()
+}
+
+fn option_unwrap_or_nested() -> String {
+    none_outer().unwrap_or(Some("outer fallback")).unwrap_or("inner fallback")
+}
+
+fn result_unwrap_nested() -> String {
+    result_nested().unwrap().unwrap_or("result fallback")
+}
+
+fn result_ok_nested_fallback() -> String {
+    result_nested_err().ok().unwrap_or(Some("ok fallback")).unwrap_or("inner fallback")
+}
+
+fn option_ok_or_nested() -> String {
+    some_nested().ok_or("outer error").unwrap().unwrap()
 }
 
 fn main() -> Void {
@@ -40,4 +64,9 @@ fn main() -> Void {
         Ok(inner) => print(inner.is_some()),
         Err(error) => print(error)
     }
+    print(option_unwrap_nested())
+    print(option_unwrap_or_nested())
+    print(result_unwrap_nested())
+    print(result_ok_nested_fallback())
+    print(option_ok_or_nested())
 }

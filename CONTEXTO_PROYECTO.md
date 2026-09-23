@@ -6217,3 +6217,24 @@ silencio. Se alinearon las páginas estáticas con el estado comprobado del comp
 Verificación de este bloque: `node scripts/website-check.mjs --wasm` pasó e informó 9 páginas
 públicas, 195 ejemplos y 192 pruebas de integración; `node scripts/distribution-check.mjs` y
 `git diff --check` también pasaron. El bloque previo corrió la suite completa del compilador.
+
+## 253. Consumidores lineales de wrappers anidados en IR/C y WASI — 2026-09-22
+
+El ownership recursivo de constructores ya existía; ahora se verifica también cuando el programa
+extrae payloads por cadenas de métodos y atraviesa ramas de fallback:
+
+- `examples/native_ir_nested_wrappers.ostrin` cubre `unwrap`, `unwrap_or`, `ok` y `ok_or` sobre
+  `Option<Option<String>>` y `Result<Option<String>,String>`, tanto en rutas presentes como en
+  fallbacks. La prueba requiere al menos diez funciones `ir-generated`, cero `hir-generated`,
+  igualdad exacta entre intérprete y C, y `live_allocations=0`.
+- El mismo ejemplo se añadió a `scripts/wasi-program-check.mjs`. La matriz ahora compila y ejecuta
+  seis módulos con stdout exacto; workflow, README del artefacto, SHA-256 y tarball incluyen el
+  módulo nuevo. `distribution-check.mjs` protege su entrada en lista, checksum y archivo.
+- Se acotaron las notas de implementación: consumidores anidados lineales sobre tipos soportados ya
+  están en IR/C; handlers capturados, consumidores no lineales, patrones anidados y escapes
+  complejos permanecen como fronteras abiertas.
+
+Verificación de este bloque: `cargo test --manifest-path compiler/Cargo.toml` pasó con 2 pruebas
+unitarias, 6 diferenciales y 192 de integración; `node scripts/wasi-program-check.mjs` ejecutó
+correctamente los seis módulos bajo Node WASI sin warnings de shifts; el test nativo exigió
+`hir-generated: 0` y `live_allocations=0`; `node scripts/distribution-check.mjs` pasó.
