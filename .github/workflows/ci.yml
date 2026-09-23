@@ -11,15 +11,13 @@ permissions:
 
 jobs:
   website:
-    name: Website checks
+    name: Website and browser checks
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-      - name: Validate pages, links and playground wiring
-        run: node scripts/website-check.mjs
-      - name: Validate release and installer contracts
-        run: node scripts/distribution-check.mjs
+      - name: Build and verify the website/playground
+        uses: ./.github/actions/website-verify
 
   compiler:
     name: Compiler tests (${{ matrix.os }})

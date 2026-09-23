@@ -11,7 +11,7 @@ tests or an explicitly labeled early-stage surface.
 | --- | --- | --- |
 | Homepage | `website/index.html`, `website/playground.js`, `website/assets/ostrin-social.png` | Branded entry point with source facts, a real compiler-backed browser playground and editable sample; all public pages share a 1200x630 social preview |
 | Example catalogue | `website/examples.html` | Filterable repository catalogue plus live quantity, standard library, record/enum and concurrency programs |
-| Browser playground | `website/playground.html`, `.github/workflows/pages.yml` | Generated `ostrinc.wasm`; Run, Check, Test, Format, share links and source diagnostics execute in an in-memory WASI filesystem |
+| Browser playground | `website/playground.html`, `website/playground.js`, `.github/workflows/pages.yml` | Generated `ostrinc.wasm`; Run, Check, Test, Format, share links and source diagnostics execute in an in-memory WASI filesystem and are exercised in Chromium before CI passes or Pages uploads |
 | Learning and reference | `website/docs.html`, `website/language.html`, `docs/design/` | Guided 14-step learning path, language reference and 22 design documents |
 | Showcase | `website/showcase.html` | Four repository-backed demonstrations with source links and explicit maturity labels |
 | Community | `website/community.html`, `CONTRIBUTING.md`, issue templates | Contribution path and repository channels; no unverified chat, registry or external community is claimed |
@@ -44,8 +44,9 @@ before publication.
   release; installer scripts require a maintainer-published matching tag.
 - Some compiler/runtime and scientific-library capabilities remain explicitly early or incomplete;
   the site should preserve those maturity labels and avoid implying production readiness.
-- Automated viewport/browser regression coverage is still thinner than compiler coverage; maintain
-  the existing responsive layout and add repeatable browser checks when the tooling is available.
+- Chromium regression coverage now checks all nine pages at phone/tablet widths, mobile/tablet
+  navigation, the real compiler output and a real diagnostic. Firefox/WebKit behavior, broader
+  screen-reader checks and visual baselines are not covered yet.
 - Keep external services, analytics and community-channel claims out of the site until they have a
   real operational contract and explicit review.
 

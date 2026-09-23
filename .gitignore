@@ -24,3 +24,8 @@ examples/*/*/ostrin.lock
 
 # Built by CI for the playground
 /website/ostrinc.wasm
+
+# Browser regression test output
+/tests/browser/node_modules/
+/tests/browser/test-results/
+/tests/browser/playwright-report/

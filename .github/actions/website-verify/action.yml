@@ -1,0 +1,32 @@
+name: Verify Ostrin website
+description: Build the real WASM compiler, run static checks and test the site in Chromium.
+runs:
+  using: composite
+  steps:
+    - name: Install Rust with the WASI target
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: wasm32-wasip1
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 24
+        cache: npm
+        cache-dependency-path: tests/browser/package-lock.json
+    - name: Install browser test dependencies
+      shell: bash
+      working-directory: tests/browser
+      run: npm ci
+    - name: Install Chromium and operating-system dependencies
+      shell: bash
+      working-directory: tests/browser
+      run: npx playwright install --with-deps chromium
+    - name: Build compiler WASM and run browser regressions
+      shell: bash
+      working-directory: tests/browser
+      run: npm test
+    - name: Validate website, WASM and distribution contracts
+      shell: bash
+      run: |
+        node scripts/website-check.mjs --wasm
+        node scripts/distribution-check.mjs

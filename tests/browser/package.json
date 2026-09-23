@@ -1,0 +1,12 @@
+{
+  "name": "ostrin-browser-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "pretest": "node prepare-runtime.mjs",
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0"
+  }
+}

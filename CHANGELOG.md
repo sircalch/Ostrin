@@ -3,6 +3,11 @@
 ## Unreleased
 
 ### Website and discovery
+- Added a pinned Playwright browser suite and a shared CI/Pages verification action. It compiles the
+  current compiler to WASM, runs the real homepage program and diagnostic in Chromium, verifies
+  mobile/tablet navigation and checks all nine public pages for horizontal overflow at 390 and
+  768 px. The new viewport checks also exposed and fixed mobile documentation overflow and the
+  tablet-width desktop navigation overflow.
 - Added a dedicated 1200×630 Ostrin social preview with the untouched official mark and current
   positioning. All nine public pages now share the large Twitter/OG card metadata, and
   `website-check.mjs` validates the PNG signature, dimensions, per-page image URL, alt text, type
