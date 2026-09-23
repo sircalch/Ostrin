@@ -1,12 +1,21 @@
-/* E1101 is attached to each live allocation, not to its address globally.
- * Releasing a record removes the flag with its allocation-table entry, so a
- * later object at the same address starts unmoved. The heap mutex also makes
- * the flag safe when native tasks access it from different OS threads. */
+/* E1101's dynamic guard tracks moved records while they are in flight through
+ * a channel. Receiving restores access to the transferred value; the static
+ * ownership pass keeps the sender's binding invalid. State belongs to the
+ * live allocation, so releasing it also prevents address-reuse false positives.
+ * The heap mutex makes both transitions safe across native OS threads. */
 static void ostrin_mark_moved(void* p) {
     if (!p) return;
     ostrin_heap_lock();
     OstrinAllocation** link = ostrin_table_link(p);
     if (link) (*link)->moved = true;
+    ostrin_heap_unlock();
+}
+
+static void ostrin_unmark_moved(void* p) {
+    if (!p) return;
+    ostrin_heap_lock();
+    OstrinAllocation** link = ostrin_table_link(p);
+    if (link) (*link)->moved = false;
     ostrin_heap_unlock();
 }
 

@@ -2500,6 +2500,9 @@ impl Interpreter {
                             };
                             let mut state = state.borrow_mut();
                             if let Some(value) = state.queue.pop_front() {
+                                if let Some(ptr) = Self::record_ptr(&value) {
+                                    self.moved.remove(&ptr);
+                                }
                                 return Ok(some_value(value));
                             }
                             if state.closed {
@@ -2976,6 +2979,9 @@ impl Interpreter {
                             self.check_task_cancellation()?;
                             let popped = state.borrow_mut().queue.pop_front();
                             if let Some(v) = popped {
+                                if let Some(ptr) = Self::record_ptr(&v) {
+                                    self.moved.remove(&ptr);
+                                }
                                 return Ok(Value::EnumInstance(
                                     "Option".to_string(),
                                     "Some".to_string(),

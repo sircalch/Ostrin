@@ -87,6 +87,7 @@ for value in ch {
 
 - `ch.send(value)`: envía `value` por el canal. Si `value` es de un tipo con campos `mut`, enviarlo **mueve** el binding: después de `ch.send(counter)`, usar `counter` de nuevo en la tarea emisora es error de compilación ("`counter` ya fue enviado por el canal"). Si `value` es inmutable, no hay restricción — se puede seguir usando después de enviarlo (conceptualmente se "copia" al canal, aunque la implementación pueda compartir la representación interna sin que el programador lo note, precisamente porque es inmutable).
 - `ch.receive() -> Option<T>`: bloquea hasta recibir un valor (`Some(value)`) o hasta que el canal se cierre y esté vacío (`None`).
+- Para un valor mutable, el envío transfiere la referencia al canal y `Some(value)` la transfiere al binding del receptor. El receptor puede usar el valor; la guardia dinámica solo cubre el intervalo en vuelo y no convierte el objeto recibido en "movido". Los aliases que quedaron en el emisor siguen siendo inválidos por E1101 estático.
 - `ch.close()`: marca el canal como cerrado. Enviar después de cerrado es panic (error de programación, no un caso esperado — igual que escribir en un archivo ya cerrado).
 - Un `Channel<T>` implementa `Iterator<Option<T>>`-como-protocolo (documento 06, §3) de forma que `for value in ch { ... }` recibe repetidamente hasta que el canal se cierra, reutilizando el mismo protocolo de iteración de listas y rangos sin un mecanismo aparte.
 

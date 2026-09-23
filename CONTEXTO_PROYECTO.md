@@ -6332,3 +6332,24 @@ compilador WASM real; `node scripts/website-check.mjs --wasm` validó 9 páginas
 196 pruebas; `node scripts/wasi-program-check.mjs` compiló y ejecutó los seis programas, y
 `node scripts/distribution-check.mjs` validó matriz de release, checksums e instaladores. No hizo
 falta instalar dependencias; se cargaron en la sesión las variables del SDK WASI 34 ya instalado.
+
+## 258. Transferencia real de records mutables por canal — 2026-09-23
+
+La auditoría posterior encontró una incoherencia: E1101 invalidaba correctamente el binding del
+emisor, pero la guarda dinámica también bloqueaba al receptor después de `receive()`, y el camino
+AST con hilos nativos dejaba viva la referencia transferida dentro de un patrón `Some(buffer)`.
+
+- El runtime marca el record mientras está en vuelo por el canal y limpia el bit al extraerlo por
+  `receive()` o `select`; el receptor puede leer el record transferido, sin revalidar una identidad
+  que ya recuperó ownership.
+- El emisor conserva la prohibición estática, incluidos aliases; recibir el valor no rehabilita
+  bindings que quedaron en la tarea emisora.
+- Los bindings de payload en patrones `Some`/`Ok`/`Err` entran en un frame de cleanup del brazo,
+  de modo que el receptor libera exactamente la referencia transferida en intérprete, IR y AST.
+- Se añadió una regresión que verifica intérprete, nativo IR, AST con `--native-threads`, leak-check
+  y el rechazo E1101 de un alias emisor.
+
+Verificación de este bloque: `cargo test --manifest-path compiler/Cargo.toml` pasó con 2 unitarias,
+6 diferenciales y 197 de integración; `npm test` pasó 4/4 pruebas Playwright; `website-check.mjs`
+validó 9 páginas y 197 pruebas; la matriz WASI de 6 programas, distribución, checksums e
+instaladores también pasaron.

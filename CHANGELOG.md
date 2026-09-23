@@ -13,6 +13,9 @@
   allocation registry under its existing mutex. Releasing a record now clears its move state
   naturally, so allocator address reuse cannot poison a new record; regression coverage churns and
   releases records in cooperative and real-thread task execution and requires zero native leaks.
+- Corrected channel transfer semantics for mutable records: the sender binding remains statically
+  moved, while the `Some(value)` receiver regains access after the dynamic in-flight guard is
+  cleared. Pattern bindings now release the transferred native reference on every backend path.
 
 ### Website and discovery
 - Added a pinned Playwright browser suite and a shared CI/Pages verification action. It compiles the
@@ -24,7 +27,7 @@
   positioning. All nine public pages now share the large Twitter/OG card metadata, and
   `website-check.mjs` validates the PNG signature, dimensions, per-page image URL, alt text, type
   and consistent titles/descriptions before CI or Pages can publish.
-- Refreshed repository-backed public counts to 195 source programs and 196 integration tests,
+- Refreshed repository-backed public counts to 195 source programs and 197 integration tests,
   aligned the static version fallbacks, and replaced the stale website audit with a current feature
   inventory. `website-check.mjs` now derives version, example/design counts and Rust test totals,
   then verifies the public JS, every HTML fallback, README, roadmap and audit in CI and Pages builds.

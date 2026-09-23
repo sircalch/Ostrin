@@ -80,7 +80,8 @@ Sobre este IR se hacen los análisis que el texto C no permite:
    el CFG alcanzable hasta punto fijo: no mezcla ramas mutuamente excluyentes, conserva el posible
    movimiento en joins y backedges, y evalúa cada operando `Phi` sólo en la arista de su predecesor.
    Records inmutables quedan fuera de la regla; las comprobaciones dinámicas se conservan como red
-   de seguridad y su estado acompaña al allocation mientras vive, nunca a una dirección reciclable.
+   de seguridad y su estado acompaña al allocation mientras vive, nunca a una dirección reciclable;
+   un `receive()`/`select` que extrae el record limpia el estado de vuelo para el binding receptor.
 3. **Escape** (para arenas): un valor que no sale de su función puede vivir en una arena.
 4. **Cierres**: capturas explícitas → estructura `{ fn_ptr, entorno }` (funciones como valores de primera clase). Mientras no haya llamada indirecta en la IR, los aliases locales de funciones globales se conservan como procedencia estática y se emiten como llamadas directas.
 5. Optimización: inlining, plegado de constantes, eliminación de código muerto, fusión de bucles sobre `Array`.

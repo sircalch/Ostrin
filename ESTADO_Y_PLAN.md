@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-22 · rama `main` · 6 pruebas diferenciales, 196 de integración y 2 unitarias en verde.*
+*Corte: 2026-09-23 · rama `main` · 6 pruebas diferenciales, 197 de integración y 2 unitarias en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
 Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–250); para el diseño

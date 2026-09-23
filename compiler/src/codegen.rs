@@ -4029,7 +4029,15 @@ impl<'a> Codegen<'a> {
             self.push_scope();
             let mut condition = format!("!{matched_var}");
             let mut bindings = String::new();
-            let bind_result = self.gen_pattern(&arm.pattern, &scrutinee_var, &scrutinee_ty, &mut condition, &mut bindings);
+            let mut arm_owned = Vec::new();
+            let bind_result = self.gen_pattern(
+                &arm.pattern,
+                &scrutinee_var,
+                &scrutinee_ty,
+                &mut condition,
+                &mut bindings,
+                &mut arm_owned,
+            );
             if let Err(error) = bind_result {
                 self.pop_scope();
                 return Err(error);
@@ -4052,7 +4060,21 @@ impl<'a> Codegen<'a> {
                 }
             };
             self.pop_scope();
-            let (body_code, body_ty) = body;
+            let (mut body_code, body_ty) = body;
+            if !arm_owned.is_empty() {
+                if body_ty == CType::Void {
+                    let mut wrapped = format!("({{ {body_code};\n");
+                    Self::emit_owned_bindings_cleanup(&arm_owned, None, &mut wrapped);
+                    wrapped.push_str("    (void)0; })");
+                    body_code = wrapped;
+                } else {
+                    let result = self.next_temp();
+                    let mut wrapped = format!("({{ {} {result} = {body_code};\n", c_type_name(&body_ty));
+                    Self::emit_owned_bindings_cleanup(&arm_owned, None, &mut wrapped);
+                    wrapped.push_str(&format!("    {result}; }})"));
+                    body_code = wrapped;
+                }
+            }
             // A bare `None` arm has no `T` of its own: remember every arm's
             // body and coerce them all once the real result type is known
             // (the first arm that isn't a bare `None`).
@@ -4112,6 +4134,7 @@ impl<'a> Codegen<'a> {
         scrutinee_ty: &CType,
         condition: &mut String,
         bindings: &mut String,
+        owned: &mut Vec<(String, CType)>,
     ) -> Result<(), String> {
         match pattern {
             Pattern::Wildcard => Ok(()),
@@ -4123,6 +4146,9 @@ impl<'a> Codegen<'a> {
                     [(_, Pattern::Ident(b))] => {
                         bindings.push_str(&format!("{} {} = {}.{field}; ", c_type_name(ty), b, scrutinee_var));
                         self.define(b, (**ty).clone());
+                        if self.ownership_active && self.lambda_depth == 0 && is_reference_type(ty) {
+                            owned.push((b.clone(), (**ty).clone()));
+                        }
                         Ok(())
                     }
                     [(_, Pattern::Wildcard)] => Ok(()),
@@ -4140,6 +4166,9 @@ impl<'a> Codegen<'a> {
                     [(_, Pattern::Ident(b))] => {
                         bindings.push_str(&format!("{} {} = {}.value; ", c_type_name(inner), b, scrutinee_var));
                         self.define(b, (**inner).clone());
+                        if self.ownership_active && self.lambda_depth == 0 && is_reference_type(inner) {
+                            owned.push((b.clone(), (**inner).clone()));
+                        }
                         Ok(())
                     }
                     [(_, Pattern::Wildcard)] => Ok(()),
@@ -4159,7 +4188,14 @@ impl<'a> Codegen<'a> {
                     let Some((actual_name, field_ty)) = resolved else {
                         return Err(format!("record '{name}' has no field matching '{field_name}'"));
                     };
-                    self.gen_pattern(sub_pattern, &format!("{scrutinee_var}->{actual_name}"), &field_ty, condition, bindings)?;
+                    self.gen_pattern(
+                        sub_pattern,
+                        &format!("{scrutinee_var}->{actual_name}"),
+                        &field_ty,
+                        condition,
+                        bindings,
+                        owned,
+                    )?;
                 }
                 Ok(())
             }
@@ -4211,7 +4247,7 @@ impl<'a> Codegen<'a> {
                         return Err(format!("variant '{name}' has no field matching '{field_name}'"));
                     };
                     let field_path = format!("{scrutinee_var}.data.{}.{actual_field_name}", variant.name);
-                    self.gen_pattern(sub_pattern, &field_path, &field_ty, condition, bindings)?;
+                    self.gen_pattern(sub_pattern, &field_path, &field_ty, condition, bindings, owned)?;
                 }
                 Ok(())
             }
@@ -5611,12 +5647,9 @@ impl<'a> Codegen<'a> {
                     "send" if codes.len() == 1 => {
                         let item = self.coerce(&codes[0], &types[0], &t)?;
                         if self.is_movable_record_type(&t) {
-                            // The interpreter marks the sent record as moved; reads of it fail afterwards (E1101).
+                            // The channel runtime marks mutable records in flight;
+                            // the receiver restores access after taking ownership.
                             self.saw_record_send = true;
-                            if self.track_moves {
-                                let temp = self.next_temp();
-                                return Ok((format!("({{ {} {temp} = {item}; ostrin_mark_moved((void*){temp}); {name}_send({obj_code}, {temp}); }})", c_type_name(&t)), CType::Void));
-                            }
                         }
                         Ok((format!("{name}_send({obj_code}, {item})"), CType::Void))
                     }
@@ -7361,6 +7394,21 @@ fn generate_impl(
                 CType::Channel(t) => {
                     let tc = c_type_name(t);
                     let opt = c_type_name(&CType::Option(t.clone()));
+                    let mark_moved = if codegen.is_movable_record_type(t) {
+                        "    ostrin_mark_moved((void*)item);\n"
+                    } else {
+                        ""
+                    };
+                    let unmark_received = if codegen.is_movable_record_type(t) {
+                        "    if (r.has) ostrin_unmark_moved((void*)r.value);\n"
+                    } else {
+                        ""
+                    };
+                    let unmark_try_received = if codegen.is_movable_record_type(t) {
+                        "ostrin_unmark_moved((void*)*out); "
+                    } else {
+                        ""
+                    };
                     let sync_fields = if codegen.native_threads { "    OstrinMutex mutex;\n    OstrinCond ready;\n" } else { "" };
                     list_type_decls.push_str(&format!("struct {name} {{\n    {tc}* items;\n    int64_t head;\n    int64_t length;\n    int64_t capacity;\n    bool closed;\n{sync_fields}}};\n\n"));
                      let drop_sig = format!("static void {name}_drop({name}* c)");
@@ -7373,20 +7421,20 @@ fn generate_impl(
                      let sync_init = if codegen.native_threads { "    ostrin_mutex_init(&c->mutex); ostrin_cond_init(&c->ready);\n" } else { "" };
                      funcs.push((format!("static {name}* {name}_new(void)"), format!("    {name}* c = ({name}*)ostrin_calloc_with_drop(1, sizeof({name}), (void (*)(void*)){name}_drop);\n{sync_init}    return c;\n")));
                      if codegen.native_threads {
-                         funcs.push((format!("static int {name}_try_receive({name}* c, {tc}* out)"), format!("    ostrin_mutex_lock(&c->mutex);\n    if (c->head < c->length) {{ *out = c->items[c->head++]; ostrin_mutex_unlock(&c->mutex); return 1; }}\n    if (c->closed) {{ ostrin_mutex_unlock(&c->mutex); return -1; }}\n    ostrin_mutex_unlock(&c->mutex);\n    return 0;\n")));
+                         funcs.push((format!("static int {name}_try_receive({name}* c, {tc}* out)"), format!("    ostrin_mutex_lock(&c->mutex);\n    if (c->head < c->length) {{ *out = c->items[c->head++]; ostrin_mutex_unlock(&c->mutex); {unmark_try_received}return 1; }}\n    if (c->closed) {{ ostrin_mutex_unlock(&c->mutex); return -1; }}\n    ostrin_mutex_unlock(&c->mutex);\n    return 0;\n")));
                      } else {
-                         funcs.push((format!("static int {name}_try_receive({name}* c, {tc}* out)"), "    if (c->head < c->length) { *out = c->items[c->head++]; return 1; }\n    if (c->closed) return -1;\n    return 0;\n".to_string()));
+                         funcs.push((format!("static int {name}_try_receive({name}* c, {tc}* out)"), format!("    if (c->head < c->length) {{ *out = c->items[c->head++]; {unmark_try_received}return 1; }}\n    if (c->closed) return -1;\n    return 0;\n")));
                      }
                      if codegen.native_threads {
-                         funcs.push((format!("static void {name}_send({name}* c, {tc} item)"), format!("    ostrin_mutex_lock(&c->mutex);\n    if (c->closed) {{ ostrin_mutex_unlock(&c->mutex); OSTRIN_FAIL(\"send on closed channel\"); }}\n    if (c->length >= c->capacity) {{\n        c->capacity = c->capacity == 0 ? 4 : c->capacity * 2;\n        c->items = ({tc}*)ostrin_realloc(c->items, sizeof({tc}) * (size_t)c->capacity);\n    }}\n    c->items[c->length] = item;\n{retain}    c->length = c->length + 1;\n    ostrin_cond_signal(&c->ready);\n    ostrin_mutex_unlock(&c->mutex);\n", retain = if is_reference_type(t) { "    ostrin_retain((void*)item);\n" } else { "" })));
-                         funcs.push((format!("static {opt} {name}_receive({name}* c)"), format!("    {opt} r;\n    memset(&r, 0, sizeof r);\n    ostrin_task_checkpoint();\n    ostrin_mutex_lock(&c->mutex);\n    while (c->head >= c->length && !c->closed) {{\n        ostrin_cond_wait_timeout(&c->ready, &c->mutex);\n        ostrin_mutex_unlock(&c->mutex);\n        ostrin_task_checkpoint();\n        ostrin_mutex_lock(&c->mutex);\n    }}\n    if (c->head < c->length) {{ r.has = true; r.value = c->items[c->head++]; }}\n    ostrin_mutex_unlock(&c->mutex);\n    return r;\n")));
+                         funcs.push((format!("static void {name}_send({name}* c, {tc} item)"), format!("    ostrin_mutex_lock(&c->mutex);\n    if (c->closed) {{ ostrin_mutex_unlock(&c->mutex); OSTRIN_FAIL(\"send on closed channel\"); }}\n    if (c->length >= c->capacity) {{\n        c->capacity = c->capacity == 0 ? 4 : c->capacity * 2;\n        c->items = ({tc}*)ostrin_realloc(c->items, sizeof({tc}) * (size_t)c->capacity);\n    }}\n    c->items[c->length] = item;\n{retain}{mark_moved}    c->length = c->length + 1;\n    ostrin_cond_signal(&c->ready);\n    ostrin_mutex_unlock(&c->mutex);\n", retain = if is_reference_type(t) { "    ostrin_retain((void*)item);\n" } else { "" })));
+                         funcs.push((format!("static {opt} {name}_receive({name}* c)"), format!("    {opt} r;\n    memset(&r, 0, sizeof r);\n    ostrin_task_checkpoint();\n    ostrin_mutex_lock(&c->mutex);\n    while (c->head >= c->length && !c->closed) {{\n        ostrin_cond_wait_timeout(&c->ready, &c->mutex);\n        ostrin_mutex_unlock(&c->mutex);\n        ostrin_task_checkpoint();\n        ostrin_mutex_lock(&c->mutex);\n    }}\n    if (c->head < c->length) {{ r.has = true; r.value = c->items[c->head++]; }}\n    ostrin_mutex_unlock(&c->mutex);\n{unmark_received}    return r;\n")));
                          funcs.push((format!("static void {name}_close({name}* c)"), format!("    ostrin_mutex_lock(&c->mutex);\n    c->closed = true;\n    ostrin_cond_broadcast(&c->ready);\n    ostrin_mutex_unlock(&c->mutex);\n")));
                      } else {
                          funcs.push((format!("static void {name}_send({name}* c, {tc} item)"), format!(
-                             "    if (c->length >= c->capacity) {{\n        c->capacity = c->capacity == 0 ? 4 : c->capacity * 2;\n        c->items = ({tc}*)ostrin_realloc(c->items, sizeof({tc}) * (size_t)c->capacity);\n    }}\n    c->items[c->length] = item;\n{retain}    c->length = c->length + 1;\n",
+                             "    if (c->length >= c->capacity) {{\n        c->capacity = c->capacity == 0 ? 4 : c->capacity * 2;\n        c->items = ({tc}*)ostrin_realloc(c->items, sizeof({tc}) * (size_t)c->capacity);\n    }}\n    c->items[c->length] = item;\n{retain}{mark_moved}    c->length = c->length + 1;\n",
                              retain = if is_reference_type(t) { "    ostrin_retain((void*)item);\n" } else { "" }
                          )));
-                         funcs.push((format!("static {opt} {name}_receive({name}* c)"), format!("    {opt} r;\n    memset(&r, 0, sizeof r);\n    ostrin_task_checkpoint();\n    while (c->head >= c->length && !c->closed) {{\n        bool progress = ostrin_poll_all();\n        ostrin_task_checkpoint();\n        if (!progress) break;\n    }}\n    if (c->head < c->length) {{ r.has = true; r.value = c->items[c->head++]; }}\n    return r;\n")));
+                         funcs.push((format!("static {opt} {name}_receive({name}* c)"), format!("    {opt} r;\n    memset(&r, 0, sizeof r);\n    ostrin_task_checkpoint();\n    while (c->head >= c->length && !c->closed) {{\n        bool progress = ostrin_poll_all();\n        ostrin_task_checkpoint();\n        if (!progress) break;\n    }}\n    if (c->head < c->length) {{ r.has = true; r.value = c->items[c->head++]; }}\n{unmark_received}    return r;\n")));
                          funcs.push((format!("static void {name}_close({name}* c)"), "    c->closed = true;\n".to_string()));
                      }
                 }

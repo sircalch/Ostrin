@@ -1526,6 +1526,110 @@ fn main() -> Void {
 }
 
 #[test]
+fn channel_receiver_can_use_transferred_mutable_record() {
+    let file = temp_source(
+        "e1101-channel-record-transfer.ostrin",
+        r#"
+record Buffer {
+    mut value: Int
+}
+
+fn main() -> Void {
+    ch = channel<Buffer>()
+    payload = Buffer { value: 7 }
+    ch.send(payload)
+    received = ch.receive()
+    ch.close()
+    match received {
+        Some(buffer) => print(buffer.value),
+        None => print(-1)
+    }
+}
+"#,
+    );
+    let interpreted = run(&["--run", &file]);
+    let exe = temp_artifact("e1101-channel-record-transfer.exe");
+    let compiled = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    let threaded_exe = temp_artifact("e1101-channel-record-transfer-threads.exe");
+    let threaded_compile = Command::new(env!("CARGO_BIN_EXE_ostrinc"))
+        .args([
+            "--compile",
+            "--native-threads",
+            "--leak-check",
+            "--out",
+            &threaded_exe,
+            &file,
+        ])
+        .env("OSTRIN_NO_IR_CODEGEN", "1")
+        .env("OSTRIN_NO_HIR_CODEGEN", "1")
+        .output()
+        .expect("compile transfer test through the AST backend");
+    let _ = fs::remove_file(&file);
+
+    assert!(
+        interpreted.status.success(),
+        "interpreter rejected use by the receiving binding: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).trim(), "7");
+    if skip_if_no_c_compiler(&compiled) {
+        return;
+    }
+    assert!(compiled.status.success(), "native compilation failed: {}", stderr(&compiled));
+    let native = Command::new(&exe).output().expect("run native transfer test");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native run failed: {}", String::from_utf8_lossy(&native.stderr));
+    assert_eq!(String::from_utf8_lossy(&native.stdout).trim(), "7");
+    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"));
+
+    if skip_if_no_c_compiler(&threaded_compile) {
+        return;
+    }
+    assert!(threaded_compile.status.success(), "native-thread compilation failed: {}", stderr(&threaded_compile));
+    let threaded = Command::new(&threaded_exe)
+        .output()
+        .expect("run native-thread transfer test");
+    let _ = fs::remove_file(&threaded_exe);
+    assert!(threaded.status.success(), "native-thread run failed: {}", String::from_utf8_lossy(&threaded.stderr));
+    assert_eq!(String::from_utf8_lossy(&threaded.stdout).trim(), "7");
+    assert!(
+        String::from_utf8_lossy(&threaded.stderr).contains("live_allocations=0"),
+        "AST native-thread transfer left allocations live: {}",
+        String::from_utf8_lossy(&threaded.stderr)
+    );
+
+    let invalid_file = temp_source(
+        "e1101-channel-stale-alias.ostrin",
+        r#"
+record Buffer {
+    mut value: Int
+}
+
+fn main() -> Void {
+    ch = channel<Buffer>()
+    payload = Buffer { value: 7 }
+    stale_alias = payload
+    ch.send(payload)
+    received = ch.receive()
+    ch.close()
+    print(stale_alias.value)
+}
+"#,
+    );
+    let invalid = run(&["--run", &invalid_file]);
+    let _ = fs::remove_file(&invalid_file);
+    assert!(
+        !invalid.status.success(),
+        "receiving the value must not restore the sender's stale alias"
+    );
+    assert!(
+        stderr(&invalid).contains("OSTRIN-E1101"),
+        "stale sender alias was not rejected by static ownership checking: {}",
+        stderr(&invalid)
+    );
+}
+
+#[test]
 fn native_backend_compiles_and_runs_records() {
     // Nested, heap-allocated records with a `mut` field mutated through its
     // binding, a record passed by identity into another function, and a
