@@ -98,8 +98,10 @@ for math, collections, strings, deterministic dates, portable JSON parsing/seria
 program arguments, process/environment helpers, generic map queries and configurable float formatting.
 
 The compiler itself also has a reproducible `wasm32-wasip1` release workflow with a pinned
-WASI C toolchain, checksums, and smoke tests for a standalone program, a path-dependent project,
-program arguments/environment, file I/O and managed ownership. The
+WASI C toolchain, checksums, and smoke tests for standalone and path-dependent programs,
+program arguments/environment, file I/O and managed ownership. Emitted programs use cooperative
+task cancellation through WebAssembly exception handling, so their WASI host must support that
+proposal. The
 native release workflow targets Linux x86_64, macOS arm64 and Windows x64; before upload it checks
 the tag/version contract, runs `ostrinc --version`, executes `examples/hello.ostrin`, verifies the
 archive checksum, and runs both the extracted example and the packaged path-dependency project.

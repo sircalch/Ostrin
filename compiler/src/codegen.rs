@@ -524,9 +524,17 @@ static OstrinAllocation** ostrin_buckets = NULL;\n\
 static size_t ostrin_bucket_count = 0;\n\
 static size_t ostrin_hash_ptr(const void* ptr) {\n\
     uintptr_t x = (uintptr_t)ptr;\n\
+#if UINTPTR_MAX > UINT32_MAX\n\
     x ^= x >> 33;\n\
     x *= (uintptr_t)0xff51afd7ed558ccdULL;\n\
     x ^= x >> 33;\n\
+#else\n\
+    x ^= x >> 16;\n\
+    x *= (uintptr_t)0x7feb352dU;\n\
+    x ^= x >> 15;\n\
+    x *= (uintptr_t)0x846ca68bU;\n\
+    x ^= x >> 16;\n\
+#endif\n\
     return (size_t)x;\n\
 }\n\
 static void ostrin_table_insert(OstrinAllocation* entry) {\n\

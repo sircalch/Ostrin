@@ -299,7 +299,10 @@ El compilador, un programa Ostrin independiente y un proyecto con dependencia `p
 construyen como `wasm32-wasip1` mediante el workflow WASI, con toolchain fijado, ejecución bajo
 Node WASI y checksums reproducibles. La matriz también compila y ejecuta un contrato real de
 `args`/`env`, E/S de archivos y ownership gestionado; un script único captura stdout/stderr,
-compara salidas exactas y limpia los artefactos temporales. El backend de programas conserva C
+compara salidas exactas y limpia los artefactos temporales. La compilación usa el triple vigente
+`wasm32-wasip1`, mantiene el alias CLI histórico y exige un host con WebAssembly exception
+handling para la cancelación cooperativa basada en SJLJ. El hash de punteros y sus shifts están
+verificados también para el ancho de 32 bits de WASI. El backend de programas conserva C
 como representación intermedia y su runtime cooperativo separa los headers y primitivas de
 `--native-threads`; la emisión local verifica que ningún programa WASI habilita hilos nativos.
 El playground de navegador ya ejecuta el compilador WASM; la siguiente frontera es aislar más

@@ -577,7 +577,14 @@ fn run_codegen(
     let mut command = std::process::Command::new(&compiler);
     command.arg(&c_path).arg("-o").arg(&output_path).arg("-O2");
     if target == "wasm32-wasi" {
-        command.arg("--target=wasm32-wasi");
+        // wasi-sdk 34 no longer defaults the legacy `wasm32-wasi` triple to
+        // the right sysroot layout. Keep the CLI spelling for compatibility,
+        // but always ask Clang for the current WASI Preview 1 target. Ostrin's
+        // cooperative task cancellation uses setjmp/longjmp, which wasi-libc
+        // implements with the WebAssembly exception-handling proposal.
+        command.arg("--target=wasm32-wasip1");
+        command.arg("-Werror=shift-count-overflow");
+        command.args(["-mllvm", "-wasm-enable-sjlj"]);
         if let Ok(sysroot) = env::var("OSTRIN_WASI_SYSROOT") {
             command.arg(format!("--sysroot={sysroot}"));
         }

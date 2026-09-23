@@ -6174,3 +6174,26 @@ Verificación de esta continuación: `cargo test --manifest-path compiler/Cargo.
 `node scripts/wasi-program-check.mjs`, pero este entorno no tiene configurado `OSTRIN_WASI_CC`
 ni un compilador C de WASI; por eso no se pudo ejecutar aquí y queda cubierta por el workflow
 WASI fijado en `.github/workflows/wasi.yml`.
+
+## 251. WASI SDK 34 y portabilidad de punteros de 32 bits — 2026-09-22
+
+Se cerró la brecha entre el workflow fijado y las verificaciones locales: se instaló WASI SDK
+34.0 para Windows x64, se comprobó su SHA-256 oficial y se configuraron `OSTRIN_WASI_CC` y
+`OSTRIN_WASI_SYSROOT` para reproducir la matriz sin instalar herramientas globales del sistema.
+
+- Ostrin mantiene `--target wasm32-wasi` como nombre compatible de CLI, pero ahora solicita a
+  Clang el triple actual `wasm32-wasip1`. El runtime de cancelación cooperativa usa
+  `setjmp`/`longjmp`; por ello se habilita SJLJ con `-mllvm -wasm-enable-sjlj` y los programas
+  resultantes requieren un host WASI Preview 1 con soporte de WebAssembly exception handling.
+- La matriz compila con `-Werror=shift-count-overflow`. Ese control reveló que el hash de punteros
+  del registro de asignaciones desplazaba 33 bits sobre `uintptr_t`, también de 32 bits en WASI.
+  El runtime usa ahora mezclas distintas según `UINTPTR_MAX`, sin desplazamientos inválidos.
+- El workflow y la guía de distribución declaran explícitamente el requisito del host; `/dist/`
+  queda ignorado como salida generada de la matriz, sin mezclar los módulos de prueba con fuentes.
+
+Verificación de este bloque: `cargo test --manifest-path compiler/Cargo.toml` pasó con 2 pruebas
+unitarias, 6 diferenciales y 192 de integración; `node scripts/wasi-program-check.mjs` compiló y
+ejecutó los cinco módulos con salidas exactas y sin warnings de desplazamiento; `ostrinc.wasm`
+compiló para `wasm32-wasip1` y pasó `--check examples/hello.ostrin` bajo Node WASI; también
+pasaron `node scripts/website-check.mjs --wasm`, `node scripts/distribution-check.mjs` y
+`node scripts/website-check.mjs`.

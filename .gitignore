@@ -1,5 +1,6 @@
 # Rust build output
 /compiler/target/
+/dist/
 
 # Editor and operating-system files
 .vscode/

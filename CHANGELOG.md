@@ -25,6 +25,12 @@
   source line, shows its line/column in the editor header and clears the marker after a valid execution.
 
 ### Distribution
+- Updated the WASI C backend for wasi-sdk 34: the legacy Ostrin target spelling now maps to
+  Clang's `wasm32-wasip1` triple and enables SJLJ for cooperative task cancellation. WASI program
+  artifacts document their WebAssembly exception-handling host requirement. Fixed the allocation
+  table's pointer hash for 32-bit targets and made the smoke matrix reject over-width shifts.
+- Installed and verified the pinned WASI toolchain locally; all five end-to-end program modules
+  compiled and ran under Node WASI with exact output checks.
 - Hardened `.github/workflows/release.yml`: tagged releases must match the compiler package version,
   and each native archive is checksum-verified and executed after extraction. The smoke contract covers
   `--version`, `examples/hello.ostrin`, and the packaged local-path dependency project on Linux x86_64,

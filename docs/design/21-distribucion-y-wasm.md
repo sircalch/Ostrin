@@ -2,10 +2,10 @@
 
 ## Estado actual
 
-La superficie WASM distribuible incluye el propio compilador `ostrinc`, un programa Ostrin
-independiente y un proyecto con dependencia local `path`, todos compilados para `wasm32-wasip1`. El workflow
-`.github/workflows/wasi.yml` instala una versión fijada de `wasi-sdk`, compila los dos
-artefactos, los ejecuta bajo Node WASI, conserva sus SHA-256 y publica un artefacto
+La superficie WASM distribuible incluye el propio compilador `ostrinc` y cinco programas Ostrin,
+incluido un proyecto con dependencia local `path`, todos compilados para `wasm32-wasip1`. El workflow
+`.github/workflows/wasi.yml` instala una versión fijada de `wasi-sdk`, compila los artefactos,
+los ejecuta bajo Node WASI, conserva sus SHA-256 y publica un artefacto
 `ostrinc-wasm32-wasip1` en ejecuciones manuales o al crear un tag `v*`.
 
 El compilador WASI también se adapta a una página web mediante `website/playground.js`: el host
@@ -18,7 +18,10 @@ El runtime C generado separa ahora sus dos superficies: el modo cooperativo por 
 locks no-op y no incluye headers de pthread/Windows para hilos; solo `--native-threads` define
 `OSTRIN_NATIVE_THREADS` y activa mutexes, condiciones y threads del sistema operativo.
 Esto permite que el mismo backend C produzca un módulo WASI cooperativo; `--native-threads`
-continúa siendo incompatible con ese target.
+continúa siendo incompatible con ese target. El CLI conserva el nombre histórico `wasm32-wasi`,
+pero invoca Clang con el triple vigente `wasm32-wasip1`. Como el runtime de tareas usa
+`setjmp`/`longjmp` para cancelación cooperativa, la compilación activa SJLJ y los programas WASI
+resultantes requieren un host con WebAssembly exception handling.
 
 ## Reproducir localmente
 
@@ -32,18 +35,19 @@ cargo run --manifest-path compiler/Cargo.toml -- `
 ```
 
 El resultado queda en
-`compiler/target/wasm32-wasip1/release/ostrinc.wasm`. Para usarlo hace falta un runtime
-WASI 0.2 compatible; el workflow conserva el checksum para que una descarga se pueda verificar
-antes de ejecutarla.
+`compiler/target/wasm32-wasip1/release/ostrinc.wasm`. Los programas emitidos usan WASI Preview 1;
+para ejecutar la cancelación cooperativa hace falta un host con WebAssembly exception handling.
+El workflow conserva los SHA-256 para verificar cada módulo antes de ejecutarlo.
 
 ## Verificación ejecutable
 
 El workflow arranca `ostrinc.wasm` bajo Node WASI preview1 con
 `--check examples/hello.ostrin` y un preopen del workspace. Después arranca `hello.wasm`
 con el mismo host. También ejecuta `pkg_project.wasm`, cuya entrada se selecciona desde
-`ostrin.toml` y que importa `shared_lib` mediante una dependencia `path`. Esto verifica que
-la distribución acepta argumentos, puede leer un archivo Ostrin, resuelve paquetes locales y
-que el backend de programas produce comandos WASI ejecutables.
+`ostrin.toml` y que importa `shared_lib` mediante una dependencia `path`. La matriz ejecuta cinco
+programas y compara salidas completas para argumentos, entorno, I/O de archivos y ownership.
+Clang trata como error los desplazamientos mayores que el ancho del operando, para proteger el
+runtime de punteros de 32 bits.
 La misma comprobación local puede ejecutarse, después de compilar, con:
 
     node --input-type=module -e "import { WASI } from 'node:wasi'; import { readFileSync } from 'node:fs'; const wasi = new WASI({ version: 'preview1', args: ['ostrinc', '--check', 'examples/hello.ostrin'], preopens: { '.': process.cwd() }, returnOnExit: true }); const mod = await WebAssembly.compile(readFileSync('compiler/target/wasm32-wasip1/release/ostrinc.wasm')); const instance = await WebAssembly.instantiate(mod, wasi.getImportObject()); const code = wasi.start(instance); if (code !== 0) process.exit(code);"
