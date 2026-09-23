@@ -1,6 +1,6 @@
 # Ostrin website audit
 
-*Cut: 2026-09-22 · source counts and public fallbacks are checked by `scripts/website-check.mjs`.*
+*Cut: 2026-09-23 · source counts and public fallbacks are checked by `scripts/website-check.mjs`.*
 
 This is a current inventory, not a roadmap claim. Public statements should remain tied to code,
 tests or an explicitly labeled early-stage surface.
@@ -20,11 +20,11 @@ tests or an explicitly labeled early-stage surface.
 
 ## Verified inventory
 
-- **195** `.ostrin` source files under `examples/`, including package-project sources and
+- **196** `.ostrin` source files under `examples/`, including package-project sources and
   intentional error cases.
 - **22** Markdown design documents under `docs/design/`.
-- Compiler suite: **197 integration**, **6 differential** and **2 unit** tests.
-- WASI release smoke matrix: six program modules covering the hello program, a local-path
+- Compiler suite: **198 integration**, **6 differential** and **2 unit** tests.
+- WASI release smoke matrix: seven program modules covering the hello program, a local-path
   package, arguments/environment, file I/O, managed ownership and nested `Option`/`Result`
   consumers; compiler and program modules
   are executed under Node WASI.

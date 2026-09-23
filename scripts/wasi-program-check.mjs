@@ -55,6 +55,12 @@ const programs = [
     args: ["native_ir_nested_wrappers.wasm"],
     expected: "nested\ninner none\nok\nnested error\nnested\nouter fallback\nok\nok fallback\nnested\n",
   },
+  {
+    name: "native_ir_function_values",
+    source: "examples/native_ir_function_values.ostrin",
+    args: ["native_ir_function_values.wasm"],
+    expected: "5\n10\n",
+  },
 ];
 
 function fail(message) {

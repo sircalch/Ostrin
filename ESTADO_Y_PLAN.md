@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-23 · rama `main` · 6 pruebas diferenciales, 197 de integración y 2 unitarias en verde.*
+*Corte: 2026-09-23 · rama `main` · 6 pruebas diferenciales, 198 de integración y 2 unitarias en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
 Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–250); para el diseño
@@ -303,7 +303,7 @@ CI de GitHub con matriz Windows/Linux/macOS, binarios de release.
 ### E. Backends adicionales
 El compilador, un programa Ostrin independiente y un proyecto con dependencia `path` ya se
 construyen como `wasm32-wasip1` mediante el workflow WASI, con toolchain fijado, ejecución bajo
-Node WASI y checksums reproducibles. La matriz de seis programas también compila y ejecuta un
+Node WASI y checksums reproducibles. La matriz de siete programas también compila y ejecuta un
 contrato real de `args`/`env`, E/S de archivos, ownership gestionado y consumidores anidados
 `Option`/`Result`; un script único captura stdout/stderr,
 compara salidas exactas y limpia los artefactos temporales. La compilación usa el triple vigente
@@ -359,7 +359,7 @@ Decisiones que necesito de ti para afinar el plan:
 
 ```powershell
 cd compiler
-    cargo test                                   # 6 diferenciales + 182 de integración + 2 unitarias
+    cargo test                                   # 6 diferenciales + 198 de integración + 2 unitarias
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```

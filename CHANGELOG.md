@@ -16,6 +16,10 @@
 - Corrected channel transfer semantics for mutable records: the sender binding remains statically
   moved, while the `Some(value)` receiver regains access after the dynamic in-flight guard is
   cleared. Pattern bindings now release the transferred native reference on every backend path.
+- Moved named function values and indirect calls into the ownership-lowered IR/C path. The native
+  emitter now supplies closure-ABI adapters for global functions, so passing a function as a
+  parameter and invoking a local function value no longer forces a HIR fallback; captured lambdas
+  remain on their existing HIR path until environment lifetime is modeled in IR.
 
 ### Website and discovery
 - Added a pinned Playwright browser suite and a shared CI/Pages verification action. It compiles the
@@ -27,7 +31,7 @@
   positioning. All nine public pages now share the large Twitter/OG card metadata, and
   `website-check.mjs` validates the PNG signature, dimensions, per-page image URL, alt text, type
   and consistent titles/descriptions before CI or Pages can publish.
-- Refreshed repository-backed public counts to 195 source programs and 197 integration tests,
+- Refreshed repository-backed public counts to 196 source programs and 198 integration tests,
   aligned the static version fallbacks, and replaced the stale website audit with a current feature
   inventory. `website-check.mjs` now derives version, example/design counts and Rust test totals,
   then verifies the public JS, every HTML fallback, README, roadmap and audit in CI and Pages builds.

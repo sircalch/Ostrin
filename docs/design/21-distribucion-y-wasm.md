@@ -2,7 +2,7 @@
 
 ## Estado actual
 
-La superficie WASM distribuible incluye el propio compilador `ostrinc` y seis programas Ostrin,
+La superficie WASM distribuible incluye el propio compilador `ostrinc` y siete programas Ostrin,
 incluido un proyecto con dependencia local `path`, todos compilados para `wasm32-wasip1`. El workflow
 `.github/workflows/wasi.yml` instala una versión fijada de `wasi-sdk`, compila los artefactos,
 los ejecuta bajo Node WASI, conserva sus SHA-256 y publica un artefacto
@@ -44,7 +44,7 @@ El workflow conserva los SHA-256 para verificar cada módulo antes de ejecutarlo
 El workflow arranca `ostrinc.wasm` bajo Node WASI preview1 con
 `--check examples/hello.ostrin` y un preopen del workspace. Después arranca `hello.wasm`
 con el mismo host. También ejecuta `pkg_project.wasm`, cuya entrada se selecciona desde
-`ostrin.toml` y que importa `shared_lib` mediante una dependencia `path`. La matriz ejecuta seis
+`ostrin.toml` y que importa `shared_lib` mediante una dependencia `path`. La matriz ejecuta siete
 programas y compara salidas completas para argumentos, entorno, I/O de archivos y ownership.
 Clang trata como error los desplazamientos mayores que el ancho del operando, para proteger el
 runtime de punteros de 32 bits.

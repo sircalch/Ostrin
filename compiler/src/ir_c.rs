@@ -57,7 +57,7 @@ fn c_type(ty: &Ty, records: &RecordFields) -> Bail<String> {
             format!("Map_{}_{}*", mangle_scalar(key), mangle_scalar(value))
         }
         Ty::Set(element) if set_supported(element) => format!("Set_{}*", mangle_scalar(element)),
-        Ty::Fn(_, _) => "void*".to_string(),
+        Ty::Fn(_, _) => "OstrinClosure".to_string(),
         Ty::Named(name) if records.contains_key(name) => format!("{name}*"),
         Ty::Applied(name, args) if name == "Channel" && args.len() == 1 && channel_supported(&args[0], records) => {
             format!("Channel_{}*", mangle_option_payload(&args[0], records))
@@ -296,6 +296,27 @@ fn value_ty(values: &Values, value: ValueId) -> Bail<Ty> {
     values.get(&value).map(|(_, ty)| ty.clone()).ok_or(())
 }
 
+fn closure_adapter_name(owner: &str, target: &str) -> String {
+    format!(
+        "ostrin_ir_closure_{}_{}",
+        crate::codegen::c_function_name(owner),
+        crate::codegen::c_function_name(target)
+    )
+}
+
+fn closure_fn_type(params: &[Ty], ret: &Ty, records: &RecordFields) -> Bail<String> {
+    let params = params
+        .iter()
+        .map(|ty| c_type(ty, records))
+        .collect::<Bail<Vec<_>>>()?;
+    let ret = c_type(ret, records)?;
+    let params = std::iter::once("void*".to_string())
+        .chain(params)
+        .collect::<Vec<_>>()
+        .join(", ");
+    Ok(format!("{ret} (*)({params})"))
+}
+
 fn defined_value(instruction: &IrInstr) -> Option<(ValueId, Ty)> {
     match instruction {
         IrInstr::Param { dst, ty, .. }
@@ -324,6 +345,9 @@ fn defined_value(instruction: &IrInstr) -> Option<(ValueId, Ty)> {
         IrInstr::Call {
             dst: Some(dst), ty, ..
         }
+        | IrInstr::ClosureCall {
+            dst: Some(dst), ty, ..
+        }
         | IrInstr::MethodCall {
             dst: Some(dst), ty, ..
         }
@@ -332,6 +356,7 @@ fn defined_value(instruction: &IrInstr) -> Option<(ValueId, Ty)> {
         } => Some((*dst, ty.clone())),
         IrInstr::StoreLocal { .. }
         | IrInstr::Call { dst: None, .. }
+        | IrInstr::ClosureCall { dst: None, .. }
         | IrInstr::MethodCall { dst: None, .. }
         | IrInstr::Opaque { dst: None, .. }
         | IrInstr::ChannelSend { .. }
@@ -563,6 +588,7 @@ fn format_float_result_code(value: &str, digits: &str) -> String {
 fn emit_instruction(
     instruction: &IrInstr,
     values: &Values,
+    owner: &str,
     known_functions: &FunctionNames,
     methods: &MethodNames,
     records: &RecordFields,
@@ -592,10 +618,11 @@ fn emit_instruction(
                     ));
                 }
                 Ty::Fn(_, _) if known_functions.contains_key(name) => {
+                    let adapter = closure_adapter_name(owner, name);
                     out.push_str(&format!(
-                        "    {} = (void*){};\n",
+                        "    {} = ((OstrinClosure){{ (void*){}, NULL }});\n",
                         value_name(*dst),
-                        known_functions.get(name).expect("known function name")
+                        adapter
                     ));
                 }
                 _ => return Err(()),
@@ -1126,14 +1153,6 @@ fn emit_instruction(
             if !supported(ty, records) {
                 return Err(());
             }
-            // Function values still use the closure ABI in the HIR/AST emitters.
-            // The IR path only keeps a static function's provenance so a local
-            // `try catch` alias can lower to a direct call; passing or returning
-            // a function value requires an indirect closure call and must fall
-            // back until that ABI exists in this emitter.
-            if matches!(ty, Ty::Fn(_, _)) || args.iter().any(|value| matches!(value_ty(values, *value), Ok(Ty::Fn(_, _)))) {
-                return Err(());
-            }
             let codes = args
                 .iter()
                 .map(|value| value_code(values, *value))
@@ -1300,6 +1319,44 @@ fn emit_instruction(
                     codes.join(", ")
                 )
             };
+            if let Some(dst) = dst {
+                if *ty == Ty::Void {
+                    return Err(());
+                }
+                out.push_str(&format!("    {} = {call};\n", value_name(*dst)));
+            } else {
+                if *ty != Ty::Void {
+                    return Err(());
+                }
+                out.push_str(&format!("    {call};\n"));
+            }
+        }
+        IrInstr::ClosureCall {
+            dst,
+            callee,
+            args,
+            ty,
+        } => {
+            let Ty::Fn(params, ret) = value_ty(values, *callee)? else { return Err(()) };
+            if *ret != *ty || params.len() != args.len() || !supported(ty, records) {
+                return Err(());
+            }
+            for (param, arg) in params.iter().zip(args) {
+                if value_ty(values, *arg)? != *param || !supported(param, records) {
+                    return Err(());
+                }
+            }
+            let closure = value_code(values, *callee)?;
+            let fn_type = closure_fn_type(&params, &ret, records)?;
+            let mut call_args = Vec::with_capacity(args.len() + 1);
+            call_args.push(format!("{closure}.env"));
+            for arg in args {
+                call_args.push(value_code(values, *arg)?);
+            }
+            let call = format!(
+                "({{ OstrinClosure __ostrin_closure = {closure}; (({fn_type})__ostrin_closure.fn)({}); }})",
+                call_args.join(", ")
+            );
             if let Some(dst) = dst {
                 if *ty == Ty::Void {
                     return Err(());
@@ -1718,6 +1775,7 @@ fn used_values(instruction: &IrInstr) -> Vec<ValueId> {
         IrInstr::Unary { operand, .. } => vec![*operand],
         IrInstr::Binary { left, right, .. } => vec![*left, *right],
         IrInstr::Call { args, .. } => args.clone(),
+        IrInstr::ClosureCall { callee, args, .. } => std::iter::once(*callee).chain(args.iter().copied()).collect(),
         IrInstr::MethodCall { receiver, args, .. } => std::iter::once(*receiver).chain(args.iter().copied()).collect(),
         IrInstr::Field { object, .. } => vec![*object],
         IrInstr::Index { object, index, .. } => vec![*object, *index],
@@ -1772,6 +1830,72 @@ fn reachable_region_blocks(function: &IrFunction, root: BlockId) -> Bail<Vec<Blo
     let mut blocks: Vec<_> = seen.into_iter().collect();
     blocks.sort_unstable();
     Ok(blocks)
+}
+
+fn build_closure_adapters(
+    function: &IrFunction,
+    known_functions: &FunctionNames,
+    records: &RecordFields,
+) -> Bail<Vec<(String, String)>> {
+    let mut targets = HashSet::new();
+    for block in &function.blocks {
+        for instruction in &block.instructions {
+            if let IrInstr::Global {
+                name,
+                ty: Ty::Fn(_, _),
+                ..
+            } = instruction
+            {
+                targets.insert(name.clone());
+            }
+        }
+    }
+
+    let mut adapters = Vec::new();
+    let mut targets: Vec<_> = targets.into_iter().collect();
+    targets.sort();
+    for target in targets {
+        let c_target = known_functions.get(&target).ok_or(())?;
+        let adapter = closure_adapter_name(&function.name, &target);
+        let Ty::Fn(params, ret) = function
+            .blocks
+            .iter()
+            .flat_map(|block| block.instructions.iter())
+            .find_map(|instruction| match instruction {
+                IrInstr::Global { name, ty, .. } if *name == target => Some(ty.clone()),
+                _ => None,
+            })
+            .ok_or(())?
+        else {
+            return Err(());
+        };
+        let c_params = params
+            .iter()
+            .enumerate()
+            .map(|(index, ty)| Ok(format!("{} arg{index}", c_type(ty, records)?)))
+            .collect::<Bail<Vec<_>>>()?;
+        let signature = format!(
+            "static {} {adapter}(void* __env{} )",
+            c_type(&ret, records)?,
+            if c_params.is_empty() {
+                String::new()
+            } else {
+                format!(", {}", c_params.join(", "))
+            }
+        );
+        let mut body = String::from("    (void)__env;\n");
+        let call_args = (0..params.len())
+            .map(|index| format!("arg{index}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        if ret.as_ref() == &Ty::Void {
+            body.push_str(&format!("    {c_target}({call_args});\n"));
+        } else {
+            body.push_str(&format!("    return {c_target}({call_args});\n"));
+        }
+        adapters.push((signature, body));
+    }
+    Ok(adapters)
 }
 
 pub struct Generated {
@@ -1968,6 +2092,7 @@ fn build_spawn_helpers(
                 emit_instruction(
                     instruction,
                     &helper_values,
+                    &function.name,
                     known_functions,
                     methods,
                     records,
@@ -2038,7 +2163,9 @@ pub fn generate_with_helpers(
 
     let values = collect_values(function, records).ok()?;
     let mut spawn_helpers = SpawnHelpers::new();
-    let (helper_declarations, helpers) = build_spawn_helpers(
+    let mut helper_declarations = Vec::new();
+    let mut helpers = build_closure_adapters(function, known_functions, records).ok()?;
+    let (spawn_declarations, spawn_helper_bodies) = build_spawn_helpers(
         function,
         &values,
         known_functions,
@@ -2047,6 +2174,8 @@ pub fn generate_with_helpers(
         &mut spawn_helpers,
         helper,
     ).ok()?;
+    helper_declarations.extend(spawn_declarations);
+    helpers.extend(spawn_helper_bodies);
     let mut region_blocks = HashSet::new();
     for root in spawn_helpers.keys().copied() {
         region_blocks.extend(reachable_region_blocks(function, root).ok()?);
@@ -2095,7 +2224,7 @@ pub fn generate_with_helpers(
         }
         out.push_str(&format!("{}:\n", block_label(block.id)));
         for instruction in &block.instructions {
-            emit_instruction(instruction, &values, known_functions, methods, records, &spawn_helpers, helper, &mut out).ok()?;
+            emit_instruction(instruction, &values, &function.name, known_functions, methods, records, &spawn_helpers, helper, &mut out).ok()?;
         }
         emit_terminator(
             function,

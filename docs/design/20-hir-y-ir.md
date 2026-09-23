@@ -12,7 +12,8 @@ de archivo administrados, comprobación de lectura/escritura/cierre y un checkpo
 antes de cruzar la libc; la operación de archivo sigue siendo bloqueante mientras está dentro del
 host. Todos estos valores conservan sus marcadores de ownership, transferencia de `Phi` simples y
 patrones simples
-`Some`/`None`; el backend mantiene
+`Some`/`None`; las funciones globales sin entorno usadas como valores también cruzan ahora la IR
+mediante `ClosureCall` y adaptadores al ABI `(env, args...)`; el backend mantiene
 HIR/AST como fallback verificado para otros payloads gestionados e iteradores propios genéricos o indirectos,
 patrones anidados, agregados complejos y escapes mientras la migración crece. Los `for`
 sobre rangos enteros —incluidos `to`/`until`, pasos positivos/negativos y paso cero— ya
@@ -108,8 +109,9 @@ Sobre este IR se hacen los análisis que el texto C no permite:
    lineales de `unwrap`/`unwrap_or`/`ok`/`ok_or` sobre `Option<Option<String>>` y
    `Result<Option<String>, String>` ya extraen y retienen payloads recursivos en IR/C; el ejemplo
    `native_ir_nested_wrappers.ostrin` comprueba ramas y fallbacks con paridad y cero fugas.
-5. **Cierres y funciones como valores**: añadir llamadas indirectas y transferencias de ownership
-   para cierres con entorno; retirar la comprobación dinámica de E1101 cuando el backend consuma
+5. **Cierres y funciones como valores**: las funciones globales sin entorno ya tienen `ClosureCall`
+   y adaptadores nativos; falta añadir llamadas indirectas y transferencias de ownership para
+   cierres con entorno. Retirar la comprobación dinámica de E1101 requiere que el backend consuma
    la IR transformada de forma completa.
 6. Optimizador y, después, otros backends (LLVM, WASM, GPU) que consumen el mismo IR.
 

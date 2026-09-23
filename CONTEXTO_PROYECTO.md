@@ -6353,3 +6353,28 @@ Verificación de este bloque: `cargo test --manifest-path compiler/Cargo.toml` p
 6 diferenciales y 197 de integración; `npm test` pasó 4/4 pruebas Playwright; `website-check.mjs`
 validó 9 páginas y 197 pruebas; la matriz WASI de 6 programas, distribución, checksums e
 instaladores también pasaron.
+
+## 259. Valores de función nombrada y llamadas indirectas en IR/C — 2026-09-23
+
+La frontera entre HIR y la IR todavía rechazaba cualquier función que apareciera como valor:
+una llamada como `operation(value)` se convertía en `Opaque`, aunque el emisor HIR ya tenía
+un ABI de closure para funciones globales sin entorno. Se cerró esa inconsistencia para la forma
+sin captura:
+
+- La IR distingue `ClosureCall` de una llamada estática. El lowering conserva el valor callee,
+  y el emisor C valida la firma completa, prepara el `OstrinClosure` y llama mediante su puntero
+  con `env == NULL`.
+- Cada función global usada como valor recibe un adaptador C con la firma `(void*, args...)`;
+  así la representación es portable dentro del ABI de closures y no depende de invocar una
+  función C ordinaria con una convención incompatible.
+- Los valores de función pueden copiarse a locales, pasarse como parámetros y devolverse desde
+  llamadas indirectas dentro de la IR. Las lambdas capturadas y sus entornos siguen en HIR hasta
+  que el análisis de lifetime del entorno tenga una representación explícita en IR.
+- `examples/native_ir_function_values.ostrin` cubre llamada local y paso a `apply`. La regresión
+  exige tres funciones `ir-generated`, cero `hir-generated`, paridad exacta y `live_allocations=0`.
+
+Verificación de este bloque: el ejemplo pasa en intérprete, `--native-type-report` y binario C con
+`--leak-check`; la prueba dirigida pasa con 198 integraciones. La matriz WASI se amplió a siete
+programas y ejecutó el nuevo módulo bajo Node WASI con salida exacta; `website-check.mjs` y
+`distribution-check.mjs` también pasan. Se actualizaron los contadores públicos a 196 programas
+fuente y 198 pruebas de integración.

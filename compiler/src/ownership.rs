@@ -792,7 +792,7 @@ fn safe_release_site(instruction: &IrInstr) -> bool {
         // local ownership after any direct call. `Some` is included here as
         // well because its constructor retains the payload before returning
         // the option value.
-        IrInstr::Call { .. } => true,
+        IrInstr::Call { .. } | IrInstr::ClosureCall { .. } => true,
         IrInstr::MethodCall { method, .. } => matches!(
             method.as_str(),
             "length"
@@ -1129,10 +1129,12 @@ fn defined_value(instruction: &IrInstr) -> Option<(ValueId, Ty)> {
         | IrInstr::Phi { dst, ty, .. } => Some((*dst, ty.clone())),
         IrInstr::PatternTest { dst, .. } | IrInstr::TryCheck { dst, .. } | IrInstr::IterHasNext { dst, .. } => Some((*dst, Ty::Bool)),
         IrInstr::Call { dst: Some(dst), ty, .. }
+        | IrInstr::ClosureCall { dst: Some(dst), ty, .. }
         | IrInstr::MethodCall { dst: Some(dst), ty, .. }
         | IrInstr::Opaque { dst: Some(dst), ty, .. } => Some((*dst, ty.clone())),
         IrInstr::StoreLocal { .. }
         | IrInstr::Call { dst: None, .. }
+        | IrInstr::ClosureCall { dst: None, .. }
         | IrInstr::MethodCall { dst: None, .. }
         | IrInstr::Opaque { dst: None, .. }
         | IrInstr::ChannelSend { .. }
@@ -1149,6 +1151,7 @@ fn used_values(instruction: &IrInstr) -> Vec<ValueId> {
         IrInstr::Unary { operand, .. } => vec![*operand],
         IrInstr::Binary { left, right, .. } => vec![*left, *right],
         IrInstr::Call { args, .. } => args.clone(),
+        IrInstr::ClosureCall { callee, args, .. } => std::iter::once(*callee).chain(args.iter().copied()).collect(),
         IrInstr::MethodCall { receiver, args, .. } => std::iter::once(*receiver).chain(args.iter().copied()).collect(),
         IrInstr::Field { object, .. } => vec![*object],
         IrInstr::Index { object, index, .. } => vec![*object, *index],

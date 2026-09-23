@@ -85,6 +85,16 @@ pub enum IrInstr {
         args: Vec<ValueId>,
         ty: Ty,
     },
+    /// Calls a function value through the closure ABI. The first native
+    /// lowering supports named functions (whose environment is null); a
+    /// captured lambda remains in HIR/AST until its environment lifetime is
+    /// represented in this IR as well.
+    ClosureCall {
+        dst: Option<ValueId>,
+        callee: ValueId,
+        args: Vec<ValueId>,
+        ty: Ty,
+    },
     MethodCall {
         dst: Option<ValueId>,
         method: String,
@@ -1758,13 +1768,11 @@ impl Builder {
                 dst
             }
             HirKind::Call { callee, args, .. } => {
-                let callee_name = match &callee.kind {
-                    HirKind::Global(name) => name.clone(),
-                    _ => {
-                        let _ = self.lower_expr(callee);
-                        "<dynamic>".to_string()
-                    }
+                let static_callee = match &callee.kind {
+                    HirKind::Global(name) => Some(name.clone()),
+                    _ => None,
                 };
+                let callee_value = (!static_callee.is_some()).then(|| self.lower_expr(callee));
                 let args: Vec<ValueId> =
                     args.iter().map(|arg| self.lower_expr(&arg.value)).collect();
                 let dst = if expression.ty == Ty::Void {
@@ -1772,12 +1780,21 @@ impl Builder {
                 } else {
                     Some(self.fresh())
                 };
-                self.emit(IrInstr::Call {
-                    dst,
-                    callee: callee_name,
-                    args,
-                    ty: expression.ty.clone(),
-                });
+                if let Some(callee) = static_callee {
+                    self.emit(IrInstr::Call {
+                        dst,
+                        callee,
+                        args,
+                        ty: expression.ty.clone(),
+                    });
+                } else {
+                    self.emit(IrInstr::ClosureCall {
+                        dst,
+                        callee: callee_value.expect("dynamic callee lowered above"),
+                        args,
+                        ty: expression.ty.clone(),
+                    });
+                }
                 dst.unwrap_or_else(|| self.unit())
             }
             HirKind::MethodCall {
@@ -2177,6 +2194,9 @@ fn defined_value_type(instruction: &IrInstr) -> Option<(ValueId, Ty)> {
         IrInstr::Call {
             dst: Some(dst), ty, ..
         }
+        | IrInstr::ClosureCall {
+            dst: Some(dst), ty, ..
+        }
         | IrInstr::MethodCall {
             dst: Some(dst), ty, ..
         }
@@ -2185,6 +2205,7 @@ fn defined_value_type(instruction: &IrInstr) -> Option<(ValueId, Ty)> {
         } => Some((*dst, ty.clone())),
         IrInstr::StoreLocal { .. }
         | IrInstr::Call { dst: None, .. }
+        | IrInstr::ClosureCall { dst: None, .. }
         | IrInstr::MethodCall { dst: None, .. }
         | IrInstr::Opaque { dst: None, .. }
         | IrInstr::ChannelSend { .. }
@@ -2377,6 +2398,11 @@ fn display_instruction(instruction: &IrInstr) -> String {
         IrInstr::Call {
             dst, callee, args, ..
         } => format!("{}call {callee}({})", result_prefix(*dst), value_list(args)),
+        IrInstr::ClosureCall { dst, callee, args, .. } => format!(
+            "{}closure_call %{callee}({})",
+            result_prefix(*dst),
+            value_list(args)
+        ),
         IrInstr::MethodCall {
             dst,
             method,

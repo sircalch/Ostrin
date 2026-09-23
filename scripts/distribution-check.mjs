@@ -39,9 +39,10 @@ for (const marker of [
   "native_ir_file_io.wasm",
   "native_ir_managed_consumers.wasm",
   "native_ir_nested_wrappers.wasm",
+  "native_ir_function_values.wasm",
   "sha256sum dist/ostrinc.wasm dist/hello.wasm dist/pkg_project.wasm dist/wasi_io_contract.wasm",
-  "dist/native_ir_managed_consumers.wasm dist/native_ir_nested_wrappers.wasm > dist/SHA256SUMS",
-  "native_ir_managed_consumers.wasm native_ir_nested_wrappers.wasm SHA256SUMS README.txt",
+  "dist/native_ir_managed_consumers.wasm dist/native_ir_nested_wrappers.wasm dist/native_ir_function_values.wasm > dist/SHA256SUMS",
+  "native_ir_managed_consumers.wasm native_ir_nested_wrappers.wasm native_ir_function_values.wasm SHA256SUMS README.txt",
 ]) {
   requireText(wasi, marker, "WASI program matrix");
 }
