@@ -1,12 +1,5 @@
 (function () {
-  const SITE_FACTS = Object.freeze({
-    version: '0.1.0',
-    designDocs: '22',
-    examples: '196',
-    integrationTests: '198',
-    differentialTests: '6',
-    unitTests: '2',
-  });
+  const SITE_FACTS = Object.freeze(globalThis.OSTRIN_SITE_FACTS || {});
 
   document.querySelectorAll('.version').forEach(function (label) {
     label.textContent = 'development / ' + SITE_FACTS.version;

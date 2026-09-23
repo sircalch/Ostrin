@@ -31,12 +31,14 @@ tests or an explicitly labeled early-stage surface.
 - The browser playground uses the generated compiler WASM and the real CLI in an in-memory WASI
   filesystem; it is not a JavaScript reimplementation of the language.
 
-`website/site.js` holds the public display facts. `scripts/website-check.mjs` derives the expected
-version and counts from `compiler/Cargo.toml`, the source tree and Rust test attributes, then checks
-the JS values, every HTML fallback, README, roadmap and this audit. It also validates the social
-card's PNG signature and dimensions and requires consistent Open Graph/Twitter metadata on every
-public page. CI and the Pages build run the check, so stale facts or missing social assets fail
-before publication.
+`website/site-data.js` is generated from the repository and holds the public display facts consumed
+by every page before `website/site.js` runs. `scripts/site-facts.mjs` derives the expected version
+and counts from `compiler/Cargo.toml`, the source tree and Rust test attributes, while
+`scripts/website-metadata.mjs` writes or checks the generated artifact. `scripts/website-check.mjs`
+then verifies the artifact, every HTML placeholder, README, roadmap and this audit. It also validates
+the social card's PNG signature and dimensions and requires consistent Open Graph/Twitter metadata
+on every public page. CI and the Pages build run both checks, so stale facts or missing social assets
+fail before publication.
 
 ## Remaining constraints
 

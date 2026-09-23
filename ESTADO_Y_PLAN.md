@@ -325,14 +325,15 @@ El sitio web y el playground real WASM ya están publicados; la primera base de 
 añade SEO técnico, cifras centralizadas, una demo viva en la portada y enlaces compartibles.
 El catálogo ya tiene demos live para cantidades, biblioteca estándar, records/enums y concurrencia,
 con Run/Check/Reset/Copy sobre el mismo módulo WASM. CI valida ahora enlaces, metadata, sitemap,
-robots y el artefacto WASM generado por Pages. `showcase.html` expone programas source-backed de
+robots, el artefacto WASM generado por Pages y la metadata generada de versión/métricas. `showcase.html` expone programas source-backed de
 cantidades, tablas, SVG y autodiff; `community.html` y las plantillas de GitHub preparan la
 contribución sin inventar canales externos. `docs.html` añade una ruta guiada de 14 pasos con
 enlaces a fuentes, referencia, playground y showcase; los pasos distinguen `available` de `early`
 sin prometer capacidades no implementadas. El playground y sus live examples renderizan ahora
 diagnósticos JSON reales con código, ubicación, severidad y mensaje, y seleccionan la línea
-diagnosticada en el editor. Siguiente: prueba responsive móvil con viewport dedicado y mejora
-incremental del learning funnel.
+diagnosticada en el editor. La versión y las métricas públicas ahora salen de
+`scripts/site-facts.mjs`/`website/site-data.js`, con una comprobación de frescura en CI. Siguiente:
+prueba responsive móvil con viewport dedicado y mejora incremental del learning funnel.
 La gramática para Linguist queda separada porque requiere uso público suficiente.
 
 ---

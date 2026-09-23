@@ -28,6 +28,10 @@
   remain on their existing HIR path until environment lifetime is modeled in IR.
 
 ### Website and discovery
+- Replaced manually duplicated website version and inventory facts with generated `website/site-data.js`.
+  `scripts/site-facts.mjs` derives the compiler version, source/design counts and Rust test totals;
+  `scripts/website-metadata.mjs` writes or checks the artifact, while every public page consumes it
+  before `site.js`. CI and Pages now fail before publication when the generated metadata is stale.
 - Added a pinned Playwright browser suite and a shared CI/Pages verification action. It compiles the
   current compiler to WASM, runs the real homepage program and diagnostic in Chromium, verifies
   mobile/tablet navigation and checks all nine public pages for horizontal overflow at 390 and

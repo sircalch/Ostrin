@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { collectSiteFacts } from "./site-facts.mjs";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const websiteRoot = path.join(repositoryRoot, "website");
@@ -40,31 +41,17 @@ if (existsSync(socialCardAbsolutePath)) {
   }
 }
 
-function filesUnder(directory) {
-  return readdirSync(path.join(repositoryRoot, directory), { withFileTypes: true }).flatMap((entry) => {
-    const relativePath = path.join(directory, entry.name);
-    return entry.isDirectory() ? filesUnder(relativePath) : [relativePath];
-  });
+let facts;
+try {
+  facts = collectSiteFacts();
+} catch (error) {
+  check(false, error.message);
+  facts = {};
 }
-
-function countRustTests(relativePath) {
-  return [...read(relativePath).replaceAll("\r\n", "\n").matchAll(/^\s*#\[test\]\s*$/gm)].length;
-}
-
-const version = read("compiler/Cargo.toml").match(/^version\s*=\s*"([^"]+)"/m)?.[1];
-check(Boolean(version), "compiler/Cargo.toml: unable to determine package version");
-const facts = {
-  version,
-  designDocs: String(filesUnder("docs/design").filter((file) => file.endsWith(".md")).length),
-  examples: String(filesUnder("examples").filter((file) => file.endsWith(".ostrin")).length),
-  integrationTests: String(countRustTests("compiler/tests/examples.rs")),
-  differentialTests: String(countRustTests("compiler/tests/differential.rs")),
-  unitTests: String(countRustTests("compiler/src/fmt.rs")),
-};
-const siteScript = read("website/site.js");
+const siteData = read("website/site-data.js");
 for (const [key, expected] of Object.entries(facts)) {
-  const actual = siteScript.match(new RegExp(`\\b${key}:\\s*'([^']+)'`))?.[1];
-  check(actual === expected, `website/site.js: ${key} is ${actual ?? "missing"}, expected ${expected}`);
+  const actual = siteData.match(new RegExp(`\\b${key}\\":\\s*\\"([^\\"]+)\\"`))?.[1];
+  check(actual === expected, `website/site-data.js: ${key} is ${actual ?? "missing"}, expected ${expected}`);
 }
 
 const readme = read("README.md");
@@ -80,6 +67,7 @@ check(audit.includes("**" + facts.examples + "** `.ostrin` source files")
 
 for (const page of publicPages) {
   const html = read(`website/${page}`);
+  check(html.includes('<script src="site-data.js" defer></script>'), `${page}: missing generated site data script`);
   check(/<title>[^<]+<\/title>/i.test(html), `${page}: missing title`);
   check(/<link rel="canonical" href="[^"]+">/i.test(html), `${page}: missing canonical`);
   check(/property="og:title"/i.test(html), `${page}: missing og:title`);
@@ -100,12 +88,12 @@ for (const page of publicPages) {
     `${page}: missing or outdated Twitter image`);
   check(html.includes('<meta name="twitter:image:alt" content="Ostrin programming language: scientific-first, general-purpose, native C and WASI.">'),
     `${page}: missing or outdated Twitter image description`);
-  const versions = [...html.matchAll(/<span class="version">([^<]*)<\/span>/g)].map((match) => match[1]);
-  check(versions.length > 0 && versions.every((label) => label === `development / ${facts.version}`),
-    `${page}: static version label drifted from compiler/Cargo.toml`);
+  const versions = [...html.matchAll(/<span class="version"[^>]*>([^<]*)<\/span>/g)].map((match) => match[1]);
+  check(versions.length > 0 && versions.every((label) => label.trim() === ""),
+    `${page}: version label must be populated from website/site-data.js`);
   for (const [, key, value] of html.matchAll(/data-site-value="([^"]+)"\s*>([^<]*)/g)) {
     check(facts[key] !== undefined, `${page}: unknown public fact ${key}`);
-    if (facts[key] !== undefined) check(value.trim() === facts[key], `${page}: static ${key} value drifted from source`);
+    if (facts[key] !== undefined) check(value.trim() === "", `${page}: static ${key} value must come from website/site-data.js`);
   }
 
   for (const match of html.matchAll(/(?:href|src)="([^"]+)"/gi)) {

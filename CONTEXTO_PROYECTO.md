@@ -6399,3 +6399,22 @@ siguiente pieza del ABI de valores de función:
 La frontera restante son closures anidadas o con cuerpos no lineales, handlers locales no inline,
 escapes complejos y el análisis completo de ownership para esos casos; siguen cayendo de forma
 verificable a HIR/AST.
+
+## 261. Metadata de la web generada desde el repositorio — 2026-09-23
+
+La auditoría de la Fase B encontraba que la web ya tenía validadores para detectar cifras obsoletas,
+pero todavía guardaba manualmente la versión y los contadores en `website/site.js` y en los fallbacks
+HTML. Eso dejaba dos fuentes de verdad para cada cambio del compilador.
+
+- `scripts/site-facts.mjs` calcula la versión de `compiler/Cargo.toml`, los documentos de diseño,
+  los programas `.ostrin` y los tests Rust desde el árbol actual.
+- `scripts/website-metadata.mjs --write` genera `website/site-data.js`; sin `--write` comprueba que
+  el artefacto versionado coincide exactamente con esas fuentes. Todas las páginas públicas cargan
+  ese archivo antes de `site.js`; los placeholders HTML ya no contienen números ni versiones
+  duplicados.
+- La acción común de CI/Pages ejecuta la comprobación antes del chequeo estático, de modo que una
+  publicación no puede avanzar con métricas de sitio desactualizadas.
+
+Verificación de este bloque: `node scripts/website-metadata.mjs`, `node scripts/website-check.mjs`
+y la suite browser/WASM de la acción deben pasar; la identidad visual, el playground WASM real,
+los enlaces y las páginas existentes se conservan.
