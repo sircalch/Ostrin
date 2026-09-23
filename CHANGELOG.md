@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### Website and discovery
+- Added a dedicated 1200×630 Ostrin social preview with the untouched official mark and current
+  positioning. All nine public pages now share the large Twitter/OG card metadata, and
+  `website-check.mjs` validates the PNG signature, dimensions, per-page image URL, alt text, type
+  and consistent titles/descriptions before CI or Pages can publish.
 - Refreshed repository-backed public counts to 195 source programs and 192 integration tests,
   aligned the static version fallbacks, and replaced the stale website audit with a current feature
   inventory. `website-check.mjs` now derives version, example/design counts and Rust test totals,

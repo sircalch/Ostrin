@@ -6238,3 +6238,21 @@ Verificación de este bloque: `cargo test --manifest-path compiler/Cargo.toml` p
 unitarias, 6 diferenciales y 192 de integración; `node scripts/wasi-program-check.mjs` ejecutó
 correctamente los seis módulos bajo Node WASI sin warnings de shifts; el test nativo exigió
 `hir-generated: 0` y `live_allocations=0`; `node scripts/distribution-check.mjs` pasó.
+
+## 254. Tarjeta social del sitio y metadatos OG/Twitter — 2026-09-22
+
+Se reemplazó el logo cuadrado como vista previa social por una pieza horizontal propia para
+Ostrin: fondo técnico violeta discreto, marca oficial sin alteraciones y texto alineado con el
+posicionamiento actual de la portada. La tarjeta mide 1200×630 y mantiene frases comprobables
+del sitio: lenguaje científico-first y general-purpose, backend nativo C/WASI y licencia MIT.
+
+- Las nueve páginas públicas usan el mismo PNG absoluto para Open Graph y Twitter/X, con tarjeta
+  grande, tipo, dimensiones, descripción alternativa y títulos/descripciones sincronizados.
+- `scripts/website-check.mjs` valida la firma e IHDR del PNG, sus dimensiones exactas y todos los
+  metadatos sociales por página; la comprobación existente protege ese contrato en CI y Pages.
+- Se conserva `website/assets/ostrin-logo.png`; el arte social es un recurso separado y no cambia
+  el playground, WASM ni la identidad visual existente.
+
+Verificación de este bloque: `node scripts/website-check.mjs --wasm` pasó para las nueve páginas,
+195 ejemplos, 192 pruebas de integración y el artefacto WASM; `node scripts/distribution-check.mjs`
+y `git diff --check` también pasaron.

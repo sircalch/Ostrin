@@ -23,6 +23,13 @@ Primary file: `assets/ostrin-logo.png`.
 The previous SVG concept is retained only for history in
 `assets/archive/ostrin-logo-concept.svg`. It is not the active brand asset.
 
+## Social preview
+
+`website/assets/ostrin-social.png` is the shared 1200×630 Open Graph and Twitter/X preview. It
+uses the official mark without modifying its shape or color and keeps the text aligned with the
+current website positioning. Update the shared card and its metadata checks together if this
+positioning changes.
+
 ## Colors
 
 | Role | Hex | Use |

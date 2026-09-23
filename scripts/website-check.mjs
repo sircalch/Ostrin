@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const websiteRoot = path.join(repositoryRoot, "website");
 const failures = [];
+const socialCardPath = "website/assets/ostrin-social.png";
+const socialCardUrl = "https://sircalch.github.io/Ostrin/assets/ostrin-social.png";
 
 function check(condition, message) {
   if (!condition) failures.push(message);
@@ -20,6 +22,23 @@ const pages = readdirSync(websiteRoot)
   .filter((name) => name.endsWith(".html"))
   .sort();
 const publicPages = pages.filter((name) => name !== "404.html");
+
+const socialCardAbsolutePath = path.join(repositoryRoot, socialCardPath);
+check(existsSync(socialCardAbsolutePath), `${socialCardPath}: missing Open Graph image`);
+if (existsSync(socialCardAbsolutePath)) {
+  const socialCard = readFileSync(socialCardAbsolutePath);
+  const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  check(socialCard.length >= 24 && socialCard.subarray(0, 8).equals(pngSignature),
+    `${socialCardPath}: expected a valid PNG image`);
+  const hasPngHeader = socialCard.length >= 24
+    && socialCard.subarray(0, 8).equals(pngSignature)
+    && socialCard.toString("ascii", 12, 16) === "IHDR";
+  check(hasPngHeader, `${socialCardPath}: missing PNG IHDR`);
+  if (hasPngHeader) {
+    check(socialCard.readUInt32BE(16) === 1200 && socialCard.readUInt32BE(20) === 630,
+      `${socialCardPath}: expected 1200x630 social-card dimensions`);
+  }
+}
 
 function filesUnder(directory) {
   return readdirSync(path.join(repositoryRoot, directory), { withFileTypes: true }).flatMap((entry) => {
@@ -64,7 +83,23 @@ for (const page of publicPages) {
   check(/<title>[^<]+<\/title>/i.test(html), `${page}: missing title`);
   check(/<link rel="canonical" href="[^"]+">/i.test(html), `${page}: missing canonical`);
   check(/property="og:title"/i.test(html), `${page}: missing og:title`);
+  check(html.includes(`<meta property="og:image" content="${socialCardUrl}">`),
+    `${page}: missing or outdated Open Graph image`);
+  check(html.includes('<meta property="og:image:type" content="image/png">'), `${page}: missing Open Graph image type`);
+  check(html.includes('<meta property="og:image:width" content="1200">'), `${page}: incorrect Open Graph image width`);
+  check(html.includes('<meta property="og:image:height" content="630">'), `${page}: incorrect Open Graph image height`);
+  check(html.includes('<meta property="og:image:alt" content="Ostrin programming language: scientific-first, general-purpose, native C and WASI.">'),
+    `${page}: missing or outdated Open Graph image description`);
   check(/name="twitter:card"/i.test(html), `${page}: missing twitter card`);
+  check(html.includes('<meta name="twitter:card" content="summary_large_image">'), `${page}: expected large Twitter card`);
+  const openGraphTitle = html.match(/<meta property="og:title" content="([^"]+)"/i)?.[1];
+  const openGraphDescription = html.match(/<meta property="og:description" content="([^"]+)"/i)?.[1];
+  check(html.includes(`<meta name="twitter:title" content="${openGraphTitle}">`), `${page}: Twitter title drifted from Open Graph`);
+  check(html.includes(`<meta name="twitter:description" content="${openGraphDescription}">`), `${page}: Twitter description drifted from Open Graph`);
+  check(html.includes(`<meta name="twitter:image" content="${socialCardUrl}">`),
+    `${page}: missing or outdated Twitter image`);
+  check(html.includes('<meta name="twitter:image:alt" content="Ostrin programming language: scientific-first, general-purpose, native C and WASI.">'),
+    `${page}: missing or outdated Twitter image description`);
   const versions = [...html.matchAll(/<span class="version">([^<]*)<\/span>/g)].map((match) => match[1]);
   check(versions.length > 0 && versions.every((label) => label === `development / ${facts.version}`),
     `${page}: static version label drifted from compiler/Cargo.toml`);

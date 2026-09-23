@@ -9,7 +9,7 @@ tests or an explicitly labeled early-stage surface.
 
 | Surface | Evidence | Current state |
 | --- | --- | --- |
-| Homepage | `website/index.html`, `website/playground.js` | Branded entry point with source facts, a real compiler-backed browser playground and editable sample |
+| Homepage | `website/index.html`, `website/playground.js`, `website/assets/ostrin-social.png` | Branded entry point with source facts, a real compiler-backed browser playground and editable sample; all public pages share a 1200x630 social preview |
 | Example catalogue | `website/examples.html` | Filterable repository catalogue plus live quantity, standard library, record/enum and concurrency programs |
 | Browser playground | `website/playground.html`, `.github/workflows/pages.yml` | Generated `ostrinc.wasm`; Run, Check, Test, Format, share links and source diagnostics execute in an in-memory WASI filesystem |
 | Learning and reference | `website/docs.html`, `website/language.html`, `docs/design/` | Guided 14-step learning path, language reference and 22 design documents |
@@ -33,8 +33,10 @@ tests or an explicitly labeled early-stage surface.
 
 `website/site.js` holds the public display facts. `scripts/website-check.mjs` derives the expected
 version and counts from `compiler/Cargo.toml`, the source tree and Rust test attributes, then checks
-the JS values, every HTML fallback, README, roadmap and this audit. CI and the Pages build run the
-check, so stale numbers or version labels fail before publication.
+the JS values, every HTML fallback, README, roadmap and this audit. It also validates the social
+card's PNG signature and dimensions and requires consistent Open Graph/Twitter metadata on every
+public page. CI and the Pages build run the check, so stale facts or missing social assets fail
+before publication.
 
 ## Remaining constraints
 
