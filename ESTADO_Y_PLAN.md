@@ -1,9 +1,9 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-21 · rama `main` · 6 pruebas diferenciales, 192 de integración y 2 unitarias en verde.*
+*Corte: 2026-09-22 · rama `main` · 6 pruebas diferenciales, 192 de integración y 2 unitarias en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
-Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–249); para el diseño
+Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–250); para el diseño
 del lenguaje, `docs/design/` (22 documentos). La auditoría del sitio vive en
 `docs/website-audit.md`.
 
@@ -141,6 +141,11 @@ payloads gestionados que no sean `String` caen de forma verificable a HIR y desp
 iteradores de records concretos con `Iterator<T>` y `next() -> Option<T>` ya cruzan la IR, incluida
 la llamada de método nativa y la liberación del record iterador. Los canales sin spawn también cruzan
 la IR con `send`, `close`, `receive` y `for`, incluida la liberación del handle al último uso.
+Las instancias concretas de funciones y métodos genéricos pasan ahora por especialización,
+ownership IR y emisor C cuando sus operaciones son representables; `native_hir_generics.ostrin`
+registra 6 funciones IR y ninguna HIR, mientras el caso de métodos mantiene una función HIR de
+fallback para el retorno de un record genérico. Las pruebas ejecutan ambas rutas con paridad y
+`live_allocations=0`; records/enums genéricos aplicados y otras formas complejas aún usan fallback.
 
 La misma ruta ya cubre la familia escalar de `Result`: `String.to_int()` y `to_float()` producen
 `Result<Int,String>`/`Result<Float,String>` desde la IR, junto con `Ok`/`Err`, `match`, bindings
@@ -230,7 +235,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Biblioteca estándar | Incluye `std.math`, `std.lists`, `std.strings` (incluidos `trim`, `split`, `lines`, `is_blank`, `format_text`, `format_float`, `char_at`, `slice` y `codepoint`), `std.time` (calendario gregoriano determinista, validación, ordinales, día de semana, ISO y `Result` de parseo), `std.json` (DOM, parser/serializer estricto y Unicode), `std.args`, `std.env` y `std.maps` (consultas genéricas de `Map<K,V>` con `Hash + Eq`); red sigue pendiente |
 | Mensajes de error de E/S | `strerror` ≠ texto de Rust (difieren entre backends) |
 | `Result<Void,E>` | Campo de valor de relleno (`char`) en C |
-| Migración HIR | Escalares, records, enums/match, Option/Result, colecciones, cierres, instancias concretas de genéricos, llamadas anidadas, records/enums genéricos aplicados y métodos genéricos centrales migrados; formas complejas restantes siguen con fallback |
+| Migración HIR/IR | HIR cubre escalares, records, enums/match, Option/Result, colecciones, cierres y formas genéricas; la IR/C ya emite instancias concretas soportadas de funciones y métodos genéricos (incluidos casos recursivos), con paridad y leak-check; records/enums genéricos aplicados y retornos complejos conservan el fallback verificado |
 | Paquetes | `--project` usa `entry`; resolución transitiva de manifiestos con alias globales sin colisión; lockfiles deterministas con rutas relativas, versión y SHA-256 de `ostrin.toml`/fuentes `.ostrin`; Git solo mediante `--fetch`, con caché local y commit resuelto; builds normales reutilizan y validan el lock, `--locked` lo exige; sin registro remoto |
 | Rendimiento del intérprete | Tree‑walking simple; sin optimizaciones |
 | `newlines.ostrin`, `advanced.ostrin` | Son muestras de sintaxis, no programas ejecutables |

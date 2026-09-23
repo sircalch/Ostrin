@@ -22,6 +22,7 @@ type Bail<T> = Result<T, ()>;
 type Values = HashMap<ValueId, (String, Ty)>;
 pub type RecordFields = HashMap<String, Vec<String>>;
 pub type MethodNames = HashMap<(String, String), String>;
+pub type FunctionNames = HashMap<String, String>;
 
 #[derive(Clone, Copy)]
 pub enum HelperRequest {
@@ -562,7 +563,7 @@ fn format_float_result_code(value: &str, digits: &str) -> String {
 fn emit_instruction(
     instruction: &IrInstr,
     values: &Values,
-    known_functions: &HashSet<String>,
+    known_functions: &FunctionNames,
     methods: &MethodNames,
     records: &RecordFields,
     spawn_helpers: &SpawnHelpers,
@@ -590,11 +591,11 @@ fn emit_instruction(
                         value_name(*dst)
                     ));
                 }
-                Ty::Fn(_, _) if known_functions.contains(name) => {
+                Ty::Fn(_, _) if known_functions.contains_key(name) => {
                     out.push_str(&format!(
                         "    {} = (void*){};\n",
                         value_name(*dst),
-                        crate::codegen::c_function_name(name)
+                        known_functions.get(name).expect("known function name")
                     ));
                 }
                 _ => return Err(()),
@@ -1285,9 +1286,9 @@ fn emit_instruction(
                     return Err(());
                 }
             } else {
-                if !known_functions.contains(callee) {
+                let Some(c_function) = known_functions.get(callee) else {
                     return Err(());
-                }
+                };
                 for value in args {
                     if !supported(&value_ty(values, *value)?, records) {
                         return Err(());
@@ -1295,7 +1296,7 @@ fn emit_instruction(
                 }
                 format!(
                     "{}({})",
-                    crate::codegen::c_function_name(callee),
+                    c_function,
                     codes.join(", ")
                 )
             };
@@ -1782,7 +1783,7 @@ pub struct Generated {
 fn build_spawn_helpers(
     function: &IrFunction,
     values: &Values,
-    known_functions: &HashSet<String>,
+    known_functions: &FunctionNames,
     methods: &MethodNames,
     records: &RecordFields,
     spawn_helpers: &mut SpawnHelpers,
@@ -1998,7 +1999,7 @@ fn build_spawn_helpers(
 #[allow(dead_code)]
 pub fn generate(
     function: &IrFunction,
-    known_functions: &HashSet<String>,
+    known_functions: &FunctionNames,
     methods: &MethodNames,
     records: &RecordFields,
     show: &mut dyn FnMut(&str, &Ty) -> Option<String>,
@@ -2012,7 +2013,7 @@ pub fn generate(
 
 pub fn generate_with_helpers(
     function: &IrFunction,
-    known_functions: &HashSet<String>,
+    known_functions: &FunctionNames,
     methods: &MethodNames,
     records: &RecordFields,
     helper: &mut HelperGenerator<'_>,

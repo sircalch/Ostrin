@@ -3461,10 +3461,10 @@ fn native_hir_handles_closures_core() {
 }
 
 #[test]
-fn native_hir_handles_concrete_generic_instances() {
-    // The generic declaration is lowered once, then specialized into HIR for
-    // each concrete call: scalar identity, List indexing, and Option methods
-    // all share the same native representation as their non-generic forms.
+fn native_ir_handles_concrete_generic_instances() {
+    // The generic declaration is lowered once, then specialized into concrete
+    // IR for each call: scalar identity, List indexing, recursive calls and
+    // Option methods share the same native representation as non-generic code.
     let file = example_path("native_hir_generics.ostrin");
     let expected = "4\nostrin\n42\n27\nloop\n";
     let interpreted = run(&["--run", &file]);
@@ -3476,14 +3476,20 @@ fn native_hir_handles_concrete_generic_instances() {
         return;
     }
     assert!(report.status.success(), "native type report failed: {}", stderr(&report));
-    let hir_functions = stdout(&report)
+    let report_text = stdout(&report);
+    let hir_functions = report_text
         .lines()
         .find_map(|line| line.strip_prefix("hir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
         .unwrap_or(0);
-    assert!(hir_functions >= 4, "generic HIR example generated only {hir_functions} functions");
+    let ir_functions = report_text
+        .lines()
+        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .unwrap_or(0);
+    assert_eq!(hir_functions, 0, "generic instances unexpectedly fell back to HIR: {report_text}");
+    assert!(ir_functions >= 6, "generic IR example generated only {ir_functions} functions: {report_text}");
 
     let exe = temp_artifact("native_hir_generics.exe");
-    let compile = run(&["--compile", "--out", &exe, &file]);
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
@@ -3492,6 +3498,7 @@ fn native_hir_handles_concrete_generic_instances() {
     let _ = fs::remove_file(&exe);
     assert!(native.status.success(), "generic HIR binary failed: {}", String::from_utf8_lossy(&native.stderr));
     assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "generic IR binary leaked: {}", String::from_utf8_lossy(&native.stderr));
 }
 
 #[test]
@@ -3532,21 +3539,27 @@ fn native_hir_handles_generic_records_and_enums() {
 }
 
 #[test]
-fn native_hir_handles_generic_methods() {
-    // Generic method instances use the same pending queue as the AST backend,
-    // but HIR must preserve the declaring impl when multiple methods share a
-    // source name and must resolve nested calls such as `container.map<U>`.
+fn native_ir_handles_generic_methods_with_hir_fallback_for_generic_records() {
+    // Generic method instances use the same pending queue as the AST backend.
+    // Scalar/list methods now use IR; the generic-record return remains on the
+    // verified HIR path until record-instance ownership is represented there.
     let file = example_path("native_generic_methods.ostrin");
     let report = run(&["--native-type-report", &file]);
     if skip_if_no_c_compiler(&report) {
         return;
     }
     assert!(report.status.success(), "native type report failed: {}", stderr(&report));
-    let hir_functions = stdout(&report)
+    let report_text = stdout(&report);
+    let hir_functions = report_text
         .lines()
         .find_map(|line| line.strip_prefix("hir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
         .unwrap_or(0);
-    assert!(hir_functions >= 6, "generic method example generated only {hir_functions} HIR functions");
+    let ir_functions = report_text
+        .lines()
+        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .unwrap_or(0);
+    assert_eq!(hir_functions, 1, "generic method HIR fallback changed unexpectedly: {report_text}");
+    assert!(ir_functions >= 5, "generic method example generated only {ir_functions} IR functions: {report_text}");
 
     let c = run(&["--emit-c", &file]);
     assert!(c.status.success(), "C emission failed: {}", stderr(&c));
@@ -3554,8 +3567,8 @@ fn native_hir_handles_generic_methods() {
 
     let expected = run(&["--run", &file]);
     assert!(expected.status.success(), "interpreter failed: {}", stderr(&expected));
-    let exe = temp_artifact("native_generic_methods_hir.exe");
-    let compile = run(&["--compile", "--out", &exe, &file]);
+    let exe = temp_artifact("native_generic_methods_ir.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
@@ -3564,6 +3577,7 @@ fn native_hir_handles_generic_methods() {
     let _ = fs::remove_file(&exe);
     assert!(native.status.success(), "generic method binary failed: {}", String::from_utf8_lossy(&native.stderr));
     assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), stdout(&expected).replace("\r\n", "\n"));
+    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "generic method binary leaked: {}", String::from_utf8_lossy(&native.stderr));
 }
 
 #[test]

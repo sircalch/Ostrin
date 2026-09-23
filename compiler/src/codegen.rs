@@ -6669,7 +6669,7 @@ fn generate_impl(
         .filter(|function| function.generics.is_empty())
         .map(|function| function.name.clone())
         .collect();
-    let ir_functions: HashSet<String> = ir
+    let mut ir_functions: crate::ir_c::FunctionNames = ir
         .as_ref()
         .into_iter()
         .flat_map(|program| {
@@ -6677,7 +6677,7 @@ fn generate_impl(
                 .functions
                 .iter()
                 .filter(|function| non_generic_function_names.contains(&function.name))
-                .map(|function| function.name.clone())
+                .map(|function| (function.name.clone(), c_function_name(&function.name)))
         })
         .collect();
     let mut codegen = Codegen {
@@ -7461,6 +7461,7 @@ fn generate_impl(
             // generic call, generic record, or another not-yet-migrated node
             // is present, `generate` returns None and the established AST
             // monomorphization remains the fallback.
+            let mut specialized_for_ir = None;
             let from_hir = if let (Some(program), None) = (&hir, std::env::var_os("OSTRIN_NO_HIR_CODEGEN")) {
                 if let Some(function) = program.functions.iter().find(|function| function.name == job.hir_name) {
                     // Register the current instance before resolving a
@@ -7511,6 +7512,11 @@ fn generate_impl(
                         };
                         crate::hir::resolve_generic_calls(&mut specialized, &mut resolver);
                     }
+                    // The C signature is already specialized by this point. Give the
+                    // explicit IR the same concrete function name so recursive and nested
+                    // generic calls can resolve to their monomorphized C symbols.
+                    specialized.name = job.c_name.clone();
+                    specialized_for_ir = Some(specialized.clone());
                     for (_, ty) in &specialized.params {
                         codegen.register_hir_type(ty);
                     }
@@ -7524,7 +7530,50 @@ fn generate_impl(
             } else {
                 None
             };
-            if let Some(text) = from_hir {
+
+            // Generic bodies used to stop at specialized HIR even when every
+            // concrete type and operation was already supported by IR/C. Try the
+            // same ownership-lowered CFG path used by ordinary functions first;
+            // if it rejects an operation, retain the established HIR fallback.
+            let from_ir = specialized_for_ir.as_ref().and_then(|specialized| {
+                let program = crate::hir::HirProgram {
+                    functions: vec![specialized.clone()],
+                    arities: HashMap::new(),
+                    iterator_items: hir.as_ref().map(|program| program.iterator_items.clone()).unwrap_or_default(),
+                };
+                let (program, summary) = crate::ownership::lower_linear(&crate::ir::lower(&program));
+                if summary.unresolved_functions.contains(&job.c_name) {
+                    return None;
+                }
+                let function = program.functions.into_iter().next()?;
+                let mut known_functions = ir_functions.clone();
+                known_functions.extend(codegen.instantiations.keys().cloned().map(|name| (name.clone(), name)));
+                known_functions.insert(job.c_name.clone(), job.c_name.clone());
+                crate::ir_c::generate_with_helpers(&function, &known_functions, &ir_methods, &ir_records, &mut |request, left, right, ty| {
+                    let ctype = codegen.ty_to_ctype(ty)?;
+                    match request {
+                        crate::ir_c::HelperRequest::Show => codegen.show_expr(left, &ctype).ok(),
+                        crate::ir_c::HelperRequest::Equality => codegen.eq_expr(left, right, &ctype).ok(),
+                    }
+                }).map(|generated| {
+                    for declaration in generated.declarations {
+                        ir_helper_prototypes.push(declaration);
+                    }
+                    for (helper_signature, helper_body) in generated.helpers {
+                        ir_helper_prototypes.push(format!("{helper_signature};"));
+                        bodies.push((helper_signature, helper_body));
+                    }
+                    generated.body
+                })
+            });
+            let used_ir = from_ir.is_some();
+            if used_ir {
+                ir_functions.insert(job.c_name.clone(), job.c_name.clone());
+            }
+            if let Some(text) = from_ir {
+                codegen.type_report.ir_generated += 1;
+                body = text;
+            } else if let Some(text) = from_hir {
                 codegen.type_report.hir_generated += 1;
                 body = text;
             } else {

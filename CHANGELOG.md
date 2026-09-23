@@ -212,8 +212,16 @@
 - Extended the IR C emitter to managed `Option<String>` values and `Some`/`None` patterns;
   `Map<String,String>.get/remove` now retain or transfer string payloads correctly. The
   `native_ir_managed_options.ostrin` regression covers dynamic strings, pattern bindings,
-  map lookups and `--leak-check`; generic calls that need monomorphization remain on the HIR
-  path rather than being emitted as unresolved IR calls.
+  map lookups and `--leak-check`. Concrete generic instances are now specialized before
+  lowering and emitted through IR/C when their operations are supported; unsupported shapes
+  retain the verified HIR/AST fallback.
+- Migrated supported concrete generic functions and methods through the ownership-lowered IR
+  and C emitter. The emitter now resolves logical function names to explicit C symbols, so
+  ordinary and monomorphized calls (including recursive instances) target the correct body.
+  `native_hir_generics.ostrin` now reports 6 IR-generated and 0 HIR-generated functions;
+  `native_generic_methods.ostrin` reports 5 IR and 1 HIR function because a generic-record
+  return still needs the HIR fallback. Both interpreter/native regressions require
+  `live_allocations=0`; generic record/enum shapes remain on the existing fallback.
 - Extended the IR C emitter to concrete heap records and `Option<Record>` values, including
   nested field access, `Some`/`None` pattern binds, record destructors and linear
   `retain/release` markers. `native_ir_records.ostrin` compares interpreter/native output

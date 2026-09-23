@@ -6147,3 +6147,30 @@ La suite queda en **6 pruebas diferenciales, 192 de integración y 2 unitarias**
 trabajo de calidad sigue siendo cubrir diagnósticos de error de forma sistemática y añadir
 benchmarks comparables entre intérprete y backend nativo; los consumidores complejos no lineales,
 scopes y escapes siguen fuera del protocolo IR/C.
+
+## 250. Instancias genéricas concretas desde IR/C — 2026-09-22
+
+Las instancias monomorfizadas de funciones y métodos ya no se detienen automáticamente en HIR:
+después de aplicar los tipos concretos, el backend intenta bajar cada cuerpo a IR, ejecutar el
+análisis lineal de ownership y generar C. Cuando la IR o el emisor no pueden representar el cuerpo,
+se conserva la ruta HIR y, donde ya correspondía, el fallback AST.
+
+- `ir_c` ahora recibe un mapa de nombre lógico a símbolo C en vez de asumir que ambos coinciden
+  tras aplicar `c_function_name`. Esto permite que las llamadas ordinarias con prefijo y las
+  llamadas a instancias monomorfizadas/recursivas resuelvan al símbolo concreto correcto.
+- `native_hir_generics.ostrin` verifica seis funciones IR y cero HIR, incluyendo llamadas
+  genéricas concretas y recursión. Compara salida del intérprete y del binario y exige
+  `live_allocations=0`.
+- `native_generic_methods.ostrin` verifica cinco funciones IR y una función HIR: el retorno del
+  record genérico de ese caso sigue fuera de la representación IR disponible. También exige
+  paridad de salida y cero asignaciones vivas.
+- Los records y enums genéricos aplicados no se declaran migrados por este bloque: sus fixtures
+  mantienen el fallback ya existente. Esta separación queda reflejada en `--native-type-report`
+  y en las aserciones de regresión.
+
+Verificación de esta continuación: `cargo test --manifest-path compiler/Cargo.toml` pasó con
+2 pruebas unitarias, 6 diferenciales y 192 de integración. El build del compilador para
+`wasm32-wasip1 --release` también pasó. Se intentó la matriz end-to-end
+`node scripts/wasi-program-check.mjs`, pero este entorno no tiene configurado `OSTRIN_WASI_CC`
+ni un compilador C de WASI; por eso no se pudo ejecutar aquí y queda cubierta por el workflow
+WASI fijado en `.github/workflows/wasi.yml`.
