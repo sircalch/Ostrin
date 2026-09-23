@@ -340,7 +340,7 @@ h4 { font-size: .86rem; }
 .timeline-content li::before { content: "✓"; margin-right: 7px; color: var(--green); }
 .timeline-content ul.future li::before, .timeline-item.future .timeline-content li::before { content: "○"; color: var(--violet); }
 
-@media (max-width: 980px) {
+@media (max-width: 1000px) {
   .header-right { gap: 18px; }
   .version { display: none; }
   .menu-toggle { display: block; }
@@ -357,6 +357,7 @@ h4 { font-size: .86rem; }
   .section-header, .split-callout, .ecosystem-layout { grid-template-columns: 1fr; gap: 30px; }
   .section-header .lede { margin-top: 0; }
   .feature-grid, .tool-grid, .ecosystem-status { grid-template-columns: repeat(2, 1fr); }
+  .example-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .page-grid { grid-template-columns: minmax(0, 1fr); gap: 45px; }
   .side-nav { position: static; display: flex; flex-wrap: wrap; gap: 10px 20px; padding-bottom: 15px; border-bottom: 1px solid var(--line); }
   .side-nav p { width: 100%; margin-bottom: 0; }

@@ -76,7 +76,7 @@ test("mobile navigation is operable and labelled", async ({ page }) => {
 });
 
 test("header switches at its tablet breakpoint without overflow", async ({ page }) => {
-  for (const [width, collapsed] of [[980, true], [981, false]]) {
+  for (const [width, collapsed] of [[1000, true], [1001, false]]) {
     await page.setViewportSize({ width, height: 844 });
     await page.goto("./", { waitUntil: "domcontentloaded" });
     await expectNoHorizontalOverflow(page, "homepage header", width);

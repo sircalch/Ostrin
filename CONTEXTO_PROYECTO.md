@@ -6269,8 +6269,9 @@ el recorrido de aprendizaje junto con su ejecución en navegador.
 - La suite ejecuta el ejemplo de cantidades real y exige `5 m/s`; reemplaza el editor por una
   expresión con tipos incompatibles y comprueba el diagnóstico y su línea en el editor. También
   verifica página/cabeceras y que no aparezcan errores JavaScript.
-- El menú responsive ahora está disponible hasta 980 px: el navegador de escritorio desbordaba
-  hasta 911 px en una ventana de 768 px. A 390 px, la documentación alcanzaba 592 px por el mínimo
+- El menú responsive ahora está disponible hasta 1000 px: Chromium Linux detectó desbordamiento
+  de 988 px en una ventana de 981 px. La rejilla de ejemplos pasa a dos columnas en tablet tras
+  medir 795 px de ancho total a 768 px. A 390 px, la documentación alcanzaba 592 px por el mínimo
   intrínseco de las columnas del grid; las columnas colapsadas usan ahora `minmax(0, 1fr)`.
 - La regresión revisa las nueve páginas en 390 y 768 px, además de la portada desktop. `ci.yml` y
   Pages reutilizan `.github/actions/website-verify`, que compila/prueba el playground y ejecuta los
@@ -6280,7 +6281,7 @@ el recorrido de aprendizaje junto con su ejecución en navegador.
 
 Verificación local de este bloque: `npm ci` reconstruyó las tres dependencias fijadas;
 `npm test` pasó con 4 pruebas —compilador/diagnóstico reales, menú a 390/768 px, las nueve páginas
-en ambos viewports y el cambio del encabezado entre 980 y 981 px sin desbordamiento—;
+  en ambos viewports y el cambio del encabezado entre 1000 y 1001 px sin desbordamiento—;
 `cargo test --manifest-path compiler/Cargo.toml` pasó con 2 unitarias,
 6 diferenciales y 192 de integración; `node scripts/website-check.mjs --wasm`,
 `node scripts/distribution-check.mjs` y `git diff --check` también pasaron. CI y Pages reutilizan
