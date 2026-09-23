@@ -76,8 +76,11 @@ Sobre este IR se hacen los análisis que el texto C no permite:
 
 1. **Último uso / movimiento** (documento 18): decide dónde van `retain`/`release` y elimina los innecesarios.
 2. **E1101 estático**: enviar por un canal *mueve* un valor gestionado; usarlo después es error
-   de compilación en `--check`, `--run`, `--emit-c` y `--compile`. Records inmutables quedan
-   fuera de la regla; las comprobaciones dinámicas se conservan como red de seguridad.
+   de compilación en `--check`, `--run`, `--emit-c` y `--compile`. El pase propaga el estado sobre
+   el CFG alcanzable hasta punto fijo: no mezcla ramas mutuamente excluyentes, conserva el posible
+   movimiento en joins y backedges, y evalúa cada operando `Phi` sólo en la arista de su predecesor.
+   Records inmutables quedan fuera de la regla; las comprobaciones dinámicas se conservan como red
+   de seguridad.
 3. **Escape** (para arenas): un valor que no sale de su función puede vivir en una arena.
 4. **Cierres**: capturas explícitas → estructura `{ fn_ptr, entorno }` (funciones como valores de primera clase). Mientras no haya llamada indirecta en la IR, los aliases locales de funciones globales se conservan como procedencia estática y se emiten como llamadas directas.
 5. Optimización: inlining, plegado de constantes, eliminación de código muerto, fusión de bucles sobre `Array`.

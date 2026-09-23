@@ -6281,8 +6281,30 @@ el recorrido de aprendizaje junto con su ejecución en navegador.
 
 Verificación local de este bloque: `npm ci` reconstruyó las tres dependencias fijadas;
 `npm test` pasó con 4 pruebas —compilador/diagnóstico reales, menú a 390/768 px, las nueve páginas
-  en ambos viewports y el cambio del encabezado entre 1000 y 1001 px sin desbordamiento—;
+en ambos viewports y el cambio del encabezado entre 1000 y 1001 px sin desbordamiento—;
 `cargo test --manifest-path compiler/Cargo.toml` pasó con 2 unitarias,
 6 diferenciales y 192 de integración; `node scripts/website-check.mjs --wasm`,
 `node scripts/distribution-check.mjs` y `git diff --check` también pasaron. CI y Pages reutilizan
 la acción compartida para repetir estas comprobaciones en GitHub antes de publicar.
+
+## 256. E1101 sensible al CFG y a Phi — 2026-09-22
+
+El chequeo de movimientos ya no interpreta `function.blocks` como si el orden almacenado fuera el
+orden de ejecución. `check_moves_impl` ahora propaga los valores movidos por las aristas alcanzables
+del CFG con un worklist de punto fijo; por ello una rama mutuamente excluyente no contamina la otra,
+los joins conservan el riesgo de cualquier predecesor, y las iteraciones/backedges se analizan hasta
+converger. Cada entrada `Phi` se comprueba sólo en la arista que la selecciona y un alias `Phi` de un
+valor movido mantiene ese estado después del merge. La guarda dinámica permanece activa.
+
+- Se añadieron tres pruebas: ramas exclusivas válidas, selección de `Phi` por arista, y rechazos
+  tras joins, en condición/reenvío de loops y en alias `Phi` de un valor movido. Se exige además que
+  intérprete y backend nativo rechacen E1101 por sus entry points habituales.
+- Se sincronizaron a 195 los contadores actuales de tests en README, portada, ejemplos, roadmap y
+  auditoría pública del sitio.
+
+Verificación local: `cargo test --manifest-path compiler/Cargo.toml` pasó con 2 pruebas unitarias,
+6 diferenciales y 195 de integración; `npm test` pasó las cuatro regresiones Chromium;
+`node scripts/website-check.mjs --wasm` confirmó 9 páginas, 195 ejemplos y 195 pruebas;
+`node scripts/wasi-program-check.mjs` compiló y ejecutó los seis módulos con salida exacta;
+`node scripts/distribution-check.mjs` y `git diff --check` también pasaron. La sesión tuvo que
+cargar explícitamente las variables del SDK WASI 34 ya instalado en el perfil de usuario.

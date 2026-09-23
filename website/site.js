@@ -3,7 +3,7 @@
     version: '0.1.0',
     designDocs: '22',
     examples: '195',
-    integrationTests: '192',
+    integrationTests: '195',
     differentialTests: '6',
     unitTests: '2',
   });

@@ -76,8 +76,10 @@ con entorno siguen pendientes.
 - **Ciclos**: son la debilidad conocida del RC. Decisión: (1) documentarlo, (2) proporcionar `Weak<T>` en la biblioteca estándar para grafos y padres, (3) un modo de depuración `--leak-check` que informe de lo no liberado al salir.
 - **E1101 (valor movible enviado por canal)** ya es un **análisis estático** de movimiento sobre
   el mismo IR en las rutas normales: enviar por un canal *mueve* el valor; usarlo después es un
-  error de compilación. La clasificación distingue records/enums con estado mutable, mientras
-  que records inmutables se pueden compartir; las guardas dinámicas quedan como red de seguridad.
+  error de compilación. Un análisis de flujo sobre el CFG alcanzable converge en loops, combina
+  conservadoramente los caminos que se juntan y comprueba los operandos `Phi` en su arista de
+  entrada seleccionada. La clasificación distingue records/enums con estado mutable, mientras que
+  records inmutables se pueden compartir; las guardas dinámicas quedan como red de seguridad.
 - **Arrays científicos** (documento 19) usan buffers con propietario único y vistas prestadas: es el único sitio donde sí hay préstamos, y son internos a la biblioteca.
 - **Concurrencia real**: contadores atómicos solo en valores que cruzan hilos (marcados por el análisis de canales y `spawn`); el resto usa contadores simples.
 

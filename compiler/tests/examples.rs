@@ -748,6 +748,12 @@ fn temp_artifact(name: &str) -> String {
         .to_string()
 }
 
+fn temp_source(name: &str, source: &str) -> String {
+    let path = temp_artifact(name);
+    fs::write(&path, source).expect("failed to write temporary Ostrin source");
+    path
+}
+
 /// True when `--compile` failed only because no GNU-compatible C compiler is
 /// installed — a real, environment-dependent condition (this suite can't
 /// require every machine it runs on to have gcc/clang), not a codegen bug.
@@ -1791,6 +1797,245 @@ fn native_ir_emitter_handles_scalar_functions() {
     let _ = fs::remove_file(&exe);
     assert!(native.status.success(), "native run failed: {}", String::from_utf8_lossy(&native.stderr));
     assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+}
+
+#[test]
+fn channel_move_analysis_respects_mutually_exclusive_cfg_paths() {
+    let file = temp_source(
+        "e1101-exclusive-paths.ostrin",
+        r#"
+record Buffer {
+    mut value: Int
+}
+
+fn inspect(flag: Bool) -> Void {
+    ch = channel<Buffer>()
+    mut buffer = Buffer { value: 5 }
+    if flag {
+        ch.send(buffer)
+    } else {
+        print(buffer.value)
+    }
+    ch.close()
+}
+
+fn main() -> Void {
+    inspect(false)
+}
+"#,
+    );
+    let checked = run(&["--ownership-check", &file]);
+    let typechecked = run(&["--check", &file]);
+    let emitted = run(&["--emit-c", &file]);
+    let executed = run(&["--run", &file]);
+    let compiled = run(&["--compile", &file]);
+    let _ = fs::remove_file(&file);
+
+    assert!(
+        checked.status.success(),
+        "exclusive paths were reported as a move violation: {}",
+        stdout(&checked)
+    );
+    assert!(
+        typechecked.status.success(),
+        "--check rejected mutually exclusive paths: {}",
+        stderr(&typechecked)
+    );
+    assert!(
+        emitted.status.success(),
+        "--emit-c rejected mutually exclusive paths: {}",
+        stderr(&emitted)
+    );
+    assert!(
+        executed.status.success(),
+        "valid non-sending branch was rejected: {}",
+        stderr(&executed)
+    );
+    assert_eq!(stdout(&executed).trim(), "5");
+    if !skip_if_no_c_compiler(&compiled) {
+        assert!(
+            compiled.status.success(),
+            "native compilation rejected exclusive paths: {}",
+            stderr(&compiled)
+        );
+    }
+}
+
+#[test]
+fn channel_move_analysis_checks_only_the_selected_phi_input() {
+    let file = temp_source(
+        "e1101-phi-exclusive-paths.ostrin",
+        r#"
+record Buffer {
+    mut value: Int
+}
+
+fn choose_buffer(flag: Bool) -> Void {
+    ch = channel<Buffer>()
+    mut buffer = Buffer { value: 5 }
+    mut selected = buffer
+    if flag {
+        ch.send(buffer)
+        selected = Buffer { value: 9 }
+    } else {
+        selected = buffer
+    }
+    ch.close()
+    print(selected.value)
+}
+
+fn main() -> Void {
+    choose_buffer(true)
+}
+"#,
+    );
+    let checked = run(&["--ownership-check", &file]);
+    let typechecked = run(&["--check", &file]);
+    let emitted = run(&["--emit-c", &file]);
+    let executed = run(&["--run", &file]);
+    let _ = fs::remove_file(&file);
+
+    assert!(
+        checked.status.success(),
+        "a non-selected Phi input was treated as a use: stdout={} stderr={}",
+        stdout(&checked),
+        stderr(&checked)
+    );
+    assert!(
+        typechecked.status.success(),
+        "--check rejected a non-selected Phi input: {}",
+        stderr(&typechecked)
+    );
+    assert!(
+        emitted.status.success(),
+        "--emit-c rejected a non-selected Phi input: {}",
+        stderr(&emitted)
+    );
+    assert!(
+        executed.status.success(),
+        "valid path-sensitive Phi was rejected: {}",
+        stderr(&executed)
+    );
+    assert_eq!(stdout(&executed).trim(), "9");
+}
+
+#[test]
+fn channel_move_analysis_follows_branch_joins_and_loop_backedges() {
+    let file = temp_source(
+        "e1101-cfg-joins.ostrin",
+        r#"
+record Buffer {
+    mut value: Int
+}
+
+fn after_join(flag: Bool) -> Void {
+    ch = channel<Buffer>()
+    mut buffer = Buffer { value: 5 }
+    if flag {
+        ch.send(buffer)
+    }
+    print(buffer.value)
+}
+
+fn after_backedge() -> Void {
+    ch = channel<Buffer>()
+    mut buffer = Buffer { value: 5 }
+    while buffer.value > 0 {
+        ch.send(buffer)
+    }
+}
+
+fn phi_after_move(flag: Bool) -> Void {
+    ch = channel<Buffer>()
+    mut buffer = Buffer { value: 5 }
+    mut selected = Buffer { value: 11 }
+    if flag {
+        ch.send(buffer)
+        selected = buffer
+    } else {
+        selected = Buffer { value: 13 }
+    }
+    print(selected.value)
+}
+
+fn main() -> Void {}
+"#,
+    );
+    let checked = run(&["--ownership-check", &file]);
+    let typechecked = run(&["--check", &file]);
+    let emitted = run(&["--emit-c", &file]);
+    let interpreted = run(&["--run", &file]);
+    let compiled = run(&["--compile", &file]);
+    let _ = fs::remove_file(&file);
+    let report = stdout(&checked);
+
+    assert!(
+        !checked.status.success(),
+        "a path that uses a moved value was not rejected: {report}"
+    );
+    assert!(
+        report.matches("OSTRIN-E1101").count() >= 4,
+        "expected join, loop and moved-phi diagnostics: {report}"
+    );
+    assert_eq!(
+        report.matches("after_join").count(),
+        1,
+        "expected one post-join use: {report}"
+    );
+    assert_eq!(
+        report.matches("after_backedge").count(),
+        2,
+        "expected condition and repeated-send uses: {report}"
+    );
+    assert!(
+        report.contains("phi_after_move"),
+        "missing moved Phi diagnostic: {report}"
+    );
+    assert!(
+        report.contains("after_join"),
+        "missing post-join diagnostic: {report}"
+    );
+    assert!(
+        report.contains("after_backedge"),
+        "missing loop-backedge diagnostic: {report}"
+    );
+    assert!(
+        !typechecked.status.success(),
+        "--check must reject a possible use after move"
+    );
+    assert!(
+        stderr(&typechecked).contains("OSTRIN-E1101"),
+        "missing --check E1101: {}",
+        stderr(&typechecked)
+    );
+    assert!(
+        !emitted.status.success(),
+        "--emit-c must reject a possible use after move"
+    );
+    assert!(
+        stderr(&emitted).contains("OSTRIN-E1101"),
+        "missing --emit-c E1101: {}",
+        stderr(&emitted)
+    );
+    assert!(
+        !interpreted.status.success(),
+        "interpreter entry point must reject E1101: {}",
+        stderr(&interpreted)
+    );
+    assert!(
+        stderr(&interpreted).contains("OSTRIN-E1101"),
+        "missing interpreter diagnostic: {}",
+        stderr(&interpreted)
+    );
+    assert!(
+        !compiled.status.success(),
+        "native entry point must reject E1101 before codegen"
+    );
+    assert!(
+        stderr(&compiled).contains("OSTRIN-E1101"),
+        "missing native diagnostic: {}",
+        stderr(&compiled)
+    );
 }
 
 #[test]

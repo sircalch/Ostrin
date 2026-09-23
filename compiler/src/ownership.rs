@@ -7,7 +7,7 @@
 //! final body use. More general CFG liveness remains deliberately unresolved.
 #![allow(dead_code)]
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::ast::{Item, Type};
 use crate::ir::{IrInstr, IrProgram, IrTerminator, ValueId};
@@ -420,42 +420,262 @@ pub fn check_moves_for_types(program: &IrProgram, movable_types: &HashSet<String
     check_moves_impl(program, Some(movable_types))
 }
 
-fn check_moves_impl(program: &IrProgram, movable_types: Option<&HashSet<String>>) -> Vec<MoveViolation> {
+fn check_moves_impl(
+    program: &IrProgram,
+    movable_types: Option<&HashSet<String>>,
+) -> Vec<MoveViolation> {
     let mut violations = Vec::new();
     for function in &program.functions {
         let mut definitions: HashMap<ValueId, Ty> = HashMap::new();
-        let mut moved: HashMap<ValueId, (Ty, usize, usize)> = HashMap::new();
         for block in &function.blocks {
-            for (index, instruction) in block.instructions.iter().enumerate() {
+            for instruction in &block.instructions {
                 if let Some((value, ty)) = defined_value(instruction) {
                     definitions.insert(value, ty);
                 }
-                for value in used_values(instruction) {
-                    if let Some((ty, send_block, send_instruction)) = moved.get(&value) {
-                        violations.push(MoveViolation {
-                            function: function.name.clone(),
-                            value,
-                            ty: ty.clone(),
-                            send_block: *send_block,
-                            send_instruction: *send_instruction,
-                            use_block: block.id,
-                            use_instruction: index,
-                        });
+            }
+        }
+
+        // A block's position in `function.blocks` is not execution order:
+        // branches can be mutually exclusive and loop backedges can revisit
+        // an earlier block. Propagate moved SSA values over reachable CFG
+        // edges to a fixed point, starting independent spawned regions with
+        // their own empty state.
+        let mut successors = vec![Vec::new(); function.blocks.len()];
+        let mut roots = vec![function.entry];
+        for block in &function.blocks {
+            for instruction in &block.instructions {
+                if let IrInstr::Spawn { region, .. } = instruction {
+                    roots.push(*region);
+                }
+            }
+            let next = match block.terminator.as_ref() {
+                Some(IrTerminator::Goto(target)) => vec![*target],
+                Some(IrTerminator::Branch {
+                    then_block,
+                    else_block,
+                    ..
+                }) => vec![*then_block, *else_block],
+                _ => Vec::new(),
+            };
+            for target in next {
+                if target < successors.len() && !successors[block.id].contains(&target) {
+                    successors[block.id].push(target);
+                }
+            }
+        }
+        roots.retain(|root| *root < function.blocks.len());
+        roots.sort_unstable();
+        roots.dedup();
+
+        // Each moved value retains the earliest deterministic source site
+        // reaching a block. The map merge is a finite, monotone dataflow
+        // lattice, so loops converge without depending on block numbering.
+        let mut incoming = vec![HashMap::<ValueId, (usize, usize)>::new(); function.blocks.len()];
+        let mut outgoing_states =
+            vec![HashMap::<ValueId, (usize, usize)>::new(); function.blocks.len()];
+        let mut reachable = vec![false; function.blocks.len()];
+        let mut pending = VecDeque::new();
+        for root in roots {
+            if !reachable[root] {
+                reachable[root] = true;
+                pending.push_back(root);
+            }
+        }
+        while let Some(block_id) = pending.pop_front() {
+            let block = &function.blocks[block_id];
+            let mut outgoing = incoming[block_id].clone();
+            for (index, instruction) in block.instructions.iter().enumerate() {
+                if let IrInstr::ChannelSend { value, .. } = instruction {
+                    if definitions
+                        .get(value)
+                        .is_some_and(|ty| is_move_type(ty, movable_types))
+                    {
+                        let site = (block.id, index);
+                        outgoing
+                            .entry(*value)
+                            .and_modify(|known| *known = (*known).min(site))
+                            .or_insert(site);
                     }
                 }
+            }
+            outgoing_states[block_id] = outgoing.clone();
+            for target in &successors[block_id] {
+                let mut changed = !reachable[*target];
+                reachable[*target] = true;
+                let mut edge_state = outgoing.clone();
+                for instruction in &function.blocks[*target].instructions {
+                    let IrInstr::Phi {
+                        dst,
+                        incoming: phi_inputs,
+                        ..
+                    } = instruction
+                    else {
+                        continue;
+                    };
+                    for (predecessor, value) in phi_inputs {
+                        if *predecessor == block_id {
+                            if let Some(site) = outgoing.get(value).copied() {
+                                edge_state
+                                    .entry(*dst)
+                                    .and_modify(|known| *known = (*known).min(site))
+                                    .or_insert(site);
+                            }
+                        }
+                    }
+                }
+                for (value, site) in &edge_state {
+                    match incoming[*target].get_mut(value) {
+                        Some(known) if *site < *known => {
+                            *known = *site;
+                            changed = true;
+                        }
+                        Some(_) => {}
+                        None => {
+                            incoming[*target].insert(*value, *site);
+                            changed = true;
+                        }
+                    }
+                }
+                if changed {
+                    pending.push_back(*target);
+                }
+            }
+        }
+
+        let mut reported = HashSet::new();
+        for block in &function.blocks {
+            if block.id >= reachable.len() || !reachable[block.id] {
+                continue;
+            }
+            let mut moved = incoming[block.id].clone();
+            for (index, instruction) in block.instructions.iter().enumerate() {
+                if matches!(instruction, IrInstr::Phi { .. }) {
+                    // Phi operands are edge uses, not simultaneous uses in the
+                    // merge block. They are checked against their selecting
+                    // predecessor below.
+                    continue;
+                }
+                let mut instruction_uses = HashSet::new();
+                for value in used_values(instruction) {
+                    if !instruction_uses.insert(value) {
+                        continue;
+                    }
+                    record_move_violation(
+                        &function.name,
+                        &definitions,
+                        &moved,
+                        value,
+                        block.id,
+                        index,
+                        &mut reported,
+                        &mut violations,
+                    );
+                }
                 if let IrInstr::ChannelSend { value, .. } = instruction {
-                    if let Some(ty) = definitions
+                    if definitions
                         .get(value)
-                        .cloned()
-                        .filter(|ty| is_move_type(ty, movable_types))
+                        .is_some_and(|ty| is_move_type(ty, movable_types))
                     {
-                        moved.entry(*value).or_insert((ty, block.id, index));
+                        moved.entry(*value).or_insert((block.id, index));
+                    }
+                }
+            }
+            if let Some(terminator) = &block.terminator {
+                for value in terminator_values(terminator) {
+                    record_move_violation(
+                        &function.name,
+                        &definitions,
+                        &moved,
+                        value,
+                        block.id,
+                        block.instructions.len(),
+                        &mut reported,
+                        &mut violations,
+                    );
+                }
+            }
+            for target in &successors[block.id] {
+                for (index, instruction) in function.blocks[*target].instructions.iter().enumerate()
+                {
+                    let IrInstr::Phi {
+                        incoming: phi_inputs,
+                        ..
+                    } = instruction
+                    else {
+                        continue;
+                    };
+                    for (predecessor, value) in phi_inputs {
+                        if *predecessor == block.id {
+                            record_move_violation(
+                                &function.name,
+                                &definitions,
+                                &outgoing_states[block.id],
+                                *value,
+                                *target,
+                                index,
+                                &mut reported,
+                                &mut violations,
+                            );
+                        }
                     }
                 }
             }
         }
     }
+    violations.sort_by(|left, right| {
+        (
+            &left.function,
+            left.send_block,
+            left.send_instruction,
+            left.use_block,
+            left.use_instruction,
+            left.value,
+        )
+            .cmp(&(
+                &right.function,
+                right.send_block,
+                right.send_instruction,
+                right.use_block,
+                right.use_instruction,
+                right.value,
+            ))
+    });
     violations
+}
+
+fn record_move_violation(
+    function: &str,
+    definitions: &HashMap<ValueId, Ty>,
+    moved: &HashMap<ValueId, (usize, usize)>,
+    value: ValueId,
+    use_block: usize,
+    use_instruction: usize,
+    reported: &mut HashSet<(ValueId, usize, usize, usize, usize)>,
+    violations: &mut Vec<MoveViolation>,
+) {
+    let (Some(ty), Some((send_block, send_instruction))) =
+        (definitions.get(&value), moved.get(&value))
+    else {
+        return;
+    };
+    let key = (
+        value,
+        *send_block,
+        *send_instruction,
+        use_block,
+        use_instruction,
+    );
+    if reported.insert(key) {
+        violations.push(MoveViolation {
+            function: function.to_string(),
+            value,
+            ty: ty.clone(),
+            send_block: *send_block,
+            send_instruction: *send_instruction,
+            use_block,
+            use_instruction,
+        });
+    }
 }
 
 fn is_move_type(ty: &Ty, movable_types: Option<&HashSet<String>>) -> bool {

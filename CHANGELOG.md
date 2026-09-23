@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Compiler and ownership
+- Replaced E1101's block-array-order scan with forward dataflow over reachable CFG paths. Mutually
+  exclusive branches no longer create false positives; joins remain conservative, loops iterate to
+  a fixed point, and `Phi` operands are checked only on their selecting predecessor edge. The
+  `--ownership-check`, interpreter and native entry points share the analysis and retain the
+  runtime guard as a safety net.
+
 ### Website and discovery
 - Added a pinned Playwright browser suite and a shared CI/Pages verification action. It compiles the
   current compiler to WASM, runs the real homepage program and diagnostic in Chromium, verifies
@@ -12,7 +19,7 @@
   positioning. All nine public pages now share the large Twitter/OG card metadata, and
   `website-check.mjs` validates the PNG signature, dimensions, per-page image URL, alt text, type
   and consistent titles/descriptions before CI or Pages can publish.
-- Refreshed repository-backed public counts to 195 source programs and 192 integration tests,
+- Refreshed repository-backed public counts to 195 source programs and 195 integration tests,
   aligned the static version fallbacks, and replaced the stale website audit with a current feature
   inventory. `website-check.mjs` now derives version, example/design counts and Rust test totals,
   then verifies the public JS, every HTML fallback, README, roadmap and audit in CI and Pages builds.
