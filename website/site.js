@@ -2,8 +2,8 @@
   const SITE_FACTS = Object.freeze({
     version: '0.1.0',
     designDocs: '22',
-    examples: '193',
-    integrationTests: '189',
+    examples: '195',
+    integrationTests: '192',
     differentialTests: '6',
     unitTests: '2',
   });

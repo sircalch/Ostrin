@@ -21,12 +21,57 @@ const pages = readdirSync(websiteRoot)
   .sort();
 const publicPages = pages.filter((name) => name !== "404.html");
 
+function filesUnder(directory) {
+  return readdirSync(path.join(repositoryRoot, directory), { withFileTypes: true }).flatMap((entry) => {
+    const relativePath = path.join(directory, entry.name);
+    return entry.isDirectory() ? filesUnder(relativePath) : [relativePath];
+  });
+}
+
+function countRustTests(relativePath) {
+  return [...read(relativePath).replaceAll("\r\n", "\n").matchAll(/^\s*#\[test\]\s*$/gm)].length;
+}
+
+const version = read("compiler/Cargo.toml").match(/^version\s*=\s*"([^"]+)"/m)?.[1];
+check(Boolean(version), "compiler/Cargo.toml: unable to determine package version");
+const facts = {
+  version,
+  designDocs: String(filesUnder("docs/design").filter((file) => file.endsWith(".md")).length),
+  examples: String(filesUnder("examples").filter((file) => file.endsWith(".ostrin")).length),
+  integrationTests: String(countRustTests("compiler/tests/examples.rs")),
+  differentialTests: String(countRustTests("compiler/tests/differential.rs")),
+  unitTests: String(countRustTests("compiler/src/fmt.rs")),
+};
+const siteScript = read("website/site.js");
+for (const [key, expected] of Object.entries(facts)) {
+  const actual = siteScript.match(new RegExp(`\\b${key}:\\s*'([^']+)'`))?.[1];
+  check(actual === expected, `website/site.js: ${key} is ${actual ?? "missing"}, expected ${expected}`);
+}
+
+const readme = read("README.md");
+check(readme.includes(`**${facts.integrationTests} integration tests, ${facts.unitTests} unit tests and ${facts.differentialTests} differential`),
+  "README.md: compiler test counts drifted from source");
+const roadmap = read("website/roadmap.html");
+check(roadmap.includes(`${facts.integrationTests} integration + ${facts.differentialTests} differential tests`),
+  "roadmap.html: test counts drifted from source");
+const audit = read("docs/website-audit.md");
+check(audit.includes("**" + facts.examples + "** `.ostrin` source files")
+  && audit.includes("**" + facts.designDocs + "** Markdown design documents"),
+  "docs/website-audit.md: inventory counts drifted from source");
+
 for (const page of publicPages) {
   const html = read(`website/${page}`);
   check(/<title>[^<]+<\/title>/i.test(html), `${page}: missing title`);
   check(/<link rel="canonical" href="[^"]+">/i.test(html), `${page}: missing canonical`);
   check(/property="og:title"/i.test(html), `${page}: missing og:title`);
   check(/name="twitter:card"/i.test(html), `${page}: missing twitter card`);
+  const versions = [...html.matchAll(/<span class="version">([^<]*)<\/span>/g)].map((match) => match[1]);
+  check(versions.length > 0 && versions.every((label) => label === `development / ${facts.version}`),
+    `${page}: static version label drifted from compiler/Cargo.toml`);
+  for (const [, key, value] of html.matchAll(/data-site-value="([^"]+)"\s*>([^<]*)/g)) {
+    check(facts[key] !== undefined, `${page}: unknown public fact ${key}`);
+    if (facts[key] !== undefined) check(value.trim() === facts[key], `${page}: static ${key} value drifted from source`);
+  }
 
   for (const match of html.matchAll(/(?:href|src)="([^"]+)"/gi)) {
     const reference = match[1];
@@ -118,5 +163,5 @@ if (failures.length) {
   console.error(failures.map((failure) => `website-check: ${failure}`).join("\n"));
   process.exitCode = 1;
 } else {
-  console.log(`website-check: ok (${publicPages.length} public pages${process.argv.includes("--wasm") ? ", WASM artifact" : ""})`);
+  console.log(`website-check: ok (${publicPages.length} public pages, ${facts.examples} examples, ${facts.integrationTests} integration tests${process.argv.includes("--wasm") ? ", WASM artifact" : ""})`);
 }

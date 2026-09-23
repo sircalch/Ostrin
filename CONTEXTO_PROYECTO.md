@@ -6197,3 +6197,23 @@ ejecutó los cinco módulos con salidas exactas y sin warnings de desplazamiento
 compiló para `wasm32-wasip1` y pasó `--check examples/hello.ostrin` bajo Node WASI; también
 pasaron `node scripts/website-check.mjs --wasm`, `node scripts/distribution-check.mjs` y
 `node scripts/website-check.mjs`.
+
+## 252. Hechos públicos del sitio comprobados contra el repositorio — 2026-09-22
+
+La auditoría de descubrimiento ya no depende de cifras copiadas a mano que puedan envejecer en
+silencio. Se alinearon las páginas estáticas con el estado comprobado del compilador:
+
+- 195 fuentes `.ostrin`, 22 documentos de diseño, 192 pruebas de integración, 6 diferenciales,
+  2 unitarias y versión `0.1.0`.
+- `scripts/website-check.mjs` ahora obtiene versión desde `compiler/Cargo.toml`, cuenta archivos
+  fuente y documentos, y cuenta atributos `#[test]` de los tres módulos de pruebas.
+- El check compara el resultado con `SITE_FACTS`, todos los fallbacks HTML, el README, la
+  roadmap y la auditoría actual. Ya corre en CI y en el workflow Pages; una cifra nueva sin
+  actualizar el sitio detiene la publicación.
+- Se sustituyeron las etiquetas HTML `prototype / 0.1` por el fallback `development / 0.1.0` y
+  se reescribió `docs/website-audit.md` como inventario actual, retirando afirmaciones que ya
+  habían quedado atrás sobre el playground, SEO, showcase, comunidad y el tamaño de la suite.
+
+Verificación de este bloque: `node scripts/website-check.mjs --wasm` pasó e informó 9 páginas
+públicas, 195 ejemplos y 192 pruebas de integración; `node scripts/distribution-check.mjs` y
+`git diff --check` también pasaron. El bloque previo corrió la suite completa del compilador.

@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### Website and discovery
+- Refreshed repository-backed public counts to 195 source programs and 192 integration tests,
+  aligned the static version fallbacks, and replaced the stale website audit with a current feature
+  inventory. `website-check.mjs` now derives version, example/design counts and Rust test totals,
+  then verifies the public JS, every HTML fallback, README, roadmap and audit in CI and Pages builds.
 - Added the first website 2.0 foundation without replacing the static site: a real compiler-backed
   playground on the homepage, `?code=` share links, centralized public counters, explicit
   scientific/general-purpose positioning, canonical/OG metadata, JSON-LD, `robots.txt`, `sitemap.xml`

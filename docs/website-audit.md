@@ -1,84 +1,54 @@
 # Ostrin website audit
 
-*Cut: 2026-09-21 · repository `main` at `4610095`.*
+*Cut: 2026-09-22 · source counts and public fallbacks are checked by `scripts/website-check.mjs`.*
 
-This audit is the starting point for the website and discovery work. It records what is
-already real so the public site can expose it without inventing maturity or replacing the
-existing implementation.
+This is a current inventory, not a roadmap claim. Public statements should remain tied to code,
+tests or an explicitly labeled early-stage surface.
 
 ## Existing surfaces
 
 | Surface | Evidence | Current state |
 | --- | --- | --- |
-| Homepage | `website/index.html` | Branded landing page with quantities, language principles and ecosystem links; no live compiler surface yet |
-| Example catalogue | `website/examples.html` | Filters, source links and illustrative panels; one panel still says the preview is static |
-| Browser playground | `website/playground.html`, `website/playground.js` | Real `ostrinc.wasm` compiled by `pages.yml`, using WASI in memory; supports Run, Check, Test and Format |
-| Documentation | `website/docs.html`, `docs/design/` | Quick start and design archive; 22 design documents are present |
-| Toolchain status | `website/ecosystem.html` | Compiler, native backend, WASI, packages and VS Code are described; several counters are stale |
-| Deployment | `.github/workflows/pages.yml` | Builds `wasm32-wasip1` and copies `ostrinc.wasm` into the Pages artifact |
-| Language tooling | `vscode-ostrin/`, `compiler/src/lsp.rs`, `compiler/src/dap.rs` | Syntax support, LSP and DAP are implemented in the repository; Marketplace publication is not claimed |
+| Homepage | `website/index.html`, `website/playground.js` | Branded entry point with source facts, a real compiler-backed browser playground and editable sample |
+| Example catalogue | `website/examples.html` | Filterable repository catalogue plus live quantity, standard library, record/enum and concurrency programs |
+| Browser playground | `website/playground.html`, `.github/workflows/pages.yml` | Generated `ostrinc.wasm`; Run, Check, Test, Format, share links and source diagnostics execute in an in-memory WASI filesystem |
+| Learning and reference | `website/docs.html`, `website/language.html`, `docs/design/` | Guided 14-step learning path, language reference and 22 design documents |
+| Showcase | `website/showcase.html` | Four repository-backed demonstrations with source links and explicit maturity labels |
+| Community | `website/community.html`, `CONTRIBUTING.md`, issue templates | Contribution path and repository channels; no unverified chat, registry or external community is claimed |
+| Ecosystem and roadmap | `website/ecosystem.html`, `website/roadmap.html` | Current capabilities, early areas and future work are distinguished |
+| Deployment and editor | `.github/workflows/pages.yml`, `vscode-ostrin/`, LSP/DAP sources | Pages builds and checks the WASM artifact; editor support is implemented, Marketplace publication is not claimed |
 
 ## Verified inventory
 
-- 192 `.ostrin` source files exist under `examples/`, including the `tables`, `plot` and
-  `autodiff` package projects.
-- 22 design documents exist under `docs/design/`.
-- The compiler test suite currently has 2 unit tests, 6 differential tests and 188 example
-  integration tests (the last full run is recorded in the development log and is rerun before
-  each website change is pushed).
-- The browser playground is not a simulation: it loads the compiler WASM and runs the selected
-  source through the real CLI entry point in an in-memory WASI directory.
+- **195** `.ostrin` source files under `examples/`, including package-project sources and
+  intentional error cases.
+- **22** Markdown design documents under `docs/design/`.
+- Compiler suite: **192 integration**, **6 differential** and **2 unit** tests.
+- WASI release smoke matrix: five program modules covering the hello program, a local-path
+  package, arguments/environment, file I/O and managed ownership; compiler and program modules
+  are executed under Node WASI.
+- The browser playground uses the generated compiler WASM and the real CLI in an in-memory WASI
+  filesystem; it is not a JavaScript reimplementation of the language.
 
-## Public inconsistencies found
+`website/site.js` holds the public display facts. `scripts/website-check.mjs` derives the expected
+version and counts from `compiler/Cargo.toml`, the source tree and Rust test attributes, then checks
+the JS values, every HTML fallback, README, roadmap and this audit. CI and the Pages build run the
+check, so stale numbers or version labels fail before publication.
 
-- Repeated `prototype / 0.1` labels coexist with `development / 0.1.0`.
-- Homepage, examples and ecosystem pages still show old example and test counts.
-- `docs.html` and `language.html` describe the browser playground as future work even though
-  `pages.yml` deploys it.
-- `examples.html` says its browser preview is static without linking the executable playground
-  at the point of discovery.
-- No canonical URLs, sitemap, robots policy or structured data are present.
-- The current site has no `/showcase`, `/community` or blog surface; these remain later phases,
-  not capabilities to imply as available today.
+## Remaining constraints
 
-## Prioritized delivery order
+- The site is static GitHub Pages. There is no public package registry or default published compiler
+  release; installer scripts require a maintainer-published matching tag.
+- Some compiler/runtime and scientific-library capabilities remain explicitly early or incomplete;
+  the site should preserve those maturity labels and avoid implying production readiness.
+- Automated viewport/browser regression coverage is still thinner than compiler coverage; maintain
+  the existing responsive layout and add repeatable browser checks when the tooling is available.
+- Keep external services, analytics and community-channel claims out of the site until they have a
+  real operational contract and explicit review.
 
-1. **Discovery foundation:** canonical/OG metadata, sitemap, robots policy, consistent version
-   and counters.
-2. **Live entry point:** reuse `playground.js` and the real WASM in a compact homepage playground.
-3. **Honest catalogue:** update examples with real source links and direct Run/Playground paths.
-4. **Learning funnel:** add a showcase and community surface only after their content has real
-   repository evidence.
-5. **Scientific experience:** expose statistics, data, plotting and autodiff using the existing
-   tested examples; keep SVG plotting marked early and do not claim interactive plotting yet.
-6. **Validation:** add a static website smoke check for local links, metadata and the required
-   playground entry point, then connect it to Pages CI.
+## Next product work
 
-This sequence preserves the current visual identity, compiler-backed playground and static
-GitHub Pages architecture while making the next public claims evidence-based.
-
-## Follow-up delivered in the next increment
-
-- `website/examples.html` now has four editable live examples backed by the same WASM module:
-  quantities, standard library, records/enums and concurrency.
-- `website/playground.js` shares its invocation and loading path between the full playground and
-  the catalogue cards, with Run, Check, Reset and Copy actions for each card.
-- `scripts/website-check.mjs` validates public HTML, metadata, local references and anchors,
-  sitemap, robots, playground wiring and drift between live source strings and their validated
-  repository examples. `ci.yml` runs the static check; `pages.yml` runs it again after generating
-  and copying the WASM artifact.
-- `website/showcase.html` now presents four repository-backed programs with links to source and
-  protecting tests; SVG is explicitly marked early and no interactive graph is claimed.
-- `website/community.html`, `CONTRIBUTING.md`, issue templates, the pull-request template and
-  `docs/community-labels.md` prepare contribution without asserting that unverified channels or
-  external projects exist.
-- `website/docs.html` now contains a 14-step guided learning path from first run through real projects.
-  It links to source-backed examples and existing reference/playground/showcase surfaces, labels
-  concurrency/packages/native compilation as early where the implementation or distribution story is
-  still growing, and is covered by `scripts/website-check.mjs`.
-- The playground now requests structured JSON diagnostics for checks and failed runs, renders their
-  code/location/message fields in an accessible status output, and keeps a plain-text fallback for
-  non-JSON runtime output. The homepage and catalogue reuse the same module and output contract.
-- The first structured diagnostic now selects its source line and exposes `line N · column M` in the
-  editor header without adding a heavyweight editor dependency. A dedicated mobile viewport remains
-  untested in the current CUA surface, while the existing one-column responsive rule is preserved.
+Continue closing the production path in dependency order: ownership and memory behavior across
+control-flow boundaries; native backend correctness; real concurrency stress and cancellation;
+standard-library and package contracts; then WASM distribution and broader platform tests. Keep
+each block linked to executable tests, update the development log, and push only after checks pass.
