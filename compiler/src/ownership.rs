@@ -778,6 +778,7 @@ fn safe_release_site(instruction: &IrInstr) -> bool {
         | IrInstr::ChannelClose { .. }
         | IrInstr::TaskJoin { .. }
         | IrInstr::Aggregate { .. }
+        | IrInstr::ClosureMake { .. }
         | IrInstr::Index { .. }
         | IrInstr::Field { .. }
         | IrInstr::Binary { .. }
@@ -1118,6 +1119,7 @@ fn defined_value(instruction: &IrInstr) -> Option<(ValueId, Ty)> {
         | IrInstr::Aggregate { dst, ty, .. }
         | IrInstr::IterInit { dst, ty, .. }
         | IrInstr::IterNext { dst, ty, .. }
+        | IrInstr::ClosureMake { dst, ty, .. }
         | IrInstr::PatternBind { dst, ty, .. }
         | IrInstr::TryValue { dst, ty, .. }
         | IrInstr::TryError { dst, ty, .. }
@@ -1152,6 +1154,7 @@ fn used_values(instruction: &IrInstr) -> Vec<ValueId> {
         IrInstr::Binary { left, right, .. } => vec![*left, *right],
         IrInstr::Call { args, .. } => args.clone(),
         IrInstr::ClosureCall { callee, args, .. } => std::iter::once(*callee).chain(args.iter().copied()).collect(),
+        IrInstr::ClosureMake { captures, .. } => captures.clone(),
         IrInstr::MethodCall { receiver, args, .. } => std::iter::once(*receiver).chain(args.iter().copied()).collect(),
         IrInstr::Field { object, .. } => vec![*object],
         IrInstr::Index { object, index, .. } => vec![*object, *index],

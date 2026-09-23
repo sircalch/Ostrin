@@ -1,14 +1,15 @@
 //! A small, explicit control-flow IR sitting between HIR and the native backend.
 //!
 //! This is deliberately an additive stage at first: --ir exposes the lowering
-//! and the C backend still consumes HIR/AST. Every expression gets a temporary
+//! and the C backend consumes the verified IR where the representation is
+//! complete, with HIR/AST fallback for unfinished families. Every expression gets a temporary
 //! value, control flow gets basic blocks, and constructs not yet ready for a
 //! semantic lowering are represented as named Opaque instructions instead of
 //! disappearing. That makes the boundary measurable and gives the future
 //! retain/release and last-use passes a stable place to work.
 #![allow(dead_code)]
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
 
 use crate::ast::{BinOp, RangeKind, UnaryOp};
@@ -30,6 +31,22 @@ pub struct IrFunction {
     pub ret: Ty,
     pub entry: BlockId,
     pub blocks: Vec<IrBlock>,
+    /// Functions synthesized for closures created inside this function. They
+    /// stay attached to their owner so a closure's capture ValueIds keep the
+    /// same SSA namespace as the `ClosureMake` instruction that creates it.
+    pub closures: Vec<IrClosure>,
+}
+
+#[derive(Debug, Clone)]
+pub struct IrClosure {
+    pub name: String,
+    /// The first parameters are the captured bindings, followed by the
+    /// lambda's source parameters. The body therefore remains an ordinary IR
+    /// function and can be emitted by the same CFG backend.
+    pub params: Vec<(String, Ty)>,
+    pub ret: Ty,
+    pub captures: Vec<(String, Ty)>,
+    pub body: IrFunction,
 }
 
 #[derive(Debug, Clone)]
@@ -85,14 +102,22 @@ pub enum IrInstr {
         args: Vec<ValueId>,
         ty: Ty,
     },
-    /// Calls a function value through the closure ABI. The first native
-    /// lowering supports named functions (whose environment is null); a
-    /// captured lambda remains in HIR/AST until its environment lifetime is
-    /// represented in this IR as well.
+    /// Calls a function value through the closure ABI. Named functions use a
+    /// null environment; captured lambdas use the ref-counted environment
+    /// synthesized by `ClosureMake`.
     ClosureCall {
         dst: Option<ValueId>,
         callee: ValueId,
         args: Vec<ValueId>,
+        ty: Ty,
+    },
+    /// Builds a closure object for a synthesized IR function. `captures` are
+    /// copied into a ref-counted environment; the helper's `captures` metadata
+    /// lives on `IrFunction::closures[closure]`.
+    ClosureMake {
+        dst: ValueId,
+        closure: usize,
+        captures: Vec<ValueId>,
         ty: Ty,
     },
     MethodCall {
@@ -253,6 +278,7 @@ struct Builder {
     region_depth: usize,
     next_scope: usize,
     active_scopes: Vec<usize>,
+    closure_counter: usize,
 }
 
 impl Builder {
@@ -269,6 +295,7 @@ impl Builder {
                 ret: function.ret.clone(),
                 entry: 0,
                 blocks: vec![entry],
+                closures: Vec::new(),
             },
             current: 0,
             next_value: 0,
@@ -280,6 +307,7 @@ impl Builder {
             region_depth: 0,
             next_scope: 0,
             active_scopes: Vec::new(),
+            closure_counter: 0,
         }
     }
 
@@ -366,6 +394,84 @@ impl Builder {
 
     fn close_active_scopes(&mut self) {
         self.close_scopes_to(0);
+    }
+
+    fn lower_lambda(&mut self, expression: &HirExpr, params: &[String], body: &HirBlock) -> ValueId {
+        let Ty::Fn(param_tys, ret) = &expression.ty else {
+            return self.opaque_lambda(expression, params);
+        };
+        if params.len() != param_tys.len() || hir_contains_lambda(body) {
+            return self.opaque_lambda(expression, params);
+        }
+
+        let mut bound: HashSet<String> = params.iter().cloned().collect();
+        let mut used = HashSet::new();
+        collect_lambda_locals_block(body, &mut bound, &mut used);
+        let mut capture_names: Vec<_> = used
+            .into_iter()
+            .filter(|name| self.lookup(name).is_some())
+            .collect();
+        capture_names.sort();
+
+        let mut captures = Vec::with_capacity(capture_names.len());
+        for name in capture_names {
+            let Some(value) = self.lookup(&name) else { continue };
+            let Some(ty) = self.known_value_type(value) else {
+                return self.opaque_lambda(expression, params);
+            };
+            if ty == Ty::Void || ty == Ty::Unknown {
+                return self.opaque_lambda(expression, params);
+            }
+            captures.push((name, value, ty));
+        }
+
+        let closure_index = self.function.closures.len();
+        let closure_name = format!("{}$closure{}", self.function.name, self.closure_counter);
+        self.closure_counter += 1;
+        let mut child_params: Vec<(String, Ty)> = captures
+            .iter()
+            .map(|(name, _, ty)| (name.clone(), ty.clone()))
+            .collect();
+        child_params.extend(params.iter().cloned().zip(param_tys.iter().cloned()));
+        let child = HirFunction {
+            name: closure_name.clone(),
+            generics: Vec::new(),
+            params: child_params.clone(),
+            ret: (**ret).clone(),
+            body: body.clone(),
+            source_file: Some(self.function.name.clone()),
+        };
+        let body_ir = lower_function(&child, &self.iterator_items);
+        self.function.closures.push(IrClosure {
+            name: closure_name,
+            params: child_params,
+            ret: (**ret).clone(),
+            captures: captures
+                .iter()
+                .map(|(name, _, ty)| (name.clone(), ty.clone()))
+                .collect(),
+            body: body_ir,
+        });
+
+        let dst = self.fresh();
+        self.emit(IrInstr::ClosureMake {
+            dst,
+            closure: closure_index,
+            captures: captures.into_iter().map(|(_, value, _)| value).collect(),
+            ty: expression.ty.clone(),
+        });
+        dst
+    }
+
+    fn opaque_lambda(&mut self, expression: &HirExpr, params: &[String]) -> ValueId {
+        let dst = self.fresh();
+        self.emit(IrInstr::Opaque {
+            dst: Some(dst),
+            op: format!("lambda<{}>", params.join(",")),
+            inputs: Vec::new(),
+            ty: expression.ty.clone(),
+        });
+        dst
     }
 
     fn lookup(&self, name: &str) -> Option<ValueId> {
@@ -1887,16 +1993,7 @@ impl Builder {
             HirKind::Block(block) | HirKind::Loop(block) => {
                 self.lower_block(block).unwrap_or_else(|| self.unit())
             }
-            HirKind::Lambda(params, _) => {
-                let dst = self.fresh();
-                self.emit(IrInstr::Opaque {
-                    dst: Some(dst),
-                    op: format!("lambda<{}>", params.join(",")),
-                    inputs: Vec::new(),
-                    ty: expression.ty.clone(),
-                });
-                dst
-            }
+            HirKind::Lambda(params, body) => self.lower_lambda(expression, params, body),
             HirKind::List(values) | HirKind::Set(values) => {
                 let fields = values.iter().map(|value| self.lower_expr(value)).collect();
                 let dst = self.fresh();
@@ -2179,6 +2276,7 @@ fn defined_value_type(instruction: &IrInstr) -> Option<(ValueId, Ty)> {
         | IrInstr::Aggregate { dst, ty, .. }
         | IrInstr::IterInit { dst, ty, .. }
         | IrInstr::IterNext { dst, ty, .. }
+        | IrInstr::ClosureMake { dst, ty, .. }
         | IrInstr::PatternBind { dst, ty, .. }
         | IrInstr::TryValue { dst, ty, .. }
         | IrInstr::TryError { dst, ty, .. }
@@ -2253,6 +2351,254 @@ fn lower_function(function: &HirFunction, iterator_items: &HashMap<String, Ty>) 
         }
     }
     builder.function
+}
+
+fn hir_contains_lambda(block: &HirBlock) -> bool {
+    block.stmts.iter().any(hir_stmt_contains_lambda)
+        || block.tail.as_deref().is_some_and(hir_expr_contains_lambda)
+}
+
+fn hir_stmt_contains_lambda(statement: &HirStmt) -> bool {
+    match statement {
+        HirStmt::Let { value, .. }
+        | HirStmt::Assign { value, .. }
+        | HirStmt::Expr(value) => hir_expr_contains_lambda(value),
+        HirStmt::FieldAssign { target, value } => {
+            hir_expr_contains_lambda(target) || hir_expr_contains_lambda(value)
+        }
+        HirStmt::Return(value) | HirStmt::Break(value) => {
+            value.as_ref().is_some_and(hir_expr_contains_lambda)
+        }
+        HirStmt::Continue => false,
+        HirStmt::While { cond, body } | HirStmt::For { iter: cond, body, .. } => {
+            hir_expr_contains_lambda(cond) || hir_contains_lambda(body)
+        }
+    }
+}
+
+fn hir_expr_contains_lambda(expression: &HirExpr) -> bool {
+    match &expression.kind {
+        HirKind::Lambda(..) => true,
+        HirKind::Unit(value, _) | HirKind::Unary(_, value) | HirKind::Field(value, _) | HirKind::As(value, _) => {
+            hir_expr_contains_lambda(value)
+        }
+        HirKind::Try(value, handler) => {
+            hir_expr_contains_lambda(value) || handler.as_deref().is_some_and(hir_expr_contains_lambda)
+        }
+        HirKind::Binary(_, left, right)
+        | HirKind::Index(left, right)
+        | HirKind::Within(left, right) => {
+            hir_expr_contains_lambda(left) || hir_expr_contains_lambda(right)
+        }
+        HirKind::Approximately(left, right, tolerance) => {
+            hir_expr_contains_lambda(left)
+                || hir_expr_contains_lambda(right)
+                || hir_expr_contains_lambda(tolerance)
+        }
+        HirKind::Range(start, _, end, step) => {
+            hir_expr_contains_lambda(start)
+                || hir_expr_contains_lambda(end)
+                || step.as_deref().is_some_and(hir_expr_contains_lambda)
+        }
+        HirKind::Call { callee, args, .. } => {
+            hir_expr_contains_lambda(callee)
+                || args.iter().any(|arg| hir_expr_contains_lambda(&arg.value))
+        }
+        HirKind::MethodCall { recv, args, .. } => {
+            hir_expr_contains_lambda(recv)
+                || args.iter().any(|arg| hir_expr_contains_lambda(&arg.value))
+        }
+        HirKind::If(condition, then_block, else_block) => {
+            hir_expr_contains_lambda(condition)
+                || hir_contains_lambda(then_block)
+                || else_block.as_ref().is_some_and(hir_contains_lambda)
+        }
+        HirKind::Block(block) | HirKind::Loop(block) | HirKind::Spawn(block) | HirKind::SpawnScope(block) => {
+            hir_contains_lambda(block)
+        }
+        HirKind::List(values) | HirKind::Set(values) => values.iter().any(hir_expr_contains_lambda),
+        HirKind::Map(values) => values.iter().any(|(key, value)| {
+            hir_expr_contains_lambda(key) || hir_expr_contains_lambda(value)
+        }),
+        HirKind::Record { fields, .. } => fields.iter().any(|(_, value)| hir_expr_contains_lambda(value)),
+        HirKind::Match(scrutinee, arms) => {
+            hir_expr_contains_lambda(scrutinee)
+                || arms.iter().any(|arm| {
+                    arm.guard.as_ref().is_some_and(hir_expr_contains_lambda)
+                        || hir_contains_lambda(&arm.body)
+                })
+        }
+        HirKind::Channel(_, capacity) => capacity.as_deref().is_some_and(hir_expr_contains_lambda),
+        HirKind::Int(_)
+        | HirKind::Sized(_, _)
+        | HirKind::Float(_)
+        | HirKind::Float32(_)
+        | HirKind::Str(_)
+        | HirKind::Char(_)
+        | HirKind::Bool(_)
+        | HirKind::Local(_)
+        | HirKind::Global(_)
+        | HirKind::EmptyCollection(..) => false,
+    }
+}
+
+fn collect_lambda_locals_block(
+    block: &HirBlock,
+    bound: &mut HashSet<String>,
+    used: &mut HashSet<String>,
+) {
+    for statement in &block.stmts {
+        match statement {
+            HirStmt::Let { name, value, .. } => {
+                collect_lambda_locals_expr(value, bound, used);
+                bound.insert(name.clone());
+            }
+            HirStmt::Assign { name, value } => {
+                collect_lambda_locals_expr(value, bound, used);
+                if !bound.contains(name) {
+                    used.insert(name.clone());
+                }
+            }
+            HirStmt::FieldAssign { target, value } => {
+                collect_lambda_locals_expr(target, bound, used);
+                collect_lambda_locals_expr(value, bound, used);
+            }
+            HirStmt::Return(value) | HirStmt::Break(value) => {
+                if let Some(value) = value {
+                    collect_lambda_locals_expr(value, bound, used);
+                }
+            }
+            HirStmt::Continue => {}
+            HirStmt::While { cond, body } => {
+                collect_lambda_locals_expr(cond, bound, used);
+                let mut nested = bound.clone();
+                collect_lambda_locals_block(body, &mut nested, used);
+            }
+            HirStmt::For { var, iter, body } => {
+                collect_lambda_locals_expr(iter, bound, used);
+                let mut nested = bound.clone();
+                nested.insert(var.clone());
+                collect_lambda_locals_block(body, &mut nested, used);
+            }
+            HirStmt::Expr(value) => collect_lambda_locals_expr(value, bound, used),
+        }
+    }
+    if let Some(tail) = &block.tail {
+        collect_lambda_locals_expr(tail, bound, used);
+    }
+}
+
+fn collect_lambda_locals_expr(
+    expression: &HirExpr,
+    bound: &mut HashSet<String>,
+    used: &mut HashSet<String>,
+) {
+    match &expression.kind {
+        HirKind::Local(name) if !bound.contains(name) => {
+            used.insert(name.clone());
+        }
+        HirKind::Local(_) | HirKind::Int(_) | HirKind::Sized(_, _) | HirKind::Float(_) | HirKind::Float32(_)
+        | HirKind::Str(_) | HirKind::Char(_) | HirKind::Bool(_) | HirKind::Global(_) | HirKind::EmptyCollection(..) => {}
+        HirKind::Unit(value, _) | HirKind::Unary(_, value) | HirKind::Field(value, _) | HirKind::As(value, _) => {
+            collect_lambda_locals_expr(value, bound, used)
+        }
+        HirKind::Binary(_, left, right)
+        | HirKind::Index(left, right)
+        | HirKind::Within(left, right) => {
+            collect_lambda_locals_expr(left, bound, used);
+            collect_lambda_locals_expr(right, bound, used);
+        }
+        HirKind::Approximately(left, right, tolerance) => {
+            collect_lambda_locals_expr(left, bound, used);
+            collect_lambda_locals_expr(right, bound, used);
+            collect_lambda_locals_expr(tolerance, bound, used);
+        }
+        HirKind::Range(start, _, end, step) => {
+            collect_lambda_locals_expr(start, bound, used);
+            collect_lambda_locals_expr(end, bound, used);
+            if let Some(step) = step {
+                collect_lambda_locals_expr(step, bound, used);
+            }
+        }
+        HirKind::Call { callee, args, .. } => {
+            collect_lambda_locals_expr(callee, bound, used);
+            for arg in args {
+                collect_lambda_locals_expr(&arg.value, bound, used);
+            }
+        }
+        HirKind::MethodCall { recv, args, .. } => {
+            collect_lambda_locals_expr(recv, bound, used);
+            for arg in args {
+                collect_lambda_locals_expr(&arg.value, bound, used);
+            }
+        }
+        HirKind::If(condition, then_block, else_block) => {
+            collect_lambda_locals_expr(condition, bound, used);
+            let mut then_bound = bound.clone();
+            collect_lambda_locals_block(then_block, &mut then_bound, used);
+            if let Some(else_block) = else_block {
+                let mut else_bound = bound.clone();
+                collect_lambda_locals_block(else_block, &mut else_bound, used);
+            }
+        }
+        HirKind::Block(block) | HirKind::Loop(block) | HirKind::Spawn(block) | HirKind::SpawnScope(block) => {
+            let mut nested = bound.clone();
+            collect_lambda_locals_block(block, &mut nested, used);
+        }
+        HirKind::Lambda(_, _) => {}
+        HirKind::List(values) | HirKind::Set(values) => {
+            for value in values {
+                collect_lambda_locals_expr(value, bound, used);
+            }
+        }
+        HirKind::Map(values) => {
+            for (key, value) in values {
+                collect_lambda_locals_expr(key, bound, used);
+                collect_lambda_locals_expr(value, bound, used);
+            }
+        }
+        HirKind::Try(value, handler) => {
+            collect_lambda_locals_expr(value, bound, used);
+            if let Some(handler) = handler {
+                collect_lambda_locals_expr(handler, bound, used);
+            }
+        }
+        HirKind::Record { fields, .. } => {
+            for (_, value) in fields {
+                collect_lambda_locals_expr(value, bound, used);
+            }
+        }
+        HirKind::Match(scrutinee, arms) => {
+            collect_lambda_locals_expr(scrutinee, bound, used);
+            for arm in arms {
+                let mut arm_bound = bound.clone();
+                collect_pattern_names(&arm.pattern, &mut arm_bound);
+                if let Some(guard) = &arm.guard {
+                    collect_lambda_locals_expr(guard, &mut arm_bound, used);
+                }
+                collect_lambda_locals_block(&arm.body, &mut arm_bound, used);
+            }
+        }
+        HirKind::Channel(_, capacity) => {
+            if let Some(capacity) = capacity {
+                collect_lambda_locals_expr(capacity, bound, used);
+            }
+        }
+    }
+}
+
+fn collect_pattern_names(pattern: &crate::ast::Pattern, bound: &mut HashSet<String>) {
+    match pattern {
+        crate::ast::Pattern::Ident(name) => {
+            bound.insert(name.clone());
+        }
+        crate::ast::Pattern::Variant(_, fields) => {
+            for (_, field) in fields {
+                collect_pattern_names(field, bound);
+            }
+        }
+        crate::ast::Pattern::Wildcard | crate::ast::Pattern::Literal(_) | crate::ast::Pattern::Range(..) => {}
+    }
 }
 
 pub fn verify(program: &IrProgram) -> VerifyReport {
@@ -2402,6 +2748,10 @@ fn display_instruction(instruction: &IrInstr) -> String {
             "{}closure_call %{callee}({})",
             result_prefix(*dst),
             value_list(args)
+        ),
+        IrInstr::ClosureMake { dst, closure, captures, .. } => format!(
+            "%{dst} = closure_make @{closure}({})",
+            value_list(captures)
         ),
         IrInstr::MethodCall {
             dst,

@@ -7,6 +7,10 @@ fn main() -> Void {
     add_offset: fn(Int) -> Int = fn(value) { value + offset }
     print(add_offset(5))
 
+    label = "value:".replace(":", "!")
+    label_value: fn(Int) -> String = fn(_value) { label }
+    print(label_value(5))
+
     increment_value = increment
     print(increment_value(4))
 }

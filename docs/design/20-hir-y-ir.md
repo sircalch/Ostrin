@@ -12,8 +12,9 @@ de archivo administrados, comprobación de lectura/escritura/cierre y un checkpo
 antes de cruzar la libc; la operación de archivo sigue siendo bloqueante mientras está dentro del
 host. Todos estos valores conservan sus marcadores de ownership, transferencia de `Phi` simples y
 patrones simples
-`Some`/`None`; las funciones globales sin entorno usadas como valores también cruzan ahora la IR
-mediante `ClosureCall` y adaptadores al ABI `(env, args...)`; el backend mantiene
+`Some`/`None`; las funciones globales sin entorno y las lambdas con capturas inmutables usadas
+como valores también cruzan ahora la IR mediante `ClosureMake`/`ClosureCall` y adaptadores al
+ABI `(env, args...)`; el backend mantiene
 HIR/AST como fallback verificado para otros payloads gestionados e iteradores propios genéricos o indirectos,
 patrones anidados, agregados complejos y escapes mientras la migración crece. Los `for`
 sobre rangos enteros —incluidos `to`/`until`, pasos positivos/negativos y paso cero— ya
@@ -35,7 +36,7 @@ esa ABI, mientras los scopes anidados y escapes complejos siguen en fallback.*
 | `TypedProgram.literal_kinds` | `typeck` | Tipo elegido para cada literal numérico |
 | `NativeTypeReport` | `codegen` | Detecta divergencias checker↔backend (0 hoy, en ~1 350 expresiones) |
 | `IrProgram` / `IrFunction` / `IrBlock` | `ir.rs` | Primera CFG con temporales explícitos, terminadores y verificador de destinos |
-| Emisor IR | `ir_c.rs` | Genera C desde SSA/CFG para funciones escalares, rangos enteros direccionales, `String`, `read_file`/`write_file` (`Result<String,String>`/`Result<Void,String>`), records concretos, iteradores de records concretos mediante métodos registrados, canales (`send`/`close`/`receive`), `Option<Record>`, `List<T>` escalar, operaciones hash escalares de `Map`/`Set`, wrappers sobre `List`/`Map`/`Set` y wrappers `Option`/`Result` anidados con `match`, `Option<T>` escalar/`String` con `Some`/`None`, `try catch` con handlers globales y aliases locales sin entorno, ramas, bucles, `phi` y enteros de ancho fijo comprobados; emite ownership para las familias migradas y deja fallback seguro para lo demás |
+| Emisor IR | `ir_c.rs` | Genera C desde SSA/CFG para funciones escalares, rangos enteros direccionales, `String`, `read_file`/`write_file` (`Result<String,String>`/`Result<Void,String>`), records concretos, iteradores de records concretos mediante métodos registrados, canales (`send`/`close`/`receive`), `Option<Record>`, `List<T>` escalar, operaciones hash escalares de `Map`/`Set`, wrappers sobre `List`/`Map`/`Set` y wrappers `Option`/`Result` anidados con `match`, `Option<T>` escalar/`String` con `Some`/`None`, `try catch` con handlers globales y aliases locales sin entorno, cierres capturados con entorno tipado y destructor, llamadas indirectas, ramas, bucles, `phi` y enteros de ancho fijo comprobados; emite ownership para las familias migradas y deja fallback seguro para lo demás |
 | Intérprete como oráculo | `interpreter` | Semántica de referencia; pruebas diferenciales automáticas |
 
 Por tanto el backend **ya no infiere solo**: la reinferencia que queda (`bind_type`, `expected`, `settle_literal`) es respaldo verificado.
@@ -84,14 +85,14 @@ Sobre este IR se hacen los análisis que el texto C no permite:
    de seguridad y su estado acompaña al allocation mientras vive, nunca a una dirección reciclable;
    un `receive()`/`select` que extrae el record limpia el estado de vuelo para el binding receptor.
 3. **Escape** (para arenas): un valor que no sale de su función puede vivir en una arena.
-4. **Cierres**: capturas explícitas → estructura `{ fn_ptr, entorno }` (funciones como valores de primera clase). Mientras no haya llamada indirecta en la IR, los aliases locales de funciones globales se conservan como procedencia estática y se emiten como llamadas directas.
+4. **Cierres**: capturas explícitas → estructura `{ fn_ptr, entorno }` (funciones como valores de primera clase). `ClosureMake` conserva los ValueIds capturados y genera una función auxiliar IR más un entorno C registrado; `ClosureCall` valida la firma y llama mediante `(env, args...)`.
 5. Optimización: inlining, plegado de constantes, eliminación de código muerto, fusión de bucles sobre `Array`.
 
 ## 4. Orden de implementación (cada paso mantiene verdes las pruebas diferenciales)
 
 1. **HIR + verificador + `--hir`** para *todo* lo que el checker tipa; medida de cobertura por ejemplo (ratchet).
 2. Migrar el backend C por **familias de nodos** al HIR (literales/operadores → llamadas → records/enums → patrones → colecciones → genéricos), eliminando la reinferencia correspondiente en cada paso.
-3. **IR de bloques básicos** y generación de C desde el IR (el HIR deja de generar C directamente). La primera CFG observable ya existe en `--ir` y el emisor consume ramas, recursión, bucles con `phi`, rangos enteros direccionales, aritmética comprobada de ancho fijo, `String`, records concretos con campos anidados, iteradores de records concretos (`next() -> Option<T>`), canales con `send`/`close`/`receive` y `for`, `spawn {}` con CFG soportado, capturas inmutables, `spawn_scope {}` inline con drenado de grupos, tareas anidadas con capturas propagadas y `Task.join()`, el núcleo de `List<T>`, operaciones hash escalares de `Map`/`Set` y lookups `Option` escalares/String/Record con `Some`/`None`; faltan rangos con cantidades, iteradores genéricos/indirectos, scopes anidados, otros `Option` gestionados, patrones anidados, agregados complejos y la retirada progresiva del fallback.
+3. **IR de bloques básicos** y generación de C desde el IR (el HIR deja de generar C directamente). La primera CFG observable ya existe en `--ir` y el emisor consume ramas, recursión, bucles con `phi`, rangos enteros direccionales, aritmética comprobada de ancho fijo, `String`, records concretos con campos anidados, iteradores de records concretos (`next() -> Option<T>`), canales con `send`/`close`/`receive` y `for`, `spawn {}` con CFG soportado, capturas inmutables, closures capturados con entorno tipado, `spawn_scope {}` inline con drenado de grupos, tareas anidadas con capturas propagadas y `Task.join()`, el núcleo de `List<T>`, operaciones hash escalares de `Map`/`Set` y lookups `Option` escalares/String/Record con `Some`/`None`; faltan rangos con cantidades, iteradores genéricos/indirectos, scopes anidados, otros `Option` gestionados, patrones anidados, agregados complejos y la retirada progresiva del fallback.
 4. **RC + último uso** sobre el IR (`--leak-check`: los ejemplos deben terminar sin objetos vivos).
    El runtime ya expone `ostrin_retain`/`ostrin_release`; el emisor C cubre la primera subetapa
    de forma lineal en locales directos: aliases y campos prestados retienen, las reasignaciones
@@ -109,10 +110,10 @@ Sobre este IR se hacen los análisis que el texto C no permite:
    lineales de `unwrap`/`unwrap_or`/`ok`/`ok_or` sobre `Option<Option<String>>` y
    `Result<Option<String>, String>` ya extraen y retienen payloads recursivos en IR/C; el ejemplo
    `native_ir_nested_wrappers.ostrin` comprueba ramas y fallbacks con paridad y cero fugas.
-5. **Cierres y funciones como valores**: las funciones globales sin entorno ya tienen `ClosureCall`
-   y adaptadores nativos; falta añadir llamadas indirectas y transferencias de ownership para
-   cierres con entorno. Retirar la comprobación dinámica de E1101 requiere que el backend consuma
-   la IR transformada de forma completa.
+5. **Cierres y funciones como valores**: las funciones globales sin entorno y las lambdas capturadas
+   ya tienen `ClosureCall`/`ClosureMake`, adaptadores nativos y ownership del entorno; quedan
+   cierres anidados y formas no lineales. Retirar la comprobación dinámica de E1101 requiere que
+   el backend consuma la IR transformada de forma completa.
 6. Optimizador y, después, otros backends (LLVM, WASM, GPU) que consumen el mismo IR.
 
 ## 5. Riesgos y mitigaciones

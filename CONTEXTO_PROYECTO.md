@@ -6378,3 +6378,24 @@ Verificación de este bloque: el ejemplo pasa en intérprete, `--native-type-rep
 programas y ejecutó el nuevo módulo bajo Node WASI con salida exacta; `website-check.mjs` y
 `distribution-check.mjs` también pasan. Se actualizaron los contadores públicos a 196 programas
 fuente y 198 pruebas de integración.
+
+## 260. Closures capturadas con entorno explícito en IR/C — 2026-09-23
+
+El bloque anterior ya había llevado las funciones nombradas a `ClosureCall`, pero una lambda que
+capturaba un binding todavía se representaba como `Opaque` y forzaba el fallback HIR. Se cerró la
+siguiente pieza del ABI de valores de función:
+
+- `IrInstr::ClosureMake` conserva los `ValueId` capturados y cada lambda compatible se convierte en
+  una `IrClosure` auxiliar con parámetros de entorno más parámetros de llamada. La función auxiliar
+  usa el mismo emisor CFG que una función normal, por lo que sus retornos y llamadas también pasan
+  por la verificación de tipos del backend IR/C.
+- El emisor genera una estructura C de entorno por closure, un adaptador `(void*, args...)` y un
+  destructor registrado. Las capturas gestionadas se retienen al construir el entorno y se liberan
+  cuando el último `ClosureCall`/`release` descarta el valor de función; los retornos gestionados de
+  la lambda retienen el payload cuando proceden de un parámetro capturado.
+- `examples/native_hir_closures.ostrin` ahora ejercita una captura escalar y una captura `String`
+  materializada, y exige cero `hir-generated`, paridad exacta y `live_allocations=0`.
+
+La frontera restante son closures anidadas o con cuerpos no lineales, handlers locales no inline,
+escapes complejos y el análisis completo de ownership para esos casos; siguen cayendo de forma
+verificable a HIR/AST.

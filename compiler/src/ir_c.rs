@@ -42,6 +42,16 @@ struct SpawnHelper {
 
 type SpawnHelpers = HashMap<BlockId, SpawnHelper>;
 
+#[derive(Clone)]
+struct ClosureHelper {
+    adapter: String,
+    env_type: Option<String>,
+    drop_name: Option<String>,
+    captures: Vec<(String, Ty)>,
+}
+
+type ClosureHelpers = HashMap<usize, ClosureHelper>;
+
 fn c_type(ty: &Ty, records: &RecordFields) -> Bail<String> {
     Ok(match ty {
         Ty::Int => "int64_t".to_string(),
@@ -276,6 +286,7 @@ fn retain_payload(access: &str, ty: &Ty, records: &RecordFields) -> Option<Strin
             if name == "Channel" && args.len() == 1 && channel_supported(&args[0], records) => {
             Some(format!("ostrin_retain((void*){access})"))
         }
+        Ty::Fn(_, _) => Some(format!("ostrin_retain((void*)({access}).env)")),
         _ => None,
     }
 }
@@ -330,6 +341,7 @@ fn defined_value(instruction: &IrInstr) -> Option<(ValueId, Ty)> {
         | IrInstr::Aggregate { dst, ty, .. }
         | IrInstr::IterInit { dst, ty, .. }
         | IrInstr::IterNext { dst, ty, .. }
+        | IrInstr::ClosureMake { dst, ty, .. }
         | IrInstr::PatternBind { dst, ty, .. }
         | IrInstr::TryValue { dst, ty, .. }
         | IrInstr::TryError { dst, ty, .. }
@@ -593,6 +605,7 @@ fn emit_instruction(
     methods: &MethodNames,
     records: &RecordFields,
     spawn_helpers: &SpawnHelpers,
+    closure_helpers: &ClosureHelpers,
     helper: &mut HelperGenerator<'_>,
     out: &mut String,
 ) -> Bail<()> {
@@ -1369,6 +1382,42 @@ fn emit_instruction(
                 out.push_str(&format!("    {call};\n"));
             }
         }
+        IrInstr::ClosureMake { dst, closure, captures, ty } => {
+            let Ty::Fn(_, _) = ty else { return Err(()) };
+            let helper = closure_helpers.get(closure).ok_or(())?;
+            if helper.captures.len() != captures.len() {
+                return Err(());
+            }
+            for ((_, capture_ty), capture) in helper.captures.iter().zip(captures) {
+                if value_ty(values, *capture)? != *capture_ty || !supported(capture_ty, records) {
+                    return Err(());
+                }
+            }
+            let env = if let (Some(env_type), Some(drop_name)) = (&helper.env_type, &helper.drop_name) {
+                let mut init = String::new();
+                for ((name, capture_ty), capture) in helper.captures.iter().zip(captures) {
+                    let field = format!("__ce->{name}");
+                    init.push_str(&format!("{field} = {}; ", value_code(values, *capture)?));
+                    if let Some(retain) = retain_payload(&field, capture_ty, records) {
+                        init.push_str(&retain);
+                        init.push_str("; ");
+                    }
+                }
+                format!(
+                    "({{ {env_type}* __ce = ({env_type}*)ostrin_calloc_with_drop(1, sizeof *__ce, (void (*)(void*)){drop_name}); {init}(void*)__ce; }})"
+                )
+            } else if helper.captures.is_empty() {
+                "NULL".to_string()
+            } else {
+                return Err(());
+            };
+            out.push_str(&format!(
+                "    {} = ((OstrinClosure){{ (void*){}, {} }});\n",
+                value_name(*dst),
+                helper.adapter,
+                env
+            ));
+        }
         IrInstr::PatternTest { dst, subject, pattern } => {
             let Ty::Applied(name, args) = value_ty(values, *subject)? else { return Err(()) };
             let subject = value_code(values, *subject)?;
@@ -1578,7 +1627,9 @@ fn emit_instruction(
                         ));
                     }
                 }
-                Ty::Fn(_, _) => {}
+                Ty::Fn(_, _) => {
+                    out.push_str(&format!("    ostrin_retain((void*)({}).env);\n", value_code(values, *value)?));
+                }
                 _ => return Err(()),
             }
         }
@@ -1618,7 +1669,9 @@ fn emit_instruction(
                         ));
                     }
                 }
-                Ty::Fn(_, _) => {}
+                Ty::Fn(_, _) => {
+                    out.push_str(&format!("    ostrin_release((void*)({}).env);\n", value_code(values, *value)?));
+                }
                 _ => return Err(()),
             }
         }
@@ -1776,6 +1829,7 @@ fn used_values(instruction: &IrInstr) -> Vec<ValueId> {
         IrInstr::Binary { left, right, .. } => vec![*left, *right],
         IrInstr::Call { args, .. } => args.clone(),
         IrInstr::ClosureCall { callee, args, .. } => std::iter::once(*callee).chain(args.iter().copied()).collect(),
+        IrInstr::ClosureMake { captures, .. } => captures.clone(),
         IrInstr::MethodCall { receiver, args, .. } => std::iter::once(*receiver).chain(args.iter().copied()).collect(),
         IrInstr::Field { object, .. } => vec![*object],
         IrInstr::Index { object, index, .. } => vec![*object, *index],
@@ -1911,6 +1965,7 @@ fn build_spawn_helpers(
     methods: &MethodNames,
     records: &RecordFields,
     spawn_helpers: &mut SpawnHelpers,
+    closure_helpers: &ClosureHelpers,
     helper: &mut HelperGenerator<'_>,
 ) -> Bail<(Vec<String>, Vec<(String, String)>)> {
     let mut specs = Vec::new();
@@ -2097,6 +2152,7 @@ fn build_spawn_helpers(
                     methods,
                     records,
                     spawn_helpers,
+                    closure_helpers,
                     helper,
                     &mut body,
                 )?;
@@ -2116,6 +2172,130 @@ fn build_spawn_helpers(
         helpers.push((signature, body));
     }
     Ok((declarations, helpers))
+}
+
+fn build_closure_helpers(
+    function: &IrFunction,
+    known_functions: &FunctionNames,
+    methods: &MethodNames,
+    records: &RecordFields,
+    helper: &mut HelperGenerator<'_>,
+) -> Bail<(ClosureHelpers, Vec<String>, Vec<(String, String)>)> {
+    let mut closure_helpers = ClosureHelpers::new();
+    let mut declarations = Vec::new();
+    let mut helpers = Vec::new();
+
+    for (index, closure) in function.closures.iter().enumerate() {
+        if closure.captures.len() > closure.body.params.len()
+            || closure
+                .captures
+                .iter()
+                .zip(&closure.body.params)
+                .any(|((name, ty), (body_name, body_ty))| name != body_name || ty != body_ty)
+        {
+            return Err(());
+        }
+        let (lowered_body_program, _) = crate::ownership::lower_linear(&crate::ir::IrProgram {
+            functions: vec![closure.body.clone()],
+        });
+        let lowered_body = lowered_body_program.functions.into_iter().next().ok_or(())?;
+        let generated = generate_with_helpers(&lowered_body, known_functions, methods, records, helper).ok_or(())?;
+        declarations.extend(generated.declarations);
+        helpers.extend(generated.helpers);
+
+        let base = crate::codegen::c_function_name(&closure.name);
+        let body_name = format!("ostrin_ir_closure_body_{base}");
+        let adapter = format!("ostrin_ir_closure_{base}");
+        let env_type = (!closure.captures.is_empty()).then(|| format!("OstrinIrClosureEnv_{base}"));
+        let drop_name = env_type
+            .as_ref()
+            .map(|_| format!("ostrin_ir_closure_drop_{base}"));
+
+        let body_params = closure
+            .body
+            .params
+            .iter()
+            .map(|(name, ty)| Ok(format!("{} {name}", c_type(ty, records)?)))
+            .collect::<Bail<Vec<_>>>()?;
+        let body_param_list = if body_params.is_empty() {
+            "void".to_string()
+        } else {
+            body_params.join(", ")
+        };
+        let body_signature = format!(
+            "static {} {body_name}({body_param_list})",
+            c_type(&closure.ret, records)?
+        );
+        declarations.push(format!("{body_signature};"));
+        helpers.push((body_signature, generated.body));
+
+        if let Some(env_type) = &env_type {
+            let fields = closure
+                .captures
+                .iter()
+                .map(|(name, ty)| Ok(format!("{} {name};", c_type(ty, records)?)))
+                .collect::<Bail<Vec<_>>>()?;
+            declarations.push(format!("typedef struct {{ {} }} {env_type};", fields.join(" ")));
+            let drop_name = drop_name.as_deref().ok_or(())?;
+            declarations.push(format!("static void {drop_name}(void* __env);"));
+            let mut drop_body = format!("    {env_type}* __e = __env;\n");
+            for (name, ty) in &closure.captures {
+                if let Some(release) = release_payload(&format!("__e->{name}"), ty, records) {
+                    drop_body.push_str("    ");
+                    drop_body.push_str(&release);
+                    drop_body.push_str(";\n");
+                }
+            }
+            helpers.push((format!("static void {drop_name}(void* __env)"), drop_body));
+        }
+
+        let lambda_params = closure.body.params.iter().skip(closure.captures.len());
+        let adapter_params = lambda_params
+            .map(|(name, ty)| Ok(format!(", {} {name}", c_type(ty, records)?)))
+            .collect::<Bail<Vec<_>>>()?
+            .join("");
+        let adapter_signature = format!(
+            "static {} {adapter}(void* __env{adapter_params})",
+            c_type(&closure.ret, records)?
+        );
+        declarations.push(format!("{adapter_signature};"));
+        let mut adapter_body = String::new();
+        if let Some(env_type) = &env_type {
+            adapter_body.push_str(&format!("    {env_type}* __e = __env;\n"));
+        } else {
+            adapter_body.push_str("    (void)__env;\n");
+        }
+        let call_args = closure
+            .captures
+            .iter()
+            .map(|(name, _)| {
+                env_type
+                    .as_ref()
+                    .map(|_| format!("__e->{name}"))
+                    .unwrap_or_else(|| name.clone())
+            })
+            .chain(closure.body.params.iter().skip(closure.captures.len()).map(|(name, _)| name.clone()))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let call = format!("{body_name}({call_args})");
+        if closure.ret == Ty::Void {
+            adapter_body.push_str(&format!("    {call};\n"));
+        } else {
+            adapter_body.push_str(&format!("    return {call};\n"));
+        }
+        helpers.push((adapter_signature, adapter_body));
+
+        closure_helpers.insert(
+            index,
+            ClosureHelper {
+                adapter,
+                env_type,
+                drop_name,
+                captures: closure.captures.clone(),
+            },
+        );
+    }
+    Ok((closure_helpers, declarations, helpers))
 }
 
 /// Emits an IR function when all of its values use a supported scalar or
@@ -2164,7 +2344,10 @@ pub fn generate_with_helpers(
     let values = collect_values(function, records).ok()?;
     let mut spawn_helpers = SpawnHelpers::new();
     let mut helper_declarations = Vec::new();
-    let mut helpers = build_closure_adapters(function, known_functions, records).ok()?;
+    let (closure_helpers, closure_declarations, mut helpers) =
+        build_closure_helpers(function, known_functions, methods, records, helper).ok()?;
+    helper_declarations.extend(closure_declarations);
+    helpers.extend(build_closure_adapters(function, known_functions, records).ok()?);
     let (spawn_declarations, spawn_helper_bodies) = build_spawn_helpers(
         function,
         &values,
@@ -2172,6 +2355,7 @@ pub fn generate_with_helpers(
         methods,
         records,
         &mut spawn_helpers,
+        &closure_helpers,
         helper,
     ).ok()?;
     helper_declarations.extend(spawn_declarations);
@@ -2224,7 +2408,7 @@ pub fn generate_with_helpers(
         }
         out.push_str(&format!("{}:\n", block_label(block.id)));
         for instruction in &block.instructions {
-            emit_instruction(instruction, &values, &function.name, known_functions, methods, records, &spawn_helpers, helper, &mut out).ok()?;
+            emit_instruction(instruction, &values, &function.name, known_functions, methods, records, &spawn_helpers, &closure_helpers, helper, &mut out).ok()?;
         }
         emit_terminator(
             function,

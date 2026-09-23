@@ -3,6 +3,12 @@
 ## Unreleased
 
 ### Compiler and ownership
+- Moved compatible captured lambdas into the ownership-lowered IR/C path. `ClosureMake` now
+  synthesizes an IR helper and a typed C environment with a destructor; captured managed values are
+  retained on construction and released with the closure environment, while managed values
+  returned from captured parameters are retained before crossing the callback boundary. The
+  closure regression requires exact interpreter/native parity, zero HIR fallback and
+  `live_allocations=0`.
 - Replaced E1101's block-array-order scan with forward dataflow over reachable CFG paths. Mutually
   exclusive branches no longer create false positives; joins remain conservative, loops iterate to
   a fixed point, and `Phi` operands are checked only on their selecting predecessor edge. The

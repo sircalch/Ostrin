@@ -1,7 +1,7 @@
 //! A real, honest native backend: `ostrinc --emit-c`/`--compile` transpile a
 //! *subset* of Ostrin to C and hand it to the system's C compiler. This is
-//! not the whole language — dimensional `Quantity` and closures still only
-//! run through the interpreter (`--run`), and without closures, `List`'s
+//! not the whole language — dimensional `Quantity` still has interpreter-only
+//! corners, and without unsupported closure shapes, `List`'s
 //! own combinators (`map`/`filter`/`fold`/`find`/`any`/`all`, all of which
 //! take a function) stay out of reach too — only `length`/`push`/
 //! `remove_at`, indexing and `for x in list` are supported. What is

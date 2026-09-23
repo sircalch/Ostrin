@@ -5,7 +5,7 @@ colecciones y entornos de tareas, primitivas `clone`/`drop`, primer lowering con
 ownership y ABI `retain`/`release`. Las familias `String`, `Result` con payload escalar y
 error `String`, `List<T>` escalar, wrappers `Option`/`Result` sobre listas, mapas, conjuntos y
 otros wrappers, `Option<Map<Int,String>>`/`Result<Set<Int>,String>`, los núcleos escalares de `Map<K,V>`/`Set<T>`,
-records concretos y `Option<T>` escalar/`Option<String>`/`Option<Record>`
+   records concretos, `Option<T>` escalar/`Option<String>`/`Option<Record>` y cierres capturados
 ya consumen ownership desde la IR y terminan sin allocations vivas en las pruebas nativas.
 Los `Phi` simples transfieren la referencia entrante sin retenerla de nuevo,
 y los `Phi` de bucle liberan el valor corriente después de su último uso seguro en el backedge;
@@ -65,8 +65,9 @@ destrucción de sus contenedores. Los records concretos pueden anidarse y vivir 
 condicionalmente el campo activo y cubren los consumidores básicos de `String.to_int()` y
 `to_float()`, además de `try` y `try catch` inline, desde la IR. Los wrappers anidados cubren
 constructores y `match` con retain/release recursivo; `unwrap` anidado, patrones más profundos,
-escapes complejos y handlers locales/closures no inline todavía no insertan RC completo por
-cada copia, retorno, phi o salida de ámbito. Un alias local de una función global sin entorno
+   escapes complejos y handlers locales no inline todavía no insertan RC completo por
+   cada copia, retorno, phi o salida de ámbito. Los cierres capturados ya construyen un entorno
+   registrado con destructor, retienen sus capturas y liberan el entorno al último uso. Un alias local de una función global sin entorno
 (`handler = recover`) conserva su procedencia y puede bajar como valor `Fn` mediante `ClosureCall`;
 el adaptador nativo usa `env == NULL` y el valor no tiene RC de entorno. Las llamadas indirectas
 de closures con entorno siguen pendientes.
@@ -101,8 +102,8 @@ El RC sobre el generador actual (texto C con expresiones‑sentencia) exigiría 
    `Option<Record>`, `Option/List`, `Result/List`, `Option/Map`, `Result/Set` y wrappers anidados con `match`, así como `Result` escalar con error `String`, `try`, `try catch` inline,
 `map`/`map_err`/`then`, `Option.map`/`then` con lambdas inline, handlers globales y aliases
 locales de handlers globales sin entorno. Las funciones globales sin captura que circulan como
-valores también cruzan la IR mediante `ClosureCall` y un adaptador nativo; aún falta extenderla
-a otros payloads gestionados, handlers locales/closures con entorno, patrones anidados, scopes,
+   valores también cruzan la IR mediante `ClosureCall` y un adaptador nativo; aún falta extenderla
+   a otros payloads gestionados, handlers locales, patrones anidados, scopes,
 escapes complejos y payloads todavía no cubiertos por
    el análisis de `Phi`.
 4. `--leak-check` y pruebas: los programas que usan ownership explícito deben terminar con cero

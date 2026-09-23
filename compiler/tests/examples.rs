@@ -3865,12 +3865,12 @@ fn native_hir_handles_collections_core() {
 }
 
 #[test]
-fn native_hir_handles_closures_core() {
-    // HIR now emits a captured closure, a named function used as a value and
-    // the list combinators that invoke closures. The AST path remains the
-    // fallback for nested/unsupported closure shapes.
+fn native_ir_handles_captured_closures_core() {
+    // A captured closure, a named function used as a value and the list
+    // combinators all cross the IR boundary. Nested/unsupported closure
+    // shapes remain on the established HIR fallback.
     let file = example_path("native_hir_closures.ostrin");
-    let expected = "15\n5\n";
+    let expected = "15\nvalue!\n5\n";
     let interpreted = run(&["--run", &file]);
     assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
@@ -3889,10 +3889,11 @@ fn native_hir_handles_closures_core() {
         .lines()
         .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
         .unwrap_or(0);
-    assert!(hir_functions + ir_functions >= 2, "closure example generated only {} HIR/IR functions", hir_functions + ir_functions);
+    assert!(ir_functions >= 2, "closure example generated only {ir_functions} IR functions: {report_text}");
+    assert_eq!(hir_functions, 0, "captured closure example fell back to HIR: {report_text}");
 
     let exe = temp_artifact("native_hir_closures.exe");
-    let compile = run(&["--compile", "--out", &exe, &file]);
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
@@ -3901,6 +3902,7 @@ fn native_hir_handles_closures_core() {
     let _ = fs::remove_file(&exe);
     assert!(native.status.success(), "closure binary failed: {}", String::from_utf8_lossy(&native.stderr));
     assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "captured closure leaked: {}", String::from_utf8_lossy(&native.stderr));
 }
 
 #[test]
