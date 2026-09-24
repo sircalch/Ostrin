@@ -2848,7 +2848,9 @@ impl Interpreter {
                                 if err.kind() == std::io::ErrorKind::BrokenPipe {
                                     std::process::exit(0);
                                 }
-                                return Err(RuntimeError::Error(format!("cannot write to standard output: {err}")));
+                                return Err(RuntimeError::Error(format!(
+                                    "cannot write to standard output: {err}"
+                                )));
                             }
                         }
                     }

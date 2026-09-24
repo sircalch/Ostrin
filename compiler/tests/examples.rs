@@ -9121,22 +9121,54 @@ fn std_viz_animates_computed_motion_with_smil() {
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     let text = stdout(&out).replace("\r\n", "\n");
     let (first, svg) = text.split_once('\n').expect("summary line, then the SVG");
-    assert!(first.ends_with("energy drift below 1e-6: true"), "rk45 must conserve energy: {first}");
-    assert!(svg.starts_with("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"560\" height=\"560\""));
+    assert!(
+        first.ends_with("energy drift below 1e-6: true"),
+        "rk45 must conserve energy: {first}"
+    );
+    assert!(
+        svg.starts_with("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"560\" height=\"560\"")
+    );
     // Fixed rod (x2, y2), moving segment (x1, y1, x2, y2), two masses (cx, cy)
     // and one trail (dash offset): every animated attribute loops over 12 s.
-    assert_eq!(svg.matches("dur=\"12s\" repeatCount=\"indefinite\"").count(), 2 + 4 + 2 + 2 + 1);
-    let values = svg.split("attributeName=\"cx\"").nth(1).and_then(|rest| rest.split("values=\"").nth(1)).expect("cx values");
+    assert_eq!(
+        svg.matches("dur=\"12s\" repeatCount=\"indefinite\"")
+            .count(),
+        2 + 4 + 2 + 2 + 1
+    );
+    let values = svg
+        .split("attributeName=\"cx\"")
+        .nth(1)
+        .and_then(|rest| rest.split("values=\"").nth(1))
+        .expect("cx values");
     let values = values.split('"').next().unwrap();
-    assert_eq!(values.split(';').count(), 721, "60 samples per second over 12 s");
-    assert!(svg.contains("pathLength=\"1000\"") && svg.contains("attributeName=\"stroke-dashoffset\""));
+    assert_eq!(
+        values.split(';').count(),
+        721,
+        "60 samples per second over 12 s"
+    );
+    assert!(
+        svg.contains("pathLength=\"1000\"") && svg.contains("attributeName=\"stroke-dashoffset\"")
+    );
     assert!(!svg.contains("<script"));
-    assert_eq!(svg.lines().filter(|line| line.starts_with("</svg>")).count(), 1);
+    assert_eq!(
+        svg.lines()
+            .filter(|line| line.starts_with("</svg>"))
+            .count(),
+        1
+    );
 
     let string = run(&["--run", &example_path("viz_string.ostrin")]);
     assert!(string.status.success(), "stderr: {}", stderr(&string));
     let text = stdout(&string);
     assert!(text.starts_with("height at the pluck: 0.29, half a period later: -0.08"));
-    let shapes = text.split("attributeName=\"d\"").nth(1).and_then(|rest| rest.split("values=\"").nth(1)).expect("d values");
-    assert_eq!(shapes.split('"').next().unwrap().split(';').count(), 91, "one path per step");
+    let shapes = text
+        .split("attributeName=\"d\"")
+        .nth(1)
+        .and_then(|rest| rest.split("values=\"").nth(1))
+        .expect("d values");
+    assert_eq!(
+        shapes.split('"').next().unwrap().split(';').count(),
+        91,
+        "one path per step"
+    );
 }
