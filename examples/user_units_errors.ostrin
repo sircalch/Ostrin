@@ -1,0 +1,9 @@
+// Declaration and dimension errors for user-defined units.
+dimension Money
+unit coin : Money
+unit ft : Length
+
+fn main() -> Void {
+    print(3 coin + 2 ft)
+    print(4 ft as coin)
+}

@@ -5487,3 +5487,37 @@ fn native_fresh_temporaries_are_released() {
     let report = String::from_utf8_lossy(&native.stderr).to_string();
     assert!(report.contains("live_allocations=0 "), "leaked: {report}");
 }
+
+#[test]
+fn programs_declare_their_own_units_and_dimensions() {
+    let out = interpreter_and_native_agree("user_units.ostrin");
+    assert_eq!(
+        out.lines().collect::<Vec<_>>(),
+        ["790 coin", "3.4 gem", "1.609344 km", "3.6575999999999995 m^2", "206.84270999999998 kPa", "4.4704 m/s", "true"]
+    );
+    let errors = run(&["--check", &example_path("user_units_errors.ostrin")]);
+    assert!(!errors.status.success());
+    let err = stderr(&errors);
+    assert!(err.contains("E1024") && err.contains("Money") && err.contains("Length"), "{err}");
+    assert!(err.contains("E1026") && err.contains("to 'coin'"), "{err}");
+
+    // Malformed declarations are reported where they are written.
+    let path = temp_artifact("bad_units.ostrin");
+    fs::write(&path, "unit x : Flavor\nunit m : Length\ndefine 1 ft = 2 m\nfn main() -> Void {\n    print(1)\n}\n").unwrap();
+    let bad = run(&["--check", &path]);
+    let _ = fs::remove_file(&path);
+    let err = stderr(&bad);
+    assert!(!bad.status.success());
+    assert!(err.contains("unknown dimension 'Flavor'"), "{err}");
+    assert!(err.contains("unit 'm' is already defined"), "{err}");
+    assert!(err.contains("unknown unit 'ft' in 'define'"), "{err}");
+}
+
+#[test]
+fn within_compares_quantities_across_units() {
+    let path = temp_artifact("within_units.ostrin");
+    fs::write(&path, "fn main() -> Void {\n    print(1500 m within (1 km to 2 km))\n    print(2 km within (1 km until 2000 m))\n}\n").unwrap();
+    let out = run(&["--run", &path]);
+    let _ = fs::remove_file(&path);
+    assert_eq!(stdout(&out).replace("\r\n", "\n"), "true\nfalse\n");
+}

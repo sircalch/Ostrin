@@ -2203,6 +2203,12 @@ impl Interpreter {
                 if let Expr::Range(start, kind, end, _) = r.as_ref().unlocated() {
                     let sv = self.eval_expr(start, env)?;
                     let ev = self.eval_expr(end, env)?;
+                    if let (Value::Quantity(..), Value::Quantity(..), Value::Quantity(..)) = (&av, &sv, &ev) {
+                        // Quantities compare across units (`6 ft within (1.5 m to 2 m)`).
+                        let low = compare(&av, &sv)?;
+                        let high = compare(&av, &ev)?;
+                        return Ok(Value::Bool(low >= 0 && if *kind == RangeKind::To { high <= 0 } else { high < 0 }));
+                    }
                     let a_f = as_f64(&av)?;
                     let s_f = as_f64(&sv)?;
                     let e_f = as_f64(&ev)?;

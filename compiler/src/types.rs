@@ -55,11 +55,89 @@ fn dim_of(parts: &[(&str, i32)]) -> Dimension {
     parts.iter().filter(|(_, e)| *e != 0).map(|(k, e)| (k.to_string(), *e)).collect()
 }
 
+// Units and dimensions declared by the program (`unit`, `dimension`, `define`,
+// document 01 §3.5). They are registered while parsing, before any expression
+// uses them, and live for one compilation (`reset_user_units`).
+thread_local! {
+    static USER_UNITS: std::cell::RefCell<Vec<(String, Dimension, f64)>> = const { std::cell::RefCell::new(Vec::new()) };
+    static USER_DIMENSIONS: std::cell::RefCell<Vec<String>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+pub fn reset_user_units() {
+    USER_UNITS.with(|u| u.borrow_mut().clear());
+    USER_DIMENSIONS.with(|d| d.borrow_mut().clear());
+}
+
+pub fn is_user_dimension(name: &str) -> bool {
+    USER_DIMENSIONS.with(|d| d.borrow().iter().any(|n| n == name))
+}
+
+/// `dimension Money`. Declaring the same dimension twice is harmless.
+pub fn declare_dimension(name: &str) -> Result<(), String> {
+    if named_dimension(name).is_some()
+        || matches!(name, "Length" | "Mass" | "Time" | "Temperature" | "ElectricCurrent" | "AmountOfSubstance" | "LuminousIntensity" | "Currency" | "Information")
+    {
+        return Err(format!("dimension '{name}' already exists"));
+    }
+    USER_DIMENSIONS.with(|d| {
+        let mut d = d.borrow_mut();
+        if !d.iter().any(|n| n == name) {
+            d.push(name.to_string());
+        }
+    });
+    Ok(())
+}
+
+/// `unit mmHg : Pressure`: a new unit symbol of that dimension, with factor 1
+/// towards the coherent unit until a `define` gives it another.
+pub fn declare_unit(symbol: &str, dim: Dimension) -> Result<(), String> {
+    if builtin_unit_info(symbol).is_some() {
+        return Err(format!("unit '{symbol}' is already defined by the standard catalog"));
+    }
+    USER_UNITS.with(|u| {
+        let mut u = u.borrow_mut();
+        match u.iter().find(|(s, _, _)| s == symbol) {
+            Some((_, existing, _)) if *existing != dim => Err(format!("unit '{symbol}' was already declared with another dimension")),
+            Some(_) => Ok(()),
+            None => {
+                u.push((symbol.to_string(), dim, 1.0));
+                Ok(())
+            }
+        }
+    })
+}
+
+/// `define 1 EUR = 1.08 USD`: the factor of a declared unit.
+pub fn define_unit(symbol: &str, factor: f64) -> Result<(), String> {
+    USER_UNITS.with(|u| {
+        let mut u = u.borrow_mut();
+        match u.iter_mut().find(|(s, _, _)| s == symbol) {
+            Some(entry) => {
+                entry.2 = factor;
+                Ok(())
+            }
+            None if builtin_unit_info(symbol).is_some() => Err(format!("'{symbol}' is a standard unit; 'define' only sets units declared with 'unit'")),
+            None => Err(format!("unknown unit '{symbol}' in 'define' (declare it with 'unit {symbol} : Dimension')")),
+        }
+    })
+}
+
+/// Declared units in declaration order, for the native runtime's table.
+pub fn user_units() -> Vec<(String, Dimension, f64)> {
+    USER_UNITS.with(|u| u.borrow().clone())
+}
+
+pub fn unit_info(symbol: &str) -> Option<(Dimension, f64)> {
+    builtin_unit_info(symbol).or_else(|| {
+        USER_UNITS.with(|u| u.borrow().iter().find(|(s, _, _)| s == symbol).map(|(_, d, f)| (d.clone(), *f)))
+    })
+}
+
 /// Catálogo de unidades conocidas por la stdlib (documento 01, §3.1/§3.5):
 /// símbolo → (dimensión, factor hacia la unidad coherente del SI). El runtime C
 /// (`qty_runtime.c`) replica la misma tabla; `native_units`/`unit_algebra`
 /// comprueban la paridad.
-pub fn unit_info(symbol: &str) -> Option<(Dimension, f64)> {
+fn builtin_unit_info(symbol: &str) -> Option<(Dimension, f64)> {
     const L: &str = "Length";
     const M: &str = "Mass";
     const T: &str = "Time";

@@ -30,6 +30,12 @@
   ohm`; `atm` is 101 325 Pa (it was 1 Pa). Named dimensions (`Velocity`, `Force`, `Energy`,
   `Pressure`, `Power`, …) expand to base dimensions; diagnostics print `Mass*Length^2/Time^2 (Energy)`.
 - `q.value()` and `q.unit()` expose a quantity's number and unit.
+- Programs declare units and dimensions (document 01 §3.5): `dimension Money`, `unit coin : Money`,
+  `unit ft : Length` with `define 1 ft = 0.3048 m`. Declarations are registered before any
+  expression is parsed and reach the native runtime through a generated table
+  (`user_units.ostrin`, interpreter/native parity).
+- `within` compares quantities across units: `6 ft within (1.5 m to 2 m)` was false because the
+  raw numbers were compared.
 - `Array<Quantity<D>>`: an array with one unit (`array([1 m, 250 cm])`, `linspace(...) as s`,
   `speeds as km/h`). Elementwise `+ - * /` and comparisons follow the scalar rules (dimensionless
   results are `Array<Float>`), `a[i]`, slices and masks keep the unit, and `sum`/`min`/`max`/`mean`/

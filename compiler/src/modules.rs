@@ -58,6 +58,8 @@ pub fn load_project(
     deps: &HashMap<String, PathBuf>,
     overrides: &HashMap<PathBuf, String>,
 ) -> Result<Vec<Item>, Vec<ModuleDiagnostic>> {
+    // Units declared by a previous compilation (the LSP reuses the process) don't carry over.
+    crate::types::reset_user_units();
     let root = entry_path.parent().unwrap_or_else(|| Path::new(".")).to_path_buf();
     let mut cache: HashMap<Vec<String>, Module> = HashMap::new();
     let mut in_progress: Vec<Vec<String>> = Vec::new();

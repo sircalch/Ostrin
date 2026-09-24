@@ -3934,6 +3934,12 @@ impl<'a> Codegen<'a> {
                 let (vc, vt) = self.gen_expr(value)?;
                 let (sc, st) = self.gen_expr(start)?;
                 let (ec, et) = self.gen_expr(end)?;
+                if matches!((&vt, &st, &et), (CType::Quantity(_), CType::Quantity(_), CType::Quantity(_))) {
+                    // Quantities compare across units, as in the interpreter.
+                    let temp = self.next_temp();
+                    let upper = if *kind == RangeKind::To { "<=" } else { "<" };
+                    return Ok((format!("({{ Qty {temp} = {vc}; ostrin_qty_cmp({temp}, {sc}) >= 0 && ostrin_qty_cmp({temp}, {ec}) {upper} 0; }})"), CType::Bool));
+                }
                 let (v, s, e) = (self.as_f64_code(&vc, &vt)?, self.as_f64_code(&sc, &st)?, self.as_f64_code(&ec, &et)?);
                 let temp = self.next_temp();
                 let upper = if *kind == RangeKind::To { "<=" } else { "<" };
@@ -8285,7 +8291,32 @@ fn generate_impl(
     }
     out.push_str("    return 0;\n}\n");
     if out.contains("Qty") {
-        out = out.replacen(PRELUDE, &format!("{PRELUDE}{QTY_RUNTIME}"), 1);
+        // Declared units join the runtime's table; a simple one (one base dimension, exponent 1)
+        // gets the same base code as the built-in units, so `ft * m` folds like `km * m`.
+        let mut user = String::new();
+        for (symbol, dim, factor) in crate::types::user_units() {
+            let base = match dim.iter().next() {
+                Some((name, 1)) if dim.len() == 1 => {
+                    let code = match name.as_str() {
+                        "Length" => "L",
+                        "Time" => "T",
+                        "Mass" => "M",
+                        "Temperature" => "Th",
+                        "ElectricCurrent" => "I",
+                        "AmountOfSubstance" => "N",
+                        "LuminousIntensity" => "J",
+                        "Currency" => "$",
+                        "Information" => "B",
+                        other => other,
+                    };
+                    c_string_literal(code)
+                }
+                _ => "NULL".to_string(),
+            };
+            user.push_str(&format!("    {{{}, {factor:?}, {base}}},\n", c_string_literal(&symbol)));
+        }
+        let runtime = QTY_RUNTIME.replace("/*@USER_UNITS@*/", &user);
+        out = out.replacen(PRELUDE, &format!("{PRELUDE}{runtime}"), 1);
     }
     if out.contains("OstrinRng") {
         out = out.replacen(PRELUDE, &format!("{PRELUDE}{RNG_RUNTIME}"), 1);

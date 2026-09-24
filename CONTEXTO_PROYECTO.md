@@ -6688,3 +6688,15 @@ scripts, así que no contradice la regla de que JavaScript no calcula resultados
 falló en nativo: `gen_block_expr` consideraba "transferido" un local del bloque exterior en
 `if c { line } else { … }`, no lo retenía y el bloque exterior lo liberaba (AddressSanitizer). La
 transferencia se limita a locales del propio bloque. Todos los ejemplos viz pasan ASan.
+
+## 276. Unidades declaradas por el programa — 2026-09-24
+
+`dimension`, `unit` y `define` (palabras reservadas desde el documento 17) ya funcionan. El parser
+hace una pasada previa por cada archivo (dimensiones, unidades, definiciones) y las registra en un
+registro por compilación de `types.rs` (`thread_local`, reiniciado en `load_project` para el LSP);
+`unit_info` consulta el catálogo y después ese registro, así que el parser, el checker, el intérprete
+y `resolve_unit_*` las ven sin cambios. El runtime C recibe una tabla `ostrin_user_units` generada;
+las unidades simples usan el mismo código de dimensión base que las del catálogo para fundirse
+(`ft * m`). Errores: dimensión desconocida, símbolo ya existente, `define` de unidad no declarada o
+entre dimensiones distintas. De paso, `within` comparaba los números sin convertir unidades
+(`6 ft within (1.5 m to 2 m)` daba false) en ambos backends.

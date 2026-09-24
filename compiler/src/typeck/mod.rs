@@ -3818,6 +3818,7 @@ fn is_known_base_dimension(name: &str) -> bool {
         "Length" | "Mass" | "Time" | "Temperature" | "ElectricCurrent" | "AmountOfSubstance" | "LuminousIntensity"
             | "Currency" | "Information"
     ) || crate::types::named_dimension(name).is_some()
+        || crate::types::is_user_dimension(name)
 }
 
 fn is_dimension_name(name: &str) -> bool {

@@ -310,5 +310,12 @@ Estado real del compilador, que concreta §3.1–§3.5:
   Intérprete (`interpreter/qarray.rs`) y nativo (`Array_Float` con campo `unit`, `ostrin_qa_*`) dan
   los mismos bytes.
 
-Pendiente: `unit`/`dimension`/`define` declarados por el usuario y unidades afines (°C).
+- **Unidades del programa** (§3.5): `dimension Money`, `unit coin : Money`, `unit psi : Pressure` y
+  `define 1 psi = 6894.757 Pa` se registran antes de analizar cualquier expresión (dimensiones,
+  luego unidades, luego definiciones), así que valen en todo el programa y en sus módulos. Una unidad
+  sin `define` tiene factor 1 respecto a la unidad coherente; `define` exige la misma dimensión a
+  ambos lados. El runtime C recibe las unidades declaradas en una tabla generada. Ejemplo:
+  `examples/user_units.ostrin`.
+
+Pendiente: unidades afines (°C, con desplazamiento) y prefijos automáticos (`kft`).
 
