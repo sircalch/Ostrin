@@ -7,8 +7,8 @@
 //! * `compile_fail_examples_report_their_error_code` — every `*_errors.ostrin`
 //!   style example must be rejected with a stable `OSTRIN-E….` code.
 //! * `mutated_sources_never_crash_the_front_end` — deterministic mutation
-//!   fuzzing of the lexer/parser/checker: bad input may produce errors but
-//!   must never panic.
+//!   fuzzing of the lexer/parser/checker and native lowering: bad input may
+//!   produce errors but must never panic.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -268,6 +268,33 @@ fn mutated_sources_never_crash_the_front_end() {
                         name_of(&path)
                     ));
                     let _ = fs::copy(&file, keep);
+                }
+            }
+            // A mutation that still type-checks is valid input for the native
+            // lowering boundary too. These modes may report an unsupported
+            // feature, but they must never panic or abort the compiler.
+            if ostrinc(&["--check", &file.to_string_lossy()])
+                .status
+                .success()
+            {
+                for mode in ["--native-type-report", "--emit-c"] {
+                    let out = ostrinc(&[mode, &file.to_string_lossy()]);
+                    let stderr = String::from_utf8_lossy(&out.stderr);
+                    if out.status.code() == Some(101)
+                        || out.status.code().is_none()
+                        || stderr.contains("panicked")
+                    {
+                        crashes.push(format!(
+                            "{} {mode} (round {round}): {}",
+                            name_of(&path),
+                            stderr.lines().next().unwrap_or("")
+                        ));
+                        let keep = std::env::temp_dir().join(format!(
+                            "ostrin_fuzz_native_crash_{}_{round}.ostrin",
+                            name_of(&path)
+                        ));
+                        let _ = fs::copy(&file, keep);
+                    }
                 }
             }
         }

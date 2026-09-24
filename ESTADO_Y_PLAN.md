@@ -349,13 +349,14 @@ El playground de navegador ya ejecuta el compilador WASM; la siguiente frontera 
 contratos de plataforma antes de LLVM IR.
 
 ### F. Calidad y confianza
-Fuzzing del lexer/parser/checker/HIR/IR mediante fuentes mutadas y pruebas diferenciales
+Fuzzing del lexer/parser/checker/HIR/IR y las fronteras `--native-type-report`/`--emit-c`
+mediante fuentes mutadas, además de pruebas diferenciales
 automáticas intérprete↔nativo sobre programas generados escalares y con ownership
 (`Option`/`Result`) ya se ejecutan en la suite; `OSTRIN_FUZZ_ROUNDS` permite ampliar las
 iteraciones. `--native-type-report` y la prueba diferencial ya miden la cobertura del backend
 por archivo fuente y verifican la suma contra el total global. El siguiente incremento añade
-casos de fallo del backend nativo antes de retirar más fallback AST; benchmarks (nativo vs
-intérprete) siguen pendientes.
+casos de compilación nativa y divergencia semántica sobre las mutaciones válidas antes de
+retirar más fallback AST; benchmarks (nativo vs intérprete) siguen pendientes.
 
 ### G. Producto
 **Homepage 3.0 (2026-09-24).** La portada muestra el estado de la release derivado de
