@@ -16,7 +16,7 @@ mod regress;
 mod math;
 mod rng;
 mod strings;
-use crate::types::{dim_div, dim_is_dimensionless, dim_mul, dim_pow, dim_to_string, resolve_unit_expr, Dimension};
+use crate::types::{dim_div, dim_is_dimensionless, dim_mul, dim_pow, dim_to_string, resolve_unit_expr, resolve_unit_factor, unit_combine, Dimension};
 
 #[derive(Clone)]
 pub(crate) struct MapState {
@@ -265,6 +265,7 @@ impl fmt::Display for Value {
             Value::Bool(b) => write!(f, "{b}"),
             Value::Char(c) => write!(f, "{c}"),
             Value::String(s) => write!(f, "{s}"),
+            Value::Quantity(v, _, unit) if unit.is_empty() => write!(f, "{v}"),
             Value::Quantity(v, _, unit) => write!(f, "{v} {unit}"),
             Value::List(state) => {
                 write!(f, "[")?;
@@ -3487,13 +3488,11 @@ fn eval_binary_builtin(op: BinOp, lv: Value, rv: Value) -> EvalResult {
         Mul | Div => match (&lv, &rv) {
             (Value::Quantity(a, d1, u1), Value::Quantity(b, d2, u2)) => {
                 let combined_dim = if op == Mul { dim_mul(d1, d2) } else { dim_div(d1, d2) };
-                let value = if op == Mul { a * b } else { a / b };
                 if op == Div && dim_is_dimensionless(&combined_dim) {
                     let converted_b = convert(*b, u2, u1)?;
                     Ok(Value::Float(a / converted_b))
                 } else {
-                    let unit = if op == Mul { format!("{u1}*{u2}") } else { format!("{u1}/{u2}") };
-                    Ok(Value::Quantity(value, combined_dim, unit))
+                    quantity_product(*a, u1, *b, u2, combined_dim, op == Div)
                 }
             }
             (Value::Quantity(a, d, u), scalar) if op == Mul || op == Div => {
@@ -3507,7 +3506,8 @@ fn eval_binary_builtin(op: BinOp, lv: Value, rv: Value) -> EvalResult {
             }
             (scalar, Value::Quantity(a, d, u)) if op == Div => {
                 let s = as_f64(scalar)?;
-                Ok(Value::Quantity(s / a, dim_pow(d, -1), format!("1/{u}")))
+                let (_, unit) = unit_combine("", u, true).map_err(unit_error)?;
+                Ok(Value::Quantity(s / a, dim_pow(d, -1), unit))
             }
             // `Int / Int` is integer division (truncating), matching the type
             // checker, which types it `Int` — the runtime used to return a
@@ -3576,65 +3576,36 @@ fn cmp_f64(a: f64, b: f64) -> i32 {
     if a < b { -1 } else if a > b { 1 } else { 0 }
 }
 
-fn unit_factor(symbol: &str) -> Option<f64> {
-    Some(match symbol {
-        "m" | "s" | "kg" | "K" | "A" | "mol" | "cd" | "USD" | "bit" | "C" | "atm" | "Pa" => 1.0,
-        "nm" => 1e-9,
-        "km" => 1000.0,
-        "cm" => 0.01,
-        "mm" => 0.001,
-        "ms" => 0.001,
-        "min" => 60.0,
-        "h" => 3600.0,
-        "g" => 0.001,
-        "mg" => 1e-6,
-        "mmol" => 0.001,
-        "L" => 0.001,
-        "EUR" => 1.0,
-        "byte" => 8.0,
-        _ => return None,
-    })
+fn unit_error(message: String) -> RuntimeError {
+    if message.contains(' ') {
+        RuntimeError::Error(message)
+    } else {
+        RuntimeError::Error(format!("unknown unit '{message}'"))
+    }
 }
 
-fn resolve_unit_factor(expr: &str) -> Result<f64, RuntimeError> {
-    let mut result = 1.0;
-    let mut op = '*';
-    let mut chars = expr.chars().peekable();
-    loop {
-        let mut atom = String::new();
-        while let Some(&c) = chars.peek() {
-            if c == '*' || c == '/' || c == '^' { break; }
-            atom.push(c);
-            chars.next();
-        }
-        if atom.is_empty() {
-            return Err(RuntimeError::Error(format!("malformed unit expression '{expr}'")));
-        }
-        let mut factor = unit_factor(&atom).ok_or_else(|| RuntimeError::Error(format!("unknown unit '{atom}'")))?;
-        if chars.peek() == Some(&'^') {
-            chars.next();
-            let mut exp_str = String::new();
-            while let Some(&c) = chars.peek() {
-                if c.is_ascii_digit() || c == '-' { exp_str.push(c); chars.next(); } else { break; }
-            }
-            let exp: i32 = exp_str.parse().map_err(|_| RuntimeError::Error(format!("invalid exponent in '{expr}'")))?;
-            factor = factor.powi(exp);
-        }
-        result = if op == '*' { result * factor } else { result / factor };
-        match chars.next() {
-            Some(c @ ('*' | '/')) => op = c,
-            None => break,
-            _ => return Err(RuntimeError::Error(format!("malformed unit expression '{expr}'"))),
-        }
+/// `a * b` / `a / b` between quantities, with the unit in canonical form
+/// (`types::unit_combine`). A result without dimension is a plain number.
+fn quantity_product(a: f64, u1: &str, b: f64, u2: &str, dim: Dimension, divide: bool) -> EvalResult {
+    let (scale, unit) = unit_combine(u1, u2, divide).map_err(unit_error)?;
+    let mut value = if divide { a / b } else { a * b };
+    if scale != 1.0 {
+        value *= scale;
     }
-    Ok(result)
+    if dim_is_dimensionless(&dim) {
+        if !unit.is_empty() {
+            value *= resolve_unit_factor(&unit).map_err(unit_error)?;
+        }
+        return Ok(if divide { Value::Float(value) } else { Value::Quantity(value, dim, String::new()) });
+    }
+    Ok(Value::Quantity(value, dim, unit))
 }
 
 fn convert(value: f64, from_unit: &str, to_unit: &str) -> Result<f64, RuntimeError> {
     if from_unit == to_unit {
         return Ok(value);
     }
-    let f_from = resolve_unit_factor(from_unit)?;
-    let f_to = resolve_unit_factor(to_unit)?;
+    let f_from = resolve_unit_factor(from_unit).map_err(unit_error)?;
+    let f_to = resolve_unit_factor(to_unit).map_err(unit_error)?;
     Ok(value * f_from / f_to)
 }

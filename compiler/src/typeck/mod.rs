@@ -1812,10 +1812,30 @@ impl Checker {
                         return target;
                     }
                 }
-                if let Expr::Ident(sym) = unit_expr.as_ref() {
-                    if let Some(dim) = unit_dimension(sym) {
-                        return Ty::Quantity(dim);
-                    }
+                if let Expr::Ident(sym) = unit_expr.as_ref().unlocated() {
+                    return match resolve_unit_expr(sym) {
+                        Ok(dim) => {
+                            if let Ty::Quantity(source) = &source_ty {
+                                if *source != dim {
+                                    self.push(
+                                        "E1026",
+                                        format!(
+                                            "Cannot convert a quantity of dimension {} to '{sym}', which measures {}.",
+                                            crate::types::dim_describe(source),
+                                            crate::types::dim_describe(&dim)
+                                        ),
+                                    );
+                                }
+                            } else if !matches!(source_ty, Ty::Int | Ty::Float | Ty::Unknown) {
+                                self.push("E1041", format!("Cannot give unit '{sym}' to a value of type '{}'.", source_ty.describe()));
+                            }
+                            Ty::Quantity(dim)
+                        }
+                        Err(bad) => {
+                            self.push("E1010", format!("Unknown unit '{bad}' in '{sym}'."));
+                            Ty::Unknown
+                        }
+                    };
                 }
                 Ty::Unknown
             }
@@ -2283,8 +2303,8 @@ impl Checker {
                             "E1024",
                             format!(
                                 "Invalid dimensional operation. Cannot add/subtract {} and {}.",
-                                dim_to_string(d1),
-                                dim_to_string(d2)
+                                crate::types::dim_describe(d1),
+                                crate::types::dim_describe(d2)
                             ),
                         );
                         Ty::Unknown
@@ -3647,8 +3667,8 @@ fn is_known_base_dimension(name: &str) -> bool {
     matches!(
         name,
         "Length" | "Mass" | "Time" | "Temperature" | "ElectricCurrent" | "AmountOfSubstance" | "LuminousIntensity"
-            | "Currency" | "Information" | "Charge" | "Pressure"
-    )
+            | "Currency" | "Information"
+    ) || crate::types::named_dimension(name).is_some()
 }
 
 fn is_dimension_name(name: &str) -> bool {
@@ -4482,7 +4502,7 @@ fn pattern_field_indices(field_names: &[Option<String>], fields: &[(String, Patt
 
 fn resolve_dimension_with_subst(ty: &Type, subst: &HashMap<String, Dimension>) -> Dimension {
     match ty {
-        Type::Named(name, _) => subst.get(name).cloned().unwrap_or_else(|| dim_single(name)),
+        Type::Named(name, _) => subst.get(name).cloned().unwrap_or_else(|| crate::types::dimension_from_name(name)),
         Type::Mul(a, b) => dim_mul(&resolve_dimension_with_subst(a, subst), &resolve_dimension_with_subst(b, subst)),
         Type::Div(a, b) => dim_div(&resolve_dimension_with_subst(a, subst), &resolve_dimension_with_subst(b, subst)),
         Type::Pow(a, n) => dim_pow(&resolve_dimension_with_subst(a, subst), *n as i32),

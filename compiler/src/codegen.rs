@@ -52,7 +52,7 @@ use crate::ast::*;
 use crate::symbols::type_to_string;
 use crate::typeck::ExprKey;
 use crate::types::Ty;
-use crate::types::{dim_div, dim_is_dimensionless, dim_mul, dim_pow, dim_single, dim_to_string, resolve_unit_expr, Dimension};
+use crate::types::{dim_div, dim_is_dimensionless, dim_mul, dim_pow, dim_to_string, resolve_unit_expr, Dimension};
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 enum CType {
@@ -225,7 +225,7 @@ fn instance_name(base: &str, args: &[CType]) -> String {
 /// same way `typeck` does, with generic `D`s taken from `subst`.
 fn resolve_dimension(ty: &Type, subst: &HashMap<String, Dimension>) -> Dimension {
     match ty {
-        Type::Named(name, _) => subst.get(name).cloned().unwrap_or_else(|| dim_single(name)),
+        Type::Named(name, _) => subst.get(name).cloned().unwrap_or_else(|| crate::types::dimension_from_name(name)),
         Type::Mul(a, b) => dim_mul(&resolve_dimension(a, subst), &resolve_dimension(b, subst)),
         Type::Div(a, b) => dim_div(&resolve_dimension(a, subst), &resolve_dimension(b, subst)),
         Type::Pow(a, n) => dim_pow(&resolve_dimension(a, subst), *n as i32),
@@ -4878,7 +4878,11 @@ impl<'a> Codegen<'a> {
             (CType::Quantity(d1), CType::Quantity(d2)) => match op {
                 BinOp::Add => Ok((format!("ostrin_qty_add({lc}, {rc})"), lt.clone())),
                 BinOp::Sub => Ok((format!("ostrin_qty_sub({lc}, {rc})"), lt.clone())),
-                BinOp::Mul => Ok((format!("ostrin_qty_mul({lc}, {rc})"), CType::Quantity(dim_mul(d1, d2)))),
+                BinOp::Mul => {
+                    let combined = dim_mul(d1, d2);
+                    let helper = if dim_is_dimensionless(&combined) { "ostrin_qty_mul_pure" } else { "ostrin_qty_mul" };
+                    Ok((format!("{helper}({lc}, {rc})"), CType::Quantity(combined)))
+                }
                 BinOp::Div => {
                     let combined = dim_div(d1, d2);
                     if dim_is_dimensionless(&combined) {

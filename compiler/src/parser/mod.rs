@@ -518,7 +518,18 @@ impl Parser {
     fn parse_as_expr(&mut self) -> PResult<Expr> {
         let mut left = self.parse_additive()?;
         while self.eat(&TokenKind::As) {
-            let unit = self.parse_multiplicative()?;
+            let unit = match self.peek().kind.clone() {
+                TokenKind::Ident(first) if crate::types::unit_info(&first).is_some() => {
+                    // `v as km/h`, `a as m/s^2`: a compound unit on one line.
+                    let line = self.peek().line;
+                    self.advance();
+                    let mut unit = first;
+                    self.unit_exponent(&mut unit, line)?;
+                    self.unit_tail(&mut unit, line)?;
+                    Expr::Ident(unit)
+                }
+                _ => self.parse_multiplicative()?,
+            };
             left = Expr::As(Box::new(left), Box::new(unit));
         }
         Ok(left)
@@ -968,27 +979,46 @@ impl Parser {
             return Ok(number);
         }
         let mut unit = self.expect_ident()?;
+        self.unit_exponent(&mut unit, number_line)?;
+        self.unit_tail(&mut unit, number_line)?;
+        Ok(Expr::UnitLiteral(Box::new(number), unit))
+    }
+
+    /// `^2` / `^-1` right after a unit atom on the same line.
+    fn unit_exponent(&mut self, unit: &mut String, line: usize) -> PResult<()> {
+        if self.check(&TokenKind::Caret) && self.peek().line == line {
+            self.advance();
+            let negative = self.eat(&TokenKind::Minus);
+            let exp = self.expect_int()?;
+            unit.push('^');
+            if negative {
+                unit.push('-');
+            }
+            unit.push_str(&exp.to_string());
+        }
+        Ok(())
+    }
+
+    /// `*atom` / `/atom` continuations of a unit. Only known unit symbols are
+    /// absorbed, so `5 m / t` still divides by the variable `t`.
+    fn unit_tail(&mut self, unit: &mut String, line: usize) -> PResult<()> {
         loop {
             let op = match self.peek().kind {
                 TokenKind::Star => "*",
                 TokenKind::Slash => "/",
                 _ => break,
             };
-            if !matches!(self.peek_at(1).kind, TokenKind::Ident(_)) || self.peek().line != number_line {
+            let is_unit = matches!(&self.peek_at(1).kind, TokenKind::Ident(atom) if crate::types::unit_info(atom).is_some());
+            if !is_unit || self.peek().line != line || self.peek_at(1).line != line {
                 break;
             }
             self.advance();
             let atom = self.expect_ident()?;
             unit.push_str(op);
             unit.push_str(&atom);
-            if self.check(&TokenKind::Caret) && self.peek().line == number_line {
-                self.advance();
-                let exp = self.expect_int()?;
-                unit.push('^');
-                unit.push_str(&exp.to_string());
-            }
+            self.unit_exponent(unit, line)?;
         }
-        Ok(Expr::UnitLiteral(Box::new(number), unit))
+        Ok(())
     }
 
     fn peek(&self) -> &Token {

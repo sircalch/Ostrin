@@ -4,24 +4,64 @@
  * but its unit is a runtime string, exactly like Value::Quantity. */
 typedef struct { double v; const char* u; } Qty;
 
-static double ostrin_unit_factor(const char* a) {
-    static const struct { const char* s; double f; } table[] = {
-        {"m", 1.0}, {"s", 1.0}, {"kg", 1.0}, {"K", 1.0}, {"A", 1.0}, {"mol", 1.0},
-        {"cd", 1.0}, {"USD", 1.0}, {"bit", 1.0}, {"C", 1.0}, {"atm", 1.0}, {"Pa", 1.0},
-        {"nm", 1e-9}, {"km", 1000.0}, {"cm", 0.01}, {"mm", 0.001}, {"ms", 0.001},
-        {"min", 60.0}, {"h", 3600.0}, {"g", 0.001}, {"mg", 1e-6}, {"mmol", 0.001},
-        {"L", 0.001}, {"EUR", 1.0}, {"byte", 8.0}
-    };
-    for (size_t i = 0; i < sizeof table / sizeof table[0]; i++) {
-        if (strcmp(table[i].s, a) == 0) return table[i].f;
+/* Unit catalog: symbol, factor to the coherent SI unit and, for simple
+ * atoms, their single base dimension (NULL for derived units such as J).
+ * Mirrors types::unit_info. */
+typedef struct { const char* s; double f; const char* base; } OstrinUnit;
+static const OstrinUnit ostrin_units[] = {
+    {"m", 1.0, "L"}, {"nm", 1e-9, "L"}, {"um", 1e-6, "L"}, {"mm", 1e-3, "L"}, {"cm", 0.01, "L"}, {"km", 1000.0, "L"},
+    {"s", 1.0, "T"}, {"ns", 1e-9, "T"}, {"us", 1e-6, "T"}, {"ms", 1e-3, "T"}, {"min", 60.0, "T"}, {"h", 3600.0, "T"},
+    {"day", 86400.0, "T"},
+    {"kg", 1.0, "M"}, {"g", 1e-3, "M"}, {"mg", 1e-6, "M"}, {"ug", 1e-9, "M"},
+    {"K", 1.0, "Th"}, {"A", 1.0, "I"}, {"mA", 1e-3, "I"},
+    {"mol", 1.0, "N"}, {"mmol", 1e-3, "N"}, {"umol", 1e-6, "N"}, {"cd", 1.0, "J"},
+    {"USD", 1.0, "$"}, {"EUR", 1.0, "$"}, {"bit", 1.0, "B"}, {"byte", 8.0, "B"},
+    {"L", 1e-3, NULL}, {"mL", 1e-6, NULL}, {"Hz", 1.0, NULL}, {"kHz", 1e3, NULL},
+    {"N", 1.0, NULL}, {"kN", 1e3, NULL}, {"J", 1.0, NULL}, {"kJ", 1e3, NULL}, {"cal", 4.184, NULL},
+    {"kcal", 4184.0, NULL}, {"W", 1.0, NULL}, {"kW", 1e3, NULL}, {"Pa", 1.0, NULL}, {"kPa", 1e3, NULL},
+    {"bar", 1e5, NULL}, {"atm", 101325.0, NULL}, {"mmHg", 133.322387415, NULL}, {"C", 1.0, NULL},
+    {"V", 1.0, NULL}, {"mV", 1e-3, NULL}, {"ohm", 1.0, NULL}
+};
+
+static const OstrinUnit* ostrin_unit_lookup(const char* a) {
+    for (size_t i = 0; i < sizeof ostrin_units / sizeof ostrin_units[0]; i++) {
+        if (strcmp(ostrin_units[i].s, a) == 0) return &ostrin_units[i];
     }
     fprintf(stderr, "runtime error: unknown unit '%s'\n", a);
     exit(1);
 }
 
-static double ostrin_unit_expr_factor(const char* expr) {
-    double result = 1.0;
-    char op = '*';
+static double ostrin_unit_pow(double base, int e) {
+    double r = 1.0;
+    for (int i = 0; i < (e < 0 ? -e : e); i++) r *= base;
+    return e < 0 ? 1.0 / r : r;
+}
+
+#define OSTRIN_MAX_UNIT_ATOMS 16
+typedef struct { const OstrinUnit* u[OSTRIN_MAX_UNIT_ATOMS]; int e[OSTRIN_MAX_UNIT_ATOMS]; int n; } OstrinUnitAtoms;
+
+static void ostrin_unit_push(OstrinUnitAtoms* atoms, const OstrinUnit* u, int e) {
+    for (int i = 0; i < atoms->n; i++) {
+        if (atoms->u[i] == u) { atoms->e[i] += e; return; }
+    }
+    if (atoms->n == OSTRIN_MAX_UNIT_ATOMS) { fprintf(stderr, "runtime error: unit expression too long\n"); exit(1); }
+    atoms->u[atoms->n] = u;
+    atoms->e[atoms->n] = e;
+    atoms->n++;
+}
+
+static void ostrin_unit_drop_zero(OstrinUnitAtoms* atoms) {
+    int k = 0;
+    for (int i = 0; i < atoms->n; i++) {
+        if (atoms->e[i] != 0) { atoms->u[k] = atoms->u[i]; atoms->e[k] = atoms->e[i]; k++; }
+    }
+    atoms->n = k;
+}
+
+/* Parses "kg*m^2/s^2" left to right into atoms, as types::unit_atoms. */
+static void ostrin_unit_parse(const char* expr, int sign_of_all, OstrinUnitAtoms* atoms) {
+    if (*expr == 0) return;
+    int sign = 1;
     const char* p = expr;
     for (;;) {
         char atom[64];
@@ -29,23 +69,30 @@ static double ostrin_unit_expr_factor(const char* expr) {
         while (*p && *p != '*' && *p != '/' && *p != '^') { if (n < 63) atom[n++] = *p; p++; }
         atom[n] = 0;
         if (n == 0) { fprintf(stderr, "runtime error: malformed unit expression '%s'\n", expr); exit(1); }
-        double factor = ostrin_unit_factor(atom);
+        int e = 1;
         if (*p == '^') {
             p++;
             char digits[16];
             size_t k = 0;
             while ((*p >= '0' && *p <= '9') || *p == '-') { if (k < 15) digits[k++] = *p; p++; }
             digits[k] = 0;
-            int e = atoi(digits);
-            double r = 1.0;
-            for (int i = 0; i < (e < 0 ? -e : e); i++) r *= factor;
-            factor = e < 0 ? 1.0 / r : r;
+            e = atoi(digits);
         }
-        result = op == '*' ? result * factor : result / factor;
+        if (strcmp(atom, "1") != 0) ostrin_unit_push(atoms, ostrin_unit_lookup(atom), sign * e * sign_of_all);
         if (*p == 0) break;
-        if (*p == '*' || *p == '/') { op = *p; p++; }
+        if (*p == '*') sign = 1;
+        else if (*p == '/') sign = -1;
         else { fprintf(stderr, "runtime error: malformed unit expression '%s'\n", expr); exit(1); }
+        p++;
     }
+    ostrin_unit_drop_zero(atoms);
+}
+
+static double ostrin_unit_expr_factor(const char* expr) {
+    OstrinUnitAtoms atoms = { {0}, {0}, 0 };
+    ostrin_unit_parse(expr, 1, &atoms);
+    double result = 1.0;
+    for (int i = 0; i < atoms.n; i++) result *= ostrin_unit_pow(atoms.u[i]->f, atoms.e[i]);
     return result;
 }
 
@@ -62,14 +109,90 @@ static const char* ostrin_unit_cat(const char* a, const char* op, const char* b)
     return out;
 }
 
+/* Canonical product/quotient of two units (types::unit_combine): returns the
+ * formatted unit and stores the value scale in *scale. */
+static const char* ostrin_unit_combine(const char* a, const char* b, int divide, double* scale) {
+    OstrinUnitAtoms atoms = { {0}, {0}, 0 };
+    ostrin_unit_parse(a, 1, &atoms);
+    OstrinUnitAtoms rhs = { {0}, {0}, 0 };
+    ostrin_unit_parse(b, divide ? -1 : 1, &rhs);
+    for (int i = 0; i < rhs.n; i++) ostrin_unit_push(&atoms, rhs.u[i], rhs.e[i]);
+    ostrin_unit_drop_zero(&atoms);
+    *scale = 1.0;
+    int i = 0;
+    while (i < atoms.n) {
+        const char* base = atoms.u[i]->base;
+        if (base) {
+            double fi = atoms.u[i]->f;
+            int j = i + 1;
+            while (j < atoms.n) {
+                if (atoms.u[j]->base && strcmp(atoms.u[j]->base, base) == 0) {
+                    *scale *= ostrin_unit_pow(atoms.u[j]->f / fi, atoms.e[j]);
+                    atoms.e[i] += atoms.e[j];
+                    for (int k = j; k + 1 < atoms.n; k++) { atoms.u[k] = atoms.u[k + 1]; atoms.e[k] = atoms.e[k + 1]; }
+                    atoms.n--;
+                } else {
+                    j++;
+                }
+            }
+        }
+        if (atoms.e[i] == 0) {
+            for (int k = i; k + 1 < atoms.n; k++) { atoms.u[k] = atoms.u[k + 1]; atoms.e[k] = atoms.e[k + 1]; }
+            atoms.n--;
+        } else {
+            i++;
+        }
+    }
+    char buf[512];
+    size_t len = 0;
+    buf[0] = 0;
+    int has_num = 0;
+    for (int k = 0; k < atoms.n; k++) {
+        if (atoms.e[k] <= 0) continue;
+        if (atoms.e[k] == 1) len += snprintf(buf + len, sizeof buf - len, "%s%s", has_num ? "*" : "", atoms.u[k]->s);
+        else len += snprintf(buf + len, sizeof buf - len, "%s%s^%d", has_num ? "*" : "", atoms.u[k]->s, atoms.e[k]);
+        has_num = 1;
+    }
+    int has_den = 0;
+    for (int k = 0; k < atoms.n; k++) if (atoms.e[k] < 0) has_den = 1;
+    if (!has_num && has_den) len += snprintf(buf + len, sizeof buf - len, "1");
+    for (int k = 0; k < atoms.n; k++) {
+        if (atoms.e[k] >= 0) continue;
+        if (atoms.e[k] == -1) len += snprintf(buf + len, sizeof buf - len, "/%s", atoms.u[k]->s);
+        else len += snprintf(buf + len, sizeof buf - len, "/%s^%d", atoms.u[k]->s, -atoms.e[k]);
+    }
+    return ostrin_unit_cat(buf, "", "");
+}
+
 static Qty ostrin_qty_add(Qty a, Qty b) { Qty r = { a.v + ostrin_convert(b.v, b.u, a.u), a.u }; return r; }
 static Qty ostrin_qty_sub(Qty a, Qty b) { Qty r = { a.v - ostrin_convert(b.v, b.u, a.u), a.u }; return r; }
-static Qty ostrin_qty_mul(Qty a, Qty b) { Qty r = { a.v * b.v, ostrin_unit_cat(a.u, "*", b.u) }; return r; }
-static Qty ostrin_qty_div(Qty a, Qty b) { Qty r = { a.v / b.v, ostrin_unit_cat(a.u, "/", b.u) }; return r; }
+static Qty ostrin_qty_mul(Qty a, Qty b) {
+    double scale;
+    Qty r = { a.v * b.v, ostrin_unit_combine(a.u, b.u, 0, &scale) };
+    if (scale != 1.0) r.v *= scale;
+    return r;
+}
+static Qty ostrin_qty_div(Qty a, Qty b) {
+    double scale;
+    Qty r = { a.v / b.v, ostrin_unit_combine(a.u, b.u, 1, &scale) };
+    if (scale != 1.0) r.v *= scale;
+    return r;
+}
+/* A product whose dimensions cancel: the leftover unit (`J/N/m`) is folded
+ * into the value, as the interpreter does. */
+static Qty ostrin_qty_mul_pure(Qty a, Qty b) {
+    Qty r = ostrin_qty_mul(a, b);
+    if (*r.u) { r.v *= ostrin_unit_expr_factor(r.u); r.u = ""; }
+    return r;
+}
 static double ostrin_qty_ratio(Qty a, Qty b) { return a.v / ostrin_convert(b.v, b.u, a.u); }
 static Qty ostrin_qty_scale_mul(Qty a, double s) { Qty r = { a.v * s, a.u }; return r; }
 static Qty ostrin_qty_scale_div(Qty a, double s) { Qty r = { a.v / s, a.u }; return r; }
-static Qty ostrin_scalar_div_qty(double s, Qty a) { Qty r = { s / a.v, ostrin_unit_cat("1/", "", a.u) }; return r; }
+static Qty ostrin_scalar_div_qty(double s, Qty a) {
+    double scale;
+    Qty r = { s / a.v, ostrin_unit_combine("", a.u, 1, &scale) };
+    return r;
+}
 static int ostrin_qty_cmp(Qty a, Qty b) {
     double c = ostrin_convert(b.v, b.u, a.u);
     return a.v < c ? -1 : (a.v > c ? 1 : 0);
@@ -78,12 +201,14 @@ static int ostrin_qty_cmp(Qty a, Qty b) {
 static void ostrin_print_qty(Qty q) {
     char buf[64];
     ostrin_fmt_double(q.v, buf, sizeof buf);
-    printf("%s %s\n", buf, q.u);
+    if (*q.u) printf("%s %s\n", buf, q.u);
+    else printf("%s\n", buf);
 }
 
 static const char* ostrin_qty_to_string(Qty q) {
     char buf[64];
     ostrin_fmt_double(q.v, buf, sizeof buf);
+    if (!*q.u) return ostrin_unit_cat(buf, "", "");
     return ostrin_unit_cat(ostrin_unit_cat(buf, " ", ""), q.u, "");
 }
 

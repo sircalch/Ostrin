@@ -4166,7 +4166,7 @@ fn native_backend_quantities_match_the_interpreter() {
     // runtime (`m/s`, `kg*m/s*m/s`), comparisons across units, `as`,
     // `within`, `approximately`, unary minus and scalar/Quantity math, plus
     // `shapes.ostrin`: an `impl` on an enum, a list of enums and `to_string()`.
-    for file in ["physics.ostrin", "native_units.ostrin", "shapes.ostrin"] {
+    for file in ["physics.ostrin", "native_units.ostrin", "shapes.ostrin", "unit_algebra.ostrin"] {
         let interpreted = run(&["--run", &example_path(file)]);
         assert!(interpreted.status.success(), "interpreter failed on {file}: {}", stderr(&interpreted));
         let expected = stdout(&interpreted).replace("\r\n", "\n");
@@ -5321,7 +5321,7 @@ fn as_converts_quantities_into_the_target_unit() {
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     assert_eq!(
         stdout(&out).replace("\r\n", "\n"),
-        "1.5 km\n2.5 m\n1.5 h\n40 m/s*s\n0.04 km\n40 m\n3 nm\ntrue\n"
+        "1.5 km\n2.5 m\n1.5 h\n40 m\n0.04 km\n40 m\n3 nm\ntrue\n"
     );
 }
 
@@ -5335,4 +5335,30 @@ fn function_typed_parameters_shadow_global_functions() {
     let rejected = run(&["--check", &example_path("function_value_arity_errors.ostrin")]);
     assert!(!rejected.status.success());
     assert!(stderr(&rejected).contains("OSTRIN-E1041") || stdout(&rejected).contains("OSTRIN-E1041"));
+}
+
+#[test]
+fn unit_algebra_simplifies_and_converts_compound_units() {
+    let out = run(&["--run", &example_path("unit_algebra.ostrin")]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let text = stdout(&out).replace("\r\n", "\n");
+    let lines: Vec<&str> = text.lines().collect();
+    assert_eq!(
+        lines,
+        [
+            "20 m/s", "72 km/h", "15000 kg*m^2/s^2", "15 kJ", "3.5850860420650097 kcal", "735.75 kg*m/s^2",
+            "735.75 N", "14.715 kPa", "1 atm", "180 km", "45 km", "2400 m", "6 m^3", "0.25 Hz", "10800 kJ", "1",
+            "0.25 L", "127137.6 km/h^2", "2 m",
+        ]
+    );
+}
+
+#[test]
+fn unit_conversions_between_dimensions_are_rejected() {
+    let out = run(&["--check", &example_path("unit_conversion_errors.ostrin")]);
+    assert!(!out.status.success());
+    let err = stderr(&out);
+    assert!(err.contains("E1026") && err.contains("to 's', which measures Time"), "missing as diagnostic: {err}");
+    assert!(err.contains("Length/Time (Velocity)"), "missing compound target: {err}");
+    assert!(err.contains("E1024") && err.contains("(Energy)") && err.contains("(Force)"), "missing named dimensions: {err}");
 }
