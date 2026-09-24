@@ -66,3 +66,8 @@ error, barras, histogramas, escalones, líneas de referencia, heatmaps y contorn
 (superficies sombreadas, mallas, trayectorias, nubes de puntos) y composición en rejilla, todo
 renderizado a SVG determinista. Diseño completo en el documento 23.
 
+## `std.numeric` (2026-09-24)
+
+Métodos numéricos escritos en Ostrin sobre `Array<Float>` y funciones de primera clase: cuadratura,
+raíces (con `Result`), derivadas, mínimos, interpolación lineal y spline cúbico, ODEs (`rk4`,
+`rk45`) y FFT. Diseño completo en el documento 24.

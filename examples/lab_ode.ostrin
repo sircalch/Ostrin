@@ -1,0 +1,15 @@
+// Scientific Lab · ODE
+// A damped, driven pendulum solved with adaptive RK45 from std.numeric.
+import std.numeric
+import std.viz
+
+fn main() -> Void {
+    damping = 0.15
+    drive = 1.1
+    start_angle = 0.2
+    sol = numeric.rk45(fn(t, y) { array([y[1], 0.0 - damping * y[1] - sin(y[0]) + drive * cos(0.8 * t)]) }, array([start_angle, 0.0]), 0.0, 40.0, tol: 1e-8)
+    print("steps " + sol.length().to_string() + ", final angle " + viz.num(sol.final_state()[0]))
+    fig = viz.figure("Phase portrait").labels("θ [rad]", "ω [rad/s]").no_legend()
+        .line(sol.component(0), sol.component(1), color: "#7c3aed", width: 1.1)
+    print(fig.svg())
+}

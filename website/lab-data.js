@@ -220,6 +220,121 @@ globalThis.OSTRIN_LAB = Object.freeze({
       ]
     },
     {
+      "id": "ode",
+      "title": "ODE",
+      "headline": "A driven pendulum, integrated by Ostrin.",
+      "file": "examples/lab_ode.ostrin",
+      "render": "svg",
+      "params": [
+        {
+          "name": "damping",
+          "label": "Damping",
+          "min": 0,
+          "max": 0.6,
+          "step": 0.05
+        },
+        {
+          "name": "drive",
+          "label": "Drive amplitude",
+          "min": 0,
+          "max": 1.6,
+          "step": 0.1
+        },
+        {
+          "name": "start_angle",
+          "label": "Start angle (rad)",
+          "min": -3,
+          "max": 3,
+          "step": 0.1
+        }
+      ],
+      "how": "std.numeric.rk45, an adaptive Dormand–Prince integrator written in Ostrin, solves θ'' = −c θ' − sin θ + A cos(0.8 t) with a lambda that captures the three parameters; it picks its own step sizes to keep the local error under 1e-8. std.viz then draws the phase portrait (θ, ω).",
+      "docs": {
+        "label": "std.numeric source",
+        "href": "https://github.com/sircalch/Ostrin/blob/main/compiler/std/numeric.ostrin"
+      },
+      "limits": "Explicit solvers only (rk4, rk45): stiff systems need an implicit method, which is planned. There are no event detection or dense output yet.",
+      "files": {
+        "main.ostrin": "// Scientific Lab · ODE\n// A damped, driven pendulum solved with adaptive RK45 from std.numeric.\nimport std.numeric\nimport std.viz\n\nfn main() -> Void {\n    damping = 0.15\n    drive = 1.1\n    start_angle = 0.2\n    sol = numeric.rk45(fn(t, y) { array([y[1], 0.0 - damping * y[1] - sin(y[0]) + drive * cos(0.8 * t)]) }, array([start_angle, 0.0]), 0.0, 40.0, tol: 1e-8)\n    print(\"steps \" + sol.length().to_string() + \", final angle \" + viz.num(sol.final_state()[0]))\n    fig = viz.figure(\"Phase portrait\").labels(\"θ [rad]\", \"ω [rad/s]\").no_legend()\n        .line(sol.component(0), sol.component(1), color: \"#7c3aed\", width: 1.1)\n    print(fig.svg())\n}\n"
+      },
+      "main": "main.ostrin",
+      "args": [
+        "--run",
+        "main.ostrin"
+      ],
+      "source": "examples/lab_ode.ostrin",
+      "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/lab_ode.ostrin",
+      "output": [
+        "steps 268, final angle -12.39",
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"640\" height=\"400\" viewBox=\"0 0 640 400\" font-family=\"Inter, Segoe UI, Helvetica, Arial, sans-serif\">",
+        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar{cursor:crosshair}</style>",
+        "<rect width=\"640\" height=\"400\" fill=\"#ffffff\"/>",
+        "",
+        "<text x=\"66\" y=\"26\" text-anchor=\"start\" font-size=\"16\" fill=\"#1f2937\" font-weight=\"600\">Phase portrait</text>",
+        "<defs><clipPath id=\"clip1095613429862472452\"><rect x=\"66\" y=\"44\" width=\"554\" height=\"304\"/></clipPath></defs>",
+        "<line x1=\"108.58\" y1=\"44\" x2=\"108.58\" y2=\"348\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>",
+        "<line x1=\"108.58\" y1=\"348\" x2=\"108.58\" y2=\"353\" stroke=\"#9ca3af\" stroke-width=\"1\"/>",
+        "<text x=\"108.58\" y=\"366\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6b7280\">-20</text>",
+        "<line x1=\"156.12\" y1=\"44\" x2=\"156.12\" y2=\"348\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>",
+        "<line x1=\"156.12\" y1=\"348\" x2=\"156.12\" y2=\"353\" stroke=\"#9ca3af\" stroke-width=\"1\"/>",
+        "<text x=\"156.12\" y=\"366\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6b7280\">-18</text>",
+        "<line x1=\"203.65\" y1=\"44\" x2=\"203.65\" y2=\"348\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>",
+        "<line x1=\"203.65\" y1=\"348\" x2=\"203.65\" y2=\"353\" stroke=\"#9ca3af\" stroke-width=\"1\"/>",
+        "<text x=\"203.65\" y=\"366\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6b7280\">-16</text>",
+        "<line x1=\"251.19\" y1=\"44\" x2=\"251.19\" y2=\"348\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>",
+        "<line x1=\"251.19\" y1=\"348\" x2=\"251.19\" y2=\"353\" stroke=\"#9ca3af\" stroke-width=\"1\"/>",
+        "<text x=\"251.19\" y=\"366\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6b7280\">-14</text>",
+        "<line x1=\"298.72\" y1=\"44\" x2=\"298.72\" y2=\"348\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>",
+        "<line x1=\"298.72\" y1=\"348\" x2=\"298.72\" y2=\"353\" stroke=\"#9ca3af\" stroke-width=\"1\"/>",
+        "<text x=\"298.72\" y=\"366\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6b7280\">-12</text>",
+        "<line x1=\"346.26\" y1=\"44\" x2=\"346.26\" y2=\"348\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>",
+        "<line x1=\"346.26\" y1=\"348\" x2=\"346.26\" y2=\"353\" stroke=\"#9ca3af\" stroke-width=\"1\"/>",
+        "<text x=\"346.26\" y=\"366\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6b7280\">-10</text>",
+        "<line x1=\"393.79\" y1=\"44\" x2=\"393.79\" y2=\"348\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>",
+        "<line x1=\"393.79\" y1=\"348\" x2=\"393.79\" y2=\"353\" stroke=\"#9ca3af\" stroke-width=\"1\"/>",
+        "<text x=\"393.79\" y=\"366\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6b7280\">-8</text>",
+        "<line x1=\"441.33\" y1=\"44\" x2=\"441.33\" y2=\"348\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>",
+        "<line x1=\"441.33\" y1=\"348\" x2=\"441.33\" y2=\"353\" stroke=\"#9ca3af\" stroke-width=\"1\"/>",
+        "<text x=\"441.33\" y=\"366\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6b7280\">-6</text>",
+        "<line x1=\"488.86\" y1=\"44\" x2=\"488.86\" y2=\"348\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>",
+        "<line x1=\"488.86\" y1=\"348\" x2=\"488.86\" y2=\"353\" stroke=\"#9ca3af\" stroke-width=\"1\"/>",
+        "<text x=\"488.86\" y=\"366\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6b7280\">-4</text>",
+        "<line x1=\"536.4\" y1=\"44\" x2=\"536.4\" y2=\"348\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>",
+        "<line x1=\"536.4\" y1=\"348\" x2=\"536.4\" y2=\"353\" stroke=\"#9ca3af\" stroke-width=\"1\"/>",
+        "<text x=\"536.4\" y=\"366\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6b7280\">-2</text>",
+        "<line x1=\"583.93\" y1=\"44\" x2=\"583.93\" y2=\"348\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>",
+        "<line x1=\"583.93\" y1=\"348\" x2=\"583.93\" y2=\"353\" stroke=\"#9ca3af\" stroke-width=\"1\"/>",
+        "<text x=\"583.93\" y=\"366\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6b7280\">0</text>",
+        "<line x1=\"66\" y1=\"322.46\" x2=\"620\" y2=\"322.46\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>",
+        "<line x1=\"61\" y1=\"322.46\" x2=\"66\" y2=\"322.46\" stroke=\"#9ca3af\" stroke-width=\"1\"/>",
+        "<text x=\"58\" y=\"326.46\" text-anchor=\"end\" font-size=\"11\" fill=\"#6b7280\">-2</text>",
+        "<line x1=\"66\" y1=\"266.94\" x2=\"620\" y2=\"266.94\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>",
+        "<line x1=\"61\" y1=\"266.94\" x2=\"66\" y2=\"266.94\" stroke=\"#9ca3af\" stroke-width=\"1\"/>",
+        "<text x=\"58\" y=\"270.94\" text-anchor=\"end\" font-size=\"11\" fill=\"#6b7280\">-1</text>",
+        "<line x1=\"66\" y1=\"211.42\" x2=\"620\" y2=\"211.42\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>",
+        "<line x1=\"61\" y1=\"211.42\" x2=\"66\" y2=\"211.42\" stroke=\"#9ca3af\" stroke-width=\"1\"/>",
+        "<text x=\"58\" y=\"215.42\" text-anchor=\"end\" font-size=\"11\" fill=\"#6b7280\">0</text>",
+        "<line x1=\"66\" y1=\"155.9\" x2=\"620\" y2=\"155.9\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>",
+        "<line x1=\"61\" y1=\"155.9\" x2=\"66\" y2=\"155.9\" stroke=\"#9ca3af\" stroke-width=\"1\"/>",
+        "<text x=\"58\" y=\"159.9\" text-anchor=\"end\" font-size=\"11\" fill=\"#6b7280\">1</text>",
+        "<line x1=\"66\" y1=\"100.39\" x2=\"620\" y2=\"100.39\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>",
+        "<line x1=\"61\" y1=\"100.39\" x2=\"66\" y2=\"100.39\" stroke=\"#9ca3af\" stroke-width=\"1\"/>",
+        "<text x=\"58\" y=\"104.39\" text-anchor=\"end\" font-size=\"11\" fill=\"#6b7280\">2</text>",
+        "<line x1=\"66\" y1=\"44.87\" x2=\"620\" y2=\"44.87\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>",
+        "<line x1=\"61\" y1=\"44.87\" x2=\"66\" y2=\"44.87\" stroke=\"#9ca3af\" stroke-width=\"1\"/>",
+        "<text x=\"58\" y=\"48.87\" text-anchor=\"end\" font-size=\"11\" fill=\"#6b7280\">3</text>",
+        "<g clip-path=\"url(#clip1095613429862472452)\">",
+        "<path d=\"M588.69 211.42 L588.79 206.51 L589.1 201.74 L589.62 197.14 L590.35 192.8 L591.28 188.76 L592.37 185.32 L593.57 182.46 L594.88 180.22 L596.27 178.59 L597.71 177.61 L599.2 177.29 L600.69 177.66 L602.18 178.74 L603.65 180.58 L605.05 183.23 L606.35 186.74 L607.5 191.18 L608.43 196.6 L609.08 203 L609.35 210.33 L609.18 218.45 L608.58 226.73 L607.57 235.07 L606.18 243.42 L604.41 251.74 L602.26 259.97 L599.73 268.03 L596.77 275.93 L593.29 283.66 L589.42 290.7 L585.6 296.33 L581.77 300.85 L577.89 304.43 L573.92 307.14 L569.84 309.04 L565.63 310.18 L561.22 310.59 L556.8 310.33 L552.4 309.52 L547.96 308.3 L543.4 306.79 L538.58 305.07 L533.14 303.24 L527.38 301.72 L521.75 300.91 L516.46 300.91 L510.88 301.82 L504.94 303.77 L499.41 306.39 L493.62 309.73 L487.91 313.37 L481.8 317.31 L475.18 321.2 L469.33 323.96 L463.36 325.78 L457.8 326.32 L452.45 325.55 L447.18 323.35 L442.01 319.57 L437.13 314.31 L432.48 307.51 L428.05 299.09 L423.84 288.84 L419.87 276.4 L416.18 260.93 L413.4 243.9 L411.83 227.38 L411.33 211.24 L411.86 195.41 L413.47 179.91 L416.3 164.77 L419.52 153.46 L423.4 143.91 L427.41 137.03 L431.46 132.4 L435.52 129.71 L439.57 128.77 L443.6 129.47 L447.6 131.78 L451.56 135.7 L455.48 141.36 L459.28 148.88 L462.66 157.79 L465.58 168.17 L467.97 180.24 L469.68 194.59 L470.34 211.79 L469.74 227.91 L467.91 244.9 L465.06 260.93 L461.31 276.1 L456.54 290.8 L450.92 304.09 L445.71 313.65 L439.95 321.72 L434.39 327.4 L428.86 331.22 L423.28 333.44 L417.54 334.18 L411.54 333.52 L405.73 331.7 L399.97 329.01 L394.12 325.65 L388 321.78 L381.2 317.48 L374.16 313.55 L367.04 310.57 L360.35 308.97 L352.98 308.67 L345.95 309.65 L338.7 311.56 L331.54 313.77 L323.23 315.91 L316.78 316.64 L310.34 316.05 L304.39 313.93 L298.71 310.13 L293.31 304.53 L288.33 297.26 L283.74 288.28 L279.53 277.46 L275.75 264.54 L272.71 250.17 L270.65 235.57 L269.54 221.11 L269.37 207.03 L270.13 193.52 L271.85 180.86 L274.4 170 L277.44 161.81 L280.74 156.14 L284.19 152.76 L287.68 151.48 L291.15 152.19 L294.55 154.83 L297.8 159.38 L300.82 165.91 L303.52 174.53 L305.74 185.41 L307.21 198.73 L307.63 213.32 L306.98 227.69 L305.36 241.85 L302.8 255.68 L299.29 269 L294.76 281.51 L290.04 291.14 L284.76 299.01 L279.43 304.51 L274.02 308.01 L268.45 309.74 L262.63 309.81 L256.86 308.41 L251.2 305.87 L245.54 302.45 L239.77 298.32 L233.64 293.57 L227.19 288.55 L221.13 284.13 L215.41 280.46 L210 277.58 L204.57 275.29 L198.89 273.49 L193.03 272.1 L186.64 270.83 L179.11 269.08 L173.51 267.15 L168.15 264.43 L163.39 261.02 L159.09 256.91 L155.23 252.21 L151.8 247.15 L148.83 242.04 L146.3 237.23 L144.14 233.08 L142.32 230 L140.83 228.29 L139.5 227.8 L138.17 228.44 L136.76 230.15 L135.15 232.83 L133.23 236.38 L130.87 240.71 L128.1 245.31 L124.91 249.83 L121.27 253.94 L117.2 257.3 L112.91 259.57 L108.46 260.69 L103.96 260.63 L99.57 259.5 L95.33 257.38 L91.27 254.3 L87.4 250.19 L83.78 244.77 L80.76 238.19 L78.49 230.37 L77.09 221.16 L76.65 210.44 L77.29 198.26 L78.95 185.15 L81.6 171.13 L85.2 156.32 L89.74 140.85 L95.29 124.82 L102.08 108.2 L110.05 92.12 L118.78 78.33 L126.78 68.94 L135.33 62.21 L143.39 58.75 L151.34 57.82 L159.5 59.02 L167.27 61.74 L174.93 65.39 L182.89 69.57 L191.85 73.88 L201.17 77.01 L211.08 78.04 L219.37 76.92 L227.62 74.3 L236.19 70.6 L245.15 66.58 L253.93 63.44 L261.75 62.05 L269.56 62.59 L277.11 65.39 L284.19 70.44 L290.85 77.61 L297.27 87.02 L303.56 99.01 L309.59 113.56 L314.84 129.53 L319.48 147.54 L323.05 166.27 L325.47 185.48 L326.64 206.35 L326.03 230.07 L323.81 249.88 L320.07 268.73 L315.12 285.46 L309.52 299.1 L303.66 309.42 L297.56 316.9 L291.42 321.49 L285.53 323.34 L279.78 322.82 L274.08 320.09 L268.39 315.1 L262.61 307.63 L257.37 298.54 L252.56 287.87 L248.19 275.56 L244.32 261.36 L241.22 245.2 L239.25 227.41 L238.74 206.39 L240.08 185.65 L243 165.63 L247.42 145.94 L252.83 128.13 L259.33 111.65 L266.39 97.94 L273.29 87.87 L279.96 80.91 L286.95 76.26 L289.57 75.17\" fill=\"none\" stroke=\"#7c3aed\" stroke-width=\"1.1\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>",
+        "</g>",
+        "<line x1=\"66\" y1=\"348\" x2=\"620\" y2=\"348\" stroke=\"#9ca3af\" stroke-width=\"1\"/>",
+        "<line x1=\"66\" y1=\"44\" x2=\"66\" y2=\"348\" stroke=\"#9ca3af\" stroke-width=\"1\"/>",
+        "<text x=\"343\" y=\"388\" text-anchor=\"middle\" font-size=\"12\" fill=\"#1f2937\">θ [rad]</text>",
+        "<text x=\"16\" y=\"196\" text-anchor=\"middle\" font-size=\"12\" fill=\"#1f2937\" transform=\"rotate(-90 16 196)\">ω [rad/s]</text>",
+        "</svg>",
+        ""
+      ]
+    },
+    {
       "id": "linear-algebra",
       "title": "Linear Algebra",
       "headline": "Solve a spring system and find its normal modes.",
@@ -692,6 +807,48 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "code": "// std.viz · bars with error bars: group means ± standard deviation.\nimport std.viz\n\nfn main() -> Void {\n    r = rng(11)\n    mut means: List<Float> = []\n    mut sds: List<Float> = []\n    effects = [0.0, 0.8, 1.9, 2.6, 2.9]\n    for effect in effects {\n        group = r.randn([30]) * 0.7 + (5.0 + effect)\n        means.push(group.mean())\n        sds.push(group.std())\n    }\n    doses = array([0.0, 1.0, 2.0, 3.0, 4.0])\n    fig = viz.figure(\"Dose response\")\n        .describe(\"30 subjects per dose, mean ± sd\")\n        .labels(\"dose [mg]\", \"response\")\n        .bars(doses, array(means), label: \"mean\", color: \"#93c5fd\")\n        .errorbars(doses, array(means), array(sds), label: \"± sd\", color: \"#1e3a8a\")\n    print(fig.svg())\n}\n",
       "svg": "assets/viz/bars.svg",
       "printed": [
+        ""
+      ]
+    },
+    {
+      "id": "ode",
+      "title": "Adaptive ODE solver",
+      "file": "examples/viz_ode.ostrin",
+      "blurb": "A pendulum solved with std.numeric.rk45: angle over time and the phase portrait, side by side.",
+      "source": "examples/viz_ode.ostrin",
+      "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_ode.ostrin",
+      "code": "// std.numeric + std.viz · a damped, driven pendulum integrated with adaptive RK45.\nimport std.numeric\nimport std.viz\n\nfn pendulum(t: Float, y: Array<Float>) -> Array<Float> {\n    // y = [angle, angular velocity]; damping 0.15, drive 1.1 cos(0.8 t)\n    array([y[1], 0.0 - 0.15 * y[1] - sin(y[0]) + 1.1 * cos(0.8 * t)])\n}\n\nfn main() -> Void {\n    sol = numeric.rk45(pendulum, array([0.2, 0.0]), 0.0, 60.0, tol: 1e-9)\n    angle = sol.component(0)\n    speed = sol.component(1)\n    print(\"steps \" + sol.length().to_string() + \", evaluations \" + sol.evaluations.to_string())\n    a = viz.figure(\"Angle over time\").size(480, 320).labels(\"t\", \"θ [rad]\").no_legend()\n        .line(sol.t, angle, width: 1.4)\n    b = viz.figure(\"Phase portrait\").size(480, 320).labels(\"θ [rad]\", \"ω [rad/s]\").no_legend()\n        .line(angle, speed, color: \"#7c3aed\", width: 1.0)\n        .scatter(array([angle[0]]), array([speed[0]]), label: \"start\", color: \"#dc2626\", size: 4.0)\n    print(viz.grid([a.svg(), b.svg()], 2, 480, 320, title: \"Driven pendulum (RK45, tol 1e-9)\"))\n}\n",
+      "svg": "assets/viz/ode.svg",
+      "printed": [
+        "steps 643, evaluations 4655",
+        ""
+      ]
+    },
+    {
+      "id": "fft",
+      "title": "Spectrum with the FFT",
+      "file": "examples/viz_fft.ostrin",
+      "blurb": "A noisy two-tone signal and its amplitude spectrum from std.numeric.fft: peaks at 50 Hz and 120 Hz.",
+      "source": "examples/viz_fft.ostrin",
+      "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_fft.ostrin",
+      "code": "// std.numeric + std.viz · a noisy two-tone signal and its spectrum.\nimport std.numeric\nimport std.viz\n\nfn main() -> Void {\n    n = 512\n    dt = 1.0 / 512.0\n    t = linspace(0.0, 1.0, n + 1)[0 until n]\n    noise = rng(42).randn([n]) * 0.4\n    signal = sin(t * (2.0 * pi() * 50.0)) + sin(t * (2.0 * pi() * 120.0)) * 0.6 + noise\n    amp = numeric.amplitude(numeric.fft(signal))\n    freqs = numeric.frequencies(n, dt)\n    print(\"peak at 50 Hz: \" + viz.num(amp[50]) + \", at 120 Hz: \" + viz.num(amp[120]))\n    a = viz.figure(\"Signal\").size(480, 320).labels(\"t [s]\", \"x\").no_legend()\n        .line(t[0 until 128], signal[0 until 128], width: 1.2)\n    b = viz.figure(\"Amplitude spectrum\").size(480, 320).labels(\"f [Hz]\", \"|X(f)|\").no_legend()\n        .area(freqs, amp, color: \"#059669\")\n    print(viz.grid([a.svg(), b.svg()], 2, 480, 320, title: \"FFT of 512 samples\"))\n}\n",
+      "svg": "assets/viz/fft.svg",
+      "printed": [
+        "peak at 50 Hz: 1, at 120 Hz: 0.59",
+        ""
+      ]
+    },
+    {
+      "id": "spline",
+      "title": "Cubic spline",
+      "file": "examples/viz_spline.ostrin",
+      "blurb": "Eight measurements, a natural cubic spline through them and the area under it by Simpson's rule.",
+      "source": "examples/viz_spline.ostrin",
+      "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_spline.ostrin",
+      "code": "// std.numeric + std.viz · linear and natural cubic spline interpolation.\nimport std.numeric\nimport std.viz\n\nfn main() -> Void {\n    xs = array([0.0, 1.0, 2.5, 3.5, 5.0, 6.0, 7.5, 9.0, 10.0])\n    ys = array([1.0, 2.2, 1.4, 3.1, 2.4, 4.0, 3.3, 5.2, 4.1])\n    fine = linspace(0.0, 10.0, 300)\n    curve = numeric.spline(xs, ys).sample(fine)\n    straight = numeric.interp_all(xs, ys, fine)\n    area = numeric.trapz(fine, curve)\n    print(\"area under the spline \" + viz.num(area))\n    fig = viz.figure(\"Interpolation\")\n        .describe(\"natural cubic spline vs. linear, area \" + viz.num(area))\n        .labels(\"x\", \"y\")\n        .line(fine, straight, label: \"linear\", color: \"#9ca3af\", dash: \"5 4\", width: 1.5)\n        .line(fine, curve, label: \"cubic spline\")\n        .scatter(xs, ys, label: \"data\", color: \"#dc2626\", size: 4.5)\n    print(fig.svg())\n}\n",
+      "svg": "assets/viz/spline.svg",
+      "printed": [
+        "area under the spline 30.65",
         ""
       ]
     },

@@ -1,0 +1,20 @@
+// std.numeric + std.viz · linear and natural cubic spline interpolation.
+import std.numeric
+import std.viz
+
+fn main() -> Void {
+    xs = array([0.0, 1.0, 2.5, 3.5, 5.0, 6.0, 7.5, 9.0, 10.0])
+    ys = array([1.0, 2.2, 1.4, 3.1, 2.4, 4.0, 3.3, 5.2, 4.1])
+    fine = linspace(0.0, 10.0, 300)
+    curve = numeric.spline(xs, ys).sample(fine)
+    straight = numeric.interp_all(xs, ys, fine)
+    area = numeric.trapz(fine, curve)
+    print("area under the spline " + viz.num(area))
+    fig = viz.figure("Interpolation")
+        .describe("natural cubic spline vs. linear, area " + viz.num(area))
+        .labels("x", "y")
+        .line(fine, straight, label: "linear", color: "#9ca3af", dash: "5 4", width: 1.5)
+        .line(fine, curve, label: "cubic spline")
+        .scatter(xs, ys, label: "data", color: "#dc2626", size: 4.5)
+    print(fig.svg())
+}

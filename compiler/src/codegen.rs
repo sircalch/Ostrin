@@ -1657,6 +1657,10 @@ fn owned_call_argument(expr: &Expr, ty: &CType) -> bool {
     if !is_reference_type(ty) {
         return false;
     }
+    // Every array operator allocates a new array.
+    if matches!(ty, CType::Array(_)) && fresh_array_expr(expr) {
+        return true;
+    }
     matches!(
         expr.unlocated(),
         Expr::Call(..)
@@ -2654,10 +2658,13 @@ impl<'a> Codegen<'a> {
         }
         let (codes, types) = self.gen_args_hinted(args, params)?;
         let coerced = self.coerce_args(&codes, &types, params)?;
+        // Fresh managed arguments (`f(t, y + k * h)`) are released after the call.
+        let owned = self.materialize_owned_call_args(args, &coerced, &types);
         let temp = self.next_temp();
-        let rest: String = coerced.iter().map(|c| format!(", {c}")).collect();
+        let rest: String = owned.codes.iter().map(|c| format!(", {c}")).collect();
         let fn_type = Self::closure_fn_type(params, ret);
-        Ok((format!("({{ OstrinClosure {temp} = {callee}; (({fn_type}){temp}.fn)({temp}.env{rest}); }})"), ret.clone()))
+        let call = format!("({{ OstrinClosure {temp} = {callee}; (({fn_type}){temp}.fn)({temp}.env{rest}); }})");
+        Ok(self.finish_owned_call(owned, call, ret.clone()))
     }
 
     fn next_temp(&mut self) -> String {

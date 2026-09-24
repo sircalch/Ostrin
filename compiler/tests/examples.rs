@@ -5521,3 +5521,33 @@ fn within_compares_quantities_across_units() {
     let _ = fs::remove_file(&path);
     assert_eq!(stdout(&out).replace("\r\n", "\n"), "true\nfalse\n");
 }
+
+#[test]
+fn std_numeric_solves_integrates_interpolates_and_transforms() {
+    let out = run(&["--run", &example_path("numeric_methods.ostrin")]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let text = stdout(&out).replace("\r\n", "\n");
+    let lines: Vec<&str> = text.lines().collect();
+    assert_eq!(lines.len(), 16, "unexpected output: {text}");
+    let number = |line: &str| -> f64 {
+        line.trim_start_matches("Ok(").trim_end_matches(')').parse().unwrap_or_else(|_| panic!("not a number: {line}"))
+    };
+    let close = |line: &str, want: f64, tol: f64| assert!((number(line) - want).abs() < tol, "{line} vs {want}");
+    let root = 2f64.sqrt();
+    close(lines[0], root, 1e-9); // bisect
+    close(lines[1], root, 1e-12); // secant
+    close(lines[2], root, 1e-12); // newton
+    close(lines[3], 2.0, 1e-8); // simpson of sin over [0, pi]
+    close(lines[4], 2.0, 1e-3); // trapz on 101 samples
+    close(lines[5], 1.0, 1e-8); // derivative of sin at 0
+    close(lines[6], 1.5, 1e-6); // golden-section minimum
+    close(lines[7], 5.0, 1e-12); // linear interpolation
+    close(lines[8], 0.5, 1e-12); // natural cubic spline, symmetric point
+    assert!(lines[9].starts_with("[0.99999999"), "rk4 after one period: {}", lines[9]);
+    assert!(lines[10].starts_with("[0.99999997"), "rk45 after one period: {}", lines[10]);
+    assert_eq!(lines[11], "59"); // accepted rk45 steps
+    close(lines[12], 1.0, 1e-9); // FFT amplitude at 5 Hz
+    close(lines[13], 0.5, 1e-9); // FFT amplitude at 12 Hz
+    assert_eq!(lines[14], "true"); // ifft(fft(x)) == x
+    assert!(number(lines[15]) < 0.9, "non-power-of-two DFT leaks: {}", lines[15]);
+}

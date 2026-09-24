@@ -112,7 +112,7 @@ test("Scientific Lab recomputes its demos with the real compiler", async ({ page
   await page.goto("./#lab", { waitUntil: "domcontentloaded" });
   await expect(page.locator("[data-release-line]")).toHaveAttribute("data-state", /published|unreleased/);
   const tabs = page.getByRole("tab");
-  await expect(tabs).toHaveCount(9);
+  await expect(tabs).toHaveCount(10);
 
   // Recorded output first, then a live run with the same compiler must reproduce it exactly.
   await page.getByRole("tab", { name: "Units" }).click();
@@ -153,7 +153,7 @@ test("Scientific Lab recomputes its demos with the real compiler", async ({ page
 
 test("Cookbook renders every recipe with source and recorded output", async ({ page }) => {
   await page.goto("./cookbook.html", { waitUntil: "domcontentloaded" });
-  await expect(page.locator("[data-cookbook] .recipe")).toHaveCount(9);
+  await expect(page.locator("[data-cookbook] .recipe")).toHaveCount(10);
   for (const recipe of await page.locator("[data-cookbook] .recipe").all()) {
     await expect(recipe.locator(".sl-code")).not.toBeEmpty();
     await expect(recipe.locator(".sl-raw pre")).not.toBeEmpty();
@@ -167,7 +167,7 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   page.on("pageerror", (error) => runtimeErrors.push(error.message));
   await page.goto("./viz.html", { waitUntil: "domcontentloaded" });
   const cards = page.locator("[data-viz-gallery] .viz-card");
-  await expect(cards).toHaveCount(10);
+  await expect(cards).toHaveCount(13);
   for (const card of await cards.all()) {
     const image = card.locator("img.viz-image");
     await expect(image).toHaveAttribute("src", /^assets\/viz\/[a-z-]+\.svg$/);

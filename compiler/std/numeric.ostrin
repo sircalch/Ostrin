@@ -1,0 +1,453 @@
+// std.numeric — numerical methods written in Ostrin.
+//
+// Integration (trapezoid, Simpson), roots (bisection, secant, Newton),
+// derivatives, one-dimensional minimization (golden section), interpolation
+// (linear, natural cubic spline), ODE solvers (classic RK4 and adaptive
+// Dormand–Prince RK45) and the FFT (radix-2, with a DFT for other lengths).
+// Everything is deterministic: the interpreter, native code and the browser
+// compute the same bits.
+
+// ---------------------------------------------------------------- integration
+
+/// Integral of samples `ys` over `xs` by the trapezoid rule.
+pub fn trapz(xs: Array<Float>, ys: Array<Float>) -> Float {
+    mut total = 0.0
+    for i in 1 until xs.length() {
+        total = total + (xs[i] - xs[i - 1]) * (ys[i] + ys[i - 1]) / 2.0
+    }
+    total
+}
+
+/// Integral of `f` over [a, b] by composite Simpson's rule with `n` panels
+/// (rounded up to an even number).
+pub fn simpson(f: fn(Float) -> Float, a: Float, b: Float, n: Int = 200) -> Float {
+    panels = if n % 2 == 0 { n } else { n + 1 }
+    h = (b - a) / (panels as Float)
+    mut total = f(a) + f(b)
+    for i in 1 until panels {
+        x = a + (i as Float) * h
+        total = total + (if i % 2 == 1 { 4.0 } else { 2.0 }) * f(x)
+    }
+    total * h / 3.0
+}
+
+// ---------------------------------------------------------------- roots and minima
+
+/// A root of `f` in [a, b], where f(a) and f(b) have opposite signs.
+pub fn bisect(f: fn(Float) -> Float, a: Float, b: Float, tol: Float = 1e-12, max_iter: Int = 200) -> Result<Float, String> {
+    mut lo = a
+    mut hi = b
+    mut flo = f(lo)
+    fhi = f(hi)
+    if flo == 0.0 {
+        return Ok(lo)
+    }
+    if fhi == 0.0 {
+        return Ok(hi)
+    }
+    if (flo < 0.0) == (fhi < 0.0) {
+        return Err("bisect needs f(a) and f(b) with opposite signs")
+    }
+    mut i = 0
+    while i < max_iter and hi - lo > tol {
+        mid = (lo + hi) / 2.0
+        fmid = f(mid)
+        if fmid == 0.0 {
+            return Ok(mid)
+        }
+        if (fmid < 0.0) == (flo < 0.0) {
+            lo = mid
+            flo = fmid
+        } else {
+            hi = mid
+        }
+        i = i + 1
+    }
+    Ok((lo + hi) / 2.0)
+}
+
+/// A root of `f` by the secant method from two starting points.
+pub fn secant(f: fn(Float) -> Float, x0: Float, x1: Float, tol: Float = 1e-12, max_iter: Int = 100) -> Result<Float, String> {
+    mut a = x0
+    mut b = x1
+    mut fa = f(a)
+    mut i = 0
+    while i < max_iter {
+        fb = f(b)
+        if abs(fb) <= tol {
+            return Ok(b)
+        }
+        if fb == fa {
+            return Err("secant stalled: f(x0) == f(x1)")
+        }
+        next = b - fb * (b - a) / (fb - fa)
+        a = b
+        fa = fb
+        b = next
+        i = i + 1
+    }
+    Err("secant did not converge in " + max_iter.to_string() + " iterations")
+}
+
+/// A root of `f` by Newton's method with the derivative `df`.
+pub fn newton(f: fn(Float) -> Float, df: fn(Float) -> Float, x0: Float, tol: Float = 1e-12, max_iter: Int = 50) -> Result<Float, String> {
+    mut x = x0
+    mut i = 0
+    while i < max_iter {
+        fx = f(x)
+        if abs(fx) <= tol {
+            return Ok(x)
+        }
+        slope = df(x)
+        if slope == 0.0 {
+            return Err("newton hit a zero derivative")
+        }
+        x = x - fx / slope
+        i = i + 1
+    }
+    Err("newton did not converge in " + max_iter.to_string() + " iterations")
+}
+
+/// f'(x) by a central difference.
+pub fn derivative(f: fn(Float) -> Float, x: Float, h: Float = 1e-5) -> Float {
+    (f(x + h) - f(x - h)) / (2.0 * h)
+}
+
+/// The minimum of a unimodal `f` on [a, b] by golden-section search.
+pub fn golden_min(f: fn(Float) -> Float, a: Float, b: Float, tol: Float = 1e-10) -> Float {
+    ratio = (sqrt(5.0) - 1.0) / 2.0
+    mut lo = a
+    mut hi = b
+    mut c = hi - ratio * (hi - lo)
+    mut d = lo + ratio * (hi - lo)
+    mut fc = f(c)
+    mut fd = f(d)
+    while hi - lo > tol {
+        if fc < fd {
+            hi = d
+            d = c
+            fd = fc
+            c = hi - ratio * (hi - lo)
+            fc = f(c)
+        } else {
+            lo = c
+            c = d
+            fc = fd
+            d = lo + ratio * (hi - lo)
+            fd = f(d)
+        }
+    }
+    (lo + hi) / 2.0
+}
+
+// ---------------------------------------------------------------- interpolation
+
+fn segment(xs: Array<Float>, x: Float) -> Int {
+    n = xs.length()
+    if x <= xs[0] {
+        return 0
+    }
+    if x >= xs[n - 1] {
+        return n - 2
+    }
+    mut lo = 0
+    mut hi = n - 1
+    while hi - lo > 1 {
+        mid = (lo + hi) / 2
+        if xs[mid] <= x {
+            lo = mid
+        } else {
+            hi = mid
+        }
+    }
+    lo
+}
+
+/// Linear interpolation of (xs, ys) at x; xs increasing. Outside the data
+/// the end segments are extended.
+pub fn interp(xs: Array<Float>, ys: Array<Float>, x: Float) -> Float {
+    i = segment(xs, x)
+    t = (x - xs[i]) / (xs[i + 1] - xs[i])
+    ys[i] + t * (ys[i + 1] - ys[i])
+}
+
+pub fn interp_all(xs: Array<Float>, ys: Array<Float>, at: Array<Float>) -> Array<Float> {
+    mut out: List<Float> = []
+    for i in 0 until at.length() {
+        out.push(interp(xs, ys, at[i]))
+    }
+    array(out)
+}
+
+/// A natural cubic spline through (xs, ys).
+pub record Spline {
+    xs: Array<Float>
+    ys: Array<Float>
+    m: Array<Float>
+}
+
+/// Second derivatives from the tridiagonal system (Thomas algorithm), zero at
+/// both ends.
+pub fn spline(xs: Array<Float>, ys: Array<Float>) -> Spline {
+    n = xs.length()
+    mut m = zeros([n])
+    if n > 2 {
+        mut c: List<Float> = []
+        mut d: List<Float> = []
+        c.push(0.0)
+        d.push(0.0)
+        for i in 1 until n - 1 {
+            h0 = xs[i] - xs[i - 1]
+            h1 = xs[i + 1] - xs[i]
+            rhs = 6.0 * ((ys[i + 1] - ys[i]) / h1 - (ys[i] - ys[i - 1]) / h0)
+            denom = 2.0 * (h0 + h1) - h0 * c[i - 1]
+            c.push(h1 / denom)
+            d.push((rhs - h0 * d[i - 1]) / denom)
+        }
+        mut i = n - 2
+        while i >= 1 {
+            m.set(i, d[i] - c[i] * m[i + 1])
+            i = i - 1
+        }
+    }
+    Spline { xs: xs, ys: ys, m: m }
+}
+
+impl Spline {
+    fn at(self, x: Float) -> Float {
+        i = segment(self.xs, x)
+        h = self.xs[i + 1] - self.xs[i]
+        a = (self.xs[i + 1] - x) / h
+        b = (x - self.xs[i]) / h
+        a * self.ys[i] + b * self.ys[i + 1] + ((a * a * a - a) * self.m[i] + (b * b * b - b) * self.m[i + 1]) * h * h / 6.0
+    }
+
+    fn sample(self, at: Array<Float>) -> Array<Float> {
+        mut out: List<Float> = []
+        for i in 0 until at.length() {
+            out.push(self.at(at[i]))
+        }
+        array(out)
+    }
+}
+
+// ---------------------------------------------------------------- ODEs
+
+/// A trajectory: times `t` and states `y` (one row per time).
+pub record Solution {
+    t: Array<Float>
+    y: Array<Float>
+    evaluations: Int
+}
+
+impl Solution {
+    /// The i-th state variable over time.
+    fn component(self, i: Int) -> Array<Float> {
+        self.y.col(i)
+    }
+
+    fn final_state(self) -> Array<Float> {
+        self.y.row(self.t.length() - 1)
+    }
+
+    fn length(self) -> Int {
+        self.t.length()
+    }
+}
+
+fn solution(times: List<Float>, states: List<Float>, dim: Int, evaluations: Int) -> Solution {
+    Solution { t: array(times), y: array(states).reshape([times.length(), dim]), evaluations: evaluations }
+}
+
+/// dy/dt = f(t, y) from t0 to t1 with `steps` classic Runge–Kutta steps.
+pub fn rk4(f: fn(Float, Array<Float>) -> Array<Float>, y0: Array<Float>, t0: Float, t1: Float, steps: Int = 1000) -> Solution {
+    h = (t1 - t0) / (steps as Float)
+    mut times: List<Float> = [t0]
+    mut states: List<Float> = []
+    for i in 0 until y0.length() {
+        states.push(y0[i])
+    }
+    mut y = y0
+    mut t = t0
+    for i in 0 until steps {
+        k1 = f(t, y)
+        k2 = f(t + h / 2.0, y + k1 * (h / 2.0))
+        k3 = f(t + h / 2.0, y + k2 * (h / 2.0))
+        k4 = f(t + h, y + k3 * h)
+        y = y + (k1 + k2 * 2.0 + k3 * 2.0 + k4) * (h / 6.0)
+        t = t0 + ((i + 1) as Float) * h
+        times.push(t)
+        for j in 0 until y.length() {
+            states.push(y[j])
+        }
+    }
+    solution(times, states, y0.length(), 4 * steps)
+}
+
+/// dy/dt = f(t, y) from t0 to t1 with the adaptive Dormand–Prince 5(4) pair:
+/// each step keeps the local error below `tol` (relative to the state).
+pub fn rk45(f: fn(Float, Array<Float>) -> Array<Float>, y0: Array<Float>, t0: Float, t1: Float, tol: Float = 1e-8, max_steps: Int = 100000) -> Solution {
+    mut times: List<Float> = [t0]
+    mut states: List<Float> = []
+    for i in 0 until y0.length() {
+        states.push(y0[i])
+    }
+    mut y = y0
+    mut t = t0
+    mut h = (t1 - t0) / 100.0
+    mut evaluations = 0
+    mut accepted = 0
+    while t < t1 and accepted < max_steps {
+        if t + h > t1 {
+            h = t1 - t
+        }
+        k1 = f(t, y)
+        k2 = f(t + h / 5.0, y + k1 * (h / 5.0))
+        k3 = f(t + h * 0.3, y + (k1 * (3.0 / 40.0) + k2 * (9.0 / 40.0)) * h)
+        k4 = f(t + h * 0.8, y + (k1 * (44.0 / 45.0) - k2 * (56.0 / 15.0) + k3 * (32.0 / 9.0)) * h)
+        k5 = f(t + h * (8.0 / 9.0), y + (k1 * (19372.0 / 6561.0) - k2 * (25360.0 / 2187.0) + k3 * (64448.0 / 6561.0) - k4 * (212.0 / 729.0)) * h)
+        k6 = f(t + h, y + (k1 * (9017.0 / 3168.0) - k2 * (355.0 / 33.0) + k3 * (46732.0 / 5247.0) + k4 * (49.0 / 176.0) - k5 * (5103.0 / 18656.0)) * h)
+        fifth = y + (k1 * (35.0 / 384.0) + k3 * (500.0 / 1113.0) + k4 * (125.0 / 192.0) - k5 * (2187.0 / 6784.0) + k6 * (11.0 / 84.0)) * h
+        k7 = f(t + h, fifth)
+        fourth = y + (k1 * (5179.0 / 57600.0) + k3 * (7571.0 / 16695.0) + k4 * (393.0 / 640.0) - k5 * (92097.0 / 339200.0) + k6 * (187.0 / 2100.0) + k7 * (1.0 / 40.0)) * h
+        evaluations = evaluations + 7
+        // Error relative to the size of the state.
+        scale = 1.0 + abs(y).max()
+        err = abs(fifth - fourth).max() / scale
+        if err <= tol {
+            t = t + h
+            y = fifth
+            times.push(t)
+            for j in 0 until y.length() {
+                states.push(y[j])
+            }
+            accepted = accepted + 1
+        }
+        factor = if err == 0.0 { 5.0 } else { 0.9 * exp(ln(tol / err) / 5.0) }
+        h = h * (if factor < 0.2 { 0.2 } else if factor > 5.0 { 5.0 } else { factor })
+    }
+    solution(times, states, y0.length(), evaluations)
+}
+
+// ---------------------------------------------------------------- FFT
+
+/// A complex spectrum as real and imaginary parts.
+pub record Spectrum {
+    re: Array<Float>
+    im: Array<Float>
+}
+
+impl Spectrum {
+    fn magnitude(self) -> Array<Float> {
+        sqrt(self.re * self.re + self.im * self.im)
+    }
+
+    fn length(self) -> Int {
+        self.re.length()
+    }
+}
+
+fn power_of_two(n: Int) -> Bool {
+    mut k = 1
+    while k < n {
+        k = k * 2
+    }
+    k == n
+}
+
+/// Discrete Fourier transform of a complex signal (re, im); `sign` = -1 for
+/// the forward transform, +1 for the inverse (unscaled). Radix-2 Cooley–Tukey
+/// when the length is a power of two, the direct O(n²) sum otherwise.
+fn transform(re: Array<Float>, im: Array<Float>, sign: Float) -> Spectrum {
+    n = re.length()
+    if not power_of_two(n) {
+        mut out_re = zeros([n])
+        mut out_im = zeros([n])
+        for k in 0 until n {
+            mut sr = 0.0
+            mut si = 0.0
+            for j in 0 until n {
+                angle = sign * 2.0 * pi() * (((k * j) % n) as Float) / (n as Float)
+                sr = sr + re[j] * cos(angle) - im[j] * sin(angle)
+                si = si + re[j] * sin(angle) + im[j] * cos(angle)
+            }
+            out_re.set(k, sr)
+            out_im.set(k, si)
+        }
+        return Spectrum { re: out_re, im: out_im }
+    }
+    // Bit-reversal permutation, then butterflies.
+    mut ar = zeros([n])
+    mut ai = zeros([n])
+    mut bits = 0
+    while pow2(bits) < n {
+        bits = bits + 1
+    }
+    for i in 0 until n {
+        mut r = 0
+        mut v = i
+        for b in 0 until bits {
+            r = r * 2 + v % 2
+            v = v / 2
+        }
+        ar.set(r, re[i])
+        ai.set(r, im[i])
+    }
+    mut size = 2
+    while size <= n {
+        half = size / 2
+        for start in 0 until n / size {
+            base = start * size
+            for k in 0 until half {
+                angle = sign * 2.0 * pi() * (k as Float) / (size as Float)
+                wr = cos(angle)
+                wi = sin(angle)
+                p = base + k
+                q = p + half
+                tr = wr * ar[q] - wi * ai[q]
+                ti = wr * ai[q] + wi * ar[q]
+                ar.set(q, ar[p] - tr)
+                ai.set(q, ai[p] - ti)
+                ar.set(p, ar[p] + tr)
+                ai.set(p, ai[p] + ti)
+            }
+        }
+        size = size * 2
+    }
+    Spectrum { re: ar, im: ai }
+}
+
+fn pow2(k: Int) -> Int {
+    mut r = 1
+    for i in 0 until k {
+        r = r * 2
+    }
+    r
+}
+
+/// Spectrum of a real signal.
+pub fn fft(signal: Array<Float>) -> Spectrum {
+    transform(signal, zeros([signal.length()]), -1.0)
+}
+
+/// The real signal back from its spectrum.
+pub fn ifft(spectrum: Spectrum) -> Array<Float> {
+    back = transform(spectrum.re, spectrum.im, 1.0)
+    back.re / (spectrum.length() as Float)
+}
+
+/// Frequencies of the first n/2 + 1 bins for samples `dt` apart.
+pub fn frequencies(n: Int, dt: Float) -> Array<Float> {
+    linspace(0.0, 1.0 / (2.0 * dt), n / 2 + 1)
+}
+
+/// The first n/2 + 1 magnitudes, scaled so a unit sinusoid reads 1.
+pub fn amplitude(spectrum: Spectrum) -> Array<Float> {
+    n = spectrum.length()
+    mags = spectrum.magnitude()
+    mut out: List<Float> = []
+    for k in 0 to n / 2 {
+        out.push(mags[k] * (if k == 0 or k * 2 == n { 1.0 } else { 2.0 }) / (n as Float))
+    }
+    array(out)
+}
