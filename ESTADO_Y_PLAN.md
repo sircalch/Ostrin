@@ -276,7 +276,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Paquetes | `--project` usa `entry`; resolución transitiva de manifiestos con alias globales sin colisión; lockfiles deterministas con rutas relativas, versión y SHA-256 de `ostrin.toml`/fuentes `.ostrin`; Git solo mediante `--fetch`, con caché local y commit resuelto; builds normales reutilizan y validan el lock, `--locked` lo exige; sin registro remoto |
 | Rendimiento del intérprete | Tree‑walking simple; sin optimizaciones |
 | `newlines.ostrin`, `advanced.ostrin` | Son muestras de sintaxis, no programas ejecutables |
-| CI | Linux, macOS y Windows; incluye las pruebas diferenciales intérprete↔nativo, `cargo fmt --check` y Clippy `suspicious`; `security.yml` audita `Cargo.lock`, `codeql.yml` analiza Rust, `sanitizers.yml` ejecuta nativo/diferencial con AddressSanitizer + UBSan en Linux y `coverage.yml` genera cobertura bajo demanda/semanal; el backend nativo enlaza `libm` explícitamente en Unix para paquetes con `sqrt`/`round` |
+| CI | Linux, macOS y Windows; incluye las pruebas diferenciales intérprete↔nativo, `cargo fmt --check` y Clippy `suspicious`; `security.yml` audita `Cargo.lock`, `codeql.yml` analiza Rust, `sanitizers.yml` ejecuta nativo/diferencial con AddressSanitizer + UBSan en Linux y `coverage.yml` genera un resumen y un artefacto LCOV reproducibles (Rust 1.98.1, cargo-llvm-cov 0.9.1) bajo demanda/semanal; el backend nativo enlaza `libm` explícitamente en Unix para paquetes con `sqrt`/`round` |
 | Distribución | Workflow WASI reproducible para `ostrinc.wasm`, `hello.wasm`, `pkg_project.wasm`, un contrato de `args`/`env`, E/S de archivos y ownership gestionado, con toolchain fijado, ejecución bajo Node WASI y SHA-256; playground de navegador sobre el compilador WASM; workflow de release `v0.1.0` para Linux x86_64, macOS arm64 y Windows x64 que valida versión, checksums, archivos extraídos, `hello.ostrin` y un proyecto con dependencia `path`, y publica `docs/releases/v0.1.0.md` como notas; `v0.1.0` está publicada y `install-check.yml` instala la release con los instaladores Unix/PowerShell en Linux, macOS y Windows limpios y ejecuta `hello.ostrin`; canales externos y registry público siguen pendientes |
 
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
@@ -357,7 +357,8 @@ automáticas intérprete↔nativo sobre programas generados escalares y con owne
 iteraciones. `--native-type-report` y la prueba diferencial ya miden la cobertura del backend
 por archivo fuente y verifican la suma contra el total global. El siguiente incremento añade
 casos de compilación nativa y divergencia semántica sobre las mutaciones válidas antes de
-retirar más fallback AST; benchmarks (nativo vs intérprete) siguen pendientes.
+retirar más fallback AST; la cobertura ya deja resumen y LCOV por commit en Actions,
+pero los benchmarks nativo vs intérprete siguen pendientes.
 
 ### G. Producto
 **Homepage 3.0 (2026-09-24).** La portada muestra el estado de la release derivado de
