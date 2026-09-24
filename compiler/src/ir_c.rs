@@ -3,7 +3,7 @@
 //! The emitter consumes the explicit CFG rather than walking HIR a second time.
 //! SSA values become named C temporaries, branches become labels/gotos, and
 //! phi nodes select the incoming value using the predecessor edge. The first
-//! managed families supported here are `String`, scalar-element `List<T>`
+//! managed families supported here are `String`, scalar `Quantity`, scalar-element `List<T>`
 //! (including the `List<String>` values produced by `String.split()`/`lines()`),
 //! and the scalar-key/value core of `Map<K,V>`/`Set<T>`, plus scalar-payload
 //! `Result<T,E>` values such as `String.to_int()`/`to_float()`; wrappers can
@@ -16,7 +16,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::ast::{BinOp, UnaryOp};
 use crate::ir::{BlockId, IrFunction, IrInstr, IrTerminator, ValueId};
-use crate::types::Ty;
+use crate::types::{dim_div, dim_is_dimensionless, dim_mul, dim_pow, Ty};
 
 type Bail<T> = Result<T, ()>;
 type Values = HashMap<ValueId, (String, Ty)>;
@@ -124,6 +124,7 @@ fn c_type(ty: &Ty, records: &RecordFields) -> Bail<String> {
         Ty::Sized(kind) => kind.c_type().to_string(),
         Ty::Bool => "bool".to_string(),
         Ty::String => "const char*".to_string(),
+        Ty::Quantity(_) => "Qty".to_string(),
         Ty::List(element) if list_supported(element, records) => {
             format!("List_{}*", mangle_option_payload(element, records))
         }
@@ -174,8 +175,13 @@ fn scalar(ty: &Ty) -> bool {
     )
 }
 
+fn quantity(ty: &Ty) -> bool {
+    matches!(ty, Ty::Quantity(_))
+}
+
 fn supported(ty: &Ty, records: &RecordFields) -> bool {
     scalar(ty)
+        || quantity(ty)
         || record_name(ty, records).is_some()
         || matches!(ty, Ty::List(element) if list_supported(element, records))
         || matches!(ty, Ty::Map(key, value) if map_supported(key, value))
@@ -210,7 +216,7 @@ fn channel_supported(element: &Ty, records: &RecordFields) -> bool {
 }
 
 fn task_supported(result: &Ty, records: &RecordFields) -> bool {
-    supported(result, records)
+    !quantity(result) && supported(result, records)
 }
 
 fn option_supported(element: &Ty, records: &RecordFields) -> bool {
@@ -529,6 +535,9 @@ const OVERFLOW_ABORT: &str = "fprintf(stderr, \"runtime error: integer overflow\
 fn unary_code(op: UnaryOp, operand: &str, ty: &Ty) -> Bail<String> {
     match (op, ty) {
         (UnaryOp::Neg, Ty::Int | Ty::Float | Ty::Float32) => Ok(format!("(-{operand})")),
+        (UnaryOp::Neg, Ty::Quantity(_)) => {
+            Ok(format!("ostrin_qty_scale_mul({operand}, -1.0)"))
+        }
         (UnaryOp::Neg, Ty::Sized(kind)) if kind.is_signed() => Ok(format!(
             "({{ {c} __ostrin_ir_neg = {operand}; if (__ostrin_ir_neg == ({c}){min}) {{ {OVERFLOW_ABORT} }} ({c})(-(__int128)__ostrin_ir_neg); }})",
             c = kind.c_type(),
@@ -584,6 +593,92 @@ fn binary_code(
     ty: &Ty,
     equality: &mut HelperGenerator<'_>,
 ) -> Bail<String> {
+    if quantity(left_ty) || quantity(right_ty) {
+        let scalar_code = |code: &str, ty: &Ty| {
+            matches!(ty, Ty::Int | Ty::Float).then(|| format!("(double)({code})"))
+        };
+        return match (left_ty, right_ty) {
+            (Ty::Quantity(left_dim), Ty::Quantity(right_dim)) => match op {
+                BinOp::Add => Ok(format!("ostrin_qty_add({left}, {right})")),
+                BinOp::Sub => Ok(format!("ostrin_qty_sub({left}, {right})")),
+                BinOp::Mul => {
+                    let combined = dim_mul(left_dim, right_dim);
+                    let helper = if dim_is_dimensionless(&combined) {
+                        "ostrin_qty_mul_pure"
+                    } else {
+                        "ostrin_qty_mul"
+                    };
+                    if *ty != Ty::Quantity(combined) {
+                        return Err(());
+                    }
+                    Ok(format!("{helper}({left}, {right})"))
+                }
+                BinOp::Div => {
+                    let combined = dim_div(left_dim, right_dim);
+                    if dim_is_dimensionless(&combined) {
+                        if *ty != Ty::Float {
+                            return Err(());
+                        }
+                        Ok(format!("ostrin_qty_ratio({left}, {right})"))
+                    } else {
+                        if *ty != Ty::Quantity(combined) {
+                            return Err(());
+                        }
+                        Ok(format!("ostrin_qty_div({left}, {right})"))
+                    }
+                }
+                BinOp::Eq | BinOp::NotEq | BinOp::Lt | BinOp::Gt | BinOp::LtEq | BinOp::GtEq => {
+                    if *ty != Ty::Bool {
+                        return Err(());
+                    }
+                    let comparison = match op {
+                        BinOp::Eq => "== 0",
+                        BinOp::NotEq => "!= 0",
+                        BinOp::Lt => "< 0",
+                        BinOp::Gt => "> 0",
+                        BinOp::LtEq => "<= 0",
+                        BinOp::GtEq => ">= 0",
+                        _ => unreachable!(),
+                    };
+                    Ok(format!("(ostrin_qty_cmp({left}, {right}) {comparison})"))
+                }
+                _ => Err(()),
+            },
+            (Ty::Quantity(_), _) => {
+                let Some(scalar) = scalar_code(right, right_ty) else {
+                    return Err(());
+                };
+                match op {
+                    BinOp::Mul if *ty == *left_ty => {
+                        Ok(format!("ostrin_qty_scale_mul({left}, {scalar})"))
+                    }
+                    BinOp::Div if *ty == *left_ty => {
+                        Ok(format!("ostrin_qty_scale_div({left}, {scalar})"))
+                    }
+                    _ => Err(()),
+                }
+            }
+            (_, Ty::Quantity(right_dim)) => {
+                let Some(scalar) = scalar_code(left, left_ty) else {
+                    return Err(());
+                };
+                match op {
+                    BinOp::Mul if *ty == *right_ty => {
+                        Ok(format!("ostrin_qty_scale_mul({right}, {scalar})"))
+                    }
+                    BinOp::Div => {
+                        let expected = Ty::Quantity(dim_pow(right_dim, -1));
+                        if *ty != expected {
+                            return Err(());
+                        }
+                        Ok(format!("ostrin_scalar_div_qty({scalar}, {right})"))
+                    }
+                    _ => Err(()),
+                }
+            }
+            _ => Err(()),
+        };
+    }
     if let (Ty::Sized(left_kind), Ty::Sized(right_kind)) = (left_ty, right_ty) {
         if left_kind != right_kind {
             return Err(());
@@ -659,6 +754,7 @@ fn print_code(value: &str, ty: &Ty) -> Bail<String> {
         Ty::Sized(_) => format!("printf(\"%llu\\n\", (unsigned long long)({value}))"),
         Ty::Bool => format!("printf(\"%s\\n\", (({value}) ? \"true\" : \"false\"))"),
         Ty::String => format!("printf(\"%s\\n\", {value})"),
+        Ty::Quantity(_) => format!("ostrin_print_qty({value})"),
         _ => return Err(()),
     })
 }
@@ -769,11 +865,11 @@ fn emit_instruction(
             operand,
             ty,
         } => {
-            if !scalar(ty) || *ty == Ty::Void {
+            if (!scalar(ty) && !quantity(ty)) || *ty == Ty::Void {
                 return Err(());
             }
             let operand_ty = value_ty(values, *operand)?;
-            if !scalar(&operand_ty) {
+            if !scalar(&operand_ty) && !quantity(&operand_ty) {
                 return Err(());
             }
             let code = unary_code(*op, &value_code(values, *operand)?, &operand_ty)?;
@@ -786,7 +882,7 @@ fn emit_instruction(
             right,
             ty,
         } => {
-            if !scalar(ty) || *ty == Ty::Void {
+            if (!scalar(ty) && !quantity(ty)) || *ty == Ty::Void {
                 return Err(());
             }
             let left_ty = value_ty(values, *left)?;
@@ -794,7 +890,10 @@ fn emit_instruction(
             let structural_equality = matches!(op, BinOp::Eq | BinOp::NotEq)
                 && left_ty == right_ty
                 && supported(&left_ty, records);
-            if (!scalar(&left_ty) || !scalar(&right_ty)) && !structural_equality {
+            if (!scalar(&left_ty) && !quantity(&left_ty)
+                || !scalar(&right_ty) && !quantity(&right_ty))
+                && !structural_equality
+            {
                 return Err(());
             }
             let code = binary_code(
@@ -1613,7 +1712,7 @@ fn emit_instruction(
                     return Err(());
                 }
                 let arg_ty = value_ty(values, args[0])?;
-                if scalar(&arg_ty) {
+                if scalar(&arg_ty) || quantity(&arg_ty) {
                     print_code(&codes[0], &arg_ty)?
                 } else if supported(&arg_ty, records) {
                     // Collections, options and records print through the generated
@@ -2141,6 +2240,103 @@ fn emit_instruction(
                 let scope = scope.parse::<usize>().map_err(|_| ())?;
                 out.push_str(&format!(
                     "    ostrin_scope_end(__ostrin_ir_scope_{scope});\n"
+                ));
+            } else {
+                return Err(());
+            }
+        }
+        IrInstr::Opaque {
+            dst: Some(dst),
+            op,
+            inputs,
+            ty,
+        } if *ty == Ty::Bool
+            && inputs.len() == 3
+            && matches!(op.as_str(), "within<To>" | "within<Until>") =>
+        {
+            let value = inputs[0];
+            let start = inputs[1];
+            let end = inputs[2];
+            if !quantity(&value_ty(values, value)?)
+                || !quantity(&value_ty(values, start)?)
+                || !quantity(&value_ty(values, end)?)
+            {
+                return Err(());
+            }
+            let value = value_code(values, value)?;
+            let start = value_code(values, start)?;
+            let end = value_code(values, end)?;
+            let upper = if op == "within<To>" { "<= 0" } else { "< 0" };
+            out.push_str(&format!(
+                "    {} = (ostrin_qty_cmp({value}, {start}) >= 0 && ostrin_qty_cmp({value}, {end}) {upper});\n",
+                value_name(*dst)
+            ));
+        }
+        IrInstr::Opaque {
+            dst: Some(dst),
+            op,
+            inputs,
+            ty,
+        } if *ty == Ty::Bool && op == "approximately" && inputs.len() == 3 => {
+            let as_f64 = |value: ValueId| -> Bail<String> {
+                let code = value_code(values, value)?;
+                match value_ty(values, value)? {
+                    Ty::Quantity(_) => Ok(format!("({code}).v")),
+                    Ty::Int | Ty::Float => Ok(format!("(double)({code})")),
+                    _ => Err(()),
+                }
+            };
+            let value = as_f64(inputs[0])?;
+            let expected = as_f64(inputs[1])?;
+            let tolerance = as_f64(inputs[2])?;
+            out.push_str(&format!(
+                "    {} = (fabs(({value}) - ({expected})) <= ({tolerance}));\n",
+                value_name(*dst)
+            ));
+        }
+        IrInstr::Opaque {
+            dst: Some(dst),
+            op,
+            inputs,
+            ty,
+        } if quantity(ty) && inputs.len() == 1 => {
+            let input = inputs[0];
+            let source_ty = value_ty(values, input)?;
+            let source = value_code(values, input)?;
+            if let Some(unit) = op
+                .strip_prefix("unit<")
+                .and_then(|unit| unit.strip_suffix('>'))
+            {
+                let value = if quantity(&source_ty) {
+                    format!("({source}).v")
+                } else if scalar(&source_ty) {
+                    format!("(double)({source})")
+                } else {
+                    return Err(());
+                };
+                out.push_str(&format!(
+                    "    {} = ((Qty){{ {value}, {} }});\n",
+                    value_name(*dst),
+                    crate::codegen::c_string_literal(unit)
+                ));
+            } else if let Some(unit) = op
+                .strip_prefix("as<")
+                .and_then(|unit| unit.strip_suffix('>'))
+            {
+                let value = if quantity(&source_ty) {
+                    format!(
+                        "ostrin_convert(({source}).v, ({source}).u, {})",
+                        crate::codegen::c_string_literal(unit)
+                    )
+                } else if scalar(&source_ty) {
+                    format!("(double)({source})")
+                } else {
+                    return Err(());
+                };
+                out.push_str(&format!(
+                    "    {} = ((Qty){{ {value}, {} }});\n",
+                    value_name(*dst),
+                    crate::codegen::c_string_literal(unit)
                 ));
             } else {
                 return Err(());

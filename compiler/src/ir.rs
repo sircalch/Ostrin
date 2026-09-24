@@ -2162,11 +2162,18 @@ impl Builder {
                 self.lower_try(value, handler.as_deref(), &expression.ty)
             }
             HirKind::Within(value, unit) => {
-                let inputs = vec![self.lower_expr(value), self.lower_expr(unit)];
+                let value = self.lower_expr(value);
+                let (op, inputs) = match &unit.kind {
+                    HirKind::Range(start, kind, end, _) => (
+                        format!("within<{kind:?}>"),
+                        vec![value, self.lower_expr(start), self.lower_expr(end)],
+                    ),
+                    _ => ("within".to_string(), vec![value, self.lower_expr(unit)]),
+                };
                 let dst = self.fresh();
                 self.emit(IrInstr::Opaque {
                     dst: Some(dst),
-                    op: "within".to_string(),
+                    op,
                     inputs,
                     ty: expression.ty.clone(),
                 });

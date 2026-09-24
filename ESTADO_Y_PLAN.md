@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-24 · rama `main` · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 219 de integración y 2 unitarias en verde.*
+*Corte: 2026-09-24 · rama `main` · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 220 de integración y 2 unitarias en verde.*
 
 Validación remota: Pages y CI pasaron para `770e41c` en Windows, Linux, macOS y web. La
 compuerta oficial exige `cargo fmt --check`, Clippy con el lint `suspicious`, la suite del
@@ -19,7 +19,7 @@ del lenguaje, `docs/design/` (24 documentos). La auditoría del sitio vive en
 | **Implementado** | Compilador + intérprete (referencia semántica), checker con cantidades físicas, records/enums/traits/genéricos, `Option`/`Result`, colecciones, `Array<T>`, módulos y paquetes con lockfile, concurrencia cooperativa determinista, `--native-threads`, backend C con `--leak-check`, build WASI, playground WASM, LSP/DAP y extensión VS Code (VSIX local) |
 | **En fallback** | El backend nativo emite desde IR las familias cubiertas (§5); records/enums genéricos aplicados, iteradores indirectos, scopes anidados, handlers no lineales y agregados/escapes complejos caen de forma verificada a HIR y después al AST |
 | **Experimental** | Todo el lenguaje (versión 0.x, sin garantía de estabilidad); `--native-threads`; `std.viz` (visualización 2D/3D en SVG); paquetes científicos de ejemplo `tables`, `plot`, `autodiff` (modo directo); dependencias Git con `--fetch` |
-| **Pendiente** | Retirar el fallback AST, ownership completo, red, registry público, GPU, autodiff inverso, canales de distribución (Homebrew, winget, Scoop, Chocolatey, AUR), extensión en Marketplace |
+| **Pendiente** | Retirar el fallback AST, ownership completo, red, registry público, GPU, autodiff inverso, canales de distribución (Homebrew, winget, Scoop, Chocolatey, AUR), extensión en Marketplace y reconocimiento upstream de Ostrin en GitHub Linguist |
 | **Release** | [`v0.1.0`](https://github.com/sircalch/Ostrin/releases/tag/v0.1.0) publicada el 2026-09-24 con tres archivos (Linux x86_64, macOS ARM64, Windows x64) y sus `.sha256`; instaladores verificados contra ella en runners limpios (`install-check.yml`); workflows de CI, release y WASI en verde |
 
 ---
@@ -148,16 +148,17 @@ arrays, canales y tareas siguen fuera.
 Transpila a C con expresiones‑sentencia GNU (`({ … })`); compilador vía `OSTRIN_CC`.
 Monomorfización bajo demanda (funciones, records, enums, métodos, vtables, listas, mapas…).
 
-La primera familia de funciones ya se emite desde la IR explícita: funciones escalares y la
-familia gestionada `String` convierten temporales SSA en temporales C, preservan división
-entera, aritmética comprobada de enteros de ancho fijo, concatenación/comparación/impresión
+La primera familia de funciones ya se emite desde la IR explícita: funciones escalares, la
+familia gestionada `String` y la familia escalar de `Quantity` convierten temporales SSA en
+temporales C, preservan división entera, aritmética comprobada de enteros de ancho fijo,
+concatenación/comparación/impresión
 de texto y salida numérica, emiten ramas, recursión, bucles con estado y `phi`, y se cuentan
 por separado en `--native-type-report` como `ir-generated`; el mismo informe expone ahora
 `hir-generated` y `ast-fallback` para que la retirada del backend legado tenga un contador
 visible. También publica líneas `native-source` agrupadas por archivo para localizar la deuda
 por módulo; la prueba diferencial comprueba que sus sumas coinciden con el total. En el corte
-actual, la suite de ejemplos suma 913 funciones IR, 457 HIR y 1 432 que aún caen al emisor
-AST; `native_backend_types_agree_with_the_checker` mantiene 1 432 como trinquete y debe bajar
+actual, la suite de ejemplos suma 927 funciones IR, 457 HIR y 1 418 que aún caen al emisor
+AST; `native_backend_types_agree_with_the_checker` mantiene 1 418 como trinquete y debe bajar
 cuando una familia migre. Los marcadores de ownership de
 `String`, `List<T>`, los núcleos escalares de `Map<K,V>`/`Set<T>` y `Option<T>` con payload
 escalar o `String` también se consumen al generar C; `Map.get/remove` producen structs
@@ -280,8 +281,8 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
 convendría dividirlos; el backend nativo no comparte el sistema de tipos del checker
-(ya consume los tipos del checker y compara cada nodo; el informe actual suma **913 funciones
-generadas desde IR, 457 desde HIR y 1 432 en fallback AST** en los ejemplos, con un trinquete
+(ya consume los tipos del checker y compara cada nodo; el informe actual suma **927 funciones
+generadas desde IR, 457 desde HIR y 1 418 en fallback AST** en los ejemplos, con un trinquete
 que impide que el fallback aumente sin justificación; las familias migradas incluyen escalares,
 `String`, records concretos, `Option<Record>`, `List<T>` escalar, `Map`/`Set` escalares, `Option`
 escalar/String y patrones `Some/None`, `Float32`, enteros de ancho fijo, records, enums, `match`,
@@ -381,7 +382,13 @@ diagnósticos JSON reales con código, ubicación, severidad y mensaje, y selecc
 diagnosticada en el editor. La versión y las métricas públicas ahora salen de
 `scripts/site-facts.mjs`/`website/site-data.js`, con una comprobación de frescura en CI. Siguiente:
 prueba responsive móvil con viewport dedicado y mejora incremental del learning funnel.
-La gramática para Linguist queda separada porque requiere uso público suficiente.
+La gramática para Linguist queda separada porque requiere uso público suficiente. El objetivo
+del siguiente ciclo es preparar y enviar la definición de Ostrin a `github/linguist`: muestras
+`.ostrin` representativas, extensión y color, reglas de comentarios/cadenas, detección de
+shebang cuando aplique y una prueba local con `github-linguist`. La configuración del
+repositorio para clasificar `.ostrin` se activará después de que Linguist acepte el nombre;
+así el mapa de lenguajes de GitHub mostrará Ostrin de forma estable y no una clasificación
+local que diverja del catálogo oficial.
 
 ---
 
@@ -394,13 +401,15 @@ La gramática para Linguist queda separada porque requiere uso público suficien
 | **3** | A.2, A.5 + gestión de memoria | Backend nativo robusto y eficiente |
 | **4** | B (concurrencia real) | Cumple la promesa de «concurrencia segura por defecto» |
 | **5** | E (WASM) + G (playground) | Difusión |
+| **6** | Definición upstream para GitHub Linguist, validación local y clasificación de `.ostrin` tras la aceptación | Ostrin visible como lenguaje en GitHub |
 
 Plan activo (2026-09-24): los bloques de release `v0.1.0`, homepage 3.0 y la compuerta inicial
 de calidad están cerrados en `main`. P5 añade auditoría de dependencias, CodeQL, sanitizers
 nativos y cobertura reproducible; después el siguiente ciclo vuelve al núcleo (retirada del
 fallback AST, ownership completo) con las brechas que expuso el Scientific Lab: `as` con
 unidades compuestas y simplificación de unidades derivadas en la salida (§6). GPU,
-autodiff inverso, registry público y red siguen fuera.
+autodiff inverso, registry público, red y la propuesta de Linguist siguen fuera hasta cerrar
+sus evidencias y validación upstream.
 
 ---
 
@@ -408,7 +417,7 @@ autodiff inverso, registry público y red siguen fuera.
 
 ```powershell
 cd compiler
-    cargo test                                   # 6 diferenciales + 219 de integración + 2 unitarias
+    cargo test                                   # 6 diferenciales + 220 de integración + 2 unitarias
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```

@@ -23,9 +23,9 @@ language. The actual Ostrin source files are the `.ostrin` programs in
 | `vscode-ostrin/` | VS Code tooling for the Ostrin language |
 
 GitHub Linguist does not yet know `Ostrin` as an official language, so the
-language bar cannot display it as a new category until Ostrin is accepted into
-that upstream catalog. The project will submit a Linguist definition once the
-language has enough public usage and its syntax/tooling are stable.
+language bar cannot display it as a stable category yet. The roadmap now includes
+the upstream submission: representative `.ostrin` samples, a language definition,
+local Linguist validation, and repository classification after acceptance.
 
 ## Why Ostrin?
 
@@ -46,7 +46,7 @@ traits, pattern matching, quantities and two concurrency modes: deterministic
 cooperative scheduling by default, plus opt-in native threads for compiled
 programs.
 
-The compiler suite currently passes **219 integration tests, 2 unit tests and 6 differential
+The compiler suite currently passes **220 integration tests, 2 unit tests and 6 differential
 interpreter↔native tests**. Function calls
 support named/default arguments, scalar and `String` collection lookups preserve `Option<T>`
 through the native IR path; concrete records and simple `Option<Record>` values
