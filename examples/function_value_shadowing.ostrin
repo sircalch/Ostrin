@@ -1,0 +1,18 @@
+// A function-typed parameter or local shadows a global function of the same name.
+fn f(x: Float) -> Float {
+    x * 10.0
+}
+
+fn combine(f: fn(Float, Float) -> Float, a: Float, b: Float) -> Float {
+    f(a, b)
+}
+
+fn add(a: Float, b: Float) -> Float {
+    a + b
+}
+
+fn main() -> Void {
+    print(f(2.0))
+    print(combine(add, 2.0, 3.0))
+    print(combine(fn(a, b) { a * b }, 2.0, 3.0))
+}

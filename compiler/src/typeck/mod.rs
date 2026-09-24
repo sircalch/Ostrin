@@ -2603,6 +2603,9 @@ impl Checker {
             // A function-typed parameter of a plain (non-generic) user function tells a lambda argument its types.
             let expected = expected.or_else(|| {
                 let Expr::Ident(name) = callee.unlocated() else { return None };
+                if scope.contains_key(name) {
+                    return None;
+                }
                 let sig = self.functions.get(name)?.clone();
                 if !sig.generics.is_empty() {
                     return None;
@@ -2623,7 +2626,10 @@ impl Checker {
             })
             .collect();
 
-        if let Expr::Ident(name) = callee.unlocated() {
+        // A local binding (such as a function-typed parameter) shadows global functions and
+        // built-ins of the same name; it is called through its value below.
+        let shadowed = matches!(callee.unlocated(), Expr::Ident(name) if scope.contains_key(name));
+        if let (Expr::Ident(name), false) = (callee.unlocated(), shadowed) {
             if let Some(return_type) = check_builtin_call(
                 name,
                 &arg_types,
@@ -2757,7 +2763,15 @@ impl Checker {
 
         let callee_ty = self.infer_expr(callee, scope);
         match callee_ty {
-            Ty::Fn(_, ret) => *ret,
+            Ty::Fn(params, ret) => {
+                if params.len() != args.len() {
+                    self.push(
+                        "E1041",
+                        format!("Function value expects {} argument(s), got {}.", params.len(), args.len()),
+                    );
+                }
+                *ret
+            }
             _ => Ty::Unknown,
         }
     }

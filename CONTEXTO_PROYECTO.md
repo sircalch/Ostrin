@@ -6589,3 +6589,21 @@ salida registrada, y todos los sliders en sus extremos recalculan sin errores. L
 Playwright (6 pruebas, ejecutada localmente con Chrome) cubre el Lab, el Cookbook, la navegación y
 el desbordamiento en 390/768 px de las 12 páginas. La suite Rust: 2 unitarias, 6 diferenciales y
 201 de integración.
+
+## 269. Parámetros función que sombrean funciones globales — 2026-09-24
+
+Encontrado al escribir el Lab de autodiff: con un `fn f` global, `fn combine(f: fn(Float, Float)
+-> Float, ...)` fallaba con E1041 en `f(a, b)`, también dentro de un paquete importado
+(`autodiff.gradient2(f: ...)`). El checker resolvía primero builtins y `self.functions`, y el
+intérprete hacía lo mismo en `eval_call`, así que ambos llamaban a la función global. El emisor
+nativo ya resolvía bien (`4`).
+
+Ahora un binding local tiene prioridad: `check_call` comprueba `scope.contains_key(name)` antes de
+builtins, constructores y funciones globales (también para inferir el tipo esperado de lambdas),
+y `eval_call` usa `env.contains(name)`. Las funciones globales no viven en `Env` (el closure se
+crea al evaluarlas como valor), así que ese test solo acierta con bindings locales reales. Las
+llamadas a través de un valor función comprueban además el número de argumentos (E1041).
+
+Pruebas: `function_value_shadowing.ostrin` (20, 5, 6; paridad nativa con `live_allocations=0`)
+y `function_value_arity_errors.ostrin`, más una prueba de integración exacta. Suite: 2
+unitarias, 6 diferenciales y 202 de integración. Las salidas del Lab no cambian.

@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-24 · rama `main` · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 201 de integración y 2 unitarias en verde.*
+*Corte: 2026-09-24 · rama `main` · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 202 de integración y 2 unitarias en verde.*
 
 Validación remota: Pages y CI pasaron para `8bc24bd` en Windows, Linux, macOS y web. La
 prueba de hilos nativos valida los pares concurrentes sin imponer un orden del planificador
@@ -255,7 +255,6 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Biblioteca estándar | Incluye `std.math`, `std.lists`, `std.strings` (incluidos `trim`, `split`, `lines`, `is_blank`, `format_text`, `format_float`, `char_at`, `slice` y `codepoint`), `std.time` (calendario gregoriano determinista, validación, ordinales, día de semana, ISO y `Result` de parseo), `std.json` (DOM, parser/serializer estricto y Unicode), `std.args`, `std.env` y `std.maps` (consultas genéricas de `Map<K,V>` con `Hash + Eq`); red sigue pendiente |
 | Mensajes de error de E/S | `strerror` ≠ texto de Rust (difieren entre backends) |
 | Unidades | `q as unidad` convierte desde 2026-09-24 (antes solo reetiquetaba); `as` acepta un único identificador de unidad (`as m / s` falla en ejecución); las unidades derivadas se imprimen sin simplificar (`m/s*s`); `unit`/`define` definidos por el usuario están especificados pero no implementados |
-| Resolución de nombres | Un parámetro de tipo función no sombrea a una función global homónima: `fn twice(f: fn(Float, Float) -> Float, ...)` con un `fn f` global da E1041 |
 | `Result<Void,E>` | Campo de valor de relleno (`char`) en C |
 | Migración HIR/IR | HIR cubre escalares, records, enums/match, Option/Result, colecciones, cierres y formas genéricas; la IR/C ya emite instancias concretas soportadas de funciones y métodos genéricos (incluidos casos recursivos), closures anidadas con capturas transitivas y ownership de entornos, con paridad y leak-check; records/enums genéricos aplicados y retornos complejos conservan el fallback verificado |
 | Paquetes | `--project` usa `entry`; resolución transitiva de manifiestos con alias globales sin colisión; lockfiles deterministas con rutas relativas, versión y SHA-256 de `ostrin.toml`/fuentes `.ostrin`; Git solo mediante `--fetch`, con caché local y commit resuelto; builds normales reutilizan y validan el lock, `--locked` lo exige; sin registro remoto |
@@ -376,8 +375,8 @@ La gramática para Linguist queda separada porque requiere uso público suficien
 Plan activo (2026-09-24): los bloques de release `v0.1.0` y homepage 3.0 están cerrados. El
 siguiente ciclo vuelve al núcleo (retirada del fallback AST, ownership completo) con las
 brechas que expuso el Scientific Lab: `as` con unidades compuestas, simplificación de unidades
-derivadas en la salida y el sombreado de funciones globales por parámetros función (§6). GPU,
-autodiff inverso, registry público y red siguen fuera.
+derivadas en la salida (§6); el sombreado de funciones globales por parámetros función ya está
+corregido. GPU, autodiff inverso, registry público y red siguen fuera.
 
 ---
 
@@ -385,7 +384,7 @@ autodiff inverso, registry público y red siguen fuera.
 
 ```powershell
 cd compiler
-    cargo test                                   # 6 diferenciales + 201 de integración + 2 unitarias
+    cargo test                                   # 6 diferenciales + 202 de integración + 2 unitarias
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```

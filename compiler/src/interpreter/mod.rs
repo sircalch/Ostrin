@@ -2381,7 +2381,13 @@ impl Interpreter {
         env: &Env,
         explicit_type_args: Option<&[Type]>,
     ) -> EvalResult {
-        if let Expr::Ident(name) = callee {
+        // A local binding (such as a function-typed parameter) shadows global functions and
+        // built-ins of the same name, so it is called through its value below.
+        let global_callee = match callee {
+            Expr::Ident(name) if !env.contains(name) => Some(name),
+            _ => None,
+        };
+        if let Some(name) = global_callee {
             match name.as_str() {
                 "print" => {
                     let v = self.eval_arg(&args[0], env)?;

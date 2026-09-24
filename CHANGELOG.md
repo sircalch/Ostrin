@@ -3,6 +3,12 @@
 ## Unreleased
 
 ### Compiler
+- A local binding now shadows a global function or built-in of the same name when called.
+  `fn combine(f: fn(Float, Float) -> Float, ...)` next to a global `fn f` failed with E1041 in the
+  checker and at runtime in the interpreter, including across packages (the `autodiff` package's
+  `gradient2(f: ...)`). Calls through a function value now also check the argument count
+  (E1041). Covered by `function_value_shadowing.ostrin` (interpreter/native parity) and
+  `function_value_arity_errors.ostrin`.
 - Fixed `quantity as unit`: it relabelled the value instead of converting it (`1500 m as km`
   printed `1500 km`), contradicting design document 01 §3.4. The interpreter and the native AST
   emitter now convert through the unit factors (`1.5 km`); `examples/unit_conversion.ostrin` is

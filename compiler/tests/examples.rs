@@ -5324,3 +5324,15 @@ fn as_converts_quantities_into_the_target_unit() {
         "1.5 km\n2.5 m\n1.5 h\n40 m/s*s\n0.04 km\n40 m\n3 nm\ntrue\n"
     );
 }
+
+#[test]
+fn function_typed_parameters_shadow_global_functions() {
+    // `f` inside `combine` is the two-argument parameter, not the global `fn f`.
+    let out = run(&["--run", &example_path("function_value_shadowing.ostrin")]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    assert_eq!(stdout(&out).replace("\r\n", "\n"), "20\n5\n6\n");
+
+    let rejected = run(&["--check", &example_path("function_value_arity_errors.ostrin")]);
+    assert!(!rejected.status.success());
+    assert!(stderr(&rejected).contains("OSTRIN-E1041") || stdout(&rejected).contains("OSTRIN-E1041"));
+}

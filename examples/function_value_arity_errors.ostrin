@@ -1,0 +1,8 @@
+// Calling a function value with the wrong number of arguments is rejected by the checker.
+fn apply(g: fn(Float) -> Float, x: Float) -> Float {
+    g(x, x)
+}
+
+fn main() -> Void {
+    print(apply(fn(x) { x }, 1.0))
+}
