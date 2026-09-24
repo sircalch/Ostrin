@@ -2,7 +2,44 @@
 
 ## Unreleased
 
+### Visualization: std.viz 0.1
+- New standard-library module `std.viz`, written in Ostrin: 2D figures (line, scatter, area,
+  band, error bars, bars, histogram, stairs, reference lines, notes, heatmap with colorbar,
+  marching-squares contours), 3D scenes (shaded surfaces with painter's algorithm and directional
+  light, wireframes, trajectories colored along time, point clouds) and `viz.grid` layouts, all
+  rendered to deterministic SVG. 1-2-5 ticks, legends placed in the emptiest corner, light and
+  dark themes, viridis/magma/coolwarm/ocean colormaps. Design document 23.
+- Unit-aware plots: `quantity_line`/`quantity_scatter` take `List<Quantity<D>>` and label the axes
+  with the data's units (`speed [km/h]`).
+- Ten gallery programs (`examples/viz_*.ostrin`) plus `lab_plot` and `lab_surface`; every one is
+  byte-identical between the interpreter and native C in the differential test.
+
+### Units
+- Canonical unit algebra: `kg*m/s*m/s` prints `kg*m^2/s^2`, same-dimension units cancel
+  (`90 km/h * 30 min` is `45 km`). This also fixes wrong factors for strings such as `km/h*h`,
+  which the left-to-right parser read as `(km/h)*h`.
+- `as` takes compound units (`v as km/h`, `g as m/s^2`) and checks the dimension (new E1026).
+- Unit literals accept `m^2` and negative exponents, and only absorb known unit symbols after
+  `*`/`/` (`8 m / t` divides by the variable `t`).
+- New units: `um ns us day ug mA umol mL Hz kHz N kN J kJ cal kcal W kW Pa kPa bar atm mmHg C V mV
+  ohm`; `atm` is 101 325 Pa (it was 1 Pa). Named dimensions (`Velocity`, `Force`, `Energy`,
+  `Pressure`, `Power`, …) expand to base dimensions; diagnostics print `Mass*Length^2/Time^2 (Energy)`.
+- `q.value()` and `q.unit()` expose a quantity's number and unit.
+
 ### Compiler
+- Scientific notation for Float literals (`6.022e23`, `1e-9`, `2.5E+3`).
+- Interpreter: a function body ran in a child of the caller's environment, so `h = ...` in a
+  callee rebound the caller's `h`. Functions now get a fresh scope.
+- Methods accept named and default arguments in the checker, the interpreter (which bound them by
+  position) and natively for generic methods; defaults are typed where they are declared.
+- Module rewriting no longer replaces a parameter or local that shares its name with a function
+  of the module.
+- Native: an owned expression statement was emitted twice (`c.add(1).add(2)` ran each call twice);
+  fresh receivers and arguments of method calls are released; an assignment inside a loop or branch
+  retains and releases like one at function level (it used to alias a freed value).
+- Generic methods infer dimension parameters (`Quantity<X>`), empty `[]` in a record field takes
+  the field's type, and `String.slice`/`char_at`/`codepoint` are typed. The HIR and typed-expression
+  ratchets drop from 26 and 11 to 19 and 8 unknowns.
 - A local binding now shadows a global function or built-in of the same name when called.
   `fn combine(f: fn(Float, Float) -> Float, ...)` next to a global `fn f` failed with E1041 in the
   checker and at runtime in the interpreter, including across packages (the `autodiff` package's
@@ -15,6 +52,15 @@
   covered by an exact-output test and by the interpreter/native differential test. A pure
   number still receives the unit (`3 as nm`).
 - `ostrinc --help` now lists `--test`.
+
+### Website: Ostrin Viz
+- New `viz.html` gallery: ten figures recorded by `ostrinc.wasm` (`website/assets/viz/*.svg`,
+  checked for drift by `scripts/lab-data.mjs`) with their source and a Run live button that
+  recomputes them in the page. The page renders even when the compiler runtime cannot load.
+- Scientific Lab: the Plot tab uses `std.viz`, and a new 3D tab rotates and recomputes a shaded
+  surface. The homepage gains a Visualization section, and every page links to Viz.
+- `lab-data.mjs` runs each program in its own Node process: repeated WebAssembly instances in one
+  process crashed Node once the heavier figures were added.
 
 ### Website: homepage 3.0 and Scientific Lab
 - New homepage: "Scientific-first. General-purpose. Native by design.", with the release status

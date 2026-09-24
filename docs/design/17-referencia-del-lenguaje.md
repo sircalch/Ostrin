@@ -33,7 +33,8 @@ Convención (no impuesta por el compilador, pero sí por `derive`/mensajes de er
 
 ```text
 INT_LITERAL   := dígito ('_'? dígito)*
-FLOAT_LITERAL := dígito ('_'? dígito)* '.' dígito ('_'? dígito)*
+FLOAT_LITERAL := dígito ('_'? dígito)* ('.' dígito ('_'? dígito)*)? EXPONENT?   (al menos '.' o EXPONENT)
+EXPONENT      := ('e' | 'E') ('+' | '-')? dígito+
 ```
 
 El `_` opcional como separador visual de miles (`1_000_000`) no cambia el valor — es puramente legibilidad, común en código científico con números grandes.
@@ -53,10 +54,16 @@ Escapes estándar dentro de `CHAR_LITERAL`/`STRING_LITERAL`: `\n`, `\t`, `\\`, `
 ```text
 UNIT_LITERAL := (INT_LITERAL | FLOAT_LITERAL) WS unit_expr
 unit_expr    := unit_atom (('*' | '/') unit_atom)*
-unit_atom    := IDENT ('^' INT_LITERAL)?
+unit_atom    := IDENT ('^' '-'? INT_LITERAL)?
 ```
 
-`WS` (al menos un espacio) es obligatorio entre el número y la unidad.
+`WS` (al menos un espacio) es obligatorio entre el número y la unidad. Todo `unit_expr` va en la
+misma línea, y tras `*` o `/` solo se absorbe un **símbolo de unidad conocido**: `8 m / t` divide
+por la variable `t`. Los literales científicos (`6.022e23`, `1e-9`, `532e-9 m`) son `Float`
+(añadidos el 2026-09-24).
+
+`as` admite la misma forma a la derecha: `v as km/h`, `g as m/s^2`. La conversión exige la misma
+dimensión (E1026). Catálogo de unidades y dimensiones derivadas con nombre: documento 01, §3.6.
 
 ---
 

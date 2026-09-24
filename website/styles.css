@@ -447,7 +447,7 @@ h4 { font-size: .86rem; }
 .sl-output-text { margin: 0 0 12px; color: #e3e3f2; font: .74rem/1.7 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
 .sl-figure { margin: 0 0 16px; }
 .sl-figure figcaption { margin-top: 6px; color: var(--muted-2); font: .64rem var(--mono); }
-.sl-svg { display: block; width: 100%; max-width: 480px; height: auto; border-radius: 3px; }
+.sl-svg { display: block; width: 100%; max-width: 640px; height: auto; border-radius: 3px; }
 .sl-chart { display: block; width: 100%; height: auto; }
 .sl-chart .axis { stroke: var(--muted-2); stroke-width: 1; }
 .sl-chart .zero { stroke: var(--line); stroke-dasharray: 3 4; }
@@ -526,4 +526,36 @@ button.button-quiet, button.button { cursor: pointer; } button.button-quiet { ba
 @media (max-width: 720px) {
   .reference-list, .flag-list { grid-template-columns: minmax(0, 1fr); }
   .flag-list div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+}
+
+/* Ostrin Viz gallery */
+.viz-intro { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 32px; align-items: start; }
+.viz-steps { display: grid; gap: 22px; }
+.viz-steps article { padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+.viz-steps h2 { margin: 6px 0 6px; font-size: 1.2rem; font-weight: 560; letter-spacing: -.02em; }
+.viz-steps p { margin: 0; }
+.viz-snippet .sl-code { max-height: none; }
+.viz-gallery, .viz-matrix { margin-top: 48px; }
+.viz-gallery { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
+.viz-card { display: flex; flex-direction: column; min-width: 0; background: var(--night-2); border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+.viz-frame { display: block; background: #fff; border-bottom: 1px solid var(--line); }
+.viz-image { display: block; width: 100%; height: auto; }
+.viz-body { display: grid; gap: 10px; padding: 16px 18px 18px; }
+.viz-body h3 { margin: 0; font-size: 1.05rem; font-weight: 560; }
+.viz-body p { margin: 0; }
+.viz-body .sl-actions { padding: 0; border: 0; }
+.viz-printed { margin: 0; color: var(--green); font: .7rem/1.6 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+.viz-code summary { cursor: pointer; color: var(--muted); font: .7rem var(--mono); }
+.viz-code .sl-code { margin-top: 8px; max-height: 22rem; border: 1px solid var(--line); }
+.viz-matrix { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; margin-bottom: 18px; }
+.viz-matrix article { padding: 18px 20px; background: var(--night-2); border: 1px solid var(--line); border-radius: 4px; }
+.viz-matrix h3 { margin: 0 0 10px; font-size: 1rem; }
+.viz-matrix ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: .9rem; }
+.viz-matrix li + li { margin-top: 5px; }
+.home-viz { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 26px; }
+.home-viz figure { margin: 0; background: #fff; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+.home-viz img { display: block; width: 100%; height: auto; }
+.home-viz figcaption { padding: 8px 10px; background: var(--night-2); color: var(--muted); font: .66rem var(--mono); }
+@media (max-width: 860px) {
+  .viz-intro, .viz-gallery, .viz-matrix, .home-viz { grid-template-columns: minmax(0, 1fr); }
 }

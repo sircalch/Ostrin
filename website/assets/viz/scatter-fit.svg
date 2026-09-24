@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
+<rect width="640" height="400" fill="#ffffff"/>
+
+<text x="66" y="26" text-anchor="start" font-size="16" fill="#1f2937" font-weight="600">Sensor calibration</text>
+<text x="66" y="45" text-anchor="start" font-size="12" fill="#6b7280">least-squares fit with a ±2σ band</text>
+<defs><clipPath id="clip1790514776951460417"><rect x="66" y="62" width="554" height="286"/></clipPath></defs>
+<line x1="104.69" y1="62" x2="104.69" y2="348" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="104.69" y1="348" x2="104.69" y2="353" stroke="#9ca3af" stroke-width="1"/>
+<text x="104.69" y="366" text-anchor="middle" font-size="11" fill="#6b7280">1</text>
+<line x1="160.76" y1="62" x2="160.76" y2="348" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="160.76" y1="348" x2="160.76" y2="353" stroke="#9ca3af" stroke-width="1"/>
+<text x="160.76" y="366" text-anchor="middle" font-size="11" fill="#6b7280">2</text>
+<line x1="216.84" y1="62" x2="216.84" y2="348" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="216.84" y1="348" x2="216.84" y2="353" stroke="#9ca3af" stroke-width="1"/>
+<text x="216.84" y="366" text-anchor="middle" font-size="11" fill="#6b7280">3</text>
+<line x1="272.91" y1="62" x2="272.91" y2="348" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="272.91" y1="348" x2="272.91" y2="353" stroke="#9ca3af" stroke-width="1"/>
+<text x="272.91" y="366" text-anchor="middle" font-size="11" fill="#6b7280">4</text>
+<line x1="328.98" y1="62" x2="328.98" y2="348" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="328.98" y1="348" x2="328.98" y2="353" stroke="#9ca3af" stroke-width="1"/>
+<text x="328.98" y="366" text-anchor="middle" font-size="11" fill="#6b7280">5</text>
+<line x1="385.05" y1="62" x2="385.05" y2="348" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="385.05" y1="348" x2="385.05" y2="353" stroke="#9ca3af" stroke-width="1"/>
+<text x="385.05" y="366" text-anchor="middle" font-size="11" fill="#6b7280">6</text>
+<line x1="441.13" y1="62" x2="441.13" y2="348" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="441.13" y1="348" x2="441.13" y2="353" stroke="#9ca3af" stroke-width="1"/>
+<text x="441.13" y="366" text-anchor="middle" font-size="11" fill="#6b7280">7</text>
+<line x1="497.2" y1="62" x2="497.2" y2="348" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="497.2" y1="348" x2="497.2" y2="353" stroke="#9ca3af" stroke-width="1"/>
+<text x="497.2" y="366" text-anchor="middle" font-size="11" fill="#6b7280">8</text>
+<line x1="553.27" y1="62" x2="553.27" y2="348" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="553.27" y1="348" x2="553.27" y2="353" stroke="#9ca3af" stroke-width="1"/>
+<text x="553.27" y="366" text-anchor="middle" font-size="11" fill="#6b7280">9</text>
+<line x1="609.35" y1="62" x2="609.35" y2="348" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="609.35" y1="348" x2="609.35" y2="353" stroke="#9ca3af" stroke-width="1"/>
+<text x="609.35" y="366" text-anchor="middle" font-size="11" fill="#6b7280">10</text>
+<line x1="66" y1="289.94" x2="620" y2="289.94" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="61" y1="289.94" x2="66" y2="289.94" stroke="#9ca3af" stroke-width="1"/>
+<text x="58" y="293.94" text-anchor="end" font-size="11" fill="#6b7280">5</text>
+<line x1="66" y1="225.98" x2="620" y2="225.98" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="61" y1="225.98" x2="66" y2="225.98" stroke="#9ca3af" stroke-width="1"/>
+<text x="58" y="229.98" text-anchor="end" font-size="11" fill="#6b7280">10</text>
+<line x1="66" y1="162.02" x2="620" y2="162.02" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="61" y1="162.02" x2="66" y2="162.02" stroke="#9ca3af" stroke-width="1"/>
+<text x="58" y="166.02" text-anchor="end" font-size="11" fill="#6b7280">15</text>
+<line x1="66" y1="98.06" x2="620" y2="98.06" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="61" y1="98.06" x2="66" y2="98.06" stroke="#9ca3af" stroke-width="1"/>
+<text x="58" y="102.06" text-anchor="end" font-size="11" fill="#6b7280">20</text>
+<g clip-path="url(#clip1790514776951460417)">
+<path d="M76.65 293.86 L90.31 288.25 L103.97 282.64 L117.63 277.03 L131.29 271.41 L144.95 265.8 L158.61 260.19 L172.27 254.58 L185.92 248.97 L199.58 243.35 L213.24 237.74 L226.9 232.13 L240.56 226.52 L254.22 220.91 L267.88 215.3 L281.54 209.68 L295.19 204.07 L308.85 198.46 L322.51 192.85 L336.17 187.24 L349.83 181.62 L363.49 176.01 L377.15 170.4 L390.81 164.79 L404.46 159.18 L418.12 153.57 L431.78 147.95 L445.44 142.34 L459.1 136.73 L472.76 131.12 L486.42 125.51 L500.08 119.89 L513.73 114.28 L527.39 108.67 L541.05 103.06 L554.71 97.45 L568.37 91.84 L582.03 86.22 L595.69 80.61 L609.35 75 L609.35 116.14 L595.69 121.75 L582.03 127.36 L568.37 132.97 L554.71 138.59 L541.05 144.2 L527.39 149.81 L513.73 155.42 L500.08 161.03 L486.42 166.65 L472.76 172.26 L459.1 177.87 L445.44 183.48 L431.78 189.09 L418.12 194.7 L404.46 200.32 L390.81 205.93 L377.15 211.54 L363.49 217.15 L349.83 222.76 L336.17 228.38 L322.51 233.99 L308.85 239.6 L295.19 245.21 L281.54 250.82 L267.88 256.43 L254.22 262.05 L240.56 267.66 L226.9 273.27 L213.24 278.88 L199.58 284.49 L185.92 290.11 L172.27 295.72 L158.61 301.33 L144.95 306.94 L131.29 312.55 L117.63 318.16 L103.97 323.78 L90.31 329.39 L76.65 335 Z" fill="#2563eb" fill-opacity="0.2" stroke="none"/>
+<g fill="#dc2626" fill-opacity="0.78" stroke="#ffffff" stroke-width="0.6"><circle cx="76.65" cy="307.74" r="3.5"/><circle cx="90.31" cy="318.51" r="3.5"/><circle cx="103.97" cy="304.68" r="3.5"/><circle cx="117.63" cy="298.14" r="3.5"/><circle cx="131.29" cy="284.38" r="3.5"/><circle cx="144.95" cy="282.12" r="3.5"/><circle cx="158.61" cy="287.34" r="3.5"/><circle cx="172.27" cy="263.15" r="3.5"/><circle cx="185.92" cy="260.2" r="3.5"/><circle cx="199.58" cy="281.4" r="3.5"/><circle cx="213.24" cy="260.78" r="3.5"/><circle cx="226.9" cy="254.94" r="3.5"/><circle cx="240.56" cy="245.69" r="3.5"/><circle cx="254.22" cy="237.54" r="3.5"/><circle cx="267.88" cy="235.77" r="3.5"/><circle cx="281.54" cy="233.95" r="3.5"/><circle cx="295.19" cy="215.61" r="3.5"/><circle cx="308.85" cy="228.64" r="3.5"/><circle cx="322.51" cy="235.44" r="3.5"/><circle cx="336.17" cy="195.92" r="3.5"/><circle cx="349.83" cy="193.89" r="3.5"/><circle cx="363.49" cy="223.48" r="3.5"/><circle cx="377.15" cy="181.53" r="3.5"/><circle cx="390.81" cy="172.05" r="3.5"/><circle cx="404.46" cy="181.96" r="3.5"/><circle cx="418.12" cy="168.04" r="3.5"/><circle cx="431.78" cy="163.13" r="3.5"/><circle cx="445.44" cy="146.73" r="3.5"/><circle cx="459.1" cy="145.06" r="3.5"/><circle cx="472.76" cy="172.75" r="3.5"/><circle cx="486.42" cy="152.75" r="3.5"/><circle cx="500.08" cy="134.77" r="3.5"/><circle cx="513.73" cy="133.3" r="3.5"/><circle cx="527.39" cy="142.15" r="3.5"/><circle cx="541.05" cy="133.67" r="3.5"/><circle cx="554.71" cy="128.68" r="3.5"/><circle cx="568.37" cy="108.78" r="3.5"/><circle cx="582.03" cy="99.25" r="3.5"/><circle cx="595.69" cy="92.74" r="3.5"/><circle cx="609.35" cy="93.34" r="3.5"/></g>
+<path d="M76.65 314.43 L90.31 308.82 L103.97 303.21 L117.63 297.59 L131.29 291.98 L144.95 286.37 L158.61 280.76 L172.27 275.15 L185.92 269.54 L199.58 263.92 L213.24 258.31 L226.9 252.7 L240.56 247.09 L254.22 241.48 L267.88 235.86 L281.54 230.25 L295.19 224.64 L308.85 219.03 L322.51 213.42 L336.17 207.81 L349.83 202.19 L363.49 196.58 L377.15 190.97 L390.81 185.36 L404.46 179.75 L418.12 174.14 L431.78 168.52 L445.44 162.91 L459.1 157.3 L472.76 151.69 L486.42 146.08 L500.08 140.46 L513.73 134.85 L527.39 129.24 L541.05 123.63 L554.71 118.02 L568.37 112.41 L582.03 106.79 L595.69 101.18 L609.35 95.57" fill="none" stroke="#059669" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+</g>
+<line x1="66" y1="348" x2="620" y2="348" stroke="#9ca3af" stroke-width="1"/>
+<line x1="66" y1="62" x2="66" y2="348" stroke="#9ca3af" stroke-width="1"/>
+<text x="343" y="388" text-anchor="middle" font-size="12" fill="#1f2937">glucose [mmol/L]</text>
+<text x="16" y="205" text-anchor="middle" font-size="12" fill="#1f2937" transform="rotate(-90 16 205)">signal [mV]</text>
+<g><rect x="76" y="72" width="113.2" height="64" rx="6" fill="#ffffff" fill-opacity="0.88" stroke="#e5e7eb"/><rect x="84" y="81" width="14" height="10" fill="#2563eb" fill-opacity="0.7"/><text x="104" y="90" text-anchor="start" font-size="11" fill="#1f2937">±2σ</text><circle cx="91" cy="104" r="4" fill="#dc2626"/><text x="104" y="108" text-anchor="start" font-size="11" fill="#1f2937">measurements</text><line x1="83" y1="122" x2="99" y2="122" stroke="#059669" stroke-width="2.5"/><text x="104" y="126" text-anchor="start" font-size="11" fill="#1f2937">fit</text></g>
+</svg>

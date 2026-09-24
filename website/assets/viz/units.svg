@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
+<rect width="640" height="400" fill="#ffffff"/>
+
+<text x="66" y="26" text-anchor="start" font-size="16" fill="#1f2937" font-weight="600">Car acceleration</text>
+<text x="66" y="45" text-anchor="start" font-size="12" fill="#6b7280">the axis units come from the quantities</text>
+<defs><clipPath id="clip7144455685522065981"><rect x="66" y="62" width="554" height="286"/></clipPath></defs>
+<line x1="76.65" y1="62" x2="76.65" y2="348" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="76.65" y1="348" x2="76.65" y2="353" stroke="#9ca3af" stroke-width="1"/>
+<text x="76.65" y="366" text-anchor="middle" font-size="11" fill="#6b7280">0</text>
+<line x1="143.24" y1="62" x2="143.24" y2="348" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="143.24" y1="348" x2="143.24" y2="353" stroke="#9ca3af" stroke-width="1"/>
+<text x="143.24" y="366" text-anchor="middle" font-size="11" fill="#6b7280">5</text>
+<line x1="209.83" y1="62" x2="209.83" y2="348" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="209.83" y1="348" x2="209.83" y2="353" stroke="#9ca3af" stroke-width="1"/>
+<text x="209.83" y="366" text-anchor="middle" font-size="11" fill="#6b7280">10</text>
+<line x1="276.41" y1="62" x2="276.41" y2="348" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="276.41" y1="348" x2="276.41" y2="353" stroke="#9ca3af" stroke-width="1"/>
+<text x="276.41" y="366" text-anchor="middle" font-size="11" fill="#6b7280">15</text>
+<line x1="343" y1="62" x2="343" y2="348" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="343" y1="348" x2="343" y2="353" stroke="#9ca3af" stroke-width="1"/>
+<text x="343" y="366" text-anchor="middle" font-size="11" fill="#6b7280">20</text>
+<line x1="409.59" y1="62" x2="409.59" y2="348" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="409.59" y1="348" x2="409.59" y2="353" stroke="#9ca3af" stroke-width="1"/>
+<text x="409.59" y="366" text-anchor="middle" font-size="11" fill="#6b7280">25</text>
+<line x1="476.17" y1="62" x2="476.17" y2="348" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="476.17" y1="348" x2="476.17" y2="353" stroke="#9ca3af" stroke-width="1"/>
+<text x="476.17" y="366" text-anchor="middle" font-size="11" fill="#6b7280">30</text>
+<line x1="542.76" y1="62" x2="542.76" y2="348" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="542.76" y1="348" x2="542.76" y2="353" stroke="#9ca3af" stroke-width="1"/>
+<text x="542.76" y="366" text-anchor="middle" font-size="11" fill="#6b7280">35</text>
+<line x1="609.35" y1="62" x2="609.35" y2="348" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="609.35" y1="348" x2="609.35" y2="353" stroke="#9ca3af" stroke-width="1"/>
+<text x="609.35" y="366" text-anchor="middle" font-size="11" fill="#6b7280">40</text>
+<line x1="66" y1="335" x2="620" y2="335" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="61" y1="335" x2="66" y2="335" stroke="#9ca3af" stroke-width="1"/>
+<text x="58" y="339" text-anchor="end" font-size="11" fill="#6b7280">0</text>
+<line x1="66" y1="281.9" x2="620" y2="281.9" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="61" y1="281.9" x2="66" y2="281.9" stroke="#9ca3af" stroke-width="1"/>
+<text x="58" y="285.9" text-anchor="end" font-size="11" fill="#6b7280">20</text>
+<line x1="66" y1="228.79" x2="620" y2="228.79" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="61" y1="228.79" x2="66" y2="228.79" stroke="#9ca3af" stroke-width="1"/>
+<text x="58" y="232.79" text-anchor="end" font-size="11" fill="#6b7280">40</text>
+<line x1="66" y1="175.69" x2="620" y2="175.69" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="61" y1="175.69" x2="66" y2="175.69" stroke="#9ca3af" stroke-width="1"/>
+<text x="58" y="179.69" text-anchor="end" font-size="11" fill="#6b7280">60</text>
+<line x1="66" y1="122.58" x2="620" y2="122.58" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="61" y1="122.58" x2="66" y2="122.58" stroke="#9ca3af" stroke-width="1"/>
+<text x="58" y="126.58" text-anchor="end" font-size="11" fill="#6b7280">80</text>
+<line x1="66" y1="69.48" x2="620" y2="69.48" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="61" y1="69.48" x2="66" y2="69.48" stroke="#9ca3af" stroke-width="1"/>
+<text x="58" y="73.48" text-anchor="end" font-size="11" fill="#6b7280">100</text>
+<g clip-path="url(#clip7144455685522065981)">
+<path d="M76.65 335 L143.24 276.69 L209.83 226.03 L276.41 183.97 L343 149.56 L409.59 121.84 L476.17 100.81 L542.76 85.51 L609.35 75" fill="none" stroke="#2563eb" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<g fill="#dc2626" fill-opacity="0.78" stroke="#ffffff" stroke-width="0.6"><circle cx="76.65" cy="335" r="3.5"/><circle cx="143.24" cy="276.69" r="3.5"/><circle cx="209.83" cy="226.03" r="3.5"/><circle cx="276.41" cy="183.97" r="3.5"/><circle cx="343" cy="149.56" r="3.5"/><circle cx="409.59" cy="121.84" r="3.5"/><circle cx="476.17" cy="100.81" r="3.5"/><circle cx="542.76" cy="85.51" r="3.5"/><circle cx="609.35" cy="75" r="3.5"/></g>
+</g>
+<line x1="66" y1="348" x2="620" y2="348" stroke="#9ca3af" stroke-width="1"/>
+<line x1="66" y1="62" x2="66" y2="348" stroke="#9ca3af" stroke-width="1"/>
+<text x="343" y="388" text-anchor="middle" font-size="12" fill="#1f2937">time [s]</text>
+<text x="16" y="205" text-anchor="middle" font-size="12" fill="#1f2937" transform="rotate(-90 16 205)">speed [km/h]</text>
+<g><rect x="76" y="72" width="86.8" height="28" rx="6" fill="#ffffff" fill-opacity="0.88" stroke="#e5e7eb"/><line x1="83" y1="86" x2="99" y2="86" stroke="#2563eb" stroke-width="2.5"/><text x="104" y="90" text-anchor="start" font-size="11" fill="#1f2937">measured</text></g>
+</svg>

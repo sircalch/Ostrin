@@ -6607,3 +6607,49 @@ llamadas a través de un valor función comprueban además el número de argumen
 Pruebas: `function_value_shadowing.ostrin` (20, 5, 6; paridad nativa con `live_allocations=0`)
 y `function_value_arity_errors.ostrin`, más una prueba de integración exacta. Suite: 2
 unitarias, 6 diferenciales y 202 de integración. Las salidas del Lab no cambian.
+
+## 270. Álgebra de unidades — 2026-09-24
+
+Cierra las limitaciones anotadas en §268. Un único catálogo (`types::unit_info`, replicado en
+`qty_runtime.c`) da dimensión y factor SI a cada símbolo; se añaden N, J, W, Pa, Hz, V, ohm, C,
+bar, mmHg, cal y prefijos (`um`, `ns`, `mA`, `mL`, …). `atm` valía 1 Pa en el runtime: ahora
+101 325 Pa. `unit_combine` produce unidades canónicas en `*`/`/` (agrupa exponentes y funde átomos
+simples de la misma dimensión ajustando el valor); esto además corrige factores erróneos de cadenas
+como `km/h*h`, que el parser izquierda→derecha leía como `(km/h)*h`. `as` acepta unidades compuestas
+y comprueba la dimensión (E1026); los literales admiten `m^2` y exponentes negativos y solo absorben
+símbolos de unidad conocidos tras `*`/`/`. Dimensiones con nombre (`Energy`, `Velocity`, …) se
+expanden a base; los diagnósticos usan `dim_describe`. Nuevos `q.value()`/`q.unit()`.
+Pruebas: `unit_algebra.ostrin` (salida exacta y paridad nativa), `unit_conversion_errors.ostrin`.
+
+## 271. Correcciones del lenguaje encontradas con std.viz — 2026-09-24
+
+- Intérprete: el cuerpo de una función se evaluaba en un hijo del entorno del llamador, y como
+  `x = e` es `Stmt::Assign`, `h = hash(seed)` en `uid` reescribía la `h` de `render`. Ahora cada
+  llamada usa un entorno raíz nuevo (`function_scope_isolation.ostrin`).
+- Métodos: el checker comparaba argumentos por posición y el intérprete los ligaba por posición;
+  ahora ambos usan `hir::arrange_arguments` (`method_default_args.ostrin`). Los defaults de métodos
+  se tipan en su declaración y la HIR/C los baja con tipo.
+- `modules.rs` reescribía cualquier identificador igual a un item del módulo: un parámetro `light`
+  se convertía en `std.viz::light`. La reescritura sigue ahora los bindings léxicos.
+- C: una sentencia con resultado propio se emitía dos veces (`code;` + `release(code)`), así que
+  `c.add(1).add(2)` ejecutaba cada llamada dos veces; receptores y argumentos frescos de métodos se
+  liberan tras la llamada; la asignación con retain/release solo se aplicaba en el nivel superior de
+  la función (`scopes.len() == 2`) y dentro de bucles dejaba punteros colgantes (`idx = merged` en
+  `argsort`). Ahora aplica fuera de lambdas.
+- Literales científicos (`1e-9`); métodos genéricos infieren parámetros de dimensión; `[]` en un
+  campo toma el tipo del campo; `String.slice/char_at/codepoint` tipados. Trinquetes HIR y de
+  expresiones tipadas bajan de 26/11 a 19/8.
+
+## 272. std.viz 0.1 y galería web — 2026-09-24
+
+Documento 23. `compiler/std/viz.ostrin` (≈1 400 líneas de Ostrin) implementa figuras 2D, heatmaps y
+contornos, escenas 3D (triángulos ordenados por profundidad con luz direccional, trayectorias con
+mapa de color, nubes de puntos), `viz.grid` y ejes con unidades. Los diez `examples/viz_*.ostrin`
+más `lab_plot`/`lab_surface` son idénticos byte a byte entre intérprete y nativo (prueba
+diferencial). Web: `viz.html` con diez figuras grabadas por `ostrinc.wasm` en `website/assets/viz/`
+(comprobadas contra deriva por `lab-data.mjs`) y botón Run live; pestañas Plot (ahora con std.viz) y
+3D en el Lab; sección Visualization en la home. `lab-data.mjs` ejecuta cada programa en un proceso
+Node propio: muchas instancias WASM pesadas en un solo proceso hacían caer a Node. Suite: 2
+unitarias, 6 diferenciales, 210 de integración; 7 pruebas Playwright en verde (localmente con el
+shim WASI servido por `page.route`). Pendiente: fugas de concatenaciones anidadas de `String` en el
+emisor HIR (la salida es correcta), interacción, animación, PNG/PDF y WebGPU.
