@@ -2179,10 +2179,26 @@ impl Builder {
                     });
                     mapped
                 } else {
-                    self.lower_expr(handler)
+                    let callee = self.lower_expr(handler);
+                    let mapped = self.fresh();
+                    self.emit(IrInstr::ClosureCall {
+                        dst: Some(mapped),
+                        callee,
+                        args: vec![error],
+                        ty: mapped_ty,
+                    });
+                    mapped
                 }
             } else {
-                self.lower_expr(handler)
+                let callee = self.lower_expr(handler);
+                let mapped = self.fresh();
+                self.emit(IrInstr::ClosureCall {
+                    dst: Some(mapped),
+                    callee,
+                    args: vec![error],
+                    ty: mapped_ty,
+                });
+                mapped
             };
             if !self.terminated() {
                 let propagated = self.fresh();

@@ -36,7 +36,7 @@ esa ABI, mientras los scopes anidados y escapes complejos siguen en fallback.*
 | `TypedProgram.literal_kinds` | `typeck` | Tipo elegido para cada literal numérico |
 | `NativeTypeReport` | `codegen` | Detecta divergencias checker↔backend (0 hoy, en ~1 350 expresiones) |
 | `IrProgram` / `IrFunction` / `IrBlock` | `ir.rs` | Primera CFG con temporales explícitos, terminadores y verificador de destinos |
-| Emisor IR | `ir_c.rs` | Genera C desde SSA/CFG para funciones escalares, rangos enteros direccionales, `String`, `read_file`/`write_file` (`Result<String,String>`/`Result<Void,String>`), records concretos, iteradores de records concretos mediante métodos registrados, canales (`send`/`close`/`receive`), `Option<Record>`, `List<T>` escalar, operaciones hash escalares de `Map`/`Set`, wrappers sobre `List`/`Map`/`Set` y wrappers `Option`/`Result` anidados con `match`, `Option<T>` escalar/`String` con `Some`/`None`, `try catch` con handlers globales y aliases locales sin entorno, cierres capturados con entorno tipado y destructor, llamadas indirectas, ramas, bucles, `phi` y enteros de ancho fijo comprobados; emite ownership para las familias migradas y deja fallback seguro para lo demás |
+| Emisor IR | `ir_c.rs` | Genera C desde SSA/CFG para funciones escalares, rangos enteros direccionales, `String`, `read_file`/`write_file` (`Result<String,String>`/`Result<Void,String>`), records concretos, iteradores de records concretos mediante métodos registrados, canales (`send`/`close`/`receive`), `Option<Record>`, `List<T>` escalar, operaciones hash escalares de `Map`/`Set`, wrappers sobre `List`/`Map`/`Set` y wrappers `Option`/`Result` anidados con `match`, `Option<T>` escalar/`String` con `Some`/`None`, `try catch` con handlers globales, aliases locales sin entorno y handlers locales capturados compatibles, cierres capturados con entorno tipado y destructor, llamadas indirectas, ramas, bucles, `phi` y enteros de ancho fijo comprobados; emite ownership para las familias migradas y deja fallback seguro para lo demás |
 | Intérprete como oráculo | `interpreter` | Semántica de referencia; pruebas diferenciales automáticas |
 
 Por tanto el backend **ya no infiere solo**: la reinferencia que queda (`bind_type`, `expected`, `settle_literal`) es respaldo verificado.
@@ -113,7 +113,7 @@ Sobre este IR se hacen los análisis que el texto C no permite:
 5. **Cierres y funciones como valores**: las funciones globales sin entorno y las lambdas capturadas
    ya tienen `ClosureCall`/`ClosureMake`, adaptadores nativos y ownership del entorno; las closures
    anidadas con capturas transitivas también se propagan a helpers IR anidados. Quedan formas no
-   lineales con scopes/escapes complejos y handlers locales. Retirar la comprobación dinámica de
+   lineales con scopes/escapes complejos y handlers locales no lineales. Retirar la comprobación dinámica de
    E1101 requiere que el backend consuma la IR transformada de forma completa.
 6. Optimizador y, después, otros backends (LLVM, WASM, GPU) que consumen el mismo IR.
 

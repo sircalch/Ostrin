@@ -65,14 +65,15 @@ destrucción de sus contenedores. Los records concretos pueden anidarse y vivir 
 condicionalmente el campo activo y cubren los consumidores básicos de `String.to_int()` y
 `to_float()`, además de `try` y `try catch` inline, desde la IR. Los wrappers anidados cubren
 constructores y `match` con retain/release recursivo; `unwrap` anidado, patrones más profundos,
-   escapes complejos y handlers locales no inline todavía no insertan RC completo por
+   escapes complejos y handlers locales no compatibles todavía no insertan RC completo por
    cada copia, retorno, phi o salida de ámbito. Los cierres capturados, incluidas las closures
    anidadas con capturas transitivas, ya construyen entornos registrados con destructor, retienen
    sus capturas y liberan cada entorno al último uso. Un alias local de una función global sin entorno
 (`handler = recover`) conserva su procedencia y puede bajar como valor `Fn` mediante `ClosureCall`;
 el adaptador nativo usa `env == NULL` y el valor no tiene RC de entorno. Las llamadas indirectas
-de closures con entorno ya usa `ClosureCall` y el entorno tipado; siguen pendientes sus formas
-no lineales con scopes o escapes complejos.
+de closures con entorno ya usa `ClosureCall` y el entorno tipado; los handlers locales capturados
+compatibles comparten esa ruta y sus retain/release. Siguen pendientes sus formas no lineales con
+scopes o escapes complejos.
 
 - Todo valor por referencia lleva un contador. `retain`/`release` los inserta el compilador **sobre el IR** (no sobre el texto C), en copias de variable, paso a funciones, campos y salida de ámbito.
 - **Análisis de último uso / movimiento** en el IR: si el compilador prueba que un valor no se vuelve a usar, transfiere la propiedad sin tocar el contador (así se recupera el coste cero en el caso común, sin sintaxis nueva).
@@ -102,10 +103,10 @@ El RC sobre el generador actual (texto C con expresiones‑sentencia) exigiría 
    el backend C ya consume esa IR transformada para `String`, el núcleo escalar de `List<T>`,
    las operaciones escalares de `Map`/`Set`, records concretos y `Option` escalar/`Option<String>`/
    `Option<Record>`, `Option/List`, `Result/List`, `Option/Map`, `Result/Set` y wrappers anidados con `match`, así como `Result` escalar con error `String`, `try`, `try catch` inline,
-`map`/`map_err`/`then`, `Option.map`/`then` con lambdas inline, handlers globales y aliases
-locales de handlers globales sin entorno. Las funciones globales sin captura que circulan como
+`map`/`map_err`/`then`, `Option.map`/`then` con lambdas inline, handlers globales, aliases
+locales de handlers globales sin entorno y handlers locales capturados compatibles. Las funciones globales sin captura que circulan como
    valores también cruzan la IR mediante `ClosureCall` y un adaptador nativo; aún falta extenderla
-   a otros payloads gestionados, handlers locales, patrones anidados, scopes,
+   a otros payloads gestionados, handlers locales no lineales, patrones anidados, scopes,
 escapes complejos y payloads todavía no cubiertos por
    el análisis de `Phi`.
 4. `--leak-check` y pruebas: los programas que usan ownership explícito deben terminar con cero

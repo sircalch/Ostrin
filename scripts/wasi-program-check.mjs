@@ -61,6 +61,12 @@ const programs = [
     args: ["native_ir_function_values.wasm"],
     expected: "5\n10\n",
   },
+  {
+    name: "native_ir_try_captured_handler",
+    source: "examples/native_ir_try_captured_handler.ostrin",
+    args: ["native_ir_try_captured_handler.wasm"],
+    expected: "VALUE!\nhandled: FAILURE\n",
+  },
 ];
 
 function fail(message) {

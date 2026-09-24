@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### Compiler and ownership
+- Lowered compatible local `try ... catch` handlers held in captured closures through `ClosureCall`.
+  The handler keeps its typed environment and managed captures instead of being mistaken for the
+  mapped error value; `native_ir_try_captured_handler.ostrin` checks interpreter/native parity,
+  zero HIR fallback and `live_allocations=0`.
 - Extended closure capture discovery through nested lambdas. Free names now propagate through the
   enclosing environment, so nested closures with scalar and `String` transitive captures lower to
   nested IR helpers and typed C environments instead of `opaque lambda`; the regression checks

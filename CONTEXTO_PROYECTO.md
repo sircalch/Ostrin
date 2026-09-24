@@ -6444,3 +6444,25 @@ HTML. Eso dejaba dos fuentes de verdad para cada cambio del compilador.
 Verificación de este bloque: `node scripts/website-metadata.mjs`, `node scripts/website-check.mjs`
 y la suite browser/WASM de la acción deben pasar; la identidad visual, el playground WASM real,
 los enlaces y las páginas existentes se conservan.
+
+## 263. Handlers locales capturados en `try catch` — 2026-09-23
+
+El lowering de `try ... catch` ya resolvía handlers globales y aliases locales de funciones globales,
+pero un alias cuyo valor era una closure capturada no emitía una llamada: recuperaba el objeto de
+closure como si fuera el error transformado. La ruta nativa quedaba fuera justo en una combinación
+importante de `Result`, funciones como valores y ownership de entornos.
+
+- `lower_try` conserva la llamada estática para handlers globales y ahora emite `ClosureCall` para
+  handlers locales o expresiones de handler que produzcan una closure compatible.
+- El entorno tipado de la closure se mantiene como fuente de captura; la rama `catch` pasa el error
+  como argumento y construye el `Err` de retorno después de la transformación, sin copiar el
+  objeto closure como payload.
+- `examples/native_ir_try_captured_handler.ostrin` crea un handler que captura un prefijo `String`
+  y lo usa desde dos funciones. La regresión compara intérprete y C, exige `hir-generated: 0` y
+  `live_allocations=0`.
+
+Verificación local del bloque: `cargo test` pasó 2 unitarias, 6 diferenciales y 199 de integración;
+la matriz WASI de ocho programas compiló y ejecutó el nuevo caso con salida exacta;
+`node scripts/website-metadata.mjs --write` actualizó los contadores públicos a 197 programas y
+199 pruebas. Los handlers con cuerpos no lineales, scopes/escapes complejos y payloads todavía no
+representados conservan el fallback verificado.

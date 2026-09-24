@@ -2,8 +2,8 @@
 globalThis.OSTRIN_SITE_FACTS = Object.freeze({
   "version": "0.1.0",
   "designDocs": "22",
-  "examples": "196",
-  "integrationTests": "198",
+  "examples": "197",
+  "integrationTests": "199",
   "differentialTests": "6",
   "unitTests": "2"
 });

@@ -46,7 +46,7 @@ traits, pattern matching, quantities and two concurrency modes: deterministic
 cooperative scheduling by default, plus opt-in native threads for compiled
 programs.
 
-The compiler suite currently passes **198 integration tests, 2 unit tests and 6 differential
+The compiler suite currently passes **199 integration tests, 2 unit tests and 6 differential
 interpreter↔native tests**. Function calls
 support named/default arguments, scalar and `String` collection lookups preserve `Option<T>`
 through the native IR path; concrete records and simple `Option<Record>` values
