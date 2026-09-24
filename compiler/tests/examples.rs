@@ -6879,6 +6879,83 @@ fn native_backend_quantities_match_the_interpreter() {
             "output mismatch for {file}"
         );
     }
+
+    let report = run(&["--native-type-report", &example_path("native_units.ostrin")]);
+    assert!(
+        report.status.success(),
+        "report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    let source_line = report_text
+        .lines()
+        .find(|line| line.starts_with("native-source: examples/native_units.ostrin "))
+        .expect("native_units must have a per-source report");
+    let ir_count = source_line
+        .split_whitespace()
+        .find_map(|field| field.strip_prefix("ir=")?.parse::<usize>().ok())
+        .expect("native_units report must include an IR count");
+    assert!(
+        ir_count >= 3,
+        "quantity arithmetic regressed to the legacy backend: {source_line}"
+    );
+}
+
+#[test]
+fn native_ir_emitter_handles_scalar_quantities() {
+    let file = temp_source(
+        "native-ir-quantities.ostrin",
+        "fn main() -> Void {\n    d = 1500 m\n    print(d within (1 km to 2 km))\n    print(d approximately 1499 m tolerance 2 m)\n    print(-d)\n    print(d as km)\n    print(d + 500 m)\n}\n",
+    );
+    let expected = "true\ntrue\n-1500 m\n1.5 km\n2000 m\n";
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    if skip_if_no_c_compiler(&report) {
+        let _ = fs::remove_file(&file);
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ir-generated: 1"), "{report_text}");
+    assert!(report_text.contains("hir-generated: 0"), "{report_text}");
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+
+    let exe = temp_artifact("native-ir-quantities.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe).output().expect("run quantity binary");
+    let _ = fs::remove_file(&exe);
+    let _ = fs::remove_file(&file);
+    assert!(
+        native.status.success(),
+        "native binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "quantity IR path leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
 }
 
 #[test]

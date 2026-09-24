@@ -6,11 +6,16 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
 ## Siguiente ciclo
 
 1. Reducir el fallback AST con el trinquete por archivo de `--native-type-report` (baseline actual:
-   913 funciones IR, 457 HIR y 1.432 AST).
+   927 funciones IR, 457 HIR y 1.418 AST).
 2. Completar ownership sobre agregados, escapes, valores `Phi`, errores y formas anidadas, con
    leak-check y sanitizers como evidencia.
 3. Añadir casos de compilación nativa y divergencia semántica al fuzzing de entradas válidas.
 4. Medir cobertura reproducible y publicar benchmarks nativo frente a intérprete.
+5. Preparar el reconocimiento de Ostrin en GitHub Linguist: reunir muestras públicas,
+   redactar la definición de lenguaje (`languages.yml`, extensiones, gramática y muestras),
+   validarla contra `github-linguist` y abrir la propuesta upstream. Después de su aceptación,
+   activar la clasificación de los archivos `.ostrin` en el repositorio y documentar el
+   resultado en la release y el sitio.
 
 ## Horizonte posterior
 
@@ -18,6 +23,7 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
 - Autodiff inverso, más álgebra lineal y métodos numéricos.
 - Exportación PNG/PDF/HTML y controles temporales de animación.
 - FFI C, registry público y canales de distribución adicionales.
+- Reconocimiento de Ostrin en GitHub Linguist y aparición de `.ostrin` en el mapa de lenguajes.
 - GPU/WebGPU después de estabilizar Array, IR y ownership.
 
 Las capacidades implementadas no se anuncian aquí hasta que tengan evidencia en el estado actual,
