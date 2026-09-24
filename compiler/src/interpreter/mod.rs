@@ -3567,8 +3567,13 @@ fn eval_binary_builtin(op: BinOp, lv: Value, rv: Value) -> EvalResult {
             }
             (scalar, Value::Quantity(a, d, u)) if op == Div => {
                 let s = as_f64(scalar)?;
-                let (_, unit) = unit_combine("", u, true).map_err(unit_error)?;
-                Ok(Value::Quantity(s / a, dim_pow(d, -1), unit))
+                // `2 / (3 km/m)`: cancelling units leave a scale that applies too.
+                let (scale, unit) = unit_combine("", u, true).map_err(unit_error)?;
+                let mut value = s / a;
+                if scale != 1.0 {
+                    value *= scale;
+                }
+                Ok(Value::Quantity(value, dim_pow(d, -1), unit))
             }
             // `Int / Int` is integer division (truncating), matching the type
             // checker, which types it `Int` — the runtime used to return a

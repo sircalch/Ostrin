@@ -36,6 +36,9 @@ fn main() -> Void {
     print(1 J / (1 N * 1 m))
     print((250 mL) as L)
     print(g as km/h^2)
+    // Units that cancel on the right of '/' still scale the number.
+    print(2 / (3 km/m))
+    print(linspace(1.0, 2.0, 2) / (2 km/m))
 
     // A variable after `/` is still a division, not a unit.
     t = 4.0

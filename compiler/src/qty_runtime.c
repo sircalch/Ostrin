@@ -199,6 +199,7 @@ static Qty ostrin_qty_scale_div(Qty a, double s) { Qty r = { a.v / s, a.u }; ret
 static Qty ostrin_scalar_div_qty(double s, Qty a) {
     double scale;
     Qty r = { s / a.v, ostrin_unit_combine("", a.u, 1, &scale) };
+    if (scale != 1.0) r.v *= scale;
     return r;
 }
 static int ostrin_qty_cmp(Qty a, Qty b) {

@@ -4910,7 +4910,7 @@ impl<'a> Codegen<'a> {
                         let product = num(&a, a_arr, &b, b_arr, false, code);
                         let db = db.expect("unit implies dimension");
                         if divide {
-                            let body = format!("({{ double __s; ostrin_qa_tag({product}, ostrin_unit_combine(\"\", {ub}, 1, &__s)); }})");
+                            let body = format!("({{ double __s; const char* __u = ostrin_unit_combine(\"\", {ub}, 1, &__s); Array_Float* __p = {product}; if (__s != 1.0) ostrin_qa_scale(__p, __s); ostrin_qa_tag(__p, __u); }})");
                             Ok((wrap(body, None), array_of(CType::Quantity(crate::types::dim_pow(&db, -1)))))
                         } else {
                             Ok((wrap(format!("ostrin_qa_tag({product}, {ub})"), None), array_of(CType::Quantity(db))))

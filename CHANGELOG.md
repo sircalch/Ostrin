@@ -34,6 +34,8 @@
   `unit ft : Length` with `define 1 ft = 0.3048 m`. Declarations are registered before any
   expression is parsed and reach the native runtime through a generated table
   (`user_units.ostrin`, interpreter/native parity).
+- A number divided by a quantity whose units cancel keeps the scale: `2 / (3 km/m)` is
+  `0.000666…` (it was `0.666…`), also for arrays.
 - `within` compares quantities across units: `6 ft within (1.5 m to 2 m)` was false because the
   raw numbers were compared.
 - `Array<Quantity<D>>`: an array with one unit (`array([1 m, 250 cm])`, `linspace(...) as s`,

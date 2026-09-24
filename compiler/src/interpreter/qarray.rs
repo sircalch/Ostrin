@@ -153,8 +153,14 @@ fn binary_units(op: BinOp, lv: &Value, rv: &Value) -> Res<Value> {
                 }
                 (Some(ua), None) => Ok(with_unit(&array::binary(op, a, b)?, Some(ua))),
                 (None, Some(ub)) => {
-                    let result = array::binary(op, a, b)?;
-                    let unit = if divide { unit_combine("", &ub, true).map_err(unit_error)?.1 } else { ub };
+                    let mut result = array::binary(op, a, b)?;
+                    if !divide {
+                        return Ok(with_unit(&result, Some(ub)));
+                    }
+                    let (scale, unit) = unit_combine("", &ub, true).map_err(unit_error)?;
+                    if scale != 1.0 {
+                        result = array::binary(Mul, result, Value::Float(scale))?;
+                    }
                     Ok(with_unit(&result, Some(unit)))
                 }
                 (None, None) => unreachable!("binary() only calls this with a unit"),
