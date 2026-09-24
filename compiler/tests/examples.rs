@@ -5528,7 +5528,7 @@ fn std_numeric_solves_integrates_interpolates_and_transforms() {
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     let text = stdout(&out).replace("\r\n", "\n");
     let lines: Vec<&str> = text.lines().collect();
-    assert_eq!(lines.len(), 16, "unexpected output: {text}");
+    assert_eq!(lines.len(), 18, "unexpected output: {text}");
     let number = |line: &str| -> f64 {
         line.trim_start_matches("Ok(").trim_end_matches(')').parse().unwrap_or_else(|_| panic!("not a number: {line}"))
     };
@@ -5550,6 +5550,8 @@ fn std_numeric_solves_integrates_interpolates_and_transforms() {
     close(lines[13], 0.5, 1e-9); // FFT amplitude at 12 Hz
     assert_eq!(lines[14], "true"); // ifft(fft(x)) == x
     assert!(number(lines[15]) < 0.9, "non-power-of-two DFT leaks: {}", lines[15]);
+    assert_eq!(lines[16], "[0, 0.2, 0.4]"); // odd n: bin k is k / (n dt), no Nyquist bin
+    assert_eq!(lines[17], "[0, 0.25, 0.5, 0.75, 1]"); // even n ends at 1 / (2 dt)
 }
 
 #[test]

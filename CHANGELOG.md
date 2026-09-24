@@ -14,6 +14,8 @@
   `interp`/`interp_all`, natural cubic `spline` (`.at`, `.sample`), ODE solvers `rk4` and adaptive
   `rk45` (Dormand–Prince) returning a `Solution` (`t`, `y`, `.component(i)`, `.final_state()`), and
   `fft`/`ifft`/`frequencies`/`amplitude` (radix-2 with a DFT fallback). Design document 24.
+- `numeric.frequencies(n, dt)` gives bin k as k / (n dt); for odd `n` it no longer stretches the
+  bins to the Nyquist frequency (`frequencies(5, 1.0)` is `[0, 0.2, 0.4]`).
 - New examples `numeric_methods`, `viz_ode`, `viz_fft` and `viz_spline` (three more gallery figures)
   and an ODE tab in the Scientific Lab (`lab_ode`: a driven pendulum whose damping, drive and start
   angle recompute live in the browser).

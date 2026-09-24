@@ -42,4 +42,6 @@ fn main() -> Void {
     back = numeric.ifft(numeric.fft(signal))
     print(abs(back - signal).max() < 0.000000001)
     print(numeric.amplitude(numeric.fft(signal[0 until 60]))[5])
+    print(numeric.frequencies(5, 1.0))
+    print(numeric.frequencies(8, 0.5))
 }
