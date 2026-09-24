@@ -5570,3 +5570,30 @@ fn std_viz_animates_frames_with_css_only() {
     assert!(!svg.contains("<script"));
     assert_eq!(svg.lines().filter(|line| line.starts_with("</svg>")).count(), 1);
 }
+
+#[test]
+fn std_numeric_integrates_and_differentiates_quantity_arrays() {
+    let out = run(&["--run", &example_path("numeric_units.ostrin")]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let text = stdout(&out).replace("\r\n", "\n");
+    let lines: Vec<&str> = text.lines().collect();
+    assert_eq!(
+        lines,
+        [
+            "distance: 20.066666666666666 km",
+            "after 10 min: 9.75 km",
+            "start acceleration: 0.07407407407407407 m/s^2",
+            "braking at the end: -0.06944444444444445 m/s^2",
+            "speed at 7.5 min: 83.5 km/h",
+            "mean speed: 60.20000000000001 km/h",
+        ]
+    );
+}
+
+#[test]
+fn dimension_generics_bind_inside_arrays() {
+    let out = run(&["--check", &example_path("unit_generic_errors.ostrin")]);
+    assert!(!out.status.success());
+    let err = stderr(&out);
+    assert!(err.contains("E1042") && err.contains("Generic dimension 'X' was inferred as both"), "missing conflict: {err}");
+}

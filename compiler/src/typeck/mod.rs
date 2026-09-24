@@ -3162,6 +3162,22 @@ impl Checker {
             }
         }
 
+        // Dimensions nested in containers (`Array<Quantity<X>>`, `List<Quantity<X>>`).
+        let dim_generics: HashSet<String> = sig
+            .generics
+            .iter()
+            .filter(|g| g.bounds.iter().any(|bound| bound == "Dimension"))
+            .map(|g| g.name.clone())
+            .collect();
+        if !dim_generics.is_empty() {
+            for (param, arg_ty) in sig.params.iter().zip(bound_args.iter()) {
+                let Some(arg_ty) = arg_ty else { continue };
+                if let Err(message) = bind_nested_dimensions(&param.ty, arg_ty, &dim_generics, &mut dim_subst) {
+                    self.push("E1042", message);
+                }
+            }
+        }
+
         if sig.generics.is_empty() {
             for (index, (param, arg_ty)) in sig.params.iter().zip(bound_args.iter()).enumerate() {
                 let Some(arg_ty) = arg_ty else { continue };
@@ -3928,6 +3944,57 @@ fn generic_substitution(generics: &[GenericParam], args: &[Ty]) -> HashMap<Strin
         .zip(args.iter())
         .map(|(generic, arg)| (generic.name.clone(), arg.clone()))
         .collect()
+}
+
+/// Binds dimension generics that appear as `Quantity<D>` inside other types
+/// (`Array<Quantity<X>>`, `List<Quantity<X>>`, function types).
+fn bind_nested_dimensions(
+    param: &Type,
+    actual: &Ty,
+    dim_generics: &HashSet<String>,
+    dims: &mut HashMap<String, Dimension>,
+) -> Result<(), String> {
+    match (param, actual) {
+        (Type::Named(name, args), Ty::Quantity(actual_dim)) if name == "Quantity" && args.len() == 1 => {
+            if let Type::Named(dim, dim_args) = &args[0] {
+                if dim_args.is_empty() && dim_generics.contains(dim) {
+                    if let Some(previous) = dims.get(dim) {
+                        if previous != actual_dim {
+                            return Err(format!(
+                                "Generic dimension '{}' was inferred as both '{}' and '{}'.",
+                                dim,
+                                dim_to_string(previous),
+                                dim_to_string(actual_dim)
+                            ));
+                        }
+                    } else {
+                        dims.insert(dim.clone(), actual_dim.clone());
+                    }
+                }
+            }
+            Ok(())
+        }
+        (Type::Named(name, args), Ty::Applied(actual_name, actual_args)) if name == actual_name && args.len() == actual_args.len() => {
+            for (expected, actual) in args.iter().zip(actual_args) {
+                bind_nested_dimensions(expected, actual, dim_generics, dims)?;
+            }
+            Ok(())
+        }
+        (Type::Named(name, args), Ty::List(elem) | Ty::Set(elem)) if (name == "List" || name == "Set") && args.len() == 1 => {
+            bind_nested_dimensions(&args[0], elem, dim_generics, dims)
+        }
+        (Type::Named(name, args), Ty::Map(key, value)) if name == "Map" && args.len() == 2 => {
+            bind_nested_dimensions(&args[0], key, dim_generics, dims)?;
+            bind_nested_dimensions(&args[1], value, dim_generics, dims)
+        }
+        (Type::Fn(params, ret), Ty::Fn(actual_params, actual_ret)) if params.len() == actual_params.len() => {
+            for (expected, actual) in params.iter().zip(actual_params) {
+                bind_nested_dimensions(expected, actual, dim_generics, dims)?;
+            }
+            bind_nested_dimensions(ret, actual_ret, dim_generics, dims)
+        }
+        _ => Ok(()),
+    }
 }
 
 fn unify_generic_type(

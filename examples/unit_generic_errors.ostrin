@@ -1,0 +1,10 @@
+// A dimension generic must bind to one dimension, also inside arrays.
+fn span<X: Dimension>(a: Array<Quantity<X>>, b: Array<Quantity<X>>) -> Quantity<X> {
+    a[0] + b[0]
+}
+
+fn main() -> Void {
+    times = array([1.0, 2.0]) as s
+    lengths = array([3.0, 4.0]) as m
+    print(span(times, lengths))
+}

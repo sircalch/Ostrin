@@ -1,0 +1,18 @@
+// std.numeric with units: a drive logged as speed (km/h) every 2 minutes.
+// Integrating gives distance, differentiating gives acceleration, and every
+// result carries the unit the dimensions imply.
+import std.numeric
+
+fn main() -> Void {
+    times = linspace(0.0, 20.0, 11) as min
+    speeds = array([0.0, 32.0, 55.0, 70.0, 88.0, 95.0, 92.0, 80.0, 60.0, 30.0, 0.0]) as km/h
+    distance = numeric.unit_trapz(times, speeds)
+    print("distance: " + (distance as km).to_string())
+    progress = numeric.unit_cumtrapz(times, speeds) as km
+    print("after 10 min: " + progress[5].to_string())
+    acceleration = numeric.unit_gradient(times, speeds) as m/s^2
+    print("start acceleration: " + acceleration[0].to_string())
+    print("braking at the end: " + acceleration[10].to_string())
+    print("speed at 7.5 min: " + numeric.unit_interp(times, speeds, 450 s).to_string())
+    print("mean speed: " + (distance / (20 min) as km/h).to_string())
+}

@@ -6722,3 +6722,13 @@ ciclo, los `id` se prefijan por fotograma y hay pausa al pasar el ratón y respe
 `prefers-reduced-motion`. Se eligió CSS porque funciona dentro de `<img>` y sin scripts, y mantiene
 la salida idéntica en los tres backends. Ejemplo `viz_animation` (paquete de ondas, 24 fotogramas) en
 la galería (14 figuras); test estructural en `examples.rs`.
+
+## 279. Métodos numéricos con unidades — 2026-09-24
+
+`numeric.unit_trapz/unit_cumtrapz/unit_gradient/unit_interp` sobre `Array<Quantity<D>>` (documento 24).
+Destapó que los genéricos `X: Dimension` solo se enlazaban cuando el parámetro era exactamente
+`Quantity<X>`: dentro de `Array<…>` quedaban sin sustituir y el retorno era `Quantity<X*Y>` literal.
+`bind_nested_dimensions` (typeck) recorre `Array`, `List`, `Set`, `Map` y funciones; el conflicto es
+E1042 (`unit_generic_errors.ostrin`). Paridad intérprete/nativo en `numeric_units`. En la revisión de
+#3, Codex marcó como P1 que `step-end` dejaría la animación en blanco; no se reproduce (opacidad
+calculada en Chromium: un único fotograma visible, el correcto, en cada instante).
