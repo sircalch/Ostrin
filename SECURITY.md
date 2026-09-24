@@ -36,5 +36,5 @@ anonymity. There is currently no bug bounty program.
 Every pull request runs the Rust dependency advisory scan and CodeQL workflow.
 The native sanitizer workflow is Linux-only because generated C programs rely
 on a GNU-compatible compiler and platform runtime. Fuzzing of lexer, parser,
-checker, HIR, and IR entry points is part of the compiler differential test suite;
+checker, HIR, IR, and native-lowering entry points is part of the compiler differential test suite;
 the `OSTRIN_FUZZ_ROUNDS` environment variable controls deeper local runs.
