@@ -1,0 +1,29 @@
+// std.viz animation: a dispersing wave packet, 24 frames played by CSS in one SVG.
+// Each frame is an ordinary figure; viz.animate loops them without scripts.
+import std.viz
+
+fn packet(x: Array<Float>, t: Float) -> Array<Float> {
+    // Free-particle Gaussian packet: the envelope spreads as it travels.
+    width = sqrt(1.0 + t * t * 0.25)
+    center = 2.0 + 1.5 * t
+    envelope = exp((x - center) * (x - center) * (-0.5 / (width * width))) / sqrt(width)
+    envelope * cos(x * 4.0 - t * 8.0)
+}
+
+fn main() -> Void {
+    x = linspace(0.0, 12.0, 160)
+    mut frames: List<String> = []
+    for i in 0 until 24 {
+        t = (i as Float) * 0.25
+        y = packet(x, t)
+        env = exp((x - (2.0 + 1.5 * t)) * (x - (2.0 + 1.5 * t)) * (-0.5 / (1.0 + t * t * 0.25))) / sqrt(sqrt(1.0 + t * t * 0.25))
+        fig = viz.figure("Wave packet, t = " + viz.num(t) + " s")
+            .describe("the envelope widens as √(1 + t²/4)")
+            .labels("position x", "amplitude")
+            .xlim(0.0, 12.0).ylim(-1.1, 1.1).no_legend()
+            .band(x, env * -1.0, env, color: "#93c5fd")
+            .line(x, y, color: "#1d4ed8", width: 2.0)
+        frames.push(fig.svg())
+    }
+    print(viz.animate(frames, fps: 8.0))
+}

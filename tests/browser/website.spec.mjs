@@ -167,7 +167,7 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   page.on("pageerror", (error) => runtimeErrors.push(error.message));
   await page.goto("./viz.html", { waitUntil: "domcontentloaded" });
   const cards = page.locator("[data-viz-gallery] .viz-card");
-  await expect(cards).toHaveCount(13);
+  await expect(cards).toHaveCount(14);
   for (const card of await cards.all()) {
     const image = card.locator("img.viz-image");
     await expect(image).toHaveAttribute("src", /^assets\/viz\/[a-z-]+\.svg$/);

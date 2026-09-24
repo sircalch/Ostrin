@@ -6713,3 +6713,12 @@ hacía `self->campo = valor` sin retener ni liberar; al liberar el argumento tem
 `fig.describe("…" + texto)` el campo quedaba colgando (ASan en `viz_spline`). Ahora sigue la regla de
 la ruta AST: retener el nuevo, `ostrin_release_owned` del viejo. Web: pestaña ODE del Lab (10 demos)
 y tres figuras nuevas en la galería (13).
+
+## 278. Animación en std.viz — 2026-09-24
+
+`viz.animate(frames, fps)` (documento 23 §4.1) une figuras ya renderizadas en un SVG: cada fotograma
+es un `<g>` con `animation-delay`, una regla `@keyframes` con `step-end` lo muestra durante `1/n` del
+ciclo, los `id` se prefijan por fotograma y hay pausa al pasar el ratón y respeto de
+`prefers-reduced-motion`. Se eligió CSS porque funciona dentro de `<img>` y sin scripts, y mantiene
+la salida idéntica en los tres backends. Ejemplo `viz_animation` (paquete de ondas, 24 fotogramas) en
+la galería (14 figuras); test estructural en `examples.rs`.

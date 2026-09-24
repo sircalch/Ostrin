@@ -2,12 +2,20 @@
 
 ## Unreleased
 
+### Visualization: animation
+- `viz.animate(frames, fps)` combines rendered figures or 3D scenes into one SVG that loops them with
+  CSS keyframes: no scripts, so it also plays as an `<img>`. Hovering pauses it, reduced-motion
+  viewers see the first frame, and ids are renamed per frame. New gallery program
+  `viz_animation` (a spreading wave packet, 24 frames).
+
 ### Numerical methods: std.numeric 0.1
 - New standard-library module `std.numeric`, written in Ostrin: `trapz`, `simpson`, `bisect`,
   `secant`, `newton` (roots return `Result<Float, String>`), `derivative`, `golden_min`, linear
   `interp`/`interp_all`, natural cubic `spline` (`.at`, `.sample`), ODE solvers `rk4` and adaptive
   `rk45` (Dormand–Prince) returning a `Solution` (`t`, `y`, `.component(i)`, `.final_state()`), and
   `fft`/`ifft`/`frequencies`/`amplitude` (radix-2 with a DFT fallback). Design document 24.
+- `numeric.frequencies(n, dt)` gives bin k as k / (n dt); for odd `n` it no longer stretches the
+  bins to the Nyquist frequency (`frequencies(5, 1.0)` is `[0, 0.2, 0.4]`).
 - New examples `numeric_methods`, `viz_ode`, `viz_fft` and `viz_spline` (three more gallery figures)
   and an ODE tab in the Scientific Lab (`lab_ode`: a driven pendulum whose damping, drive and start
   angle recompute live in the browser).

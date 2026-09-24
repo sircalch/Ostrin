@@ -1394,3 +1394,52 @@ pub fn grid(panels: List<String>, cols: Int, cell_width: Int, cell_height: Int, 
     out.push("</svg>\n")
     out.join("\n")
 }
+
+/// The number in a `name="…"` attribute of an SVG's first tag.
+fn svg_size(svg: String, name: String) -> Int {
+    parts = svg.split(name + "=\"")
+    if parts.length() < 2 {
+        return 0
+    }
+    match parts[1].split("px")[0].split("\"")[0].to_int() {
+        Ok(n) => n,
+        Err(_) => 0,
+    }
+}
+
+/// An animation: the frames (whole figures, `fig.svg()` or `scene.svg()`)
+/// shown one after another in a loop at `fps` frames per second. It is one
+/// self-contained SVG; CSS keyframes switch the frames, so it plays wherever
+/// the SVG is shown, even as an <img>, without scripts. Hovering pauses it,
+/// and viewers that ask for reduced motion see the first frame only.
+pub fn animate(frames: List<String>, fps: Float = 12.0) -> String {
+    n = frames.length()
+    if n == 0 {
+        return ""
+    }
+    width = svg_size(frames[0], "width")
+    height = svg_size(frames[0], "height")
+    step_ms = round(1000.0 / fps) as Int
+    total_ms = step_ms * n
+    // Each frame is opaque for 1/n of the cycle, rounded up so consecutive
+    // frames overlap by a hair instead of leaving a blank instant.
+    share = short(ceil(100000.0 / (n as Float)) / 1000.0)
+    mut out: List<String> = [header(width, height, light())]
+    out.push("<style>.ostrin-frame{opacity:0;animation:ostrin-frames " + total_ms.to_string() + "ms step-end infinite}" +
+        "@keyframes ostrin-frames{0%{opacity:1}" + share + "%{opacity:0}}" +
+        "svg:hover .ostrin-frame{animation-play-state:paused}" +
+        "@media (prefers-reduced-motion:reduce){.ostrin-frame{animation:none}.ostrin-first{opacity:1}}</style>")
+    for i in 0 until n {
+        // Ids (clip paths, gradients) are made unique per frame.
+        prefix = "f" + i.to_string() + "-"
+        panel = frames[i].trim()
+        body = panel.slice(0, panel.length() - 6).trim()
+            .replace("<svg xmlns=\"http://www.w3.org/2000/svg\"", "<svg")
+            .replace(" id=\"", " id=\"" + prefix)
+            .replace("url(#", "url(#" + prefix)
+        class = if i == 0 { "ostrin-frame ostrin-first" } else { "ostrin-frame" }
+        out.push("<g" + attr("class", class) + attr("style", "animation-delay:" + (step_ms * i).to_string() + "ms") + ">" + body + "</svg></g>")
+    }
+    out.push("</svg>\n")
+    out.join("\n")
+}

@@ -5528,7 +5528,7 @@ fn std_numeric_solves_integrates_interpolates_and_transforms() {
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     let text = stdout(&out).replace("\r\n", "\n");
     let lines: Vec<&str> = text.lines().collect();
-    assert_eq!(lines.len(), 16, "unexpected output: {text}");
+    assert_eq!(lines.len(), 18, "unexpected output: {text}");
     let number = |line: &str| -> f64 {
         line.trim_start_matches("Ok(").trim_end_matches(')').parse().unwrap_or_else(|_| panic!("not a number: {line}"))
     };
@@ -5550,4 +5550,23 @@ fn std_numeric_solves_integrates_interpolates_and_transforms() {
     close(lines[13], 0.5, 1e-9); // FFT amplitude at 12 Hz
     assert_eq!(lines[14], "true"); // ifft(fft(x)) == x
     assert!(number(lines[15]) < 0.9, "non-power-of-two DFT leaks: {}", lines[15]);
+    assert_eq!(lines[16], "[0, 0.2, 0.4]"); // odd n: bin k is k / (n dt), no Nyquist bin
+    assert_eq!(lines[17], "[0, 0.25, 0.5, 0.75, 1]"); // even n ends at 1 / (2 dt)
+}
+
+#[test]
+fn std_viz_animates_frames_with_css_only() {
+    let out = run(&["--run", &example_path("viz_animation.ostrin")]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let svg = stdout(&out);
+    assert!(svg.starts_with("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"640\" height=\"400\""));
+    assert_eq!(svg.matches("<g class=\"ostrin-frame").count(), 24);
+    assert!(svg.contains("animation:ostrin-frames 3000ms step-end infinite"), "8 fps × 24 frames");
+    assert!(svg.contains("@keyframes ostrin-frames{0%{opacity:1}4.167%{opacity:0}}"));
+    assert!(svg.contains("style=\"animation-delay:2875ms\""), "last frame starts at 23 × 125 ms");
+    assert!(svg.contains("prefers-reduced-motion"));
+    // Ids are renamed per frame, so frames never share a clip path.
+    assert!(svg.contains("id=\"f0-") && svg.contains("id=\"f23-") && svg.contains("url(#f23-"));
+    assert!(!svg.contains("<script"));
+    assert_eq!(svg.lines().filter(|line| line.starts_with("</svg>")).count(), 1);
 }

@@ -436,9 +436,14 @@ pub fn ifft(spectrum: Spectrum) -> Array<Float> {
     back.re / (spectrum.length() as Float)
 }
 
-/// Frequencies of the first n/2 + 1 bins for samples `dt` apart.
+/// Frequencies of the first n/2 + 1 bins for samples `dt` apart: bin k is
+/// k / (n dt). Only an even n reaches the Nyquist frequency 1 / (2 dt).
 pub fn frequencies(n: Int, dt: Float) -> Array<Float> {
-    linspace(0.0, 1.0 / (2.0 * dt), n / 2 + 1)
+    mut out: List<Float> = []
+    for k in 0 to n / 2 {
+        out.push((k as Float) / ((n as Float) * dt))
+    }
+    array(out)
 }
 
 /// The first n/2 + 1 magnitudes, scaled so a unit sinusoid reads 1.
