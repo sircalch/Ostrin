@@ -347,7 +347,7 @@ El playground de navegador ya ejecuta el compilador WASM; la siguiente frontera 
 contratos de plataforma antes de LLVM IR.
 
 ### F. Calidad y confianza
-Fuzzing del lexer/parser/checker/HIR mediante fuentes mutadas y pruebas diferenciales
+Fuzzing del lexer/parser/checker/HIR/IR mediante fuentes mutadas y pruebas diferenciales
 automáticas intérprete↔nativo sobre programas generados escalares y con ownership
 (`Option`/`Result`) ya se ejecutan en la suite; `OSTRIN_FUZZ_ROUNDS` permite ampliar las
 iteraciones. El siguiente incremento mide cobertura por módulo y añade casos de fallos del
