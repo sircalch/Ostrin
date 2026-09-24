@@ -116,6 +116,12 @@ pub struct Checker {
     node_types: HashMap<usize, Ty>,
     call_substs_by_node: HashMap<usize, CallSubst>,
     call_node_stack: Vec<usize>,
+    /// Copies of declarations checked in place of the original (impl methods
+    /// with `Self` substituted, trait default bodies). `node_types` is keyed by
+    /// node address: the copies stay alive until the check ends, and then the
+    /// types of their default arguments are dropped, so no later node allocated
+    /// at a reused address (codegen's copies of defaults) reads a stale type.
+    checked_copies: Vec<FunctionDecl>,
     call_key_stack: Vec<ExprKey>,
     collection_bound_diagnostics: HashSet<String>,
     errors: Vec<TypeError>,
@@ -188,6 +194,7 @@ impl Checker {
             node_types: HashMap::new(),
             call_substs_by_node: HashMap::new(),
             call_node_stack: Vec::new(),
+            checked_copies: Vec::new(),
             call_key_stack: Vec::new(),
             collection_bound_diagnostics: HashSet::new(),
             errors: Vec::new(),
@@ -341,6 +348,18 @@ impl Checker {
                 Item::Record(_) | Item::Enum(_) | Item::Import(_) | Item::Trait(_) => {}
             }
         }
+        // Node types recorded for the copies' default arguments would outlive the
+        // copies and could be read back for unrelated nodes allocated at the same
+        // addresses later (codegen's copies of those defaults); drop them.
+        let copies = std::mem::take(&mut self.checked_copies);
+        for copy in &copies {
+            for param in &copy.params {
+                if let Some(default) = &param.default {
+                    forget_node_types(default, &mut self.node_types);
+                }
+            }
+        }
+        drop(copies);
         (self.errors, self.editor_bindings, self.editor_expressions, self.expr_types, self.call_substs, self.literal_kinds, self.node_types, self.call_substs_by_node)
     }
 
@@ -466,6 +485,7 @@ impl Checker {
                 source_file: None,
             };
             self.check_function_with_body(&function, &extra_bounds, body);
+            self.checked_copies.push(function);
         }
     }
 
@@ -496,6 +516,7 @@ impl Checker {
         }
         self.errors.truncate(reported);
         self.current_source_file = previous_file;
+        self.checked_copies.push(method);
     }
 
     fn validate_impl(&mut self, implementation: &ImplDecl) {
@@ -5270,5 +5291,31 @@ fn ty_mentions_generic(ty: &Ty) -> bool {
         Ty::Applied(_, args) => args.iter().any(ty_mentions_generic),
         Ty::Fn(params, ret) => params.iter().any(ty_mentions_generic) || ty_mentions_generic(ret),
         _ => false,
+    }
+}
+
+/// Removes the recorded types of `expr` and its sub-expressions (by address).
+fn forget_node_types(expr: &Expr, node_types: &mut HashMap<usize, Ty>) {
+    node_types.remove(&(expr as *const Expr as usize));
+    match expr {
+        Expr::Located(inner, _) | Expr::Unary(_, inner) => forget_node_types(inner, node_types),
+        Expr::Binary(_, l, r) => {
+            forget_node_types(l, node_types);
+            forget_node_types(r, node_types);
+        }
+        Expr::ListLiteral(items) | Expr::SetLiteral(items) => {
+            for item in items {
+                forget_node_types(item, node_types);
+            }
+        }
+        Expr::Call(callee, args) => {
+            forget_node_types(callee, node_types);
+            for arg in args {
+                match arg {
+                    Arg::Positional(e) | Arg::Named(_, e) => forget_node_types(e, node_types),
+                }
+            }
+        }
+        _ => {}
     }
 }
