@@ -37,7 +37,17 @@ sol = numeric.rk45(f, y0, t0, t1, tol: 1e-8)   // Dormand–Prince adaptativo
 sol.t  sol.y  sol.evaluations  sol.component(i)  sol.final_state()  sol.length()
 spec = numeric.fft(signal)                     // Spectrum { re, im }, spec.magnitude()
 numeric.ifft(spec)  numeric.frequencies(n, dt)  numeric.amplitude(spec)
+
+// Con unidades: xs: Array<Quantity<X>>, ys: Array<Quantity<Y>>
+numeric.unit_trapz(xs, ys)                     // Quantity<X * Y>   (km/h sobre min → km)
+numeric.unit_cumtrapz(xs, ys)                  // Array<Quantity<X * Y>>
+numeric.unit_gradient(xs, ys)                  // Array<Quantity<Y / X>>
+numeric.unit_interp(xs, ys, x)                 // Quantity<Y>; x en cualquier unidad de X
 ```
+
+Las funciones `unit_*` se escriben con aritmética de cantidades escalares (`xs[i] - xs[i-1]`,
+`ys[i] + ys[i-1]`), así que la unidad del resultado sale de las reglas de siempre y no hace falta
+ningún caso especial en el runtime. Requieren al menos dos muestras.
 
 ## 3. Algoritmos
 
@@ -60,6 +70,12 @@ numeric.ifft(spec)  numeric.frequencies(n, dt)  numeric.amplitude(spec)
   argumentos temporales de los métodos, `fig.describe("..." + texto)` dejaba el campo apuntando a
   memoria liberada (ASan: heap-use-after-free en `render`). Ahora retiene y libera como la ruta AST.
 
+Para escribirlas hizo falta que los genéricos de dimensión se infieran dentro de contenedores:
+`fn f<X: Dimension>(xs: Array<Quantity<X>>) -> Quantity<X>` dejaba `X` sin sustituir en el tipo de
+retorno (y `f(t) as min` fallaba con E1026). El checker recorre ahora `Array`, `List`, `Set`, `Map`
+y tipos función para enlazar `X`, y una segunda aparición con otra dimensión es E1042
+(`examples/unit_generic_errors.ostrin`).
+
 ## 5. Límites y siguientes pasos
 
 | Pendiente | Nota |
@@ -68,4 +84,4 @@ numeric.ifft(spec)  numeric.frequencies(n, dt)  numeric.amplitude(spec)
 | eventos y salida densa en ODE | detener la integración en un cruce; interpolar entre pasos |
 | cuadratura adaptativa, integrales múltiples | Gauss–Kronrod |
 | optimización multivariable | Nelder–Mead, BFGS |
-| unidades en `std.numeric` | hoy trabaja con `Float`; con `Array<Quantity<D>>` se puede llamar a `.values()` |
+| unidades en ODEs y raíces | `unit_*` cubre integrales, derivadas e interpolación; `rk45` y `newton` siguen en `Float` (un estado con dimensiones mezcladas necesitaría tuplas o records de cantidades) |

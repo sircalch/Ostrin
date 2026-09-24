@@ -231,6 +231,54 @@ impl Spline {
     }
 }
 
+// ---------------------------------------------------------------- with units
+
+// These take arrays of quantities (`Array<Quantity<D>>`), so the result
+// carries the right unit: speeds in km/h over times in h integrate to km.
+// Each array needs at least two samples; xs must be increasing.
+
+/// The trapezoid-rule integral of ys over xs: `Quantity<X * Y>`.
+pub fn unit_trapz<X: Dimension, Y: Dimension>(xs: Array<Quantity<X>>, ys: Array<Quantity<Y>>) -> Quantity<X * Y> {
+    mut total = (xs[1] - xs[0]) * ys[0] * 0.0
+    for i in 1 until xs.length() {
+        total = total + (xs[i] - xs[i - 1]) * (ys[i] + ys[i - 1]) * 0.5
+    }
+    total
+}
+
+/// The running trapezoid integral: element i integrates up to xs[i] (the first is zero).
+pub fn unit_cumtrapz<X: Dimension, Y: Dimension>(xs: Array<Quantity<X>>, ys: Array<Quantity<Y>>) -> Array<Quantity<X * Y>> {
+    mut total = (xs[1] - xs[0]) * ys[0] * 0.0
+    mut out: List<Quantity<X * Y>> = [total]
+    for i in 1 until xs.length() {
+        total = total + (xs[i] - xs[i - 1]) * (ys[i] + ys[i - 1]) * 0.5
+        out.push(total)
+    }
+    array(out)
+}
+
+/// dy/dx at every sample: central differences inside, one-sided at the ends.
+pub fn unit_gradient<X: Dimension, Y: Dimension>(xs: Array<Quantity<X>>, ys: Array<Quantity<Y>>) -> Array<Quantity<Y / X>> {
+    n = xs.length()
+    mut out: List<Quantity<Y / X>> = []
+    for i in 0 until n {
+        lo = if i == 0 { 0 } else { i - 1 }
+        hi = if i == n - 1 { n - 1 } else { i + 1 }
+        out.push((ys[hi] - ys[lo]) / (xs[hi] - xs[lo]))
+    }
+    array(out)
+}
+
+/// Linear interpolation of (xs, ys) at x, in any unit of X; the result is in ys' unit.
+pub fn unit_interp<X: Dimension, Y: Dimension>(xs: Array<Quantity<X>>, ys: Array<Quantity<Y>>, x: Quantity<X>) -> Quantity<Y> {
+    // x in the unit of xs (a sum takes the left operand's unit).
+    at = (xs[0] * 0.0 + x).value()
+    values = xs.values()
+    i = segment(values, at)
+    frac = (at - values[i]) / (values[i + 1] - values[i])
+    ys[i] + (ys[i + 1] - ys[i]) * frac
+}
+
 // ---------------------------------------------------------------- ODEs
 
 /// A trajectory: times `t` and states `y` (one row per time).

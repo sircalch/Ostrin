@@ -22,7 +22,7 @@ tests or an explicitly labeled early-stage surface.
 
 ## Verified inventory
 
-- **239** `.ostrin` source files under `examples/`, including package-project sources and
+- **241** `.ostrin` source files under `examples/`, including package-project sources and
   intentional error cases.
 - **24** Markdown design documents under `docs/design/`.
 - Compiler suite: **214 integration**, **6 differential** and **2 unit** tests.

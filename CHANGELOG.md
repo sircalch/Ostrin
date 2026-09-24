@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Numerical methods with units
+- `numeric.unit_trapz`, `unit_cumtrapz`, `unit_gradient` and `unit_interp` take
+  `Array<Quantity<D>>` and return values with the implied unit: speeds in km/h over minutes
+  integrate to km, and their gradient is in km/h^2 (convert with `as m/s^2`). Example
+  `numeric_units`.
+- Dimension generics are inferred inside containers: `fn f<X: Dimension>(xs: Array<Quantity<X>>) ->
+  Quantity<X>` now returns the argument's dimension, and a conflicting second binding is E1042.
+
 ### Visualization: animation
 - `viz.animate(frames, fps)` combines rendered figures or 3D scenes into one SVG that loops them with
   CSS keyframes: no scripts, so it also plays as an `<img>`. Hovering pauses it, reduced-motion
