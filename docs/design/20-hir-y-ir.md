@@ -94,6 +94,8 @@ Sobre este IR se hacen los análisis que el texto C no permite:
 
 1. **HIR + verificador + `--hir`** para *todo* lo que el checker tipa; medida de cobertura por ejemplo (ratchet).
    `--native-type-report` publica también `ir-generated`, `hir-generated` y `ast-fallback`.
+   El mismo informe agrupa esas cifras por archivo fuente con líneas `native-source`, y la
+   prueba diferencial comprueba que la suma por módulo coincide con los totales globales.
    La prueba diferencial conserva el baseline actual de fallback (1 432 funciones agregadas
    sobre los ejemplos) y solo permite reducirlo o justificar explícitamente un aumento.
    Los destructores de tareas generados se registran con la firma ABI `void (*)(void*)` del

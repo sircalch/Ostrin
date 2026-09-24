@@ -46,7 +46,7 @@
 //! interpreter, i.e. already a value type there.
 
 use std::cell::RefCell;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 
 use crate::ast::*;
 use crate::symbols::type_to_string;
@@ -1347,6 +1347,16 @@ struct VariantInfo {
 
 /// How the backend's own type inference compares with the checker's
 /// (the typed-expression table), expression by expression.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct NativeSourceReport {
+    /// Functions whose C body was generated from the explicit IR.
+    pub ir_generated: usize,
+    /// Functions whose C body was generated from the typed HIR.
+    pub hir_generated: usize,
+    /// Functions that still use the legacy AST emitter.
+    pub ast_fallback: usize,
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct NativeTypeReport {
     /// Expressions where both agree.
@@ -1373,9 +1383,32 @@ pub struct NativeTypeReport {
     /// Functions that still use the legacy AST emitter after IR and HIR reject
     /// the body. This is the migration debt tracked by the native ratchet.
     pub ast_fallback: usize,
+    /// The same backend-generation counts grouped by stable source module.
+    /// This avoids absolute checkout paths in compiler output.
+    pub native_by_source: BTreeMap<String, NativeSourceReport>,
     /// The same comparison, but for *every* expression node (operands included), by node address.
     pub node_agreed: usize,
     pub node_unchecked: usize,
+}
+
+fn native_source_key(source: Option<&str>) -> String {
+    let normalized = source.unwrap_or("<generated>").replace('\\', "/");
+    for marker in ["examples/", "compiler/std/", "std/"] {
+        if let Some(index) = normalized.find(marker) {
+            return normalized[index..].to_string();
+        }
+    }
+    normalized
+}
+
+fn native_source_report<'a>(
+    report: &'a mut NativeTypeReport,
+    source: Option<&str>,
+) -> &'a mut NativeSourceReport {
+    report
+        .native_by_source
+        .entry(native_source_key(source))
+        .or_default()
 }
 
 /// A method with its own type parameters (`fn map<U>(self, ..)`), kept
@@ -9180,13 +9213,19 @@ fn generate_impl(
             Some(text) => {
                 if used_ir {
                     codegen.type_report.ir_generated += 1;
+                    native_source_report(&mut codegen.type_report, f.source_file.as_deref())
+                        .ir_generated += 1;
                 } else {
                     codegen.type_report.hir_generated += 1;
+                    native_source_report(&mut codegen.type_report, f.source_file.as_deref())
+                        .hir_generated += 1;
                 }
                 body = text;
             }
             None => {
                 codegen.type_report.ast_fallback += 1;
+                native_source_report(&mut codegen.type_report, f.source_file.as_deref())
+                    .ast_fallback += 1;
                 codegen.gen_function_body(f, &return_type, &mut body)?;
             }
         }
@@ -9235,10 +9274,14 @@ fn generate_impl(
         match hir_method {
             Some(text) => {
                 codegen.type_report.hir_generated += 1;
+                native_source_report(&mut codegen.type_report, decl.source_file.as_deref())
+                    .hir_generated += 1;
                 body = text;
             }
             None => {
                 codegen.type_report.ast_fallback += 1;
+                native_source_report(&mut codegen.type_report, decl.source_file.as_deref())
+                    .ast_fallback += 1;
                 codegen.gen_callable_body(
                     &decl.params,
                     &decl.body,
@@ -9943,12 +9986,18 @@ fn generate_impl(
             }
             if let Some(text) = from_ir {
                 codegen.type_report.ir_generated += 1;
+                native_source_report(&mut codegen.type_report, job.decl.source_file.as_deref())
+                    .ir_generated += 1;
                 body = text;
             } else if let Some(text) = from_hir {
                 codegen.type_report.hir_generated += 1;
+                native_source_report(&mut codegen.type_report, job.decl.source_file.as_deref())
+                    .hir_generated += 1;
                 body = text;
             } else {
                 codegen.type_report.ast_fallback += 1;
+                native_source_report(&mut codegen.type_report, job.decl.source_file.as_deref())
+                    .ast_fallback += 1;
                 codegen.gen_callable_body(
                     &job.decl.params,
                     &job.decl.body,

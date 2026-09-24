@@ -10,6 +10,7 @@
 //!   fuzzing of the lexer/parser/checker: bad input may produce errors but
 //!   must never panic.
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 use std::process::{Command, Output};
@@ -323,6 +324,7 @@ fn native_backend_types_agree_with_the_checker() {
     let mut hir_generated = 0usize;
     let mut ir_generated = 0usize;
     let mut ast_fallback = 0usize;
+    let mut native_sources: BTreeMap<String, (usize, usize, usize)> = BTreeMap::new();
     let (mut agreed, mut partial, mut completed, mut unchecked, mut node_agreed, mut divergences) =
         (0usize, 0usize, 0usize, 0usize, 0usize, Vec::<String>::new());
     for path in examples() {
@@ -350,6 +352,23 @@ fn native_backend_types_agree_with_the_checker() {
                 ir_generated += n.trim().parse::<usize>().unwrap();
             } else if let Some(n) = line.strip_prefix("ast-fallback: ") {
                 ast_fallback += n.trim().parse::<usize>().unwrap();
+            } else if let Some(rest) = line.strip_prefix("native-source: ") {
+                let mut fields = rest.split_whitespace();
+                let source = fields.next().unwrap_or("<unknown>").to_string();
+                let mut counts = (0usize, 0usize, 0usize);
+                for field in fields {
+                    if let Some(n) = field.strip_prefix("ir=") {
+                        counts.0 = n.parse().unwrap();
+                    } else if let Some(n) = field.strip_prefix("hir=") {
+                        counts.1 = n.parse().unwrap();
+                    } else if let Some(n) = field.strip_prefix("ast=") {
+                        counts.2 = n.parse().unwrap();
+                    }
+                }
+                let entry = native_sources.entry(source).or_default();
+                entry.0 += counts.0;
+                entry.1 += counts.1;
+                entry.2 += counts.2;
             } else if let Some(n) = line.strip_prefix("unchecked: ") {
                 unchecked += n.trim().parse::<usize>().unwrap();
             } else if let Some(n) = line.strip_prefix("completed: ") {
@@ -375,6 +394,15 @@ fn native_backend_types_agree_with_the_checker() {
     );
     println!("functions generated from HIR/IR: {native_generated} (HIR {hir_generated}, IR {ir_generated})");
     println!("functions still using AST fallback: {ast_fallback}");
+    let source_ir: usize = native_sources.values().map(|counts| counts.0).sum();
+    let source_hir: usize = native_sources.values().map(|counts| counts.1).sum();
+    let source_ast: usize = native_sources.values().map(|counts| counts.2).sum();
+    assert_eq!(
+        (source_ir, source_hir, source_ast),
+        (ir_generated, hir_generated, ast_fallback),
+        "per-source native metrics do not add up to the global report"
+    );
+    println!("native source modules measured: {}", native_sources.len());
     // This is intentionally the current repository-wide baseline. Lower it
     // whenever a backend family moves from AST to HIR/IR; a new example that
     // increases the total must update the limit only with an explicit reason.
