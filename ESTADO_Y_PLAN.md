@@ -2,9 +2,9 @@
 
 *Corte: 2026-09-23 · rama `main` · 6 pruebas diferenciales, 200 de integración y 2 unitarias en verde.*
 
-Validación remota: Pages de `36abf4c` pasó; CI Ubuntu detectó una expectativa de orden
-total en una prueba de hilos nativos. La corrección valida los pares concurrentes sin
-orden y conserva las barreras de `join()`/scope y cero fugas; nueva CI pendiente.
+Validación remota: Pages y CI pasaron para `8bc24bd` en Windows, Linux, macOS y web. La
+prueba de hilos nativos valida los pares concurrentes sin imponer un orden del planificador
+y conserva las barreras de `join()`/scope y cero fugas.
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
 Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–250); para el diseño

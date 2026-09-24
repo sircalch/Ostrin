@@ -6500,5 +6500,5 @@ concurrentes: `main`/`task` y `scope-body`/`scope-task`. La prueba exige exactam
 líneas, compara cada par sin imponer orden y mantiene `42` después de `join()` y `7`
 después del drenado del scope. Se conserva la comprobación `live_allocations=0`.
 
-El bloque anterior pasó localmente 2 unitarias, 6 diferenciales y 200 de integración;
-Pages remoto pasó, pero CI requiere validar esta corrección antes de declararse verde.
+El bloque anterior pasó localmente 2 unitarias, 6 diferenciales y 200 de integración.
+Después de la corrección, CI y Pages pasaron en Windows, Linux, macOS y web para `8bc24bd`.
