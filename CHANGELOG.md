@@ -25,6 +25,12 @@
   ohm`; `atm` is 101 325 Pa (it was 1 Pa). Named dimensions (`Velocity`, `Force`, `Energy`,
   `Pressure`, `Power`, …) expand to base dimensions; diagnostics print `Mass*Length^2/Time^2 (Energy)`.
 - `q.value()` and `q.unit()` expose a quantity's number and unit.
+- `Array<Quantity<D>>`: an array with one unit (`array([1 m, 250 cm])`, `linspace(...) as s`,
+  `speeds as km/h`). Elementwise `+ - * /` and comparisons follow the scalar rules (dimensionless
+  results are `Array<Float>`), `a[i]`, slices and masks keep the unit, and `sum`/`min`/`max`/`mean`/
+  `median`/`std`/`percentile` return quantities (`var` squares the unit). Interpreter and native
+  output are identical (`quantity_arrays.ostrin`); `std.viz` plots them with `unit_line` and
+  `unit_scatter`.
 
 ### Compiler
 - Scientific notation for Float literals (`6.022e23`, `1e-9`, `2.5E+3`).

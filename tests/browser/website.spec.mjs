@@ -179,6 +179,6 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   await run.click();
   await expect(page.locator("#viz-units .sl-provenance")).toHaveAttribute("data-state", "live", { timeout: 30_000 });
   await expect(page.locator("#viz-units img.viz-image")).toHaveAttribute("src", /^data:image\/svg\+xml/);
-  await expect(page.locator("#viz-units .viz-printed")).toHaveText("top speed 97.91999999999999 km/h");
+  await expect(page.locator("#viz-units .viz-printed")).toHaveText("top speed 97.91999999999999 km/h, distance 0.764 km");
   expect(runtimeErrors).toEqual([]);
 });

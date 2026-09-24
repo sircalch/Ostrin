@@ -467,6 +467,22 @@ impl Figure {
         self.add(Series { kind: s.kind, xs: s.xs, ys: s.ys, zs: s.zs, lo: s.lo, hi: s.hi, grid: z, label: "", color: color, width: 1.2, dash: "", size: s.size, colormap: colormap, levels: levels })
     }
 
+    /// Line of two arrays of quantities (`Array<Quantity<D>>`): the numbers
+    /// in each array's unit, and the axes labelled with those units.
+    fn unit_line<X: Dimension, Y: Dimension>(mut self, xs: Array<Quantity<X>>, ys: Array<Quantity<Y>>, label: String = "", color: String = "", width: Float = 2.0, dash: String = "") -> Figure {
+        self.xunit = xs.unit()
+        self.yunit = ys.unit()
+        s = series("line", xs.values(), ys.values(), label, color)
+        self.add(Series { kind: s.kind, xs: s.xs, ys: s.ys, zs: s.zs, lo: s.lo, hi: s.hi, grid: s.grid, label: s.label, color: s.color, width: width, dash: dash, size: s.size, colormap: s.colormap, levels: 0 })
+    }
+
+    fn unit_scatter<X: Dimension, Y: Dimension>(mut self, xs: Array<Quantity<X>>, ys: Array<Quantity<Y>>, label: String = "", color: String = "", size: Float = 3.5) -> Figure {
+        self.xunit = xs.unit()
+        self.yunit = ys.unit()
+        s = series("scatter", xs.values(), ys.values(), label, color)
+        self.add(Series { kind: s.kind, xs: s.xs, ys: s.ys, zs: s.zs, lo: s.lo, hi: s.hi, grid: s.grid, label: s.label, color: s.color, width: s.width, dash: "", size: size, colormap: s.colormap, levels: 0 })
+    }
+
     /// Line of quantities: the numbers are taken in the first element's
     /// unit and the axes are labelled with those units.
     fn quantity_line<X: Dimension, Y: Dimension>(mut self, xs: List<Quantity<X>>, ys: List<Quantity<Y>>, label: String = "", color: String = "") -> Figure {

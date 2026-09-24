@@ -37,7 +37,7 @@
         <div class="viz-steps">
           <article><span class="feature-number">01 / DESCRIBE</span><h2>A figure is a value.</h2><p class="muted"><span class="mono">viz.figure(title)</span> and <span class="mono">viz.scene3d(title)</span> return records; each mark (line, band, histogram, heatmap, surface…) appends a series. Named and default arguments keep calls short.</p></article>
           <article><span class="feature-number">02 / LAY OUT</span><h2>Ostrin does the geometry.</h2><p class="muted">1-2-5 ticks, legends placed in the emptiest corner, marching-squares contours, an orthographic camera, painter's algorithm and directional light: all of it is Ostrin code.</p></article>
-          <article><span class="feature-number">03 / RENDER</span><h2>Standalone SVG.</h2><p class="muted"><span class="mono">fig.svg()</span> returns the document and <span class="mono">fig.save(path)</span> writes it. Units travel with the data: plotting <span class="mono">List&lt;Quantity&gt;</span> labels the axes <span class="mono">speed [km/h]</span>.</p></article>
+          <article><span class="feature-number">03 / RENDER</span><h2>Standalone SVG.</h2><p class="muted"><span class="mono">fig.svg()</span> returns the document and <span class="mono">fig.save(path)</span> writes it. Units travel with the data: plotting <span class="mono">Array&lt;Quantity&lt;D&gt;&gt;</span> labels the axes <span class="mono">speed [km/h]</span>.</p></article>
         </div>
         <div class="code-window viz-snippet"><div class="window-bar"><span></span><span>examples/viz_units.ostrin</span><span></span></div><pre class="sl-code"><code>import std.viz
 
@@ -47,7 +47,7 @@ fn main() -&gt; Void {
     in_kmh = speeds.map(fn(v) { v as km/h })
     fig = viz.figure("Car acceleration")
         .labels("time", "speed")
-        .quantity_line(times, in_kmh, label: "measured")
+        .unit_line(times, in_kmh, label: "measured")
     print(fig.svg())   // axes: "time [s]" and "speed [km/h]"
 }</code></pre></div>
       </section>
@@ -56,10 +56,10 @@ fn main() -&gt; Void {
       </section>
       <section class="section shell viz-status"><div class="section-header"><p class="eyebrow">Status</p><div><h2>What std.viz does today, and what is next.</h2></div></div>
         <div class="viz-matrix">
-          <article><h3>Available</h3><ul><li>line, scatter, area, band, error bars, bars, histogram, stairs, reference lines, notes</li><li>heatmap with colorbar, contour lines</li><li>3D surface, wireframe, trajectory, point cloud; azimuth/elevation camera</li><li>legends, 1-2-5 ticks, light and dark themes, viridis/magma/coolwarm/ocean</li><li>multi-panel layouts with <span class="mono">viz.grid</span></li><li>axis units from <span class="mono">Quantity</span> data</li></ul></article>
+          <article><h3>Available</h3><ul><li>line, scatter, area, band, error bars, bars, histogram, stairs, reference lines, notes</li><li>heatmap with colorbar, contour lines</li><li>3D surface, wireframe, trajectory, point cloud; azimuth/elevation camera</li><li>legends, 1-2-5 ticks, light and dark themes, viridis/magma/coolwarm/ocean</li><li>multi-panel layouts with <span class="mono">viz.grid</span></li><li>axis units from <span class="mono">Array&lt;Quantity&lt;D&gt;&gt;</span> or <span class="mono">List&lt;Quantity&lt;D&gt;&gt;</span> data</li></ul></article>
           <article><h3>Planned</h3><ul><li>interaction: zoom, pan, hover, tooltips</li><li>animation frames</li><li>PNG and PDF export (needs a raster backend)</li><li>a WebGPU backend for large meshes, volumes and iso-surfaces</li><li>uncertainty-aware plots once <span class="mono">Measurement&lt;T&gt;</span> exists</li><li>figure provenance (source and data hashes, seed)</li></ul></article>
         </div>
-        <p class="sl-limits"><strong>Current limits: </strong>rendering is CPU-side SVG, comfortable up to a few thousand triangles; Ostrin arrays cannot hold quantities yet, so unit-aware plots take <span class="mono">List&lt;Quantity&lt;D&gt;&gt;</span>.</p>
+        <p class="sl-limits"><strong>Current limits: </strong>rendering is CPU-side SVG, comfortable up to a few thousand triangles.</p>
       </section>
     </main>
     <footer class="site-footer shell"><a class="brand" href="index.html"><img src="assets/ostrin-logo.png" alt="" width="30" height="30"><span>OSTRIN</span></a><span>Open development · MIT License</span><div class="footer-links"><a href="language.html">Language</a><a href="ecosystem.html">Ecosystem</a><a href="showcase.html">Showcase</a><a href="community.html">Community</a><a href="roadmap.html">Roadmap</a><a href="https://github.com/sircalch/Ostrin">GitHub ↗</a></div></footer>

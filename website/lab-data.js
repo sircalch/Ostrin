@@ -470,7 +470,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
         "label": "quantities and units",
         "href": "language.html#quantities"
       },
-      "limits": "as converts to compound units (km/h, m/s^2) and derived units print simplified (kg*m^2/s^2). Arrays of quantities and user-defined units (unit/define) are specified but not implemented yet.",
+      "limits": "as converts to compound units (km/h, m/s^2), derived units print simplified (kg*m^2/s^2) and Array<Quantity<D>> keeps one unit per array. User-defined units (unit/define) and affine units (°C) are specified but not implemented yet.",
       "files": {
         "main.ostrin": "// Scientific Lab · Units\n// Projectile motion with dimensions checked by the compiler.\nfn flight_time(vertical: Quantity<Length / Time>, g: Quantity<Length / Time / Time>) -> Quantity<Time> {\n    2.0 * vertical / g\n}\n\nfn two(x: Float) -> String {\n    (round(x * 100.0) / 100.0).to_string()\n}\n\nfn main() -> Void {\n    launch_speed = 20.0\n    angle_degrees = 45.0\n\n    g = 9.81 m / (1 s * 1 s)\n    speed = launch_speed * (1 m / 1 s)\n    angle = angle_degrees * pi() / 180.0\n    vertical = speed * sin(angle)\n    horizontal = speed * cos(angle)\n\n    t = flight_time(vertical, g)\n    range = horizontal * t\n    height = vertical * vertical / (2.0 * g)\n\n    // Dividing by a unit only compiles when the dimensions match.\n    print(\"flight time: \" + two(t / (1 s)) + \" s\")\n    print(\"range: \" + two(range / (1 m)) + \" m = \" + two((range as km) / (1 km)) + \" km\")\n    print(\"peak height: \" + two((height as cm) / (1 cm)) + \" cm\")\n    print(\"lands between 30 m and 50 m: \" + (range within (30 m to 50 m)).to_string())\n    print(1500 m as km)\n    print((90 min) as h)\n}\n"
       },
@@ -673,10 +673,10 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "blurb": "Quantities converted to km/h: the axis labels come from the units in the data.",
       "source": "examples/viz_units.ostrin",
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_units.ostrin",
-      "code": "// std.viz · unit-aware plots: axes are labelled with the units the data carries.\nimport std.viz\n\nfn main() -> Void {\n    times = [0 s, 5 s, 10 s, 15 s, 20 s, 25 s, 30 s, 35 s, 40 s]\n    speeds = [0 m/s, 6.1 m/s, 11.4 m/s, 15.8 m/s, 19.4 m/s, 22.3 m/s, 24.5 m/s, 26.1 m/s, 27.2 m/s]\n    // Converting the data converts the axis: the chart is in km/h.\n    in_kmh = speeds.map(fn(v) { v as km/h })\n    print(\"top speed \" + in_kmh[8].to_string())\n    fig = viz.figure(\"Car acceleration\")\n        .describe(\"the axis units come from the quantities\")\n        .labels(\"time\", \"speed\")\n        .quantity_line(times, in_kmh, label: \"measured\")\n        .quantity_scatter(times, in_kmh)\n    print(fig.svg())\n}\n",
+      "code": "// std.viz · unit-aware plots: axes are labelled with the units the data carries.\nimport std.viz\n\nfn main() -> Void {\n    times = linspace(0.0, 40.0, 9) as s\n    speeds = array([0.0, 6.1, 11.4, 15.8, 19.4, 22.3, 24.5, 26.1, 27.2]) as m/s\n    // Converting the data converts the axis: the chart is in km/h.\n    in_kmh = speeds as km/h\n    distance = (speeds * (5 s)).cumsum()\n    print(\"top speed \" + in_kmh.max().to_string() + \", distance \" + (distance.max() as km).to_string())\n    fig = viz.figure(\"Car acceleration\")\n        .describe(\"the axis units come from the quantities\")\n        .labels(\"time\", \"speed\")\n        .unit_line(times, in_kmh, label: \"measured\")\n        .unit_scatter(times, in_kmh)\n    print(fig.svg())\n}\n",
       "svg": "assets/viz/units.svg",
       "printed": [
-        "top speed 97.91999999999999 km/h",
+        "top speed 97.91999999999999 km/h, distance 0.764 km",
         ""
       ]
     },

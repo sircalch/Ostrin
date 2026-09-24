@@ -11,6 +11,7 @@ use crate::ast::*;
 use crate::protocol;
 
 mod array;
+mod qarray;
 mod detmath;
 mod regress;
 mod math;
@@ -2026,6 +2027,7 @@ impl Interpreter {
                         Some(f) => self.call_user_function(&f, vec![v.clone()], env.clone()),
                         None => Err(RuntimeError::Error(format!("'{}' has no 'neg' method", value_type_name(&v)))),
                     },
+                    (UnaryOp::Neg, Value::Array(_)) if qarray::unit_of(&v).is_some() => qarray::negate(&v),
                     (UnaryOp::Neg, Value::Array(_)) => array::negate(&v),
                     (UnaryOp::Not, Value::Array(_)) => array::not_array(&v),
                     (UnaryOp::Neg, Value::Quantity(n, d, u)) => Ok(Value::Quantity(-n, d.clone(), u.clone())),
@@ -2061,7 +2063,10 @@ impl Interpreter {
                 let lo = as_i64(&self.eval_expr(start, env)?)?;
                 let hi = as_i64(&self.eval_expr(end, env)?)? + if *kind == RangeKind::To { 1 } else { 0 };
                 match ov {
-                    Value::Array(a) => array::slice(&a, lo, hi),
+                    Value::Array(a) => {
+                        let unit = a.borrow().unit.clone();
+                        Ok(qarray::with_unit(&array::slice(&a, lo, hi)?, unit))
+                    }
                     other => Err(RuntimeError::Error(format!("cannot slice '{other}'"))),
                 }
             }
@@ -2069,7 +2074,8 @@ impl Interpreter {
                 let ov = self.eval_expr(obj, env)?;
                 let index_value = self.eval_expr(idx, env)?;
                 if let (Value::Array(a), Value::Array(_)) = (&ov, &index_value) {
-                    return array::index_mask(a, &index_value);
+                    let unit = a.borrow().unit.clone();
+                    return Ok(qarray::with_unit(&array::index_mask(a, &index_value)?, unit));
                 }
                 let iv = as_i64(&index_value)?;
                 match ov {
@@ -2078,7 +2084,13 @@ impl Interpreter {
                         .get(iv as usize)
                         .cloned()
                         .ok_or_else(|| RuntimeError::Error(format!("index out of bounds: {iv}"))),
-                    Value::Array(a) => array::index1(&a, iv),
+                    Value::Array(a) => {
+                        let element = array::index1(&a, iv)?;
+                        match a.borrow().unit.clone() {
+                            Some(unit) => qarray::index(element, &unit),
+                            None => Ok(element),
+                        }
+                    }
                     other => Err(RuntimeError::Error(format!("cannot index '{other}'"))),
                 }
             }
@@ -2222,6 +2234,9 @@ impl Interpreter {
                     let dim = resolve_unit_expr(sym).map_err(|u| RuntimeError::Error(format!("unknown unit '{u}'")))?;
                     // A quantity is converted into the target unit; a pure number
                     // is given that unit (document 01, §3.3–3.4).
+                    if let Value::Array(_) = &value {
+                        return qarray::as_unit(&value, sym);
+                    }
                     let v = match &value {
                         Value::Quantity(v, _, from) => convert(*v, from, sym)?,
                         other => as_f64(other)?,
@@ -2672,7 +2687,8 @@ impl Interpreter {
                 }
                 ("array", 1) => {
                     let list = self.eval_arg(&args[0], env)?;
-                    return array::from_list(&list);
+                    let made = array::from_list(&list)?;
+                    return Ok(qarray::from_quantities(&made)?.unwrap_or(made));
                 }
                 ("zeros", 1) | ("ones", 1) => {
                     let shape = self.eval_arg(&args[0], env)?;
@@ -2849,7 +2865,11 @@ impl Interpreter {
                 for arg in args {
                     values.push(self.eval_arg(arg, env)?);
                 }
-                return array::call_method(state, method, values);
+                let unit = state.borrow().unit.clone();
+                return match unit {
+                    Some(unit) => qarray::call_method(state, &unit, method, values),
+                    None => array::call_method(state, method, values),
+                };
             }
             if let Value::Set(state) = &receiver {
                 match method.as_str() {
@@ -3484,6 +3504,9 @@ fn f32_binary(op: BinOp, lv: Value, rv: Value) -> EvalResult {
 fn eval_binary_builtin(op: BinOp, lv: Value, rv: Value) -> EvalResult {
     use BinOp::*;
     if matches!(lv, Value::Array(_)) || matches!(rv, Value::Array(_)) {
+        if let Some(result) = qarray::binary(op, &lv, &rv) {
+            return result;
+        }
         return array::binary(op, lv, rv);
     }
     if matches!(lv, Value::Sized(..)) || matches!(rv, Value::Sized(..)) {

@@ -1,0 +1,8 @@
+// Dimension errors on arrays of quantities are compile-time errors.
+fn main() -> Void {
+    d = array([1 m, 2 m])
+    t = linspace(0.0, 1.0, 2) as s
+    print(d + t)
+    print(d as h)
+    print(d + 1.0)
+}

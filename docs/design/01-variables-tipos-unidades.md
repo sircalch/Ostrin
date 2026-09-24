@@ -301,6 +301,14 @@ Estado real del compilador, que concreta §3.1–§3.5:
 - **Introspección**: `q.value()` (número en su propia unidad) y `q.unit()` (texto de la unidad),
   usados por `std.viz` para etiquetar ejes.
 
-Pendiente: `unit`/`dimension`/`define` declarados por el usuario, arrays de cantidades y unidades
-afines (°C).
+- **Arrays de cantidades** (`Array<Quantity<D>>`, documento 19 §5): un array numérico más una unidad
+  común. `array([1 m, 250 cm])` toma la unidad del primer elemento; `linspace(0.0, 4.0, 5) as s` da
+  unidad a un `Array<Float>`; `+`, `-` y las comparaciones convierten el lado derecho a la unidad del
+  izquierdo; `*` y `/` combinan unidades como los escalares (un resultado sin dimensión es
+  `Array<Float>`); `a[i]`, `sum`, `min`, `max`, `mean`, `median`, `std`, `percentile` devuelven
+  cantidades y `var` la unidad al cuadrado; `a.unit()` y `a.values()` exponen unidad y números.
+  Intérprete (`interpreter/qarray.rs`) y nativo (`Array_Float` con campo `unit`, `ostrin_qa_*`) dan
+  los mismos bytes.
+
+Pendiente: `unit`/`dimension`/`define` declarados por el usuario y unidades afines (°C).
 

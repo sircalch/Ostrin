@@ -1004,9 +1004,10 @@ impl Checker {
                     ty = inner;
                     depth += 1;
                 }
-                if depth == 0 || !is_array_scalar(ty) {
+                // Quantities make an `Array<Quantity<D>>` in the first element's unit.
+                if depth == 0 || !(is_array_scalar(ty) || matches!(ty, Ty::Quantity(_))) {
                     if *ty != Ty::Unknown {
-                        self.push("E1041", format!("'array' expects a (nested) List of numbers, got '{}'.", arg_types[0].describe()));
+                        self.push("E1041", format!("'array' expects a (nested) List of numbers or quantities, got '{}'.", arg_types[0].describe()));
                     }
                     return Some(Ty::Unknown);
                 }
@@ -1180,8 +1181,66 @@ impl Checker {
     }
 
     /// Methods of `Array<T>`.
+    /// Operators where an array of quantities, or a Float array and a
+    /// quantity, meet: the element rules of `Quantity` applied elementwise.
+    fn check_quantity_array_binary(&mut self, op: BinOp, lt: &Ty, rt: &Ty) -> Option<Ty> {
+        use BinOp::*;
+        let element = |t: &Ty| array_elem(t).unwrap_or_else(|| t.clone());
+        let (le, re) = (element(lt), element(rt));
+        if !matches!(le, Ty::Quantity(_)) && !matches!(re, Ty::Quantity(_)) {
+            return None;
+        }
+        let numeric = |t: &Ty| matches!(t, Ty::Float | Ty::Int);
+        let arr = |t: Ty| Ty::Applied("Array".to_string(), vec![t]);
+        let invalid = |this: &mut Self| {
+            this.push(
+                "E1024",
+                format!("Invalid dimensional operation on arrays: '{}' and '{}'.", lt.describe(), rt.describe()),
+            );
+            Some(Ty::Unknown)
+        };
+        if array_elem(lt).is_some_and(|e| numeric(&e) && e != Ty::Float) || array_elem(rt).is_some_and(|e| numeric(&e) && e != Ty::Float) {
+            self.push("E1041", "Quantities combine with Array<Float>, not Array<Int> (use to_float()).".to_string());
+            return Some(Ty::Unknown);
+        }
+        match (op, &le, &re) {
+            (Add | Sub, Ty::Quantity(a), Ty::Quantity(b)) if a == b => Some(arr(le.clone())),
+            (Eq | NotEq | Lt | Gt | LtEq | GtEq, Ty::Quantity(a), Ty::Quantity(b)) if a == b => Some(arr(Ty::Bool)),
+            (Mul, Ty::Quantity(a), Ty::Quantity(b)) => Some(arr(Ty::Quantity(dim_mul(a, b)))),
+            (Div, Ty::Quantity(a), Ty::Quantity(b)) => {
+                let d = dim_div(a, b);
+                Some(arr(if dim_is_dimensionless(&d) { Ty::Float } else { Ty::Quantity(d) }))
+            }
+            (Mul | Div, Ty::Quantity(_), n) if numeric(n) => Some(arr(le.clone())),
+            (Mul, n, Ty::Quantity(_)) if numeric(n) => Some(arr(re.clone())),
+            (Div, n, Ty::Quantity(b)) if numeric(n) => Some(arr(Ty::Quantity(crate::types::dim_pow(b, -1)))),
+            _ => invalid(self),
+        }
+    }
+
     fn check_array_method(&mut self, receiver: &Ty, method: &str, arg_types: &[Ty]) -> Ty {
         let elem = array_elem(receiver).expect("called for arrays only");
+        if let Ty::Quantity(dim) = &elem {
+            // Array<Quantity<D>>: reductions keep the unit (var squares it).
+            let quantity = elem.clone();
+            return match method {
+                "unit" if arg_types.is_empty() => Ty::String,
+                "values" if arg_types.is_empty() => Ty::Applied("Array".to_string(), vec![Ty::Float]),
+                "sum" | "min" | "max" | "mean" | "median" | "std" | "sample_std" if arg_types.is_empty() => quantity,
+                "percentile" if arg_types.len() == 1 => quantity,
+                "get" => quantity,
+                "var" | "sample_var" if arg_types.is_empty() => Ty::Quantity(dim_mul(dim, dim)),
+                "to_list" if arg_types.is_empty() => Ty::List(Box::new(quantity)),
+                "sort" | "cumsum" | "transpose" if arg_types.is_empty() => receiver.clone(),
+                "reshape" | "row" | "col" if arg_types.len() == 1 => receiver.clone(),
+                "shape" if arg_types.is_empty() => Ty::List(Box::new(Ty::Int)),
+                "rank" | "size" | "length" | "count" if arg_types.is_empty() => Ty::Int,
+                other => {
+                    self.push("E1041", format!("Array method '{other}' isn't available on '{}' (with these arguments).", receiver.describe()));
+                    Ty::Unknown
+                }
+            };
+        }
         let list_int = Ty::List(Box::new(Ty::Int));
         let expected_count = match method {
             "shape" | "rank" | "size" | "length" | "count" | "sum" | "min" | "max" | "mean" | "to_list" | "transpose" | "var" | "std" | "sample_var" | "sample_std" | "median" | "cumsum" | "sort" | "to_float" | "any" | "all" | "count_true" => Some(0),
@@ -1826,6 +1885,30 @@ impl Checker {
                         return target;
                     }
                 }
+                if let (Expr::Ident(sym), Some(elem)) = (unit_expr.as_ref().unlocated(), array_elem(&source_ty)) {
+                    // `times as s` gives a Float array a unit; `speeds as km/h` converts.
+                    return match resolve_unit_expr(sym) {
+                        Ok(dim) => {
+                            match &elem {
+                                Ty::Quantity(source) if *source != dim => self.push(
+                                    "E1026",
+                                    format!(
+                                        "Cannot convert quantities of dimension {} to '{sym}', which measures {}.",
+                                        crate::types::dim_describe(source),
+                                        crate::types::dim_describe(&dim)
+                                    ),
+                                ),
+                                Ty::Quantity(_) | Ty::Float | Ty::Unknown => {}
+                                other => self.push("E1041", format!("Only Array<Float> or an array of quantities takes a unit with 'as', got Array<{}>.", other.describe())),
+                            }
+                            Ty::Applied("Array".to_string(), vec![Ty::Quantity(dim)])
+                        }
+                        Err(bad) => {
+                            self.push("E1010", format!("Unknown unit '{bad}' in '{sym}'."));
+                            Ty::Unknown
+                        }
+                    };
+                }
                 if let Expr::Ident(sym) = unit_expr.as_ref().unlocated() {
                     return match resolve_unit_expr(sym) {
                         Ok(dim) => {
@@ -2220,6 +2303,9 @@ impl Checker {
             };
         }
         if array_elem(&lt).is_some() || array_elem(&rt).is_some() {
+            if let Some(result) = self.check_quantity_array_binary(op, &lt, &rt) {
+                return result;
+            }
             let (left_elem, right_elem) = (array_elem(&lt), array_elem(&rt));
             let same = match (&left_elem, &right_elem) {
                 (Some(a), Some(b)) => a == b,

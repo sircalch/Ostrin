@@ -6656,3 +6656,16 @@ shim WASI servido por `page.route`). Después, `+` entre `String` libera los ope
 (concatenaciones y resultados de llamadas) en los emisores AST y HIR: la galería nativa pasa de
 233 855 a 18 652 asignaciones vivas al salir, con salida idéntica. Pendiente: argumentos `String`
 frescos pasados a funciones y a `push`, interacción, animación, PNG/PDF y WebGPU.
+
+## 273. Arrays de cantidades — 2026-09-24
+
+`Array<Quantity<D>>` con una unidad común por array (modelo NumPy+pint): en el intérprete,
+`ArrayData.unit`, y `interpreter/qarray.rs` aplica a los números las reglas de los escalares
+(`+`/`-`/comparaciones convierten el lado derecho a la unidad del izquierdo con la fórmula de
+`convert`; `*`/`/` usan `unit_combine` y su factor; un resultado sin dimensión es `Array<Float>`).
+En nativo, el mismo `Array_Float` con un campo `unit` (todas las instancias de array lo tienen, NULL
+para arrays simples) y los helpers `ostrin_qa_*`; `mangle_ctype(Array<Quantity>)` es `Array_Float`.
+El checker valida dimensiones (E1024/E1026) y tipa reducciones (`var` eleva la unidad al cuadrado).
+`std.viz` gana `unit_line`/`unit_scatter` y `viz_units.ostrin` usa arrays. Pruebas:
+`quantity_arrays.ostrin` (salida exacta y paridad) y `quantity_arrays_errors.ostrin`; suite 211
+integración, 6 diferenciales, 2 unitarias; Playwright 7/7.

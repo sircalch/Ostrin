@@ -2,15 +2,16 @@
 import std.viz
 
 fn main() -> Void {
-    times = [0 s, 5 s, 10 s, 15 s, 20 s, 25 s, 30 s, 35 s, 40 s]
-    speeds = [0 m/s, 6.1 m/s, 11.4 m/s, 15.8 m/s, 19.4 m/s, 22.3 m/s, 24.5 m/s, 26.1 m/s, 27.2 m/s]
+    times = linspace(0.0, 40.0, 9) as s
+    speeds = array([0.0, 6.1, 11.4, 15.8, 19.4, 22.3, 24.5, 26.1, 27.2]) as m/s
     // Converting the data converts the axis: the chart is in km/h.
-    in_kmh = speeds.map(fn(v) { v as km/h })
-    print("top speed " + in_kmh[8].to_string())
+    in_kmh = speeds as km/h
+    distance = (speeds * (5 s)).cumsum()
+    print("top speed " + in_kmh.max().to_string() + ", distance " + (distance.max() as km).to_string())
     fig = viz.figure("Car acceleration")
         .describe("the axis units come from the quantities")
         .labels("time", "speed")
-        .quantity_line(times, in_kmh, label: "measured")
-        .quantity_scatter(times, in_kmh)
+        .unit_line(times, in_kmh, label: "measured")
+        .unit_scatter(times, in_kmh)
     print(fig.svg())
 }

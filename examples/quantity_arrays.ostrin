@@ -1,0 +1,30 @@
+// Array<Quantity<D>>: one unit for the whole array, checked dimensions,
+// elementwise arithmetic and reductions that keep the unit.
+fn kinetic(m: Quantity<Mass>, v: Array<Quantity<Velocity>>) -> Array<Quantity<Energy>> {
+    0.5 * m * v * v
+}
+
+fn main() -> Void {
+    t = linspace(0.0, 4.0, 5) as s
+    d = array([0 m, 3 m, 12 m, 27 m, 4800 cm])
+    print(t)
+    print(d)
+    print(d[4])
+
+    v = d / (1 s)
+    print(v as km/h)
+    print(kinetic(2 kg, v) as kJ)
+
+    print(d.max() as km)
+    print(d.mean())
+    print(d.std())
+    print(d.var())
+    print(d + array([1 km, 1 km, 1 km, 1 km, 1 km]))
+    print(d > (10 m))
+    print(d / (1 km))
+    print(-d[1 until 3])
+    print(d.unit())
+    print(d.to_list())
+    print(1.0 / t[1 until 5])
+    print((linspace(0.0, 30.0, 4) as m/s) * (10 s))
+}

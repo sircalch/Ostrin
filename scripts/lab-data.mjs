@@ -117,7 +117,7 @@ export const LAB = [
     ],
     how: "Quantities carry their dimension in the type: flight_time only accepts a speed and an acceleration, and dividing by 1 m only compiles for a length. as converts between compatible units.",
     docs: { label: "quantities and units", href: "language.html#quantities" },
-    limits: "as converts to compound units (km/h, m/s^2) and derived units print simplified (kg*m^2/s^2). Arrays of quantities and user-defined units (unit/define) are specified but not implemented yet.",
+    limits: "as converts to compound units (km/h, m/s^2), derived units print simplified (kg*m^2/s^2) and Array<Quantity<D>> keeps one unit per array. User-defined units (unit/define) and affine units (°C) are specified but not implemented yet.",
   },
   {
     id: "data",

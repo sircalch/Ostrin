@@ -58,6 +58,8 @@ fig = viz.figure("Damped oscillator")          // 640 × 400, tema claro
     .hline(y) .vline(x) .text(x, y, "nota")
     .heatmap(z, x0, x1, y0, y1, colormap: "viridis", label: "z")
     .contour(z, x0, x1, y0, y1, levels: 8, colormap: "", color: "")
+    .unit_line(times, speeds)                    // Array<Quantity<X>>, Array<Quantity<Y>>
+    .unit_scatter(times, speeds)
     .quantity_line(times, speeds)                // List<Quantity<X>>, List<Quantity<Y>>
     .quantity_scatter(times, speeds)
 svg = fig.svg()
@@ -100,8 +102,8 @@ unidad del primer elemento (`q.value()`, convirtiendo los que usen otra unidad) 
 - `q.value()` y `q.unit()` sobre `Quantity` (intérprete y C), y `unit` como nombre de miembro;
 - inferencia de parámetros de dimensión en métodos genéricos (`Quantity<X>` con `X: Dimension`).
 
-Los arrays de cantidades (`Array<Quantity<D>>`, documento 19 §5) siguen pendientes; cuando existan,
-las marcas aceptarán arrays con unidades directamente.
+Con arrays de cantidades (`Array<Quantity<D>>`) se usan `unit_line`/`unit_scatter`, que toman
+`a.values()` y `a.unit()` directamente.
 
 ## 6. Hallazgos del compilador
 

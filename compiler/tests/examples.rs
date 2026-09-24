@@ -5410,7 +5410,7 @@ fn viz_figures_label_axes_with_the_units_of_their_quantities() {
     let out = interpreter_and_native_agree("viz_units.ostrin");
     assert!(out.contains(">time [s]</text>"), "missing x unit: {out}");
     assert!(out.contains(">speed [km/h]</text>"), "missing converted y unit: {out}");
-    assert!(out.starts_with("top speed 97.91999999999999 km/h\n<svg xmlns=\"http://www.w3.org/2000/svg\""));
+    assert!(out.starts_with("top speed 97.91999999999999 km/h, distance 0.764 km\n<svg xmlns=\"http://www.w3.org/2000/svg\""));
 }
 
 #[test]
@@ -5435,4 +5435,37 @@ fn viz_3d_scenes_and_heatmaps_render_their_marks() {
     let heat = stdout(&run(&["--run", &example_path("viz_heatmap.ostrin")]));
     assert!(heat.matches("<rect").count() > 48 * 48, "heatmap cells missing");
     assert_eq!(heat.matches("stroke=\"#ffffff\" stroke-width=\"1.2\"").count(), 10, "ten contour levels");
+}
+
+#[test]
+fn arrays_of_quantities_keep_one_unit_and_check_dimensions() {
+    let out = interpreter_and_native_agree("quantity_arrays.ostrin");
+    let lines: Vec<&str> = out.lines().collect();
+    assert_eq!(
+        lines,
+        [
+            "[0, 1, 2, 3, 4] s",
+            "[0, 3, 12, 27, 48] m",
+            "48 m",
+            "[0, 10.799999999999999, 43.199999999999996, 97.19999999999999, 172.79999999999998] km/h",
+            "[0, 0.009, 0.144, 0.729, 2.304] kJ",
+            "0.048 km",
+            "18 m",
+            "17.69745744450315 m",
+            "313.2 m^2",
+            "[1000, 1003, 1012, 1027, 1048] m",
+            "[false, false, true, true, true]",
+            "[0, 0.003, 0.012, 0.027, 0.048]",
+            "[-3, -12] m",
+            "m",
+            "[0 m, 3 m, 12 m, 27 m, 48 m]",
+            "[1, 0.5, 0.3333333333333333, 0.25] 1/s",
+            "[0, 100, 200, 300] m",
+        ]
+    );
+    let errors = run(&["--check", &example_path("quantity_arrays_errors.ostrin")]);
+    assert!(!errors.status.success());
+    let err = stderr(&errors);
+    assert!(err.contains("E1024") && err.contains("Array<Quantity<Length>>") && err.contains("Array<Quantity<Time>>"), "{err}");
+    assert!(err.contains("E1026") && err.contains("to 'h'"), "{err}");
 }

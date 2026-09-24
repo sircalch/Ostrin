@@ -280,7 +280,7 @@ fn map_type_with_subst(ty: &Type, types: &NamedTypes, subst: &HashMap<String, CT
         Type::Named(name, args) if name == "Task" && args.len() == 1 => Ok(CType::Task(Box::new(map_type_with_subst(&args[0], types, subst)?))),
         Type::Named(name, args) if name == "Array" && args.len() == 1 => {
             let elem = map_type_with_subst(&args[0], types, subst)?;
-            if matches!(elem, CType::Int | CType::Float | CType::Float32 | CType::Bool) {
+            if matches!(elem, CType::Int | CType::Float | CType::Float32 | CType::Bool | CType::Quantity(_)) {
                 Ok(CType::Array(Box::new(elem)))
             } else {
                 Err("Array<T> is only supported by the native backend for Int, Float, Float32 and Bool elements yet".to_string())
@@ -335,6 +335,38 @@ pub(crate) fn c_function_name(name: &str) -> String {
 /// Quantity runtime (unit table, conversion, arithmetic helpers), spliced in
 /// right after `PRELUDE` only when a program actually uses `Qty`.
 const QTY_RUNTIME: &str = include_str!("qty_runtime.c");
+/// `Array<Quantity<D>>` helpers (`Array_Float` plus a unit), mirroring `interpreter/qarray.rs`.
+const QUANTITY_ARRAY_RUNTIME: &str = "\
+/* Array<Quantity<D>>: an Array_Float whose `unit` names the unit of its numbers. */
+static Array_Float* ostrin_qa_tag(Array_Float* a, const char* unit) { a->unit = unit; return a; }
+static Array_Float* ostrin_qa_copy(Array_Float* a) {
+    Array_Float* r = Array_Float_alloc(a->rank, a->shape);
+    memcpy(r->data, a->data, sizeof(double) * (size_t)a->size);
+    return r;
+}
+/* A fresh copy of the numbers converted between units (the scalar convert formula). */
+static Array_Float* ostrin_qa_converted(Array_Float* a, const char* from, const char* to) {
+    Array_Float* r = ostrin_qa_copy(a);
+    if (strcmp(from, to) != 0) {
+        double ff = ostrin_unit_expr_factor(from), ft = ostrin_unit_expr_factor(to);
+        for (int64_t i = 0; i < r->size; i++) r->data[i] = r->data[i] * ff / ft;
+    }
+    return r;
+}
+static Array_Float* ostrin_qa_as(Array_Float* a, const char* to) {
+    Array_Float* r = a->unit ? ostrin_qa_converted(a, a->unit, to) : ostrin_qa_copy(a);
+    return ostrin_qa_tag(r, to);
+}
+static Array_Float* ostrin_qa_scale(Array_Float* a, double s) {
+    for (int64_t i = 0; i < a->size; i++) a->data[i] = a->data[i] * s;
+    return a;
+}
+static const char* ostrin_qa_show(Array_Float* a, const char* shown) {
+    if (!a->unit || !*a->unit) return shown;
+    const char* out = ostrin_str_concat(ostrin_str_concat(shown, \" \"), a->unit);
+    return out;
+}
+";
 
 /// Reproducible random generator, spliced in when a program uses `Rng`.
 const RNG_RUNTIME: &str = include_str!("rng_runtime.c");
@@ -1359,6 +1391,8 @@ struct Codegen<'a> {
     pending_results: VecDeque<(CType, CType)>,
     current_return: Vec<CType>,
     lambda_depth: usize,
+    /// An `Array<Quantity<D>>` appeared: emit the `ostrin_qa_*` helpers.
+    uses_quantity_arrays: bool,
     /// Enclosing-function scopes of the closures being generated (innermost last), plus what each captured.
     capture_frames: RefCell<Vec<CaptureFrame>>,
     closure_bodies: Vec<(String, String)>,
@@ -1498,6 +1532,8 @@ fn mangle_ctype(ty: &CType) -> String {
         CType::Sized(kind) => kind.name().to_string(),
         CType::Float32 => "Float32".to_string(),
         CType::Rng => "Rng".to_string(),
+        // An array of quantities is an `Array_Float` whose `unit` field names the unit.
+        CType::Array(t) if matches!(**t, CType::Quantity(_)) => "Array_Float".to_string(),
         CType::Array(t) => format!("Array_{}", mangle_ctype(t)),
         CType::Channel(t) => format!("Channel_{}", mangle_ctype(t)),
         CType::Task(t) => format!("Task_{}", mangle_ctype(t)),
@@ -2196,6 +2232,12 @@ impl<'a> Codegen<'a> {
             }
         }
         if let CType::Array(t) = ty {
+            if matches!(**t, CType::Quantity(_)) {
+                self.uses_quantity_arrays = true;
+                self.ensure_list(t);
+                self.register_list_types(&CType::Array(Box::new(CType::Float)));
+                return;
+            }
             self.register_list_types(t);
             if **t != CType::Bool {
                 // Comparisons produce (and masks consume) an `Array<Bool>`.
@@ -3673,6 +3715,10 @@ impl<'a> Codegen<'a> {
                         };
                         Ok((format!("{}({code})", info.c_name), info.return_type.clone()))
                     }
+                    UnaryOp::Neg if matches!(&ty, CType::Array(e) if matches!(**e, CType::Quantity(_))) => {
+                        let t = self.next_temp();
+                        Ok((format!("({{ Array_Float* {t} = {code}; ostrin_qa_tag(Array_Float_neg({t}), {t}->unit); }})"), ty))
+                    }
                     UnaryOp::Neg if matches!(ty, CType::Array(_)) => Ok((format!("{}_neg({code})", mangle_ctype(&ty)), ty)),
                     UnaryOp::Not if matches!(ty, CType::Array(_)) => Ok((format!("{}_not({code})", mangle_ctype(&ty)), ty)),
                     UnaryOp::Neg if matches!(ty, CType::Sized(_)) => {
@@ -3857,6 +3903,11 @@ impl<'a> Codegen<'a> {
                 };
                 let dim = resolve_unit_expr(sym).map_err(|u| format!("unknown unit '{u}'"))?;
                 let unit = c_string_literal(sym);
+                if matches!(ty, CType::Array(_)) {
+                    let array_ty = CType::Array(Box::new(CType::Quantity(dim)));
+                    self.register_list_types(&array_ty);
+                    return Ok((format!("ostrin_qa_as({code}, {unit})"), array_ty));
+                }
                 if matches!(ty, CType::Quantity(_)) {
                     // Convert the quantity's value into the target unit, as the interpreter does.
                     let temp = self.next_temp();
@@ -3890,6 +3941,21 @@ impl<'a> Codegen<'a> {
             Expr::Index(obj, idx) => {
                 let (obj_code, obj_ty) = self.gen_expr(obj)?;
                 if let CType::Array(elem) = &obj_ty {
+                    if matches!(**elem, CType::Quantity(_)) {
+                        // Slices and masks keep the unit; an element is a quantity.
+                        let t = self.next_temp();
+                        if let Expr::Range(start, kind, end, None) = idx.unlocated() {
+                            let (lo, _) = self.gen_expr(start)?;
+                            let (hi, _) = self.gen_expr(end)?;
+                            let hi = if *kind == RangeKind::To { format!("(({hi}) + 1)") } else { hi };
+                            return Ok((format!("({{ Array_Float* {t} = {obj_code}; ostrin_qa_tag(Array_Float_slice({t}, {lo}, {hi}), {t}->unit); }})"), obj_ty.clone()));
+                        }
+                        let (idx_code, idx_ty) = self.gen_expr(idx)?;
+                        if matches!(&idx_ty, CType::Array(m) if **m == CType::Bool) {
+                            return Ok((format!("({{ Array_Float* {t} = {obj_code}; ostrin_qa_tag(Array_Float_mask({t}, {idx_code}), {t}->unit); }})"), obj_ty.clone()));
+                        }
+                        return Ok((format!("({{ Array_Float* {t} = {obj_code}; (Qty){{ Array_Float_index1({t}, {idx_code}), {t}->unit }}; }})"), (**elem).clone()));
+                    }
                     let n = mangle_ctype(&obj_ty);
                     if let Expr::Range(start, kind, end, None) = idx.unlocated() {
                         let (lo, _) = self.gen_expr(start)?;
@@ -4725,6 +4791,124 @@ impl<'a> Codegen<'a> {
         Ok((converted, to_ty))
     }
 
+    /// Operators between an `Array<Quantity<D>>` and anything, or a Float
+    /// array and a quantity (`interpreter/qarray.rs::binary`, step for step).
+    fn gen_quantity_array_binary(&mut self, op: BinOp, lc: &str, lt: &CType, rc: &str, rt: &CType) -> Option<Result<(String, CType), String>> {
+        let is_qarr = |t: &CType| matches!(t, CType::Array(e) if matches!(**e, CType::Quantity(_)));
+        let is_arr = |t: &CType| matches!(t, CType::Array(_));
+        let involved = is_qarr(lt) || is_qarr(rt) || (is_arr(lt) && matches!(rt, CType::Quantity(_))) || (matches!(lt, CType::Quantity(_)) && is_arr(rt));
+        if !involved {
+            return None;
+        }
+        Some(self.gen_quantity_array_binary_inner(op, lc, lt, rc, rt))
+    }
+
+    fn gen_quantity_array_binary_inner(&mut self, op: BinOp, lc: &str, lt: &CType, rc: &str, rt: &CType) -> Result<(String, CType), String> {
+        self.register_list_types(&CType::Array(Box::new(CType::Float)));
+        self.uses_quantity_arrays = true;
+        let float_array = CType::Array(Box::new(CType::Float));
+        let (l, r) = (self.next_temp(), self.next_temp());
+        // (numbers, is_array, unit, dimension) of each side.
+        let describe = |name: &str, ty: &CType| -> (String, bool, Option<String>, Option<Dimension>) {
+            match ty {
+                CType::Array(e) => match &**e {
+                    CType::Quantity(d) => (name.to_string(), true, Some(format!("{name}->unit")), Some(d.clone())),
+                    _ => (name.to_string(), true, None, None),
+                },
+                CType::Quantity(d) => (format!("{name}.v"), false, Some(format!("{name}.u")), Some(d.clone())),
+                _ => (format!("(double)({name})"), false, None, None),
+            }
+        };
+        let (a, a_arr, ua, da) = describe(&l, lt);
+        let (b, b_arr, ub, db) = describe(&r, rt);
+        let c_ty = |t: &CType| if matches!(t, CType::Array(_)) { "Array_Float*".to_string() } else { c_type_name(t) };
+        let head = format!("{} {l} = {lc}; {} {r} = {rc}; ", c_ty(lt), c_ty(rt));
+        let num = |x: &str, x_arr: bool, y: &str, y_arr: bool, cmp: bool, code: i32| -> String {
+            let (pair, scalar) = if cmp { ("cmp", "cmp_scalar") } else { ("binop", "scalar") };
+            match (x_arr, y_arr) {
+                (true, true) => format!("Array_Float_{pair}({x}, {y}, {code})"),
+                (true, false) => format!("Array_Float_{scalar}({x}, {y}, {code}, 0)"),
+                _ => format!("Array_Float_{scalar}({y}, {x}, {code}, 1)"),
+            }
+        };
+        let arith = |op: BinOp| match op { BinOp::Add => 0, BinOp::Sub => 1, BinOp::Mul => 2, _ => 3 };
+        let compare = |op: BinOp| match op { BinOp::Eq => 0, BinOp::NotEq => 1, BinOp::Lt => 2, BinOp::Gt => 3, BinOp::LtEq => 4, _ => 5 };
+        // The right side converted into the left side's unit: (code, temp to release).
+        let converted = |this: &mut Self, ua: &str, ub: &str| -> (String, Option<String>) {
+            if b_arr {
+                let t = this.next_temp();
+                (format!("({{ {t} = ostrin_qa_converted({r}, {ub}, {ua}); {t}; }})"), Some(t))
+            } else {
+                (format!("ostrin_convert({r}.v, {ub}, {ua})"), None)
+            }
+        };
+        let wrap = |body: String, release: Option<String>| -> String {
+            match release {
+                Some(t) => format!("({{ {head}Array_Float* {t}; Array_Float* __qa = {body}; ostrin_release((void*){t}); __qa; }})"),
+                None => format!("({{ {head}{body}; }})"),
+            }
+        };
+        let array_of = |t: CType| CType::Array(Box::new(t));
+        match op {
+            BinOp::Add | BinOp::Sub | BinOp::Eq | BinOp::NotEq | BinOp::Lt | BinOp::Gt | BinOp::LtEq | BinOp::GtEq => {
+                let (Some(ua), Some(ub), Some(d)) = (ua, ub, da) else {
+                    return Err("cannot combine a quantity array with a plain number without a unit ('as <unit>')".to_string());
+                };
+                let (b_conv, release) = converted(self, &ua, &ub);
+                if matches!(op, BinOp::Add | BinOp::Sub) {
+                    let body = format!("ostrin_qa_tag({}, {ua})", num(&a, a_arr, &b_conv, b_arr, false, arith(op)));
+                    Ok((wrap(body, release), array_of(CType::Quantity(d))))
+                } else {
+                    self.register_list_types(&array_of(CType::Bool));
+                    Ok((wrap(num(&a, a_arr, &b_conv, b_arr, true, compare(op)), release), array_of(CType::Bool)))
+                }
+            }
+            BinOp::Mul | BinOp::Div => {
+                let divide = op == BinOp::Div;
+                let code = arith(op);
+                match (ua, ub) {
+                    (Some(ua), Some(ub)) => {
+                        let (da, db) = (da.expect("unit implies dimension"), db.expect("unit implies dimension"));
+                        let dim = if divide { dim_div(&da, &db) } else { dim_mul(&da, &db) };
+                        if divide && dim_is_dimensionless(&dim) {
+                            let (b_conv, release) = converted(self, &ua, &ub);
+                            return Ok((wrap(num(&a, a_arr, &b_conv, b_arr, false, 3), release), float_array));
+                        }
+                        let product = num(&a, a_arr, &b, b_arr, false, code);
+                        let body = if dim_is_dimensionless(&dim) {
+                            format!(
+                                "({{ double __s; const char* __u = ostrin_unit_combine({ua}, {ub}, 0, &__s); Array_Float* __p = {product}; if (__s != 1.0) ostrin_qa_scale(__p, __s); if (*__u) ostrin_qa_scale(__p, ostrin_unit_expr_factor(__u)); __p; }})"
+                            )
+                        } else {
+                            format!(
+                                "({{ double __s; const char* __u = ostrin_unit_combine({ua}, {ub}, {}, &__s); Array_Float* __p = {product}; if (__s != 1.0) ostrin_qa_scale(__p, __s); ostrin_qa_tag(__p, __u); }})",
+                                i32::from(divide)
+                            )
+                        };
+                        let result = if dim_is_dimensionless(&dim) { float_array } else { array_of(CType::Quantity(dim)) };
+                        Ok((wrap(body, None), result))
+                    }
+                    (Some(ua), None) => {
+                        let body = format!("ostrin_qa_tag({}, {ua})", num(&a, a_arr, &b, b_arr, false, code));
+                        Ok((wrap(body, None), array_of(CType::Quantity(da.expect("unit implies dimension")))))
+                    }
+                    (None, Some(ub)) => {
+                        let product = num(&a, a_arr, &b, b_arr, false, code);
+                        let db = db.expect("unit implies dimension");
+                        if divide {
+                            let body = format!("({{ double __s; ostrin_qa_tag({product}, ostrin_unit_combine(\"\", {ub}, 1, &__s)); }})");
+                            Ok((wrap(body, None), array_of(CType::Quantity(crate::types::dim_pow(&db, -1)))))
+                        } else {
+                            Ok((wrap(format!("ostrin_qa_tag({product}, {ub})"), None), array_of(CType::Quantity(db))))
+                        }
+                    }
+                    (None, None) => unreachable!("only called with a unit on one side"),
+                }
+            }
+            _ => Err("this operator isn't defined on arrays of quantities".to_string()),
+        }
+    }
+
     fn gen_binary(&mut self, op: BinOp, l: &Expr, r: &Expr) -> Result<(String, CType), String> {
         let (lc, lt) = self.gen_expr(l)?;
         let (rc, rt) = self.gen_expr(r)?;
@@ -4742,6 +4926,9 @@ impl<'a> Codegen<'a> {
                 let arg = self.coerce(&lc, &lt, param_types.get(1).unwrap_or(&lt))?;
                 return Ok((format!("{c_name}({rc}, {arg})"), return_type));
             }
+        }
+        if let Some(result) = self.gen_quantity_array_binary(op, &lc, &lt, &rc, &rt) {
+            return result;
         }
         if matches!(lt, CType::Quantity(_)) || matches!(rt, CType::Quantity(_)) {
             return self.gen_quantity_binary(op, &lc, &lt, &rc, &rt);
@@ -5624,6 +5811,46 @@ impl<'a> Codegen<'a> {
                     (other, _) => Err(format!("Rng has no method '{other}' with these arguments")),
                 }
             }
+            CType::Array(t) if matches!(**t, CType::Quantity(_)) => {
+                let quantity = (**t).clone();
+                let CType::Quantity(dim) = &quantity else { unreachable!() };
+                let dim = dim.clone();
+                let (codes, _) = self.gen_args(args)?;
+                let a = self.next_temp();
+                let head = format!("Array_Float* {a} = {obj_code};");
+                let with_args = |codes: &[String]| if codes.is_empty() { String::new() } else { format!(", {}", codes.join(", ")) };
+                match method_name {
+                    "unit" => Ok((format!("({{ {head} ostrin_unit_cat({a}->unit, \"\", \"\"); }})"), CType::Str)),
+                    "values" => Ok((format!("({{ {head} ostrin_qa_tag(ostrin_qa_copy({a}), NULL); }})"), CType::Array(Box::new(CType::Float)))),
+                    "sum" | "min" | "max" | "mean" | "median" | "std" | "sample_std" | "percentile" => Ok((
+                        format!("({{ {head} (Qty){{ Array_Float_{method_name}({a}{}), {a}->unit }}; }})", with_args(&codes)),
+                        quantity,
+                    )),
+                    "get" => Ok((
+                        format!("({{ {head} (Qty){{ Array_Float_get({a}, (int64_t[]){{ {} }}, {}), {a}->unit }}; }})", codes.join(", "), codes.len()),
+                        quantity,
+                    )),
+                    "var" | "sample_var" => Ok((
+                        format!("({{ {head} double __s; (Qty){{ Array_Float_{method_name}({a}), ostrin_unit_combine({a}->unit, {a}->unit, 0, &__s) }}; }})"),
+                        CType::Quantity(dim_mul(&dim, &dim)),
+                    )),
+                    "to_list" => {
+                        let list = self.ensure_list(&quantity);
+                        Ok((
+                            format!("({{ {head} {list}* __l = {list}_new_from_array(NULL, 0); for (int64_t __i = 0; __i < {a}->size; __i++) {list}_push(__l, (Qty){{ {a}->data[__i], {a}->unit }}); __l; }})"),
+                            CType::List(Box::new(quantity)),
+                        ))
+                    }
+                    "sort" | "cumsum" | "transpose" | "reshape" | "row" | "col" => Ok((
+                        format!("({{ {head} ostrin_qa_tag(Array_Float_{method_name}({a}{}), {a}->unit); }})", with_args(&codes)),
+                        obj_ty.clone(),
+                    )),
+                    "shape" => Ok((format!("Array_Float_shape({obj_code})"), CType::List(Box::new(CType::Int)))),
+                    "rank" => Ok((format!("Array_Float_rank({obj_code})"), CType::Int)),
+                    "size" | "length" | "count" => Ok((format!("Array_Float_size({obj_code})"), CType::Int)),
+                    other => Err(format!("Array of quantities has no method '{other}' the native backend supports")),
+                }
+            }
             CType::Array(t) => {
                 let t = (**t).clone();
                 let n = mangle_ctype(&obj_ty);
@@ -5972,6 +6199,10 @@ impl<'a> Codegen<'a> {
             CType::Bool => Ok(format!("(({code}) ? \"true\" : \"false\")")),
             CType::Str => Ok(code.to_string()),
             CType::Quantity(_) => Ok(format!("ostrin_qty_to_string({code})")),
+            CType::Array(e) if matches!(**e, CType::Quantity(_)) => {
+                let shown = self.show_expr("__qa_shown", &CType::Array(Box::new(CType::Float)))?;
+                Ok(format!("({{ Array_Float* __qa_shown = {code}; ostrin_qa_show(__qa_shown, {shown}); }})"))
+            }
             CType::Record(_) | CType::Enum(_) | CType::List(_) | CType::Option(_) | CType::Result(..) | CType::Map(..) | CType::Set(_) | CType::Array(_) => {
                 let name = mangle_ctype(ty);
                 if self.show_done.insert(name.clone()) {
@@ -6423,6 +6654,20 @@ impl<'a> Codegen<'a> {
                     ty = inner;
                     depth += 1;
                 }
+                if depth == 1 && matches!(ty, CType::Quantity(_)) {
+                    // Quantities: the numbers in the first element's unit.
+                    let array_ty = CType::Array(Box::new(ty.clone()));
+                    self.register_list_types(&array_ty);
+                    let list = self.ensure_list(ty);
+                    let (l, r) = (self.next_temp(), self.next_temp());
+                    return Ok(Some((
+                        format!(
+                            "({{ {list}* {l} = {}; if ({l}->length < 1) OSTRIN_FAIL(\"an array can't be empty\"); int64_t __shape[1] = {{ {l}->length }}; Array_Float* {r} = Array_Float_alloc(1, __shape); for (int64_t __i = 0; __i < {l}->length; __i++) {r}->data[__i] = ostrin_convert({l}->items[__i].v, {l}->items[__i].u, {l}->items[0].u); ostrin_qa_tag({r}, {l}->items[0].u); }})",
+                            codes[0]
+                        ),
+                        array_ty,
+                    )));
+                }
                 if !(1..=3).contains(&depth) || !matches!(ty, CType::Int | CType::Float | CType::Float32 | CType::Bool) {
                     return Err("'array' supports nested lists (up to 3 deep) of Int, Float, Float32 or Bool in the native backend".to_string());
                 }
@@ -6817,6 +7062,7 @@ fn generate_impl(
         pending_results: VecDeque::new(),
         current_return: Vec::new(),
         lambda_depth: 0,
+        uses_quantity_arrays: false,
         capture_frames: RefCell::new(Vec::new()),
         closure_bodies: Vec::new(),
         closure_protos: Vec::new(),
@@ -7262,7 +7508,7 @@ fn generate_impl(
             list_typedefs.push_str(&format!("typedef struct {name} {name};\n"));
             if let CType::Array(elem) = &ty {
                 let tc = c_type_name(elem);
-                list_type_decls.push_str(&format!("struct {name} {{\n    {tc}* data;\n    int64_t* shape;\n    int64_t rank;\n    int64_t size;\n}};\n\n"));
+                list_type_decls.push_str(&format!("struct {name} {{\n    {tc}* data;\n    int64_t* shape;\n    int64_t rank;\n    int64_t size;\n    const char* unit;\n}};\n\n"));
                 let lt = list_struct_name(elem);
                 let rows = CType::List(elem.clone());
                 let llt = list_struct_name(&rows);
@@ -7944,6 +8190,9 @@ fn generate_impl(
         out.push_str("\n\n");
     }
 
+    if codegen.uses_quantity_arrays {
+        late_array_blocks.push(QUANTITY_ARRAY_RUNTIME.to_string());
+    }
     // Array runtimes: full definitions, after every prototype they call.
     for block in array_blocks.iter().chain(&late_array_blocks) {
         out.push_str(block);
