@@ -247,7 +247,10 @@ fn mutated_sources_never_crash_the_front_end() {
             let mutated = mutate(&source, &mut rng);
             let file = dir.join(format!("case_{}_{round}.ostrin", name_of(&path)));
             fs::write(&file, &mutated).unwrap();
-            for mode in ["--check", "--ast"] {
+            // Exercise each front-end/lowering boundary. Invalid input is
+            // expected to return diagnostics, but none of these stages may
+            // panic or abort the compiler process.
+            for mode in ["--tokens", "--check", "--ast", "--hir", "--ir"] {
                 let out = ostrinc(&[mode, &file.to_string_lossy()]);
                 let stderr = String::from_utf8_lossy(&out.stderr);
                 if out.status.code() == Some(101)
