@@ -286,6 +286,7 @@ fn real_main() -> ExitCode {
                 println!("node-unchecked: {}", report.node_unchecked);
                 println!("ir-generated: {}", report.ir_generated);
                 println!("hir-generated: {}", report.hir_generated);
+                println!("ast-fallback: {}", report.ast_fallback);
                 println!("partial: {}", report.partial);
                 println!("completed: {}", report.completed);
                 println!("generic-calls-from-checker: {}", report.calls_from_checker);

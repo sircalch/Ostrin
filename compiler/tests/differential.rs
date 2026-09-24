@@ -319,6 +319,7 @@ fn typed_expression_table_does_not_regress() {
 fn native_backend_types_agree_with_the_checker() {
     let mut hir_generated = 0usize;
     let mut ir_generated = 0usize;
+    let mut ast_fallback = 0usize;
     let (mut agreed, mut partial, mut completed, mut unchecked, mut node_agreed, mut divergences) =
         (0usize, 0usize, 0usize, 0usize, 0usize, Vec::<String>::new());
     for path in examples() {
@@ -344,6 +345,8 @@ fn native_backend_types_agree_with_the_checker() {
                 hir_generated += n.trim().parse::<usize>().unwrap();
             } else if let Some(n) = line.strip_prefix("ir-generated: ") {
                 ir_generated += n.trim().parse::<usize>().unwrap();
+            } else if let Some(n) = line.strip_prefix("ast-fallback: ") {
+                ast_fallback += n.trim().parse::<usize>().unwrap();
             } else if let Some(n) = line.strip_prefix("unchecked: ") {
                 unchecked += n.trim().parse::<usize>().unwrap();
             } else if let Some(n) = line.strip_prefix("completed: ") {
@@ -368,6 +371,15 @@ fn native_backend_types_agree_with_the_checker() {
         "only {native_generated} functions were generated from HIR/IR (expected at least 131)"
     );
     println!("functions generated from HIR/IR: {native_generated} (HIR {hir_generated}, IR {ir_generated})");
+    println!("functions still using AST fallback: {ast_fallback}");
+    // This is intentionally the current repository-wide baseline. Lower it
+    // whenever a backend family moves from AST to HIR/IR; a new example that
+    // increases the total must update the limit only with an explicit reason.
+    const MAX_AST_FALLBACK_FUNCTIONS: usize = 1432;
+    assert!(
+        ast_fallback <= MAX_AST_FALLBACK_FUNCTIONS,
+        "AST fallback grew to {ast_fallback} functions (ratchet limit {MAX_AST_FALLBACK_FUNCTIONS})"
+    );
     assert!(
         unchecked <= 4,
         "{unchecked} expressions have no checker type (limit 4)"
