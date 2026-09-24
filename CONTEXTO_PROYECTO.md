@@ -6502,3 +6502,30 @@ después del drenado del scope. Se conserva la comprobación `live_allocations=0
 
 El bloque anterior pasó localmente 2 unitarias, 6 diferenciales y 200 de integración.
 Después de la corrección, CI y Pages pasaron en Windows, Linux, macOS y web para `8bc24bd`.
+
+## 266. Consolidación previa a la release `v0.1.0` — 2026-09-23
+
+Auditoría de coherencia antes de publicar el tag. README, `ESTADO_Y_PLAN.md`, `docs.html` y
+`roadmap.html` afirmaban una release `v0.1.0` publicada e instaladores verificados contra ella,
+pero el repositorio no tenía tags ni releases y los workflows de release y WASI nunca se habían
+ejecutado. Los textos distinguen ahora «versión 0.1.0 preparada» de «release publicada», y
+`ESTADO_Y_PLAN.md` añade una tabla §0 con implementado / en fallback / experimental /
+pendiente / release.
+
+- `scripts/install.ps1`: `-not $Repository -match …` negaba la cadena antes de comparar, así
+  que nunca rechazaba un `-Repository` inválido; ahora usa `-notmatch`.
+- `release.yml`: la release usa `docs/releases/<tag>.md` como notas, `--verify-tag`, y comprueba
+  los seis archivos antes de publicar. No se marca como prerelease porque los instaladores
+  resuelven `releases/latest`, que ignora prereleases.
+- `distribution-check.mjs` exige las notas de la versión de `Cargo.toml`, el comando de
+  instalación del README para esa versión y la entrada del CHANGELOG.
+- `ARQUITECTURA_Y_VISION.md` queda marcado como snapshot histórico de `aef27fc`; conteos
+  actualizados (~34 500 líneas de Rust), VSIX `0.4.0` en el README.
+
+Verificación local (Windows, `OSTRIN_REQUIRE_CC=1`, release): 2 unitarias, 6 diferenciales y
+200 de integración en verde; `ostrinc --version` → `ostrinc 0.1.0`; `--check`/`--run` de
+`hello.ostrin`; `ownership_primitives.ostrin` con `--leak-check` → `live_allocations=0`; un zip
+empaquetado como en el workflow pasa checksum, `--version`, `hello.ostrin` y
+`--locked --run --project examples/pkg_project/main_app`. `website-check`, `website-metadata
+--check` y `distribution-check` pasan. La matriz WASI necesita el WASI SDK y se valida con
+`workflow_dispatch` en GitHub.

@@ -2,6 +2,12 @@
 
 *Base: commit `aef27fc` (código idéntico a `90e525e`; 93 pruebas en verde; la Etapa 0 posterior añade 3 más, ver §85 de CONTEXTO). Este documento responde a las partes A–E del «Master Development Prompt». Todo lo que se afirma como existente se ha comprobado en el código; lo demás está marcado como **propuesta**.*
 
+> **Documento histórico.** Las cifras y estados de este documento corresponden al commit
+> `aef27fc` y no se actualizan. El estado vigente (≈34 500 líneas de Rust, 200 pruebas de
+> integración, HIR/IR con fallback verificado, concurrencia nativa, WASI, release `0.1.0`
+> preparada) está en [`ESTADO_Y_PLAN.md`](../ESTADO_Y_PLAN.md); la historia completa, en
+> [`CONTEXTO_PROYECTO.md`](../CONTEXTO_PROYECTO.md).
+
 ---
 
 ## A. Auditoría del repositorio

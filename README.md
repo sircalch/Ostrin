@@ -105,10 +105,12 @@ proposal. The
 native release workflow targets Linux x86_64, macOS arm64 and Windows x64; before upload it checks
 the tag/version contract, runs `ostrinc --version`, executes `examples/hello.ostrin`, verifies the
 archive checksum, and runs both the extracted example and the packaged path-dependency project.
-The experimental `v0.1.0` release publishes Linux x86_64, macOS arm64 and Windows x64 archives
-with SHA-256 checksums. Repository installers resolve that release by default and verify the
-checksum before installing. The public package registry and additional distribution channels
-remain future work.
+The compiler version is `0.1.0`, an experimental developer release for Linux x86_64, macOS arm64
+and Windows x64 archives with SHA-256 checksums ([release notes](docs/releases/v0.1.0.md)).
+**Release status:** prepared; the `v0.1.0` tag and GitHub release are not published yet, so
+the installers below will report that no release exists until then. The public package registry
+and additional distribution channels (Homebrew, winget, Scoop, Chocolatey, AUR) remain future
+work.
 
 The cooperative runtime avoids thread-only headers unless `--native-threads` is requested. The
 same compiler is also deployed as `ostrinc.wasm` for the browser playground, where it runs the
@@ -122,7 +124,7 @@ Requirements: Rust and Cargo.
 ```powershell
 cd compiler
 cargo test
-cargo run -- --run ..\\examples\\physics.ostrin
+cargo run -- --run ..\examples\physics.ostrin
 ```
 
 ### Install a published release
@@ -200,7 +202,7 @@ cd compiler
 cargo build
 cd ..\vscode-ostrin
 npx --yes @vscode/vsce package
-code --install-extension .\ostrin-language-support-0.2.0.vsix
+code --install-extension .\ostrin-language-support-0.4.0.vsix
 ```
 
 Once installed, VS Code detects `.ostrin` files automatically. The extension
@@ -229,12 +231,15 @@ when GitHub Pages is enabled.
 
 ## Roadmap
 
-1. Complete the semantic core and remove unnecessary `Unknown` types.
-2. Expand source spans and complete the LSP workspace semantic service.
-3. Grow the standard library and runtime.
-4. Finish semantic tokens, workspace resolution and debugging in the VS Code client.
-5. Publish verified native archives/installers and make project lockfiles reproducible.
-6. Extend real concurrency with cancellation, then add WebAssembly and platform bindings.
+1. Publish the experimental `v0.1.0` release and validate the installers against it.
+2. Make typed HIR/IR the single native lowering path and retire the AST fallback.
+3. Complete ownership and last-use lowering for aggregates and escapes.
+4. Grow the scientific core: numeric hierarchy, linear algebra, units and dataframes.
+5. Grow the standard library; networking and a package registry come later.
+6. Publish the VS Code extension and additional distribution channels.
+
+Completed milestones include the LSP/DAP tooling, reproducible lockfiles, native threads with
+structured cancellation, the WASI build and the browser playground.
 
 See [`CONTEXTO_PROYECTO.md`](CONTEXTO_PROYECTO.md) for the complete project
 history and current implementation notes.

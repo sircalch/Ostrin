@@ -2,8 +2,6 @@
 
 ## Unreleased
 
-### Compiler and ownership
-
 ## 0.1.0 — experimental developer release
 
 Ostrin 0.1.0 is the first public developer release. It packages the compiler for Linux
@@ -19,6 +17,20 @@ and forward-mode autodiff.
 The release remains experimental. HIR/IR migration, complete ownership lowering, advanced
 iterators, GPU execution, reverse autodiff, public package registries, networking and broader
 scientific libraries remain in development.
+
+Release notes: [`docs/releases/v0.1.0.md`](docs/releases/v0.1.0.md).
+
+### Release preparation
+- Published release bodies now come from `docs/releases/<tag>.md` instead of generated notes;
+  the publish job checks that all three archives and their `.sha256` files are present and
+  uses `--verify-tag`. The release is intentionally not a GitHub prerelease, because the
+  installers resolve `releases/latest`, which ignores prereleases.
+- Fixed the PowerShell installer's repository validation: `-not $Repository -match …` negated
+  the string before matching, so malformed `-Repository` values were never rejected.
+- `distribution-check.mjs` now also requires the release notes for the compiler version, the
+  README install command for that version and a matching CHANGELOG entry.
+
+### Compiler and ownership
 
 - Hardened the native thread `spawn_scope` ownership regression test against
   scheduler-dependent ordering: concurrent `main`/`task` and `scope-body`/`scope-task`

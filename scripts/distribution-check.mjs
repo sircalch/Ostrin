@@ -27,7 +27,7 @@ for (const target of [
 ]) {
   requireText(release, target, "release workflow");
 }
-for (const marker of ["sha256sum", "shasum", "ARCHIVE=", "gh release create"]) {
+for (const marker of ["sha256sum", "shasum", "ARCHIVE=", "gh release create", "--notes-file", "--verify-tag"]) {
   requireText(release, marker, "release workflow");
 }
 for (const marker of ["safe_ref=", "matrix.target", "archive=\"$name.tar.gz\"", "archive=\"$name.zip\""]) {
@@ -72,10 +72,36 @@ for (const marker of [
   requireText(powershell, marker, "Windows installer");
 }
 
+requireText(powershell, "$Repository -notmatch", "Windows installer repository validation");
+
+const cargo = read("compiler/Cargo.toml");
+const version = (cargo.match(/^version\s*=\s*"([^"]+)"/m) || [])[1];
+if (!version) failures.push("compiler/Cargo.toml: missing package version");
+
 const readme = read("README.md");
-for (const marker of ["scripts/install.sh", "scripts/install.ps1", "checksum"]) {
+for (const marker of ["scripts/install.sh", "scripts/install.ps1", "checksum", "--version " + version]) {
   requireText(readme, marker, "README installation documentation");
 }
+
+// The release workflow publishes docs/releases/v<version>.md as the release body.
+const notesPath = "docs/releases/v" + version + ".md";
+const notes = read(notesPath);
+for (const marker of [
+  "## Supported platforms",
+  "## Install",
+  "## Known limitations",
+  "## Examples",
+  "## Reporting problems",
+  "experimental",
+  "ostrinc-v" + version + "-x86_64-unknown-linux-gnu.tar.gz",
+  "ostrinc-v" + version + "-aarch64-apple-darwin.tar.gz",
+  "ostrinc-v" + version + "-x86_64-pc-windows-msvc.zip",
+  "--version " + version,
+]) {
+  requireText(notes, marker, notesPath);
+}
+const changelog = read("CHANGELOG.md");
+requireText(changelog, "## " + version + " ", "CHANGELOG.md");
 
 if (failures.length) {
   console.error(failures.map((failure) => "distribution-check: " + failure).join("\n"));

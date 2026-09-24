@@ -19,7 +19,7 @@ if ([string]::IsNullOrWhiteSpace($InstallDir)) {
     $base = if ([string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) { $env:USERPROFILE } else { $env:LOCALAPPDATA }
     $InstallDir = Join-Path $base "Ostrin\bin"
 }
-if (-not $Repository -match "^[^/]+/[^/]+$") {
+if ($Repository -notmatch "^[^/]+/[^/]+$") {
     Stop-Installer "repository must look like OWNER/REPO"
 }
 

@@ -28,6 +28,9 @@ The default first looks for a locally built compiler in
 `compiler/target/debug/ostrinc.exe` (or the platform equivalent) when the
 workspace is the Ostrin repository, and otherwise falls back to `ostrinc` on
 `PATH`. You can always set the full path manually in VS Code settings.
+Outside the repository, install `ostrinc` with the installers described in the main
+[README](../README.md#install-a-published-release) (Ostrin 0.1.0, experimental) so that it is on
+`PATH`. The extension is distributed as a local VSIX; it is not on the Marketplace yet.
 
 ## Install from the repository
 
