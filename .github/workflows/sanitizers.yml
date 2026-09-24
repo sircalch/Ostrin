@@ -1,0 +1,62 @@
+name: Native sanitizers
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  address:
+    name: AddressSanitizer native suite
+    runs-on: ubuntu-latest
+    env:
+      OSTRIN_CC: clang
+      OSTRIN_CFLAGS: "-fsanitize=address -fno-omit-frame-pointer"
+      OSTRIN_REQUIRE_CC: "1"
+      # The compiler's --leak-check assertions remain enabled in the native
+      # examples. LeakSanitizer is disabled here because std.viz deliberately
+      # retains a small process-lifetime SVG metadata cache.
+      ASAN_OPTIONS: detect_leaks=0:halt_on_error=1
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install Clang
+        run: sudo apt-get update && sudo apt-get install --yes clang
+      - name: Run native examples under sanitizers
+        run: cargo test --manifest-path compiler/Cargo.toml --test examples -- --test-threads=1
+      - name: Run front-end fuzz checks
+        env:
+          OSTRIN_FUZZ_ROUNDS: "8"
+        run: cargo test --manifest-path compiler/Cargo.toml --test differential -- --skip every_example_agrees_between_interpreter_and_native
+  undefined:
+    name: UBSan native smoke tests
+    runs-on: ubuntu-latest
+    env:
+      OSTRIN_CC: clang
+      OSTRIN_CFLAGS: "-fsanitize=undefined -fno-omit-frame-pointer"
+      OSTRIN_REQUIRE_CC: "1"
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install Clang
+        run: sudo apt-get update && sudo apt-get install --yes clang
+      - name: Run supported UBSan smoke programs
+        shell: bash
+        run: |
+          set -euo pipefail
+          for test_name in \
+            native_backend_compiles_and_runs_fibonacci \
+            native_backend_compiles_and_runs_strings_and_booleans \
+            native_ir_emitter_handles_scalar_functions \
+            native_ir_emitter_handles_checked_fixed_width_arithmetic
+          do
+            cargo test --manifest-path compiler/Cargo.toml --test examples "$test_name" -- --exact --test-threads=1
+          done

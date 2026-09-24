@@ -116,7 +116,8 @@ work.
 The cooperative runtime avoids thread-only headers unless `--native-threads` is requested. The
 same compiler is also deployed as `ostrinc.wasm` for the browser playground, where it runs the
 interpreter locally through an in-memory WASI directory. Native C compilation remains a desktop/
-WASI toolchain feature rather than a browser capability.
+WASI toolchain feature rather than a browser capability. Set `OSTRIN_CFLAGS` to pass additional
+compiler or linker flags to generated native programs, for example when running sanitizer builds.
 
 ## Quick start
 

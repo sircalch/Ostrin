@@ -1,0 +1,25 @@
+name: Compiler coverage
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "53 3 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  coverage:
+    name: Rust source coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+      - name: Install cargo-llvm-cov
+        run: cargo install cargo-llvm-cov --locked
+      - name: Generate coverage summary
+        run: cargo llvm-cov --manifest-path compiler/Cargo.toml --all-targets --summary-only

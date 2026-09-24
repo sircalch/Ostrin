@@ -704,6 +704,12 @@ fn run_codegen(
         // of the platform C runtime).
         command.args((!cfg!(windows)).then_some("-lm"));
     }
+    // Allow CI and downstream users to add compiler/linker instrumentation
+    // without changing the generated C or shelling through an interpolated
+    // command line. Each whitespace-separated item becomes one argv entry.
+    if let Ok(flags) = env::var("OSTRIN_CFLAGS") {
+        command.args(flags.split_whitespace());
+    }
     // No fused multiply-add: results must match the interpreter bit for bit.
     let status = command.arg("-ffp-contract=off").status();
     let _ = fs::remove_file(&c_path);
