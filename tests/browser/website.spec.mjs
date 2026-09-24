@@ -180,5 +180,12 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   await expect(page.locator("#viz-units .sl-provenance")).toHaveAttribute("data-state", "live", { timeout: 30_000 });
   await expect(page.locator("#viz-units img.viz-image")).toHaveAttribute("src", /^data:image\/svg\+xml/);
   await expect(page.locator("#viz-units .viz-printed")).toHaveText("top speed 97.91999999999999 km/h, distance 0.764 km");
+
+  // The explorer shows the SVG in a sandboxed frame where its own tooltips and hover styles work.
+  await page.locator('[data-viz-explore="scatter-fit"]').click();
+  const point = page.frameLocator(".viz-frame-live").locator("circle.pt").first();
+  await expect(point.locator("title")).toHaveText(/^measurements: \(0\.5, /);
+  await page.getByRole("button", { name: "Zoom in" }).click();
+  await expect(page.locator(".viz-zoom")).toHaveText("150%");
   expect(runtimeErrors).toEqual([]);
 });

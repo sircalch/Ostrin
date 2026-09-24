@@ -14,6 +14,11 @@
 - Ten gallery programs (`examples/viz_*.ostrin`) plus `lab_plot` and `lab_surface`; every one is
   byte-identical between the interpreter and native C in the differential test.
 
+- Interaction without scripts: figures embed hover styles and `<title>` tooltips with the values
+  of points, bars, error bars and 3D points (`(0.5, 3.609)`, `-1.915 to -1.653: 1`), so they work
+  wherever the SVG is opened. The Viz gallery's Explore view shows a figure in a sandboxed frame
+  (no scripts) with zoom and scroll-to-pan.
+
 ### Units
 - Canonical unit algebra: `kg*m/s*m/s` prints `kg*m^2/s^2`, same-dimension units cancel
   (`90 km/h * 30 min` is `45 km`). This also fixes wrong factors for strings such as `km/h*h`,
@@ -43,6 +48,10 @@
 - Native: an owned expression statement was emitted twice (`c.add(1).add(2)` ran each call twice);
   fresh receivers and arguments of method calls are released; an assignment inside a loop or branch
   retains and releases like one at function level (it used to alias a freed value).
+- Native: a block whose value was a local of an enclosing block (`if c { line } else { .. }`)
+  returned it without retaining it while the enclosing block still released it (use-after-free,
+  found by AddressSanitizer once std.viz used the pattern). Only locals of the block itself move
+  out now. Generated C silences GCC's false `-Wfree-nonheap-object` on released literals.
 - Native memory: fresh `String` operands of `+`, values pushed into lists, receivers of String and
   array methods and array operands are released after use, and releasing an array now frees its
   shape and data. Rendering the Viz gallery natively went from 233 855 to 303 live allocations at

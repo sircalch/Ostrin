@@ -118,7 +118,8 @@ la falta de literales científicos (`1e-9`). Ver `CONTEXTO_PROYECTO.md` §270–
 | Versión | Contenido |
 |---|---|
 | 0.1 (hecho) | marcas 2D, heatmap/contornos, superficies/trayectorias/nubes 3D, layouts, unidades en ejes, SVG |
-| 0.2 | interacción: zoom, desplazamiento, tooltips, selección (requiere un backend con eventos) |
+| 0.2 (parcial, hecho) | tooltips `<title>` con valores y resaltado CSS al pasar el ratón, dentro del SVG y sin scripts; visor web con zoom y desplazamiento en un iframe aislado |
+| 0.2 (resto) | selección enlazada y controles conducidos por Ostrin (requiere un backend con eventos) |
 | 0.3 | animación: fotogramas generados por Ostrin; sintaxis por decidir en un diseño propio |
 | 0.4 | volúmenes, isosuperficies, campos vectoriales, cortes; cámaras en perspectiva |
 | 0.5 | backend WebGPU sobre la misma lista de series; PNG/PDF |

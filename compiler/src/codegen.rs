@@ -394,7 +394,11 @@ const ARRAY_RUNTIME: &str = include_str!("array_runtime.c");
 /// release the task while the underlying libc call finishes and cleans up.
 const FILE_IO_RUNTIME: &str = include_str!("file_io_runtime.c");
 
-const PRELUDE: &str = "#include <stdint.h>\n\
+const PRELUDE: &str = "/* The runtime only frees pointers it registered; releasing a string literal is a no-op. */\n\
+#if defined(__GNUC__)\n\
+#pragma GCC diagnostic ignored \"-Wfree-nonheap-object\"\n\
+#endif\n\
+#include <stdint.h>\n\
 #include <stdbool.h>\n\
 #include <stdio.h>\n\
 #include <stdlib.h>\n\
@@ -2781,6 +2785,10 @@ impl<'a> Codegen<'a> {
         } else {
             Vec::new()
         };
+        // Only a local of this very block moves out with the value; a local of an
+        // enclosing block (`if c { line } else { .. }`) is still released there,
+        // so the value is retained like any other borrowed reference.
+        let transfer = transfer.filter(|name| owned.iter().any(|(local, _)| local == name));
         self.pop_scope();
         if tail_ty == CType::Void {
             let mut code = format!("({{ {body} {tail_code};\n");

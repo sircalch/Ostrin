@@ -163,7 +163,26 @@ fn header(width: Int, height: Int, theme: Theme) -> String {
     "<svg xmlns=\"http://www.w3.org/2000/svg\"" + attr("width", px(width)) + attr("height", px(height)) +
         attr("viewBox", "0 0 " + px(width) + " " + px(height)) +
         attr("font-family", "Inter, Segoe UI, Helvetica, Arial, sans-serif") + ">\n" +
+        // Interaction without scripts: hovering highlights a mark and its
+        // <title> shows the values, wherever the SVG is opened.
+        "<style>.pt:hover{stroke:" + theme.text + ";stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}" +
+        ".series:hover>path{stroke-width:3.5px}.pt,.bar{cursor:crosshair}</style>\n" +
         "<rect" + attr("width", px(width)) + attr("height", px(height)) + attr("fill", theme.background) + "/>\n"
+}
+
+/// Tooltip text shown by the SVG viewer on hover.
+fn tip(text: String) -> String {
+    "<title>" + escape(text) + "</title>"
+}
+
+/// A value for tooltips: three decimals, trailing zeros dropped.
+pub fn short(v: Float) -> String {
+    r = round(v * 1000.0) / 1000.0
+    if r == 0.0 { "0" } else { r.to_string() }
+}
+
+fn named(label: String) -> String {
+    if label == "" { "" } else { label + ": " }
 }
 
 fn pow10(k: Int) -> Float {
@@ -699,13 +718,14 @@ fn draw_series(s: Series, color: String, left: Float, bottom: Float, x0: Float, 
     kind = s.kind
     if kind == "line" {
         dash = if s.dash != "" { attr("stroke-dasharray", s.dash) } else { "" }
-        "<path" + attr("d", path_of(s.xs, s.ys, left, bottom, x0, y0, sx, sy)) + attr("fill", "none") + attr("stroke", color) +
+        line = "<path" + attr("d", path_of(s.xs, s.ys, left, bottom, x0, y0, sx, sy)) + attr("fill", "none") + attr("stroke", color) +
             attr("stroke-width", num(s.width)) + attr("stroke-linejoin", "round") + attr("stroke-linecap", "round") + dash + "/>"
+        if s.label == "" { line } else { "<g class=\"series\">" + tip(s.label) + line + "</g>" }
     } else if kind == "scatter" {
         mut parts: List<String> = []
         for i in 0 until s.xs.length() {
-            parts.push("<circle" + attr("cx", num(left + (s.xs[i] - x0) * sx)) + attr("cy", num(bottom - (s.ys[i] - y0) * sy)) +
-                attr("r", num(s.size)) + "/>")
+            parts.push("<circle class=\"pt\"" + attr("cx", num(left + (s.xs[i] - x0) * sx)) + attr("cy", num(bottom - (s.ys[i] - y0) * sy)) +
+                attr("r", num(s.size)) + ">" + tip(named(s.label) + "(" + short(s.xs[i]) + ", " + short(s.ys[i]) + ")") + "</circle>")
         }
         "<g" + attr("fill", color) + attr("fill-opacity", "0.78") + attr("stroke", theme.background) + attr("stroke-width", "0.6") + ">" +
             parts.join("") + "</g>"
@@ -736,7 +756,8 @@ fn draw_series(s: Series, color: String, left: Float, bottom: Float, x0: Float, 
             yhi = bottom - (s.hi[i] - y0) * sy
             parts.push(seg(x, ylo, x, yhi, color, s.width, "") + seg(x - 4.0, ylo, x + 4.0, ylo, color, s.width, "") +
                 seg(x - 4.0, yhi, x + 4.0, yhi, color, s.width, ""))
-            parts.push("<circle" + attr("cx", num(x)) + attr("cy", num(bottom - (s.ys[i] - y0) * sy)) + attr("r", "3.5") + attr("fill", color) + "/>")
+            parts.push("<circle class=\"pt\"" + attr("cx", num(x)) + attr("cy", num(bottom - (s.ys[i] - y0) * sy)) + attr("r", "3.5") + attr("fill", color) + ">" +
+                tip(named(s.label) + short(s.xs[i]) + ": " + short(s.ys[i]) + " ± " + short(s.hi[i] - s.ys[i])) + "</circle>")
         }
         parts.join("")
     } else if kind == "bar" or kind == "hist" {
@@ -750,7 +771,9 @@ fn draw_series(s: Series, color: String, left: Float, bottom: Float, x0: Float, 
             y = bottom - (s.ys[i] - y0) * sy
             ytop = if y < base { y } else { base }
             hgt = abs(base - y)
-            parts.push("<rect" + attr("x", num(x)) + attr("y", num(ytop)) + attr("width", num(bw)) + attr("height", num(hgt)) + "/>")
+            where = if kind == "hist" { short(s.xs[i] - gap / 2.0) + " to " + short(s.xs[i] + gap / 2.0) } else { short(s.xs[i]) }
+            parts.push("<rect class=\"bar\"" + attr("x", num(x)) + attr("y", num(ytop)) + attr("width", num(bw)) + attr("height", num(hgt)) + ">" +
+                tip(named(s.label) + where + ": " + short(s.ys[i])) + "</rect>")
         }
         edge = if kind == "hist" { attr("stroke", theme.background) + attr("stroke-width", "1") } else { "" }
         "<g" + attr("fill", color) + attr("fill-opacity", "0.85") + edge + ">" + parts.join("") + "</g>"
@@ -1190,8 +1213,9 @@ fn render3d(scene: Scene3D) -> String {
             zspan = if s.zs.max() > zlo { s.zs.max() - zlo } else { 1.0 }
             mut parts: List<String> = []
             for i in argsort(array(keys)) {
-                parts.push("<circle" + attr("cx", num(project_x(cam, s.xs[i], s.ys[i]))) + attr("cy", num(project_y(cam, s.xs[i], s.ys[i], s.zs[i]))) +
-                    attr("r", num(s.size)) + attr("fill", colormap(s.colormap, (s.zs[i] - zlo) / zspan, 1.0)) + "/>")
+                parts.push("<circle class=\"pt\"" + attr("cx", num(project_x(cam, s.xs[i], s.ys[i]))) + attr("cy", num(project_y(cam, s.xs[i], s.ys[i], s.zs[i]))) +
+                    attr("r", num(s.size)) + attr("fill", colormap(s.colormap, (s.zs[i] - zlo) / zspan, 1.0)) + ">" +
+                    tip("(" + short(s.xs[i]) + ", " + short(s.ys[i]) + ", " + short(s.zs[i]) + ")") + "</circle>")
             }
             out.push("<g" + attr("stroke", theme.background) + attr("stroke-width", "0.5") + ">" + parts.join("") + "</g>")
         }

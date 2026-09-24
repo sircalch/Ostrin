@@ -559,3 +559,12 @@ button.button-quiet, button.button { cursor: pointer; } button.button-quiet { ba
 @media (max-width: 860px) {
   .viz-intro, .viz-gallery, .viz-matrix, .home-viz { grid-template-columns: minmax(0, 1fr); }
 }
+
+.viz-dialog { width: min(1100px, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 0; background: var(--night-2); color: var(--white); border: 1px solid var(--line); border-radius: 6px; }
+.viz-dialog::backdrop { background: rgba(4, 5, 9, .72); }
+.viz-dialog-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.viz-dialog-title { margin: 0; font-size: 1rem; font-weight: 560; }
+.viz-dialog-tools { display: flex; align-items: center; gap: 8px; }
+.viz-zoom { min-width: 3.5rem; text-align: center; color: var(--muted); font: .72rem var(--mono); }
+.viz-dialog .sl-provenance { margin: 0; padding: 8px 16px; }
+.viz-frame-live { display: block; width: 100%; height: min(72vh, 760px); border: 0; background: #fff; }

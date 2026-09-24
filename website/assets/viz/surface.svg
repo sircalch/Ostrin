@@ -1,4 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="640" height="520" viewBox="0 0 640 520" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
+<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar{cursor:crosshair}</style>
 <rect width="640" height="520" fill="#ffffff"/>
 
 <text x="20" y="26" text-anchor="start" font-size="16" fill="#1f2937" font-weight="600">peaks(x, y) as a surface</text>

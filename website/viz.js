@@ -27,12 +27,63 @@ function svgOf(lines) {
   return { svg: lines.slice(start, end + 1).join("\n"), printed: [...lines.slice(0, start), ...lines.slice(end + 1)] };
 }
 
+// ---- explorer: the SVG in a sandboxed frame (no scripts) where its own hover styles and
+// <title> tooltips work; zoom rescales the vector figure and the frame scrolls to pan.
+let dialog;
+function explorer() {
+  if (dialog) return dialog;
+  const frame = el("iframe", { className: "viz-frame-live", sandbox: "", title: "Interactive figure" });
+  const heading = el("h2", { className: "viz-dialog-title" });
+  const zoomLabel = el("output", { className: "viz-zoom", text: "100%" });
+  let zoom = 100;
+  let svg = "";
+  const render = () => {
+    zoomLabel.textContent = `${zoom}%`;
+    frame.srcdoc = `<!doctype html><meta charset="utf-8"><style>html,body{margin:0;background:#fff}svg{display:block;width:${zoom}%;height:auto}</style>${svg}`;
+  };
+  const button = (text, label, action) => {
+    const node = el("button", { type: "button", className: "button-quiet", "aria-label": label, text });
+    node.addEventListener("click", action);
+    return node;
+  };
+  const node = el("dialog", { className: "viz-dialog", "aria-label": "Figure explorer" }, [
+    el("div", { className: "viz-dialog-bar" }, [
+      heading,
+      el("div", { className: "viz-dialog-tools" }, [
+        button("−", "Zoom out", () => { zoom = Math.max(50, zoom - 25); render(); }),
+        zoomLabel,
+        button("+", "Zoom in", () => { zoom = Math.min(400, zoom + 50); render(); }),
+        button("Close", "Close the explorer", () => node.close()),
+      ]),
+    ]),
+    el("p", { className: "sl-provenance", text: "Hover a point or bar for its values (the SVG's own <title> tooltips). Zoom rescales the vector figure; scroll to pan." }),
+    frame,
+  ]);
+  document.body.append(node);
+  dialog = {
+    open(title, text) {
+      heading.textContent = title;
+      svg = text;
+      zoom = 100;
+      render();
+      node.showModal();
+    },
+  };
+  return dialog;
+}
+
 function card(figure) {
   const image = el("img", { className: "viz-image", src: figure.svg, alt: `${figure.title}: SVG produced by the Ostrin program ${figure.source}`, loading: "lazy", decoding: "async" });
   const printed = el("pre", { className: "viz-printed", text: figure.printed.join("\n") });
   const provenance = el("p", { className: "sl-provenance", text: `Recorded by ostrinc ${LAB.compiler} from ${figure.source}.` });
   const run = el("button", { type: "button", className: "button", disabled: true, "data-viz-run": figure.id, text: "Run live" });
   const status = el("span", { className: "sl-status", text: "loading compiler…" });
+  let liveSvg = null;
+  const explore = el("button", { type: "button", className: "button-quiet", "data-viz-explore": figure.id, text: "Explore" });
+  explore.addEventListener("click", async () => {
+    const text = liveSvg ?? await fetch(figure.svg).then((response) => response.text());
+    explorer().open(figure.title, text);
+  });
   const code = el("details", { className: "viz-code" }, [
     el("summary", { text: `Source · ${figure.source}` }),
     el("pre", { className: "sl-code", tabindex: "0" }, [el("code", { text: figure.code })]),
@@ -49,6 +100,7 @@ function card(figure) {
       const { svg, printed: text } = svgOf(stdout);
       const elapsed = Math.round(performance.now() - started);
       if (exit === 0 && svg) {
+        liveSvg = svg;
         image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
         printed.textContent = text.join("\n");
         provenance.textContent = `Computed live in your browser by ostrinc.wasm ${LAB.compiler} in ${elapsed} ms.`;
@@ -76,7 +128,7 @@ function card(figure) {
         el("h3", { text: figure.title }),
         el("p", { className: "muted", text: figure.blurb }),
         figure.printed.length ? printed : null,
-        el("div", { className: "sl-actions" }, [run, status, el("a", { className: "text-link", href: figure.sourceUrl, text: "View source ↗" })]),
+        el("div", { className: "sl-actions" }, [run, explore, status, el("a", { className: "text-link", href: figure.sourceUrl, text: "View source ↗" })]),
         provenance,
         code,
       ]),

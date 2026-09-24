@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-24 · rama `main` · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 211 de integración y 2 unitarias en verde.*
+*Corte: 2026-09-24 · rama `main` · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 212 de integración y 2 unitarias en verde.*
 
 Validación remota: Pages y CI pasaron para `8bc24bd` en Windows, Linux, macOS y web. La
 prueba de hilos nativos valida los pares concurrentes sin imponer un orden del planificador
@@ -258,7 +258,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Biblioteca estándar | Incluye `std.math`, `std.lists`, `std.strings` (incluidos `trim`, `split`, `lines`, `is_blank`, `format_text`, `format_float`, `char_at`, `slice` y `codepoint`), `std.time` (calendario gregoriano determinista, validación, ordinales, día de semana, ISO y `Result` de parseo), `std.json` (DOM, parser/serializer estricto y Unicode), `std.args`, `std.env` y `std.maps` (consultas genéricas de `Map<K,V>` con `Hash + Eq`); red sigue pendiente |
 | Mensajes de error de E/S | `strerror` ≠ texto de Rust (difieren entre backends) |
 | Unidades | `as` convierte a unidades compuestas (`v as km/h`) y comprueba la dimensión (E1026); `*`/`/` producen unidades canónicas (`kg*m^2/s^2`, `90 km/h * 30 min` → `45 km`); catálogo con N, J, W, Pa, Hz, V… y dimensiones con nombre (`Energy`, `Velocity`); `q.value()`/`q.unit()`. `Array<Quantity<D>>` (una unidad por array, aritmética elemento a elemento, reducciones con unidad, `as` sobre arrays, paridad nativa). Pendiente: `unit`/`define` definidos por el usuario y unidades afines (°C) |
-| Visualización | `std.viz` 0.1 (documento 23): marcas 2D, heatmap/contornos, superficies/trayectorias/nubes 3D, layouts y ejes con unidades, SVG determinista idéntico en intérprete, nativo y WASM. Pendiente: interacción, animación, PNG/PDF, WebGPU; la galería nativa deja ~300 asignaciones vivas al salir (textos de unidades de cantidades), la salida es correcta |
+| Visualización | `std.viz` 0.1 (documento 23): marcas 2D, heatmap/contornos, superficies/trayectorias/nubes 3D, layouts y ejes con unidades, SVG determinista idéntico en intérprete, nativo y WASM, con tooltips y resaltado al pasar el ratón sin scripts. Pendiente: selección enlazada, animación, PNG/PDF, WebGPU; la galería nativa deja ~300 asignaciones vivas al salir (textos de unidades de cantidades), la salida es correcta |
 | `Result<Void,E>` | Campo de valor de relleno (`char`) en C |
 | Migración HIR/IR | HIR cubre escalares, records, enums/match, Option/Result, colecciones, cierres y formas genéricas; la IR/C ya emite instancias concretas soportadas de funciones y métodos genéricos (incluidos casos recursivos), closures anidadas con capturas transitivas y ownership de entornos, con paridad y leak-check; records/enums genéricos aplicados y retornos complejos conservan el fallback verificado |
 | Paquetes | `--project` usa `entry`; resolución transitiva de manifiestos con alias globales sin colisión; lockfiles deterministas con rutas relativas, versión y SHA-256 de `ostrin.toml`/fuentes `.ostrin`; Git solo mediante `--fetch`, con caché local y commit resuelto; builds normales reutilizan y validan el lock, `--locked` lo exige; sin registro remoto |

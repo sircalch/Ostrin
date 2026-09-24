@@ -6678,3 +6678,13 @@ retiene su valor pero el llamador nunca soltaba un valor fresco; los receptores 
 liberar un array solo liberaba la cabecera (`shape` y `data` quedaban vivos: ahora hay `@N@_drop`).
 La galería pasa de 233 855 a 303 asignaciones vivas al salir (pico 3 987) con SVG idénticos;
 `native_memory_temporaries.ostrin` llega a `live_allocations=0` y tiene su prueba.
+
+## 275. Interacción en std.viz y un use-after-free del emisor AST — 2026-09-24
+
+std.viz 0.2 (parcial): cada figura lleva un `<style>` con resaltado al pasar el ratón y `<title>` con
+los valores de puntos, barras, barras de error y puntos 3D; funciona donde se abra el SVG, sin
+scripts, así que no contradice la regla de que JavaScript no calcula resultados. La galería añade
+"Explore": el SVG en un `iframe sandbox` con zoom y desplazamiento. Al añadirlo, `viz_dashboard`
+falló en nativo: `gen_block_expr` consideraba "transferido" un local del bloque exterior en
+`if c { line } else { … }`, no lo retenía y el bloque exterior lo liberaba (AddressSanitizer). La
+transferencia se limita a locales del propio bloque. Todos los ejemplos viz pasan ASan.
