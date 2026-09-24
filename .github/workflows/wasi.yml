@@ -76,7 +76,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist
-          cp compiler/target/wasm32-wasip1/release/ostrinc dist/ostrinc.wasm
+          cp compiler/target/wasm32-wasip1/release/ostrinc.wasm dist/ostrinc.wasm
           printf '%s\n' 'Ostrin WASI distribution' 'compiler = ostrinc.wasm' 'program smoke tests = hello.wasm, pkg_project.wasm, wasi_io_contract.wasm, native_ir_file_io.wasm, native_ir_managed_consumers.wasm, native_ir_nested_wrappers.wasm, native_ir_function_values.wasm' 'target = wasm32-wasip1' 'runner = WASI Preview 1 host with WebAssembly exception handling' > dist/README.txt
           sha256sum dist/ostrinc.wasm dist/hello.wasm dist/pkg_project.wasm dist/wasi_io_contract.wasm dist/native_ir_file_io.wasm dist/native_ir_managed_consumers.wasm dist/native_ir_nested_wrappers.wasm dist/native_ir_function_values.wasm > dist/SHA256SUMS
           tar -czf ostrinc-wasm32-wasip1.tar.gz -C dist ostrinc.wasm hello.wasm pkg_project.wasm wasi_io_contract.wasm native_ir_file_io.wasm native_ir_managed_consumers.wasm native_ir_nested_wrappers.wasm native_ir_function_values.wasm SHA256SUMS README.txt
