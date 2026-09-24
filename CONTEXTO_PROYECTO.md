@@ -6552,3 +6552,40 @@ Hallazgo: el comando de Windows documentado (`Invoke-WebRequest` sin `-UseBasicP
 quedó colgado más de dos minutos en Windows PowerShell 5.1 no interactivo; con
 `-UseBasicParsing` descarga al instante. README y notas de la release lo usan ahora y
 `distribution-check` lo exige.
+
+## 268. Homepage 3.0 y Scientific Lab — 2026-09-24
+
+Bloque web completo sobre la release `v0.1.0`, sin cambios de sintaxis.
+
+**Hallazgo de compilador.** Al escribir la pestaña Units se vio que `q as km` reetiquetaba el
+valor (`1500 m as km` → `1500 km`) en intérprete y nativo, por lo que las pruebas de paridad no
+lo detectaban. El documento 01 §3.4 define `(a + b) as nm` como conversión. `Expr::As` convierte
+ahora con `convert(v, from, to)` en el intérprete y con `ostrin_convert` en el emisor AST (HIR/IR
+ya caían a ese emisor). Regresión: `examples/unit_conversion.ostrin` con salida exacta. Siguen
+como limitaciones: `as` solo acepta un identificador de unidad, las unidades derivadas se
+imprimen sin simplificar y `unit`/`define` no están implementados. También apareció que un
+parámetro de tipo función no sombrea a una función global homónima (E1041), documentado en §6
+de `ESTADO_Y_PLAN.md` y propuesto como tarea separada. `--help` lista ahora `--test`.
+
+**Lab.** Ocho programas (`examples/lab_*.ostrin`, `plot_project/lab`, `autodiff_project/lab`) con
+parámetros de la forma `nombre = número`. `website/ostrin-runtime.js` monta proyectos
+multiarchivo como directorios WASI anidados en memoria, así que los paquetes reales `plot` y
+`autodiff` corren en el navegador. `lab.js` sustituye parámetros conservando el tipo del literal
+(`1` → `1.0` si el valor original era Float), dibuja gráficos solo a partir de líneas impresas por
+Ostrin (`bin`, `estimate`, `point`) y muestra el SVG del paquete `plot` como `<img>`.
+
+**Evidencia.** `scripts/lab-data.mjs` ejecuta con `website/ostrinc.wasm` bajo Node WASI los ocho
+programas, el héroe y el ejemplo de pipeline (`--hir`, `--ir`, `--emit-c`), y escribe
+`website/lab-data.js`. En modo check falla si cambia una fuente o una salida, si un
+`<pre data-output-source>` muestra una línea que su programa no imprime o si la Reference lista
+un flag ausente de `--help`. Esto destapó que la tarjeta autodiff del showcase mostraba una
+salida parafraseada; ahora muestra líneas reales. `site-facts.mjs` deriva `releaseStatus`,
+`releaseDate` y `releaseUrl` del encabezado fechado del CHANGELOG y de `docs/releases/`, y
+`website-check.mjs` rechaza claims de release, comandos de instalación y enlaces al repositorio
+que no coincidan.
+
+**Verificación.** En el navegador, las ocho demos recalculadas en vivo reproducen exactamente la
+salida registrada, y todos los sliders en sus extremos recalculan sin errores. La suite
+Playwright (6 pruebas, ejecutada localmente con Chrome) cubre el Lab, el Cookbook, la navegación y
+el desbordamiento en 390/768 px de las 12 páginas. La suite Rust: 2 unitarias, 6 diferenciales y
+201 de integración.

@@ -1,0 +1,35 @@
+// Scientific Lab · Data
+// Parse CSV measurements, group them by station and summarize each group.
+fn main() -> Void {
+    text = "station,temp_c,rain_mm\nLima,21.5,0.0\nCusco,12.0,3.5\nLima,23.5,0.5\nCusco,10.0,4.5\nQuito,15.5,2.0\nQuito,14.0,6.5\nLima,22.0,0.2\n"
+    rows = parse_csv(text)
+    header = rows[0]
+    print("columns: " + header.join(", "))
+
+    mut temps = Map<String, List<Float>>()
+    mut order: List<String> = []
+    mut i = 1
+    while i < rows.length() {
+        row = rows[i]
+        station = row[0]
+        match row[1].to_float() {
+            Ok(value) => {
+                if not temps.contains_key(station) {
+                    temps.set(station, [])
+                    order.push(station)
+                }
+                mut values = temps.get(station).unwrap()
+                values.push(value)
+                temps.set(station, values)
+            },
+            Err(message) => print("skipped row " + i.to_string() + ": " + message),
+        }
+        i = i + 1
+    }
+
+    for station in order {
+        values = array(temps.get(station).unwrap())
+        print(station + ": n=" + values.length().to_string() + " mean=" + (round(values.mean() * 100.0) / 100.0).to_string() + " min=" + values.min().to_string() + " max=" + values.max().to_string())
+    }
+    print("stations: " + order.length().to_string() + ", rows: " + (rows.length() - 1).to_string())
+}

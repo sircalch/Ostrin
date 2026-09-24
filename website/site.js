@@ -1,8 +1,25 @@
 (function () {
   const SITE_FACTS = Object.freeze(globalThis.OSTRIN_SITE_FACTS || {});
 
+  const released = SITE_FACTS.releaseStatus === 'published';
   document.querySelectorAll('.version').forEach(function (label) {
-    label.textContent = 'development / ' + SITE_FACTS.version;
+    label.textContent = released ? 'v' + SITE_FACTS.version + ' / experimental' : 'development / ' + SITE_FACTS.version;
+  });
+
+  // The release line only claims what scripts/site-facts.mjs derived from CHANGELOG.md.
+  document.querySelectorAll('[data-release-line]').forEach(function (line) {
+    const text = line.querySelector('[data-release-text]');
+    if (!text) return;
+    line.dataset.state = released ? 'published' : 'unreleased';
+    if (released) {
+      text.textContent = 'Ostrin v' + SITE_FACTS.version + ' · experimental developer release · published ' + SITE_FACTS.releaseDate + ' · ';
+      const link = document.createElement('a');
+      link.href = SITE_FACTS.releaseUrl;
+      link.textContent = 'release notes ↗';
+      text.append(link);
+    } else {
+      text.textContent = 'Version ' + SITE_FACTS.version + ' is in development; no release has been published yet.';
+    }
   });
 
   document.querySelectorAll('[data-site-value]').forEach(function (node) {
@@ -31,24 +48,6 @@
       document.body.classList.remove('menu-open');
     });
   });
-
-  const nav = document.querySelector('.site-nav');
-  const githubLink = nav && nav.querySelector('a[href^="https://github.com"]');
-  const ecosystemLink = nav && nav.querySelector('a[href="ecosystem.html"]');
-  if (nav && githubLink) {
-    [['showcase.html', 'Showcase'], ['community.html', 'Community']].forEach(function (item) {
-      if (!nav.querySelector('a[href="' + item[0] + '"]')) {
-        const link = document.createElement('a');
-        link.href = item[0];
-        link.textContent = item[1];
-        link.addEventListener('click', function () {
-          if (header) header.classList.remove('menu-active');
-          document.body.classList.remove('menu-open');
-        });
-        nav.insertBefore(link, ecosystemLink || githubLink);
-      }
-    });
-  }
 
   document.querySelectorAll('.filter-button').forEach(function (button) {
     button.addEventListener('click', function () {

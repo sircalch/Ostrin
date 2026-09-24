@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-23 · rama `main` · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 200 de integración y 2 unitarias en verde.*
+*Corte: 2026-09-24 · rama `main` · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 201 de integración y 2 unitarias en verde.*
 
 Validación remota: Pages y CI pasaron para `8bc24bd` en Windows, Linux, macOS y web. La
 prueba de hilos nativos valida los pares concurrentes sin imponer un orden del planificador
@@ -254,6 +254,8 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Ownership/último uso | `--ownership-report`, `--ownership-check` y `--ownership-ir`; la IR ya inserta y consume retain/release lineal para `String`, `Result` con payload `String` (incluido `Result<Void, String>`), records concretos, `Option<Record>`, listas escalares/String (incluida la lista fresca de `args()`), mapas/conjuntos escalares y `Option<String>` (incluido el valor fresco de `env()`), con transferencia en `Phi` simples y liberación de `Phi` de bucle en backedges probados; `clone`/`drop` tienen lowering explícito en IR, los entornos de tareas retienen también cada `Channel<T>` capturado, los buffers temporales de `split/lines` transfieren y liberan sus strings, `Result` libera condicionalmente `value`/`error`, y `unwrap`/`unwrap_or`/`ok`/`ok_or` retienen payloads extraídos o fallbacks antes de la liberación del wrapper; la ruta AST conserva la misma regla para temporales frescos en llamadas genéricas, `print` y acceso a campos; `Option` escalar es por valor, mientras llamadas transferentes no lineales, agregados complejos, scopes y escapes siguen conservadores |
 | Biblioteca estándar | Incluye `std.math`, `std.lists`, `std.strings` (incluidos `trim`, `split`, `lines`, `is_blank`, `format_text`, `format_float`, `char_at`, `slice` y `codepoint`), `std.time` (calendario gregoriano determinista, validación, ordinales, día de semana, ISO y `Result` de parseo), `std.json` (DOM, parser/serializer estricto y Unicode), `std.args`, `std.env` y `std.maps` (consultas genéricas de `Map<K,V>` con `Hash + Eq`); red sigue pendiente |
 | Mensajes de error de E/S | `strerror` ≠ texto de Rust (difieren entre backends) |
+| Unidades | `q as unidad` convierte desde 2026-09-24 (antes solo reetiquetaba); `as` acepta un único identificador de unidad (`as m / s` falla en ejecución); las unidades derivadas se imprimen sin simplificar (`m/s*s`); `unit`/`define` definidos por el usuario están especificados pero no implementados |
+| Resolución de nombres | Un parámetro de tipo función no sombrea a una función global homónima: `fn twice(f: fn(Float, Float) -> Float, ...)` con un `fn f` global da E1041 |
 | `Result<Void,E>` | Campo de valor de relleno (`char`) en C |
 | Migración HIR/IR | HIR cubre escalares, records, enums/match, Option/Result, colecciones, cierres y formas genéricas; la IR/C ya emite instancias concretas soportadas de funciones y métodos genéricos (incluidos casos recursivos), closures anidadas con capturas transitivas y ownership de entornos, con paridad y leak-check; records/enums genéricos aplicados y retornos complejos conservan el fallback verificado |
 | Paquetes | `--project` usa `entry`; resolución transitiva de manifiestos con alias globales sin colisión; lockfiles deterministas con rutas relativas, versión y SHA-256 de `ostrin.toml`/fuentes `.ostrin`; Git solo mediante `--fetch`, con caché local y commit resuelto; builds normales reutilizan y validan el lock, `--locked` lo exige; sin registro remoto |
@@ -335,6 +337,15 @@ generados escalares y con ownership (`Option`/`Result`), cobertura de mensajes d
 benchmarks (nativo vs intérprete).
 
 ### G. Producto
+**Homepage 3.0 (2026-09-24).** La portada muestra el estado de la release derivado de
+`CHANGELOG.md`, un Scientific Lab de ocho demos (Plot, Linear Algebra, Statistics, Monte Carlo,
+Autodiff, Units, Data, Concurrency) que ejecutan programas de `examples/` con `ostrinc.wasm`
+en el navegador —incluidos proyectos multiarchivo con los paquetes `plot` y `autodiff`—, la
+etapa source → HIR → IR → C de una función real, y tarjetas de capacidades con enlaces a su
+evidencia. `scripts/lab-data.mjs` registra las salidas con el mismo WASM y su modo check falla
+ante cualquier deriva; `website-check.mjs` valida evidencias, enlaces al repositorio y claims de
+release. La documentación se separa en Learn, Reference, Guides, Examples y Cookbook.
+
 El sitio web y el playground real WASM ya están publicados; la primera base de descubrimiento
 añade SEO técnico, cifras centralizadas, una demo viva en la portada y enlaces compartibles.
 El catálogo ya tiene demos live para cantidades, biblioteca estándar, records/enums y concurrencia,
@@ -362,9 +373,11 @@ La gramática para Linguist queda separada porque requiere uso público suficien
 | **4** | B (concurrencia real) | Cumple la promesa de «concurrencia segura por defecto» |
 | **5** | E (WASM) + G (playground) | Difusión |
 
-Plan activo (2026-09-24): el bloque de release `v0.1.0` está cerrado (publicada e instaladores
-validados); sigue la homepage 3.0 con Scientific Lab alimentado solo por
-salidas reales de Ostrin. GPU, autodiff inverso, registry público y red quedan fuera de ambos bloques.
+Plan activo (2026-09-24): los bloques de release `v0.1.0` y homepage 3.0 están cerrados. El
+siguiente ciclo vuelve al núcleo (retirada del fallback AST, ownership completo) con las
+brechas que expuso el Scientific Lab: `as` con unidades compuestas, simplificación de unidades
+derivadas en la salida y el sombreado de funciones globales por parámetros función (§6). GPU,
+autodiff inverso, registry público y red siguen fuera.
 
 ---
 
@@ -372,7 +385,7 @@ salidas reales de Ostrin. GPU, autodiff inverso, registry público y red quedan 
 
 ```powershell
 cd compiler
-    cargo test                                   # 6 diferenciales + 200 de integración + 2 unitarias
+    cargo test                                   # 6 diferenciales + 201 de integración + 2 unitarias
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```

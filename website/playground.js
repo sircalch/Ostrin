@@ -1,6 +1,5 @@
-// Runs the real Ostrin compiler (ostrinc.wasm, wasm32-wasip1) in the page. The WASI layer comes from
-// @bjorn3/browser_wasi_shim; the program is the only file in an in-memory preopened directory.
-import { WASI, File, OpenFile, ConsoleStdout, PreopenDirectory } from "https://cdn.jsdelivr.net/npm/@bjorn3/browser_wasi_shim@0.3.0/+esm";
+// Playground and live examples on top of the real compiler (see ostrin-runtime.js).
+import { loadCompiler, runOstrinc } from "./ostrin-runtime.js";
 
 const EXAMPLES = {
   "Hello, quantities": `fn velocity(distance: Quantity<Length>, time: Quantity<Time>) -> Quantity<Length / Time> {
@@ -82,11 +81,7 @@ const status = $("status");
 const buttons = ["run", "check", "test", "format"].map($).filter(Boolean);
 const shareButton = $("share");
 
-let modulePromise;
-function loadModule() {
-  modulePromise ??= WebAssembly.compileStreaming(fetch("ostrinc.wasm"));
-  return modulePromise;
-}
+const loadModule = loadCompiler;
 
 function escapeHtml(text) {
   return text.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
@@ -94,24 +89,7 @@ function escapeHtml(text) {
 
 async function invoke(sourceText, flags) {
   const normalizedFlags = Array.isArray(flags) ? flags : [flags];
-  const lines = [];
-  const files = new Map([["main.ostrin", new File(new TextEncoder().encode(sourceText))]]);
-  const fds = [
-    new OpenFile(new File([])),
-    ConsoleStdout.lineBuffered((line) => lines.push(["out", line])),
-    ConsoleStdout.lineBuffered((line) => lines.push(["err", line])),
-    new PreopenDirectory(".", files),
-  ];
-  const wasi = new WASI(["ostrinc", ...normalizedFlags, "main.ostrin"], [], fds);
-  const instance = await WebAssembly.instantiate(await loadModule(), { wasi_snapshot_preview1: wasi.wasiImport });
-  let code = 0;
-  try {
-    code = wasi.start(instance);
-  } catch (error) {
-    lines.push(["err", `runtime trap: ${error.message ?? error}`]);
-    code = 1;
-  }
-  return { code, lines };
+  return runOstrinc({ "main.ostrin": sourceText }, [...normalizedFlags, "main.ostrin"]);
 }
 
 function parseDiagnostic(text) {

@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#080a10">
+    <meta name="description" content="Task-oriented Ostrin guides: install the release, create projects, test, compile to native C and WASI, and use the VS Code tooling.">
+    <link rel="canonical" href="https://sircalch.github.io/Ostrin/guides.html">
+    <meta property="og:site_name" content="Ostrin">
+    <meta property="og:title" content="Ostrin Guides — Install, Projects, Native, WASI and Editor">
+    <meta property="og:description" content="Task-oriented Ostrin guides: install the release, create projects, test, compile to native C and WASI, and use the VS Code tooling.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://sircalch.github.io/Ostrin/guides.html">
+    <meta property="og:image" content="https://sircalch.github.io/Ostrin/assets/ostrin-social.png">
+    <meta property="og:image:type" content="image/png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Ostrin programming language: scientific-first, general-purpose, native C and WASI.">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Ostrin Guides — Install, Projects, Native, WASI and Editor">
+    <meta name="twitter:description" content="Task-oriented Ostrin guides: install the release, create projects, test, compile to native C and WASI, and use the VS Code tooling.">
+    <meta name="twitter:image" content="https://sircalch.github.io/Ostrin/assets/ostrin-social.png">
+    <meta name="twitter:image:alt" content="Ostrin programming language: scientific-first, general-purpose, native C and WASI.">
+    <link rel="icon" href="assets/ostrin-logo.png">
+    <link rel="stylesheet" href="styles.css">
+    <script src="site-data.js" defer></script>
+    <script src="site.js" defer></script>
+    <title>Ostrin Guides — Install, Projects, Native, WASI and Editor</title>
+  </head>
+  <body>
+    <header class="site-header"><a class="brand" href="index.html"><img src="assets/ostrin-logo.png" alt="" width="36" height="36"><span>OSTRIN</span></a><div class="header-right"><span class="version"></span><button class="menu-toggle" aria-label="Open navigation" aria-expanded="false"><span></span><span></span></button><nav class="site-nav" aria-label="Main navigation"><a href="docs.html">Learn</a><a href="reference.html">Reference</a><a href="guides.html" aria-current="page">Guides</a><a href="examples.html">Examples</a><a href="cookbook.html">Cookbook</a><a href="playground.html">Playground</a><a href="https://github.com/sircalch/Ostrin">GitHub <span aria-hidden="true">↗</span></a></nav></div></header>
+    <main>
+      <section class="page-hero shell"><p class="eyebrow">Guides</p><h1>Workflows,<br><em>step by step.</em></h1><p class="lede">Task-oriented guides for the current compiler. Every command here exists in <span class="mono">ostrinc --help</span>; anything not available yet says so.</p></section>
+      <section class="page-grid shell"><aside class="side-nav"><p class="eyebrow">On this page</p><a href="#install">Install the compiler</a><a href="#projects">Create a project with dependencies</a><a href="#testing">Test and format</a><a href="#native">Compile to native code</a><a href="#wasi">Build WebAssembly (WASI)</a><a href="#editor">Use Visual Studio Code</a><a href="#site-evidence">How this site proves its results</a></aside><div class="guide-list">
+        <article class="guide" id="install"><h2>Install the compiler</h2><p>Ostrin <span data-site-value="version"></span> is an experimental developer release for Linux x86_64, macOS ARM64 and Windows x64. The installers download the release archive, verify its SHA-256 checksum and check <span class="mono">ostrinc --version</span>.</p><pre class="code guide-code"><code># Linux x86_64 or macOS ARM64
+curl --fail --location https://raw.githubusercontent.com/sircalch/Ostrin/main/scripts/install.sh \
+  --output /tmp/ostrinc-install.sh
+sh /tmp/ostrinc-install.sh --version 0.1.0</code></pre><pre class="code guide-code"><code># Windows PowerShell
+$installer = Join-Path $env:TEMP 'ostrinc-install.ps1'
+Invoke-WebRequest -UseBasicParsing https://raw.githubusercontent.com/sircalch/Ostrin/main/scripts/install.ps1 -OutFile $installer
+powershell -ExecutionPolicy Bypass -File $installer -Version 0.1.0 -AddToPath</code></pre><pre class="code guide-code"><code>ostrinc --version
+ostrinc --run examples/hello.ostrin</code></pre><p class="muted">To build from source instead: <span class="mono">cargo build --release --manifest-path compiler/Cargo.toml</span>. Package-manager channels (Homebrew, winget, Scoop, Chocolatey, AUR) are not available yet.</p></article>
+        <article class="guide" id="projects"><h2>Create a project with dependencies</h2><p><span class="mono">--new</span> creates a manifest and a <span class="mono">main.ostrin</span> with a test. Dependencies are local paths or Git repositories; builds write a deterministic <span class="mono">ostrin.lock</span>.</p><pre class="code guide-code"><code>ostrinc --new my_project
+ostrinc --run --project my_project
+ostrinc --locked --run --project my_project   # require the existing lockfile
+ostrinc --fetch --run --project my_project    # explicitly fetch Git dependencies</code></pre><pre class="code guide-code"><code>[package]
+name = "my_project"
+version = "0.1.0"
+entry = "main.ostrin"
+
+[dependencies]
+plot = { path = "../plot" }</code></pre><p class="muted">There is no public package registry yet. See <a class="text-link violet" href="https://github.com/sircalch/Ostrin/blob/main/docs/design/14-sistema-de-paquetes.md">the package design ↗</a>.</p></article>
+        <article class="guide" id="testing"><h2>Test and format</h2><p>Functions named <span class="mono">test_*</span> are tests. <span class="mono">assert_eq</span> reports both values when it fails.</p><pre class="code guide-code"><code>ostrinc --test examples/testing.ostrin
+ostrinc --test --project my_project
+ostrinc --fmt --check main.ostrin</code></pre></article>
+        <article class="guide" id="native"><h2>Compile to native code</h2><p>The native backend transpiles to C and compiles it with <span class="mono">gcc</span>, <span class="mono">clang</span> or <span class="mono">cc</span> (or <span class="mono">OSTRIN_CC</span>). The interpreter is the semantic reference, and a differential test compares every example against it.</p><pre class="code guide-code"><code>ostrinc --compile examples/collections.ostrin
+ostrinc --compile --leak-check examples/ownership_primitives.ostrin
+ostrinc --compile --native-threads examples/native_threads.ostrin
+ostrinc --emit-c examples/lab_pipeline.ostrin</code></pre><p class="muted">Constructs outside the migrated HIR/IR families use a verified fallback; a few are rejected with a clear error instead of compiling with different semantics.</p></article>
+        <article class="guide" id="wasi"><h2>Build WebAssembly (WASI)</h2><p>Programs compile to <span class="mono">wasm32-wasip1</span> with the WASI SDK's clang; cancellation uses WebAssembly exception handling, so the host must support it. The compiler itself also runs as WASI — that is what powers the playground and the Lab.</p><pre class="code guide-code"><code>export OSTRIN_WASI_CC=/path/to/wasi-sdk/bin/clang
+ostrinc --compile --target wasm32-wasi examples/hello.ostrin
+cargo build --manifest-path compiler/Cargo.toml --target wasm32-wasip1 --release</code></pre></article>
+        <article class="guide" id="editor"><h2>Use Visual Studio Code</h2><p>The extension in <span class="mono">vscode-ostrin/</span> uses <span class="mono">ostrinc --lsp</span> for diagnostics, hover, completion, definitions, references, rename and semantic tokens, and <span class="mono">ostrinc --dap</span> for breakpoints, stepping and variables. It is distributed as a local VSIX, not through the Marketplace.</p><pre class="code guide-code"><code>cd vscode-ostrin
+npx --yes @vscode/vsce package
+code --install-extension ./ostrin-language-support-0.4.0.vsix</code></pre><p class="muted"><a class="text-link violet" href="https://github.com/sircalch/Ostrin/blob/main/vscode-ostrin/README.md">Extension README ↗</a></p></article>
+        <article class="guide" id="site-evidence"><h2>How this site proves its results</h2><p>The Scientific Lab, the Cookbook and the compiler pipeline come from <span class="mono">website/lab-data.js</span>, generated by <span class="mono">scripts/lab-data.mjs</span> from programs in <span class="mono">examples/</span> and run with <span class="mono">ostrinc.wasm</span>. CI regenerates it and fails when a source, a recorded output or a static page output drifts. Version, counts and release status come from <span class="mono">scripts/site-facts.mjs</span>.</p><pre class="code guide-code"><code>node scripts/lab-data.mjs            # check recorded outputs
+node scripts/website-metadata.mjs     # check version, counts and release facts
+node scripts/website-check.mjs        # links, evidence, claims</code></pre></article>
+      </div></section>
+    </main>
+    <footer class="site-footer shell"><a class="brand" href="index.html"><img src="assets/ostrin-logo.png" alt="" width="30" height="30"><span>OSTRIN</span></a><span>Open development · MIT License</span><div class="footer-links"><a href="language.html">Language</a><a href="ecosystem.html">Ecosystem</a><a href="showcase.html">Showcase</a><a href="community.html">Community</a><a href="roadmap.html">Roadmap</a><a href="https://github.com/sircalch/Ostrin">GitHub ↗</a></div></footer>
+  </body>
+</html>

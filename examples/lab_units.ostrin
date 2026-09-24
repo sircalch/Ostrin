@@ -1,0 +1,32 @@
+// Scientific Lab · Units
+// Projectile motion with dimensions checked by the compiler.
+fn flight_time(vertical: Quantity<Length / Time>, g: Quantity<Length / Time / Time>) -> Quantity<Time> {
+    2.0 * vertical / g
+}
+
+fn two(x: Float) -> String {
+    (round(x * 100.0) / 100.0).to_string()
+}
+
+fn main() -> Void {
+    launch_speed = 20.0
+    angle_degrees = 45.0
+
+    g = 9.81 m / (1 s * 1 s)
+    speed = launch_speed * (1 m / 1 s)
+    angle = angle_degrees * pi() / 180.0
+    vertical = speed * sin(angle)
+    horizontal = speed * cos(angle)
+
+    t = flight_time(vertical, g)
+    range = horizontal * t
+    height = vertical * vertical / (2.0 * g)
+
+    // Dividing by a unit only compiles when the dimensions match.
+    print("flight time: " + two(t / (1 s)) + " s")
+    print("range: " + two(range / (1 m)) + " m = " + two((range as km) / (1 km)) + " km")
+    print("peak height: " + two((height as cm) / (1 cm)) + " cm")
+    print("lands between 30 m and 50 m: " + (range within (30 m to 50 m)).to_string())
+    print(1500 m as km)
+    print((90 min) as h)
+}

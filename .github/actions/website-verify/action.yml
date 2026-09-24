@@ -29,5 +29,6 @@ runs:
       shell: bash
       run: |
         node scripts/website-metadata.mjs
+        node --no-warnings scripts/lab-data.mjs
         node scripts/website-check.mjs --wasm
         node scripts/distribution-check.mjs

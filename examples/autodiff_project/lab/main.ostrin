@@ -1,0 +1,24 @@
+// Scientific Lab · Autodiff
+// Forward-mode derivatives with dual numbers from the `autodiff` package, then Newton's method.
+import autodiff.autodiff
+import autodiff.autodiff.{Dual}
+
+fn cubic(x: Dual) -> Dual {
+    // f(x) = x^3 - 2x - 5
+    x * x * x - 2.0 * x - autodiff.constant(5.0)
+}
+
+fn three(x: Float) -> String {
+    (round(x * 1000.0) / 1000.0).to_string()
+}
+
+fn main() -> Void {
+    start = 3.0
+    for i in 0 to 8 {
+        x = (i as Float) * 0.5 - 1.0
+        print("point " + three(x) + " " + three(autodiff.value(cubic, x)) + " " + three(autodiff.derivative(cubic, x)))
+    }
+    root = autodiff.newton(cubic, start, 8)
+    print("newton from " + three(start) + ": root = " + (round(root * 1000000.0) / 1000000.0).to_string())
+    print("|f(root)| = " + three(abs(autodiff.value(cubic, root))) + ", f'(root) = " + three(autodiff.derivative(cubic, root)))
+}

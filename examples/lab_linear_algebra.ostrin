@@ -1,0 +1,28 @@
+// Scientific Lab · Linear Algebra
+// Three masses joined by springs: stiffness matrix, static response and normal modes.
+fn clean(x: Float) -> Float {
+    round(x * 10000.0) / 10000.0
+}
+
+fn main() -> Void {
+    coupling = 1.0
+    k = array([
+        [1.0 + coupling, 0.0 - coupling, 0.0],
+        [0.0 - coupling, 1.0 + 2.0 * coupling, 0.0 - coupling],
+        [0.0, 0.0 - coupling, 1.0 + coupling]
+    ])
+    force = array([1.0, 0.0, -1.0])
+
+    print("det(K) = " + clean(det(k)).to_string())
+    print("trace(K) = " + clean(trace(k)).to_string())
+
+    x = solve(k, force)
+    print("displacement x = K⁻¹ f:")
+    print(round(x * 10000.0) / 10000.0)
+    print("residual |K x - f| = " + clean(norm(k @ x - force)).to_string())
+
+    modes = eigvals(k)
+    print("eigenvalues (squared mode frequencies):")
+    print(round(modes * 10000.0) / 10000.0)
+    print("sum of eigenvalues - trace = " + clean(abs(modes.sum() - trace(k))).to_string())
+}

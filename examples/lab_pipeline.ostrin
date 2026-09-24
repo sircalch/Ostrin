@@ -1,0 +1,8 @@
+// Shown on the homepage: one function through HIR, IR and C.
+fn kinetic(mass: Float, speed: Float) -> Float {
+    0.5 * mass * speed * speed
+}
+
+fn main() -> Void {
+    print(kinetic(2.0, 3.0))
+}

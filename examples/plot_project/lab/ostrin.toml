@@ -1,0 +1,7 @@
+[package]
+name = "plot_lab"
+version = "0.1.0"
+entry = "main.ostrin"
+
+[dependencies]
+plot = { path = "../plot" }

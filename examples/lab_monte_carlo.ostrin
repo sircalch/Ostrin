@@ -1,0 +1,30 @@
+// Scientific Lab · Monte Carlo
+// Estimate pi from uniformly random points in the unit square, with a seeded generator.
+fn main() -> Void {
+    seed = 2024
+    samples = 20000
+    checkpoints = 10
+    g = rng(seed)
+    points = g.rand([samples, 2])
+
+    mut hits = 0
+    mut i = 0
+    every = samples / checkpoints
+    while i < samples {
+        x = points.get(i, 0)
+        y = points.get(i, 1)
+        if x * x + y * y < 1.0 {
+            hits = hits + 1
+        }
+        i = i + 1
+        if i % every == 0 {
+            estimate = 4.0 * (hits as Float) / (i as Float)
+            print("estimate " + i.to_string() + " " + (round(estimate * 100000.0) / 100000.0).to_string())
+        }
+    }
+
+    result = 4.0 * (hits as Float) / (samples as Float)
+    print("pi ≈ " + (round(result * 100000.0) / 100000.0).to_string())
+    print("|error| = " + (round(abs(result - pi()) * 100000.0) / 100000.0).to_string())
+    print("expected standard error ≈ " + (round(4.0 * sqrt(pi() / 4.0 * (1.0 - pi() / 4.0) / (samples as Float)) * 100000.0) / 100000.0).to_string())
+}

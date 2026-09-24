@@ -1,0 +1,10 @@
+// Shown in the homepage hero: dimensions are part of the type.
+fn velocity(distance: Quantity<Length>, time: Quantity<Time>) -> Quantity<Length / Time> {
+    distance / time
+}
+
+fn main() -> Void {
+    speed = velocity(100 m, 8 s)
+    print(speed)
+    print(42.195 km as m)
+}

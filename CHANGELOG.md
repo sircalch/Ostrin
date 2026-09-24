@@ -2,6 +2,44 @@
 
 ## Unreleased
 
+### Compiler
+- Fixed `quantity as unit`: it relabelled the value instead of converting it (`1500 m as km`
+  printed `1500 km`), contradicting design document 01 §3.4. The interpreter and the native AST
+  emitter now convert through the unit factors (`1.5 km`); `examples/unit_conversion.ostrin` is
+  covered by an exact-output test and by the interpreter/native differential test. A pure
+  number still receives the unit (`3 as nm`).
+- `ostrinc --help` now lists `--test`.
+
+### Website: homepage 3.0 and Scientific Lab
+- New homepage: "Scientific-first. General-purpose. Native by design.", with the release status
+  derived from `CHANGELOG.md`/`docs/releases/` (`site-facts.mjs` adds `releaseStatus`,
+  `releaseDate` and `releaseUrl`) and a hero program recorded from `examples/lab_hero.ostrin`.
+- Scientific Lab with eight tabs — Plot, Linear Algebra, Statistics, Monte Carlo, Autodiff,
+  Units, Data and Concurrency. Each is an Ostrin program under `examples/` (`lab_*.ostrin`, or
+  the `plot_project/lab` and `autodiff_project/lab` projects that use the real `plot` and
+  `autodiff` packages). Run and the parameter sliders recompute with `ostrinc.wasm` in the page;
+  multi-file projects run through a nested in-memory WASI directory (`website/ostrin-runtime.js`,
+  now shared with the playground). JavaScript only substitutes parameters, draws charts from the
+  numbers Ostrin prints and shows the SVG the `plot` package emits. Every tab links to its source
+  and documentation, explains how the result is produced and states its current limits.
+- `scripts/lab-data.mjs` generates `website/lab-data.js` by running every Lab program, the hero
+  and the source → HIR → IR → C pipeline example with `website/ostrinc.wasm` under Node WASI.
+  Its check mode fails when a source or recorded output drifts, when a static
+  `<pre data-output-source>` on any page shows a line its program does not print, when a showcase
+  output has no source, or when the Reference lists a flag missing from `ostrinc --help`.
+- The showcase autodiff card showed paraphrased output (`f(2) = -1`, `gradient = (-51, 50)`) that
+  the program never prints; it now shows the real lines, verified by the check above.
+- Documentation surfaces separated: Learn (`docs.html`), Reference (new `reference.html`: design
+  documents and CLI), Guides (new `guides.html`: install, projects, testing, native, WASI,
+  editor), Examples and Cookbook (new `cookbook.html`, rendered from the Lab data). Shared
+  navigation and footer across all twelve public pages.
+- `website-check.mjs` now also rejects cited repository paths and GitHub links to missing files,
+  release links or install commands that do not match the recorded release, "unpublished"
+  wording once a release is recorded, stale Lab sources, and design documents missing from the
+  Reference. The shared CI/Pages verification runs `lab-data.mjs` after building the WASM
+  compiler, and the browser suite covers the Lab (live parity, parameter recomputation, the SVG
+  project) and the Cookbook.
+
 ## 0.1.0 — experimental developer release (2026-09-24)
 
 Ostrin 0.1.0 is the first public developer release. It packages the compiler for Linux

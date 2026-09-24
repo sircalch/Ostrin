@@ -26,8 +26,18 @@ export function collectSiteFacts() {
   const version = readRepositoryFile("compiler/Cargo.toml").match(/^version\s*=\s*"([^"]+)"/m)?.[1];
   if (!version) throw new Error("compiler/Cargo.toml: unable to determine package version");
 
+  // A version counts as released only when CHANGELOG.md dates its heading and its release notes
+  // exist; the website never claims a release that the repository does not record.
+  const heading = readRepositoryFile("CHANGELOG.md").replaceAll("\r\n", "\n").split("\n")
+    .find((line) => line.startsWith(`## ${version} `));
+  const releaseDate = heading?.match(/\((\d{4}-\d{2}-\d{2})\)\s*$/)?.[1];
+  const released = Boolean(releaseDate) && existsSync(path.join(repositoryRoot, "docs", "releases", `v${version}.md`));
+
   return {
     version,
+    releaseStatus: released ? "published" : "unreleased",
+    releaseDate: released ? releaseDate : "",
+    releaseUrl: released ? `https://github.com/sircalch/Ostrin/releases/tag/v${version}` : "",
     designDocs: String(filesUnder("docs/design").filter((file) => file.endsWith(".md")).length),
     examples: String(filesUnder("examples").filter((file) => file.endsWith(".ostrin")).length),
     integrationTests: String(countRustTests("compiler/tests/examples.rs")),

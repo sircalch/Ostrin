@@ -50,7 +50,7 @@ try {
 }
 const siteData = read("website/site-data.js");
 for (const [key, expected] of Object.entries(facts)) {
-  const actual = siteData.match(new RegExp(`\\b${key}\\":\\s*\\"([^\\"]+)\\"`))?.[1];
+  const actual = siteData.match(new RegExp(`\\b${key}\\":\\s*\\"([^\\"]*)\\"`))?.[1];
   check(actual === expected, `website/site-data.js: ${key} is ${actual ?? "missing"}, expected ${expected}`);
 }
 
@@ -112,7 +112,71 @@ for (const page of publicPages) {
   }
 }
 
+// Evidence: repository paths cited by pages must exist, including links into this repository.
+const repositoryLink = /https:\/\/github\.com\/sircalch\/Ostrin\/(?:blob|tree)\/main\/([^"#?]+)/g;
+for (const page of publicPages) {
+  const html = read(`website/${page}`);
+  for (const [, cited] of html.matchAll(/data-evidence="([^"]+)"/g)) {
+    check(existsSync(path.join(repositoryRoot, cited)), `${page}: evidence ${cited} does not exist`);
+  }
+  for (const [, cited] of html.matchAll(repositoryLink)) {
+    check(existsSync(path.join(repositoryRoot, decodeURIComponent(cited))), `${page}: GitHub link to missing path ${cited}`);
+  }
+}
+
+// Release claims must match what CHANGELOG.md and docs/releases/ record (see site-facts.mjs).
+const released = facts.releaseStatus === "published";
+for (const page of [...publicPages.map((name) => `website/${name}`), "README.md"]) {
+  const text = read(page);
+  for (const [, tag] of text.matchAll(/releases\/tag\/(v[0-9][^"'\s)<]*)/g)) {
+    check(released && tag === `v${facts.version}`, `${page}: links to release ${tag}, but ${released ? `the current release is v${facts.version}` : "no release is recorded"}`);
+  }
+  for (const [, version] of text.matchAll(/--version (\d+\.\d+\.\d+)/g)) {
+    check(version === facts.version, `${page}: install command uses ${version}, compiler is ${facts.version}`);
+  }
+  if (released) {
+    check(!/not (?:yet )?published|not published yet|prepared, not yet/i.test(text), `${page}: says the release is unpublished, but v${facts.version} is recorded as published`);
+  } else {
+    check(!text.includes(`v${facts.version}`) || page === "README.md", `${page}: mentions v${facts.version}, which has no recorded release`);
+  }
+}
+
+// Scientific Lab data: every demo is backed by an existing Ostrin source with recorded output.
+const labData = read("website/lab-data.js");
+let lab;
+try {
+  lab = JSON.parse(labData.slice(labData.indexOf("Object.freeze(") + "Object.freeze(".length, labData.lastIndexOf(");")));
+} catch (error) {
+  check(false, `website/lab-data.js: unreadable (${error.message})`);
+}
+if (lab) {
+  check(lab.compiler === facts.version, `website/lab-data.js: recorded with ${lab.compiler}, compiler is ${facts.version}; run node scripts/lab-data.mjs --write`);
+  check(lab.demos.length === 8, `website/lab-data.js: expected 8 Scientific Lab demos, found ${lab.demos.length}`);
+  for (const demo of lab.demos) {
+    check(existsSync(path.join(repositoryRoot, demo.source)), `lab ${demo.id}: source ${demo.source} does not exist`);
+    check(demo.output.length > 0, `lab ${demo.id}: no recorded output`);
+    check(Boolean(demo.docs?.href) && Boolean(demo.sourceUrl) && Boolean(demo.how) && Boolean(demo.limits), `lab ${demo.id}: needs source, documentation, explanation and limits`);
+    for (const [name, text] of Object.entries(demo.files)) {
+      const base = demo.file ? demo.file : `${path.posix.dirname(demo.project)}/${name}`;
+      const onDisk = read(base);
+      check(onDisk.replaceAll("\r\n", "\n") === text, `lab ${demo.id}: ${name} drifted from ${base}; run node scripts/lab-data.mjs --write`);
+    }
+  }
+  for (const key of ["hero", "pipeline"]) {
+    check(existsSync(path.join(repositoryRoot, lab[key].source)), `lab ${key}: source ${lab[key].source} does not exist`);
+  }
+}
+
+const reference = read("website/reference.html");
+for (const name of readdirSync(path.join(repositoryRoot, "docs", "design")).filter((file) => file.endsWith(".md"))) {
+  check(reference.includes(`data-evidence="docs/design/${name}"`), `reference.html: missing design document ${name}`);
+}
+
 const homepage = read("website/index.html");
+for (const marker of ["data-lab", "data-hero", "data-pipeline", '<script src="lab-data.js" defer></script>', 'type="module" src="lab.js"', "data-release-line", 'href="guides.html#install"']) {
+  check(homepage.includes(marker), `index.html: missing ${marker}`);
+}
+check(read("website/cookbook.html").includes("data-cookbook"), "cookbook.html: missing recipes container");
 check(homepage.includes('id="try-ostrin"'), "index.html: missing homepage playground anchor");
 check(homepage.includes('type="module" src="playground.js"'), "index.html: missing real playground module");
 check(homepage.includes('data-site-value="examples"'), "index.html: missing centralized project facts");

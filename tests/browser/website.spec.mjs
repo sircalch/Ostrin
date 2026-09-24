@@ -3,11 +3,14 @@ import { expect, test } from "@playwright/test";
 const publicPages = [
   "./",
   "./community.html",
+  "./cookbook.html",
   "./docs.html",
   "./ecosystem.html",
   "./examples.html",
+  "./guides.html",
   "./language.html",
   "./playground.html",
+  "./reference.html",
   "./roadmap.html",
   "./showcase.html",
 ];
@@ -31,19 +34,19 @@ test("homepage runs the real compiler and renders its diagnostics", async ({ pag
 
   await page.goto("./", { waitUntil: "domcontentloaded" });
   await expect(page).toHaveTitle(/Ostrin Programming Language/);
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Make the meaning of code");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Scientific-first. General-purpose.");
   await expect(page.getByLabel("Example program")).toBeVisible();
   await expectNoHorizontalOverflow(page, "homepage desktop", 1280);
   await expect(page.locator("vite-error-overlay, .nextjs-portal, #webpack-dev-server-client-overlay")).toHaveCount(0);
 
-  const runButton = page.getByRole("button", { name: "Run" });
+  const runButton = page.locator("#run");
   await expect(runButton).toBeEnabled({ timeout: 45_000 });
   await runButton.click();
   await expect(page.locator("#output")).toContainText("5 m/s", { timeout: 30_000 });
 
   const source = page.getByLabel("Ostrin source");
   await source.fill("fn main() -> Void {\n    print(1 + true)\n}\n");
-  await page.getByRole("button", { name: "Check" }).click();
+  await page.locator("#check").click();
   await expect(page.locator("#output .diagnostic.error")).toBeVisible();
   await expect(source).toHaveClass(/has-diagnostic/);
   await expect(page.locator("#source-status")).toContainText(/line \d+/);
@@ -65,7 +68,7 @@ test("mobile navigation is operable and labelled", async ({ page }) => {
     await expect(navigation).toBeHidden();
     await menuButton.click();
     await expect(menuButton).toHaveAttribute("aria-expanded", "true");
-    const docsLink = navigation.getByRole("link", { name: "Docs" });
+    const docsLink = navigation.getByRole("link", { name: "Learn" });
     await expect(docsLink).toBeVisible();
     await docsLink.click();
 
@@ -99,5 +102,56 @@ test("all public pages fit phone and tablet viewports", async ({ page }) => {
       await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
       await expectNoHorizontalOverflow(page, route, width);
     }
+  }
+});
+
+test("Scientific Lab recomputes its demos with the real compiler", async ({ page }) => {
+  const runtimeErrors = [];
+  page.on("pageerror", (error) => runtimeErrors.push(error.message));
+  await page.goto("./#lab", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("[data-release-line]")).toHaveAttribute("data-state", /published|unreleased/);
+  const tabs = page.getByRole("tab");
+  await expect(tabs).toHaveCount(8);
+
+  // Recorded output first, then a live run with the same compiler must reproduce it exactly.
+  await page.getByRole("tab", { name: "Units" }).click();
+  const provenance = page.locator('[data-lab-provenance="units"]');
+  await expect(provenance).toHaveAttribute("data-state", "recorded");
+  const recorded = await page.locator('#lab-panel-units .sl-raw pre').textContent();
+  const run = page.locator('[data-lab-run="units"]');
+  await expect(run).toBeEnabled({ timeout: 45_000 });
+  await run.click();
+  await expect(provenance).toHaveAttribute("data-state", "live", { timeout: 30_000 });
+  await expect(page.locator('#lab-panel-units .sl-raw pre')).toHaveText(recorded);
+
+  // A control rewrites the source and Ostrin recomputes the result.
+  await page.getByRole("tab", { name: "Monte Carlo" }).click();
+  const samples = page.locator("#lab-monte-carlo-samples");
+  await expect(page.locator('[data-lab-run="monte-carlo"]')).toBeEnabled();
+  await samples.fill("40000");
+  await expect(page.locator("#lab-panel-monte-carlo .sl-code")).toContainText("samples = 40000");
+  await expect(page.locator('[data-lab-provenance="monte-carlo"]')).toHaveAttribute("data-state", "live", { timeout: 30_000 });
+  await expect(page.locator('#lab-panel-monte-carlo .sl-raw pre')).toContainText("estimate 40000 ");
+  await expect(page.locator("#lab-panel-monte-carlo .sl-chart")).toBeVisible();
+
+  // The plot package's SVG is shown as an image, from a multi-file project run in the browser.
+  await page.getByRole("tab", { name: "Plot" }).click();
+  await page.locator('[data-lab-run="plot"]').click();
+  await expect(page.locator('[data-lab-provenance="plot"]')).toHaveAttribute("data-state", "live", { timeout: 30_000 });
+  await expect(page.locator('#lab-panel-plot img.sl-svg')).toBeVisible();
+
+  await expect(page.locator("[data-pipeline] .pipeline-stage")).toHaveCount(4);
+  await expect(page.locator("[data-pipeline]")).toContainText("ostrin_fn_kinetic");
+  expect(runtimeErrors).toEqual([]);
+});
+
+test("Cookbook renders every recipe with source and recorded output", async ({ page }) => {
+  await page.goto("./cookbook.html", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("[data-cookbook] .recipe")).toHaveCount(8);
+  for (const recipe of await page.locator("[data-cookbook] .recipe").all()) {
+    await expect(recipe.locator(".sl-code")).not.toBeEmpty();
+    await expect(recipe.locator(".sl-raw pre")).not.toBeEmpty();
+    const source = await recipe.getByRole("link", { name: /View source/ }).getAttribute("href");
+    expect(source.startsWith("https://github.com/sircalch/Ostrin/blob/main/examples/")).toBe(true);
   }
 });

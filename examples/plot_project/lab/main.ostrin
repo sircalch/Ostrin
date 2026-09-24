@@ -1,0 +1,14 @@
+// Scientific Lab · Plot
+// A damped oscillator computed with arrays and drawn as SVG by the `plot` package.
+import plot.plot
+
+fn main() -> Void {
+    damping = 0.25
+    frequency = 2.0
+    t = linspace(0.0, 10.0, 81)
+    x = exp(t * (0.0 - damping)) * cos(t * frequency)
+    print("samples: " + t.length().to_string())
+    print("x(0) = " + x[0].to_string() + ", min x = " + (round(x.min() * 1000.0) / 1000.0).to_string())
+    title = "x(t) = exp(-" + damping.to_string() + " t) cos(" + frequency.to_string() + " t)"
+    print(plot.line_svg(title, t, x))
+}
