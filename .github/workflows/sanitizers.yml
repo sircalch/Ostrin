@@ -56,7 +56,8 @@ jobs:
             native_backend_compiles_and_runs_fibonacci \
             native_backend_compiles_and_runs_strings_and_booleans \
             native_ir_emitter_handles_scalar_functions \
-            native_ir_emitter_handles_checked_fixed_width_arithmetic
+            native_ir_emitter_handles_checked_fixed_width_arithmetic \
+            native_ir_emitter_handles_task_cancel
           do
             cargo test --manifest-path compiler/Cargo.toml --test examples "$test_name" -- --exact --test-threads=1
           done
