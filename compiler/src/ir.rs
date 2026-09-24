@@ -133,7 +133,11 @@ pub enum IrInstr {
         field: String,
         ty: Ty,
     },
-    FieldStore { object: ValueId, field: String, value: ValueId },
+    FieldStore {
+        object: ValueId,
+        field: String,
+        value: ValueId,
+    },
     Index {
         dst: ValueId,
         object: ValueId,
@@ -397,7 +401,12 @@ impl Builder {
         self.close_scopes_to(0);
     }
 
-    fn lower_lambda(&mut self, expression: &HirExpr, params: &[String], body: &HirBlock) -> ValueId {
+    fn lower_lambda(
+        &mut self,
+        expression: &HirExpr,
+        params: &[String],
+        body: &HirBlock,
+    ) -> ValueId {
         let Ty::Fn(param_tys, ret) = &expression.ty else {
             return self.opaque_lambda(expression, params);
         };
@@ -416,7 +425,9 @@ impl Builder {
 
         let mut captures = Vec::with_capacity(capture_names.len());
         for name in capture_names {
-            let Some(value) = self.lookup(&name) else { continue };
+            let Some(value) = self.lookup(&name) else {
+                continue;
+            };
             let Some(ty) = self.known_value_type(value) else {
                 return self.opaque_lambda(expression, params);
             };
@@ -582,10 +593,19 @@ impl Builder {
                 let value = self.lower_expr(value);
                 if let HirKind::Field(object, field) = &target.kind {
                     let object = self.lower_expr(object);
-                    self.emit(IrInstr::FieldStore { object, field: field.clone(), value });
+                    self.emit(IrInstr::FieldStore {
+                        object,
+                        field: field.clone(),
+                        value,
+                    });
                 } else {
                     let target = self.lower_expr(target);
-                    self.emit(IrInstr::Opaque { dst: None, op: "field_assign".to_string(), inputs: vec![target, value], ty: Ty::Void });
+                    self.emit(IrInstr::Opaque {
+                        dst: None,
+                        op: "field_assign".to_string(),
+                        inputs: vec![target, value],
+                        ty: Ty::Void,
+                    });
                 }
             }
             HirStmt::Return(value) => {
@@ -724,7 +744,8 @@ impl Builder {
 
         self.current = body_block;
         let scope_depth = self.active_scopes.len();
-        self.break_targets.push((after_block, condition_block, scope_depth));
+        self.break_targets
+            .push((after_block, condition_block, scope_depth));
         self.loop_edges.push(LoopEdges::default());
         let _ = self.lower_block(body);
         self.break_targets.pop();
@@ -775,7 +796,11 @@ impl Builder {
         // body so the loop's backedge block is the block holding the last uses.
         let body_text = format!("{body:?}");
         let needs_step = body_text.contains("Continue");
-        let step_block = if needs_step { self.new_block() } else { body_block };
+        let step_block = if needs_step {
+            self.new_block()
+        } else {
+            body_block
+        };
         let after_block = self.new_block();
         self.terminate(IrTerminator::Goto(condition_block));
 
@@ -803,7 +828,8 @@ impl Builder {
 
         self.current = body_block;
         let scope_depth = self.active_scopes.len();
-        self.break_targets.push((after_block, step_block, scope_depth));
+        self.break_targets
+            .push((after_block, step_block, scope_depth));
         self.loop_edges.push(LoopEdges::default());
         self.locals.push(HashMap::new());
         let item = self.fresh();
@@ -847,7 +873,7 @@ impl Builder {
                     break;
                 }
                 let ty = self.known_value_type(*destination).unwrap_or(Ty::Unknown);
-                    let merged = self.fresh();
+                let merged = self.fresh();
                 let incoming = step_preds
                     .iter()
                     .map(|(block, values)| (*block, values.get(name).copied().unwrap_or(*initial)))
@@ -882,7 +908,10 @@ impl Builder {
         for (name, destination, initial) in &loop_phis {
             let mut incoming = vec![(preheader, *initial)];
             if reachable {
-                incoming.push((step_block, step_values.get(name).copied().unwrap_or(*initial)));
+                incoming.push((
+                    step_block,
+                    step_values.get(name).copied().unwrap_or(*initial),
+                ));
             }
             self.patch_phi(*destination, incoming);
         }
@@ -1002,7 +1031,8 @@ impl Builder {
 
         self.current = body_block;
         let scope_depth = self.active_scopes.len();
-        self.break_targets.push((after_block, step_block, scope_depth));
+        self.break_targets
+            .push((after_block, step_block, scope_depth));
         self.loop_edges.push(LoopEdges::default());
         self.locals.push(HashMap::new());
         let item = self.fresh();
@@ -1061,7 +1091,10 @@ impl Builder {
                 ty: Ty::Int,
             });
             self.terminate(IrTerminator::Goto(condition_block));
-            self.patch_phi(index, vec![(preheader, start_value), (step_block, next_index)]);
+            self.patch_phi(
+                index,
+                vec![(preheader, start_value), (step_block, next_index)],
+            );
         } else {
             self.terminate(IrTerminator::Unreachable);
             self.patch_phi(index, vec![(preheader, start_value)]);
@@ -1069,7 +1102,10 @@ impl Builder {
         for (name, destination, initial) in &loop_phis {
             let mut incoming = vec![(preheader, *initial)];
             if reachable {
-                incoming.push((step_block, step_values.get(name).copied().unwrap_or(*initial)));
+                incoming.push((
+                    step_block,
+                    step_values.get(name).copied().unwrap_or(*initial),
+                ));
             }
             self.patch_phi(*destination, incoming);
         }
@@ -1085,16 +1121,27 @@ impl Builder {
             _ => return None,
         };
         let info = self.iterator_items.get(name)?;
-        if info.receiver_args.len() != actual_args.len() { return None; }
+        if info.receiver_args.len() != actual_args.len() {
+            return None;
+        }
         let mut substitutions = HashMap::new();
-        if !match_iterator_type(&info.receiver_args, &actual_args, &mut substitutions) { return None; }
+        if !match_iterator_type(&info.receiver_args, &actual_args, &mut substitutions) {
+            return None;
+        }
         Some(substitute_iterator_type(&info.element, &substitutions))
     }
 
     /// Lowers a source whose iteration protocol yields `Option<T>` into an
     /// explicit polling CFG. `channel` selects the runtime receive operation;
     /// otherwise the source is a concrete record with `next()`.
-    fn lower_for_option_source(&mut self, var: &str, source: ValueId, element: &Ty, body: &HirBlock, channel: bool) {
+    fn lower_for_option_source(
+        &mut self,
+        var: &str,
+        source: ValueId,
+        element: &Ty,
+        body: &HirBlock,
+        channel: bool,
+    ) {
         let option_ty = Ty::Applied("Option".to_string(), vec![element.clone()]);
         let preheader = self.current;
         let visible_before = self.snapshot_visible();
@@ -1105,10 +1152,15 @@ impl Builder {
 
         self.current = condition_block;
         let body_text = format!("{body:?}");
-        let loop_phis = self.loop_entry_phis(&visible_before, &body_text, preheader, condition_block);
+        let loop_phis =
+            self.loop_entry_phis(&visible_before, &body_text, preheader, condition_block);
         let next = self.fresh();
         if channel {
-            self.emit(IrInstr::ChannelReceive { dst: next, channel: source, ty: option_ty });
+            self.emit(IrInstr::ChannelReceive {
+                dst: next,
+                channel: source,
+                ty: option_ty,
+            });
         } else {
             self.emit(IrInstr::MethodCall {
                 dst: Some(next),
@@ -1119,7 +1171,10 @@ impl Builder {
             });
         }
         let has_next = self.fresh();
-        self.emit(IrInstr::TryCheck { dst: has_next, value: next });
+        self.emit(IrInstr::TryCheck {
+            dst: has_next,
+            value: next,
+        });
         self.terminate(IrTerminator::Branch {
             condition: has_next,
             then_block: body_block,
@@ -1128,7 +1183,8 @@ impl Builder {
 
         self.current = body_block;
         let scope_depth = self.active_scopes.len();
-        self.break_targets.push((after_block, condition_block, scope_depth));
+        self.break_targets
+            .push((after_block, condition_block, scope_depth));
         self.loop_edges.push(LoopEdges::default());
         self.locals.push(HashMap::new());
         let item = self.fresh();
@@ -1226,7 +1282,8 @@ impl Builder {
 
         self.current = body_block;
         let scope_depth = self.active_scopes.len();
-        self.break_targets.push((after_block, condition_block, scope_depth));
+        self.break_targets
+            .push((after_block, condition_block, scope_depth));
         self.loop_edges.push(LoopEdges::default());
         self.locals.push(HashMap::new());
         let item = self.fresh();
@@ -1270,12 +1327,16 @@ impl Builder {
         edges: &[(BlockId, HashMap<String, ValueId>)],
     ) {
         for name in names {
-            let Some(initial) = before.get(name).copied() else { continue };
+            let Some(initial) = before.get(name).copied() else {
+                continue;
+            };
             let incoming: Vec<(BlockId, ValueId)> = edges
                 .iter()
                 .map(|(block, values)| (*block, values.get(name).copied().unwrap_or(initial)))
                 .collect();
-            let Some(&(_, first)) = incoming.first() else { continue };
+            let Some(&(_, first)) = incoming.first() else {
+                continue;
+            };
             if incoming.iter().all(|(_, value)| *value == first) {
                 self.bind(name, first);
                 continue;
@@ -1451,8 +1512,12 @@ impl Builder {
         callback: &HirExpr,
         result_ty: &Ty,
     ) -> Option<ValueId> {
-        let Ty::Applied(receiver_name, receiver_args) = receiver_ty else { return None };
-        let Ty::Applied(result_name, result_args) = result_ty else { return None };
+        let Ty::Applied(receiver_name, receiver_args) = receiver_ty else {
+            return None;
+        };
+        let Ty::Applied(result_name, result_args) = result_ty else {
+            return None;
+        };
         if receiver_name != "Result"
             || result_name != "Result"
             || receiver_args.len() != 2
@@ -1460,7 +1525,9 @@ impl Builder {
         {
             return None;
         }
-        let HirKind::Lambda(params, body) = &callback.kind else { return None };
+        let HirKind::Lambda(params, body) = &callback.kind else {
+            return None;
+        };
         if params.len() != 1 {
             return None;
         }
@@ -1469,7 +1536,10 @@ impl Builder {
         let error_block = self.new_block();
         let merge_block = self.new_block();
         let check = self.fresh();
-        self.emit(IrInstr::TryCheck { dst: check, value: receiver });
+        self.emit(IrInstr::TryCheck {
+            dst: check,
+            value: receiver,
+        });
         self.terminate(IrTerminator::Branch {
             condition: check,
             then_block: normal_block,
@@ -1585,8 +1655,12 @@ impl Builder {
         callback: &HirExpr,
         option_ty: &Ty,
     ) -> Option<ValueId> {
-        let Ty::Applied(receiver_name, receiver_args) = receiver_ty else { return None };
-        let Ty::Applied(option_name, option_args) = option_ty else { return None };
+        let Ty::Applied(receiver_name, receiver_args) = receiver_ty else {
+            return None;
+        };
+        let Ty::Applied(option_name, option_args) = option_ty else {
+            return None;
+        };
         if receiver_name != "Option"
             || option_name != "Option"
             || receiver_args.len() != 1
@@ -1595,7 +1669,9 @@ impl Builder {
         {
             return None;
         }
-        let HirKind::Lambda(params, body) = &callback.kind else { return None };
+        let HirKind::Lambda(params, body) = &callback.kind else {
+            return None;
+        };
         if params.len() != 1 {
             return None;
         }
@@ -1604,7 +1680,10 @@ impl Builder {
         let none_block = self.new_block();
         let merge_block = self.new_block();
         let check = self.fresh();
-        self.emit(IrInstr::TryCheck { dst: check, value: receiver });
+        self.emit(IrInstr::TryCheck {
+            dst: check,
+            value: receiver,
+        });
         self.terminate(IrTerminator::Branch {
             condition: check,
             then_block: some_block,
@@ -1673,7 +1752,12 @@ impl Builder {
         Some(dst)
     }
 
-    fn lower_inline_lambda(&mut self, params: &[String], body: &HirBlock, argument: ValueId) -> ValueId {
+    fn lower_inline_lambda(
+        &mut self,
+        params: &[String],
+        body: &HirBlock,
+        argument: ValueId,
+    ) -> ValueId {
         self.locals.push(HashMap::new());
         self.locals
             .last_mut()
@@ -1693,13 +1777,20 @@ impl Builder {
                     subject_ty
                 } else {
                     match subject_ty {
-                        Ty::Applied(name, args) if name == "Option" && args.len() == 1 && path.len() == 1 => args[0].clone(),
                         Ty::Applied(name, args)
-                            if name == "Result" && args.len() == 2 && path.len() == 2 => match path[0].as_str() {
+                            if name == "Option" && args.len() == 1 && path.len() == 1 =>
+                        {
+                            args[0].clone()
+                        }
+                        Ty::Applied(name, args)
+                            if name == "Result" && args.len() == 2 && path.len() == 2 =>
+                        {
+                            match path[0].as_str() {
                                 "Ok" => args[0].clone(),
                                 "Err" => args[1].clone(),
                                 _ => Ty::Unknown,
-                            },
+                            }
+                        }
                         _ => Ty::Unknown,
                     }
                 };
@@ -1804,7 +1895,9 @@ impl Builder {
                 dst
             }
             HirKind::Binary(op, left_expr, right_expr)
-                if matches!(op, BinOp::And | BinOp::Or) && left_expr.ty == Ty::Bool && right_expr.ty == Ty::Bool =>
+                if matches!(op, BinOp::And | BinOp::Or)
+                    && left_expr.ty == Ty::Bool
+                    && right_expr.ty == Ty::Bool =>
             {
                 // Short-circuit: the right operand only runs when the left one
                 // does not already decide the result.
@@ -1849,11 +1942,22 @@ impl Builder {
                     let left_ty = self.known_value_type(left).unwrap_or(Ty::Unknown);
                     let right_ty = self.known_value_type(right).unwrap_or(Ty::Unknown);
                     match op {
-                        BinOp::Eq | BinOp::NotEq | BinOp::Lt | BinOp::Gt | BinOp::LtEq | BinOp::GtEq
-                            if left_ty == right_ty && left_ty != Ty::Unknown => Ty::Bool,
+                        BinOp::Eq
+                        | BinOp::NotEq
+                        | BinOp::Lt
+                        | BinOp::Gt
+                        | BinOp::LtEq
+                        | BinOp::GtEq
+                            if left_ty == right_ty && left_ty != Ty::Unknown =>
+                        {
+                            Ty::Bool
+                        }
                         BinOp::Add if left_ty == Ty::String && right_ty == Ty::String => Ty::String,
                         BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Rem
-                            if left_ty == right_ty && left_ty != Ty::Unknown => left_ty,
+                            if left_ty == right_ty && left_ty != Ty::Unknown =>
+                        {
+                            left_ty
+                        }
                         _ => Ty::Unknown,
                     }
                 };
@@ -1914,11 +2018,26 @@ impl Builder {
                 recv, method, args, ..
             } => {
                 let receiver = self.lower_expr(recv);
-                if args.len() == 1 && args[0].name.is_none() && matches!(method.as_str(), "map" | "map_err" | "then") {
-                    if let Some(value) = self.lower_option_combinator(receiver, &recv.ty, method, &args[0].value, &expression.ty) {
+                if args.len() == 1
+                    && args[0].name.is_none()
+                    && matches!(method.as_str(), "map" | "map_err" | "then")
+                {
+                    if let Some(value) = self.lower_option_combinator(
+                        receiver,
+                        &recv.ty,
+                        method,
+                        &args[0].value,
+                        &expression.ty,
+                    ) {
                         return value;
                     }
-                    if let Some(value) = self.lower_result_combinator(receiver, &recv.ty, method, &args[0].value, &expression.ty) {
+                    if let Some(value) = self.lower_result_combinator(
+                        receiver,
+                        &recv.ty,
+                        method,
+                        &args[0].value,
+                        &expression.ty,
+                    ) {
                         return value;
                     }
                 }
@@ -2081,7 +2200,10 @@ impl Builder {
             }
             HirKind::Record { name, fields, .. } => {
                 let field_names = fields.iter().map(|(name, _)| name.clone()).collect();
-                let fields = fields.iter().map(|(_, value)| self.lower_expr(value)).collect();
+                let fields = fields
+                    .iter()
+                    .map(|(_, value)| self.lower_expr(value))
+                    .collect();
                 let dst = self.fresh();
                 self.emit(IrInstr::Aggregate {
                     dst,
@@ -2133,7 +2255,9 @@ impl Builder {
         self.current = catch_block;
         let catch_incoming = if let Some(handler) = handler {
             let error_ty = match self.known_value_type(value) {
-                Some(Ty::Applied(name, args)) if name == "Result" && args.len() == 2 => args[1].clone(),
+                Some(Ty::Applied(name, args)) if name == "Result" && args.len() == 2 => {
+                    args[1].clone()
+                }
                 _ => Ty::Unknown,
             };
             let error = self.fresh();
@@ -2282,7 +2406,13 @@ impl Builder {
         if !self.terminated() {
             self.emit_scope_end(scope);
         }
-        result.unwrap_or_else(|| if *ty == Ty::Void { self.unit() } else { self.fresh() })
+        result.unwrap_or_else(|| {
+            if *ty == Ty::Void {
+                self.unit()
+            } else {
+                self.fresh()
+            }
+        })
     }
 }
 
@@ -2353,7 +2483,10 @@ pub fn lower(program: &HirProgram) -> IrProgram {
     }
 }
 
-fn lower_function(function: &HirFunction, iterator_items: &HashMap<String, IteratorInfo>) -> IrFunction {
+fn lower_function(
+    function: &HirFunction,
+    iterator_items: &HashMap<String, IteratorInfo>,
+) -> IrFunction {
     let mut builder = Builder::new(function, iterator_items);
     for (index, (name, ty)) in function.params.iter().enumerate() {
         let value = builder.fresh();
@@ -2377,32 +2510,74 @@ fn lower_function(function: &HirFunction, iterator_items: &HashMap<String, Itera
     builder.function
 }
 
-fn match_iterator_type(patterns: &[Ty], actuals: &[Ty], substitutions: &mut HashMap<String, Ty>) -> bool {
-    patterns.iter().zip(actuals).all(|(pattern, actual)| match_iterator_type_one(pattern, actual, substitutions))
+fn match_iterator_type(
+    patterns: &[Ty],
+    actuals: &[Ty],
+    substitutions: &mut HashMap<String, Ty>,
+) -> bool {
+    patterns
+        .iter()
+        .zip(actuals)
+        .all(|(pattern, actual)| match_iterator_type_one(pattern, actual, substitutions))
 }
 
-fn match_iterator_type_one(pattern: &Ty, actual: &Ty, substitutions: &mut HashMap<String, Ty>) -> bool {
+fn match_iterator_type_one(
+    pattern: &Ty,
+    actual: &Ty,
+    substitutions: &mut HashMap<String, Ty>,
+) -> bool {
     match (pattern, actual) {
         (Ty::Generic(name), actual) => match substitutions.get(name) {
             Some(bound) => bound == actual,
-            None => { substitutions.insert(name.clone(), actual.clone()); true }
+            None => {
+                substitutions.insert(name.clone(), actual.clone());
+                true
+            }
         },
-        (Ty::Applied(a, aa), Ty::Applied(b, ba)) => a == b && aa.len() == ba.len() && match_iterator_type(aa, ba, substitutions),
-        (Ty::List(a), Ty::List(b)) | (Ty::Set(a), Ty::Set(b)) => match_iterator_type_one(a, b, substitutions),
-        (Ty::Map(ak, av), Ty::Map(bk, bv)) => match_iterator_type_one(ak, bk, substitutions) && match_iterator_type_one(av, bv, substitutions),
-        (Ty::Fn(ap, ar), Ty::Fn(bp, br)) => ap.len() == bp.len() && match_iterator_type(ap, bp, substitutions) && match_iterator_type_one(ar, br, substitutions),
+        (Ty::Applied(a, aa), Ty::Applied(b, ba)) => {
+            a == b && aa.len() == ba.len() && match_iterator_type(aa, ba, substitutions)
+        }
+        (Ty::List(a), Ty::List(b)) | (Ty::Set(a), Ty::Set(b)) => {
+            match_iterator_type_one(a, b, substitutions)
+        }
+        (Ty::Map(ak, av), Ty::Map(bk, bv)) => {
+            match_iterator_type_one(ak, bk, substitutions)
+                && match_iterator_type_one(av, bv, substitutions)
+        }
+        (Ty::Fn(ap, ar), Ty::Fn(bp, br)) => {
+            ap.len() == bp.len()
+                && match_iterator_type(ap, bp, substitutions)
+                && match_iterator_type_one(ar, br, substitutions)
+        }
         (a, b) => a == b,
     }
 }
 
 fn substitute_iterator_type(ty: &Ty, substitutions: &HashMap<String, Ty>) -> Ty {
     match ty {
-        Ty::Generic(name) => substitutions.get(name).cloned().unwrap_or_else(|| ty.clone()),
+        Ty::Generic(name) => substitutions
+            .get(name)
+            .cloned()
+            .unwrap_or_else(|| ty.clone()),
         Ty::List(inner) => Ty::List(Box::new(substitute_iterator_type(inner, substitutions))),
         Ty::Set(inner) => Ty::Set(Box::new(substitute_iterator_type(inner, substitutions))),
-        Ty::Map(key, value) => Ty::Map(Box::new(substitute_iterator_type(key, substitutions)), Box::new(substitute_iterator_type(value, substitutions))),
-        Ty::Applied(name, args) => Ty::Applied(name.clone(), args.iter().map(|arg| substitute_iterator_type(arg, substitutions)).collect()),
-        Ty::Fn(params, ret) => Ty::Fn(params.iter().map(|param| substitute_iterator_type(param, substitutions)).collect(), Box::new(substitute_iterator_type(ret, substitutions))),
+        Ty::Map(key, value) => Ty::Map(
+            Box::new(substitute_iterator_type(key, substitutions)),
+            Box::new(substitute_iterator_type(value, substitutions)),
+        ),
+        Ty::Applied(name, args) => Ty::Applied(
+            name.clone(),
+            args.iter()
+                .map(|arg| substitute_iterator_type(arg, substitutions))
+                .collect(),
+        ),
+        Ty::Fn(params, ret) => Ty::Fn(
+            params
+                .iter()
+                .map(|param| substitute_iterator_type(param, substitutions))
+                .collect(),
+            Box::new(substitute_iterator_type(ret, substitutions)),
+        ),
         _ => ty.clone(),
     }
 }
@@ -2462,11 +2637,20 @@ fn collect_lambda_locals_expr(
         HirKind::Local(name) if !bound.contains(name) => {
             used.insert(name.clone());
         }
-        HirKind::Local(_) | HirKind::Int(_) | HirKind::Sized(_, _) | HirKind::Float(_) | HirKind::Float32(_)
-        | HirKind::Str(_) | HirKind::Char(_) | HirKind::Bool(_) | HirKind::Global(_) | HirKind::EmptyCollection(..) => {}
-        HirKind::Unit(value, _) | HirKind::Unary(_, value) | HirKind::Field(value, _) | HirKind::As(value, _) => {
-            collect_lambda_locals_expr(value, bound, used)
-        }
+        HirKind::Local(_)
+        | HirKind::Int(_)
+        | HirKind::Sized(_, _)
+        | HirKind::Float(_)
+        | HirKind::Float32(_)
+        | HirKind::Str(_)
+        | HirKind::Char(_)
+        | HirKind::Bool(_)
+        | HirKind::Global(_)
+        | HirKind::EmptyCollection(..) => {}
+        HirKind::Unit(value, _)
+        | HirKind::Unary(_, value)
+        | HirKind::Field(value, _)
+        | HirKind::As(value, _) => collect_lambda_locals_expr(value, bound, used),
         HirKind::Binary(_, left, right)
         | HirKind::Index(left, right)
         | HirKind::Within(left, right) => {
@@ -2506,7 +2690,10 @@ fn collect_lambda_locals_expr(
                 collect_lambda_locals_block(else_block, &mut else_bound, used);
             }
         }
-        HirKind::Block(block) | HirKind::Loop(block) | HirKind::Spawn(block) | HirKind::SpawnScope(block) => {
+        HirKind::Block(block)
+        | HirKind::Loop(block)
+        | HirKind::Spawn(block)
+        | HirKind::SpawnScope(block) => {
             let mut nested = bound.clone();
             collect_lambda_locals_block(block, &mut nested, used);
         }
@@ -2569,7 +2756,9 @@ fn collect_pattern_names(pattern: &crate::ast::Pattern, bound: &mut HashSet<Stri
                 collect_pattern_names(field, bound);
             }
         }
-        crate::ast::Pattern::Wildcard | crate::ast::Pattern::Literal(_) | crate::ast::Pattern::Range(..) => {}
+        crate::ast::Pattern::Wildcard
+        | crate::ast::Pattern::Literal(_)
+        | crate::ast::Pattern::Range(..) => {}
     }
 }
 
@@ -2716,15 +2905,19 @@ fn display_instruction(instruction: &IrInstr) -> String {
         IrInstr::Call {
             dst, callee, args, ..
         } => format!("{}call {callee}({})", result_prefix(*dst), value_list(args)),
-        IrInstr::ClosureCall { dst, callee, args, .. } => format!(
+        IrInstr::ClosureCall {
+            dst, callee, args, ..
+        } => format!(
             "{}closure_call %{callee}({})",
             result_prefix(*dst),
             value_list(args)
         ),
-        IrInstr::ClosureMake { dst, closure, captures, .. } => format!(
-            "%{dst} = closure_make @{closure}({})",
-            value_list(captures)
-        ),
+        IrInstr::ClosureMake {
+            dst,
+            closure,
+            captures,
+            ..
+        } => format!("%{dst} = closure_make @{closure}({})", value_list(captures)),
         IrInstr::MethodCall {
             dst,
             method,
@@ -2739,7 +2932,11 @@ fn display_instruction(instruction: &IrInstr) -> String {
         IrInstr::Field {
             dst, object, field, ..
         } => format!("%{dst} = field %{object}.{field}"),
-        IrInstr::FieldStore { object, field, value } => format!("field_store %{object}.{field} <- %{value}"),
+        IrInstr::FieldStore {
+            object,
+            field,
+            value,
+        } => format!("field_store %{object}.{field} <- %{value}"),
         IrInstr::Index {
             dst, object, index, ..
         } => format!("%{dst} = index %{object}[%{index}]"),

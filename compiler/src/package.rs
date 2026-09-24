@@ -68,18 +68,37 @@ pub fn load_manifest(manifest_path: &Path) -> Result<PackageManifest, String> {
     let package = table
         .get("package")
         .and_then(|v| v.as_table())
-        .ok_or_else(|| format!("'{}' is missing a [package] section", manifest_path.display()))?;
+        .ok_or_else(|| {
+            format!(
+                "'{}' is missing a [package] section",
+                manifest_path.display()
+            )
+        })?;
 
-    let name = package.get("name").and_then(|v| v.as_str()).unwrap_or("unknown").to_string();
-    let version = package.get("version").and_then(|v| v.as_str()).unwrap_or("0.0.0").to_string();
-    let entry = package.get("entry").and_then(|v| v.as_str()).unwrap_or("main.ostrin").to_string();
+    let name = package
+        .get("name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown")
+        .to_string();
+    let version = package
+        .get("version")
+        .and_then(|v| v.as_str())
+        .unwrap_or("0.0.0")
+        .to_string();
+    let entry = package
+        .get("entry")
+        .and_then(|v| v.as_str())
+        .unwrap_or("main.ostrin")
+        .to_string();
 
     let mut dependencies = HashMap::new();
     if let Some(deps) = table.get("dependencies").and_then(|v| v.as_table()) {
         let base = manifest_path.parent().unwrap_or_else(|| Path::new("."));
         for (dep_name, spec) in deps {
             let Some(spec_table) = spec.as_table() else {
-                return Err(format!("dependency '{dep_name}' must be a table, e.g. {{ path = \"...\" }}"));
+                return Err(format!(
+                    "dependency '{dep_name}' must be a table, e.g. {{ path = \"...\" }}"
+                ));
             };
             if let Some(path) = spec_table.get("path").and_then(|v| v.as_str()) {
                 dependencies.insert(dep_name.clone(), DependencySpec::Path(base.join(path)));
@@ -90,14 +109,27 @@ pub fn load_manifest(manifest_path: &Path) -> Result<PackageManifest, String> {
                     .and_then(|v| v.as_str())
                     .unwrap_or("HEAD")
                     .to_string();
-                dependencies.insert(dep_name.clone(), DependencySpec::Git { url: url.to_string(), ratchet });
+                dependencies.insert(
+                    dep_name.clone(),
+                    DependencySpec::Git {
+                        url: url.to_string(),
+                        ratchet,
+                    },
+                );
             } else {
-                return Err(format!("dependency '{dep_name}' needs either 'path' or 'git'"));
+                return Err(format!(
+                    "dependency '{dep_name}' needs either 'path' or 'git'"
+                ));
             }
         }
     }
 
-    Ok(PackageManifest { name, version, entry, dependencies })
+    Ok(PackageManifest {
+        name,
+        version,
+        entry,
+        dependencies,
+    })
 }
 
 /// Resuelve cada dependencia a un directorio raíz local.
@@ -212,8 +244,13 @@ fn resolve_dependency(
             let root = if let Some(entry) = locked {
                 match validate_locked_git(name, url, ratchet, entry, project_dir) {
                     Ok(root) => root,
-                    Err(error) if !locked_mode => fetch_git_dependency(project_dir, name, url, ratchet)
-                        .map_err(|fetch_error| format!("{error}; fetching dependency also failed: {fetch_error}"))?,
+                    Err(error) if !locked_mode => {
+                        fetch_git_dependency(project_dir, name, url, ratchet).map_err(
+                            |fetch_error| {
+                                format!("{error}; fetching dependency also failed: {fetch_error}")
+                            },
+                        )?
+                    }
                     Err(error) => return Err(error),
                 }
             } else {
@@ -238,7 +275,10 @@ fn resolve_dependency(
     }
     resolved.dependencies.insert(
         name.to_string(),
-        ResolvedDependency { spec: spec.clone(), root: root.clone() },
+        ResolvedDependency {
+            spec: spec.clone(),
+            root: root.clone(),
+        },
     );
 
     let nested_manifest_path = root.join("ostrin.toml");
@@ -287,11 +327,17 @@ fn load_lockfile(manifest_dir: &Path) -> Result<Option<Lockfile>, String> {
     if let Some(entries) = table.get("dependency").and_then(|value| value.as_array()) {
         for entry in entries {
             let Some(entry) = entry.as_table() else {
-                return Err(format!("'{}' contains a non-table dependency entry", path.display()));
+                return Err(format!(
+                    "'{}' contains a non-table dependency entry",
+                    path.display()
+                ));
             };
             let name = required_lock_string(entry, "name", &path)?;
             if dependencies.contains_key(&name) {
-                return Err(format!("'{}' contains duplicate dependency '{name}'", path.display()));
+                return Err(format!(
+                    "'{}' contains duplicate dependency '{name}'",
+                    path.display()
+                ));
             }
             let source = required_lock_string(entry, "source", &path)?;
             let resolved_path = PathBuf::from(required_lock_string(entry, "resolved_path", &path)?);
@@ -312,16 +358,28 @@ fn load_lockfile(manifest_dir: &Path) -> Result<Option<Lockfile>, String> {
     Ok(Some(Lockfile { dependencies }))
 }
 
-fn required_lock_string(table: &toml::value::Table, key: &str, path: &Path) -> Result<String, String> {
+fn required_lock_string(
+    table: &toml::value::Table,
+    key: &str,
+    path: &Path,
+) -> Result<String, String> {
     table
         .get(key)
         .and_then(|value| value.as_str())
         .map(str::to_string)
-        .ok_or_else(|| format!("'{}' has a dependency entry without string '{key}'", path.display()))
+        .ok_or_else(|| {
+            format!(
+                "'{}' has a dependency entry without string '{key}'",
+                path.display()
+            )
+        })
 }
 
 fn optional_lock_string(table: &toml::value::Table, key: &str) -> Option<String> {
-    table.get(key).and_then(|value| value.as_str()).map(str::to_string)
+    table
+        .get(key)
+        .and_then(|value| value.as_str())
+        .map(str::to_string)
 }
 
 fn lock_root(manifest_dir: &Path, entry: &LockedDependency) -> PathBuf {
@@ -345,7 +403,9 @@ fn validate_locked_path(
         ));
     }
     let locked = lock_root(manifest_dir, entry);
-    let declared = declared.canonicalize().unwrap_or_else(|_| declared.to_path_buf());
+    let declared = declared
+        .canonicalize()
+        .unwrap_or_else(|_| declared.to_path_buf());
     let locked_canonical = locked.canonicalize().unwrap_or_else(|_| locked.clone());
     if declared != locked_canonical {
         return Err(format!(
@@ -399,8 +459,12 @@ fn validate_package_version(
     root: &Path,
     entry: Option<&LockedDependency>,
 ) -> Result<(), String> {
-    let Some(entry) = entry else { return Ok(()); };
-    let Some(expected) = &entry.package_version else { return Ok(()); };
+    let Some(entry) = entry else {
+        return Ok(());
+    };
+    let Some(expected) = &entry.package_version else {
+        return Ok(());
+    };
     let actual = package_version(root)?;
     if &actual != expected {
         return Err(format!(
@@ -410,11 +474,26 @@ fn validate_package_version(
     Ok(())
 }
 
-fn fetch_git_dependency(manifest_dir: &Path, name: &str, url: &str, ratchet: &str) -> Result<PathBuf, String> {
+fn fetch_git_dependency(
+    manifest_dir: &Path,
+    name: &str,
+    url: &str,
+    ratchet: &str,
+) -> Result<PathBuf, String> {
     let cache = manifest_dir.join(".ostrin").join("packages");
-    fs::create_dir_all(&cache).map_err(|e| format!("could not create package cache '{}': {e}", cache.display()))?;
+    fs::create_dir_all(&cache)
+        .map_err(|e| format!("could not create package cache '{}': {e}", cache.display()))?;
     let key = stable_key(&format!("{name}\n{url}\n{ratchet}"));
-    let safe_name = name.chars().map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '_' }).collect::<String>();
+    let safe_name = name
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>();
     let destination = cache.join(format!("{safe_name}-{key:016x}"));
 
     if destination.join(".git").is_dir() {
@@ -433,7 +512,10 @@ fn fetch_git_dependency(manifest_dir: &Path, name: &str, url: &str, ratchet: &st
             .output()
             .map_err(|e| format!("could not start git: {e}"))?;
         if !output.status.success() {
-            return Err(format!("git clone failed: {}", command_error(&output.stderr, output.status.code())));
+            return Err(format!(
+                "git clone failed: {}",
+                command_error(&output.stderr, output.status.code())
+            ));
         }
     }
 
@@ -442,7 +524,9 @@ fn fetch_git_dependency(manifest_dir: &Path, name: &str, url: &str, ratchet: &st
     let revision = git_output(&destination, &["rev-parse", "HEAD"])
         .map_err(|e| format!("could not resolve the commit for git dependency '{name}': {e}"))?;
     if revision.is_empty() {
-        return Err(format!("git dependency '{name}' resolved to an empty commit"));
+        return Err(format!(
+            "git dependency '{name}' resolved to an empty commit"
+        ));
     }
     Ok(destination)
 }
@@ -478,7 +562,10 @@ fn git_output(directory: &Path, args: &[&str]) -> Result<String, String> {
 fn command_error(stderr: &[u8], code: Option<i32>) -> String {
     let detail = String::from_utf8_lossy(stderr).trim().to_string();
     if detail.is_empty() {
-        format!("process exited with {}", code.map_or_else(|| "no status".to_string(), |n| n.to_string()))
+        format!(
+            "process exited with {}",
+            code.map_or_else(|| "no status".to_string(), |n| n.to_string())
+        )
     } else {
         detail
     }
@@ -495,7 +582,13 @@ fn stable_key(text: &str) -> u64 {
 }
 
 fn toml_string(value: &str) -> String {
-    format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n"))
+    format!(
+        "\"{}\"",
+        value
+            .replace('\\', "\\\\")
+            .replace('"', "\\\"")
+            .replace('\n', "\\n")
+    )
 }
 
 fn package_version(root: &Path) -> Result<String, String> {
@@ -560,11 +653,24 @@ fn canonical_package_bytes(bytes: &[u8]) -> Vec<u8> {
     canonical
 }
 
-fn collect_package_sources(root: &Path, directory: &Path, files: &mut Vec<PathBuf>) -> Result<(), String> {
-    let entries = fs::read_dir(directory)
-        .map_err(|e| format!("could not read package directory '{}': {e}", directory.display()))?;
+fn collect_package_sources(
+    root: &Path,
+    directory: &Path,
+    files: &mut Vec<PathBuf>,
+) -> Result<(), String> {
+    let entries = fs::read_dir(directory).map_err(|e| {
+        format!(
+            "could not read package directory '{}': {e}",
+            directory.display()
+        )
+    })?;
     for entry in entries {
-        let entry = entry.map_err(|e| format!("could not inspect package directory '{}': {e}", directory.display()))?;
+        let entry = entry.map_err(|e| {
+            format!(
+                "could not inspect package directory '{}': {e}",
+                directory.display()
+            )
+        })?;
         let path = entry.path();
         let file_type = entry
             .file_type()
@@ -577,10 +683,19 @@ fn collect_package_sources(root: &Path, directory: &Path, files: &mut Vec<PathBu
         } else if file_type.is_file() {
             let relative = path
                 .strip_prefix(root)
-                .map_err(|_| format!("package source '{}' is outside package root", path.display()))?
+                .map_err(|_| {
+                    format!(
+                        "package source '{}' is outside package root",
+                        path.display()
+                    )
+                })?
                 .to_path_buf();
-            let is_manifest = relative.file_name().and_then(|name| name.to_str()) == Some("ostrin.toml");
-            let is_source = relative.extension().and_then(|extension| extension.to_str()) == Some("ostrin");
+            let is_manifest =
+                relative.file_name().and_then(|name| name.to_str()) == Some("ostrin.toml");
+            let is_source = relative
+                .extension()
+                .and_then(|extension| extension.to_str())
+                == Some("ostrin");
             if is_manifest || is_source {
                 files.push(relative);
             }
@@ -594,7 +709,11 @@ fn portable_relative_path(from: &Path, to: &Path) -> Option<PathBuf> {
     let to = to.canonicalize().unwrap_or_else(|_| to.to_path_buf());
     let from: Vec<Component<'_>> = from.components().collect();
     let to: Vec<Component<'_>> = to.components().collect();
-    let common = from.iter().zip(&to).take_while(|(left, right)| left == right).count();
+    let common = from
+        .iter()
+        .zip(&to)
+        .take_while(|(left, right)| left == right)
+        .count();
     if common == 0 {
         return None;
     }
@@ -611,10 +730,16 @@ fn portable_relative_path(from: &Path, to: &Path) -> Option<PathBuf> {
     Some(relative)
 }
 
-pub fn write_lockfile(manifest_dir: &Path, manifest: &PackageManifest, resolved: &ResolvedDependencies) -> Result<(), String> {
+pub fn write_lockfile(
+    manifest_dir: &Path,
+    manifest: &PackageManifest,
+    resolved: &ResolvedDependencies,
+) -> Result<(), String> {
     let mut out = String::new();
     out.push_str(&format!("# generado por ostrinc — no editar a mano\nlockfile_version = 1\npackage = {}\nversion = {}\n\n", toml_string(&manifest.name), toml_string(&manifest.version)));
-    let base = manifest_dir.canonicalize().unwrap_or_else(|_| manifest_dir.to_path_buf());
+    let base = manifest_dir
+        .canonicalize()
+        .unwrap_or_else(|_| manifest_dir.to_path_buf());
     let mut names: Vec<&String> = resolved.dependencies.keys().collect();
     names.sort();
     for name in names {
@@ -637,10 +762,17 @@ pub fn write_lockfile(manifest_dir: &Path, manifest: &PackageManifest, resolved:
                 out.push_str(&format!("resolved_path = {}\n", toml_string(&display)));
             }
             DependencySpec::Git { url, ratchet } => {
-                let revision = git_output(root, &["rev-parse", "HEAD"])
-                    .map_err(|e| format!("could not record resolved commit for dependency '{name}': {e}"))?;
+                let revision = git_output(root, &["rev-parse", "HEAD"]).map_err(|e| {
+                    format!("could not record resolved commit for dependency '{name}': {e}")
+                })?;
                 out.push_str("source = \"git\"\n");
-                out.push_str(&format!("git = {}\nrequested = {}\nresolved_rev = {}\nresolved_path = {}\n", toml_string(url), toml_string(ratchet), toml_string(&revision), toml_string(&display)));
+                out.push_str(&format!(
+                    "git = {}\nrequested = {}\nresolved_rev = {}\nresolved_path = {}\n",
+                    toml_string(url),
+                    toml_string(ratchet),
+                    toml_string(&revision),
+                    toml_string(&display)
+                ));
             }
         }
         out.push_str(&format!(
@@ -650,5 +782,6 @@ pub fn write_lockfile(manifest_dir: &Path, manifest: &PackageManifest, resolved:
         ));
     }
     let lock_path = manifest_dir.join("ostrin.lock");
-    fs::write(&lock_path, out).map_err(|e| format!("could not write '{}': {e}", lock_path.display()))
+    fs::write(&lock_path, out)
+        .map_err(|e| format!("could not write '{}': {e}", lock_path.display()))
 }

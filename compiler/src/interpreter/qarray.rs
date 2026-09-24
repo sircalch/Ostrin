@@ -9,7 +9,9 @@ use std::rc::Rc;
 use super::array::{self, ArrayData};
 use super::{convert, unit_error, RuntimeError, Value};
 use crate::ast::BinOp;
-use crate::types::{dim_div, dim_is_dimensionless, dim_mul, resolve_unit_expr, resolve_unit_factor, unit_combine};
+use crate::types::{
+    dim_div, dim_is_dimensionless, dim_mul, resolve_unit_expr, resolve_unit_factor, unit_combine,
+};
 
 type Res<T> = Result<T, RuntimeError>;
 
@@ -29,14 +31,22 @@ pub fn with_unit(value: &Value, unit: Option<String>) -> Value {
     match value {
         Value::Array(a) => {
             let a = a.borrow();
-            Value::Array(Rc::new(RefCell::new(ArrayData { shape: a.shape.clone(), data: a.data.clone(), unit })))
+            Value::Array(Rc::new(RefCell::new(ArrayData {
+                shape: a.shape.clone(),
+                data: a.data.clone(),
+                unit,
+            })))
         }
         other => other.clone(),
     }
 }
 
 pub fn quantity(value: f64, unit: &str) -> Res<Value> {
-    Ok(Value::Quantity(value, resolve_unit_expr(unit).map_err(unit_error)?, unit.to_string()))
+    Ok(Value::Quantity(
+        value,
+        resolve_unit_expr(unit).map_err(unit_error)?,
+        unit.to_string(),
+    ))
 }
 
 fn number(value: &Value) -> Res<f64> {
@@ -56,7 +66,11 @@ fn converted(value: &Value, from: &str, to: &str) -> Res<Value> {
     match value {
         Value::Array(a) => {
             let a = a.borrow();
-            let data = a.data.iter().map(|v| Ok(Value::Float(convert(number(v)?, from, to)?))).collect::<Res<Vec<_>>>()?;
+            let data = a
+                .data
+                .iter()
+                .map(|v| Ok(Value::Float(convert(number(v)?, from, to)?)))
+                .collect::<Res<Vec<_>>>()?;
             Ok(array::make(a.shape.clone(), data))
         }
         other => Ok(Value::Float(convert(number(other)?, from, to)?)),
@@ -75,7 +89,9 @@ pub fn as_unit(value: &Value, target: &str) -> Res<Value> {
 
 /// `array([1 m, 250 cm])`: the numbers in the first element's unit.
 pub fn from_quantities(value: &Value) -> Res<Option<Value>> {
-    let Value::Array(a) = value else { return Ok(None) };
+    let Value::Array(a) = value else {
+        return Ok(None);
+    };
     let first_unit = match a.borrow().data.first() {
         Some(Value::Quantity(_, _, unit)) => unit.clone(),
         _ => return Ok(None),
@@ -89,7 +105,11 @@ pub fn from_quantities(value: &Value) -> Res<Option<Value>> {
             other => fail(format!("array(...) mixes quantities with '{other}'")),
         })
         .collect::<Res<Vec<_>>>()?;
-    Ok(Some(Value::Array(Rc::new(RefCell::new(ArrayData { shape: a.shape.clone(), data, unit: Some(first_unit) })))))
+    Ok(Some(Value::Array(Rc::new(RefCell::new(ArrayData {
+        shape: a.shape.clone(),
+        data,
+        unit: Some(first_unit),
+    })))))
 }
 
 /// Splits an operand into its numbers and its unit (`None` for a plain number or array).
@@ -126,14 +146,25 @@ fn binary_units(op: BinOp, lv: &Value, rv: &Value) -> Res<Value> {
             // The right side is converted into the left side's unit.
             let b = converted(&b, &ub, &ua)?;
             let result = array::binary(op, a, b)?;
-            Ok(if matches!(op, Add | Sub) { with_unit(&result, Some(ua)) } else { result })
+            Ok(if matches!(op, Add | Sub) {
+                with_unit(&result, Some(ua))
+            } else {
+                result
+            })
         }
         Mul | Div => {
             let divide = op == Div;
             match (ua, ub) {
                 (Some(ua), Some(ub)) => {
-                    let (da, db) = (resolve_unit_expr(&ua).map_err(unit_error)?, resolve_unit_expr(&ub).map_err(unit_error)?);
-                    let dim = if divide { dim_div(&da, &db) } else { dim_mul(&da, &db) };
+                    let (da, db) = (
+                        resolve_unit_expr(&ua).map_err(unit_error)?,
+                        resolve_unit_expr(&ub).map_err(unit_error)?,
+                    );
+                    let dim = if divide {
+                        dim_div(&da, &db)
+                    } else {
+                        dim_mul(&da, &db)
+                    };
                     if divide && dim_is_dimensionless(&dim) {
                         let b = converted(&b, &ub, &ua)?;
                         return array::binary(Div, a, b);
@@ -145,7 +176,11 @@ fn binary_units(op: BinOp, lv: &Value, rv: &Value) -> Res<Value> {
                     }
                     if dim_is_dimensionless(&dim) {
                         if !unit.is_empty() {
-                            result = array::binary(Mul, result, Value::Float(resolve_unit_factor(&unit).map_err(unit_error)?))?;
+                            result = array::binary(
+                                Mul,
+                                result,
+                                Value::Float(resolve_unit_factor(&unit).map_err(unit_error)?),
+                            )?;
                         }
                         return Ok(result);
                     }
@@ -180,9 +215,16 @@ pub fn index(element: Value, unit: &str) -> Res<Value> {
 }
 
 /// Methods of a quantity array (`receiver` has a unit).
-pub fn call_method(receiver: &Rc<RefCell<ArrayData>>, unit: &str, method: &str, args: Vec<Value>) -> Res<Value> {
+pub fn call_method(
+    receiver: &Rc<RefCell<ArrayData>>,
+    unit: &str,
+    method: &str,
+    args: Vec<Value>,
+) -> Res<Value> {
     let plain = with_unit(&Value::Array(receiver.clone()), None);
-    let Value::Array(numbers) = &plain else { unreachable!() };
+    let Value::Array(numbers) = &plain else {
+        unreachable!()
+    };
     match method {
         "unit" => Ok(Value::String(unit.to_string())),
         "values" => Ok(plain.clone()),
@@ -191,17 +233,27 @@ pub fn call_method(receiver: &Rc<RefCell<ArrayData>>, unit: &str, method: &str, 
         }
         "var" | "sample_var" => {
             let squared = unit_combine(unit, unit, false).map_err(unit_error)?.1;
-            quantity(number(&array::call_method(numbers, method, args)?)?, &squared)
+            quantity(
+                number(&array::call_method(numbers, method, args)?)?,
+                &squared,
+            )
         }
         "to_list" => {
             let a = numbers.borrow();
-            let items = a.data.iter().map(|v| quantity(number(v)?, unit)).collect::<Res<Vec<_>>>()?;
+            let items = a
+                .data
+                .iter()
+                .map(|v| quantity(number(v)?, unit))
+                .collect::<Res<Vec<_>>>()?;
             Ok(Value::List(Rc::new(RefCell::new(items))))
         }
-        "sort" | "cumsum" | "transpose" | "reshape" | "row" | "col" => {
-            Ok(with_unit(&array::call_method(numbers, method, args)?, Some(unit.to_string())))
-        }
+        "sort" | "cumsum" | "transpose" | "reshape" | "row" | "col" => Ok(with_unit(
+            &array::call_method(numbers, method, args)?,
+            Some(unit.to_string()),
+        )),
         "shape" | "rank" | "size" | "length" | "count" => array::call_method(numbers, method, args),
-        other => fail(format!("'{other}' isn't supported on arrays of quantities yet")),
+        other => fail(format!(
+            "'{other}' isn't supported on arrays of quantities yet"
+        )),
     }
 }

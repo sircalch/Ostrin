@@ -12,8 +12,13 @@ use crate::lexer::Lexer;
 const INDENT: &str = "    ";
 
 fn signature(source: &str) -> Result<Vec<String>, String> {
-    let tokens = Lexer::new(source).tokenize().map_err(|error| format!("{error:?}"))?;
-    Ok(tokens.iter().map(|t| format!("{:?}\u{0}{}", t.kind, t.lexeme)).collect())
+    let tokens = Lexer::new(source)
+        .tokenize()
+        .map_err(|error| format!("{error:?}"))?;
+    Ok(tokens
+        .iter()
+        .map(|t| format!("{:?}\u{0}{}", t.kind, t.lexeme))
+        .collect())
 }
 
 /// Formats `source`. Fails (leaving the caller's text untouched) if the input
@@ -23,7 +28,9 @@ pub fn format_source(source: &str) -> Result<String, String> {
     let formatted = layout(source);
     let after = signature(&formatted)?;
     if before != after {
-        return Err("internal formatter error: token stream changed; refusing to format".to_string());
+        return Err(
+            "internal formatter error: token stream changed; refusing to format".to_string(),
+        );
     }
     Ok(formatted)
 }
@@ -49,7 +56,10 @@ fn layout(source: &str) -> String {
             pending_blank = !out.is_empty();
             continue;
         }
-        let leading_closers = trimmed.chars().take_while(|c| matches!(c, '}' | ')' | ']')).count() as i64;
+        let leading_closers = trimmed
+            .chars()
+            .take_while(|c| matches!(c, '}' | ')' | ']'))
+            .count() as i64;
         let closes_block = trimmed.starts_with('}');
         flush_blank(&mut out, &mut pending_blank, closes_block);
         let indent = (depth - leading_closers).max(0) as usize;
@@ -112,7 +122,8 @@ mod tests {
 
     #[test]
     fn indents_by_depth_and_is_idempotent() {
-        let src = "fn main() -> Void {\r\nprint(\"a{\")   \n\n\n    if true {\nprint(1)\n}\n}\n\n\n";
+        let src =
+            "fn main() -> Void {\r\nprint(\"a{\")   \n\n\n    if true {\nprint(1)\n}\n}\n\n\n";
         let once = format_source(src).unwrap();
         assert_eq!(
             once,

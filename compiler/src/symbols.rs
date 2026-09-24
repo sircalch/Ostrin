@@ -25,7 +25,9 @@ pub fn collect(items: &[Item]) -> Vec<Symbol> {
     let mut symbols = Vec::new();
     for item in items {
         match item {
-            Item::Function(function) => symbols.push(function_symbol(function, "function", &function.name)),
+            Item::Function(function) => {
+                symbols.push(function_symbol(function, "function", &function.name))
+            }
             Item::Record(record) => {
                 symbols.push(Symbol {
                     kind: "record",
@@ -48,7 +50,11 @@ pub fn collect(items: &[Item]) -> Vec<Symbol> {
                 symbols.push(Symbol {
                     kind: "enum",
                     name: enum_decl.name.clone(),
-                    detail: format!("enum {}{}", enum_decl.name, generic_suffix(&enum_decl.generics)),
+                    detail: format!(
+                        "enum {}{}",
+                        enum_decl.name,
+                        generic_suffix(&enum_decl.generics)
+                    ),
                     span: enum_decl.span,
                     source_file: enum_decl.source_file.clone(),
                 });
@@ -66,7 +72,11 @@ pub fn collect(items: &[Item]) -> Vec<Symbol> {
                 symbols.push(Symbol {
                     kind: "trait",
                     name: trait_decl.name.clone(),
-                    detail: format!("trait {}{}", trait_decl.name, generic_suffix(&trait_decl.generics)),
+                    detail: format!(
+                        "trait {}{}",
+                        trait_decl.name,
+                        generic_suffix(&trait_decl.generics)
+                    ),
                     span: trait_decl.span,
                     source_file: trait_decl.source_file.clone(),
                 });
@@ -74,7 +84,12 @@ pub fn collect(items: &[Item]) -> Vec<Symbol> {
                     symbols.push(Symbol {
                         kind: "method",
                         name: format!("{}.{}", trait_decl.name, method.name),
-                        detail: method_signature(&method.name, &method.generics, &method.params, &method.return_type),
+                        detail: method_signature(
+                            &method.name,
+                            &method.generics,
+                            &method.params,
+                            &method.return_type,
+                        ),
                         span: trait_decl.span,
                         source_file: trait_decl.source_file.clone(),
                     });
@@ -119,7 +134,11 @@ pub fn collect_members(items: &[Item]) -> Vec<MemberSymbol> {
                 for field in &record.fields {
                     members.push(MemberSymbol {
                         owner: record.name.clone(),
-                        owner_generics: record.generics.iter().map(|generic| generic.name.clone()).collect(),
+                        owner_generics: record
+                            .generics
+                            .iter()
+                            .map(|generic| generic.name.clone())
+                            .collect(),
                         kind: "field",
                         name: field.name.clone(),
                         detail: format!("{}: {}", field.name, type_to_string(&field.ty)),
@@ -133,7 +152,11 @@ pub fn collect_members(items: &[Item]) -> Vec<MemberSymbol> {
                 for variant in &enum_decl.variants {
                     members.push(MemberSymbol {
                         owner: enum_decl.name.clone(),
-                        owner_generics: enum_decl.generics.iter().map(|generic| generic.name.clone()).collect(),
+                        owner_generics: enum_decl
+                            .generics
+                            .iter()
+                            .map(|generic| generic.name.clone())
+                            .collect(),
                         kind: "enumMember",
                         name: variant.name.clone(),
                         detail: format!("{}::{}", enum_decl.name, variant.name),
@@ -147,7 +170,11 @@ pub fn collect_members(items: &[Item]) -> Vec<MemberSymbol> {
                 for method in &trait_decl.methods {
                     members.push(MemberSymbol {
                         owner: trait_decl.name.clone(),
-                        owner_generics: trait_decl.generics.iter().map(|generic| generic.name.clone()).collect(),
+                        owner_generics: trait_decl
+                            .generics
+                            .iter()
+                            .map(|generic| generic.name.clone())
+                            .collect(),
                         kind: "method",
                         name: method.name.clone(),
                         detail: method_signature(
@@ -166,7 +193,11 @@ pub fn collect_members(items: &[Item]) -> Vec<MemberSymbol> {
                 for method in &implementation.methods {
                     members.push(MemberSymbol {
                         owner: implementation.type_name.clone(),
-                        owner_generics: implementation.generics.iter().map(|generic| generic.name.clone()).collect(),
+                        owner_generics: implementation
+                            .generics
+                            .iter()
+                            .map(|generic| generic.name.clone())
+                            .collect(),
                         kind: "method",
                         name: method.name.clone(),
                         detail: method_signature(
@@ -177,7 +208,10 @@ pub fn collect_members(items: &[Item]) -> Vec<MemberSymbol> {
                         ),
                         result_type: Some(type_to_string(&method.return_type)),
                         span: Some(method.span),
-                        source_file: method.source_file.clone().or_else(|| implementation.source_file.clone()),
+                        source_file: method
+                            .source_file
+                            .clone()
+                            .or_else(|| implementation.source_file.clone()),
                     });
                 }
             }
@@ -192,57 +226,200 @@ fn core_members() -> Vec<MemberSymbol> {
         ("List", "length", "length() -> Int", "Int", &["T"]),
         ("List", "count", "count() -> Int", "Int", &["T"]),
         ("List", "push", "push(value: T) -> Void", "Void", &["T"]),
-        ("List", "remove_at", "remove_at(index: Int) -> T", "T", &["T"]),
-        ("List", "map", "map(transform: fn(T) -> U) -> List<U>", "List<U>", &["T"]),
-        ("List", "filter", "filter(predicate: fn(T) -> Bool) -> List<T>", "List<T>", &["T"]),
-        ("List", "fold", "fold(initial: U, combine: fn(U, T) -> U) -> U", "U", &["T"]),
-        ("List", "find", "find(predicate: fn(T) -> Bool) -> Option<T>", "Option<T>", &["T"]),
-        ("List", "any", "any(predicate: fn(T) -> Bool) -> Bool", "Bool", &["T"]),
-        ("List", "all", "all(predicate: fn(T) -> Bool) -> Bool", "Bool", &["T"]),
+        (
+            "List",
+            "remove_at",
+            "remove_at(index: Int) -> T",
+            "T",
+            &["T"],
+        ),
+        (
+            "List",
+            "map",
+            "map(transform: fn(T) -> U) -> List<U>",
+            "List<U>",
+            &["T"],
+        ),
+        (
+            "List",
+            "filter",
+            "filter(predicate: fn(T) -> Bool) -> List<T>",
+            "List<T>",
+            &["T"],
+        ),
+        (
+            "List",
+            "fold",
+            "fold(initial: U, combine: fn(U, T) -> U) -> U",
+            "U",
+            &["T"],
+        ),
+        (
+            "List",
+            "find",
+            "find(predicate: fn(T) -> Bool) -> Option<T>",
+            "Option<T>",
+            &["T"],
+        ),
+        (
+            "List",
+            "any",
+            "any(predicate: fn(T) -> Bool) -> Bool",
+            "Bool",
+            &["T"],
+        ),
+        (
+            "List",
+            "all",
+            "all(predicate: fn(T) -> Bool) -> Bool",
+            "Bool",
+            &["T"],
+        ),
         ("Map", "count", "count() -> Int", "Int", &["K", "V"]),
         ("Map", "keys", "keys() -> List<K>", "List<K>", &["K", "V"]),
-        ("Map", "values", "values() -> List<V>", "List<V>", &["K", "V"]),
-        ("Map", "get", "get(key: K) -> Option<V>", "Option<V>", &["K", "V"]),
-        ("Map", "remove", "remove(key: K) -> Option<V>", "Option<V>", &["K", "V"]),
-        ("Map", "contains_key", "contains_key(key: K) -> Bool", "Bool", &["K", "V"]),
-        ("Map", "set", "set(key: K, value: V) -> Void", "Void", &["K", "V"]),
+        (
+            "Map",
+            "values",
+            "values() -> List<V>",
+            "List<V>",
+            &["K", "V"],
+        ),
+        (
+            "Map",
+            "get",
+            "get(key: K) -> Option<V>",
+            "Option<V>",
+            &["K", "V"],
+        ),
+        (
+            "Map",
+            "remove",
+            "remove(key: K) -> Option<V>",
+            "Option<V>",
+            &["K", "V"],
+        ),
+        (
+            "Map",
+            "contains_key",
+            "contains_key(key: K) -> Bool",
+            "Bool",
+            &["K", "V"],
+        ),
+        (
+            "Map",
+            "set",
+            "set(key: K, value: V) -> Void",
+            "Void",
+            &["K", "V"],
+        ),
         ("Set", "count", "count() -> Int", "Int", &["T"]),
-        ("Set", "contains", "contains(value: T) -> Bool", "Bool", &["T"]),
+        (
+            "Set",
+            "contains",
+            "contains(value: T) -> Bool",
+            "Bool",
+            &["T"],
+        ),
         ("Set", "add", "add(value: T) -> Void", "Void", &["T"]),
         ("Set", "remove", "remove(value: T) -> Void", "Void", &["T"]),
         ("Option", "is_some", "is_some() -> Bool", "Bool", &["T"]),
         ("Option", "is_none", "is_none() -> Bool", "Bool", &["T"]),
         ("Option", "unwrap", "unwrap() -> T", "T", &["T"]),
-        ("Option", "unwrap_or", "unwrap_or(default: T) -> T", "T", &["T"]),
-        ("Option", "ok_or", "ok_or(error: E) -> Result<T, E>", "Result<T, E>", &["T"]),
-        ("Option", "map", "map(transform: fn(T) -> U) -> Option<U>", "Option<U>", &["T"]),
-        ("Option", "then", "then(transform: fn(T) -> Option<U>) -> Option<U>", "Option<U>", &["T"]),
+        (
+            "Option",
+            "unwrap_or",
+            "unwrap_or(default: T) -> T",
+            "T",
+            &["T"],
+        ),
+        (
+            "Option",
+            "ok_or",
+            "ok_or(error: E) -> Result<T, E>",
+            "Result<T, E>",
+            &["T"],
+        ),
+        (
+            "Option",
+            "map",
+            "map(transform: fn(T) -> U) -> Option<U>",
+            "Option<U>",
+            &["T"],
+        ),
+        (
+            "Option",
+            "then",
+            "then(transform: fn(T) -> Option<U>) -> Option<U>",
+            "Option<U>",
+            &["T"],
+        ),
         ("Result", "is_ok", "is_ok() -> Bool", "Bool", &["T", "E"]),
         ("Result", "is_err", "is_err() -> Bool", "Bool", &["T", "E"]),
         ("Result", "unwrap", "unwrap() -> T", "T", &["T", "E"]),
-        ("Result", "unwrap_or", "unwrap_or(default: T) -> T", "T", &["T", "E"]),
-        ("Result", "ok", "ok() -> Option<T>", "Option<T>", &["T", "E"]),
-        ("Result", "map", "map(transform: fn(T) -> U) -> Result<U, E>", "Result<U, E>", &["T", "E"]),
-        ("Result", "map_err", "map_err(transform: fn(E) -> F) -> Result<T, F>", "Result<T, F>", &["T", "E"]),
-        ("Result", "then", "then(transform: fn(T) -> Result<U, E>) -> Result<U, E>", "Result<U, E>", &["T", "E"]),
+        (
+            "Result",
+            "unwrap_or",
+            "unwrap_or(default: T) -> T",
+            "T",
+            &["T", "E"],
+        ),
+        (
+            "Result",
+            "ok",
+            "ok() -> Option<T>",
+            "Option<T>",
+            &["T", "E"],
+        ),
+        (
+            "Result",
+            "map",
+            "map(transform: fn(T) -> U) -> Result<U, E>",
+            "Result<U, E>",
+            &["T", "E"],
+        ),
+        (
+            "Result",
+            "map_err",
+            "map_err(transform: fn(E) -> F) -> Result<T, F>",
+            "Result<T, F>",
+            &["T", "E"],
+        ),
+        (
+            "Result",
+            "then",
+            "then(transform: fn(T) -> Result<U, E>) -> Result<U, E>",
+            "Result<U, E>",
+            &["T", "E"],
+        ),
         ("Task", "join", "join() -> T", "T", &["T"]),
         ("Task", "cancel", "cancel() -> Bool", "Bool", &["T"]),
         ("Channel", "send", "send(value: T) -> Void", "Void", &["T"]),
-        ("Channel", "receive", "receive() -> Option<T>", "Option<T>", &["T"]),
+        (
+            "Channel",
+            "receive",
+            "receive() -> Option<T>",
+            "Option<T>",
+            &["T"],
+        ),
         ("Channel", "close", "close() -> Void", "Void", &["T"]),
     ];
     definitions
         .iter()
-        .map(|(owner, name, detail, result_type, generics)| MemberSymbol {
-            owner: (*owner).to_string(),
-            owner_generics: generics.iter().map(|generic| (*generic).to_string()).collect(),
-            kind: "method",
-            name: (*name).to_string(),
-            detail: (*detail).to_string(),
-            result_type: Some((*result_type).to_string()),
-            span: None,
-            source_file: None,
-        })
+        .map(
+            |(owner, name, detail, result_type, generics)| MemberSymbol {
+                owner: (*owner).to_string(),
+                owner_generics: generics
+                    .iter()
+                    .map(|generic| (*generic).to_string())
+                    .collect(),
+                kind: "method",
+                name: (*name).to_string(),
+                detail: (*detail).to_string(),
+                result_type: Some((*result_type).to_string()),
+                span: None,
+                source_file: None,
+            },
+        )
         .collect()
 }
 
@@ -250,31 +427,53 @@ fn function_symbol(function: &FunctionDecl, kind: &'static str, name: &str) -> S
     Symbol {
         kind,
         name: name.to_string(),
-        detail: method_signature(&function.name, &function.generics, &function.params, &function.return_type),
+        detail: method_signature(
+            &function.name,
+            &function.generics,
+            &function.params,
+            &function.return_type,
+        ),
         span: function.span,
         source_file: function.source_file.clone(),
     }
 }
 
-fn method_signature(name: &str, generics: &[GenericParam], params: &[Param], return_type: &Type) -> String {
+fn method_signature(
+    name: &str,
+    generics: &[GenericParam],
+    params: &[Param],
+    return_type: &Type,
+) -> String {
     let parameters = params
         .iter()
         .map(|param| {
             let mut text = String::new();
-            if param.is_mut { text.push_str("mut "); }
+            if param.is_mut {
+                text.push_str("mut ");
+            }
             text.push_str(&param.name);
             text.push_str(": ");
             text.push_str(&type_to_string(&param.ty));
-            if param.default.is_some() { text.push_str(" = …"); }
+            if param.default.is_some() {
+                text.push_str(" = …");
+            }
             text
         })
         .collect::<Vec<_>>()
         .join(", ");
-    format!("fn {}{}({}) -> {}", name, generic_suffix(generics), parameters, type_to_string(return_type))
+    format!(
+        "fn {}{}({}) -> {}",
+        name,
+        generic_suffix(generics),
+        parameters,
+        type_to_string(return_type)
+    )
 }
 
 fn generic_suffix(generics: &[GenericParam]) -> String {
-    if generics.is_empty() { return String::new(); }
+    if generics.is_empty() {
+        return String::new();
+    }
     let params = generics
         .iter()
         .map(|generic| {
@@ -292,13 +491,24 @@ fn generic_suffix(generics: &[GenericParam]) -> String {
 pub fn type_to_string(ty: &Type) -> String {
     match ty {
         Type::Named(name, args) if args.is_empty() => name.clone(),
-        Type::Named(name, args) => format!("{}<{}>", name, args.iter().map(type_to_string).collect::<Vec<_>>().join(", ")),
+        Type::Named(name, args) => format!(
+            "{}<{}>",
+            name,
+            args.iter()
+                .map(type_to_string)
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
         Type::Mul(left, right) => format!("{} * {}", type_to_string(left), type_to_string(right)),
         Type::Div(left, right) => format!("{} / {}", type_to_string(left), type_to_string(right)),
         Type::Pow(base, exponent) => format!("{}^{}", type_to_string(base), exponent),
         Type::Fn(params, result) => format!(
             "fn({}) -> {}",
-            params.iter().map(type_to_string).collect::<Vec<_>>().join(", "),
+            params
+                .iter()
+                .map(type_to_string)
+                .collect::<Vec<_>>()
+                .join(", "),
             type_to_string(result)
         ),
         Type::Dyn(traits) => format!("dyn {}", traits.join(" + ")),

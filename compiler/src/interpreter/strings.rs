@@ -21,7 +21,9 @@ fn text_arg<'a>(args: &'a [Value], method: &str) -> Result<&'a str, RuntimeError
 }
 
 fn list_of(items: Vec<String>) -> Value {
-    Value::List(Rc::new(RefCell::new(items.into_iter().map(Value::String).collect())))
+    Value::List(Rc::new(RefCell::new(
+        items.into_iter().map(Value::String).collect(),
+    )))
 }
 
 fn is_space(c: char) -> bool {
@@ -29,7 +31,11 @@ fn is_space(c: char) -> bool {
 }
 
 /// Returns `None` when `method` isn't a `String` method.
-pub fn call_method(text: &str, method: &str, args: &[Value]) -> Option<Result<Value, RuntimeError>> {
+pub fn call_method(
+    text: &str,
+    method: &str,
+    args: &[Value],
+) -> Option<Result<Value, RuntimeError>> {
     Some((|| -> Result<Value, RuntimeError> {
         match (method, args.len()) {
             ("length", 0) => Ok(Value::Int(text.chars().count() as i64)),
@@ -44,7 +50,9 @@ pub fn call_method(text: &str, method: &str, args: &[Value]) -> Option<Result<Va
                 text.chars()
                     .nth(index as usize)
                     .map(|ch| Value::String(ch.to_string()))
-                    .ok_or_else(|| RuntimeError::Error(format!("'char_at' index out of bounds: {index}")))
+                    .ok_or_else(|| {
+                        RuntimeError::Error(format!("'char_at' index out of bounds: {index}"))
+                    })
             }
             ("slice", 2) => {
                 let (Value::Int(start), Value::Int(end)) = (&args[0], &args[1]) else {
@@ -55,16 +63,23 @@ pub fn call_method(text: &str, method: &str, args: &[Value]) -> Option<Result<Va
                     return fail(format!("'slice' range out of bounds: {start} until {end}"));
                 }
                 Ok(Value::String(
-                    text.chars().skip(*start as usize).take((*end - *start) as usize).collect(),
+                    text.chars()
+                        .skip(*start as usize)
+                        .take((*end - *start) as usize)
+                        .collect(),
                 ))
             }
             ("codepoint", 0) => {
                 let mut chars = text.chars();
                 let Some(ch) = chars.next() else {
-                    return Ok(err_value(Value::String("codepoint expects exactly one character".to_string())));
+                    return Ok(err_value(Value::String(
+                        "codepoint expects exactly one character".to_string(),
+                    )));
                 };
                 if chars.next().is_some() {
-                    return Ok(err_value(Value::String("codepoint expects exactly one character".to_string())));
+                    return Ok(err_value(Value::String(
+                        "codepoint expects exactly one character".to_string(),
+                    )));
                 }
                 Ok(ok_value(Value::Int(ch as i64)))
             }
@@ -99,14 +114,32 @@ pub fn call_method(text: &str, method: &str, args: &[Value]) -> Option<Result<Va
                 Ok(v) => ok_value(Value::Float(v)),
                 Err(e) => err_value(Value::String(e.to_string())),
             }),
-            _ => fail(format!("String has no method '{method}' with {} argument(s)", args.len())),
+            _ => fail(format!(
+                "String has no method '{method}' with {} argument(s)",
+                args.len()
+            )),
         }
     })())
     .filter(|_| STRING_METHODS.contains(&method))
 }
 
 pub const STRING_METHODS: &[&str] = &[
-    "length", "is_empty", "char_at", "slice", "codepoint", "trim", "to_upper", "to_lower", "contains", "starts_with", "ends_with", "replace", "split", "lines", "to_int", "to_float",
+    "length",
+    "is_empty",
+    "char_at",
+    "slice",
+    "codepoint",
+    "trim",
+    "to_upper",
+    "to_lower",
+    "contains",
+    "starts_with",
+    "ends_with",
+    "replace",
+    "split",
+    "lines",
+    "to_int",
+    "to_float",
 ];
 
 /// `list.join(separator)` for a list of strings.
@@ -176,5 +209,7 @@ pub fn parse_csv(text: &str) -> Vec<Vec<String>> {
 }
 
 pub fn csv_value(text: &str) -> Value {
-    Value::List(Rc::new(RefCell::new(parse_csv(text).into_iter().map(list_of).collect())))
+    Value::List(Rc::new(RefCell::new(
+        parse_csv(text).into_iter().map(list_of).collect(),
+    )))
 }

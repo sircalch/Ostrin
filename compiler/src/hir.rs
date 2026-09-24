@@ -70,14 +70,32 @@ pub struct HirBlock {
 
 #[derive(Debug, Clone)]
 pub enum HirStmt {
-    Let { name: String, mutable: bool, declared: Option<Type>, value: HirExpr },
-    Assign { name: String, value: HirExpr },
-    FieldAssign { target: HirExpr, value: HirExpr },
+    Let {
+        name: String,
+        mutable: bool,
+        declared: Option<Type>,
+        value: HirExpr,
+    },
+    Assign {
+        name: String,
+        value: HirExpr,
+    },
+    FieldAssign {
+        target: HirExpr,
+        value: HirExpr,
+    },
     Return(Option<HirExpr>),
     Break(Option<HirExpr>),
     Continue,
-    While { cond: HirExpr, body: HirBlock },
-    For { var: String, iter: HirExpr, body: HirBlock },
+    While {
+        cond: HirExpr,
+        body: HirBlock,
+    },
+    For {
+        var: String,
+        iter: HirExpr,
+        body: HirBlock,
+    },
     Expr(HirExpr),
 }
 
@@ -115,9 +133,20 @@ pub enum HirKind {
     Unary(UnaryOp, Box<HirExpr>),
     Binary(BinOp, Box<HirExpr>, Box<HirExpr>),
     Range(Box<HirExpr>, RangeKind, Box<HirExpr>, Option<Box<HirExpr>>),
-    Call { callee: Box<HirExpr>, args: Vec<HirArg>, type_args: Vec<Type>, subst: Option<CallSubst> },
+    Call {
+        callee: Box<HirExpr>,
+        args: Vec<HirArg>,
+        type_args: Vec<Type>,
+        subst: Option<CallSubst>,
+    },
     /// `recv.method(args)`: resolved to a concrete impl/vtable slot by later stages.
-    MethodCall { recv: Box<HirExpr>, method: String, args: Vec<HirArg>, type_args: Vec<Type>, subst: Option<CallSubst> },
+    MethodCall {
+        recv: Box<HirExpr>,
+        method: String,
+        args: Vec<HirArg>,
+        type_args: Vec<Type>,
+        subst: Option<CallSubst>,
+    },
     Field(Box<HirExpr>, String),
     Index(Box<HirExpr>, Box<HirExpr>),
     If(Box<HirExpr>, HirBlock, Option<HirBlock>),
@@ -132,7 +161,11 @@ pub enum HirKind {
     Approximately(Box<HirExpr>, Box<HirExpr>, Box<HirExpr>),
     As(Box<HirExpr>, String),
     Loop(HirBlock),
-    Record { name: String, type_args: Vec<Type>, fields: Vec<(String, HirExpr)> },
+    Record {
+        name: String,
+        type_args: Vec<Type>,
+        fields: Vec<(String, HirExpr)>,
+    },
     Match(Box<HirExpr>, Vec<HirArm>),
     Spawn(HirBlock),
     SpawnScope(HirBlock),
@@ -159,11 +192,18 @@ struct Lowerer<'a> {
 
 impl<'a> Lowerer<'a> {
     fn ty_of(&self, expr: &Expr) -> Ty {
-        self.typed.node_types.get(&(expr as *const Expr as usize)).cloned().unwrap_or(Ty::Unknown)
+        self.typed
+            .node_types
+            .get(&(expr as *const Expr as usize))
+            .cloned()
+            .unwrap_or(Ty::Unknown)
     }
 
     fn declare(&mut self, name: &str) {
-        self.scopes.last_mut().expect("a scope is always open").insert(name.to_string());
+        self.scopes
+            .last_mut()
+            .expect("a scope is always open")
+            .insert(name.to_string());
     }
 
     fn is_local(&self, name: &str) -> bool {
@@ -180,7 +220,12 @@ impl<'a> Lowerer<'a> {
 
     fn stmt(&mut self, stmt: &Stmt) -> HirStmt {
         match stmt {
-            Stmt::Binding { mut_, name, ty, value } => {
+            Stmt::Binding {
+                mut_,
+                name,
+                ty,
+                value,
+            } => {
                 let value = self.expr(value);
                 self.declare(name);
                 let bound = match ty {
@@ -188,7 +233,12 @@ impl<'a> Lowerer<'a> {
                     None => value.ty.clone(),
                 };
                 self.local_types.insert(name.clone(), bound);
-                HirStmt::Let { name: name.clone(), mutable: *mut_, declared: ty.clone(), value }
+                HirStmt::Let {
+                    name: name.clone(),
+                    mutable: *mut_,
+                    declared: ty.clone(),
+                    value,
+                }
             }
             Stmt::Assign { name, value } => {
                 let value = self.expr(value);
@@ -197,20 +247,37 @@ impl<'a> Lowerer<'a> {
                     self.declare(name);
                     self.local_types.insert(name.clone(), value.ty.clone());
                 }
-                HirStmt::Assign { name: name.clone(), value }
+                HirStmt::Assign {
+                    name: name.clone(),
+                    value,
+                }
             }
-            Stmt::FieldAssign { target, value } => HirStmt::FieldAssign { target: self.expr(target), value: self.expr(value) },
+            Stmt::FieldAssign { target, value } => HirStmt::FieldAssign {
+                target: self.expr(target),
+                value: self.expr(value),
+            },
             Stmt::Return(value) => HirStmt::Return(value.as_ref().map(|e| self.expr(e))),
             Stmt::Break(value) => HirStmt::Break(value.as_ref().map(|e| self.expr(e))),
             Stmt::Continue => HirStmt::Continue,
-            Stmt::While { cond, body } => HirStmt::While { cond: self.expr(cond), body: self.block(body) },
-            Stmt::For { pattern, iter, body } => {
+            Stmt::While { cond, body } => HirStmt::While {
+                cond: self.expr(cond),
+                body: self.block(body),
+            },
+            Stmt::For {
+                pattern,
+                iter,
+                body,
+            } => {
                 let iter = self.expr(iter);
                 self.scopes.push(HashSet::new());
                 self.declare(pattern);
                 let body = self.block(body);
                 self.scopes.pop();
-                HirStmt::For { var: pattern.clone(), iter, body }
+                HirStmt::For {
+                    var: pattern.clone(),
+                    iter,
+                    body,
+                }
             }
             Stmt::Expr(e) => HirStmt::Expr(self.expr(e)),
         }
@@ -219,8 +286,14 @@ impl<'a> Lowerer<'a> {
     fn args(&mut self, args: &[Arg]) -> Vec<HirArg> {
         args.iter()
             .map(|a| match a {
-                Arg::Positional(e) => HirArg { name: None, value: self.expr(e) },
-                Arg::Named(n, e) => HirArg { name: Some(n.clone()), value: self.expr(e) },
+                Arg::Positional(e) => HirArg {
+                    name: None,
+                    value: self.expr(e),
+                },
+                Arg::Named(n, e) => HirArg {
+                    name: Some(n.clone()),
+                    value: self.expr(e),
+                },
             })
             .collect()
     }
@@ -247,7 +320,11 @@ impl<'a> Lowerer<'a> {
         let ty = self.ty_of(expr);
         let kind = match expr {
             Expr::Located(inner, range) => {
-                let key = ExprKey { file: self.file.clone(), start: range.start, end: range.end };
+                let key = ExprKey {
+                    file: self.file.clone(),
+                    start: range.start,
+                    end: range.end,
+                };
                 let mut lowered = self.expr_keyed(inner, Some(key));
                 // The wrapper's own recorded type wins when the inner node has none.
                 if lowered.ty == Ty::Unknown {
@@ -268,7 +345,10 @@ impl<'a> Lowerer<'a> {
                     // The checker sometimes records nothing for a use (`self`); fall back to the binding's type.
                     if ty == Ty::Unknown {
                         if let Some(known) = self.local_types.get(name) {
-                            return HirExpr { ty: known.clone(), kind: HirKind::Local(name.clone()) };
+                            return HirExpr {
+                                ty: known.clone(),
+                                kind: HirKind::Local(name.clone()),
+                            };
                         }
                     }
                     HirKind::Local(name.clone())
@@ -277,17 +357,37 @@ impl<'a> Lowerer<'a> {
                 }
             }
             Expr::Unary(op, e) => HirKind::Unary(*op, Box::new(self.expr(e))),
-            Expr::Binary(op, l, r) => HirKind::Binary(*op, Box::new(self.expr(l)), Box::new(self.expr(r))),
-            Expr::Range(a, kind, b, step) => {
-                HirKind::Range(Box::new(self.expr(a)), *kind, Box::new(self.expr(b)), step.as_ref().map(|s| Box::new(self.expr(s))))
+            Expr::Binary(op, l, r) => {
+                HirKind::Binary(*op, Box::new(self.expr(l)), Box::new(self.expr(r)))
             }
-            Expr::Call(callee, args) => self.call(callee, &[], args, key, &ty, expr as *const Expr as usize),
-            Expr::GenericCall(callee, type_args, args) => self.call(callee, type_args, args, key, &ty, expr as *const Expr as usize),
-            Expr::FieldAccess(obj, field) => HirKind::Field(Box::new(self.expr(obj)), field.clone()),
-            Expr::Index(obj, idx) => HirKind::Index(Box::new(self.expr(obj)), Box::new(self.expr(idx))),
-            Expr::If(cond, then_b, else_b) => {
-                HirKind::If(Box::new(self.expr(cond)), self.block(then_b), else_b.as_ref().map(|b| self.block(b)))
+            Expr::Range(a, kind, b, step) => HirKind::Range(
+                Box::new(self.expr(a)),
+                *kind,
+                Box::new(self.expr(b)),
+                step.as_ref().map(|s| Box::new(self.expr(s))),
+            ),
+            Expr::Call(callee, args) => {
+                self.call(callee, &[], args, key, &ty, expr as *const Expr as usize)
             }
+            Expr::GenericCall(callee, type_args, args) => self.call(
+                callee,
+                type_args,
+                args,
+                key,
+                &ty,
+                expr as *const Expr as usize,
+            ),
+            Expr::FieldAccess(obj, field) => {
+                HirKind::Field(Box::new(self.expr(obj)), field.clone())
+            }
+            Expr::Index(obj, idx) => {
+                HirKind::Index(Box::new(self.expr(obj)), Box::new(self.expr(idx)))
+            }
+            Expr::If(cond, then_b, else_b) => HirKind::If(
+                Box::new(self.expr(cond)),
+                self.block(then_b),
+                else_b.as_ref().map(|b| self.block(b)),
+            ),
             Expr::Block(b) => HirKind::Block(self.block(b)),
             Expr::Lambda(params, body) => {
                 self.scopes.push(params.iter().cloned().collect());
@@ -297,11 +397,25 @@ impl<'a> Lowerer<'a> {
             }
             Expr::ListLiteral(items) => HirKind::List(items.iter().map(|e| self.expr(e)).collect()),
             Expr::SetLiteral(items) => HirKind::Set(items.iter().map(|e| self.expr(e)).collect()),
-            Expr::MapLiteral(pairs) => HirKind::Map(pairs.iter().map(|(k, v)| (self.expr(k), self.expr(v))).collect()),
-            Expr::EmptyCollection(name, types) => HirKind::EmptyCollection(name.clone(), types.clone()),
-            Expr::Try(e, handler) => HirKind::Try(Box::new(self.expr(e)), handler.as_ref().map(|h| Box::new(self.expr(h)))),
+            Expr::MapLiteral(pairs) => HirKind::Map(
+                pairs
+                    .iter()
+                    .map(|(k, v)| (self.expr(k), self.expr(v)))
+                    .collect(),
+            ),
+            Expr::EmptyCollection(name, types) => {
+                HirKind::EmptyCollection(name.clone(), types.clone())
+            }
+            Expr::Try(e, handler) => HirKind::Try(
+                Box::new(self.expr(e)),
+                handler.as_ref().map(|h| Box::new(self.expr(h))),
+            ),
             Expr::Within(a, b) => HirKind::Within(Box::new(self.expr(a)), Box::new(self.expr(b))),
-            Expr::Approximately(a, b, t) => HirKind::Approximately(Box::new(self.expr(a)), Box::new(self.expr(b)), Box::new(self.expr(t))),
+            Expr::Approximately(a, b, t) => HirKind::Approximately(
+                Box::new(self.expr(a)),
+                Box::new(self.expr(b)),
+                Box::new(self.expr(t)),
+            ),
             Expr::As(e, target) => {
                 let name = match target.unlocated() {
                     Expr::Ident(n) => n.clone(),
@@ -313,12 +427,18 @@ impl<'a> Lowerer<'a> {
             Expr::RecordLiteral(name, fields) => HirKind::Record {
                 name: name.clone(),
                 type_args: Vec::new(),
-                fields: fields.iter().map(|(n, e)| (n.clone(), self.expr(e))).collect(),
+                fields: fields
+                    .iter()
+                    .map(|(n, e)| (n.clone(), self.expr(e)))
+                    .collect(),
             },
             Expr::GenericRecordLiteral(name, type_args, fields) => HirKind::Record {
                 name: name.clone(),
                 type_args: type_args.clone(),
-                fields: fields.iter().map(|(n, e)| (n.clone(), self.expr(e))).collect(),
+                fields: fields
+                    .iter()
+                    .map(|(n, e)| (n.clone(), self.expr(e)))
+                    .collect(),
             },
             Expr::Match(scrutinee, arms) => {
                 let scrutinee = Box::new(self.expr(scrutinee));
@@ -330,14 +450,20 @@ impl<'a> Lowerer<'a> {
                         let guard = arm.guard.as_ref().map(|g| self.expr(g));
                         let body = self.block(&arm.body);
                         self.scopes.pop();
-                        HirArm { pattern: arm.pattern.clone(), guard, body }
+                        HirArm {
+                            pattern: arm.pattern.clone(),
+                            guard,
+                            body,
+                        }
                     })
                     .collect();
                 HirKind::Match(scrutinee, arms)
             }
             Expr::Spawn(b) => HirKind::Spawn(self.block(b)),
             Expr::SpawnScope(b) => HirKind::SpawnScope(self.block(b)),
-            Expr::Channel(ty, cap) => HirKind::Channel(ty.clone(), cap.as_ref().map(|c| Box::new(self.expr(c)))),
+            Expr::Channel(ty, cap) => {
+                HirKind::Channel(ty.clone(), cap.as_ref().map(|c| Box::new(self.expr(c))))
+            }
         };
         HirExpr { ty, kind }
     }
@@ -347,27 +473,47 @@ impl<'a> Lowerer<'a> {
     /// argument can't be matched, so the verifier reports it.
     fn normalize(&mut self, params: &[Param], args: Vec<HirArg>) -> Vec<HirArg> {
         let original = args.clone();
-        let named: Vec<(Option<String>, HirExpr)> = args.into_iter().map(|a| (a.name, a.value)).collect();
+        let named: Vec<(Option<String>, HirExpr)> =
+            args.into_iter().map(|a| (a.name, a.value)).collect();
         // A default is typed where it is declared; when that node's type isn't
         // recorded (a method checked through a copy of its declaration), the
         // parameter's declared type stands in.
         match arrange_arguments(params, named, |p| {
-            let mut lowered = self.expr(p.default.as_ref().expect("called for defaulted parameters"));
+            let mut lowered =
+                self.expr(p.default.as_ref().expect("called for defaulted parameters"));
             if lowered.ty == Ty::Unknown {
                 let declared = crate::typeck::resolve_type(&p.ty);
-                if !crate::types::ty_contains_unknown(&declared) && !matches!(declared, Ty::Generic(_) | Ty::Named(_)) {
+                if !crate::types::ty_contains_unknown(&declared)
+                    && !matches!(declared, Ty::Generic(_) | Ty::Named(_))
+                {
                     lowered.ty = declared;
                 }
             }
             lowered
         }) {
-            Ok(list) => list.into_iter().map(|value| HirArg { name: None, value }).collect(),
+            Ok(list) => list
+                .into_iter()
+                .map(|value| HirArg { name: None, value })
+                .collect(),
             Err(_) => original,
         }
     }
 
-    fn call(&mut self, callee: &Expr, type_args: &[Type], args: &[Arg], key: Option<ExprKey>, result: &Ty, node: usize) -> HirKind {
-        let subst = self.typed.call_substs_by_node.get(&node).cloned().or_else(|| key.and_then(|k| self.typed.call_substs.get(&k).cloned()));
+    fn call(
+        &mut self,
+        callee: &Expr,
+        type_args: &[Type],
+        args: &[Arg],
+        key: Option<ExprKey>,
+        result: &Ty,
+        node: usize,
+    ) -> HirKind {
+        let subst = self
+            .typed
+            .call_substs_by_node
+            .get(&node)
+            .cloned()
+            .or_else(|| key.and_then(|k| self.typed.call_substs.get(&k).cloned()));
         let type_args = type_args.to_vec();
         // `recv.method(args)` is a method call, not a call of a field value.
         if let Expr::FieldAccess(recv, method) = callee.unlocated() {
@@ -377,11 +523,26 @@ impl<'a> Lowerer<'a> {
                 Ty::Named(n) | Ty::Applied(n, _) => Some(n.clone()),
                 _ => None,
             };
-            if let Some(decl) = owner.and_then(|n| self.signatures.methods.get(&(n.as_str(), method.as_str())).copied()) {
-                let without_self = if decl.params.first().is_some_and(|p| p.name == "self") { &decl.params[1..] } else { &decl.params[..] };
+            if let Some(decl) = owner.and_then(|n| {
+                self.signatures
+                    .methods
+                    .get(&(n.as_str(), method.as_str()))
+                    .copied()
+            }) {
+                let without_self = if decl.params.first().is_some_and(|p| p.name == "self") {
+                    &decl.params[1..]
+                } else {
+                    &decl.params[..]
+                };
                 args = self.normalize(without_self, args);
             }
-            return HirKind::MethodCall { recv: Box::new(recv), method: method.clone(), args, type_args, subst };
+            return HirKind::MethodCall {
+                recv: Box::new(recv),
+                method: method.clone(),
+                args,
+                type_args,
+                subst,
+            };
         }
         let mut args = self.args(args);
         // Named and defaulted arguments become plain positional ones, in parameter order.
@@ -396,9 +557,17 @@ impl<'a> Lowerer<'a> {
         // The callee itself is rarely typed by the checker (builtins, constructors);
         // its type follows from the arguments and the call's result.
         if callee.ty == Ty::Unknown {
-            callee.ty = Ty::Fn(args.iter().map(|a| a.value.ty.clone()).collect(), Box::new(result.clone()));
+            callee.ty = Ty::Fn(
+                args.iter().map(|a| a.value.ty.clone()).collect(),
+                Box::new(result.clone()),
+            );
         }
-        HirKind::Call { callee: Box::new(callee), args, type_args, subst }
+        HirKind::Call {
+            callee: Box::new(callee),
+            args,
+            type_args,
+            subst,
+        }
     }
 }
 
@@ -419,7 +588,10 @@ fn normalize_variant(fields: &[Option<String>], args: Vec<HirArg>) -> Vec<HirArg
                 slots[next] = Some(arg.value);
                 next += 1;
             }
-            Some(name) => match fields.iter().position(|f| f.as_deref() == Some(name.as_str())) {
+            Some(name) => match fields
+                .iter()
+                .position(|f| f.as_deref() == Some(name.as_str()))
+            {
                 Some(index) => slots[index] = Some(arg.value),
                 None => return original,
             },
@@ -428,12 +600,22 @@ fn normalize_variant(fields: &[Option<String>], args: Vec<HirArg>) -> Vec<HirArg
     if slots.iter().any(Option::is_none) {
         return original;
     }
-    slots.into_iter().map(|s| HirArg { name: None, value: s.expect("checked above") }).collect()
+    slots
+        .into_iter()
+        .map(|s| HirArg {
+            name: None,
+            value: s.expect("checked above"),
+        })
+        .collect()
 }
 
 /// Builds the HIR of every function, method and trait default body.
 pub fn lower<'a>(items: &'a [Item], typed: &'a TypedProgram) -> HirProgram {
-    let mut signatures = Signatures { functions: Default::default(), methods: Default::default(), variants: Default::default() };
+    let mut signatures = Signatures {
+        functions: Default::default(),
+        methods: Default::default(),
+        variants: Default::default(),
+    };
     let mut arities = std::collections::HashMap::new();
     for item in items {
         match item {
@@ -443,14 +625,22 @@ pub fn lower<'a>(items: &'a [Item], typed: &'a TypedProgram) -> HirProgram {
             }
             Item::Impl(im) => {
                 for m in &im.methods {
-                    signatures.methods.insert((im.type_name.as_str(), m.name.as_str()), m);
+                    signatures
+                        .methods
+                        .insert((im.type_name.as_str(), m.name.as_str()), m);
                     let skip = usize::from(m.params.first().is_some_and(|p| p.name == "self"));
-                    arities.insert(format!("{}.{}", im.type_name, m.name), m.params.len() - skip);
+                    arities.insert(
+                        format!("{}.{}", im.type_name, m.name),
+                        m.params.len() - skip,
+                    );
                 }
             }
             Item::Enum(e) => {
                 for v in &e.variants {
-                    signatures.variants.insert(v.name.as_str(), v.fields.iter().map(|f| f.name.clone()).collect());
+                    signatures.variants.insert(
+                        v.name.as_str(),
+                        v.fields.iter().map(|f| f.name.clone()).collect(),
+                    );
                     arities.insert(v.name.clone(), v.fields.len());
                 }
             }
@@ -459,23 +649,51 @@ pub fn lower<'a>(items: &'a [Item], typed: &'a TypedProgram) -> HirProgram {
     }
     let signatures = &signatures;
     let mut functions = Vec::new();
-    let lower_fn = |name: String, f: &FunctionDecl, extra_generics: &[GenericParam], self_ty: Ty| {
-        let mut lowerer = Lowerer { typed, signatures, file: f.source_file.clone(), scopes: vec![HashSet::new()], local_types: Default::default() };
-        for p in &f.params {
-            lowerer.declare(&p.name);
-            let ty = if p.name == "self" { self_ty.clone() } else { crate::typeck::resolve_type(&p.ty) };
-            lowerer.local_types.insert(p.name.clone(), ty);
-        }
-        let body = lowerer.block(&f.body);
-        HirFunction {
-            name,
-            generics: extra_generics.iter().chain(&f.generics).map(|g| g.name.clone()).collect(),
-            params: f.params.iter().map(|p| (p.name.clone(), if p.name == "self" { self_ty.clone() } else { crate::typeck::resolve_type(&p.ty) })).collect(),
-            ret: crate::typeck::resolve_type(&f.return_type),
-            body,
-            source_file: f.source_file.clone(),
-        }
-    };
+    let lower_fn =
+        |name: String, f: &FunctionDecl, extra_generics: &[GenericParam], self_ty: Ty| {
+            let mut lowerer = Lowerer {
+                typed,
+                signatures,
+                file: f.source_file.clone(),
+                scopes: vec![HashSet::new()],
+                local_types: Default::default(),
+            };
+            for p in &f.params {
+                lowerer.declare(&p.name);
+                let ty = if p.name == "self" {
+                    self_ty.clone()
+                } else {
+                    crate::typeck::resolve_type(&p.ty)
+                };
+                lowerer.local_types.insert(p.name.clone(), ty);
+            }
+            let body = lowerer.block(&f.body);
+            HirFunction {
+                name,
+                generics: extra_generics
+                    .iter()
+                    .chain(&f.generics)
+                    .map(|g| g.name.clone())
+                    .collect(),
+                params: f
+                    .params
+                    .iter()
+                    .map(|p| {
+                        (
+                            p.name.clone(),
+                            if p.name == "self" {
+                                self_ty.clone()
+                            } else {
+                                crate::typeck::resolve_type(&p.ty)
+                            },
+                        )
+                    })
+                    .collect(),
+                ret: crate::typeck::resolve_type(&f.return_type),
+                body,
+                source_file: f.source_file.clone(),
+            }
+        };
     for item in items {
         match item {
             Item::Function(f) => functions.push(lower_fn(f.name.clone(), f, &[], Ty::Unknown)),
@@ -483,10 +701,21 @@ pub fn lower<'a>(items: &'a [Item], typed: &'a TypedProgram) -> HirProgram {
                 let self_ty = if im.type_args.is_empty() {
                     Ty::Named(im.type_name.clone())
                 } else {
-                    Ty::Applied(im.type_name.clone(), im.type_args.iter().map(crate::typeck::resolve_type).collect())
+                    Ty::Applied(
+                        im.type_name.clone(),
+                        im.type_args
+                            .iter()
+                            .map(crate::typeck::resolve_type)
+                            .collect(),
+                    )
                 };
                 for m in &im.methods {
-                    functions.push(lower_fn(impl_method_name(im, &m.name), m, &im.generics, self_ty.clone()));
+                    functions.push(lower_fn(
+                        impl_method_name(im, &m.name),
+                        m,
+                        &im.generics,
+                        self_ty.clone(),
+                    ));
                 }
             }
             _ => {}
@@ -495,20 +724,34 @@ pub fn lower<'a>(items: &'a [Item], typed: &'a TypedProgram) -> HirProgram {
     let iterator_items = items
         .iter()
         .filter_map(|item| match item {
-            Item::Impl(im) if im.trait_name.as_deref() == Some("Iterator") => im.trait_args.first().map(|element| {
-                let generic_names: HashSet<String> = im.generics.iter().map(|generic| generic.name.clone()).collect();
-                (
-                    im.type_name.clone(),
-                    IteratorInfo {
-                        receiver_args: im.type_args.iter().map(|ty| iterator_type(ty, &generic_names)).collect(),
-                        element: iterator_type(element, &generic_names),
-                    },
-                )
-            }),
+            Item::Impl(im) if im.trait_name.as_deref() == Some("Iterator") => {
+                im.trait_args.first().map(|element| {
+                    let generic_names: HashSet<String> = im
+                        .generics
+                        .iter()
+                        .map(|generic| generic.name.clone())
+                        .collect();
+                    (
+                        im.type_name.clone(),
+                        IteratorInfo {
+                            receiver_args: im
+                                .type_args
+                                .iter()
+                                .map(|ty| iterator_type(ty, &generic_names))
+                                .collect(),
+                            element: iterator_type(element, &generic_names),
+                        },
+                    )
+                })
+            }
             _ => None,
         })
         .collect();
-    HirProgram { functions, arities, iterator_items }
+    HirProgram {
+        functions,
+        arities,
+        iterator_items,
+    }
 }
 
 fn iterator_type(ty: &Type, generic_names: &HashSet<String>) -> Ty {
@@ -517,9 +760,23 @@ fn iterator_type(ty: &Type, generic_names: &HashSet<String>) -> Ty {
             Ty::Named(name) if generic_names.contains(&name) => Ty::Generic(name),
             Ty::List(inner) => Ty::List(Box::new(replace(*inner, generic_names))),
             Ty::Set(inner) => Ty::Set(Box::new(replace(*inner, generic_names))),
-            Ty::Map(key, value) => Ty::Map(Box::new(replace(*key, generic_names)), Box::new(replace(*value, generic_names))),
-            Ty::Applied(name, args) => Ty::Applied(name, args.into_iter().map(|arg| replace(arg, generic_names)).collect()),
-            Ty::Fn(params, ret) => Ty::Fn(params.into_iter().map(|param| replace(param, generic_names)).collect(), Box::new(replace(*ret, generic_names))),
+            Ty::Map(key, value) => Ty::Map(
+                Box::new(replace(*key, generic_names)),
+                Box::new(replace(*value, generic_names)),
+            ),
+            Ty::Applied(name, args) => Ty::Applied(
+                name,
+                args.into_iter()
+                    .map(|arg| replace(arg, generic_names))
+                    .collect(),
+            ),
+            Ty::Fn(params, ret) => Ty::Fn(
+                params
+                    .into_iter()
+                    .map(|param| replace(param, generic_names))
+                    .collect(),
+                Box::new(replace(*ret, generic_names)),
+            ),
             other => other,
         }
     }
@@ -569,11 +826,20 @@ fn specialize_ty(ty: &Ty, subst: &HashMap<String, Ty>) -> Ty {
         Ty::Named(name) if subst.contains_key(name) => subst[name].clone(),
         Ty::Quantity(dimension) => Ty::Quantity(specialize_dimension(dimension, subst)),
         Ty::List(inner) => Ty::List(Box::new(specialize_ty(inner, subst))),
-        Ty::Map(key, value) => Ty::Map(Box::new(specialize_ty(key, subst)), Box::new(specialize_ty(value, subst))),
+        Ty::Map(key, value) => Ty::Map(
+            Box::new(specialize_ty(key, subst)),
+            Box::new(specialize_ty(value, subst)),
+        ),
         Ty::Set(inner) => Ty::Set(Box::new(specialize_ty(inner, subst))),
-        Ty::Applied(name, args) => Ty::Applied(name.clone(), args.iter().map(|arg| specialize_ty(arg, subst)).collect()),
+        Ty::Applied(name, args) => Ty::Applied(
+            name.clone(),
+            args.iter().map(|arg| specialize_ty(arg, subst)).collect(),
+        ),
         Ty::Fn(params, ret) => Ty::Fn(
-            params.iter().map(|param| specialize_ty(param, subst)).collect(),
+            params
+                .iter()
+                .map(|param| specialize_ty(param, subst))
+                .collect(),
             Box::new(specialize_ty(ret, subst)),
         ),
         _ => ty.clone(),
@@ -582,21 +848,41 @@ fn specialize_ty(ty: &Ty, subst: &HashMap<String, Ty>) -> Ty {
 
 fn specialize_subst(call: &Option<CallSubst>, subst: &HashMap<String, Ty>) -> Option<CallSubst> {
     call.as_ref().map(|call| CallSubst {
-        types: call.types.iter().map(|(name, ty)| (name.clone(), specialize_ty(ty, subst))).collect(),
-        dims: call.dims.iter().map(|(name, dimension)| (name.clone(), specialize_dimension(dimension, subst))).collect(),
+        types: call
+            .types
+            .iter()
+            .map(|(name, ty)| (name.clone(), specialize_ty(ty, subst)))
+            .collect(),
+        dims: call
+            .dims
+            .iter()
+            .map(|(name, dimension)| (name.clone(), specialize_dimension(dimension, subst)))
+            .collect(),
     })
 }
 
 fn specialize_block(block: &HirBlock, subst: &HashMap<String, Ty>) -> HirBlock {
     HirBlock {
-        stmts: block.stmts.iter().map(|stmt| specialize_stmt(stmt, subst)).collect(),
-        tail: block.tail.as_ref().map(|expr| Box::new(specialize_expr(expr, subst))),
+        stmts: block
+            .stmts
+            .iter()
+            .map(|stmt| specialize_stmt(stmt, subst))
+            .collect(),
+        tail: block
+            .tail
+            .as_ref()
+            .map(|expr| Box::new(specialize_expr(expr, subst))),
     }
 }
 
 fn specialize_stmt(stmt: &HirStmt, subst: &HashMap<String, Ty>) -> HirStmt {
     match stmt {
-        HirStmt::Let { name, mutable, value, .. } => HirStmt::Let {
+        HirStmt::Let {
+            name,
+            mutable,
+            value,
+            ..
+        } => HirStmt::Let {
             name: name.clone(),
             mutable: *mutable,
             // The HIR expression type is authoritative after specialization;
@@ -605,13 +891,20 @@ fn specialize_stmt(stmt: &HirStmt, subst: &HashMap<String, Ty>) -> HirStmt {
             declared: None,
             value: specialize_expr(value, subst),
         },
-        HirStmt::Assign { name, value } => HirStmt::Assign { name: name.clone(), value: specialize_expr(value, subst) },
+        HirStmt::Assign { name, value } => HirStmt::Assign {
+            name: name.clone(),
+            value: specialize_expr(value, subst),
+        },
         HirStmt::FieldAssign { target, value } => HirStmt::FieldAssign {
             target: specialize_expr(target, subst),
             value: specialize_expr(value, subst),
         },
-        HirStmt::Return(value) => HirStmt::Return(value.as_ref().map(|value| specialize_expr(value, subst))),
-        HirStmt::Break(value) => HirStmt::Break(value.as_ref().map(|value| specialize_expr(value, subst))),
+        HirStmt::Return(value) => {
+            HirStmt::Return(value.as_ref().map(|value| specialize_expr(value, subst)))
+        }
+        HirStmt::Break(value) => {
+            HirStmt::Break(value.as_ref().map(|value| specialize_expr(value, subst)))
+        }
         HirStmt::Continue => HirStmt::Continue,
         HirStmt::While { cond, body } => HirStmt::While {
             cond: specialize_expr(cond, subst),
@@ -627,13 +920,19 @@ fn specialize_stmt(stmt: &HirStmt, subst: &HashMap<String, Ty>) -> HirStmt {
 }
 
 fn specialize_arg(arg: &HirArg, subst: &HashMap<String, Ty>) -> HirArg {
-    HirArg { name: arg.name.clone(), value: specialize_expr(&arg.value, subst) }
+    HirArg {
+        name: arg.name.clone(),
+        value: specialize_expr(&arg.value, subst),
+    }
 }
 
 fn specialize_arm(arm: &HirArm, subst: &HashMap<String, Ty>) -> HirArm {
     HirArm {
         pattern: arm.pattern.clone(),
-        guard: arm.guard.as_ref().map(|guard| specialize_expr(guard, subst)),
+        guard: arm
+            .guard
+            .as_ref()
+            .map(|guard| specialize_expr(guard, subst)),
         body: specialize_block(&arm.body, subst),
     }
 }
@@ -647,7 +946,9 @@ fn specialize_expr(expr: &HirExpr, subst: &HashMap<String, Ty>) -> HirExpr {
         HirKind::Str(value) => HirKind::Str(value.clone()),
         HirKind::Char(value) => HirKind::Char(*value),
         HirKind::Bool(value) => HirKind::Bool(*value),
-        HirKind::Unit(value, unit) => HirKind::Unit(Box::new(specialize_expr(value, subst)), unit.clone()),
+        HirKind::Unit(value, unit) => {
+            HirKind::Unit(Box::new(specialize_expr(value, subst)), unit.clone())
+        }
         HirKind::Local(name) => HirKind::Local(name.clone()),
         HirKind::Global(name) => HirKind::Global(name.clone()),
         HirKind::Unary(op, value) => HirKind::Unary(*op, Box::new(specialize_expr(value, subst))),
@@ -660,22 +961,36 @@ fn specialize_expr(expr: &HirExpr, subst: &HashMap<String, Ty>) -> HirExpr {
             Box::new(specialize_expr(start, subst)),
             *kind,
             Box::new(specialize_expr(end, subst)),
-            step.as_ref().map(|step| Box::new(specialize_expr(step, subst))),
+            step.as_ref()
+                .map(|step| Box::new(specialize_expr(step, subst))),
         ),
-        HirKind::Call { callee, args, type_args, subst: call } => HirKind::Call {
+        HirKind::Call {
+            callee,
+            args,
+            type_args,
+            subst: call,
+        } => HirKind::Call {
             callee: Box::new(specialize_expr(callee, subst)),
             args: args.iter().map(|arg| specialize_arg(arg, subst)).collect(),
             type_args: type_args.clone(),
             subst: specialize_subst(call, subst),
         },
-        HirKind::MethodCall { recv, method, args, type_args, subst: call } => HirKind::MethodCall {
+        HirKind::MethodCall {
+            recv,
+            method,
+            args,
+            type_args,
+            subst: call,
+        } => HirKind::MethodCall {
             recv: Box::new(specialize_expr(recv, subst)),
             method: method.clone(),
             args: args.iter().map(|arg| specialize_arg(arg, subst)).collect(),
             type_args: type_args.clone(),
             subst: specialize_subst(call, subst),
         },
-        HirKind::Field(value, field) => HirKind::Field(Box::new(specialize_expr(value, subst)), field.clone()),
+        HirKind::Field(value, field) => {
+            HirKind::Field(Box::new(specialize_expr(value, subst)), field.clone())
+        }
         HirKind::Index(value, index) => HirKind::Index(
             Box::new(specialize_expr(value, subst)),
             Box::new(specialize_expr(index, subst)),
@@ -683,22 +998,40 @@ fn specialize_expr(expr: &HirExpr, subst: &HashMap<String, Ty>) -> HirExpr {
         HirKind::If(cond, then_block, else_block) => HirKind::If(
             Box::new(specialize_expr(cond, subst)),
             specialize_block(then_block, subst),
-            else_block.as_ref().map(|block| specialize_block(block, subst)),
+            else_block
+                .as_ref()
+                .map(|block| specialize_block(block, subst)),
         ),
         HirKind::Block(block) => HirKind::Block(specialize_block(block, subst)),
-        HirKind::Lambda(params, block) => HirKind::Lambda(params.clone(), specialize_block(block, subst)),
-        HirKind::List(values) => HirKind::List(values.iter().map(|value| specialize_expr(value, subst)).collect()),
-        HirKind::Set(values) => HirKind::Set(values.iter().map(|value| specialize_expr(value, subst)).collect()),
+        HirKind::Lambda(params, block) => {
+            HirKind::Lambda(params.clone(), specialize_block(block, subst))
+        }
+        HirKind::List(values) => HirKind::List(
+            values
+                .iter()
+                .map(|value| specialize_expr(value, subst))
+                .collect(),
+        ),
+        HirKind::Set(values) => HirKind::Set(
+            values
+                .iter()
+                .map(|value| specialize_expr(value, subst))
+                .collect(),
+        ),
         HirKind::Map(values) => HirKind::Map(
             values
                 .iter()
                 .map(|(key, value)| (specialize_expr(key, subst), specialize_expr(value, subst)))
                 .collect(),
         ),
-        HirKind::EmptyCollection(name, type_args) => HirKind::EmptyCollection(name.clone(), type_args.clone()),
+        HirKind::EmptyCollection(name, type_args) => {
+            HirKind::EmptyCollection(name.clone(), type_args.clone())
+        }
         HirKind::Try(value, handler) => HirKind::Try(
             Box::new(specialize_expr(value, subst)),
-            handler.as_ref().map(|handler| Box::new(specialize_expr(handler, subst))),
+            handler
+                .as_ref()
+                .map(|handler| Box::new(specialize_expr(handler, subst))),
         ),
         HirKind::Within(left, right) => HirKind::Within(
             Box::new(specialize_expr(left, subst)),
@@ -709,12 +1042,21 @@ fn specialize_expr(expr: &HirExpr, subst: &HashMap<String, Ty>) -> HirExpr {
             Box::new(specialize_expr(target, subst)),
             Box::new(specialize_expr(tolerance, subst)),
         ),
-        HirKind::As(value, target) => HirKind::As(Box::new(specialize_expr(value, subst)), target.clone()),
+        HirKind::As(value, target) => {
+            HirKind::As(Box::new(specialize_expr(value, subst)), target.clone())
+        }
         HirKind::Loop(block) => HirKind::Loop(specialize_block(block, subst)),
-        HirKind::Record { name, type_args, fields } => HirKind::Record {
+        HirKind::Record {
+            name,
+            type_args,
+            fields,
+        } => HirKind::Record {
             name: name.clone(),
             type_args: type_args.clone(),
-            fields: fields.iter().map(|(name, value)| (name.clone(), specialize_expr(value, subst))).collect(),
+            fields: fields
+                .iter()
+                .map(|(name, value)| (name.clone(), specialize_expr(value, subst)))
+                .collect(),
         },
         HirKind::Match(scrutinee, arms) => HirKind::Match(
             Box::new(specialize_expr(scrutinee, subst)),
@@ -724,10 +1066,15 @@ fn specialize_expr(expr: &HirExpr, subst: &HashMap<String, Ty>) -> HirExpr {
         HirKind::SpawnScope(block) => HirKind::SpawnScope(specialize_block(block, subst)),
         HirKind::Channel(ty, capacity) => HirKind::Channel(
             ty.clone(),
-            capacity.as_ref().map(|capacity| Box::new(specialize_expr(capacity, subst))),
+            capacity
+                .as_ref()
+                .map(|capacity| Box::new(specialize_expr(capacity, subst))),
         ),
     };
-    HirExpr { ty: specialize_ty(&expr.ty, subst), kind }
+    HirExpr {
+        ty: specialize_ty(&expr.ty, subst),
+        kind,
+    }
 }
 
 /// Resolves generic calls inside an already-specialized function. The
@@ -735,8 +1082,15 @@ fn specialize_expr(expr: &HirExpr, subst: &HashMap<String, Ty>) -> HirExpr {
 /// mangling and can queue a missing monomorphized body. Keeping this as a
 /// separate pass means specialization stays a pure HIR transformation.
 pub enum GenericCall<'a> {
-    Function { name: &'a str, subst: &'a CallSubst },
-    Method { receiver: &'a Ty, name: &'a str, subst: &'a CallSubst },
+    Function {
+        name: &'a str,
+        subst: &'a CallSubst,
+    },
+    Method {
+        receiver: &'a Ty,
+        name: &'a str,
+        subst: &'a CallSubst,
+    },
 }
 
 pub fn resolve_generic_calls<F>(function: &mut HirFunction, resolver: &mut F)
@@ -763,7 +1117,9 @@ where
     F: FnMut(GenericCall<'_>) -> Option<String>,
 {
     match stmt {
-        HirStmt::Let { value, .. } | HirStmt::Assign { value, .. } => resolve_expr_calls(value, resolver),
+        HirStmt::Let { value, .. } | HirStmt::Assign { value, .. } => {
+            resolve_expr_calls(value, resolver)
+        }
         HirStmt::FieldAssign { target, value } => {
             resolve_expr_calls(target, resolver);
             resolve_expr_calls(value, resolver);
@@ -791,10 +1147,13 @@ where
     F: FnMut(GenericCall<'_>) -> Option<String>,
 {
     match &mut expr.kind {
-        HirKind::Unit(value, _) | HirKind::Unary(_, value) | HirKind::Field(value, _) | HirKind::As(value, _) => {
-            resolve_expr_calls(value, resolver)
-        }
-        HirKind::Binary(_, left, right) | HirKind::Index(left, right) | HirKind::Within(left, right) => {
+        HirKind::Unit(value, _)
+        | HirKind::Unary(_, value)
+        | HirKind::Field(value, _)
+        | HirKind::As(value, _) => resolve_expr_calls(value, resolver),
+        HirKind::Binary(_, left, right)
+        | HirKind::Index(left, right)
+        | HirKind::Within(left, right) => {
             resolve_expr_calls(left, resolver);
             resolve_expr_calls(right, resolver);
         }
@@ -810,13 +1169,20 @@ where
                 resolve_expr_calls(step, resolver);
             }
         }
-        HirKind::Call { callee, args, type_args, subst } => {
+        HirKind::Call {
+            callee,
+            args,
+            type_args,
+            subst,
+        } => {
             resolve_expr_calls(callee, resolver);
             for arg in args {
                 resolve_expr_calls(&mut arg.value, resolver);
             }
             let target = if let HirKind::Global(name) = &callee.kind {
-                subst.as_ref().and_then(|call| resolver(GenericCall::Function { name, subst: call }))
+                subst
+                    .as_ref()
+                    .and_then(|call| resolver(GenericCall::Function { name, subst: call }))
             } else {
                 None
             };
@@ -826,13 +1192,23 @@ where
                 type_args.clear();
             }
         }
-        HirKind::MethodCall { recv, method, args, type_args, subst } => {
+        HirKind::MethodCall {
+            recv,
+            method,
+            args,
+            type_args,
+            subst,
+        } => {
             resolve_expr_calls(recv, resolver);
             for arg in args {
                 resolve_expr_calls(&mut arg.value, resolver);
             }
             let target = subst.as_ref().and_then(|call| {
-                resolver(GenericCall::Method { receiver: &recv.ty, name: method, subst: call })
+                resolver(GenericCall::Method {
+                    receiver: &recv.ty,
+                    name: method,
+                    subst: call,
+                })
             });
             if let Some(target) = target {
                 *method = target;
@@ -847,9 +1223,11 @@ where
                 resolve_block_calls(else_block, resolver);
             }
         }
-        HirKind::Block(block) | HirKind::Loop(block) | HirKind::Spawn(block) | HirKind::SpawnScope(block) | HirKind::Lambda(_, block) => {
-            resolve_block_calls(block, resolver)
-        }
+        HirKind::Block(block)
+        | HirKind::Loop(block)
+        | HirKind::Spawn(block)
+        | HirKind::SpawnScope(block)
+        | HirKind::Lambda(_, block) => resolve_block_calls(block, resolver),
         HirKind::List(values) | HirKind::Set(values) => {
             for value in values {
                 resolve_expr_calls(value, resolver);
@@ -924,12 +1302,18 @@ pub fn verify(program: &HirProgram, generic_functions: &HashSet<String>) -> Veri
     report
 }
 
-type Ctx<'r> = (String, &'r mut VerifyReport, &'r std::collections::HashMap<String, usize>);
+type Ctx<'r> = (
+    String,
+    &'r mut VerifyReport,
+    &'r std::collections::HashMap<String, usize>,
+);
 
 fn verify_block(block: &HirBlock, generics: &HashSet<String>, ctx: &mut Ctx) {
     for s in &block.stmts {
         match s {
-            HirStmt::Let { value, .. } | HirStmt::Assign { value, .. } => verify_expr(value, generics, ctx),
+            HirStmt::Let { value, .. } | HirStmt::Assign { value, .. } => {
+                verify_expr(value, generics, ctx)
+            }
             HirStmt::FieldAssign { target, value } => {
                 verify_expr(target, generics, ctx);
                 verify_expr(value, generics, ctx);
@@ -963,7 +1347,9 @@ fn verify_expr(e: &HirExpr, generics: &HashSet<String>, ctx: &mut Ctx) {
     }
     let go = |x: &HirExpr, ctx: &mut Ctx| verify_expr(x, generics, ctx);
     match &e.kind {
-        HirKind::Unit(a, _) | HirKind::Unary(_, a) | HirKind::Field(a, _) | HirKind::As(a, _) => go(a, ctx),
+        HirKind::Unit(a, _) | HirKind::Unary(_, a) | HirKind::Field(a, _) | HirKind::As(a, _) => {
+            go(a, ctx)
+        }
         HirKind::Binary(_, a, b) | HirKind::Index(a, b) | HirKind::Within(a, b) => {
             go(a, ctx);
             go(b, ctx);
@@ -980,21 +1366,36 @@ fn verify_expr(e: &HirExpr, generics: &HashSet<String>, ctx: &mut Ctx) {
                 go(s, ctx);
             }
         }
-        HirKind::MethodCall { recv, method, args, .. } => {
+        HirKind::MethodCall {
+            recv, method, args, ..
+        } => {
             if args.iter().any(|a| a.name.is_some()) {
                 let function = ctx.0.clone();
-                ctx.1.violations.push(Violation { function, message: format!("method call '.{method}' still has named arguments") });
+                ctx.1.violations.push(Violation {
+                    function,
+                    message: format!("method call '.{method}' still has named arguments"),
+                });
             }
             go(recv, ctx);
             for a in args {
                 go(&a.value, ctx);
             }
         }
-        HirKind::Call { callee, args, subst, .. } => {
+        HirKind::Call {
+            callee,
+            args,
+            subst,
+            ..
+        } => {
             if let HirKind::Global(name) = &callee.kind {
                 if generics.contains(name) && subst.is_none() {
                     let function = ctx.0.clone();
-                    ctx.1.violations.push(Violation { function, message: format!("call to generic function '{name}' has no resolved type arguments") });
+                    ctx.1.violations.push(Violation {
+                        function,
+                        message: format!(
+                            "call to generic function '{name}' has no resolved type arguments"
+                        ),
+                    });
                 }
             }
             if let HirKind::Global(name) = &callee.kind {
@@ -1017,7 +1418,11 @@ fn verify_expr(e: &HirExpr, generics: &HashSet<String>, ctx: &mut Ctx) {
                 verify_block(f, generics, ctx);
             }
         }
-        HirKind::Block(b) | HirKind::Loop(b) | HirKind::Spawn(b) | HirKind::SpawnScope(b) | HirKind::Lambda(_, b) => verify_block(b, generics, ctx),
+        HirKind::Block(b)
+        | HirKind::Loop(b)
+        | HirKind::Spawn(b)
+        | HirKind::SpawnScope(b)
+        | HirKind::Lambda(_, b) => verify_block(b, generics, ctx),
         HirKind::List(v) | HirKind::Set(v) => {
             for x in v {
                 go(x, ctx);
@@ -1054,7 +1459,16 @@ fn verify_expr(e: &HirExpr, generics: &HashSet<String>, ctx: &mut Ctx) {
                 go(c, ctx);
             }
         }
-        HirKind::Int(_) | HirKind::Sized(..) | HirKind::Float(_) | HirKind::Float32(_) | HirKind::Str(_) | HirKind::Char(_) | HirKind::Bool(_) | HirKind::Local(_) | HirKind::Global(_) | HirKind::EmptyCollection(..) => {}
+        HirKind::Int(_)
+        | HirKind::Sized(..)
+        | HirKind::Float(_)
+        | HirKind::Float32(_)
+        | HirKind::Str(_)
+        | HirKind::Char(_)
+        | HirKind::Bool(_)
+        | HirKind::Local(_)
+        | HirKind::Global(_)
+        | HirKind::EmptyCollection(..) => {}
     }
 }
 
@@ -1062,9 +1476,24 @@ fn verify_expr(e: &HirExpr, generics: &HashSet<String>, ctx: &mut Ctx) {
 pub fn dump(program: &HirProgram) -> String {
     let mut out = String::new();
     for f in &program.functions {
-        let generics = if f.generics.is_empty() { String::new() } else { format!("<{}>", f.generics.join(", ")) };
-        let params: Vec<String> = f.params.iter().map(|(n, t)| format!("{n}: {}", t.describe())).collect();
-        let _ = writeln!(out, "fn {}{}({}) -> {}", f.name, generics, params.join(", "), f.ret.describe());
+        let generics = if f.generics.is_empty() {
+            String::new()
+        } else {
+            format!("<{}>", f.generics.join(", "))
+        };
+        let params: Vec<String> = f
+            .params
+            .iter()
+            .map(|(n, t)| format!("{n}: {}", t.describe()))
+            .collect();
+        let _ = writeln!(
+            out,
+            "fn {}{}({}) -> {}",
+            f.name,
+            generics,
+            params.join(", "),
+            f.ret.describe()
+        );
         dump_block(&f.body, 1, &mut out);
         out.push('\n');
     }
@@ -1078,17 +1507,39 @@ fn pad(depth: usize) -> String {
 fn dump_block(b: &HirBlock, depth: usize, out: &mut String) {
     for s in &b.stmts {
         match s {
-            HirStmt::Let { name, mutable, value, .. } => {
-                let _ = writeln!(out, "{}{} {name} = {}", pad(depth), if *mutable { "let mut" } else { "let" }, one_line(value));
+            HirStmt::Let {
+                name,
+                mutable,
+                value,
+                ..
+            } => {
+                let _ = writeln!(
+                    out,
+                    "{}{} {name} = {}",
+                    pad(depth),
+                    if *mutable { "let mut" } else { "let" },
+                    one_line(value)
+                );
             }
             HirStmt::Assign { name, value } => {
                 let _ = writeln!(out, "{}{name} := {}", pad(depth), one_line(value));
             }
             HirStmt::FieldAssign { target, value } => {
-                let _ = writeln!(out, "{}{} := {}", pad(depth), one_line(target), one_line(value));
+                let _ = writeln!(
+                    out,
+                    "{}{} := {}",
+                    pad(depth),
+                    one_line(target),
+                    one_line(value)
+                );
             }
             HirStmt::Return(v) => {
-                let _ = writeln!(out, "{}return {}", pad(depth), v.as_ref().map(one_line).unwrap_or_default());
+                let _ = writeln!(
+                    out,
+                    "{}return {}",
+                    pad(depth),
+                    v.as_ref().map(one_line).unwrap_or_default()
+                );
             }
             HirStmt::Break(_) => {
                 let _ = writeln!(out, "{}break", pad(depth));
@@ -1130,11 +1581,20 @@ fn one_line(e: &HirExpr) -> String {
         HirKind::Unary(op, a) => format!("({op:?} {})", one_line(a)),
         HirKind::Binary(op, a, b) => format!("({} {op:?} {})", one_line(a), one_line(b)),
         HirKind::Range(a, k, b, _) => format!("({} {k:?} {})", one_line(a), one_line(b)),
-        HirKind::Call { callee, args, subst, .. } => {
+        HirKind::Call {
+            callee,
+            args,
+            subst,
+            ..
+        } => {
             let args: Vec<String> = args.iter().map(|a| one_line(&a.value)).collect();
             let subst = match subst {
                 Some(s) if !s.types.is_empty() || !s.dims.is_empty() => {
-                    let mut parts: Vec<String> = s.types.iter().map(|(k, v)| format!("{k}={}", v.describe())).collect();
+                    let mut parts: Vec<String> = s
+                        .types
+                        .iter()
+                        .map(|(k, v)| format!("{k}={}", v.describe()))
+                        .collect();
                     parts.sort();
                     format!("<{}>", parts.join(", "))
                 }
@@ -1142,25 +1602,55 @@ fn one_line(e: &HirExpr) -> String {
             };
             format!("{}{subst}({})", one_line(callee), args.join(", "))
         }
-        HirKind::MethodCall { recv, method, args, .. } => {
-            format!("{}.{method}({})", one_line(recv), args.iter().map(|a| one_line(&a.value)).collect::<Vec<_>>().join(", "))
+        HirKind::MethodCall {
+            recv, method, args, ..
+        } => {
+            format!(
+                "{}.{method}({})",
+                one_line(recv),
+                args.iter()
+                    .map(|a| one_line(&a.value))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
         }
         HirKind::Field(a, f) => format!("{}.{f}", one_line(a)),
         HirKind::Index(a, i) => format!("{}[{}]", one_line(a), one_line(i)),
         HirKind::If(c, ..) => format!("if {} {{…}}", one_line(c)),
         HirKind::Block(_) => "{…}".to_string(),
         HirKind::Lambda(p, _) => format!("fn({}) {{…}}", p.join(", ")),
-        HirKind::List(v) => format!("[{}]", v.iter().map(one_line).collect::<Vec<_>>().join(", ")),
-        HirKind::Set(v) => format!("{{{}}}", v.iter().map(one_line).collect::<Vec<_>>().join(", ")),
-        HirKind::Map(v) => format!("[{}]", v.iter().map(|(k, x)| format!("{}: {}", one_line(k), one_line(x))).collect::<Vec<_>>().join(", ")),
+        HirKind::List(v) => format!(
+            "[{}]",
+            v.iter().map(one_line).collect::<Vec<_>>().join(", ")
+        ),
+        HirKind::Set(v) => format!(
+            "{{{}}}",
+            v.iter().map(one_line).collect::<Vec<_>>().join(", ")
+        ),
+        HirKind::Map(v) => format!(
+            "[{}]",
+            v.iter()
+                .map(|(k, x)| format!("{}: {}", one_line(k), one_line(x)))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
         HirKind::EmptyCollection(n, _) => format!("{n}()"),
         HirKind::Try(a, _) => format!("try {}", one_line(a)),
         HirKind::Within(a, b) => format!("({} within {})", one_line(a), one_line(b)),
-        HirKind::Approximately(a, b, t) => format!("({} ≈ {} ± {})", one_line(a), one_line(b), one_line(t)),
+        HirKind::Approximately(a, b, t) => {
+            format!("({} ≈ {} ± {})", one_line(a), one_line(b), one_line(t))
+        }
         HirKind::As(a, t) => format!("({} as {t})", one_line(a)),
         HirKind::Loop(_) => "loop {…}".to_string(),
         HirKind::Record { name, fields, .. } => {
-            format!("{name} {{ {} }}", fields.iter().map(|(n, x)| format!("{n}: {}", one_line(x))).collect::<Vec<_>>().join(", "))
+            format!(
+                "{name} {{ {} }}",
+                fields
+                    .iter()
+                    .map(|(n, x)| format!("{n}: {}", one_line(x)))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
         }
         HirKind::Match(s, arms) => format!("match {} {{ {} arm(s) }}", one_line(s), arms.len()),
         HirKind::Spawn(_) => "spawn {…}".to_string(),

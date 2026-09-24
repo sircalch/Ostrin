@@ -1,7 +1,7 @@
 mod token;
 
-pub use token::{Token, TokenKind};
 use token::keyword_from_str;
+pub use token::{Token, TokenKind};
 
 #[derive(Debug, Clone)]
 pub struct LexError {
@@ -37,7 +37,13 @@ impl<'a> Lexer<'a> {
             let newline_before = self.skip_whitespace_and_comments();
             let (line, col) = (self.line, self.col);
             let Some(c) = self.peek() else {
-                tokens.push(Token { kind: TokenKind::Eof, lexeme: String::new(), line, col, newline_before });
+                tokens.push(Token {
+                    kind: TokenKind::Eof,
+                    lexeme: String::new(),
+                    line,
+                    col,
+                    newline_before,
+                });
                 break;
             };
 
@@ -53,8 +59,16 @@ impl<'a> Lexer<'a> {
                 self.lex_operator_or_punct()?
             };
 
-            let lexeme: String = self.chars[self.token_start(line, col)..self.pos].iter().collect();
-            tokens.push(Token { kind, lexeme, line, col, newline_before });
+            let lexeme: String = self.chars[self.token_start(line, col)..self.pos]
+                .iter()
+                .collect();
+            tokens.push(Token {
+                kind,
+                lexeme,
+                line,
+                col,
+                newline_before,
+            });
         }
         Ok(tokens)
     }
@@ -88,12 +102,16 @@ impl<'a> Lexer<'a> {
         loop {
             match self.peek() {
                 Some(c) if c.is_whitespace() => {
-                    if c == '\n' { saw_newline = true; }
+                    if c == '\n' {
+                        saw_newline = true;
+                    }
                     self.advance();
                 }
                 Some('/') if self.peek_at(1) == Some('/') => {
                     while let Some(c) = self.peek() {
-                        if c == '\n' { break; }
+                        if c == '\n' {
+                            break;
+                        }
                         self.advance();
                     }
                 }
@@ -108,8 +126,13 @@ impl<'a> Lexer<'a> {
                                 self.advance();
                                 break;
                             }
-                            Some('\n') => { saw_newline = true; self.advance(); }
-                            _ => { self.advance(); }
+                            Some('\n') => {
+                                saw_newline = true;
+                                self.advance();
+                            }
+                            _ => {
+                                self.advance();
+                            }
                         }
                     }
                 }
@@ -134,7 +157,11 @@ impl<'a> Lexer<'a> {
         }
         // Scientific notation: `6.022e23`, `1e-9`, `2.5E+3` are Float literals.
         if matches!(self.peek(), Some('e') | Some('E')) {
-            let digit_at = if matches!(self.peek_at(1), Some('+') | Some('-')) { 2 } else { 1 };
+            let digit_at = if matches!(self.peek_at(1), Some('+') | Some('-')) {
+                2
+            } else {
+                1
+            };
             if matches!(self.peek_at(digit_at), Some(c) if c.is_ascii_digit()) {
                 is_float = true;
                 for _ in 0..digit_at {
@@ -146,7 +173,10 @@ impl<'a> Lexer<'a> {
             }
         }
         self.last_token_start = start;
-        let text: String = self.chars[start..self.pos].iter().filter(|c| **c != '_').collect();
+        let text: String = self.chars[start..self.pos]
+            .iter()
+            .filter(|c| **c != '_')
+            .collect();
         // `2.5f32` / `1f32` (single precision) and `2.5f64` / `1f64` (the default width).
         if self.peek() == Some('f') {
             let mut suffix = String::new();
@@ -165,14 +195,22 @@ impl<'a> Lexer<'a> {
                 }
                 self.last_token_start = start;
                 return if suffix == "f32" {
-                    Ok(TokenKind::Float32Literal(text.parse().map_err(|_| self.error("invalid float literal"))?))
+                    Ok(TokenKind::Float32Literal(
+                        text.parse()
+                            .map_err(|_| self.error("invalid float literal"))?,
+                    ))
                 } else {
-                    Ok(TokenKind::FloatLiteral(text.parse().map_err(|_| self.error("invalid float literal"))?))
+                    Ok(TokenKind::FloatLiteral(
+                        text.parse()
+                            .map_err(|_| self.error("invalid float literal"))?,
+                    ))
                 };
             }
         }
         if is_float {
-            let value: f64 = text.parse().map_err(|_| self.error("invalid float literal"))?;
+            let value: f64 = text
+                .parse()
+                .map_err(|_| self.error("invalid float literal"))?;
             Ok(TokenKind::FloatLiteral(value))
         } else {
             // A width suffix (`200u8`, `5i32`) directly after the digits.
@@ -192,7 +230,9 @@ impl<'a> Lexer<'a> {
                         self.advance();
                     }
                     self.last_token_start = start;
-                    let value: i64 = text.parse().map_err(|_| self.error("invalid integer literal"))?;
+                    let value: i64 = text
+                        .parse()
+                        .map_err(|_| self.error("invalid integer literal"))?;
                     return Ok(TokenKind::IntLiteral(value));
                 }
                 if let Some(kind) = crate::ast::IntKind::from_suffix(&suffix) {
@@ -200,7 +240,9 @@ impl<'a> Lexer<'a> {
                         self.advance();
                     }
                     self.last_token_start = start;
-                    let value: i128 = text.parse().map_err(|_| self.error("invalid integer literal"))?;
+                    let value: i128 = text
+                        .parse()
+                        .map_err(|_| self.error("invalid integer literal"))?;
                     return Ok(TokenKind::SizedIntLiteral(value, kind));
                 }
             }
@@ -208,8 +250,13 @@ impl<'a> Lexer<'a> {
             match text.parse::<i64>() {
                 Ok(value) => Ok(TokenKind::IntLiteral(value)),
                 Err(_) => {
-                    let value: u64 = text.parse().map_err(|_| self.error("invalid integer literal"))?;
-                    Ok(TokenKind::SizedIntLiteral(value as i128, crate::ast::IntKind::U64))
+                    let value: u64 = text
+                        .parse()
+                        .map_err(|_| self.error("invalid integer literal"))?;
+                    Ok(TokenKind::SizedIntLiteral(
+                        value as i128,
+                        crate::ast::IntKind::U64,
+                    ))
                 }
             }
         }
@@ -223,12 +270,18 @@ impl<'a> Lexer<'a> {
         loop {
             match self.peek() {
                 None => return Err(self.error("unterminated string literal")),
-                Some('"') => { self.advance(); break; }
+                Some('"') => {
+                    self.advance();
+                    break;
+                }
                 Some('\\') => {
                     self.advance();
                     value.push(self.lex_escape()?);
                 }
-                Some(c) => { value.push(c); self.advance(); }
+                Some(c) => {
+                    value.push(c);
+                    self.advance();
+                }
             }
         }
         Ok(TokenKind::StringLiteral(value))
@@ -240,8 +293,14 @@ impl<'a> Lexer<'a> {
         self.advance();
         let c = match self.peek() {
             None => return Err(self.error("unterminated char literal")),
-            Some('\\') => { self.advance(); self.lex_escape()? }
-            Some(c) => { self.advance(); c }
+            Some('\\') => {
+                self.advance();
+                self.lex_escape()?
+            }
+            Some(c) => {
+                self.advance();
+                c
+            }
         };
         if self.peek() != Some('\'') {
             return Err(self.error("unterminated char literal"));
@@ -271,7 +330,8 @@ impl<'a> Lexer<'a> {
                     return Err(self.error("unterminated unicode escape"));
                 }
                 self.advance();
-                let code = u32::from_str_radix(&hex, 16).map_err(|_| self.error("invalid unicode escape"))?;
+                let code = u32::from_str_radix(&hex, 16)
+                    .map_err(|_| self.error("invalid unicode escape"))?;
                 char::from_u32(code).ok_or_else(|| self.error("invalid unicode code point"))
             }
             _ => Err(self.error("invalid escape sequence")),
@@ -295,7 +355,14 @@ impl<'a> Lexer<'a> {
         use TokenKind::*;
         let kind = match c {
             '+' => Plus,
-            '-' => if self.peek() == Some('>') { self.advance(); Arrow } else { Minus },
+            '-' => {
+                if self.peek() == Some('>') {
+                    self.advance();
+                    Arrow
+                } else {
+                    Minus
+                }
+            }
             '*' => Star,
             '@' => At,
             '/' => Slash,
@@ -304,17 +371,48 @@ impl<'a> Lexer<'a> {
             '|' => Pipe,
             '&' => Amp,
             '=' => {
-                if self.peek() == Some('=') { self.advance(); EqEq }
-                else if self.peek() == Some('>') { self.advance(); FatArrow }
-                else { Eq }
+                if self.peek() == Some('=') {
+                    self.advance();
+                    EqEq
+                } else if self.peek() == Some('>') {
+                    self.advance();
+                    FatArrow
+                } else {
+                    Eq
+                }
             }
             '!' => {
-                if self.peek() == Some('=') { self.advance(); NotEq }
-                else { return Err(self.error("unexpected character '!'")); }
+                if self.peek() == Some('=') {
+                    self.advance();
+                    NotEq
+                } else {
+                    return Err(self.error("unexpected character '!'"));
+                }
             }
-            '<' => if self.peek() == Some('=') { self.advance(); LtEq } else { Lt },
-            '>' => if self.peek() == Some('=') { self.advance(); GtEq } else { Gt },
-            ':' => if self.peek() == Some(':') { self.advance(); ColonColon } else { Colon },
+            '<' => {
+                if self.peek() == Some('=') {
+                    self.advance();
+                    LtEq
+                } else {
+                    Lt
+                }
+            }
+            '>' => {
+                if self.peek() == Some('=') {
+                    self.advance();
+                    GtEq
+                } else {
+                    Gt
+                }
+            }
+            ':' => {
+                if self.peek() == Some(':') {
+                    self.advance();
+                    ColonColon
+                } else {
+                    Colon
+                }
+            }
             ',' => Comma,
             '.' => Dot,
             '(' => LParen,
@@ -329,7 +427,11 @@ impl<'a> Lexer<'a> {
     }
 
     fn error(&self, message: &str) -> LexError {
-        LexError { message: message.to_string(), line: self.line, col: self.col }
+        LexError {
+            message: message.to_string(),
+            line: self.line,
+            col: self.col,
+        }
     }
 }
 

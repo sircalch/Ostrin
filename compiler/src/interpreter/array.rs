@@ -26,7 +26,11 @@ fn fail<T>(message: impl Into<String>) -> Res<T> {
 }
 
 pub fn make(shape: Vec<usize>, data: Vec<Value>) -> Value {
-    Value::Array(Rc::new(RefCell::new(ArrayData { shape, data, unit: None })))
+    Value::Array(Rc::new(RefCell::new(ArrayData {
+        shape,
+        data,
+        unit: None,
+    })))
 }
 
 fn list_of(values: Vec<Value>) -> Value {
@@ -34,13 +38,19 @@ fn list_of(values: Vec<Value>) -> Value {
 }
 
 fn shape_arg(value: &Value) -> Res<Vec<usize>> {
-    let Value::List(items) = value else { return fail("an array shape must be a List<Int>") };
+    let Value::List(items) = value else {
+        return fail("an array shape must be a List<Int>");
+    };
     let mut shape = Vec::new();
     for item in items.borrow().iter() {
         match item {
             Value::Int(n) if *n >= 1 => shape.push(*n as usize),
             Value::Int(n) => return fail(format!("array dimensions must be at least 1, got {n}")),
-            other => return fail(format!("an array shape must hold Int values, got '{other}'")),
+            other => {
+                return fail(format!(
+                    "an array shape must hold Int values, got '{other}'"
+                ))
+            }
         }
     }
     if shape.is_empty() {
@@ -74,7 +84,9 @@ pub fn from_list(value: &Value) -> Res<Value> {
                 }
             };
         }
-        let Value::List(items) = v else { return fail("array(...) needs lists nested to the same depth") };
+        let Value::List(items) = v else {
+            return fail("array(...) needs lists nested to the same depth");
+        };
         let items = items.borrow();
         if items.len() != shape[depth] {
             return fail("array(...) needs rectangular nested lists (all rows the same length)");
@@ -104,7 +116,10 @@ pub fn arange(start: i64, stop: i64) -> Res<Value> {
     if stop <= start {
         return fail("arange needs start < stop");
     }
-    Ok(make(vec![(stop - start) as usize], (start..stop).map(Value::Int).collect()))
+    Ok(make(
+        vec![(stop - start) as usize],
+        (start..stop).map(Value::Int).collect(),
+    ))
 }
 
 pub fn linspace(a: f64, b: f64, n: i64) -> Res<Value> {
@@ -130,8 +145,16 @@ fn broadcast_shape(a: &[usize], b: &[usize]) -> Res<Vec<usize>> {
     let rank = a.len().max(b.len());
     let mut out = vec![0; rank];
     for i in 0..rank {
-        let da = if i < rank - a.len() { 1 } else { a[i - (rank - a.len())] };
-        let db = if i < rank - b.len() { 1 } else { b[i - (rank - b.len())] };
+        let da = if i < rank - a.len() {
+            1
+        } else {
+            a[i - (rank - a.len())]
+        };
+        let db = if i < rank - b.len() {
+            1
+        } else {
+            b[i - (rank - b.len())]
+        };
         out[i] = if da == db {
             da
         } else if da == 1 {
@@ -139,7 +162,9 @@ fn broadcast_shape(a: &[usize], b: &[usize]) -> Res<Vec<usize>> {
         } else if db == 1 {
             da
         } else {
-            return fail(format!("shape mismatch: {a:?} and {b:?} can't be broadcast together"));
+            return fail(format!(
+                "shape mismatch: {a:?} and {b:?} can't be broadcast together"
+            ));
         };
     }
     Ok(out)
@@ -168,7 +193,21 @@ fn coords_of(mut linear: usize, shape: &[usize]) -> Vec<usize> {
 
 /// `+ - * /` between two arrays (broadcast) or an array and a scalar.
 pub fn binary(op: BinOp, lv: Value, rv: Value) -> Res<Value> {
-    if !matches!(op, BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Eq | BinOp::NotEq | BinOp::Lt | BinOp::Gt | BinOp::LtEq | BinOp::GtEq | BinOp::And | BinOp::Or) {
+    if !matches!(
+        op,
+        BinOp::Add
+            | BinOp::Sub
+            | BinOp::Mul
+            | BinOp::Div
+            | BinOp::Eq
+            | BinOp::NotEq
+            | BinOp::Lt
+            | BinOp::Gt
+            | BinOp::LtEq
+            | BinOp::GtEq
+            | BinOp::And
+            | BinOp::Or
+    ) {
         return fail("only + - * / comparisons and and/or are defined on arrays");
     }
     match (&lv, &rv) {
@@ -187,12 +226,20 @@ pub fn binary(op: BinOp, lv: Value, rv: Value) -> Res<Value> {
         }
         (Value::Array(a), scalar) => {
             let a = a.borrow();
-            let data = a.data.iter().map(|x| eval_binary_builtin(op, x.clone(), scalar.clone())).collect::<Res<Vec<_>>>()?;
+            let data = a
+                .data
+                .iter()
+                .map(|x| eval_binary_builtin(op, x.clone(), scalar.clone()))
+                .collect::<Res<Vec<_>>>()?;
             Ok(make(a.shape.clone(), data))
         }
         (scalar, Value::Array(b)) => {
             let b = b.borrow();
-            let data = b.data.iter().map(|y| eval_binary_builtin(op, scalar.clone(), y.clone())).collect::<Res<Vec<_>>>()?;
+            let data = b
+                .data
+                .iter()
+                .map(|y| eval_binary_builtin(op, scalar.clone(), y.clone()))
+                .collect::<Res<Vec<_>>>()?;
             Ok(make(b.shape.clone(), data))
         }
         _ => unreachable!("binary() is only called with at least one array"),
@@ -200,7 +247,9 @@ pub fn binary(op: BinOp, lv: Value, rv: Value) -> Res<Value> {
 }
 
 pub fn negate(value: &Value) -> Res<Value> {
-    let Value::Array(a) = value else { return fail("cannot negate this value") };
+    let Value::Array(a) = value else {
+        return fail("cannot negate this value");
+    };
     let a = a.borrow();
     let data = a
         .data
@@ -218,11 +267,17 @@ pub fn negate(value: &Value) -> Res<Value> {
 
 fn offset(shape: &[usize], indices: &[Value]) -> Res<usize> {
     if indices.len() != shape.len() {
-        return fail(format!("this array has {} dimension(s), but {} index(es) were given", shape.len(), indices.len()));
+        return fail(format!(
+            "this array has {} dimension(s), but {} index(es) were given",
+            shape.len(),
+            indices.len()
+        ));
     }
     let mut linear = 0;
     for (dim, index) in shape.iter().zip(indices) {
-        let Value::Int(i) = index else { return fail("array indices must be Int") };
+        let Value::Int(i) = index else {
+            return fail("array indices must be Int");
+        };
         if *i < 0 || (*i as usize) >= *dim {
             return fail(format!("index out of bounds: {i}"));
         }
@@ -234,7 +289,9 @@ fn offset(shape: &[usize], indices: &[Value]) -> Res<usize> {
 pub fn index1(array: &Rc<RefCell<ArrayData>>, index: i64) -> Res<Value> {
     let a = array.borrow();
     if a.shape.len() != 1 {
-        return fail("a[i] needs a one-dimensional array; use a.get(i, j, ...) for more dimensions");
+        return fail(
+            "a[i] needs a one-dimensional array; use a.get(i, j, ...) for more dimensions",
+        );
     }
     if index < 0 || index as usize >= a.shape[0] {
         return fail(format!("index out of bounds: {index}"));
@@ -254,7 +311,11 @@ fn accumulate(op: BinOp, items: impl Iterator<Item = Value>) -> Res<Value> {
 fn ordered(pick_less: bool, items: &[Value]) -> Res<Value> {
     let mut best = items[0].clone();
     for item in &items[1..] {
-        let better = eval_binary_builtin(if pick_less { BinOp::Lt } else { BinOp::Gt }, item.clone(), best.clone())?;
+        let better = eval_binary_builtin(
+            if pick_less { BinOp::Lt } else { BinOp::Gt },
+            item.clone(),
+            best.clone(),
+        )?;
         if matches!(better, Value::Bool(true)) {
             best = item.clone();
         }
@@ -263,10 +324,16 @@ fn ordered(pick_less: bool, items: &[Value]) -> Res<Value> {
 }
 
 /// Methods on an array receiver; `args` are already evaluated.
-pub fn call_method(receiver: &Rc<RefCell<ArrayData>>, method: &str, args: Vec<Value>) -> Res<Value> {
+pub fn call_method(
+    receiver: &Rc<RefCell<ArrayData>>,
+    method: &str,
+    args: Vec<Value>,
+) -> Res<Value> {
     let a = receiver.borrow();
     match method {
-        "shape" => Ok(list_of(a.shape.iter().map(|d| Value::Int(*d as i64)).collect())),
+        "shape" => Ok(list_of(
+            a.shape.iter().map(|d| Value::Int(*d as i64)).collect(),
+        )),
         "rank" => Ok(Value::Int(a.shape.len() as i64)),
         "size" | "length" | "count" => Ok(Value::Int(a.data.len() as i64)),
         "sum" => accumulate(BinOp::Add, a.data.iter().cloned()),
@@ -286,7 +353,9 @@ pub fn call_method(receiver: &Rc<RefCell<ArrayData>>, method: &str, args: Vec<Va
         "get" => Ok(a.data[offset(&a.shape, &args)?].clone()),
         "set" => {
             drop(a);
-            let (value, indices) = args.split_last().ok_or_else(|| RuntimeError::Error("set needs indices and a value".to_string()))?;
+            let (value, indices) = args
+                .split_last()
+                .ok_or_else(|| RuntimeError::Error("set needs indices and a value".to_string()))?;
             let mut a = receiver.borrow_mut();
             let at = offset(&a.shape, indices)?;
             a.data[at] = value.clone();
@@ -295,7 +364,10 @@ pub fn call_method(receiver: &Rc<RefCell<ArrayData>>, method: &str, args: Vec<Va
         "reshape" => {
             let shape = shape_arg(&args[0])?;
             if total(&shape) != a.data.len() {
-                return fail(format!("cannot reshape an array of {} element(s) to {shape:?}", a.data.len()));
+                return fail(format!(
+                    "cannot reshape an array of {} element(s) to {shape:?}",
+                    a.data.len()
+                ));
             }
             Ok(make(shape, a.data.clone()))
         }
@@ -317,18 +389,32 @@ pub fn call_method(receiver: &Rc<RefCell<ArrayData>>, method: &str, args: Vec<Va
             if a.shape.len() != 2 {
                 return fail(format!("{method} needs a two-dimensional array"));
             }
-            let Value::Int(i) = &args[0] else { return fail(format!("{method} expects an Int index")) };
+            let Value::Int(i) = &args[0] else {
+                return fail(format!("{method} expects an Int index"));
+            };
             let (rows, cols) = (a.shape[0] as i64, a.shape[1] as i64);
-            let (limit, count) = if method == "row" { (rows, cols) } else { (cols, rows) };
+            let (limit, count) = if method == "row" {
+                (rows, cols)
+            } else {
+                (cols, rows)
+            };
             if *i < 0 || *i >= limit {
                 return fail(format!("index out of bounds: {i}"));
             }
             let data = (0..count)
-                .map(|k| if method == "row" { a.data[(*i * cols + k) as usize].clone() } else { a.data[(k * cols + *i) as usize].clone() })
+                .map(|k| {
+                    if method == "row" {
+                        a.data[(*i * cols + k) as usize].clone()
+                    } else {
+                        a.data[(k * cols + *i) as usize].clone()
+                    }
+                })
                 .collect();
             Ok(make(vec![count as usize], data))
         }
-        "var" | "std" | "sample_var" | "sample_std" | "median" | "percentile" => stats_method(&a, method, &args),
+        "var" | "std" | "sample_var" | "sample_std" | "median" | "percentile" => {
+            stats_method(&a, method, &args)
+        }
         "cumsum" => {
             let mut data = Vec::with_capacity(a.data.len());
             let mut acc = a.data[0].clone();
@@ -346,7 +432,8 @@ pub fn call_method(receiver: &Rc<RefCell<ArrayData>>, method: &str, args: Vec<Va
             let mut data = a.data.clone();
             let mut failure = None;
             data.sort_by(|x, y| {
-                let less = |p: &Value, q: &Value| eval_binary_builtin(BinOp::Lt, p.clone(), q.clone());
+                let less =
+                    |p: &Value, q: &Value| eval_binary_builtin(BinOp::Lt, p.clone(), q.clone());
                 match (less(x, y), less(y, x)) {
                     (Ok(Value::Bool(true)), _) => std::cmp::Ordering::Less,
                     (Ok(_), Ok(Value::Bool(true))) => std::cmp::Ordering::Greater,
@@ -387,12 +474,17 @@ pub fn call_method(receiver: &Rc<RefCell<ArrayData>>, method: &str, args: Vec<Va
             Ok(make(vec![c, r], data))
         }
         "sum_axis" => {
-            let Value::Int(axis) = &args[0] else { return fail("sum_axis expects an Int axis") };
+            let Value::Int(axis) = &args[0] else {
+                return fail("sum_axis expects an Int axis");
+            };
             if a.shape.len() < 2 {
                 return fail("sum_axis needs at least two dimensions");
             }
             if *axis < 0 || *axis as usize >= a.shape.len() {
-                return fail(format!("axis {axis} is out of range for {} dimension(s)", a.shape.len()));
+                return fail(format!(
+                    "axis {axis} is out of range for {} dimension(s)",
+                    a.shape.len()
+                ));
             }
             let axis = *axis as usize;
             let mut out_shape = a.shape.clone();
@@ -415,24 +507,34 @@ pub fn call_method(receiver: &Rc<RefCell<ArrayData>>, method: &str, args: Vec<Va
             Ok(make(out_shape, data))
         }
         "dot" => {
-            let Value::Array(other) = &args[0] else { return fail("dot expects an array") };
+            let Value::Array(other) = &args[0] else {
+                return fail("dot expects an array");
+            };
             let b = other.borrow();
             if a.shape.len() != 1 || b.shape.len() != 1 || a.shape[0] != b.shape[0] {
                 return fail("dot needs two one-dimensional arrays of the same length");
             }
-            let products = a.data.iter().zip(b.data.iter()).map(|(x, y)| eval_binary_builtin(BinOp::Mul, x.clone(), y.clone())).collect::<Res<Vec<_>>>()?;
+            let products = a
+                .data
+                .iter()
+                .zip(b.data.iter())
+                .map(|(x, y)| eval_binary_builtin(BinOp::Mul, x.clone(), y.clone()))
+                .collect::<Res<Vec<_>>>()?;
             accumulate(BinOp::Add, products.into_iter())
         }
         "matmul" => {
-            let Value::Array(other) = &args[0] else { return fail("matmul expects an array") };
+            let Value::Array(other) = &args[0] else {
+                return fail("matmul expects an array");
+            };
             let b = other.borrow();
             // A vector on the right is a column (result: vector of length m); on the left, a row (result: length n).
-            let (a_shape, b_shape, out_shape): (Vec<usize>, Vec<usize>, Option<Vec<usize>>) = match (a.shape.len(), b.shape.len()) {
-                (2, 2) => (a.shape.clone(), b.shape.clone(), None),
-                (2, 1) => (a.shape.clone(), vec![b.shape[0], 1], Some(vec![a.shape[0]])),
-                (1, 2) => (vec![1, a.shape[0]], b.shape.clone(), Some(vec![b.shape[1]])),
-                _ => (Vec::new(), Vec::new(), None),
-            };
+            let (a_shape, b_shape, out_shape): (Vec<usize>, Vec<usize>, Option<Vec<usize>>) =
+                match (a.shape.len(), b.shape.len()) {
+                    (2, 2) => (a.shape.clone(), b.shape.clone(), None),
+                    (2, 1) => (a.shape.clone(), vec![b.shape[0], 1], Some(vec![a.shape[0]])),
+                    (1, 2) => (vec![1, a.shape[0]], b.shape.clone(), Some(vec![b.shape[1]])),
+                    _ => (Vec::new(), Vec::new(), None),
+                };
             if a_shape.len() != 2 || b_shape.len() != 2 || a_shape[1] != b_shape[0] {
                 return fail(format!("matmul needs (m, k) x (k, n) matrices (or a matrix and a vector), got {:?} and {:?}", a.shape, b.shape));
             }
@@ -442,7 +544,11 @@ pub fn call_method(receiver: &Rc<RefCell<ArrayData>>, method: &str, args: Vec<Va
                 for j in 0..n {
                     let mut terms = Vec::with_capacity(k);
                     for t in 0..k {
-                        terms.push(eval_binary_builtin(BinOp::Mul, a.data[i * k + t].clone(), b.data[t * n + j].clone())?);
+                        terms.push(eval_binary_builtin(
+                            BinOp::Mul,
+                            a.data[i * k + t].clone(),
+                            b.data[t * n + j].clone(),
+                        )?);
                     }
                     data.push(accumulate(BinOp::Add, terms.into_iter())?);
                 }
@@ -493,7 +599,10 @@ macro_rules! stats_impl {
                     .iter()
                     .map(|v| match v {
                         $unwrap(x) => Ok(*x),
-                        other => fail(format!("expected a {} element, got '{other}'", stringify!($t))),
+                        other => fail(format!(
+                            "expected a {} element, got '{other}'",
+                            stringify!($t)
+                        )),
                     })
                     .collect()
             }
@@ -532,7 +641,11 @@ macro_rules! stats_impl {
             pub fn median(v: &[$t]) -> $t {
                 let s = sorted(v);
                 let n = s.len();
-                if n % 2 == 1 { s[n / 2] } else { (s[n / 2 - 1] + s[n / 2]) / 2.0 }
+                if n % 2 == 1 {
+                    s[n / 2]
+                } else {
+                    (s[n / 2 - 1] + s[n / 2]) / 2.0
+                }
             }
 
             pub fn percentile(v: &[$t], p: f64) -> Res<$t> {
@@ -592,13 +705,17 @@ pub fn stats_method(a: &ArrayData, method: &str, args: &[Value]) -> Res<Value> {
     match a.data.first() {
         Some(Value::Float(_)) => stats64::call(method, a, args),
         Some(Value::F32(_)) => stats32::call(method, a, args),
-        _ => fail(format!("'{method}' needs an array of Float or Float32 (use to_float() on an Int array)")),
+        _ => fail(format!(
+            "'{method}' needs an array of Float or Float32 (use to_float() on an Int array)"
+        )),
     }
 }
 
 /// `cov(a, b)` / `corr(a, b)` on two one-dimensional float arrays.
 pub fn cov_corr(name: &str, a: &Value, b: &Value) -> Res<Value> {
-    let (Value::Array(a), Value::Array(b)) = (a, b) else { return fail(format!("{name} expects two arrays")) };
+    let (Value::Array(a), Value::Array(b)) = (a, b) else {
+        return fail(format!("{name} expects two arrays"));
+    };
     let (a, b) = (a.borrow(), b.borrow());
     if a.shape.len() != 1 || b.shape.len() != 1 {
         return fail(format!("{name} needs two one-dimensional arrays"));
@@ -606,11 +723,19 @@ pub fn cov_corr(name: &str, a: &Value, b: &Value) -> Res<Value> {
     match (a.data.first(), b.data.first()) {
         (Some(Value::Float(_)), Some(Value::Float(_))) => {
             let (x, y) = (stats64::values(&a)?, stats64::values(&b)?);
-            Ok(Value::Float(if name == "cov" { stats64::cov(&x, &y)? } else { stats64::corr(&x, &y)? }))
+            Ok(Value::Float(if name == "cov" {
+                stats64::cov(&x, &y)?
+            } else {
+                stats64::corr(&x, &y)?
+            }))
         }
         (Some(Value::F32(_)), Some(Value::F32(_))) => {
             let (x, y) = (stats32::values(&a)?, stats32::values(&b)?);
-            Ok(Value::F32(if name == "cov" { stats32::cov(&x, &y)? } else { stats32::corr(&x, &y)? }))
+            Ok(Value::F32(if name == "cov" {
+                stats32::cov(&x, &y)?
+            } else {
+                stats32::corr(&x, &y)?
+            }))
         }
         _ => fail(format!("{name} needs two arrays of the same float type")),
     }
@@ -618,10 +743,15 @@ pub fn cov_corr(name: &str, a: &Value, b: &Value) -> Res<Value> {
 
 /// `a[mask]` with an `Array<Bool>` of the same shape: the selected elements, as a vector.
 pub fn index_mask(array: &Rc<RefCell<ArrayData>>, mask: &Value) -> Res<Value> {
-    let Value::Array(mask) = mask else { return fail("a mask must be an Array<Bool>") };
+    let Value::Array(mask) = mask else {
+        return fail("a mask must be an Array<Bool>");
+    };
     let (a, m) = (array.borrow(), mask.borrow());
     if a.shape != m.shape {
-        return fail(format!("mask shape {:?} doesn't match the array shape {:?}", m.shape, a.shape));
+        return fail(format!(
+            "mask shape {:?} doesn't match the array shape {:?}",
+            m.shape, a.shape
+        ));
     }
     let mut data = Vec::new();
     for (x, keep) in a.data.iter().zip(m.data.iter()) {
@@ -644,13 +774,21 @@ pub fn slice(array: &Rc<RefCell<ArrayData>>, lo: i64, hi_exclusive: i64) -> Res<
         return fail("slicing needs a one-dimensional array (use row(i) / col(j) on matrices)");
     }
     if lo < 0 || hi_exclusive > a.shape[0] as i64 || lo >= hi_exclusive {
-        return fail(format!("invalid slice {lo}..{hi_exclusive} for an array of length {}", a.shape[0]));
+        return fail(format!(
+            "invalid slice {lo}..{hi_exclusive} for an array of length {}",
+            a.shape[0]
+        ));
     }
-    Ok(make(vec![(hi_exclusive - lo) as usize], a.data[lo as usize..hi_exclusive as usize].to_vec()))
+    Ok(make(
+        vec![(hi_exclusive - lo) as usize],
+        a.data[lo as usize..hi_exclusive as usize].to_vec(),
+    ))
 }
 
 pub fn not_array(value: &Value) -> Res<Value> {
-    let Value::Array(a) = value else { return fail("cannot negate this value") };
+    let Value::Array(a) = value else {
+        return fail("cannot negate this value");
+    };
     let a = a.borrow();
     let data = a
         .data

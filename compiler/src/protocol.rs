@@ -32,7 +32,10 @@ pub fn read_message<R: BufRead + ?Sized>(reader: &mut R) -> io::Result<Option<Ve
         }
     }
     let length = content_length.ok_or_else(|| {
-        io::Error::new(io::ErrorKind::InvalidData, "message has no Content-Length header")
+        io::Error::new(
+            io::ErrorKind::InvalidData,
+            "message has no Content-Length header",
+        )
     })?;
     let mut body = vec![0_u8; length];
     reader.read_exact(&mut body)?;
