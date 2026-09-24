@@ -5313,3 +5313,14 @@ fn autodiff_package_runs_identically_in_both_backends() {
     let native_text = String::from_utf8_lossy(&native.stdout).to_string();
     assert_eq!(text.lines().collect::<Vec<_>>(), native_text.lines().collect::<Vec<_>>());
 }
+
+#[test]
+fn as_converts_quantities_into_the_target_unit() {
+    // `q as unit` used to relabel the value (`1500 m as km` printed `1500 km`).
+    let out = run(&["--run", &example_path("unit_conversion.ostrin")]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    assert_eq!(
+        stdout(&out).replace("\r\n", "\n"),
+        "1.5 km\n2.5 m\n1.5 h\n40 m/s*s\n0.04 km\n40 m\n3 nm\ntrue\n"
+    );
+}

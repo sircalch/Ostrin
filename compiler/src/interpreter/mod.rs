@@ -2195,9 +2195,15 @@ impl Interpreter {
                 convert_numeric(value, target)
             }
             Expr::As(e, unit_expr) => {
-                let v = as_f64(&self.eval_expr(e, env)?)?;
+                let value = self.eval_expr(e, env)?;
                 if let Expr::Ident(sym) = unit_expr.as_ref().unlocated() {
                     let dim = resolve_unit_expr(sym).map_err(|u| RuntimeError::Error(format!("unknown unit '{u}'")))?;
+                    // A quantity is converted into the target unit; a pure number
+                    // is given that unit (document 01, §3.3–3.4).
+                    let v = match &value {
+                        Value::Quantity(v, _, from) => convert(*v, from, sym)?,
+                        other => as_f64(other)?,
+                    };
                     Ok(Value::Quantity(v, dim, sym.clone()))
                 } else {
                     Err(RuntimeError::Error("'as' expects a unit identifier".to_string()))

@@ -1,0 +1,14 @@
+// `as <unit>` converts a quantity into the target unit and gives a pure number its unit.
+fn main() -> Void {
+    distance = 1500 m
+    print(distance as km)
+    print(250 cm as m)
+    print((90 min) as h)
+    speed = 20 m / 1 s
+    travelled = speed * (2 s)
+    print(travelled)
+    print(travelled as km)
+    print(travelled as m)
+    print(3 as nm)
+    print((1 km as m) == 1000 m)
+}

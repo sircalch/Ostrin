@@ -3846,8 +3846,17 @@ impl<'a> Codegen<'a> {
                     return Err("'as' expects a unit identifier".to_string());
                 };
                 let dim = resolve_unit_expr(sym).map_err(|u| format!("unknown unit '{u}'"))?;
+                let unit = c_string_literal(sym);
+                if matches!(ty, CType::Quantity(_)) {
+                    // Convert the quantity's value into the target unit, as the interpreter does.
+                    let temp = self.next_temp();
+                    return Ok((
+                        format!("({{ Qty {temp} = {code}; (Qty){{ ostrin_convert({temp}.v, {temp}.u, {unit}), {unit} }}; }})"),
+                        CType::Quantity(dim),
+                    ));
+                }
                 let v = self.as_f64_code(&code, &ty)?;
-                Ok((format!("((Qty){{ {v}, {} }})", c_string_literal(sym)), CType::Quantity(dim)))
+                Ok((format!("((Qty){{ {v}, {unit} }})"), CType::Quantity(dim)))
             }
             Expr::Within(value, range) => {
                 let Expr::Range(start, kind, end, _) = range.unlocated() else {

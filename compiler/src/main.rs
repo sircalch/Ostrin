@@ -718,6 +718,7 @@ fn print_help() {
     println!("  --tokens      Print lexer tokens");
     println!("  --new DIR     Create a new project in DIR (manifest, main.ostrin with a test)");
     println!("  --fmt         Print the formatted file (--write to rewrite, --check to verify)");
+    println!("  --test        Run every test_* function in the file or project");
     println!("  --symbols     Print source symbols and signatures");
     println!("  --members     Print type members and local bindings for editor tools");
     println!("  --types       Print inferred expression types for editor tools");
