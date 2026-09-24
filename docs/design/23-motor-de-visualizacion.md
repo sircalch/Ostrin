@@ -72,6 +72,13 @@ scene = viz.scene3d("Surface").labels("x", "y", "z").view(-55.0, 28.0)
 z = viz.grid_of(xs, ys, f)                       // z[i, j] = f(xs[j], ys[i])
 page = viz.grid([a.svg(), b.svg()], 2, 480, 320, title: "Dashboard")
 movie = viz.animate(frames, fps: 12.0)          // frames: List<String> de fig.svg()/scene.svg()
+
+// Movimiento continuo (posiciones calculadas en Ostrin, muestras a pasos iguales de tiempo)
+fig = viz.figure("Péndulo").no_axes().animate(12.0)          // duración del bucle en segundos
+    .rod(0.0, 0.0, xs, ys)                        // segmento desde un punto fijo a un extremo móvil
+    .moving_segment(ax, ay, bx, by)               // segmento con los dos extremos móviles
+    .moving_point(xs, ys, trail: true, size: 7.0) // punto móvil; la estela se dibuja al avanzar
+    .morph(xs, frames)                            // curva que cambia de forma (fila k = paso k)
 ```
 
 Utilidades públicas: `viz.num` (dos decimales, idéntico en todos los backends), `viz.ticks`,
@@ -109,6 +116,35 @@ regla de la web: JavaScript no produce resultados) y el SVG sigue siendo determi
 intérprete, nativo y WASM. Coste: el tamaño crece linealmente con los fotogramas (24 fotogramas 2D
 ≈ 270 kB). Pendiente: reproducir una vez, barra de desplazamiento temporal y exportar vídeo.
 
+## 4.2 Movimiento continuo
+
+`fig.animate(segundos)` convierte una figura en animación. Las marcas de movimiento guardan una
+posición por paso de tiempo, todas calculadas por el programa, y el SVG las interpola con SMIL
+(`<animate attributeName="cx" values="…" dur="12s" repeatCount="indefinite">`). Los atributos
+estáticos llevan la primera muestra, así que un visor sin animación muestra el instante inicial.
+
+- `moving_point`: anima `cx`/`cy`. Con `trail`, el recorrido completo es un `<path>` con
+  `pathLength="1000"` y `stroke-dasharray="1000 1000"`; `stroke-dashoffset` sigue la distancia
+  recorrida en píxeles hasta cada muestra, así que la estela crece al ritmo real del punto (no a
+  velocidad constante).
+- `rod`, `moving_segment`: animan `x2`/`y2` (y `x1`/`y1` si el origen también se mueve).
+- `morph`: una fila de `frames` por paso. Todas las rutas tienen los mismos comandos (`M` + `L`), así
+  que SMIL interpola la forma punto a punto.
+
+Frente a `viz.animate` (fotogramas), el movimiento continuo es suave a cualquier velocidad de
+refresco y mucho más ligero: 12 s de doble péndulo a 60 muestras/s ocupan 72 kB, frente a unos
+270 kB para 24 fotogramas 2D. Los fotogramas siguen siendo la vía para lo que SMIL no puede
+interpolar, como reordenar los triángulos de una superficie 3D que gira.
+
+Ejemplos: `viz_double_pendulum` (rk45 con deriva de energía < 1e-6), `viz_orbits` (Kepler, en UA y
+años), `viz_string` (cuerda pulsada, 25 modos) y la pestaña ODE del Lab (péndulo y retrato de fase
+animados, recalculados en el navegador al mover los controles). `no_axes()` oculta ticks, rejilla y
+marco para escenas tipo "escenario".
+
+Límites: SMIL no se puede pausar sin scripts ni desactivar con `prefers-reduced-motion`; en Chromium
+cada `<svg>` anidado (paneles de `viz.grid`) tiene su propio reloj, que arranca con la carga, así
+que los paneles quedan sincronizados en la reproducción normal.
+
 ## 5. Unidades
 
 `quantity_line(xs, ys)` acepta `List<Quantity<X>>` y `List<Quantity<Y>>`: toma los números en la
@@ -137,6 +173,7 @@ la falta de literales científicos (`1e-9`). Ver `CONTEXTO_PROYECTO.md` §270–
 | 0.2 (parcial, hecho) | tooltips `<title>` con valores y resaltado CSS al pasar el ratón, dentro del SVG y sin scripts; visor web con zoom y desplazamiento en un iframe aislado |
 | 0.2 (resto) | selección enlazada y controles conducidos por Ostrin (requiere un backend con eventos) |
 | 0.3 (parcial, hecho) | animación en bucle con `viz.animate`: fotogramas generados por Ostrin, reproducidos con CSS dentro del SVG |
+| 0.3 (hecho) | movimiento continuo con SMIL: `animate`, `moving_point` con estela, `rod`, `moving_segment`, `morph`; `no_axes` |
 | 0.3 (resto) | reproducir una vez, control temporal, exportar vídeo |
 | 0.4 | volúmenes, isosuperficies, campos vectoriales, cortes; cámaras en perspectiva |
 | 0.5 | backend WebGPU sobre la misma lista de series; PNG/PDF |

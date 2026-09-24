@@ -1,0 +1,40 @@
+// Kepler orbits: Earth, Mars and a comet around the Sun, integrated with rk45
+// (units: AU and years, GM = 4π²) and animated by std.viz. Three years pass in
+// 15 seconds; the comet speeds up near the Sun, as Kepler's second law says.
+import std.numeric
+import std.viz
+
+fn gravity(t: Float, s: Array<Float>) -> Array<Float> {
+    // s = [x, y, vx, vy]
+    gm = 4.0 * pi() * pi()
+    r = sqrt(s[0] * s[0] + s[1] * s[1])
+    k = 0.0 - gm / (r * r * r)
+    array([s[2], s[3], k * s[0], k * s[1]])
+}
+
+/// A body starting at perihelion: distance q (AU), eccentricity e.
+fn orbit(q: Float, e: Float, t: Array<Float>) -> List<Array<Float>> {
+    speed = sqrt(4.0 * pi() * pi() * (1.0 + e) / q)
+    sol = numeric.rk45(gravity, array([q, 0.0, 0.0, speed]), 0.0, t[t.length() - 1], tol: 1e-10)
+    [numeric.interp_all(sol.t, sol.component(0), t), numeric.interp_all(sol.t, sol.component(1), t)]
+}
+
+fn main() -> Void {
+    years = 3.0
+    t = linspace(0.0, years, 901)
+    earth = orbit(0.983, 0.0167, t)
+    mars = orbit(1.381, 0.0934, t)
+    comet = orbit(0.45, 0.75, t)
+    // Kepler's third law: a = q / (1 - e), T = a^1.5 years.
+    a = 0.45 / 0.25
+    print("comet: a = " + viz.num(a) + " AU, period " + viz.num(exp(1.5 * ln(a))) + " years")
+    print("Earth after one year: x = " + viz.num(earth[0][300]) + " AU")
+    fig = viz.figure("Kepler orbits").describe("rk45 in AU and years · 3 years in 15 s · the comet (e = 0.75) is fastest at perihelion")
+        .size(620, 520).xlim(-3.4, 1.9).ylim(-2.2, 2.2).labels("x [AU]", "y [AU]")
+        .animate(15.0)
+        .scatter(array([0.0]), array([0.0]), label: "Sun", size: 9.0, color: "#f59e0b")
+        .moving_point(earth[0], earth[1], label: "Earth", color: "#2563eb", size: 6.0)
+        .moving_point(mars[0], mars[1], label: "Mars", color: "#dc2626", size: 5.0)
+        .moving_point(comet[0], comet[1], label: "comet", color: "#7c3aed", size: 4.5)
+    print(fig.svg())
+}

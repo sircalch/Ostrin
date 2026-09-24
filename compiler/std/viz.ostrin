@@ -83,6 +83,8 @@ pub record Figure {
     mut y0: Float
     mut y1: Float
     mut colorbar: String
+    mut duration: Float
+    mut axes: Bool
 }
 
 pub record Scene3D {
@@ -344,7 +346,9 @@ pub fn figure(title: String) -> Figure {
         x1: 1.0,
         y0: 0.0,
         y1: 1.0,
-        colorbar: ""
+        colorbar: "",
+        duration: 0.0,
+        axes: true
     }
 }
 
@@ -569,6 +573,17 @@ fn render(fig: Figure) -> String {
         } else if s.kind == "vline" {
             xs_lo = if s.xs[0] < xs_lo { s.xs[0] } else { xs_lo }
             xs_hi = if s.xs[0] > xs_hi { s.xs[0] } else { xs_hi }
+        } else if s.kind == "rod" {
+            // A rod spans its fixed-or-moving start (lo, hi) and its moving end (xs, ys).
+            xs_lo = min_of(xs_lo, min_of(s.xs.min(), s.lo.min()))
+            xs_hi = max_of(xs_hi, max_of(s.xs.max(), s.lo.max()))
+            ys_lo = min_of(ys_lo, min_of(s.ys.min(), s.hi.min()))
+            ys_hi = max_of(ys_hi, max_of(s.ys.max(), s.hi.max()))
+        } else if s.kind == "morph" {
+            xs_lo = min_of(xs_lo, s.xs.min())
+            xs_hi = max_of(xs_hi, s.xs.max())
+            ys_lo = min_of(ys_lo, s.grid.min())
+            ys_hi = max_of(ys_hi, s.grid.max())
         } else if s.xs.length() > 0 {
             half = if s.kind == "hist" { s.width / 2.0 } else if s.kind == "bar" { min_gap(s.xs) / 2.0 } else { 0.0 }
             xs_lo = if s.xs.min() - half < xs_lo { s.xs.min() - half } else { xs_lo }
@@ -637,7 +652,14 @@ fn render(fig: Figure) -> String {
     // Grid and ticks.
     xstep = nice_step(x0, x1, 8)
     ystep = nice_step(y0, y1, 6)
-    for v in ticks(x0, x1, 8).to_list() {
+    // No ticks on a stage without axes.
+    mut xticks: List<Float> = []
+    mut yticks: List<Float> = []
+    if fig.axes {
+        xticks = ticks(x0, x1, 8).to_list()
+        yticks = ticks(y0, y1, 6).to_list()
+    }
+    for v in xticks {
         x = left + (v - x0) * sx
         if fig.gridlines and not has_grid {
             out.push(seg(x, top, x, bottom, theme.grid, 1.0, ""))
@@ -645,7 +667,7 @@ fn render(fig: Figure) -> String {
         out.push(seg(x, bottom, x, bottom + 5.0, theme.axis, 1.0, ""))
         out.push(text_at(x, bottom + 18.0, tick_label(v, xstep), "middle", 11, theme.muted, ""))
     }
-    for v in ticks(y0, y1, 6).to_list() {
+    for v in yticks {
         y = bottom - (v - y0) * sy
         if fig.gridlines and not has_grid {
             out.push(seg(left, y, right, y, theme.grid, 1.0, ""))
@@ -663,7 +685,11 @@ fn render(fig: Figure) -> String {
         if not is_grid(s.kind) and not reference {
             index = index + 1
         }
-        out.push(draw_series(s, color, left, bottom, x0, y0, sx, sy, zlo, zhi, theme, top, right))
+        if is_motion(s.kind) {
+            out.push(draw_motion(s, color, fig.duration, left, bottom, x0, y0, sx, sy, theme))
+        } else {
+            out.push(draw_series(s, color, left, bottom, x0, y0, sx, sy, zlo, zhi, theme, top, right))
+        }
     }
     for n in fig.notes {
         out.push(text_at(left + (n.x - x0) * sx, bottom - (n.y - y0) * sy, n.text, "start", 11, theme.text, ""))
@@ -671,8 +697,10 @@ fn render(fig: Figure) -> String {
     out.push("</g>")
 
     // Frame and axis titles.
-    out.push(seg(left, bottom, right, bottom, theme.axis, 1.0, ""))
-    out.push(seg(left, top, left, bottom, theme.axis, 1.0, ""))
+    if fig.axes {
+        out.push(seg(left, bottom, right, bottom, theme.axis, 1.0, ""))
+        out.push(seg(left, top, left, bottom, theme.axis, 1.0, ""))
+    }
     xt = axis_title(fig.xlabel, fig.xunit)
     yt = axis_title(fig.ylabel, fig.yunit)
     if xt != "" {
@@ -942,7 +970,7 @@ fn legend(fig: Figure, left: Float, right: Float, top: Float, bottom: Float, x0:
     for i in 0 until labels.length() {
         cy = y + 14.0 + (i as Float) * 18.0
         k = kinds[i]
-        if k == "scatter" or k == "errorbar" {
+        if k == "scatter" or k == "errorbar" or k == "moving" {
             out = out + "<circle" + attr("cx", num(x + 15.0)) + attr("cy", num(cy)) + attr("r", "4") + attr("fill", colors[i]) + "/>"
         } else if k == "bar" or k == "hist" or k == "band" or k == "area" {
             out = out + "<rect" + attr("x", num(x + 8.0)) + attr("y", num(cy - 5.0)) + attr("width", "14") + attr("height", "10") + attr("fill", colors[i]) + attr("fill-opacity", "0.7") + "/>"
@@ -952,6 +980,143 @@ fn legend(fig: Figure, left: Float, right: Float, top: Float, bottom: Float, x0:
         out = out + text_at(x + 28.0, cy + 4.0, labels[i], "start", 11, theme.text, "")
     }
     out + "</g>"
+}
+
+// ---------------------------------------------------------------- motion
+
+// Animated marks. Ostrin computes every position; the SVG interpolates
+// between them with SMIL (<animate>), which plays wherever the SVG is shown,
+// also as an <img>, without scripts. Positions are samples at equal steps
+// over `fig.animate(seconds)`; the static attributes hold the first sample.
+
+fn min_of(a: Float, b: Float) -> Float {
+    if a < b { a } else { b }
+}
+
+fn max_of(a: Float, b: Float) -> Float {
+    if a > b { a } else { b }
+}
+
+fn is_motion(kind: String) -> Bool {
+    kind == "moving" or kind == "trail" or kind == "rod" or kind == "morph"
+}
+
+/// `<animate>` of one attribute through `values`, looping over `dur` seconds.
+fn animate_attr(name: String, values: List<String>, dur: Float) -> String {
+    "<animate" + attr("attributeName", name) + attr("dur", num(dur) + "s") + attr("repeatCount", "indefinite") +
+        attr("calcMode", "linear") + attr("values", values.join(";")) + "/>"
+}
+
+fn screen_xs(xs: Array<Float>, left: Float, x0: Float, sx: Float) -> List<String> {
+    mut out: List<String> = []
+    for i in 0 until xs.length() {
+        out.push(num(left + (xs[i] - x0) * sx))
+    }
+    out
+}
+
+fn screen_ys(ys: Array<Float>, bottom: Float, y0: Float, sy: Float) -> List<String> {
+    mut out: List<String> = []
+    for i in 0 until ys.length() {
+        out.push(num(bottom - (ys[i] - y0) * sy))
+    }
+    out
+}
+
+fn draw_motion(s: Series, color: String, duration: Float, left: Float, bottom: Float, x0: Float, y0: Float, sx: Float, sy: Float, theme: Theme) -> String {
+    dur = if duration > 0.0 { duration } else { 4.0 }
+    kind = s.kind
+    if kind == "moving" {
+        cx = screen_xs(s.xs, left, x0, sx)
+        cy = screen_ys(s.ys, bottom, y0, sy)
+        "<circle" + attr("cx", cx[0]) + attr("cy", cy[0]) + attr("r", num(s.size)) + attr("fill", color) +
+            attr("stroke", theme.background) + attr("stroke-width", "1.5") + ">" + tip(s.label) +
+            animate_attr("cx", cx, dur) + animate_attr("cy", cy, dur) + "</circle>"
+    } else if kind == "trail" {
+        // The whole path, revealed as the point moves: the dash offset follows
+        // the distance travelled (pathLength normalizes it to 1000).
+        n = s.xs.length()
+        mut travelled: List<Float> = [0.0]
+        mut total = 0.0
+        for i in 1 until n {
+            dx = (s.xs[i] - s.xs[i - 1]) * sx
+            dy = (s.ys[i] - s.ys[i - 1]) * sy
+            total = total + sqrt(dx * dx + dy * dy)
+            travelled.push(total)
+        }
+        mut offsets: List<String> = []
+        for d in travelled {
+            offsets.push(num(1000.0 - (if total > 0.0 { d / total } else { 0.0 }) * 1000.0))
+        }
+        "<path" + attr("d", path_of(s.xs, s.ys, left, bottom, x0, y0, sx, sy)) + attr("fill", "none") + attr("stroke", color) +
+            attr("stroke-width", num(s.width)) + attr("stroke-opacity", "0.55") + attr("stroke-linejoin", "round") +
+            attr("pathLength", "1000") + attr("stroke-dasharray", "1000 1000") + attr("stroke-dashoffset", offsets[0]) + ">" +
+            animate_attr("stroke-dashoffset", offsets, dur) + "</path>"
+    } else if kind == "rod" {
+        x1 = screen_xs(s.lo, left, x0, sx)
+        y1 = screen_ys(s.hi, bottom, y0, sy)
+        x2 = screen_xs(s.xs, left, x0, sx)
+        y2 = screen_ys(s.ys, bottom, y0, sy)
+        fixed = s.lo.length() == 1
+        start = if fixed { "" } else { animate_attr("x1", x1, dur) + animate_attr("y1", y1, dur) }
+        "<line" + attr("x1", x1[0]) + attr("y1", y1[0]) + attr("x2", x2[0]) + attr("y2", y2[0]) + attr("stroke", color) +
+            attr("stroke-width", num(s.width)) + attr("stroke-linecap", "round") + ">" +
+            start + animate_attr("x2", x2, dur) + animate_attr("y2", y2, dur) + "</line>"
+    } else {
+        // morph: one curve per frame (rows of `grid`), same xs; SMIL
+        // interpolates the path between frames point by point.
+        shape = s.grid.shape()
+        mut paths: List<String> = []
+        for k in 0 until shape[0] {
+            paths.push(path_of(s.xs, s.grid.row(k), left, bottom, x0, y0, sx, sy))
+        }
+        "<g class=\"series\">" + tip(s.label) + "<path" + attr("d", paths[0]) + attr("fill", "none") + attr("stroke", color) +
+            attr("stroke-width", num(s.width)) + attr("stroke-linejoin", "round") + attr("stroke-linecap", "round") + ">" +
+            animate_attr("d", paths, dur) + "</path></g>"
+    }
+}
+
+impl Figure {
+    /// Hides ticks, gridlines and the axis frame: a stage for a scene.
+    fn no_axes(mut self) -> Figure {
+        self.axes = false
+        self
+    }
+
+    /// Makes the figure an animation lasting `seconds` (it loops).
+    fn animate(mut self, seconds: Float) -> Figure {
+        self.duration = seconds
+        self
+    }
+
+    /// A point moving through (xs[i], ys[i]), samples at equal time steps.
+    /// With `trail`, its path is drawn as it goes.
+    fn moving_point(mut self, xs: Array<Float>, ys: Array<Float>, label: String = "", color: String = "", size: Float = 7.0, trail: Bool = true) -> Figure {
+        if trail {
+            self.series.push(motion_series("trail", xs, ys, empty(), empty(), empty(), "", color, 1.6, 0.0))
+        }
+        self.add(motion_series("moving", xs, ys, empty(), empty(), empty(), label, color, 2.0, size))
+    }
+
+    /// A segment from a fixed point (x0, y0) to a moving end (xs[i], ys[i]),
+    /// such as a pendulum rod or a spring.
+    fn rod(mut self, x0: Float, y0: Float, xs: Array<Float>, ys: Array<Float>, color: String = "", width: Float = 2.5) -> Figure {
+        self.add(motion_series("rod", xs, ys, array([x0]), array([y0]), empty(), "", color, width, 0.0))
+    }
+
+    /// A segment whose both ends move: from (ax[i], ay[i]) to (bx[i], by[i]).
+    fn moving_segment(mut self, ax: Array<Float>, ay: Array<Float>, bx: Array<Float>, by: Array<Float>, color: String = "", width: Float = 2.5) -> Figure {
+        self.add(motion_series("rod", bx, by, ax, ay, empty(), "", color, width, 0.0))
+    }
+
+    /// A curve that changes shape: row k of `frames` is y over xs at step k.
+    fn morph(mut self, xs: Array<Float>, frames: Array<Float>, label: String = "", color: String = "", width: Float = 2.2) -> Figure {
+        self.add(motion_series("morph", xs, frames.row(0), empty(), empty(), frames, label, color, width, 0.0))
+    }
+}
+
+fn motion_series(kind: String, xs: Array<Float>, ys: Array<Float>, lo: Array<Float>, hi: Array<Float>, grid: Array<Float>, label: String, color: String, width: Float, size: Float) -> Series {
+    Series { kind: kind, xs: xs, ys: ys, zs: empty(), lo: lo, hi: hi, grid: grid, label: label, color: color, width: width, dash: "", size: size, colormap: "viridis", levels: 0 }
 }
 
 // ---------------------------------------------------------------- 3D

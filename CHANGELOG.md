@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Visualization: continuous motion
+- Figures can animate the motion Ostrin computes: `fig.animate(seconds)` with `moving_point`
+  (an optional trail follows the distance actually travelled), `rod`, `moving_segment` and `morph`
+  (a curve that changes shape). The SVG interpolates with SMIL `<animate>`, which plays wherever
+  the SVG is shown, even as an `<img>`, with no scripts. `no_axes()` gives a clean stage.
+- New animated gallery programs: `viz_double_pendulum` (rk45, energy drift below 1e-6),
+  `viz_orbits` (Kepler orbits, AU and years) and `viz_string` (plucked string, 25 modes). The Lab's
+  ODE tab is now an animated pendulum beside its self-drawing phase portrait, recomputed live.
+- `ostrinc --run prog | head` no longer panics when the pipe closes; it exits quietly, as native
+  binaries do.
+
 ### Numerical methods with units
 - `numeric.unit_trapz`, `unit_cumtrapz`, `unit_gradient` and `unit_interp` take
   `Array<Quantity<D>>` and return values with the implied unit: speeds in km/h over minutes
