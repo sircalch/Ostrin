@@ -1,0 +1,16 @@
+// std.viz · lines: three damped oscillators, their envelope and a reference line.
+import std.viz
+
+fn main() -> Void {
+    t = linspace(0.0, 12.0, 300)
+    envelope = exp(t * -0.2)
+    fig = viz.figure("Damped oscillators")
+        .describe("x(t) = exp(-t/5) cos(ω t) for three frequencies")
+        .labels("time t", "displacement x")
+        .band(t, envelope * -1.0, envelope, label: "envelope")
+        .line(t, envelope * cos(t * 1.0), label: "ω = 1")
+        .line(t, envelope * cos(t * 2.0), label: "ω = 2")
+        .line(t, envelope * cos(t * 3.5), label: "ω = 3.5", dash: "6 4")
+        .hline(0.0)
+    print(fig.svg())
+}

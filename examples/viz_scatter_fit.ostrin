@@ -1,0 +1,20 @@
+// std.viz · scatter: noisy calibration data, a least-squares fit and its ±2σ band.
+import std.viz
+
+fn main() -> Void {
+    r = rng(2024)
+    concentration = linspace(0.5, 10.0, 40)
+    signal = concentration * 1.8 + 2.0 + r.randn([40]) * 0.9
+    // linfit returns [slope, intercept, r²].
+    fit = linfit(concentration, signal)
+    predicted = concentration * fit[0] + fit[1]
+    residual = (signal - predicted).std()
+    print("slope " + viz.num(fit[0]) + ", intercept " + viz.num(fit[1]) + ", r2 " + viz.num(fit[2]) + ", residual sd " + viz.num(residual))
+    fig = viz.figure("Sensor calibration")
+        .describe("least-squares fit with a ±2σ band")
+        .labels("glucose [mmol/L]", "signal [mV]")
+        .band(concentration, predicted - residual * 2.0, predicted + residual * 2.0, label: "±2σ")
+        .scatter(concentration, signal, label: "measurements")
+        .line(concentration, predicted, label: "fit")
+    print(fig.svg())
+}

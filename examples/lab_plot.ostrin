@@ -1,0 +1,17 @@
+// Scientific Lab · Plot
+// A damped oscillator computed with arrays and drawn as SVG by std.viz.
+import std.viz
+
+fn main() -> Void {
+    damping = 0.25
+    frequency = 2.0
+    t = linspace(0.0, 10.0, 240)
+    envelope = exp(t * (0.0 - damping))
+    x = envelope * cos(t * frequency)
+    print("samples: " + t.length().to_string() + ", min x = " + viz.num(x.min()))
+    fig = viz.figure("x(t) = exp(-" + damping.to_string() + " t) cos(" + frequency.to_string() + " t)")
+        .labels("time t", "displacement x")
+        .band(t, envelope * -1.0, envelope, label: "envelope")
+        .line(t, x, label: "x(t)")
+    print(fig.svg())
+}

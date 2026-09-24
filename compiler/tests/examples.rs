@@ -5400,3 +5400,39 @@ fn methods_accept_named_and_default_arguments() {
 fn float_literals_accept_scientific_notation() {
     assert_eq!(interpreter_and_native_agree("scientific_literals.ostrin"), "6.02214076\n1.5\n2000\ntrue\n532 nm\n");
 }
+
+fn svg_lines(output: &str) -> Vec<String> {
+    output.lines().map(str::to_string).collect()
+}
+
+#[test]
+fn viz_figures_label_axes_with_the_units_of_their_quantities() {
+    let out = interpreter_and_native_agree("viz_units.ostrin");
+    assert!(out.contains(">time [s]</text>"), "missing x unit: {out}");
+    assert!(out.contains(">speed [km/h]</text>"), "missing converted y unit: {out}");
+    assert!(out.starts_with("top speed 97.91999999999999 km/h\n<svg xmlns=\"http://www.w3.org/2000/svg\""));
+}
+
+#[test]
+fn viz_layouts_keep_one_top_level_svg_element() {
+    // The website extracts a figure from the first "<svg" line to the first
+    // "</svg>" line, so nested panels must close inline.
+    let out = run(&["--run", &example_path("viz_dashboard.ostrin")]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let lines = svg_lines(&stdout(&out));
+    let first = lines.iter().find(|l| l.starts_with("<svg")).expect("an <svg> line");
+    assert!(first.contains("xmlns") && first.contains("width=\"960\""), "the first <svg> line is the whole figure: {first}");
+    assert_eq!(lines.iter().filter(|l| l.as_str() == "</svg>").count(), 1);
+    assert_eq!(stdout(&out).matches("<svg").count(), 5, "four panels inside one figure");
+}
+
+#[test]
+fn viz_3d_scenes_and_heatmaps_render_their_marks() {
+    let surface = stdout(&run(&["--run", &example_path("viz_surface.ostrin")]));
+    // 35 × 35 cells, two triangles each, plus the three axis panels.
+    assert_eq!(surface.matches("<polygon").count(), 35 * 35 * 2 + 3);
+    assert!(surface.contains("linearGradient"), "surface colorbar missing");
+    let heat = stdout(&run(&["--run", &example_path("viz_heatmap.ostrin")]));
+    assert!(heat.matches("<rect").count() > 48 * 48, "heatmap cells missing");
+    assert_eq!(heat.matches("stroke=\"#ffffff\" stroke-width=\"1.2\"").count(), 10, "ten contour levels");
+}

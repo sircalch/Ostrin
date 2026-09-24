@@ -227,7 +227,7 @@ fn mutated_sources_never_crash_the_front_end() {
 /// When you close a gap, lower `MAX_UNKNOWN_EXPRESSIONS` to the new value.
 #[test]
 fn typed_expression_table_does_not_regress() {
-    const MAX_UNKNOWN_EXPRESSIONS: usize = 11;
+    const MAX_UNKNOWN_EXPRESSIONS: usize = 8;
     let (mut total, mut unknown) = (0usize, 0usize);
     for path in examples() {
         if STANDARD_LIBRARY_FIXTURES.contains(&name_of(&path).as_str()) {
@@ -312,7 +312,7 @@ fn native_backend_types_agree_with_the_checker() {
 /// (`ostrinc --hir`) may only go down; lower the limits when a gap is closed.
 #[test]
 fn hir_covers_the_examples_with_known_types() {
-    const MAX_UNKNOWN_NODES: usize = 26;
+    const MAX_UNKNOWN_NODES: usize = 19;
     const MAX_VIOLATIONS: usize = 0;
     let (mut nodes, mut unknown, mut violations) = (0usize, 0usize, Vec::<String>::new());
     for path in examples() {

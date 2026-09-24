@@ -482,6 +482,20 @@ impl Checker {
         }
         replace_self_type_with_type(&mut method.return_type, &owner);
         self.check_function_with_body(&method, &HashMap::new(), &original.body);
+        // The copy's defaults were checked above; the original nodes, which
+        // call sites lower, get their types recorded too (errors already
+        // reported are not repeated).
+        let previous_file = self.current_source_file.clone();
+        self.current_source_file = original.source_file.clone();
+        let reported = self.errors.len();
+        for param in &original.params {
+            if let Some(default) = &param.default {
+                let mut scope: Scope = HashMap::new();
+                self.infer_expr(default, &mut scope);
+            }
+        }
+        self.errors.truncate(reported);
+        self.current_source_file = previous_file;
     }
 
     fn validate_impl(&mut self, implementation: &ImplDecl) {
@@ -1907,7 +1921,13 @@ impl Checker {
                     .get(name)
                     .and_then(|fs| fs.iter().find(|(n, _)| n == field_name).map(|(_, t)| t.clone()))
                     .map(|t| self.resolve_type_in_context(&t))
-                    .filter(|t| matches!(t, Ty::Fn(..)));
+                    .filter(|t| {
+                        // A lambda learns its parameter types, and an empty
+                        // `[]`/`{}` its element type, from the field.
+                        let empty = matches!(value.unlocated(), Expr::ListLiteral(items) | Expr::SetLiteral(items) if items.is_empty())
+                            || matches!(value.unlocated(), Expr::MapLiteral(pairs) if pairs.is_empty());
+                        matches!(t, Ty::Fn(..)) || (empty && !ty_mentions_generic(t))
+                    });
                 (field_name.clone(), self.infer_expr_with_expected(value, declared_fn.as_ref(), scope))
             })
             .collect();
@@ -3345,7 +3365,7 @@ impl Checker {
                 }
             }
             for generic in &candidate.generics {
-                if !method_substitutions.contains_key(&generic.name) {
+                if !method_substitutions.contains_key(&generic.name) && !method_substitutions.contains_key(&format!("#dim:{}", generic.name)) {
                     self.push(
                         "E1042",
                         format!("Cannot infer generic method parameter '{}'.", generic.name),
@@ -3753,7 +3773,17 @@ fn resolve_type_with_type_subst(
             "Char" => Ty::Char,
             "String" => Ty::String,
             "Void" => Ty::Void,
-            "Quantity" if args.len() == 1 => Ty::Quantity(resolve_dimension_with_subst(&args[0], dim_subst)),
+            "Quantity" if args.len() == 1 => {
+                // A generic method's `D: Dimension` is inferred into
+                // `type_subst` as `Quantity<D>` (see `unify_generic_type`).
+                let mut dims = dim_subst.clone();
+                for (k, v) in type_subst {
+                    if let (Some(name), Ty::Quantity(d)) = (k.strip_prefix("#dim:"), v) {
+                        dims.entry(name.to_string()).or_insert_with(|| d.clone());
+                    }
+                }
+                Ty::Quantity(resolve_dimension_with_subst(&args[0], &dims))
+            }
             "List" if args.len() == 1 => Ty::List(Box::new(resolve_type_with_type_subst(&args[0], type_subst, dim_subst))),
             "Map" if args.len() == 2 => Ty::Map(
                 Box::new(resolve_type_with_type_subst(&args[0], type_subst, dim_subst)),
@@ -3823,6 +3853,25 @@ fn unify_generic_type(
             subst.insert(name.clone(), actual.clone());
             Ok(())
         }
+        Type::Named(name, args) if name == "Quantity" && args.len() == 1 => match (&args[0], actual) {
+            (Type::Named(dim, dim_args), Ty::Quantity(actual_dim)) if dim_args.is_empty() && generic_names.contains(dim) => {
+                let bound = Ty::Quantity(actual_dim.clone());
+                let dim = &format!("#dim:{dim}");
+                match subst.get(dim) {
+                    Some(previous) if *previous != bound => Err(format!(
+                        "Generic dimension '{}' was inferred as both '{}' and '{}'.",
+                        dim,
+                        previous.describe(),
+                        bound.describe()
+                    )),
+                    _ => {
+                        subst.insert(dim.clone(), bound);
+                        Ok(())
+                    }
+                }
+            }
+            _ => Ok(()),
+        },
         Type::Named(name, args) if name == "List" && args.len() == 1 => match actual {
             Ty::List(elem) => unify_generic_type(&args[0], elem, generic_names, subst),
             _ => Err(format!("Expected '{}', got '{}'.", resolve_type(param).describe(), actual.describe())),
@@ -4749,9 +4798,28 @@ fn implementation_type_substitutions(
 fn substitute_impl_type_parameters(ty: &mut Type, substitutions: &HashMap<String, Ty>) {
     let type_substitutions: HashMap<String, Type> = substitutions
         .iter()
-        .map(|(name, ty)| (name.clone(), type_from_ty(ty)))
+        .map(|(name, ty)| match (name.strip_prefix("#dim:"), ty) {
+            // A dimension generic stands for the dimension itself, not a Quantity.
+            (Some(dim), Ty::Quantity(d)) => (dim.to_string(), type_from_dimension(d)),
+            _ => (name.clone(), type_from_ty(ty)),
+        })
         .collect();
     replace_type_parameters(ty, &type_substitutions);
+}
+
+fn type_from_dimension(d: &Dimension) -> Type {
+    let mut parts: Vec<(&String, &i32)> = d.iter().collect();
+    parts.sort();
+    let mut result: Option<Type> = None;
+    for (name, exp) in parts {
+        let base = Type::Named(name.clone(), Vec::new());
+        let term = if *exp == 1 { base } else { Type::Pow(Box::new(base), (*exp).into()) };
+        result = Some(match result {
+            None => term,
+            Some(acc) => Type::Mul(Box::new(acc), Box::new(term)),
+        });
+    }
+    result.unwrap_or_else(|| Type::Named("Dimensionless".to_string(), Vec::new()))
 }
 
 fn type_from_ty(ty: &Ty) -> Type {
@@ -5103,5 +5171,17 @@ fn replace_self_type_with_type(ty: &mut Type, owner: &Type) {
 
 /// Methods of `String` (kept in step with `interpreter/strings.rs`).
 const STRING_METHOD_NAMES: &[&str] = &[
-    "length", "is_empty", "trim", "to_upper", "to_lower", "contains", "starts_with", "ends_with", "replace", "split", "lines", "to_int", "to_float",
+    "length", "is_empty", "char_at", "slice", "codepoint", "trim", "to_upper", "to_lower", "contains", "starts_with", "ends_with", "replace", "split", "lines", "to_int", "to_float",
 ];
+
+/// True when a type mentions a generic parameter anywhere inside it.
+fn ty_mentions_generic(ty: &Ty) -> bool {
+    match ty {
+        Ty::Generic(_) => true,
+        Ty::List(t) | Ty::Set(t) => ty_mentions_generic(t),
+        Ty::Map(k, v) => ty_mentions_generic(k) || ty_mentions_generic(v),
+        Ty::Applied(_, args) => args.iter().any(ty_mentions_generic),
+        Ty::Fn(params, ret) => params.iter().any(ty_mentions_generic) || ty_mentions_generic(ret),
+        _ => false,
+    }
+}

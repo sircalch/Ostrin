@@ -1767,6 +1767,8 @@ impl<'a> Codegen<'a> {
     fn gen_generic_method_call(&mut self, gm: GenericMethod<'a>, obj_code: &str, type_args: Option<&[Type]>, args: &[Arg]) -> Result<(String, CType), String> {
         let decl = gm.decl;
         let generics: Vec<String> = decl.generics.iter().map(|g| g.name.clone()).collect();
+        let normalized = normalize_call_args(&decl.params, args, 1)?;
+        let args = normalized.as_deref().unwrap_or(args);
         let (arg_codes, arg_types) = self.gen_args(args)?;
         if arg_codes.len() + 1 != decl.params.len() {
             return Err(format!("method '{}' expects {} argument(s), got {}", decl.name, decl.params.len() - 1, arg_codes.len()));
@@ -2828,8 +2830,11 @@ impl<'a> Codegen<'a> {
                 // tracking, so this backend re-derives it the same way the
                 // interpreter does, from whether `name` is already in scope.
                 if self.lookup(name).is_some() {
+                    // Also inside loops and branches (not inlined lambda
+                    // bodies): a raw pointer copy there left the target
+                    // aliasing a value released at the end of its block.
                     if self.ownership_active
-                        && self.scopes.len() == 2
+                        && self.lambda_depth == 0
                         && existing.as_ref().is_some_and(is_reference_type)
                         && self.owned_local_name_by_str(name).is_some()
                     {
@@ -6527,8 +6532,20 @@ fn normalize_call_args(params: &[Param], args: &[Arg], skip: usize) -> Result<Op
             Arg::Named(n, e) => (Some(n.clone()), e.clone()),
         })
         .collect();
-    crate::hir::arrange_arguments(params, named, Expr::clone)
+    // A default is checked where it is declared (possibly another module),
+    // so its copy drops the source locations that would be looked up in the
+    // caller's file.
+    crate::hir::arrange_arguments(params, named, |p| strip_locations(p.default.as_ref().expect("called for defaulted parameters")))
         .map(|list| Some(list.into_iter().map(Arg::Positional).collect()))
+}
+
+fn strip_locations(expr: &Expr) -> Expr {
+    match expr {
+        Expr::Located(inner, _) => strip_locations(inner),
+        Expr::Unary(op, operand) => Expr::Unary(*op, Box::new(strip_locations(operand))),
+        Expr::Binary(op, left, right) => Expr::Binary(*op, Box::new(strip_locations(left)), Box::new(strip_locations(right))),
+        other => other.clone(),
+    }
 }
 
 /// Matches a variant constructor's arguments to its declared fields:

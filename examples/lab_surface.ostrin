@@ -1,0 +1,23 @@
+// Scientific Lab · 3D
+// A ripple surface z = cos(k r) exp(-r / 4), shaded and projected by std.viz.
+import std.viz
+
+fn main() -> Void {
+    waves = 1.6
+    azimuth = -50.0
+    elevation = 32.0
+    xs = linspace(-8.0, 8.0, 34)
+    mut z = zeros([34, 34])
+    for i in 0 until 34 {
+        for j in 0 until 34 {
+            r = sqrt(xs[i] * xs[i] + xs[j] * xs[j])
+            z.set(i, j, cos(r * waves) * exp(-r / 4.0))
+        }
+    }
+    print("z range: " + viz.num(z.min()) + " to " + viz.num(z.max()))
+    scene = viz.scene3d("Ripple, k = " + waves.to_string())
+        .labels("x", "y", "z")
+        .view(azimuth, elevation)
+        .surface(xs, xs, z, colormap: "magma", label: "z")
+    print(scene.svg())
+}
