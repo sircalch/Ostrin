@@ -31,7 +31,7 @@ jobs:
           set -euo pipefail
           archive="wasi-sdk-${WASI_SDK_VERSION}-x86_64-linux.tar.gz"
           curl --fail --location --retry 3 --output "$archive" \
-            "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-${WASI_SDK_VERSION}/$archive"
+            "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-${WASI_SDK_VERSION%%.*}/$archive"
           printf '%s  %s\n' "$WASI_SDK_SHA256" "$archive" | sha256sum --check
           tar -xzf "$archive"
           sdk="$PWD/wasi-sdk-${WASI_SDK_VERSION}-x86_64-linux"

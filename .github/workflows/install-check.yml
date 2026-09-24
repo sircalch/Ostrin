@@ -1,0 +1,67 @@
+name: Ostrin Installer Check
+
+# Installs a published release on clean runners with the repository installers and runs
+# hello.ostrin with the installed compiler. Run manually after publishing a release
+# (releases created with GITHUB_TOKEN do not trigger other workflows).
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version to install (e.g. 0.1.0, or latest)"
+        required: true
+        default: "latest"
+
+permissions:
+  contents: read
+
+jobs:
+  unix:
+    name: Install (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install with install.sh
+        shell: bash
+        env:
+          VERSION: ${{ github.event.inputs.version }}
+        run: |
+          set -euo pipefail
+          install_dir="$RUNNER_TEMP/ostrin-bin"
+          sh scripts/install.sh --version "$VERSION" --install-dir "$install_dir"
+          echo "$install_dir" >> "$GITHUB_PATH"
+      - name: Run the installed compiler
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          ostrinc --version
+          ostrinc --check "$GITHUB_WORKSPACE/examples/hello.ostrin"
+          output="$(ostrinc --run "$GITHUB_WORKSPACE/examples/hello.ostrin")"
+          grep -Fqx "hola desde Ostrin" <<< "$output"
+
+  windows:
+    name: Install (windows-latest)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install with install.ps1
+        shell: pwsh
+        env:
+          VERSION: ${{ github.event.inputs.version }}
+        run: |
+          $installDir = Join-Path $env:RUNNER_TEMP "ostrin-bin"
+          & ./scripts/install.ps1 -Version $env:VERSION -InstallDir $installDir
+          Add-Content -Path $env:GITHUB_PATH -Value $installDir
+      - name: Run the installed compiler
+        shell: pwsh
+        run: |
+          Set-Location $env:RUNNER_TEMP
+          ostrinc --version
+          ostrinc --check "$env:GITHUB_WORKSPACE/examples/hello.ostrin"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          $output = ostrinc --run "$env:GITHUB_WORKSPACE/examples/hello.ostrin"
+          if ($LASTEXITCODE -ne 0 -or $output -notcontains "hola desde Ostrin") { exit 1 }
