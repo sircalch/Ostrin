@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Build and verify the website/playground
         uses: ./.github/actions/website-verify
 
@@ -31,7 +31,7 @@ jobs:
       OSTRIN_REQUIRE_CC: "1"
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Check Rust formatting
