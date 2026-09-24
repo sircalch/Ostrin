@@ -2,7 +2,7 @@
 
 *Corte: 2026-09-24 · rama `main` · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 219 de integración y 2 unitarias en verde.*
 
-Validación remota: Pages y CI pasaron para `9e31280` en Windows, Linux, macOS y web. La
+Validación remota: Pages y CI pasaron para `770e41c` en Windows, Linux, macOS y web. La
 compuerta oficial exige `cargo fmt --check`, Clippy con el lint `suspicious`, la suite del
 compilador y las comprobaciones del sitio; los workflows de auditoría de dependencias,
 CodeQL, sanitizers nativos y cobertura quedan registrados para el ciclo P5.
@@ -152,7 +152,11 @@ La primera familia de funciones ya se emite desde la IR explícita: funciones es
 familia gestionada `String` convierten temporales SSA en temporales C, preservan división
 entera, aritmética comprobada de enteros de ancho fijo, concatenación/comparación/impresión
 de texto y salida numérica, emiten ramas, recursión, bucles con estado y `phi`, y se cuentan
-por separado en `--native-type-report` como `ir-generated`. Los marcadores de ownership de
+por separado en `--native-type-report` como `ir-generated`; el mismo informe expone ahora
+`hir-generated` y `ast-fallback` para que la retirada del backend legado tenga un contador
+visible. En el corte actual, la suite de ejemplos suma 913 funciones IR, 457 HIR y 1 432
+que aún caen al emisor AST; `native_backend_types_agree_with_the_checker` mantiene 1 432 como
+trinquete y debe bajar cuando una familia migre. Los marcadores de ownership de
 `String`, `List<T>`, los núcleos escalares de `Map<K,V>`/`Set<T>` y `Option<T>` con payload
 escalar o `String` también se consumen al generar C; `Map.get/remove` producen structs
 `Option_<T>` por valor y retienen/transfieren sus strings correctamente. Los `for` sobre rangos

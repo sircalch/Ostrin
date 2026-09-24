@@ -1370,6 +1370,9 @@ pub struct NativeTypeReport {
     pub hir_generated: usize,
     /// Functions whose C body was generated from the explicit IR (see `ir_c.rs`).
     pub ir_generated: usize,
+    /// Functions that still use the legacy AST emitter after IR and HIR reject
+    /// the body. This is the migration debt tracked by the native ratchet.
+    pub ast_fallback: usize,
     /// The same comparison, but for *every* expression node (operands included), by node address.
     pub node_agreed: usize,
     pub node_unchecked: usize,
@@ -9182,7 +9185,10 @@ fn generate_impl(
                 }
                 body = text;
             }
-            None => codegen.gen_function_body(f, &return_type, &mut body)?,
+            None => {
+                codegen.type_report.ast_fallback += 1;
+                codegen.gen_function_body(f, &return_type, &mut body)?;
+            }
         }
         bodies.push((signature, body));
     }
@@ -9231,13 +9237,16 @@ fn generate_impl(
                 codegen.type_report.hir_generated += 1;
                 body = text;
             }
-            None => codegen.gen_callable_body(
-                &decl.params,
-                &decl.body,
-                &return_type,
-                &self_subst,
-                &mut body,
-            )?,
+            None => {
+                codegen.type_report.ast_fallback += 1;
+                codegen.gen_callable_body(
+                    &decl.params,
+                    &decl.body,
+                    &return_type,
+                    &self_subst,
+                    &mut body,
+                )?;
+            }
         }
         bodies.push((signature, body));
     }
@@ -9938,6 +9947,7 @@ fn generate_impl(
                 codegen.type_report.hir_generated += 1;
                 body = text;
             } else {
+                codegen.type_report.ast_fallback += 1;
                 codegen.gen_callable_body(
                     &job.decl.params,
                     &job.decl.body,
