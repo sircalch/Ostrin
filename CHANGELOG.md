@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### Compiler and ownership
+- Hardened the native thread `spawn_scope` ownership regression test against
+  scheduler-dependent ordering: concurrent `main`/`task` and `scope-body`/`scope-task`
+  output is checked as unordered pairs while the join and scope lifecycle markers remain
+  ordered. This keeps CI focused on task-handle cleanup and leak freedom.
 - Lowered monomorphized generic record iterators through IR/C. `HirProgram` now preserves
   the receiver pattern for `impl<T> Iterator<T> for Cursor<T>`, the IR specializes `T` from
   `Cursor<Int>`, and the C emitter resolves `Cursor__Int` fields and `next()` calls. The new

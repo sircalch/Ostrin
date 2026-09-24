@@ -1276,10 +1276,20 @@ fn native_threads_scope_drain_releases_nested_task_handles() {
         "native scope binary failed: {}",
         String::from_utf8_lossy(&native.stderr)
     );
-    assert_eq!(
-        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
-        "main\ntask\n42\nscope-body\nscope-task\n7\n"
-    );
+    let output_lines: Vec<_> = String::from_utf8_lossy(&native.stdout)
+        .replace("\r\n", "\n")
+        .lines()
+        .map(str::to_owned)
+        .collect();
+    assert_eq!(output_lines.len(), 6, "unexpected task output: {output_lines:?}");
+    let mut initial_lines = output_lines[..2].to_vec();
+    initial_lines.sort();
+    assert_eq!(initial_lines, vec!["main", "task"]);
+    assert_eq!(output_lines.get(2).map(String::as_str), Some("42"));
+    assert_eq!(output_lines.last().map(String::as_str), Some("7"));
+    let mut concurrent_lines = output_lines[3..output_lines.len() - 1].to_vec();
+    concurrent_lines.sort();
+    assert_eq!(concurrent_lines, vec!["scope-body", "scope-task"]);
     assert!(
         String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
         "nested spawn_scope task handles should be released: {}",

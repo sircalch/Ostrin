@@ -6491,3 +6491,14 @@ unitarias, 6 diferenciales y 200 de integración. `website/site-data.js` se rege
 ejemplos y 200 pruebas; el script WASI queda en nueve programas. Los iteradores indirectos,
 scopes complejos, agregados genéricos con payloads gestionados y la retirada total del fallback
 siguen pendientes.
+
+## 265. Prueba concurrente con orden parcial — 2026-09-23
+
+CI de `36abf4c` falló en Ubuntu por una expectativa de orden total en
+`native_threads_scope_drain_releases_nested_task_handles`. El programa permite dos pares
+concurrentes: `main`/`task` y `scope-body`/`scope-task`. La prueba exige exactamente seis
+líneas, compara cada par sin imponer orden y mantiene `42` después de `join()` y `7`
+después del drenado del scope. Se conserva la comprobación `live_allocations=0`.
+
+El bloque anterior pasó localmente 2 unitarias, 6 diferenciales y 200 de integración;
+Pages remoto pasó, pero CI requiere validar esta corrección antes de declararse verde.
