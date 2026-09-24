@@ -6396,9 +6396,35 @@ siguiente pieza del ABI de valores de función:
 - `examples/native_hir_closures.ostrin` ahora ejercita una captura escalar y una captura `String`
   materializada, y exige cero `hir-generated`, paridad exacta y `live_allocations=0`.
 
-La frontera restante son closures anidadas o con cuerpos no lineales, handlers locales no inline,
-escapes complejos y el análisis completo de ownership para esos casos; siguen cayendo de forma
-verificable a HIR/AST.
+Las closures anidadas con capturas transitivas ya comparten esa representación: el escaneo de
+nombres libres propaga el valor desde el entorno exterior, y el helper IR anidado genera su propio
+entorno C con retain/release recursivo. La frontera restante son cuerpos no lineales con scopes o
+escapes complejos, handlers locales no inline y el análisis completo de ownership para esos casos;
+siguen cayendo de forma verificable a HIR/AST.
+
+## 262. Capturas transitivas en closures anidadas — 2026-09-23
+
+El primer lowering de `ClosureMake` rechazaba cualquier lambda cuyo cuerpo contuviera otra lambda.
+Eso dejaba sin migrar una forma esencial de funciones de orden superior: una función que devuelve
+un closure que a su vez devuelve otro closure, como `make_scaler` o un factory que conserva un
+`String` del entorno exterior.
+
+- `collect_lambda_locals_expr` ahora recorre una lambda anidada con su propio conjunto de parámetros
+  ligados y propaga sus nombres libres al escaneo de la lambda envolvente. El entorno exterior
+  recibe los valores que vienen de la función padre; el lowering de la lambda exterior los vuelve a
+  encontrar al construir el helper interior.
+- Se retiró el veto global `hir_contains_lambda`: cada cuerpo continúa pasando por el mismo lowering
+  HIR→IR/ownership y `build_closure_helpers` genera recursivamente los adaptadores y destructores
+  C de los helpers anidados.
+- `examples/native_hir_closures.ostrin` ahora cubre una captura transitiva escalar (`k`, `a`) y
+  otra gestionada (`prefix: String`) con llamadas encadenadas. La prueba exige paridad exacta,
+  `ir-generated: 4`, cero HIR fallback y `live_allocations=0`.
+
+Verificación dirigida de este bloque: `--native-type-report` informa 4 funciones IR y 0 HIR;
+`--ir` informa 0 instrucciones opacas, 0 bloques sin terminador y 0 violaciones; el ejemplo
+interpreta y compila nativamente con salida `15`, `value!`, `5`, `23`, `nested ` y leak-check en
+cero. La suite completa del compilador y los gates web/WASM siguen siendo obligatorios antes del
+push.
 
 ## 261. Metadata de la web generada desde el repositorio — 2026-09-23
 

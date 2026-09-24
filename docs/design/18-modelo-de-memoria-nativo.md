@@ -66,11 +66,13 @@ condicionalmente el campo activo y cubren los consumidores básicos de `String.t
 `to_float()`, además de `try` y `try catch` inline, desde la IR. Los wrappers anidados cubren
 constructores y `match` con retain/release recursivo; `unwrap` anidado, patrones más profundos,
    escapes complejos y handlers locales no inline todavía no insertan RC completo por
-   cada copia, retorno, phi o salida de ámbito. Los cierres capturados ya construyen un entorno
-   registrado con destructor, retienen sus capturas y liberan el entorno al último uso. Un alias local de una función global sin entorno
+   cada copia, retorno, phi o salida de ámbito. Los cierres capturados, incluidas las closures
+   anidadas con capturas transitivas, ya construyen entornos registrados con destructor, retienen
+   sus capturas y liberan cada entorno al último uso. Un alias local de una función global sin entorno
 (`handler = recover`) conserva su procedencia y puede bajar como valor `Fn` mediante `ClosureCall`;
 el adaptador nativo usa `env == NULL` y el valor no tiene RC de entorno. Las llamadas indirectas
-de closures con entorno siguen pendientes.
+de closures con entorno ya usa `ClosureCall` y el entorno tipado; siguen pendientes sus formas
+no lineales con scopes o escapes complejos.
 
 - Todo valor por referencia lleva un contador. `retain`/`release` los inserta el compilador **sobre el IR** (no sobre el texto C), en copias de variable, paso a funciones, campos y salida de ámbito.
 - **Análisis de último uso / movimiento** en el IR: si el compilador prueba que un valor no se vuelve a usar, transfiere la propiedad sin tocar el contador (así se recupera el coste cero en el caso común, sin sintaxis nueva).

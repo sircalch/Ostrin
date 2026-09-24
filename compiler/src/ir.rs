@@ -400,7 +400,7 @@ impl Builder {
         let Ty::Fn(param_tys, ret) = &expression.ty else {
             return self.opaque_lambda(expression, params);
         };
-        if params.len() != param_tys.len() || hir_contains_lambda(body) {
+        if params.len() != param_tys.len() {
             return self.opaque_lambda(expression, params);
         }
 
@@ -2353,95 +2353,6 @@ fn lower_function(function: &HirFunction, iterator_items: &HashMap<String, Ty>) 
     builder.function
 }
 
-fn hir_contains_lambda(block: &HirBlock) -> bool {
-    block.stmts.iter().any(hir_stmt_contains_lambda)
-        || block.tail.as_deref().is_some_and(hir_expr_contains_lambda)
-}
-
-fn hir_stmt_contains_lambda(statement: &HirStmt) -> bool {
-    match statement {
-        HirStmt::Let { value, .. }
-        | HirStmt::Assign { value, .. }
-        | HirStmt::Expr(value) => hir_expr_contains_lambda(value),
-        HirStmt::FieldAssign { target, value } => {
-            hir_expr_contains_lambda(target) || hir_expr_contains_lambda(value)
-        }
-        HirStmt::Return(value) | HirStmt::Break(value) => {
-            value.as_ref().is_some_and(hir_expr_contains_lambda)
-        }
-        HirStmt::Continue => false,
-        HirStmt::While { cond, body } | HirStmt::For { iter: cond, body, .. } => {
-            hir_expr_contains_lambda(cond) || hir_contains_lambda(body)
-        }
-    }
-}
-
-fn hir_expr_contains_lambda(expression: &HirExpr) -> bool {
-    match &expression.kind {
-        HirKind::Lambda(..) => true,
-        HirKind::Unit(value, _) | HirKind::Unary(_, value) | HirKind::Field(value, _) | HirKind::As(value, _) => {
-            hir_expr_contains_lambda(value)
-        }
-        HirKind::Try(value, handler) => {
-            hir_expr_contains_lambda(value) || handler.as_deref().is_some_and(hir_expr_contains_lambda)
-        }
-        HirKind::Binary(_, left, right)
-        | HirKind::Index(left, right)
-        | HirKind::Within(left, right) => {
-            hir_expr_contains_lambda(left) || hir_expr_contains_lambda(right)
-        }
-        HirKind::Approximately(left, right, tolerance) => {
-            hir_expr_contains_lambda(left)
-                || hir_expr_contains_lambda(right)
-                || hir_expr_contains_lambda(tolerance)
-        }
-        HirKind::Range(start, _, end, step) => {
-            hir_expr_contains_lambda(start)
-                || hir_expr_contains_lambda(end)
-                || step.as_deref().is_some_and(hir_expr_contains_lambda)
-        }
-        HirKind::Call { callee, args, .. } => {
-            hir_expr_contains_lambda(callee)
-                || args.iter().any(|arg| hir_expr_contains_lambda(&arg.value))
-        }
-        HirKind::MethodCall { recv, args, .. } => {
-            hir_expr_contains_lambda(recv)
-                || args.iter().any(|arg| hir_expr_contains_lambda(&arg.value))
-        }
-        HirKind::If(condition, then_block, else_block) => {
-            hir_expr_contains_lambda(condition)
-                || hir_contains_lambda(then_block)
-                || else_block.as_ref().is_some_and(hir_contains_lambda)
-        }
-        HirKind::Block(block) | HirKind::Loop(block) | HirKind::Spawn(block) | HirKind::SpawnScope(block) => {
-            hir_contains_lambda(block)
-        }
-        HirKind::List(values) | HirKind::Set(values) => values.iter().any(hir_expr_contains_lambda),
-        HirKind::Map(values) => values.iter().any(|(key, value)| {
-            hir_expr_contains_lambda(key) || hir_expr_contains_lambda(value)
-        }),
-        HirKind::Record { fields, .. } => fields.iter().any(|(_, value)| hir_expr_contains_lambda(value)),
-        HirKind::Match(scrutinee, arms) => {
-            hir_expr_contains_lambda(scrutinee)
-                || arms.iter().any(|arm| {
-                    arm.guard.as_ref().is_some_and(hir_expr_contains_lambda)
-                        || hir_contains_lambda(&arm.body)
-                })
-        }
-        HirKind::Channel(_, capacity) => capacity.as_deref().is_some_and(hir_expr_contains_lambda),
-        HirKind::Int(_)
-        | HirKind::Sized(_, _)
-        | HirKind::Float(_)
-        | HirKind::Float32(_)
-        | HirKind::Str(_)
-        | HirKind::Char(_)
-        | HirKind::Bool(_)
-        | HirKind::Local(_)
-        | HirKind::Global(_)
-        | HirKind::EmptyCollection(..) => false,
-    }
-}
-
 fn collect_lambda_locals_block(
     block: &HirBlock,
     bound: &mut HashSet<String>,
@@ -2545,7 +2456,14 @@ fn collect_lambda_locals_expr(
             let mut nested = bound.clone();
             collect_lambda_locals_block(block, &mut nested, used);
         }
-        HirKind::Lambda(_, _) => {}
+        HirKind::Lambda(params, body) => {
+            // A nested lambda captures names relative to its own parameters.
+            // Propagating those free names to the enclosing scan lets the
+            // outer closure carry values from its environment far enough for
+            // the nested IR helper to capture them again.
+            let mut nested_bound: HashSet<String> = params.iter().cloned().collect();
+            collect_lambda_locals_block(body, &mut nested_bound, used);
+        }
         HirKind::List(values) | HirKind::Set(values) => {
             for value in values {
                 collect_lambda_locals_expr(value, bound, used);

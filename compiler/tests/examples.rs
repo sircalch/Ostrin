@@ -3829,8 +3829,8 @@ fn native_ir_emitter_handles_cfg_control_flow() {
 #[test]
 fn native_hir_handles_collections_core() {
     // Collection literals, indexing, iteration and the non-closure methods
-    // are now emitted directly from HIR. Closure combinators remain an AST
-    // fallback until the closure family is migrated.
+    // are now emitted directly from HIR; closure-family coverage is exercised
+    // by the dedicated IR closure regressions below.
     let file = example_path("native_hir_collections.ostrin");
     let expected = "3\n2\n1\n9\n10\ntrue\n2\n2\ntrue\n2\n1\n";
     let interpreted = run(&["--run", &file]);
@@ -3866,11 +3866,12 @@ fn native_hir_handles_collections_core() {
 
 #[test]
 fn native_ir_handles_captured_closures_core() {
-    // A captured closure, a named function used as a value and the list
-    // combinators all cross the IR boundary. Nested/unsupported closure
-    // shapes remain on the established HIR fallback.
+    // Captured closures, including a nested closure with a transitive
+    // environment, a named function used as a value and the list combinators
+    // all cross the IR boundary. Unsupported shapes keep the established
+    // fallback.
     let file = example_path("native_hir_closures.ostrin");
-    let expected = "15\nvalue!\n5\n";
+    let expected = "15\nvalue!\n5\n23\nnested \n";
     let interpreted = run(&["--run", &file]);
     assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
@@ -3889,8 +3890,14 @@ fn native_ir_handles_captured_closures_core() {
         .lines()
         .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
         .unwrap_or(0);
-    assert!(ir_functions >= 2, "closure example generated only {ir_functions} IR functions: {report_text}");
+    assert!(ir_functions >= 3, "closure example generated only {ir_functions} IR functions: {report_text}");
     assert_eq!(hir_functions, 0, "captured closure example fell back to HIR: {report_text}");
+
+    let ir = run(&["--ir", &file]);
+    assert!(ir.status.success(), "closure IR dump failed: {}", stderr(&ir));
+    let ir_text = stdout(&ir);
+    assert!(ir_text.contains("ir opaque: 0"), "nested closure lowering left an opaque IR node: {ir_text}");
+    assert!(ir_text.contains("ir violations: 0"), "nested closure lowering violated IR invariants: {ir_text}");
 
     let exe = temp_artifact("native_hir_closures.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
@@ -3909,7 +3916,8 @@ fn native_ir_handles_captured_closures_core() {
 fn native_ir_handles_named_function_values_and_indirect_calls() {
     // A named function used as a local value can now cross the IR boundary:
     // direct calls through the value and passing it to another function both
-    // use the same closure ABI, while captured lambdas remain HIR-backed.
+    // use the same closure ABI; the captured-closure regression covers
+    // environment-backed lambdas separately.
     let file = example_path("native_ir_function_values.ostrin");
     let expected = "5\n10\n";
     let interpreted = run(&["--run", &file]);

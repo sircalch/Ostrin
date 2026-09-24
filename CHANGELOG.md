@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### Compiler and ownership
+- Extended closure capture discovery through nested lambdas. Free names now propagate through the
+  enclosing environment, so nested closures with scalar and `String` transitive captures lower to
+  nested IR helpers and typed C environments instead of `opaque lambda`; the regression checks
+  interpreter/native parity and `live_allocations=0`.
 - Moved compatible captured lambdas into the ownership-lowered IR/C path. `ClosureMake` now
   synthesizes an IR helper and a typed C environment with a destructor; captured managed values are
   retained on construction and released with the closure environment, while managed values
@@ -24,8 +28,8 @@
   cleared. Pattern bindings now release the transferred native reference on every backend path.
 - Moved named function values and indirect calls into the ownership-lowered IR/C path. The native
   emitter now supplies closure-ABI adapters for global functions, so passing a function as a
-  parameter and invoking a local function value no longer forces a HIR fallback; captured lambdas
-  remain on their existing HIR path until environment lifetime is modeled in IR.
+  parameter and invoking a local function value no longer forces a HIR fallback; complex captured
+  shapes still use the established fallback.
 
 ### Website and discovery
 - Replaced manually duplicated website version and inventory facts with generated `website/site-data.js`.

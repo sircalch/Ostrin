@@ -2,6 +2,14 @@ fn increment(value: Int) -> Int {
     value + 1
 }
 
+fn make_scaler(k: Int) -> fn(Int) -> fn(Int) -> Int {
+    fn(a) { fn(b) { a * k + b } }
+}
+
+fn make_label(prefix: String) -> fn(Int) -> fn(Int) -> String {
+    fn(_outer) { fn(_inner) { prefix } }
+}
+
 fn main() -> Void {
     offset = 10
     add_offset: fn(Int) -> Int = fn(value) { value + offset }
@@ -13,4 +21,11 @@ fn main() -> Void {
 
     increment_value = increment
     print(increment_value(4))
+
+    scale = make_scaler(10)
+    print(scale(2)(3))
+
+    nested_label_factory = make_label("nested ")
+    nested_label_value = nested_label_factory(1)
+    print(nested_label_value(2))
 }

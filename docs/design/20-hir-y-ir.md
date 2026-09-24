@@ -13,8 +13,8 @@ antes de cruzar la libc; la operación de archivo sigue siendo bloqueante mientr
 host. Todos estos valores conservan sus marcadores de ownership, transferencia de `Phi` simples y
 patrones simples
 `Some`/`None`; las funciones globales sin entorno y las lambdas con capturas inmutables usadas
-como valores también cruzan ahora la IR mediante `ClosureMake`/`ClosureCall` y adaptadores al
-ABI `(env, args...)`; el backend mantiene
+como valores —incluidas closures anidadas con capturas transitivas— también cruzan ahora la IR
+mediante `ClosureMake`/`ClosureCall` y adaptadores al ABI `(env, args...)`; el backend mantiene
 HIR/AST como fallback verificado para otros payloads gestionados e iteradores propios genéricos o indirectos,
 patrones anidados, agregados complejos y escapes mientras la migración crece. Los `for`
 sobre rangos enteros —incluidos `to`/`until`, pasos positivos/negativos y paso cero— ya
@@ -111,9 +111,10 @@ Sobre este IR se hacen los análisis que el texto C no permite:
    `Result<Option<String>, String>` ya extraen y retienen payloads recursivos en IR/C; el ejemplo
    `native_ir_nested_wrappers.ostrin` comprueba ramas y fallbacks con paridad y cero fugas.
 5. **Cierres y funciones como valores**: las funciones globales sin entorno y las lambdas capturadas
-   ya tienen `ClosureCall`/`ClosureMake`, adaptadores nativos y ownership del entorno; quedan
-   cierres anidados y formas no lineales. Retirar la comprobación dinámica de E1101 requiere que
-   el backend consuma la IR transformada de forma completa.
+   ya tienen `ClosureCall`/`ClosureMake`, adaptadores nativos y ownership del entorno; las closures
+   anidadas con capturas transitivas también se propagan a helpers IR anidados. Quedan formas no
+   lineales con scopes/escapes complejos y handlers locales. Retirar la comprobación dinámica de
+   E1101 requiere que el backend consuma la IR transformada de forma completa.
 6. Optimizador y, después, otros backends (LLVM, WASM, GPU) que consumen el mismo IR.
 
 ## 5. Riesgos y mitigaciones
