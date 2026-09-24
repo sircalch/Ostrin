@@ -71,6 +71,7 @@ scene = viz.scene3d("Surface").labels("x", "y", "z").view(-55.0, 28.0)
 
 z = viz.grid_of(xs, ys, f)                       // z[i, j] = f(xs[j], ys[i])
 page = viz.grid([a.svg(), b.svg()], 2, 480, 320, title: "Dashboard")
+movie = viz.animate(frames, fps: 12.0)          // frames: List<String> de fig.svg()/scene.svg()
 ```
 
 Utilidades públicas: `viz.num` (dos decimales, idéntico en todos los backends), `viz.ticks`,
@@ -92,6 +93,21 @@ Utilidades públicas: `viz.num` (dos decimales, idéntico en todos los backends)
   pintor con `argsort` estable) y sombreados con luz direccional: brillo 0.5 + 0.5 |n · l|. Suelo y
   paredes traseras con rejilla; etiquetas de ticks fuera del borde frontal.
 - **Mapas de color**: viridis, magma, coolwarm y ocean, nueve paradas interpoladas linealmente.
+
+## 4.1 Animación
+
+`viz.animate(frames, fps)` recibe figuras ya renderizadas (cualquier mezcla de `Figure` y `Scene3D`)
+y devuelve un único SVG del tamaño del primer fotograma. Cada fotograma va en un `<g
+class="ostrin-frame">` con `animation-delay: i · paso`; una sola regla `@keyframes` lo deja opaco
+durante `1/n` del ciclo (redondeado hacia arriba a milésimas de porcentaje, para que dos fotogramas
+se solapen un instante en vez de dejar un hueco) y `step-end` evita fundidos. Los `id` (recortes,
+degradados) se prefijan con `f<i>-` para que los fotogramas no compartan `clip-path`. Pasar el ratón
+pausa la animación y `prefers-reduced-motion` muestra solo el primer fotograma.
+
+Por qué CSS y no SMIL ni JavaScript: CSS se ejecuta también en un `<img>`, no requiere scripts (la
+regla de la web: JavaScript no produce resultados) y el SVG sigue siendo determinista byte a byte en
+intérprete, nativo y WASM. Coste: el tamaño crece linealmente con los fotogramas (24 fotogramas 2D
+≈ 270 kB). Pendiente: reproducir una vez, barra de desplazamiento temporal y exportar vídeo.
 
 ## 5. Unidades
 
@@ -120,7 +136,8 @@ la falta de literales científicos (`1e-9`). Ver `CONTEXTO_PROYECTO.md` §270–
 | 0.1 (hecho) | marcas 2D, heatmap/contornos, superficies/trayectorias/nubes 3D, layouts, unidades en ejes, SVG |
 | 0.2 (parcial, hecho) | tooltips `<title>` con valores y resaltado CSS al pasar el ratón, dentro del SVG y sin scripts; visor web con zoom y desplazamiento en un iframe aislado |
 | 0.2 (resto) | selección enlazada y controles conducidos por Ostrin (requiere un backend con eventos) |
-| 0.3 | animación: fotogramas generados por Ostrin; sintaxis por decidir en un diseño propio |
+| 0.3 (parcial, hecho) | animación en bucle con `viz.animate`: fotogramas generados por Ostrin, reproducidos con CSS dentro del SVG |
+| 0.3 (resto) | reproducir una vez, control temporal, exportar vídeo |
 | 0.4 | volúmenes, isosuperficies, campos vectoriales, cortes; cámaras en perspectiva |
 | 0.5 | backend WebGPU sobre la misma lista de series; PNG/PDF |
 | — | figuras con procedencia (hash de fuente y datos, semilla, versión del compilador) |

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Visualization: animation
+- `viz.animate(frames, fps)` combines rendered figures or 3D scenes into one SVG that loops them with
+  CSS keyframes: no scripts, so it also plays as an `<img>`. Hovering pauses it, reduced-motion
+  viewers see the first frame, and ids are renamed per frame. New gallery program
+  `viz_animation` (a spreading wave packet, 24 frames).
+
 ### Numerical methods: std.numeric 0.1
 - New standard-library module `std.numeric`, written in Ostrin: `trapz`, `simpson`, `bisect`,
   `secant`, `newton` (roots return `Result<Float, String>`), `derivative`, `golden_min`, linear

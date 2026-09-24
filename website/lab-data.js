@@ -39,7 +39,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
         "label": "std.viz source",
         "href": "https://github.com/sircalch/Ostrin/blob/main/compiler/std/viz.ostrin"
       },
-      "limits": "std.viz 0.1 renders static SVG. Interaction (zoom, hover) and animation are planned; PNG/PDF export needs a raster backend.",
+      "limits": "std.viz renders SVG: hover tooltips and looping animations (viz.animate) work without scripts; linked selection and sliders driven by Ostrin are planned, and PNG/PDF export needs a raster backend.",
       "files": {
         "main.ostrin": "// Scientific Lab · Plot\n// A damped oscillator computed with arrays and drawn as SVG by std.viz.\nimport std.viz\n\nfn main() -> Void {\n    damping = 0.25\n    frequency = 2.0\n    t = linspace(0.0, 10.0, 240)\n    envelope = exp(t * (0.0 - damping))\n    x = envelope * cos(t * frequency)\n    print(\"samples: \" + t.length().to_string() + \", min x = \" + viz.num(x.min()))\n    fig = viz.figure(\"x(t) = exp(-\" + damping.to_string() + \" t) cos(\" + frequency.to_string() + \" t)\")\n        .labels(\"time t\", \"displacement x\")\n        .band(t, envelope * -1.0, envelope, label: \"envelope\")\n        .line(t, x, label: \"x(t)\")\n    print(fig.svg())\n}\n"
       },
@@ -849,6 +849,19 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "svg": "assets/viz/spline.svg",
       "printed": [
         "area under the spline 30.65",
+        ""
+      ]
+    },
+    {
+      "id": "animation",
+      "title": "Animation",
+      "file": "examples/viz_animation.ostrin",
+      "blurb": "24 frames of a spreading wave packet, combined by viz.animate into one SVG that loops with CSS alone.",
+      "source": "examples/viz_animation.ostrin",
+      "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_animation.ostrin",
+      "code": "// std.viz animation: a dispersing wave packet, 24 frames played by CSS in one SVG.\n// Each frame is an ordinary figure; viz.animate loops them without scripts.\nimport std.viz\n\nfn packet(x: Array<Float>, t: Float) -> Array<Float> {\n    // Free-particle Gaussian packet: the envelope spreads as it travels.\n    width = sqrt(1.0 + t * t * 0.25)\n    center = 2.0 + 1.5 * t\n    envelope = exp((x - center) * (x - center) * (-0.5 / (width * width))) / sqrt(width)\n    envelope * cos(x * 4.0 - t * 8.0)\n}\n\nfn main() -> Void {\n    x = linspace(0.0, 12.0, 160)\n    mut frames: List<String> = []\n    for i in 0 until 24 {\n        t = (i as Float) * 0.25\n        y = packet(x, t)\n        env = exp((x - (2.0 + 1.5 * t)) * (x - (2.0 + 1.5 * t)) * (-0.5 / (1.0 + t * t * 0.25))) / sqrt(sqrt(1.0 + t * t * 0.25))\n        fig = viz.figure(\"Wave packet, t = \" + viz.num(t) + \" s\")\n            .describe(\"the envelope widens as √(1 + t²/4)\")\n            .labels(\"position x\", \"amplitude\")\n            .xlim(0.0, 12.0).ylim(-1.1, 1.1).no_legend()\n            .band(x, env * -1.0, env, color: \"#93c5fd\")\n            .line(x, y, color: \"#1d4ed8\", width: 2.0)\n        frames.push(fig.svg())\n    }\n    print(viz.animate(frames, fps: 8.0))\n}\n",
+      "svg": "assets/viz/animation.svg",
+      "printed": [
         ""
       ]
     },

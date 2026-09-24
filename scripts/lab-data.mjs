@@ -35,7 +35,7 @@ export const LAB = [
     ],
     how: "Ostrin computes x(t) with array operations (linspace, exp, cos) and std.viz, the visualization library written in Ostrin, lays out the axes, ticks, band, line and legend and writes the SVG text. The page only displays that SVG as an image.",
     docs: { label: "std.viz source", href: `${repository}/blob/main/compiler/std/viz.ostrin` },
-    limits: "std.viz 0.1 renders static SVG. Interaction (zoom, hover) and animation are planned; PNG/PDF export needs a raster backend.",
+    limits: "std.viz renders SVG: hover tooltips and looping animations (viz.animate) work without scripts; linked selection and sliders driven by Ostrin are planned, and PNG/PDF export needs a raster backend.",
   },
   {
     id: "surface",
@@ -173,6 +173,7 @@ export const GALLERY = [
   { id: "ode", title: "Adaptive ODE solver", file: "examples/viz_ode.ostrin", blurb: "A pendulum solved with std.numeric.rk45: angle over time and the phase portrait, side by side." },
   { id: "fft", title: "Spectrum with the FFT", file: "examples/viz_fft.ostrin", blurb: "A noisy two-tone signal and its amplitude spectrum from std.numeric.fft: peaks at 50 Hz and 120 Hz." },
   { id: "spline", title: "Cubic spline", file: "examples/viz_spline.ostrin", blurb: "Eight measurements, a natural cubic spline through them and the area under it by Simpson's rule." },
+  { id: "animation", title: "Animation", file: "examples/viz_animation.ostrin", blurb: "24 frames of a spreading wave packet, combined by viz.animate into one SVG that loops with CSS alone." },
   { id: "dashboard", title: "Multi-panel layout", file: "examples/viz_dashboard.ostrin", blurb: "Four figures, 2D and 3D, composed with viz.grid into one SVG." },
 ];
 
