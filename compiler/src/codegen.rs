@@ -52,7 +52,7 @@ use crate::ast::*;
 use crate::symbols::type_to_string;
 use crate::typeck::ExprKey;
 use crate::types::Ty;
-use crate::types::{dim_div, dim_is_dimensionless, dim_mul, dim_pow, dim_single, dim_to_string, resolve_unit_expr, Dimension};
+use crate::types::{dim_div, dim_is_dimensionless, dim_mul, dim_pow, dim_to_string, resolve_unit_expr, Dimension};
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 enum CType {
@@ -225,7 +225,7 @@ fn instance_name(base: &str, args: &[CType]) -> String {
 /// same way `typeck` does, with generic `D`s taken from `subst`.
 fn resolve_dimension(ty: &Type, subst: &HashMap<String, Dimension>) -> Dimension {
     match ty {
-        Type::Named(name, _) => subst.get(name).cloned().unwrap_or_else(|| dim_single(name)),
+        Type::Named(name, _) => subst.get(name).cloned().unwrap_or_else(|| crate::types::dimension_from_name(name)),
         Type::Mul(a, b) => dim_mul(&resolve_dimension(a, subst), &resolve_dimension(b, subst)),
         Type::Div(a, b) => dim_div(&resolve_dimension(a, subst), &resolve_dimension(b, subst)),
         Type::Pow(a, n) => dim_pow(&resolve_dimension(a, subst), *n as i32),
@@ -280,7 +280,7 @@ fn map_type_with_subst(ty: &Type, types: &NamedTypes, subst: &HashMap<String, CT
         Type::Named(name, args) if name == "Task" && args.len() == 1 => Ok(CType::Task(Box::new(map_type_with_subst(&args[0], types, subst)?))),
         Type::Named(name, args) if name == "Array" && args.len() == 1 => {
             let elem = map_type_with_subst(&args[0], types, subst)?;
-            if matches!(elem, CType::Int | CType::Float | CType::Float32 | CType::Bool) {
+            if matches!(elem, CType::Int | CType::Float | CType::Float32 | CType::Bool | CType::Quantity(_)) {
                 Ok(CType::Array(Box::new(elem)))
             } else {
                 Err("Array<T> is only supported by the native backend for Int, Float, Float32 and Bool elements yet".to_string())
@@ -335,6 +335,38 @@ pub(crate) fn c_function_name(name: &str) -> String {
 /// Quantity runtime (unit table, conversion, arithmetic helpers), spliced in
 /// right after `PRELUDE` only when a program actually uses `Qty`.
 const QTY_RUNTIME: &str = include_str!("qty_runtime.c");
+/// `Array<Quantity<D>>` helpers (`Array_Float` plus a unit), mirroring `interpreter/qarray.rs`.
+const QUANTITY_ARRAY_RUNTIME: &str = "\
+/* Array<Quantity<D>>: an Array_Float whose `unit` names the unit of its numbers. */
+static Array_Float* ostrin_qa_tag(Array_Float* a, const char* unit) { a->unit = unit; return a; }
+static Array_Float* ostrin_qa_copy(Array_Float* a) {
+    Array_Float* r = Array_Float_alloc(a->rank, a->shape);
+    memcpy(r->data, a->data, sizeof(double) * (size_t)a->size);
+    return r;
+}
+/* A fresh copy of the numbers converted between units (the scalar convert formula). */
+static Array_Float* ostrin_qa_converted(Array_Float* a, const char* from, const char* to) {
+    Array_Float* r = ostrin_qa_copy(a);
+    if (strcmp(from, to) != 0) {
+        double ff = ostrin_unit_expr_factor(from), ft = ostrin_unit_expr_factor(to);
+        for (int64_t i = 0; i < r->size; i++) r->data[i] = r->data[i] * ff / ft;
+    }
+    return r;
+}
+static Array_Float* ostrin_qa_as(Array_Float* a, const char* to) {
+    Array_Float* r = a->unit ? ostrin_qa_converted(a, a->unit, to) : ostrin_qa_copy(a);
+    return ostrin_qa_tag(r, to);
+}
+static Array_Float* ostrin_qa_scale(Array_Float* a, double s) {
+    for (int64_t i = 0; i < a->size; i++) a->data[i] = a->data[i] * s;
+    return a;
+}
+static const char* ostrin_qa_show(Array_Float* a, const char* shown) {
+    if (!a->unit || !*a->unit) return shown;
+    const char* out = ostrin_str_concat(ostrin_str_concat(shown, \" \"), a->unit);
+    return out;
+}
+";
 
 /// Reproducible random generator, spliced in when a program uses `Rng`.
 const RNG_RUNTIME: &str = include_str!("rng_runtime.c");
@@ -362,7 +394,11 @@ const ARRAY_RUNTIME: &str = include_str!("array_runtime.c");
 /// release the task while the underlying libc call finishes and cleans up.
 const FILE_IO_RUNTIME: &str = include_str!("file_io_runtime.c");
 
-const PRELUDE: &str = "#include <stdint.h>\n\
+const PRELUDE: &str = "/* The runtime only frees pointers it registered; releasing a string literal is a no-op. */\n\
+#if defined(__GNUC__)\n\
+#pragma GCC diagnostic ignored \"-Wfree-nonheap-object\"\n\
+#endif\n\
+#include <stdint.h>\n\
 #include <stdbool.h>\n\
 #include <stdio.h>\n\
 #include <stdlib.h>\n\
@@ -1359,6 +1395,8 @@ struct Codegen<'a> {
     pending_results: VecDeque<(CType, CType)>,
     current_return: Vec<CType>,
     lambda_depth: usize,
+    /// An `Array<Quantity<D>>` appeared: emit the `ostrin_qa_*` helpers.
+    uses_quantity_arrays: bool,
     /// Enclosing-function scopes of the closures being generated (innermost last), plus what each captured.
     capture_frames: RefCell<Vec<CaptureFrame>>,
     closure_bodies: Vec<(String, String)>,
@@ -1498,6 +1536,8 @@ fn mangle_ctype(ty: &CType) -> String {
         CType::Sized(kind) => kind.name().to_string(),
         CType::Float32 => "Float32".to_string(),
         CType::Rng => "Rng".to_string(),
+        // An array of quantities is an `Array_Float` whose `unit` field names the unit.
+        CType::Array(t) if matches!(**t, CType::Quantity(_)) => "Array_Float".to_string(),
         CType::Array(t) => format!("Array_{}", mangle_ctype(t)),
         CType::Channel(t) => format!("Channel_{}", mangle_ctype(t)),
         CType::Task(t) => format!("Task_{}", mangle_ctype(t)),
@@ -1767,6 +1807,8 @@ impl<'a> Codegen<'a> {
     fn gen_generic_method_call(&mut self, gm: GenericMethod<'a>, obj_code: &str, type_args: Option<&[Type]>, args: &[Arg]) -> Result<(String, CType), String> {
         let decl = gm.decl;
         let generics: Vec<String> = decl.generics.iter().map(|g| g.name.clone()).collect();
+        let normalized = normalize_call_args(&decl.params, args, 1)?;
+        let args = normalized.as_deref().unwrap_or(args);
         let (arg_codes, arg_types) = self.gen_args(args)?;
         if arg_codes.len() + 1 != decl.params.len() {
             return Err(format!("method '{}' expects {} argument(s), got {}", decl.name, decl.params.len() - 1, arg_codes.len()));
@@ -2194,6 +2236,12 @@ impl<'a> Codegen<'a> {
             }
         }
         if let CType::Array(t) = ty {
+            if matches!(**t, CType::Quantity(_)) {
+                self.uses_quantity_arrays = true;
+                self.ensure_list(t);
+                self.register_list_types(&CType::Array(Box::new(CType::Float)));
+                return;
+            }
             self.register_list_types(t);
             if **t != CType::Bool {
                 // Comparisons produce (and masks consume) an `Array<Bool>`.
@@ -2668,9 +2716,11 @@ impl<'a> Codegen<'a> {
             Some(e) => {
                 let (code, ty) = self.gen_expr_hint(e, Some(return_type.clone()))?;
                 if *return_type == CType::Void {
-                    out.push_str(&format!("    {code};\n"));
+                    // An owned result is released in the same evaluation.
                     if owned_call_argument(e, &ty) {
-                        out.push_str(&format!("    ostrin_release_owned((void*){code});\n"));
+                        out.push_str(&format!("    ostrin_release_owned((void*)({code}));\n"));
+                    } else {
+                        out.push_str(&format!("    {code};\n"));
                     }
                     self.emit_owned_cleanup(out, None);
                     out.push_str("    return;\n");
@@ -2706,9 +2756,10 @@ impl<'a> Codegen<'a> {
         }
         if let Some(e) = &block.tail {
             let (code, ty) = self.gen_expr(e)?;
-            out.push_str(&format!("    {code};\n"));
             if owned_call_argument(e, &ty) {
-                out.push_str(&format!("    ostrin_release_owned((void*){code});\n"));
+                out.push_str(&format!("    ostrin_release_owned((void*)({code}));\n"));
+            } else {
+                out.push_str(&format!("    {code};\n"));
             }
         }
         Ok(())
@@ -2734,6 +2785,10 @@ impl<'a> Codegen<'a> {
         } else {
             Vec::new()
         };
+        // Only a local of this very block moves out with the value; a local of an
+        // enclosing block (`if c { line } else { .. }`) is still released there,
+        // so the value is retained like any other borrowed reference.
+        let transfer = transfer.filter(|name| owned.iter().any(|(local, _)| local == name));
         self.pop_scope();
         if tail_ty == CType::Void {
             let mut code = format!("({{ {body} {tail_code};\n");
@@ -2825,8 +2880,11 @@ impl<'a> Codegen<'a> {
                 // tracking, so this backend re-derives it the same way the
                 // interpreter does, from whether `name` is already in scope.
                 if self.lookup(name).is_some() {
+                    // Also inside loops and branches (not inlined lambda
+                    // bodies): a raw pointer copy there left the target
+                    // aliasing a value released at the end of its block.
                     if self.ownership_active
-                        && self.scopes.len() == 2
+                        && self.lambda_depth == 0
                         && existing.as_ref().is_some_and(is_reference_type)
                         && self.owned_local_name_by_str(name).is_some()
                     {
@@ -2920,9 +2978,11 @@ impl<'a> Codegen<'a> {
                     }
                 } else {
                     let (code, ty) = self.gen_expr(e)?;
-                    out.push_str(&format!("    {code};\n"));
+                    // An owned result is released in the same evaluation.
                     if owned_call_argument(e, &ty) {
-                        out.push_str(&format!("    ostrin_release_owned((void*){code});\n"));
+                        out.push_str(&format!("    ostrin_release_owned((void*)({code}));\n"));
+                    } else {
+                        out.push_str(&format!("    {code};\n"));
                     }
                 }
             }
@@ -3663,6 +3723,10 @@ impl<'a> Codegen<'a> {
                         };
                         Ok((format!("{}({code})", info.c_name), info.return_type.clone()))
                     }
+                    UnaryOp::Neg if matches!(&ty, CType::Array(e) if matches!(**e, CType::Quantity(_))) => {
+                        let t = self.next_temp();
+                        Ok((format!("({{ Array_Float* {t} = {code}; ostrin_qa_tag(Array_Float_neg({t}), {t}->unit); }})"), ty))
+                    }
                     UnaryOp::Neg if matches!(ty, CType::Array(_)) => Ok((format!("{}_neg({code})", mangle_ctype(&ty)), ty)),
                     UnaryOp::Not if matches!(ty, CType::Array(_)) => Ok((format!("{}_not({code})", mangle_ctype(&ty)), ty)),
                     UnaryOp::Neg if matches!(ty, CType::Sized(_)) => {
@@ -3847,6 +3911,11 @@ impl<'a> Codegen<'a> {
                 };
                 let dim = resolve_unit_expr(sym).map_err(|u| format!("unknown unit '{u}'"))?;
                 let unit = c_string_literal(sym);
+                if matches!(ty, CType::Array(_)) {
+                    let array_ty = CType::Array(Box::new(CType::Quantity(dim)));
+                    self.register_list_types(&array_ty);
+                    return Ok((format!("ostrin_qa_as({code}, {unit})"), array_ty));
+                }
                 if matches!(ty, CType::Quantity(_)) {
                     // Convert the quantity's value into the target unit, as the interpreter does.
                     let temp = self.next_temp();
@@ -3865,6 +3934,12 @@ impl<'a> Codegen<'a> {
                 let (vc, vt) = self.gen_expr(value)?;
                 let (sc, st) = self.gen_expr(start)?;
                 let (ec, et) = self.gen_expr(end)?;
+                if matches!((&vt, &st, &et), (CType::Quantity(_), CType::Quantity(_), CType::Quantity(_))) {
+                    // Quantities compare across units, as in the interpreter.
+                    let temp = self.next_temp();
+                    let upper = if *kind == RangeKind::To { "<=" } else { "<" };
+                    return Ok((format!("({{ Qty {temp} = {vc}; ostrin_qty_cmp({temp}, {sc}) >= 0 && ostrin_qty_cmp({temp}, {ec}) {upper} 0; }})"), CType::Bool));
+                }
                 let (v, s, e) = (self.as_f64_code(&vc, &vt)?, self.as_f64_code(&sc, &st)?, self.as_f64_code(&ec, &et)?);
                 let temp = self.next_temp();
                 let upper = if *kind == RangeKind::To { "<=" } else { "<" };
@@ -3880,6 +3955,21 @@ impl<'a> Codegen<'a> {
             Expr::Index(obj, idx) => {
                 let (obj_code, obj_ty) = self.gen_expr(obj)?;
                 if let CType::Array(elem) = &obj_ty {
+                    if matches!(**elem, CType::Quantity(_)) {
+                        // Slices and masks keep the unit; an element is a quantity.
+                        let t = self.next_temp();
+                        if let Expr::Range(start, kind, end, None) = idx.unlocated() {
+                            let (lo, _) = self.gen_expr(start)?;
+                            let (hi, _) = self.gen_expr(end)?;
+                            let hi = if *kind == RangeKind::To { format!("(({hi}) + 1)") } else { hi };
+                            return Ok((format!("({{ Array_Float* {t} = {obj_code}; ostrin_qa_tag(Array_Float_slice({t}, {lo}, {hi}), {t}->unit); }})"), obj_ty.clone()));
+                        }
+                        let (idx_code, idx_ty) = self.gen_expr(idx)?;
+                        if matches!(&idx_ty, CType::Array(m) if **m == CType::Bool) {
+                            return Ok((format!("({{ Array_Float* {t} = {obj_code}; ostrin_qa_tag(Array_Float_mask({t}, {idx_code}), {t}->unit); }})"), obj_ty.clone()));
+                        }
+                        return Ok((format!("({{ Array_Float* {t} = {obj_code}; (Qty){{ Array_Float_index1({t}, {idx_code}), {t}->unit }}; }})"), (**elem).clone()));
+                    }
                     let n = mangle_ctype(&obj_ty);
                     if let Expr::Range(start, kind, end, None) = idx.unlocated() {
                         let (lo, _) = self.gen_expr(start)?;
@@ -4715,6 +4805,124 @@ impl<'a> Codegen<'a> {
         Ok((converted, to_ty))
     }
 
+    /// Operators between an `Array<Quantity<D>>` and anything, or a Float
+    /// array and a quantity (`interpreter/qarray.rs::binary`, step for step).
+    fn gen_quantity_array_binary(&mut self, op: BinOp, lc: &str, lt: &CType, rc: &str, rt: &CType) -> Option<Result<(String, CType), String>> {
+        let is_qarr = |t: &CType| matches!(t, CType::Array(e) if matches!(**e, CType::Quantity(_)));
+        let is_arr = |t: &CType| matches!(t, CType::Array(_));
+        let involved = is_qarr(lt) || is_qarr(rt) || (is_arr(lt) && matches!(rt, CType::Quantity(_))) || (matches!(lt, CType::Quantity(_)) && is_arr(rt));
+        if !involved {
+            return None;
+        }
+        Some(self.gen_quantity_array_binary_inner(op, lc, lt, rc, rt))
+    }
+
+    fn gen_quantity_array_binary_inner(&mut self, op: BinOp, lc: &str, lt: &CType, rc: &str, rt: &CType) -> Result<(String, CType), String> {
+        self.register_list_types(&CType::Array(Box::new(CType::Float)));
+        self.uses_quantity_arrays = true;
+        let float_array = CType::Array(Box::new(CType::Float));
+        let (l, r) = (self.next_temp(), self.next_temp());
+        // (numbers, is_array, unit, dimension) of each side.
+        let describe = |name: &str, ty: &CType| -> (String, bool, Option<String>, Option<Dimension>) {
+            match ty {
+                CType::Array(e) => match &**e {
+                    CType::Quantity(d) => (name.to_string(), true, Some(format!("{name}->unit")), Some(d.clone())),
+                    _ => (name.to_string(), true, None, None),
+                },
+                CType::Quantity(d) => (format!("{name}.v"), false, Some(format!("{name}.u")), Some(d.clone())),
+                _ => (format!("(double)({name})"), false, None, None),
+            }
+        };
+        let (a, a_arr, ua, da) = describe(&l, lt);
+        let (b, b_arr, ub, db) = describe(&r, rt);
+        let c_ty = |t: &CType| if matches!(t, CType::Array(_)) { "Array_Float*".to_string() } else { c_type_name(t) };
+        let head = format!("{} {l} = {lc}; {} {r} = {rc}; ", c_ty(lt), c_ty(rt));
+        let num = |x: &str, x_arr: bool, y: &str, y_arr: bool, cmp: bool, code: i32| -> String {
+            let (pair, scalar) = if cmp { ("cmp", "cmp_scalar") } else { ("binop", "scalar") };
+            match (x_arr, y_arr) {
+                (true, true) => format!("Array_Float_{pair}({x}, {y}, {code})"),
+                (true, false) => format!("Array_Float_{scalar}({x}, {y}, {code}, 0)"),
+                _ => format!("Array_Float_{scalar}({y}, {x}, {code}, 1)"),
+            }
+        };
+        let arith = |op: BinOp| match op { BinOp::Add => 0, BinOp::Sub => 1, BinOp::Mul => 2, _ => 3 };
+        let compare = |op: BinOp| match op { BinOp::Eq => 0, BinOp::NotEq => 1, BinOp::Lt => 2, BinOp::Gt => 3, BinOp::LtEq => 4, _ => 5 };
+        // The right side converted into the left side's unit: (code, temp to release).
+        let converted = |this: &mut Self, ua: &str, ub: &str| -> (String, Option<String>) {
+            if b_arr {
+                let t = this.next_temp();
+                (format!("({{ {t} = ostrin_qa_converted({r}, {ub}, {ua}); {t}; }})"), Some(t))
+            } else {
+                (format!("ostrin_convert({r}.v, {ub}, {ua})"), None)
+            }
+        };
+        let wrap = |body: String, release: Option<String>| -> String {
+            match release {
+                Some(t) => format!("({{ {head}Array_Float* {t}; Array_Float* __qa = {body}; ostrin_release((void*){t}); __qa; }})"),
+                None => format!("({{ {head}{body}; }})"),
+            }
+        };
+        let array_of = |t: CType| CType::Array(Box::new(t));
+        match op {
+            BinOp::Add | BinOp::Sub | BinOp::Eq | BinOp::NotEq | BinOp::Lt | BinOp::Gt | BinOp::LtEq | BinOp::GtEq => {
+                let (Some(ua), Some(ub), Some(d)) = (ua, ub, da) else {
+                    return Err("cannot combine a quantity array with a plain number without a unit ('as <unit>')".to_string());
+                };
+                let (b_conv, release) = converted(self, &ua, &ub);
+                if matches!(op, BinOp::Add | BinOp::Sub) {
+                    let body = format!("ostrin_qa_tag({}, {ua})", num(&a, a_arr, &b_conv, b_arr, false, arith(op)));
+                    Ok((wrap(body, release), array_of(CType::Quantity(d))))
+                } else {
+                    self.register_list_types(&array_of(CType::Bool));
+                    Ok((wrap(num(&a, a_arr, &b_conv, b_arr, true, compare(op)), release), array_of(CType::Bool)))
+                }
+            }
+            BinOp::Mul | BinOp::Div => {
+                let divide = op == BinOp::Div;
+                let code = arith(op);
+                match (ua, ub) {
+                    (Some(ua), Some(ub)) => {
+                        let (da, db) = (da.expect("unit implies dimension"), db.expect("unit implies dimension"));
+                        let dim = if divide { dim_div(&da, &db) } else { dim_mul(&da, &db) };
+                        if divide && dim_is_dimensionless(&dim) {
+                            let (b_conv, release) = converted(self, &ua, &ub);
+                            return Ok((wrap(num(&a, a_arr, &b_conv, b_arr, false, 3), release), float_array));
+                        }
+                        let product = num(&a, a_arr, &b, b_arr, false, code);
+                        let body = if dim_is_dimensionless(&dim) {
+                            format!(
+                                "({{ double __s; const char* __u = ostrin_unit_combine({ua}, {ub}, 0, &__s); Array_Float* __p = {product}; if (__s != 1.0) ostrin_qa_scale(__p, __s); if (*__u) ostrin_qa_scale(__p, ostrin_unit_expr_factor(__u)); __p; }})"
+                            )
+                        } else {
+                            format!(
+                                "({{ double __s; const char* __u = ostrin_unit_combine({ua}, {ub}, {}, &__s); Array_Float* __p = {product}; if (__s != 1.0) ostrin_qa_scale(__p, __s); ostrin_qa_tag(__p, __u); }})",
+                                i32::from(divide)
+                            )
+                        };
+                        let result = if dim_is_dimensionless(&dim) { float_array } else { array_of(CType::Quantity(dim)) };
+                        Ok((wrap(body, None), result))
+                    }
+                    (Some(ua), None) => {
+                        let body = format!("ostrin_qa_tag({}, {ua})", num(&a, a_arr, &b, b_arr, false, code));
+                        Ok((wrap(body, None), array_of(CType::Quantity(da.expect("unit implies dimension")))))
+                    }
+                    (None, Some(ub)) => {
+                        let product = num(&a, a_arr, &b, b_arr, false, code);
+                        let db = db.expect("unit implies dimension");
+                        if divide {
+                            let body = format!("({{ double __s; const char* __u = ostrin_unit_combine(\"\", {ub}, 1, &__s); Array_Float* __p = {product}; if (__s != 1.0) ostrin_qa_scale(__p, __s); ostrin_qa_tag(__p, __u); }})");
+                            Ok((wrap(body, None), array_of(CType::Quantity(crate::types::dim_pow(&db, -1)))))
+                        } else {
+                            Ok((wrap(format!("ostrin_qa_tag({product}, {ub})"), None), array_of(CType::Quantity(db))))
+                        }
+                    }
+                    (None, None) => unreachable!("only called with a unit on one side"),
+                }
+            }
+            _ => Err("this operator isn't defined on arrays of quantities".to_string()),
+        }
+    }
+
     fn gen_binary(&mut self, op: BinOp, l: &Expr, r: &Expr) -> Result<(String, CType), String> {
         let (lc, lt) = self.gen_expr(l)?;
         let (rc, rt) = self.gen_expr(r)?;
@@ -4732,6 +4940,9 @@ impl<'a> Codegen<'a> {
                 let arg = self.coerce(&lc, &lt, param_types.get(1).unwrap_or(&lt))?;
                 return Ok((format!("{c_name}({rc}, {arg})"), return_type));
             }
+        }
+        if let Some(result) = self.gen_quantity_array_binary(op, &lc, &lt, &rc, &rt) {
+            return result;
         }
         if matches!(lt, CType::Quantity(_)) || matches!(rt, CType::Quantity(_)) {
             return self.gen_quantity_binary(op, &lc, &lt, &rc, &rt);
@@ -4762,6 +4973,29 @@ impl<'a> Codegen<'a> {
             };
             let n = mangle_ctype(&array_ty);
             let result = if function == "cmp_" { CType::Array(Box::new(CType::Bool)) } else { array_ty.clone() };
+            // Fresh array operands (`x * 2.0` in `x * 2.0 + 1.0`) are released after the operation.
+            let fresh = |e: &Expr, t: &CType| matches!(t, CType::Array(_)) && fresh_array_expr(e);
+            let (lf, rf) = (fresh(l, &lt), fresh(r, &rt));
+            if lf || rf {
+                let (a, b, out) = (self.next_temp(), self.next_temp(), self.next_temp());
+                let call = match (&lt, &rt) {
+                    (CType::Array(x), CType::Array(y)) if x == y => format!("{n}_{}({a}, {b}, {code})", if function == "cmp_" { "cmp" } else { "binop" }),
+                    (CType::Array(x), scalar) if **x == *scalar => format!("{n}_{}({a}, {b}, {code}, 0)", if function == "cmp_" { "cmp_scalar" } else { "scalar" }),
+                    (scalar, CType::Array(y)) if **y == *scalar => format!("{n}_{}({b}, {a}, {code}, 1)", if function == "cmp_" { "cmp_scalar" } else { "scalar" }),
+                    _ => return Err("array operands must have the same element type".to_string()),
+                };
+                let release_a = if lf { format!("ostrin_release((void*){a}); ") } else { String::new() };
+                let release_b = if rf { format!("ostrin_release((void*){b}); ") } else { String::new() };
+                return Ok((
+                    format!(
+                        "({{ {} {a} = {lc}; {} {b} = {rc}; {} {out} = {call}; {release_a}{release_b}{out}; }})",
+                        c_type_name(&lt),
+                        c_type_name(&rt),
+                        c_type_name(&result)
+                    ),
+                    result,
+                ));
+            }
             return match (&lt, &rt) {
                 (CType::Array(a), CType::Array(b)) if a == b => Ok((format!("{n}_{}({lc}, {rc}, {code})", if function == "cmp_" { "cmp" } else { "binop" }), result)),
                 (CType::Array(a), scalar) if **a == *scalar => Ok((format!("{n}_{}({lc}, {rc}, {code}, 0)", if function == "cmp_" { "cmp_scalar" } else { "scalar" }), result)),
@@ -4818,7 +5052,21 @@ impl<'a> Codegen<'a> {
         }
         if lt == CType::Str || rt == CType::Str {
             return match op {
-                BinOp::Add if lt == CType::Str && rt == CType::Str => Ok((format!("ostrin_str_concat({lc}, {rc})"), CType::Str)),
+                BinOp::Add if lt == CType::Str && rt == CType::Str => {
+                    // A fresh operand (a concatenation or a call's result) is released once
+                    // it has been copied; literals and named values are borrowed.
+                    let (lf, rf) = (owned_call_argument(l, &lt), owned_call_argument(r, &rt));
+                    if !lf && !rf {
+                        return Ok((format!("ostrin_str_concat({lc}, {rc})"), CType::Str));
+                    }
+                    let (a, b, joined) = (self.next_temp(), self.next_temp(), self.next_temp());
+                    let release_a = if lf { format!("ostrin_release((void*){a}); ") } else { String::new() };
+                    let release_b = if rf { format!("ostrin_release((void*){b}); ") } else { String::new() };
+                    Ok((
+                        format!("({{ const char* {a} = {lc}; const char* {b} = {rc}; const char* {joined} = ostrin_str_concat({a}, {b}); {release_a}{release_b}{joined}; }})"),
+                        CType::Str,
+                    ))
+                }
                 BinOp::Eq if lt == CType::Str && rt == CType::Str => Ok((format!("(strcmp({lc}, {rc}) == 0)"), CType::Bool)),
                 BinOp::NotEq if lt == CType::Str && rt == CType::Str => Ok((format!("(strcmp({lc}, {rc}) != 0)"), CType::Bool)),
                 BinOp::Lt | BinOp::Gt | BinOp::LtEq | BinOp::GtEq if lt == CType::Str && rt == CType::Str => {
@@ -4878,7 +5126,11 @@ impl<'a> Codegen<'a> {
             (CType::Quantity(d1), CType::Quantity(d2)) => match op {
                 BinOp::Add => Ok((format!("ostrin_qty_add({lc}, {rc})"), lt.clone())),
                 BinOp::Sub => Ok((format!("ostrin_qty_sub({lc}, {rc})"), lt.clone())),
-                BinOp::Mul => Ok((format!("ostrin_qty_mul({lc}, {rc})"), CType::Quantity(dim_mul(d1, d2)))),
+                BinOp::Mul => {
+                    let combined = dim_mul(d1, d2);
+                    let helper = if dim_is_dimensionless(&combined) { "ostrin_qty_mul_pure" } else { "ostrin_qty_mul" };
+                    Ok((format!("{helper}({lc}, {rc})"), CType::Quantity(combined)))
+                }
                 BinOp::Div => {
                     let combined = dim_div(d1, d2);
                     if dim_is_dimensionless(&combined) {
@@ -5358,6 +5610,22 @@ impl<'a> Codegen<'a> {
 
     fn gen_method_call(&mut self, obj: &Expr, method_name: &str, type_args: Option<&[Type]>, args: &[Arg]) -> Result<(String, CType), String> {
         let (obj_code, obj_ty) = self.gen_expr(obj)?;
+        if matches!(obj_ty, CType::Array(_)) && fresh_array_expr(obj) {
+            // `(x * 2.0).sum()`: array methods never return their receiver, so a
+            // fresh one is released once the method has run.
+            let receiver = self.next_temp();
+            let (code, ty) = self.gen_method_call_on(obj, receiver.clone(), obj_ty.clone(), method_name, type_args, args)?;
+            let head = format!("Array_Float* {receiver} = {obj_code};").replacen("Array_Float*", &c_type_name(&obj_ty), 1);
+            if ty == CType::Void {
+                return Ok((format!("({{ {head} {code}; ostrin_release((void*){receiver}); }})"), ty));
+            }
+            let result = self.next_temp();
+            return Ok((format!("({{ {head} {} {result} = {code}; ostrin_release((void*){receiver}); {result}; }})", c_type_name(&ty)), ty));
+        }
+        self.gen_method_call_on(obj, obj_code, obj_ty, method_name, type_args, args)
+    }
+
+    fn gen_method_call_on(&mut self, obj: &Expr, obj_code: String, obj_ty: CType, method_name: &str, type_args: Option<&[Type]>, args: &[Arg]) -> Result<(String, CType), String> {
         // `to_string()` exists on every scalar in the interpreter
         // (`receiver.to_string()` in `eval_call`); records/enums aren't
         // covered (their printed form needs a generated Display).
@@ -5379,7 +5647,29 @@ impl<'a> Codegen<'a> {
                 return Ok((text, CType::Str));
             }
         }
+        if matches!(obj_ty, CType::Quantity(_)) && args.is_empty() && (method_name == "value" || method_name == "unit") {
+            let temp = self.next_temp();
+            return Ok(if method_name == "value" {
+                (format!("({{ Qty {temp} = {obj_code}; {temp}.v; }})"), CType::Float)
+            } else {
+                (format!("({{ Qty {temp} = {obj_code}; ostrin_unit_cat({temp}.u, \"\", \"\"); }})"), CType::Str)
+            });
+        }
         if obj_ty == CType::Str && method_name != "to_string" {
+            if owned_call_argument(obj, &obj_ty) {
+                // A fresh receiver (`pt(..).replace(..)`): every String method
+                // returns a new value, so the receiver is released after the call.
+                let receiver = self.next_temp();
+                let (code, ty) = self.gen_string_method(&receiver, method_name, args, false)?;
+                if ty == CType::Void {
+                    return Ok((format!("({{ const char* {receiver} = {obj_code}; {code}; ostrin_release((void*){receiver}); }})"), ty));
+                }
+                let result = self.next_temp();
+                return Ok((
+                    format!("({{ const char* {receiver} = {obj_code}; {} {result} = {code}; ostrin_release((void*){receiver}); {result}; }})", c_type_name(&ty)),
+                    ty,
+                ));
+            }
             let borrowed_receiver = matches!(obj.unlocated(), Expr::Ident(_) | Expr::FieldAccess(..) | Expr::Index(..));
             return self.gen_string_method(&obj_code, method_name, args, !borrowed_receiver);
         }
@@ -5433,9 +5723,20 @@ impl<'a> Codegen<'a> {
                     ));
                 }
                 let coerced = self.coerce_args(&arg_codes, &arg_types, &param_types[1..])?;
-                let mut all_args = vec![obj_code];
-                all_args.extend(coerced);
-                Ok((format!("{c_name}({})", all_args.join(", ")), return_type))
+                // Fresh managed arguments and a fresh receiver (`a.f().g()`)
+                // are held in temporaries and released after the call.
+                let mut owned = self.materialize_owned_call_args(args, &coerced, &arg_types);
+                let receiver = if owned_call_argument(obj, &obj_ty) {
+                    let temp = self.next_temp();
+                    owned.temporaries.insert(0, (c_type_name(&obj_ty), temp.clone(), obj_code));
+                    temp
+                } else {
+                    obj_code
+                };
+                let mut all_args = vec![receiver];
+                all_args.extend(owned.codes.iter().cloned());
+                let call = format!("{c_name}({})", all_args.join(", "));
+                Ok(self.finish_owned_call(owned, call, return_type))
             }
             CType::DynTrait(trait_name) => {
                 let Some((param_types, return_type)) = self.trait_methods.get(trait_name).and_then(|m| m.get(method_name)).cloned()
@@ -5577,6 +5878,46 @@ impl<'a> Codegen<'a> {
                     (other, _) => Err(format!("Rng has no method '{other}' with these arguments")),
                 }
             }
+            CType::Array(t) if matches!(**t, CType::Quantity(_)) => {
+                let quantity = (**t).clone();
+                let CType::Quantity(dim) = &quantity else { unreachable!() };
+                let dim = dim.clone();
+                let (codes, _) = self.gen_args(args)?;
+                let a = self.next_temp();
+                let head = format!("Array_Float* {a} = {obj_code};");
+                let with_args = |codes: &[String]| if codes.is_empty() { String::new() } else { format!(", {}", codes.join(", ")) };
+                match method_name {
+                    "unit" => Ok((format!("({{ {head} ostrin_unit_cat({a}->unit, \"\", \"\"); }})"), CType::Str)),
+                    "values" => Ok((format!("({{ {head} ostrin_qa_tag(ostrin_qa_copy({a}), NULL); }})"), CType::Array(Box::new(CType::Float)))),
+                    "sum" | "min" | "max" | "mean" | "median" | "std" | "sample_std" | "percentile" => Ok((
+                        format!("({{ {head} (Qty){{ Array_Float_{method_name}({a}{}), {a}->unit }}; }})", with_args(&codes)),
+                        quantity,
+                    )),
+                    "get" => Ok((
+                        format!("({{ {head} (Qty){{ Array_Float_get({a}, (int64_t[]){{ {} }}, {}), {a}->unit }}; }})", codes.join(", "), codes.len()),
+                        quantity,
+                    )),
+                    "var" | "sample_var" => Ok((
+                        format!("({{ {head} double __s; (Qty){{ Array_Float_{method_name}({a}), ostrin_unit_combine({a}->unit, {a}->unit, 0, &__s) }}; }})"),
+                        CType::Quantity(dim_mul(&dim, &dim)),
+                    )),
+                    "to_list" => {
+                        let list = self.ensure_list(&quantity);
+                        Ok((
+                            format!("({{ {head} {list}* __l = {list}_new_from_array(NULL, 0); for (int64_t __i = 0; __i < {a}->size; __i++) {list}_push(__l, (Qty){{ {a}->data[__i], {a}->unit }}); __l; }})"),
+                            CType::List(Box::new(quantity)),
+                        ))
+                    }
+                    "sort" | "cumsum" | "transpose" | "reshape" | "row" | "col" => Ok((
+                        format!("({{ {head} ostrin_qa_tag(Array_Float_{method_name}({a}{}), {a}->unit); }})", with_args(&codes)),
+                        obj_ty.clone(),
+                    )),
+                    "shape" => Ok((format!("Array_Float_shape({obj_code})"), CType::List(Box::new(CType::Int)))),
+                    "rank" => Ok((format!("Array_Float_rank({obj_code})"), CType::Int)),
+                    "size" | "length" | "count" => Ok((format!("Array_Float_size({obj_code})"), CType::Int)),
+                    other => Err(format!("Array of quantities has no method '{other}' the native backend supports")),
+                }
+            }
             CType::Array(t) => {
                 let t = (**t).clone();
                 let n = mangle_ctype(&obj_ty);
@@ -5700,6 +6041,15 @@ impl<'a> Codegen<'a> {
                             return Err("'push' expects exactly one argument".to_string());
                         }
                         let coerced = self.coerce(&arg_codes[0], &arg_types[0], &elem_ty)?;
+                        // `push` retains its value: a fresh one drops the caller's reference.
+                        let fresh = matches!(&args[0], Arg::Positional(e) if owned_call_argument(e, &elem_ty));
+                        if fresh {
+                            let t = self.next_temp();
+                            return Ok((
+                                format!("({{ {} {t} = {coerced}; {struct_name}_push({obj_code}, {t}); ostrin_release_owned((void*){t}); }})", c_type_name(&elem_ty)),
+                                CType::Void,
+                            ));
+                        }
                         Ok((format!("{struct_name}_push({obj_code}, {coerced})"), CType::Void))
                     }
                     "remove_at" => {
@@ -5925,6 +6275,10 @@ impl<'a> Codegen<'a> {
             CType::Bool => Ok(format!("(({code}) ? \"true\" : \"false\")")),
             CType::Str => Ok(code.to_string()),
             CType::Quantity(_) => Ok(format!("ostrin_qty_to_string({code})")),
+            CType::Array(e) if matches!(**e, CType::Quantity(_)) => {
+                let shown = self.show_expr("__qa_shown", &CType::Array(Box::new(CType::Float)))?;
+                Ok(format!("({{ Array_Float* __qa_shown = {code}; ostrin_qa_show(__qa_shown, {shown}); }})"))
+            }
             CType::Record(_) | CType::Enum(_) | CType::List(_) | CType::Option(_) | CType::Result(..) | CType::Map(..) | CType::Set(_) | CType::Array(_) => {
                 let name = mangle_ctype(ty);
                 if self.show_done.insert(name.clone()) {
@@ -6376,6 +6730,20 @@ impl<'a> Codegen<'a> {
                     ty = inner;
                     depth += 1;
                 }
+                if depth == 1 && matches!(ty, CType::Quantity(_)) {
+                    // Quantities: the numbers in the first element's unit.
+                    let array_ty = CType::Array(Box::new(ty.clone()));
+                    self.register_list_types(&array_ty);
+                    let list = self.ensure_list(ty);
+                    let (l, r) = (self.next_temp(), self.next_temp());
+                    return Ok(Some((
+                        format!(
+                            "({{ {list}* {l} = {}; if ({l}->length < 1) OSTRIN_FAIL(\"an array can't be empty\"); int64_t __shape[1] = {{ {l}->length }}; Array_Float* {r} = Array_Float_alloc(1, __shape); for (int64_t __i = 0; __i < {l}->length; __i++) {r}->data[__i] = ostrin_convert({l}->items[__i].v, {l}->items[__i].u, {l}->items[0].u); ostrin_qa_tag({r}, {l}->items[0].u); }})",
+                            codes[0]
+                        ),
+                        array_ty,
+                    )));
+                }
                 if !(1..=3).contains(&depth) || !matches!(ty, CType::Int | CType::Float | CType::Float32 | CType::Bool) {
                     return Err("'array' supports nested lists (up to 3 deep) of Int, Float, Float32 or Bool in the native backend".to_string());
                 }
@@ -6499,8 +6867,28 @@ fn normalize_call_args(params: &[Param], args: &[Arg], skip: usize) -> Result<Op
             Arg::Named(n, e) => (Some(n.clone()), e.clone()),
         })
         .collect();
-    crate::hir::arrange_arguments(params, named, Expr::clone)
+    // A default is checked where it is declared (possibly another module),
+    // so its copy drops the source locations that would be looked up in the
+    // caller's file.
+    crate::hir::arrange_arguments(params, named, |p| strip_locations(p.default.as_ref().expect("called for defaulted parameters")))
         .map(|list| Some(list.into_iter().map(Arg::Positional).collect()))
+}
+
+/// An array-valued expression whose result nobody else holds.
+fn fresh_array_expr(expr: &Expr) -> bool {
+    matches!(
+        expr.unlocated(),
+        Expr::Call(..) | Expr::GenericCall(..) | Expr::Binary(..) | Expr::Unary(..) | Expr::As(..)
+    )
+}
+
+fn strip_locations(expr: &Expr) -> Expr {
+    match expr {
+        Expr::Located(inner, _) => strip_locations(inner),
+        Expr::Unary(op, operand) => Expr::Unary(*op, Box::new(strip_locations(operand))),
+        Expr::Binary(op, left, right) => Expr::Binary(*op, Box::new(strip_locations(left)), Box::new(strip_locations(right))),
+        other => other.clone(),
+    }
 }
 
 /// Matches a variant constructor's arguments to its declared fields:
@@ -6758,6 +7146,7 @@ fn generate_impl(
         pending_results: VecDeque::new(),
         current_return: Vec::new(),
         lambda_depth: 0,
+        uses_quantity_arrays: false,
         capture_frames: RefCell::new(Vec::new()),
         closure_bodies: Vec::new(),
         closure_protos: Vec::new(),
@@ -7203,7 +7592,7 @@ fn generate_impl(
             list_typedefs.push_str(&format!("typedef struct {name} {name};\n"));
             if let CType::Array(elem) = &ty {
                 let tc = c_type_name(elem);
-                list_type_decls.push_str(&format!("struct {name} {{\n    {tc}* data;\n    int64_t* shape;\n    int64_t rank;\n    int64_t size;\n}};\n\n"));
+                list_type_decls.push_str(&format!("struct {name} {{\n    {tc}* data;\n    int64_t* shape;\n    int64_t rank;\n    int64_t size;\n    const char* unit;\n}};\n\n"));
                 let lt = list_struct_name(elem);
                 let rows = CType::List(elem.clone());
                 let llt = list_struct_name(&rows);
@@ -7885,6 +8274,9 @@ fn generate_impl(
         out.push_str("\n\n");
     }
 
+    if codegen.uses_quantity_arrays {
+        late_array_blocks.push(QUANTITY_ARRAY_RUNTIME.to_string());
+    }
     // Array runtimes: full definitions, after every prototype they call.
     for block in array_blocks.iter().chain(&late_array_blocks) {
         out.push_str(block);
@@ -7899,7 +8291,32 @@ fn generate_impl(
     }
     out.push_str("    return 0;\n}\n");
     if out.contains("Qty") {
-        out = out.replacen(PRELUDE, &format!("{PRELUDE}{QTY_RUNTIME}"), 1);
+        // Declared units join the runtime's table; a simple one (one base dimension, exponent 1)
+        // gets the same base code as the built-in units, so `ft * m` folds like `km * m`.
+        let mut user = String::new();
+        for (symbol, dim, factor) in crate::types::user_units() {
+            let base = match dim.iter().next() {
+                Some((name, 1)) if dim.len() == 1 => {
+                    let code = match name.as_str() {
+                        "Length" => "L",
+                        "Time" => "T",
+                        "Mass" => "M",
+                        "Temperature" => "Th",
+                        "ElectricCurrent" => "I",
+                        "AmountOfSubstance" => "N",
+                        "LuminousIntensity" => "J",
+                        "Currency" => "$",
+                        "Information" => "B",
+                        other => other,
+                    };
+                    c_string_literal(code)
+                }
+                _ => "NULL".to_string(),
+            };
+            user.push_str(&format!("    {{{}, {factor:?}, {base}}},\n", c_string_literal(&symbol)));
+        }
+        let runtime = QTY_RUNTIME.replace("/*@USER_UNITS@*/", &user);
+        out = out.replacen(PRELUDE, &format!("{PRELUDE}{runtime}"), 1);
     }
     if out.contains("OstrinRng") {
         out = out.replacen(PRELUDE, &format!("{PRELUDE}{RNG_RUNTIME}"), 1);

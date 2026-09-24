@@ -1,0 +1,17 @@
+// std.viz · unit-aware plots: axes are labelled with the units the data carries.
+import std.viz
+
+fn main() -> Void {
+    times = linspace(0.0, 40.0, 9) as s
+    speeds = array([0.0, 6.1, 11.4, 15.8, 19.4, 22.3, 24.5, 26.1, 27.2]) as m/s
+    // Converting the data converts the axis: the chart is in km/h.
+    in_kmh = speeds as km/h
+    distance = (speeds * (5 s)).cumsum()
+    print("top speed " + in_kmh.max().to_string() + ", distance " + (distance.max() as km).to_string())
+    fig = viz.figure("Car acceleration")
+        .describe("the axis units come from the quantities")
+        .labels("time", "speed")
+        .unit_line(times, in_kmh, label: "measured")
+        .unit_scatter(times, in_kmh)
+    print(fig.svg())
+}

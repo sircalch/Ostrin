@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#080a10">
+    <meta name="description" content="Ostrin Viz: scientific figures (lines, histograms, heatmaps, contours, shaded 3D surfaces, trajectories and point clouds) drawn to SVG by std.viz, a library written in Ostrin. Every figure runs live in your browser.">
+    <link rel="canonical" href="https://sircalch.github.io/Ostrin/viz.html">
+    <meta property="og:site_name" content="Ostrin">
+    <meta property="og:title" content="Ostrin Viz — Scientific Figures Drawn by Ostrin">
+    <meta property="og:description" content="Ostrin Viz: scientific figures (lines, histograms, heatmaps, contours, shaded 3D surfaces, trajectories and point clouds) drawn to SVG by std.viz, a library written in Ostrin. Every figure runs live in your browser.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://sircalch.github.io/Ostrin/viz.html">
+    <meta property="og:image" content="https://sircalch.github.io/Ostrin/assets/ostrin-social.png">
+    <meta property="og:image:type" content="image/png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Ostrin programming language: scientific-first, general-purpose, native C and WASI.">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Ostrin Viz — Scientific Figures Drawn by Ostrin">
+    <meta name="twitter:description" content="Ostrin Viz: scientific figures (lines, histograms, heatmaps, contours, shaded 3D surfaces, trajectories and point clouds) drawn to SVG by std.viz, a library written in Ostrin. Every figure runs live in your browser.">
+    <meta name="twitter:image" content="https://sircalch.github.io/Ostrin/assets/ostrin-social.png">
+    <meta name="twitter:image:alt" content="Ostrin programming language: scientific-first, general-purpose, native C and WASI.">
+    <link rel="icon" href="assets/ostrin-logo.png">
+    <link rel="stylesheet" href="styles.css">
+    <script src="site-data.js" defer></script>
+    <script src="site.js" defer></script>
+    <script src="lab-data.js" defer></script>
+    <script type="module" src="viz.js"></script>
+    <title>Ostrin Viz — Scientific Figures Drawn by Ostrin</title>
+  </head>
+  <body>
+    <header class="site-header"><a class="brand" href="index.html"><img src="assets/ostrin-logo.png" alt="" width="36" height="36"><span>OSTRIN</span></a><div class="header-right"><span class="version"></span><button class="menu-toggle" aria-label="Open navigation" aria-expanded="false"><span></span><span></span></button><nav class="site-nav" aria-label="Main navigation"><a href="docs.html">Learn</a><a href="reference.html">Reference</a><a href="guides.html">Guides</a><a href="examples.html">Examples</a><a href="cookbook.html">Cookbook</a><a href="viz.html" aria-current="page">Viz</a><a href="playground.html">Playground</a><a href="https://github.com/sircalch/Ostrin">GitHub <span aria-hidden="true">↗</span></a></nav></div></header>
+    <main>
+      <section class="page-hero shell"><p class="eyebrow">Ostrin Viz 0.1</p><h1>Scientific figures,<br><em>drawn by Ostrin.</em></h1><p class="lede"><span class="mono">std.viz</span> is the visualization library of the Ostrin standard library, written in Ostrin itself. A figure is data (a list of series); rendering it lays out ticks, legends, colormaps and 3D projections and writes a standalone SVG. The interpreter, the native C backend and the compiler running in this page produce the same bytes.</p><div class="page-meta"><span>2D and 3D</span><span>unit-aware axes</span><span>byte-identical across backends</span><span>runs in your browser</span></div></section>
+      <section class="section shell viz-intro">
+        <div class="viz-steps">
+          <article><span class="feature-number">01 / DESCRIBE</span><h2>A figure is a value.</h2><p class="muted"><span class="mono">viz.figure(title)</span> and <span class="mono">viz.scene3d(title)</span> return records; each mark (line, band, histogram, heatmap, surface…) appends a series. Named and default arguments keep calls short.</p></article>
+          <article><span class="feature-number">02 / LAY OUT</span><h2>Ostrin does the geometry.</h2><p class="muted">1-2-5 ticks, legends placed in the emptiest corner, marching-squares contours, an orthographic camera, painter's algorithm and directional light: all of it is Ostrin code.</p></article>
+          <article><span class="feature-number">03 / RENDER</span><h2>Standalone SVG.</h2><p class="muted"><span class="mono">fig.svg()</span> returns the document and <span class="mono">fig.save(path)</span> writes it. Units travel with the data: plotting <span class="mono">Array&lt;Quantity&lt;D&gt;&gt;</span> labels the axes <span class="mono">speed [km/h]</span>.</p></article>
+        </div>
+        <div class="code-window viz-snippet"><div class="window-bar"><span></span><span>examples/viz_units.ostrin</span><span></span></div><pre class="sl-code"><code>import std.viz
+
+fn main() -&gt; Void {
+    times = [0 s, 5 s, 10 s, 15 s, 20 s]
+    speeds = [0 m/s, 6.1 m/s, 11.4 m/s, 15.8 m/s, 19.4 m/s]
+    in_kmh = speeds.map(fn(v) { v as km/h })
+    fig = viz.figure("Car acceleration")
+        .labels("time", "speed")
+        .unit_line(times, in_kmh, label: "measured")
+    print(fig.svg())   // axes: "time [s]" and "speed [km/h]"
+}</code></pre></div>
+      </section>
+      <section class="section shell"><div class="section-header"><p class="eyebrow">Gallery</p><div><h2>Every figure is a program you can run.</h2><p class="lede">Each image below is the SVG its program printed when this site was built with <span class="mono">ostrinc.wasm</span>. Press <strong>Run live</strong> to recompute it in this page.</p></div></div>
+        <div class="viz-gallery" data-viz-gallery><noscript><p class="dim">The gallery needs JavaScript to list the figures; the programs are under <a class="text-link violet" href="https://github.com/sircalch/Ostrin/tree/main/examples">examples/viz_*.ostrin ↗</a>.</p></noscript></div>
+      </section>
+      <section class="section shell viz-status"><div class="section-header"><p class="eyebrow">Status</p><div><h2>What std.viz does today, and what is next.</h2></div></div>
+        <div class="viz-matrix">
+          <article><h3>Available</h3><ul><li>line, scatter, area, band, error bars, bars, histogram, stairs, reference lines, notes</li><li>heatmap with colorbar, contour lines</li><li>3D surface, wireframe, trajectory, point cloud; azimuth/elevation camera</li><li>legends, 1-2-5 ticks, light and dark themes, viridis/magma/coolwarm/ocean</li><li>multi-panel layouts with <span class="mono">viz.grid</span></li><li>hover highlights and value tooltips inside the SVG (no scripts), explorable here with zoom and pan</li><li>axis units from <span class="mono">Array&lt;Quantity&lt;D&gt;&gt;</span> or <span class="mono">List&lt;Quantity&lt;D&gt;&gt;</span> data</li></ul></article>
+          <article><h3>Planned</h3><ul><li>richer interaction: linked selection, sliders driven by Ostrin</li><li>animation frames</li><li>PNG and PDF export (needs a raster backend)</li><li>a WebGPU backend for large meshes, volumes and iso-surfaces</li><li>uncertainty-aware plots once <span class="mono">Measurement&lt;T&gt;</span> exists</li><li>figure provenance (source and data hashes, seed)</li></ul></article>
+        </div>
+        <p class="sl-limits"><strong>Current limits: </strong>rendering is CPU-side SVG, comfortable up to a few thousand triangles.</p>
+      </section>
+    </main>
+    <footer class="site-footer shell"><a class="brand" href="index.html"><img src="assets/ostrin-logo.png" alt="" width="30" height="30"><span>OSTRIN</span></a><span>Open development · MIT License</span><div class="footer-links"><a href="language.html">Language</a><a href="ecosystem.html">Ecosystem</a><a href="showcase.html">Showcase</a><a href="community.html">Community</a><a href="roadmap.html">Roadmap</a><a href="https://github.com/sircalch/Ostrin">GitHub ↗</a></div></footer>
+  </body>
+</html>

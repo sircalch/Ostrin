@@ -1,0 +1,28 @@
+// Units and dimensions declared by the program (document 01 §3.5).
+dimension Money
+unit coin : Money
+unit gem : Money
+define 1 gem = 250 coin
+
+unit ft : Length
+define 1 ft = 0.3048 m
+unit mi : Length
+define 1 mi = 5280 ft
+
+unit psi : Pressure
+define 1 psi = 6894.757 Pa
+
+fn total(prices: Array<Quantity<Money>>) -> Quantity<Money> {
+    prices.sum()
+}
+
+fn main() -> Void {
+    print((3 gem + 40 coin) as coin)
+    print(total(array([2 gem, 100 coin, 1 gem])))
+    print(1 mi as km)
+    print((6 ft * 2 m) as m^2)
+    print(30 psi as kPa)
+    print((10 mi / 1 h) as m/s)
+    height = 6 ft
+    print(height within (1.5 m to 2 m))
+}

@@ -1,0 +1,33 @@
+// std.viz · 3D trajectory: the Lorenz attractor, colored by time.
+import std.viz
+
+fn main() -> Void {
+    sigma = 10.0
+    rho = 28.0
+    beta = 8.0 / 3.0
+    dt = 0.01
+    mut xs: List<Float> = []
+    mut ys: List<Float> = []
+    mut zs: List<Float> = []
+    mut x = 1.0
+    mut y = 1.0
+    mut z = 1.0
+    for n in 0 until 4000 {
+        dx = sigma * (y - x)
+        dy = x * (rho - z) - y
+        dz = x * y - beta * z
+        x = x + dx * dt
+        y = y + dy * dt
+        z = z + dz * dt
+        xs.push(x)
+        ys.push(y)
+        zs.push(z)
+    }
+    print("final state " + viz.num(x) + " " + viz.num(y) + " " + viz.num(z))
+    scene = viz.scene3d("Lorenz attractor")
+        .describe("σ = 10, ρ = 28, β = 8/3, 4000 Euler steps")
+        .labels("x", "y", "z")
+        .view(-60.0, 20.0)
+        .line(array(xs), array(ys), array(zs), width: 0.9, colormap: "viridis")
+    print(scene.svg())
+}

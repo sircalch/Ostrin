@@ -58,6 +58,8 @@ pub fn load_project(
     deps: &HashMap<String, PathBuf>,
     overrides: &HashMap<PathBuf, String>,
 ) -> Result<Vec<Item>, Vec<ModuleDiagnostic>> {
+    // Units declared by a previous compilation (the LSP reuses the process) don't carry over.
+    crate::types::reset_user_units();
     let root = entry_path.parent().unwrap_or_else(|| Path::new(".")).to_path_buf();
     let mut cache: HashMap<Vec<String>, Module> = HashMap::new();
     let mut in_progress: Vec<Vec<String>> = Vec::new();
@@ -135,6 +137,7 @@ const STD_MODULES: &[(&str, &str)] = &[
     ("args", include_str!("../std/args.ostrin")),
     ("env", include_str!("../std/env.ostrin")),
     ("maps", include_str!("../std/maps.ostrin")),
+    ("viz", include_str!("../std/viz.ostrin")),
 ];
 
 fn std_module_source(file_path: &Path) -> Option<io::Result<String>> {
@@ -346,7 +349,8 @@ fn rewrite_item(item: &mut Item, module_path: &[String], ctx: &RewriteCtx) -> Re
         Item::Function(f) => {
             f.name = mangled(module_path, &f.name);
             rewrite_signature(&mut f.params, &mut f.return_type, ctx)?;
-            rewrite_block(&mut f.body, ctx)?;
+            let bound: HashSet<String> = f.params.iter().map(|p| p.name.clone()).collect();
+            rewrite_block(&mut f.body, ctx, &bound)?;
         }
         Item::Record(r) => {
             r.module_path = module_path.to_vec();
@@ -354,7 +358,7 @@ fn rewrite_item(item: &mut Item, module_path: &[String], ctx: &RewriteCtx) -> Re
             for field in &mut r.fields {
                 rewrite_type(&mut field.ty, ctx)?;
                 if let Some(default) = &mut field.default {
-                    rewrite_expr(default, ctx)?;
+                    rewrite_expr(default, ctx, &HashSet::new())?;
                 }
             }
         }
@@ -385,7 +389,9 @@ fn rewrite_item(item: &mut Item, module_path: &[String], ctx: &RewriteCtx) -> Re
             }
             for m in &mut im.methods {
                 rewrite_signature(&mut m.params, &mut m.return_type, ctx)?;
-                rewrite_block(&mut m.body, ctx)?;
+                let mut bound: HashSet<String> = m.params.iter().map(|p| p.name.clone()).collect();
+                bound.insert("self".to_string());
+                rewrite_block(&mut m.body, ctx, &bound)?;
             }
         }
         Item::Import(_) => {}
@@ -400,7 +406,9 @@ fn rewrite_item(item: &mut Item, module_path: &[String], ctx: &RewriteCtx) -> Re
             for method in &mut t.methods {
                 rewrite_signature(&mut method.params, &mut method.return_type, ctx)?;
                 if let Some(body) = &mut method.default_body {
-                    rewrite_block(body, ctx)?;
+                    let mut bound: HashSet<String> = method.params.iter().map(|p| p.name.clone()).collect();
+                    bound.insert("self".to_string());
+                    rewrite_block(body, ctx, &bound)?;
                 }
             }
         }
@@ -414,97 +422,130 @@ fn rewrite_signature(params: &mut [Param], return_type: &mut Type, ctx: &Rewrite
     for param in params {
         rewrite_type(&mut param.ty, ctx)?;
         if let Some(default) = &mut param.default {
-            rewrite_expr(default, ctx)?;
+            rewrite_expr(default, ctx, &HashSet::new())?;
         }
     }
     rewrite_type(return_type, ctx)
 }
 
-fn rewrite_block(block: &mut Block, ctx: &RewriteCtx) -> Result<(), String> {
-    for stmt in &mut block.stmts { rewrite_stmt(&mut stmt.stmt, ctx)?; }
-    if let Some(tail) = &mut block.tail { rewrite_expr(tail, ctx)?; }
+/// Names bound locally (parameters, bindings, loop and pattern variables,
+/// lambda parameters) shadow the module's own items: `fn f(light: Float)`
+/// keeps `light` a parameter even when the module also defines `fn light`.
+fn rewrite_block(block: &mut Block, ctx: &RewriteCtx, bound: &HashSet<String>) -> Result<(), String> {
+    let mut local = bound.clone();
+    for stmt in &mut block.stmts { rewrite_stmt(&mut stmt.stmt, ctx, &mut local)?; }
+    if let Some(tail) = &mut block.tail { rewrite_expr(tail, ctx, &local)?; }
     Ok(())
 }
 
-fn rewrite_stmt(stmt: &mut Stmt, ctx: &RewriteCtx) -> Result<(), String> {
-    match stmt {
-        Stmt::Binding { ty, value, .. } => {
-            if let Some(ty) = ty {
-                rewrite_type(ty, ctx)?;
-            }
-            rewrite_expr(value, ctx)
+fn pattern_names(pattern: &Pattern, bound: &mut HashSet<String>) {
+    match pattern {
+        Pattern::Ident(name) => {
+            bound.insert(name.clone());
         }
-        Stmt::Assign { value, .. } => rewrite_expr(value, ctx),
-        Stmt::Return(Some(e)) | Stmt::Break(Some(e)) => rewrite_expr(e, ctx),
-        Stmt::Return(None) | Stmt::Break(None) | Stmt::Continue => Ok(()),
-        Stmt::For { iter, body, .. } => { rewrite_expr(iter, ctx)?; rewrite_block(body, ctx) }
-        Stmt::While { cond, body } => { rewrite_expr(cond, ctx)?; rewrite_block(body, ctx) }
-        Stmt::FieldAssign { target, value } => { rewrite_expr(target, ctx)?; rewrite_expr(value, ctx) }
-        Stmt::Expr(e) => rewrite_expr(e, ctx),
+        Pattern::Variant(_, fields) => {
+            for (_, field) in fields {
+                pattern_names(field, bound);
+            }
+        }
+        Pattern::Wildcard | Pattern::Literal(_) | Pattern::Range(..) => {}
     }
 }
 
-fn rewrite_expr(expr: &mut Expr, ctx: &RewriteCtx) -> Result<(), String> {
+fn rewrite_stmt(stmt: &mut Stmt, ctx: &RewriteCtx, bound: &mut HashSet<String>) -> Result<(), String> {
+    match stmt {
+        Stmt::Binding { ty, value, name, .. } => {
+            if let Some(ty) = ty {
+                rewrite_type(ty, ctx)?;
+            }
+            rewrite_expr(value, ctx, bound)?;
+            bound.insert(name.clone());
+            Ok(())
+        }
+        Stmt::Assign { value, name } => {
+            rewrite_expr(value, ctx, bound)?;
+            bound.insert(name.clone());
+            Ok(())
+        }
+        Stmt::Return(Some(e)) | Stmt::Break(Some(e)) => rewrite_expr(e, ctx, bound),
+        Stmt::Return(None) | Stmt::Break(None) | Stmt::Continue => Ok(()),
+        Stmt::For { pattern, iter, body } => {
+            rewrite_expr(iter, ctx, bound)?;
+            let mut inner = bound.clone();
+            inner.insert(pattern.clone());
+            rewrite_block(body, ctx, &inner)
+        }
+        Stmt::While { cond, body } => { rewrite_expr(cond, ctx, bound)?; rewrite_block(body, ctx, bound) }
+        Stmt::FieldAssign { target, value } => { rewrite_expr(target, ctx, bound)?; rewrite_expr(value, ctx, bound) }
+        Stmt::Expr(e) => rewrite_expr(e, ctx, bound),
+    }
+}
+
+fn rewrite_expr(expr: &mut Expr, ctx: &RewriteCtx, bound: &HashSet<String>) -> Result<(), String> {
     match expr {
-        Expr::Located(inner, _) => rewrite_expr(inner, ctx),
+        Expr::Located(inner, _) => rewrite_expr(inner, ctx, bound),
         Expr::FieldAccess(obj, member) => {
             if let Expr::Ident(alias) = obj.as_ref() {
-                if let Some(target_path) = ctx.alias_map.get(alias) {
+                if let Some(target_path) = ctx.alias_map.get(alias).filter(|_| !bound.contains(alias)) {
                     let resolved = resolve_export(target_path, member, ctx.cache)?;
                     *expr = Expr::Ident(resolved);
                     return Ok(());
                 }
             }
-            rewrite_expr(obj, ctx)
+            rewrite_expr(obj, ctx, bound)
         }
         Expr::Ident(name) => {
-            if let Some(resolved) = ctx.resolve_map.get(name) {
+            if let Some(resolved) = ctx.resolve_map.get(name).filter(|_| !bound.contains(name)) {
                 *name = resolved.clone();
             }
             Ok(())
         }
-        Expr::UnitLiteral(n, _) => rewrite_expr(n, ctx),
-        Expr::Loop(b) => rewrite_block(b, ctx),
-        Expr::Unary(_, e) => rewrite_expr(e, ctx),
-        Expr::Binary(_, l, r) => { rewrite_expr(l, ctx)?; rewrite_expr(r, ctx) }
+        Expr::UnitLiteral(n, _) => rewrite_expr(n, ctx, bound),
+        Expr::Loop(b) => rewrite_block(b, ctx, bound),
+        Expr::Unary(_, e) => rewrite_expr(e, ctx, bound),
+        Expr::Binary(_, l, r) => { rewrite_expr(l, ctx, bound)?; rewrite_expr(r, ctx, bound) }
         Expr::Range(s, _, e, step) => {
-            rewrite_expr(s, ctx)?;
-            rewrite_expr(e, ctx)?;
-            if let Some(st) = step { rewrite_expr(st, ctx)?; }
+            rewrite_expr(s, ctx, bound)?;
+            rewrite_expr(e, ctx, bound)?;
+            if let Some(st) = step { rewrite_expr(st, ctx, bound)?; }
             Ok(())
         }
         Expr::Call(callee, args) => {
-            rewrite_expr(callee, ctx)?;
+            rewrite_expr(callee, ctx, bound)?;
             for a in args {
                 match a {
-                    Arg::Positional(e) | Arg::Named(_, e) => rewrite_expr(e, ctx)?,
+                    Arg::Positional(e) | Arg::Named(_, e) => rewrite_expr(e, ctx, bound)?,
                 }
             }
             Ok(())
         }
         Expr::GenericCall(callee, type_args, args) => {
-            rewrite_expr(callee, ctx)?;
+            rewrite_expr(callee, ctx, bound)?;
             for type_arg in type_args {
                 rewrite_type(type_arg, ctx)?;
             }
             for a in args {
                 match a {
-                    Arg::Positional(e) | Arg::Named(_, e) => rewrite_expr(e, ctx)?,
+                    Arg::Positional(e) | Arg::Named(_, e) => rewrite_expr(e, ctx, bound)?,
                 }
             }
             Ok(())
         }
-        Expr::Index(obj, idx) => { rewrite_expr(obj, ctx)?; rewrite_expr(idx, ctx) }
+        Expr::Index(obj, idx) => { rewrite_expr(obj, ctx, bound)?; rewrite_expr(idx, ctx, bound) }
         Expr::If(cond, then_b, else_b) => {
-            rewrite_expr(cond, ctx)?;
-            rewrite_block(then_b, ctx)?;
-            if let Some(b) = else_b { rewrite_block(b, ctx)?; }
+            rewrite_expr(cond, ctx, bound)?;
+            rewrite_block(then_b, ctx, bound)?;
+            if let Some(b) = else_b { rewrite_block(b, ctx, bound)?; }
             Ok(())
         }
-        Expr::Block(b) => rewrite_block(b, ctx),
-        Expr::Lambda(_, b) => rewrite_block(b, ctx),
+        Expr::Block(b) => rewrite_block(b, ctx, bound),
+        Expr::Lambda(params, b) => {
+            let mut inner = bound.clone();
+            inner.extend(params.iter().cloned());
+            rewrite_block(b, ctx, &inner)
+        }
         Expr::ListLiteral(items) | Expr::SetLiteral(items) => {
-            for it in items { rewrite_expr(it, ctx)?; }
+            for it in items { rewrite_expr(it, ctx, bound)?; }
             Ok(())
         }
         Expr::EmptyCollection(_, type_args) => {
@@ -515,22 +556,22 @@ fn rewrite_expr(expr: &mut Expr, ctx: &RewriteCtx) -> Result<(), String> {
         }
         Expr::SizedIntLiteral(..) | Expr::Float32Literal(_) => Ok(()),
         Expr::MapLiteral(pairs) => {
-            for (k, v) in pairs { rewrite_expr(k, ctx)?; rewrite_expr(v, ctx)?; }
+            for (k, v) in pairs { rewrite_expr(k, ctx, bound)?; rewrite_expr(v, ctx, bound)?; }
             Ok(())
         }
         Expr::Try(inner, catch) => {
-            rewrite_expr(inner, ctx)?;
-            if let Some(c) = catch { rewrite_expr(c, ctx)?; }
+            rewrite_expr(inner, ctx, bound)?;
+            if let Some(c) = catch { rewrite_expr(c, ctx, bound)?; }
             Ok(())
         }
-        Expr::Within(a, r) => { rewrite_expr(a, ctx)?; rewrite_expr(r, ctx) }
-        Expr::Approximately(a, b, t) => { rewrite_expr(a, ctx)?; rewrite_expr(b, ctx)?; rewrite_expr(t, ctx) }
-        Expr::As(e, _) => rewrite_expr(e, ctx),
+        Expr::Within(a, r) => { rewrite_expr(a, ctx, bound)?; rewrite_expr(r, ctx, bound) }
+        Expr::Approximately(a, b, t) => { rewrite_expr(a, ctx, bound)?; rewrite_expr(b, ctx, bound)?; rewrite_expr(t, ctx, bound) }
+        Expr::As(e, _) => rewrite_expr(e, ctx, bound),
         Expr::RecordLiteral(name, fields) => {
             if let Some(resolved) = ctx.resolve_map.get(name.as_str()) {
                 *name = resolved.clone();
             }
-            for (_, v) in fields { rewrite_expr(v, ctx)?; }
+            for (_, v) in fields { rewrite_expr(v, ctx, bound)?; }
             Ok(())
         }
         Expr::GenericRecordLiteral(name, type_args, fields) => {
@@ -540,20 +581,22 @@ fn rewrite_expr(expr: &mut Expr, ctx: &RewriteCtx) -> Result<(), String> {
             for type_arg in type_args {
                 rewrite_type(type_arg, ctx)?;
             }
-            for (_, v) in fields { rewrite_expr(v, ctx)?; }
+            for (_, v) in fields { rewrite_expr(v, ctx, bound)?; }
             Ok(())
         }
         Expr::Match(scrutinee, arms) => {
-            rewrite_expr(scrutinee, ctx)?;
+            rewrite_expr(scrutinee, ctx, bound)?;
             for arm in arms {
-                if let Some(g) = &mut arm.guard { rewrite_expr(g, ctx)?; }
-                rewrite_block(&mut arm.body, ctx)?;
+                let mut inner = bound.clone();
+                pattern_names(&arm.pattern, &mut inner);
+                if let Some(g) = &mut arm.guard { rewrite_expr(g, ctx, &inner)?; }
+                rewrite_block(&mut arm.body, ctx, &inner)?;
             }
             Ok(())
         }
-        Expr::Spawn(b) | Expr::SpawnScope(b) => rewrite_block(b, ctx),
+        Expr::Spawn(b) | Expr::SpawnScope(b) => rewrite_block(b, ctx, bound),
         Expr::Channel(_, cap) => {
-            if let Some(c) = cap { rewrite_expr(c, ctx)?; }
+            if let Some(c) = cap { rewrite_expr(c, ctx, bound)?; }
             Ok(())
         }
         Expr::IntLiteral(_) | Expr::FloatLiteral(_) | Expr::StringLiteral(_) | Expr::CharLiteral(_) | Expr::BoolLiteral(_) => Ok(()),

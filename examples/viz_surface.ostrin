@@ -1,0 +1,18 @@
+// std.viz · 3D: a shaded surface with a colorbar.
+import std.viz
+
+fn peaks(x: Float, y: Float) -> Float {
+    3.0 * (1.0 - x) * (1.0 - x) * exp(-x * x - (y + 1.0) * (y + 1.0)) -
+        10.0 * (x / 5.0 - x * x * x - y * y * y * y * y) * exp(-x * x - y * y) -
+        exp(-(x + 1.0) * (x + 1.0) - y * y) / 3.0
+}
+
+fn main() -> Void {
+    xs = linspace(-3.0, 3.0, 36)
+    ys = linspace(-3.0, 3.0, 36)
+    scene = viz.scene3d("peaks(x, y) as a surface")
+        .describe("36 × 36 grid, 2450 shaded triangles")
+        .labels("x", "y", "z")
+        .surface(xs, ys, viz.grid_of(xs, ys, peaks), label: "height")
+    print(scene.svg())
+}

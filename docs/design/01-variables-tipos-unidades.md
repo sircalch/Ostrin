@@ -277,3 +277,45 @@ unit mmHg : Mass / (Length * Time^2)   // ejemplo de unidad derivada nombrada
 3. **Errores y control de flujo** (`Result`, propagación tipo `?`, panics vs errores recuperables) — no cubierto aquí.
 4. **Lógica de comparación difusa** (`approximately ... tolerance ...`, `within ... .. ...`) — pertenece al sistema de expresiones/lógica, se diseña después de cerrar funciones.
 5. **Concurrencia y modelo de memoria** — fuera de alcance de este documento.
+
+---
+
+## 3.6 Álgebra de unidades implementada (2026-09-24)
+
+Estado real del compilador, que concreta §3.1–§3.5:
+
+- **Catálogo** (`compiler/src/types.rs::unit_info`, replicado en `qty_runtime.c`): `m nm um mm cm km`,
+  `s ns us ms min h day`, `kg g mg ug`, `K`, `A mA`, `mol mmol umol`, `cd`, `USD EUR`, `bit byte`,
+  `L mL`, `Hz kHz`, `N kN`, `J kJ cal kcal`, `W kW`, `Pa kPa bar atm mmHg`, `C`, `V mV`, `ohm`.
+  Cada símbolo tiene su dimensión en unidades base y su factor hacia la unidad coherente del SI
+  (`atm` = 101 325 Pa; antes valía 1 Pa por error).
+- **Dimensiones con nombre** en tipos: `Area`, `Volume`, `Velocity`/`Speed`, `Acceleration`,
+  `Frequency`, `Force`, `Momentum`, `Energy`, `Power`, `Pressure`, `Density`, `Charge`, `Voltage`,
+  `Resistance`, `Concentration`. Se expanden a dimensiones base: `Quantity<Energy>` y
+  `Quantity<Mass * Length^2 / Time^2>` son el mismo tipo.
+- **Forma canónica**: `*` y `/` entre cantidades agrupan exponentes (`kg*m/s*m/s` → `kg*m^2/s^2`) y
+  funden átomos simples de la misma dimensión en el primero que aparece, ajustando el valor
+  (`90 km/h * 30 min` → `45 km`). Si todo se cancela, el resultado es un número.
+- **`as` con unidades compuestas** (`v as km/h`) y comprobación de dimensión: `x as s` con `x` una
+  longitud es E1026. Los mensajes muestran la dimensión legible: `Mass*Length^2/Time^2 (Energy)`.
+- **Introspección**: `q.value()` (número en su propia unidad) y `q.unit()` (texto de la unidad),
+  usados por `std.viz` para etiquetar ejes.
+
+- **Arrays de cantidades** (`Array<Quantity<D>>`, documento 19 §5): un array numérico más una unidad
+  común. `array([1 m, 250 cm])` toma la unidad del primer elemento; `linspace(0.0, 4.0, 5) as s` da
+  unidad a un `Array<Float>`; `+`, `-` y las comparaciones convierten el lado derecho a la unidad del
+  izquierdo; `*` y `/` combinan unidades como los escalares (un resultado sin dimensión es
+  `Array<Float>`); `a[i]`, `sum`, `min`, `max`, `mean`, `median`, `std`, `percentile` devuelven
+  cantidades y `var` la unidad al cuadrado; `a.unit()` y `a.values()` exponen unidad y números.
+  Intérprete (`interpreter/qarray.rs`) y nativo (`Array_Float` con campo `unit`, `ostrin_qa_*`) dan
+  los mismos bytes.
+
+- **Unidades del programa** (§3.5): `dimension Money`, `unit coin : Money`, `unit psi : Pressure` y
+  `define 1 psi = 6894.757 Pa` se registran antes de analizar cualquier expresión (dimensiones,
+  luego unidades, luego definiciones), así que valen en todo el programa y en sus módulos. Una unidad
+  sin `define` tiene factor 1 respecto a la unidad coherente; `define` exige la misma dimensión a
+  ambos lados. El runtime C recibe las unidades declaradas en una tabla generada. Ejemplo:
+  `examples/user_units.ostrin`.
+
+Pendiente: unidades afines (°C, con desplazamiento) y prefijos automáticos (`kft`).
+

@@ -3660,7 +3660,8 @@ Cobertura: 43 funciones y métodos de los ejemplos (36 antes); ratchet ≥ 40; t
 
 **Herramientas útiles:** `OSTRIN_HIR_DEBUG=1 ostrinc --emit-c f.ostrin` (qué funciones van por HIR), `OSTRIN_NO_HIR_CODEGEN=1` (fuerza AST), `--native-type-report`, `--typed-report`, `--hir`.
 
-**Trampas conocidas:** editar con scripts Python en el scratchpad (los heredocs de bash rompen comillas/backslashes); los `.rs` del repo usan CRLF (normalizar al editar); sintaxis: `and/or/not`, sin `let`, `match` con comas, sin `` hasta la sección 111; un ejemplo nuevo no debe pisar uno existente (`native_strings.ostrin` ya existía); los `ostrin.lock` de ejemplos se ignoran por `.gitignore`.
+**Trampas conocidas:** editar con scripts Python en el scratchpad (los heredocs de bash rompen comillas/backslashes); los `.rs` del repo usan CRLF (normalizar al editar); sintaxis: `and/or/not`, sin `let`, `match` con comas, sin `
+` hasta la sección 111; un ejemplo nuevo no debe pisar uno existente (`native_strings.ostrin` ya existía); los `ostrin.lock` de ejemplos se ignoran por `.gitignore`.
 
 **Pendientes de producto (no empezados):** concurrencia real, gestión de memoria en nativo (hoy `malloc` sin liberar), LU/QR/SVD, autovectores, histograma/barras en `plot`, `Array` de más tipos, WASM/playground, instalador y binarios.
 
@@ -6607,3 +6608,95 @@ llamadas a través de un valor función comprueban además el número de argumen
 Pruebas: `function_value_shadowing.ostrin` (20, 5, 6; paridad nativa con `live_allocations=0`)
 y `function_value_arity_errors.ostrin`, más una prueba de integración exacta. Suite: 2
 unitarias, 6 diferenciales y 202 de integración. Las salidas del Lab no cambian.
+
+## 270. Álgebra de unidades — 2026-09-24
+
+Cierra las limitaciones anotadas en §268. Un único catálogo (`types::unit_info`, replicado en
+`qty_runtime.c`) da dimensión y factor SI a cada símbolo; se añaden N, J, W, Pa, Hz, V, ohm, C,
+bar, mmHg, cal y prefijos (`um`, `ns`, `mA`, `mL`, …). `atm` valía 1 Pa en el runtime: ahora
+101 325 Pa. `unit_combine` produce unidades canónicas en `*`/`/` (agrupa exponentes y funde átomos
+simples de la misma dimensión ajustando el valor); esto además corrige factores erróneos de cadenas
+como `km/h*h`, que el parser izquierda→derecha leía como `(km/h)*h`. `as` acepta unidades compuestas
+y comprueba la dimensión (E1026); los literales admiten `m^2` y exponentes negativos y solo absorben
+símbolos de unidad conocidos tras `*`/`/`. Dimensiones con nombre (`Energy`, `Velocity`, …) se
+expanden a base; los diagnósticos usan `dim_describe`. Nuevos `q.value()`/`q.unit()`.
+Pruebas: `unit_algebra.ostrin` (salida exacta y paridad nativa), `unit_conversion_errors.ostrin`.
+
+## 271. Correcciones del lenguaje encontradas con std.viz — 2026-09-24
+
+- Intérprete: el cuerpo de una función se evaluaba en un hijo del entorno del llamador, y como
+  `x = e` es `Stmt::Assign`, `h = hash(seed)` en `uid` reescribía la `h` de `render`. Ahora cada
+  llamada usa un entorno raíz nuevo (`function_scope_isolation.ostrin`).
+- Métodos: el checker comparaba argumentos por posición y el intérprete los ligaba por posición;
+  ahora ambos usan `hir::arrange_arguments` (`method_default_args.ostrin`). Los defaults de métodos
+  se tipan en su declaración y la HIR/C los baja con tipo.
+- `modules.rs` reescribía cualquier identificador igual a un item del módulo: un parámetro `light`
+  se convertía en `std.viz::light`. La reescritura sigue ahora los bindings léxicos.
+- C: una sentencia con resultado propio se emitía dos veces (`code;` + `release(code)`), así que
+  `c.add(1).add(2)` ejecutaba cada llamada dos veces; receptores y argumentos frescos de métodos se
+  liberan tras la llamada; la asignación con retain/release solo se aplicaba en el nivel superior de
+  la función (`scopes.len() == 2`) y dentro de bucles dejaba punteros colgantes (`idx = merged` en
+  `argsort`). Ahora aplica fuera de lambdas.
+- Literales científicos (`1e-9`); métodos genéricos infieren parámetros de dimensión; `[]` en un
+  campo toma el tipo del campo; `String.slice/char_at/codepoint` tipados. Trinquetes HIR y de
+  expresiones tipadas bajan de 26/11 a 19/8.
+
+## 272. std.viz 0.1 y galería web — 2026-09-24
+
+Documento 23. `compiler/std/viz.ostrin` (≈1 400 líneas de Ostrin) implementa figuras 2D, heatmaps y
+contornos, escenas 3D (triángulos ordenados por profundidad con luz direccional, trayectorias con
+mapa de color, nubes de puntos), `viz.grid` y ejes con unidades. Los diez `examples/viz_*.ostrin`
+más `lab_plot`/`lab_surface` son idénticos byte a byte entre intérprete y nativo (prueba
+diferencial). Web: `viz.html` con diez figuras grabadas por `ostrinc.wasm` en `website/assets/viz/`
+(comprobadas contra deriva por `lab-data.mjs`) y botón Run live; pestañas Plot (ahora con std.viz) y
+3D en el Lab; sección Visualization en la home. `lab-data.mjs` ejecuta cada programa en un proceso
+Node propio: muchas instancias WASM pesadas en un solo proceso hacían caer a Node. Suite: 2
+unitarias, 6 diferenciales, 210 de integración; 7 pruebas Playwright en verde (localmente con el
+shim WASI servido por `page.route`). Después, `+` entre `String` libera los operandos frescos
+(concatenaciones y resultados de llamadas) en los emisores AST y HIR: la galería nativa pasa de
+233 855 a 18 652 asignaciones vivas al salir, con salida idéntica. Pendiente: argumentos `String`
+frescos pasados a funciones y a `push`, interacción, animación, PNG/PDF y WebGPU.
+
+## 273. Arrays de cantidades — 2026-09-24
+
+`Array<Quantity<D>>` con una unidad común por array (modelo NumPy+pint): en el intérprete,
+`ArrayData.unit`, y `interpreter/qarray.rs` aplica a los números las reglas de los escalares
+(`+`/`-`/comparaciones convierten el lado derecho a la unidad del izquierdo con la fórmula de
+`convert`; `*`/`/` usan `unit_combine` y su factor; un resultado sin dimensión es `Array<Float>`).
+En nativo, el mismo `Array_Float` con un campo `unit` (todas las instancias de array lo tienen, NULL
+para arrays simples) y los helpers `ostrin_qa_*`; `mangle_ctype(Array<Quantity>)` es `Array_Float`.
+El checker valida dimensiones (E1024/E1026) y tipa reducciones (`var` eleva la unidad al cuadrado).
+`std.viz` gana `unit_line`/`unit_scatter` y `viz_units.ostrin` usa arrays. Pruebas:
+`quantity_arrays.ostrin` (salida exacta y paridad) y `quantity_arrays_errors.ostrin`; suite 211
+integración, 6 diferenciales, 2 unitarias; Playwright 7/7.
+
+## 274. Temporales nativos — 2026-09-24
+
+Con un volcado temporal del registro de memoria sobre la galería Viz se localizaron las fugas: `push`
+retiene su valor pero el llamador nunca soltaba un valor fresco; los receptores frescos de métodos de
+`String` y de arrays no se liberaban; los operandos frescos de operaciones con arrays tampoco; y
+liberar un array solo liberaba la cabecera (`shape` y `data` quedaban vivos: ahora hay `@N@_drop`).
+La galería pasa de 233 855 a 303 asignaciones vivas al salir (pico 3 987) con SVG idénticos;
+`native_memory_temporaries.ostrin` llega a `live_allocations=0` y tiene su prueba.
+
+## 275. Interacción en std.viz y un use-after-free del emisor AST — 2026-09-24
+
+std.viz 0.2 (parcial): cada figura lleva un `<style>` con resaltado al pasar el ratón y `<title>` con
+los valores de puntos, barras, barras de error y puntos 3D; funciona donde se abra el SVG, sin
+scripts, así que no contradice la regla de que JavaScript no calcula resultados. La galería añade
+"Explore": el SVG en un `iframe sandbox` con zoom y desplazamiento. Al añadirlo, `viz_dashboard`
+falló en nativo: `gen_block_expr` consideraba "transferido" un local del bloque exterior en
+`if c { line } else { … }`, no lo retenía y el bloque exterior lo liberaba (AddressSanitizer). La
+transferencia se limita a locales del propio bloque. Todos los ejemplos viz pasan ASan.
+
+## 276. Unidades declaradas por el programa — 2026-09-24
+
+`dimension`, `unit` y `define` (palabras reservadas desde el documento 17) ya funcionan. El parser
+hace una pasada previa por cada archivo (dimensiones, unidades, definiciones) y las registra en un
+registro por compilación de `types.rs` (`thread_local`, reiniciado en `load_project` para el LSP);
+`unit_info` consulta el catálogo y después ese registro, así que el parser, el checker, el intérprete
+y `resolve_unit_*` las ven sin cambios. El runtime C recibe una tabla `ostrin_user_units` generada;
+las unidades simples usan el mismo código de dimensión base que las del catálogo para fundirse
+(`ft * m`). Errores: dimensión desconocida, símbolo ya existente, `define` de unidad no declarada o
+entre dimensiones distintas. De paso, `within` comparaba los números sin convertir unidades
+(`6 ft within (1.5 m to 2 m)` daba false) en ambos backends.

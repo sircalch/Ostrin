@@ -14,6 +14,9 @@ use crate::ast::BinOp;
 pub struct ArrayData {
     pub shape: Vec<usize>,
     pub data: Vec<Value>,
+    /// Unit shared by every element of an `Array<Quantity<D>>`; the data are
+    /// the numbers in that unit (see `qarray.rs`). `None` for plain arrays.
+    pub unit: Option<String>,
 }
 
 type Res<T> = Result<T, RuntimeError>;
@@ -23,7 +26,7 @@ fn fail<T>(message: impl Into<String>) -> Res<T> {
 }
 
 pub fn make(shape: Vec<usize>, data: Vec<Value>) -> Value {
-    Value::Array(Rc::new(RefCell::new(ArrayData { shape, data })))
+    Value::Array(Rc::new(RefCell::new(ArrayData { shape, data, unit: None })))
 }
 
 fn list_of(values: Vec<Value>) -> Value {
@@ -468,6 +471,12 @@ pub fn display(array: &ArrayData) -> String {
     }
     let mut out = String::new();
     rec(array, 0, 0, &mut out);
+    if let Some(unit) = &array.unit {
+        if !unit.is_empty() {
+            out.push(' ');
+            out.push_str(unit);
+        }
+    }
     out
 }
 

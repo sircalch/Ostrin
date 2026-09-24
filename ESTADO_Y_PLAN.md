@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-24 · rama `main` · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 202 de integración y 2 unitarias en verde.*
+*Corte: 2026-09-24 · rama `main` · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 214 de integración y 2 unitarias en verde.*
 
 Validación remota: Pages y CI pasaron para `8bc24bd` en Windows, Linux, macOS y web. La
 prueba de hilos nativos valida los pares concurrentes sin imponer un orden del planificador
@@ -8,7 +8,7 @@ y conserva las barreras de `join()`/scope y cero fugas.
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
 Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–266); para el diseño
-del lenguaje, `docs/design/` (22 documentos). La auditoría del sitio vive en
+del lenguaje, `docs/design/` (23 documentos). La auditoría del sitio vive en
 `docs/website-audit.md`.
 
 ## 0. Estado de un vistazo
@@ -17,7 +17,7 @@ del lenguaje, `docs/design/` (22 documentos). La auditoría del sitio vive en
 |---|---|
 | **Implementado** | Compilador + intérprete (referencia semántica), checker con cantidades físicas, records/enums/traits/genéricos, `Option`/`Result`, colecciones, `Array<T>`, módulos y paquetes con lockfile, concurrencia cooperativa determinista, `--native-threads`, backend C con `--leak-check`, build WASI, playground WASM, LSP/DAP y extensión VS Code (VSIX local) |
 | **En fallback** | El backend nativo emite desde IR las familias cubiertas (§5); records/enums genéricos aplicados, iteradores indirectos, scopes anidados, handlers no lineales y agregados/escapes complejos caen de forma verificada a HIR y después al AST |
-| **Experimental** | Todo el lenguaje (versión 0.x, sin garantía de estabilidad); `--native-threads`; paquetes científicos de ejemplo `tables`, `plot`, `autodiff` (modo directo); dependencias Git con `--fetch` |
+| **Experimental** | Todo el lenguaje (versión 0.x, sin garantía de estabilidad); `--native-threads`; `std.viz` (visualización 2D/3D en SVG); paquetes científicos de ejemplo `tables`, `plot`, `autodiff` (modo directo); dependencias Git con `--fetch` |
 | **Pendiente** | Retirar el fallback AST, ownership completo, red, registry público, GPU, autodiff inverso, canales de distribución (Homebrew, winget, Scoop, Chocolatey, AUR), extensión en Marketplace |
 | **Release** | [`v0.1.0`](https://github.com/sircalch/Ostrin/releases/tag/v0.1.0) publicada el 2026-09-24 con tres archivos (Linux x86_64, macOS ARM64, Windows x64) y sus `.sha256`; instaladores verificados contra ella en runners limpios (`install-check.yml`); workflows de CI, release y WASI en verde |
 
@@ -95,7 +95,10 @@ esa ABI, `Task.cancel()` invoca el helper tipado del runtime para los handles qu
 IR, y `yield()` usa el mismo punto de polling/checkpoint que el emisor HIR. Scopes anidados y
 escapes complejos conservan el fallback verificado.
 
-**Numérico/científico**: enteros de ancho fijo, `Float32`, `Array<T>` (difusión, máscaras,
+**Visualización**: `std.viz` (documento 23) dibuja figuras 2D y escenas 3D a SVG desde Ostrin; la
+galería `website/viz.html` y las pestañas Plot/3D del Lab las ejecutan en el navegador.
+
+**Numérico/científico**: literales científicos (`6.022e23`), enteros de ancho fijo, `Float32`, `Array<T>` (difusión, máscaras,
 rebanadas, `@`), estadística, regresión, `det/inv/eigvals/norm`, `Rng` reproducible,
 funciones elementales deterministas (idénticas en intérprete y nativo).
 
@@ -254,7 +257,8 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Ownership/último uso | `--ownership-report`, `--ownership-check` y `--ownership-ir`; la IR ya inserta y consume retain/release lineal para `String`, `Result` con payload `String` (incluido `Result<Void, String>`), records concretos, `Option<Record>`, listas escalares/String (incluida la lista fresca de `args()`), mapas/conjuntos escalares y `Option<String>` (incluido el valor fresco de `env()`), con transferencia en `Phi` simples y liberación de `Phi` de bucle en backedges probados; `clone`/`drop` tienen lowering explícito en IR, los entornos de tareas retienen también cada `Channel<T>` capturado, los buffers temporales de `split/lines` transfieren y liberan sus strings, `Result` libera condicionalmente `value`/`error`, y `unwrap`/`unwrap_or`/`ok`/`ok_or` retienen payloads extraídos o fallbacks antes de la liberación del wrapper; la ruta AST conserva la misma regla para temporales frescos en llamadas genéricas, `print` y acceso a campos; `Option` escalar es por valor, mientras llamadas transferentes no lineales, agregados complejos, scopes y escapes siguen conservadores |
 | Biblioteca estándar | Incluye `std.math`, `std.lists`, `std.strings` (incluidos `trim`, `split`, `lines`, `is_blank`, `format_text`, `format_float`, `char_at`, `slice` y `codepoint`), `std.time` (calendario gregoriano determinista, validación, ordinales, día de semana, ISO y `Result` de parseo), `std.json` (DOM, parser/serializer estricto y Unicode), `std.args`, `std.env` y `std.maps` (consultas genéricas de `Map<K,V>` con `Hash + Eq`); red sigue pendiente |
 | Mensajes de error de E/S | `strerror` ≠ texto de Rust (difieren entre backends) |
-| Unidades | `q as unidad` convierte desde 2026-09-24 (antes solo reetiquetaba); `as` acepta un único identificador de unidad (`as m / s` falla en ejecución); las unidades derivadas se imprimen sin simplificar (`m/s*s`); `unit`/`define` definidos por el usuario están especificados pero no implementados |
+| Unidades | `as` convierte a unidades compuestas (`v as km/h`) y comprueba la dimensión (E1026); `*`/`/` producen unidades canónicas (`kg*m^2/s^2`, `90 km/h * 30 min` → `45 km`); catálogo con N, J, W, Pa, Hz, V… y dimensiones con nombre (`Energy`, `Velocity`); `q.value()`/`q.unit()`. `Array<Quantity<D>>` (una unidad por array, aritmética elemento a elemento, reducciones con unidad, `as` sobre arrays, paridad nativa). `dimension`/`unit`/`define` declarados por el programa (registrados antes de analizar expresiones, con tabla nativa). Pendiente: unidades afines (°C) y unidades con prefijos automáticos |
+| Visualización | `std.viz` 0.1 (documento 23): marcas 2D, heatmap/contornos, superficies/trayectorias/nubes 3D, layouts y ejes con unidades, SVG determinista idéntico en intérprete, nativo y WASM, con tooltips y resaltado al pasar el ratón sin scripts. Pendiente: selección enlazada, animación, PNG/PDF, WebGPU; la galería nativa deja ~300 asignaciones vivas al salir (textos de unidades de cantidades), la salida es correcta |
 | `Result<Void,E>` | Campo de valor de relleno (`char`) en C |
 | Migración HIR/IR | HIR cubre escalares, records, enums/match, Option/Result, colecciones, cierres y formas genéricas; la IR/C ya emite instancias concretas soportadas de funciones y métodos genéricos (incluidos casos recursivos), closures anidadas con capturas transitivas y ownership de entornos, con paridad y leak-check; records/enums genéricos aplicados y retornos complejos conservan el fallback verificado |
 | Paquetes | `--project` usa `entry`; resolución transitiva de manifiestos con alias globales sin colisión; lockfiles deterministas con rutas relativas, versión y SHA-256 de `ostrin.toml`/fuentes `.ostrin`; Git solo mediante `--fetch`, con caché local y commit resuelto; builds normales reutilizan y validan el lock, `--locked` lo exige; sin registro remoto |

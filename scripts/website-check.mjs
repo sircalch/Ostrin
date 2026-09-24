@@ -151,7 +151,7 @@ try {
 }
 if (lab) {
   check(lab.compiler === facts.version, `website/lab-data.js: recorded with ${lab.compiler}, compiler is ${facts.version}; run node scripts/lab-data.mjs --write`);
-  check(lab.demos.length === 8, `website/lab-data.js: expected 8 Scientific Lab demos, found ${lab.demos.length}`);
+  check(lab.demos.length === 9, `website/lab-data.js: expected 9 Scientific Lab demos, found ${lab.demos.length}`);
   for (const demo of lab.demos) {
     check(existsSync(path.join(repositoryRoot, demo.source)), `lab ${demo.id}: source ${demo.source} does not exist`);
     check(demo.output.length > 0, `lab ${demo.id}: no recorded output`);
@@ -165,6 +165,14 @@ if (lab) {
   for (const key of ["hero", "pipeline"]) {
     check(existsSync(path.join(repositoryRoot, lab[key].source)), `lab ${key}: source ${lab[key].source} does not exist`);
   }
+  // Viz gallery: every figure is the SVG its Ostrin program printed (scripts/lab-data.mjs).
+  check(Array.isArray(lab.gallery) && lab.gallery.length >= 8, "website/lab-data.js: the Viz gallery is missing");
+  for (const figure of lab.gallery ?? []) {
+    check(read(figure.source).replaceAll("\r\n", "\n") === figure.code, `viz ${figure.id}: code drifted from ${figure.source}; run node scripts/lab-data.mjs --write`);
+    const svg = read(`website/${figure.svg}`);
+    check(svg.startsWith("<svg xmlns=\"http://www.w3.org/2000/svg\"") && svg.trimEnd().endsWith("</svg>"), `viz ${figure.id}: ${figure.svg} is not a recorded SVG`);
+  }
+  check(read("website/viz.html").includes("data-viz-gallery"), "viz.html: missing gallery container");
 }
 
 const reference = read("website/reference.html");

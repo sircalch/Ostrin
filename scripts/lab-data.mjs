@@ -12,7 +12,8 @@ import { WASI } from "node:wasi";
 import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { spawnSync } from "node:child_process";
 import { collectSiteFacts, repositoryRoot } from "./site-facts.mjs";
 
 const repository = "https://github.com/sircalch/Ostrin";
@@ -26,15 +27,30 @@ export const LAB = [
     id: "plot",
     title: "Plot",
     headline: "A damped oscillator, drawn by Ostrin.",
-    project: "examples/plot_project/lab",
+    file: "examples/lab_plot.ostrin",
     render: "svg",
     params: [
       { name: "damping", label: "Damping", min: 0, max: 1, step: 0.05 },
       { name: "frequency", label: "Frequency", min: 0.5, max: 5, step: 0.25 },
     ],
-    how: "Ostrin computes x(t) with array operations (linspace, exp, cos) and the plot package, written in Ostrin, turns the samples into SVG text. The page only displays that SVG as an image.",
-    docs: { label: "plot package source", href: `${repository}/blob/main/examples/plot_project/plot/plot.ostrin` },
-    limits: "The plot package is an early example package: line and scatter charts with fixed size and styling.",
+    how: "Ostrin computes x(t) with array operations (linspace, exp, cos) and std.viz, the visualization library written in Ostrin, lays out the axes, ticks, band, line and legend and writes the SVG text. The page only displays that SVG as an image.",
+    docs: { label: "std.viz source", href: `${repository}/blob/main/compiler/std/viz.ostrin` },
+    limits: "std.viz 0.1 renders static SVG. Interaction (zoom, hover) and animation are planned; PNG/PDF export needs a raster backend.",
+  },
+  {
+    id: "surface",
+    title: "3D",
+    headline: "A shaded 3D surface, projected by Ostrin.",
+    file: "examples/lab_surface.ostrin",
+    render: "svg",
+    params: [
+      { name: "waves", label: "Wave number k", min: 0.4, max: 3, step: 0.1 },
+      { name: "azimuth", label: "Azimuth (°)", min: -90, max: 0, step: 5 },
+      { name: "elevation", label: "Elevation (°)", min: 10, max: 70, step: 5 },
+    ],
+    how: "Ostrin samples z = cos(k r) exp(-r/4) on a 28 × 28 grid; std.viz rotates it with an orthographic camera, sorts 1458 triangles back to front, shades each one with a directional light and maps its height to the magma colormap.",
+    docs: { label: "std.viz source", href: `${repository}/blob/main/compiler/std/viz.ostrin` },
+    limits: "Rendering is CPU-side SVG (painter's algorithm), fine for thousands of triangles. A WebGPU backend for large meshes and volumes is planned.",
   },
   {
     id: "linear-algebra",
@@ -101,7 +117,7 @@ export const LAB = [
     ],
     how: "Quantities carry their dimension in the type: flight_time only accepts a speed and an acceleration, and dividing by 1 m only compiles for a length. as converts between compatible units.",
     docs: { label: "quantities and units", href: "language.html#quantities" },
-    limits: "as accepts a single unit name, and derived units are printed unsimplified (m/s*s). User-defined units are specified but not implemented yet.",
+    limits: "as converts to compound units (km/h, m/s^2), derived units print simplified (kg*m^2/s^2) Array<Quantity<D>> keeps one unit per array, and programs declare their own units with unit/dimension/define. Affine units (°C) are not supported yet.",
   },
   {
     id: "data",
@@ -125,6 +141,21 @@ export const LAB = [
     docs: { label: "concurrency design", href: "language.html#concurrency" },
     limits: "The browser playground runs the cooperative scheduler, not OS threads. GPU execution is not planned before the core stabilizes.",
   },
+];
+
+// Figures of the Viz gallery (website/viz.html). Each program prints one SVG; the recorded SVG
+// is written to website/assets/viz/<id>.svg and checked for drift like the Lab outputs.
+export const GALLERY = [
+  { id: "lines", title: "Lines, bands and legends", file: "examples/viz_lines.ostrin", blurb: "Three damped oscillators, the envelope as a shaded band and a reference line." },
+  { id: "surface", title: "Shaded 3D surface", file: "examples/viz_surface.ostrin", blurb: "peaks(x, y) on a 36 × 36 grid: 2450 triangles sorted back to front and lit." },
+  { id: "heatmap", title: "Heatmap and contours", file: "examples/viz_heatmap.ostrin", blurb: "A 48 × 48 field with a colorbar and ten marching-squares contour levels." },
+  { id: "lorenz", title: "3D trajectory", file: "examples/viz_lorenz.ostrin", blurb: "The Lorenz attractor integrated in Ostrin and colored by time." },
+  { id: "histogram", title: "Histogram and density", file: "examples/viz_histogram.ostrin", blurb: "20 000 seeded normal samples with the scaled N(4, 1.5²) density on top." },
+  { id: "point-cloud", title: "3D point cloud", file: "examples/viz_point_cloud.ostrin", blurb: "Three Gaussian clusters, depth-sorted and colored by height." },
+  { id: "scatter-fit", title: "Scatter and fit", file: "examples/viz_scatter_fit.ostrin", blurb: "Calibration data, a least-squares line and its ±2σ band." },
+  { id: "units", title: "Unit-aware axes", file: "examples/viz_units.ostrin", blurb: "Quantities converted to km/h: the axis labels come from the units in the data." },
+  { id: "bars", title: "Bars with error bars", file: "examples/viz_bars.ostrin", blurb: "Group means ± standard deviation from seeded samples." },
+  { id: "dashboard", title: "Multi-panel layout", file: "examples/viz_dashboard.ostrin", blurb: "Four figures, 2D and 3D, composed with viz.grid into one SVG." },
 ];
 
 // A tiny function shown through every compiler stage on the homepage.
@@ -167,8 +198,21 @@ export function demoInputs(demo) {
   return { files: { "main.ostrin": readText(demo.file) }, main: "main.ostrin", args: ["--run", "main.ostrin"], source: demo.file };
 }
 
-// Runs ostrinc.wasm under Node WASI in a scratch copy of `files`; returns stdout lines.
+// Runs ostrinc.wasm on `files` in a child Node process and returns its stdout lines. Each run
+// gets a fresh process: WebAssembly memories of finished instances are not reliably released
+// within one process, and a few dozen heavy Viz programs used to crash Node.
 async function runWasm(module, files, args) {
+  const child = spawnSync(process.execPath, ["--no-warnings", fileURLToPath(import.meta.url), "--wasm-child"], {
+    input: JSON.stringify({ files, args }),
+    maxBuffer: 256 * 1024 * 1024,
+    encoding: "utf8",
+  });
+  if (child.status !== 0) throw new Error(child.stderr || `ostrinc ${args.join(" ")} crashed (signal ${child.signal})`);
+  return JSON.parse(child.stdout);
+}
+
+// Runs ostrinc.wasm under Node WASI in a scratch copy of `files`; returns stdout lines.
+async function runWasmHere(module, files, args) {
   const scratch = mkdtempSync(path.join(os.tmpdir(), "ostrin-lab-"));
   const stdoutPath = path.join(scratch, ".stdout");
   const stderrPath = path.join(scratch, ".stderr");
@@ -255,12 +299,33 @@ export async function buildLabData() {
     output: await runWasm(module, { "main.ostrin": heroSource }, ["--run", "main.ostrin"]),
   };
 
-  return { compiler: collectSiteFacts().version, recordedWith: "ostrinc.wasm (wasm32-wasip1) under Node WASI", hero, demos, pipeline };
+  const gallery = [];
+  const figures = {};
+  for (const figure of GALLERY) {
+    const source = readText(figure.file);
+    const output = await runWasm(module, { "main.ostrin": source }, ["--run", "main.ostrin"]);
+    const start = output.findIndex((line) => line.startsWith("<svg"));
+    const end = output.findIndex((line, index) => index >= start && line === "</svg>");
+    if (start < 0 || end < 0) throw new Error(`${figure.file}: expected one SVG figure in the output`);
+    const svgPath = `assets/viz/${figure.id}.svg`;
+    figures[svgPath] = `${output.slice(start, end + 1).join("\n")}\n`;
+    gallery.push({
+      ...figure,
+      source: figure.file,
+      sourceUrl: `${repository}/blob/main/${figure.file}`,
+      code: source,
+      svg: svgPath,
+      printed: [...output.slice(0, start), ...output.slice(end + 1)],
+    });
+  }
+
+  return { compiler: collectSiteFacts().version, recordedWith: "ostrinc.wasm (wasm32-wasip1) under Node WASI", hero, demos, pipeline, gallery, figures };
 }
 
 export function renderLabData(data) {
+  const { figures, ...rest } = data;
   return "// Generated by scripts/lab-data.mjs from examples/. Do not edit by hand.\n" +
-    `globalThis.OSTRIN_LAB = Object.freeze(${JSON.stringify(data, null, 2)});\n`;
+    `globalThis.OSTRIN_LAB = Object.freeze(${JSON.stringify(rest, null, 2)});\n`;
 }
 
 function decodeHtml(text) {
@@ -310,19 +375,43 @@ export async function verifyOutputEvidence() {
 async function main() {
   const verified = await verifyOutputEvidence();
   console.log(`lab-data: ${verified} static page outputs match their Ostrin programs`);
-  const expected = renderLabData(await buildLabData());
+  const data = await buildLabData();
+  const expected = renderLabData(data);
+  const figureDir = path.join(repositoryRoot, "website", "assets", "viz");
   if (process.argv.includes("--write")) {
     writeFileSync(outputPath, expected, "utf8");
-    console.log("lab-data: wrote website/lab-data.js");
-  } else if (!existsSync(outputPath) || readFileSync(outputPath, "utf8").replaceAll("\r\n", "\n") !== expected) {
-    console.error("lab-data: website/lab-data.js is stale (sources or recorded outputs changed); run node scripts/lab-data.mjs --write");
-    process.exitCode = 1;
+    mkdirSync(figureDir, { recursive: true });
+    for (const name of readdirSync(figureDir)) {
+      if (!data.figures[`assets/viz/${name}`]) rmSync(path.join(figureDir, name));
+    }
+    for (const [relative, svg] of Object.entries(data.figures)) writeFileSync(path.join(repositoryRoot, "website", relative), svg, "utf8");
+    console.log(`lab-data: wrote website/lab-data.js and ${Object.keys(data.figures).length} figures in website/assets/viz`);
   } else {
-    console.log(`lab-data: ok (${LAB.length} demos recorded with ostrinc.wasm)`);
+    const staleFigures = Object.entries(data.figures).filter(([relative, svg]) => {
+      const file = path.join(repositoryRoot, "website", relative);
+      return !existsSync(file) || readFileSync(file, "utf8").replaceAll("\r\n", "\n") !== svg;
+    });
+    if (!existsSync(outputPath) || readFileSync(outputPath, "utf8").replaceAll("\r\n", "\n") !== expected || staleFigures.length) {
+      console.error(`lab-data: website/lab-data.js or ${staleFigures.map(([name]) => name).join(", ") || "its figures"} is stale (sources or recorded outputs changed); run node scripts/lab-data.mjs --write`);
+      process.exitCode = 1;
+    } else {
+      console.log(`lab-data: ok (${LAB.length} demos and ${GALLERY.length} Viz figures recorded with ostrinc.wasm)`);
+    }
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+async function wasmChild() {
+  const { files, args } = JSON.parse(readFileSync(0, "utf8"));
+  const module = await WebAssembly.compile(readFileSync(wasmPath));
+  process.stdout.write(JSON.stringify(await runWasmHere(module, files, args)));
+}
+
+if (process.argv.includes("--wasm-child")) {
+  wasmChild().catch((error) => {
+    process.stderr.write(error.message);
+    process.exitCode = 1;
+  });
+} else if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   main().catch((error) => {
     console.error(`lab-data: ${error.message}`);
     process.exitCode = 1;

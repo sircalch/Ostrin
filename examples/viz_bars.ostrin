@@ -1,0 +1,21 @@
+// std.viz · bars with error bars: group means ± standard deviation.
+import std.viz
+
+fn main() -> Void {
+    r = rng(11)
+    mut means: List<Float> = []
+    mut sds: List<Float> = []
+    effects = [0.0, 0.8, 1.9, 2.6, 2.9]
+    for effect in effects {
+        group = r.randn([30]) * 0.7 + (5.0 + effect)
+        means.push(group.mean())
+        sds.push(group.std())
+    }
+    doses = array([0.0, 1.0, 2.0, 3.0, 4.0])
+    fig = viz.figure("Dose response")
+        .describe("30 subjects per dose, mean ± sd")
+        .labels("dose [mg]", "response")
+        .bars(doses, array(means), label: "mean", color: "#93c5fd")
+        .errorbars(doses, array(means), array(sds), label: "± sd", color: "#1e3a8a")
+    print(fig.svg())
+}

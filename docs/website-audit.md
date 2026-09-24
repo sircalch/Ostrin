@@ -14,7 +14,7 @@ tests or an explicitly labeled early-stage surface.
 | Guides | `website/guides.html` | Install, projects, testing, native, WASI, editor and site-evidence workflows; every command exists in `ostrinc --help` |
 | Example catalogue | `website/examples.html` | Filterable repository catalogue plus live quantity, standard library, record/enum and concurrency programs |
 | Browser playground | `website/playground.html`, `website/playground.js`, `.github/workflows/pages.yml` | Generated `ostrinc.wasm`; Run, Check, Test, Format, share links and source diagnostics execute in an in-memory WASI filesystem and are exercised in Chromium before CI passes or Pages uploads |
-| Learn and Reference | `website/docs.html`, `website/reference.html`, `website/language.html`, `docs/design/` | Guided 14-step learning path; Reference indexes all 22 design documents and the CLI flags, checked against `ostrinc --help` |
+| Learn and Reference | `website/docs.html`, `website/reference.html`, `website/language.html`, `docs/design/` | Guided 14-step learning path; Reference indexes all 23 design documents and the CLI flags, checked against `ostrinc --help` |
 | Showcase | `website/showcase.html` | Four repository-backed demonstrations; every displayed output line is verified against its program by `scripts/lab-data.mjs` |
 | Community | `website/community.html`, `CONTRIBUTING.md`, issue templates | Contribution path and repository channels; no unverified chat, registry or external community is claimed |
 | Ecosystem and roadmap | `website/ecosystem.html`, `website/roadmap.html` | Current capabilities, early areas and future work are distinguished |
@@ -22,10 +22,10 @@ tests or an explicitly labeled early-stage surface.
 
 ## Verified inventory
 
-- **211** `.ostrin` source files under `examples/`, including package-project sources and
+- **233** `.ostrin` source files under `examples/`, including package-project sources and
   intentional error cases.
-- **22** Markdown design documents under `docs/design/`.
-- Compiler suite: **202 integration**, **6 differential** and **2 unit** tests.
+- **23** Markdown design documents under `docs/design/`.
+- Compiler suite: **214 integration**, **6 differential** and **2 unit** tests.
 - WASI release smoke matrix: nine program modules covering the hello program, a local-path
   package, arguments/environment, file I/O, managed ownership and nested `Option`/`Result`
   consumers; compiler and program modules

@@ -1,0 +1,22 @@
+// std.viz · layout: four panels composed into one figure with viz.grid.
+import std.viz
+
+fn wave(x: Float, y: Float) -> Float {
+    sin(x) * cos(y)
+}
+
+fn main() -> Void {
+    r = rng(3)
+    t = linspace(0.0, 6.28, 120)
+    samples = r.randn([3000])
+    grid = linspace(-3.14, 3.14, 28)
+    a = viz.figure("Signals").size(480, 320).no_legend()
+        .line(t, sin(t)).line(t, cos(t))
+    b = viz.figure("Distribution").size(480, 320).no_legend()
+        .histogram(samples, 30)
+    c = viz.figure("sin(x) cos(y)").size(480, 320)
+        .heatmap(viz.grid_of(grid, grid, wave), -3.14, 3.14, -3.14, 3.14, colormap: "coolwarm")
+    d = viz.scene3d("sin(x) cos(y)").size(480, 320)
+        .surface(grid, grid, viz.grid_of(grid, grid, wave), colormap: "coolwarm")
+    print(viz.grid([a.svg(), b.svg(), c.svg(), d.svg()], 2, 480, 320, title: "Ostrin Viz dashboard"))
+}

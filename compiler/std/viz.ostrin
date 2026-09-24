@@ -1,0 +1,1396 @@
+// std.viz — Ostrin Viz Engine 0.1.
+//
+// Scientific figures described as data (a Figure or a Scene3D holding a list
+// of Series) and rendered to standalone SVG by Ostrin itself, so the same
+// program draws the same bytes in the interpreter, the native backend and the
+// browser (WASM). Marks: line, scatter, area, band, error bars, bars,
+// histogram, stp, reference lines, text, heatmap, contour, and in 3D
+// surface, wireframe, trajectory and point cloud. Axes use "nice" 1-2-5
+// ticks; quantity series label their axes with the unit they carry.
+
+pub record Theme {
+    background: String
+    text: String
+    muted: String
+    grid: String
+    axis: String
+    palette: List<String>
+}
+
+pub fn light() -> Theme {
+    Theme {
+        background: "#ffffff",
+        text: "#1f2937",
+        muted: "#6b7280",
+        grid: "#e5e7eb",
+        axis: "#9ca3af",
+        palette: ["#2563eb", "#dc2626", "#059669", "#d97706", "#7c3aed", "#0891b2", "#db2777", "#4b5563"]
+    }
+}
+
+pub fn dark() -> Theme {
+    Theme {
+        background: "#0f172a",
+        text: "#e2e8f0",
+        muted: "#94a3b8",
+        grid: "#1e293b",
+        axis: "#475569",
+        palette: ["#60a5fa", "#f87171", "#34d399", "#fbbf24", "#a78bfa", "#22d3ee", "#f472b6", "#cbd5e1"]
+    }
+}
+
+pub record Series {
+    kind: String
+    xs: Array<Float>
+    ys: Array<Float>
+    zs: Array<Float>
+    lo: Array<Float>
+    hi: Array<Float>
+    grid: Array<Float>
+    label: String
+    color: String
+    width: Float
+    dash: String
+    size: Float
+    colormap: String
+    levels: Int
+}
+
+pub record Note {
+    x: Float
+    y: Float
+    text: String
+}
+
+pub record Figure {
+    title: String
+    mut subtitle: String
+    mut xlabel: String
+    mut ylabel: String
+    mut xunit: String
+    mut yunit: String
+    mut width: Int
+    mut height: Int
+    mut theme: Theme
+    mut series: List<Series>
+    mut notes: List<Note>
+    mut legend: Bool
+    mut gridlines: Bool
+    mut xfixed: Bool
+    mut yfixed: Bool
+    mut x0: Float
+    mut x1: Float
+    mut y0: Float
+    mut y1: Float
+    mut colorbar: String
+}
+
+pub record Scene3D {
+    title: String
+    mut subtitle: String
+    mut xlabel: String
+    mut ylabel: String
+    mut zlabel: String
+    mut width: Int
+    mut height: Int
+    mut theme: Theme
+    mut series: List<Series>
+    mut azimuth: Float
+    mut elevation: Float
+    mut colorbar: String
+}
+
+// ---------------------------------------------------------------- helpers
+
+// Arrays can't be empty: an unused field holds one zero and is only read
+// by the kinds that fill it.
+fn empty() -> Array<Float> {
+    zeros([1])
+}
+
+fn has_range(kind: String) -> Bool {
+    kind == "band" or kind == "errorbar"
+}
+
+fn series(kind: String, xs: Array<Float>, ys: Array<Float>, label: String, color: String) -> Series {
+    Series {
+        kind: kind,
+        xs: xs,
+        ys: ys,
+        zs: empty(),
+        lo: empty(),
+        hi: empty(),
+        grid: empty(),
+        label: label,
+        color: color,
+        width: 2.0,
+        dash: "",
+        size: 3.5,
+        colormap: "viridis",
+        levels: 0
+    }
+}
+
+/// A coordinate with two decimals: compact and identical in every backend.
+pub fn num(v: Float) -> String {
+    r = round(v * 100.0) / 100.0
+    if r == 0.0 { "0" } else { r.to_string() }
+}
+
+fn px(v: Int) -> String {
+    v.to_string()
+}
+
+fn escape(text: String) -> String {
+    text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+}
+
+fn attr(name: String, value: String) -> String {
+    " " + name + "=\"" + value + "\""
+}
+
+fn text_at(x: Float, y: Float, content: String, anchor: String, size: Int, fill: String, extra: String) -> String {
+    "<text" + attr("x", num(x)) + attr("y", num(y)) + attr("text-anchor", anchor) + attr("font-size", px(size)) +
+        attr("fill", fill) + extra + ">" + escape(content) + "</text>"
+}
+
+fn seg(x0: Float, y0: Float, x1: Float, y1: Float, stroke: String, width: Float, extra: String) -> String {
+    "<line" + attr("x1", num(x0)) + attr("y1", num(y0)) + attr("x2", num(x1)) + attr("y2", num(y1)) +
+        attr("stroke", stroke) + attr("stroke-width", num(width)) + extra + "/>"
+}
+
+fn header(width: Int, height: Int, theme: Theme) -> String {
+    "<svg xmlns=\"http://www.w3.org/2000/svg\"" + attr("width", px(width)) + attr("height", px(height)) +
+        attr("viewBox", "0 0 " + px(width) + " " + px(height)) +
+        attr("font-family", "Inter, Segoe UI, Helvetica, Arial, sans-serif") + ">\n" +
+        // Interaction without scripts: hovering highlights a mark and its
+        // <title> shows the values, wherever the SVG is opened.
+        "<style>.pt:hover{stroke:" + theme.text + ";stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}" +
+        ".series:hover>path{stroke-width:3.5px}.pt,.bar{cursor:crosshair}</style>\n" +
+        "<rect" + attr("width", px(width)) + attr("height", px(height)) + attr("fill", theme.background) + "/>\n"
+}
+
+/// Tooltip text shown by the SVG viewer on hover.
+fn tip(text: String) -> String {
+    "<title>" + escape(text) + "</title>"
+}
+
+/// A value for tooltips: three decimals, trailing zeros dropped.
+pub fn short(v: Float) -> String {
+    r = round(v * 1000.0) / 1000.0
+    if r == 0.0 { "0" } else { r.to_string() }
+}
+
+fn named(label: String) -> String {
+    if label == "" { "" } else { label + ": " }
+}
+
+fn pow10(k: Int) -> Float {
+    mut r = 1.0
+    mut i = 0
+    if k >= 0 {
+        while i < k {
+            r = r * 10.0
+            i = i + 1
+        }
+    } else {
+        while i < 0 - k {
+            r = r / 10.0
+            i = i + 1
+        }
+    }
+    r
+}
+
+/// Step of a "nice" axis: 1, 2 or 5 times a power of ten, about `target`
+/// ticks over [lo, hi].
+pub fn nice_step(lo: Float, hi: Float, target: Int) -> Float {
+    span = if hi > lo { hi - lo } else { 1.0 }
+    raw = span / (target as Float)
+    k = floor(log10(raw)) as Int
+    base = pow10(k)
+    m = raw / base
+    if m < 1.5 { base } else if m < 3.5 { 2.0 * base } else if m < 7.5 { 5.0 * base } else { 10.0 * base }
+}
+
+fn decimals(stp: Float) -> Int {
+    k = floor(log10(stp) + 0.000001) as Int
+    if k >= 0 { 0 } else { 0 - k }
+}
+
+/// Tick positions inside [lo, hi].
+pub fn ticks(lo: Float, hi: Float, target: Int) -> Array<Float> {
+    stp = nice_step(lo, hi, target)
+    first = ceil(lo / stp - 0.000001)
+    mut out: List<Float> = []
+    mut k = first
+    while k * stp <= hi + stp * 0.000001 {
+        out.push(k * stp)
+        k = k + 1.0
+    }
+    array(out)
+}
+
+/// A tick label with as many decimals as the stp needs.
+pub fn tick_label(v: Float, stp: Float) -> String {
+    d = decimals(stp)
+    value = if abs(v) < stp * 0.000001 { 0.0 } else { v }
+    if abs(value) >= 100000.0 or (abs(value) > 0.0 and abs(value) < 0.001) {
+        exponent = floor(log10(abs(value))) as Int
+        mantissa = value / pow10(exponent)
+        format_float_value(mantissa, 1).unwrap_or("?") + "e" + exponent.to_string()
+    } else {
+        format_float_value(value, d).unwrap_or("?")
+    }
+}
+
+// ---------------------------------------------------------------- colors
+
+fn stops(name: String) -> List<Int> {
+    if name == "magma" {
+        [0, 0, 4, 28, 16, 68, 79, 18, 123, 129, 37, 129, 181, 54, 122, 229, 80, 100, 251, 135, 97, 254, 194, 135, 252, 253, 191]
+    } else if name == "coolwarm" {
+        [59, 76, 192, 98, 130, 234, 141, 176, 254, 184, 208, 249, 221, 221, 221, 245, 196, 173, 244, 154, 123, 222, 96, 77, 180, 4, 38]
+    } else if name == "ocean" {
+        [8, 29, 88, 37, 52, 148, 34, 94, 168, 29, 145, 192, 65, 182, 196, 127, 205, 187, 199, 233, 180, 237, 248, 177, 255, 255, 217]
+    } else {
+        [68, 1, 84, 71, 45, 123, 59, 82, 139, 44, 114, 142, 33, 145, 140, 40, 174, 128, 94, 201, 98, 173, 220, 48, 253, 231, 37]
+    }
+}
+
+fn clamp01(t: Float) -> Float {
+    if t < 0.0 { 0.0 } else if t > 1.0 { 1.0 } else { t }
+}
+
+fn rgb_part(v: Float) -> String {
+    c = round(v)
+    (if c < 0.0 { 0 } else if c > 255.0 { 255 } else { c as Int }).to_string()
+}
+
+/// Color of `t` in [0, 1] on a colormap (viridis, magma, coolwarm, ocean),
+/// scaled by `light` (1.0 = unshaded).
+pub fn colormap(name: String, t: Float, light: Float) -> String {
+    s = stops(name)
+    pos = clamp01(t) * 8.0
+    mut i = floor(pos) as Int
+    if i > 7 {
+        i = 7
+    }
+    f = pos - (i as Float)
+    r = ((s[i * 3] as Float) * (1.0 - f) + (s[i * 3 + 3] as Float) * f) * light
+    g = ((s[i * 3 + 1] as Float) * (1.0 - f) + (s[i * 3 + 4] as Float) * f) * light
+    b = ((s[i * 3 + 2] as Float) * (1.0 - f) + (s[i * 3 + 5] as Float) * f) * light
+    "rgb(" + rgb_part(r) + "," + rgb_part(g) + "," + rgb_part(b) + ")"
+}
+
+fn pick(color: String, index: Int, theme: Theme) -> String {
+    if color != "" { color } else { theme.palette[index % theme.palette.length()] }
+}
+
+fn gradient(id: String, name: String, vertical: Bool) -> String {
+    coords = if vertical { attr("x1", "0") + attr("y1", "1") + attr("x2", "0") + attr("y2", "0") } else { attr("x1", "0") + attr("y1", "0") + attr("x2", "1") + attr("y2", "0") }
+    mut out = "<defs><linearGradient" + attr("id", id) + coords + ">"
+    for k in 0 to 8 {
+        t = (k as Float) / 8.0
+        out = out + "<stop" + attr("offset", num(t)) + attr("stop-color", colormap(name, t, 1.0)) + "/>"
+    }
+    out + "</linearGradient></defs>\n"
+}
+
+fn colorbar(id: String, name: String, lo: Float, hi: Float, label: String, x: Float, top: Float, bottom: Float, theme: Theme) -> String {
+    mut out = gradient(id, name, true)
+    out = out + "<rect" + attr("x", num(x)) + attr("y", num(top)) + attr("width", "12") + attr("height", num(bottom - top)) +
+        attr("fill", "url(#" + id + ")") + attr("stroke", theme.axis) + attr("stroke-width", "0.5") + "/>\n"
+    stp = nice_step(lo, hi, 5)
+    for v in ticks(lo, hi, 5).to_list() {
+        y = bottom - (v - lo) / (hi - lo) * (bottom - top)
+        out = out + seg(x + 12.0, y, x + 16.0, y, theme.axis, 1.0, "") +
+            text_at(x + 19.0, y + 3.5, tick_label(v, stp), "start", 10, theme.muted, "") + "\n"
+    }
+    if label != "" {
+        cx = x + 50.0
+        cy = (top + bottom) / 2.0
+        out = out + text_at(cx, cy, label, "middle", 11, theme.muted, attr("transform", "rotate(-90 " + num(cx) + " " + num(cy) + ")")) + "\n"
+    }
+    out
+}
+
+fn uid(prefix: String, seed: String) -> String {
+    h = hash(seed)
+    prefix + (if h < 0 { 0 - h } else { h }).to_string()
+}
+
+// ---------------------------------------------------------------- figures
+
+/// A 2D figure (640×400 by default, light theme).
+pub fn figure(title: String) -> Figure {
+    Figure {
+        title: title,
+        subtitle: "",
+        xlabel: "",
+        ylabel: "",
+        xunit: "",
+        yunit: "",
+        width: 640,
+        height: 400,
+        theme: light(),
+        series: [],
+        notes: [],
+        legend: true,
+        gridlines: true,
+        xfixed: false,
+        yfixed: false,
+        x0: 0.0,
+        x1: 1.0,
+        y0: 0.0,
+        y1: 1.0,
+        colorbar: ""
+    }
+}
+
+/// Converts a list of quantities to numbers in the unit of the first one.
+pub fn values<D: Dimension>(qs: List<Quantity<D>>) -> Array<Float> {
+    mut out: List<Float> = []
+    if qs.length() > 0 {
+        first = qs[0]
+        unit_name = first.unit()
+        for q in qs {
+            out.push(if q.unit() == unit_name { q.value() } else { (q / first) * first.value() })
+        }
+    }
+    array(out)
+}
+
+/// The unit a list of quantities is plotted in (that of the first element).
+pub fn unit_of<D: Dimension>(qs: List<Quantity<D>>) -> String {
+    if qs.length() > 0 { qs[0].unit() } else { "" }
+}
+
+impl Figure {
+    fn add(mut self, s: Series) -> Figure {
+        self.series.push(s)
+        self
+    }
+
+    fn labels(mut self, x: String, y: String) -> Figure {
+        self.xlabel = x
+        self.ylabel = y
+        self
+    }
+
+    fn describe(mut self, text: String) -> Figure {
+        self.subtitle = text
+        self
+    }
+
+    fn size(mut self, width: Int, height: Int) -> Figure {
+        self.width = width
+        self.height = height
+        self
+    }
+
+    fn dark(mut self) -> Figure {
+        self.theme = dark()
+        self
+    }
+
+    fn xlim(mut self, lo: Float, hi: Float) -> Figure {
+        self.xfixed = true
+        self.x0 = lo
+        self.x1 = hi
+        self
+    }
+
+    fn ylim(mut self, lo: Float, hi: Float) -> Figure {
+        self.yfixed = true
+        self.y0 = lo
+        self.y1 = hi
+        self
+    }
+
+    fn no_legend(mut self) -> Figure {
+        self.legend = false
+        self
+    }
+
+    fn line(mut self, xs: Array<Float>, ys: Array<Float>, label: String = "", color: String = "", width: Float = 2.0, dash: String = "") -> Figure {
+        mut s = series("line", xs, ys, label, color)
+        s = Series { kind: s.kind, xs: s.xs, ys: s.ys, zs: s.zs, lo: s.lo, hi: s.hi, grid: s.grid, label: s.label, color: s.color, width: width, dash: dash, size: s.size, colormap: s.colormap, levels: 0 }
+        self.add(s)
+    }
+
+    fn scatter(mut self, xs: Array<Float>, ys: Array<Float>, label: String = "", color: String = "", size: Float = 3.5) -> Figure {
+        s = series("scatter", xs, ys, label, color)
+        self.add(Series { kind: s.kind, xs: s.xs, ys: s.ys, zs: s.zs, lo: s.lo, hi: s.hi, grid: s.grid, label: s.label, color: s.color, width: s.width, dash: "", size: size, colormap: s.colormap, levels: 0 })
+    }
+
+    fn area(mut self, xs: Array<Float>, ys: Array<Float>, label: String = "", color: String = "") -> Figure {
+        self.add(series("area", xs, ys, label, color))
+    }
+
+    fn stairs(mut self, xs: Array<Float>, ys: Array<Float>, label: String = "", color: String = "") -> Figure {
+        self.add(series("stairs", xs, ys, label, color))
+    }
+
+    /// A shaded region between `lo` and `hi` (confidence band, envelope).
+    fn band(mut self, xs: Array<Float>, lo: Array<Float>, hi: Array<Float>, label: String = "", color: String = "") -> Figure {
+        s = series("band", xs, (lo + hi) / 2.0, label, color)
+        self.add(Series { kind: s.kind, xs: s.xs, ys: s.ys, zs: s.zs, lo: lo, hi: hi, grid: s.grid, label: s.label, color: s.color, width: s.width, dash: "", size: s.size, colormap: s.colormap, levels: 0 })
+    }
+
+    /// Points with symmetric vertical error bars `ys ± err`.
+    fn errorbars(mut self, xs: Array<Float>, ys: Array<Float>, err: Array<Float>, label: String = "", color: String = "") -> Figure {
+        s = series("errorbar", xs, ys, label, color)
+        self.add(Series { kind: s.kind, xs: s.xs, ys: s.ys, zs: s.zs, lo: ys - err, hi: ys + err, grid: s.grid, label: s.label, color: s.color, width: 1.5, dash: "", size: s.size, colormap: s.colormap, levels: 0 })
+    }
+
+    fn bars(mut self, xs: Array<Float>, heights: Array<Float>, label: String = "", color: String = "") -> Figure {
+        self.add(series("bar", xs, heights, label, color))
+    }
+
+    /// Histogram of `data` with `bins` equal-width bins.
+    fn histogram(mut self, data: Array<Float>, bins: Int, label: String = "", color: String = "") -> Figure {
+        lo = data.min()
+        hi = data.max()
+        counts = histogram(data, bins, lo, hi).to_float()
+        width = (hi - lo) / (bins as Float)
+        centers = linspace(lo + width / 2.0, hi - width / 2.0, bins)
+        s = series("hist", centers, counts, label, color)
+        self.add(Series { kind: s.kind, xs: s.xs, ys: s.ys, zs: s.zs, lo: s.lo, hi: s.hi, grid: s.grid, label: s.label, color: s.color, width: width, dash: "", size: s.size, colormap: s.colormap, levels: 0 })
+    }
+
+    fn hline(mut self, y: Float, label: String = "", color: String = "") -> Figure {
+        self.add(series("hline", array([0.0]), array([y]), label, color))
+    }
+
+    fn vline(mut self, x: Float, label: String = "", color: String = "") -> Figure {
+        self.add(series("vline", array([x]), array([0.0]), label, color))
+    }
+
+    fn text(mut self, x: Float, y: Float, content: String) -> Figure {
+        self.notes.push(Note { x: x, y: y, text: content })
+        self
+    }
+
+    /// A color-mapped 2D grid (rows along y, columns along x) spanning
+    /// [x0, x1] × [y0, y1].
+    fn heatmap(mut self, z: Array<Float>, x0: Float, x1: Float, y0: Float, y1: Float, colormap: String = "viridis", label: String = "") -> Figure {
+        s = series("heatmap", array([x0, x1]), array([y0, y1]), label, "")
+        self.colorbar = label
+        self.add(Series { kind: s.kind, xs: s.xs, ys: s.ys, zs: s.zs, lo: s.lo, hi: s.hi, grid: z, label: "", color: "", width: s.width, dash: "", size: s.size, colormap: colormap, levels: 0 })
+    }
+
+    /// Iso-lines of a 2D grid (marching squares), `levels` equally spaced.
+    fn contour(mut self, z: Array<Float>, x0: Float, x1: Float, y0: Float, y1: Float, levels: Int = 8, colormap: String = "", color: String = "") -> Figure {
+        s = series("contour", array([x0, x1]), array([y0, y1]), "", color)
+        self.add(Series { kind: s.kind, xs: s.xs, ys: s.ys, zs: s.zs, lo: s.lo, hi: s.hi, grid: z, label: "", color: color, width: 1.2, dash: "", size: s.size, colormap: colormap, levels: levels })
+    }
+
+    /// Line of two arrays of quantities (`Array<Quantity<D>>`): the numbers
+    /// in each array's unit, and the axes labelled with those units.
+    fn unit_line<X: Dimension, Y: Dimension>(mut self, xs: Array<Quantity<X>>, ys: Array<Quantity<Y>>, label: String = "", color: String = "", width: Float = 2.0, dash: String = "") -> Figure {
+        self.xunit = xs.unit()
+        self.yunit = ys.unit()
+        s = series("line", xs.values(), ys.values(), label, color)
+        self.add(Series { kind: s.kind, xs: s.xs, ys: s.ys, zs: s.zs, lo: s.lo, hi: s.hi, grid: s.grid, label: s.label, color: s.color, width: width, dash: dash, size: s.size, colormap: s.colormap, levels: 0 })
+    }
+
+    fn unit_scatter<X: Dimension, Y: Dimension>(mut self, xs: Array<Quantity<X>>, ys: Array<Quantity<Y>>, label: String = "", color: String = "", size: Float = 3.5) -> Figure {
+        self.xunit = xs.unit()
+        self.yunit = ys.unit()
+        s = series("scatter", xs.values(), ys.values(), label, color)
+        self.add(Series { kind: s.kind, xs: s.xs, ys: s.ys, zs: s.zs, lo: s.lo, hi: s.hi, grid: s.grid, label: s.label, color: s.color, width: s.width, dash: "", size: size, colormap: s.colormap, levels: 0 })
+    }
+
+    /// Line of quantities: the numbers are taken in the first element's
+    /// unit and the axes are labelled with those units.
+    fn quantity_line<X: Dimension, Y: Dimension>(mut self, xs: List<Quantity<X>>, ys: List<Quantity<Y>>, label: String = "", color: String = "") -> Figure {
+        self.xunit = if xs.length() > 0 { xs[0].unit() } else { "" }
+        self.yunit = if ys.length() > 0 { ys[0].unit() } else { "" }
+        mut xv: List<Float> = []
+        for q in xs {
+            xv.push(if q.unit() == self.xunit { q.value() } else { (q / xs[0]) * xs[0].value() })
+        }
+        mut yv: List<Float> = []
+        for q in ys {
+            yv.push(if q.unit() == self.yunit { q.value() } else { (q / ys[0]) * ys[0].value() })
+        }
+        self.add(series("line", array(xv), array(yv), label, color))
+    }
+
+    fn quantity_scatter<X: Dimension, Y: Dimension>(mut self, xs: List<Quantity<X>>, ys: List<Quantity<Y>>, label: String = "", color: String = "") -> Figure {
+        self.xunit = if xs.length() > 0 { xs[0].unit() } else { "" }
+        self.yunit = if ys.length() > 0 { ys[0].unit() } else { "" }
+        mut xv: List<Float> = []
+        for q in xs {
+            xv.push(if q.unit() == self.xunit { q.value() } else { (q / xs[0]) * xs[0].value() })
+        }
+        mut yv: List<Float> = []
+        for q in ys {
+            yv.push(if q.unit() == self.yunit { q.value() } else { (q / ys[0]) * ys[0].value() })
+        }
+        self.add(series("scatter", array(xv), array(yv), label, color))
+    }
+
+    fn svg(self) -> String {
+        render(self)
+    }
+
+    fn save(self, path: String) -> Result<Void, String> {
+        write_file(path, render(self))
+    }
+}
+
+fn axis_title(name: String, unit_name: String) -> String {
+    if unit_name == "" { name } else if name == "" { "[" + unit_name + "]" } else { name + " [" + unit_name + "]" }
+}
+
+fn is_grid(kind: String) -> Bool {
+    kind == "heatmap" or kind == "contour"
+}
+
+fn render(fig: Figure) -> String {
+    theme = fig.theme
+    w = fig.width as Float
+    h = fig.height as Float
+    mut has_grid = false
+    mut has_bars = false
+    mut xs_lo = 1000000000000000.0
+    mut xs_hi = -1000000000000000.0
+    mut ys_lo = 1000000000000000.0
+    mut ys_hi = -1000000000000000.0
+    mut zlo = 1000000000000000.0
+    mut zhi = -1000000000000000.0
+    mut heat_map = "viridis"
+    for s in fig.series {
+        if s.kind == "hline" {
+            ys_lo = if s.ys[0] < ys_lo { s.ys[0] } else { ys_lo }
+            ys_hi = if s.ys[0] > ys_hi { s.ys[0] } else { ys_hi }
+        } else if s.kind == "vline" {
+            xs_lo = if s.xs[0] < xs_lo { s.xs[0] } else { xs_lo }
+            xs_hi = if s.xs[0] > xs_hi { s.xs[0] } else { xs_hi }
+        } else if s.xs.length() > 0 {
+            half = if s.kind == "hist" { s.width / 2.0 } else if s.kind == "bar" { min_gap(s.xs) / 2.0 } else { 0.0 }
+            xs_lo = if s.xs.min() - half < xs_lo { s.xs.min() - half } else { xs_lo }
+            xs_hi = if s.xs.max() + half > xs_hi { s.xs.max() + half } else { xs_hi }
+            lo_y = if has_range(s.kind) { s.lo.min() } else { s.ys.min() }
+            hi_y = if has_range(s.kind) { s.hi.max() } else { s.ys.max() }
+            ys_lo = if lo_y < ys_lo { lo_y } else { ys_lo }
+            ys_hi = if hi_y > ys_hi { hi_y } else { ys_hi }
+        }
+        if is_grid(s.kind) {
+            has_grid = true
+            zlo = if s.grid.min() < zlo { s.grid.min() } else { zlo }
+            zhi = if s.grid.max() > zhi { s.grid.max() } else { zhi }
+            if s.kind == "heatmap" {
+                heat_map = s.colormap
+            }
+        }
+        if s.kind == "bar" or s.kind == "hist" or s.kind == "area" {
+            has_bars = true
+        }
+    }
+    if xs_lo > xs_hi {
+        xs_lo = 0.0
+        xs_hi = 1.0
+    }
+    if ys_lo > ys_hi {
+        ys_lo = 0.0
+        ys_hi = 1.0
+    }
+    if has_bars {
+        ys_lo = if ys_lo > 0.0 { 0.0 } else { ys_lo }
+        ys_hi = if ys_hi < 0.0 { 0.0 } else { ys_hi }
+    }
+    if xs_hi - xs_lo < 1.0e-12 {
+        xs_lo = xs_lo - 1.0
+        xs_hi = xs_hi + 1.0
+    }
+    if ys_hi - ys_lo < 1.0e-12 {
+        ys_lo = ys_lo - 1.0
+        ys_hi = ys_hi + 1.0
+    }
+    xpad = if has_grid or has_bars { 0.0 } else { (xs_hi - xs_lo) * 0.02 }
+    ypad = if has_grid { 0.0 } else { (ys_hi - ys_lo) * 0.05 }
+    x0 = if fig.xfixed { fig.x0 } else { xs_lo - xpad }
+    x1 = if fig.xfixed { fig.x1 } else { xs_hi + xpad }
+    y0 = if fig.yfixed { fig.y0 } else if has_bars and ys_lo == 0.0 { 0.0 } else { ys_lo - ypad }
+    y1 = if fig.yfixed { fig.y1 } else { ys_hi + ypad }
+
+    heat = fig.series.any(fn(s) { s.kind == "heatmap" })
+    left = 66.0
+    right = w - (if heat { 86.0 } else { 20.0 })
+    top = if fig.subtitle != "" { 62.0 } else { 44.0 }
+    bottom = h - 52.0
+    sx = (right - left) / (x1 - x0)
+    sy = (bottom - top) / (y1 - y0)
+    clip = uid("clip", fig.title + fig.xlabel + fig.ylabel + fig.series.length().to_string())
+
+    mut out: List<String> = [header(fig.width, fig.height, theme)]
+    out.push(text_at(left, 26.0, fig.title, "start", 16, theme.text, attr("font-weight", "600")))
+    if fig.subtitle != "" {
+        out.push(text_at(left, 45.0, fig.subtitle, "start", 12, theme.muted, ""))
+    }
+    out.push("<defs><clipPath" + attr("id", clip) + "><rect" + attr("x", num(left)) + attr("y", num(top)) +
+        attr("width", num(right - left)) + attr("height", num(bottom - top)) + "/></clipPath></defs>")
+
+    // Grid and ticks.
+    xstep = nice_step(x0, x1, 8)
+    ystep = nice_step(y0, y1, 6)
+    for v in ticks(x0, x1, 8).to_list() {
+        x = left + (v - x0) * sx
+        if fig.gridlines and not has_grid {
+            out.push(seg(x, top, x, bottom, theme.grid, 1.0, ""))
+        }
+        out.push(seg(x, bottom, x, bottom + 5.0, theme.axis, 1.0, ""))
+        out.push(text_at(x, bottom + 18.0, tick_label(v, xstep), "middle", 11, theme.muted, ""))
+    }
+    for v in ticks(y0, y1, 6).to_list() {
+        y = bottom - (v - y0) * sy
+        if fig.gridlines and not has_grid {
+            out.push(seg(left, y, right, y, theme.grid, 1.0, ""))
+        }
+        out.push(seg(left - 5.0, y, left, y, theme.axis, 1.0, ""))
+        out.push(text_at(left - 8.0, y + 4.0, tick_label(v, ystep), "end", 11, theme.muted, ""))
+    }
+
+    // Marks, in order, clipped to the plot area.
+    out.push("<g" + attr("clip-path", "url(#" + clip + ")") + ">")
+    mut index = 0
+    for s in fig.series {
+        reference = s.kind == "hline" or s.kind == "vline"
+        color = if reference and s.color == "" { theme.muted } else { pick(s.color, index, theme) }
+        if not is_grid(s.kind) and not reference {
+            index = index + 1
+        }
+        out.push(draw_series(s, color, left, bottom, x0, y0, sx, sy, zlo, zhi, theme, top, right))
+    }
+    for n in fig.notes {
+        out.push(text_at(left + (n.x - x0) * sx, bottom - (n.y - y0) * sy, n.text, "start", 11, theme.text, ""))
+    }
+    out.push("</g>")
+
+    // Frame and axis titles.
+    out.push(seg(left, bottom, right, bottom, theme.axis, 1.0, ""))
+    out.push(seg(left, top, left, bottom, theme.axis, 1.0, ""))
+    xt = axis_title(fig.xlabel, fig.xunit)
+    yt = axis_title(fig.ylabel, fig.yunit)
+    if xt != "" {
+        out.push(text_at((left + right) / 2.0, h - 12.0, xt, "middle", 12, theme.text, ""))
+    }
+    if yt != "" {
+        cy = (top + bottom) / 2.0
+        out.push(text_at(16.0, cy, yt, "middle", 12, theme.text, attr("transform", "rotate(-90 16 " + num(cy) + ")")))
+    }
+    if heat {
+        out.push(colorbar(uid("cb", clip), heat_map, zlo, zhi, fig.colorbar, right + 14.0, top, bottom, theme))
+    }
+    if fig.legend {
+        out.push(legend(fig, left, right, top, bottom, x0, y0, sx, sy, theme))
+    }
+    out.push("</svg>\n")
+    out.join("\n")
+}
+
+/// Smallest distance between consecutive x values (1 for a single bar).
+fn min_gap(xs: Array<Float>) -> Float {
+    n = xs.length()
+    if n < 2 {
+        return 1.0
+    }
+    mut gap = abs(xs[1] - xs[0])
+    for i in 1 until n {
+        d = abs(xs[i] - xs[i - 1])
+        gap = if d < gap and d > 0.0 { d } else { gap }
+    }
+    gap
+}
+
+fn path_of(xs: Array<Float>, ys: Array<Float>, left: Float, bottom: Float, x0: Float, y0: Float, sx: Float, sy: Float) -> String {
+    mut parts: List<String> = []
+    for i in 0 until xs.length() {
+        parts.push((if i == 0 { "M" } else { "L" }) + num(left + (xs[i] - x0) * sx) + " " + num(bottom - (ys[i] - y0) * sy))
+    }
+    parts.join(" ")
+}
+
+fn draw_series(s: Series, color: String, left: Float, bottom: Float, x0: Float, y0: Float, sx: Float, sy: Float, zlo: Float, zhi: Float, theme: Theme, top: Float, right: Float) -> String {
+    kind = s.kind
+    if kind == "line" {
+        dash = if s.dash != "" { attr("stroke-dasharray", s.dash) } else { "" }
+        line = "<path" + attr("d", path_of(s.xs, s.ys, left, bottom, x0, y0, sx, sy)) + attr("fill", "none") + attr("stroke", color) +
+            attr("stroke-width", num(s.width)) + attr("stroke-linejoin", "round") + attr("stroke-linecap", "round") + dash + "/>"
+        if s.label == "" { line } else { "<g class=\"series\">" + tip(s.label) + line + "</g>" }
+    } else if kind == "scatter" {
+        mut parts: List<String> = []
+        for i in 0 until s.xs.length() {
+            parts.push("<circle class=\"pt\"" + attr("cx", num(left + (s.xs[i] - x0) * sx)) + attr("cy", num(bottom - (s.ys[i] - y0) * sy)) +
+                attr("r", num(s.size)) + ">" + tip(named(s.label) + "(" + short(s.xs[i]) + ", " + short(s.ys[i]) + ")") + "</circle>")
+        }
+        "<g" + attr("fill", color) + attr("fill-opacity", "0.78") + attr("stroke", theme.background) + attr("stroke-width", "0.6") + ">" +
+            parts.join("") + "</g>"
+    } else if kind == "area" {
+        n = s.xs.length()
+        base = bottom - ((if y0 > 0.0 { y0 } else { 0.0 }) - y0) * sy
+        line = path_of(s.xs, s.ys, left, bottom, x0, y0, sx, sy)
+        fill = line + " L" + num(left + (s.xs[n - 1] - x0) * sx) + " " + num(base) + " L" + num(left + (s.xs[0] - x0) * sx) + " " + num(base) + " Z"
+        "<path" + attr("d", fill) + attr("fill", color) + attr("fill-opacity", "0.18") + "/>" +
+            "<path" + attr("d", line) + attr("fill", "none") + attr("stroke", color) + attr("stroke-width", num(s.width)) + "/>"
+    } else if kind == "band" {
+        n = s.xs.length()
+        mut parts: List<String> = []
+        for i in 0 until n {
+            parts.push((if i == 0 { "M" } else { "L" }) + num(left + (s.xs[i] - x0) * sx) + " " + num(bottom - (s.hi[i] - y0) * sy))
+        }
+        mut j = n - 1
+        while j >= 0 {
+            parts.push("L" + num(left + (s.xs[j] - x0) * sx) + " " + num(bottom - (s.lo[j] - y0) * sy))
+            j = j - 1
+        }
+        "<path" + attr("d", parts.join(" ") + " Z") + attr("fill", color) + attr("fill-opacity", "0.2") + attr("stroke", "none") + "/>"
+    } else if kind == "errorbar" {
+        mut parts: List<String> = []
+        for i in 0 until s.xs.length() {
+            x = left + (s.xs[i] - x0) * sx
+            ylo = bottom - (s.lo[i] - y0) * sy
+            yhi = bottom - (s.hi[i] - y0) * sy
+            parts.push(seg(x, ylo, x, yhi, color, s.width, "") + seg(x - 4.0, ylo, x + 4.0, ylo, color, s.width, "") +
+                seg(x - 4.0, yhi, x + 4.0, yhi, color, s.width, ""))
+            parts.push("<circle class=\"pt\"" + attr("cx", num(x)) + attr("cy", num(bottom - (s.ys[i] - y0) * sy)) + attr("r", "3.5") + attr("fill", color) + ">" +
+                tip(named(s.label) + short(s.xs[i]) + ": " + short(s.ys[i]) + " ± " + short(s.hi[i] - s.ys[i])) + "</circle>")
+        }
+        parts.join("")
+    } else if kind == "bar" or kind == "hist" {
+        n = s.xs.length()
+        gap = if kind == "hist" { s.width } else { min_gap(s.xs) }
+        bw = gap * (if kind == "hist" { 1.0 } else { 0.72 }) * sx
+        base = bottom - ((if y0 > 0.0 { y0 } else { 0.0 }) - y0) * sy
+        mut parts: List<String> = []
+        for i in 0 until n {
+            x = left + (s.xs[i] - x0) * sx - bw / 2.0
+            y = bottom - (s.ys[i] - y0) * sy
+            ytop = if y < base { y } else { base }
+            hgt = abs(base - y)
+            where = if kind == "hist" { short(s.xs[i] - gap / 2.0) + " to " + short(s.xs[i] + gap / 2.0) } else { short(s.xs[i]) }
+            parts.push("<rect class=\"bar\"" + attr("x", num(x)) + attr("y", num(ytop)) + attr("width", num(bw)) + attr("height", num(hgt)) + ">" +
+                tip(named(s.label) + where + ": " + short(s.ys[i])) + "</rect>")
+        }
+        edge = if kind == "hist" { attr("stroke", theme.background) + attr("stroke-width", "1") } else { "" }
+        "<g" + attr("fill", color) + attr("fill-opacity", "0.85") + edge + ">" + parts.join("") + "</g>"
+    } else if kind == "stairs" {
+        mut parts: List<String> = []
+        for i in 0 until s.xs.length() {
+            x = left + (s.xs[i] - x0) * sx
+            y = bottom - (s.ys[i] - y0) * sy
+            if i == 0 {
+                parts.push("M" + num(x) + " " + num(y))
+            } else {
+                parts.push("H" + num(x) + " V" + num(y))
+            }
+        }
+        "<path" + attr("d", parts.join(" ")) + attr("fill", "none") + attr("stroke", color) + attr("stroke-width", num(s.width)) + "/>"
+    } else if kind == "hline" {
+        y = bottom - (s.ys[0] - y0) * sy
+        seg(left, y, right, y, color, 1.2, attr("stroke-dasharray", "6 4"))
+    } else if kind == "vline" {
+        x = left + (s.xs[0] - x0) * sx
+        seg(x, top, x, bottom, color, 1.2, attr("stroke-dasharray", "6 4"))
+    } else if kind == "heatmap" {
+        draw_heatmap(s, left, bottom, x0, y0, sx, sy, zlo, zhi)
+    } else if kind == "contour" {
+        draw_contour(s, color, left, bottom, x0, y0, sx, sy, theme)
+    } else {
+        ""
+    }
+}
+
+fn draw_heatmap(s: Series, left: Float, bottom: Float, x0: Float, y0: Float, sx: Float, sy: Float, zlo: Float, zhi: Float) -> String {
+    shape = s.grid.shape()
+    rows = shape[0]
+    cols = shape[1]
+    // Each value is the center of its cell, so contours line up with it.
+    cw = (s.xs[1] - s.xs[0]) / ((if cols > 1 { cols - 1 } else { 1 }) as Float)
+    ch = (s.ys[1] - s.ys[0]) / ((if rows > 1 { rows - 1 } else { 1 }) as Float)
+    span = if zhi > zlo { zhi - zlo } else { 1.0 }
+    mut parts: List<String> = []
+    for r in 0 until rows {
+        for c in 0 until cols {
+            v = s.grid.get(r, c)
+            x = left + (s.xs[0] + ((c as Float) - 0.5) * cw - x0) * sx
+            y = bottom - (s.ys[0] + ((r as Float) + 0.5) * ch - y0) * sy
+            // Cells overlap by a fraction of a pixel so no seams show.
+            parts.push("<rect" + attr("x", num(x)) + attr("y", num(y)) + attr("width", num(cw * sx + 0.6)) +
+                attr("height", num(ch * sy + 0.6)) + attr("fill", colormap(s.colormap, (v - zlo) / span, 1.0)) + "/>")
+        }
+    }
+    "<g>" + parts.join("") + "</g>"
+}
+
+/// Marching squares over the grid for each level; each crossing cell adds
+/// one or two segments.
+fn draw_contour(s: Series, color: String, left: Float, bottom: Float, x0: Float, y0: Float, sx: Float, sy: Float, theme: Theme) -> String {
+    shape = s.grid.shape()
+    rows = shape[0]
+    cols = shape[1]
+    zmin = s.grid.min()
+    zmax = s.grid.max()
+    dx = (s.xs[1] - s.xs[0]) / ((cols - 1) as Float)
+    dy = (s.ys[1] - s.ys[0]) / ((rows - 1) as Float)
+    mut out: List<String> = []
+    for k in 1 to s.levels {
+        level = zmin + (zmax - zmin) * (k as Float) / ((s.levels + 1) as Float)
+        stroke = if s.colormap != "" { colormap(s.colormap, (k as Float) / ((s.levels + 1) as Float), 0.85) } else if color != "" { color } else { theme.text }
+        mut d: List<String> = []
+        for r in 0 until rows - 1 {
+            for c in 0 until cols - 1 {
+                a = s.grid.get(r, c)
+                b = s.grid.get(r, c + 1)
+                e = s.grid.get(r + 1, c + 1)
+                f = s.grid.get(r + 1, c)
+                // Crossing points on the four edges (bottom, right, top, left).
+                mut pts: List<Float> = []
+                if (a < level) != (b < level) {
+                    t = (level - a) / (b - a)
+                    pts.push((c as Float) + t)
+                    pts.push(r as Float)
+                }
+                if (b < level) != (e < level) {
+                    t = (level - b) / (e - b)
+                    pts.push((c + 1) as Float)
+                    pts.push((r as Float) + t)
+                }
+                if (f < level) != (e < level) {
+                    t = (level - f) / (e - f)
+                    pts.push((c as Float) + t)
+                    pts.push((r + 1) as Float)
+                }
+                if (a < level) != (f < level) {
+                    t = (level - a) / (f - a)
+                    pts.push(c as Float)
+                    pts.push((r as Float) + t)
+                }
+                mut p = 0
+                while p + 3 < pts.length() {
+                    xa = left + (s.xs[0] + pts[p] * dx - x0) * sx
+                    ya = bottom - (s.ys[0] + pts[p + 1] * dy - y0) * sy
+                    xb = left + (s.xs[0] + pts[p + 2] * dx - x0) * sx
+                    yb = bottom - (s.ys[0] + pts[p + 3] * dy - y0) * sy
+                    d.push("M" + num(xa) + " " + num(ya) + " L" + num(xb) + " " + num(yb))
+                    p = p + 4
+                }
+            }
+        }
+        out.push("<path" + attr("d", d.join(" ")) + attr("fill", "none") + attr("stroke", stroke) + attr("stroke-width", num(s.width)) + attr("stroke-linecap", "round") + "/>")
+    }
+    out.join("")
+}
+
+fn legend(fig: Figure, left: Float, right: Float, top: Float, bottom: Float, x0: Float, y0: Float, sx: Float, sy: Float, theme: Theme) -> String {
+    mut labels: List<String> = []
+    mut colors: List<String> = []
+    mut kinds: List<String> = []
+    mut index = 0
+    for s in fig.series {
+        reference = s.kind == "hline" or s.kind == "vline"
+        if not is_grid(s.kind) {
+            if s.label != "" {
+                labels.push(s.label)
+                colors.push(if reference and s.color == "" { theme.muted } else { pick(s.color, index, theme) })
+                kinds.push(s.kind)
+            }
+            if not reference {
+                index = index + 1
+            }
+        }
+    }
+    if labels.length() == 0 {
+        return ""
+    }
+    mut longest = 0
+    for l in labels {
+        longest = if l.length() > longest { l.length() } else { longest }
+    }
+    bw = 34.0 + (longest as Float) * 6.6
+    bh = 10.0 + (labels.length() as Float) * 18.0
+    // The corner whose box covers the fewest drawn points.
+    mut best = 0
+    mut best_count = 1000000000
+    for corner in 0 until 4 {
+        cx0 = if corner % 2 == 0 { right - bw - 10.0 } else { left + 10.0 }
+        cy0 = if corner < 2 { top + 10.0 } else { bottom - bh - 10.0 }
+        mut count = 0
+        for s in fig.series {
+            if not is_grid(s.kind) and s.kind != "hline" and s.kind != "vline" {
+                for i in 0 until s.xs.length() {
+                    px_ = left + (s.xs[i] - x0) * sx
+                    py_ = bottom - (s.ys[i] - y0) * sy
+                    if px_ >= cx0 - 4.0 and px_ <= cx0 + bw + 4.0 and py_ >= cy0 - 4.0 and py_ <= cy0 + bh + 4.0 {
+                        count = count + 1
+                    }
+                }
+            }
+        }
+        if count < best_count {
+            best = corner
+            best_count = count
+        }
+    }
+    x = if best % 2 == 0 { right - bw - 10.0 } else { left + 10.0 }
+    y = if best < 2 { top + 10.0 } else { bottom - bh - 10.0 }
+    mut out = "<g><rect" + attr("x", num(x)) + attr("y", num(y)) + attr("width", num(bw)) + attr("height", num(bh)) +
+        attr("rx", "6") + attr("fill", theme.background) + attr("fill-opacity", "0.88") + attr("stroke", theme.grid) + "/>"
+    for i in 0 until labels.length() {
+        cy = y + 14.0 + (i as Float) * 18.0
+        k = kinds[i]
+        if k == "scatter" or k == "errorbar" {
+            out = out + "<circle" + attr("cx", num(x + 15.0)) + attr("cy", num(cy)) + attr("r", "4") + attr("fill", colors[i]) + "/>"
+        } else if k == "bar" or k == "hist" or k == "band" or k == "area" {
+            out = out + "<rect" + attr("x", num(x + 8.0)) + attr("y", num(cy - 5.0)) + attr("width", "14") + attr("height", "10") + attr("fill", colors[i]) + attr("fill-opacity", "0.7") + "/>"
+        } else {
+            out = out + seg(x + 7.0, cy, x + 23.0, cy, colors[i], 2.5, "")
+        }
+        out = out + text_at(x + 28.0, cy + 4.0, labels[i], "start", 11, theme.text, "")
+    }
+    out + "</g>"
+}
+
+// ---------------------------------------------------------------- 3D
+
+/// A 3D scene (orthographic camera; azimuth and elevation in degrees).
+pub fn scene3d(title: String) -> Scene3D {
+    Scene3D {
+        title: title,
+        subtitle: "",
+        xlabel: "x",
+        ylabel: "y",
+        zlabel: "z",
+        width: 640,
+        height: 520,
+        theme: light(),
+        series: [],
+        azimuth: -55.0,
+        elevation: 28.0,
+        colorbar: ""
+    }
+}
+
+/// z[i, j] = f(xs[j], ys[i]) on a grid: rows follow y, columns follow x.
+pub fn grid_of(xs: Array<Float>, ys: Array<Float>, f: fn(Float, Float) -> Float) -> Array<Float> {
+    mut z = zeros([ys.length(), xs.length()])
+    for i in 0 until ys.length() {
+        for j in 0 until xs.length() {
+            z.set(i, j, f(xs[j], ys[i]))
+        }
+    }
+    z
+}
+
+impl Scene3D {
+    fn labels(mut self, x: String, y: String, z: String) -> Scene3D {
+        self.xlabel = x
+        self.ylabel = y
+        self.zlabel = z
+        self
+    }
+
+    fn describe(mut self, text: String) -> Scene3D {
+        self.subtitle = text
+        self
+    }
+
+    fn view(mut self, azimuth: Float, elevation: Float) -> Scene3D {
+        self.azimuth = azimuth
+        self.elevation = elevation
+        self
+    }
+
+    fn size(mut self, width: Int, height: Int) -> Scene3D {
+        self.width = width
+        self.height = height
+        self
+    }
+
+    fn dark(mut self) -> Scene3D {
+        self.theme = dark()
+        self
+    }
+
+    /// A shaded height field z[i, j] over xs × ys.
+    fn surface(mut self, xs: Array<Float>, ys: Array<Float>, z: Array<Float>, colormap: String = "viridis", label: String = "") -> Scene3D {
+        s = series("surface", xs, ys, "", "")
+        self.colorbar = label
+        self.series.push(Series { kind: s.kind, xs: xs, ys: ys, zs: s.zs, lo: s.lo, hi: s.hi, grid: z, label: label, color: "", width: s.width, dash: "", size: s.size, colormap: colormap, levels: 0 })
+        self
+    }
+
+    fn wireframe(mut self, xs: Array<Float>, ys: Array<Float>, z: Array<Float>, color: String = "") -> Scene3D {
+        s = series("wire", xs, ys, "", color)
+        self.series.push(Series { kind: s.kind, xs: xs, ys: ys, zs: s.zs, lo: s.lo, hi: s.hi, grid: z, label: "", color: color, width: 0.8, dash: "", size: s.size, colormap: "", levels: 0 })
+        self
+    }
+
+    /// A curve through 3D points (trajectory, orbit, attractor).
+    fn line(mut self, xs: Array<Float>, ys: Array<Float>, zs: Array<Float>, color: String = "", width: Float = 1.6, colormap: String = "") -> Scene3D {
+        s = series("line3", xs, ys, "", color)
+        self.series.push(Series { kind: s.kind, xs: xs, ys: ys, zs: zs, lo: s.lo, hi: s.hi, grid: s.grid, label: "", color: color, width: width, dash: "", size: s.size, colormap: colormap, levels: 0 })
+        self
+    }
+
+    /// A point cloud colored by height.
+    fn scatter(mut self, xs: Array<Float>, ys: Array<Float>, zs: Array<Float>, colormap: String = "viridis", size: Float = 3.0) -> Scene3D {
+        s = series("scatter3", xs, ys, "", "")
+        self.series.push(Series { kind: s.kind, xs: xs, ys: ys, zs: zs, lo: s.lo, hi: s.hi, grid: s.grid, label: "", color: "", width: s.width, dash: "", size: size, colormap: colormap, levels: 0 })
+        self
+    }
+
+    fn svg(self) -> String {
+        render3d(self)
+    }
+
+    fn save(self, path: String) -> Result<Void, String> {
+        write_file(path, render3d(self))
+    }
+}
+
+/// Orthographic camera: data is normalized to the cube [-1, 1]^3 (z squashed
+/// to 0.8), rotated by the azimuth around z and tilted by the elevation.
+record Camera {
+    ca: Float
+    sa: Float
+    ce: Float
+    se: Float
+    cx: Float
+    cy: Float
+    scale: Float
+    x0: Float
+    x1: Float
+    y0: Float
+    y1: Float
+    z0: Float
+    z1: Float
+}
+
+fn norm(v: Float, lo: Float, hi: Float) -> Float {
+    if hi > lo { (v - lo) / (hi - lo) * 2.0 - 1.0 } else { 0.0 }
+}
+
+fn project_x(cam: Camera, x: Float, y: Float) -> Float {
+    u = norm(x, cam.x0, cam.x1)
+    v = norm(y, cam.y0, cam.y1)
+    cam.cx + (u * cam.ca - v * cam.sa) * cam.scale
+}
+
+fn project_y(cam: Camera, x: Float, y: Float, z: Float) -> Float {
+    u = norm(x, cam.x0, cam.x1)
+    v = norm(y, cam.y0, cam.y1)
+    w = norm(z, cam.z0, cam.z1) * 0.8
+    ry = u * cam.sa + v * cam.ca
+    cam.cy - (ry * cam.se + w * cam.ce) * cam.scale
+}
+
+/// Distance towards the viewer (bigger is nearer).
+fn depth(cam: Camera, x: Float, y: Float, z: Float) -> Float {
+    u = norm(x, cam.x0, cam.x1)
+    v = norm(y, cam.y0, cam.y1)
+    w = norm(z, cam.z0, cam.z1) * 0.8
+    ry = u * cam.sa + v * cam.ca
+    w * cam.se - ry * cam.ce
+}
+
+fn pt(cam: Camera, x: Float, y: Float, z: Float) -> String {
+    num(project_x(cam, x, y)) + "," + num(project_y(cam, x, y, z))
+}
+
+/// Indices of `keys` in ascending order (merge sort, stable).
+pub fn argsort(keys: Array<Float>) -> List<Int> {
+    n = keys.length()
+    mut idx: List<Int> = []
+    for i in 0 until n {
+        idx.push(i)
+    }
+    mut width = 1
+    while width < n {
+        mut merged: List<Int> = []
+        mut start = 0
+        while start < n {
+            mid = if start + width < n { start + width } else { n }
+            stop = if start + 2 * width < n { start + 2 * width } else { n }
+            mut i = start
+            mut j = mid
+            while i < mid or j < stop {
+                if j >= stop or (i < mid and keys[idx[i]] <= keys[idx[j]]) {
+                    merged.push(idx[i])
+                    i = i + 1
+                } else {
+                    merged.push(idx[j])
+                    j = j + 1
+                }
+            }
+            start = stop
+        }
+        idx = merged
+        width = width * 2
+    }
+    idx
+}
+
+fn render3d(scene: Scene3D) -> String {
+    theme = scene.theme
+    w = scene.width as Float
+    h = scene.height as Float
+    mut x0 = 1000000000000000.0
+    mut x1 = -1000000000000000.0
+    mut y0 = 1000000000000000.0
+    mut y1 = -1000000000000000.0
+    mut z0 = 1000000000000000.0
+    mut z1 = -1000000000000000.0
+    mut cmap = ""
+    for s in scene.series {
+        x0 = if s.xs.min() < x0 { s.xs.min() } else { x0 }
+        x1 = if s.xs.max() > x1 { s.xs.max() } else { x1 }
+        y0 = if s.ys.min() < y0 { s.ys.min() } else { y0 }
+        y1 = if s.ys.max() > y1 { s.ys.max() } else { y1 }
+        zz = if s.kind == "surface" or s.kind == "wire" { s.grid } else { s.zs }
+        z0 = if zz.min() < z0 { zz.min() } else { z0 }
+        z1 = if zz.max() > z1 { zz.max() } else { z1 }
+        if s.kind == "surface" {
+            cmap = s.colormap
+        }
+    }
+    if x0 > x1 {
+        x0 = -1.0
+        x1 = 1.0
+        y0 = -1.0
+        y1 = 1.0
+        z0 = -1.0
+        z1 = 1.0
+    }
+    a = scene.azimuth * pi() / 180.0
+    e = scene.elevation * pi() / 180.0
+    has_bar = cmap != ""
+    top = if scene.subtitle != "" { 62.0 } else { 44.0 }
+    plot_w = w - (if has_bar { 90.0 } else { 20.0 })
+    cam = Camera {
+        ca: cos(a), sa: sin(a), ce: cos(e), se: sin(e),
+        cx: plot_w / 2.0 + 6.0, cy: top + (h - top) / 2.0 + 6.0,
+        scale: (if plot_w < h - top { plot_w } else { h - top }) * 0.33,
+        x0: x0, x1: x1, y0: y0, y1: y1, z0: z0, z1: z1
+    }
+
+    mut out: List<String> = [header(scene.width, scene.height, theme)]
+    out.push(text_at(20.0, 26.0, scene.title, "start", 16, theme.text, attr("font-weight", "600")))
+    if scene.subtitle != "" {
+        out.push(text_at(20.0, 45.0, scene.subtitle, "start", 12, theme.muted, ""))
+    }
+    out.push(axes3d(cam, scene, theme))
+
+    for s in scene.series {
+        if s.kind == "surface" or s.kind == "wire" {
+            out.push(draw_surface(cam, s, theme))
+        } else if s.kind == "line3" {
+            n = s.xs.length()
+            // With a colormap the curve is split in 64 pieces colored by progress.
+            pieces = if s.colormap != "" { 64 } else { 1 }
+            mut groups: List<String> = []
+            for p in 0 until pieces {
+                first = p * (n - 1) / pieces
+                last = (p + 1) * (n - 1) / pieces
+                mut parts: List<String> = []
+                for i in first to last {
+                    parts.push((if i == first { "M" } else { "L" }) + pt(cam, s.xs[i], s.ys[i], s.zs[i]).replace(",", " "))
+                }
+                stroke = if s.colormap != "" { colormap(s.colormap, (p as Float) / ((pieces - 1) as Float), 1.0) } else { pick(s.color, 0, theme) }
+                groups.push("<path" + attr("d", parts.join(" ")) + attr("stroke", stroke) + "/>")
+            }
+            out.push("<g" + attr("fill", "none") + attr("stroke-width", num(s.width)) + attr("stroke-linejoin", "round") + attr("stroke-linecap", "round") + ">" + groups.join("") + "</g>")
+        } else if s.kind == "scatter3" {
+            n = s.xs.length()
+            mut keys: List<Float> = []
+            for i in 0 until n {
+                keys.push(depth(cam, s.xs[i], s.ys[i], s.zs[i]))
+            }
+            zlo = s.zs.min()
+            zspan = if s.zs.max() > zlo { s.zs.max() - zlo } else { 1.0 }
+            mut parts: List<String> = []
+            for i in argsort(array(keys)) {
+                parts.push("<circle class=\"pt\"" + attr("cx", num(project_x(cam, s.xs[i], s.ys[i]))) + attr("cy", num(project_y(cam, s.xs[i], s.ys[i], s.zs[i]))) +
+                    attr("r", num(s.size)) + attr("fill", colormap(s.colormap, (s.zs[i] - zlo) / zspan, 1.0)) + ">" +
+                    tip("(" + short(s.xs[i]) + ", " + short(s.ys[i]) + ", " + short(s.zs[i]) + ")") + "</circle>")
+            }
+            out.push("<g" + attr("stroke", theme.background) + attr("stroke-width", "0.5") + ">" + parts.join("") + "</g>")
+        }
+    }
+    if has_bar {
+        out.push(colorbar(uid("cb3", scene.title + scene.zlabel), cmap, z0, z1, scene.colorbar, plot_w + 20.0, top + 30.0, h - 40.0, theme))
+    }
+    out.push("</svg>\n")
+    out.join("\n")
+}
+
+fn edge(cam: Camera, ax: Float, ay: Float, az: Float, bx: Float, by: Float, bz: Float) -> String {
+    "<line" + attr("x1", num(project_x(cam, ax, ay))) + attr("y1", num(project_y(cam, ax, ay, az))) +
+        attr("x2", num(project_x(cam, bx, by))) + attr("y2", num(project_y(cam, bx, by, bz))) + "/>"
+}
+
+/// Floor grid and the two back walls, with ticks and axis titles.
+fn axes3d(cam: Camera, scene: Scene3D, theme: Theme) -> String {
+    x0 = cam.x0
+    x1 = cam.x1
+    y0 = cam.y0
+    y1 = cam.y1
+    z0 = cam.z0
+    z1 = cam.z1
+    // Back walls: the x and y planes farthest from the viewer.
+    xb = if depth(cam, x0, (y0 + y1) / 2.0, z0) < depth(cam, x1, (y0 + y1) / 2.0, z0) { x0 } else { x1 }
+    yb = if depth(cam, (x0 + x1) / 2.0, y0, z0) < depth(cam, (x0 + x1) / 2.0, y1, z0) { y0 } else { y1 }
+    xf = if xb == x0 { x1 } else { x0 }
+    yf = if yb == y0 { y1 } else { y0 }
+    // Tick labels sit just outside the front edges of the floor.
+    ox = yf + (yf - yb) * 0.1
+    oy = xf + (xf - xb) * 0.1
+    tx = yf + (yf - yb) * 0.26
+    ty = xf + (xf - xb) * 0.26
+    mut out: List<String> = []
+    panel = attr("fill", theme.grid) + attr("fill-opacity", "0.35") + attr("stroke", theme.axis) + attr("stroke-width", "0.8")
+    out.push("<polygon" + attr("points", pt(cam, x0, y0, z0) + " " + pt(cam, x1, y0, z0) + " " + pt(cam, x1, y1, z0) + " " + pt(cam, x0, y1, z0)) + panel + "/>")
+    out.push("<polygon" + attr("points", pt(cam, xb, y0, z0) + " " + pt(cam, xb, y1, z0) + " " + pt(cam, xb, y1, z1) + " " + pt(cam, xb, y0, z1)) + panel + "/>")
+    out.push("<polygon" + attr("points", pt(cam, x0, yb, z0) + " " + pt(cam, x1, yb, z0) + " " + pt(cam, x1, yb, z1) + " " + pt(cam, x0, yb, z1)) + panel + "/>")
+    mut grid: List<String> = []
+    xstep = nice_step(x0, x1, 5)
+    ystep = nice_step(y0, y1, 5)
+    zstep = nice_step(z0, z1, 5)
+    for v in ticks(x0, x1, 5).to_list() {
+        grid.push(edge(cam, v, y0, z0, v, y1, z0))
+        grid.push(edge(cam, v, yb, z0, v, yb, z1))
+        out.push(text_at(project_x(cam, v, ox), project_y(cam, v, ox, z0) + 4.0, tick_label(v, xstep), "middle", 10, theme.muted, ""))
+    }
+    for v in ticks(y0, y1, 5).to_list() {
+        grid.push(edge(cam, x0, v, z0, x1, v, z0))
+        grid.push(edge(cam, xb, v, z0, xb, v, z1))
+        out.push(text_at(project_x(cam, oy, v), project_y(cam, oy, v, z0) + 4.0, tick_label(v, ystep), "middle", 10, theme.muted, ""))
+    }
+    for v in ticks(z0, z1, 5).to_list() {
+        grid.push(edge(cam, xb, y0, v, xb, y1, v))
+        grid.push(edge(cam, x0, yb, v, x1, yb, v))
+        // z ticks on the vertical edge shared by the two back walls' outer side.
+        ex = if xb == x0 { x0 } else { x1 }
+        ey = if yb == y0 { y1 } else { y0 }
+        out.push(text_at(project_x(cam, ex, ey) - 8.0, project_y(cam, ex, ey, v) + 3.5, tick_label(v, zstep), "end", 10, theme.muted, ""))
+    }
+    out.push("<g" + attr("stroke", theme.axis) + attr("stroke-width", "0.5") + attr("stroke-opacity", "0.7") + ">" + grid.join("") + "</g>")
+    // Axis titles next to the middle of the front edges.
+    out.push(text_at(project_x(cam, (x0 + x1) / 2.0, tx), project_y(cam, (x0 + x1) / 2.0, tx, z0) + 4.0, scene.xlabel, "middle", 12, theme.text, attr("font-weight", "600")))
+    out.push(text_at(project_x(cam, ty, (y0 + y1) / 2.0), project_y(cam, ty, (y0 + y1) / 2.0, z0) + 4.0, scene.ylabel, "middle", 12, theme.text, attr("font-weight", "600")))
+    ex = if xb == x0 { x0 } else { x1 }
+    ey = if yb == y0 { y1 } else { y0 }
+    out.push(text_at(project_x(cam, ex, ey) - 44.0, project_y(cam, ex, ey, (z0 + z1) / 2.0), scene.zlabel, "middle", 12, theme.text, attr("font-weight", "600")))
+    out.join("\n")
+}
+
+/// Brightness of a triangle under a directional light from the upper left of
+/// the viewer: 0.5 + 0.5 |n · l|, with n the normal in the normalized cube.
+fn shade(ax: Float, ay: Float, az: Float, bx: Float, by: Float, bz: Float, cx: Float, cy: Float, cz: Float) -> Float {
+    ux = bx - ax
+    uy = by - ay
+    uz = bz - az
+    vx = cx - ax
+    vy = cy - ay
+    vz = cz - az
+    nx = uy * vz - uz * vy
+    ny = uz * vx - ux * vz
+    nz = ux * vy - uy * vx
+    len = sqrt(nx * nx + ny * ny + nz * nz)
+    if len == 0.0 {
+        return 1.0
+    }
+    // l = normalize(-0.35, -0.45, 0.82)
+    0.5 + 0.5 * abs(nx * -0.3469 + ny * -0.4461 + nz * 0.8129) / len
+}
+
+/// Height fields drawn as triangles sorted back to front (painter's
+/// algorithm); each triangle is flat-shaded, colored by its mean height.
+fn draw_surface(cam: Camera, s: Series, theme: Theme) -> String {
+    shape = s.grid.shape()
+    rows = shape[0]
+    cols = shape[1]
+    zspan = if cam.z1 > cam.z0 { cam.z1 - cam.z0 } else { 1.0 }
+    if s.kind == "wire" {
+        mut keys: List<Float> = []
+        for i in 0 until rows - 1 {
+            for j in 0 until cols - 1 {
+                zc = (s.grid.get(i, j) + s.grid.get(i, j + 1) + s.grid.get(i + 1, j) + s.grid.get(i + 1, j + 1)) / 4.0
+                keys.push(depth(cam, (s.xs[j] + s.xs[j + 1]) / 2.0, (s.ys[i] + s.ys[i + 1]) / 2.0, zc))
+            }
+        }
+        mut parts: List<String> = []
+        for q in argsort(array(keys)) {
+            i = q / (cols - 1)
+            j = q % (cols - 1)
+            parts.push("<polygon" + attr("points", pt(cam, s.xs[j], s.ys[i], s.grid.get(i, j)) + " " + pt(cam, s.xs[j + 1], s.ys[i], s.grid.get(i, j + 1)) + " " +
+                pt(cam, s.xs[j + 1], s.ys[i + 1], s.grid.get(i + 1, j + 1)) + " " + pt(cam, s.xs[j], s.ys[i + 1], s.grid.get(i + 1, j))) + "/>")
+        }
+        return "<g" + attr("fill", theme.background) + attr("fill-opacity", "0.9") + attr("stroke", pick(s.color, 0, theme)) + attr("stroke-width", num(s.width)) + ">" + parts.join("") + "</g>"
+    }
+    // Two triangles per cell: (i,j) (i,j+1) (i+1,j+1) and (i,j) (i+1,j+1) (i+1,j).
+    mut keys: List<Float> = []
+    for i in 0 until rows - 1 {
+        for j in 0 until cols - 1 {
+            za = s.grid.get(i, j)
+            zb = s.grid.get(i, j + 1)
+            zc = s.grid.get(i + 1, j + 1)
+            zd = s.grid.get(i + 1, j)
+            keys.push(depth(cam, (s.xs[j] + 2.0 * s.xs[j + 1]) / 3.0, (2.0 * s.ys[i] + s.ys[i + 1]) / 3.0, (za + zb + zc) / 3.0))
+            keys.push(depth(cam, (2.0 * s.xs[j] + s.xs[j + 1]) / 3.0, (s.ys[i] + 2.0 * s.ys[i + 1]) / 3.0, (za + zc + zd) / 3.0))
+        }
+    }
+    mut parts: List<String> = []
+    for t in argsort(array(keys)) {
+        q = t / 2
+        i = q / (cols - 1)
+        j = q % (cols - 1)
+        upper = t % 2 == 0
+        // Corners of this triangle.
+        x2 = if upper { s.xs[j + 1] } else { s.xs[j + 1] }
+        y2 = s.ys[i + 1]
+        xb = if upper { s.xs[j + 1] } else { s.xs[j] }
+        yb = if upper { s.ys[i] } else { s.ys[i + 1] }
+        za = s.grid.get(i, j)
+        zb = if upper { s.grid.get(i, j + 1) } else { s.grid.get(i + 1, j) }
+        zc = s.grid.get(i + 1, j + 1)
+        light = shade(norm(s.xs[j], cam.x0, cam.x1), norm(s.ys[i], cam.y0, cam.y1), norm(za, cam.z0, cam.z1) * 0.8,
+            norm(xb, cam.x0, cam.x1), norm(yb, cam.y0, cam.y1), norm(zb, cam.z0, cam.z1) * 0.8,
+            norm(x2, cam.x0, cam.x1), norm(y2, cam.y0, cam.y1), norm(zc, cam.z0, cam.z1) * 0.8)
+        fill = colormap(s.colormap, ((za + zb + zc) / 3.0 - cam.z0) / zspan, light)
+        points = pt(cam, s.xs[j], s.ys[i], za) + " " + pt(cam, xb, yb, zb) + " " + pt(cam, x2, y2, zc)
+        parts.push("<polygon" + attr("points", points) + attr("fill", fill) + attr("stroke", fill) + "/>")
+    }
+    "<g" + attr("stroke-width", "0.5") + attr("stroke-linejoin", "round") + ">" + parts.join("") + "</g>"
+}
+
+// ---------------------------------------------------------------- layout
+
+/// Places rendered panels (all `cell_width` × `cell_height`) on a grid.
+pub fn grid(panels: List<String>, cols: Int, cell_width: Int, cell_height: Int, title: String = "") -> String {
+    theme = light()
+    rows = (panels.length() + cols - 1) / cols
+    offset = if title != "" { 40 } else { 0 }
+    width = cols * cell_width
+    height = rows * cell_height + offset
+    mut out: List<String> = [header(width, height, theme)]
+    if title != "" {
+        out.push(text_at(20.0, 28.0, title, "start", 18, theme.text, attr("font-weight", "700")))
+    }
+    for i in 0 until panels.length() {
+        x = (i % cols) * cell_width
+        y = (i / cols) * cell_height + offset
+        // A panel is a whole <svg>; nested, it gets a position, and its closing
+        // tag stays on its last line so the document keeps a single
+        // top-level "</svg>" line.
+        panel = panels[i].trim()
+        body = panel.slice(0, panel.length() - 6).trim()
+        placed = body.replace("<svg xmlns=\"http://www.w3.org/2000/svg\"", "<svg" + attr("x", x.to_string()) + attr("y", y.to_string()))
+        out.push(placed + "</svg>")
+    }
+    out.push("</svg>\n")
+    out.join("\n")
+}

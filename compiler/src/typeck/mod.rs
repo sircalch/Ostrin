@@ -116,6 +116,12 @@ pub struct Checker {
     node_types: HashMap<usize, Ty>,
     call_substs_by_node: HashMap<usize, CallSubst>,
     call_node_stack: Vec<usize>,
+    /// Copies of declarations checked in place of the original (impl methods
+    /// with `Self` substituted, trait default bodies). `node_types` is keyed by
+    /// node address: the copies stay alive until the check ends, and then the
+    /// types of their default arguments are dropped, so no later node allocated
+    /// at a reused address (codegen's copies of defaults) reads a stale type.
+    checked_copies: Vec<FunctionDecl>,
     call_key_stack: Vec<ExprKey>,
     collection_bound_diagnostics: HashSet<String>,
     errors: Vec<TypeError>,
@@ -188,6 +194,7 @@ impl Checker {
             node_types: HashMap::new(),
             call_substs_by_node: HashMap::new(),
             call_node_stack: Vec::new(),
+            checked_copies: Vec::new(),
             call_key_stack: Vec::new(),
             collection_bound_diagnostics: HashSet::new(),
             errors: Vec::new(),
@@ -341,6 +348,18 @@ impl Checker {
                 Item::Record(_) | Item::Enum(_) | Item::Import(_) | Item::Trait(_) => {}
             }
         }
+        // Node types recorded for the copies' default arguments would outlive the
+        // copies and could be read back for unrelated nodes allocated at the same
+        // addresses later (codegen's copies of those defaults); drop them.
+        let copies = std::mem::take(&mut self.checked_copies);
+        for copy in &copies {
+            for param in &copy.params {
+                if let Some(default) = &param.default {
+                    forget_node_types(default, &mut self.node_types);
+                }
+            }
+        }
+        drop(copies);
         (self.errors, self.editor_bindings, self.editor_expressions, self.expr_types, self.call_substs, self.literal_kinds, self.node_types, self.call_substs_by_node)
     }
 
@@ -466,6 +485,7 @@ impl Checker {
                 source_file: None,
             };
             self.check_function_with_body(&function, &extra_bounds, body);
+            self.checked_copies.push(function);
         }
     }
 
@@ -482,6 +502,21 @@ impl Checker {
         }
         replace_self_type_with_type(&mut method.return_type, &owner);
         self.check_function_with_body(&method, &HashMap::new(), &original.body);
+        // The copy's defaults were checked above; the original nodes, which
+        // call sites lower, get their types recorded too (errors already
+        // reported are not repeated).
+        let previous_file = self.current_source_file.clone();
+        self.current_source_file = original.source_file.clone();
+        let reported = self.errors.len();
+        for param in &original.params {
+            if let Some(default) = &param.default {
+                let mut scope: Scope = HashMap::new();
+                self.infer_expr(default, &mut scope);
+            }
+        }
+        self.errors.truncate(reported);
+        self.current_source_file = previous_file;
+        self.checked_copies.push(method);
     }
 
     fn validate_impl(&mut self, implementation: &ImplDecl) {
@@ -990,9 +1025,10 @@ impl Checker {
                     ty = inner;
                     depth += 1;
                 }
-                if depth == 0 || !is_array_scalar(ty) {
+                // Quantities make an `Array<Quantity<D>>` in the first element's unit.
+                if depth == 0 || !(is_array_scalar(ty) || matches!(ty, Ty::Quantity(_))) {
                     if *ty != Ty::Unknown {
-                        self.push("E1041", format!("'array' expects a (nested) List of numbers, got '{}'.", arg_types[0].describe()));
+                        self.push("E1041", format!("'array' expects a (nested) List of numbers or quantities, got '{}'.", arg_types[0].describe()));
                     }
                     return Some(Ty::Unknown);
                 }
@@ -1166,8 +1202,66 @@ impl Checker {
     }
 
     /// Methods of `Array<T>`.
+    /// Operators where an array of quantities, or a Float array and a
+    /// quantity, meet: the element rules of `Quantity` applied elementwise.
+    fn check_quantity_array_binary(&mut self, op: BinOp, lt: &Ty, rt: &Ty) -> Option<Ty> {
+        use BinOp::*;
+        let element = |t: &Ty| array_elem(t).unwrap_or_else(|| t.clone());
+        let (le, re) = (element(lt), element(rt));
+        if !matches!(le, Ty::Quantity(_)) && !matches!(re, Ty::Quantity(_)) {
+            return None;
+        }
+        let numeric = |t: &Ty| matches!(t, Ty::Float | Ty::Int);
+        let arr = |t: Ty| Ty::Applied("Array".to_string(), vec![t]);
+        let invalid = |this: &mut Self| {
+            this.push(
+                "E1024",
+                format!("Invalid dimensional operation on arrays: '{}' and '{}'.", lt.describe(), rt.describe()),
+            );
+            Some(Ty::Unknown)
+        };
+        if array_elem(lt).is_some_and(|e| numeric(&e) && e != Ty::Float) || array_elem(rt).is_some_and(|e| numeric(&e) && e != Ty::Float) {
+            self.push("E1041", "Quantities combine with Array<Float>, not Array<Int> (use to_float()).".to_string());
+            return Some(Ty::Unknown);
+        }
+        match (op, &le, &re) {
+            (Add | Sub, Ty::Quantity(a), Ty::Quantity(b)) if a == b => Some(arr(le.clone())),
+            (Eq | NotEq | Lt | Gt | LtEq | GtEq, Ty::Quantity(a), Ty::Quantity(b)) if a == b => Some(arr(Ty::Bool)),
+            (Mul, Ty::Quantity(a), Ty::Quantity(b)) => Some(arr(Ty::Quantity(dim_mul(a, b)))),
+            (Div, Ty::Quantity(a), Ty::Quantity(b)) => {
+                let d = dim_div(a, b);
+                Some(arr(if dim_is_dimensionless(&d) { Ty::Float } else { Ty::Quantity(d) }))
+            }
+            (Mul | Div, Ty::Quantity(_), n) if numeric(n) => Some(arr(le.clone())),
+            (Mul, n, Ty::Quantity(_)) if numeric(n) => Some(arr(re.clone())),
+            (Div, n, Ty::Quantity(b)) if numeric(n) => Some(arr(Ty::Quantity(crate::types::dim_pow(b, -1)))),
+            _ => invalid(self),
+        }
+    }
+
     fn check_array_method(&mut self, receiver: &Ty, method: &str, arg_types: &[Ty]) -> Ty {
         let elem = array_elem(receiver).expect("called for arrays only");
+        if let Ty::Quantity(dim) = &elem {
+            // Array<Quantity<D>>: reductions keep the unit (var squares it).
+            let quantity = elem.clone();
+            return match method {
+                "unit" if arg_types.is_empty() => Ty::String,
+                "values" if arg_types.is_empty() => Ty::Applied("Array".to_string(), vec![Ty::Float]),
+                "sum" | "min" | "max" | "mean" | "median" | "std" | "sample_std" if arg_types.is_empty() => quantity,
+                "percentile" if arg_types.len() == 1 => quantity,
+                "get" => quantity,
+                "var" | "sample_var" if arg_types.is_empty() => Ty::Quantity(dim_mul(dim, dim)),
+                "to_list" if arg_types.is_empty() => Ty::List(Box::new(quantity)),
+                "sort" | "cumsum" | "transpose" if arg_types.is_empty() => receiver.clone(),
+                "reshape" | "row" | "col" if arg_types.len() == 1 => receiver.clone(),
+                "shape" if arg_types.is_empty() => Ty::List(Box::new(Ty::Int)),
+                "rank" | "size" | "length" | "count" if arg_types.is_empty() => Ty::Int,
+                other => {
+                    self.push("E1041", format!("Array method '{other}' isn't available on '{}' (with these arguments).", receiver.describe()));
+                    Ty::Unknown
+                }
+            };
+        }
         let list_int = Ty::List(Box::new(Ty::Int));
         let expected_count = match method {
             "shape" | "rank" | "size" | "length" | "count" | "sum" | "min" | "max" | "mean" | "to_list" | "transpose" | "var" | "std" | "sample_var" | "sample_std" | "median" | "cumsum" | "sort" | "to_float" | "any" | "all" | "count_true" => Some(0),
@@ -1812,10 +1906,54 @@ impl Checker {
                         return target;
                     }
                 }
-                if let Expr::Ident(sym) = unit_expr.as_ref() {
-                    if let Some(dim) = unit_dimension(sym) {
-                        return Ty::Quantity(dim);
-                    }
+                if let (Expr::Ident(sym), Some(elem)) = (unit_expr.as_ref().unlocated(), array_elem(&source_ty)) {
+                    // `times as s` gives a Float array a unit; `speeds as km/h` converts.
+                    return match resolve_unit_expr(sym) {
+                        Ok(dim) => {
+                            match &elem {
+                                Ty::Quantity(source) if *source != dim => self.push(
+                                    "E1026",
+                                    format!(
+                                        "Cannot convert quantities of dimension {} to '{sym}', which measures {}.",
+                                        crate::types::dim_describe(source),
+                                        crate::types::dim_describe(&dim)
+                                    ),
+                                ),
+                                Ty::Quantity(_) | Ty::Float | Ty::Unknown => {}
+                                other => self.push("E1041", format!("Only Array<Float> or an array of quantities takes a unit with 'as', got Array<{}>.", other.describe())),
+                            }
+                            Ty::Applied("Array".to_string(), vec![Ty::Quantity(dim)])
+                        }
+                        Err(bad) => {
+                            self.push("E1010", format!("Unknown unit '{bad}' in '{sym}'."));
+                            Ty::Unknown
+                        }
+                    };
+                }
+                if let Expr::Ident(sym) = unit_expr.as_ref().unlocated() {
+                    return match resolve_unit_expr(sym) {
+                        Ok(dim) => {
+                            if let Ty::Quantity(source) = &source_ty {
+                                if *source != dim {
+                                    self.push(
+                                        "E1026",
+                                        format!(
+                                            "Cannot convert a quantity of dimension {} to '{sym}', which measures {}.",
+                                            crate::types::dim_describe(source),
+                                            crate::types::dim_describe(&dim)
+                                        ),
+                                    );
+                                }
+                            } else if !matches!(source_ty, Ty::Int | Ty::Float | Ty::Unknown) {
+                                self.push("E1041", format!("Cannot give unit '{sym}' to a value of type '{}'.", source_ty.describe()));
+                            }
+                            Ty::Quantity(dim)
+                        }
+                        Err(bad) => {
+                            self.push("E1010", format!("Unknown unit '{bad}' in '{sym}'."));
+                            Ty::Unknown
+                        }
+                    };
                 }
                 Ty::Unknown
             }
@@ -1887,7 +2025,13 @@ impl Checker {
                     .get(name)
                     .and_then(|fs| fs.iter().find(|(n, _)| n == field_name).map(|(_, t)| t.clone()))
                     .map(|t| self.resolve_type_in_context(&t))
-                    .filter(|t| matches!(t, Ty::Fn(..)));
+                    .filter(|t| {
+                        // A lambda learns its parameter types, and an empty
+                        // `[]`/`{}` its element type, from the field.
+                        let empty = matches!(value.unlocated(), Expr::ListLiteral(items) | Expr::SetLiteral(items) if items.is_empty())
+                            || matches!(value.unlocated(), Expr::MapLiteral(pairs) if pairs.is_empty());
+                        matches!(t, Ty::Fn(..)) || (empty && !ty_mentions_generic(t))
+                    });
                 (field_name.clone(), self.infer_expr_with_expected(value, declared_fn.as_ref(), scope))
             })
             .collect();
@@ -2180,6 +2324,9 @@ impl Checker {
             };
         }
         if array_elem(&lt).is_some() || array_elem(&rt).is_some() {
+            if let Some(result) = self.check_quantity_array_binary(op, &lt, &rt) {
+                return result;
+            }
             let (left_elem, right_elem) = (array_elem(&lt), array_elem(&rt));
             let same = match (&left_elem, &right_elem) {
                 (Some(a), Some(b)) => a == b,
@@ -2283,8 +2430,8 @@ impl Checker {
                             "E1024",
                             format!(
                                 "Invalid dimensional operation. Cannot add/subtract {} and {}.",
-                                dim_to_string(d1),
-                                dim_to_string(d2)
+                                crate::types::dim_describe(d1),
+                                crate::types::dim_describe(d2)
                             ),
                         );
                         Ty::Unknown
@@ -2709,16 +2856,31 @@ impl Checker {
             ) {
                 return return_type;
             }
+            if let Ty::Quantity(_) = receiver_ty {
+                if arg_types.is_empty() && (method == "value" || method == "unit") {
+                    // Introspection for unit-aware code (std.viz axis labels):
+                    // the number in the quantity's own unit, and that unit.
+                    return if method == "value" { Ty::Float } else { Ty::String };
+                }
+            }
             if method == "to_string" {
                 // `to_string` is a core operation provided for every runtime
                 // value, including concrete user types and quantities.
                 return Ty::String;
             }
+            let arg_names: Vec<Option<String>> = args
+                .iter()
+                .map(|arg| match arg {
+                    Arg::Named(name, _) => Some(name.clone()),
+                    Arg::Positional(_) => None,
+                })
+                .collect();
             if let Some(return_type) = self.check_concrete_method_call(
                 &receiver_ty,
                 method,
                 &arg_types,
                 &arg_exprs,
+                &arg_names,
                 explicit_type_args,
             ) {
                 return return_type;
@@ -3232,9 +3394,37 @@ impl Checker {
         method: &str,
         arg_types: &[Ty],
         arg_exprs: &[&Expr],
+        arg_names: &[Option<String>],
         explicit_type_args: Option<&[Type]>,
     ) -> Option<Ty> {
         let candidate = self.concrete_method_candidate(receiver_ty, method)?;
+        // Named and defaulted arguments are put in parameter order first
+        // (the rule `hir::arrange_arguments` applies when lowering); an
+        // omitted argument takes its default, which checks as `?`.
+        let params_after_self: Vec<Param> = candidate.params.iter().skip(1).cloned().collect();
+        let needs_arranging = arg_names.iter().any(|n| n.is_some()) || arg_types.len() < params_after_self.len();
+        let (arranged_types, arranged_exprs): (Vec<Ty>, Vec<&Expr>) = if needs_arranging && arg_names.len() == arg_types.len() {
+            let tagged: Vec<(Option<String>, (Ty, Option<&Expr>))> = arg_names
+                .iter()
+                .cloned()
+                .zip(arg_types.iter().cloned().zip(arg_exprs.iter().map(|e| Some(*e))))
+                .collect();
+            match crate::hir::arrange_arguments(&params_after_self, tagged, |_| (Ty::Unknown, None)) {
+                Ok(list) => {
+                    let types = list.iter().map(|(t, _)| t.clone()).collect();
+                    let exprs = list.iter().map(|(_, e)| e.unwrap_or(&Expr::BoolLiteral(false))).collect();
+                    (types, exprs)
+                }
+                Err(message) => {
+                    self.push("E1042", format!("Method '{method}': {message}."));
+                    return Some(Ty::Unknown);
+                }
+            }
+        } else {
+            (arg_types.to_vec(), arg_exprs.to_vec())
+        };
+        let arg_types: &[Ty] = &arranged_types;
+        let arg_exprs: &[&Expr] = &arranged_exprs;
         let method_generic_names: HashSet<String> = candidate
             .generics
             .iter()
@@ -3282,7 +3472,7 @@ impl Checker {
                 }
             }
             for generic in &candidate.generics {
-                if !method_substitutions.contains_key(&generic.name) {
+                if !method_substitutions.contains_key(&generic.name) && !method_substitutions.contains_key(&format!("#dim:{}", generic.name)) {
                     self.push(
                         "E1042",
                         format!("Cannot infer generic method parameter '{}'.", generic.name),
@@ -3647,8 +3837,9 @@ fn is_known_base_dimension(name: &str) -> bool {
     matches!(
         name,
         "Length" | "Mass" | "Time" | "Temperature" | "ElectricCurrent" | "AmountOfSubstance" | "LuminousIntensity"
-            | "Currency" | "Information" | "Charge" | "Pressure"
-    )
+            | "Currency" | "Information"
+    ) || crate::types::named_dimension(name).is_some()
+        || crate::types::is_user_dimension(name)
 }
 
 fn is_dimension_name(name: &str) -> bool {
@@ -3690,7 +3881,17 @@ fn resolve_type_with_type_subst(
             "Char" => Ty::Char,
             "String" => Ty::String,
             "Void" => Ty::Void,
-            "Quantity" if args.len() == 1 => Ty::Quantity(resolve_dimension_with_subst(&args[0], dim_subst)),
+            "Quantity" if args.len() == 1 => {
+                // A generic method's `D: Dimension` is inferred into
+                // `type_subst` as `Quantity<D>` (see `unify_generic_type`).
+                let mut dims = dim_subst.clone();
+                for (k, v) in type_subst {
+                    if let (Some(name), Ty::Quantity(d)) = (k.strip_prefix("#dim:"), v) {
+                        dims.entry(name.to_string()).or_insert_with(|| d.clone());
+                    }
+                }
+                Ty::Quantity(resolve_dimension_with_subst(&args[0], &dims))
+            }
             "List" if args.len() == 1 => Ty::List(Box::new(resolve_type_with_type_subst(&args[0], type_subst, dim_subst))),
             "Map" if args.len() == 2 => Ty::Map(
                 Box::new(resolve_type_with_type_subst(&args[0], type_subst, dim_subst)),
@@ -3760,6 +3961,25 @@ fn unify_generic_type(
             subst.insert(name.clone(), actual.clone());
             Ok(())
         }
+        Type::Named(name, args) if name == "Quantity" && args.len() == 1 => match (&args[0], actual) {
+            (Type::Named(dim, dim_args), Ty::Quantity(actual_dim)) if dim_args.is_empty() && generic_names.contains(dim) => {
+                let bound = Ty::Quantity(actual_dim.clone());
+                let dim = &format!("#dim:{dim}");
+                match subst.get(dim) {
+                    Some(previous) if *previous != bound => Err(format!(
+                        "Generic dimension '{}' was inferred as both '{}' and '{}'.",
+                        dim,
+                        previous.describe(),
+                        bound.describe()
+                    )),
+                    _ => {
+                        subst.insert(dim.clone(), bound);
+                        Ok(())
+                    }
+                }
+            }
+            _ => Ok(()),
+        },
         Type::Named(name, args) if name == "List" && args.len() == 1 => match actual {
             Ty::List(elem) => unify_generic_type(&args[0], elem, generic_names, subst),
             _ => Err(format!("Expected '{}', got '{}'.", resolve_type(param).describe(), actual.describe())),
@@ -4482,7 +4702,7 @@ fn pattern_field_indices(field_names: &[Option<String>], fields: &[(String, Patt
 
 fn resolve_dimension_with_subst(ty: &Type, subst: &HashMap<String, Dimension>) -> Dimension {
     match ty {
-        Type::Named(name, _) => subst.get(name).cloned().unwrap_or_else(|| dim_single(name)),
+        Type::Named(name, _) => subst.get(name).cloned().unwrap_or_else(|| crate::types::dimension_from_name(name)),
         Type::Mul(a, b) => dim_mul(&resolve_dimension_with_subst(a, subst), &resolve_dimension_with_subst(b, subst)),
         Type::Div(a, b) => dim_div(&resolve_dimension_with_subst(a, subst), &resolve_dimension_with_subst(b, subst)),
         Type::Pow(a, n) => dim_pow(&resolve_dimension_with_subst(a, subst), *n as i32),
@@ -4686,9 +4906,28 @@ fn implementation_type_substitutions(
 fn substitute_impl_type_parameters(ty: &mut Type, substitutions: &HashMap<String, Ty>) {
     let type_substitutions: HashMap<String, Type> = substitutions
         .iter()
-        .map(|(name, ty)| (name.clone(), type_from_ty(ty)))
+        .map(|(name, ty)| match (name.strip_prefix("#dim:"), ty) {
+            // A dimension generic stands for the dimension itself, not a Quantity.
+            (Some(dim), Ty::Quantity(d)) => (dim.to_string(), type_from_dimension(d)),
+            _ => (name.clone(), type_from_ty(ty)),
+        })
         .collect();
     replace_type_parameters(ty, &type_substitutions);
+}
+
+fn type_from_dimension(d: &Dimension) -> Type {
+    let mut parts: Vec<(&String, &i32)> = d.iter().collect();
+    parts.sort();
+    let mut result: Option<Type> = None;
+    for (name, exp) in parts {
+        let base = Type::Named(name.clone(), Vec::new());
+        let term = if *exp == 1 { base } else { Type::Pow(Box::new(base), (*exp).into()) };
+        result = Some(match result {
+            None => term,
+            Some(acc) => Type::Mul(Box::new(acc), Box::new(term)),
+        });
+    }
+    result.unwrap_or_else(|| Type::Named("Dimensionless".to_string(), Vec::new()))
 }
 
 fn type_from_ty(ty: &Ty) -> Type {
@@ -5040,5 +5279,43 @@ fn replace_self_type_with_type(ty: &mut Type, owner: &Type) {
 
 /// Methods of `String` (kept in step with `interpreter/strings.rs`).
 const STRING_METHOD_NAMES: &[&str] = &[
-    "length", "is_empty", "trim", "to_upper", "to_lower", "contains", "starts_with", "ends_with", "replace", "split", "lines", "to_int", "to_float",
+    "length", "is_empty", "char_at", "slice", "codepoint", "trim", "to_upper", "to_lower", "contains", "starts_with", "ends_with", "replace", "split", "lines", "to_int", "to_float",
 ];
+
+/// True when a type mentions a generic parameter anywhere inside it.
+fn ty_mentions_generic(ty: &Ty) -> bool {
+    match ty {
+        Ty::Generic(_) => true,
+        Ty::List(t) | Ty::Set(t) => ty_mentions_generic(t),
+        Ty::Map(k, v) => ty_mentions_generic(k) || ty_mentions_generic(v),
+        Ty::Applied(_, args) => args.iter().any(ty_mentions_generic),
+        Ty::Fn(params, ret) => params.iter().any(ty_mentions_generic) || ty_mentions_generic(ret),
+        _ => false,
+    }
+}
+
+/// Removes the recorded types of `expr` and its sub-expressions (by address).
+fn forget_node_types(expr: &Expr, node_types: &mut HashMap<usize, Ty>) {
+    node_types.remove(&(expr as *const Expr as usize));
+    match expr {
+        Expr::Located(inner, _) | Expr::Unary(_, inner) => forget_node_types(inner, node_types),
+        Expr::Binary(_, l, r) => {
+            forget_node_types(l, node_types);
+            forget_node_types(r, node_types);
+        }
+        Expr::ListLiteral(items) | Expr::SetLiteral(items) => {
+            for item in items {
+                forget_node_types(item, node_types);
+            }
+        }
+        Expr::Call(callee, args) => {
+            forget_node_types(callee, node_types);
+            for arg in args {
+                match arg {
+                    Arg::Positional(e) | Arg::Named(_, e) => forget_node_types(e, node_types),
+                }
+            }
+        }
+        _ => {}
+    }
+}

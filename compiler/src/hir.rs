@@ -348,7 +348,19 @@ impl<'a> Lowerer<'a> {
     fn normalize(&mut self, params: &[Param], args: Vec<HirArg>) -> Vec<HirArg> {
         let original = args.clone();
         let named: Vec<(Option<String>, HirExpr)> = args.into_iter().map(|a| (a.name, a.value)).collect();
-        match arrange_arguments(params, named, |d| self.expr(d)) {
+        // A default is typed where it is declared; when that node's type isn't
+        // recorded (a method checked through a copy of its declaration), the
+        // parameter's declared type stands in.
+        match arrange_arguments(params, named, |p| {
+            let mut lowered = self.expr(p.default.as_ref().expect("called for defaulted parameters"));
+            if lowered.ty == Ty::Unknown {
+                let declared = crate::typeck::resolve_type(&p.ty);
+                if !crate::types::ty_contains_unknown(&declared) && !matches!(declared, Ty::Generic(_) | Ty::Named(_)) {
+                    lowered.ty = declared;
+                }
+            }
+            lowered
+        }) {
             Ok(list) => list.into_iter().map(|value| HirArg { name: None, value }).collect(),
             Err(_) => original,
         }
@@ -1164,7 +1176,7 @@ fn one_line(e: &HirExpr) -> String {
 pub fn arrange_arguments<T>(
     params: &[Param],
     args: Vec<(Option<String>, T)>,
-    mut lower_default: impl FnMut(&Expr) -> T,
+    mut lower_default: impl FnMut(&Param) -> T,
 ) -> Result<Vec<T>, String> {
     let mut slots: Vec<Option<T>> = (0..params.len()).map(|_| None).collect();
     let mut next = 0usize;
@@ -1189,7 +1201,7 @@ pub fn arrange_arguments<T>(
         .map(|(slot, param)| match slot {
             Some(value) => Ok(value),
             None => match &param.default {
-                Some(default) => Ok(lower_default(default)),
+                Some(_) => Ok(lower_default(param)),
                 None => Err(format!("missing argument for parameter '{}'", param.name)),
             },
         })

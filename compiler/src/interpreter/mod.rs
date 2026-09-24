@@ -11,12 +11,13 @@ use crate::ast::*;
 use crate::protocol;
 
 mod array;
+mod qarray;
 mod detmath;
 mod regress;
 mod math;
 mod rng;
 mod strings;
-use crate::types::{dim_div, dim_is_dimensionless, dim_mul, dim_pow, dim_to_string, resolve_unit_expr, Dimension};
+use crate::types::{dim_div, dim_is_dimensionless, dim_mul, dim_pow, dim_to_string, resolve_unit_expr, resolve_unit_factor, unit_combine, Dimension};
 
 #[derive(Clone)]
 pub(crate) struct MapState {
@@ -265,6 +266,7 @@ impl fmt::Display for Value {
             Value::Bool(b) => write!(f, "{b}"),
             Value::Char(c) => write!(f, "{c}"),
             Value::String(s) => write!(f, "{s}"),
+            Value::Quantity(v, _, unit) if unit.is_empty() => write!(f, "{v}"),
             Value::Quantity(v, _, unit) => write!(f, "{v} {unit}"),
             Value::List(state) => {
                 write!(f, "[")?;
@@ -1437,8 +1439,11 @@ impl Interpreter {
         result
     }
 
-    fn call_user_function(&mut self, f: &FunctionDecl, args: Vec<Value>, closure_env: Env) -> EvalResult {
-        let call_env = closure_env.child();
+    /// A named function runs in a fresh scope: its body never sees (nor, via
+    /// `x = ...`, rebinds) the caller's locals. `_caller_env` is kept for the
+    /// call sites' symmetry with closures.
+    fn call_user_function(&mut self, f: &FunctionDecl, args: Vec<Value>, _caller_env: Env) -> EvalResult {
+        let call_env = Env::root().child();
         for (param, arg) in f.params.iter().zip(args.into_iter()) {
             call_env.define(&param.name, arg);
         }
@@ -1451,8 +1456,26 @@ impl Interpreter {
         args: &[Arg],
         closure_env: Env,
     ) -> EvalResult {
+        self.call_with_receiver(f, None, args, closure_env)
+    }
+
+    /// Binds positional, named and defaulted arguments; a method's already
+    /// evaluated receiver fills the first parameter (`self`).
+    fn call_with_receiver(
+        &mut self,
+        f: &FunctionDecl,
+        receiver: Option<Value>,
+        args: &[Arg],
+        closure_env: Env,
+    ) -> EvalResult {
         let mut values: Vec<Option<Value>> = (0..f.params.len()).map(|_| None).collect();
         let mut next_positional = 0usize;
+        if let Some(receiver) = receiver {
+            if !values.is_empty() {
+                values[0] = Some(receiver);
+                next_positional = 1;
+            }
+        }
         let mut saw_named = false;
 
         for arg in args {
@@ -1493,7 +1516,7 @@ impl Interpreter {
             }
         }
 
-        let call_env = closure_env.child();
+        let call_env = Env::root().child();
         for (index, param) in f.params.iter().enumerate() {
             let value = match values[index].take() {
                 Some(value) => value,
@@ -1982,7 +2005,7 @@ impl Interpreter {
                 // A named function used as a value: a closure over its own parameters.
                 if let Some(decl) = self.functions.get(name).cloned() {
                     let params: Vec<String> = decl.params.iter().map(|p| p.name.clone()).collect();
-                    return Ok(Value::Closure(Rc::new(params), Rc::new(decl.body.clone()), env.clone()));
+                    return Ok(Value::Closure(Rc::new(params), Rc::new(decl.body.clone()), Env::root()));
                 }
                 Err(RuntimeError::Error(format!("undefined name '{name}'")))
             }
@@ -2004,6 +2027,7 @@ impl Interpreter {
                         Some(f) => self.call_user_function(&f, vec![v.clone()], env.clone()),
                         None => Err(RuntimeError::Error(format!("'{}' has no 'neg' method", value_type_name(&v)))),
                     },
+                    (UnaryOp::Neg, Value::Array(_)) if qarray::unit_of(&v).is_some() => qarray::negate(&v),
                     (UnaryOp::Neg, Value::Array(_)) => array::negate(&v),
                     (UnaryOp::Not, Value::Array(_)) => array::not_array(&v),
                     (UnaryOp::Neg, Value::Quantity(n, d, u)) => Ok(Value::Quantity(-n, d.clone(), u.clone())),
@@ -2039,7 +2063,10 @@ impl Interpreter {
                 let lo = as_i64(&self.eval_expr(start, env)?)?;
                 let hi = as_i64(&self.eval_expr(end, env)?)? + if *kind == RangeKind::To { 1 } else { 0 };
                 match ov {
-                    Value::Array(a) => array::slice(&a, lo, hi),
+                    Value::Array(a) => {
+                        let unit = a.borrow().unit.clone();
+                        Ok(qarray::with_unit(&array::slice(&a, lo, hi)?, unit))
+                    }
                     other => Err(RuntimeError::Error(format!("cannot slice '{other}'"))),
                 }
             }
@@ -2047,7 +2074,8 @@ impl Interpreter {
                 let ov = self.eval_expr(obj, env)?;
                 let index_value = self.eval_expr(idx, env)?;
                 if let (Value::Array(a), Value::Array(_)) = (&ov, &index_value) {
-                    return array::index_mask(a, &index_value);
+                    let unit = a.borrow().unit.clone();
+                    return Ok(qarray::with_unit(&array::index_mask(a, &index_value)?, unit));
                 }
                 let iv = as_i64(&index_value)?;
                 match ov {
@@ -2056,7 +2084,13 @@ impl Interpreter {
                         .get(iv as usize)
                         .cloned()
                         .ok_or_else(|| RuntimeError::Error(format!("index out of bounds: {iv}"))),
-                    Value::Array(a) => array::index1(&a, iv),
+                    Value::Array(a) => {
+                        let element = array::index1(&a, iv)?;
+                        match a.borrow().unit.clone() {
+                            Some(unit) => qarray::index(element, &unit),
+                            None => Ok(element),
+                        }
+                    }
                     other => Err(RuntimeError::Error(format!("cannot index '{other}'"))),
                 }
             }
@@ -2169,6 +2203,12 @@ impl Interpreter {
                 if let Expr::Range(start, kind, end, _) = r.as_ref().unlocated() {
                     let sv = self.eval_expr(start, env)?;
                     let ev = self.eval_expr(end, env)?;
+                    if let (Value::Quantity(..), Value::Quantity(..), Value::Quantity(..)) = (&av, &sv, &ev) {
+                        // Quantities compare across units (`6 ft within (1.5 m to 2 m)`).
+                        let low = compare(&av, &sv)?;
+                        let high = compare(&av, &ev)?;
+                        return Ok(Value::Bool(low >= 0 && if *kind == RangeKind::To { high <= 0 } else { high < 0 }));
+                    }
                     let a_f = as_f64(&av)?;
                     let s_f = as_f64(&sv)?;
                     let e_f = as_f64(&ev)?;
@@ -2200,6 +2240,9 @@ impl Interpreter {
                     let dim = resolve_unit_expr(sym).map_err(|u| RuntimeError::Error(format!("unknown unit '{u}'")))?;
                     // A quantity is converted into the target unit; a pure number
                     // is given that unit (document 01, §3.3–3.4).
+                    if let Value::Array(_) = &value {
+                        return qarray::as_unit(&value, sym);
+                    }
                     let v = match &value {
                         Value::Quantity(v, _, from) => convert(*v, from, sym)?,
                         other => as_f64(other)?,
@@ -2650,7 +2693,8 @@ impl Interpreter {
                 }
                 ("array", 1) => {
                     let list = self.eval_arg(&args[0], env)?;
-                    return array::from_list(&list);
+                    let made = array::from_list(&list)?;
+                    return Ok(qarray::from_quantities(&made)?.unwrap_or(made));
                 }
                 ("zeros", 1) | ("ones", 1) => {
                     let shape = self.eval_arg(&args[0], env)?;
@@ -2679,6 +2723,14 @@ impl Interpreter {
             let receiver = self.eval_expr(obj, env)?;
             if method == "to_string" {
                 return Ok(Value::String(receiver.to_string()));
+            }
+            if let Value::Quantity(v, _, unit) = &receiver {
+                if args.is_empty() && method == "value" {
+                    return Ok(Value::Float(*v));
+                }
+                if args.is_empty() && method == "unit" {
+                    return Ok(Value::String(unit.clone()));
+                }
             }
             if method == "length" {
                 if let Value::List(state) = &receiver {
@@ -2819,7 +2871,11 @@ impl Interpreter {
                 for arg in args {
                     values.push(self.eval_arg(arg, env)?);
                 }
-                return array::call_method(state, method, values);
+                let unit = state.borrow().unit.clone();
+                return match unit {
+                    Some(unit) => qarray::call_method(state, &unit, method, values),
+                    None => array::call_method(state, method, values),
+                };
             }
             if let Value::Set(state) = &receiver {
                 match method.as_str() {
@@ -3026,6 +3082,9 @@ impl Interpreter {
             }
             let type_name = value_type_name(&receiver);
             if let Some(f) = self.find_method_for_value(&receiver, method) {
+                if args.iter().any(|a| matches!(a, Arg::Named(..))) || args.len() + 1 < f.params.len() {
+                    return self.call_with_receiver(&f, Some(receiver), args, env.clone());
+                }
                 let mut values = vec![receiver];
                 for a in args { values.push(self.eval_arg(a, env)?); }
                 return self.call_user_function(&f, values, env.clone());
@@ -3451,6 +3510,9 @@ fn f32_binary(op: BinOp, lv: Value, rv: Value) -> EvalResult {
 fn eval_binary_builtin(op: BinOp, lv: Value, rv: Value) -> EvalResult {
     use BinOp::*;
     if matches!(lv, Value::Array(_)) || matches!(rv, Value::Array(_)) {
+        if let Some(result) = qarray::binary(op, &lv, &rv) {
+            return result;
+        }
         return array::binary(op, lv, rv);
     }
     if matches!(lv, Value::Sized(..)) || matches!(rv, Value::Sized(..)) {
@@ -3487,13 +3549,11 @@ fn eval_binary_builtin(op: BinOp, lv: Value, rv: Value) -> EvalResult {
         Mul | Div => match (&lv, &rv) {
             (Value::Quantity(a, d1, u1), Value::Quantity(b, d2, u2)) => {
                 let combined_dim = if op == Mul { dim_mul(d1, d2) } else { dim_div(d1, d2) };
-                let value = if op == Mul { a * b } else { a / b };
                 if op == Div && dim_is_dimensionless(&combined_dim) {
                     let converted_b = convert(*b, u2, u1)?;
                     Ok(Value::Float(a / converted_b))
                 } else {
-                    let unit = if op == Mul { format!("{u1}*{u2}") } else { format!("{u1}/{u2}") };
-                    Ok(Value::Quantity(value, combined_dim, unit))
+                    quantity_product(*a, u1, *b, u2, combined_dim, op == Div)
                 }
             }
             (Value::Quantity(a, d, u), scalar) if op == Mul || op == Div => {
@@ -3507,7 +3567,13 @@ fn eval_binary_builtin(op: BinOp, lv: Value, rv: Value) -> EvalResult {
             }
             (scalar, Value::Quantity(a, d, u)) if op == Div => {
                 let s = as_f64(scalar)?;
-                Ok(Value::Quantity(s / a, dim_pow(d, -1), format!("1/{u}")))
+                // `2 / (3 km/m)`: cancelling units leave a scale that applies too.
+                let (scale, unit) = unit_combine("", u, true).map_err(unit_error)?;
+                let mut value = s / a;
+                if scale != 1.0 {
+                    value *= scale;
+                }
+                Ok(Value::Quantity(value, dim_pow(d, -1), unit))
             }
             // `Int / Int` is integer division (truncating), matching the type
             // checker, which types it `Int` — the runtime used to return a
@@ -3576,65 +3642,36 @@ fn cmp_f64(a: f64, b: f64) -> i32 {
     if a < b { -1 } else if a > b { 1 } else { 0 }
 }
 
-fn unit_factor(symbol: &str) -> Option<f64> {
-    Some(match symbol {
-        "m" | "s" | "kg" | "K" | "A" | "mol" | "cd" | "USD" | "bit" | "C" | "atm" | "Pa" => 1.0,
-        "nm" => 1e-9,
-        "km" => 1000.0,
-        "cm" => 0.01,
-        "mm" => 0.001,
-        "ms" => 0.001,
-        "min" => 60.0,
-        "h" => 3600.0,
-        "g" => 0.001,
-        "mg" => 1e-6,
-        "mmol" => 0.001,
-        "L" => 0.001,
-        "EUR" => 1.0,
-        "byte" => 8.0,
-        _ => return None,
-    })
+fn unit_error(message: String) -> RuntimeError {
+    if message.contains(' ') {
+        RuntimeError::Error(message)
+    } else {
+        RuntimeError::Error(format!("unknown unit '{message}'"))
+    }
 }
 
-fn resolve_unit_factor(expr: &str) -> Result<f64, RuntimeError> {
-    let mut result = 1.0;
-    let mut op = '*';
-    let mut chars = expr.chars().peekable();
-    loop {
-        let mut atom = String::new();
-        while let Some(&c) = chars.peek() {
-            if c == '*' || c == '/' || c == '^' { break; }
-            atom.push(c);
-            chars.next();
-        }
-        if atom.is_empty() {
-            return Err(RuntimeError::Error(format!("malformed unit expression '{expr}'")));
-        }
-        let mut factor = unit_factor(&atom).ok_or_else(|| RuntimeError::Error(format!("unknown unit '{atom}'")))?;
-        if chars.peek() == Some(&'^') {
-            chars.next();
-            let mut exp_str = String::new();
-            while let Some(&c) = chars.peek() {
-                if c.is_ascii_digit() || c == '-' { exp_str.push(c); chars.next(); } else { break; }
-            }
-            let exp: i32 = exp_str.parse().map_err(|_| RuntimeError::Error(format!("invalid exponent in '{expr}'")))?;
-            factor = factor.powi(exp);
-        }
-        result = if op == '*' { result * factor } else { result / factor };
-        match chars.next() {
-            Some(c @ ('*' | '/')) => op = c,
-            None => break,
-            _ => return Err(RuntimeError::Error(format!("malformed unit expression '{expr}'"))),
-        }
+/// `a * b` / `a / b` between quantities, with the unit in canonical form
+/// (`types::unit_combine`). A result without dimension is a plain number.
+fn quantity_product(a: f64, u1: &str, b: f64, u2: &str, dim: Dimension, divide: bool) -> EvalResult {
+    let (scale, unit) = unit_combine(u1, u2, divide).map_err(unit_error)?;
+    let mut value = if divide { a / b } else { a * b };
+    if scale != 1.0 {
+        value *= scale;
     }
-    Ok(result)
+    if dim_is_dimensionless(&dim) {
+        if !unit.is_empty() {
+            value *= resolve_unit_factor(&unit).map_err(unit_error)?;
+        }
+        return Ok(if divide { Value::Float(value) } else { Value::Quantity(value, dim, String::new()) });
+    }
+    Ok(Value::Quantity(value, dim, unit))
 }
 
 fn convert(value: f64, from_unit: &str, to_unit: &str) -> Result<f64, RuntimeError> {
     if from_unit == to_unit {
         return Ok(value);
     }
-    let f_from = resolve_unit_factor(from_unit)?;
-    let f_to = resolve_unit_factor(to_unit)?;
+    let f_from = resolve_unit_factor(from_unit).map_err(unit_error)?;
+    let f_to = resolve_unit_factor(to_unit).map_err(unit_error)?;
     Ok(value * f_from / f_to)
 }

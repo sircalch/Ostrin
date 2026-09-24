@@ -1,0 +1,8 @@
+// Each line is a compile-time dimension error.
+fn main() -> Void {
+    x = 5 m
+    print(x as s)
+    print(x as km/h)
+    y = 3 J + 2 N
+    print(y)
+}

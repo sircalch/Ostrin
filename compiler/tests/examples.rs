@@ -4166,7 +4166,7 @@ fn native_backend_quantities_match_the_interpreter() {
     // runtime (`m/s`, `kg*m/s*m/s`), comparisons across units, `as`,
     // `within`, `approximately`, unary minus and scalar/Quantity math, plus
     // `shapes.ostrin`: an `impl` on an enum, a list of enums and `to_string()`.
-    for file in ["physics.ostrin", "native_units.ostrin", "shapes.ostrin"] {
+    for file in ["physics.ostrin", "native_units.ostrin", "shapes.ostrin", "unit_algebra.ostrin"] {
         let interpreted = run(&["--run", &example_path(file)]);
         assert!(interpreted.status.success(), "interpreter failed on {file}: {}", stderr(&interpreted));
         let expected = stdout(&interpreted).replace("\r\n", "\n");
@@ -5321,7 +5321,7 @@ fn as_converts_quantities_into_the_target_unit() {
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     assert_eq!(
         stdout(&out).replace("\r\n", "\n"),
-        "1.5 km\n2.5 m\n1.5 h\n40 m/s*s\n0.04 km\n40 m\n3 nm\ntrue\n"
+        "1.5 km\n2.5 m\n1.5 h\n40 m\n0.04 km\n40 m\n3 nm\ntrue\n"
     );
 }
 
@@ -5335,4 +5335,189 @@ fn function_typed_parameters_shadow_global_functions() {
     let rejected = run(&["--check", &example_path("function_value_arity_errors.ostrin")]);
     assert!(!rejected.status.success());
     assert!(stderr(&rejected).contains("OSTRIN-E1041") || stdout(&rejected).contains("OSTRIN-E1041"));
+}
+
+#[test]
+fn unit_algebra_simplifies_and_converts_compound_units() {
+    let out = run(&["--run", &example_path("unit_algebra.ostrin")]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let text = stdout(&out).replace("\r\n", "\n");
+    let lines: Vec<&str> = text.lines().collect();
+    assert_eq!(
+        lines,
+        [
+            "20 m/s", "72 km/h", "15000 kg*m^2/s^2", "15 kJ", "3.5850860420650097 kcal", "735.75 kg*m/s^2",
+            "735.75 N", "14.715 kPa", "1 atm", "180 km", "45 km", "2400 m", "6 m^3", "0.25 Hz", "10800 kJ", "1",
+            "0.25 L", "127137.6 km/h^2", "0.0006666666666666666", "[0.0005, 0.001]", "2 m",
+        ]
+    );
+}
+
+#[test]
+fn unit_conversions_between_dimensions_are_rejected() {
+    let out = run(&["--check", &example_path("unit_conversion_errors.ostrin")]);
+    assert!(!out.status.success());
+    let err = stderr(&out);
+    assert!(err.contains("E1026") && err.contains("to 's', which measures Time"), "missing as diagnostic: {err}");
+    assert!(err.contains("Length/Time (Velocity)"), "missing compound target: {err}");
+    assert!(err.contains("E1024") && err.contains("(Energy)") && err.contains("(Force)"), "missing named dimensions: {err}");
+}
+
+/// Runs `file` with the interpreter and natively and returns the interpreter's
+/// stdout after checking both agree (`None` when no C compiler is available).
+fn interpreter_and_native_agree(file: &str) -> String {
+    let interpreted = run(&["--run", &example_path(file)]);
+    assert!(interpreted.status.success(), "interpreter failed on {file}: {}", stderr(&interpreted));
+    let expected = stdout(&interpreted).replace("\r\n", "\n");
+    let exe = temp_artifact(&format!("{file}.exe"));
+    let compile = run(&["--compile", "--out", &exe, &example_path(file)]);
+    if skip_if_no_c_compiler(&compile) {
+        return expected;
+    }
+    assert!(compile.status.success(), "compile failed for {file}: {}", stderr(&compile));
+    let native = Command::new(&exe).output().unwrap();
+    let _ = fs::remove_file(&exe);
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected, "output mismatch for {file}");
+    expected
+}
+
+#[test]
+fn a_function_body_never_rebinds_the_callers_locals() {
+    // `h = ...` in a callee used to walk up into the caller's frame.
+    assert_eq!(interpreter_and_native_agree("function_scope_isolation.ostrin"), "14\n400\n4\n1\n");
+}
+
+#[test]
+fn methods_accept_named_and_default_arguments() {
+    // Also checks that a chained `c.mark(..).mark(..)` statement runs once natively.
+    assert_eq!(
+        interpreter_and_native_agree("method_default_args.ostrin"),
+        "[a:black:1, b:red:1, c:black:2.5, d:blue:1]\n31\n24\n"
+    );
+}
+
+#[test]
+fn float_literals_accept_scientific_notation() {
+    assert_eq!(interpreter_and_native_agree("scientific_literals.ostrin"), "6.02214076\n1.5\n2000\ntrue\n532 nm\n");
+}
+
+fn svg_lines(output: &str) -> Vec<String> {
+    output.lines().map(str::to_string).collect()
+}
+
+#[test]
+fn viz_figures_label_axes_with_the_units_of_their_quantities() {
+    let out = interpreter_and_native_agree("viz_units.ostrin");
+    assert!(out.contains(">time [s]</text>"), "missing x unit: {out}");
+    assert!(out.contains(">speed [km/h]</text>"), "missing converted y unit: {out}");
+    assert!(out.starts_with("top speed 97.91999999999999 km/h, distance 0.764 km\n<svg xmlns=\"http://www.w3.org/2000/svg\""));
+}
+
+#[test]
+fn viz_layouts_keep_one_top_level_svg_element() {
+    // The website extracts a figure from the first "<svg" line to the first
+    // "</svg>" line, so nested panels must close inline.
+    let out = run(&["--run", &example_path("viz_dashboard.ostrin")]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let lines = svg_lines(&stdout(&out));
+    let first = lines.iter().find(|l| l.starts_with("<svg")).expect("an <svg> line");
+    assert!(first.contains("xmlns") && first.contains("width=\"960\""), "the first <svg> line is the whole figure: {first}");
+    assert_eq!(lines.iter().filter(|l| l.as_str() == "</svg>").count(), 1);
+    assert_eq!(stdout(&out).matches("<svg").count(), 5, "four panels inside one figure");
+}
+
+#[test]
+fn viz_3d_scenes_and_heatmaps_render_their_marks() {
+    let surface = stdout(&run(&["--run", &example_path("viz_surface.ostrin")]));
+    // 35 × 35 cells, two triangles each, plus the three axis panels.
+    assert_eq!(surface.matches("<polygon").count(), 35 * 35 * 2 + 3);
+    assert!(surface.contains("linearGradient"), "surface colorbar missing");
+    let heat = stdout(&run(&["--run", &example_path("viz_heatmap.ostrin")]));
+    assert!(heat.matches("<rect").count() > 48 * 48, "heatmap cells missing");
+    assert_eq!(heat.matches("stroke=\"#ffffff\" stroke-width=\"1.2\"").count(), 10, "ten contour levels");
+}
+
+#[test]
+fn arrays_of_quantities_keep_one_unit_and_check_dimensions() {
+    let out = interpreter_and_native_agree("quantity_arrays.ostrin");
+    let lines: Vec<&str> = out.lines().collect();
+    assert_eq!(
+        lines,
+        [
+            "[0, 1, 2, 3, 4] s",
+            "[0, 3, 12, 27, 48] m",
+            "48 m",
+            "[0, 10.799999999999999, 43.199999999999996, 97.19999999999999, 172.79999999999998] km/h",
+            "[0, 0.009, 0.144, 0.729, 2.304] kJ",
+            "0.048 km",
+            "18 m",
+            "17.69745744450315 m",
+            "313.2 m^2",
+            "[1000, 1003, 1012, 1027, 1048] m",
+            "[false, false, true, true, true]",
+            "[0, 0.003, 0.012, 0.027, 0.048]",
+            "[-3, -12] m",
+            "m",
+            "[0 m, 3 m, 12 m, 27 m, 48 m]",
+            "[1, 0.5, 0.3333333333333333, 0.25] 1/s",
+            "[0, 100, 200, 300] m",
+        ]
+    );
+    let errors = run(&["--check", &example_path("quantity_arrays_errors.ostrin")]);
+    assert!(!errors.status.success());
+    let err = stderr(&errors);
+    assert!(err.contains("E1024") && err.contains("Array<Quantity<Length>>") && err.contains("Array<Quantity<Time>>"), "{err}");
+    assert!(err.contains("E1026") && err.contains("to 'h'"), "{err}");
+}
+
+#[test]
+fn native_fresh_temporaries_are_released() {
+    // Arrays (shape and data included), values pushed into lists, String method
+    // receivers and concatenation operands used to stay alive until exit.
+    let expected = interpreter_and_native_agree("native_memory_temporaries.ostrin");
+    let exe = temp_artifact("native_memory_temporaries_leaks.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &example_path("native_memory_temporaries.ostrin")]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "stderr: {}", stderr(&compile));
+    let native = Command::new(&exe).output().unwrap();
+    let _ = fs::remove_file(&exe);
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    let report = String::from_utf8_lossy(&native.stderr).to_string();
+    assert!(report.contains("live_allocations=0 "), "leaked: {report}");
+}
+
+#[test]
+fn programs_declare_their_own_units_and_dimensions() {
+    let out = interpreter_and_native_agree("user_units.ostrin");
+    assert_eq!(
+        out.lines().collect::<Vec<_>>(),
+        ["790 coin", "3.4 gem", "1.609344 km", "3.6575999999999995 m^2", "206.84270999999998 kPa", "4.4704 m/s", "true"]
+    );
+    let errors = run(&["--check", &example_path("user_units_errors.ostrin")]);
+    assert!(!errors.status.success());
+    let err = stderr(&errors);
+    assert!(err.contains("E1024") && err.contains("Money") && err.contains("Length"), "{err}");
+    assert!(err.contains("E1026") && err.contains("to 'coin'"), "{err}");
+
+    // Malformed declarations are reported where they are written.
+    let path = temp_artifact("bad_units.ostrin");
+    fs::write(&path, "unit x : Flavor\nunit m : Length\ndefine 1 ft = 2 m\nfn main() -> Void {\n    print(1)\n}\n").unwrap();
+    let bad = run(&["--check", &path]);
+    let _ = fs::remove_file(&path);
+    let err = stderr(&bad);
+    assert!(!bad.status.success());
+    assert!(err.contains("unknown dimension 'Flavor'"), "{err}");
+    assert!(err.contains("unit 'm' is already defined"), "{err}");
+    assert!(err.contains("unknown unit 'ft' in 'define'"), "{err}");
+}
+
+#[test]
+fn within_compares_quantities_across_units() {
+    let path = temp_artifact("within_units.ostrin");
+    fs::write(&path, "fn main() -> Void {\n    print(1500 m within (1 km to 2 km))\n    print(2 km within (1 km until 2000 m))\n}\n").unwrap();
+    let out = run(&["--run", &path]);
+    let _ = fs::remove_file(&path);
+    assert_eq!(stdout(&out).replace("\r\n", "\n"), "true\nfalse\n");
 }

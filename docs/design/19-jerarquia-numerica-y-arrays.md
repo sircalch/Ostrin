@@ -49,6 +49,8 @@ Tensor<T, D1..Dk>   = Array<T, (D1..Dk)>
 - **Operaciones**: aritmética elemento a elemento con **broadcasting** (reglas de NumPy, comprobadas estáticamente cuando es posible), reducciones (`sum`, `mean`, `min`, `max`, por eje), `@` para el producto matricial, `.T`, y comparaciones que devuelven `Array<Bool, _>`.
 - **Sintaxis**: los literales `[1, 2, 3]` siguen siendo `List`; `array([1, 2, 3])` y `linspace(a, b, n)` construyen `Array`. Rangos indexables `a[1..4]`, `a[:, 0]`.
 - Los elementos pueden ser `Quantity`: `Vector<Quantity<Length>, 3>` es válido y `dot` produce `Quantity<Length^2>`.
+  *Implementado (2026-09-24)* como `Array<Quantity<D>>` con una unidad común por array; ver documento 01
+  §3.6. `dot`/`matmul` sobre cantidades siguen pendientes.
 
 ## 6. Implementación por fases
 

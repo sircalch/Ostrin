@@ -1,0 +1,22 @@
+// std.viz · heatmap and contours of a two-dimensional field.
+import std.viz
+
+fn peaks(x: Float, y: Float) -> Float {
+    3.0 * (1.0 - x) * (1.0 - x) * exp(-x * x - (y + 1.0) * (y + 1.0)) -
+        10.0 * (x / 5.0 - x * x * x - y * y * y * y * y) * exp(-x * x - y * y) -
+        exp(-(x + 1.0) * (x + 1.0) - y * y) / 3.0
+}
+
+fn main() -> Void {
+    xs = linspace(-3.0, 3.0, 48)
+    ys = linspace(-3.0, 3.0, 48)
+    z = viz.grid_of(xs, ys, peaks)
+    print("min " + viz.num(z.min()) + ", max " + viz.num(z.max()))
+    fig = viz.figure("peaks(x, y)")
+        .describe("48 × 48 samples, 10 contour levels")
+        .labels("x", "y")
+        .size(600, 500)
+        .heatmap(z, -3.0, 3.0, -3.0, 3.0, label: "z")
+        .contour(z, -3.0, 3.0, -3.0, 3.0, levels: 10, color: "#ffffff")
+    print(fig.svg())
+}

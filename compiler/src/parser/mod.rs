@@ -37,8 +37,16 @@ impl Parser {
     /// los errores de sintaxis del archivo, no solo el primero.
     pub fn parse_program(mut self) -> (Vec<Item>, Vec<ParseError>) {
         let mut items = Vec::new();
-        let mut errors = Vec::new();
+        let mut errors = self.register_unit_declarations();
         while !self.check(&TokenKind::Eof) {
+            if self.at_unit_declaration() {
+                // Already registered by `register_unit_declarations`.
+                let line = self.peek().line;
+                while !self.check(&TokenKind::Eof) && self.peek().line == line {
+                    self.advance();
+                }
+                continue;
+            }
             let checkpoint = self.pos;
             match self.parse_item() {
                 Ok(item) => items.push(item),
@@ -52,6 +60,126 @@ impl Parser {
             }
         }
         (items, errors)
+    }
+
+    fn at_unit_declaration(&self) -> bool {
+        matches!(self.peek().kind, TokenKind::Unit | TokenKind::Dimension | TokenKind::Define)
+            && (self.pos == 0 || self.tokens[self.pos - 1].line != self.peek().line)
+    }
+
+    /// `dimension D`, `unit X : D` and `define 1 X = 2.5 Y` (document 01
+    /// §3.5) are registered before anything else is parsed, dimensions first,
+    /// then units, then definitions, so every expression in the program (and
+    /// the parser's own unit-literal rule) already knows them.
+    fn register_unit_declarations(&mut self) -> Vec<ParseError> {
+        let mut errors = Vec::new();
+        for kind in [TokenKind::Dimension, TokenKind::Unit, TokenKind::Define] {
+            for start in 0..self.tokens.len() {
+                if self.tokens[start].kind != kind || (start > 0 && self.tokens[start - 1].line == self.tokens[start].line) {
+                    continue;
+                }
+                self.pos = start;
+                if let Err(e) = self.unit_declaration() {
+                    errors.push(e);
+                }
+            }
+        }
+        self.pos = 0;
+        errors
+    }
+
+    fn unit_declaration(&mut self) -> PResult<()> {
+        let keyword = self.peek().kind.clone();
+        let line = self.peek().line;
+        self.advance();
+        let semantic = |this: &Self, result: Result<(), String>| result.map_err(|m| this.error(&m));
+        match keyword {
+            TokenKind::Dimension => {
+                let name = self.expect_ident()?;
+                semantic(self, crate::types::declare_dimension(&name))?;
+            }
+            TokenKind::Unit => {
+                let symbol = self.expect_ident()?;
+                self.expect(&TokenKind::Colon)?;
+                let dim = self.dimension_expr()?;
+                semantic(self, crate::types::declare_unit(&symbol, dim))?;
+            }
+            _ => {
+                let left = self.number_literal()?;
+                let symbol = self.expect_ident()?;
+                self.expect(&TokenKind::Eq)?;
+                let right = self.number_literal()?;
+                let mut unit = self.expect_ident()?;
+                self.unit_exponent(&mut unit, line)?;
+                self.unit_tail(&mut unit, line)?;
+                let target = crate::types::resolve_unit_expr(&unit).map_err(|u| self.error(&format!("unknown unit '{u}' in 'define'")))?;
+                let own = crate::types::unit_info(&symbol).map(|(d, _)| d);
+                if let Some(own) = own {
+                    if own != target {
+                        return Err(self.error(&format!(
+                            "'define' relates units of different dimensions: {} is {}, {} is {}",
+                            symbol,
+                            crate::types::dim_describe(&own),
+                            unit,
+                            crate::types::dim_describe(&target)
+                        )));
+                    }
+                }
+                let factor = crate::types::resolve_unit_factor(&unit).map_err(|u| self.error(&u))?;
+                semantic(self, crate::types::define_unit(&symbol, right * factor / left))?;
+            }
+        }
+        if !self.check(&TokenKind::Eof) && self.peek().line == line {
+            return Err(self.error("unexpected tokens after the declaration"));
+        }
+        Ok(())
+    }
+
+    fn number_literal(&mut self) -> PResult<f64> {
+        match self.peek().kind.clone() {
+            TokenKind::IntLiteral(n) => { self.advance(); Ok(n as f64) }
+            TokenKind::FloatLiteral(f) => { self.advance(); Ok(f) }
+            other => Err(self.error(&format!("expected a number, found {other:?}"))),
+        }
+    }
+
+    /// `Mass / (Length * Time^2)`: base, named and declared dimensions.
+    fn dimension_expr(&mut self) -> PResult<crate::types::Dimension> {
+        let mut dim = self.dimension_term()?;
+        loop {
+            if self.eat(&TokenKind::Star) {
+                dim = crate::types::dim_mul(&dim, &self.dimension_term()?);
+            } else if self.eat(&TokenKind::Slash) {
+                dim = crate::types::dim_div(&dim, &self.dimension_term()?);
+            } else {
+                return Ok(dim);
+            }
+        }
+    }
+
+    fn dimension_term(&mut self) -> PResult<crate::types::Dimension> {
+        let base = if self.eat(&TokenKind::LParen) {
+            let inner = self.dimension_expr()?;
+            self.expect(&TokenKind::RParen)?;
+            inner
+        } else {
+            let name = self.expect_ident()?;
+            let known = matches!(
+                name.as_str(),
+                "Length" | "Mass" | "Time" | "Temperature" | "ElectricCurrent" | "AmountOfSubstance" | "LuminousIntensity" | "Currency" | "Information" | "Dimensionless"
+            ) || crate::types::named_dimension(&name).is_some()
+                || crate::types::is_user_dimension(&name);
+            if !known {
+                return Err(self.error(&format!("unknown dimension '{name}' (declare it with 'dimension {name}')")));
+            }
+            if name == "Dimensionless" { crate::types::Dimension::new() } else { crate::types::dimension_from_name(&name) }
+        };
+        if self.eat(&TokenKind::Caret) {
+            let negative = self.eat(&TokenKind::Minus);
+            let exp = self.expect_int()? as i32;
+            return Ok(crate::types::dim_pow(&base, if negative { -exp } else { exp }));
+        }
+        Ok(base)
     }
 
     fn synchronize_to_item_boundary(&mut self) {
@@ -518,7 +646,18 @@ impl Parser {
     fn parse_as_expr(&mut self) -> PResult<Expr> {
         let mut left = self.parse_additive()?;
         while self.eat(&TokenKind::As) {
-            let unit = self.parse_multiplicative()?;
+            let unit = match self.peek().kind.clone() {
+                TokenKind::Ident(first) if crate::types::unit_info(&first).is_some() => {
+                    // `v as km/h`, `a as m/s^2`: a compound unit on one line.
+                    let line = self.peek().line;
+                    self.advance();
+                    let mut unit = first;
+                    self.unit_exponent(&mut unit, line)?;
+                    self.unit_tail(&mut unit, line)?;
+                    Expr::Ident(unit)
+                }
+                _ => self.parse_multiplicative()?,
+            };
             left = Expr::As(Box::new(left), Box::new(unit));
         }
         Ok(left)
@@ -579,7 +718,9 @@ impl Parser {
         let mut expr = self.parse_primary()?;
         loop {
             if self.eat(&TokenKind::Dot) {
-                let field = self.expect_ident()?;
+                // `q.unit()`: the reserved word is only a declaration keyword,
+                // so it is a valid member name after '.'.
+                let field = if self.eat(&TokenKind::Unit) { "unit".to_string() } else { self.expect_ident()? };
                 expr = Expr::FieldAccess(Box::new(expr), field);
             } else if self.check(&TokenKind::Lt) && !self.newline_breaks_statement() {
                 let checkpoint = self.pos;
@@ -968,27 +1109,46 @@ impl Parser {
             return Ok(number);
         }
         let mut unit = self.expect_ident()?;
+        self.unit_exponent(&mut unit, number_line)?;
+        self.unit_tail(&mut unit, number_line)?;
+        Ok(Expr::UnitLiteral(Box::new(number), unit))
+    }
+
+    /// `^2` / `^-1` right after a unit atom on the same line.
+    fn unit_exponent(&mut self, unit: &mut String, line: usize) -> PResult<()> {
+        if self.check(&TokenKind::Caret) && self.peek().line == line {
+            self.advance();
+            let negative = self.eat(&TokenKind::Minus);
+            let exp = self.expect_int()?;
+            unit.push('^');
+            if negative {
+                unit.push('-');
+            }
+            unit.push_str(&exp.to_string());
+        }
+        Ok(())
+    }
+
+    /// `*atom` / `/atom` continuations of a unit. Only known unit symbols are
+    /// absorbed, so `5 m / t` still divides by the variable `t`.
+    fn unit_tail(&mut self, unit: &mut String, line: usize) -> PResult<()> {
         loop {
             let op = match self.peek().kind {
                 TokenKind::Star => "*",
                 TokenKind::Slash => "/",
                 _ => break,
             };
-            if !matches!(self.peek_at(1).kind, TokenKind::Ident(_)) || self.peek().line != number_line {
+            let is_unit = matches!(&self.peek_at(1).kind, TokenKind::Ident(atom) if crate::types::unit_info(atom).is_some());
+            if !is_unit || self.peek().line != line || self.peek_at(1).line != line {
                 break;
             }
             self.advance();
             let atom = self.expect_ident()?;
             unit.push_str(op);
             unit.push_str(&atom);
-            if self.check(&TokenKind::Caret) && self.peek().line == number_line {
-                self.advance();
-                let exp = self.expect_int()?;
-                unit.push('^');
-                unit.push_str(&exp.to_string());
-            }
+            self.unit_exponent(unit, line)?;
         }
-        Ok(Expr::UnitLiteral(Box::new(number), unit))
+        Ok(())
     }
 
     fn peek(&self) -> &Token {

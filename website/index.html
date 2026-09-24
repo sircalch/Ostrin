@@ -58,7 +58,7 @@
       <div class="header-right">
         <span class="version"></span>
         <button class="menu-toggle" aria-label="Open navigation" aria-expanded="false"><span></span><span></span></button>
-        <nav class="site-nav" aria-label="Main navigation"><a href="docs.html">Learn</a><a href="reference.html">Reference</a><a href="guides.html">Guides</a><a href="examples.html">Examples</a><a href="cookbook.html">Cookbook</a><a href="playground.html">Playground</a><a href="https://github.com/sircalch/Ostrin">GitHub <span aria-hidden="true">↗</span></a></nav>
+        <nav class="site-nav" aria-label="Main navigation"><a href="docs.html">Learn</a><a href="reference.html">Reference</a><a href="guides.html">Guides</a><a href="examples.html">Examples</a><a href="cookbook.html">Cookbook</a><a href="viz.html">Viz</a><a href="playground.html">Playground</a><a href="https://github.com/sircalch/Ostrin">GitHub <span aria-hidden="true">↗</span></a></nav>
       </div>
     </header>
 
@@ -84,8 +84,18 @@
       </section>
 
       <section class="section shell sl-section" id="lab" aria-labelledby="lab-title">
-        <div class="section-header"><p class="eyebrow">Scientific Lab</p><div><h2 id="lab-title">Change a parameter. Ostrin recomputes it.</h2><p class="lede">Eight programs from the repository, running on the compiler built for WebAssembly. Each shows its source, a Run button, where the result comes from and what is not supported yet.</p></div></div>
+        <div class="section-header"><p class="eyebrow">Scientific Lab</p><div><h2 id="lab-title">Change a parameter. Ostrin recomputes it.</h2><p class="lede">Nine programs from the repository, running on the compiler built for WebAssembly. Each shows its source, a Run button, where the result comes from and what is not supported yet.</p></div></div>
         <div class="sl" data-lab><p class="dim">The Lab needs JavaScript to run the compiler. Recorded outputs are also in the <a class="text-link violet" href="cookbook.html">Cookbook</a>.</p></div>
+      </section>
+
+      <section class="section shell" id="visualization" aria-labelledby="viz-title">
+        <div class="section-header"><p class="eyebrow">Visualization</p><div><h2 id="viz-title">Figures drawn by the language, not by a plugin.</h2><p class="lede"><span class="mono">std.viz</span> is written in Ostrin: axes, legends, contours, 3D projection and shading run in the same interpreter, native binary or browser compiler as your analysis, and produce the same SVG bytes in all three.</p></div></div>
+        <div class="home-viz">
+          <figure><img src="assets/viz/surface.svg" alt="Shaded 3D surface of peaks(x, y) rendered by std.viz" loading="lazy" width="640" height="520"><figcaption>examples/viz_surface.ostrin</figcaption></figure>
+          <figure><img src="assets/viz/heatmap.svg" alt="Heatmap with contour lines rendered by std.viz" loading="lazy" width="600" height="500"><figcaption>examples/viz_heatmap.ostrin</figcaption></figure>
+          <figure><img src="assets/viz/lorenz.svg" alt="Lorenz attractor trajectory rendered by std.viz" loading="lazy" width="640" height="520"><figcaption>examples/viz_lorenz.ostrin</figcaption></figure>
+        </div>
+        <div class="button-row"><a class="button" href="viz.html">Open the Viz gallery <span>→</span></a><a class="button-quiet" href="#lab">Rotate a surface in the Lab (3D tab) <span>→</span></a></div>
       </section>
 
       <section class="live-demo-band" id="try-ostrin">

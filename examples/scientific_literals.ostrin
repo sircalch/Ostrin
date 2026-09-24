@@ -1,0 +1,10 @@
+// Scientific notation for Float literals, also before a unit.
+fn main() -> Void {
+    avogadro = 6.02214076e23
+    print(avogadro / 1e23)
+    print(1.5e-3 * 1000.0)
+    print(2E3)
+    print(1e-9 + 2e-9 < 4e-9)
+    wavelength = 532e-9 m
+    print(wavelength as nm)
+}

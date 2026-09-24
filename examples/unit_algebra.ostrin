@@ -1,0 +1,46 @@
+// Unit algebra: compound units are simplified (`kg*m^2/s^2`), same-dimension
+// units cancel (`km/h * min` → `km`), `as` accepts compound targets and named
+// derived dimensions (`Energy`, `Velocity`, `Pressure`) work in signatures.
+fn kinetic(m: Quantity<Mass>, v: Quantity<Velocity>) -> Quantity<Energy> {
+    0.5 * m * v * v
+}
+
+fn pressure(force: Quantity<Force>, area: Quantity<Area>) -> Quantity<Pressure> {
+    force / area
+}
+
+fn main() -> Void {
+    v = 20 m / 1 s
+    print(v)
+    print(v as km/h)
+
+    mass = 75 kg
+    energy = kinetic(mass, v)
+    print(energy)
+    print(energy as kJ)
+    print(energy as kcal)
+
+    g = 9.81 m/s^2
+    weight = mass * g
+    print(weight)
+    print(weight as N)
+    print(pressure(weight, 0.05 m^2) as kPa)
+    print((101325 Pa) as atm)
+
+    print(90 km/h * 2 h)
+    print(90 km/h * 30 min)
+    print(20 m/s * 2 min)
+    print(3 m^2 * 2 m)
+    print((1 / (4 s)) as Hz)
+    print((1500 W * 2 h) as kJ)
+    print(1 J / (1 N * 1 m))
+    print((250 mL) as L)
+    print(g as km/h^2)
+    // Units that cancel on the right of '/' still scale the number.
+    print(2 / (3 km/m))
+    print(linspace(1.0, 2.0, 2) / (2 km/m))
+
+    // A variable after `/` is still a division, not a unit.
+    t = 4.0
+    print(8 m / t)
+}

@@ -1,0 +1,18 @@
+// std.viz · histogram: 20 000 normal samples and the scaled density on top.
+import std.viz
+
+fn main() -> Void {
+    samples = rng(7).randn([20000]) * 1.5 + 4.0
+    bins = 48
+    width = (samples.max() - samples.min()) / (bins as Float)
+    x = linspace(samples.min(), samples.max(), 200)
+    density = norm_pdf(x, 4.0, 1.5) * (20000.0 * width)
+    print("mean " + viz.num(samples.mean()) + ", sd " + viz.num(samples.std()) + ", p95 " + viz.num(samples.percentile(95.0)))
+    fig = viz.figure("Normal samples")
+        .describe("20 000 draws from N(4, 1.5²), seed 7")
+        .labels("value", "count")
+        .histogram(samples, bins, label: "samples")
+        .line(x, density, label: "N(4, 1.5²) density", color: "#111827", width: 1.8)
+        .vline(4.0, color: "#dc2626")
+    print(fig.svg())
+}

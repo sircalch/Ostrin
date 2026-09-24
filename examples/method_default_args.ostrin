@@ -1,0 +1,26 @@
+// Methods take named and default arguments like functions do.
+record Canvas {
+    mut marks: List<String>
+}
+
+impl Canvas {
+    fn mark(mut self, name: String, color: String = "black", width: Float = 1.0) -> Canvas {
+        self.marks.push(name + ":" + color + ":" + width.to_string())
+        self
+    }
+
+    fn scaled(self, by: Int, times: Int = 1) -> Int {
+        by * 10 + times
+    }
+}
+
+fn main() -> Void {
+    c = Canvas { marks: [] }
+    c.mark("a")
+        .mark("b", "red")
+        .mark("c", width: 2.5)
+        .mark(color: "blue", name: "d")
+    print(c.marks)
+    print(c.scaled(3))
+    print(c.scaled(times: 4, by: 2))
+}

@@ -1,0 +1,26 @@
+// std.viz · 3D scatter: three Gaussian clusters drawn back to front.
+import std.viz
+
+fn main() -> Void {
+    r = rng(5)
+    mut xs: List<Float> = []
+    mut ys: List<Float> = []
+    mut zs: List<Float> = []
+    centers = [0.0, 0.0, 0.0, 4.0, 1.0, 2.5, 1.5, 4.0, 5.0]
+    for c in 0 until 3 {
+        px = r.randn([120]) * 0.8 + centers[c * 3]
+        py = r.randn([120]) * 0.8 + centers[c * 3 + 1]
+        pz = r.randn([120]) * 0.8 + centers[c * 3 + 2]
+        for i in 0 until 120 {
+            xs.push(px[i])
+            ys.push(py[i])
+            zs.push(pz[i])
+        }
+    }
+    scene = viz.scene3d("Three clusters")
+        .describe("360 points colored by height")
+        .labels("x", "y", "z")
+        .view(-40.0, 22.0)
+        .scatter(array(xs), array(ys), array(zs), colormap: "coolwarm", size: 3.2)
+    print(scene.svg())
+}
