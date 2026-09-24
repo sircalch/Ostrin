@@ -2,9 +2,10 @@
 
 *Corte: 2026-09-24 · rama `main` · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 219 de integración y 2 unitarias en verde.*
 
-Validación remota: Pages y CI pasaron para `8bc24bd` en Windows, Linux, macOS y web. La
-prueba de hilos nativos valida los pares concurrentes sin imponer un orden del planificador
-y conserva las barreras de `join()`/scope y cero fugas.
+Validación remota: Pages y CI pasaron para `9e31280` en Windows, Linux, macOS y web. La
+compuerta oficial exige `cargo fmt --check`, Clippy con el lint `suspicious`, la suite del
+compilador y las comprobaciones del sitio; los workflows de auditoría de dependencias,
+CodeQL, sanitizers nativos y cobertura quedan registrados para el ciclo P5.
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
 Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–266); para el diseño
@@ -268,7 +269,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Paquetes | `--project` usa `entry`; resolución transitiva de manifiestos con alias globales sin colisión; lockfiles deterministas con rutas relativas, versión y SHA-256 de `ostrin.toml`/fuentes `.ostrin`; Git solo mediante `--fetch`, con caché local y commit resuelto; builds normales reutilizan y validan el lock, `--locked` lo exige; sin registro remoto |
 | Rendimiento del intérprete | Tree‑walking simple; sin optimizaciones |
 | `newlines.ostrin`, `advanced.ostrin` | Son muestras de sintaxis, no programas ejecutables |
-| CI | Linux, macOS y Windows; incluye las pruebas diferenciales intérprete↔nativo; el backend nativo enlaza `libm` explícitamente en Unix para paquetes con `sqrt`/`round` |
+| CI | Linux, macOS y Windows; incluye las pruebas diferenciales intérprete↔nativo, `cargo fmt --check` y Clippy `suspicious`; `security.yml` audita `Cargo.lock`, `codeql.yml` analiza Rust, `sanitizers.yml` ejecuta nativo/diferencial con AddressSanitizer + UBSan en Linux y `coverage.yml` genera cobertura bajo demanda/semanal; el backend nativo enlaza `libm` explícitamente en Unix para paquetes con `sqrt`/`round` |
 | Distribución | Workflow WASI reproducible para `ostrinc.wasm`, `hello.wasm`, `pkg_project.wasm`, un contrato de `args`/`env`, E/S de archivos y ownership gestionado, con toolchain fijado, ejecución bajo Node WASI y SHA-256; playground de navegador sobre el compilador WASM; workflow de release `v0.1.0` para Linux x86_64, macOS arm64 y Windows x64 que valida versión, checksums, archivos extraídos, `hello.ostrin` y un proyecto con dependencia `path`, y publica `docs/releases/v0.1.0.md` como notas; `v0.1.0` está publicada y `install-check.yml` instala la release con los instaladores Unix/PowerShell en Linux, macOS y Windows limpios y ejecuta `hello.ostrin`; canales externos y registry público siguen pendientes |
 
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
@@ -339,9 +340,12 @@ El playground de navegador ya ejecuta el compilador WASM; la siguiente frontera 
 contratos de plataforma antes de LLVM IR.
 
 ### F. Calidad y confianza
-Fuzzing del parser, pruebas diferenciales automáticas intérprete↔nativo sobre programas
-generados escalares y con ownership (`Option`/`Result`), cobertura de mensajes de error,
-benchmarks (nativo vs intérprete).
+Fuzzing del lexer/parser/checker/HIR mediante fuentes mutadas y pruebas diferenciales
+automáticas intérprete↔nativo sobre programas generados escalares y con ownership
+(`Option`/`Result`) ya se ejecutan en la suite; `OSTRIN_FUZZ_ROUNDS` permite ampliar las
+iteraciones. El siguiente incremento mide cobertura por módulo y añade casos de fallos del
+backend nativo antes de retirar más fallback AST; benchmarks (nativo vs intérprete) siguen
+pendientes.
 
 ### G. Producto
 **Homepage 3.0 (2026-09-24).** La portada muestra el estado de la release derivado de
@@ -380,11 +384,12 @@ La gramática para Linguist queda separada porque requiere uso público suficien
 | **4** | B (concurrencia real) | Cumple la promesa de «concurrencia segura por defecto» |
 | **5** | E (WASM) + G (playground) | Difusión |
 
-Plan activo (2026-09-24): los bloques de release `v0.1.0` y homepage 3.0 están cerrados. El
-siguiente ciclo vuelve al núcleo (retirada del fallback AST, ownership completo) con las
-brechas que expuso el Scientific Lab: `as` con unidades compuestas, simplificación de unidades
-derivadas en la salida (§6); el sombreado de funciones globales por parámetros función ya está
-corregido. GPU, autodiff inverso, registry público y red siguen fuera.
+Plan activo (2026-09-24): los bloques de release `v0.1.0`, homepage 3.0 y la compuerta inicial
+de calidad están cerrados en `main`. P5 añade auditoría de dependencias, CodeQL, sanitizers
+nativos y cobertura reproducible; después el siguiente ciclo vuelve al núcleo (retirada del
+fallback AST, ownership completo) con las brechas que expuso el Scientific Lab: `as` con
+unidades compuestas y simplificación de unidades derivadas en la salida (§6). GPU,
+autodiff inverso, registry público y red siguen fuera.
 
 ---
 
