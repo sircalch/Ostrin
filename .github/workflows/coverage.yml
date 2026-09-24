@@ -16,10 +16,29 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v5
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.98.1
         with:
           components: llvm-tools-preview
       - name: Install cargo-llvm-cov
-        run: cargo install cargo-llvm-cov --locked
-      - name: Generate coverage summary
-        run: cargo llvm-cov --manifest-path compiler/Cargo.toml --all-targets --summary-only
+        run: cargo install cargo-llvm-cov --version 0.9.1 --locked
+      - name: Generate LCOV and coverage summary
+        run: |
+          mkdir -p target/coverage
+          cargo llvm-cov --manifest-path compiler/Cargo.toml --all-targets --lcov --output-path target/coverage/lcov.info
+          cargo llvm-cov report --manifest-path compiler/Cargo.toml --summary-only | tee target/coverage/summary.txt
+      - name: Publish coverage summary
+        if: always()
+        run: |
+          if [ -f target/coverage/summary.txt ]; then
+            cat target/coverage/summary.txt >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Coverage summary was not generated." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ostrin-coverage-${{ github.sha }}
+          path: target/coverage
+          if-no-files-found: error
+          retention-days: 14
