@@ -1,5 +1,9 @@
 # Ostrin — Contexto completo del proyecto (para retomar en otra herramienta)
 
+> **Documento histórico.** Este snapshot conserva el contexto de una etapa anterior del proyecto.
+> Sus cifras y listas de capacidades no describen necesariamente el estado actual. Para el estado
+> verificado usa [ESTADO_Y_PLAN.md](ESTADO_Y_PLAN.md); para arquitectura usa [ARCHITECTURE.md](ARCHITECTURE.md).
+
 Este documento existe para que puedas seguir trabajando en Ostrin desde otra sesión/herramienta (Codex u otra) sin perder el hilo. Resume: qué es Ostrin, por qué existe, qué se decidió y por qué, qué se construyó, qué está probado, y qué falta.
 
 ---
