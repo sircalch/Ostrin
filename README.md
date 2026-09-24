@@ -105,9 +105,10 @@ proposal. The
 native release workflow targets Linux x86_64, macOS arm64 and Windows x64; before upload it checks
 the tag/version contract, runs `ostrinc --version`, executes `examples/hello.ostrin`, verifies the
 archive checksum, and runs both the extracted example and the packaged path-dependency project.
-There is still no published release by default: a maintainer must push a matching
-`v<compiler-version>` tag. Repository installers are prepared, but they cannot install anything
-until such a release exists.
+The experimental `v0.1.0` release publishes Linux x86_64, macOS arm64 and Windows x64 archives
+with SHA-256 checksums. Repository installers resolve that release by default and verify the
+checksum before installing. The public package registry and additional distribution channels
+remain future work.
 
 The cooperative runtime avoids thread-only headers unless `--native-threads` is requested. The
 same compiler is also deployed as `ostrinc.wasm` for the browser playground, where it runs the
@@ -127,10 +128,8 @@ cargo run -- --run ..\\examples\\physics.ostrin
 ### Install a published release
 
 Release archives are built for Linux x86_64, macOS arm64 and Windows x64 by
-`.github/workflows/release.yml`. Once a matching `v<compiler-version>` release exists, the
-repository installers download the archive and verify its published SHA-256 before installing
-`ostrinc`. They fail clearly when no release exists; this repository does not claim a release is
-currently published.
+`.github/workflows/release.yml`. The installers download the matching release archive and verify
+its published SHA-256 before installing `ostrinc`.
 
 Unix (Linux x86_64 or macOS arm64):
 

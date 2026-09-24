@@ -3,6 +3,23 @@
 ## Unreleased
 
 ### Compiler and ownership
+
+## 0.1.0 — experimental developer release
+
+Ostrin 0.1.0 is the first public developer release. It packages the compiler for Linux
+x86_64, macOS arm64 and Windows x64, with SHA-256 checksums, shell and PowerShell installers,
+the repository examples, and smoke-tested local package dependencies.
+
+This release includes the Rust compiler and interpreter, physical quantities, records, enums,
+traits, generics, `Option`/`Result`, pattern matching, collections, deterministic cooperative
+concurrency, optional native threads, native C compilation, leak checking, WASI distribution,
+the browser playground, LSP/DAP tooling and the initial scientific packages for tables, plots
+and forward-mode autodiff.
+
+The release remains experimental. HIR/IR migration, complete ownership lowering, advanced
+iterators, GPU execution, reverse autodiff, public package registries, networking and broader
+scientific libraries remain in development.
+
 - Hardened the native thread `spawn_scope` ownership regression test against
   scheduler-dependent ordering: concurrent `main`/`task` and `scope-body`/`scope-task`
   output is checked as unordered pairs while the join and scope lifecycle markers remain
