@@ -472,7 +472,16 @@ impl Emitter<'_> {
                     return Err(());
                 }
                 let (o, v) = (self.expr(obj)?, self.expr(value)?);
-                out.push_str(&format!("    {o}->{field} = {v};\n"));
+                if Self::managed_c_type(&field_ty) {
+                    // Same ownership as the AST path: the field keeps its own
+                    // reference to the new value and drops the old one.
+                    let temp = self.next_temp();
+                    out.push_str(&format!(
+                        "    {field_ty} {temp} = {v}; ostrin_retain((void*){temp}); ostrin_release_owned((void*)({o})->{field}); ({o})->{field} = {temp};\n"
+                    ));
+                } else {
+                    out.push_str(&format!("    {o}->{field} = {v};\n"));
+                }
             }
             HirStmt::Return(Some(value)) => {
                 let code = self.expr(value)?;

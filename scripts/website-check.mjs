@@ -151,7 +151,7 @@ try {
 }
 if (lab) {
   check(lab.compiler === facts.version, `website/lab-data.js: recorded with ${lab.compiler}, compiler is ${facts.version}; run node scripts/lab-data.mjs --write`);
-  check(lab.demos.length === 9, `website/lab-data.js: expected 9 Scientific Lab demos, found ${lab.demos.length}`);
+  check(lab.demos.length === 10, `website/lab-data.js: expected 10 Scientific Lab demos, found ${lab.demos.length}`);
   for (const demo of lab.demos) {
     check(existsSync(path.join(repositoryRoot, demo.source)), `lab ${demo.id}: source ${demo.source} does not exist`);
     check(demo.output.length > 0, `lab ${demo.id}: no recorded output`);

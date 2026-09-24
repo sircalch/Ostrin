@@ -6700,3 +6700,16 @@ las unidades simples usan el mismo código de dimensión base que las del catál
 (`ft * m`). Errores: dimensión desconocida, símbolo ya existente, `define` de unidad no declarada o
 entre dimensiones distintas. De paso, `within` comparaba los números sin convertir unidades
 (`6 ft within (1.5 m to 2 m)` daba false) en ambos backends.
+
+## 277. std.numeric 0.1 — 2026-09-24
+
+Métodos numéricos de la fase 6 escritos en Ostrin (documento 24): cuadratura (`trapz`, `simpson`),
+raíces con `Result` (`bisect`, `secant`, `newton`), `derivative`, `golden_min`, interpolación lineal
+y spline cúbico natural, `rk4` y `rk45` (Dormand–Prince adaptativo) con un record `Solution`, y FFT
+radix 2 con DFT de respaldo. Los parámetros no pueden ser `mut`, así que el guardado de estados se
+escribe en línea. Dos fallos nativos: los argumentos frescos de llamadas a clausuras no se liberaban
+(`gen_closure_call` usa ahora `materialize_owned_call_args`/`finish_owned_call`), y el emisor HIR
+hacía `self->campo = valor` sin retener ni liberar; al liberar el argumento temporal de
+`fig.describe("…" + texto)` el campo quedaba colgando (ASan en `viz_spline`). Ahora sigue la regla de
+la ruta AST: retener el nuevo, `ostrin_release_owned` del viejo. Web: pestaña ODE del Lab (10 demos)
+y tres figuras nuevas en la galería (13).

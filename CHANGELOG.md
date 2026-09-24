@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Numerical methods: std.numeric 0.1
+- New standard-library module `std.numeric`, written in Ostrin: `trapz`, `simpson`, `bisect`,
+  `secant`, `newton` (roots return `Result<Float, String>`), `derivative`, `golden_min`, linear
+  `interp`/`interp_all`, natural cubic `spline` (`.at`, `.sample`), ODE solvers `rk4` and adaptive
+  `rk45` (Dormand–Prince) returning a `Solution` (`t`, `y`, `.component(i)`, `.final_state()`), and
+  `fft`/`ifft`/`frequencies`/`amplitude` (radix-2 with a DFT fallback). Design document 24.
+- New examples `numeric_methods`, `viz_ode`, `viz_fft` and `viz_spline` (three more gallery figures)
+  and an ODE tab in the Scientific Lab (`lab_ode`: a driven pendulum whose damping, drive and start
+  angle recompute live in the browser).
+- Native fixes found on the way: fresh arguments passed to closures are released after the call
+  (2 891 → 38 live allocations in `numeric_methods`), and HIR-emitted field assignments retain the new
+  value and release the old one (a method storing a temporary string in a field was a
+  use-after-free).
+
 ### Visualization: std.viz 0.1
 - New standard-library module `std.viz`, written in Ostrin: 2D figures (line, scatter, area,
   band, error bars, bars, histogram, stairs, reference lines, notes, heatmap with colorbar,

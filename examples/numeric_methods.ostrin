@@ -1,0 +1,45 @@
+// std.numeric: roots, integrals, derivatives, minima, interpolation, ODEs and the FFT.
+import std.numeric
+
+fn f(x: Float) -> Float {
+    x * x - 2.0
+}
+fn df(x: Float) -> Float {
+    2.0 * x
+}
+fn g(x: Float) -> Float {
+    sin(x)
+}
+fn bowl(x: Float) -> Float {
+    (x - 1.5) * (x - 1.5) + 0.25
+}
+fn oscillator(t: Float, y: Array<Float>) -> Array<Float> {
+    array([y[1], 0.0 - y[0]])
+}
+
+fn main() -> Void {
+    print(numeric.bisect(f, 0.0, 2.0))
+    print(numeric.secant(f, 1.0, 2.0))
+    print(numeric.newton(f, df, 1.0))
+    print(numeric.simpson(g, 0.0, pi()))
+    xs = linspace(0.0, pi(), 101)
+    print(numeric.trapz(xs, sin(xs)))
+    print(numeric.derivative(g, 0.0))
+    print(numeric.golden_min(bowl, 0.0, 4.0))
+    print(numeric.interp(array([0.0, 1.0, 2.0]), array([0.0, 10.0, 0.0]), 1.5))
+    s = numeric.spline(array([0.0, 1.0, 2.0, 3.0]), array([0.0, 1.0, 0.0, 1.0]))
+    print(s.at(1.5))
+    sol = numeric.rk4(oscillator, array([1.0, 0.0]), 0.0, 2.0 * pi(), 200)
+    print(sol.final_state())
+    adaptive = numeric.rk45(oscillator, array([1.0, 0.0]), 0.0, 2.0 * pi())
+    print(adaptive.final_state())
+    print(adaptive.length())
+    t = linspace(0.0, 1.0, 65)[0 until 64]
+    signal = sin(t * (2.0 * pi() * 5.0)) + sin(t * (2.0 * pi() * 12.0)) * 0.5
+    amp = numeric.amplitude(numeric.fft(signal))
+    print(amp[5])
+    print(amp[12])
+    back = numeric.ifft(numeric.fft(signal))
+    print(abs(back - signal).max() < 0.000000001)
+    print(numeric.amplitude(numeric.fft(signal[0 until 60]))[5])
+}

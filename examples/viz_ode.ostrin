@@ -1,0 +1,21 @@
+// std.numeric + std.viz · a damped, driven pendulum integrated with adaptive RK45.
+import std.numeric
+import std.viz
+
+fn pendulum(t: Float, y: Array<Float>) -> Array<Float> {
+    // y = [angle, angular velocity]; damping 0.15, drive 1.1 cos(0.8 t)
+    array([y[1], 0.0 - 0.15 * y[1] - sin(y[0]) + 1.1 * cos(0.8 * t)])
+}
+
+fn main() -> Void {
+    sol = numeric.rk45(pendulum, array([0.2, 0.0]), 0.0, 60.0, tol: 1e-9)
+    angle = sol.component(0)
+    speed = sol.component(1)
+    print("steps " + sol.length().to_string() + ", evaluations " + sol.evaluations.to_string())
+    a = viz.figure("Angle over time").size(480, 320).labels("t", "θ [rad]").no_legend()
+        .line(sol.t, angle, width: 1.4)
+    b = viz.figure("Phase portrait").size(480, 320).labels("θ [rad]", "ω [rad/s]").no_legend()
+        .line(angle, speed, color: "#7c3aed", width: 1.0)
+        .scatter(array([angle[0]]), array([speed[0]]), label: "start", color: "#dc2626", size: 4.0)
+    print(viz.grid([a.svg(), b.svg()], 2, 480, 320, title: "Driven pendulum (RK45, tol 1e-9)"))
+}

@@ -1,0 +1,19 @@
+// std.numeric + std.viz · a noisy two-tone signal and its spectrum.
+import std.numeric
+import std.viz
+
+fn main() -> Void {
+    n = 512
+    dt = 1.0 / 512.0
+    t = linspace(0.0, 1.0, n + 1)[0 until n]
+    noise = rng(42).randn([n]) * 0.4
+    signal = sin(t * (2.0 * pi() * 50.0)) + sin(t * (2.0 * pi() * 120.0)) * 0.6 + noise
+    amp = numeric.amplitude(numeric.fft(signal))
+    freqs = numeric.frequencies(n, dt)
+    print("peak at 50 Hz: " + viz.num(amp[50]) + ", at 120 Hz: " + viz.num(amp[120]))
+    a = viz.figure("Signal").size(480, 320).labels("t [s]", "x").no_legend()
+        .line(t[0 until 128], signal[0 until 128], width: 1.2)
+    b = viz.figure("Amplitude spectrum").size(480, 320).labels("f [Hz]", "|X(f)|").no_legend()
+        .area(freqs, amp, color: "#059669")
+    print(viz.grid([a.svg(), b.svg()], 2, 480, 320, title: "FFT of 512 samples"))
+}

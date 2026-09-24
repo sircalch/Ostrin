@@ -53,6 +53,21 @@ export const LAB = [
     limits: "Rendering is CPU-side SVG (painter's algorithm), fine for thousands of triangles. A WebGPU backend for large meshes and volumes is planned.",
   },
   {
+    id: "ode",
+    title: "ODE",
+    headline: "A driven pendulum, integrated by Ostrin.",
+    file: "examples/lab_ode.ostrin",
+    render: "svg",
+    params: [
+      { name: "damping", label: "Damping", min: 0, max: 0.6, step: 0.05 },
+      { name: "drive", label: "Drive amplitude", min: 0, max: 1.6, step: 0.1 },
+      { name: "start_angle", label: "Start angle (rad)", min: -3, max: 3, step: 0.1 },
+    ],
+    how: "std.numeric.rk45, an adaptive Dormand–Prince integrator written in Ostrin, solves θ'' = −c θ' − sin θ + A cos(0.8 t) with a lambda that captures the three parameters; it picks its own step sizes to keep the local error under 1e-8. std.viz then draws the phase portrait (θ, ω).",
+    docs: { label: "std.numeric source", href: `${repository}/blob/main/compiler/std/numeric.ostrin` },
+    limits: "Explicit solvers only (rk4, rk45): stiff systems need an implicit method, which is planned. There are no event detection or dense output yet.",
+  },
+  {
     id: "linear-algebra",
     title: "Linear Algebra",
     headline: "Solve a spring system and find its normal modes.",
@@ -155,6 +170,9 @@ export const GALLERY = [
   { id: "scatter-fit", title: "Scatter and fit", file: "examples/viz_scatter_fit.ostrin", blurb: "Calibration data, a least-squares line and its ±2σ band." },
   { id: "units", title: "Unit-aware axes", file: "examples/viz_units.ostrin", blurb: "Quantities converted to km/h: the axis labels come from the units in the data." },
   { id: "bars", title: "Bars with error bars", file: "examples/viz_bars.ostrin", blurb: "Group means ± standard deviation from seeded samples." },
+  { id: "ode", title: "Adaptive ODE solver", file: "examples/viz_ode.ostrin", blurb: "A pendulum solved with std.numeric.rk45: angle over time and the phase portrait, side by side." },
+  { id: "fft", title: "Spectrum with the FFT", file: "examples/viz_fft.ostrin", blurb: "A noisy two-tone signal and its amplitude spectrum from std.numeric.fft: peaks at 50 Hz and 120 Hz." },
+  { id: "spline", title: "Cubic spline", file: "examples/viz_spline.ostrin", blurb: "Eight measurements, a natural cubic spline through them and the area under it by Simpson's rule." },
   { id: "dashboard", title: "Multi-panel layout", file: "examples/viz_dashboard.ostrin", blurb: "Four figures, 2D and 3D, composed with viz.grid into one SVG." },
 ];
 
