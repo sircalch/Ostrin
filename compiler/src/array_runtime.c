@@ -5,8 +5,15 @@
  * and the macros OSTRIN_ADD/SUB/MUL/DIV(a, b), OSTRIN_ELEM_LT(a, b) supplied by the
  * instantiation. Mirrors interpreter/array.rs operation for operation (same
  * accumulation order, same error conditions). */
+/* Releasing an array frees its shape and data too. */
+static void @N@_drop(void* p) {
+    @N@* a = (@N@*)p;
+    ostrin_release((void*)a->shape);
+    ostrin_release((void*)a->data);
+}
+
 static @N@* @N@_alloc(int64_t rank, const int64_t* shape) {
-    @N@* r = (@N@*)ostrin_calloc(1, sizeof(@N@));
+    @N@* r = (@N@*)ostrin_calloc_with_drop(1, sizeof(@N@), @N@_drop);
     if (!r) OSTRIN_OOM();
     int64_t size = 1;
     for (int64_t i = 0; i < rank; i++) size *= shape[i];

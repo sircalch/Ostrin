@@ -5469,3 +5469,21 @@ fn arrays_of_quantities_keep_one_unit_and_check_dimensions() {
     assert!(err.contains("E1024") && err.contains("Array<Quantity<Length>>") && err.contains("Array<Quantity<Time>>"), "{err}");
     assert!(err.contains("E1026") && err.contains("to 'h'"), "{err}");
 }
+
+#[test]
+fn native_fresh_temporaries_are_released() {
+    // Arrays (shape and data included), values pushed into lists, String method
+    // receivers and concatenation operands used to stay alive until exit.
+    let expected = interpreter_and_native_agree("native_memory_temporaries.ostrin");
+    let exe = temp_artifact("native_memory_temporaries_leaks.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &example_path("native_memory_temporaries.ostrin")]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "stderr: {}", stderr(&compile));
+    let native = Command::new(&exe).output().unwrap();
+    let _ = fs::remove_file(&exe);
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    let report = String::from_utf8_lossy(&native.stderr).to_string();
+    assert!(report.contains("live_allocations=0 "), "leaked: {report}");
+}

@@ -6669,3 +6669,12 @@ El checker valida dimensiones (E1024/E1026) y tipa reducciones (`var` eleva la u
 `std.viz` gana `unit_line`/`unit_scatter` y `viz_units.ostrin` usa arrays. Pruebas:
 `quantity_arrays.ostrin` (salida exacta y paridad) y `quantity_arrays_errors.ostrin`; suite 211
 integración, 6 diferenciales, 2 unitarias; Playwright 7/7.
+
+## 274. Temporales nativos — 2026-09-24
+
+Con un volcado temporal del registro de memoria sobre la galería Viz se localizaron las fugas: `push`
+retiene su valor pero el llamador nunca soltaba un valor fresco; los receptores frescos de métodos de
+`String` y de arrays no se liberaban; los operandos frescos de operaciones con arrays tampoco; y
+liberar un array solo liberaba la cabecera (`shape` y `data` quedaban vivos: ahora hay `@N@_drop`).
+La galería pasa de 233 855 a 303 asignaciones vivas al salir (pico 3 987) con SVG idénticos;
+`native_memory_temporaries.ostrin` llega a `live_allocations=0` y tiene su prueba.

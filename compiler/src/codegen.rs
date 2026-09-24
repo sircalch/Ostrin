@@ -4959,6 +4959,29 @@ impl<'a> Codegen<'a> {
             };
             let n = mangle_ctype(&array_ty);
             let result = if function == "cmp_" { CType::Array(Box::new(CType::Bool)) } else { array_ty.clone() };
+            // Fresh array operands (`x * 2.0` in `x * 2.0 + 1.0`) are released after the operation.
+            let fresh = |e: &Expr, t: &CType| matches!(t, CType::Array(_)) && fresh_array_expr(e);
+            let (lf, rf) = (fresh(l, &lt), fresh(r, &rt));
+            if lf || rf {
+                let (a, b, out) = (self.next_temp(), self.next_temp(), self.next_temp());
+                let call = match (&lt, &rt) {
+                    (CType::Array(x), CType::Array(y)) if x == y => format!("{n}_{}({a}, {b}, {code})", if function == "cmp_" { "cmp" } else { "binop" }),
+                    (CType::Array(x), scalar) if **x == *scalar => format!("{n}_{}({a}, {b}, {code}, 0)", if function == "cmp_" { "cmp_scalar" } else { "scalar" }),
+                    (scalar, CType::Array(y)) if **y == *scalar => format!("{n}_{}({b}, {a}, {code}, 1)", if function == "cmp_" { "cmp_scalar" } else { "scalar" }),
+                    _ => return Err("array operands must have the same element type".to_string()),
+                };
+                let release_a = if lf { format!("ostrin_release((void*){a}); ") } else { String::new() };
+                let release_b = if rf { format!("ostrin_release((void*){b}); ") } else { String::new() };
+                return Ok((
+                    format!(
+                        "({{ {} {a} = {lc}; {} {b} = {rc}; {} {out} = {call}; {release_a}{release_b}{out}; }})",
+                        c_type_name(&lt),
+                        c_type_name(&rt),
+                        c_type_name(&result)
+                    ),
+                    result,
+                ));
+            }
             return match (&lt, &rt) {
                 (CType::Array(a), CType::Array(b)) if a == b => Ok((format!("{n}_{}({lc}, {rc}, {code})", if function == "cmp_" { "cmp" } else { "binop" }), result)),
                 (CType::Array(a), scalar) if **a == *scalar => Ok((format!("{n}_{}({lc}, {rc}, {code}, 0)", if function == "cmp_" { "cmp_scalar" } else { "scalar" }), result)),
@@ -5573,6 +5596,22 @@ impl<'a> Codegen<'a> {
 
     fn gen_method_call(&mut self, obj: &Expr, method_name: &str, type_args: Option<&[Type]>, args: &[Arg]) -> Result<(String, CType), String> {
         let (obj_code, obj_ty) = self.gen_expr(obj)?;
+        if matches!(obj_ty, CType::Array(_)) && fresh_array_expr(obj) {
+            // `(x * 2.0).sum()`: array methods never return their receiver, so a
+            // fresh one is released once the method has run.
+            let receiver = self.next_temp();
+            let (code, ty) = self.gen_method_call_on(obj, receiver.clone(), obj_ty.clone(), method_name, type_args, args)?;
+            let head = format!("Array_Float* {receiver} = {obj_code};").replacen("Array_Float*", &c_type_name(&obj_ty), 1);
+            if ty == CType::Void {
+                return Ok((format!("({{ {head} {code}; ostrin_release((void*){receiver}); }})"), ty));
+            }
+            let result = self.next_temp();
+            return Ok((format!("({{ {head} {} {result} = {code}; ostrin_release((void*){receiver}); {result}; }})", c_type_name(&ty)), ty));
+        }
+        self.gen_method_call_on(obj, obj_code, obj_ty, method_name, type_args, args)
+    }
+
+    fn gen_method_call_on(&mut self, obj: &Expr, obj_code: String, obj_ty: CType, method_name: &str, type_args: Option<&[Type]>, args: &[Arg]) -> Result<(String, CType), String> {
         // `to_string()` exists on every scalar in the interpreter
         // (`receiver.to_string()` in `eval_call`); records/enums aren't
         // covered (their printed form needs a generated Display).
@@ -5603,6 +5642,20 @@ impl<'a> Codegen<'a> {
             });
         }
         if obj_ty == CType::Str && method_name != "to_string" {
+            if owned_call_argument(obj, &obj_ty) {
+                // A fresh receiver (`pt(..).replace(..)`): every String method
+                // returns a new value, so the receiver is released after the call.
+                let receiver = self.next_temp();
+                let (code, ty) = self.gen_string_method(&receiver, method_name, args, false)?;
+                if ty == CType::Void {
+                    return Ok((format!("({{ const char* {receiver} = {obj_code}; {code}; ostrin_release((void*){receiver}); }})"), ty));
+                }
+                let result = self.next_temp();
+                return Ok((
+                    format!("({{ const char* {receiver} = {obj_code}; {} {result} = {code}; ostrin_release((void*){receiver}); {result}; }})", c_type_name(&ty)),
+                    ty,
+                ));
+            }
             let borrowed_receiver = matches!(obj.unlocated(), Expr::Ident(_) | Expr::FieldAccess(..) | Expr::Index(..));
             return self.gen_string_method(&obj_code, method_name, args, !borrowed_receiver);
         }
@@ -5974,6 +6027,15 @@ impl<'a> Codegen<'a> {
                             return Err("'push' expects exactly one argument".to_string());
                         }
                         let coerced = self.coerce(&arg_codes[0], &arg_types[0], &elem_ty)?;
+                        // `push` retains its value: a fresh one drops the caller's reference.
+                        let fresh = matches!(&args[0], Arg::Positional(e) if owned_call_argument(e, &elem_ty));
+                        if fresh {
+                            let t = self.next_temp();
+                            return Ok((
+                                format!("({{ {} {t} = {coerced}; {struct_name}_push({obj_code}, {t}); ostrin_release_owned((void*){t}); }})", c_type_name(&elem_ty)),
+                                CType::Void,
+                            ));
+                        }
                         Ok((format!("{struct_name}_push({obj_code}, {coerced})"), CType::Void))
                     }
                     "remove_at" => {
@@ -6796,6 +6858,14 @@ fn normalize_call_args(params: &[Param], args: &[Arg], skip: usize) -> Result<Op
     // caller's file.
     crate::hir::arrange_arguments(params, named, |p| strip_locations(p.default.as_ref().expect("called for defaulted parameters")))
         .map(|list| Some(list.into_iter().map(Arg::Positional).collect()))
+}
+
+/// An array-valued expression whose result nobody else holds.
+fn fresh_array_expr(expr: &Expr) -> bool {
+    matches!(
+        expr.unlocated(),
+        Expr::Call(..) | Expr::GenericCall(..) | Expr::Binary(..) | Expr::Unary(..) | Expr::As(..)
+    )
 }
 
 fn strip_locations(expr: &Expr) -> Expr {

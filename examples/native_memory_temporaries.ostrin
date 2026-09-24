@@ -1,0 +1,20 @@
+// Fresh temporaries are released natively: arrays (with their shape and data),
+// values pushed into lists, receivers of String methods and concatenations.
+fn label(v: Float) -> String {
+    (round(v * 10.0) / 10.0).to_string()
+}
+
+fn pair(a: Float, b: Float) -> String {
+    label(a) + "," + label(b)
+}
+
+fn main() -> Void {
+    x = linspace(0.0, 1.0, 5)
+    mut parts: List<String> = []
+    for i in 0 until 5 {
+        parts.push(pair(x[i], x[i] * 2.0).replace(",", " "))
+    }
+    print(parts.join(" | "))
+    total = (x * 2.0 + 1.0).sum()
+    print(total)
+}
