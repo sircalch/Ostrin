@@ -6466,3 +6466,28 @@ la matriz WASI de ocho programas compiló y ejecutó el nuevo caso con salida ex
 `node scripts/website-metadata.mjs --write` actualizó los contadores públicos a 197 programas y
 199 pruebas. Los handlers con cuerpos no lineales, scopes/escapes complejos y payloads todavía no
 representados conservan el fallback verificado.
+
+## 264. Iteradores genéricos monomorfizados en IR/C — 2026-09-23
+
+El hueco que quedaba después de migrar los iteradores de records concretos era la pérdida de
+la sustitución de tipos en `impl<T> Iterator<T> for Cursor<T>`. El checker conocía
+`Cursor<Int>`, pero la metadata HIR sólo guardaba `Cursor -> T`, por lo que el `for` terminaba
+en los nodos legacy `iter_init`/`iter_next` y el backend generaba HIR/AST.
+
+- `HirProgram` conserva ahora el patrón de argumentos del receiver y el elemento de cada
+  implementación `Iterator`; el lowering IR unifica patrones anidados y sustituye `T` por el
+  argumento concreto antes de construir el polling `Option<T>`.
+- `ir_c.rs` reconoce las instancias de records aplicados (`Cursor<Int>` → `Cursor__Int`) en
+  tipos, agregados, campos, métodos y ownership. La asignación de campos escalares necesaria
+  para `next(mut self)` tiene una instrucción IR explícita `FieldStore`; los campos gestionados
+  conservan fallback hasta que exista metadata de tipos de campo suficiente para actualizar
+  ownership de forma segura.
+- `examples/native_generic_iterator.ostrin` ejecuta tres valores `7`, exige dos funciones
+  `ir-generated`, cero `hir-generated`, cero divergencias, llamada `Cursor__Int__next` y
+  `live_allocations=0`. La matriz WASI incorpora el mismo programa con salida exacta.
+
+Verificación local del bloque: la regresión dirigida pasó; la suite completa debe mantener 2
+unitarias, 6 diferenciales y 200 de integración. `website/site-data.js` se regenera a 198
+ejemplos y 200 pruebas; el script WASI queda en nueve programas. Los iteradores indirectos,
+scopes complejos, agregados genéricos con payloads gestionados y la retirada total del fallback
+siguen pendientes.

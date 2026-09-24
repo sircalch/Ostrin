@@ -6719,7 +6719,12 @@ fn generate_impl(
             program
                 .functions
                 .iter()
-                .filter(|function| non_generic_function_names.contains(&function.name))
+                .filter(|function| {
+                    non_generic_function_names.contains(&function.name)
+                        && !ir_unresolved.contains(&function.name)
+                        && !function.params.iter().any(|(_, ty)| matches!(ty, Ty::Dyn(_)))
+                        && !matches!(function.ret, Ty::Dyn(_))
+                })
                 .map(|function| (function.name.clone(), c_function_name(&function.name)))
         })
         .collect();

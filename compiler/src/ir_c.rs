@@ -24,6 +24,32 @@ pub type RecordFields = HashMap<String, Vec<String>>;
 pub type MethodNames = HashMap<(String, String), String>;
 pub type FunctionNames = HashMap<String, String>;
 
+fn record_name(ty: &Ty, records: &RecordFields) -> Option<String> {
+    match ty {
+        Ty::Named(name) if records.contains_key(name) => Some(name.clone()),
+        Ty::Applied(name, args) => {
+            let instance = format!("{name}__{}", args.iter().map(|arg| mangle_record_type(arg, records)).collect::<Vec<_>>().join("_"));
+            records.contains_key(&instance).then_some(instance)
+        }
+        _ => None,
+    }
+}
+
+fn mangle_record_type(ty: &Ty, records: &RecordFields) -> String {
+    match ty {
+        Ty::Int => "Int".to_string(), Ty::Float => "Float".to_string(), Ty::Float32 => "Float32".to_string(),
+        Ty::Sized(kind) => kind.name().to_string(), Ty::Bool => "Bool".to_string(), Ty::Char => "Char".to_string(),
+        Ty::String => "String".to_string(), Ty::Void => "Void".to_string(), Ty::Named(name) => name.clone(),
+        Ty::Applied(name, args) if matches!(name.as_str(), "Option" | "Result" | "List" | "Map" | "Set" | "Channel" | "Task") => format!("{name}_{}", args.iter().map(|arg| mangle_record_type(arg, records)).collect::<Vec<_>>().join("_")),
+        Ty::Applied(name, args) => format!("{name}__{}", args.iter().map(|arg| mangle_record_type(arg, records)).collect::<Vec<_>>().join("_")),
+        Ty::List(element) => format!("List_{}", mangle_record_type(element, records)),
+        Ty::Map(key, value) => format!("Map_{}_{}", mangle_record_type(key, records), mangle_record_type(value, records)),
+        Ty::Set(element) => format!("Set_{}", mangle_record_type(element, records)),
+        Ty::Fn(_, _) => "Fn".to_string(), Ty::Quantity(_) => "Quantity".to_string(), Ty::Dyn(name) => name.clone(),
+        Ty::Generic(name) => name.clone(), Ty::Unknown => "Unknown".to_string(),
+    }
+}
+
 #[derive(Clone, Copy)]
 pub enum HelperRequest {
     Show,
@@ -69,6 +95,7 @@ fn c_type(ty: &Ty, records: &RecordFields) -> Bail<String> {
         Ty::Set(element) if set_supported(element) => format!("Set_{}*", mangle_scalar(element)),
         Ty::Fn(_, _) => "OstrinClosure".to_string(),
         Ty::Named(name) if records.contains_key(name) => format!("{name}*"),
+        Ty::Applied(_, _) if record_name(ty, records).is_some() => format!("{}*", record_name(ty, records).ok_or(())?),
         Ty::Applied(name, args) if name == "Channel" && args.len() == 1 && channel_supported(&args[0], records) => {
             format!("Channel_{}*", mangle_option_payload(&args[0], records))
         }
@@ -101,7 +128,7 @@ fn scalar(ty: &Ty) -> bool {
 
 fn supported(ty: &Ty, records: &RecordFields) -> bool {
     scalar(ty)
-        || matches!(ty, Ty::Named(name) if records.contains_key(name))
+        || record_name(ty, records).is_some()
         || matches!(ty, Ty::List(element) if list_supported(element, records))
         || matches!(ty, Ty::Map(key, value) if map_supported(key, value))
         || matches!(ty, Ty::Set(element) if set_supported(element))
@@ -118,7 +145,7 @@ fn list_element_supported(ty: &Ty) -> bool {
 
 fn list_supported(ty: &Ty, records: &RecordFields) -> bool {
     list_element_supported(ty)
-        || matches!(ty, Ty::Named(name) if records.contains_key(name))
+        || record_name(ty, records).is_some()
         || matches!(ty, Ty::Applied(name, args) if name == "Channel" && args.len() == 1 && channel_supported(&args[0], records))
 }
 
@@ -145,7 +172,7 @@ fn option_supported(element: &Ty, records: &RecordFields) -> bool {
         || matches!(element, Ty::Set(inner) if set_supported(inner))
         || matches!(element, Ty::Applied(name, args) if name == "Option" && args.len() == 1 && option_supported(&args[0], records))
         || matches!(element, Ty::Applied(name, args) if name == "Result" && args.len() == 2 && result_supported(&args[0], &args[1], records))
-        || matches!(element, Ty::Named(name) if records.contains_key(name))
+        || record_name(element, records).is_some()
 }
 
 fn option_managed_payload(element: &Ty, records: &RecordFields) -> bool {
@@ -159,7 +186,7 @@ fn result_payload_supported(ty: &Ty, records: &RecordFields) -> bool {
         || matches!(ty, Ty::Set(inner) if set_supported(inner))
         || matches!(ty, Ty::Applied(name, args) if name == "Option" && args.len() == 1 && option_supported(&args[0], records))
         || matches!(ty, Ty::Applied(name, args) if name == "Result" && args.len() == 2 && result_supported(&args[0], &args[1], records))
-        || matches!(ty, Ty::Named(name) if records.contains_key(name))
+        || record_name(ty, records).is_some()
 }
 
 fn result_supported(ok: &Ty, err: &Ty, records: &RecordFields) -> bool {
@@ -174,6 +201,7 @@ fn managed_payload(ty: &Ty, records: &RecordFields) -> bool {
     match ty {
         Ty::String | Ty::List(_) | Ty::Map(_, _) | Ty::Set(_) => true,
         Ty::Named(name) => records.contains_key(name),
+        Ty::Applied(_, _) if record_name(ty, records).is_some() => true,
         Ty::Applied(name, args) if name == "Channel" && args.len() == 1 => channel_supported(&args[0], records),
         Ty::Applied(name, args) if name == "Task" && args.len() == 1 => task_supported(&args[0], records),
         Ty::Applied(name, args) if name == "Option" && args.len() == 1 => {
@@ -206,6 +234,7 @@ fn mangle_scalar(ty: &Ty) -> String {
 fn mangle_option_payload(ty: &Ty, records: &RecordFields) -> String {
     match ty {
         Ty::Named(name) if records.contains_key(name) => name.clone(),
+        Ty::Applied(_, _) if record_name(ty, records).is_some() => record_name(ty, records).unwrap_or_default(),
         Ty::List(element) if list_supported(element, records) => {
             format!("List_{}", mangle_option_payload(element, records))
         }
@@ -262,6 +291,7 @@ fn retain_payload(access: &str, ty: &Ty, records: &RecordFields) -> Option<Strin
         Ty::Named(name) if records.contains_key(name) => {
             Some(format!("ostrin_retain((void*){access})"))
         }
+        Ty::Applied(_, _) if record_name(ty, records).is_some() => Some(format!("ostrin_retain((void*){access})")),
         Ty::Applied(name, args)
             if name == "Option"
                 && args.len() == 1
@@ -367,6 +397,7 @@ fn defined_value(instruction: &IrInstr) -> Option<(ValueId, Ty)> {
             dst: Some(dst), ty, ..
         } => Some((*dst, ty.clone())),
         IrInstr::StoreLocal { .. }
+        | IrInstr::FieldStore { .. }
         | IrInstr::Call { dst: None, .. }
         | IrInstr::ClosureCall { dst: None, .. }
         | IrInstr::MethodCall { dst: None, .. }
@@ -792,9 +823,11 @@ fn emit_instruction(
             field_names,
             ty,
         } => match ty {
-            Ty::Named(name) => {
-                let expected_kind = format!("record<{name}>");
-                let Some(declared_fields) = records.get(name) else { return Err(()) };
+            Ty::Named(_) | Ty::Applied(_, _) => {
+                let Some(name) = record_name(ty, records) else { return Err(()) };
+                let base_name = name.split_once("__").map_or(name.as_str(), |(base, _)| base);
+                let expected_kind = format!("record<{base_name}>");
+                let Some(declared_fields) = records.get(&name) else { return Err(()) };
                 if kind != &expected_kind
                     || fields.len() != field_names.len()
                     || fields.len() != declared_fields.len()
@@ -886,7 +919,8 @@ fn emit_instruction(
             _ => return Err(()),
         },
         IrInstr::Field { dst, object, field, ty } => {
-            let Ty::Named(record) = value_ty(values, *object)? else { return Err(()) };
+            let object_ty = value_ty(values, *object)?;
+            let Some(record) = record_name(&object_ty, records) else { return Err(()) };
             if !records.contains_key(&record) || !supported(ty, records) {
                 return Err(());
             }
@@ -896,6 +930,13 @@ fn emit_instruction(
                 value_code(values, *object)?,
                 field
             ));
+        }
+        IrInstr::FieldStore { object, field, value } => {
+            let object_ty = value_ty(values, *object)?;
+            let Some(record) = record_name(&object_ty, records) else { return Err(()) };
+            let value_ty = value_ty(values, *value)?;
+            if !records.get(&record).is_some_and(|fields| fields.iter().any(|name| name == field)) || !scalar(&value_ty) { return Err(()); }
+            out.push_str(&format!("    ({})->{} = {};\n", value_code(values, *object)?, field, value_code(values, *value)?));
         }
         IrInstr::Index { dst, object, index, ty } => {
             let Ty::List(element) = value_ty(values, *object)? else { return Err(()) };
@@ -1128,7 +1169,8 @@ fn emit_instruction(
                         _ => return Err(()),
                     }
                 }
-                Ty::Named(record) if records.contains_key(&record) => {
+                receiver_ty if record_name(&receiver_ty, records).is_some() => {
+                    let record = record_name(&receiver_ty, records).ok_or(())?;
                     let c_name = methods.get(&(record, method.clone())).ok_or(())?;
                     if !supported(ty, records) {
                         return Err(());
@@ -1600,6 +1642,9 @@ fn emit_instruction(
                 Ty::Named(name) if records.contains_key(&name) => {
                     out.push_str(&format!("    ostrin_retain((void*){});\n", value_code(values, *value)?));
                 }
+                Ty::Applied(_, _) if record_name(&ty, records).is_some() => {
+                    out.push_str(&format!("    ostrin_retain((void*){});\n", value_code(values, *value)?));
+                }
                 Ty::Applied(name, args) if name == "Channel" && args.len() == 1 && channel_supported(&args[0], records) => {
                     out.push_str(&format!("    ostrin_retain((void*){});\n", value_code(values, *value)?));
                 }
@@ -1640,6 +1685,9 @@ fn emit_instruction(
                     out.push_str(&format!("    ostrin_release((void*){});\n", value_code(values, *value)?));
                 }
                 Ty::Named(name) if records.contains_key(&name) => {
+                    out.push_str(&format!("    ostrin_release((void*){});\n", value_code(values, *value)?));
+                }
+                Ty::Applied(_, _) if record_name(&ty, records).is_some() => {
                     out.push_str(&format!("    ostrin_release((void*){});\n", value_code(values, *value)?));
                 }
                 Ty::Applied(name, args) if name == "Channel" && args.len() == 1 && channel_supported(&args[0], records) => {
@@ -1832,6 +1880,7 @@ fn used_values(instruction: &IrInstr) -> Vec<ValueId> {
         IrInstr::ClosureMake { captures, .. } => captures.clone(),
         IrInstr::MethodCall { receiver, args, .. } => std::iter::once(*receiver).chain(args.iter().copied()).collect(),
         IrInstr::Field { object, .. } => vec![*object],
+        IrInstr::FieldStore { object, value, .. } => vec![*object, *value],
         IrInstr::Index { object, index, .. } => vec![*object, *index],
         IrInstr::Aggregate { fields, .. } => fields.clone(),
         IrInstr::IterInit { source, .. } => vec![*source],

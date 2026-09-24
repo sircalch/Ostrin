@@ -1,0 +1,22 @@
+record Cursor<T> {
+    value: T
+    mut remaining: Int
+}
+
+impl<T> Iterator<T> for Cursor<T> {
+    fn next(mut self) -> Option<T> {
+        if self.remaining <= 0 {
+            None
+        } else {
+            self.remaining = self.remaining - 1
+            Some(self.value)
+        }
+    }
+}
+
+fn main() -> Void {
+    cursor = Cursor<Int> { value: 7, remaining: 3 }
+    for value in cursor {
+        print(value)
+    }
+}

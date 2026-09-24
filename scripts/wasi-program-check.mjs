@@ -67,6 +67,12 @@ const programs = [
     args: ["native_ir_try_captured_handler.wasm"],
     expected: "VALUE!\nhandled: FAILURE\n",
   },
+  {
+    name: "native_generic_iterator",
+    source: "examples/native_generic_iterator.ostrin",
+    args: ["native_generic_iterator.wasm"],
+    expected: "7\n7\n7\n",
+  },
 ];
 
 function fail(message) {

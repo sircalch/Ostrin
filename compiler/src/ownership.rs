@@ -1135,6 +1135,7 @@ fn defined_value(instruction: &IrInstr) -> Option<(ValueId, Ty)> {
         | IrInstr::MethodCall { dst: Some(dst), ty, .. }
         | IrInstr::Opaque { dst: Some(dst), ty, .. } => Some((*dst, ty.clone())),
         IrInstr::StoreLocal { .. }
+        | IrInstr::FieldStore { .. }
         | IrInstr::Call { dst: None, .. }
         | IrInstr::ClosureCall { dst: None, .. }
         | IrInstr::MethodCall { dst: None, .. }
@@ -1157,6 +1158,7 @@ fn used_values(instruction: &IrInstr) -> Vec<ValueId> {
         IrInstr::ClosureMake { captures, .. } => captures.clone(),
         IrInstr::MethodCall { receiver, args, .. } => std::iter::once(*receiver).chain(args.iter().copied()).collect(),
         IrInstr::Field { object, .. } => vec![*object],
+        IrInstr::FieldStore { object, value, .. } => vec![*object, *value],
         IrInstr::Index { object, index, .. } => vec![*object, *index],
         IrInstr::Aggregate { fields, .. } => fields.clone(),
         IrInstr::IterInit { source, .. } => vec![*source],

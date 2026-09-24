@@ -2301,6 +2301,35 @@ fn native_ir_emitter_handles_user_iterator_protocol() {
 }
 
 #[test]
+fn native_ir_emitter_handles_generic_iterator_protocol() {
+    let file = example_path("native_generic_iterator.ostrin");
+    let expected = "7\n7\n7\n";
+    let interpreted = run(&["--run", &file]);
+    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+    let report = run(&["--native-type-report", &file]);
+    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ir-generated: 2"), "generic iterator did not use IR: {report_text}");
+    assert!(report_text.contains("hir-generated: 0"), "generic iterator fell back to HIR: {report_text}");
+    assert!(report_text.contains("divergences: 0"), "generic iterator diverged: {report_text}");
+    let emitted = run(&["--emit-c", &file]);
+    assert!(emitted.status.success(), "generic iterator IR emission failed: {}", stderr(&emitted));
+    let source = stdout(&emitted);
+    assert!(source.contains("Cursor__Int__next(__ir_v"), "generic iterator call missing from IR C: {source}");
+    assert!(!source.contains("iter_init"), "generic iterator used the legacy ABI: {source}");
+    let exe = temp_artifact("native_ir_generic_iterator.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) { return; }
+    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+    let native = Command::new(&exe).output().expect("failed to run generic iterator IR binary");
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native run failed: {}", String::from_utf8_lossy(&native.stderr));
+    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "generic iterator leaked: {}", String::from_utf8_lossy(&native.stderr));
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+}
+
+#[test]
 fn native_ir_emitter_handles_channel_iterator_protocol() {
     let file = example_path("native_ir_channel_iterator.ostrin");
     let expected = "3\ntrue\n";
@@ -4040,11 +4069,11 @@ fn native_hir_handles_generic_records_and_enums() {
         .lines()
         .find_map(|line| line.strip_prefix("hir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
         .unwrap_or(0);
-    assert!(hir_functions >= 10, "generic record/enum example generated only {hir_functions} HIR functions");
+    assert!(hir_functions >= 8, "generic record/enum example generated only {hir_functions} HIR functions");
 
     let c = run(&["--emit-c", &file]);
     assert!(c.status.success(), "C emission failed: {}", stderr(&c));
-    assert!(stdout(&c).contains("Pair__String_Int* __hir_rec"), "generic record literal did not come from HIR");
+    assert!(stdout(&c).contains("Pair__String_Int* __ir_v"), "generic record literal did not reach the IR C emitter");
 
     let exe = temp_artifact("native_generic_types.exe");
     let compile = run(&["--compile", "--out", &exe, &file]);
@@ -4062,10 +4091,9 @@ fn native_hir_handles_generic_records_and_enums() {
 }
 
 #[test]
-fn native_ir_handles_generic_methods_with_hir_fallback_for_generic_records() {
-    // Generic method instances use the same pending queue as the AST backend.
-    // Scalar/list methods now use IR; the generic-record return remains on the
-    // verified HIR path until record-instance ownership is represented there.
+fn native_ir_handles_generic_methods_with_ir_for_generic_records() {
+    // Generic method instances now lower through the IR pending queue,
+    // including concrete generic-record returns.
     let file = example_path("native_generic_methods.ostrin");
     let report = run(&["--native-type-report", &file]);
     if skip_if_no_c_compiler(&report) {
@@ -4081,12 +4109,12 @@ fn native_ir_handles_generic_methods_with_hir_fallback_for_generic_records() {
         .lines()
         .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
         .unwrap_or(0);
-    assert_eq!(hir_functions, 1, "generic method HIR fallback changed unexpectedly: {report_text}");
+    assert_eq!(hir_functions, 0, "generic method unexpectedly fell back to HIR: {report_text}");
     assert!(ir_functions >= 5, "generic method example generated only {ir_functions} IR functions: {report_text}");
 
     let c = run(&["--emit-c", &file]);
     assert!(c.status.success(), "C emission failed: {}", stderr(&c));
-    assert!(stdout(&c).contains("Box__String* __hir_rec"), "generic method record return did not come from HIR");
+    assert!(stdout(&c).contains("Box__String* __ir_v"), "generic method record return did not come from IR");
 
     let expected = run(&["--run", &file]);
     assert!(expected.status.success(), "interpreter failed: {}", stderr(&expected));

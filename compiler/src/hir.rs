@@ -21,10 +21,15 @@ pub struct HirProgram {
     /// Parameter count of every user function and every enum variant constructor: after
     /// lowering, a call to one of these carries exactly this many positional arguments.
     pub arities: std::collections::HashMap<String, usize>,
-    /// Element type yielded by each concrete user-defined `Iterator<T>` impl.
-    /// The IR uses this metadata to lower `for` without re-inferring the
-    /// protocol from the AST.
-    pub iterator_items: HashMap<String, Ty>,
+    /// Receiver pattern and element type for each user-defined `Iterator<T>` impl.
+    /// Generic receiver patterns are specialized at the IR boundary.
+    pub iterator_items: HashMap<String, IteratorInfo>,
+}
+
+#[derive(Debug, Clone)]
+pub struct IteratorInfo {
+    pub receiver_args: Vec<Ty>,
+    pub element: Ty,
 }
 
 #[derive(Debug, Clone)]
@@ -478,14 +483,35 @@ pub fn lower<'a>(items: &'a [Item], typed: &'a TypedProgram) -> HirProgram {
     let iterator_items = items
         .iter()
         .filter_map(|item| match item {
-            Item::Impl(im) if im.trait_name.as_deref() == Some("Iterator") => im
-                .trait_args
-                .first()
-                .map(|item| (im.type_name.clone(), crate::typeck::resolve_type(item))),
+            Item::Impl(im) if im.trait_name.as_deref() == Some("Iterator") => im.trait_args.first().map(|element| {
+                let generic_names: HashSet<String> = im.generics.iter().map(|generic| generic.name.clone()).collect();
+                (
+                    im.type_name.clone(),
+                    IteratorInfo {
+                        receiver_args: im.type_args.iter().map(|ty| iterator_type(ty, &generic_names)).collect(),
+                        element: iterator_type(element, &generic_names),
+                    },
+                )
+            }),
             _ => None,
         })
         .collect();
     HirProgram { functions, arities, iterator_items }
+}
+
+fn iterator_type(ty: &Type, generic_names: &HashSet<String>) -> Ty {
+    fn replace(ty: Ty, generic_names: &HashSet<String>) -> Ty {
+        match ty {
+            Ty::Named(name) if generic_names.contains(&name) => Ty::Generic(name),
+            Ty::List(inner) => Ty::List(Box::new(replace(*inner, generic_names))),
+            Ty::Set(inner) => Ty::Set(Box::new(replace(*inner, generic_names))),
+            Ty::Map(key, value) => Ty::Map(Box::new(replace(*key, generic_names)), Box::new(replace(*value, generic_names))),
+            Ty::Applied(name, args) => Ty::Applied(name, args.into_iter().map(|arg| replace(arg, generic_names)).collect()),
+            Ty::Fn(params, ret) => Ty::Fn(params.into_iter().map(|param| replace(param, generic_names)).collect(), Box::new(replace(*ret, generic_names))),
+            other => other,
+        }
+    }
+    replace(crate::typeck::resolve_type(ty), generic_names)
 }
 
 /// Creates the concrete HIR body of one monomorphized generic function.

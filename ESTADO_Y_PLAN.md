@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-23 · rama `main` · 6 pruebas diferenciales, 199 de integración y 2 unitarias en verde.*
+*Corte: 2026-09-23 · rama `main` · 6 pruebas diferenciales, 200 de integración y 2 unitarias en verde.*
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
 Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–250); para el diseño
@@ -31,7 +31,7 @@ Implementación: compilador + intérprete + herramientas de editor, todo en Rust
 | Léxico / parser | `lexer/`, `parser/mod.rs` | Tokens, AST con rangos de origen |
 | Módulos y paquetes | `modules.rs`, `package.rs`, `ostrin.toml` | Imports, `--project`, grafo transitivo de dependencias y lockfile portable |
 | Verificador de tipos | `typeck/mod.rs` (~3 500 l.) | Tipos, dimensiones, traits, exhaustividad, genéricos |
-| HIR/IR | `hir.rs`, `hir_c.rs`, `ir.rs`, `ir_c.rs` | HIR verificado, CFG con temporales explícitos y emisor C para escalares, `String`, `Result<Int, String>`/`Result<Float, String>` con `try`, `try catch` inline, handlers globales, aliases locales y handlers locales capturados compatibles, wrappers `Option`/`Result` sobre `List`, `Map` y `Set` con payload gestionado, `Result<String, String>`/`Result<Void, String>` de E/S de archivos, records concretos, iteradores de records concretos (`next() -> Option<T>`), iteración de canales mediante `receive() -> Option<T>`, `spawn {}` con CFG y capturas inmutables, `spawn_scope {}` inline con grupos nativos, `Task.join()` y `Task.cancel()` tipados, `Option<Record>`, listas escalares, mapas/conjuntos escalares, enteros de ancho fijo y control de flujo, con fallback HIR/AST acotado |
+| HIR/IR | `hir.rs`, `hir_c.rs`, `ir.rs`, `ir_c.rs` | HIR verificado, CFG con temporales explícitos y emisor C para escalares, `String`, `Result<Int, String>`/`Result<Float, String>` con `try`, `try catch` inline, handlers globales, aliases locales y handlers locales capturados compatibles, wrappers `Option`/`Result` sobre `List`, `Map` y `Set` con payload gestionado, `Result<String, String>`/`Result<Void, String>` de E/S de archivos, records concretos y records genéricos monomorfizados, iteradores de records concretos (`next() -> Option<T>`), iteradores genéricos monomorfizados (`Cursor<Int>`), iteración de canales mediante `receive() -> Option<T>`, `spawn {}` con CFG y capturas inmutables, `spawn_scope {}` inline con grupos nativos, `Task.join()` y `Task.cancel()` tipados, `Option<Record>`, listas escalares, mapas/conjuntos escalares, enteros de ancho fijo y control de flujo, con fallback HIR/AST acotado |
 | Intérprete | `interpreter/mod.rs` | Ejecución tree‑walking y scheduler cooperativo; referencia semántica |
 | Servidor de lenguaje | `lsp.rs`, `symbols.rs`, `protocol.rs` | LSP sobre stdio |
 | Adaptador de depuración | `dap.rs` + hooks del intérprete | DAP sobre stdio |
@@ -136,10 +136,10 @@ escalar o `String` también se consumen al generar C; `Map.get/remove` producen 
 `Option_<T>` por valor y retienen/transfieren sus strings correctamente. Los `for` sobre rangos
 enteros también se bajan a CFG con dirección derivada del signo del paso: `to`/`until`, pasos
 positivos/negativos y paso cero conservan la semántica del intérprete, incluyendo `break`/`continue`.
-Agregados complejos, iteradores propios genéricos o indirectos, tareas anidadas dentro de `spawn`,
+Agregados complejos, iteradores propios indirectos, tareas anidadas dentro de `spawn`,
 `spawn_scope` y patrones distintos de `Some/None` y
 payloads gestionados que no sean `String` caen de forma verificable a HIR y después al AST. Los
-iteradores de records concretos con `Iterator<T>` y `next() -> Option<T>` ya cruzan la IR, incluida
+iteradores de records concretos y genéricos monomorfizados con `Iterator<T>` y `next() -> Option<T>` ya cruzan la IR, incluida
 la llamada de método nativa y la liberación del record iterador. Los canales sin spawn también cruzan
 la IR con `send`, `close`, `receive` y `for`, incluida la liberación del handle al último uso.
 Las instancias concretas de funciones y métodos genéricos pasan ahora por especialización,
@@ -303,7 +303,7 @@ CI de GitHub con matriz Windows/Linux/macOS, binarios de release.
 ### E. Backends adicionales
 El compilador, un programa Ostrin independiente y un proyecto con dependencia `path` ya se
 construyen como `wasm32-wasip1` mediante el workflow WASI, con toolchain fijado, ejecución bajo
-Node WASI y checksums reproducibles. La matriz de ocho programas también compila y ejecuta un
+Node WASI y checksums reproducibles. La matriz de nueve programas también compila y ejecuta un
 contrato real de `args`/`env`, E/S de archivos, ownership gestionado y consumidores anidados
 `Option`/`Result`; un script único captura stdout/stderr,
 compara salidas exactas y limpia los artefactos temporales. La compilación usa el triple vigente
@@ -360,7 +360,7 @@ Decisiones que necesito de ti para afinar el plan:
 
 ```powershell
 cd compiler
-    cargo test                                   # 6 diferenciales + 199 de integración + 2 unitarias
+    cargo test                                   # 6 diferenciales + 200 de integración + 2 unitarias
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```

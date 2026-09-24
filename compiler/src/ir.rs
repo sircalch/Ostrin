@@ -13,7 +13,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
 
 use crate::ast::{BinOp, RangeKind, UnaryOp};
-use crate::hir::{HirBlock, HirExpr, HirFunction, HirKind, HirProgram, HirStmt};
+use crate::hir::{HirBlock, HirExpr, HirFunction, HirKind, HirProgram, HirStmt, IteratorInfo};
 use crate::types::Ty;
 
 pub type ValueId = usize;
@@ -133,6 +133,7 @@ pub enum IrInstr {
         field: String,
         ty: Ty,
     },
+    FieldStore { object: ValueId, field: String, value: ValueId },
     Index {
         dst: ValueId,
         object: ValueId,
@@ -271,7 +272,7 @@ struct Builder {
     current: BlockId,
     next_value: ValueId,
     locals: Vec<HashMap<String, ValueId>>,
-    iterator_items: HashMap<String, Ty>,
+    iterator_items: HashMap<String, IteratorInfo>,
     function_globals: HashMap<ValueId, String>,
     break_targets: Vec<(BlockId, BlockId, usize)>,
     loop_edges: Vec<LoopEdges>,
@@ -282,7 +283,7 @@ struct Builder {
 }
 
 impl Builder {
-    fn new(function: &HirFunction, iterator_items: &HashMap<String, Ty>) -> Self {
+    fn new(function: &HirFunction, iterator_items: &HashMap<String, IteratorInfo>) -> Self {
         let entry = IrBlock {
             id: 0,
             instructions: Vec::new(),
@@ -578,14 +579,14 @@ impl Builder {
                 self.bind(name, value);
             }
             HirStmt::FieldAssign { target, value } => {
-                let target = self.lower_expr(target);
                 let value = self.lower_expr(value);
-                self.emit(IrInstr::Opaque {
-                    dst: None,
-                    op: "field_assign".to_string(),
-                    inputs: vec![target, value],
-                    ty: Ty::Void,
-                });
+                if let HirKind::Field(object, field) = &target.kind {
+                    let object = self.lower_expr(object);
+                    self.emit(IrInstr::FieldStore { object, field: field.clone(), value });
+                } else {
+                    let target = self.lower_expr(target);
+                    self.emit(IrInstr::Opaque { dst: None, op: "field_assign".to_string(), inputs: vec![target, value], ty: Ty::Void });
+                }
             }
             HirStmt::Return(value) => {
                 let value = value.as_ref().map(|value| self.lower_expr(value));
@@ -1078,10 +1079,16 @@ impl Builder {
     }
 
     fn iterator_element_type(&self, ty: &Ty) -> Option<Ty> {
-        match ty {
-            Ty::Named(name) | Ty::Applied(name, _) => self.iterator_items.get(name).cloned(),
-            _ => None,
-        }
+        let (name, actual_args) = match ty {
+            Ty::Named(name) => (name, Vec::new()),
+            Ty::Applied(name, args) => (name, args.clone()),
+            _ => return None,
+        };
+        let info = self.iterator_items.get(name)?;
+        if info.receiver_args.len() != actual_args.len() { return None; }
+        let mut substitutions = HashMap::new();
+        if !match_iterator_type(&info.receiver_args, &actual_args, &mut substitutions) { return None; }
+        Some(substitute_iterator_type(&info.element, &substitutions))
     }
 
     /// Lowers a source whose iteration protocol yields `Option<T>` into an
@@ -2318,6 +2325,7 @@ fn defined_value_type(instruction: &IrInstr) -> Option<(ValueId, Ty)> {
             dst: Some(dst), ty, ..
         } => Some((*dst, ty.clone())),
         IrInstr::StoreLocal { .. }
+        | IrInstr::FieldStore { .. }
         | IrInstr::Call { dst: None, .. }
         | IrInstr::ClosureCall { dst: None, .. }
         | IrInstr::MethodCall { dst: None, .. }
@@ -2345,7 +2353,7 @@ pub fn lower(program: &HirProgram) -> IrProgram {
     }
 }
 
-fn lower_function(function: &HirFunction, iterator_items: &HashMap<String, Ty>) -> IrFunction {
+fn lower_function(function: &HirFunction, iterator_items: &HashMap<String, IteratorInfo>) -> IrFunction {
     let mut builder = Builder::new(function, iterator_items);
     for (index, (name, ty)) in function.params.iter().enumerate() {
         let value = builder.fresh();
@@ -2367,6 +2375,36 @@ fn lower_function(function: &HirFunction, iterator_items: &HashMap<String, Ty>) 
         }
     }
     builder.function
+}
+
+fn match_iterator_type(patterns: &[Ty], actuals: &[Ty], substitutions: &mut HashMap<String, Ty>) -> bool {
+    patterns.iter().zip(actuals).all(|(pattern, actual)| match_iterator_type_one(pattern, actual, substitutions))
+}
+
+fn match_iterator_type_one(pattern: &Ty, actual: &Ty, substitutions: &mut HashMap<String, Ty>) -> bool {
+    match (pattern, actual) {
+        (Ty::Generic(name), actual) => match substitutions.get(name) {
+            Some(bound) => bound == actual,
+            None => { substitutions.insert(name.clone(), actual.clone()); true }
+        },
+        (Ty::Applied(a, aa), Ty::Applied(b, ba)) => a == b && aa.len() == ba.len() && match_iterator_type(aa, ba, substitutions),
+        (Ty::List(a), Ty::List(b)) | (Ty::Set(a), Ty::Set(b)) => match_iterator_type_one(a, b, substitutions),
+        (Ty::Map(ak, av), Ty::Map(bk, bv)) => match_iterator_type_one(ak, bk, substitutions) && match_iterator_type_one(av, bv, substitutions),
+        (Ty::Fn(ap, ar), Ty::Fn(bp, br)) => ap.len() == bp.len() && match_iterator_type(ap, bp, substitutions) && match_iterator_type_one(ar, br, substitutions),
+        (a, b) => a == b,
+    }
+}
+
+fn substitute_iterator_type(ty: &Ty, substitutions: &HashMap<String, Ty>) -> Ty {
+    match ty {
+        Ty::Generic(name) => substitutions.get(name).cloned().unwrap_or_else(|| ty.clone()),
+        Ty::List(inner) => Ty::List(Box::new(substitute_iterator_type(inner, substitutions))),
+        Ty::Set(inner) => Ty::Set(Box::new(substitute_iterator_type(inner, substitutions))),
+        Ty::Map(key, value) => Ty::Map(Box::new(substitute_iterator_type(key, substitutions)), Box::new(substitute_iterator_type(value, substitutions))),
+        Ty::Applied(name, args) => Ty::Applied(name.clone(), args.iter().map(|arg| substitute_iterator_type(arg, substitutions)).collect()),
+        Ty::Fn(params, ret) => Ty::Fn(params.iter().map(|param| substitute_iterator_type(param, substitutions)).collect(), Box::new(substitute_iterator_type(ret, substitutions))),
+        _ => ty.clone(),
+    }
 }
 
 fn collect_lambda_locals_block(
@@ -2701,6 +2739,7 @@ fn display_instruction(instruction: &IrInstr) -> String {
         IrInstr::Field {
             dst, object, field, ..
         } => format!("%{dst} = field %{object}.{field}"),
+        IrInstr::FieldStore { object, field, value } => format!("field_store %{object}.{field} <- %{value}"),
         IrInstr::Index {
             dst, object, index, ..
         } => format!("%{dst} = index %{object}[%{index}]"),

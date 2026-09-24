@@ -3,6 +3,12 @@
 ## Unreleased
 
 ### Compiler and ownership
+- Lowered monomorphized generic record iterators through IR/C. `HirProgram` now preserves
+  the receiver pattern for `impl<T> Iterator<T> for Cursor<T>`, the IR specializes `T` from
+  `Cursor<Int>`, and the C emitter resolves `Cursor__Int` fields and `next()` calls. The new
+  regression requires exact interpreter/native parity, two IR-generated functions, no HIR
+  fallback or type divergences, and `live_allocations=0`; indirect iterators and managed field
+  stores remain conservative fallback cases.
 - Lowered compatible local `try ... catch` handlers held in captured closures through `ClosureCall`.
   The handler keeps its typed environment and managed captures instead of being mistaken for the
   mapped error value; `native_ir_try_captured_handler.ostrin` checks interpreter/native parity,
