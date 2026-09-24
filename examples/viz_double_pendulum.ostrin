@@ -1,0 +1,44 @@
+// A chaotic double pendulum, integrated by std.numeric.rk45 and animated by std.viz.
+// Every position is computed in Ostrin; the SVG only interpolates between them.
+import std.numeric
+import std.viz
+
+fn swing(t: Float, y: Array<Float>) -> Array<Float> {
+    // y = [θ1, θ2, ω1, ω2]; equal masses and rods (1 kg, 1 m), g = 9.81 m/s².
+    g = 9.81
+    d = y[0] - y[1]
+    den = 3.0 - cos(2.0 * d)
+    a1 = (0.0 - 3.0 * g * sin(y[0]) - g * sin(y[0] - 2.0 * y[1]) - 2.0 * sin(d) * (y[3] * y[3] + y[2] * y[2] * cos(d))) / den
+    a2 = 2.0 * sin(d) * (2.0 * y[2] * y[2] + 2.0 * g * cos(y[0]) + y[3] * y[3] * cos(d)) / den
+    array([y[2], y[3], a1, a2])
+}
+
+/// Energy per unit mass: kinetic + potential (it should stay constant).
+fn energy(y: Array<Float>) -> Float {
+    g = 9.81
+    y[2] * y[2] + 0.5 * y[3] * y[3] + y[2] * y[3] * cos(y[0] - y[1]) - 2.0 * g * cos(y[0]) - g * cos(y[1])
+}
+
+fn main() -> Void {
+    seconds = 12.0
+    sol = numeric.rk45(swing, array([2.2, 2.6, 0.0, 0.0]), 0.0, seconds, tol: 1e-10)
+    // Resample at 60 samples per second so the animation runs in real time.
+    t = linspace(0.0, seconds, 721)
+    th1 = numeric.interp_all(sol.t, sol.component(0), t)
+    th2 = numeric.interp_all(sol.t, sol.component(1), t)
+    x1 = sin(th1)
+    y1 = cos(th1) * -1.0
+    x2 = x1 + sin(th2)
+    y2 = y1 - cos(th2)
+    drift = abs(energy(sol.final_state()) - energy(array([2.2, 2.6, 0.0, 0.0])))
+    print("rk45 steps: " + sol.length().to_string() + ", energy drift below 1e-6: " + (drift < 0.000001).to_string())
+    fig = viz.figure("Double pendulum").describe("θ1 = 2.2, θ2 = 2.6 rad at rest · rk45, tol 1e-10 · 12 s in real time")
+        .size(560, 560).xlim(-2.2, 2.2).ylim(-2.2, 2.2).labels("x [m]", "y [m]").no_legend()
+        .animate(seconds)
+        .rod(0.0, 0.0, x1, y1, color: "#475569")
+        .moving_segment(x1, y1, x2, y2, color: "#475569")
+        .moving_point(x1, y1, color: "#2563eb", size: 8.0, trail: false)
+        .moving_point(x2, y2, color: "#dc2626", size: 8.0)
+        .scatter(array([0.0]), array([0.0]), size: 4.0, color: "#0f172a")
+    print(fig.svg())
+}

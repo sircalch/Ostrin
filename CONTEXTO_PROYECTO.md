@@ -6732,3 +6732,16 @@ Destapó que los genéricos `X: Dimension` solo se enlazaban cuando el parámetr
 E1042 (`unit_generic_errors.ostrin`). Paridad intérprete/nativo en `numeric_units`. En la revisión de
 #3, Codex marcó como P1 que `step-end` dejaría la animación en blanco; no se reproduce (opacidad
 calculada en Chromium: un único fotograma visible, el correcto, en cada instante).
+
+## 280. Animaciones de movimiento continuo — 2026-09-24
+
+`viz.animate` (fotogramas) cambiaba de imagen; ahora las figuras animan el movimiento que calcula el
+programa (documento 23 §4.2): `animate(s)`, `moving_point` con estela, `rod`, `moving_segment`,
+`morph` y `no_axes`, interpolados por SMIL. La estela usa `pathLength` y un `stroke-dashoffset` que
+sigue la distancia recorrida, no el tiempo. Ejemplos con física verificable: doble péndulo (energía
+conservada < 1e-6 con rk45 a tol 1e-10), órbitas de Kepler y cuerda pulsada (a media período la
+forma es la reflejada: -0.08 en x = 0.2). La pestaña ODE del Lab es ahora péndulo + retrato de fase
+animados. Hallazgos: `[]` dentro de un `if` no compila en nativo (el tipo del elemento no se infiere;
+se usa una variable tipada); en Chromium los `<svg>` anidados tienen reloj propio, así que las
+capturas por tiempo deben fijar `setCurrentTime` en cada uno; y el intérprete entraba en pánico
+al cerrarse la tubería de salida (`| head`), ahora termina con código 0.

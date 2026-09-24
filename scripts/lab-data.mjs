@@ -55,7 +55,7 @@ export const LAB = [
   {
     id: "ode",
     title: "ODE",
-    headline: "A driven pendulum, integrated by Ostrin.",
+    headline: "A driven pendulum, integrated and animated by Ostrin.",
     file: "examples/lab_ode.ostrin",
     render: "svg",
     params: [
@@ -63,9 +63,9 @@ export const LAB = [
       { name: "drive", label: "Drive amplitude", min: 0, max: 1.6, step: 0.1 },
       { name: "start_angle", label: "Start angle (rad)", min: -3, max: 3, step: 0.1 },
     ],
-    how: "std.numeric.rk45, an adaptive Dormand–Prince integrator written in Ostrin, solves θ'' = −c θ' − sin θ + A cos(0.8 t) with a lambda that captures the three parameters; it picks its own step sizes to keep the local error under 1e-8. std.viz then draws the phase portrait (θ, ω).",
+    how: "std.numeric.rk45, an adaptive Dormand–Prince integrator written in Ostrin, solves θ'' = −c θ' − sin θ + A cos(0.8 t) with a lambda that captures the three parameters. interp_all resamples the solution at 25 points per second, and std.viz turns them into an animation: the pendulum swings on the left while the phase portrait (θ, ω) draws itself on the right. The browser only interpolates between positions Ostrin computed (SVG <animate>, no scripts).",
     docs: { label: "std.numeric source", href: `${repository}/blob/main/compiler/std/numeric.ostrin` },
-    limits: "Explicit solvers only (rk4, rk45): stiff systems need an implicit method, which is planned. There are no event detection or dense output yet.",
+    limits: "Explicit solvers only (rk4, rk45): stiff systems need an implicit method, which is planned. Animations loop; there is no scrubbing or play-once control yet.",
   },
   {
     id: "linear-algebra",
@@ -173,6 +173,9 @@ export const GALLERY = [
   { id: "ode", title: "Adaptive ODE solver", file: "examples/viz_ode.ostrin", blurb: "A pendulum solved with std.numeric.rk45: angle over time and the phase portrait, side by side." },
   { id: "fft", title: "Spectrum with the FFT", file: "examples/viz_fft.ostrin", blurb: "A noisy two-tone signal and its amplitude spectrum from std.numeric.fft: peaks at 50 Hz and 120 Hz." },
   { id: "spline", title: "Cubic spline", file: "examples/viz_spline.ostrin", blurb: "Eight measurements, a natural cubic spline through them and the area under it by Simpson's rule." },
+  { id: "double-pendulum", title: "Double pendulum (animated)", file: "examples/viz_double_pendulum.ostrin", blurb: "Chaos in real time: rk45 integrates 12 s with energy conserved to 1e-6, and the rods and masses move smoothly with SVG <animate>." },
+  { id: "orbits", title: "Kepler orbits (animated)", file: "examples/viz_orbits.ostrin", blurb: "Earth, Mars and a comet around the Sun; the comet visibly speeds up at perihelion, as Kepler's second law says." },
+  { id: "string", title: "Plucked string (animated)", file: "examples/viz_string.ostrin", blurb: "25 standing waves summed in Ostrin; viz.morph animates the curve's shape through one period." },
   { id: "animation", title: "Animation", file: "examples/viz_animation.ostrin", blurb: "24 frames of a spreading wave packet, combined by viz.animate into one SVG that loops with CSS alone." },
   { id: "dashboard", title: "Multi-panel layout", file: "examples/viz_dashboard.ostrin", blurb: "Four figures, 2D and 3D, composed with viz.grid into one SVG." },
 ];

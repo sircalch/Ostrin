@@ -2436,7 +2436,17 @@ impl Interpreter {
                     let v = self.eval_arg(&args[0], env)?;
                     match &mut self.debugger {
                         Some(dbg) => dbg.send_output(&format!("{v}\n")),
-                        None => println!("{v}"),
+                        None => {
+                            use std::io::Write;
+                            // A closed pipe (`ostrinc --run prog | head`) ends the
+                            // program quietly, as a native binary does.
+                            if let Err(err) = writeln!(std::io::stdout(), "{v}") {
+                                if err.kind() == std::io::ErrorKind::BrokenPipe {
+                                    std::process::exit(0);
+                                }
+                                return Err(RuntimeError::Error(format!("cannot write to standard output: {err}")));
+                            }
+                        }
                     }
                     return Ok(Value::Void);
                 }

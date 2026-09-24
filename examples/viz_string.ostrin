@@ -1,0 +1,36 @@
+// A plucked string: the sum of its first 25 standing waves, computed in Ostrin.
+// viz.morph animates the curve itself; the SVG interpolates between 91 shapes.
+import std.viz
+
+/// Displacement of a string of length 1 plucked at `at` to height h, after t periods.
+fn shape(xs: Array<Float>, at: Float, h: Float, t: Float) -> Array<Float> {
+    mut y = xs * 0.0
+    for n in 1 to 25 {
+        k = (n as Float) * pi()
+        // Fourier coefficient of the triangular initial shape.
+        b = 2.0 * h * sin(k * at) / (k * k * at * (1.0 - at))
+        y = y + sin(xs * k) * (b * cos(2.0 * pi() * (n as Float) * t))
+    }
+    y
+}
+
+fn main() -> Void {
+    xs = linspace(0.0, 1.0, 81)
+    steps = 90
+    mut rows: List<Float> = []
+    for i in 0 until steps + 1 {
+        frame = shape(xs, 0.2, 0.3, (i as Float) / (steps as Float))
+        for j in 0 until xs.length() {
+            rows.push(frame[j])
+        }
+    }
+    frames = array(rows).reshape([steps + 1, xs.length()])
+    start = shape(xs, 0.2, 0.3, 0.0)
+    print("height at the pluck: " + viz.num(start[16]) + ", half a period later: " + viz.num(shape(xs, 0.2, 0.3, 0.5)[16]))
+    fig = viz.figure("Plucked string").describe("25 standing waves summed in Ostrin · one period, looping")
+        .size(640, 360).ylim(-0.4, 0.4).labels("position along the string", "displacement").no_legend()
+        .animate(4.0)
+        .line(xs, start, color: "#cbd5e1", width: 1.2, dash: "4 4")
+        .morph(xs, frames, label: "string", color: "#0f766e", width: 3.0)
+    print(fig.svg())
+}
