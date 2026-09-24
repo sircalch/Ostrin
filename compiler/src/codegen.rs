@@ -4828,7 +4828,21 @@ impl<'a> Codegen<'a> {
         }
         if lt == CType::Str || rt == CType::Str {
             return match op {
-                BinOp::Add if lt == CType::Str && rt == CType::Str => Ok((format!("ostrin_str_concat({lc}, {rc})"), CType::Str)),
+                BinOp::Add if lt == CType::Str && rt == CType::Str => {
+                    // A fresh operand (a concatenation or a call's result) is released once
+                    // it has been copied; literals and named values are borrowed.
+                    let (lf, rf) = (owned_call_argument(l, &lt), owned_call_argument(r, &rt));
+                    if !lf && !rf {
+                        return Ok((format!("ostrin_str_concat({lc}, {rc})"), CType::Str));
+                    }
+                    let (a, b, joined) = (self.next_temp(), self.next_temp(), self.next_temp());
+                    let release_a = if lf { format!("ostrin_release((void*){a}); ") } else { String::new() };
+                    let release_b = if rf { format!("ostrin_release((void*){b}); ") } else { String::new() };
+                    Ok((
+                        format!("({{ const char* {a} = {lc}; const char* {b} = {rc}; const char* {joined} = ostrin_str_concat({a}, {b}); {release_a}{release_b}{joined}; }})"),
+                        CType::Str,
+                    ))
+                }
                 BinOp::Eq if lt == CType::Str && rt == CType::Str => Ok((format!("(strcmp({lc}, {rc}) == 0)"), CType::Bool)),
                 BinOp::NotEq if lt == CType::Str && rt == CType::Str => Ok((format!("(strcmp({lc}, {rc}) != 0)"), CType::Bool)),
                 BinOp::Lt | BinOp::Gt | BinOp::LtEq | BinOp::GtEq if lt == CType::Str && rt == CType::Str => {

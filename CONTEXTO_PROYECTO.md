@@ -3660,7 +3660,8 @@ Cobertura: 43 funciones y métodos de los ejemplos (36 antes); ratchet ≥ 40; t
 
 **Herramientas útiles:** `OSTRIN_HIR_DEBUG=1 ostrinc --emit-c f.ostrin` (qué funciones van por HIR), `OSTRIN_NO_HIR_CODEGEN=1` (fuerza AST), `--native-type-report`, `--typed-report`, `--hir`.
 
-**Trampas conocidas:** editar con scripts Python en el scratchpad (los heredocs de bash rompen comillas/backslashes); los `.rs` del repo usan CRLF (normalizar al editar); sintaxis: `and/or/not`, sin `let`, `match` con comas, sin `` hasta la sección 111; un ejemplo nuevo no debe pisar uno existente (`native_strings.ostrin` ya existía); los `ostrin.lock` de ejemplos se ignoran por `.gitignore`.
+**Trampas conocidas:** editar con scripts Python en el scratchpad (los heredocs de bash rompen comillas/backslashes); los `.rs` del repo usan CRLF (normalizar al editar); sintaxis: `and/or/not`, sin `let`, `match` con comas, sin `
+` hasta la sección 111; un ejemplo nuevo no debe pisar uno existente (`native_strings.ostrin` ya existía); los `ostrin.lock` de ejemplos se ignoran por `.gitignore`.
 
 **Pendientes de producto (no empezados):** concurrencia real, gestión de memoria en nativo (hoy `malloc` sin liberar), LU/QR/SVD, autovectores, histograma/barras en `plot`, `Array` de más tipos, WASM/playground, instalador y binarios.
 
@@ -6651,5 +6652,7 @@ diferencial). Web: `viz.html` con diez figuras grabadas por `ostrinc.wasm` en `w
 3D en el Lab; sección Visualization en la home. `lab-data.mjs` ejecuta cada programa en un proceso
 Node propio: muchas instancias WASM pesadas en un solo proceso hacían caer a Node. Suite: 2
 unitarias, 6 diferenciales, 210 de integración; 7 pruebas Playwright en verde (localmente con el
-shim WASI servido por `page.route`). Pendiente: fugas de concatenaciones anidadas de `String` en el
-emisor HIR (la salida es correcta), interacción, animación, PNG/PDF y WebGPU.
+shim WASI servido por `page.route`). Después, `+` entre `String` libera los operandos frescos
+(concatenaciones y resultados de llamadas) en los emisores AST y HIR: la galería nativa pasa de
+233 855 a 18 652 asignaciones vivas al salir, con salida idéntica. Pendiente: argumentos `String`
+frescos pasados a funciones y a `push`, interacción, animación, PNG/PDF y WebGPU.

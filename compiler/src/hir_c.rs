@@ -1087,7 +1087,18 @@ impl Emitter<'_> {
                 if l.ty == Ty::String || r.ty == Ty::String {
                     return match op {
                         BinOp::Add if l.ty == Ty::String && r.ty == Ty::String => {
-                            Ok(format!("ostrin_str_concat({lc}, {rc})"))
+                            // A fresh operand (another concatenation or a call's result)
+                            // is released once it has been copied into the new string.
+                            let (lf, rf) = (fresh_string(l), fresh_string(r));
+                            if !lf && !rf {
+                                return Ok(format!("ostrin_str_concat({lc}, {rc})"));
+                            }
+                            let (a, b, out) = (self.next_temp(), self.next_temp(), self.next_temp());
+                            let release_a = if lf { format!("ostrin_release((void*){a}); ") } else { String::new() };
+                            let release_b = if rf { format!("ostrin_release((void*){b}); ") } else { String::new() };
+                            Ok(format!(
+                                "({{ const char* {a} = {lc}; const char* {b} = {rc}; const char* {out} = ostrin_str_concat({a}, {b}); {release_a}{release_b}{out}; }})"
+                            ))
                         }
                         BinOp::Eq if l.ty == r.ty => Ok(format!("(strcmp({lc}, {rc}) == 0)")),
                         BinOp::NotEq if l.ty == r.ty => Ok(format!("(strcmp({lc}, {rc}) != 0)")),
@@ -2208,4 +2219,14 @@ fn result_types(ty: &Ty) -> Bail<(Ty, Ty)> {
     (name == "Result" && args.len() == 2)
         .then(|| (args[0].clone(), args[1].clone()))
         .ok_or(())
+}
+
+/// A `String` expression whose value the caller owns: a concatenation or the
+/// result of a call (functions and string methods return a new reference).
+fn fresh_string(e: &HirExpr) -> bool {
+    e.ty == Ty::String
+        && matches!(
+            &e.kind,
+            HirKind::Binary(BinOp::Add, ..) | HirKind::Call { .. } | HirKind::MethodCall { .. }
+        )
 }

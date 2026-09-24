@@ -37,6 +37,9 @@
 - Native: an owned expression statement was emitted twice (`c.add(1).add(2)` ran each call twice);
   fresh receivers and arguments of method calls are released; an assignment inside a loop or branch
   retains and releases like one at function level (it used to alias a freed value).
+- Native: fresh `String` operands of `+` (nested concatenations, call results) are released after
+  the copy, in the AST and HIR emitters. Rendering the Viz gallery natively went from 233 855 to
+  18 652 live allocations at exit, with byte-identical output.
 - Generic methods infer dimension parameters (`Quantity<X>`), empty `[]` in a record field takes
   the field's type, and `String.slice`/`char_at`/`codepoint` are typed. The HIR and typed-expression
   ratchets drop from 26 and 11 to 19 and 8 unknowns.

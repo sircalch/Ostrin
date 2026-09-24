@@ -124,5 +124,5 @@ la falta de literales científicos (`1e-9`). Ver `CONTEXTO_PROYECTO.md` §270–
 | — | gráficas con incertidumbre cuando exista `Measurement<T>` |
 
 Límites actuales: renderizado SVG en CPU, cómodo hasta unos miles de triángulos; los SVG 3D grandes
-pesan cientos de kB; el emisor nativo aún pierde memoria de cadenas intermedias al construir el SVG
-(no afecta a la salida).
+pesan cientos de kB; el emisor nativo aún retiene algunos argumentos `String` frescos al construir
+el SVG (~18 k asignaciones vivas al salir en la galería completa; no afecta a la salida).
