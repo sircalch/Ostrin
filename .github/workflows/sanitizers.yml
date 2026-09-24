@@ -34,7 +34,7 @@ jobs:
           OSTRIN_FUZZ_ROUNDS: "8"
         run: cargo test --manifest-path compiler/Cargo.toml --test differential -- --skip every_example_agrees_between_interpreter_and_native
   undefined:
-    name: UBSan native smoke tests
+    name: UBSan native suite
     runs-on: ubuntu-latest
     env:
       OSTRIN_CC: clang
@@ -48,16 +48,5 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Install Clang
         run: sudo apt-get update && sudo apt-get install --yes clang
-      - name: Run supported UBSan smoke programs
-        shell: bash
-        run: |
-          set -euo pipefail
-          for test_name in \
-            native_backend_compiles_and_runs_fibonacci \
-            native_backend_compiles_and_runs_strings_and_booleans \
-            native_ir_emitter_handles_scalar_functions \
-            native_ir_emitter_handles_checked_fixed_width_arithmetic \
-            native_ir_emitter_handles_task_cancel
-          do
-            cargo test --manifest-path compiler/Cargo.toml --test examples "$test_name" -- --exact --test-threads=1
-          done
+      - name: Run native examples under UBSan
+        run: cargo test --manifest-path compiler/Cargo.toml --test examples -- --test-threads=1
