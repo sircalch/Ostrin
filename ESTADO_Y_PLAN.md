@@ -154,9 +154,11 @@ entera, aritmética comprobada de enteros de ancho fijo, concatenación/comparac
 de texto y salida numérica, emiten ramas, recursión, bucles con estado y `phi`, y se cuentan
 por separado en `--native-type-report` como `ir-generated`; el mismo informe expone ahora
 `hir-generated` y `ast-fallback` para que la retirada del backend legado tenga un contador
-visible. En el corte actual, la suite de ejemplos suma 913 funciones IR, 457 HIR y 1 432
-que aún caen al emisor AST; `native_backend_types_agree_with_the_checker` mantiene 1 432 como
-trinquete y debe bajar cuando una familia migre. Los marcadores de ownership de
+visible. También publica líneas `native-source` agrupadas por archivo para localizar la deuda
+por módulo; la prueba diferencial comprueba que sus sumas coinciden con el total. En el corte
+actual, la suite de ejemplos suma 913 funciones IR, 457 HIR y 1 432 que aún caen al emisor
+AST; `native_backend_types_agree_with_the_checker` mantiene 1 432 como trinquete y debe bajar
+cuando una familia migre. Los marcadores de ownership de
 `String`, `List<T>`, los núcleos escalares de `Map<K,V>`/`Set<T>` y `Option<T>` con payload
 escalar o `String` también se consumen al generar C; `Map.get/remove` producen structs
 `Option_<T>` por valor y retienen/transfieren sus strings correctamente. Los `for` sobre rangos
@@ -350,9 +352,10 @@ contratos de plataforma antes de LLVM IR.
 Fuzzing del lexer/parser/checker/HIR/IR mediante fuentes mutadas y pruebas diferenciales
 automáticas intérprete↔nativo sobre programas generados escalares y con ownership
 (`Option`/`Result`) ya se ejecutan en la suite; `OSTRIN_FUZZ_ROUNDS` permite ampliar las
-iteraciones. El siguiente incremento mide cobertura por módulo y añade casos de fallos del
-backend nativo antes de retirar más fallback AST; benchmarks (nativo vs intérprete) siguen
-pendientes.
+iteraciones. `--native-type-report` y la prueba diferencial ya miden la cobertura del backend
+por archivo fuente y verifican la suma contra el total global. El siguiente incremento añade
+casos de fallo del backend nativo antes de retirar más fallback AST; benchmarks (nativo vs
+intérprete) siguen pendientes.
 
 ### G. Producto
 **Homepage 3.0 (2026-09-24).** La portada muestra el estado de la release derivado de
