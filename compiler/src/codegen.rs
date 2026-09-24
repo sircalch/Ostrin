@@ -2668,9 +2668,11 @@ impl<'a> Codegen<'a> {
             Some(e) => {
                 let (code, ty) = self.gen_expr_hint(e, Some(return_type.clone()))?;
                 if *return_type == CType::Void {
-                    out.push_str(&format!("    {code};\n"));
+                    // An owned result is released in the same evaluation.
                     if owned_call_argument(e, &ty) {
-                        out.push_str(&format!("    ostrin_release_owned((void*){code});\n"));
+                        out.push_str(&format!("    ostrin_release_owned((void*)({code}));\n"));
+                    } else {
+                        out.push_str(&format!("    {code};\n"));
                     }
                     self.emit_owned_cleanup(out, None);
                     out.push_str("    return;\n");
@@ -2706,9 +2708,10 @@ impl<'a> Codegen<'a> {
         }
         if let Some(e) = &block.tail {
             let (code, ty) = self.gen_expr(e)?;
-            out.push_str(&format!("    {code};\n"));
             if owned_call_argument(e, &ty) {
-                out.push_str(&format!("    ostrin_release_owned((void*){code});\n"));
+                out.push_str(&format!("    ostrin_release_owned((void*)({code}));\n"));
+            } else {
+                out.push_str(&format!("    {code};\n"));
             }
         }
         Ok(())
@@ -2920,9 +2923,11 @@ impl<'a> Codegen<'a> {
                     }
                 } else {
                     let (code, ty) = self.gen_expr(e)?;
-                    out.push_str(&format!("    {code};\n"));
+                    // An owned result is released in the same evaluation.
                     if owned_call_argument(e, &ty) {
-                        out.push_str(&format!("    ostrin_release_owned((void*){code});\n"));
+                        out.push_str(&format!("    ostrin_release_owned((void*)({code}));\n"));
+                    } else {
+                        out.push_str(&format!("    {code};\n"));
                     }
                 }
             }
@@ -5383,6 +5388,14 @@ impl<'a> Codegen<'a> {
                 return Ok((text, CType::Str));
             }
         }
+        if matches!(obj_ty, CType::Quantity(_)) && args.is_empty() && (method_name == "value" || method_name == "unit") {
+            let temp = self.next_temp();
+            return Ok(if method_name == "value" {
+                (format!("({{ Qty {temp} = {obj_code}; {temp}.v; }})"), CType::Float)
+            } else {
+                (format!("({{ Qty {temp} = {obj_code}; ostrin_unit_cat({temp}.u, \"\", \"\"); }})"), CType::Str)
+            });
+        }
         if obj_ty == CType::Str && method_name != "to_string" {
             let borrowed_receiver = matches!(obj.unlocated(), Expr::Ident(_) | Expr::FieldAccess(..) | Expr::Index(..));
             return self.gen_string_method(&obj_code, method_name, args, !borrowed_receiver);
@@ -5437,9 +5450,20 @@ impl<'a> Codegen<'a> {
                     ));
                 }
                 let coerced = self.coerce_args(&arg_codes, &arg_types, &param_types[1..])?;
-                let mut all_args = vec![obj_code];
-                all_args.extend(coerced);
-                Ok((format!("{c_name}({})", all_args.join(", ")), return_type))
+                // Fresh managed arguments and a fresh receiver (`a.f().g()`)
+                // are held in temporaries and released after the call.
+                let mut owned = self.materialize_owned_call_args(args, &coerced, &arg_types);
+                let receiver = if owned_call_argument(obj, &obj_ty) {
+                    let temp = self.next_temp();
+                    owned.temporaries.insert(0, (c_type_name(&obj_ty), temp.clone(), obj_code));
+                    temp
+                } else {
+                    obj_code
+                };
+                let mut all_args = vec![receiver];
+                all_args.extend(owned.codes.iter().cloned());
+                let call = format!("{c_name}({})", all_args.join(", "));
+                Ok(self.finish_owned_call(owned, call, return_type))
             }
             CType::DynTrait(trait_name) => {
                 let Some((param_types, return_type)) = self.trait_methods.get(trait_name).and_then(|m| m.get(method_name)).cloned()

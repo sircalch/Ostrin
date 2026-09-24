@@ -1,0 +1,22 @@
+// A function body has its own scope: `h = ...` inside `inner` is a new local,
+// it never rebinds the caller's `h` (the interpreter used to walk up into the
+// caller's frame, so `outer` returned 14 instead of 400).
+fn inner(seed: Int) -> Int {
+    h = seed * 2
+    h
+}
+
+fn outer() -> Int {
+    h = 400
+    k = inner(7)
+    print(k)
+    h
+}
+
+fn main() -> Void {
+    print(outer())
+    twice = inner
+    h = 1
+    print(twice(h + 1))
+    print(h)
+}

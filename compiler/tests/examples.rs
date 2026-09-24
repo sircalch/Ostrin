@@ -5362,3 +5362,41 @@ fn unit_conversions_between_dimensions_are_rejected() {
     assert!(err.contains("Length/Time (Velocity)"), "missing compound target: {err}");
     assert!(err.contains("E1024") && err.contains("(Energy)") && err.contains("(Force)"), "missing named dimensions: {err}");
 }
+
+/// Runs `file` with the interpreter and natively and returns the interpreter's
+/// stdout after checking both agree (`None` when no C compiler is available).
+fn interpreter_and_native_agree(file: &str) -> String {
+    let interpreted = run(&["--run", &example_path(file)]);
+    assert!(interpreted.status.success(), "interpreter failed on {file}: {}", stderr(&interpreted));
+    let expected = stdout(&interpreted).replace("\r\n", "\n");
+    let exe = temp_artifact(&format!("{file}.exe"));
+    let compile = run(&["--compile", "--out", &exe, &example_path(file)]);
+    if skip_if_no_c_compiler(&compile) {
+        return expected;
+    }
+    assert!(compile.status.success(), "compile failed for {file}: {}", stderr(&compile));
+    let native = Command::new(&exe).output().unwrap();
+    let _ = fs::remove_file(&exe);
+    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected, "output mismatch for {file}");
+    expected
+}
+
+#[test]
+fn a_function_body_never_rebinds_the_callers_locals() {
+    // `h = ...` in a callee used to walk up into the caller's frame.
+    assert_eq!(interpreter_and_native_agree("function_scope_isolation.ostrin"), "14\n400\n4\n1\n");
+}
+
+#[test]
+fn methods_accept_named_and_default_arguments() {
+    // Also checks that a chained `c.mark(..).mark(..)` statement runs once natively.
+    assert_eq!(
+        interpreter_and_native_agree("method_default_args.ostrin"),
+        "[a:black:1, b:red:1, c:black:2.5, d:blue:1]\n31\n24\n"
+    );
+}
+
+#[test]
+fn float_literals_accept_scientific_notation() {
+    assert_eq!(interpreter_and_native_agree("scientific_literals.ostrin"), "6.02214076\n1.5\n2000\ntrue\n532 nm\n");
+}

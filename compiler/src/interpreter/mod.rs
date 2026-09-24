@@ -1438,8 +1438,11 @@ impl Interpreter {
         result
     }
 
-    fn call_user_function(&mut self, f: &FunctionDecl, args: Vec<Value>, closure_env: Env) -> EvalResult {
-        let call_env = closure_env.child();
+    /// A named function runs in a fresh scope: its body never sees (nor, via
+    /// `x = ...`, rebinds) the caller's locals. `_caller_env` is kept for the
+    /// call sites' symmetry with closures.
+    fn call_user_function(&mut self, f: &FunctionDecl, args: Vec<Value>, _caller_env: Env) -> EvalResult {
+        let call_env = Env::root().child();
         for (param, arg) in f.params.iter().zip(args.into_iter()) {
             call_env.define(&param.name, arg);
         }
@@ -1452,8 +1455,26 @@ impl Interpreter {
         args: &[Arg],
         closure_env: Env,
     ) -> EvalResult {
+        self.call_with_receiver(f, None, args, closure_env)
+    }
+
+    /// Binds positional, named and defaulted arguments; a method's already
+    /// evaluated receiver fills the first parameter (`self`).
+    fn call_with_receiver(
+        &mut self,
+        f: &FunctionDecl,
+        receiver: Option<Value>,
+        args: &[Arg],
+        closure_env: Env,
+    ) -> EvalResult {
         let mut values: Vec<Option<Value>> = (0..f.params.len()).map(|_| None).collect();
         let mut next_positional = 0usize;
+        if let Some(receiver) = receiver {
+            if !values.is_empty() {
+                values[0] = Some(receiver);
+                next_positional = 1;
+            }
+        }
         let mut saw_named = false;
 
         for arg in args {
@@ -1494,7 +1515,7 @@ impl Interpreter {
             }
         }
 
-        let call_env = closure_env.child();
+        let call_env = Env::root().child();
         for (index, param) in f.params.iter().enumerate() {
             let value = match values[index].take() {
                 Some(value) => value,
@@ -1983,7 +2004,7 @@ impl Interpreter {
                 // A named function used as a value: a closure over its own parameters.
                 if let Some(decl) = self.functions.get(name).cloned() {
                     let params: Vec<String> = decl.params.iter().map(|p| p.name.clone()).collect();
-                    return Ok(Value::Closure(Rc::new(params), Rc::new(decl.body.clone()), env.clone()));
+                    return Ok(Value::Closure(Rc::new(params), Rc::new(decl.body.clone()), Env::root()));
                 }
                 Err(RuntimeError::Error(format!("undefined name '{name}'")))
             }
@@ -2681,6 +2702,14 @@ impl Interpreter {
             if method == "to_string" {
                 return Ok(Value::String(receiver.to_string()));
             }
+            if let Value::Quantity(v, _, unit) = &receiver {
+                if args.is_empty() && method == "value" {
+                    return Ok(Value::Float(*v));
+                }
+                if args.is_empty() && method == "unit" {
+                    return Ok(Value::String(unit.clone()));
+                }
+            }
             if method == "length" {
                 if let Value::List(state) = &receiver {
                     return Ok(Value::Int(state.borrow().len() as i64));
@@ -3027,6 +3056,9 @@ impl Interpreter {
             }
             let type_name = value_type_name(&receiver);
             if let Some(f) = self.find_method_for_value(&receiver, method) {
+                if args.iter().any(|a| matches!(a, Arg::Named(..))) || args.len() + 1 < f.params.len() {
+                    return self.call_with_receiver(&f, Some(receiver), args, env.clone());
+                }
                 let mut values = vec![receiver];
                 for a in args { values.push(self.eval_arg(a, env)?); }
                 return self.call_user_function(&f, values, env.clone());

@@ -2729,16 +2729,31 @@ impl Checker {
             ) {
                 return return_type;
             }
+            if let Ty::Quantity(_) = receiver_ty {
+                if arg_types.is_empty() && (method == "value" || method == "unit") {
+                    // Introspection for unit-aware code (std.viz axis labels):
+                    // the number in the quantity's own unit, and that unit.
+                    return if method == "value" { Ty::Float } else { Ty::String };
+                }
+            }
             if method == "to_string" {
                 // `to_string` is a core operation provided for every runtime
                 // value, including concrete user types and quantities.
                 return Ty::String;
             }
+            let arg_names: Vec<Option<String>> = args
+                .iter()
+                .map(|arg| match arg {
+                    Arg::Named(name, _) => Some(name.clone()),
+                    Arg::Positional(_) => None,
+                })
+                .collect();
             if let Some(return_type) = self.check_concrete_method_call(
                 &receiver_ty,
                 method,
                 &arg_types,
                 &arg_exprs,
+                &arg_names,
                 explicit_type_args,
             ) {
                 return return_type;
@@ -3252,9 +3267,37 @@ impl Checker {
         method: &str,
         arg_types: &[Ty],
         arg_exprs: &[&Expr],
+        arg_names: &[Option<String>],
         explicit_type_args: Option<&[Type]>,
     ) -> Option<Ty> {
         let candidate = self.concrete_method_candidate(receiver_ty, method)?;
+        // Named and defaulted arguments are put in parameter order first
+        // (the rule `hir::arrange_arguments` applies when lowering); an
+        // omitted argument takes its default, which checks as `?`.
+        let params_after_self: Vec<Param> = candidate.params.iter().skip(1).cloned().collect();
+        let needs_arranging = arg_names.iter().any(|n| n.is_some()) || arg_types.len() < params_after_self.len();
+        let (arranged_types, arranged_exprs): (Vec<Ty>, Vec<&Expr>) = if needs_arranging && arg_names.len() == arg_types.len() {
+            let tagged: Vec<(Option<String>, (Ty, Option<&Expr>))> = arg_names
+                .iter()
+                .cloned()
+                .zip(arg_types.iter().cloned().zip(arg_exprs.iter().map(|e| Some(*e))))
+                .collect();
+            match crate::hir::arrange_arguments(&params_after_self, tagged, |_| (Ty::Unknown, None)) {
+                Ok(list) => {
+                    let types = list.iter().map(|(t, _)| t.clone()).collect();
+                    let exprs = list.iter().map(|(_, e)| e.unwrap_or(&Expr::BoolLiteral(false))).collect();
+                    (types, exprs)
+                }
+                Err(message) => {
+                    self.push("E1042", format!("Method '{method}': {message}."));
+                    return Some(Ty::Unknown);
+                }
+            }
+        } else {
+            (arg_types.to_vec(), arg_exprs.to_vec())
+        };
+        let arg_types: &[Ty] = &arranged_types;
+        let arg_exprs: &[&Expr] = &arranged_exprs;
         let method_generic_names: HashSet<String> = candidate
             .generics
             .iter()

@@ -590,7 +590,9 @@ impl Parser {
         let mut expr = self.parse_primary()?;
         loop {
             if self.eat(&TokenKind::Dot) {
-                let field = self.expect_ident()?;
+                // `q.unit()`: the reserved word is only a declaration keyword,
+                // so it is a valid member name after '.'.
+                let field = if self.eat(&TokenKind::Unit) { "unit".to_string() } else { self.expect_ident()? };
                 expr = Expr::FieldAccess(Box::new(expr), field);
             } else if self.check(&TokenKind::Lt) && !self.newline_breaks_statement() {
                 let checkpoint = self.pos;

@@ -132,6 +132,19 @@ impl<'a> Lexer<'a> {
                 self.advance();
             }
         }
+        // Scientific notation: `6.022e23`, `1e-9`, `2.5E+3` are Float literals.
+        if matches!(self.peek(), Some('e') | Some('E')) {
+            let digit_at = if matches!(self.peek_at(1), Some('+') | Some('-')) { 2 } else { 1 };
+            if matches!(self.peek_at(digit_at), Some(c) if c.is_ascii_digit()) {
+                is_float = true;
+                for _ in 0..digit_at {
+                    self.advance();
+                }
+                while matches!(self.peek(), Some(c) if c.is_ascii_digit() || c == '_') {
+                    self.advance();
+                }
+            }
+        }
         self.last_token_start = start;
         let text: String = self.chars[start..self.pos].iter().filter(|c| **c != '_').collect();
         // `2.5f32` / `1f32` (single precision) and `2.5f64` / `1f64` (the default width).
