@@ -79,7 +79,7 @@ const version = (cargo.match(/^version\s*=\s*"([^"]+)"/m) || [])[1];
 if (!version) failures.push("compiler/Cargo.toml: missing package version");
 
 const readme = read("README.md");
-for (const marker of ["scripts/install.sh", "scripts/install.ps1", "checksum", "--version " + version]) {
+for (const marker of ["scripts/install.sh", "scripts/install.ps1", "checksum", "--version " + version, "Invoke-WebRequest -UseBasicParsing"]) {
   requireText(readme, marker, "README installation documentation");
 }
 
@@ -97,6 +97,7 @@ for (const marker of [
   "ostrinc-v" + version + "-aarch64-apple-darwin.tar.gz",
   "ostrinc-v" + version + "-x86_64-pc-windows-msvc.zip",
   "--version " + version,
+  "Invoke-WebRequest -UseBasicParsing",
 ]) {
   requireText(notes, marker, notesPath);
 }

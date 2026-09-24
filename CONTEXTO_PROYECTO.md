@@ -6529,3 +6529,26 @@ empaquetado como en el workflow pasa checksum, `--version`, `hello.ostrin` y
 `--locked --run --project examples/pkg_project/main_app`. `website-check`, `website-metadata
 --check` y `distribution-check` pasan. La matriz WASI necesita el WASI SDK y se valida con
 `workflow_dispatch` en GitHub.
+
+## 267. Publicación de `v0.1.0` — 2026-09-24
+
+Los cuatro pasos de publicación se ejecutaron con autorización explícita del usuario:
+
+1. Push de `main`: CI Windows/Linux/macOS y Pages en verde.
+2. `workflow_dispatch` de release (sin publicar) en verde en los tres targets. El WASI
+   workflow nunca había pasado: la URL fijada usaba el tag `wasi-sdk-34.0` (el upstream es
+   `wasi-sdk-34`; el SHA-256 fijado sí coincidía con el archivo real) y el empaquetado copiaba
+   `ostrinc` en lugar de `ostrinc.wasm`. Tras ambas correcciones la matriz de nueve programas
+   pasa en GitHub.
+3. Tag anotado `v0.1.0` sobre `34ead55`; release y WASI del tag en
+   verde. La GitHub Release contiene los tres archivos y sus `.sha256`, no es draft ni
+   prerelease, y usa `docs/releases/v0.1.0.md` como cuerpo.
+4. `install-check.yml` (nuevo, manual) instaló la release con `install.sh` en Ubuntu y macOS y
+   con `install.ps1` en Windows, tanto con `latest` como con `0.1.0`, y ejecutó `--version`,
+   `--check` y `--run hello.ostrin`. Instalación local limpia en Windows: checksum verificado,
+   `ostrinc 0.1.0` y `hola desde Ostrin`.
+
+Hallazgo: el comando de Windows documentado (`Invoke-WebRequest` sin `-UseBasicParsing`) se
+quedó colgado más de dos minutos en Windows PowerShell 5.1 no interactivo; con
+`-UseBasicParsing` descarga al instante. README y notas de la release lo usan ahora y
+`distribution-check` lo exige.

@@ -80,7 +80,7 @@ la documentación.
 ## Siguiente etapa
 
 La ruta WASI ya existe para el runtime cooperativo básico, paquetes locales y el playground del
-sitio. El siguiente bloque es publicar una primera release etiquetada después de revisar el
-contrato de mantenimiento, ampliar la matriz de programas (I/O), aislar APIs de proceso/archivos
+sitio. La primera release etiquetada, `v0.1.0`, está publicada y sus instaladores se validan con
+`install-check.yml`. El siguiente bloque es ampliar la matriz de programas (I/O), aislar APIs de proceso/archivos
 con contratos WASI explícitos y mejorar la experiencia del playground (compartir código,
 diagnósticos y ejemplos) sin convertirlo en una simulación JavaScript.

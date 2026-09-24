@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-23 · rama `main` · versión `0.1.0` (release experimental preparada, sin tag publicado) · 6 pruebas diferenciales, 200 de integración y 2 unitarias en verde.*
+*Corte: 2026-09-23 · rama `main` · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 200 de integración y 2 unitarias en verde.*
 
 Validación remota: Pages y CI pasaron para `8bc24bd` en Windows, Linux, macOS y web. La
 prueba de hilos nativos valida los pares concurrentes sin imponer un orden del planificador
@@ -19,7 +19,7 @@ del lenguaje, `docs/design/` (22 documentos). La auditoría del sitio vive en
 | **En fallback** | El backend nativo emite desde IR las familias cubiertas (§5); records/enums genéricos aplicados, iteradores indirectos, scopes anidados, handlers no lineales y agregados/escapes complejos caen de forma verificada a HIR y después al AST |
 | **Experimental** | Todo el lenguaje (versión 0.x, sin garantía de estabilidad); `--native-threads`; paquetes científicos de ejemplo `tables`, `plot`, `autodiff` (modo directo); dependencias Git con `--fetch` |
 | **Pendiente** | Retirar el fallback AST, ownership completo, red, registry público, GPU, autodiff inverso, canales de distribución (Homebrew, winget, Scoop, Chocolatey, AUR), extensión en Marketplace |
-| **Release** | Versión `0.1.0` preparada; los workflows de release y WASI aún no se han ejecutado en GitHub; **no existe todavía un tag ni una GitHub Release publicada** |
+| **Release** | [`v0.1.0`](https://github.com/sircalch/Ostrin/releases/tag/v0.1.0) publicada el 2026-09-24 con tres archivos (Linux x86_64, macOS ARM64, Windows x64) y sus `.sha256`; instaladores verificados contra ella en runners limpios (`install-check.yml`); workflows de CI, release y WASI en verde |
 
 ---
 
@@ -260,7 +260,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Rendimiento del intérprete | Tree‑walking simple; sin optimizaciones |
 | `newlines.ostrin`, `advanced.ostrin` | Son muestras de sintaxis, no programas ejecutables |
 | CI | Linux, macOS y Windows; incluye las pruebas diferenciales intérprete↔nativo; el backend nativo enlaza `libm` explícitamente en Unix para paquetes con `sqrt`/`round` |
-| Distribución | Workflow WASI reproducible para `ostrinc.wasm`, `hello.wasm`, `pkg_project.wasm`, un contrato de `args`/`env`, E/S de archivos y ownership gestionado, con toolchain fijado, ejecución bajo Node WASI y SHA-256; playground de navegador sobre el compilador WASM; workflow de release `v0.1.0` para Linux x86_64, macOS arm64 y Windows x64 que valida versión, checksums, archivos extraídos, `hello.ostrin` y un proyecto con dependencia `path`, y publica `docs/releases/v0.1.0.md` como notas; **el tag y la release aún no están publicados**, por lo que los instaladores Unix/PowerShell solo están verificados estáticamente (`distribution-check`) y no contra archivos publicados; canales externos y registry público siguen pendientes |
+| Distribución | Workflow WASI reproducible para `ostrinc.wasm`, `hello.wasm`, `pkg_project.wasm`, un contrato de `args`/`env`, E/S de archivos y ownership gestionado, con toolchain fijado, ejecución bajo Node WASI y SHA-256; playground de navegador sobre el compilador WASM; workflow de release `v0.1.0` para Linux x86_64, macOS arm64 y Windows x64 que valida versión, checksums, archivos extraídos, `hello.ostrin` y un proyecto con dependencia `path`, y publica `docs/releases/v0.1.0.md` como notas; `v0.1.0` está publicada y `install-check.yml` instala la release con los instaladores Unix/PowerShell en Linux, macOS y Windows limpios y ejecuta `hello.ostrin`; canales externos y registry público siguen pendientes |
 
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
 convendría dividirlos; el backend nativo no comparte el sistema de tipos del checker
@@ -312,7 +312,7 @@ red y paquetes con registro (con consentimiento explícito del usuario para la r
 ### D. Experiencia de desarrollador
 Formateador oficial (`ostrinc fmt`), `ostrinc test`, documentación generada, acciones de
 código en LSP (quick fixes), inlay hints, publicación de la extensión en el Marketplace,
-publicación de la release `v0.1.0` (la CI con matriz Windows/Linux/macOS y el workflow de binarios ya existen).
+canales de distribución adicionales (la release `v0.1.0`, la CI con matriz y los instaladores ya existen).
 
 ### E. Backends adicionales
 El compilador, un programa Ostrin independiente y un proyecto con dependencia `path` ya se
@@ -362,9 +362,8 @@ La gramática para Linguist queda separada porque requiere uso público suficien
 | **4** | B (concurrencia real) | Cumple la promesa de «concurrencia segura por defecto» |
 | **5** | E (WASM) + G (playground) | Difusión |
 
-Plan activo (2026-09-23): primero cerrar y publicar `v0.1.0` sin añadir features de lenguaje
-(consolidación de documentos, suite completa, WASI, `distribution-check`, CI, tag y validación de
-instaladores contra la release); después, la homepage 3.0 con Scientific Lab alimentado solo por
+Plan activo (2026-09-24): el bloque de release `v0.1.0` está cerrado (publicada e instaladores
+validados); sigue la homepage 3.0 con Scientific Lab alimentado solo por
 salidas reales de Ostrin. GPU, autodiff inverso, registry público y red quedan fuera de ambos bloques.
 
 ---

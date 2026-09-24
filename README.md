@@ -107,8 +107,9 @@ the tag/version contract, runs `ostrinc --version`, executes `examples/hello.ost
 archive checksum, and runs both the extracted example and the packaged path-dependency project.
 The compiler version is `0.1.0`, an experimental developer release for Linux x86_64, macOS arm64
 and Windows x64 archives with SHA-256 checksums ([release notes](docs/releases/v0.1.0.md)).
-**Release status:** prepared; the `v0.1.0` tag and GitHub release are not published yet, so
-the installers below will report that no release exists until then. The public package registry
+**Release status:** published as [`v0.1.0`](https://github.com/sircalch/Ostrin/releases/tag/v0.1.0)
+(2026-09-24); both installers have been verified against it on clean Linux, macOS and Windows
+runners by `.github/workflows/install-check.yml`. The public package registry
 and additional distribution channels (Homebrew, winget, Scoop, Chocolatey, AUR) remain future
 work.
 
@@ -145,7 +146,7 @@ Windows PowerShell:
 
 ```powershell
 $installer = Join-Path $env:TEMP 'ostrinc-install.ps1'
-Invoke-WebRequest https://raw.githubusercontent.com/sircalch/Ostrin/main/scripts/install.ps1 -OutFile $installer
+Invoke-WebRequest -UseBasicParsing https://raw.githubusercontent.com/sircalch/Ostrin/main/scripts/install.ps1 -OutFile $installer
 powershell -ExecutionPolicy Bypass -File $installer -Version 0.1.0 -AddToPath
 ```
 
@@ -231,14 +232,13 @@ when GitHub Pages is enabled.
 
 ## Roadmap
 
-1. Publish the experimental `v0.1.0` release and validate the installers against it.
-2. Make typed HIR/IR the single native lowering path and retire the AST fallback.
-3. Complete ownership and last-use lowering for aggregates and escapes.
-4. Grow the scientific core: numeric hierarchy, linear algebra, units and dataframes.
-5. Grow the standard library; networking and a package registry come later.
-6. Publish the VS Code extension and additional distribution channels.
+1. Make typed HIR/IR the single native lowering path and retire the AST fallback.
+2. Complete ownership and last-use lowering for aggregates and escapes.
+3. Grow the scientific core: numeric hierarchy, linear algebra, units and dataframes.
+4. Grow the standard library; networking and a package registry come later.
+5. Publish the VS Code extension and additional distribution channels.
 
-Completed milestones include the LSP/DAP tooling, reproducible lockfiles, native threads with
+Completed milestones include the experimental `v0.1.0` release, the LSP/DAP tooling, reproducible lockfiles, native threads with
 structured cancellation, the WASI build and the browser playground.
 
 See [`CONTEXTO_PROYECTO.md`](CONTEXTO_PROYECTO.md) for the complete project

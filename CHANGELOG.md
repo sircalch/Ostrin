@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-## 0.1.0 — experimental developer release
+## 0.1.0 — experimental developer release (2026-09-24)
 
 Ostrin 0.1.0 is the first public developer release. It packages the compiler for Linux
 x86_64, macOS arm64 and Windows x64, with SHA-256 checksums, shell and PowerShell installers,
@@ -21,6 +21,13 @@ scientific libraries remain in development.
 Release notes: [`docs/releases/v0.1.0.md`](docs/releases/v0.1.0.md).
 
 ### Release preparation
+- Fixed the WASI workflow, which had never succeeded: the pinned SDK URL used the tag
+  `wasi-sdk-34.0` instead of `wasi-sdk-34`, and packaging copied `ostrinc` instead of
+  `ostrinc.wasm`. The nine-program WASI matrix now passes on GitHub.
+- Added `install-check.yml`, which installs a published release with both installers on clean
+  Linux, macOS and Windows runners and runs `hello.ostrin` with the installed compiler.
+- The documented Windows command now uses `Invoke-WebRequest -UseBasicParsing`; without it,
+  Windows PowerShell 5.1 could hang downloading the installer.
 - Published release bodies now come from `docs/releases/<tag>.md` instead of generated notes;
   the publish job checks that all three archives and their `.sha256` files are present and
   uses `--verify-tag`. The release is intentionally not a GitHub prerelease, because the
