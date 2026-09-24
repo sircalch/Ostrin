@@ -12,11 +12,28 @@ fn fail<T>(message: impl Into<String>) -> Res<T> {
 }
 
 pub fn is_regress(name: &str, arity: usize) -> bool {
-    matches!((name, arity), ("linfit", 2) | ("polyfit", 3) | ("polyval", 2) | ("solve", 2) | ("norm", 1) | ("eigvals", 1) | ("det", 1) | ("inv", 1) | ("trace", 1) | ("eye", 1) | ("histogram", 4) | ("norm_pdf", 3) | ("norm_cdf", 3))
+    matches!(
+        (name, arity),
+        ("linfit", 2)
+            | ("polyfit", 3)
+            | ("polyval", 2)
+            | ("solve", 2)
+            | ("norm", 1)
+            | ("eigvals", 1)
+            | ("det", 1)
+            | ("inv", 1)
+            | ("trace", 1)
+            | ("eye", 1)
+            | ("histogram", 4)
+            | ("norm_pdf", 3)
+            | ("norm_cdf", 3)
+    )
 }
 
 fn floats(value: &Value, what: &str) -> Res<(Vec<usize>, Vec<f64>)> {
-    let Value::Array(a) = value else { return fail(format!("{what} expects an Array<Float>")) };
+    let Value::Array(a) = value else {
+        return fail(format!("{what} expects an Array<Float>"));
+    };
     let a = a.borrow();
     let mut data = Vec::with_capacity(a.data.len());
     for v in &a.data {
@@ -162,7 +179,9 @@ pub fn call(name: &str, args: &[Value]) -> Res<Value> {
         "linfit" => {
             let ((sx, x), (sy, y)) = (floats(&args[0], "linfit")?, floats(&args[1], "linfit")?);
             if sx.len() != 1 || sy.len() != 1 || x.len() != y.len() || x.len() < 2 {
-                return fail("linfit needs two one-dimensional arrays of the same length (at least 2)");
+                return fail(
+                    "linfit needs two one-dimensional arrays of the same length (at least 2)",
+                );
             }
             let n = x.len() as f64;
             let mut sum_x = x[0];
@@ -184,12 +203,18 @@ pub fn call(name: &str, args: &[Value]) -> Res<Value> {
             }
             let slope = sxy / sxx;
             let intercept = my - slope * mx;
-            let r2 = if syy == 0.0 { 1.0 } else { sxy * sxy / (sxx * syy) };
+            let r2 = if syy == 0.0 {
+                1.0
+            } else {
+                sxy * sxy / (sxx * syy)
+            };
             Ok(vector(vec![slope, intercept, r2]))
         }
         "polyfit" => {
             let ((sx, x), (sy, y)) = (floats(&args[0], "polyfit")?, floats(&args[1], "polyfit")?);
-            let Value::Int(degree) = &args[2] else { return fail("polyfit expects an Int degree") };
+            let Value::Int(degree) = &args[2] else {
+                return fail("polyfit expects an Int degree");
+            };
             if sx.len() != 1 || sy.len() != 1 || x.len() != y.len() {
                 return fail("polyfit needs two one-dimensional arrays of the same length");
             }
@@ -236,7 +261,10 @@ pub fn call(name: &str, args: &[Value]) -> Res<Value> {
                 Value::Float(x) => Ok(Value::Float(horner(*x))),
                 other => {
                     let (shape, xs) = floats(other, "polyval")?;
-                    Ok(array::make(shape, xs.into_iter().map(|x| Value::Float(horner(x))).collect()))
+                    Ok(array::make(
+                        shape,
+                        xs.into_iter().map(|x| Value::Float(horner(x))).collect(),
+                    ))
                 }
             }
         }
@@ -265,7 +293,10 @@ pub fn call(name: &str, args: &[Value]) -> Res<Value> {
                             out[i * n + j] = column[i];
                         }
                     }
-                    Ok(array::make(vec![n, n], out.into_iter().map(Value::Float).collect()))
+                    Ok(array::make(
+                        vec![n, n],
+                        out.into_iter().map(Value::Float).collect(),
+                    ))
                 }
             }
         }
@@ -293,7 +324,9 @@ pub fn call(name: &str, args: &[Value]) -> Res<Value> {
             Ok(vector(jacobi_eigenvalues(a, n)))
         }
         "eye" => {
-            let Value::Int(n) = &args[0] else { return fail("eye expects an Int size") };
+            let Value::Int(n) = &args[0] else {
+                return fail("eye expects an Int size");
+            };
             if *n < 1 {
                 return fail("eye needs n >= 1");
             }
@@ -302,7 +335,10 @@ pub fn call(name: &str, args: &[Value]) -> Res<Value> {
             for i in 0..n {
                 out[i * n + i] = 1.0;
             }
-            Ok(array::make(vec![n, n], out.into_iter().map(Value::Float).collect()))
+            Ok(array::make(
+                vec![n, n],
+                out.into_iter().map(Value::Float).collect(),
+            ))
         }
         "solve" => {
             let ((sa, a), (sb, b)) = (floats(&args[0], "solve")?, floats(&args[1], "solve")?);
@@ -313,7 +349,9 @@ pub fn call(name: &str, args: &[Value]) -> Res<Value> {
         }
         "histogram" => {
             let (_, data) = floats(&args[0], "histogram")?;
-            let Value::Int(bins) = &args[1] else { return fail("histogram expects an Int bin count") };
+            let Value::Int(bins) = &args[1] else {
+                return fail("histogram expects an Int bin count");
+            };
             let (lo, hi) = (float(&args[2], "histogram")?, float(&args[3], "histogram")?);
             if *bins < 1 || !(hi > lo) {
                 return fail("histogram needs bins >= 1 and lo < hi");
@@ -332,19 +370,31 @@ pub fn call(name: &str, args: &[Value]) -> Res<Value> {
                 counts[index] += 1;
             }
             let n = counts.len();
-            Ok(array::make(vec![n], counts.into_iter().map(Value::Int).collect()))
+            Ok(array::make(
+                vec![n],
+                counts.into_iter().map(Value::Int).collect(),
+            ))
         }
         "norm_pdf" | "norm_cdf" => {
             let (mu, sigma) = (float(&args[1], name)?, float(&args[2], name)?);
             if !(sigma > 0.0) {
                 return fail(format!("{name} needs sigma > 0"));
             }
-            let f = |x: f64| if name == "norm_pdf" { detmath::norm_pdf(x, mu, sigma) } else { detmath::norm_cdf(x, mu, sigma) };
+            let f = |x: f64| {
+                if name == "norm_pdf" {
+                    detmath::norm_pdf(x, mu, sigma)
+                } else {
+                    detmath::norm_cdf(x, mu, sigma)
+                }
+            };
             match &args[0] {
                 Value::Float(x) => Ok(Value::Float(f(*x))),
                 other => {
                     let (shape, xs) = floats(other, name)?;
-                    Ok(array::make(shape, xs.into_iter().map(|x| Value::Float(f(x))).collect()))
+                    Ok(array::make(
+                        shape,
+                        xs.into_iter().map(|x| Value::Float(f(x))).collect(),
+                    ))
                 }
             }
         }

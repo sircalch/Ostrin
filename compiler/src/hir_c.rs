@@ -58,7 +58,10 @@ pub struct VariantView {
 }
 
 fn is_scalar(ty: &Ty) -> bool {
-    matches!(ty, Ty::Int | Ty::Float | Ty::Float32 | Ty::Sized(_) | Ty::Bool | Ty::String)
+    matches!(
+        ty,
+        Ty::Int | Ty::Float | Ty::Float32 | Ty::Sized(_) | Ty::Bool | Ty::String
+    )
 }
 
 /// Scalars compatible in C without a conversion helper (`Int` where a `Float` goes, …).
@@ -183,7 +186,12 @@ impl Emitter<'_> {
     fn record_name(&self, ty: &Ty) -> Bail<String> {
         match ty {
             Ty::Named(name) if self.world.records.contains_key(name) => Ok(name.clone()),
-            Ty::Applied(..) => self.world.applied_records.get(&ty.describe()).cloned().ok_or(()),
+            Ty::Applied(..) => self
+                .world
+                .applied_records
+                .get(&ty.describe())
+                .cloned()
+                .ok_or(()),
             _ => Err(()),
         }
     }
@@ -191,7 +199,12 @@ impl Emitter<'_> {
     fn enum_name(&self, ty: &Ty) -> Bail<String> {
         match ty {
             Ty::Named(name) if self.world.enums.contains(name) => Ok(name.clone()),
-            Ty::Applied(..) => self.world.applied_enums.get(&ty.describe()).cloned().ok_or(()),
+            Ty::Applied(..) => self
+                .world
+                .applied_enums
+                .get(&ty.describe())
+                .cloned()
+                .ok_or(()),
             _ => Err(()),
         }
     }
@@ -202,12 +215,21 @@ impl Emitter<'_> {
             .applied_variants
             .get(&(enum_name.clone(), name.to_string()))
             .cloned()
-            .or_else(|| self.world.variants.get(name).filter(|variant| variant.enum_name == enum_name).cloned())
+            .or_else(|| {
+                self.world
+                    .variants
+                    .get(name)
+                    .filter(|variant| variant.enum_name == enum_name)
+                    .cloned()
+            })
     }
 
     fn variant_constructor(&mut self, e: &HirExpr, name: &str, args: &[HirArg]) -> Bail<String> {
         let v = self.variant(name, &e.ty).ok_or(())?;
-        if v.fields.len() != args.len() || args.iter().any(|arg| arg.name.is_some()) || self.c_type(&e.ty)? != v.enum_name {
+        if v.fields.len() != args.len()
+            || args.iter().any(|arg| arg.name.is_some())
+            || self.c_type(&e.ty)? != v.enum_name
+        {
             return Err(());
         }
         let mut inits = Vec::new();
@@ -264,7 +286,10 @@ impl Emitter<'_> {
     }
 
     fn borrowed_expr(expr: &HirExpr) -> bool {
-        matches!(expr.kind, HirKind::Local(_) | HirKind::Field(..) | HirKind::Index(..))
+        matches!(
+            expr.kind,
+            HirKind::Local(_) | HirKind::Field(..) | HirKind::Index(..)
+        )
     }
 
     fn owned_local(&self, name: &str) -> bool {
@@ -276,7 +301,9 @@ impl Emitter<'_> {
     }
 
     fn owned_local_expr(&self, expr: &HirExpr) -> Option<String> {
-        let HirKind::Local(name) = &expr.kind else { return None };
+        let HirKind::Local(name) = &expr.kind else {
+            return None;
+        };
         self.owned_local(name).then(|| name.clone())
     }
 
@@ -318,7 +345,9 @@ impl Emitter<'_> {
     }
 
     fn emit_control_cleanup(&self, out: &mut String) {
-        let Some(&start) = self.ownership_control_frames.last() else { return };
+        let Some(&start) = self.ownership_control_frames.last() else {
+            return;
+        };
         for frame in self.owned_block_locals[start..].iter().rev() {
             for (name, ty) in frame.iter().rev() {
                 if self.managed(ty) {
@@ -341,11 +370,21 @@ impl Emitter<'_> {
                 out.push_str(&format!("    ostrin_release((void*){name});\n"));
             }
         }
-        self.owned_block_locals.pop().expect("loop ownership frame must exist");
-        self.ownership_control_frames.pop().expect("loop control frame must exist");
+        self.owned_block_locals
+            .pop()
+            .expect("loop ownership frame must exist");
+        self.ownership_control_frames
+            .pop()
+            .expect("loop control frame must exist");
     }
 
-    fn emit_return(&mut self, expr: Option<&HirExpr>, code: String, ty: &Ty, out: &mut String) -> Bail<()> {
+    fn emit_return(
+        &mut self,
+        expr: Option<&HirExpr>,
+        code: String,
+        ty: &Ty,
+        out: &mut String,
+    ) -> Bail<()> {
         if self.managed(ty) {
             let cty = self.c_type(ty)?;
             let temp = self.next_temp();
@@ -357,7 +396,11 @@ impl Emitter<'_> {
             self.cleanup(out, transfer.as_deref());
             out.push_str(&format!("    return {temp};\n"));
         } else if *ty != Ty::Void
-            && (!self.owned_locals.is_empty() || self.owned_block_locals.iter().any(|frame| !frame.is_empty()))
+            && (!self.owned_locals.is_empty()
+                || self
+                    .owned_block_locals
+                    .iter()
+                    .any(|frame| !frame.is_empty()))
         {
             // Evaluate wrapper returns before releasing managed locals. A
             // by-value Result/Option may still contain a managed pointer.
@@ -416,7 +459,9 @@ impl Emitter<'_> {
                 out.push_str(&format!("    ostrin_release((void*){name});\n"));
             }
         }
-        self.owned_block_locals.pop().expect("statement ownership frame must exist");
+        self.owned_block_locals
+            .pop()
+            .expect("statement ownership frame must exist");
         Ok(())
     }
 
@@ -450,7 +495,9 @@ impl Emitter<'_> {
                         if Self::borrowed_expr(value) {
                             out.push_str(&format!("    ostrin_retain((void*){temp});\n"));
                         }
-                        out.push_str(&format!("    ostrin_release((void*){name}); {name} = {temp};\n"));
+                        out.push_str(&format!(
+                            "    ostrin_release((void*){name}); {name} = {temp};\n"
+                        ));
                     } else {
                         out.push_str(&format!("    {name} = {code};\n"));
                     }
@@ -713,7 +760,10 @@ impl Emitter<'_> {
                 )
             }
             Pattern::Ident(name) => {
-                let unit = self.variant(name, ty).filter(|v| v.fields.is_empty() && self.c_type(ty).ok().as_deref() == Some(v.enum_name.as_str()));
+                let unit = self.variant(name, ty).filter(|v| {
+                    v.fields.is_empty()
+                        && self.c_type(ty).ok().as_deref() == Some(v.enum_name.as_str())
+                });
                 match unit {
                     Some(v) => {
                         condition.push_str(&format!(" && ({var}.tag == {})", v.tag));
@@ -726,7 +776,10 @@ impl Emitter<'_> {
                 Ok(())
             }
             Pattern::Variant(name, fields) => {
-                let v = self.variant(name, ty).filter(|v| self.c_type(ty).ok().as_deref() == Some(v.enum_name.as_str())).ok_or(())?;
+                let v = self
+                    .variant(name, ty)
+                    .filter(|v| self.c_type(ty).ok().as_deref() == Some(v.enum_name.as_str()))
+                    .ok_or(())?;
                 condition.push_str(&format!(" && ({var}.tag == {})", v.tag));
                 for (position, (field_name, sub)) in fields.iter().enumerate() {
                     let (actual, field_c) = v
@@ -849,7 +902,9 @@ impl Emitter<'_> {
             }
             format!("({{ {body} {tail}; }})")
         };
-        self.owned_block_locals.pop().expect("block ownership frame must exist");
+        self.owned_block_locals
+            .pop()
+            .expect("block ownership frame must exist");
         Ok(result)
     }
 
@@ -915,7 +970,11 @@ impl Emitter<'_> {
             BinOp::And | BinOp::Or => return Err(()),
         };
         let result = matches!(op, BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div);
-        Ok(if result { format!("((float)(({lc}) {c_op} ({rc})))") } else { format!("(({lc}) {c_op} ({rc}))") })
+        Ok(if result {
+            format!("((float)(({lc}) {c_op} ({rc})))")
+        } else {
+            format!("(({lc}) {c_op} ({rc}))")
+        })
     }
 
     fn expr(&mut self, e: &HirExpr) -> Bail<String> {
@@ -937,7 +996,10 @@ impl Emitter<'_> {
             HirKind::Str(s) => Ok(crate::codegen::c_string_literal(s)),
             HirKind::Local(name) => Ok(name.clone()),
             HirKind::Lambda(params, body) => self.lambda_expr(e, params, body),
-            HirKind::Global(name) if self.variant(name, &e.ty).is_some_and(|v| v.fields.is_empty()) =>
+            HirKind::Global(name)
+                if self
+                    .variant(name, &e.ty)
+                    .is_some_and(|v| v.fields.is_empty()) =>
             {
                 let v = self.variant(name, &e.ty).ok_or(())?;
                 if self.c_type(&e.ty)? != v.enum_name {
@@ -962,7 +1024,12 @@ impl Emitter<'_> {
             HirKind::Record { fields, .. } => {
                 let record = match &e.ty {
                     Ty::Named(name) if self.world.records.contains_key(name) => name.clone(),
-                    Ty::Applied(..) => self.world.applied_records.get(&e.ty.describe()).cloned().ok_or(())?,
+                    Ty::Applied(..) => self
+                        .world
+                        .applied_records
+                        .get(&e.ty.describe())
+                        .cloned()
+                        .ok_or(())?,
                     _ => return Err(()),
                 };
                 let declared = self.world.records.get(&record).ok_or(())?.clone();
@@ -1034,7 +1101,9 @@ impl Emitter<'_> {
                     let recv_code = self.expr(recv)?;
                     match &recv.ty {
                         Ty::Float32 => return Ok(format!("ostrin_single_to_string({recv_code})")),
-                        Ty::Sized(kind) if kind.is_signed() => return Ok(format!("ostrin_int_to_string({recv_code})")),
+                        Ty::Sized(kind) if kind.is_signed() => {
+                            return Ok(format!("ostrin_int_to_string({recv_code})"))
+                        }
                         Ty::Sized(_) => return Ok(format!("ostrin_uint_to_string({recv_code})")),
                         _ => {}
                     }
@@ -1077,7 +1146,9 @@ impl Emitter<'_> {
                     UnaryOp::Neg if matches!(inner.ty, Ty::Int | Ty::Float | Ty::Float32) => {
                         Ok(format!("(-{code})"))
                     }
-                    UnaryOp::Neg if matches!(inner.ty, Ty::Sized(kind) if kind.is_signed()) => Ok(format!("(-{code})")),
+                    UnaryOp::Neg if matches!(inner.ty, Ty::Sized(kind) if kind.is_signed()) => {
+                        Ok(format!("(-{code})"))
+                    }
                     UnaryOp::Not if inner.ty == Ty::Bool => Ok(format!("(!{code})")),
                     _ => Err(()),
                 }
@@ -1102,9 +1173,18 @@ impl Emitter<'_> {
                             if !lf && !rf {
                                 return Ok(format!("ostrin_str_concat({lc}, {rc})"));
                             }
-                            let (a, b, out) = (self.next_temp(), self.next_temp(), self.next_temp());
-                            let release_a = if lf { format!("ostrin_release((void*){a}); ") } else { String::new() };
-                            let release_b = if rf { format!("ostrin_release((void*){b}); ") } else { String::new() };
+                            let (a, b, out) =
+                                (self.next_temp(), self.next_temp(), self.next_temp());
+                            let release_a = if lf {
+                                format!("ostrin_release((void*){a}); ")
+                            } else {
+                                String::new()
+                            };
+                            let release_b = if rf {
+                                format!("ostrin_release((void*){b}); ")
+                            } else {
+                                String::new()
+                            };
                             Ok(format!(
                                 "({{ const char* {a} = {lc}; const char* {b} = {rc}; const char* {out} = ostrin_str_concat({a}, {b}); {release_a}{release_b}{out}; }})"
                             ))
@@ -1164,8 +1244,7 @@ impl Emitter<'_> {
                 };
                 self.constructor(e, name, args)
             }
-            HirKind::Call { callee, args, .. }
-                if matches!(&callee.kind, HirKind::Global(name) if self.variant(name, &e.ty).is_some()) =>
+            HirKind::Call { callee, args, .. } if matches!(&callee.kind, HirKind::Global(name) if self.variant(name, &e.ty).is_some()) =>
             {
                 let HirKind::Global(name) = &callee.kind else {
                     return Err(());
@@ -1200,8 +1279,12 @@ impl Emitter<'_> {
                         Ty::Int => Ok(format!("printf(\"%lld\\n\", (long long)({code}))")),
                         Ty::Float => Ok(format!("ostrin_print_float({code})")),
                         Ty::Float32 => Ok(format!("ostrin_print_single({code})")),
-                        Ty::Sized(kind) if kind.is_signed() => Ok(format!("printf(\"%lld\\n\", (long long)({code}))")),
-                        Ty::Sized(_) => Ok(format!("printf(\"%llu\\n\", (unsigned long long)({code}))")),
+                        Ty::Sized(kind) if kind.is_signed() => {
+                            Ok(format!("printf(\"%lld\\n\", (long long)({code}))"))
+                        }
+                        Ty::Sized(_) => {
+                            Ok(format!("printf(\"%llu\\n\", (unsigned long long)({code}))"))
+                        }
                         Ty::Bool => Ok(format!(
                             "printf(\"%s\\n\", (({code}) ? \"true\" : \"false\"))"
                         )),

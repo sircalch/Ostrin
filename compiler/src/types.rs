@@ -45,14 +45,24 @@ pub fn dim_to_string(d: &Dimension) -> String {
     }
     let mut parts: Vec<String> = d
         .iter()
-        .map(|(k, v)| if *v == 1 { k.clone() } else { format!("{k}^{v}") })
+        .map(|(k, v)| {
+            if *v == 1 {
+                k.clone()
+            } else {
+                format!("{k}^{v}")
+            }
+        })
         .collect();
     parts.sort();
     parts.join("*")
 }
 
 fn dim_of(parts: &[(&str, i32)]) -> Dimension {
-    parts.iter().filter(|(_, e)| *e != 0).map(|(k, e)| (k.to_string(), *e)).collect()
+    parts
+        .iter()
+        .filter(|(_, e)| *e != 0)
+        .map(|(k, e)| (k.to_string(), *e))
+        .collect()
 }
 
 // Units and dimensions declared by the program (`unit`, `dimension`, `define`,
@@ -75,7 +85,18 @@ pub fn is_user_dimension(name: &str) -> bool {
 /// `dimension Money`. Declaring the same dimension twice is harmless.
 pub fn declare_dimension(name: &str) -> Result<(), String> {
     if named_dimension(name).is_some()
-        || matches!(name, "Length" | "Mass" | "Time" | "Temperature" | "ElectricCurrent" | "AmountOfSubstance" | "LuminousIntensity" | "Currency" | "Information")
+        || matches!(
+            name,
+            "Length"
+                | "Mass"
+                | "Time"
+                | "Temperature"
+                | "ElectricCurrent"
+                | "AmountOfSubstance"
+                | "LuminousIntensity"
+                | "Currency"
+                | "Information"
+        )
     {
         return Err(format!("dimension '{name}' already exists"));
     }
@@ -92,12 +113,16 @@ pub fn declare_dimension(name: &str) -> Result<(), String> {
 /// towards the coherent unit until a `define` gives it another.
 pub fn declare_unit(symbol: &str, dim: Dimension) -> Result<(), String> {
     if builtin_unit_info(symbol).is_some() {
-        return Err(format!("unit '{symbol}' is already defined by the standard catalog"));
+        return Err(format!(
+            "unit '{symbol}' is already defined by the standard catalog"
+        ));
     }
     USER_UNITS.with(|u| {
         let mut u = u.borrow_mut();
         match u.iter().find(|(s, _, _)| s == symbol) {
-            Some((_, existing, _)) if *existing != dim => Err(format!("unit '{symbol}' was already declared with another dimension")),
+            Some((_, existing, _)) if *existing != dim => Err(format!(
+                "unit '{symbol}' was already declared with another dimension"
+            )),
             Some(_) => Ok(()),
             None => {
                 u.push((symbol.to_string(), dim, 1.0));
@@ -116,8 +141,12 @@ pub fn define_unit(symbol: &str, factor: f64) -> Result<(), String> {
                 entry.2 = factor;
                 Ok(())
             }
-            None if builtin_unit_info(symbol).is_some() => Err(format!("'{symbol}' is a standard unit; 'define' only sets units declared with 'unit'")),
-            None => Err(format!("unknown unit '{symbol}' in 'define' (declare it with 'unit {symbol} : Dimension')")),
+            None if builtin_unit_info(symbol).is_some() => Err(format!(
+                "'{symbol}' is a standard unit; 'define' only sets units declared with 'unit'"
+            )),
+            None => Err(format!(
+                "unknown unit '{symbol}' in 'define' (declare it with 'unit {symbol} : Dimension')"
+            )),
         }
     })
 }
@@ -129,7 +158,12 @@ pub fn user_units() -> Vec<(String, Dimension, f64)> {
 
 pub fn unit_info(symbol: &str) -> Option<(Dimension, f64)> {
     builtin_unit_info(symbol).or_else(|| {
-        USER_UNITS.with(|u| u.borrow().iter().find(|(s, _, _)| s == symbol).map(|(_, d, f)| (d.clone(), *f)))
+        USER_UNITS.with(|u| {
+            u.borrow()
+                .iter()
+                .find(|(s, _, _)| s == symbol)
+                .map(|(_, d, f)| (d.clone(), *f))
+        })
     })
 }
 
@@ -241,28 +275,61 @@ pub fn dim_describe(d: &Dimension) -> String {
     let mut num: Vec<(&String, &i32)> = d.iter().filter(|(_, e)| **e > 0).collect();
     let mut den: Vec<(&String, &i32)> = d.iter().filter(|(_, e)| **e < 0).collect();
     let rank = |k: &str| {
-        ["Mass", "Length", "Time", "ElectricCurrent", "Temperature", "AmountOfSubstance", "LuminousIntensity"]
-            .iter()
-            .position(|b| *b == k)
-            .unwrap_or(99)
+        [
+            "Mass",
+            "Length",
+            "Time",
+            "ElectricCurrent",
+            "Temperature",
+            "AmountOfSubstance",
+            "LuminousIntensity",
+        ]
+        .iter()
+        .position(|b| *b == k)
+        .unwrap_or(99)
     };
     num.sort_by(|a, b| (rank(a.0), a.0).cmp(&(rank(b.0), b.0)));
     den.sort_by(|a, b| (rank(a.0), a.0).cmp(&(rank(b.0), b.0)));
-    let part = |(k, e): (&String, i32)| if e == 1 { k.clone() } else { format!("{k}^{e}") };
+    let part = |(k, e): (&String, i32)| {
+        if e == 1 {
+            k.clone()
+        } else {
+            format!("{k}^{e}")
+        }
+    };
     let mut text = if num.is_empty() {
         "1".to_string()
     } else {
-        num.iter().map(|(k, e)| part((k, **e))).collect::<Vec<_>>().join("*")
+        num.iter()
+            .map(|(k, e)| part((k, **e)))
+            .collect::<Vec<_>>()
+            .join("*")
     };
     for (k, e) in den {
         text.push('/');
         text.push_str(&part((k, -*e)));
     }
     const NAMES: [&str; 15] = [
-        "Area", "Volume", "Velocity", "Acceleration", "Frequency", "Force", "Momentum", "Energy", "Power",
-        "Pressure", "Density", "Charge", "Voltage", "Resistance", "Concentration",
+        "Area",
+        "Volume",
+        "Velocity",
+        "Acceleration",
+        "Frequency",
+        "Force",
+        "Momentum",
+        "Energy",
+        "Power",
+        "Pressure",
+        "Density",
+        "Charge",
+        "Voltage",
+        "Resistance",
+        "Concentration",
     ];
-    if let Some(name) = NAMES.iter().find(|n| named_dimension(n).as_ref() == Some(d)) {
+    if let Some(name) = NAMES
+        .iter()
+        .find(|n| named_dimension(n).as_ref() == Some(d))
+    {
         text.push_str(&format!(" ({name})"));
     }
     text
@@ -302,7 +369,9 @@ pub fn unit_atoms(expr: &str) -> Result<Vec<(String, i32)>, String> {
                     break;
                 }
             }
-            exp = exp_str.parse().map_err(|_| format!("invalid exponent in '{expr}'"))?;
+            exp = exp_str
+                .parse()
+                .map_err(|_| format!("invalid exponent in '{expr}'"))?;
         }
         if atom != "1" {
             if unit_info(&atom).is_none() {
@@ -336,7 +405,11 @@ pub fn unit_pow(base: f64, exp: i32) -> f64 {
     for _ in 0..exp.unsigned_abs() {
         r *= base;
     }
-    if exp < 0 { 1.0 / r } else { r }
+    if exp < 0 {
+        1.0 / r
+    } else {
+        r
+    }
 }
 
 /// Resuelve una expresión de unidad compuesta ya concatenada por el lexer/parser
@@ -372,13 +445,31 @@ fn single_base(atom: &str) -> Option<String> {
 }
 
 pub fn format_unit_atoms(atoms: &[(String, i32)]) -> String {
-    let part = |a: &str, e: i32| if e == 1 { a.to_string() } else { format!("{a}^{e}") };
-    let num: Vec<String> = atoms.iter().filter(|(_, e)| *e > 0).map(|(a, e)| part(a, *e)).collect();
-    let den: Vec<String> = atoms.iter().filter(|(_, e)| *e < 0).map(|(a, e)| part(a, -*e)).collect();
+    let part = |a: &str, e: i32| {
+        if e == 1 {
+            a.to_string()
+        } else {
+            format!("{a}^{e}")
+        }
+    };
+    let num: Vec<String> = atoms
+        .iter()
+        .filter(|(_, e)| *e > 0)
+        .map(|(a, e)| part(a, *e))
+        .collect();
+    let den: Vec<String> = atoms
+        .iter()
+        .filter(|(_, e)| *e < 0)
+        .map(|(a, e)| part(a, -*e))
+        .collect();
     if num.is_empty() && den.is_empty() {
         return String::new();
     }
-    let mut text = if num.is_empty() { "1".to_string() } else { num.join("*") };
+    let mut text = if num.is_empty() {
+        "1".to_string()
+    } else {
+        num.join("*")
+    };
     for d in den {
         text.push('/');
         text.push_str(&d);

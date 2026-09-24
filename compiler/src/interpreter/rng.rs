@@ -81,7 +81,9 @@ impl RngState {
 }
 
 fn shape_of(value: &Value) -> Result<Vec<usize>, RuntimeError> {
-    let Value::List(items) = value else { return fail("an array shape must be a List<Int>") };
+    let Value::List(items) = value else {
+        return fail("an array shape must be a List<Int>");
+    };
     let mut shape = Vec::new();
     for item in items.borrow().iter() {
         match item {
@@ -103,7 +105,11 @@ fn as_int(value: &Value) -> Result<i64, RuntimeError> {
 }
 
 /// `rng.method(args)`.
-pub fn call_method(rng: &mut RngState, method: &str, args: &[Value]) -> Result<Value, RuntimeError> {
+pub fn call_method(
+    rng: &mut RngState,
+    method: &str,
+    args: &[Value],
+) -> Result<Value, RuntimeError> {
     match (method, args) {
         ("next_float", []) => Ok(Value::Float(rng.next_float())),
         ("normal", []) => Ok(Value::Float(rng.normal())),
@@ -111,7 +117,15 @@ pub fn call_method(rng: &mut RngState, method: &str, args: &[Value]) -> Result<V
         ("rand", [shape]) | ("randn", [shape]) => {
             let shape = shape_of(shape)?;
             let count: usize = shape.iter().product();
-            let data = (0..count).map(|_| Value::Float(if method == "rand" { rng.next_float() } else { rng.normal() })).collect();
+            let data = (0..count)
+                .map(|_| {
+                    Value::Float(if method == "rand" {
+                        rng.next_float()
+                    } else {
+                        rng.normal()
+                    })
+                })
+                .collect();
             Ok(array::make(shape, data))
         }
         ("randint", [lo, hi, shape]) => {
@@ -134,7 +148,10 @@ pub fn call_method(rng: &mut RngState, method: &str, args: &[Value]) -> Result<V
                 let j = rng.next_int(0, i as i64 + 1)? as usize;
                 items.swap(i, j);
             }
-            Ok(array::make(vec![n as usize], items.into_iter().map(Value::Int).collect()))
+            Ok(array::make(
+                vec![n as usize],
+                items.into_iter().map(Value::Int).collect(),
+            ))
         }
         _ => fail(format!("Rng has no method '{method}' with these arguments")),
     }

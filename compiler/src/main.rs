@@ -33,7 +33,10 @@ static NEXT_C_SOURCE_ID: AtomicU64 = AtomicU64::new(0);
 /// thread stack on Windows. Everything runs on a thread with a much larger
 /// stack instead.
 fn main() -> ExitCode {
-    match std::thread::Builder::new().stack_size(512 * 1024 * 1024).spawn(real_main) {
+    match std::thread::Builder::new()
+        .stack_size(512 * 1024 * 1024)
+        .spawn(real_main)
+    {
         Ok(handle) => handle.join().unwrap_or(ExitCode::FAILURE),
         Err(_) => real_main(),
     }
@@ -93,17 +96,21 @@ fn real_main() -> ExitCode {
 
     let value_flags = ["--file", "--out", "--project", "--target", "--new"];
     let mut skip_next = false;
-    let positional = args.iter().skip(1).find(|a| {
-        if skip_next {
-            skip_next = false;
-            return false;
-        }
-        if value_flags.contains(&a.as_str()) {
-            skip_next = true;
-            return false;
-        }
-        !a.starts_with("--")
-    }).cloned();
+    let positional = args
+        .iter()
+        .skip(1)
+        .find(|a| {
+            if skip_next {
+                skip_next = false;
+                return false;
+            }
+            if value_flags.contains(&a.as_str()) {
+                skip_next = true;
+                return false;
+            }
+            !a.starts_with("--")
+        })
+        .cloned();
     let path_owned = if let Some(path) = positional {
         path
     } else if let Some(project) = argument_value(&args, "--project") {
@@ -121,7 +128,11 @@ fn real_main() -> ExitCode {
     let path = path_owned.as_str();
 
     if fmt_mode {
-        return format_file(path, args.iter().any(|a| a == "--write"), args.iter().any(|a| a == "--check"));
+        return format_file(
+            path,
+            args.iter().any(|a| a == "--write"),
+            args.iter().any(|a| a == "--check"),
+        );
     }
 
     if tokens_only {
@@ -135,14 +146,26 @@ fn real_main() -> ExitCode {
         return match lexer::Lexer::new(&source).tokenize() {
             Ok(tokens) => {
                 for token in &tokens {
-                    println!("{:4}:{:<4} {:<16} {:?}", token.line, token.col, format!("{:?}", token.kind), token.lexeme);
+                    println!(
+                        "{:4}:{:<4} {:<16} {:?}",
+                        token.line,
+                        token.col,
+                        format!("{:?}", token.kind),
+                        token.lexeme
+                    );
                 }
                 println!("\n{} tokens", tokens.len());
                 ExitCode::SUCCESS
             }
             Err(e) => {
                 if json {
-                    emit_json_diagnostic(None, &format!("lex error: {}", e.message), Some(path), Some(e.line), Some(e.col));
+                    emit_json_diagnostic(
+                        None,
+                        &format!("lex error: {}", e.message),
+                        Some(path),
+                        Some(e.line),
+                        Some(e.col),
+                    );
                 } else {
                     eprintln!("lex error at {}:{}: {}", e.line, e.col, e.message);
                 }
@@ -152,12 +175,19 @@ fn real_main() -> ExitCode {
     }
 
     let entry_path = Path::new(path);
-    let manifest_path = entry_path.parent().unwrap_or_else(|| Path::new(".")).join("ostrin.toml");
+    let manifest_path = entry_path
+        .parent()
+        .unwrap_or_else(|| Path::new("."))
+        .join("ostrin.toml");
     let deps = if manifest_path.is_file() {
         let manifest = match package::load_manifest(&manifest_path) {
             Ok(m) => m,
             Err(e) => {
-                if json { emit_json_diagnostic(None, &e, Some(path), None, None); } else { eprintln!("{e}"); }
+                if json {
+                    emit_json_diagnostic(None, &e, Some(path), None, None);
+                } else {
+                    eprintln!("{e}");
+                }
                 return ExitCode::FAILURE;
             }
         };
@@ -169,12 +199,18 @@ fn real_main() -> ExitCode {
         ) {
             Ok(r) => r,
             Err(e) => {
-                if json { emit_json_diagnostic(None, &e, Some(path), None, None); } else { eprintln!("{e}"); }
+                if json {
+                    emit_json_diagnostic(None, &e, Some(path), None, None);
+                } else {
+                    eprintln!("{e}");
+                }
                 return ExitCode::FAILURE;
             }
         };
         if !locked_packages {
-            if let Err(e) = package::write_lockfile(manifest_path.parent().unwrap(), &manifest, &resolved) {
+            if let Err(e) =
+                package::write_lockfile(manifest_path.parent().unwrap(), &manifest, &resolved)
+            {
                 eprintln!("warning: could not write ostrin.lock: {e}");
             }
         }
@@ -204,7 +240,9 @@ fn real_main() -> ExitCode {
                     eprintln!("{diagnostic}");
                 }
             }
-            if !json { eprintln!("\n{} error(es) de análisis", messages.len()); }
+            if !json {
+                eprintln!("\n{} error(es) de análisis", messages.len());
+            }
             return ExitCode::FAILURE;
         }
     };
@@ -275,7 +313,13 @@ fn real_main() -> ExitCode {
             .expr_types
             .iter()
             .filter(|(_, ty)| types::ty_contains_unknown(ty))
-            .map(|(key, _)| (key.file.clone().unwrap_or_else(|| path.to_string()), key.start.line, key.start.col))
+            .map(|(key, _)| {
+                (
+                    key.file.clone().unwrap_or_else(|| path.to_string()),
+                    key.start.line,
+                    key.start.col,
+                )
+            })
             .collect();
         unknown.sort();
         println!("expressions: {total}");
@@ -338,7 +382,9 @@ fn real_main() -> ExitCode {
                 eprintln!("error OSTRIN-{}: {}", e.code, e.message);
             }
         }
-        if !json { eprintln!("\n{} error(es)", errors.len()); }
+        if !json {
+            eprintln!("\n{} error(es)", errors.len());
+        }
         return ExitCode::FAILURE;
     }
 
@@ -382,7 +428,11 @@ fn real_main() -> ExitCode {
         for violation in &report.violations {
             println!("  {violation}");
         }
-        return if report.violations.is_empty() { ExitCode::SUCCESS } else { ExitCode::FAILURE };
+        return if report.violations.is_empty() {
+            ExitCode::SUCCESS
+        } else {
+            ExitCode::FAILURE
+        };
     }
 
     if ownership_report {
@@ -398,7 +448,11 @@ fn real_main() -> ExitCode {
         let movable_types = ownership::movable_types(&items);
         let violations = ownership::check_moves_for_types(&ir_program, &movable_types);
         print!("{}", ownership::dump_moves(&violations));
-        return if violations.is_empty() { ExitCode::SUCCESS } else { ExitCode::FAILURE };
+        return if violations.is_empty() {
+            ExitCode::SUCCESS
+        } else {
+            ExitCode::FAILURE
+        };
     }
 
     if ownership_ir {
@@ -407,7 +461,11 @@ fn real_main() -> ExitCode {
         let (lowered, summary) = ownership::lower_linear(&ir_program);
         print!("{}", ir::dump(&lowered));
         print!("{}", ownership::dump_lowering(&summary));
-        return if ir::verify(&lowered).violations.is_empty() { ExitCode::SUCCESS } else { ExitCode::FAILURE };
+        return if ir::verify(&lowered).violations.is_empty() {
+            ExitCode::SUCCESS
+        } else {
+            ExitCode::FAILURE
+        };
     }
 
     // E1101 is part of the normal compiler contract now: every executable
@@ -445,7 +503,9 @@ fn real_main() -> ExitCode {
     let native_threads = args.iter().any(|a| a == "--native-threads");
     let target = argument_value(&args, "--target").unwrap_or_else(|| "native".to_string());
     if target != "native" && target != "wasm32-wasi" {
-        eprintln!("error: unsupported compilation target '{target}' (expected native or wasm32-wasi)");
+        eprintln!(
+            "error: unsupported compilation target '{target}' (expected native or wasm32-wasi)"
+        );
         return ExitCode::FAILURE;
     }
     if target != "native" && !(emit_c || compile_native) {
@@ -457,7 +517,18 @@ fn real_main() -> ExitCode {
         return ExitCode::FAILURE;
     }
     if emit_c || compile_native {
-        return run_codegen(&items, &typed_program, entry_path, path, &args, emit_c, json, leak_check, native_threads, &target);
+        return run_codegen(
+            &items,
+            &typed_program,
+            entry_path,
+            path,
+            &args,
+            emit_c,
+            json,
+            leak_check,
+            native_threads,
+            &target,
+        );
     }
     if leak_check || native_threads {
         eprintln!("error: --leak-check and --native-threads require --emit-c or --compile");
@@ -466,14 +537,19 @@ fn real_main() -> ExitCode {
 
     if test_mode {
         // Runs every zero-argument `test_*` function, each in a fresh interpreter.
-        let names = interpreter::Interpreter::new(&items).with_literal_kinds(typed_program.literal_kinds.clone()).test_function_names();
+        let names = interpreter::Interpreter::new(&items)
+            .with_literal_kinds(typed_program.literal_kinds.clone())
+            .test_function_names();
         if names.is_empty() {
             eprintln!("error: no 'test_*' functions found in '{path}'");
             return ExitCode::FAILURE;
         }
         let mut failed = 0usize;
         for name in &names {
-            match interpreter::Interpreter::new(&items).with_literal_kinds(typed_program.literal_kinds.clone()).run_function(name) {
+            match interpreter::Interpreter::new(&items)
+                .with_literal_kinds(typed_program.literal_kinds.clone())
+                .run_function(name)
+            {
                 Ok(_) => println!("test {name} ... ok"),
                 Err(message) => {
                     failed += 1;
@@ -481,21 +557,41 @@ fn real_main() -> ExitCode {
                 }
             }
         }
-        println!("
-test result: {}. {} passed; {failed} failed", if failed == 0 { "ok" } else { "FAILED" }, names.len() - failed);
-        return if failed == 0 { ExitCode::SUCCESS } else { ExitCode::FAILURE };
+        println!(
+            "
+test result: {}. {} passed; {failed} failed",
+            if failed == 0 { "ok" } else { "FAILED" },
+            names.len() - failed
+        );
+        return if failed == 0 {
+            ExitCode::SUCCESS
+        } else {
+            ExitCode::FAILURE
+        };
     }
 
     if !run {
-        println!("OK — no se encontraron errores de tipo ({} elemento(s)).", items.len());
+        println!(
+            "OK — no se encontraron errores de tipo ({} elemento(s)).",
+            items.len()
+        );
         return ExitCode::SUCCESS;
     }
 
-    match interpreter::Interpreter::new(&items).with_literal_kinds(typed_program.literal_kinds.clone()).run_main() {
+    match interpreter::Interpreter::new(&items)
+        .with_literal_kinds(typed_program.literal_kinds.clone())
+        .run_main()
+    {
         Ok(_) => ExitCode::SUCCESS,
         Err(msg) => {
             if json {
-                emit_json_diagnostic(None, &format!("runtime error: {msg}"), Some(path), None, None);
+                emit_json_diagnostic(
+                    None,
+                    &format!("runtime error: {msg}"),
+                    Some(path),
+                    None,
+                    None,
+                );
             } else {
                 eprintln!("runtime error: {msg}");
             }
@@ -520,17 +616,18 @@ fn run_codegen(
     native_threads: bool,
     target: &str,
 ) -> ExitCode {
-    let source = match codegen::generate_with_native_options(items, typed, leak_check, native_threads) {
-        Ok((source, _)) => source,
-        Err(message) => {
-            if json {
-                emit_json_diagnostic(None, &message, Some(display_path), None, None);
-            } else {
-                eprintln!("error: {message}");
+    let source =
+        match codegen::generate_with_native_options(items, typed, leak_check, native_threads) {
+            Ok((source, _)) => source,
+            Err(message) => {
+                if json {
+                    emit_json_diagnostic(None, &message, Some(display_path), None, None);
+                } else {
+                    eprintln!("error: {message}");
+                }
+                return ExitCode::FAILURE;
             }
-            return ExitCode::FAILURE;
-        }
-    };
+        };
 
     if emit_c {
         return match argument_value(args, "--out") {
@@ -550,14 +647,21 @@ fn run_codegen(
 
     let Some(compiler) = codegen::find_c_compiler_for_target(target) else {
         if target == "wasm32-wasi" {
-            eprintln!("error: no WASI C compiler found (set $OSTRIN_WASI_CC or install clang/wasi-sdk)");
+            eprintln!(
+                "error: no WASI C compiler found (set $OSTRIN_WASI_CC or install clang/wasi-sdk)"
+            );
         } else {
-            eprintln!("error: no GNU-compatible C compiler found (checked $OSTRIN_CC, cc, gcc, clang)");
+            eprintln!(
+                "error: no GNU-compatible C compiler found (checked $OSTRIN_CC, cc, gcc, clang)"
+            );
         }
         return ExitCode::FAILURE;
     };
     let output_path = argument_value(args, "--out").unwrap_or_else(|| {
-        let stem = entry_path.file_stem().and_then(|s| s.to_str()).unwrap_or("a");
+        let stem = entry_path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("a");
         let dir = entry_path.parent().unwrap_or_else(|| Path::new("."));
         let exe_name = if target == "wasm32-wasi" {
             format!("{stem}.wasm")
@@ -569,7 +673,11 @@ fn run_codegen(
         dir.join(exe_name).display().to_string()
     });
     let c_source_id = NEXT_C_SOURCE_ID.fetch_add(1, Ordering::Relaxed);
-    let c_path = env::temp_dir().join(format!("ostrin_codegen_{}_{}.c", std::process::id(), c_source_id));
+    let c_path = env::temp_dir().join(format!(
+        "ostrin_codegen_{}_{}.c",
+        std::process::id(),
+        c_source_id
+    ));
     if let Err(e) = fs::write(&c_path, &source) {
         eprintln!("error: could not write temporary C source: {e}");
         return ExitCode::FAILURE;
@@ -657,21 +765,31 @@ fn format_file(path: &str, write: bool, check: bool) -> ExitCode {
 fn scaffold_project(directory: &str) -> ExitCode {
     let root = Path::new(directory);
     let name = root.file_name().and_then(|n| n.to_str()).unwrap_or("");
-    if name.is_empty() || !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-') {
+    if name.is_empty()
+        || !name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+    {
         eprintln!("error: '{directory}' does not end in a valid project name (letters, digits, '-' and '_')");
         return ExitCode::FAILURE;
     }
-    if root.exists() && fs::read_dir(root).map(|mut entries| entries.next().is_some()).unwrap_or(true) {
+    if root.exists()
+        && fs::read_dir(root)
+            .map(|mut entries| entries.next().is_some())
+            .unwrap_or(true)
+    {
         eprintln!("error: '{directory}' already exists and is not empty");
         return ExitCode::FAILURE;
     }
-    let manifest = format!("[package]
+    let manifest = format!(
+        "[package]
 name = \"{name}\"
 version = \"0.1.0\"
 entry = \"main.ostrin\"
 
 [dependencies]
-");
+"
+    );
     let entry = "import std.math
 
 fn greet(name: String) -> String {
@@ -687,16 +805,26 @@ fn test_greet() -> Void {
     assert_eq(greet(\"you\"), \"Hello, you!\")
 }
 ";
-    let files = [("ostrin.toml", manifest.as_str()), ("main.ostrin", entry), (".gitignore", "*.exe
+    let files = [
+        ("ostrin.toml", manifest.as_str()),
+        ("main.ostrin", entry),
+        (
+            ".gitignore",
+            "*.exe
 *.c
-")];
+",
+        ),
+    ];
     if let Err(error) = fs::create_dir_all(root) {
         eprintln!("error: could not create '{directory}': {error}");
         return ExitCode::FAILURE;
     }
     for (file, content) in files {
         if let Err(error) = fs::write(root.join(file), content) {
-            eprintln!("error: could not write '{}': {error}", root.join(file).display());
+            eprintln!(
+                "error: could not write '{}': {error}",
+                root.join(file).display()
+            );
             return ExitCode::FAILURE;
         }
     }
@@ -733,7 +861,9 @@ fn print_help() {
     println!("  --ownership-check   Detect managed values used after channel send (E1101)");
     println!("  --leak-check       Report native allocations before process cleanup (with --emit-c/--compile)");
     println!("  --native-threads   Use OS threads and blocking native channels (with --emit-c/--compile)");
-    println!("  --emit-c      Transpile to C (a supported subset only; see docs) instead of running");
+    println!(
+        "  --emit-c      Transpile to C (a supported subset only; see docs) instead of running"
+    );
     println!("  --compile     Transpile to C and compile it to a native executable or WASI module");
     println!("  --target NAME Select native (default) or wasm32-wasi for --emit-c/--compile");
     println!("  --project DIR Compile the entry declared by DIR/ostrin.toml");
@@ -753,7 +883,11 @@ fn argument_value(args: &[String], flag: &str) -> Option<String> {
 
 fn project_entry_path(project: &str) -> Result<String, String> {
     let candidate = Path::new(project);
-    let manifest_path = if candidate.is_file() { candidate.to_path_buf() } else { candidate.join("ostrin.toml") };
+    let manifest_path = if candidate.is_file() {
+        candidate.to_path_buf()
+    } else {
+        candidate.join("ostrin.toml")
+    };
     let manifest = package::load_manifest(&manifest_path)?;
     let root = manifest_path.parent().unwrap_or_else(|| Path::new("."));
     Ok(root.join(manifest.entry).display().to_string())
@@ -763,7 +897,13 @@ fn check_stdin(source_file: &str, json: bool) -> ExitCode {
     let mut source = String::new();
     if let Err(error) = io::stdin().read_to_string(&mut source) {
         if json {
-            emit_json_diagnostic(None, &format!("could not read stdin: {error}"), Some(source_file), None, None);
+            emit_json_diagnostic(
+                None,
+                &format!("could not read stdin: {error}"),
+                Some(source_file),
+                None,
+                None,
+            );
         } else {
             eprintln!("could not read stdin: {error}");
         }
@@ -782,7 +922,10 @@ fn check_stdin(source_file: &str, json: bool) -> ExitCode {
                     Some(error.col),
                 );
             } else {
-                eprintln!("error OSTRIN-E0002: lex error at {}:{}: {}", error.line, error.col, error.message);
+                eprintln!(
+                    "error OSTRIN-E0002: lex error at {}:{}: {}",
+                    error.line, error.col, error.message
+                );
             }
             return ExitCode::FAILURE;
         }
@@ -799,7 +942,10 @@ fn check_stdin(source_file: &str, json: bool) -> ExitCode {
                 Some(error.col),
             );
         } else {
-            eprintln!("error OSTRIN-E0001: parse error at {}:{}: {}", error.line, error.col, error.message);
+            eprintln!(
+                "error OSTRIN-E0001: parse error at {}:{}: {}",
+                error.line, error.col, error.message
+            );
         }
     }
 

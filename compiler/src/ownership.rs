@@ -70,7 +70,10 @@ struct UsePoint {
 }
 
 pub fn analyze(program: &IrProgram) -> OwnershipReport {
-    let mut report = OwnershipReport { functions: program.functions.len(), ..OwnershipReport::default() };
+    let mut report = OwnershipReport {
+        functions: program.functions.len(),
+        ..OwnershipReport::default()
+    };
     for function in &program.functions {
         analyze_function(function, &mut report);
     }
@@ -88,7 +91,11 @@ fn reachable_region_blocks(function: &crate::ir::IrFunction, root: usize) -> Opt
         let terminator = block.terminator.as_ref()?;
         match terminator {
             IrTerminator::Goto(target) => pending.push(*target),
-            IrTerminator::Branch { then_block, else_block, .. } => {
+            IrTerminator::Branch {
+                then_block,
+                else_block,
+                ..
+            } => {
                 pending.push(*then_block);
                 pending.push(*else_block);
             }
@@ -112,7 +119,10 @@ fn reachable_region_blocks(function: &crate::ir::IrFunction, root: usize) -> Opt
 /// can still return it to the caller.
 pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
     let mut lowered = program.clone();
-    let mut summary = LoweringSummary { functions: lowered.functions.len(), ..LoweringSummary::default() };
+    let mut summary = LoweringSummary {
+        functions: lowered.functions.len(),
+        ..LoweringSummary::default()
+    };
 
     for function in &mut lowered.functions {
         let mut definitions: HashMap<ValueId, (Ty, usize, usize)> = HashMap::new();
@@ -143,7 +153,9 @@ pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
             if region_blocks_by_root.contains_key(region) {
                 continue;
             }
-            let Some(region_blocks) = reachable_region_blocks(function, *region) else { continue };
+            let Some(region_blocks) = reachable_region_blocks(function, *region) else {
+                continue;
+            };
             let local_definitions: HashSet<ValueId> = region_blocks
                 .iter()
                 .filter_map(|block| function.blocks.get(*block))
@@ -152,7 +164,9 @@ pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
                 .collect();
             let mut captured = HashSet::new();
             for region_id in &region_blocks {
-                let Some(region_block) = function.blocks.get(*region_id) else { continue };
+                let Some(region_block) = function.blocks.get(*region_id) else {
+                    continue;
+                };
                 for nested in &region_block.instructions {
                     for value in used_values(nested) {
                         if !local_definitions.contains(&value) {
@@ -177,11 +191,19 @@ pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
         roots.sort_by_key(|region| std::cmp::Reverse(*region));
         let mut resolved_captures: HashMap<usize, HashSet<ValueId>> = HashMap::new();
         for region in roots {
-            let region_blocks = region_blocks_by_root.get(&region).cloned().unwrap_or_default();
-            let local_definitions = region_definitions_by_root.get(&region).cloned().unwrap_or_default();
+            let region_blocks = region_blocks_by_root
+                .get(&region)
+                .cloned()
+                .unwrap_or_default();
+            let local_definitions = region_definitions_by_root
+                .get(&region)
+                .cloned()
+                .unwrap_or_default();
             let mut captured = direct_captures_by_root.remove(&region).unwrap_or_default();
             for region_id in &region_blocks {
-                let Some(region_block) = function.blocks.get(*region_id) else { continue };
+                let Some(region_block) = function.blocks.get(*region_id) else {
+                    continue;
+                };
                 for instruction in &region_block.instructions {
                     if let IrInstr::Spawn { region: nested, .. } = instruction {
                         if let Some(nested_captures) = resolved_captures.get(nested) {
@@ -203,7 +225,9 @@ pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
             }
         }
         for (parent, index, region) in &spawn_sites {
-            let Some(captured) = resolved_captures.get(region) else { continue };
+            let Some(captured) = resolved_captures.get(region) else {
+                continue;
+            };
             let inherited = region_owner_by_block
                 .get(parent)
                 .and_then(|owner| resolved_captures.get(owner));
@@ -225,7 +249,10 @@ pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
                 }
                 if let IrInstr::Phi { incoming, .. } = instruction {
                     for (predecessor, value) in incoming {
-                        phi_edges.entry(*value).or_default().push((*predecessor, block.id));
+                        phi_edges
+                            .entry(*value)
+                            .or_default()
+                            .push((*predecessor, block.id));
                     }
                 }
                 for value in used_values(instruction) {
@@ -235,7 +262,10 @@ pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
                     {
                         continue;
                     }
-                    uses.entry(value).or_default().push(UsePoint { block: block.id, instruction: index });
+                    uses.entry(value).or_default().push(UsePoint {
+                        block: block.id,
+                        instruction: index,
+                    });
                 }
                 if matches!(instruction, IrInstr::Opaque { .. }) {
                     for value in used_values(instruction) {
@@ -259,7 +289,9 @@ pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
             }
         }
         for (block, instruction, value) in capture_sites {
-            uses.entry(value).or_default().push(UsePoint { block, instruction });
+            uses.entry(value)
+                .or_default()
+                .push(UsePoint { block, instruction });
         }
 
         let mut retain_before: HashMap<(usize, usize), Vec<ValueId>> = HashMap::new();
@@ -276,10 +308,14 @@ pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
             // them, but a `Phi` input or a returned parameter needs its own reference.
             if borrowed_values.contains(value) {
                 for edge in &edges {
-                    edge_ops.entry(*edge).or_default().push(EdgeOp::Retain(*value));
+                    edge_ops
+                        .entry(*edge)
+                        .or_default()
+                        .push(EdgeOp::Retain(*value));
                 }
                 for block in &function.blocks {
-                    if matches!(block.terminator, Some(IrTerminator::Return(Some(returned))) if returned == *value) {
+                    if matches!(block.terminator, Some(IrTerminator::Return(Some(returned))) if returned == *value)
+                    {
                         return_retains.entry(block.id).or_default().push(*value);
                     }
                 }
@@ -290,10 +326,20 @@ pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
                 .cloned()
                 .unwrap_or_default()
                 .into_iter()
-                .filter(|point| !matches!(function.blocks[point.block].instructions.get(point.instruction), Some(IrInstr::Phi { .. })))
+                .filter(|point| {
+                    !matches!(
+                        function.blocks[point.block]
+                            .instructions
+                            .get(point.instruction),
+                        Some(IrInstr::Phi { .. })
+                    )
+                })
                 .collect();
             let blocks: HashSet<usize> = value_uses.iter().map(|point| point.block).collect();
-            let single_block = edges.is_empty() && !value_uses.is_empty() && blocks.len() == 1 && !opaque_values.contains(value);
+            let single_block = edges.is_empty()
+                && !value_uses.is_empty()
+                && blocks.len() == 1
+                && !opaque_values.contains(value);
             if single_block {
                 let last = value_uses
                     .iter()
@@ -305,15 +351,23 @@ pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
                 let block = &function.blocks[last.block];
                 if last.instruction < block.instructions.len() {
                     if safe_release_site(&block.instructions[last.instruction]) {
-                        release_after.entry((last.block, last.instruction + 1)).or_default().push(*value);
+                        release_after
+                            .entry((last.block, last.instruction + 1))
+                            .or_default()
+                            .push(*value);
                     } else {
                         summary.unresolved_values += 1;
                         note_unresolved(
-                        &mut summary,
-                        &function.name,
-                        ty,
-                        matches!(function.blocks[*definition_block].instructions.get(*definition_instruction), Some(IrInstr::Const { .. })),
-                    );
+                            &mut summary,
+                            &function.name,
+                            ty,
+                            matches!(
+                                function.blocks[*definition_block]
+                                    .instructions
+                                    .get(*definition_instruction),
+                                Some(IrInstr::Const { .. })
+                            ),
+                        );
                     }
                 } else if !matches!(
                     block.terminator,
@@ -324,16 +378,32 @@ pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
                         &mut summary,
                         &function.name,
                         ty,
-                        matches!(function.blocks[*definition_block].instructions.get(*definition_instruction), Some(IrInstr::Const { .. })),
+                        matches!(
+                            function.blocks[*definition_block]
+                                .instructions
+                                .get(*definition_instruction),
+                            Some(IrInstr::Const { .. })
+                        ),
                     );
                 }
             } else if value_uses.is_empty() && edges.is_empty() {
-                release_after.entry((*definition_block, definition_instruction + 1)).or_default().push(*value);
-            } else if let Some(plan) =
-                plan_cross_block_releases(function, *definition_block, *value, &value_uses, &edges, &opaque_values)
-            {
+                release_after
+                    .entry((*definition_block, definition_instruction + 1))
+                    .or_default()
+                    .push(*value);
+            } else if let Some(plan) = plan_cross_block_releases(
+                function,
+                *definition_block,
+                *value,
+                &value_uses,
+                &edges,
+                &opaque_values,
+            ) {
                 for (block, index) in plan.after {
-                    release_after.entry((block, index + 1)).or_default().push(*value);
+                    release_after
+                        .entry((block, index + 1))
+                        .or_default()
+                        .push(*value);
                 }
                 for (edge, op) in plan.edge_ops {
                     edge_ops.entry(edge).or_default().push(op);
@@ -341,11 +411,16 @@ pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
             } else {
                 summary.unresolved_values += 1;
                 note_unresolved(
-                        &mut summary,
-                        &function.name,
-                        ty,
-                        matches!(function.blocks[*definition_block].instructions.get(*definition_instruction), Some(IrInstr::Const { .. })),
-                    );
+                    &mut summary,
+                    &function.name,
+                    ty,
+                    matches!(
+                        function.blocks[*definition_block]
+                            .instructions
+                            .get(*definition_instruction),
+                        Some(IrInstr::Const { .. })
+                    ),
+                );
             }
         }
 
@@ -358,14 +433,25 @@ pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
                     // contracts are migrated.
                     if !matches!(ty, Ty::List(_) | Ty::Map(_, _) | Ty::Set(_)) {
                         for value in fields {
-                            if definitions.get(value).is_some_and(|(ty, _, _)| requires_management(ty)) {
-                                retain_before.entry((block.id, index)).or_default().push(*value);
+                            if definitions
+                                .get(value)
+                                .is_some_and(|(ty, _, _)| requires_management(ty))
+                            {
+                                retain_before
+                                    .entry((block.id, index))
+                                    .or_default()
+                                    .push(*value);
                             }
                         }
                     }
                 }
-                if let Some((value, _)) = alias_destination(instruction).filter(|(_, ty)| requires_management(ty)) {
-                    retain_after.entry((block.id, index + 1)).or_default().push(value);
+                if let Some((value, _)) =
+                    alias_destination(instruction).filter(|(_, ty)| requires_management(ty))
+                {
+                    retain_after
+                        .entry((block.id, index + 1))
+                        .or_default()
+                        .push(value);
                 }
             }
         }
@@ -416,7 +502,10 @@ pub fn check_moves(program: &IrProgram) -> Vec<MoveViolation> {
     check_moves_impl(program, None)
 }
 
-pub fn check_moves_for_types(program: &IrProgram, movable_types: &HashSet<String>) -> Vec<MoveViolation> {
+pub fn check_moves_for_types(
+    program: &IrProgram,
+    movable_types: &HashSet<String>,
+) -> Vec<MoveViolation> {
     check_moves_impl(program, Some(movable_types))
 }
 
@@ -686,14 +775,19 @@ fn is_move_type(ty: &Ty, movable_types: Option<&HashSet<String>>) -> bool {
         Ty::List(_) | Ty::Map(_, _) | Ty::Set(_) => true,
         Ty::Dyn(_) | Ty::Fn(_, _) => movable_types.is_none(),
         Ty::Named(name) => movable_types.map_or(
-            !matches!(name.as_str(), "Int" | "Float" | "Bool" | "Char" | "String" | "Void" | "Ordering"),
+            !matches!(
+                name.as_str(),
+                "Int" | "Float" | "Bool" | "Char" | "String" | "Void" | "Ordering"
+            ),
             |types| types.contains(name),
         ),
         Ty::Applied(name, args) => {
             if matches!(name.as_str(), "Option" | "Result") {
                 return false;
             }
-            movable_types.map_or(true, |types| types.contains(name) || args.iter().any(|arg| is_move_type(arg, Some(types))))
+            movable_types.map_or(true, |types| {
+                types.contains(name) || args.iter().any(|arg| is_move_type(arg, Some(types)))
+            })
         }
         _ => false,
     }
@@ -726,7 +820,11 @@ pub fn movable_types(items: &[Item]) -> HashSet<String> {
             if movable.contains(&record.name) {
                 continue;
             }
-            if record.fields.iter().any(|field| type_contains_movable(&field.ty, &movable)) {
+            if record
+                .fields
+                .iter()
+                .any(|field| type_contains_movable(&field.ty, &movable))
+            {
                 changed |= movable.insert(record.name.clone());
             }
         }
@@ -753,14 +851,24 @@ pub fn movable_types(items: &[Item]) -> HashSet<String> {
 fn type_contains_movable(ty: &Type, movable: &HashSet<String>) -> bool {
     match ty {
         Type::Named(name, args) => {
-            if matches!(name.as_str(), "List" | "Map" | "Set" | "Array" | "Channel" | "Task" | "Rng") {
+            if matches!(
+                name.as_str(),
+                "List" | "Map" | "Set" | "Array" | "Channel" | "Task" | "Rng"
+            ) {
                 return true;
             }
             movable.contains(name) || args.iter().any(|arg| type_contains_movable(arg, movable))
         }
-        Type::Mul(left, right) | Type::Div(left, right) => type_contains_movable(left, movable) || type_contains_movable(right, movable),
+        Type::Mul(left, right) | Type::Div(left, right) => {
+            type_contains_movable(left, movable) || type_contains_movable(right, movable)
+        }
         Type::Pow(inner, _) => type_contains_movable(inner, movable),
-        Type::Fn(params, ret) => params.iter().any(|param| type_contains_movable(param, movable)) || type_contains_movable(ret, movable),
+        Type::Fn(params, ret) => {
+            params
+                .iter()
+                .any(|param| type_contains_movable(param, movable))
+                || type_contains_movable(ret, movable)
+        }
         Type::Dyn(_) => false,
     }
 }
@@ -892,7 +1000,9 @@ fn plan_cross_block_releases(
             }
         }
         used_in[point.block] = true;
-        last_use[point.block] = Some(last_use[point.block].map_or(point.instruction, |last| last.max(point.instruction)));
+        last_use[point.block] = Some(
+            last_use[point.block].map_or(point.instruction, |last| last.max(point.instruction)),
+        );
     }
     // A `Phi` input is consumed when control leaves the predecessor.
     let mut end_use = vec![false; count];
@@ -901,9 +1011,17 @@ fn plan_cross_block_releases(
         end_use[*pred] = true;
     }
     let successors = |block: usize| -> Vec<usize> {
-        let mut next = match function.blocks.get(block).and_then(|b| b.terminator.as_ref()) {
+        let mut next = match function
+            .blocks
+            .get(block)
+            .and_then(|b| b.terminator.as_ref())
+        {
             Some(IrTerminator::Goto(target)) => vec![*target],
-            Some(IrTerminator::Branch { then_block, else_block, .. }) => vec![*then_block, *else_block],
+            Some(IrTerminator::Branch {
+                then_block,
+                else_block,
+                ..
+            }) => vec![*then_block, *else_block],
             _ => Vec::new(),
         };
         next.dedup();
@@ -929,14 +1047,20 @@ fn plan_cross_block_releases(
         }
     }
 
-    let mut plan = CrossBlockPlan { after: Vec::new(), edge_ops: Vec::new() };
+    let mut plan = CrossBlockPlan {
+        after: Vec::new(),
+        edge_ops: Vec::new(),
+    };
     for block in 0..count {
         if block != definition_block && !live_in[block] {
             continue;
         }
         if live_out[block] || end_use[block] {
             for next in successors(block) {
-                let consumers = phi_edges.iter().filter(|edge| **edge == (block, next)).count();
+                let consumers = phi_edges
+                    .iter()
+                    .filter(|edge| **edge == (block, next))
+                    .count();
                 let needed_after = live_in[next];
                 let (retains, release) = match (needed_after, consumers) {
                     (true, m) => (m, false),
@@ -992,7 +1116,8 @@ fn apply_edge_ops(
                 })
                 .collect()
         };
-        if matches!(function.blocks[pred].terminator, Some(IrTerminator::Goto(target)) if target == succ) {
+        if matches!(function.blocks[pred].terminator, Some(IrTerminator::Goto(target)) if target == succ)
+        {
             let instructions = materialize(ops, summary);
             function.blocks[pred].instructions.extend(instructions);
             continue;
@@ -1004,7 +1129,12 @@ fn apply_edge_ops(
             instructions,
             terminator: Some(IrTerminator::Goto(succ)),
         });
-        if let Some(IrTerminator::Branch { then_block, else_block, .. }) = function.blocks[pred].terminator.as_mut() {
+        if let Some(IrTerminator::Branch {
+            then_block,
+            else_block,
+            ..
+        }) = function.blocks[pred].terminator.as_mut()
+        {
             if *then_block == succ {
                 *then_block = new_id;
             }
@@ -1043,10 +1173,19 @@ fn analyze_function(function: &crate::ir::IrFunction, report: &mut OwnershipRepo
     for block in &function.blocks {
         for (index, instruction) in block.instructions.iter().enumerate() {
             if let Some((value, ty)) = defined_value(instruction) {
-                definitions.insert(value, Definition { ty, block: block.id });
+                definitions.insert(
+                    value,
+                    Definition {
+                        ty,
+                        block: block.id,
+                    },
+                );
             }
             for value in used_values(instruction) {
-                uses.entry(value).or_default().push(UsePoint { block: block.id, instruction: index });
+                uses.entry(value).or_default().push(UsePoint {
+                    block: block.id,
+                    instruction: index,
+                });
             }
             if matches!(instruction, IrInstr::Opaque { .. }) {
                 report.opaque_barriers += 1;
@@ -1072,8 +1211,12 @@ fn analyze_function(function: &crate::ir::IrFunction, report: &mut OwnershipRepo
         report.managed_values += 1;
         let value_uses = uses.remove(&value).unwrap_or_default();
         let blocks: HashSet<usize> = value_uses.iter().map(|point| point.block).collect();
-        let last = value_uses.iter().max_by_key(|point| (point.block, point.instruction)).copied();
-        let candidate = !value_uses.is_empty() && blocks.len() == 1 && !opaque_values.contains(&value);
+        let last = value_uses
+            .iter()
+            .max_by_key(|point| (point.block, point.instruction))
+            .copied();
+        let candidate =
+            !value_uses.is_empty() && blocks.len() == 1 && !opaque_values.contains(&value);
         if candidate {
             report.last_use_candidates += 1;
         } else if blocks.len() > 1 {
@@ -1096,14 +1239,30 @@ fn analyze_function(function: &crate::ir::IrFunction, report: &mut OwnershipRepo
 pub(crate) fn requires_management(ty: &Ty) -> bool {
     match ty {
         Ty::String | Ty::List(_) | Ty::Map(_, _) | Ty::Set(_) | Ty::Dyn(_) | Ty::Fn(_, _) => true,
-        Ty::Applied(name, args) if name == "Option" && args.len() == 1 && option_value_payload(&args[0]) => false,
+        Ty::Applied(name, args)
+            if name == "Option" && args.len() == 1 && option_value_payload(&args[0]) =>
+        {
+            false
+        }
         Ty::Named(_) | Ty::Applied(_, _) => true,
-        Ty::Quantity(_) | Ty::Int | Ty::Float | Ty::Bool | Ty::Char | Ty::Void | Ty::Sized(_) | Ty::Float32 | Ty::Generic(_) | Ty::Unknown => false,
+        Ty::Quantity(_)
+        | Ty::Int
+        | Ty::Float
+        | Ty::Bool
+        | Ty::Char
+        | Ty::Void
+        | Ty::Sized(_)
+        | Ty::Float32
+        | Ty::Generic(_)
+        | Ty::Unknown => false,
     }
 }
 
 fn option_value_payload(ty: &Ty) -> bool {
-    matches!(ty, Ty::Int | Ty::Float | Ty::Float32 | Ty::Sized(_) | Ty::Bool)
+    matches!(
+        ty,
+        Ty::Int | Ty::Float | Ty::Float32 | Ty::Sized(_) | Ty::Bool
+    )
 }
 
 fn defined_value(instruction: &IrInstr) -> Option<(ValueId, Ty)> {
@@ -1129,11 +1288,21 @@ fn defined_value(instruction: &IrInstr) -> Option<(ValueId, Ty)> {
         | IrInstr::ChannelReceive { dst, ty, .. }
         | IrInstr::TaskJoin { dst, ty, .. }
         | IrInstr::Phi { dst, ty, .. } => Some((*dst, ty.clone())),
-        IrInstr::PatternTest { dst, .. } | IrInstr::TryCheck { dst, .. } | IrInstr::IterHasNext { dst, .. } => Some((*dst, Ty::Bool)),
-        IrInstr::Call { dst: Some(dst), ty, .. }
-        | IrInstr::ClosureCall { dst: Some(dst), ty, .. }
-        | IrInstr::MethodCall { dst: Some(dst), ty, .. }
-        | IrInstr::Opaque { dst: Some(dst), ty, .. } => Some((*dst, ty.clone())),
+        IrInstr::PatternTest { dst, .. }
+        | IrInstr::TryCheck { dst, .. }
+        | IrInstr::IterHasNext { dst, .. } => Some((*dst, Ty::Bool)),
+        IrInstr::Call {
+            dst: Some(dst), ty, ..
+        }
+        | IrInstr::ClosureCall {
+            dst: Some(dst), ty, ..
+        }
+        | IrInstr::MethodCall {
+            dst: Some(dst), ty, ..
+        }
+        | IrInstr::Opaque {
+            dst: Some(dst), ty, ..
+        } => Some((*dst, ty.clone())),
         IrInstr::StoreLocal { .. }
         | IrInstr::FieldStore { .. }
         | IrInstr::Call { dst: None, .. }
@@ -1154,16 +1323,22 @@ fn used_values(instruction: &IrInstr) -> Vec<ValueId> {
         IrInstr::Unary { operand, .. } => vec![*operand],
         IrInstr::Binary { left, right, .. } => vec![*left, *right],
         IrInstr::Call { args, .. } => args.clone(),
-        IrInstr::ClosureCall { callee, args, .. } => std::iter::once(*callee).chain(args.iter().copied()).collect(),
+        IrInstr::ClosureCall { callee, args, .. } => std::iter::once(*callee)
+            .chain(args.iter().copied())
+            .collect(),
         IrInstr::ClosureMake { captures, .. } => captures.clone(),
-        IrInstr::MethodCall { receiver, args, .. } => std::iter::once(*receiver).chain(args.iter().copied()).collect(),
+        IrInstr::MethodCall { receiver, args, .. } => std::iter::once(*receiver)
+            .chain(args.iter().copied())
+            .collect(),
         IrInstr::Field { object, .. } => vec![*object],
         IrInstr::FieldStore { object, value, .. } => vec![*object, *value],
         IrInstr::Index { object, index, .. } => vec![*object, *index],
         IrInstr::Aggregate { fields, .. } => fields.clone(),
         IrInstr::IterInit { source, .. } => vec![*source],
         IrInstr::IterHasNext { iter, .. } | IrInstr::IterNext { iter, .. } => vec![*iter],
-        IrInstr::PatternTest { subject, .. } | IrInstr::PatternBind { subject, .. } => vec![*subject],
+        IrInstr::PatternTest { subject, .. } | IrInstr::PatternBind { subject, .. } => {
+            vec![*subject]
+        }
         IrInstr::TryCheck { value, .. }
         | IrInstr::TryValue { value, .. }
         | IrInstr::TryError { value, .. }
@@ -1185,18 +1360,36 @@ fn terminator_values(terminator: &IrTerminator) -> Vec<ValueId> {
     match terminator {
         IrTerminator::Branch { condition, .. } => vec![*condition],
         IrTerminator::Return(Some(value)) | IrTerminator::RegionReturn(Some(value)) => vec![*value],
-        IrTerminator::Goto(_) | IrTerminator::Return(None) | IrTerminator::RegionReturn(None) | IrTerminator::Unreachable => Vec::new(),
+        IrTerminator::Goto(_)
+        | IrTerminator::Return(None)
+        | IrTerminator::RegionReturn(None)
+        | IrTerminator::Unreachable => Vec::new(),
     }
 }
 
 pub fn dump(report: &OwnershipReport) -> String {
     let mut out = String::new();
     out.push_str(&format!("ownership functions: {}\n", report.functions));
-    out.push_str(&format!("ownership managed-values: {}\n", report.managed_values));
-    out.push_str(&format!("ownership last-use-candidates: {}\n", report.last_use_candidates));
-    out.push_str(&format!("ownership cross-block-values: {}\n", report.cross_block_values));
-    out.push_str(&format!("ownership opaque-barriers: {}\n", report.opaque_barriers));
-    out.push_str(&format!("ownership unused-managed-values: {}\n", report.unused_managed_values));
+    out.push_str(&format!(
+        "ownership managed-values: {}\n",
+        report.managed_values
+    ));
+    out.push_str(&format!(
+        "ownership last-use-candidates: {}\n",
+        report.last_use_candidates
+    ));
+    out.push_str(&format!(
+        "ownership cross-block-values: {}\n",
+        report.cross_block_values
+    ));
+    out.push_str(&format!(
+        "ownership opaque-barriers: {}\n",
+        report.opaque_barriers
+    ));
+    out.push_str(&format!(
+        "ownership unused-managed-values: {}\n",
+        report.unused_managed_values
+    ));
     for fact in &report.facts {
         out.push_str(&format!(
             "  {}: %{} {} uses={} last={}:{} candidate={}\n",
@@ -1204,8 +1397,10 @@ pub fn dump(report: &OwnershipReport) -> String {
             fact.value,
             fact.ty.describe(),
             fact.uses,
-            fact.last_block.map_or_else(|| "-".to_string(), |value| value.to_string()),
-            fact.last_instruction.map_or_else(|| "-".to_string(), |value| value.to_string()),
+            fact.last_block
+                .map_or_else(|| "-".to_string(), |value| value.to_string()),
+            fact.last_instruction
+                .map_or_else(|| "-".to_string(), |value| value.to_string()),
             fact.candidate
         ));
     }
@@ -1214,7 +1409,10 @@ pub fn dump(report: &OwnershipReport) -> String {
 
 pub fn dump_moves(violations: &[MoveViolation]) -> String {
     let mut out = String::new();
-    out.push_str(&format!("ownership move-violations: {}\n", violations.len()));
+    out.push_str(&format!(
+        "ownership move-violations: {}\n",
+        violations.len()
+    ));
     for violation in violations {
         out.push_str(&format!(
             "  OSTRIN-E1101 {}: %{} {} sent at bb{}:{} then used at bb{}:{}\n",
@@ -1231,7 +1429,11 @@ pub fn dump_moves(violations: &[MoveViolation]) -> String {
 }
 
 pub fn dump_lowering(summary: &LoweringSummary) -> String {
-    let mut unresolved: Vec<&str> = summary.unresolved_functions.iter().map(|name| name.as_str()).collect();
+    let mut unresolved: Vec<&str> = summary
+        .unresolved_functions
+        .iter()
+        .map(|name| name.as_str())
+        .collect();
     unresolved.sort();
     format!(
         "ownership-ir functions: {}\nownership-ir inserted-retains: {}\nownership-ir inserted-releases: {}\nownership-ir unresolved-values: {}\nownership-ir unresolved-functions: {}\n",

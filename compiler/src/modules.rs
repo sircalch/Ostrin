@@ -22,7 +22,12 @@ pub struct ModuleDiagnostic {
 
 impl ModuleDiagnostic {
     fn message(message: impl Into<String>) -> Self {
-        Self { message: message.into(), file: None, line: None, col: None }
+        Self {
+            message: message.into(),
+            file: None,
+            line: None,
+            col: None,
+        }
     }
 
     fn at(file: &Path, line: usize, col: usize, message: impl Into<String>) -> Self {
@@ -60,11 +65,23 @@ pub fn load_project(
 ) -> Result<Vec<Item>, Vec<ModuleDiagnostic>> {
     // Units declared by a previous compilation (the LSP reuses the process) don't carry over.
     crate::types::reset_user_units();
-    let root = entry_path.parent().unwrap_or_else(|| Path::new(".")).to_path_buf();
+    let root = entry_path
+        .parent()
+        .unwrap_or_else(|| Path::new("."))
+        .to_path_buf();
     let mut cache: HashMap<Vec<String>, Module> = HashMap::new();
     let mut in_progress: Vec<Vec<String>> = Vec::new();
     let mut errors: Vec<ModuleDiagnostic> = Vec::new();
-    if let Err(e) = load_module_file(entry_path, &[], &root, deps, overrides, &mut cache, &mut in_progress, &mut errors) {
+    if let Err(e) = load_module_file(
+        entry_path,
+        &[],
+        &root,
+        deps,
+        overrides,
+        &mut cache,
+        &mut in_progress,
+        &mut errors,
+    ) {
         errors.push(e);
     }
     if !errors.is_empty() {
@@ -77,7 +94,11 @@ pub fn load_project(
         let (resolve_map, alias_map) = build_resolution_maps(&module_path, &cache)
             .map_err(|e| vec![ModuleDiagnostic::message(e)])?;
         let module = cache.get(&module_path).unwrap();
-        let ctx = RewriteCtx { resolve_map: &resolve_map, alias_map: &alias_map, cache: &cache };
+        let ctx = RewriteCtx {
+            resolve_map: &resolve_map,
+            alias_map: &alias_map,
+            cache: &cache,
+        };
         for item in &module.items {
             let mut item = item.clone();
             rewrite_item(&mut item, &module_path, &ctx)
@@ -110,7 +131,9 @@ fn file_path_of(module_path: &[String], root: &Path, deps: &HashMap<String, Path
             if rest.is_empty() {
                 p.push("mod");
             } else {
-                for segment in rest { p.push(segment); }
+                for segment in rest {
+                    p.push(segment);
+                }
             }
             p.set_extension("ostrin");
             return p;
@@ -146,19 +169,27 @@ fn std_module_source(file_path: &Path) -> Option<io::Result<String>> {
         return None;
     }
     let name = file_path.file_stem()?.to_str()?;
-    Some(match STD_MODULES.iter().find(|(module, _)| *module == name) {
-        Some((_, source)) => Ok((*source).to_string()),
-        None => {
-            let available: Vec<&str> = STD_MODULES.iter().map(|(module, _)| *module).collect();
-            Err(io::Error::new(
-                io::ErrorKind::NotFound,
-                format!("the standard library has no module '{name}' (available: {})", available.join(", ")),
-            ))
-        }
-    })
+    Some(
+        match STD_MODULES.iter().find(|(module, _)| *module == name) {
+            Some((_, source)) => Ok((*source).to_string()),
+            None => {
+                let available: Vec<&str> = STD_MODULES.iter().map(|(module, _)| *module).collect();
+                Err(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    format!(
+                        "the standard library has no module '{name}' (available: {})",
+                        available.join(", ")
+                    ),
+                ))
+            }
+        },
+    )
 }
 
-fn read_module_source(file_path: &Path, overrides: &HashMap<PathBuf, String>) -> io::Result<String> {
+fn read_module_source(
+    file_path: &Path,
+    overrides: &HashMap<PathBuf, String>,
+) -> io::Result<String> {
     if let Some(source) = std_module_source(file_path) {
         return source;
     }
@@ -183,7 +214,13 @@ fn load_module_file(
         return Ok(());
     }
     if in_progress.iter().any(|p| p == module_path) {
-        let label = |p: &[String]| if p.is_empty() { "(entry)".to_string() } else { p.join(".") };
+        let label = |p: &[String]| {
+            if p.is_empty() {
+                "(entry)".to_string()
+            } else {
+                p.join(".")
+            }
+        };
         let mut chain: Vec<String> = in_progress.iter().map(|p| label(p)).collect();
         chain.push(label(module_path));
         return Err(ModuleDiagnostic::message(format!(
@@ -198,22 +235,45 @@ fn load_module_file(
             file_path,
             1,
             1,
-            format!("could not read module '{}' ({}): {e}", module_path.join("."), file_path.display()),
+            format!(
+                "could not read module '{}' ({}): {e}",
+                module_path.join("."),
+                file_path.display()
+            ),
         )
     })?;
-    let tokens = Lexer::new(&source)
-        .tokenize()
-        .map_err(|e| ModuleDiagnostic::at(file_path, e.line, e.col, format!("OSTRIN-E0002: lex error: {}", e.message)))?;
+    let tokens = Lexer::new(&source).tokenize().map_err(|e| {
+        ModuleDiagnostic::at(
+            file_path,
+            e.line,
+            e.col,
+            format!("OSTRIN-E0002: lex error: {}", e.message),
+        )
+    })?;
     let (items, parse_errors) = Parser::new(tokens).parse_program();
     for e in parse_errors {
-        errors.push(ModuleDiagnostic::at(file_path, e.line, e.col, format!("OSTRIN-E0001: parse error: {}", e.message)));
+        errors.push(ModuleDiagnostic::at(
+            file_path,
+            e.line,
+            e.col,
+            format!("OSTRIN-E0001: parse error: {}", e.message),
+        ));
     }
 
     for item in &items {
         if let Item::Import(imp) = item {
             if !cache.contains_key(&imp.path) {
                 let dep_file = file_path_of(&imp.path, root, deps);
-                load_module_file(&dep_file, &imp.path, root, deps, overrides, cache, in_progress, errors)?;
+                load_module_file(
+                    &dep_file,
+                    &imp.path,
+                    root,
+                    deps,
+                    overrides,
+                    cache,
+                    in_progress,
+                    errors,
+                )?;
             }
         }
     }
@@ -249,13 +309,23 @@ fn compute_exports(items: &[Item]) -> HashSet<String> {
     let mut exported = HashSet::new();
     for item in items {
         match item {
-            Item::Function(f) if f.is_pub => { exported.insert(f.name.clone()); }
-            Item::Record(r) if r.is_pub => { exported.insert(r.name.clone()); }
-            Item::Enum(e) if e.is_pub => { exported.insert(e.name.clone()); }
-            Item::Trait(t) if t.is_pub => { exported.insert(t.name.clone()); }
+            Item::Function(f) if f.is_pub => {
+                exported.insert(f.name.clone());
+            }
+            Item::Record(r) if r.is_pub => {
+                exported.insert(r.name.clone());
+            }
+            Item::Enum(e) if e.is_pub => {
+                exported.insert(e.name.clone());
+            }
+            Item::Trait(t) if t.is_pub => {
+                exported.insert(t.name.clone());
+            }
             Item::Import(imp) if imp.is_pub => {
                 if let Some(names) = &imp.names {
-                    for n in names { exported.insert(n.clone()); }
+                    for n in names {
+                        exported.insert(n.clone());
+                    }
                 } else if let Some(alias) = &imp.alias {
                     exported.insert(alias.clone());
                 }
@@ -276,9 +346,16 @@ fn mangled(module_path: &[String], name: &str) -> String {
 
 /// Sigue una cadena de 'pub import' hasta encontrar dónde vive de verdad el
 /// símbolo, verificando visibilidad en cada salto (documento 07, §3 y §4).
-fn resolve_export(target_path: &[String], name: &str, cache: &HashMap<Vec<String>, Module>) -> Result<String, String> {
+fn resolve_export(
+    target_path: &[String],
+    name: &str,
+    cache: &HashMap<Vec<String>, Module>,
+) -> Result<String, String> {
     let Some(module) = cache.get(target_path) else {
-        return Err(format!("internal error: module '{}' was not loaded", target_path.join(".")));
+        return Err(format!(
+            "internal error: module '{}' was not loaded",
+            target_path.join(".")
+        ));
     };
     if !module.exported.contains(name) {
         return Err(format!(
@@ -307,7 +384,10 @@ fn resolve_export(target_path: &[String], name: &str, cache: &HashMap<Vec<String
             }
         }
     }
-    Err(format!("internal error: exported name '{name}' not found in module '{}'", target_path.join(".")))
+    Err(format!(
+        "internal error: exported name '{name}' not found in module '{}'",
+        target_path.join(".")
+    ))
 }
 
 fn build_resolution_maps(
@@ -319,17 +399,28 @@ fn build_resolution_maps(
     let mut alias_map = HashMap::new();
     for item in &module.items {
         match item {
-            Item::Function(f) => { resolve_map.insert(f.name.clone(), mangled(module_path, &f.name)); }
-            Item::Record(r) => { resolve_map.insert(r.name.clone(), mangled(module_path, &r.name)); }
-            Item::Enum(e) => { resolve_map.insert(e.name.clone(), mangled(module_path, &e.name)); }
-            Item::Trait(t) => { resolve_map.insert(t.name.clone(), mangled(module_path, &t.name)); }
+            Item::Function(f) => {
+                resolve_map.insert(f.name.clone(), mangled(module_path, &f.name));
+            }
+            Item::Record(r) => {
+                resolve_map.insert(r.name.clone(), mangled(module_path, &r.name));
+            }
+            Item::Enum(e) => {
+                resolve_map.insert(e.name.clone(), mangled(module_path, &e.name));
+            }
+            Item::Trait(t) => {
+                resolve_map.insert(t.name.clone(), mangled(module_path, &t.name));
+            }
             Item::Import(imp) => {
                 if let Some(names) = &imp.names {
                     for n in names {
                         resolve_map.insert(n.clone(), resolve_export(&imp.path, n, cache)?);
                     }
                 } else {
-                    let alias = imp.alias.clone().unwrap_or_else(|| imp.path.last().cloned().unwrap());
+                    let alias = imp
+                        .alias
+                        .clone()
+                        .unwrap_or_else(|| imp.path.last().cloned().unwrap());
                     alias_map.insert(alias, imp.path.clone());
                 }
             }
@@ -407,7 +498,8 @@ fn rewrite_item(item: &mut Item, module_path: &[String], ctx: &RewriteCtx) -> Re
             for method in &mut t.methods {
                 rewrite_signature(&mut method.params, &mut method.return_type, ctx)?;
                 if let Some(body) = &mut method.default_body {
-                    let mut bound: HashSet<String> = method.params.iter().map(|p| p.name.clone()).collect();
+                    let mut bound: HashSet<String> =
+                        method.params.iter().map(|p| p.name.clone()).collect();
                     bound.insert("self".to_string());
                     rewrite_block(body, ctx, &bound)?;
                 }
@@ -419,7 +511,11 @@ fn rewrite_item(item: &mut Item, module_path: &[String], ctx: &RewriteCtx) -> Re
 
 /// Types written in a signature name items of the module (or things it imported): they must be
 /// spelled the way the merged program knows them, exactly like names in a body.
-fn rewrite_signature(params: &mut [Param], return_type: &mut Type, ctx: &RewriteCtx) -> Result<(), String> {
+fn rewrite_signature(
+    params: &mut [Param],
+    return_type: &mut Type,
+    ctx: &RewriteCtx,
+) -> Result<(), String> {
     for param in params {
         rewrite_type(&mut param.ty, ctx)?;
         if let Some(default) = &mut param.default {
@@ -432,10 +528,18 @@ fn rewrite_signature(params: &mut [Param], return_type: &mut Type, ctx: &Rewrite
 /// Names bound locally (parameters, bindings, loop and pattern variables,
 /// lambda parameters) shadow the module's own items: `fn f(light: Float)`
 /// keeps `light` a parameter even when the module also defines `fn light`.
-fn rewrite_block(block: &mut Block, ctx: &RewriteCtx, bound: &HashSet<String>) -> Result<(), String> {
+fn rewrite_block(
+    block: &mut Block,
+    ctx: &RewriteCtx,
+    bound: &HashSet<String>,
+) -> Result<(), String> {
     let mut local = bound.clone();
-    for stmt in &mut block.stmts { rewrite_stmt(&mut stmt.stmt, ctx, &mut local)?; }
-    if let Some(tail) = &mut block.tail { rewrite_expr(tail, ctx, &local)?; }
+    for stmt in &mut block.stmts {
+        rewrite_stmt(&mut stmt.stmt, ctx, &mut local)?;
+    }
+    if let Some(tail) = &mut block.tail {
+        rewrite_expr(tail, ctx, &local)?;
+    }
     Ok(())
 }
 
@@ -453,9 +557,15 @@ fn pattern_names(pattern: &Pattern, bound: &mut HashSet<String>) {
     }
 }
 
-fn rewrite_stmt(stmt: &mut Stmt, ctx: &RewriteCtx, bound: &mut HashSet<String>) -> Result<(), String> {
+fn rewrite_stmt(
+    stmt: &mut Stmt,
+    ctx: &RewriteCtx,
+    bound: &mut HashSet<String>,
+) -> Result<(), String> {
     match stmt {
-        Stmt::Binding { ty, value, name, .. } => {
+        Stmt::Binding {
+            ty, value, name, ..
+        } => {
             if let Some(ty) = ty {
                 rewrite_type(ty, ctx)?;
             }
@@ -470,14 +580,24 @@ fn rewrite_stmt(stmt: &mut Stmt, ctx: &RewriteCtx, bound: &mut HashSet<String>) 
         }
         Stmt::Return(Some(e)) | Stmt::Break(Some(e)) => rewrite_expr(e, ctx, bound),
         Stmt::Return(None) | Stmt::Break(None) | Stmt::Continue => Ok(()),
-        Stmt::For { pattern, iter, body } => {
+        Stmt::For {
+            pattern,
+            iter,
+            body,
+        } => {
             rewrite_expr(iter, ctx, bound)?;
             let mut inner = bound.clone();
             inner.insert(pattern.clone());
             rewrite_block(body, ctx, &inner)
         }
-        Stmt::While { cond, body } => { rewrite_expr(cond, ctx, bound)?; rewrite_block(body, ctx, bound) }
-        Stmt::FieldAssign { target, value } => { rewrite_expr(target, ctx, bound)?; rewrite_expr(value, ctx, bound) }
+        Stmt::While { cond, body } => {
+            rewrite_expr(cond, ctx, bound)?;
+            rewrite_block(body, ctx, bound)
+        }
+        Stmt::FieldAssign { target, value } => {
+            rewrite_expr(target, ctx, bound)?;
+            rewrite_expr(value, ctx, bound)
+        }
         Stmt::Expr(e) => rewrite_expr(e, ctx, bound),
     }
 }
@@ -487,7 +607,9 @@ fn rewrite_expr(expr: &mut Expr, ctx: &RewriteCtx, bound: &HashSet<String>) -> R
         Expr::Located(inner, _) => rewrite_expr(inner, ctx, bound),
         Expr::FieldAccess(obj, member) => {
             if let Expr::Ident(alias) = obj.as_ref() {
-                if let Some(target_path) = ctx.alias_map.get(alias).filter(|_| !bound.contains(alias)) {
+                if let Some(target_path) =
+                    ctx.alias_map.get(alias).filter(|_| !bound.contains(alias))
+                {
                     let resolved = resolve_export(target_path, member, ctx.cache)?;
                     *expr = Expr::Ident(resolved);
                     return Ok(());
@@ -504,11 +626,16 @@ fn rewrite_expr(expr: &mut Expr, ctx: &RewriteCtx, bound: &HashSet<String>) -> R
         Expr::UnitLiteral(n, _) => rewrite_expr(n, ctx, bound),
         Expr::Loop(b) => rewrite_block(b, ctx, bound),
         Expr::Unary(_, e) => rewrite_expr(e, ctx, bound),
-        Expr::Binary(_, l, r) => { rewrite_expr(l, ctx, bound)?; rewrite_expr(r, ctx, bound) }
+        Expr::Binary(_, l, r) => {
+            rewrite_expr(l, ctx, bound)?;
+            rewrite_expr(r, ctx, bound)
+        }
         Expr::Range(s, _, e, step) => {
             rewrite_expr(s, ctx, bound)?;
             rewrite_expr(e, ctx, bound)?;
-            if let Some(st) = step { rewrite_expr(st, ctx, bound)?; }
+            if let Some(st) = step {
+                rewrite_expr(st, ctx, bound)?;
+            }
             Ok(())
         }
         Expr::Call(callee, args) => {
@@ -532,11 +659,16 @@ fn rewrite_expr(expr: &mut Expr, ctx: &RewriteCtx, bound: &HashSet<String>) -> R
             }
             Ok(())
         }
-        Expr::Index(obj, idx) => { rewrite_expr(obj, ctx, bound)?; rewrite_expr(idx, ctx, bound) }
+        Expr::Index(obj, idx) => {
+            rewrite_expr(obj, ctx, bound)?;
+            rewrite_expr(idx, ctx, bound)
+        }
         Expr::If(cond, then_b, else_b) => {
             rewrite_expr(cond, ctx, bound)?;
             rewrite_block(then_b, ctx, bound)?;
-            if let Some(b) = else_b { rewrite_block(b, ctx, bound)?; }
+            if let Some(b) = else_b {
+                rewrite_block(b, ctx, bound)?;
+            }
             Ok(())
         }
         Expr::Block(b) => rewrite_block(b, ctx, bound),
@@ -546,7 +678,9 @@ fn rewrite_expr(expr: &mut Expr, ctx: &RewriteCtx, bound: &HashSet<String>) -> R
             rewrite_block(b, ctx, &inner)
         }
         Expr::ListLiteral(items) | Expr::SetLiteral(items) => {
-            for it in items { rewrite_expr(it, ctx, bound)?; }
+            for it in items {
+                rewrite_expr(it, ctx, bound)?;
+            }
             Ok(())
         }
         Expr::EmptyCollection(_, type_args) => {
@@ -557,22 +691,36 @@ fn rewrite_expr(expr: &mut Expr, ctx: &RewriteCtx, bound: &HashSet<String>) -> R
         }
         Expr::SizedIntLiteral(..) | Expr::Float32Literal(_) => Ok(()),
         Expr::MapLiteral(pairs) => {
-            for (k, v) in pairs { rewrite_expr(k, ctx, bound)?; rewrite_expr(v, ctx, bound)?; }
+            for (k, v) in pairs {
+                rewrite_expr(k, ctx, bound)?;
+                rewrite_expr(v, ctx, bound)?;
+            }
             Ok(())
         }
         Expr::Try(inner, catch) => {
             rewrite_expr(inner, ctx, bound)?;
-            if let Some(c) = catch { rewrite_expr(c, ctx, bound)?; }
+            if let Some(c) = catch {
+                rewrite_expr(c, ctx, bound)?;
+            }
             Ok(())
         }
-        Expr::Within(a, r) => { rewrite_expr(a, ctx, bound)?; rewrite_expr(r, ctx, bound) }
-        Expr::Approximately(a, b, t) => { rewrite_expr(a, ctx, bound)?; rewrite_expr(b, ctx, bound)?; rewrite_expr(t, ctx, bound) }
+        Expr::Within(a, r) => {
+            rewrite_expr(a, ctx, bound)?;
+            rewrite_expr(r, ctx, bound)
+        }
+        Expr::Approximately(a, b, t) => {
+            rewrite_expr(a, ctx, bound)?;
+            rewrite_expr(b, ctx, bound)?;
+            rewrite_expr(t, ctx, bound)
+        }
         Expr::As(e, _) => rewrite_expr(e, ctx, bound),
         Expr::RecordLiteral(name, fields) => {
             if let Some(resolved) = ctx.resolve_map.get(name.as_str()) {
                 *name = resolved.clone();
             }
-            for (_, v) in fields { rewrite_expr(v, ctx, bound)?; }
+            for (_, v) in fields {
+                rewrite_expr(v, ctx, bound)?;
+            }
             Ok(())
         }
         Expr::GenericRecordLiteral(name, type_args, fields) => {
@@ -582,7 +730,9 @@ fn rewrite_expr(expr: &mut Expr, ctx: &RewriteCtx, bound: &HashSet<String>) -> R
             for type_arg in type_args {
                 rewrite_type(type_arg, ctx)?;
             }
-            for (_, v) in fields { rewrite_expr(v, ctx, bound)?; }
+            for (_, v) in fields {
+                rewrite_expr(v, ctx, bound)?;
+            }
             Ok(())
         }
         Expr::Match(scrutinee, arms) => {
@@ -590,17 +740,25 @@ fn rewrite_expr(expr: &mut Expr, ctx: &RewriteCtx, bound: &HashSet<String>) -> R
             for arm in arms {
                 let mut inner = bound.clone();
                 pattern_names(&arm.pattern, &mut inner);
-                if let Some(g) = &mut arm.guard { rewrite_expr(g, ctx, &inner)?; }
+                if let Some(g) = &mut arm.guard {
+                    rewrite_expr(g, ctx, &inner)?;
+                }
                 rewrite_block(&mut arm.body, ctx, &inner)?;
             }
             Ok(())
         }
         Expr::Spawn(b) | Expr::SpawnScope(b) => rewrite_block(b, ctx, bound),
         Expr::Channel(_, cap) => {
-            if let Some(c) = cap { rewrite_expr(c, ctx, bound)?; }
+            if let Some(c) = cap {
+                rewrite_expr(c, ctx, bound)?;
+            }
             Ok(())
         }
-        Expr::IntLiteral(_) | Expr::FloatLiteral(_) | Expr::StringLiteral(_) | Expr::CharLiteral(_) | Expr::BoolLiteral(_) => Ok(()),
+        Expr::IntLiteral(_)
+        | Expr::FloatLiteral(_)
+        | Expr::StringLiteral(_)
+        | Expr::CharLiteral(_)
+        | Expr::BoolLiteral(_) => Ok(()),
     }
 }
 

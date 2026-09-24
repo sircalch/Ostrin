@@ -56,7 +56,9 @@ fn run_stdin(args: &[&str], source: &str) -> Output {
         .expect("missing stdin pipe")
         .write_all(source.as_bytes())
         .expect("failed to write source to ostrinc");
-    child.wait_with_output().expect("failed to collect ostrinc output")
+    child
+        .wait_with_output()
+        .expect("failed to collect ostrinc output")
 }
 
 fn lsp_frame(body: &str) -> Vec<u8> {
@@ -74,7 +76,9 @@ fn run_lsp(messages: &[&str]) -> Output {
     {
         let mut stdin = child.stdin.take().expect("missing LSP stdin pipe");
         for message in messages {
-            stdin.write_all(&lsp_frame(message)).expect("failed to write LSP message");
+            stdin
+                .write_all(&lsp_frame(message))
+                .expect("failed to write LSP message");
         }
     }
     let mut output = Vec::new();
@@ -103,7 +107,9 @@ fn run_dap(messages: &[String]) -> Output {
     {
         let mut stdin = child.stdin.take().expect("missing DAP stdin pipe");
         for message in messages {
-            stdin.write_all(&lsp_frame(message)).expect("failed to write DAP message");
+            stdin
+                .write_all(&lsp_frame(message))
+                .expect("failed to write DAP message");
         }
     }
     let mut output = Vec::new();
@@ -114,7 +120,11 @@ fn run_dap(messages: &[String]) -> Output {
         .read_to_end(&mut output)
         .expect("failed to read DAP output");
     let status = child.wait().expect("failed to wait for DAP");
-    Output { status, stdout: output, stderr: Vec::new() }
+    Output {
+        status,
+        stdout: output,
+        stderr: Vec::new(),
+    }
 }
 
 fn stdout(out: &Output) -> String {
@@ -146,15 +156,24 @@ fn invalid_record_field_access_and_assignment_are_rejected() {
     let err = stderr(&out);
     assert!(err.contains("E1043"), "missing field diagnostic: {err}");
     assert!(err.contains("missing"), "missing field name: {err}");
-    assert!(err.contains("E1041"), "missing field assignment diagnostic: {err}");
-    assert!(err.contains("String") && err.contains("Int"), "missing field types: {err}");
+    assert!(
+        err.contains("E1041"),
+        "missing field assignment diagnostic: {err}"
+    );
+    assert!(
+        err.contains("String") && err.contains("Int"),
+        "missing field types: {err}"
+    );
 }
 
 #[test]
 fn named_and_default_function_arguments_work() {
     let out = run(&["--run", &example_path("function_arguments.ostrin")]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
-    assert_eq!(stdout(&out).lines().collect::<Vec<_>>(), ["Ostrin!", "Ostrin?"]);
+    assert_eq!(
+        stdout(&out).lines().collect::<Vec<_>>(),
+        ["Ostrin!", "Ostrin?"]
+    );
 }
 
 #[test]
@@ -163,10 +182,22 @@ fn function_argument_count_names_and_types_are_checked() {
     assert!(!out.status.success());
     let err = stderr(&out);
     assert!(err.contains("E1041"), "missing argument diagnostic: {err}");
-    assert!(err.contains("Missing required argument 'value'"), "missing arity diagnostic: {err}");
-    assert!(err.contains("String") && err.contains("Int"), "missing argument types: {err}");
-    assert!(err.contains("no parameter named 'extra'"), "missing named argument diagnostic: {err}");
-    assert!(err.contains("Positional arguments must come before named arguments"), "missing ordering diagnostic: {err}");
+    assert!(
+        err.contains("Missing required argument 'value'"),
+        "missing arity diagnostic: {err}"
+    );
+    assert!(
+        err.contains("String") && err.contains("Int"),
+        "missing argument types: {err}"
+    );
+    assert!(
+        err.contains("no parameter named 'extra'"),
+        "missing named argument diagnostic: {err}"
+    );
+    assert!(
+        err.contains("Positional arguments must come before named arguments"),
+        "missing ordering diagnostic: {err}"
+    );
 }
 
 #[test]
@@ -174,8 +205,14 @@ fn collection_lookup_results_are_option_types() {
     let out = run(&[&example_path("collection_types_errors.ostrin")]);
     assert!(!out.status.success());
     let err = stderr(&out);
-    assert!(err.contains("E1041"), "missing Option argument diagnostic: {err}");
-    assert!(err.contains("Option<Int>"), "collection lookup did not preserve Option<Int>: {err}");
+    assert!(
+        err.contains("E1041"),
+        "missing Option argument diagnostic: {err}"
+    );
+    assert!(
+        err.contains("Option<Int>"),
+        "collection lookup did not preserve Option<Int>: {err}"
+    );
 }
 
 #[test]
@@ -183,9 +220,18 @@ fn task_channel_and_iterator_types_are_checked() {
     let out = run(&[&example_path("concurrency_types_errors.ostrin")]);
     assert!(!out.status.success());
     let err = stderr(&out);
-    assert!(err.contains("E1041"), "missing concurrency type diagnostic: {err}");
-    assert!(err.contains("Method 'send' expects 'Int', got 'String'"), "missing channel send diagnostic: {err}");
-    assert!(err.contains("Option<Int>"), "missing channel receive type: {err}");
+    assert!(
+        err.contains("E1041"),
+        "missing concurrency type diagnostic: {err}"
+    );
+    assert!(
+        err.contains("Method 'send' expects 'Int', got 'String'"),
+        "missing channel send diagnostic: {err}"
+    );
+    assert!(
+        err.contains("Option<Int>"),
+        "missing channel receive type: {err}"
+    );
     assert!(err.contains("String"), "missing task join type: {err}");
 }
 
@@ -194,10 +240,22 @@ fn collection_method_arguments_are_checked() {
     let out = run(&[&example_path("collection_argument_errors.ostrin")]);
     assert!(!out.status.success());
     let err = stderr(&out);
-    assert!(err.contains("E1041"), "missing collection argument diagnostic: {err}");
-    assert!(err.contains("push") && err.contains("expects 'Int'") && err.contains("String"), "missing List argument types: {err}");
-    assert!(err.contains("get") && err.contains("expects 'String'") && err.contains("Int"), "missing Map key type: {err}");
-    assert!(err.contains("add") && err.contains("expects 'Int'"), "missing Set element type: {err}");
+    assert!(
+        err.contains("E1041"),
+        "missing collection argument diagnostic: {err}"
+    );
+    assert!(
+        err.contains("push") && err.contains("expects 'Int'") && err.contains("String"),
+        "missing List argument types: {err}"
+    );
+    assert!(
+        err.contains("get") && err.contains("expects 'String'") && err.contains("Int"),
+        "missing Map key type: {err}"
+    );
+    assert!(
+        err.contains("add") && err.contains("expects 'Int'"),
+        "missing Set element type: {err}"
+    );
 }
 
 #[test]
@@ -205,12 +263,30 @@ fn control_flow_conditions_and_explicit_returns_are_checked() {
     let out = run(&[&example_path("control_type_errors.ostrin")]);
     assert!(!out.status.success());
     let err = stderr(&out);
-    assert!(err.contains("If condition expects 'Bool', got 'Int'"), "missing if condition diagnostic: {err}");
-    assert!(err.contains("While condition expects 'Bool', got 'String'"), "missing while condition diagnostic: {err}");
-    assert!(err.contains("Logical operators expect 'Bool' operands"), "missing logical operand diagnostic: {err}");
-    assert!(err.contains("Return expression expects 'Int', got 'String'"), "missing return type diagnostic: {err}");
-    assert!(err.contains("Empty return expects function return type 'Void'"), "missing empty return diagnostic: {err}");
-    assert!(err.contains("Default value for 'value' expects 'Int', got 'String'"), "missing default value diagnostic: {err}");
+    assert!(
+        err.contains("If condition expects 'Bool', got 'Int'"),
+        "missing if condition diagnostic: {err}"
+    );
+    assert!(
+        err.contains("While condition expects 'Bool', got 'String'"),
+        "missing while condition diagnostic: {err}"
+    );
+    assert!(
+        err.contains("Logical operators expect 'Bool' operands"),
+        "missing logical operand diagnostic: {err}"
+    );
+    assert!(
+        err.contains("Return expression expects 'Int', got 'String'"),
+        "missing return type diagnostic: {err}"
+    );
+    assert!(
+        err.contains("Empty return expects function return type 'Void'"),
+        "missing empty return diagnostic: {err}"
+    );
+    assert!(
+        err.contains("Default value for 'value' expects 'Int', got 'String'"),
+        "missing default value diagnostic: {err}"
+    );
 }
 
 #[test]
@@ -220,15 +296,31 @@ fn option_and_result_methods_run() {
     assert_eq!(
         stdout(&out).lines().collect::<Vec<_>>(),
         [
-            "true", "Some(5)", "Some(5)", "4", "Ok(4)", "true", "9",
-            "Err(missing)", "true", "Ok(8)", "Some(7)", "true", "Err(bad!)", "None"
+            "true",
+            "Some(5)",
+            "Some(5)",
+            "4",
+            "Ok(4)",
+            "true",
+            "9",
+            "Err(missing)",
+            "true",
+            "Ok(8)",
+            "Some(7)",
+            "true",
+            "Err(bad!)",
+            "None"
         ]
     );
 }
 
 #[test]
 fn option_and_result_lambdas_receive_contextual_types() {
-    let out = run(&["--members", "--json", &example_path("option_result_types.ostrin")]);
+    let out = run(&[
+        "--members",
+        "--json",
+        &example_path("option_result_types.ostrin"),
+    ]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     let text = stdout(&out);
     assert!(text.contains("\"name\":\"mapped\",\"type\":\"Option<Int>\""));
@@ -242,9 +334,18 @@ fn option_and_result_method_arguments_are_checked() {
     let out = run(&[&example_path("option_result_errors.ostrin")]);
     assert!(!out.status.success());
     let err = stderr(&out);
-    assert!(err.contains("E1041"), "missing Option/Result diagnostic: {err}");
-    assert!(err.contains("unwrap_or") && err.contains("expects 'Int'") && err.contains("String"), "missing unwrap_or type diagnostic: {err}");
-    assert!(err.contains("map") && err.contains("fn(Int)"), "missing map callback-shape diagnostic: {err}");
+    assert!(
+        err.contains("E1041"),
+        "missing Option/Result diagnostic: {err}"
+    );
+    assert!(
+        err.contains("unwrap_or") && err.contains("expects 'Int'") && err.contains("String"),
+        "missing unwrap_or type diagnostic: {err}"
+    );
+    assert!(
+        err.contains("map") && err.contains("fn(Int)"),
+        "missing map callback-shape diagnostic: {err}"
+    );
 }
 
 #[test]
@@ -263,9 +364,18 @@ fn try_requires_a_matching_enclosing_result_type() {
     assert!(!out.status.success());
     let err = stderr(&out);
     assert!(err.contains("E1041"), "missing try diagnostic: {err}");
-    assert!(err.contains("enclosing Option/Result"), "missing container mismatch: {err}");
-    assert!(err.contains("propagates error type") && err.contains("String") && err.contains("Int"), "missing error propagation mismatch: {err}");
-    assert!(err.contains("try catch") && err.contains("fn(String)"), "missing catch signature mismatch: {err}");
+    assert!(
+        err.contains("enclosing Option/Result"),
+        "missing container mismatch: {err}"
+    );
+    assert!(
+        err.contains("propagates error type") && err.contains("String") && err.contains("Int"),
+        "missing error propagation mismatch: {err}"
+    );
+    assert!(
+        err.contains("try catch") && err.contains("fn(String)"),
+        "missing catch signature mismatch: {err}"
+    );
 }
 
 #[test]
@@ -273,7 +383,10 @@ fn standard_library_file_io_and_parsing_work() {
     let out = run(&["--run", &example_path("stdlib_io.ostrin")]);
     let _ = fs::remove_file("target/ostrin-stdlib-test.txt");
     assert!(out.status.success(), "stderr: {}", stderr(&out));
-    assert_eq!(stdout(&out).lines().collect::<Vec<_>>(), ["true", "42", "hello from Ostrin"]);
+    assert_eq!(
+        stdout(&out).lines().collect::<Vec<_>>(),
+        ["true", "42", "hello from Ostrin"]
+    );
 }
 
 #[test]
@@ -282,7 +395,11 @@ fn native_ir_file_io_preserves_results_and_ownership() {
     let interpreted = run(&["--run", &file]);
     let _ = fs::remove_file("target/ostrin-ir-file-io.txt");
     let _ = fs::remove_file("target/ostrin-ir-file-io-missing.txt");
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
     let expected = stdout(&interpreted).replace("\r\n", "\n");
     assert_eq!(expected, "true\ntrue\nhello from IR\ntrue\n");
 
@@ -290,50 +407,120 @@ fn native_ir_file_io_preserves_results_and_ownership() {
     if skip_if_no_c_compiler(&report) {
         return;
     }
-    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
     let report_text = stdout(&report);
     let ir_functions = report_text
         .lines()
-        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|value| value.trim().parse::<usize>().ok()))
+        .find_map(|line| {
+            line.strip_prefix("ir-generated: ")
+                .and_then(|value| value.trim().parse::<usize>().ok())
+        })
         .unwrap_or(0);
-    assert!(ir_functions >= 3, "file I/O example did not use the IR emitter: {report_text}");
-    assert!(report_text.contains("hir-generated: 0"), "file I/O example left a HIR fallback: {report_text}");
+    assert!(
+        ir_functions >= 3,
+        "file I/O example did not use the IR emitter: {report_text}"
+    );
+    assert!(
+        report_text.contains("hir-generated: 0"),
+        "file I/O example left a HIR fallback: {report_text}"
+    );
 
     let exe = temp_artifact("native-ir-file-io.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "native compile failed: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("run native IR file I/O binary");
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run native IR file I/O binary");
     let _ = fs::remove_file(&exe);
     let _ = fs::remove_file("target/ostrin-ir-file-io.txt");
     let _ = fs::remove_file("target/ostrin-ir-file-io-missing.txt");
-    assert!(native.status.success(), "native binary failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
-    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "native file I/O leaked: {}", String::from_utf8_lossy(&native.stderr));
+    assert!(
+        native.status.success(),
+        "native binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "native file I/O leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
 
     let threaded_source = run(&["--emit-c", "--native-threads", &file]);
-    assert!(threaded_source.status.success(), "native-thread file I/O emission failed: {}", stderr(&threaded_source));
+    assert!(
+        threaded_source.status.success(),
+        "native-thread file I/O emission failed: {}",
+        stderr(&threaded_source)
+    );
     let threaded_source = stdout(&threaded_source);
-    assert!(threaded_source.contains("ostrin_file_read_cancelable"), "native file I/O did not lower read_file through the cancelable helper: {threaded_source}");
-    assert!(threaded_source.contains("ostrin_file_write_cancelable"), "native file I/O did not lower write_file through the cancelable helper: {threaded_source}");
-    assert!(threaded_source.contains("ostrin_file_request_wait"), "native file I/O did not use the cancelable request wait: {threaded_source}");
-    assert!(threaded_source.contains("ostrin_thread_start_detached"), "native file I/O did not emit the detached worker runtime: {threaded_source}");
+    assert!(
+        threaded_source.contains("ostrin_file_read_cancelable"),
+        "native file I/O did not lower read_file through the cancelable helper: {threaded_source}"
+    );
+    assert!(
+        threaded_source.contains("ostrin_file_write_cancelable"),
+        "native file I/O did not lower write_file through the cancelable helper: {threaded_source}"
+    );
+    assert!(
+        threaded_source.contains("ostrin_file_request_wait"),
+        "native file I/O did not use the cancelable request wait: {threaded_source}"
+    );
+    assert!(
+        threaded_source.contains("ostrin_thread_start_detached"),
+        "native file I/O did not emit the detached worker runtime: {threaded_source}"
+    );
 
     let threaded_exe = temp_artifact("native-ir-file-io-threads.exe");
-    let threaded_compile = run(&["--compile", "--native-threads", "--leak-check", "--out", &threaded_exe, &file]);
+    let threaded_compile = run(&[
+        "--compile",
+        "--native-threads",
+        "--leak-check",
+        "--out",
+        &threaded_exe,
+        &file,
+    ]);
     if skip_if_no_c_compiler(&threaded_compile) {
         return;
     }
-    assert!(threaded_compile.status.success(), "native-thread compile failed: {}", stderr(&threaded_compile));
-    let threaded = Command::new(&threaded_exe).output().expect("run native-thread IR file I/O binary");
+    assert!(
+        threaded_compile.status.success(),
+        "native-thread compile failed: {}",
+        stderr(&threaded_compile)
+    );
+    let threaded = Command::new(&threaded_exe)
+        .output()
+        .expect("run native-thread IR file I/O binary");
     let _ = fs::remove_file(&threaded_exe);
     let _ = fs::remove_file("target/ostrin-ir-file-io.txt");
     let _ = fs::remove_file("target/ostrin-ir-file-io-missing.txt");
-    assert!(threaded.status.success(), "native-thread binary failed: {}", String::from_utf8_lossy(&threaded.stderr));
-    assert_eq!(String::from_utf8_lossy(&threaded.stdout).replace("\r\n", "\n"), expected);
-    assert!(String::from_utf8_lossy(&threaded.stderr).contains("live_allocations=0"), "native-thread file I/O leaked: {}", String::from_utf8_lossy(&threaded.stderr));
+    assert!(
+        threaded.status.success(),
+        "native-thread binary failed: {}",
+        String::from_utf8_lossy(&threaded.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&threaded.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&threaded.stderr).contains("live_allocations=0"),
+        "native-thread file I/O leaked: {}",
+        String::from_utf8_lossy(&threaded.stderr)
+    );
 }
 
 #[test]
@@ -341,10 +528,22 @@ fn standard_library_arguments_are_checked() {
     let out = run(&[&example_path("stdlib_io_errors.ostrin")]);
     assert!(!out.status.success());
     let err = stderr(&out);
-    assert!(err.contains("E1041"), "missing standard library diagnostic: {err}");
-    assert!(err.contains("read_file") && err.contains("String") && err.contains("Int"), "missing read_file type diagnostic: {err}");
-    assert!(err.contains("write_file") && err.contains("String") && err.contains("Int"), "missing write_file type diagnostic: {err}");
-    assert!(err.contains("parse_int") && err.contains("Bool"), "missing parse_int type diagnostic: {err}");
+    assert!(
+        err.contains("E1041"),
+        "missing standard library diagnostic: {err}"
+    );
+    assert!(
+        err.contains("read_file") && err.contains("String") && err.contains("Int"),
+        "missing read_file type diagnostic: {err}"
+    );
+    assert!(
+        err.contains("write_file") && err.contains("String") && err.contains("Int"),
+        "missing write_file type diagnostic: {err}"
+    );
+    assert!(
+        err.contains("parse_int") && err.contains("Bool"),
+        "missing parse_int type diagnostic: {err}"
+    );
 }
 
 #[test]
@@ -353,8 +552,14 @@ fn json_diagnostics_are_editor_friendly_and_keep_source_locations() {
     assert!(!out.status.success());
     let text = stdout(&out);
     let lines: Vec<&str> = text.lines().collect();
-    assert_eq!(lines.len(), 4, "expected one JSON object per diagnostic: {text}");
-    assert!(lines.iter().all(|line| line.starts_with('{') && line.ends_with('}')));
+    assert_eq!(
+        lines.len(),
+        4,
+        "expected one JSON object per diagnostic: {text}"
+    );
+    assert!(lines
+        .iter()
+        .all(|line| line.starts_with('{') && line.ends_with('}')));
     assert!(text.contains("\"code\":\"E1043\""));
     assert!(text.contains("\"message\":\"Type 'Score' has no field 'missing'.\""));
     assert!(text.contains("\"line\":8"));
@@ -364,24 +569,43 @@ fn json_diagnostics_are_editor_friendly_and_keep_source_locations() {
 #[test]
 fn compiler_checks_unsaved_stdin_source_for_editor_integrations() {
     let source = "fn main() -> Void {\n    if 1 {\n        print(\"bad\")\n    }\n}\n";
-    let out = run_stdin(&[
-        "--stdin",
-        "--check",
-        "--json",
-        "--file",
-        "C:/workspace/unsaved.ostrin",
-    ], source);
+    let out = run_stdin(
+        &[
+            "--stdin",
+            "--check",
+            "--json",
+            "--file",
+            "C:/workspace/unsaved.ostrin",
+        ],
+        source,
+    );
     assert!(!out.status.success());
     let text = stdout(&out);
-    assert!(text.contains("\"severity\":\"error\""), "missing JSON diagnostic: {text}");
-    assert!(text.contains("C:/workspace/unsaved.ostrin"), "missing source path: {text}");
+    assert!(
+        text.contains("\"severity\":\"error\""),
+        "missing JSON diagnostic: {text}"
+    );
+    assert!(
+        text.contains("C:/workspace/unsaved.ostrin"),
+        "missing source path: {text}"
+    );
 
     let valid = run_stdin(
-        &["--stdin", "--check", "--json", "--file", "C:/workspace/unsaved.ostrin"],
+        &[
+            "--stdin",
+            "--check",
+            "--json",
+            "--file",
+            "C:/workspace/unsaved.ostrin",
+        ],
         "fn main() -> Void {\n    print(\"ok\")\n}\n",
     );
     assert!(valid.status.success(), "stderr: {}", stderr(&valid));
-    assert!(stdout(&valid).is_empty(), "JSON success should be silent: {}", stdout(&valid));
+    assert!(
+        stdout(&valid).is_empty(),
+        "JSON success should be silent: {}",
+        stdout(&valid)
+    );
 }
 
 #[test]
@@ -399,14 +623,38 @@ fn compiler_lsp_negotiates_and_publishes_diagnostics() {
     ]);
     assert!(out.status.success(), "LSP exited unsuccessfully");
     let text = stdout(&out);
-    assert!(text.contains("\"hoverProvider\":true"), "missing initialize capabilities: {text}");
-    assert!(text.contains("textDocument/publishDiagnostics"), "missing diagnostics notification: {text}");
-    assert!(text.contains("OSTRIN-E1041"), "missing type diagnostic: {text}");
-    assert!(text.contains("\"line\":1"), "missing zero-based diagnostic range: {text}");
-    assert!(text.contains("\"id\":3") && text.contains("Ostrin function"), "missing hover response: {text}");
-    assert!(text.contains("\"id\":4") && text.contains("\"label\":\"main\""), "missing completion response: {text}");
-    assert!(text.contains("\"id\":5") && text.contains("\"uri\":\"file:///C:/workspace/lsp.ostrin\""), "missing definition response: {text}");
-    assert!(text.contains("\"diagnostics\":[]"), "didChange should clear diagnostics: {text}");
+    assert!(
+        text.contains("\"hoverProvider\":true"),
+        "missing initialize capabilities: {text}"
+    );
+    assert!(
+        text.contains("textDocument/publishDiagnostics"),
+        "missing diagnostics notification: {text}"
+    );
+    assert!(
+        text.contains("OSTRIN-E1041"),
+        "missing type diagnostic: {text}"
+    );
+    assert!(
+        text.contains("\"line\":1"),
+        "missing zero-based diagnostic range: {text}"
+    );
+    assert!(
+        text.contains("\"id\":3") && text.contains("Ostrin function"),
+        "missing hover response: {text}"
+    );
+    assert!(
+        text.contains("\"id\":4") && text.contains("\"label\":\"main\""),
+        "missing completion response: {text}"
+    );
+    assert!(
+        text.contains("\"id\":5") && text.contains("\"uri\":\"file:///C:/workspace/lsp.ostrin\""),
+        "missing definition response: {text}"
+    );
+    assert!(
+        text.contains("\"diagnostics\":[]"),
+        "didChange should clear diagnostics: {text}"
+    );
 }
 
 #[test]
@@ -430,7 +678,8 @@ fn compiler_lsp_resolves_imports_across_open_documents() {
     let hover = json!({
         "jsonrpc":"2.0","id":2,"method":"textDocument/hover",
         "params":{"textDocument":{"uri":main_uri},"position":{"line":5,"character":15}}
-    }).to_string();
+    })
+    .to_string();
     let references = json!({
         "jsonrpc":"2.0","id":3,"method":"textDocument/references",
         "params":{"textDocument":{"uri":main_uri},"position":{"line":5,"character":15},"context":{"includeDeclaration":true}}
@@ -438,11 +687,13 @@ fn compiler_lsp_resolves_imports_across_open_documents() {
     let signature_help = json!({
         "jsonrpc":"2.0","id":4,"method":"textDocument/signatureHelp",
         "params":{"textDocument":{"uri":main_uri},"position":{"line":5,"character":25}}
-    }).to_string();
+    })
+    .to_string();
     let semantic_tokens = json!({
         "jsonrpc":"2.0","id":5,"method":"textDocument/semanticTokens/full",
         "params":{"textDocument":{"uri":main_uri}}
-    }).to_string();
+    })
+    .to_string();
     let rename = json!({
         "jsonrpc":"2.0","id":6,"method":"textDocument/rename",
         "params":{"textDocument":{"uri":main_uri},"position":{"line":5,"character":15},"newName":"to_kelvin_renamed"}
@@ -458,7 +709,8 @@ fn compiler_lsp_resolves_imports_across_open_documents() {
     let retouch_main = json!({
         "jsonrpc":"2.0","method":"textDocument/didChange",
         "params":{"textDocument":{"uri":main_uri,"version":2},"contentChanges":[{"text":main_text}]}
-    }).to_string();
+    })
+    .to_string();
 
     let out = run_lsp(&[
         &initialize,
@@ -475,7 +727,11 @@ fn compiler_lsp_resolves_imports_across_open_documents() {
         r#"{"jsonrpc":"2.0","id":7,"method":"shutdown","params":null}"#,
         r#"{"jsonrpc":"2.0","method":"exit","params":null}"#,
     ]);
-    assert!(out.status.success(), "LSP exited unsuccessfully: {}", stderr(&out));
+    assert!(
+        out.status.success(),
+        "LSP exited unsuccessfully: {}",
+        stderr(&out)
+    );
     let text = stdout(&out);
 
     assert!(
@@ -489,7 +745,8 @@ fn compiler_lsp_resolves_imports_across_open_documents() {
         "references should span both the declaration and every call site across files: {references_reply}"
     );
     assert!(
-        references_reply.contains(&units_uri.replace('\\', "\\\\")) || references_reply.contains("units.ostrin"),
+        references_reply.contains(&units_uri.replace('\\', "\\\\"))
+            || references_reply.contains("units.ostrin"),
         "references should include the declaration file: {references_reply}"
     );
 
@@ -500,18 +757,30 @@ fn compiler_lsp_resolves_imports_across_open_documents() {
     );
 
     let tokens_reply = extract_result(&text, 5);
-    assert!(tokens_reply.contains("\"data\":["), "semantic tokens should return a data array: {tokens_reply}");
-    assert_ne!(tokens_reply, "{\"data\":[]}", "semantic tokens should not be empty for a resolved file: {tokens_reply}");
+    assert!(
+        tokens_reply.contains("\"data\":["),
+        "semantic tokens should return a data array: {tokens_reply}"
+    );
+    assert_ne!(
+        tokens_reply, "{\"data\":[]}",
+        "semantic tokens should not be empty for a resolved file: {tokens_reply}"
+    );
 
     let rename_reply = extract_result(&text, 6);
-    assert!(rename_reply.contains("\"changes\""), "rename should produce a workspace edit: {rename_reply}");
+    assert!(
+        rename_reply.contains("\"changes\""),
+        "rename should produce a workspace edit: {rename_reply}"
+    );
     assert!(
         rename_reply.contains("to_kelvin_renamed"),
         "rename should carry the new name in the edit: {rename_reply}"
     );
 
     assert!(
-        text.contains("OSTRIN") || text.contains("private") || text.contains("not found") || text.contains("Error"),
+        text.contains("OSTRIN")
+            || text.contains("private")
+            || text.contains("not found")
+            || text.contains("Error"),
         "editing the imported file in memory should surface a diagnostic on the importer: {text}"
     );
 }
@@ -528,7 +797,8 @@ fn compiler_lsp_finds_references_in_unopened_workspace_files() {
     let initialize = json!({
         "jsonrpc":"2.0","id":1,"method":"initialize",
         "params":{"rootUri":root_uri}
-    }).to_string();
+    })
+    .to_string();
     let open_main = json!({
         "jsonrpc":"2.0","method":"textDocument/didOpen",
         "params":{"textDocument":{"uri":main_uri,"languageId":"ostrin","version":1,"text":main_text}}
@@ -551,7 +821,11 @@ fn compiler_lsp_finds_references_in_unopened_workspace_files() {
         r#"{"jsonrpc":"2.0","id":4,"method":"shutdown","params":null}"#,
         r#"{"jsonrpc":"2.0","method":"exit","params":null}"#,
     ]);
-    assert!(out.status.success(), "LSP exited unsuccessfully: {}", stderr(&out));
+    assert!(
+        out.status.success(),
+        "LSP exited unsuccessfully: {}",
+        stderr(&out)
+    );
     let text = stdout(&out);
 
     let references_reply = extract_result(&text, 2);
@@ -574,7 +848,9 @@ fn compiler_lsp_finds_references_in_unopened_workspace_files() {
 
 fn extract_result(stream: &str, id: u64) -> String {
     let marker = format!("\"id\":{id},");
-    let start = stream.find(&marker).unwrap_or_else(|| panic!("no reply for id {id} in: {stream}"));
+    let start = stream
+        .find(&marker)
+        .unwrap_or_else(|| panic!("no reply for id {id} in: {stream}"));
     let tail = &stream[start..];
     let end = tail.find("Content-Length").unwrap_or(tail.len());
     tail[..end].to_string()
@@ -596,7 +872,10 @@ fn parse_framed_messages(out: &Output) -> Vec<serde_json::Value> {
         let header = String::from_utf8_lossy(&bytes[offset..header_end]);
         let length: usize = header
             .lines()
-            .find_map(|line| line.strip_prefix("Content-Length:").map(|value| value.trim().parse().unwrap()))
+            .find_map(|line| {
+                line.strip_prefix("Content-Length:")
+                    .map(|value| value.trim().parse().unwrap())
+            })
             .expect("frame missing Content-Length");
         let body_start = header_end + 4;
         let body = &bytes[body_start..body_start + length];
@@ -632,53 +911,108 @@ fn compiler_dap_hits_breakpoints_and_reports_locals() {
     ];
     // The loop runs exactly 10 times; inspect the first stop in full, then
     // just keep continuing through the remaining nine.
-    messages.push(next(json!({"command":"stackTrace","arguments":{"threadId":1}})));
+    messages.push(next(
+        json!({"command":"stackTrace","arguments":{"threadId":1}}),
+    ));
     messages.push(next(json!({"command":"scopes","arguments":{"frameId":0}})));
-    messages.push(next(json!({"command":"variables","arguments":{"variablesReference":1}})));
-    messages.push(next(json!({"command":"evaluate","arguments":{"expression":"n","frameId":0}})));
+    messages.push(next(
+        json!({"command":"variables","arguments":{"variablesReference":1}}),
+    ));
+    messages.push(next(
+        json!({"command":"evaluate","arguments":{"expression":"n","frameId":0}}),
+    ));
     for _ in 0..10 {
-        messages.push(next(json!({"command":"continue","arguments":{"threadId":1}})));
+        messages.push(next(
+            json!({"command":"continue","arguments":{"threadId":1}}),
+        ));
     }
 
     let out = run_dap(&messages);
-    assert!(out.status.success(), "DAP session exited unsuccessfully: {}", stderr(&out));
+    assert!(
+        out.status.success(),
+        "DAP session exited unsuccessfully: {}",
+        stderr(&out)
+    );
     let received = parse_framed_messages(&out);
 
     let events = |name: &str| -> Vec<&serde_json::Value> {
-        received.iter().filter(|m| m["type"] == "event" && m["event"] == name).collect()
+        received
+            .iter()
+            .filter(|m| m["type"] == "event" && m["event"] == name)
+            .collect()
     };
     let response = |request_seq: u64| -> &serde_json::Value {
         received
             .iter()
             .find(|m| m["type"] == "response" && m["request_seq"] == request_seq)
-            .unwrap_or_else(|| panic!("no response for request_seq {request_seq} in: {received:#?}"))
+            .unwrap_or_else(|| {
+                panic!("no response for request_seq {request_seq} in: {received:#?}")
+            })
     };
 
-    assert_eq!(events("initialized").len(), 1, "expected exactly one initialized event: {received:#?}");
+    assert_eq!(
+        events("initialized").len(),
+        1,
+        "expected exactly one initialized event: {received:#?}"
+    );
     let stopped = events("stopped");
-    assert_eq!(stopped.len(), 10, "the breakpoint on line 24 should be hit once per loop iteration: {received:#?}");
-    assert!(stopped.iter().all(|event| event["body"]["reason"] == "breakpoint"));
+    assert_eq!(
+        stopped.len(),
+        10,
+        "the breakpoint on line 24 should be hit once per loop iteration: {received:#?}"
+    );
+    assert!(stopped
+        .iter()
+        .all(|event| event["body"]["reason"] == "breakpoint"));
 
     let stack_trace = &response(5)["body"];
     let top_frame = &stack_trace["stackFrames"][0];
     assert_eq!(top_frame["name"], "main");
     assert_eq!(top_frame["line"], 24);
 
-    let variables = response(7)["body"]["variables"].as_array().expect("variables body");
-    let names: Vec<&str> = variables.iter().filter_map(|v| v["name"].as_str()).collect();
-    assert!(names.contains(&"n"), "locals should include the loop variable: {names:?}");
-    assert!(names.contains(&"fib"), "locals should include a variable from an outer statement in the same function: {names:?}");
+    let variables = response(7)["body"]["variables"]
+        .as_array()
+        .expect("variables body");
+    let names: Vec<&str> = variables
+        .iter()
+        .filter_map(|v| v["name"].as_str())
+        .collect();
+    assert!(
+        names.contains(&"n"),
+        "locals should include the loop variable: {names:?}"
+    );
+    assert!(
+        names.contains(&"fib"),
+        "locals should include a variable from an outer statement in the same function: {names:?}"
+    );
 
-    assert_eq!(response(8)["body"]["result"], "0", "evaluating 'n' on the first iteration should be 0");
+    assert_eq!(
+        response(8)["body"]["result"],
+        "0",
+        "evaluating 'n' on the first iteration should be 0"
+    );
 
-    let output_text: String = events("output").iter().filter_map(|event| event["body"]["output"].as_str()).collect();
+    let output_text: String = events("output")
+        .iter()
+        .filter_map(|event| event["body"]["output"].as_str())
+        .collect();
     // Fibonacci(10) starting at 0,1: 0 1 1 2 3 5 8 13 21 34.
-    assert_eq!(output_text, "0\n1\n1\n2\n3\n5\n8\n13\n21\n34\n", "unexpected printed sequence");
+    assert_eq!(
+        output_text, "0\n1\n1\n2\n3\n5\n8\n13\n21\n34\n",
+        "unexpected printed sequence"
+    );
 
-    assert_eq!(events("terminated").len(), 1, "expected a terminated event: {received:#?}");
+    assert_eq!(
+        events("terminated").len(),
+        1,
+        "expected a terminated event: {received:#?}"
+    );
     let exited = events("exited");
     assert_eq!(exited.len(), 1, "expected an exited event: {received:#?}");
-    assert_eq!(exited[0]["body"]["exitCode"], 0, "program should exit cleanly");
+    assert_eq!(
+        exited[0]["body"]["exitCode"], 0,
+        "program should exit cleanly"
+    );
 }
 
 #[test]
@@ -711,31 +1045,57 @@ fn compiler_dap_stops_on_entry_steps_and_disconnects_cleanly() {
     let out = run_dap(&messages);
     let received = parse_framed_messages(&out);
     let events = |name: &str| -> Vec<&serde_json::Value> {
-        received.iter().filter(|m| m["type"] == "event" && m["event"] == name).collect()
+        received
+            .iter()
+            .filter(|m| m["type"] == "event" && m["event"] == name)
+            .collect()
     };
     let response = |request_seq: u64| -> &serde_json::Value {
         received
             .iter()
             .find(|m| m["type"] == "response" && m["request_seq"] == request_seq)
-            .unwrap_or_else(|| panic!("no response for request_seq {request_seq} in: {received:#?}"))
+            .unwrap_or_else(|| {
+                panic!("no response for request_seq {request_seq} in: {received:#?}")
+            })
     };
 
     let stopped = events("stopped");
-    assert_eq!(stopped.len(), 2, "expected an entry stop and a step stop: {received:#?}");
+    assert_eq!(
+        stopped.len(),
+        2,
+        "expected an entry stop and a step stop: {received:#?}"
+    );
     assert_eq!(stopped[0]["body"]["reason"], "entry");
     assert_eq!(stopped[1]["body"]["reason"], "step");
 
-    let first_line = response(4)["body"]["stackFrames"][0]["line"].as_i64().unwrap();
-    let second_line = response(6)["body"]["stackFrames"][0]["line"].as_i64().unwrap();
-    assert_eq!(first_line, 8, "stopOnEntry should land on main's first statement");
-    assert_eq!(second_line, 9, "'next' should move exactly one statement forward in the same frame");
+    let first_line = response(4)["body"]["stackFrames"][0]["line"]
+        .as_i64()
+        .unwrap();
+    let second_line = response(6)["body"]["stackFrames"][0]["line"]
+        .as_i64()
+        .unwrap();
+    assert_eq!(
+        first_line, 8,
+        "stopOnEntry should land on main's first statement"
+    );
+    assert_eq!(
+        second_line, 9,
+        "'next' should move exactly one statement forward in the same frame"
+    );
 
     // Disconnecting here happens before the loop that calls print() ever
     // runs, so the only 'output' event should be the interpreter reporting
     // its own termination, not anything the Ostrin program printed.
     let output = events("output");
-    assert_eq!(output.len(), 1, "no Ostrin print() should have run yet: {received:#?}");
-    assert!(output[0]["body"]["output"].as_str().unwrap().contains("terminated"));
+    assert_eq!(
+        output.len(),
+        1,
+        "no Ostrin print() should have run yet: {received:#?}"
+    );
+    assert!(output[0]["body"]["output"]
+        .as_str()
+        .unwrap()
+        .contains("terminated"));
     assert_eq!(events("terminated").len(), 1);
 }
 
@@ -768,30 +1128,72 @@ fn skip_if_no_c_compiler(compile: &Output) -> bool {
 
 #[test]
 fn native_backend_compiles_and_runs_fibonacci() {
-    let report = run(&["--native-type-report", &example_path("native_fibonacci.ostrin")]);
-    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    let report = run(&[
+        "--native-type-report",
+        &example_path("native_fibonacci.ostrin"),
+    ]);
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
     let ir_functions = stdout(&report)
         .lines()
-        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .find_map(|line| {
+            line.strip_prefix("ir-generated: ")
+                .and_then(|n| n.trim().parse::<usize>().ok())
+        })
         .unwrap_or(0);
-    assert!(ir_functions >= 1, "recursive scalar function did not use the IR emitter: {}", stdout(&report));
+    assert!(
+        ir_functions >= 1,
+        "recursive scalar function did not use the IR emitter: {}",
+        stdout(&report)
+    );
 
     let emitted = run(&["--emit-c", &example_path("native_fibonacci.ostrin")]);
-    assert!(emitted.status.success(), "IR C emission failed: {}", stderr(&emitted));
-    assert!(stdout(&emitted).contains("__ostrin_ir_bb3:"), "expected CFG labels in IR output");
-    assert!(stdout(&emitted).contains("__ostrin_ir_pred"), "expected predecessor tracking for phi lowering");
+    assert!(
+        emitted.status.success(),
+        "IR C emission failed: {}",
+        stderr(&emitted)
+    );
+    assert!(
+        stdout(&emitted).contains("__ostrin_ir_bb3:"),
+        "expected CFG labels in IR output"
+    );
+    assert!(
+        stdout(&emitted).contains("__ostrin_ir_pred"),
+        "expected predecessor tracking for phi lowering"
+    );
 
     let exe = temp_artifact("fibonacci.exe");
-    let compile = run(&["--compile", "--out", &exe, &example_path("native_fibonacci.ostrin")]);
+    let compile = run(&[
+        "--compile",
+        "--out",
+        &exe,
+        &example_path("native_fibonacci.ostrin"),
+    ]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
-    assert!(stdout(&compile).contains("compiled:"), "expected a confirmation message: {}", stdout(&compile));
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    assert!(
+        stdout(&compile).contains("compiled:"),
+        "expected a confirmation message: {}",
+        stdout(&compile)
+    );
 
-    let run_output = Command::new(&exe).output().unwrap_or_else(|e| panic!("failed to run compiled binary '{exe}': {e}"));
+    let run_output = Command::new(&exe)
+        .output()
+        .unwrap_or_else(|e| panic!("failed to run compiled binary '{exe}': {e}"));
     let _ = fs::remove_file(&exe);
-    assert!(run_output.status.success(), "compiled binary exited unsuccessfully");
+    assert!(
+        run_output.status.success(),
+        "compiled binary exited unsuccessfully"
+    );
     // The MinGW C runtime's stdout is opened in text mode, so it rewrites
     // "\n" to "\r\n" on Windows; normalize before comparing.
     assert_eq!(
@@ -804,15 +1206,29 @@ fn native_backend_compiles_and_runs_fibonacci() {
 #[test]
 fn native_backend_compiles_and_runs_strings_and_booleans() {
     let exe = temp_artifact("strings.exe");
-    let compile = run(&["--compile", "--out", &exe, &example_path("native_strings.ostrin")]);
+    let compile = run(&[
+        "--compile",
+        "--out",
+        &exe,
+        &example_path("native_strings.ostrin"),
+    ]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
 
-    let run_output = Command::new(&exe).output().unwrap_or_else(|e| panic!("failed to run compiled binary '{exe}': {e}"));
+    let run_output = Command::new(&exe)
+        .output()
+        .unwrap_or_else(|e| panic!("failed to run compiled binary '{exe}': {e}"));
     let _ = fs::remove_file(&exe);
-    assert!(run_output.status.success(), "compiled binary exited unsuccessfully");
+    assert!(
+        run_output.status.success(),
+        "compiled binary exited unsuccessfully"
+    );
     assert_eq!(
         String::from_utf8_lossy(&run_output.stdout).replace("\r\n", "\n"),
         "Hello, Ostrin\nHello, Ostrin\nHello, Ostrin\ntrue\nfalse\n",
@@ -827,28 +1243,58 @@ fn native_backend_emit_c_writes_readable_c_source() {
     let source = stdout(&out);
     assert!(source.contains("#include <stdint.h>"));
     assert!(source.contains("int64_t ostrin_fn_fib(int64_t n)"));
-    assert!(source.contains("int main(int argc, char** argv)"), "the generated file must supply its own C main: {source}");
+    assert!(
+        source.contains("int main(int argc, char** argv)"),
+        "the generated file must supply its own C main: {source}"
+    );
 }
 
 #[test]
 fn cooperative_c_runtime_guards_thread_only_headers() {
     let cooperative = run(&["--emit-c", &example_path("native_fibonacci.ostrin")]);
-    assert!(cooperative.status.success(), "cooperative emit failed: {}", stderr(&cooperative));
+    assert!(
+        cooperative.status.success(),
+        "cooperative emit failed: {}",
+        stderr(&cooperative)
+    );
     let source = stdout(&cooperative);
     assert!(source.contains("#if defined(OSTRIN_NATIVE_THREADS) && defined(_WIN32)"));
-    assert!(source.contains("typedef int OstrinMutex;"), "cooperative runtime should provide no-op locks: {source}");
+    assert!(
+        source.contains("typedef int OstrinMutex;"),
+        "cooperative runtime should provide no-op locks: {source}"
+    );
     assert!(!source.contains("#define OSTRIN_NATIVE_THREADS"));
 
-    let threaded = run(&["--emit-c", "--native-threads", &example_path("native_threads.ostrin")]);
-    assert!(threaded.status.success(), "threaded emit failed: {}", stderr(&threaded));
+    let threaded = run(&[
+        "--emit-c",
+        "--native-threads",
+        &example_path("native_threads.ostrin"),
+    ]);
+    assert!(
+        threaded.status.success(),
+        "threaded emit failed: {}",
+        stderr(&threaded)
+    );
     assert!(stdout(&threaded).contains("#define OSTRIN_NATIVE_THREADS"));
-    assert!(stdout(&threaded).contains("#include <pthread.h>") || stdout(&threaded).contains("#include <windows.h>"));
+    assert!(
+        stdout(&threaded).contains("#include <pthread.h>")
+            || stdout(&threaded).contains("#include <windows.h>")
+    );
 }
 
 #[test]
 fn wasm_target_emits_cooperative_c_and_rejects_native_threads() {
-    let wasm = run(&["--emit-c", "--target", "wasm32-wasi", &example_path("hello.ostrin")]);
-    assert!(wasm.status.success(), "WASI C emission failed: {}", stderr(&wasm));
+    let wasm = run(&[
+        "--emit-c",
+        "--target",
+        "wasm32-wasi",
+        &example_path("hello.ostrin"),
+    ]);
+    assert!(
+        wasm.status.success(),
+        "WASI C emission failed: {}",
+        stderr(&wasm)
+    );
     let source = stdout(&wasm);
     assert!(!source.contains("#define OSTRIN_NATIVE_THREADS"));
     assert!(source.contains("typedef int OstrinMutex;"));
@@ -873,10 +1319,20 @@ fn wasm_program_matrix_emits_without_native_thread_dependencies() {
         "native_ir_managed_consumers.ostrin",
     ] {
         let wasm = run(&["--emit-c", "--target", "wasm32-wasi", &example_path(file)]);
-        assert!(wasm.status.success(), "WASI C emission failed for {file}: {}", stderr(&wasm));
+        assert!(
+            wasm.status.success(),
+            "WASI C emission failed for {file}: {}",
+            stderr(&wasm)
+        );
         let source = stdout(&wasm);
-        assert!(!source.contains("#define OSTRIN_NATIVE_THREADS"), "WASI program {file} enabled native threads");
-        assert!(source.contains("typedef int OstrinMutex;"), "WASI program {file} did not use the cooperative runtime");
+        assert!(
+            !source.contains("#define OSTRIN_NATIVE_THREADS"),
+            "WASI program {file} enabled native threads"
+        );
+        assert!(
+            source.contains("typedef int OstrinMutex;"),
+            "WASI program {file} did not use the cooperative runtime"
+        );
     }
 
     let package = run(&[
@@ -886,7 +1342,11 @@ fn wasm_program_matrix_emits_without_native_thread_dependencies() {
         "--project",
         &example_path("pkg_project/main_app"),
     ]);
-    assert!(package.status.success(), "WASI package C emission failed: {}", stderr(&package));
+    assert!(
+        package.status.success(),
+        "WASI package C emission failed: {}",
+        stderr(&package)
+    );
     assert!(!stdout(&package).contains("#define OSTRIN_NATIVE_THREADS"));
 }
 
@@ -894,7 +1354,11 @@ fn wasm_program_matrix_emits_without_native_thread_dependencies() {
 fn program_arguments_match_between_interpreter_and_native() {
     let file = example_path("args.ostrin");
     let interpreted = run(&["--run", &file, "--", "uno", "dos"]);
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), "2\nuno\ndos\n");
 
     let exe = temp_artifact("args.exe");
@@ -902,18 +1366,36 @@ fn program_arguments_match_between_interpreter_and_native() {
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "native compile failed: {}", stderr(&compile));
-    let native = Command::new(&exe).args(["uno", "dos"]).output().expect("run args binary");
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .args(["uno", "dos"])
+        .output()
+        .expect("run args binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native binary failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), "2\nuno\ndos\n");
+    assert!(
+        native.status.success(),
+        "native binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        "2\nuno\ndos\n"
+    );
 }
 
 #[test]
 fn environment_and_paths_match_between_interpreter_and_native() {
     let file = example_path("env_path.ostrin");
     let interpreted = run_with_env(&["--run", &file], "OSTRIN_TEST_VALUE", "Ostrin");
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
     let expected = stdout(&interpreted).replace("\r\n", "\n");
     assert_eq!(expected, "Some(Ostrin)\nsrc/main.ostrin\n");
 
@@ -922,21 +1404,40 @@ fn environment_and_paths_match_between_interpreter_and_native() {
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "native compile failed: {}", stderr(&compile));
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
     let native = Command::new(&exe)
         .env("OSTRIN_TEST_VALUE", "Ostrin")
         .output()
         .expect("run environment/path binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native binary failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(
+        native.status.success(),
+        "native binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
 }
 
 #[test]
 fn standard_args_and_env_modules_match_between_interpreter_and_native() {
     let file = example_path("std_args_env.ostrin");
-    let interpreted = run_with_env(&["--run", &file, "--", "uno", "dos"], "OSTRIN_TEST_VALUE", "Ostrin");
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    let interpreted = run_with_env(
+        &["--run", &file, "--", "uno", "dos"],
+        "OSTRIN_TEST_VALUE",
+        "Ostrin",
+    );
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
     let expected = stdout(&interpreted).replace("\r\n", "\n");
     assert_eq!(
         expected,
@@ -947,29 +1448,53 @@ fn standard_args_and_env_modules_match_between_interpreter_and_native() {
     if skip_if_no_c_compiler(&report) {
         return;
     }
-    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
     let report_text = stdout(&report);
     let ir_functions = report_text
         .lines()
-        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|value| value.trim().parse::<usize>().ok()))
+        .find_map(|line| {
+            line.strip_prefix("ir-generated: ")
+                .and_then(|value| value.trim().parse::<usize>().ok())
+        })
         .unwrap_or(0);
-    assert!(ir_functions >= 8, "std args/env modules still fall back from IR: {report_text}");
-    assert!(report_text.contains("hir-generated: 0"), "std args/env modules left a HIR fallback: {report_text}");
+    assert!(
+        ir_functions >= 8,
+        "std args/env modules still fall back from IR: {report_text}"
+    );
+    assert!(
+        report_text.contains("hir-generated: 0"),
+        "std args/env modules left a HIR fallback: {report_text}"
+    );
 
     let exe = temp_artifact("std-args-env.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "native compile failed: {}", stderr(&compile));
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
     let native = Command::new(&exe)
         .env("OSTRIN_TEST_VALUE", "Ostrin")
         .args(["uno", "dos"])
         .output()
         .expect("run std args/env binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native binary failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(
+        native.status.success(),
+        "native binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
     assert!(
         String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
         "std args/env native ownership leaked: {}",
@@ -981,7 +1506,11 @@ fn standard_args_and_env_modules_match_between_interpreter_and_native() {
 fn structural_equality_matches_between_interpreter_and_native() {
     let file = example_path("structural_equality.ostrin");
     let interpreted = run(&["--run", &file]);
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
     let expected = stdout(&interpreted).replace("\r\n", "\n");
     assert_eq!(expected, "true\ntrue\ntrue\ntrue\ntrue\ntrue\ntrue\n");
 
@@ -989,28 +1518,60 @@ fn structural_equality_matches_between_interpreter_and_native() {
     if skip_if_no_c_compiler(&report) {
         return;
     }
-    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
     let ir_functions = stdout(&report)
         .lines()
-        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|value| value.trim().parse::<usize>().ok()))
+        .find_map(|line| {
+            line.strip_prefix("ir-generated: ")
+                .and_then(|value| value.trim().parse::<usize>().ok())
+        })
         .unwrap_or(0);
-    assert!(ir_functions >= 1, "structural equality still falls back from IR: {}", stdout(&report));
+    assert!(
+        ir_functions >= 1,
+        "structural equality still falls back from IR: {}",
+        stdout(&report)
+    );
 
     let exe = temp_artifact("structural-equality.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
-    assert!(compile.status.success(), "native compile failed: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("run structural equality binary");
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run structural equality binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native binary failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
-    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "structural equality leaked: {}", String::from_utf8_lossy(&native.stderr));
+    assert!(
+        native.status.success(),
+        "native binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "structural equality leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
 }
 
 #[test]
 fn formatting_and_filesystem_builtins_match_between_interpreter_and_native() {
     let file = example_path("format_filesystem.ostrin");
     let interpreted = run(&["--run", &file]);
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
     let expected = stdout(&interpreted).replace("\r\n", "\n");
     assert_eq!(expected, "2 + 3 = 5\ntrue\ntrue\n");
 
@@ -1019,38 +1580,73 @@ fn formatting_and_filesystem_builtins_match_between_interpreter_and_native() {
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "native compile failed: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("run formatting/filesystem binary");
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run formatting/filesystem binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native binary failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(
+        native.status.success(),
+        "native binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
 }
 
 #[test]
 fn hash_map_scalars_match_between_interpreter_and_native() {
     let file = example_path("hash_map_stress.ostrin");
     let interpreted = run(&["--run", &file]);
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
     let expected = stdout(&interpreted).replace("\r\n", "\n");
-    assert_eq!(expected, "51\nSome(999)\nfalse\nSome(98)\n51\ntrue\nfalse\n");
+    assert_eq!(
+        expected,
+        "51\nSome(999)\nfalse\nSome(98)\n51\ntrue\nfalse\n"
+    );
 
     let exe = temp_artifact("hash-map-stress.exe");
     let compile = run(&["--compile", "--out", &exe, &file]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "native compile failed: {}", stderr(&compile));
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
     let native = Command::new(&exe).output().expect("run hash map binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native binary failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(
+        native.status.success(),
+        "native binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
 }
 
 #[test]
 fn hash_builtin_matches_between_interpreter_and_native() {
     let file = example_path("hash_builtin.ostrin");
     let interpreted = run(&["--run", &file]);
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
     let expected = stdout(&interpreted).replace("\r\n", "\n");
 
     let exe = temp_artifact("hash-builtin.exe");
@@ -1058,18 +1654,35 @@ fn hash_builtin_matches_between_interpreter_and_native() {
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "native compile failed: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("run hash builtin binary");
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run hash builtin binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native binary failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(
+        native.status.success(),
+        "native binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
 }
 
 #[test]
 fn composite_collection_keys_match_between_interpreter_and_native() {
     let file = example_path("hash_map_composite.ostrin");
     let interpreted = run(&["--run", &file]);
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
     let expected = stdout(&interpreted).replace("\r\n", "\n");
     assert_eq!(expected, "Some(ok)\nfalse\nSome(updated)\n1\ntrue\nfalse\n1\nSome(eleven)\ntrue\n1\nSome(stable)\ntrue\n");
 
@@ -1078,11 +1691,24 @@ fn composite_collection_keys_match_between_interpreter_and_native() {
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "native compile failed: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("run composite hash map binary");
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run composite hash map binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native binary failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(
+        native.status.success(),
+        "native binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
 }
 
 #[test]
@@ -1094,7 +1720,10 @@ fn hash_rejects_unhashable_composite_payloads() {
     assert!(!out.status.success());
     let text = stderr(&out);
     assert!(text.contains("E1041"), "missing hash diagnostic: {text}");
-    assert!(text.contains("derive(Hash)"), "missing hash contract: {text}");
+    assert!(
+        text.contains("derive(Hash)"),
+        "missing hash contract: {text}"
+    );
 }
 
 #[test]
@@ -1105,14 +1734,27 @@ fn map_and_set_require_hash_and_eq_bounds() {
     );
     assert!(!out.status.success());
     let text = stderr(&out);
-    assert!(text.contains("Map key type 'HashOnly' must satisfy Hash + Eq"), "missing Map bound diagnostic: {text}");
-    assert!(text.contains("Set element type 'EqOnly' must satisfy Hash + Eq"), "missing Set bound diagnostic: {text}");
-    assert!(text.contains("missing Eq") && text.contains("missing Hash"), "missing individual bounds: {text}");
+    assert!(
+        text.contains("Map key type 'HashOnly' must satisfy Hash + Eq"),
+        "missing Map bound diagnostic: {text}"
+    );
+    assert!(
+        text.contains("Set element type 'EqOnly' must satisfy Hash + Eq"),
+        "missing Set bound diagnostic: {text}"
+    );
+    assert!(
+        text.contains("missing Eq") && text.contains("missing Hash"),
+        "missing individual bounds: {text}"
+    );
 }
 
 #[test]
 fn native_backend_exposes_ownership_runtime_and_leak_check() {
-    let out = run(&["--emit-c", "--leak-check", &example_path("native_fibonacci.ostrin")]);
+    let out = run(&[
+        "--emit-c",
+        "--leak-check",
+        &example_path("native_fibonacci.ostrin"),
+    ]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     let source = stdout(&out);
     assert!(source.contains("static void ostrin_retain(void* ptr)"));
@@ -1135,11 +1777,24 @@ fn native_ownership_primitives_release_composite_allocations() {
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "ownership compile failed: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("run ownership primitive binary");
+    assert!(
+        compile.status.success(),
+        "ownership compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run ownership primitive binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "ownership binary failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), "3\n");
+    assert!(
+        native.status.success(),
+        "ownership binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        "3\n"
+    );
     assert!(
         String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
         "explicit clone/drop should release the list and its backing storage: {}",
@@ -1160,11 +1815,24 @@ fn native_ownership_automatically_releases_aliases_reassignments_and_returns() {
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "ownership auto compile failed: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("run automatic ownership binary");
+    assert!(
+        compile.status.success(),
+        "ownership auto compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run automatic ownership binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "ownership auto binary failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), "3\n1\n1\n");
+    assert!(
+        native.status.success(),
+        "ownership auto binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        "3\n1\n1\n"
+    );
     assert!(
         String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
         "automatic ownership should release aliases, replaced values and returned values: {}",
@@ -1185,11 +1853,24 @@ fn native_ownership_releases_loop_and_branch_locals() {
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "ownership loop compile failed: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("run loop ownership binary");
+    assert!(
+        compile.status.success(),
+        "ownership loop compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run loop ownership binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "ownership loop binary failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), "3\n1\n");
+    assert!(
+        native.status.success(),
+        "ownership loop binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        "3\n1\n"
+    );
     assert!(
         String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
         "loop and branch locals should be released per iteration: {}",
@@ -1210,11 +1891,24 @@ fn native_ownership_releases_ast_loop_locals() {
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "AST ownership loop compile failed: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("run AST loop ownership binary");
+    assert!(
+        compile.status.success(),
+        "AST ownership loop compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run AST loop ownership binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "AST ownership loop binary failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), "2\nNone\n");
+    assert!(
+        native.status.success(),
+        "AST ownership loop binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        "2\nNone\n"
+    );
     assert!(
         String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
         "AST loop locals should be released per iteration: {}",
@@ -1236,11 +1930,24 @@ fn native_threads_use_os_thread_and_blocking_channel_runtime() {
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "native thread compile failed: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("run native thread binary");
+    assert!(
+        compile.status.success(),
+        "native thread compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run native thread binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native thread binary failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), "7\n");
+    assert!(
+        native.status.success(),
+        "native thread binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        "7\n"
+    );
     assert!(
         String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
         "native thread runtime should release task, environment and channel allocations: {}",
@@ -1281,7 +1988,11 @@ fn native_threads_scope_drain_releases_nested_task_handles() {
         .lines()
         .map(str::to_owned)
         .collect();
-    assert_eq!(output_lines.len(), 6, "unexpected task output: {output_lines:?}");
+    assert_eq!(
+        output_lines.len(),
+        6,
+        "unexpected task output: {output_lines:?}"
+    );
     let mut initial_lines = output_lines[..2].to_vec();
     initial_lines.sort();
     assert_eq!(initial_lines, vec!["main", "task"]);
@@ -1304,10 +2015,19 @@ fn compiler_lowers_hir_to_verified_cfg_ir() {
     let source = stdout(&out);
     assert!(source.contains("ir fn"));
     assert!(source.contains("bb0:"));
-    assert!(source.contains("br %"), "the loop must become an explicit branch: {source}");
-    assert!(source.contains("ret"), "the IR must terminate functions: {source}");
+    assert!(
+        source.contains("br %"),
+        "the loop must become an explicit branch: {source}"
+    );
+    assert!(
+        source.contains("ret"),
+        "the IR must terminate functions: {source}"
+    );
     assert!(source.contains("ir functions:"));
-    assert!(source.contains("ir violations: 0"), "IR verifier reported a problem: {source}");
+    assert!(
+        source.contains("ir violations: 0"),
+        "IR verifier reported a problem: {source}"
+    );
 }
 
 #[test]
@@ -1318,7 +2038,10 @@ fn compiler_lowers_match_and_try_to_explicit_ir_control_flow() {
     assert!(match_source.contains("pattern_test"));
     assert!(match_source.contains("pattern_bind"));
     assert!(match_source.contains("phi"));
-    assert!(!match_source.contains("opaque match"), "match was left opaque: {match_source}");
+    assert!(
+        !match_source.contains("opaque match"),
+        "match was left opaque: {match_source}"
+    );
 
     let try_ir = run(&["--ir", &example_path("native_result.ostrin")]);
     assert!(try_ir.status.success(), "stderr: {}", stderr(&try_ir));
@@ -1326,7 +2049,10 @@ fn compiler_lowers_match_and_try_to_explicit_ir_control_flow() {
     assert!(try_source.contains("try_check"));
     assert!(try_source.contains("try_value"));
     assert!(try_source.contains("try_error"));
-    assert!(!try_source.contains("opaque try"), "try was left opaque: {try_source}");
+    assert!(
+        !try_source.contains("opaque try"),
+        "try was left opaque: {try_source}"
+    );
 }
 
 #[test]
@@ -1341,7 +2067,10 @@ fn compiler_lowers_concurrency_operations_to_explicit_ir() {
     assert!(source.contains("spawn"));
     assert!(source.contains("task_join"));
     assert!(source.contains("region_ret"));
-    assert!(!source.contains("opaque concurrency"), "concurrency remained opaque: {source}");
+    assert!(
+        !source.contains("opaque concurrency"),
+        "concurrency remained opaque: {source}"
+    );
 }
 
 #[test]
@@ -1351,8 +2080,14 @@ fn compiler_reports_conservative_ownership_facts() {
     let source = stdout(&out);
     assert!(source.contains("ownership managed-values:"));
     assert!(source.contains("ownership last-use-candidates:"));
-    assert!(source.contains("Point"), "record values should be classified as managed: {source}");
-    assert!(source.contains("candidate=true"), "straight-line record uses should be reported: {source}");
+    assert!(
+        source.contains("Point"),
+        "record values should be classified as managed: {source}"
+    );
+    assert!(
+        source.contains("candidate=true"),
+        "straight-line record uses should be reported: {source}"
+    );
 }
 
 #[test]
@@ -1360,8 +2095,14 @@ fn compiler_inserts_only_conservative_linear_releases() {
     let out = run(&["--ownership-ir", &example_path("ownership_linear.ostrin")]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     let source = stdout(&out);
-    assert!(source.contains("release %"), "the channel transfer should have a release marker: {source}");
-    assert!(source.contains("ownership-ir inserted-releases: 2"), "unexpected lowering summary: {source}");
+    assert!(
+        source.contains("release %"),
+        "the channel transfer should have a release marker: {source}"
+    );
+    assert!(
+        source.contains("ownership-ir inserted-releases: 2"),
+        "unexpected lowering summary: {source}"
+    );
 }
 
 #[test]
@@ -1369,17 +2110,35 @@ fn compiler_marks_reference_aliases_with_retains() {
     let out = run(&["--ownership-ir", &example_path("native_records.ostrin")]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     let source = stdout(&out);
-    assert!(source.contains("retain %"), "managed aggregate aliases need retain markers: {source}");
-    assert!(source.contains("ownership-ir inserted-retains:"), "missing retain summary: {source}");
+    assert!(
+        source.contains("retain %"),
+        "managed aggregate aliases need retain markers: {source}"
+    );
+    assert!(
+        source.contains("ownership-ir inserted-retains:"),
+        "missing retain summary: {source}"
+    );
 }
 
 #[test]
 fn compiler_reports_static_channel_move_violations() {
-    let out = run(&["--ownership-check", &example_path("moved_after_send.ostrin")]);
-    assert!(!out.status.success(), "use-after-send must be rejected by the ownership check");
+    let out = run(&[
+        "--ownership-check",
+        &example_path("moved_after_send.ostrin"),
+    ]);
+    assert!(
+        !out.status.success(),
+        "use-after-send must be rejected by the ownership check"
+    );
     let source = format!("{}{}", stdout(&out), stderr(&out));
-    assert!(source.contains("OSTRIN-E1101"), "missing static E1101: {source}");
-    assert!(source.contains("sent at") && source.contains("then used at"), "missing move locations: {source}");
+    assert!(
+        source.contains("OSTRIN-E1101"),
+        "missing static E1101: {source}"
+    );
+    assert!(
+        source.contains("sent at") && source.contains("then used at"),
+        "missing move locations: {source}"
+    );
 }
 
 #[test]
@@ -1392,7 +2151,10 @@ fn native_backend_emits_centralized_memory_cleanup() {
     assert!(source.contains("static void* ostrin_realloc(void* old_ptr, size_t size)"));
     assert!(source.contains("static void ostrin_free(void* ptr)"));
     assert!(source.contains("atexit(ostrin_mem_cleanup);"));
-    assert!(source.contains("ostrin_realloc("), "collection growth must use the tracked allocator");
+    assert!(
+        source.contains("ostrin_realloc("),
+        "collection growth must use the tracked allocator"
+    );
 }
 
 #[test]
@@ -1401,9 +2163,15 @@ fn native_backend_rejects_constructs_it_does_not_support_yet() {
     // the backend has no representation for: it must fail with a clear
     // message rather than silently emit something wrong.
     let out = run(&["--emit-c", &example_path("advanced.ostrin")]);
-    assert!(!out.status.success(), "the native backend should refuse a program it can't fully compile");
+    assert!(
+        !out.status.success(),
+        "the native backend should refuse a program it can't fully compile"
+    );
     let error = stderr(&out);
-    assert!(error.contains("supported by the native backend"), "unexpected error: {error}");
+    assert!(
+        error.contains("supported by the native backend"),
+        "unexpected error: {error}"
+    );
 }
 
 #[test]
@@ -1414,31 +2182,61 @@ fn moved_after_send_is_rejected_statically_in_both_entry_points() {
     let interpreted = run(&["--run", &file]);
     assert!(!interpreted.status.success());
     let interpreted_error = format!("{}{}", stdout(&interpreted), stderr(&interpreted));
-    assert!(interpreted_error.contains("OSTRIN-E1101"), "missing E1101: {interpreted_error}");
-    assert!(interpreted_error.contains("used after channel send"), "unexpected diagnostic: {interpreted_error}");
+    assert!(
+        interpreted_error.contains("OSTRIN-E1101"),
+        "missing E1101: {interpreted_error}"
+    );
+    assert!(
+        interpreted_error.contains("used after channel send"),
+        "unexpected diagnostic: {interpreted_error}"
+    );
 
     let exe = temp_artifact("moved.exe");
     let compile = run(&["--compile", "--out", &exe, &file]);
-    assert!(!compile.status.success(), "native compilation must stop at E1101");
-    assert!(stderr(&compile).contains("OSTRIN-E1101"), "missing native E1101: {}", stderr(&compile));
+    assert!(
+        !compile.status.success(),
+        "native compilation must stop at E1101"
+    );
+    assert!(
+        stderr(&compile).contains("OSTRIN-E1101"),
+        "missing native E1101: {}",
+        stderr(&compile)
+    );
     let _ = fs::remove_file(&exe);
 }
 
 #[test]
 fn immutable_records_can_be_shared_through_channels() {
     let interpreted = run(&["--run", &example_path("immutable_record_channel.ostrin")]);
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
     assert_eq!(stdout(&interpreted).trim(), "1");
 
     let exe = temp_artifact("immutable-record.exe");
-    let compile = run(&["--compile", "--out", &exe, &example_path("immutable_record_channel.ostrin")]);
+    let compile = run(&[
+        "--compile",
+        "--out",
+        &exe,
+        &example_path("immutable_record_channel.ostrin"),
+    ]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "native compile failed: {}", stderr(&compile));
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
     let native = Command::new(&exe).output().unwrap();
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native binary failed: {}", String::from_utf8_lossy(&native.stderr));
+    assert!(
+        native.status.success(),
+        "native binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
     assert_eq!(String::from_utf8_lossy(&native.stdout).trim(), "1");
 }
 
@@ -1499,10 +2297,20 @@ fn main() -> Void {
     if skip_if_no_c_compiler(&compiled) {
         return;
     }
-    assert!(compiled.status.success(), "native compilation failed: {}", stderr(&compiled));
-    let native = Command::new(&exe).output().expect("run native allocation-reuse test");
+    assert!(
+        compiled.status.success(),
+        "native compilation failed: {}",
+        stderr(&compiled)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run native allocation-reuse test");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native run failed: {}", String::from_utf8_lossy(&native.stderr));
+    assert!(
+        native.status.success(),
+        "native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
     assert_eq!(String::from_utf8_lossy(&native.stdout).trim(), "4194304");
     assert!(
         String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
@@ -1585,22 +2393,40 @@ fn main() -> Void {
     if skip_if_no_c_compiler(&compiled) {
         return;
     }
-    assert!(compiled.status.success(), "native compilation failed: {}", stderr(&compiled));
-    let native = Command::new(&exe).output().expect("run native transfer test");
+    assert!(
+        compiled.status.success(),
+        "native compilation failed: {}",
+        stderr(&compiled)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run native transfer test");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native run failed: {}", String::from_utf8_lossy(&native.stderr));
+    assert!(
+        native.status.success(),
+        "native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
     assert_eq!(String::from_utf8_lossy(&native.stdout).trim(), "7");
     assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"));
 
     if skip_if_no_c_compiler(&threaded_compile) {
         return;
     }
-    assert!(threaded_compile.status.success(), "native-thread compilation failed: {}", stderr(&threaded_compile));
+    assert!(
+        threaded_compile.status.success(),
+        "native-thread compilation failed: {}",
+        stderr(&threaded_compile)
+    );
     let threaded = Command::new(&threaded_exe)
         .output()
         .expect("run native-thread transfer test");
     let _ = fs::remove_file(&threaded_exe);
-    assert!(threaded.status.success(), "native-thread run failed: {}", String::from_utf8_lossy(&threaded.stderr));
+    assert!(
+        threaded.status.success(),
+        "native-thread run failed: {}",
+        String::from_utf8_lossy(&threaded.stderr)
+    );
     assert_eq!(String::from_utf8_lossy(&threaded.stdout).trim(), "7");
     assert!(
         String::from_utf8_lossy(&threaded.stderr).contains("live_allocations=0"),
@@ -1645,15 +2471,29 @@ fn native_backend_compiles_and_runs_records() {
     // binding, a record passed by identity into another function, and a
     // record literal nesting another record literal as one of its fields.
     let exe = temp_artifact("records.exe");
-    let compile = run(&["--compile", "--out", &exe, &example_path("native_records.ostrin")]);
+    let compile = run(&[
+        "--compile",
+        "--out",
+        &exe,
+        &example_path("native_records.ostrin"),
+    ]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
 
-    let run_output = Command::new(&exe).output().unwrap_or_else(|e| panic!("failed to run compiled binary '{exe}': {e}"));
+    let run_output = Command::new(&exe)
+        .output()
+        .unwrap_or_else(|e| panic!("failed to run compiled binary '{exe}': {e}"));
     let _ = fs::remove_file(&exe);
-    assert!(run_output.status.success(), "compiled binary exited unsuccessfully");
+    assert!(
+        run_output.status.success(),
+        "compiled binary exited unsuccessfully"
+    );
     assert_eq!(
         String::from_utf8_lossy(&run_output.stdout).replace("\r\n", "\n"),
         "11\n2\n13\n",
@@ -1668,15 +2508,29 @@ fn native_backend_compiles_and_runs_record_methods() {
     // pointer identity, and `Point.manhattan_distance` calls a plain
     // top-level function from inside a method body.
     let exe = temp_artifact("methods.exe");
-    let compile = run(&["--compile", "--out", &exe, &example_path("native_methods.ostrin")]);
+    let compile = run(&[
+        "--compile",
+        "--out",
+        &exe,
+        &example_path("native_methods.ostrin"),
+    ]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
 
-    let run_output = Command::new(&exe).output().unwrap_or_else(|e| panic!("failed to run compiled binary '{exe}': {e}"));
+    let run_output = Command::new(&exe)
+        .output()
+        .unwrap_or_else(|e| panic!("failed to run compiled binary '{exe}': {e}"));
     let _ = fs::remove_file(&exe);
-    assert!(run_output.status.success(), "compiled binary exited unsuccessfully");
+    assert!(
+        run_output.status.success(),
+        "compiled binary exited unsuccessfully"
+    );
     assert_eq!(
         String::from_utf8_lossy(&run_output.stdout).replace("\r\n", "\n"),
         "7\n7\n",
@@ -1693,15 +2547,29 @@ fn native_backend_compiles_and_runs_enums_and_match() {
     // exercising a literal, a range, a guard that reads its own binding,
     // and a wildcard fallback.
     let exe = temp_artifact("enums.exe");
-    let compile = run(&["--compile", "--out", &exe, &example_path("native_enums.ostrin")]);
+    let compile = run(&[
+        "--compile",
+        "--out",
+        &exe,
+        &example_path("native_enums.ostrin"),
+    ]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
 
-    let run_output = Command::new(&exe).output().unwrap_or_else(|e| panic!("failed to run compiled binary '{exe}': {e}"));
+    let run_output = Command::new(&exe)
+        .output()
+        .unwrap_or_else(|e| panic!("failed to run compiled binary '{exe}': {e}"));
     let _ = fs::remove_file(&exe);
-    assert!(run_output.status.success(), "compiled binary exited unsuccessfully");
+    assert!(
+        run_output.status.success(),
+        "compiled binary exited unsuccessfully"
+    );
     assert_eq!(
         String::from_utf8_lossy(&run_output.stdout).replace("\r\n", "\n"),
         "27\n20\n0\nzero\nsmall\nnegative\nlarge\n",
@@ -1717,15 +2585,29 @@ fn native_backend_compiles_and_runs_generic_functions() {
     // exercises a generic function whose body itself isn't trivial (an
     // `if`-expression comparing its own type parameter).
     let exe = temp_artifact("generics.exe");
-    let compile = run(&["--compile", "--out", &exe, &example_path("native_generics.ostrin")]);
+    let compile = run(&[
+        "--compile",
+        "--out",
+        &exe,
+        &example_path("native_generics.ostrin"),
+    ]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
 
-    let run_output = Command::new(&exe).output().unwrap_or_else(|e| panic!("failed to run compiled binary '{exe}': {e}"));
+    let run_output = Command::new(&exe)
+        .output()
+        .unwrap_or_else(|e| panic!("failed to run compiled binary '{exe}': {e}"));
     let _ = fs::remove_file(&exe);
-    assert!(run_output.status.success(), "compiled binary exited unsuccessfully");
+    assert!(
+        run_output.status.success(),
+        "compiled binary exited unsuccessfully"
+    );
     assert_eq!(
         String::from_utf8_lossy(&run_output.stdout).replace("\r\n", "\n"),
         "42\nhello\n7\n9\n9\n",
@@ -1743,10 +2625,18 @@ fn native_backend_emits_one_c_function_per_concrete_instantiation() {
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     let source = stdout(&out);
     assert_eq!(source.matches("identity__Int(int64_t value)").count(), 1);
-    assert_eq!(source.matches("identity__String(const char* value)").count(), 1);
+    assert_eq!(
+        source
+            .matches("identity__String(const char* value)")
+            .count(),
+        1
+    );
     assert_eq!(source.matches("identity__Pair(Pair* value)").count(), 1);
     assert_eq!(source.matches("max__Int(int64_t a, int64_t b)").count(), 1);
-    assert!(!source.contains("<T>"), "no generic syntax should leak into the generated C: {source}");
+    assert!(
+        !source.contains("<T>"),
+        "no generic syntax should leak into the generated C: {source}"
+    );
 }
 
 #[test]
@@ -1758,15 +2648,29 @@ fn native_backend_compiles_and_runs_dyn_trait() {
     // through the same dyn value — exercising the vtable dispatch itself,
     // not just a single trivial method.
     let exe = temp_artifact("dyn_trait.exe");
-    let compile = run(&["--compile", "--out", &exe, &example_path("native_dyn_trait.ostrin")]);
+    let compile = run(&[
+        "--compile",
+        "--out",
+        &exe,
+        &example_path("native_dyn_trait.ostrin"),
+    ]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
 
-    let run_output = Command::new(&exe).output().unwrap_or_else(|e| panic!("failed to run compiled binary '{exe}': {e}"));
+    let run_output = Command::new(&exe)
+        .output()
+        .unwrap_or_else(|e| panic!("failed to run compiled binary '{exe}': {e}"));
     let _ = fs::remove_file(&exe);
-    assert!(run_output.status.success(), "compiled binary exited unsuccessfully");
+    assert!(
+        run_output.status.success(),
+        "compiled binary exited unsuccessfully"
+    );
     assert_eq!(
         String::from_utf8_lossy(&run_output.stdout).replace("\r\n", "\n"),
         "12\n9\n3\n4\n",
@@ -1783,8 +2687,16 @@ fn native_backend_dedups_vtables_across_repeated_boxing() {
     let out = run(&["--emit-c", &example_path("native_dyn_trait.ostrin")]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     let source = stdout(&out);
-    assert_eq!(source.matches("Shape__Circle__vtable = {").count(), 1, "Circle's vtable should be emitted once: {source}");
-    assert_eq!(source.matches("Shape__Square__vtable = {").count(), 1, "Square's vtable should be emitted once: {source}");
+    assert_eq!(
+        source.matches("Shape__Circle__vtable = {").count(),
+        1,
+        "Circle's vtable should be emitted once: {source}"
+    );
+    assert_eq!(
+        source.matches("Shape__Square__vtable = {").count(),
+        1,
+        "Square's vtable should be emitted once: {source}"
+    );
 }
 
 #[test]
@@ -1797,15 +2709,29 @@ fn native_backend_compiles_and_runs_lists() {
     // constructs a list, so its signature is the only thing that would
     // ever discover List_Int without it).
     let exe = temp_artifact("lists.exe");
-    let compile = run(&["--compile", "--out", &exe, &example_path("native_lists.ostrin")]);
+    let compile = run(&[
+        "--compile",
+        "--out",
+        &exe,
+        &example_path("native_lists.ostrin"),
+    ]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
 
-    let run_output = Command::new(&exe).output().unwrap_or_else(|e| panic!("failed to run compiled binary '{exe}': {e}"));
+    let run_output = Command::new(&exe)
+        .output()
+        .unwrap_or_else(|e| panic!("failed to run compiled binary '{exe}': {e}"));
     let _ = fs::remove_file(&exe);
-    assert!(run_output.status.success(), "compiled binary exited unsuccessfully");
+    assert!(
+        run_output.status.success(),
+        "compiled binary exited unsuccessfully"
+    );
     assert_eq!(
         String::from_utf8_lossy(&run_output.stdout).replace("\r\n", "\n"),
         "4\n5\n1\n5\n15\n1\n4\n14\n3\n7\na\nb\nc\n",
@@ -1818,11 +2744,20 @@ fn native_backend_compiles_and_runs_list_combinators_with_captures() {
     // map/filter/fold/any/all with lambdas that capture an enclosing local
     // (`offset`), including a `map` that changes the element type.
     let exe = temp_artifact("closures.exe");
-    let compile = run(&["--compile", "--out", &exe, &example_path("native_closures.ostrin")]);
+    let compile = run(&[
+        "--compile",
+        "--out",
+        &exe,
+        &example_path("native_closures.ostrin"),
+    ]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
     let run_output = Command::new(&exe).output().unwrap();
     let _ = fs::remove_file(&exe);
     assert_eq!(
@@ -1837,11 +2772,20 @@ fn native_backend_compiles_the_original_dyn_trait_example() {
     // lambda calling a trait method through the vtable, and Float printing
     // that must match the interpreter digit for digit.
     let exe = temp_artifact("dyn_trait_original.exe");
-    let compile = run(&["--compile", "--out", &exe, &example_path("dyn_trait.ostrin")]);
+    let compile = run(&[
+        "--compile",
+        "--out",
+        &exe,
+        &example_path("dyn_trait.ostrin"),
+    ]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
     let run_output = Command::new(&exe).output().unwrap();
     let _ = fs::remove_file(&exe);
     assert_eq!(
@@ -1855,11 +2799,20 @@ fn native_backend_compiles_and_runs_option() {
     // Some/None (a bare `None` typed by return position, `if` arms and call
     // arguments), match on Option, is_some/unwrap/unwrap_or, and List.find.
     let exe = temp_artifact("option.exe");
-    let compile = run(&["--compile", "--out", &exe, &example_path("native_option.ostrin")]);
+    let compile = run(&[
+        "--compile",
+        "--out",
+        &exe,
+        &example_path("native_option.ostrin"),
+    ]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
     let run_output = Command::new(&exe).output().unwrap();
     let _ = fs::remove_file(&exe);
     assert_eq!(
@@ -1875,22 +2828,41 @@ fn native_backend_compiles_and_runs_result_and_try() {
     // maps the error type, match on Ok/Err, and a call as a `match`
     // scrutinee (which used to be misparsed as a trailing closure).
     for (file, expected) in [
-        ("native_result.ostrin", "ok\nnegative\n10\ntrue\n0\n4\ntrue\n"),
+        (
+            "native_result.ostrin",
+            "ok\nnegative\n10\ntrue\n0\n4\ntrue\n",
+        ),
         ("native_result_catch.ostrin", "2\nbad code\n"),
     ] {
         let interpreted = run(&["--run", &example_path(file)]);
-        assert!(interpreted.status.success(), "interpreter failed on {file}: {}", stderr(&interpreted));
-        assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected, "interpreter output for {file}");
+        assert!(
+            interpreted.status.success(),
+            "interpreter failed on {file}: {}",
+            stderr(&interpreted)
+        );
+        assert_eq!(
+            stdout(&interpreted).replace("\r\n", "\n"),
+            expected,
+            "interpreter output for {file}"
+        );
 
         let exe = temp_artifact(&format!("{file}.exe"));
         let compile = run(&["--compile", "--out", &exe, &example_path(file)]);
         if skip_if_no_c_compiler(&compile) {
             return;
         }
-        assert!(compile.status.success(), "compile failed for {file}: {}", stderr(&compile));
+        assert!(
+            compile.status.success(),
+            "compile failed for {file}: {}",
+            stderr(&compile)
+        );
         let run_output = Command::new(&exe).output().unwrap();
         let _ = fs::remove_file(&exe);
-        assert_eq!(String::from_utf8_lossy(&run_output.stdout).replace("\r\n", "\n"), expected, "native output for {file}");
+        assert_eq!(
+            String::from_utf8_lossy(&run_output.stdout).replace("\r\n", "\n"),
+            expected,
+            "native output for {file}"
+        );
     }
 }
 
@@ -1913,7 +2885,11 @@ fn native_hir_handles_option_result_core() {
         if skip_if_no_c_compiler(&report) {
             return;
         }
-        assert!(report.status.success(), "native type report failed for {file}: {}", stderr(&report));
+        assert!(
+            report.status.success(),
+            "native type report failed for {file}: {}",
+            stderr(&report)
+        );
         // Functions migrate from HIR to the IR emitter over time; count both.
         let hir_functions: usize = stdout(&report)
             .lines()
@@ -1980,30 +2956,58 @@ fn native_ir_emitter_handles_scalar_functions() {
     let file = example_path("int_division.ostrin");
     let expected = "3\n3\n";
     let interpreted = run(&["--run", &file]);
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
 
     let report = run(&["--native-type-report", &file]);
     if skip_if_no_c_compiler(&report) {
         return;
     }
-    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
     let ir_functions = stdout(&report)
         .lines()
-        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .find_map(|line| {
+            line.strip_prefix("ir-generated: ")
+                .and_then(|n| n.trim().parse::<usize>().ok())
+        })
         .unwrap_or(0);
-    assert!(ir_functions >= 1, "scalar example did not exercise the IR native emitter: {}", stdout(&report));
+    assert!(
+        ir_functions >= 1,
+        "scalar example did not exercise the IR native emitter: {}",
+        stdout(&report)
+    );
 
     let exe = temp_artifact("native_ir_scalar.exe");
     let compile = run(&["--compile", "--out", &exe, &file]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("failed to run IR scalar binary");
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run IR scalar binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native run failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(
+        native.status.success(),
+        "native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
 }
 
 #[test]
@@ -2250,30 +3254,64 @@ fn native_ir_emitter_handles_directional_integer_ranges() {
     let file = example_path("native_ir_ranges.ostrin");
     let expected = "25\n20\n19\n0\n";
     let interpreted = run(&["--run", &file]);
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
 
     let report = run(&["--native-type-report", &file]);
-    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
     let report_text = stdout(&report);
     let ir_functions = report_text
         .lines()
-        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .find_map(|line| {
+            line.strip_prefix("ir-generated: ")
+                .and_then(|n| n.trim().parse::<usize>().ok())
+        })
         .unwrap_or(0);
-    assert_eq!(ir_functions, 5, "all range functions should use the IR emitter: {report_text}");
-    assert!(report_text.contains("hir-generated: 0"), "range example fell back to HIR: {report_text}");
+    assert_eq!(
+        ir_functions, 5,
+        "all range functions should use the IR emitter: {report_text}"
+    );
+    assert!(
+        report_text.contains("hir-generated: 0"),
+        "range example fell back to HIR: {report_text}"
+    );
 
     let exe = temp_artifact("native_ir_ranges.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("failed to run range IR binary");
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run range IR binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native run failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "range IR leaked: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(
+        native.status.success(),
+        "native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "range IR leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
 }
 
 #[test]
@@ -2281,33 +3319,72 @@ fn native_ir_emitter_handles_user_iterator_protocol() {
     let file = example_path("fibonacci.ostrin");
     let expected = "0\n1\n1\n2\n3\n5\n8\n13\n21\n34\n";
     let interpreted = run(&["--run", &file]);
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
 
     let report = run(&["--native-type-report", &file]);
-    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
     let report_text = stdout(&report);
     let ir_functions = report_text
         .lines()
-        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .find_map(|line| {
+            line.strip_prefix("ir-generated: ")
+                .and_then(|n| n.trim().parse::<usize>().ok())
+        })
         .unwrap_or(0);
-    assert!(ir_functions >= 1, "iterator consumer did not use the IR emitter: {report_text}");
+    assert!(
+        ir_functions >= 1,
+        "iterator consumer did not use the IR emitter: {report_text}"
+    );
 
     let emitted = run(&["--emit-c", &file]);
-    assert!(emitted.status.success(), "iterator IR emission failed: {}", stderr(&emitted));
-    assert!(stdout(&emitted).contains("Fibonacci__next(__ir_v"), "iterator method call missing from IR C: {}", stdout(&emitted));
+    assert!(
+        emitted.status.success(),
+        "iterator IR emission failed: {}",
+        stderr(&emitted)
+    );
+    assert!(
+        stdout(&emitted).contains("Fibonacci__next(__ir_v"),
+        "iterator method call missing from IR C: {}",
+        stdout(&emitted)
+    );
 
     let exe = temp_artifact("native_ir_user_iterator.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("failed to run user iterator IR binary");
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run user iterator IR binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native run failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "user iterator leaked: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(
+        native.status.success(),
+        "native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "user iterator leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
 }
 
 #[test]
@@ -2315,28 +3392,74 @@ fn native_ir_emitter_handles_generic_iterator_protocol() {
     let file = example_path("native_generic_iterator.ostrin");
     let expected = "7\n7\n7\n";
     let interpreted = run(&["--run", &file]);
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
     let report = run(&["--native-type-report", &file]);
-    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
     let report_text = stdout(&report);
-    assert!(report_text.contains("ir-generated: 2"), "generic iterator did not use IR: {report_text}");
-    assert!(report_text.contains("hir-generated: 0"), "generic iterator fell back to HIR: {report_text}");
-    assert!(report_text.contains("divergences: 0"), "generic iterator diverged: {report_text}");
+    assert!(
+        report_text.contains("ir-generated: 2"),
+        "generic iterator did not use IR: {report_text}"
+    );
+    assert!(
+        report_text.contains("hir-generated: 0"),
+        "generic iterator fell back to HIR: {report_text}"
+    );
+    assert!(
+        report_text.contains("divergences: 0"),
+        "generic iterator diverged: {report_text}"
+    );
     let emitted = run(&["--emit-c", &file]);
-    assert!(emitted.status.success(), "generic iterator IR emission failed: {}", stderr(&emitted));
+    assert!(
+        emitted.status.success(),
+        "generic iterator IR emission failed: {}",
+        stderr(&emitted)
+    );
     let source = stdout(&emitted);
-    assert!(source.contains("Cursor__Int__next(__ir_v"), "generic iterator call missing from IR C: {source}");
-    assert!(!source.contains("iter_init"), "generic iterator used the legacy ABI: {source}");
+    assert!(
+        source.contains("Cursor__Int__next(__ir_v"),
+        "generic iterator call missing from IR C: {source}"
+    );
+    assert!(
+        !source.contains("iter_init"),
+        "generic iterator used the legacy ABI: {source}"
+    );
     let exe = temp_artifact("native_ir_generic_iterator.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
-    if skip_if_no_c_compiler(&compile) { return; }
-    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("failed to run generic iterator IR binary");
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run generic iterator IR binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native run failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "generic iterator leaked: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(
+        native.status.success(),
+        "native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "generic iterator leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
 }
 
 #[test]
@@ -2344,45 +3467,113 @@ fn native_ir_emitter_handles_channel_iterator_protocol() {
     let file = example_path("native_ir_channel_iterator.ostrin");
     let expected = "3\ntrue\n";
     let interpreted = run(&["--run", &file]);
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
 
     let report = run(&["--native-type-report", &file]);
-    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
     let report_text = stdout(&report);
-    assert!(report_text.contains("ir-generated: 1"), "channel iterator did not use the IR emitter: {report_text}");
-    assert!(report_text.contains("hir-generated: 0"), "channel iterator fell back to HIR: {report_text}");
+    assert!(
+        report_text.contains("ir-generated: 1"),
+        "channel iterator did not use the IR emitter: {report_text}"
+    );
+    assert!(
+        report_text.contains("hir-generated: 0"),
+        "channel iterator fell back to HIR: {report_text}"
+    );
 
     let emitted = run(&["--emit-c", &file]);
-    assert!(emitted.status.success(), "channel IR emission failed: {}", stderr(&emitted));
+    assert!(
+        emitted.status.success(),
+        "channel IR emission failed: {}",
+        stderr(&emitted)
+    );
     let source = stdout(&emitted);
-    assert!(source.contains("Channel_Int_send"), "channel send missing from IR C: {source}");
-    assert!(source.contains("Channel_Int_receive"), "channel receive missing from IR C: {source}");
-    assert!(source.contains("Channel_Int_close"), "channel close missing from IR C: {source}");
+    assert!(
+        source.contains("Channel_Int_send"),
+        "channel send missing from IR C: {source}"
+    );
+    assert!(
+        source.contains("Channel_Int_receive"),
+        "channel receive missing from IR C: {source}"
+    );
+    assert!(
+        source.contains("Channel_Int_close"),
+        "channel close missing from IR C: {source}"
+    );
 
     let exe = temp_artifact("native_ir_channel_iterator.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("failed to run channel iterator IR binary");
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run channel iterator IR binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native run failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "channel iterator leaked: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(
+        native.status.success(),
+        "native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "channel iterator leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
 
     let threaded_exe = temp_artifact("native_ir_channel_iterator_threads.exe");
-    let threaded_compile = run(&["--native-threads", "--compile", "--leak-check", "--out", &threaded_exe, &file]);
+    let threaded_compile = run(&[
+        "--native-threads",
+        "--compile",
+        "--leak-check",
+        "--out",
+        &threaded_exe,
+        &file,
+    ]);
     if skip_if_no_c_compiler(&threaded_compile) {
         return;
     }
-    assert!(threaded_compile.status.success(), "native-threads compile failed: {}", stderr(&threaded_compile));
-    let threaded = Command::new(&threaded_exe).output().expect("failed to run threaded channel iterator IR binary");
+    assert!(
+        threaded_compile.status.success(),
+        "native-threads compile failed: {}",
+        stderr(&threaded_compile)
+    );
+    let threaded = Command::new(&threaded_exe)
+        .output()
+        .expect("failed to run threaded channel iterator IR binary");
     let _ = fs::remove_file(&threaded_exe);
-    assert!(threaded.status.success(), "threaded native run failed: {}", String::from_utf8_lossy(&threaded.stderr));
-    assert!(String::from_utf8_lossy(&threaded.stderr).contains("live_allocations=0"), "threaded channel iterator leaked: {}", String::from_utf8_lossy(&threaded.stderr));
-    assert_eq!(String::from_utf8_lossy(&threaded.stdout).replace("\r\n", "\n"), expected);
+    assert!(
+        threaded.status.success(),
+        "threaded native run failed: {}",
+        String::from_utf8_lossy(&threaded.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&threaded.stderr).contains("live_allocations=0"),
+        "threaded channel iterator leaked: {}",
+        String::from_utf8_lossy(&threaded.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&threaded.stdout).replace("\r\n", "\n"),
+        expected
+    );
 }
 
 #[test]
@@ -2390,66 +3581,172 @@ fn native_ir_emitter_handles_spawn_cfg_scope_and_nested_join() {
     let file = example_path("native_ir_spawn_join.ostrin");
     let expected = "7\n7\ncaptured\ninside task\n21\n6\n8\ncaptured!\n3\n";
     let interpreted = run(&["--run", &file]);
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
 
     let report = run(&["--native-type-report", &file]);
-    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
     let report_text = stdout(&report);
-    assert!(report_text.contains("ir-generated: 1"), "spawn/join did not use the IR emitter: {report_text}");
-    assert!(report_text.contains("hir-generated: 0"), "spawn/join fell back to HIR: {report_text}");
+    assert!(
+        report_text.contains("ir-generated: 1"),
+        "spawn/join did not use the IR emitter: {report_text}"
+    );
+    assert!(
+        report_text.contains("hir-generated: 0"),
+        "spawn/join fell back to HIR: {report_text}"
+    );
 
     let emitted = run(&["--emit-c", &file]);
-    assert!(emitted.status.success(), "spawn/join IR emission failed: {}", stderr(&emitted));
+    assert!(
+        emitted.status.success(),
+        "spawn/join IR emission failed: {}",
+        stderr(&emitted)
+    );
     let source = stdout(&emitted);
-    assert!(source.contains("ostrin_ir_task_ostrin_main_"), "spawn callback missing from IR C: {source}");
-    assert!(source.contains("OstrinIrTaskEnv_ostrin_main_"), "captured task environment missing from IR C: {source}");
-    assert!(source.contains("ostrin_ir_task_env_drop_ostrin_main_"), "captured task drop helper missing from IR C: {source}");
-    assert!(source.contains("__e->__ir_v16"), "spawn CFG did not read its captured branch condition from the environment: {source}");
-    assert!(source.contains("__ostrin_ir_bb6"), "spawn CFG branch target missing from IR C: {source}");
-    assert!(source.contains("ostrin_scope_begin()"), "spawn_scope did not lower to the native scope runtime: {source}");
-    assert!(source.contains("ostrin_scope_end(__ostrin_ir_scope_0)"), "spawn_scope cleanup missing from IR C: {source}");
-    assert!(source.contains("ostrin_scope_end(__ostrin_ir_scope_1)"), "break path did not close its nested scope in IR C: {source}");
-    assert!(source.matches("ostrin_ir_task_ostrin_main_").count() >= 8, "nested native task callbacks missing from IR C: {source}");
-    assert!(source.contains("Task_Int_join"), "task join missing from IR C: {source}");
-    assert!(source.contains("Task_String_join"), "managed task join missing from IR C: {source}");
+    assert!(
+        source.contains("ostrin_ir_task_ostrin_main_"),
+        "spawn callback missing from IR C: {source}"
+    );
+    assert!(
+        source.contains("OstrinIrTaskEnv_ostrin_main_"),
+        "captured task environment missing from IR C: {source}"
+    );
+    assert!(
+        source.contains("ostrin_ir_task_env_drop_ostrin_main_"),
+        "captured task drop helper missing from IR C: {source}"
+    );
+    assert!(
+        source.contains("__e->__ir_v16"),
+        "spawn CFG did not read its captured branch condition from the environment: {source}"
+    );
+    assert!(
+        source.contains("__ostrin_ir_bb6"),
+        "spawn CFG branch target missing from IR C: {source}"
+    );
+    assert!(
+        source.contains("ostrin_scope_begin()"),
+        "spawn_scope did not lower to the native scope runtime: {source}"
+    );
+    assert!(
+        source.contains("ostrin_scope_end(__ostrin_ir_scope_0)"),
+        "spawn_scope cleanup missing from IR C: {source}"
+    );
+    assert!(
+        source.contains("ostrin_scope_end(__ostrin_ir_scope_1)"),
+        "break path did not close its nested scope in IR C: {source}"
+    );
+    assert!(
+        source.matches("ostrin_ir_task_ostrin_main_").count() >= 8,
+        "nested native task callbacks missing from IR C: {source}"
+    );
+    assert!(
+        source.contains("Task_Int_join"),
+        "task join missing from IR C: {source}"
+    );
+    assert!(
+        source.contains("Task_String_join"),
+        "managed task join missing from IR C: {source}"
+    );
 
     let exe = temp_artifact("native_ir_spawn_join.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("failed to run spawn/join IR binary");
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run spawn/join IR binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native run failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "spawn/join leaked: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(
+        native.status.success(),
+        "native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "spawn/join leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
 
     let threaded_exe = temp_artifact("native_ir_spawn_join_threads.exe");
-    let threaded_compile = run(&["--native-threads", "--compile", "--leak-check", "--out", &threaded_exe, &file]);
+    let threaded_compile = run(&[
+        "--native-threads",
+        "--compile",
+        "--leak-check",
+        "--out",
+        &threaded_exe,
+        &file,
+    ]);
     if skip_if_no_c_compiler(&threaded_compile) {
         return;
     }
-    assert!(threaded_compile.status.success(), "native-threads compile failed: {}", stderr(&threaded_compile));
-    let threaded = Command::new(&threaded_exe).output().expect("failed to run threaded spawn/join IR binary");
+    assert!(
+        threaded_compile.status.success(),
+        "native-threads compile failed: {}",
+        stderr(&threaded_compile)
+    );
+    let threaded = Command::new(&threaded_exe)
+        .output()
+        .expect("failed to run threaded spawn/join IR binary");
     let _ = fs::remove_file(&threaded_exe);
-    assert!(threaded.status.success(), "threaded native run failed: {}", String::from_utf8_lossy(&threaded.stderr));
-    assert!(String::from_utf8_lossy(&threaded.stderr).contains("live_allocations=0"), "threaded spawn/join leaked: {}", String::from_utf8_lossy(&threaded.stderr));
-    assert_eq!(String::from_utf8_lossy(&threaded.stdout).replace("\r\n", "\n"), expected);
+    assert!(
+        threaded.status.success(),
+        "threaded native run failed: {}",
+        String::from_utf8_lossy(&threaded.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&threaded.stderr).contains("live_allocations=0"),
+        "threaded spawn/join leaked: {}",
+        String::from_utf8_lossy(&threaded.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&threaded.stdout).replace("\r\n", "\n"),
+        expected
+    );
 }
 
 #[test]
 fn native_ir_emitter_handles_task_cancel() {
     let file = example_path("native_ir_task_cancel.ostrin");
     let report = run(&["--native-type-report", &file]);
-    assert!(report.status.success(), "task cancel type report failed: {}", stderr(&report));
+    assert!(
+        report.status.success(),
+        "task cancel type report failed: {}",
+        stderr(&report)
+    );
     let report_text = stdout(&report);
-    assert!(report_text.contains("ir-generated: 1"), "task cancel did not use the IR emitter: {report_text}");
-    assert!(report_text.contains("hir-generated: 0"), "task cancel fell back to HIR: {report_text}");
+    assert!(
+        report_text.contains("ir-generated: 1"),
+        "task cancel did not use the IR emitter: {report_text}"
+    );
+    assert!(
+        report_text.contains("hir-generated: 0"),
+        "task cancel fell back to HIR: {report_text}"
+    );
 
     let interpreted = run(&["--run", &file]);
-    assert!(interpreted.status.success(), "interpreter task cancel failed: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter task cancel failed: {}",
+        stderr(&interpreted)
+    );
     let expected = "true\nfalse\n";
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
 
@@ -2458,43 +3755,104 @@ fn native_ir_emitter_handles_task_cancel() {
     if skip_if_no_c_compiler(&compiled) {
         return;
     }
-    assert!(compiled.status.success(), "native task cancel compile failed: {}", stderr(&compiled));
-    let native = Command::new(&exe).output().expect("run native task cancel binary");
+    assert!(
+        compiled.status.success(),
+        "native task cancel compile failed: {}",
+        stderr(&compiled)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run native task cancel binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native task cancel failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
-    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "native task cancel leaked: {}", String::from_utf8_lossy(&native.stderr));
+    assert!(
+        native.status.success(),
+        "native task cancel failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "native task cancel leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
 
     let threaded_exe = temp_artifact("native-ir-task-cancel-threads.exe");
-    let threaded_compile = run(&["--compile", "--native-threads", "--leak-check", "--out", &threaded_exe, &file]);
-    assert!(threaded_compile.status.success(), "native-thread task cancel compile failed: {}", stderr(&threaded_compile));
-    let threaded = Command::new(&threaded_exe).output().expect("run native-thread task cancel binary");
+    let threaded_compile = run(&[
+        "--compile",
+        "--native-threads",
+        "--leak-check",
+        "--out",
+        &threaded_exe,
+        &file,
+    ]);
+    assert!(
+        threaded_compile.status.success(),
+        "native-thread task cancel compile failed: {}",
+        stderr(&threaded_compile)
+    );
+    let threaded = Command::new(&threaded_exe)
+        .output()
+        .expect("run native-thread task cancel binary");
     let _ = fs::remove_file(&threaded_exe);
-    assert!(threaded.status.success(), "native-thread task cancel failed: {}", String::from_utf8_lossy(&threaded.stderr));
+    assert!(
+        threaded.status.success(),
+        "native-thread task cancel failed: {}",
+        String::from_utf8_lossy(&threaded.stderr)
+    );
     let threaded_stdout = String::from_utf8_lossy(&threaded.stdout).replace("\r\n", "\n");
     assert!(
         threaded_stdout.lines().count() == 2
-            && threaded_stdout.lines().all(|line| matches!(line, "true" | "false")),
+            && threaded_stdout
+                .lines()
+                .all(|line| matches!(line, "true" | "false")),
         "native-thread task cancel returned an invalid result sequence: {threaded_stdout}"
     );
-    assert!(String::from_utf8_lossy(&threaded.stderr).contains("live_allocations=0"), "native-thread task cancel leaked: {}", String::from_utf8_lossy(&threaded.stderr));
+    assert!(
+        String::from_utf8_lossy(&threaded.stderr).contains("live_allocations=0"),
+        "native-thread task cancel leaked: {}",
+        String::from_utf8_lossy(&threaded.stderr)
+    );
 
     let emitted = run(&["--emit-c", &file]);
-    assert!(emitted.status.success(), "task cancel C emission failed: {}", stderr(&emitted));
-    assert!(stdout(&emitted).contains("Task_Int_cancel"), "native C did not call the typed cancel helper");
+    assert!(
+        emitted.status.success(),
+        "task cancel C emission failed: {}",
+        stderr(&emitted)
+    );
+    assert!(
+        stdout(&emitted).contains("Task_Int_cancel"),
+        "native C did not call the typed cancel helper"
+    );
 }
 
 #[test]
 fn native_ir_emitter_handles_yield_with_task_runtime() {
     let file = example_path("native_ir_yield.ostrin");
     let report = run(&["--native-type-report", &file]);
-    assert!(report.status.success(), "yield type report failed: {}", stderr(&report));
+    assert!(
+        report.status.success(),
+        "yield type report failed: {}",
+        stderr(&report)
+    );
     let report_text = stdout(&report);
-    assert!(report_text.contains("ir-generated: 1"), "yield did not use the IR emitter: {report_text}");
-    assert!(report_text.contains("hir-generated: 0"), "yield fell back to HIR: {report_text}");
+    assert!(
+        report_text.contains("ir-generated: 1"),
+        "yield did not use the IR emitter: {report_text}"
+    );
+    assert!(
+        report_text.contains("hir-generated: 0"),
+        "yield fell back to HIR: {report_text}"
+    );
 
     let interpreted = run(&["--run", &file]);
-    assert!(interpreted.status.success(), "interpreter yield failed: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter yield failed: {}",
+        stderr(&interpreted)
+    );
     let expected = "7\n";
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
 
@@ -2503,24 +3861,69 @@ fn native_ir_emitter_handles_yield_with_task_runtime() {
     if skip_if_no_c_compiler(&compiled) {
         return;
     }
-    assert!(compiled.status.success(), "native yield compile failed: {}", stderr(&compiled));
-    let native = Command::new(&exe).output().expect("run native yield binary");
+    assert!(
+        compiled.status.success(),
+        "native yield compile failed: {}",
+        stderr(&compiled)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run native yield binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native yield failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
-    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "native yield leaked: {}", String::from_utf8_lossy(&native.stderr));
+    assert!(
+        native.status.success(),
+        "native yield failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "native yield leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
 
     let threaded_exe = temp_artifact("native-ir-yield-threads.exe");
-    let threaded_compile = run(&["--compile", "--native-threads", "--leak-check", "--out", &threaded_exe, &file]);
-    assert!(threaded_compile.status.success(), "native-thread yield compile failed: {}", stderr(&threaded_compile));
-    let threaded = Command::new(&threaded_exe).output().expect("run native-thread yield binary");
+    let threaded_compile = run(&[
+        "--compile",
+        "--native-threads",
+        "--leak-check",
+        "--out",
+        &threaded_exe,
+        &file,
+    ]);
+    assert!(
+        threaded_compile.status.success(),
+        "native-thread yield compile failed: {}",
+        stderr(&threaded_compile)
+    );
+    let threaded = Command::new(&threaded_exe)
+        .output()
+        .expect("run native-thread yield binary");
     let _ = fs::remove_file(&threaded_exe);
-    assert!(threaded.status.success(), "native-thread yield failed: {}", String::from_utf8_lossy(&threaded.stderr));
-    assert_eq!(String::from_utf8_lossy(&threaded.stdout).replace("\r\n", "\n"), expected);
-    assert!(String::from_utf8_lossy(&threaded.stderr).contains("live_allocations=0"), "native-thread yield leaked: {}", String::from_utf8_lossy(&threaded.stderr));
+    assert!(
+        threaded.status.success(),
+        "native-thread yield failed: {}",
+        String::from_utf8_lossy(&threaded.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&threaded.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&threaded.stderr).contains("live_allocations=0"),
+        "native-thread yield leaked: {}",
+        String::from_utf8_lossy(&threaded.stderr)
+    );
 
     let emitted = run(&["--emit-c", "--native-threads", &file]);
-    assert!(emitted.status.success(), "yield C emission failed: {}", stderr(&emitted));
+    assert!(
+        emitted.status.success(),
+        "yield C emission failed: {}",
+        stderr(&emitted)
+    );
     let source = stdout(&emitted);
     assert!(source.contains("ostrin_select_wait()"));
     assert!(source.contains("ostrin_poll_one()"));
@@ -2531,13 +3934,27 @@ fn native_ir_emitter_handles_yield_with_task_runtime() {
 fn native_ir_emitter_handles_select_over_channels() {
     let file = example_path("native_ir_select.ostrin");
     let report = run(&["--native-type-report", &file]);
-    assert!(report.status.success(), "select type report failed: {}", stderr(&report));
+    assert!(
+        report.status.success(),
+        "select type report failed: {}",
+        stderr(&report)
+    );
     let report_text = stdout(&report);
-    assert!(report_text.contains("ir-generated: 1"), "select did not use the IR emitter: {report_text}");
-    assert!(report_text.contains("hir-generated: 0"), "select fell back to HIR: {report_text}");
+    assert!(
+        report_text.contains("ir-generated: 1"),
+        "select did not use the IR emitter: {report_text}"
+    );
+    assert!(
+        report_text.contains("hir-generated: 0"),
+        "select fell back to HIR: {report_text}"
+    );
 
     let interpreted = run(&["--run", &file]);
-    assert!(interpreted.status.success(), "interpreter select failed: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter select failed: {}",
+        stderr(&interpreted)
+    );
     let expected = "7\n";
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
 
@@ -2546,24 +3963,69 @@ fn native_ir_emitter_handles_select_over_channels() {
     if skip_if_no_c_compiler(&compiled) {
         return;
     }
-    assert!(compiled.status.success(), "native select compile failed: {}", stderr(&compiled));
-    let native = Command::new(&exe).output().expect("run native select binary");
+    assert!(
+        compiled.status.success(),
+        "native select compile failed: {}",
+        stderr(&compiled)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run native select binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native select failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
-    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "native select leaked: {}", String::from_utf8_lossy(&native.stderr));
+    assert!(
+        native.status.success(),
+        "native select failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "native select leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
 
     let threaded_exe = temp_artifact("native-ir-select-threads.exe");
-    let threaded_compile = run(&["--compile", "--native-threads", "--leak-check", "--out", &threaded_exe, &file]);
-    assert!(threaded_compile.status.success(), "native-thread select compile failed: {}", stderr(&threaded_compile));
-    let threaded = Command::new(&threaded_exe).output().expect("run native-thread select binary");
+    let threaded_compile = run(&[
+        "--compile",
+        "--native-threads",
+        "--leak-check",
+        "--out",
+        &threaded_exe,
+        &file,
+    ]);
+    assert!(
+        threaded_compile.status.success(),
+        "native-thread select compile failed: {}",
+        stderr(&threaded_compile)
+    );
+    let threaded = Command::new(&threaded_exe)
+        .output()
+        .expect("run native-thread select binary");
     let _ = fs::remove_file(&threaded_exe);
-    assert!(threaded.status.success(), "native-thread select failed: {}", String::from_utf8_lossy(&threaded.stderr));
-    assert_eq!(String::from_utf8_lossy(&threaded.stdout).replace("\r\n", "\n"), expected);
-    assert!(String::from_utf8_lossy(&threaded.stderr).contains("live_allocations=0"), "native-thread select leaked: {}", String::from_utf8_lossy(&threaded.stderr));
+    assert!(
+        threaded.status.success(),
+        "native-thread select failed: {}",
+        String::from_utf8_lossy(&threaded.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&threaded.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&threaded.stderr).contains("live_allocations=0"),
+        "native-thread select leaked: {}",
+        String::from_utf8_lossy(&threaded.stderr)
+    );
 
     let emitted = run(&["--emit-c", "--native-threads", &file]);
-    assert!(emitted.status.success(), "select C emission failed: {}", stderr(&emitted));
+    assert!(
+        emitted.status.success(),
+        "select C emission failed: {}",
+        stderr(&emitted)
+    );
     let source = stdout(&emitted);
     assert!(source.contains("List_Channel_Int_new_from_array"));
     assert!(source.contains("Channel_Int_try_receive"));
@@ -2575,36 +4037,84 @@ fn native_ir_emitter_handles_strings_and_ownership_markers() {
     let file = example_path("native_ir_strings.ostrin");
     let expected = "true\nfalse\nHello, Ostrin\nfallback\nHello, Alias\nalias-fallback\n";
     let interpreted = run(&["--run", &file]);
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
 
     let report = run(&["--native-type-report", &file]);
-    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
     let ir_functions = stdout(&report)
         .lines()
-        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .find_map(|line| {
+            line.strip_prefix("ir-generated: ")
+                .and_then(|n| n.trim().parse::<usize>().ok())
+        })
         .unwrap_or(0);
-    assert!(ir_functions >= 6, "string example did not use the IR emitter: {}", stdout(&report));
+    assert!(
+        ir_functions >= 6,
+        "string example did not use the IR emitter: {}",
+        stdout(&report)
+    );
 
     let emitted = run(&["--emit-c", &file]);
-    assert!(emitted.status.success(), "string IR emission failed: {}", stderr(&emitted));
+    assert!(
+        emitted.status.success(),
+        "string IR emission failed: {}",
+        stderr(&emitted)
+    );
     let source = stdout(&emitted);
-    assert!(source.contains("ostrin_str_concat(__ir_v"), "string concatenation did not come from IR: {source}");
-    assert!(source.contains("strcmp(__ir_v"), "string equality did not come from IR: {source}");
-    assert!(source.contains("ostrin_release((void*)__ir_v"), "IR ownership release marker was not emitted: {source}");
-    assert!(!source.contains("ostrin_retain((void*)__ir_v"), "Phi ownership transfer should not retain the incoming branch value: {source}");
+    assert!(
+        source.contains("ostrin_str_concat(__ir_v"),
+        "string concatenation did not come from IR: {source}"
+    );
+    assert!(
+        source.contains("strcmp(__ir_v"),
+        "string equality did not come from IR: {source}"
+    );
+    assert!(
+        source.contains("ostrin_release((void*)__ir_v"),
+        "IR ownership release marker was not emitted: {source}"
+    );
+    assert!(
+        !source.contains("ostrin_retain((void*)__ir_v"),
+        "Phi ownership transfer should not retain the incoming branch value: {source}"
+    );
 
     let exe = temp_artifact("native_ir_strings.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("failed to run string IR binary");
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run string IR binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native run failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "string IR ownership leaked: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(
+        native.status.success(),
+        "native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "string IR ownership leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
 }
 
 #[test]
@@ -2612,15 +4122,30 @@ fn native_ir_emitter_releases_managed_loop_phi_values() {
     let file = example_path("native_ir_managed_loop.ostrin");
     let expected = "startxxx\n";
     let interpreted = run(&["--run", &file]);
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
 
     let ownership = run(&["--ownership-ir", &file]);
-    assert!(ownership.status.success(), "ownership lowering failed: {}", stderr(&ownership));
-    let ownership_source = stdout(&ownership);
-    assert!(ownership_source.contains("phi"), "managed loop did not lower through a Phi: {ownership_source}");
     assert!(
-        ownership_source.lines().filter(|line| line.trim_start().starts_with("release %")).count() >= 2,
+        ownership.status.success(),
+        "ownership lowering failed: {}",
+        stderr(&ownership)
+    );
+    let ownership_source = stdout(&ownership);
+    assert!(
+        ownership_source.contains("phi"),
+        "managed loop did not lower through a Phi: {ownership_source}"
+    );
+    assert!(
+        ownership_source
+            .lines()
+            .filter(|line| line.trim_start().starts_with("release %"))
+            .count()
+            >= 2,
         "loop-carried String was not released on its backedge: {ownership_source}"
     );
 
@@ -2629,11 +4154,24 @@ fn native_ir_emitter_releases_managed_loop_phi_values() {
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("failed to run managed loop binary");
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run managed loop binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native run failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(
+        native.status.success(),
+        "native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
     assert!(
         String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
         "managed loop Phi ownership leaked: {}",
@@ -2646,38 +4184,92 @@ fn native_ir_emitter_handles_lists_and_ownership_markers() {
     let file = example_path("native_ir_lists.ostrin");
     let expected = "4\n4\n5\n4\n4\n0\n2\nA-one\n1\n";
     let interpreted = run(&["--run", &file]);
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
 
     let report = run(&["--native-type-report", &file]);
-    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
     let ir_functions = stdout(&report)
         .lines()
-        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .find_map(|line| {
+            line.strip_prefix("ir-generated: ")
+                .and_then(|n| n.trim().parse::<usize>().ok())
+        })
         .unwrap_or(0);
-    assert!(ir_functions >= 4, "list example did not use the IR emitter: {}", stdout(&report));
+    assert!(
+        ir_functions >= 4,
+        "list example did not use the IR emitter: {}",
+        stdout(&report)
+    );
 
     let emitted = run(&["--emit-c", &file]);
-    assert!(emitted.status.success(), "list IR emission failed: {}", stderr(&emitted));
+    assert!(
+        emitted.status.success(),
+        "list IR emission failed: {}",
+        stderr(&emitted)
+    );
     let source = stdout(&emitted);
-    assert!(source.contains("List_Int_new_from_array"), "list construction did not come from IR: {source}");
-    assert!(source.contains("List_String_new_from_array"), "managed string list construction did not come from IR: {source}");
-    assert!(source.contains("List_Int_push"), "list push did not come from IR: {source}");
-    assert!(source.contains("List_Int_get"), "list indexing did not come from IR: {source}");
-    assert!(source.contains("List_Int_remove_at"), "list removal did not come from IR: {source}");
-    assert!(source.contains("ostrin_release((void*)__ir_v"), "IR list ownership release marker was not emitted: {source}");
+    assert!(
+        source.contains("List_Int_new_from_array"),
+        "list construction did not come from IR: {source}"
+    );
+    assert!(
+        source.contains("List_String_new_from_array"),
+        "managed string list construction did not come from IR: {source}"
+    );
+    assert!(
+        source.contains("List_Int_push"),
+        "list push did not come from IR: {source}"
+    );
+    assert!(
+        source.contains("List_Int_get"),
+        "list indexing did not come from IR: {source}"
+    );
+    assert!(
+        source.contains("List_Int_remove_at"),
+        "list removal did not come from IR: {source}"
+    );
+    assert!(
+        source.contains("ostrin_release((void*)__ir_v"),
+        "IR list ownership release marker was not emitted: {source}"
+    );
 
     let exe = temp_artifact("native_ir_lists.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("failed to run list IR binary");
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run list IR binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native run failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "list IR ownership leaked: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(
+        native.status.success(),
+        "native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "list IR ownership leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
 }
 
 #[test]
@@ -2685,34 +4277,76 @@ fn native_ir_emitter_handles_record_lists() {
     let file = example_path("native_ir_record_lists.ostrin");
     let expected = "3\n2\npt\n1\n2\n";
     let interpreted = run(&["--run", &file]);
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
 
     let report = run(&["--native-type-report", &file]);
-    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
     let ir_functions = stdout(&report)
         .lines()
-        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .find_map(|line| {
+            line.strip_prefix("ir-generated: ")
+                .and_then(|n| n.trim().parse::<usize>().ok())
+        })
         .unwrap_or(0);
-    assert!(ir_functions >= 3, "record list example did not use the IR emitter: {}", stdout(&report));
+    assert!(
+        ir_functions >= 3,
+        "record list example did not use the IR emitter: {}",
+        stdout(&report)
+    );
 
     let emitted = run(&["--emit-c", &file]);
-    assert!(emitted.status.success(), "record list IR emission failed: {}", stderr(&emitted));
+    assert!(
+        emitted.status.success(),
+        "record list IR emission failed: {}",
+        stderr(&emitted)
+    );
     let source = stdout(&emitted);
-    assert!(source.contains("List_Point_new_from_array"), "record list construction missing: {source}");
-    assert!(source.contains("List_Point_remove_at"), "record list removal missing: {source}");
+    assert!(
+        source.contains("List_Point_new_from_array"),
+        "record list construction missing: {source}"
+    );
+    assert!(
+        source.contains("List_Point_remove_at"),
+        "record list removal missing: {source}"
+    );
 
     let exe = temp_artifact("native_ir_record_lists.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("failed to run record list binary");
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run record list binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native run failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "record list leaked: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(
+        native.status.success(),
+        "native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "record list leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
 }
 
 #[test]
@@ -2722,40 +4356,83 @@ fn native_ir_emitter_handles_for_lists() {
 ab
 ";
     let interpreted = run(&["--run", &file]);
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
 
     let report = run(&["--native-type-report", &file]);
-    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
     let ir_functions = stdout(&report)
         .lines()
-        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .find_map(|line| {
+            line.strip_prefix("ir-generated: ")
+                .and_then(|n| n.trim().parse::<usize>().ok())
+        })
         .unwrap_or(0);
-    assert!(ir_functions >= 3, "for list example did not use the IR emitter: {}", stdout(&report));
+    assert!(
+        ir_functions >= 3,
+        "for list example did not use the IR emitter: {}",
+        stdout(&report)
+    );
 
     let emitted = run(&["--emit-c", &file]);
-    assert!(emitted.status.success(), "for list IR emission failed: {}", stderr(&emitted));
+    assert!(
+        emitted.status.success(),
+        "for list IR emission failed: {}",
+        stderr(&emitted)
+    );
     let source = stdout(&emitted);
-    assert!(source.contains("List_Int_length"), "for list construction missing: {source}");
-    assert!(source.contains("List_String_get"), "for list removal missing: {source}");
+    assert!(
+        source.contains("List_Int_length"),
+        "for list construction missing: {source}"
+    );
+    assert!(
+        source.contains("List_String_get"),
+        "for list removal missing: {source}"
+    );
 
     let exe = temp_artifact("native_ir_for_lists.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("failed to run for list binary");
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run for list binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native run failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "for list leaked: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(
+        native.status.success(),
+        "native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "for list leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
 }
 
 #[test]
 fn fmt_normalizes_layout_and_supports_write_and_check() {
     let messy = "fn main() -> Void {\r\nprint(\"{\")   \n\n\n    if true {\nprint(1)\n}\n}\n\n";
-    let clean = "fn main() -> Void {\n    print(\"{\")\n\n    if true {\n        print(1)\n    }\n}\n";
+    let clean =
+        "fn main() -> Void {\n    print(\"{\")\n\n    if true {\n        print(1)\n    }\n}\n";
     let path = temp_artifact("fmt_messy.ostrin");
     fs::write(&path, messy).unwrap();
 
@@ -2764,14 +4441,25 @@ fn fmt_normalizes_layout_and_supports_write_and_check() {
     assert_eq!(stdout(&printed).replace("\r\n", "\n"), clean);
 
     let check = run(&["--fmt", "--check", &path]);
-    assert!(!check.status.success(), "--check must fail on unformatted input");
+    assert!(
+        !check.status.success(),
+        "--check must fail on unformatted input"
+    );
 
     let write = run(&["--fmt", "--write", &path]);
-    assert!(write.status.success(), "fmt --write failed: {}", stderr(&write));
+    assert!(
+        write.status.success(),
+        "fmt --write failed: {}",
+        stderr(&write)
+    );
     assert_eq!(fs::read_to_string(&path).unwrap(), clean);
 
     let check = run(&["--fmt", "--check", &path]);
-    assert!(check.status.success(), "--check must pass after --write: {}", stderr(&check));
+    assert!(
+        check.status.success(),
+        "--check must pass after --write: {}",
+        stderr(&check)
+    );
     let _ = fs::remove_file(&path);
 }
 
@@ -2785,8 +4473,16 @@ fn native_ir_merges_branch_and_loop_bindings_and_supports_rem() {
     ] {
         let path = example_path(file);
         let interpreted = run(&["--run", &path]);
-        assert!(interpreted.status.success(), "interpreter failed for {file}: {}", stderr(&interpreted));
-        assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected, "interpreter output for {file}");
+        assert!(
+            interpreted.status.success(),
+            "interpreter failed for {file}: {}",
+            stderr(&interpreted)
+        );
+        assert_eq!(
+            stdout(&interpreted).replace("\r\n", "\n"),
+            expected,
+            "interpreter output for {file}"
+        );
 
         let report = run(&["--native-type-report", &path]);
         if skip_if_no_c_compiler(&report) {
@@ -2794,35 +4490,67 @@ fn native_ir_merges_branch_and_loop_bindings_and_supports_rem() {
         }
         let ir_functions = stdout(&report)
             .lines()
-            .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+            .find_map(|line| {
+                line.strip_prefix("ir-generated: ")
+                    .and_then(|n| n.trim().parse::<usize>().ok())
+            })
             .unwrap_or(0);
-        assert!(ir_functions >= minimum_ir, "{file} generated only {ir_functions} IR function(s): {}", stdout(&report));
+        assert!(
+            ir_functions >= minimum_ir,
+            "{file} generated only {ir_functions} IR function(s): {}",
+            stdout(&report)
+        );
 
         let exe = temp_artifact(&format!("merge_{file}.exe"));
         let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
-        assert!(compile.status.success(), "compile failed for {file}: {}", stderr(&compile));
-        let native = Command::new(&exe).output().expect("failed to run native binary");
+        assert!(
+            compile.status.success(),
+            "compile failed for {file}: {}",
+            stderr(&compile)
+        );
+        let native = Command::new(&exe)
+            .output()
+            .expect("failed to run native binary");
         let _ = fs::remove_file(&exe);
         assert!(native.status.success(), "native run failed for {file}");
-        assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "{file} leaked: {}", String::from_utf8_lossy(&native.stderr));
-        assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected, "native output for {file}");
+        assert!(
+            String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+            "{file} leaked: {}",
+            String::from_utf8_lossy(&native.stderr)
+        );
+        assert_eq!(
+            String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+            expected,
+            "native output for {file}"
+        );
     }
 }
 
 #[test]
 fn rem_operator_reports_zero_divisor_and_type_errors() {
     let zero = temp_artifact("rem_zero.ostrin");
-    fs::write(&zero, "fn main() -> Void {\n    z = 0\n    print(5 % z)\n}\n").unwrap();
+    fs::write(
+        &zero,
+        "fn main() -> Void {\n    z = 0\n    print(5 % z)\n}\n",
+    )
+    .unwrap();
     let output = run(&["--run", &zero]);
     assert!(!output.status.success(), "division by zero must fail");
-    assert!(stderr(&output).contains("division by zero"), "unexpected stderr: {}", stderr(&output));
+    assert!(
+        stderr(&output).contains("division by zero"),
+        "unexpected stderr: {}",
+        stderr(&output)
+    );
     let _ = fs::remove_file(&zero);
 
     let bad = temp_artifact("rem_type.ostrin");
     fs::write(&bad, "fn main() -> Void {\n    print(\"a\" % 2)\n}\n").unwrap();
     let output = run(&[&bad]);
     assert!(!output.status.success());
-    assert!(stdout(&output).contains("E1041") || stderr(&output).contains("E1041"), "expected E1041");
+    assert!(
+        stdout(&output).contains("E1041") || stderr(&output).contains("E1041"),
+        "expected E1041"
+    );
     let _ = fs::remove_file(&bad);
 }
 
@@ -2830,18 +4558,46 @@ fn rem_operator_reports_zero_divisor_and_type_errors() {
 fn native_ir_string_methods_cross_block_ownership_and_short_circuit() {
     // (file, expected stdout, minimum IR-generated functions)
     for (file, expected, minimum_ir) in [
-        ("native_ir_string_methods.ostrin", "OSTRIN!\nmixed\na+b+c\n0\n30\n5\ntrue\n4\n2\n", 3usize),
-        ("native_ir_string_results.ostrin", "41\nfalse\n0\n3.25\nfalse\n0\ntrue\ntrue\n9\n7\n8\n", 3usize),
-        ("native_ir_try_strings.ostrin", "VALUE!\ntrue\nrecovered: FAILURE\n", 5usize),
-        ("native_ir_cross_block_ownership.ostrin", "item-x\nitem-x!\n9\n2\n4\n24\n", 7usize),
+        (
+            "native_ir_string_methods.ostrin",
+            "OSTRIN!\nmixed\na+b+c\n0\n30\n5\ntrue\n4\n2\n",
+            3usize,
+        ),
+        (
+            "native_ir_string_results.ostrin",
+            "41\nfalse\n0\n3.25\nfalse\n0\ntrue\ntrue\n9\n7\n8\n",
+            3usize,
+        ),
+        (
+            "native_ir_try_strings.ostrin",
+            "VALUE!\ntrue\nrecovered: FAILURE\n",
+            5usize,
+        ),
+        (
+            "native_ir_cross_block_ownership.ostrin",
+            "item-x\nitem-x!\n9\n2\n4\n24\n",
+            7usize,
+        ),
         ("short_circuit.ostrin", "false\ntrue\ntrue\nfalse\n", 3usize),
         ("native_ir_param_ownership.ostrin", "abcd\nabcd\n", 3usize),
-        ("native_ir_print_compound.ostrin", "[ab, c]\nPoint { x: 3, label: pt }\nSome(yes)\nNone\n[1, 2, 3]\n[k: vw]\n", 4usize),
+        (
+            "native_ir_print_compound.ostrin",
+            "[ab, c]\nPoint { x: 3, label: pt }\nSome(yes)\nNone\n[1, 2, 3]\n[k: vw]\n",
+            4usize,
+        ),
     ] {
         let path = example_path(file);
         let interpreted = run(&["--run", &path]);
-        assert!(interpreted.status.success(), "interpreter failed for {file}: {}", stderr(&interpreted));
-        assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected, "interpreter output for {file}");
+        assert!(
+            interpreted.status.success(),
+            "interpreter failed for {file}: {}",
+            stderr(&interpreted)
+        );
+        assert_eq!(
+            stdout(&interpreted).replace("\r\n", "\n"),
+            expected,
+            "interpreter output for {file}"
+        );
 
         let report = run(&["--native-type-report", &path]);
         if skip_if_no_c_compiler(&report) {
@@ -2849,18 +4605,39 @@ fn native_ir_string_methods_cross_block_ownership_and_short_circuit() {
         }
         let ir_functions = stdout(&report)
             .lines()
-            .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+            .find_map(|line| {
+                line.strip_prefix("ir-generated: ")
+                    .and_then(|n| n.trim().parse::<usize>().ok())
+            })
             .unwrap_or(0);
-        assert!(ir_functions >= minimum_ir, "{file} generated only {ir_functions} IR function(s): {}", stdout(&report));
+        assert!(
+            ir_functions >= minimum_ir,
+            "{file} generated only {ir_functions} IR function(s): {}",
+            stdout(&report)
+        );
 
         let exe = temp_artifact(&format!("xblock_{file}.exe"));
         let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
-        assert!(compile.status.success(), "compile failed for {file}: {}", stderr(&compile));
-        let native = Command::new(&exe).output().expect("failed to run native binary");
+        assert!(
+            compile.status.success(),
+            "compile failed for {file}: {}",
+            stderr(&compile)
+        );
+        let native = Command::new(&exe)
+            .output()
+            .expect("failed to run native binary");
         let _ = fs::remove_file(&exe);
         assert!(native.status.success(), "native run failed for {file}");
-        assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "{file} leaked: {}", String::from_utf8_lossy(&native.stderr));
-        assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected, "native output for {file}");
+        assert!(
+            String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+            "{file} leaked: {}",
+            String::from_utf8_lossy(&native.stderr)
+        );
+        assert_eq!(
+            String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+            expected,
+            "native output for {file}"
+        );
     }
 }
 
@@ -2870,28 +4647,56 @@ fn native_ir_option_combinators_preserve_some_none_and_ownership() {
     let path = example_path(file);
     let expected = "mapped: VALUE\nnone\n5\nnone\n";
     let interpreted = run(&["--run", &path]);
-    assert!(interpreted.status.success(), "interpreter failed for {file}: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed for {file}: {}",
+        stderr(&interpreted)
+    );
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
 
     let report = run(&["--native-type-report", &path]);
     if skip_if_no_c_compiler(&report) {
         return;
     }
-    assert!(report.status.success(), "native type report failed for {file}: {}", stderr(&report));
+    assert!(
+        report.status.success(),
+        "native type report failed for {file}: {}",
+        stderr(&report)
+    );
     let ir_functions = stdout(&report)
         .lines()
-        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .find_map(|line| {
+            line.strip_prefix("ir-generated: ")
+                .and_then(|n| n.trim().parse::<usize>().ok())
+        })
         .unwrap_or(0);
-    assert!(ir_functions >= 9, "{file} generated only {ir_functions} IR function(s): {}", stdout(&report));
+    assert!(
+        ir_functions >= 9,
+        "{file} generated only {ir_functions} IR function(s): {}",
+        stdout(&report)
+    );
 
     let exe = temp_artifact("native_ir_option_combinators.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
-    assert!(compile.status.success(), "compile failed for {file}: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("failed to run Option combinator binary");
+    assert!(
+        compile.status.success(),
+        "compile failed for {file}: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run Option combinator binary");
     let _ = fs::remove_file(&exe);
     assert!(native.status.success(), "native run failed for {file}");
-    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "{file} leaked: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "{file} leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
 }
 
 #[test]
@@ -2900,28 +4705,60 @@ fn native_ir_option_list_preserves_payload_and_ownership() {
     let path = example_path(file);
     let expected = "2\nalpha\nnone\n2\ngamma\nbad\n";
     let interpreted = run(&["--run", &path]);
-    assert!(interpreted.status.success(), "interpreter failed for {file}: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed for {file}: {}",
+        stderr(&interpreted)
+    );
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
 
     let report = run(&["--native-type-report", &path]);
     if skip_if_no_c_compiler(&report) {
         return;
     }
-    assert!(report.status.success(), "native type report failed for {file}: {}", stderr(&report));
+    assert!(
+        report.status.success(),
+        "native type report failed for {file}: {}",
+        stderr(&report)
+    );
     let ir_functions = stdout(&report)
         .lines()
-        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .find_map(|line| {
+            line.strip_prefix("ir-generated: ")
+                .and_then(|n| n.trim().parse::<usize>().ok())
+        })
         .unwrap_or(0);
-    assert!(ir_functions >= 5, "{file} generated only {ir_functions} IR function(s): {}", stdout(&report));
+    assert!(
+        ir_functions >= 5,
+        "{file} generated only {ir_functions} IR function(s): {}",
+        stdout(&report)
+    );
 
     let exe = temp_artifact("native_ir_option_list.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
-    assert!(compile.status.success(), "compile failed for {file}: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("failed to run Option<List> binary");
+    assert!(
+        compile.status.success(),
+        "compile failed for {file}: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run Option<List> binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native run failed for {file}: {}", stderr(&compile));
-    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "{file} leaked: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(
+        native.status.success(),
+        "native run failed for {file}: {}",
+        stderr(&compile)
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "{file} leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
 }
 
 #[test]
@@ -2930,59 +4767,128 @@ fn native_ir_compound_collections_preserve_payload_and_ownership() {
     let path = example_path(file);
     let expected = "2\nnone\n3\nbad set\n";
     let interpreted = run(&["--run", &path]);
-    assert!(interpreted.status.success(), "interpreter failed for {file}: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed for {file}: {}",
+        stderr(&interpreted)
+    );
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
 
     let report = run(&["--native-type-report", &path]);
     if skip_if_no_c_compiler(&report) {
         return;
     }
-    assert!(report.status.success(), "native type report failed for {file}: {}", stderr(&report));
+    assert!(
+        report.status.success(),
+        "native type report failed for {file}: {}",
+        stderr(&report)
+    );
     let ir_functions = stdout(&report)
         .lines()
-        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .find_map(|line| {
+            line.strip_prefix("ir-generated: ")
+                .and_then(|n| n.trim().parse::<usize>().ok())
+        })
         .unwrap_or(0);
-    assert!(ir_functions >= 5, "{file} generated only {ir_functions} IR function(s): {}", stdout(&report));
+    assert!(
+        ir_functions >= 5,
+        "{file} generated only {ir_functions} IR function(s): {}",
+        stdout(&report)
+    );
 
     let exe = temp_artifact("native_ir_compound_collections.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
-    assert!(compile.status.success(), "compile failed for {file}: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("failed to run compound collection binary");
+    assert!(
+        compile.status.success(),
+        "compile failed for {file}: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run compound collection binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native run failed for {file}: {}", stderr(&compile));
-    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "{file} leaked: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(
+        native.status.success(),
+        "native run failed for {file}: {}",
+        stderr(&compile)
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "{file} leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
 }
 
 #[test]
 fn native_ir_nested_wrappers_preserve_recursive_ownership() {
     let file = "native_ir_nested_wrappers.ostrin";
     let path = example_path(file);
-    let expected = "nested\ninner none\nok\nnested error\nnested\nouter fallback\nok\nok fallback\nnested\n";
+    let expected =
+        "nested\ninner none\nok\nnested error\nnested\nouter fallback\nok\nok fallback\nnested\n";
     let interpreted = run(&["--run", &path]);
-    assert!(interpreted.status.success(), "interpreter failed for {file}: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed for {file}: {}",
+        stderr(&interpreted)
+    );
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
 
     let report = run(&["--native-type-report", &path]);
     if skip_if_no_c_compiler(&report) {
         return;
     }
-    assert!(report.status.success(), "native type report failed for {file}: {}", stderr(&report));
+    assert!(
+        report.status.success(),
+        "native type report failed for {file}: {}",
+        stderr(&report)
+    );
     let ir_functions = stdout(&report)
         .lines()
-        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .find_map(|line| {
+            line.strip_prefix("ir-generated: ")
+                .and_then(|n| n.trim().parse::<usize>().ok())
+        })
         .unwrap_or(0);
-    assert!(ir_functions >= 10, "{file} generated only {ir_functions} IR function(s): {}", stdout(&report));
-    assert!(stdout(&report).contains("hir-generated: 0"), "{file} unexpectedly used a HIR fallback: {}", stdout(&report));
+    assert!(
+        ir_functions >= 10,
+        "{file} generated only {ir_functions} IR function(s): {}",
+        stdout(&report)
+    );
+    assert!(
+        stdout(&report).contains("hir-generated: 0"),
+        "{file} unexpectedly used a HIR fallback: {}",
+        stdout(&report)
+    );
 
     let exe = temp_artifact("native_ir_nested_wrappers.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
-    assert!(compile.status.success(), "compile failed for {file}: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("failed to run nested wrapper binary");
+    assert!(
+        compile.status.success(),
+        "compile failed for {file}: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run nested wrapper binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native run failed for {file}: {}", stderr(&compile));
-    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "{file} leaked: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(
+        native.status.success(),
+        "native run failed for {file}: {}",
+        stderr(&compile)
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "{file} leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
 }
 
 #[test]
@@ -2991,28 +4897,56 @@ fn native_ir_try_global_handler_preserves_error_ownership() {
     let path = example_path(file);
     let expected = "VALUE!\nhandled: FAILURE\n";
     let interpreted = run(&["--run", &path]);
-    assert!(interpreted.status.success(), "interpreter failed for {file}: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed for {file}: {}",
+        stderr(&interpreted)
+    );
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
 
     let report = run(&["--native-type-report", &path]);
     if skip_if_no_c_compiler(&report) {
         return;
     }
-    assert!(report.status.success(), "native type report failed for {file}: {}", stderr(&report));
+    assert!(
+        report.status.success(),
+        "native type report failed for {file}: {}",
+        stderr(&report)
+    );
     let ir_functions = stdout(&report)
         .lines()
-        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .find_map(|line| {
+            line.strip_prefix("ir-generated: ")
+                .and_then(|n| n.trim().parse::<usize>().ok())
+        })
         .unwrap_or(0);
-    assert!(ir_functions >= 6, "{file} generated only {ir_functions} IR function(s): {}", stdout(&report));
+    assert!(
+        ir_functions >= 6,
+        "{file} generated only {ir_functions} IR function(s): {}",
+        stdout(&report)
+    );
 
     let exe = temp_artifact("native_ir_try_handler.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
-    assert!(compile.status.success(), "compile failed for {file}: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("failed to run global try handler binary");
+    assert!(
+        compile.status.success(),
+        "compile failed for {file}: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run global try handler binary");
     let _ = fs::remove_file(&exe);
     assert!(native.status.success(), "native run failed for {file}");
-    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "{file} leaked: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "{file} leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
 }
 
 #[test]
@@ -3021,28 +4955,56 @@ fn native_ir_try_local_handler_preserves_error_ownership() {
     let path = example_path(file);
     let expected = "VALUE!\nhandled: FAILURE\n";
     let interpreted = run(&["--run", &path]);
-    assert!(interpreted.status.success(), "interpreter failed for {file}: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed for {file}: {}",
+        stderr(&interpreted)
+    );
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
 
     let report = run(&["--native-type-report", &path]);
     if skip_if_no_c_compiler(&report) {
         return;
     }
-    assert!(report.status.success(), "native type report failed for {file}: {}", stderr(&report));
+    assert!(
+        report.status.success(),
+        "native type report failed for {file}: {}",
+        stderr(&report)
+    );
     let ir_functions = stdout(&report)
         .lines()
-        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .find_map(|line| {
+            line.strip_prefix("ir-generated: ")
+                .and_then(|n| n.trim().parse::<usize>().ok())
+        })
         .unwrap_or(0);
-    assert!(ir_functions >= 6, "{file} generated only {ir_functions} IR function(s): {}", stdout(&report));
+    assert!(
+        ir_functions >= 6,
+        "{file} generated only {ir_functions} IR function(s): {}",
+        stdout(&report)
+    );
 
     let exe = temp_artifact("native_ir_try_local_handler.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
-    assert!(compile.status.success(), "compile failed for {file}: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("failed to run local try handler binary");
+    assert!(
+        compile.status.success(),
+        "compile failed for {file}: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run local try handler binary");
     let _ = fs::remove_file(&exe);
     assert!(native.status.success(), "native run failed for {file}");
-    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "{file} leaked: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "{file} leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
 }
 
 #[test]
@@ -3051,30 +5013,60 @@ fn native_ir_try_captured_handler_preserves_closure_ownership() {
     let path = example_path(file);
     let expected = "VALUE!\nhandled: FAILURE\n";
     let interpreted = run(&["--run", &path]);
-    assert!(interpreted.status.success(), "interpreter failed for {file}: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed for {file}: {}",
+        stderr(&interpreted)
+    );
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
 
     let report = run(&["--native-type-report", &path]);
     if skip_if_no_c_compiler(&report) {
         return;
     }
-    assert!(report.status.success(), "native type report failed for {file}: {}", stderr(&report));
+    assert!(
+        report.status.success(),
+        "native type report failed for {file}: {}",
+        stderr(&report)
+    );
     let report_text = stdout(&report);
     let ir_functions = report_text
         .lines()
-        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .find_map(|line| {
+            line.strip_prefix("ir-generated: ")
+                .and_then(|n| n.trim().parse::<usize>().ok())
+        })
         .unwrap_or(0);
-    assert!(ir_functions >= 6, "{file} generated only {ir_functions} IR function(s): {report_text}");
-    assert!(report_text.contains("hir-generated: 0"), "{file} unexpectedly used a HIR fallback: {report_text}");
+    assert!(
+        ir_functions >= 6,
+        "{file} generated only {ir_functions} IR function(s): {report_text}"
+    );
+    assert!(
+        report_text.contains("hir-generated: 0"),
+        "{file} unexpectedly used a HIR fallback: {report_text}"
+    );
 
     let exe = temp_artifact("native_ir_try_captured_handler.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
-    assert!(compile.status.success(), "compile failed for {file}: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("failed to run captured try handler binary");
+    assert!(
+        compile.status.success(),
+        "compile failed for {file}: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run captured try handler binary");
     let _ = fs::remove_file(&exe);
     assert!(native.status.success(), "native run failed for {file}");
-    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "{file} leaked: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "{file} leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
 }
 
 /// Deterministic generator of small programs (integer arithmetic, `%`, `if`, `while`, `for`,
@@ -3087,11 +5079,19 @@ struct ProgramGen {
 
 impl ProgramGen {
     fn new(seed: u64) -> Self {
-        Self { state: seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407), loop_id: 0 }
+        Self {
+            state: seed
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407),
+            loop_id: 0,
+        }
     }
 
     fn next(&mut self, bound: u64) -> u64 {
-        self.state = self.state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        self.state = self
+            .state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         (self.state >> 33) % bound
     }
 
@@ -3134,7 +5134,13 @@ impl ProgramGen {
         format!("{pad}{target} = ({value}) % 100000\n")
     }
 
-    fn block(&mut self, vars: &mut Vec<String>, depth: u32, in_loop: bool, indent: usize) -> String {
+    fn block(
+        &mut self,
+        vars: &mut Vec<String>,
+        depth: u32,
+        in_loop: bool,
+        indent: usize,
+    ) -> String {
         let pad = "    ".repeat(indent);
         let mut out = String::new();
         for _ in 0..(1 + self.next(3)) {
@@ -3155,7 +5161,11 @@ impl ProgramGen {
                     out.push_str(&format!("{pad}l.push({value})\n"));
                 }
                 4 if in_loop => {
-                    let keyword = if self.next(2) == 0 { "break" } else { "continue" };
+                    let keyword = if self.next(2) == 0 {
+                        "break"
+                    } else {
+                        "continue"
+                    };
                     let cond = self.bool_expr(vars, 1);
                     out.push_str(&format!("{pad}if {cond} {{\n{pad}    {keyword}\n{pad}}}\n"));
                 }
@@ -3173,7 +5183,9 @@ impl ProgramGen {
                     self.loop_id += 1;
                     let counter = format!("i{}", self.loop_id);
                     let limit = 1 + self.next(5);
-                    out.push_str(&format!("{pad}mut {counter} = 0\n{pad}while {counter} < {limit} {{\n"));
+                    out.push_str(&format!(
+                        "{pad}mut {counter} = 0\n{pad}while {counter} < {limit} {{\n"
+                    ));
                     out.push_str(&format!("{pad}    {counter} = {counter} + 1\n"));
                     vars.push(counter);
                     let body = self.block(vars, depth + 1, true, indent + 1);
@@ -3183,7 +5195,9 @@ impl ProgramGen {
                 _ => {
                     self.loop_id += 1;
                     let item = format!("x{}", self.loop_id);
-                    let items: Vec<String> = (0..(1 + self.next(4))).map(|_| format!("{}", self.next(20))).collect();
+                    let items: Vec<String> = (0..(1 + self.next(4)))
+                        .map(|_| format!("{}", self.next(20)))
+                        .collect();
                     out.push_str(&format!("{pad}for {item} in [{}] {{\n", items.join(", ")));
                     vars.push(item);
                     let body = self.block(vars, depth + 1, true, indent + 1);
@@ -3198,7 +5212,8 @@ impl ProgramGen {
     fn program(&mut self, functions: usize) -> String {
         let mut source = String::new();
         for index in 0..functions {
-            let mut vars: Vec<String> = ["a", "b", "c", "n"].iter().map(|v| v.to_string()).collect();
+            let mut vars: Vec<String> =
+                ["a", "b", "c", "n"].iter().map(|v| v.to_string()).collect();
             let body = self.block(&mut vars, 0, false, 1);
             source.push_str(&format!(
                 "fn f{index}(n: Int) -> Int {{\n    mut a = n\n    mut b = 1\n    mut c = 2\n    mut s = \"\"\n    mut l = [n]\n{body}    (a + b + c + s.length() + l.length()) % 1000003\n}}\n\n"
@@ -3218,14 +5233,21 @@ impl ProgramGen {
 #[test]
 fn generated_programs_agree_between_interpreter_and_native_backend() {
     // `OSTRIN_FUZZ_SEEDS=200 cargo test generated_programs` widens the search.
-    let seed_count: u64 = std::env::var("OSTRIN_FUZZ_SEEDS").ok().and_then(|v| v.parse().ok()).unwrap_or(4);
+    let seed_count: u64 = std::env::var("OSTRIN_FUZZ_SEEDS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(4);
     for seed in 1..=seed_count {
         let source = ProgramGen::new(seed).program(10);
         let path = temp_artifact(&format!("generated_{seed}.ostrin"));
         fs::write(&path, &source).unwrap();
 
         let interpreted = run(&["--run", &path]);
-        assert!(interpreted.status.success(), "interpreter failed for seed {seed}: {}\n{source}", stderr(&interpreted));
+        assert!(
+            interpreted.status.success(),
+            "interpreter failed for seed {seed}: {}\n{source}",
+            stderr(&interpreted)
+        );
 
         let exe = temp_artifact(&format!("generated_{seed}.exe"));
         let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
@@ -3233,10 +5255,20 @@ fn generated_programs_agree_between_interpreter_and_native_backend() {
             let _ = fs::remove_file(&path);
             return;
         }
-        assert!(compile.status.success(), "native compile failed for seed {seed}: {}\n{source}", stderr(&compile));
-        let native = Command::new(&exe).output().expect("failed to run generated binary");
+        assert!(
+            compile.status.success(),
+            "native compile failed for seed {seed}: {}\n{source}",
+            stderr(&compile)
+        );
+        let native = Command::new(&exe)
+            .output()
+            .expect("failed to run generated binary");
         let _ = fs::remove_file(&exe);
-        assert!(native.status.success(), "native run failed for seed {seed}: {}\n{source}", String::from_utf8_lossy(&native.stderr));
+        assert!(
+            native.status.success(),
+            "native run failed for seed {seed}: {}\n{source}",
+            String::from_utf8_lossy(&native.stderr)
+        );
         assert_eq!(
             String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
             stdout(&interpreted).replace("\r\n", "\n"),
@@ -3261,11 +5293,18 @@ struct ManagedWrapperGen {
 
 impl ManagedWrapperGen {
     fn new(seed: u64) -> Self {
-        Self { state: seed.wrapping_mul(2862933555777941757).wrapping_add(3037000493) }
+        Self {
+            state: seed
+                .wrapping_mul(2862933555777941757)
+                .wrapping_add(3037000493),
+        }
     }
 
     fn next(&mut self, bound: u64) -> u64 {
-        self.state = self.state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        self.state = self
+            .state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         (self.state >> 33) % bound.max(1)
     }
 
@@ -3308,11 +5347,15 @@ fn consume_result_{case}(value: Result<String, String>) -> String {{\n\
 
         source.push_str("fn main() -> Void {\n");
         for case in 0..cases {
-            source.push_str(&format!("    print(option_{case}().unwrap_or(\"option fallback\"))\n"));
+            source.push_str(&format!(
+                "    print(option_{case}().unwrap_or(\"option fallback\"))\n"
+            ));
             if option_flags[case as usize] {
                 source.push_str(&format!("    print(option_{case}().unwrap())\n"));
             } else {
-                source.push_str(&format!("    print(option_{case}().unwrap_or(\"option safe fallback\"))\n"));
+                source.push_str(&format!(
+                    "    print(option_{case}().unwrap_or(\"option safe fallback\"))\n"
+                ));
             }
             source.push_str(&format!(
                 "    match option_{case}().ok_or(\"option error\") {{\n\
@@ -3320,15 +5363,23 @@ fn consume_result_{case}(value: Result<String, String>) -> String {{\n\
         Err(error) => print(error),\n\
     }}\n"
             ));
-            source.push_str(&format!("    print(result_{case}().unwrap_or(\"result fallback\"))\n"));
+            source.push_str(&format!(
+                "    print(result_{case}().unwrap_or(\"result fallback\"))\n"
+            ));
             if result_flags[case as usize] {
                 source.push_str(&format!("    print(result_{case}().unwrap())\n"));
             } else {
-                source.push_str(&format!("    print(result_{case}().unwrap_or(\"result safe fallback\"))\n"));
+                source.push_str(&format!(
+                    "    print(result_{case}().unwrap_or(\"result safe fallback\"))\n"
+                ));
             }
             source.push_str(&format!("    print(result_{case}().ok().is_some())\n"));
-            source.push_str(&format!("    print(consume_option_{case}(option_{case}()))\n"));
-            source.push_str(&format!("    print(consume_result_{case}(result_{case}()))\n"));
+            source.push_str(&format!(
+                "    print(consume_option_{case}(option_{case}()))\n"
+            ));
+            source.push_str(&format!(
+                "    print(consume_result_{case}(result_{case}()))\n"
+            ));
         }
         source.push_str("}\n");
         source
@@ -3338,7 +5389,10 @@ fn consume_result_{case}(value: Result<String, String>) -> String {{\n\
 #[test]
 fn generated_managed_wrappers_agree_between_interpreter_and_native_backend() {
     // `OSTRIN_FUZZ_SEEDS=50 cargo test generated_managed_wrappers` widens the search.
-    let seed_count: u64 = std::env::var("OSTRIN_FUZZ_SEEDS").ok().and_then(|v| v.parse().ok()).unwrap_or(4);
+    let seed_count: u64 = std::env::var("OSTRIN_FUZZ_SEEDS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(4);
     for seed in 1..=seed_count {
         let mut generator = ManagedWrapperGen::new(seed);
         let source = generator.program(seed);
@@ -3346,7 +5400,11 @@ fn generated_managed_wrappers_agree_between_interpreter_and_native_backend() {
         fs::write(&path, &source).unwrap();
 
         let interpreted = run(&["--run", &path]);
-        assert!(interpreted.status.success(), "interpreter failed for managed seed {seed}: {}\n{source}", stderr(&interpreted));
+        assert!(
+            interpreted.status.success(),
+            "interpreter failed for managed seed {seed}: {}\n{source}",
+            stderr(&interpreted)
+        );
 
         let exe = temp_artifact(&format!("generated_managed_{seed}.exe"));
         let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
@@ -3354,11 +5412,21 @@ fn generated_managed_wrappers_agree_between_interpreter_and_native_backend() {
             let _ = fs::remove_file(&path);
             return;
         }
-        assert!(compile.status.success(), "native compile failed for managed seed {seed}: {}\n{source}", stderr(&compile));
-        let native = Command::new(&exe).output().expect("failed to run generated managed binary");
+        assert!(
+            compile.status.success(),
+            "native compile failed for managed seed {seed}: {}\n{source}",
+            stderr(&compile)
+        );
+        let native = Command::new(&exe)
+            .output()
+            .expect("failed to run generated managed binary");
         let _ = fs::remove_file(&exe);
         let _ = fs::remove_file(&path);
-        assert!(native.status.success(), "native run failed for managed seed {seed}: {}\n{source}", String::from_utf8_lossy(&native.stderr));
+        assert!(
+            native.status.success(),
+            "native run failed for managed seed {seed}: {}\n{source}",
+            String::from_utf8_lossy(&native.stderr)
+        );
         assert_eq!(
             String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
             stdout(&interpreted).replace("\r\n", "\n"),
@@ -3379,7 +5447,9 @@ fn generated_managed_wrappers_agree_between_interpreter_and_native_backend() {
 fn front_end_never_panics_on_mutated_sources() {
     let mut state: u64 = 0x9E3779B97F4A7C15;
     let mut next = |bound: usize| -> usize {
-        state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        state = state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         ((state >> 33) as usize) % bound.max(1)
     };
     let mut files: Vec<_> = fs::read_dir(example_path(""))
@@ -3391,7 +5461,9 @@ fn front_end_never_panics_on_mutated_sources() {
     let path = temp_artifact("mutated.ostrin");
     let mut checked = 0;
     // `OSTRIN_FUZZ_SEEDS=N` mutates every example N times instead of every third one 3 times.
-    let widened: Option<usize> = std::env::var("OSTRIN_FUZZ_SEEDS").ok().and_then(|v| v.parse().ok());
+    let widened: Option<usize> = std::env::var("OSTRIN_FUZZ_SEEDS")
+        .ok()
+        .and_then(|v| v.parse().ok());
     let rounds = widened.unwrap_or(3);
     for file in files.iter().step_by(if widened.is_some() { 1 } else { 3 }) {
         let source: Vec<char> = fs::read_to_string(file).unwrap().chars().collect();
@@ -3436,16 +5508,36 @@ fn front_end_never_panics_on_mutated_sources() {
         }
     }
     let _ = fs::remove_file(&path);
-    assert!(checked > 60, "expected to check many mutations, checked {checked}");
+    assert!(
+        checked > 60,
+        "expected to check many mutations, checked {checked}"
+    );
 }
 
 #[test]
 fn deeply_nested_input_does_not_crash_the_front_end() {
     let path = temp_artifact("deep_nesting.ostrin");
     for (label, source) in [
-        ("parens", format!("fn main() -> Void {{\n    print({}1{})\n}}\n", "(".repeat(3000), ")".repeat(3000))),
-        ("blocks", format!("fn main() -> Void {{\n{}{}}}\n", "    if true {\n".repeat(1500), "    }\n".repeat(1500))),
-        ("unclosed", format!("fn main() -> Void {{\n    print({}\n", "[".repeat(3000))),
+        (
+            "parens",
+            format!(
+                "fn main() -> Void {{\n    print({}1{})\n}}\n",
+                "(".repeat(3000),
+                ")".repeat(3000)
+            ),
+        ),
+        (
+            "blocks",
+            format!(
+                "fn main() -> Void {{\n{}{}}}\n",
+                "    if true {\n".repeat(1500),
+                "    }\n".repeat(1500)
+            ),
+        ),
+        (
+            "unclosed",
+            format!("fn main() -> Void {{\n    print({}\n", "[".repeat(3000)),
+        ),
     ] {
         fs::write(&path, source).unwrap();
         let output = run(&["--check", &path]);
@@ -3462,29 +5554,63 @@ fn deeply_nested_input_does_not_crash_the_front_end() {
 #[test]
 fn std_library_modules_agree_between_backends_and_pass_their_own_tests() {
     let tests = run(&["--test", &example_path("std_tests.ostrin")]);
-    assert!(tests.status.success(), "std tests failed: {}{}", stdout(&tests), stderr(&tests));
-    assert!(stdout(&tests).contains("10 passed"), "unexpected std test output: {}", stdout(&tests));
+    assert!(
+        tests.status.success(),
+        "std tests failed: {}{}",
+        stdout(&tests),
+        stderr(&tests)
+    );
+    assert!(
+        stdout(&tests).contains("10 passed"),
+        "unexpected std test output: {}",
+        stdout(&tests)
+    );
 
     let path = example_path("std_library.ostrin");
     let interpreted = run(&["--run", &path]);
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
     let expected = "3\n2.5\n10\n6\n12\n1024\ntrue\n1\n[3, 2, 1]\n[1, 2, 3, 4, 5]\n[apple, fig, pear]\n[1, 2]\n[1, 2, 3]\n[2, 3, 4, 5]\nSome(9)\nSome(2)\nababab\n007\n2\nOstrin\n[a, b, c]\n[a, b]\ntrue\n2 + 3 = 5\ns\nstr\n115\n115\n2024-02-29\n1\n29\n{\"ok\":true,\"items\":[1,2]}\n[ok, items]\n2\nfalse\ntrue\nfalse\n3\n0\n2\n2\n3.14\n-0.125\n2\ntrue\n";
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
 
     let emitted = run(&["--emit-c", &path]);
-    assert!(emitted.status.success(), "std library C emission failed: {}", stderr(&emitted));
-    assert!(stdout(&emitted).contains("ostrin_float_format"), "float formatter did not reach native C: {}", stdout(&emitted));
+    assert!(
+        emitted.status.success(),
+        "std library C emission failed: {}",
+        stderr(&emitted)
+    );
+    assert!(
+        stdout(&emitted).contains("ostrin_float_format"),
+        "float formatter did not reach native C: {}",
+        stdout(&emitted)
+    );
 
     let exe = temp_artifact("std_library.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "native compile failed: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("failed to run std binary");
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run std binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native run failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(
+        native.status.success(),
+        "native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
     assert!(
         String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
         "std library native ownership leaked: {}",
@@ -3492,12 +5618,17 @@ fn std_library_modules_agree_between_backends_and_pass_their_own_tests() {
     );
 
     let missing = temp_artifact("std_missing.ostrin");
-    fs::write(&missing, "import std.nope\nfn main() -> Void {\n    print(1)\n}\n").unwrap();
+    fs::write(
+        &missing,
+        "import std.nope\nfn main() -> Void {\n    print(1)\n}\n",
+    )
+    .unwrap();
     let output = run(&[&missing]);
     assert!(!output.status.success());
     let text = format!("{}{}", stdout(&output), stderr(&output));
     assert!(
-        text.contains("no module 'nope'") && text.contains("math, lists, strings, time, json, args, env, maps"),
+        text.contains("no module 'nope'")
+            && text.contains("math, lists, strings, time, json, args, env, maps"),
         "unhelpful message: {text}"
     );
     let _ = fs::remove_file(&missing);
@@ -3507,7 +5638,11 @@ fn std_library_modules_agree_between_backends_and_pass_their_own_tests() {
 fn json_standard_library_matches_between_backends_and_is_leak_free() {
     let path = example_path("json_library.ostrin");
     let interpreted = run(&["--run", &path]);
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
     let expected = "{\"name\":\"Ostrin\",\"items\":[true,null,3.5],\"unicode\":\"😀\"}\nOstrin\n[name, items, unicode]\n[1,false]\n";
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
 
@@ -3516,11 +5651,24 @@ fn json_standard_library_matches_between_backends_and_is_leak_free() {
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "native JSON compile failed: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("failed to run JSON binary");
+    assert!(
+        compile.status.success(),
+        "native JSON compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run JSON binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native JSON run failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(
+        native.status.success(),
+        "native JSON run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
     assert!(
         String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
         "native JSON ownership leaked: {}",
@@ -3536,12 +5684,29 @@ fn std_time_native_example_is_leak_free() {
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "native compile failed: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("failed to run time binary");
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run time binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native run failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), "true\nfalse\ntrue\n60\n1\n2024-02-29\n29\n2\n");
-    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "native leak report: {}", String::from_utf8_lossy(&native.stderr));
+    assert!(
+        native.status.success(),
+        "native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        "true\nfalse\ntrue\n60\n1\n2024-02-29\n29\n2\n"
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "native leak report: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
 }
 
 #[test]
@@ -3550,18 +5715,29 @@ fn functions_ending_in_return_type_check_and_run_natively() {
     let path = temp_artifact("ends_in_return.ostrin");
     fs::write(&path, source).unwrap();
     let interpreted = run(&["--run", &path]);
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), "1\n4\n1\n2\n");
     let exe = temp_artifact("ends_in_return.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "native compile failed: {}", stderr(&compile));
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
     let native = Command::new(&exe).output().expect("failed to run binary");
     let _ = fs::remove_file(&exe);
     let _ = fs::remove_file(&path);
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), "1\n4\n1\n2\n");
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        "1\n4\n1\n2\n"
+    );
     assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"));
 }
 
@@ -3577,7 +5753,11 @@ fn native_allocator_scales_linearly_with_live_allocations() {
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "native compile failed: {}", stderr(&compile));
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
     let started = std::time::Instant::now();
     let native = Command::new(&exe).output().expect("failed to run binary");
     let elapsed = started.elapsed();
@@ -3586,7 +5766,10 @@ fn native_allocator_scales_linearly_with_live_allocations() {
     assert!(native.status.success());
     assert_eq!(String::from_utf8_lossy(&native.stdout).trim(), "60000");
     assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"));
-    assert!(elapsed.as_secs_f64() < 5.0, "allocator is superlinear again: {elapsed:?}");
+    assert!(
+        elapsed.as_secs_f64() < 5.0,
+        "allocator is superlinear again: {elapsed:?}"
+    );
 }
 
 #[test]
@@ -3594,22 +5777,45 @@ fn new_scaffolds_a_project_that_runs_and_passes_its_own_test() {
     let root = temp_artifact("scaffold_project");
     let _ = fs::remove_dir_all(&root);
     let created = run(&["--new", &root]);
-    assert!(created.status.success(), "--new failed: {}", stderr(&created));
+    assert!(
+        created.status.success(),
+        "--new failed: {}",
+        stderr(&created)
+    );
     for file in ["ostrin.toml", "main.ostrin", ".gitignore"] {
-        assert!(std::path::Path::new(&root).join(file).exists(), "missing {file}");
+        assert!(
+            std::path::Path::new(&root).join(file).exists(),
+            "missing {file}"
+        );
     }
 
     let output = run(&["--project", &root, "--run"]);
-    assert!(output.status.success(), "project run failed: {}", stderr(&output));
+    assert!(
+        output.status.success(),
+        "project run failed: {}",
+        stderr(&output)
+    );
     assert_eq!(stdout(&output).replace("\r\n", "\n"), "Hello, Ostrin!\n3\n");
 
     let entry = format!("{root}/main.ostrin");
     let tests = run(&["--test", &entry]);
-    assert!(tests.status.success(), "project test failed: {}{}", stdout(&tests), stderr(&tests));
-    assert!(stdout(&tests).contains("1 passed"), "unexpected test output: {}", stdout(&tests));
+    assert!(
+        tests.status.success(),
+        "project test failed: {}{}",
+        stdout(&tests),
+        stderr(&tests)
+    );
+    assert!(
+        stdout(&tests).contains("1 passed"),
+        "unexpected test output: {}",
+        stdout(&tests)
+    );
 
     let again = run(&["--new", &root]);
-    assert!(!again.status.success(), "--new must not overwrite an existing project");
+    assert!(
+        !again.status.success(),
+        "--new must not overwrite an existing project"
+    );
     let _ = fs::remove_dir_all(&root);
 
     let invalid = run(&["--new", &format!("{root}/bad name!")]);
@@ -3621,19 +5827,38 @@ fn native_ir_emitter_handles_scalar_maps_and_sets() {
     let file = example_path("native_ir_maps_sets.ostrin");
     let expected = "3\ntrue\nfalse\n3\n3\n1\n3\n3\n2\ntrue\nfalse\n1\n2\n2\n";
     let interpreted = run(&["--run", &file]);
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
 
     let report = run(&["--native-type-report", &file]);
-    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
     let ir_functions = stdout(&report)
         .lines()
-        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .find_map(|line| {
+            line.strip_prefix("ir-generated: ")
+                .and_then(|n| n.trim().parse::<usize>().ok())
+        })
         .unwrap_or(0);
-    assert!(ir_functions >= 3, "map/set example did not use the IR emitter: {}", stdout(&report));
+    assert!(
+        ir_functions >= 3,
+        "map/set example did not use the IR emitter: {}",
+        stdout(&report)
+    );
 
     let emitted = run(&["--emit-c", &file]);
-    assert!(emitted.status.success(), "map/set IR emission failed: {}", stderr(&emitted));
+    assert!(
+        emitted.status.success(),
+        "map/set IR emission failed: {}",
+        stderr(&emitted)
+    );
     let source = stdout(&emitted);
     for helper in [
         "Map_String_Int_new",
@@ -3647,7 +5872,10 @@ fn native_ir_emitter_handles_scalar_maps_and_sets() {
         "Set_String_contains",
         "ostrin_release((void*)__ir_v",
     ] {
-        assert!(source.contains(helper), "expected IR map/set helper '{helper}' in generated C: {source}");
+        assert!(
+            source.contains(helper),
+            "expected IR map/set helper '{helper}' in generated C: {source}"
+        );
     }
 
     let exe = temp_artifact("native_ir_maps_sets.exe");
@@ -3655,12 +5883,29 @@ fn native_ir_emitter_handles_scalar_maps_and_sets() {
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("failed to run map/set IR binary");
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run map/set IR binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native run failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "map/set IR ownership leaked: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(
+        native.status.success(),
+        "native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "map/set IR ownership leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
 }
 
 #[test]
@@ -3668,19 +5913,38 @@ fn native_ir_emitter_handles_scalar_map_options() {
     let file = example_path("native_ir_map_options.ostrin");
     let expected = "3\n-1\ntrue\ntrue\n3\n5\n2\n5\n1\n";
     let interpreted = run(&["--run", &file]);
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
 
     let report = run(&["--native-type-report", &file]);
-    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
     let ir_functions = stdout(&report)
         .lines()
-        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .find_map(|line| {
+            line.strip_prefix("ir-generated: ")
+                .and_then(|n| n.trim().parse::<usize>().ok())
+        })
         .unwrap_or(0);
-    assert!(ir_functions >= 3, "map Option example did not use the IR emitter: {}", stdout(&report));
+    assert!(
+        ir_functions >= 3,
+        "map Option example did not use the IR emitter: {}",
+        stdout(&report)
+    );
 
     let emitted = run(&["--emit-c", &file]);
-    assert!(emitted.status.success(), "map Option IR emission failed: {}", stderr(&emitted));
+    assert!(
+        emitted.status.success(),
+        "map Option IR emission failed: {}",
+        stderr(&emitted)
+    );
     let source = stdout(&emitted);
     for helper in [
         "typedef struct { bool has; int64_t value; } Option_Int;",
@@ -3689,7 +5953,10 @@ fn native_ir_emitter_handles_scalar_map_options() {
         ".has",
         "ostrin: unwrap on None",
     ] {
-        assert!(source.contains(helper), "expected scalar Option support '{helper}' in generated C: {source}");
+        assert!(
+            source.contains(helper),
+            "expected scalar Option support '{helper}' in generated C: {source}"
+        );
     }
 
     let exe = temp_artifact("native_ir_map_options.exe");
@@ -3697,12 +5964,29 @@ fn native_ir_emitter_handles_scalar_map_options() {
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("failed to run map Option IR binary");
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run map Option IR binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native run failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "map Option IR ownership leaked: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(
+        native.status.success(),
+        "native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "map Option IR ownership leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
 }
 
 #[test]
@@ -3710,19 +5994,38 @@ fn native_ir_emitter_handles_managed_options_and_patterns() {
     let file = example_path("native_ir_managed_options.ostrin");
     let expected = "native\nfalse\nempty\nalpha\ntrue\nbeta\n1\n";
     let interpreted = run(&["--run", &file]);
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
 
     let report = run(&["--native-type-report", &file]);
-    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
     let ir_functions = stdout(&report)
         .lines()
-        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .find_map(|line| {
+            line.strip_prefix("ir-generated: ")
+                .and_then(|n| n.trim().parse::<usize>().ok())
+        })
         .unwrap_or(0);
-    assert!(ir_functions >= 3, "managed Option example did not use the IR emitter: {}", stdout(&report));
+    assert!(
+        ir_functions >= 3,
+        "managed Option example did not use the IR emitter: {}",
+        stdout(&report)
+    );
 
     let emitted = run(&["--emit-c", &file]);
-    assert!(emitted.status.success(), "managed Option IR emission failed: {}", stderr(&emitted));
+    assert!(
+        emitted.status.success(),
+        "managed Option IR emission failed: {}",
+        stderr(&emitted)
+    );
     let source = stdout(&emitted);
     for helper in [
         "typedef struct { bool has; const char* value; } Option_String;",
@@ -3731,7 +6034,10 @@ fn native_ir_emitter_handles_managed_options_and_patterns() {
         "ostrin_retain((void*)__ostrin_option.value)",
         ".has",
     ] {
-        assert!(source.contains(helper), "expected managed Option support '{helper}' in generated C: {source}");
+        assert!(
+            source.contains(helper),
+            "expected managed Option support '{helper}' in generated C: {source}"
+        );
     }
 
     let exe = temp_artifact("native_ir_managed_options.exe");
@@ -3739,12 +6045,29 @@ fn native_ir_emitter_handles_managed_options_and_patterns() {
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("failed to run managed Option IR binary");
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run managed Option IR binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native run failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "managed Option IR ownership leaked: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(
+        native.status.success(),
+        "native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "managed Option IR ownership leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
 }
 
 #[test]
@@ -3752,20 +6075,38 @@ fn native_ir_managed_option_result_consumers_preserve_ownership() {
     let file = example_path("native_ir_managed_consumers.ostrin");
     let expected = "native option\nnative option\noption fallback\nnative option\noption error\nnative result\nnative result\nresult fallback\ntrue\n";
     let interpreted = run(&["--run", &file]);
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
 
     let report = run(&["--native-type-report", &file]);
-    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
     let report_text = stdout(&report);
     let ir_functions = report_text
         .lines()
-        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .find_map(|line| {
+            line.strip_prefix("ir-generated: ")
+                .and_then(|n| n.trim().parse::<usize>().ok())
+        })
         .unwrap_or(0);
-    assert!(ir_functions >= 10, "managed Option/Result consumers did not migrate to IR: {report_text}");
+    assert!(
+        ir_functions >= 10,
+        "managed Option/Result consumers did not migrate to IR: {report_text}"
+    );
 
     let emitted = run(&["--emit-c", &file]);
-    assert!(emitted.status.success(), "managed consumer IR emission failed: {}", stderr(&emitted));
+    assert!(
+        emitted.status.success(),
+        "managed consumer IR emission failed: {}",
+        stderr(&emitted)
+    );
     let source = stdout(&emitted);
     for helper in [
         "ostrin: unwrap on None",
@@ -3774,7 +6115,10 @@ fn native_ir_managed_option_result_consumers_preserve_ownership() {
         "__ostrin_result.ok = true",
         "__ostrin_result.ok = false",
     ] {
-        assert!(source.contains(helper), "expected managed consumer support '{helper}' in generated C: {source}");
+        assert!(
+            source.contains(helper),
+            "expected managed consumer support '{helper}' in generated C: {source}"
+        );
     }
 
     let exe = temp_artifact("native_ir_managed_consumers.exe");
@@ -3782,12 +6126,29 @@ fn native_ir_managed_option_result_consumers_preserve_ownership() {
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "managed consumer compile failed: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("failed to run managed consumer binary");
+    assert!(
+        compile.status.success(),
+        "managed consumer compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run managed consumer binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "managed consumer binary failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "managed Option/Result consumers leaked: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(
+        native.status.success(),
+        "managed consumer binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "managed Option/Result consumers leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
 }
 
 #[test]
@@ -3795,20 +6156,38 @@ fn native_ir_emitter_handles_records_and_option_record_ownership() {
     let file = example_path("native_ir_records.ostrin");
     let expected = "3\nseven\nempty\nthree\n";
     let interpreted = run(&["--run", &file]);
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
 
     let report = run(&["--native-type-report", &file]);
-    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
     let report_text = stdout(&report);
     let ir_functions = report_text
         .lines()
-        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .find_map(|line| {
+            line.strip_prefix("ir-generated: ")
+                .and_then(|n| n.trim().parse::<usize>().ok())
+        })
         .unwrap_or(0);
-    assert!(ir_functions >= 5, "record example did not use the IR emitter: {report_text}");
+    assert!(
+        ir_functions >= 5,
+        "record example did not use the IR emitter: {report_text}"
+    );
 
     let emitted = run(&["--emit-c", &file]);
-    assert!(emitted.status.success(), "record IR emission failed: {}", stderr(&emitted));
+    assert!(
+        emitted.status.success(),
+        "record IR emission failed: {}",
+        stderr(&emitted)
+    );
     let source = stdout(&emitted);
     for marker in [
         "typedef struct { bool has; Point* value; } Option_Point;",
@@ -3817,7 +6196,10 @@ fn native_ir_emitter_handles_records_and_option_record_ownership() {
         "ostrin_retain((void*)__ir_v",
         "ostrin_release((void*)__ir_v",
     ] {
-        assert!(source.contains(marker), "expected record IR marker '{marker}' in generated C: {source}");
+        assert!(
+            source.contains(marker),
+            "expected record IR marker '{marker}' in generated C: {source}"
+        );
     }
 
     let exe = temp_artifact("native_ir_records.exe");
@@ -3825,12 +6207,29 @@ fn native_ir_emitter_handles_records_and_option_record_ownership() {
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("failed to run record IR binary");
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run record IR binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native run failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "record IR ownership leaked: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(
+        native.status.success(),
+        "native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "record IR ownership leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
 }
 
 #[test]
@@ -3838,30 +6237,58 @@ fn native_ir_emitter_preserves_checked_fixed_width_arithmetic() {
     let file = example_path("native_ir_sized.ostrin");
     let expected = "120\n-4\n-7\n";
     let interpreted = run(&["--run", &file]);
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
 
     let report = run(&["--native-type-report", &file]);
     if skip_if_no_c_compiler(&report) {
         return;
     }
-    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
     let ir_functions = stdout(&report)
         .lines()
-        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .find_map(|line| {
+            line.strip_prefix("ir-generated: ")
+                .and_then(|n| n.trim().parse::<usize>().ok())
+        })
         .unwrap_or(0);
-    assert!(ir_functions >= 4, "fixed-width scalar functions did not use IR: {}", stdout(&report));
+    assert!(
+        ir_functions >= 4,
+        "fixed-width scalar functions did not use IR: {}",
+        stdout(&report)
+    );
 
     let exe = temp_artifact("native_ir_sized.exe");
     let compile = run(&["--compile", "--out", &exe, &file]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("failed to run fixed-width IR binary");
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run fixed-width IR binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native run failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(
+        native.status.success(),
+        "native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
 }
 
 #[test]
@@ -3869,32 +6296,70 @@ fn native_ir_emitter_handles_cfg_control_flow() {
     let file = example_path("native_ir_control_flow.ostrin");
     let expected = "-1\n0\n1\n15\n";
     let interpreted = run(&["--run", &file]);
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
 
     let report = run(&["--native-type-report", &file]);
-    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
     let ir_functions = stdout(&report)
         .lines()
-        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .find_map(|line| {
+            line.strip_prefix("ir-generated: ")
+                .and_then(|n| n.trim().parse::<usize>().ok())
+        })
         .unwrap_or(0);
-    assert!(ir_functions >= 3, "branch/loop example did not use the IR emitter: {}", stdout(&report));
+    assert!(
+        ir_functions >= 3,
+        "branch/loop example did not use the IR emitter: {}",
+        stdout(&report)
+    );
 
     let emitted = run(&["--emit-c", &file]);
-    assert!(emitted.status.success(), "IR CFG emission failed: {}", stderr(&emitted));
-    assert!(stdout(&emitted).contains("__ostrin_ir_pred"), "expected phi predecessor tracking");
-    assert!(stdout(&emitted).contains("__ostrin_ir_bb3:"), "expected branch merge label");
+    assert!(
+        emitted.status.success(),
+        "IR CFG emission failed: {}",
+        stderr(&emitted)
+    );
+    assert!(
+        stdout(&emitted).contains("__ostrin_ir_pred"),
+        "expected phi predecessor tracking"
+    );
+    assert!(
+        stdout(&emitted).contains("__ostrin_ir_bb3:"),
+        "expected branch merge label"
+    );
 
     let exe = temp_artifact("native_ir_control_flow.exe");
     let compile = run(&["--compile", "--out", &exe, &file]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("failed to run IR CFG binary");
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run IR CFG binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native run failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(
+        native.status.success(),
+        "native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
 }
 
 #[test]
@@ -3905,14 +6370,22 @@ fn native_hir_handles_collections_core() {
     let file = example_path("native_hir_collections.ostrin");
     let expected = "3\n2\n1\n9\n10\ntrue\n2\n2\ntrue\n2\n1\n";
     let interpreted = run(&["--run", &file]);
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
 
     let report = run(&["--native-type-report", &file]);
     if skip_if_no_c_compiler(&report) {
         return;
     }
-    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
     let generated: usize = stdout(&report)
         .lines()
         .filter_map(|line| {
@@ -3921,18 +6394,34 @@ fn native_hir_handles_collections_core() {
                 .and_then(|n| n.trim().parse::<usize>().ok())
         })
         .sum();
-    assert!(generated >= 1, "collections example did not use the HIR/IR backends");
+    assert!(
+        generated >= 1,
+        "collections example did not use the HIR/IR backends"
+    );
 
     let exe = temp_artifact("native_hir_collections.exe");
     let compile = run(&["--compile", "--out", &exe, &file]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("failed to run collections binary");
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run collections binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "collections binary failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert!(
+        native.status.success(),
+        "collections binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
 }
 
 #[test]
@@ -3944,43 +6433,90 @@ fn native_ir_handles_captured_closures_core() {
     let file = example_path("native_hir_closures.ostrin");
     let expected = "15\nvalue!\n5\n23\nnested \n";
     let interpreted = run(&["--run", &file]);
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
 
     let report = run(&["--native-type-report", &file]);
     if skip_if_no_c_compiler(&report) {
         return;
     }
-    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
     let report_text = stdout(&report);
     let hir_functions = report_text
         .lines()
-        .find_map(|line| line.strip_prefix("hir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .find_map(|line| {
+            line.strip_prefix("hir-generated: ")
+                .and_then(|n| n.trim().parse::<usize>().ok())
+        })
         .unwrap_or(0);
     let ir_functions = report_text
         .lines()
-        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .find_map(|line| {
+            line.strip_prefix("ir-generated: ")
+                .and_then(|n| n.trim().parse::<usize>().ok())
+        })
         .unwrap_or(0);
-    assert!(ir_functions >= 3, "closure example generated only {ir_functions} IR functions: {report_text}");
-    assert_eq!(hir_functions, 0, "captured closure example fell back to HIR: {report_text}");
+    assert!(
+        ir_functions >= 3,
+        "closure example generated only {ir_functions} IR functions: {report_text}"
+    );
+    assert_eq!(
+        hir_functions, 0,
+        "captured closure example fell back to HIR: {report_text}"
+    );
 
     let ir = run(&["--ir", &file]);
-    assert!(ir.status.success(), "closure IR dump failed: {}", stderr(&ir));
+    assert!(
+        ir.status.success(),
+        "closure IR dump failed: {}",
+        stderr(&ir)
+    );
     let ir_text = stdout(&ir);
-    assert!(ir_text.contains("ir opaque: 0"), "nested closure lowering left an opaque IR node: {ir_text}");
-    assert!(ir_text.contains("ir violations: 0"), "nested closure lowering violated IR invariants: {ir_text}");
+    assert!(
+        ir_text.contains("ir opaque: 0"),
+        "nested closure lowering left an opaque IR node: {ir_text}"
+    );
+    assert!(
+        ir_text.contains("ir violations: 0"),
+        "nested closure lowering violated IR invariants: {ir_text}"
+    );
 
     let exe = temp_artifact("native_hir_closures.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("failed to run closure binary");
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run closure binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "closure binary failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
-    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "captured closure leaked: {}", String::from_utf8_lossy(&native.stderr));
+    assert!(
+        native.status.success(),
+        "closure binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "captured closure leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
 }
 
 #[test]
@@ -3992,34 +6528,71 @@ fn native_ir_handles_named_function_values_and_indirect_calls() {
     let file = example_path("native_ir_function_values.ostrin");
     let expected = "5\n10\n";
     let interpreted = run(&["--run", &file]);
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
 
     let report = run(&["--native-type-report", &file]);
     if skip_if_no_c_compiler(&report) {
         return;
     }
-    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
     let report_text = stdout(&report);
     let ir_functions = report_text
         .lines()
-        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .find_map(|line| {
+            line.strip_prefix("ir-generated: ")
+                .and_then(|n| n.trim().parse::<usize>().ok())
+        })
         .unwrap_or(0);
     let hir_functions = report_text
         .lines()
-        .find_map(|line| line.strip_prefix("hir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .find_map(|line| {
+            line.strip_prefix("hir-generated: ")
+                .and_then(|n| n.trim().parse::<usize>().ok())
+        })
         .unwrap_or(0);
-    assert!(ir_functions >= 3, "named function value example generated only {ir_functions} IR functions");
-    assert_eq!(hir_functions, 0, "named function values should not force a HIR fallback: {report_text}");
+    assert!(
+        ir_functions >= 3,
+        "named function value example generated only {ir_functions} IR functions"
+    );
+    assert_eq!(
+        hir_functions, 0,
+        "named function values should not force a HIR fallback: {report_text}"
+    );
 
     let exe = temp_artifact("native_ir_function_values.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
-    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("failed to run function-value binary");
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run function-value binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native binary failed: {}", stderr(&native));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
-    assert!(stderr(&native).contains("live_allocations=0"), "function values leaked: {}", stderr(&native));
+    assert!(
+        native.status.success(),
+        "native binary failed: {}",
+        stderr(&native)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        stderr(&native).contains("live_allocations=0"),
+        "function values leaked: {}",
+        stderr(&native)
+    );
 }
 
 #[test]
@@ -4030,37 +6603,74 @@ fn native_ir_handles_concrete_generic_instances() {
     let file = example_path("native_hir_generics.ostrin");
     let expected = "4\nostrin\n42\n27\nloop\n";
     let interpreted = run(&["--run", &file]);
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
 
     let report = run(&["--native-type-report", &file]);
     if skip_if_no_c_compiler(&report) {
         return;
     }
-    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
     let report_text = stdout(&report);
     let hir_functions = report_text
         .lines()
-        .find_map(|line| line.strip_prefix("hir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .find_map(|line| {
+            line.strip_prefix("hir-generated: ")
+                .and_then(|n| n.trim().parse::<usize>().ok())
+        })
         .unwrap_or(0);
     let ir_functions = report_text
         .lines()
-        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .find_map(|line| {
+            line.strip_prefix("ir-generated: ")
+                .and_then(|n| n.trim().parse::<usize>().ok())
+        })
         .unwrap_or(0);
-    assert_eq!(hir_functions, 0, "generic instances unexpectedly fell back to HIR: {report_text}");
-    assert!(ir_functions >= 6, "generic IR example generated only {ir_functions} functions: {report_text}");
+    assert_eq!(
+        hir_functions, 0,
+        "generic instances unexpectedly fell back to HIR: {report_text}"
+    );
+    assert!(
+        ir_functions >= 6,
+        "generic IR example generated only {ir_functions} functions: {report_text}"
+    );
 
     let exe = temp_artifact("native_hir_generics.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("failed to run generic HIR binary");
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run generic HIR binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "generic HIR binary failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
-    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "generic IR binary leaked: {}", String::from_utf8_lossy(&native.stderr));
+    assert!(
+        native.status.success(),
+        "generic HIR binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "generic IR binary leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
 }
 
 #[test]
@@ -4074,26 +6684,49 @@ fn native_hir_handles_generic_records_and_enums() {
     if skip_if_no_c_compiler(&report) {
         return;
     }
-    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
     let hir_functions = stdout(&report)
         .lines()
-        .find_map(|line| line.strip_prefix("hir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .find_map(|line| {
+            line.strip_prefix("hir-generated: ")
+                .and_then(|n| n.trim().parse::<usize>().ok())
+        })
         .unwrap_or(0);
-    assert!(hir_functions >= 8, "generic record/enum example generated only {hir_functions} HIR functions");
+    assert!(
+        hir_functions >= 8,
+        "generic record/enum example generated only {hir_functions} HIR functions"
+    );
 
     let c = run(&["--emit-c", &file]);
     assert!(c.status.success(), "C emission failed: {}", stderr(&c));
-    assert!(stdout(&c).contains("Pair__String_Int* __ir_v"), "generic record literal did not reach the IR C emitter");
+    assert!(
+        stdout(&c).contains("Pair__String_Int* __ir_v"),
+        "generic record literal did not reach the IR C emitter"
+    );
 
     let exe = temp_artifact("native_generic_types.exe");
     let compile = run(&["--compile", "--out", &exe, &file]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("failed to run generic record/enum binary");
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run generic record/enum binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "generic record/enum binary failed: {}", String::from_utf8_lossy(&native.stderr));
+    assert!(
+        native.status.success(),
+        "generic record/enum binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
     assert_eq!(
         String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
         "one\n1\n1\ntrue\nhi\n3\n4\nb\n99\n1\n2\n1.5\n"
@@ -4109,36 +6742,76 @@ fn native_ir_handles_generic_methods_with_ir_for_generic_records() {
     if skip_if_no_c_compiler(&report) {
         return;
     }
-    assert!(report.status.success(), "native type report failed: {}", stderr(&report));
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
     let report_text = stdout(&report);
     let hir_functions = report_text
         .lines()
-        .find_map(|line| line.strip_prefix("hir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .find_map(|line| {
+            line.strip_prefix("hir-generated: ")
+                .and_then(|n| n.trim().parse::<usize>().ok())
+        })
         .unwrap_or(0);
     let ir_functions = report_text
         .lines()
-        .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
+        .find_map(|line| {
+            line.strip_prefix("ir-generated: ")
+                .and_then(|n| n.trim().parse::<usize>().ok())
+        })
         .unwrap_or(0);
-    assert_eq!(hir_functions, 0, "generic method unexpectedly fell back to HIR: {report_text}");
-    assert!(ir_functions >= 5, "generic method example generated only {ir_functions} IR functions: {report_text}");
+    assert_eq!(
+        hir_functions, 0,
+        "generic method unexpectedly fell back to HIR: {report_text}"
+    );
+    assert!(
+        ir_functions >= 5,
+        "generic method example generated only {ir_functions} IR functions: {report_text}"
+    );
 
     let c = run(&["--emit-c", &file]);
     assert!(c.status.success(), "C emission failed: {}", stderr(&c));
-    assert!(stdout(&c).contains("Box__String* __ir_v"), "generic method record return did not come from IR");
+    assert!(
+        stdout(&c).contains("Box__String* __ir_v"),
+        "generic method record return did not come from IR"
+    );
 
     let expected = run(&["--run", &file]);
-    assert!(expected.status.success(), "interpreter failed: {}", stderr(&expected));
+    assert!(
+        expected.status.success(),
+        "interpreter failed: {}",
+        stderr(&expected)
+    );
     let exe = temp_artifact("native_generic_methods_ir.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("failed to run generic method binary");
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run generic method binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "generic method binary failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), stdout(&expected).replace("\r\n", "\n"));
-    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "generic method binary leaked: {}", String::from_utf8_lossy(&native.stderr));
+    assert!(
+        native.status.success(),
+        "generic method binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        stdout(&expected).replace("\r\n", "\n")
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "generic method binary leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
 }
 
 #[test]
@@ -4149,13 +6822,21 @@ fn int_division_truncates_in_both_backends() {
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), "3\n3\n");
 
     let exe = temp_artifact("int_division.exe");
-    let compile = run(&["--compile", "--out", &exe, &example_path("int_division.ostrin")]);
+    let compile = run(&[
+        "--compile",
+        "--out",
+        &exe,
+        &example_path("int_division.ostrin"),
+    ]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
     let native = Command::new(&exe).output().unwrap();
     let _ = fs::remove_file(&exe);
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), "3\n3\n");
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        "3\n3\n"
+    );
 }
 
 #[test]
@@ -4166,9 +6847,18 @@ fn native_backend_quantities_match_the_interpreter() {
     // runtime (`m/s`, `kg*m/s*m/s`), comparisons across units, `as`,
     // `within`, `approximately`, unary minus and scalar/Quantity math, plus
     // `shapes.ostrin`: an `impl` on an enum, a list of enums and `to_string()`.
-    for file in ["physics.ostrin", "native_units.ostrin", "shapes.ostrin", "unit_algebra.ostrin"] {
+    for file in [
+        "physics.ostrin",
+        "native_units.ostrin",
+        "shapes.ostrin",
+        "unit_algebra.ostrin",
+    ] {
         let interpreted = run(&["--run", &example_path(file)]);
-        assert!(interpreted.status.success(), "interpreter failed on {file}: {}", stderr(&interpreted));
+        assert!(
+            interpreted.status.success(),
+            "interpreter failed on {file}: {}",
+            stderr(&interpreted)
+        );
         let expected = stdout(&interpreted).replace("\r\n", "\n");
 
         let exe = temp_artifact(&format!("{file}.exe"));
@@ -4176,10 +6866,18 @@ fn native_backend_quantities_match_the_interpreter() {
         if skip_if_no_c_compiler(&compile) {
             return;
         }
-        assert!(compile.status.success(), "compile failed for {file}: {}", stderr(&compile));
+        assert!(
+            compile.status.success(),
+            "compile failed for {file}: {}",
+            stderr(&compile)
+        );
         let native = Command::new(&exe).output().unwrap();
         let _ = fs::remove_file(&exe);
-        assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected, "output mismatch for {file}");
+        assert_eq!(
+            String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+            expected,
+            "output mismatch for {file}"
+        );
     }
 }
 
@@ -4242,12 +6940,15 @@ fn compiler_exports_type_members_and_local_bindings_for_editor_tools() {
     let advanced = run(&["--members", "--json", &example_path("advanced.ostrin")]);
     assert!(advanced.status.success(), "stderr: {}", stderr(&advanced));
     let advanced_text = stdout(&advanced);
-    assert!(advanced_text.contains("\"name\":\"x\",\"type\":\"Quantity<D>\",\"function\":\"double\",\"scopeDepth\":0"));
+    assert!(advanced_text.contains(
+        "\"name\":\"x\",\"type\":\"Quantity<D>\",\"function\":\"double\",\"scopeDepth\":0"
+    ));
 
     let generics = run(&["--members", "--json", &example_path("generics.ostrin")]);
     assert!(generics.status.success(), "stderr: {}", stderr(&generics));
     let generics_text = stdout(&generics);
-    assert!(generics_text.contains("\"name\":\"a\",\"type\":\"Score\",\"function\":\"main\",\"scopeDepth\":1"));
+    assert!(generics_text
+        .contains("\"name\":\"a\",\"type\":\"Score\",\"function\":\"main\",\"scopeDepth\":1"));
     assert!(generics_text.contains("\"owner\":\"Score\",\"name\":\"value\""));
     assert!(generics_text.contains("\"resultType\":\"Int\""));
     assert!(generics_text.contains("\"line\":5,\"column\":1"));
@@ -4255,7 +6956,11 @@ fn compiler_exports_type_members_and_local_bindings_for_editor_tools() {
 
 #[test]
 fn compiler_exports_inferred_expression_types_for_editor_tools() {
-    let out = run(&["--types", "--json", &example_path("option_result_types.ostrin")]);
+    let out = run(&[
+        "--types",
+        "--json",
+        &example_path("option_result_types.ostrin"),
+    ]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     let text = stdout(&out);
     assert!(text.contains("\"kind\":\"expression\""));
@@ -4291,7 +6996,11 @@ fn dimensional_errors_are_all_reported() {
     assert!(err.contains("E1024"), "missing E1024 in: {err}");
     assert!(err.contains("E1025"), "missing E1025 in: {err}");
     assert!(err.contains("E1001"), "missing E1001 in: {err}");
-    assert_eq!(err.matches("E1024").count(), 2, "expected E1024 to appear twice: {err}");
+    assert_eq!(
+        err.matches("E1024").count(),
+        2,
+        "expected E1024 to appear twice: {err}"
+    );
 }
 
 #[test]
@@ -4323,7 +7032,17 @@ fn traits_dispatch_operators_via_impl() {
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     let text = stdout(&out);
     let lines: Vec<&str> = text.lines().collect();
-    assert_eq!(lines, ["Vector2 { x: 4, y: 6 }", "true", "false", "true", "false", "true"]);
+    assert_eq!(
+        lines,
+        [
+            "Vector2 { x: 4, y: 6 }",
+            "true",
+            "false",
+            "true",
+            "false",
+            "true"
+        ]
+    );
 }
 
 #[test]
@@ -4369,7 +7088,11 @@ fn concurrency_scheduler_defers_tasks_and_drains_scopes() {
 fn pending_tasks_can_be_cancelled_before_they_run() {
     let file = example_path("concurrency_cancel.ostrin");
     let interpreted = run(&["--run", &file]);
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), "true\nfalse\n");
 
     let exe = temp_artifact("cancel.exe");
@@ -4377,16 +7100,43 @@ fn pending_tasks_can_be_cancelled_before_they_run() {
     if skip_if_no_c_compiler(&compiled) {
         return;
     }
-    assert!(compiled.status.success(), "native cancellation compile failed: {}", stderr(&compiled));
-    let native = Command::new(&exe).output().expect("run native cancellation binary");
+    assert!(
+        compiled.status.success(),
+        "native cancellation compile failed: {}",
+        stderr(&compiled)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run native cancellation binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native cancellation binary failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), "true\nfalse\n");
-    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "cancellation leaked: {}", String::from_utf8_lossy(&native.stderr));
+    assert!(
+        native.status.success(),
+        "native cancellation binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        "true\nfalse\n"
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "cancellation leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
 
     let threaded_exe = temp_artifact("cancel-native-threads.exe");
-    let threaded_compile = run(&["--compile", "--native-threads", "--out", &threaded_exe, &file]);
-    assert!(threaded_compile.status.success(), "native-thread cancellation compile failed: {}", stderr(&threaded_compile));
+    let threaded_compile = run(&[
+        "--compile",
+        "--native-threads",
+        "--out",
+        &threaded_exe,
+        &file,
+    ]);
+    assert!(
+        threaded_compile.status.success(),
+        "native-thread cancellation compile failed: {}",
+        stderr(&threaded_compile)
+    );
     let _ = fs::remove_file(&threaded_exe);
 }
 
@@ -4394,7 +7144,11 @@ fn pending_tasks_can_be_cancelled_before_they_run() {
 fn running_tasks_honor_cancellation_at_cooperative_checkpoints() {
     let file = example_path("concurrency_cancel_safe.ostrin");
     let interpreted = run(&["--run", &file]);
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
     let expected = "started\n1\ntrue\ncontroller-finished\nfalse\n";
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
 
@@ -4403,23 +7157,65 @@ fn running_tasks_honor_cancellation_at_cooperative_checkpoints() {
     if skip_if_no_c_compiler(&compiled) {
         return;
     }
-    assert!(compiled.status.success(), "safe cancellation compile failed: {}", stderr(&compiled));
-    let native = Command::new(&exe).output().expect("run native safe cancellation binary");
+    assert!(
+        compiled.status.success(),
+        "safe cancellation compile failed: {}",
+        stderr(&compiled)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run native safe cancellation binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native safe cancellation failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
-    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "safe cancellation leaked: {}", String::from_utf8_lossy(&native.stderr));
+    assert!(
+        native.status.success(),
+        "native safe cancellation failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "safe cancellation leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
 
     let threaded_exe = temp_artifact("cancel-safe-native-threads.exe");
-    let threaded_compile = run(&["--compile", "--native-threads", "--leak-check", "--out", &threaded_exe, &file]);
-    assert!(threaded_compile.status.success(), "native-thread safe cancellation compile failed: {}", stderr(&threaded_compile));
-    let threaded_native = Command::new(&threaded_exe).output().expect("run native-thread safe cancellation binary");
+    let threaded_compile = run(&[
+        "--compile",
+        "--native-threads",
+        "--leak-check",
+        "--out",
+        &threaded_exe,
+        &file,
+    ]);
+    assert!(
+        threaded_compile.status.success(),
+        "native-thread safe cancellation compile failed: {}",
+        stderr(&threaded_compile)
+    );
+    let threaded_native = Command::new(&threaded_exe)
+        .output()
+        .expect("run native-thread safe cancellation binary");
     let _ = fs::remove_file(&threaded_exe);
-    assert!(threaded_native.status.success(), "native-thread safe cancellation failed: {}", String::from_utf8_lossy(&threaded_native.stderr));
-    assert!(String::from_utf8_lossy(&threaded_native.stderr).contains("live_allocations=0"), "native-thread safe cancellation leaked: {}", String::from_utf8_lossy(&threaded_native.stderr));
+    assert!(
+        threaded_native.status.success(),
+        "native-thread safe cancellation failed: {}",
+        String::from_utf8_lossy(&threaded_native.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&threaded_native.stderr).contains("live_allocations=0"),
+        "native-thread safe cancellation leaked: {}",
+        String::from_utf8_lossy(&threaded_native.stderr)
+    );
 
     let threaded = run(&["--emit-c", "--native-threads", &file]);
-    assert!(threaded.status.success(), "native-thread safe cancellation emission failed: {}", stderr(&threaded));
+    assert!(
+        threaded.status.success(),
+        "native-thread safe cancellation emission failed: {}",
+        stderr(&threaded)
+    );
     let source = stdout(&threaded);
     assert!(source.contains("cancel_requested"));
     assert!(source.contains("ostrin_task_checkpoint"));
@@ -4429,65 +7225,171 @@ fn running_tasks_honor_cancellation_at_cooperative_checkpoints() {
 fn cancelling_a_parent_task_cancels_its_spawn_scope_group() {
     let file = example_path("concurrency_scope_cancel.ostrin");
     let interpreted = run(&["--run", &file]);
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
-    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), "parent-started\ntrue\n");
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(
+        stdout(&interpreted).replace("\r\n", "\n"),
+        "parent-started\ntrue\n"
+    );
 
     let exe = temp_artifact("scope-cancel.exe");
     let compiled = run(&["--compile", "--leak-check", "--out", &exe, &file]);
     if skip_if_no_c_compiler(&compiled) {
         return;
     }
-    assert!(compiled.status.success(), "scope cancellation compile failed: {}", stderr(&compiled));
-    let native = Command::new(&exe).output().expect("run scope cancellation binary");
+    assert!(
+        compiled.status.success(),
+        "scope cancellation compile failed: {}",
+        stderr(&compiled)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run scope cancellation binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "scope cancellation binary failed: {}", String::from_utf8_lossy(&native.stderr));
+    assert!(
+        native.status.success(),
+        "scope cancellation binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
     let native_stdout = String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n");
-    assert!(!native_stdout.contains("parent-must-not-run"), "parent continued after cancellation: {native_stdout}");
-    assert!(!native_stdout.contains("child-must-not-run"), "child escaped its cancelled scope: {native_stdout}");
-    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "scope cancellation leaked: {}", String::from_utf8_lossy(&native.stderr));
+    assert!(
+        !native_stdout.contains("parent-must-not-run"),
+        "parent continued after cancellation: {native_stdout}"
+    );
+    assert!(
+        !native_stdout.contains("child-must-not-run"),
+        "child escaped its cancelled scope: {native_stdout}"
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "scope cancellation leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
 
     let threaded_exe = temp_artifact("scope-cancel-native-threads.exe");
-    let threaded_compile = run(&["--compile", "--native-threads", "--leak-check", "--out", &threaded_exe, &file]);
-    assert!(threaded_compile.status.success(), "native-thread scope cancellation compile failed: {}", stderr(&threaded_compile));
-    let threaded_native = Command::new(&threaded_exe).output().expect("run native-thread scope cancellation binary");
+    let threaded_compile = run(&[
+        "--compile",
+        "--native-threads",
+        "--leak-check",
+        "--out",
+        &threaded_exe,
+        &file,
+    ]);
+    assert!(
+        threaded_compile.status.success(),
+        "native-thread scope cancellation compile failed: {}",
+        stderr(&threaded_compile)
+    );
+    let threaded_native = Command::new(&threaded_exe)
+        .output()
+        .expect("run native-thread scope cancellation binary");
     let _ = fs::remove_file(&threaded_exe);
-    assert!(threaded_native.status.success(), "native-thread scope cancellation failed: {}", String::from_utf8_lossy(&threaded_native.stderr));
+    assert!(
+        threaded_native.status.success(),
+        "native-thread scope cancellation failed: {}",
+        String::from_utf8_lossy(&threaded_native.stderr)
+    );
     let threaded_stdout = String::from_utf8_lossy(&threaded_native.stdout);
-    assert!(!threaded_stdout.contains("parent-must-not-run"), "native parent continued after cancellation: {threaded_stdout}");
-    assert!(!threaded_stdout.contains("child-must-not-run"), "native child escaped its cancelled scope: {threaded_stdout}");
-    assert!(String::from_utf8_lossy(&threaded_native.stderr).contains("live_allocations=0"), "native-thread scope cancellation leaked: {}", String::from_utf8_lossy(&threaded_native.stderr));
+    assert!(
+        !threaded_stdout.contains("parent-must-not-run"),
+        "native parent continued after cancellation: {threaded_stdout}"
+    );
+    assert!(
+        !threaded_stdout.contains("child-must-not-run"),
+        "native child escaped its cancelled scope: {threaded_stdout}"
+    );
+    assert!(
+        String::from_utf8_lossy(&threaded_native.stderr).contains("live_allocations=0"),
+        "native-thread scope cancellation leaked: {}",
+        String::from_utf8_lossy(&threaded_native.stderr)
+    );
 }
 
 #[test]
 fn cancelling_a_task_wakes_a_blocked_channel_receive() {
     let file = example_path("concurrency_cancel_blocked_receive.ostrin");
     let interpreted = run(&["--run", &file]);
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
-    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), "blocked-started\ntrue\n");
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(
+        stdout(&interpreted).replace("\r\n", "\n"),
+        "blocked-started\ntrue\n"
+    );
 
     let exe = temp_artifact("cancel-blocked-receive.exe");
     let compiled = run(&["--compile", "--leak-check", "--out", &exe, &file]);
     if skip_if_no_c_compiler(&compiled) {
         return;
     }
-    assert!(compiled.status.success(), "blocked receive compile failed: {}", stderr(&compiled));
-    let native = Command::new(&exe).output().expect("run blocked receive binary");
+    assert!(
+        compiled.status.success(),
+        "blocked receive compile failed: {}",
+        stderr(&compiled)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run blocked receive binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "blocked receive binary failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), "blocked-started\ntrue\n");
-    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "blocked receive leaked: {}", String::from_utf8_lossy(&native.stderr));
+    assert!(
+        native.status.success(),
+        "blocked receive binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        "blocked-started\ntrue\n"
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "blocked receive leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
 
     let threaded_exe = temp_artifact("cancel-blocked-receive-native-threads.exe");
-    let threaded_compile = run(&["--compile", "--native-threads", "--leak-check", "--out", &threaded_exe, &file]);
-    assert!(threaded_compile.status.success(), "native-thread blocked receive compile failed: {}", stderr(&threaded_compile));
-    let threaded_native = Command::new(&threaded_exe).output().expect("run native-thread blocked receive binary");
+    let threaded_compile = run(&[
+        "--compile",
+        "--native-threads",
+        "--leak-check",
+        "--out",
+        &threaded_exe,
+        &file,
+    ]);
+    assert!(
+        threaded_compile.status.success(),
+        "native-thread blocked receive compile failed: {}",
+        stderr(&threaded_compile)
+    );
+    let threaded_native = Command::new(&threaded_exe)
+        .output()
+        .expect("run native-thread blocked receive binary");
     let _ = fs::remove_file(&threaded_exe);
-    assert!(threaded_native.status.success(), "native-thread blocked receive failed: {}", String::from_utf8_lossy(&threaded_native.stderr));
-    assert_eq!(String::from_utf8_lossy(&threaded_native.stdout).replace("\r\n", "\n"), "blocked-started\ntrue\n");
-    assert!(String::from_utf8_lossy(&threaded_native.stderr).contains("live_allocations=0"), "native-thread blocked receive leaked: {}", String::from_utf8_lossy(&threaded_native.stderr));
+    assert!(
+        threaded_native.status.success(),
+        "native-thread blocked receive failed: {}",
+        String::from_utf8_lossy(&threaded_native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&threaded_native.stdout).replace("\r\n", "\n"),
+        "blocked-started\ntrue\n"
+    );
+    assert!(
+        String::from_utf8_lossy(&threaded_native.stderr).contains("live_allocations=0"),
+        "native-thread blocked receive leaked: {}",
+        String::from_utf8_lossy(&threaded_native.stderr)
+    );
 
     let emitted = run(&["--emit-c", "--native-threads", &file]);
-    assert!(emitted.status.success(), "native-thread blocked receive emission failed: {}", stderr(&emitted));
+    assert!(
+        emitted.status.success(),
+        "native-thread blocked receive emission failed: {}",
+        stderr(&emitted)
+    );
     assert!(stdout(&emitted).contains("ostrin_cond_wait_timeout"));
     assert!(stdout(&emitted).contains("ostrin_task_checkpoint"));
 }
@@ -4496,32 +7398,84 @@ fn cancelling_a_task_wakes_a_blocked_channel_receive() {
 fn cancelled_tasks_do_not_release_dropped_child_handles_twice() {
     let file = example_path("concurrency_cancel_after_drop.ostrin");
     let interpreted = run(&["--run", &file]);
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
-    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), "parent-started\ntrue\n");
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(
+        stdout(&interpreted).replace("\r\n", "\n"),
+        "parent-started\ntrue\n"
+    );
 
     let exe = temp_artifact("cancel-after-drop.exe");
     let compiled = run(&["--compile", "--leak-check", "--out", &exe, &file]);
     if skip_if_no_c_compiler(&compiled) {
         return;
     }
-    assert!(compiled.status.success(), "cancel-after-drop compile failed: {}", stderr(&compiled));
-    let native = Command::new(&exe).output().expect("run cancel-after-drop binary");
+    assert!(
+        compiled.status.success(),
+        "cancel-after-drop compile failed: {}",
+        stderr(&compiled)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run cancel-after-drop binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "cancel-after-drop binary failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), "parent-started\ntrue\n");
-    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "dropped child handle leaked or was released twice: {}", String::from_utf8_lossy(&native.stderr));
+    assert!(
+        native.status.success(),
+        "cancel-after-drop binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        "parent-started\ntrue\n"
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "dropped child handle leaked or was released twice: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
 
     let threaded_exe = temp_artifact("cancel-after-drop-native-threads.exe");
-    let threaded_compile = run(&["--compile", "--native-threads", "--leak-check", "--out", &threaded_exe, &file]);
-    assert!(threaded_compile.status.success(), "native-thread cancel-after-drop compile failed: {}", stderr(&threaded_compile));
-    let threaded_native = Command::new(&threaded_exe).output().expect("run native-thread cancel-after-drop binary");
+    let threaded_compile = run(&[
+        "--compile",
+        "--native-threads",
+        "--leak-check",
+        "--out",
+        &threaded_exe,
+        &file,
+    ]);
+    assert!(
+        threaded_compile.status.success(),
+        "native-thread cancel-after-drop compile failed: {}",
+        stderr(&threaded_compile)
+    );
+    let threaded_native = Command::new(&threaded_exe)
+        .output()
+        .expect("run native-thread cancel-after-drop binary");
     let _ = fs::remove_file(&threaded_exe);
-    assert!(threaded_native.status.success(), "native-thread cancel-after-drop failed: {}", String::from_utf8_lossy(&threaded_native.stderr));
-    assert_eq!(String::from_utf8_lossy(&threaded_native.stdout).replace("\r\n", "\n"), "parent-started\ntrue\n");
-    assert!(String::from_utf8_lossy(&threaded_native.stderr).contains("live_allocations=0"), "native-thread dropped child handle leaked or was released twice: {}", String::from_utf8_lossy(&threaded_native.stderr));
+    assert!(
+        threaded_native.status.success(),
+        "native-thread cancel-after-drop failed: {}",
+        String::from_utf8_lossy(&threaded_native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&threaded_native.stdout).replace("\r\n", "\n"),
+        "parent-started\ntrue\n"
+    );
+    assert!(
+        String::from_utf8_lossy(&threaded_native.stderr).contains("live_allocations=0"),
+        "native-thread dropped child handle leaked or was released twice: {}",
+        String::from_utf8_lossy(&threaded_native.stderr)
+    );
 
     let emitted = run(&["--emit-c", "--native-threads", &file]);
-    assert!(emitted.status.success(), "cancel-after-drop emission failed: {}", stderr(&emitted));
+    assert!(
+        emitted.status.success(),
+        "cancel-after-drop emission failed: {}",
+        stderr(&emitted)
+    );
     assert!(stdout(&emitted).contains("released"));
     assert!(stdout(&emitted).contains("ostrin_release_owned"));
 }
@@ -4530,7 +7484,11 @@ fn cancelled_tasks_do_not_release_dropped_child_handles_twice() {
 fn yield_advances_the_cooperative_scheduler_and_compiles_with_threads() {
     let file = example_path("concurrency_yield.ostrin");
     let interpreted = run(&["--run", &file]);
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
     let expected = stdout(&interpreted).replace("\r\n", "\n");
     assert_eq!(expected, "main\ntask\nafter\n");
 
@@ -4539,16 +7497,43 @@ fn yield_advances_the_cooperative_scheduler_and_compiles_with_threads() {
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "native yield compile failed: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("run native yield binary");
+    assert!(
+        compile.status.success(),
+        "native yield compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run native yield binary");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "native yield binary failed: {}", String::from_utf8_lossy(&native.stderr));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
-    assert!(String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"), "yield leaked: {}", String::from_utf8_lossy(&native.stderr));
+    assert!(
+        native.status.success(),
+        "native yield binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "yield leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
 
     let threaded_exe = temp_artifact("yield-native-threads.exe");
-    let threaded_compile = run(&["--compile", "--native-threads", "--out", &threaded_exe, &file]);
-    assert!(threaded_compile.status.success(), "native-thread yield compile failed: {}", stderr(&threaded_compile));
+    let threaded_compile = run(&[
+        "--compile",
+        "--native-threads",
+        "--out",
+        &threaded_exe,
+        &file,
+    ]);
+    assert!(
+        threaded_compile.status.success(),
+        "native-thread yield compile failed: {}",
+        stderr(&threaded_compile)
+    );
     let _ = fs::remove_file(&threaded_exe);
 }
 
@@ -4556,11 +7541,18 @@ fn yield_advances_the_cooperative_scheduler_and_compiles_with_threads() {
 fn concurrency_select_matches_between_interpreter_and_native_modes() {
     let file = example_path("concurrency_select.ostrin");
     let interpreted = run(&["--run", &file]);
-    assert!(interpreted.status.success(), "interpreter failed: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
     let expected = stdout(&interpreted).replace("\r\n", "\n");
     assert_eq!(expected, "9\n7\nNone\n");
 
-    for (label, extra) in [("cooperative", Vec::<&str>::new()), ("native-threads", vec!["--native-threads"])] {
+    for (label, extra) in [
+        ("cooperative", Vec::<&str>::new()),
+        ("native-threads", vec!["--native-threads"]),
+    ] {
         let exe = temp_artifact(&format!("concurrency-select-{label}.exe"));
         let mut args = vec!["--compile", "--leak-check", "--out", exe.as_str()];
         args.extend(extra);
@@ -4569,11 +7561,25 @@ fn concurrency_select_matches_between_interpreter_and_native_modes() {
         if skip_if_no_c_compiler(&compile) {
             return;
         }
-        assert!(compile.status.success(), "{label} native compile failed: {}", stderr(&compile));
-        let native = Command::new(&exe).output().expect("run native select binary");
+        assert!(
+            compile.status.success(),
+            "{label} native compile failed: {}",
+            stderr(&compile)
+        );
+        let native = Command::new(&exe)
+            .output()
+            .expect("run native select binary");
         let _ = fs::remove_file(&exe);
-        assert!(native.status.success(), "{label} native binary failed: {}", String::from_utf8_lossy(&native.stderr));
-        assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected, "{label} output differs");
+        assert!(
+            native.status.success(),
+            "{label} native binary failed: {}",
+            String::from_utf8_lossy(&native.stderr)
+        );
+        assert_eq!(
+            String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+            expected,
+            "{label} output differs"
+        );
         assert!(
             String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
             "{label} select runtime leaked allocations: {}",
@@ -4585,13 +7591,24 @@ fn concurrency_select_matches_between_interpreter_and_native_modes() {
 #[test]
 fn select_requires_a_homogeneous_channel_list() {
     let out = run_stdin(
-        &["--stdin", "--check", "--file", "C:/workspace/select_error.ostrin"],
+        &[
+            "--stdin",
+            "--check",
+            "--file",
+            "C:/workspace/select_error.ostrin",
+        ],
         "fn main() -> Void {\n    print(select([1, 2]))\n}\n",
     );
     assert!(!out.status.success());
     let text = stderr(&out);
-    assert!(text.contains("E1041"), "missing select type diagnostic: {text}");
-    assert!(text.contains("List<Channel<T>>"), "missing select contract: {text}");
+    assert!(
+        text.contains("E1041"),
+        "missing select type diagnostic: {text}"
+    );
+    assert!(
+        text.contains("List<Channel<T>>"),
+        "missing select contract: {text}"
+    );
 }
 
 #[test]
@@ -4617,8 +7634,20 @@ fn collections_map_set_and_combinators_work() {
     assert_eq!(
         lines,
         [
-            "Some(1.5)", "false", "Some(12)", "2", "3", "true", "false", "2",
-            "[2, 4, 6, 8, 10, 12]", "[2, 4, 6]", "21", "Some(4)", "true", "true"
+            "Some(1.5)",
+            "false",
+            "Some(12)",
+            "2",
+            "3",
+            "true",
+            "false",
+            "2",
+            "[2, 4, 6, 8, 10, 12]",
+            "[2, 4, 6]",
+            "21",
+            "Some(4)",
+            "true",
+            "true"
         ]
     );
 }
@@ -4639,14 +7668,20 @@ fn list_mutation_requires_mutable_binding() {
     assert!(!out.status.success());
     let err = stderr(&out);
     assert!(err.contains("E1053"), "missing E1053 in: {err}");
-    assert!(err.contains("immutable binding 'numbers'"), "unexpected error: {err}");
+    assert!(
+        err.contains("immutable binding 'numbers'"),
+        "unexpected error: {err}"
+    );
 }
 
 #[test]
 fn exhaustive_enum_match_checks_and_runs() {
     let out = run(&["--run", &example_path("match_exhaustive.ostrin")]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
-    assert_eq!(stdout(&out).lines().collect::<Vec<_>>(), ["red", "yellow", "green"]);
+    assert_eq!(
+        stdout(&out).lines().collect::<Vec<_>>(),
+        ["red", "yellow", "green"]
+    );
 }
 
 #[test]
@@ -4662,7 +7697,10 @@ fn non_exhaustive_enum_match_is_rejected() {
 fn generic_functions_infer_types_and_honor_trait_bounds() {
     let out = run(&["--run", &example_path("generics.ostrin")]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
-    assert_eq!(stdout(&out).lines().collect::<Vec<_>>(), ["true", "false", "7"]);
+    assert_eq!(
+        stdout(&out).lines().collect::<Vec<_>>(),
+        ["true", "false", "7"]
+    );
 }
 
 #[test]
@@ -4688,9 +7726,18 @@ fn malformed_match_patterns_are_rejected() {
     assert!(!out.status.success());
     let err = stderr(&out);
     assert!(err.contains("E1061"), "missing E1061: {err}");
-    assert!(err.contains("other"), "missing unknown field diagnostic: {err}");
-    assert!(err.contains("Pattern literal has type 'Bool'"), "missing nested type diagnostic: {err}");
-    assert!(err.contains("carries data"), "missing bare constructor diagnostic: {err}");
+    assert!(
+        err.contains("other"),
+        "missing unknown field diagnostic: {err}"
+    );
+    assert!(
+        err.contains("Pattern literal has type 'Bool'"),
+        "missing nested type diagnostic: {err}"
+    );
+    assert!(
+        err.contains("carries data"),
+        "missing bare constructor diagnostic: {err}"
+    );
 }
 
 #[test]
@@ -4709,7 +7756,10 @@ fn nested_generic_match_reports_missing_inner_combination() {
     assert!(!out.status.success());
     let err = stderr(&out);
     assert!(err.contains("E1060"), "missing E1060: {err}");
-    assert!(err.contains("Just"), "missing partially-covered variant: {err}");
+    assert!(
+        err.contains("Just"),
+        "missing partially-covered variant: {err}"
+    );
 }
 
 #[test]
@@ -4724,9 +7774,15 @@ fn trait_required_methods_supertraits_and_signatures_are_checked() {
     let out = run(&[&example_path("traits_semantics_errors.ostrin")]);
     assert!(!out.status.success());
     let err = stderr(&out);
-    assert!(err.contains("E1050"), "missing supertrait diagnostic: {err}");
+    assert!(
+        err.contains("E1050"),
+        "missing supertrait diagnostic: {err}"
+    );
     assert!(err.contains("E1054"), "missing signature diagnostic: {err}");
-    assert!(err.contains("E1055"), "missing required-method diagnostic: {err}");
+    assert!(
+        err.contains("E1055"),
+        "missing required-method diagnostic: {err}"
+    );
 }
 
 #[test]
@@ -4734,9 +7790,18 @@ fn trait_supertraits_are_transitive_and_collisions_are_rejected() {
     let out = run(&[&example_path("traits_coherence_errors.ostrin")]);
     assert!(!out.status.success());
     let err = stderr(&out);
-    assert!(err.contains("E1050"), "missing transitive-supertrait diagnostic: {err}");
-    assert!(err.contains("Root"), "missing transitive supertrait name: {err}");
-    assert!(err.contains("E1057"), "missing inherited-method collision diagnostic: {err}");
+    assert!(
+        err.contains("E1050"),
+        "missing transitive-supertrait diagnostic: {err}"
+    );
+    assert!(
+        err.contains("Root"),
+        "missing transitive supertrait name: {err}"
+    );
+    assert!(
+        err.contains("E1057"),
+        "missing inherited-method collision diagnostic: {err}"
+    );
 }
 
 #[test]
@@ -4744,9 +7809,18 @@ fn trait_orphan_rule_rejects_foreign_trait_for_foreign_type() {
     let out = run(&[&example_path("proj_orphan/main.ostrin")]);
     assert!(!out.status.success());
     let err = stderr(&out);
-    assert!(err.contains("E1056"), "missing orphan-rule diagnostic: {err}");
-    assert!(err.contains("ForeignTrait"), "missing foreign trait name: {err}");
-    assert!(err.contains("ForeignType"), "missing foreign type name: {err}");
+    assert!(
+        err.contains("E1056"),
+        "missing orphan-rule diagnostic: {err}"
+    );
+    assert!(
+        err.contains("ForeignTrait"),
+        "missing foreign trait name: {err}"
+    );
+    assert!(
+        err.contains("ForeignType"),
+        "missing foreign type name: {err}"
+    );
 }
 
 #[test]
@@ -4759,7 +7833,10 @@ fn trait_orphan_rule_allows_local_trait_for_foreign_type() {
 fn explicit_generic_arguments_select_function_types() {
     let out = run(&["--run", &example_path("generics_explicit.ostrin")]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
-    assert_eq!(stdout(&out).lines().collect::<Vec<_>>(), ["7", "a", "Just(a)", "5 m", "1"]);
+    assert_eq!(
+        stdout(&out).lines().collect::<Vec<_>>(),
+        ["7", "a", "Just(a)", "5 m", "1"]
+    );
 }
 
 #[test]
@@ -4767,8 +7844,14 @@ fn explicit_generic_arguments_check_arity_types_and_bounds() {
     let out = run(&[&example_path("generics_explicit_errors.ostrin")]);
     assert!(!out.status.success());
     let err = stderr(&out);
-    assert!(err.contains("E1042"), "missing explicit-generic diagnostic: {err}");
-    assert!(err.contains("explicit generic argument"), "missing arity diagnostic: {err}");
+    assert!(
+        err.contains("E1042"),
+        "missing explicit-generic diagnostic: {err}"
+    );
+    assert!(
+        err.contains("explicit generic argument"),
+        "missing arity diagnostic: {err}"
+    );
     assert!(err.contains("Plain"), "missing explicit-bound type: {err}");
 }
 
@@ -4784,8 +7867,14 @@ fn generic_trait_arguments_specialize_method_signatures() {
     let out = run(&[&example_path("generic_trait_args_errors.ostrin")]);
     assert!(!out.status.success());
     let err = stderr(&out);
-    assert!(err.contains("E1054"), "missing trait-signature diagnostic: {err}");
-    assert!(err.contains("Bad.convert"), "missing implementation name: {err}");
+    assert!(
+        err.contains("E1054"),
+        "missing trait-signature diagnostic: {err}"
+    );
+    assert!(
+        err.contains("Bad.convert"),
+        "missing implementation name: {err}"
+    );
 }
 
 #[test]
@@ -4799,7 +7888,10 @@ fn transitive_trait_defaults_dispatch_through_supertraits() {
 fn applied_generic_impls_dispatch_by_record_arguments() {
     let out = run(&["--run", &example_path("generic_impl_dispatch.ostrin")]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
-    assert_eq!(stdout(&out).lines().collect::<Vec<_>>(), ["integer", "text"]);
+    assert_eq!(
+        stdout(&out).lines().collect::<Vec<_>>(),
+        ["integer", "text"]
+    );
 }
 
 #[test]
@@ -4807,7 +7899,10 @@ fn applied_generic_impls_do_not_fall_back_to_another_type() {
     let out = run(&["--run", &example_path("generic_impl_dispatch_error.ostrin")]);
     assert!(!out.status.success());
     let err = stderr(&out);
-    assert!(err.contains("E1042"), "missing static method diagnostic: {err}");
+    assert!(
+        err.contains("E1042"),
+        "missing static method diagnostic: {err}"
+    );
     assert!(
         err.contains("Type 'Box<String>' has no method 'label'"),
         "missing applied type/method in diagnostic: {err}"
@@ -4819,7 +7914,10 @@ fn concrete_method_arguments_are_checked_before_runtime() {
     let out = run(&[&example_path("concrete_method_errors.ostrin")]);
     assert!(!out.status.success());
     let err = stderr(&out);
-    assert!(err.contains("E1042"), "missing static argument diagnostic: {err}");
+    assert!(
+        err.contains("E1042"),
+        "missing static argument diagnostic: {err}"
+    );
     assert!(
         err.contains("Argument for 'add' expects 'Int', got 'String'"),
         "missing method argument types in diagnostic: {err}"
@@ -4831,7 +7929,10 @@ fn trait_default_bodies_are_type_checked() {
     let out = run(&[&example_path("trait_default_errors.ostrin")]);
     assert!(!out.status.success());
     let err = stderr(&out);
-    assert!(err.contains("E1041"), "missing default-body type diagnostic: {err}");
+    assert!(
+        err.contains("E1041"),
+        "missing default-body type diagnostic: {err}"
+    );
     assert!(
         err.contains("Broken.value") && err.contains("Int") && err.contains("String"),
         "missing default method and types in diagnostic: {err}"
@@ -4843,7 +7944,10 @@ fn impl_generic_bounds_are_honored_for_applied_methods() {
     let out = run(&[&example_path("impl_bounds_errors.ostrin")]);
     assert!(!out.status.success());
     let err = stderr(&out);
-    assert!(err.contains("E1042"), "missing impl-bound method diagnostic: {err}");
+    assert!(
+        err.contains("E1042"),
+        "missing impl-bound method diagnostic: {err}"
+    );
     assert!(
         err.contains("Box<Plain>") && err.contains("no method 'label'"),
         "missing rejected applied type/method in diagnostic: {err}"
@@ -4854,14 +7958,20 @@ fn impl_generic_bounds_are_honored_for_applied_methods() {
 fn applied_generic_enum_impls_dispatch_by_constructor_arguments() {
     let out = run(&["--run", &example_path("generic_enum_dispatch.ostrin")]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
-    assert_eq!(stdout(&out).lines().collect::<Vec<_>>(), ["integer enum", "text enum"]);
+    assert_eq!(
+        stdout(&out).lines().collect::<Vec<_>>(),
+        ["integer enum", "text enum"]
+    );
 }
 
 #[test]
 fn quantity_impls_dispatch_by_dimension_argument() {
     let out = run(&["--run", &example_path("quantity_impl_dispatch.ostrin")]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
-    assert_eq!(stdout(&out).lines().collect::<Vec<_>>(), ["length quantity", "time quantity"]);
+    assert_eq!(
+        stdout(&out).lines().collect::<Vec<_>>(),
+        ["length quantity", "time quantity"]
+    );
 }
 
 #[test]
@@ -4892,7 +8002,11 @@ fn parser_recovers_and_reports_every_syntax_error() {
     let out = run(&[&example_path("parse_errors.ostrin")]);
     assert!(!out.status.success());
     let err = stderr(&out);
-    assert_eq!(err.matches("parse error").count(), 3, "expected exactly 3 parse errors: {err}");
+    assert_eq!(
+        err.matches("parse error").count(),
+        3,
+        "expected exactly 3 parse errors: {err}"
+    );
 }
 
 #[test]
@@ -4904,7 +8018,8 @@ fn path_dependency_resolves_and_runs() {
 
 #[test]
 fn transitive_path_dependencies_resolve_and_lock_reproducibly() {
-    let root = std::env::temp_dir().join(format!("ostrin_transitive_package_{}", std::process::id()));
+    let root =
+        std::env::temp_dir().join(format!("ostrin_transitive_package_{}", std::process::id()));
     let _ = fs::remove_dir_all(&root);
     let project = root.join("project");
     let shared = root.join("shared");
@@ -4918,7 +8033,11 @@ fn transitive_path_dependencies_resolve_and_lock_reproducibly() {
         "[package]\nname = \"nested\"\nversion = \"0.2.0\"\nentry = \"value.ostrin\"\n",
     )
     .unwrap();
-    fs::write(nested.join("value.ostrin"), "pub fn text() -> String { \"transitive\" }\n").unwrap();
+    fs::write(
+        nested.join("value.ostrin"),
+        "pub fn text() -> String { \"transitive\" }\n",
+    )
+    .unwrap();
     fs::write(
         shared.join("ostrin.toml"),
         "[package]\nname = \"shared\"\nversion = \"0.1.0\"\nentry = \"helpers.ostrin\"\n\n[dependencies]\nnested_utils = { path = \"../nested\" }\n",
@@ -4942,17 +8061,37 @@ fn transitive_path_dependencies_resolve_and_lock_reproducibly() {
 
     let project_text = project.display().to_string();
     let first = run(&["--run", "--project", &project_text]);
-    assert!(first.status.success(), "transitive package run failed: {}", stderr(&first));
+    assert!(
+        first.status.success(),
+        "transitive package run failed: {}",
+        stderr(&first)
+    );
     assert_eq!(stdout(&first).trim(), "transitive");
 
     let lockfile = fs::read_to_string(project.join("ostrin.lock")).unwrap();
-    assert!(lockfile.contains("name = \"shared\""), "lockfile omitted direct package: {lockfile}");
-    assert!(lockfile.contains("name = \"nested_utils\""), "lockfile omitted transitive package: {lockfile}");
-    assert!(!lockfile.contains(&root.display().to_string()), "lockfile should keep transitive paths portable: {lockfile}");
+    assert!(
+        lockfile.contains("name = \"shared\""),
+        "lockfile omitted direct package: {lockfile}"
+    );
+    assert!(
+        lockfile.contains("name = \"nested_utils\""),
+        "lockfile omitted transitive package: {lockfile}"
+    );
+    assert!(
+        !lockfile.contains(&root.display().to_string()),
+        "lockfile should keep transitive paths portable: {lockfile}"
+    );
     let locked = run(&["--locked", "--run", "--project", &project_text]);
-    assert!(locked.status.success(), "locked transitive package run failed: {}", stderr(&locked));
+    assert!(
+        locked.status.success(),
+        "locked transitive package run failed: {}",
+        stderr(&locked)
+    );
     assert_eq!(stdout(&locked).trim(), "transitive");
-    assert_eq!(fs::read_to_string(project.join("ostrin.lock")).unwrap(), lockfile);
+    assert_eq!(
+        fs::read_to_string(project.join("ostrin.lock")).unwrap(),
+        lockfile
+    );
     let _ = fs::remove_dir_all(&root);
 }
 
@@ -4964,11 +8103,24 @@ fn native_backend_compiles_project_manifest_and_path_dependency() {
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "package compile failed: {}", stderr(&compile));
-    let native = Command::new(&exe).output().expect("compiled package should run");
+    assert!(
+        compile.status.success(),
+        "package compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("compiled package should run");
     let _ = fs::remove_file(&exe);
-    assert!(native.status.success(), "compiled package exited unsuccessfully: {}", stderr(&native));
-    assert_eq!(String::from_utf8_lossy(&native.stdout).trim(), "hola, Ostrin");
+    assert!(
+        native.status.success(),
+        "compiled package exited unsuccessfully: {}",
+        stderr(&native)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).trim(),
+        "hola, Ostrin"
+    );
 }
 
 #[test]
@@ -4978,25 +8130,44 @@ fn project_manifest_selects_entry_and_writes_portable_lockfile() {
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     assert_eq!(stdout(&out).trim(), "hola, Ostrin");
 
-    let lockfile = fs::read_to_string(format!("{project}/ostrin.lock")).expect("project build should write ostrin.lock");
-    assert!(lockfile.contains("lockfile_version = 1"), "lockfile should declare its schema: {lockfile}");
-    assert!(lockfile.contains("source = \"path\""), "lockfile should identify path dependencies: {lockfile}");
-    assert!(lockfile.contains("package_version = \"0.0.0\""), "lockfile should record the dependency version: {lockfile}");
+    let lockfile = fs::read_to_string(format!("{project}/ostrin.lock"))
+        .expect("project build should write ostrin.lock");
+    assert!(
+        lockfile.contains("lockfile_version = 1"),
+        "lockfile should declare its schema: {lockfile}"
+    );
+    assert!(
+        lockfile.contains("source = \"path\""),
+        "lockfile should identify path dependencies: {lockfile}"
+    );
+    assert!(
+        lockfile.contains("package_version = \"0.0.0\""),
+        "lockfile should record the dependency version: {lockfile}"
+    );
     assert!(
         lockfile.lines().any(|line| {
             line.strip_prefix("content_sha256 = \"")
                 .and_then(|value| value.strip_suffix('"'))
-                .is_some_and(|hash| hash.len() == 64 && hash.chars().all(|ch| ch.is_ascii_hexdigit()))
+                .is_some_and(|hash| {
+                    hash.len() == 64 && hash.chars().all(|ch| ch.is_ascii_hexdigit())
+                })
         }),
         "lockfile should record a SHA-256 content hash: {lockfile}"
     );
-    assert!(lockfile.contains("resolved_path = \"../shared_lib\""), "lockfile should use a project-relative path: {lockfile}");
-    assert!(!lockfile.contains("Lenguaje nuevo"), "lockfile should not embed this checkout's absolute path: {lockfile}");
+    assert!(
+        lockfile.contains("resolved_path = \"../shared_lib\""),
+        "lockfile should use a project-relative path: {lockfile}"
+    );
+    assert!(
+        !lockfile.contains("Lenguaje nuevo"),
+        "lockfile should not embed this checkout's absolute path: {lockfile}"
+    );
 }
 
 #[test]
 fn locked_path_dependency_rejects_content_tampering() {
-    let root = std::env::temp_dir().join(format!("ostrin_package_integrity_{}", std::process::id()));
+    let root =
+        std::env::temp_dir().join(format!("ostrin_package_integrity_{}", std::process::id()));
     let _ = fs::remove_dir_all(&root);
     let dependency = root.join("shared");
     let project = root.join("project");
@@ -5007,7 +8178,11 @@ fn locked_path_dependency_rejects_content_tampering() {
         "[package]\nname = \"shared\"\nversion = \"0.1.0\"\nentry = \"helpers.ostrin\"\n",
     )
     .unwrap();
-    fs::write(dependency.join("helpers.ostrin"), "pub fn greet() -> String { \"before\" }\n").unwrap();
+    fs::write(
+        dependency.join("helpers.ostrin"),
+        "pub fn greet() -> String { \"before\" }\n",
+    )
+    .unwrap();
     fs::write(
         project.join("ostrin.toml"),
         "[package]\nname = \"integrity_app\"\nversion = \"0.1.0\"\nentry = \"main.ostrin\"\n\n[dependencies]\nshared = { path = \"../shared\" }\n",
@@ -5021,16 +8196,37 @@ fn locked_path_dependency_rejects_content_tampering() {
 
     let project_text = project.display().to_string();
     let first = run(&["--run", "--project", &project_text]);
-    assert!(first.status.success(), "initial package run failed: {}", stderr(&first));
+    assert!(
+        first.status.success(),
+        "initial package run failed: {}",
+        stderr(&first)
+    );
     let locked = run(&["--locked", "--run", "--project", &project_text]);
-    assert!(locked.status.success(), "locked package run failed: {}", stderr(&locked));
-    fs::write(dependency.join("helpers.ostrin"), "pub fn greet() -> String { \"after\" }\n").unwrap();
+    assert!(
+        locked.status.success(),
+        "locked package run failed: {}",
+        stderr(&locked)
+    );
+    fs::write(
+        dependency.join("helpers.ostrin"),
+        "pub fn greet() -> String { \"after\" }\n",
+    )
+    .unwrap();
 
     let tampered = run(&["--locked", "--run", "--project", &project_text]);
-    assert!(!tampered.status.success(), "locked package run should reject source tampering");
+    assert!(
+        !tampered.status.success(),
+        "locked package run should reject source tampering"
+    );
     let error = stderr(&tampered);
-    assert!(error.contains("content hash changed"), "unexpected integrity error: {error}");
-    assert!(error.contains("shared"), "integrity error should name the dependency: {error}");
+    assert!(
+        error.contains("content hash changed"),
+        "unexpected integrity error: {error}"
+    );
+    assert!(
+        error.contains("shared"),
+        "integrity error should name the dependency: {error}"
+    );
     let _ = fs::remove_dir_all(&root);
 }
 
@@ -5039,7 +8235,10 @@ fn git_dependency_fails_clearly_without_network_access() {
     let out = run(&[&example_path("pkg_git_test/main.ostrin")]);
     assert!(!out.status.success());
     let err = stderr(&out);
-    assert!(err.contains("does not fetch git dependencies automatically"), "unexpected message: {err}");
+    assert!(
+        err.contains("does not fetch git dependencies automatically"),
+        "unexpected message: {err}"
+    );
 }
 
 #[test]
@@ -5061,15 +8260,43 @@ fn git_dependency_can_be_fetched_only_with_explicit_flag() {
     )
     .unwrap();
     let dependency_text = dependency.display().to_string().replace('\\', "/");
-    let init = Command::new("git").args(["-C", &dependency_text, "init"]).output().unwrap();
-    assert!(init.status.success(), "git init failed: {}", String::from_utf8_lossy(&init.stderr));
-    let add = Command::new("git").args(["-C", &dependency_text, "add", "."]).output().unwrap();
-    assert!(add.status.success(), "git add failed: {}", String::from_utf8_lossy(&add.stderr));
-    let commit = Command::new("git")
-        .args(["-C", &dependency_text, "-c", "user.name=Ostrin Tests", "-c", "user.email=ostrinc-tests@example.invalid", "commit", "-m", "initial"])
+    let init = Command::new("git")
+        .args(["-C", &dependency_text, "init"])
         .output()
         .unwrap();
-    assert!(commit.status.success(), "git commit failed: {}", String::from_utf8_lossy(&commit.stderr));
+    assert!(
+        init.status.success(),
+        "git init failed: {}",
+        String::from_utf8_lossy(&init.stderr)
+    );
+    let add = Command::new("git")
+        .args(["-C", &dependency_text, "add", "."])
+        .output()
+        .unwrap();
+    assert!(
+        add.status.success(),
+        "git add failed: {}",
+        String::from_utf8_lossy(&add.stderr)
+    );
+    let commit = Command::new("git")
+        .args([
+            "-C",
+            &dependency_text,
+            "-c",
+            "user.name=Ostrin Tests",
+            "-c",
+            "user.email=ostrinc-tests@example.invalid",
+            "commit",
+            "-m",
+            "initial",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        commit.status.success(),
+        "git commit failed: {}",
+        String::from_utf8_lossy(&commit.stderr)
+    );
 
     let git_url = format!("file:///{dependency_text}");
     fs::write(
@@ -5087,16 +8314,37 @@ fn git_dependency_can_be_fetched_only_with_explicit_flag() {
 
     let project_text = project.display().to_string();
     let out = run(&["--fetch", "--run", "--project", &project_text]);
-    assert!(out.status.success(), "explicit Git fetch failed: {}", stderr(&out));
+    assert!(
+        out.status.success(),
+        "explicit Git fetch failed: {}",
+        stderr(&out)
+    );
     assert_eq!(stdout(&out).trim(), "git package");
     let lockfile = fs::read_to_string(project.join("ostrin.lock")).unwrap();
-    assert!(lockfile.contains("source = \"git\""), "lockfile lost Git source: {lockfile}");
-    assert!(lockfile.contains("requested = \"HEAD\""), "lockfile lost requested revision: {lockfile}");
-    assert!(lockfile.lines().any(|line| line.starts_with("resolved_rev = \"") && line.len() >= 56), "lockfile did not record a resolved commit: {lockfile}");
-    assert!(lockfile.contains("resolved_path = \".ostrin/packages/"), "lockfile did not use the project cache: {lockfile}");
+    assert!(
+        lockfile.contains("source = \"git\""),
+        "lockfile lost Git source: {lockfile}"
+    );
+    assert!(
+        lockfile.contains("requested = \"HEAD\""),
+        "lockfile lost requested revision: {lockfile}"
+    );
+    assert!(
+        lockfile
+            .lines()
+            .any(|line| line.starts_with("resolved_rev = \"") && line.len() >= 56),
+        "lockfile did not record a resolved commit: {lockfile}"
+    );
+    assert!(
+        lockfile.contains("resolved_path = \".ostrin/packages/"),
+        "lockfile did not use the project cache: {lockfile}"
+    );
     let resolved_path = lockfile
         .lines()
-        .find_map(|line| line.strip_prefix("resolved_path = \"").and_then(|value| value.strip_suffix('"')))
+        .find_map(|line| {
+            line.strip_prefix("resolved_path = \"")
+                .and_then(|value| value.strip_suffix('"'))
+        })
         .expect("Git lockfile should contain a resolved path");
     let cache_path = project.join(resolved_path);
     let cache_path_text = cache_path.display().to_string();
@@ -5104,19 +8352,46 @@ fn git_dependency_can_be_fetched_only_with_explicit_flag() {
         .args(["-C", &cache_path_text, "remote", "remove", "origin"])
         .output()
         .unwrap();
-    assert!(remove_remote.status.success(), "could not make the cache offline: {}", String::from_utf8_lossy(&remove_remote.stderr));
+    assert!(
+        remove_remote.status.success(),
+        "could not make the cache offline: {}",
+        String::from_utf8_lossy(&remove_remote.stderr)
+    );
     let locked = run(&["--locked", "--run", "--project", &project_text]);
-    assert!(locked.status.success(), "locked build should use the cached commit: {}", stderr(&locked));
+    assert!(
+        locked.status.success(),
+        "locked build should use the cached commit: {}",
+        stderr(&locked)
+    );
     assert_eq!(stdout(&locked).trim(), "git package");
-    assert_eq!(fs::read_to_string(project.join("ostrin.lock")).unwrap(), lockfile, "--locked must not rewrite the lockfile");
+    assert_eq!(
+        fs::read_to_string(project.join("ostrin.lock")).unwrap(),
+        lockfile,
+        "--locked must not rewrite the lockfile"
+    );
     let normal = run(&["--run", "--project", &project_text]);
-    assert!(normal.status.success(), "normal build should reuse a valid lockfile without network: {}", stderr(&normal));
+    assert!(
+        normal.status.success(),
+        "normal build should reuse a valid lockfile without network: {}",
+        stderr(&normal)
+    );
     let _ = fs::remove_dir_all(&cache_path);
     let missing = run(&["--locked", "--run", "--project", &project_text]);
-    assert!(!missing.status.success(), "--locked should reject a missing cached checkout");
-    assert!(stderr(&missing).contains("checkout") && stderr(&missing).contains("missing"), "unexpected missing-cache error: {}", stderr(&missing));
+    assert!(
+        !missing.status.success(),
+        "--locked should reject a missing cached checkout"
+    );
+    assert!(
+        stderr(&missing).contains("checkout") && stderr(&missing).contains("missing"),
+        "unexpected missing-cache error: {}",
+        stderr(&missing)
+    );
     let restored = run(&["--fetch", "--run", "--project", &project_text]);
-    assert!(restored.status.success(), "--fetch should restore a missing locked checkout: {}", stderr(&restored));
+    assert!(
+        restored.status.success(),
+        "--fetch should restore a missing locked checkout: {}",
+        stderr(&restored)
+    );
     let _ = fs::remove_dir_all(&root);
 }
 
@@ -5157,7 +8432,11 @@ fn native_backend_generic_records_and_enums_match_the_interpreter() {
         "traits.ostrin",
     ] {
         let interpreted = run(&["--run", &example_path(file)]);
-        assert!(interpreted.status.success(), "interpreter failed on {file}: {}", stderr(&interpreted));
+        assert!(
+            interpreted.status.success(),
+            "interpreter failed on {file}: {}",
+            stderr(&interpreted)
+        );
         let expected = stdout(&interpreted).replace("\r\n", "\n");
 
         let exe = temp_artifact(&format!("{file}.exe"));
@@ -5165,27 +8444,57 @@ fn native_backend_generic_records_and_enums_match_the_interpreter() {
         if skip_if_no_c_compiler(&compile) {
             return;
         }
-        assert!(compile.status.success(), "compile failed for {file}: {}", stderr(&compile));
+        assert!(
+            compile.status.success(),
+            "compile failed for {file}: {}",
+            stderr(&compile)
+        );
         let native = Command::new(&exe).output().unwrap();
         let _ = fs::remove_file(&exe);
-        assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected, "output mismatch for {file}");
+        assert_eq!(
+            String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+            expected,
+            "output mismatch for {file}"
+        );
     }
 }
 
 #[test]
 fn test_mode_runs_test_functions_and_reports_failures() {
     let ok = run(&["--test", &example_path("testing.ostrin")]);
-    assert!(ok.status.success(), "all tests should pass: {}", stdout(&ok));
+    assert!(
+        ok.status.success(),
+        "all tests should pass: {}",
+        stdout(&ok)
+    );
     let text = stdout(&ok);
-    assert!(text.contains("test test_add ... ok") && text.contains("3 passed; 0 failed"), "unexpected output: {text}");
+    assert!(
+        text.contains("test test_add ... ok") && text.contains("3 passed; 0 failed"),
+        "unexpected output: {text}"
+    );
 
     let bad = run(&["--test", &example_path("testing_failure.ostrin")]);
-    assert!(!bad.status.success(), "failing tests must give a non-zero exit code");
+    assert!(
+        !bad.status.success(),
+        "failing tests must give a non-zero exit code"
+    );
     let text = stdout(&bad);
-    assert!(text.contains("test test_passes ... ok"), "unexpected output: {text}");
-    assert!(text.contains("test test_fails ... FAILED (assertion failed: left = 4, right = 5)"), "unexpected output: {text}");
-    assert!(text.contains("test test_condition_fails ... FAILED (assertion failed)"), "unexpected output: {text}");
-    assert!(text.contains("1 passed; 2 failed"), "unexpected output: {text}");
+    assert!(
+        text.contains("test test_passes ... ok"),
+        "unexpected output: {text}"
+    );
+    assert!(
+        text.contains("test test_fails ... FAILED (assertion failed: left = 4, right = 5)"),
+        "unexpected output: {text}"
+    );
+    assert!(
+        text.contains("test test_condition_fails ... FAILED (assertion failed)"),
+        "unexpected output: {text}"
+    );
+    assert!(
+        text.contains("1 passed; 2 failed"),
+        "unexpected output: {text}"
+    );
 }
 
 #[test]
@@ -5196,19 +8505,31 @@ fn fixed_width_integer_overflow_is_an_error_in_both_backends() {
     let file = example_path("sized_ints_overflow.ostrin");
     let interpreted = run(&["--run", &file]);
     assert!(!interpreted.status.success());
-    assert!(stdout(&interpreted).replace("\r\n", "\n").starts_with("255\n"));
-    assert!(stderr(&interpreted).contains("integer overflow"), "unexpected stderr: {}", stderr(&interpreted));
+    assert!(stdout(&interpreted)
+        .replace("\r\n", "\n")
+        .starts_with("255\n"));
+    assert!(
+        stderr(&interpreted).contains("integer overflow"),
+        "unexpected stderr: {}",
+        stderr(&interpreted)
+    );
 
     let exe = temp_artifact("overflow.exe");
     let compile = run(&["--compile", "--out", &exe, &file]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
     let native = Command::new(&exe).output().unwrap();
     let _ = fs::remove_file(&exe);
     assert!(!native.status.success());
-    assert!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n").starts_with("255\n"));
+    assert!(String::from_utf8_lossy(&native.stdout)
+        .replace("\r\n", "\n")
+        .starts_with("255\n"));
     assert!(String::from_utf8_lossy(&native.stderr).contains("integer overflow"));
 }
 
@@ -5219,19 +8540,31 @@ fn array_shape_mismatch_is_a_runtime_error_in_both_backends() {
     let file = example_path("arrays_shape_mismatch.ostrin");
     let interpreted = run(&["--run", &file]);
     assert!(!interpreted.status.success());
-    assert!(stdout(&interpreted).replace("\r\n", "\n").starts_with("[2, 3]\n"));
-    assert!(stderr(&interpreted).contains("shape mismatch"), "unexpected stderr: {}", stderr(&interpreted));
+    assert!(stdout(&interpreted)
+        .replace("\r\n", "\n")
+        .starts_with("[2, 3]\n"));
+    assert!(
+        stderr(&interpreted).contains("shape mismatch"),
+        "unexpected stderr: {}",
+        stderr(&interpreted)
+    );
 
     let exe = temp_artifact("shape_mismatch.exe");
     let compile = run(&["--compile", "--out", &exe, &file]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
     let native = Command::new(&exe).output().unwrap();
     let _ = fs::remove_file(&exe);
     assert!(!native.status.success());
-    assert!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n").starts_with("[2, 3]\n"));
+    assert!(String::from_utf8_lossy(&native.stdout)
+        .replace("\r\n", "\n")
+        .starts_with("[2, 3]\n"));
     assert!(String::from_utf8_lossy(&native.stderr).contains("shape mismatch"));
 }
 
@@ -5242,19 +8575,31 @@ fn empty_mask_is_a_runtime_error_in_both_backends() {
     let file = example_path("array_empty_mask.ostrin");
     let interpreted = run(&["--run", &file]);
     assert!(!interpreted.status.success());
-    assert!(stdout(&interpreted).replace("\r\n", "\n").starts_with("[1, 2, 3]\n"));
-    assert!(stderr(&interpreted).contains("selects no elements"), "unexpected stderr: {}", stderr(&interpreted));
+    assert!(stdout(&interpreted)
+        .replace("\r\n", "\n")
+        .starts_with("[1, 2, 3]\n"));
+    assert!(
+        stderr(&interpreted).contains("selects no elements"),
+        "unexpected stderr: {}",
+        stderr(&interpreted)
+    );
 
     let exe = temp_artifact("empty_mask.exe");
     let compile = run(&["--compile", "--out", &exe, &file]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
-    assert!(compile.status.success(), "compile failed: {}", stderr(&compile));
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
     let native = Command::new(&exe).output().unwrap();
     let _ = fs::remove_file(&exe);
     assert!(!native.status.success());
-    assert!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n").starts_with("[1, 2, 3]\n"));
+    assert!(String::from_utf8_lossy(&native.stdout)
+        .replace("\r\n", "\n")
+        .starts_with("[1, 2, 3]\n"));
     assert!(String::from_utf8_lossy(&native.stderr).contains("selects no elements"));
 }
 
@@ -5262,7 +8607,11 @@ fn empty_mask_is_a_runtime_error_in_both_backends() {
 fn table_library_module_runs_identically_in_both_backends() {
     let entry = example_path("data_project/app/main.ostrin");
     let interpreted = run(&["--run", &entry]);
-    assert!(interpreted.status.success(), "stderr: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "stderr: {}",
+        stderr(&interpreted)
+    );
     let exe = temp_artifact("table_lib.exe");
     let compiled = run(&["--compile", "--out", &exe, &entry]);
     if skip_if_no_c_compiler(&compiled) {
@@ -5272,15 +8621,26 @@ fn table_library_module_runs_identically_in_both_backends() {
     let native = Command::new(&exe).output().expect("run native binary");
     let _ = fs::remove_file(&exe);
     let native_text = String::from_utf8_lossy(&native.stdout).to_string();
-    assert_eq!(stdout(&interpreted).lines().collect::<Vec<_>>(), native_text.lines().collect::<Vec<_>>());
-    assert!(stdout(&interpreted).contains("Cusco: n=2 media=11"), "unexpected output: {}", stdout(&interpreted));
+    assert_eq!(
+        stdout(&interpreted).lines().collect::<Vec<_>>(),
+        native_text.lines().collect::<Vec<_>>()
+    );
+    assert!(
+        stdout(&interpreted).contains("Cusco: n=2 media=11"),
+        "unexpected output: {}",
+        stdout(&interpreted)
+    );
 }
 
 #[test]
 fn svg_plot_package_runs_identically_in_both_backends() {
     let entry = example_path("plot_project/app/main.ostrin");
     let interpreted = run(&["--run", &entry]);
-    assert!(interpreted.status.success(), "stderr: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "stderr: {}",
+        stderr(&interpreted)
+    );
     let exe = temp_artifact("plot_lib.exe");
     let compiled = run(&["--compile", "--out", &exe, &entry]);
     if skip_if_no_c_compiler(&compiled) {
@@ -5290,18 +8650,40 @@ fn svg_plot_package_runs_identically_in_both_backends() {
     let native = Command::new(&exe).output().expect("run native binary");
     let _ = fs::remove_file(&exe);
     let native_text = String::from_utf8_lossy(&native.stdout).to_string();
-    assert_eq!(stdout(&interpreted).lines().collect::<Vec<_>>(), native_text.lines().collect::<Vec<_>>());
-    assert!(stdout(&interpreted).contains("<polyline"), "expected an SVG polyline: {}", stdout(&interpreted));
+    assert_eq!(
+        stdout(&interpreted).lines().collect::<Vec<_>>(),
+        native_text.lines().collect::<Vec<_>>()
+    );
+    assert!(
+        stdout(&interpreted).contains("<polyline"),
+        "expected an SVG polyline: {}",
+        stdout(&interpreted)
+    );
 }
 
 #[test]
 fn autodiff_package_runs_identically_in_both_backends() {
     let entry = example_path("autodiff_project/app/main.ostrin");
     let interpreted = run(&["--run", &entry]);
-    assert!(interpreted.status.success(), "stderr: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "stderr: {}",
+        stderr(&interpreted)
+    );
     let text = stdout(&interpreted);
     // f(x) = x^3 - 2x - 5: f(2) = -1, f'(2) = 10; Newton converges to 2.0945514815423265.
-    assert_eq!(text.lines().collect::<Vec<_>>(), ["0.25", "-1", "10", "1.58448345995801", "-51", "50", "2.0945514815423265"]);
+    assert_eq!(
+        text.lines().collect::<Vec<_>>(),
+        [
+            "0.25",
+            "-1",
+            "10",
+            "1.58448345995801",
+            "-51",
+            "50",
+            "2.0945514815423265"
+        ]
+    );
     let exe = temp_artifact("autodiff_lib.exe");
     let compiled = run(&["--compile", "--out", &exe, &entry]);
     if skip_if_no_c_compiler(&compiled) {
@@ -5311,7 +8693,10 @@ fn autodiff_package_runs_identically_in_both_backends() {
     let native = Command::new(&exe).output().expect("run native binary");
     let _ = fs::remove_file(&exe);
     let native_text = String::from_utf8_lossy(&native.stdout).to_string();
-    assert_eq!(text.lines().collect::<Vec<_>>(), native_text.lines().collect::<Vec<_>>());
+    assert_eq!(
+        text.lines().collect::<Vec<_>>(),
+        native_text.lines().collect::<Vec<_>>()
+    );
 }
 
 #[test]
@@ -5332,9 +8717,14 @@ fn function_typed_parameters_shadow_global_functions() {
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     assert_eq!(stdout(&out).replace("\r\n", "\n"), "20\n5\n6\n");
 
-    let rejected = run(&["--check", &example_path("function_value_arity_errors.ostrin")]);
+    let rejected = run(&[
+        "--check",
+        &example_path("function_value_arity_errors.ostrin"),
+    ]);
     assert!(!rejected.status.success());
-    assert!(stderr(&rejected).contains("OSTRIN-E1041") || stdout(&rejected).contains("OSTRIN-E1041"));
+    assert!(
+        stderr(&rejected).contains("OSTRIN-E1041") || stdout(&rejected).contains("OSTRIN-E1041")
+    );
 }
 
 #[test]
@@ -5346,9 +8736,27 @@ fn unit_algebra_simplifies_and_converts_compound_units() {
     assert_eq!(
         lines,
         [
-            "20 m/s", "72 km/h", "15000 kg*m^2/s^2", "15 kJ", "3.5850860420650097 kcal", "735.75 kg*m/s^2",
-            "735.75 N", "14.715 kPa", "1 atm", "180 km", "45 km", "2400 m", "6 m^3", "0.25 Hz", "10800 kJ", "1",
-            "0.25 L", "127137.6 km/h^2", "0.0006666666666666666", "[0.0005, 0.001]", "2 m",
+            "20 m/s",
+            "72 km/h",
+            "15000 kg*m^2/s^2",
+            "15 kJ",
+            "3.5850860420650097 kcal",
+            "735.75 kg*m/s^2",
+            "735.75 N",
+            "14.715 kPa",
+            "1 atm",
+            "180 km",
+            "45 km",
+            "2400 m",
+            "6 m^3",
+            "0.25 Hz",
+            "10800 kJ",
+            "1",
+            "0.25 L",
+            "127137.6 km/h^2",
+            "0.0006666666666666666",
+            "[0.0005, 0.001]",
+            "2 m",
         ]
     );
 }
@@ -5358,33 +8766,57 @@ fn unit_conversions_between_dimensions_are_rejected() {
     let out = run(&["--check", &example_path("unit_conversion_errors.ostrin")]);
     assert!(!out.status.success());
     let err = stderr(&out);
-    assert!(err.contains("E1026") && err.contains("to 's', which measures Time"), "missing as diagnostic: {err}");
-    assert!(err.contains("Length/Time (Velocity)"), "missing compound target: {err}");
-    assert!(err.contains("E1024") && err.contains("(Energy)") && err.contains("(Force)"), "missing named dimensions: {err}");
+    assert!(
+        err.contains("E1026") && err.contains("to 's', which measures Time"),
+        "missing as diagnostic: {err}"
+    );
+    assert!(
+        err.contains("Length/Time (Velocity)"),
+        "missing compound target: {err}"
+    );
+    assert!(
+        err.contains("E1024") && err.contains("(Energy)") && err.contains("(Force)"),
+        "missing named dimensions: {err}"
+    );
 }
 
 /// Runs `file` with the interpreter and natively and returns the interpreter's
 /// stdout after checking both agree (`None` when no C compiler is available).
 fn interpreter_and_native_agree(file: &str) -> String {
     let interpreted = run(&["--run", &example_path(file)]);
-    assert!(interpreted.status.success(), "interpreter failed on {file}: {}", stderr(&interpreted));
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed on {file}: {}",
+        stderr(&interpreted)
+    );
     let expected = stdout(&interpreted).replace("\r\n", "\n");
     let exe = temp_artifact(&format!("{file}.exe"));
     let compile = run(&["--compile", "--out", &exe, &example_path(file)]);
     if skip_if_no_c_compiler(&compile) {
         return expected;
     }
-    assert!(compile.status.success(), "compile failed for {file}: {}", stderr(&compile));
+    assert!(
+        compile.status.success(),
+        "compile failed for {file}: {}",
+        stderr(&compile)
+    );
     let native = Command::new(&exe).output().unwrap();
     let _ = fs::remove_file(&exe);
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected, "output mismatch for {file}");
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected,
+        "output mismatch for {file}"
+    );
     expected
 }
 
 #[test]
 fn a_function_body_never_rebinds_the_callers_locals() {
     // `h = ...` in a callee used to walk up into the caller's frame.
-    assert_eq!(interpreter_and_native_agree("function_scope_isolation.ostrin"), "14\n400\n4\n1\n");
+    assert_eq!(
+        interpreter_and_native_agree("function_scope_isolation.ostrin"),
+        "14\n400\n4\n1\n"
+    );
 }
 
 #[test]
@@ -5398,7 +8830,10 @@ fn methods_accept_named_and_default_arguments() {
 
 #[test]
 fn float_literals_accept_scientific_notation() {
-    assert_eq!(interpreter_and_native_agree("scientific_literals.ostrin"), "6.02214076\n1.5\n2000\ntrue\n532 nm\n");
+    assert_eq!(
+        interpreter_and_native_agree("scientific_literals.ostrin"),
+        "6.02214076\n1.5\n2000\ntrue\n532 nm\n"
+    );
 }
 
 fn svg_lines(output: &str) -> Vec<String> {
@@ -5409,7 +8844,10 @@ fn svg_lines(output: &str) -> Vec<String> {
 fn viz_figures_label_axes_with_the_units_of_their_quantities() {
     let out = interpreter_and_native_agree("viz_units.ostrin");
     assert!(out.contains(">time [s]</text>"), "missing x unit: {out}");
-    assert!(out.contains(">speed [km/h]</text>"), "missing converted y unit: {out}");
+    assert!(
+        out.contains(">speed [km/h]</text>"),
+        "missing converted y unit: {out}"
+    );
     assert!(out.starts_with("top speed 97.91999999999999 km/h, distance 0.764 km\n<svg xmlns=\"http://www.w3.org/2000/svg\""));
 }
 
@@ -5420,10 +8858,20 @@ fn viz_layouts_keep_one_top_level_svg_element() {
     let out = run(&["--run", &example_path("viz_dashboard.ostrin")]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     let lines = svg_lines(&stdout(&out));
-    let first = lines.iter().find(|l| l.starts_with("<svg")).expect("an <svg> line");
-    assert!(first.contains("xmlns") && first.contains("width=\"960\""), "the first <svg> line is the whole figure: {first}");
+    let first = lines
+        .iter()
+        .find(|l| l.starts_with("<svg"))
+        .expect("an <svg> line");
+    assert!(
+        first.contains("xmlns") && first.contains("width=\"960\""),
+        "the first <svg> line is the whole figure: {first}"
+    );
     assert_eq!(lines.iter().filter(|l| l.as_str() == "</svg>").count(), 1);
-    assert_eq!(stdout(&out).matches("<svg").count(), 5, "four panels inside one figure");
+    assert_eq!(
+        stdout(&out).matches("<svg").count(),
+        5,
+        "four panels inside one figure"
+    );
 }
 
 #[test]
@@ -5431,10 +8879,21 @@ fn viz_3d_scenes_and_heatmaps_render_their_marks() {
     let surface = stdout(&run(&["--run", &example_path("viz_surface.ostrin")]));
     // 35 × 35 cells, two triangles each, plus the three axis panels.
     assert_eq!(surface.matches("<polygon").count(), 35 * 35 * 2 + 3);
-    assert!(surface.contains("linearGradient"), "surface colorbar missing");
+    assert!(
+        surface.contains("linearGradient"),
+        "surface colorbar missing"
+    );
     let heat = stdout(&run(&["--run", &example_path("viz_heatmap.ostrin")]));
-    assert!(heat.matches("<rect").count() > 48 * 48, "heatmap cells missing");
-    assert_eq!(heat.matches("stroke=\"#ffffff\" stroke-width=\"1.2\"").count(), 10, "ten contour levels");
+    assert!(
+        heat.matches("<rect").count() > 48 * 48,
+        "heatmap cells missing"
+    );
+    assert_eq!(
+        heat.matches("stroke=\"#ffffff\" stroke-width=\"1.2\"")
+            .count(),
+        10,
+        "ten contour levels"
+    );
 }
 
 #[test]
@@ -5466,7 +8925,12 @@ fn arrays_of_quantities_keep_one_unit_and_check_dimensions() {
     let errors = run(&["--check", &example_path("quantity_arrays_errors.ostrin")]);
     assert!(!errors.status.success());
     let err = stderr(&errors);
-    assert!(err.contains("E1024") && err.contains("Array<Quantity<Length>>") && err.contains("Array<Quantity<Time>>"), "{err}");
+    assert!(
+        err.contains("E1024")
+            && err.contains("Array<Quantity<Length>>")
+            && err.contains("Array<Quantity<Time>>"),
+        "{err}"
+    );
     assert!(err.contains("E1026") && err.contains("to 'h'"), "{err}");
 }
 
@@ -5476,14 +8940,23 @@ fn native_fresh_temporaries_are_released() {
     // receivers and concatenation operands used to stay alive until exit.
     let expected = interpreter_and_native_agree("native_memory_temporaries.ostrin");
     let exe = temp_artifact("native_memory_temporaries_leaks.exe");
-    let compile = run(&["--compile", "--leak-check", "--out", &exe, &example_path("native_memory_temporaries.ostrin")]);
+    let compile = run(&[
+        "--compile",
+        "--leak-check",
+        "--out",
+        &exe,
+        &example_path("native_memory_temporaries.ostrin"),
+    ]);
     if skip_if_no_c_compiler(&compile) {
         return;
     }
     assert!(compile.status.success(), "stderr: {}", stderr(&compile));
     let native = Command::new(&exe).output().unwrap();
     let _ = fs::remove_file(&exe);
-    assert_eq!(String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"), expected);
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
     let report = String::from_utf8_lossy(&native.stderr).to_string();
     assert!(report.contains("live_allocations=0 "), "leaked: {report}");
 }
@@ -5493,12 +8966,23 @@ fn programs_declare_their_own_units_and_dimensions() {
     let out = interpreter_and_native_agree("user_units.ostrin");
     assert_eq!(
         out.lines().collect::<Vec<_>>(),
-        ["790 coin", "3.4 gem", "1.609344 km", "3.6575999999999995 m^2", "206.84270999999998 kPa", "4.4704 m/s", "true"]
+        [
+            "790 coin",
+            "3.4 gem",
+            "1.609344 km",
+            "3.6575999999999995 m^2",
+            "206.84270999999998 kPa",
+            "4.4704 m/s",
+            "true"
+        ]
     );
     let errors = run(&["--check", &example_path("user_units_errors.ostrin")]);
     assert!(!errors.status.success());
     let err = stderr(&errors);
-    assert!(err.contains("E1024") && err.contains("Money") && err.contains("Length"), "{err}");
+    assert!(
+        err.contains("E1024") && err.contains("Money") && err.contains("Length"),
+        "{err}"
+    );
     assert!(err.contains("E1026") && err.contains("to 'coin'"), "{err}");
 
     // Malformed declarations are reported where they are written.
@@ -5530,9 +9014,14 @@ fn std_numeric_solves_integrates_interpolates_and_transforms() {
     let lines: Vec<&str> = text.lines().collect();
     assert_eq!(lines.len(), 18, "unexpected output: {text}");
     let number = |line: &str| -> f64 {
-        line.trim_start_matches("Ok(").trim_end_matches(')').parse().unwrap_or_else(|_| panic!("not a number: {line}"))
+        line.trim_start_matches("Ok(")
+            .trim_end_matches(')')
+            .parse()
+            .unwrap_or_else(|_| panic!("not a number: {line}"))
     };
-    let close = |line: &str, want: f64, tol: f64| assert!((number(line) - want).abs() < tol, "{line} vs {want}");
+    let close = |line: &str, want: f64, tol: f64| {
+        assert!((number(line) - want).abs() < tol, "{line} vs {want}")
+    };
     let root = 2f64.sqrt();
     close(lines[0], root, 1e-9); // bisect
     close(lines[1], root, 1e-12); // secant
@@ -5543,13 +9032,25 @@ fn std_numeric_solves_integrates_interpolates_and_transforms() {
     close(lines[6], 1.5, 1e-6); // golden-section minimum
     close(lines[7], 5.0, 1e-12); // linear interpolation
     close(lines[8], 0.5, 1e-12); // natural cubic spline, symmetric point
-    assert!(lines[9].starts_with("[0.99999999"), "rk4 after one period: {}", lines[9]);
-    assert!(lines[10].starts_with("[0.99999997"), "rk45 after one period: {}", lines[10]);
+    assert!(
+        lines[9].starts_with("[0.99999999"),
+        "rk4 after one period: {}",
+        lines[9]
+    );
+    assert!(
+        lines[10].starts_with("[0.99999997"),
+        "rk45 after one period: {}",
+        lines[10]
+    );
     assert_eq!(lines[11], "59"); // accepted rk45 steps
     close(lines[12], 1.0, 1e-9); // FFT amplitude at 5 Hz
     close(lines[13], 0.5, 1e-9); // FFT amplitude at 12 Hz
     assert_eq!(lines[14], "true"); // ifft(fft(x)) == x
-    assert!(number(lines[15]) < 0.9, "non-power-of-two DFT leaks: {}", lines[15]);
+    assert!(
+        number(lines[15]) < 0.9,
+        "non-power-of-two DFT leaks: {}",
+        lines[15]
+    );
     assert_eq!(lines[16], "[0, 0.2, 0.4]"); // odd n: bin k is k / (n dt), no Nyquist bin
     assert_eq!(lines[17], "[0, 0.25, 0.5, 0.75, 1]"); // even n ends at 1 / (2 dt)
 }
@@ -5559,16 +9060,29 @@ fn std_viz_animates_frames_with_css_only() {
     let out = run(&["--run", &example_path("viz_animation.ostrin")]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     let svg = stdout(&out);
-    assert!(svg.starts_with("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"640\" height=\"400\""));
+    assert!(
+        svg.starts_with("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"640\" height=\"400\"")
+    );
     assert_eq!(svg.matches("<g class=\"ostrin-frame").count(), 24);
-    assert!(svg.contains("animation:ostrin-frames 3000ms step-end infinite"), "8 fps × 24 frames");
+    assert!(
+        svg.contains("animation:ostrin-frames 3000ms step-end infinite"),
+        "8 fps × 24 frames"
+    );
     assert!(svg.contains("@keyframes ostrin-frames{0%{opacity:1}4.167%{opacity:0}}"));
-    assert!(svg.contains("style=\"animation-delay:2875ms\""), "last frame starts at 23 × 125 ms");
+    assert!(
+        svg.contains("style=\"animation-delay:2875ms\""),
+        "last frame starts at 23 × 125 ms"
+    );
     assert!(svg.contains("prefers-reduced-motion"));
     // Ids are renamed per frame, so frames never share a clip path.
     assert!(svg.contains("id=\"f0-") && svg.contains("id=\"f23-") && svg.contains("url(#f23-"));
     assert!(!svg.contains("<script"));
-    assert_eq!(svg.lines().filter(|line| line.starts_with("</svg>")).count(), 1);
+    assert_eq!(
+        svg.lines()
+            .filter(|line| line.starts_with("</svg>"))
+            .count(),
+        1
+    );
 }
 
 #[test]
@@ -5595,7 +9109,10 @@ fn dimension_generics_bind_inside_arrays() {
     let out = run(&["--check", &example_path("unit_generic_errors.ostrin")]);
     assert!(!out.status.success());
     let err = stderr(&out);
-    assert!(err.contains("E1042") && err.contains("Generic dimension 'X' was inferred as both"), "missing conflict: {err}");
+    assert!(
+        err.contains("E1042") && err.contains("Generic dimension 'X' was inferred as both"),
+        "missing conflict: {err}"
+    );
 }
 
 #[test]
@@ -5604,22 +9121,54 @@ fn std_viz_animates_computed_motion_with_smil() {
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     let text = stdout(&out).replace("\r\n", "\n");
     let (first, svg) = text.split_once('\n').expect("summary line, then the SVG");
-    assert!(first.ends_with("energy drift below 1e-6: true"), "rk45 must conserve energy: {first}");
-    assert!(svg.starts_with("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"560\" height=\"560\""));
+    assert!(
+        first.ends_with("energy drift below 1e-6: true"),
+        "rk45 must conserve energy: {first}"
+    );
+    assert!(
+        svg.starts_with("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"560\" height=\"560\"")
+    );
     // Fixed rod (x2, y2), moving segment (x1, y1, x2, y2), two masses (cx, cy)
     // and one trail (dash offset): every animated attribute loops over 12 s.
-    assert_eq!(svg.matches("dur=\"12s\" repeatCount=\"indefinite\"").count(), 2 + 4 + 2 + 2 + 1);
-    let values = svg.split("attributeName=\"cx\"").nth(1).and_then(|rest| rest.split("values=\"").nth(1)).expect("cx values");
+    assert_eq!(
+        svg.matches("dur=\"12s\" repeatCount=\"indefinite\"")
+            .count(),
+        2 + 4 + 2 + 2 + 1
+    );
+    let values = svg
+        .split("attributeName=\"cx\"")
+        .nth(1)
+        .and_then(|rest| rest.split("values=\"").nth(1))
+        .expect("cx values");
     let values = values.split('"').next().unwrap();
-    assert_eq!(values.split(';').count(), 721, "60 samples per second over 12 s");
-    assert!(svg.contains("pathLength=\"1000\"") && svg.contains("attributeName=\"stroke-dashoffset\""));
+    assert_eq!(
+        values.split(';').count(),
+        721,
+        "60 samples per second over 12 s"
+    );
+    assert!(
+        svg.contains("pathLength=\"1000\"") && svg.contains("attributeName=\"stroke-dashoffset\"")
+    );
     assert!(!svg.contains("<script"));
-    assert_eq!(svg.lines().filter(|line| line.starts_with("</svg>")).count(), 1);
+    assert_eq!(
+        svg.lines()
+            .filter(|line| line.starts_with("</svg>"))
+            .count(),
+        1
+    );
 
     let string = run(&["--run", &example_path("viz_string.ostrin")]);
     assert!(string.status.success(), "stderr: {}", stderr(&string));
     let text = stdout(&string);
     assert!(text.starts_with("height at the pluck: 0.29, half a period later: -0.08"));
-    let shapes = text.split("attributeName=\"d\"").nth(1).and_then(|rest| rest.split("values=\"").nth(1)).expect("d values");
-    assert_eq!(shapes.split('"').next().unwrap().split(';').count(), 91, "one path per step");
+    let shapes = text
+        .split("attributeName=\"d\"")
+        .nth(1)
+        .and_then(|rest| rest.split("values=\"").nth(1))
+        .expect("d values");
+    assert_eq!(
+        shapes.split('"').next().unwrap().split(';').count(),
+        91,
+        "one path per step"
+    );
 }

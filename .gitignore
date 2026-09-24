@@ -1,5 +1,6 @@
 # Rust build output
 /compiler/target/
+/target/
 /dist/
 
 # Editor and operating-system files

@@ -139,18 +139,48 @@ impl Checker {
         let mut variant_field_names = HashMap::new();
         let mut enum_generics = HashMap::new();
         for (enum_name, variants) in [
-            ("Option", vec![("Some", vec![Type::Named("T".to_string(), vec![])]), ("None", vec![])]),
-            ("Result", vec![("Ok", vec![Type::Named("T".to_string(), vec![])]), ("Err", vec![Type::Named("E".to_string(), vec![])]),]),
-            ("Ordering", vec![("Less", vec![]), ("Equal", vec![]), ("Greater", vec![])]),
+            (
+                "Option",
+                vec![
+                    ("Some", vec![Type::Named("T".to_string(), vec![])]),
+                    ("None", vec![]),
+                ],
+            ),
+            (
+                "Result",
+                vec![
+                    ("Ok", vec![Type::Named("T".to_string(), vec![])]),
+                    ("Err", vec![Type::Named("E".to_string(), vec![])]),
+                ],
+            ),
+            (
+                "Ordering",
+                vec![("Less", vec![]), ("Equal", vec![]), ("Greater", vec![])],
+            ),
         ] {
-            enum_variants.insert(enum_name.to_string(), variants.iter().map(|(name, _)| (*name).to_string()).collect());
+            enum_variants.insert(
+                enum_name.to_string(),
+                variants
+                    .iter()
+                    .map(|(name, _)| (*name).to_string())
+                    .collect(),
+            );
             enum_generics.insert(
                 enum_name.to_string(),
                 match enum_name {
-                    "Option" => vec![GenericParam { name: "T".to_string(), bounds: vec![] }],
+                    "Option" => vec![GenericParam {
+                        name: "T".to_string(),
+                        bounds: vec![],
+                    }],
                     "Result" => vec![
-                        GenericParam { name: "T".to_string(), bounds: vec![] },
-                        GenericParam { name: "E".to_string(), bounds: vec![] },
+                        GenericParam {
+                            name: "T".to_string(),
+                            bounds: vec![],
+                        },
+                        GenericParam {
+                            name: "E".to_string(),
+                            bounds: vec![],
+                        },
                     ],
                     _ => Vec::new(),
                 },
@@ -160,7 +190,10 @@ impl Checker {
                 variant_fields.insert((enum_name.to_string(), variant_name.to_string()), fields);
                 variant_field_names.insert(
                     (enum_name.to_string(), variant_name.to_string()),
-                    vec![None; variant_fields[&(enum_name.to_string(), variant_name.to_string())].len()],
+                    vec![
+                        None;
+                        variant_fields[&(enum_name.to_string(), variant_name.to_string())].len()
+                    ],
                 );
             }
         }
@@ -205,7 +238,10 @@ impl Checker {
         self.check_program_with_bindings(items).0
     }
 
-    pub fn check_program_with_bindings(self, items: &[Item]) -> (Vec<TypeError>, Vec<EditorBinding>) {
+    pub fn check_program_with_bindings(
+        self,
+        items: &[Item],
+    ) -> (Vec<TypeError>, Vec<EditorBinding>) {
         let (errors, bindings, _) = self.check_program_with_editor_data(items);
         (errors, bindings)
     }
@@ -220,40 +256,71 @@ impl Checker {
 
     /// Like `check_program`, but also returns the type of every expression.
     pub fn check_program_typed(self, items: &[Item]) -> TypedProgram {
-        let (errors, _, _, expr_types, call_substs, literal_kinds, node_types, call_substs_by_node) = self.check_all(items);
-        TypedProgram { errors, expr_types, call_substs, literal_kinds, node_types, call_substs_by_node }
+        let (errors, _, _, expr_types, call_substs, literal_kinds, node_types, call_substs_by_node) =
+            self.check_all(items);
+        TypedProgram {
+            errors,
+            expr_types,
+            call_substs,
+            literal_kinds,
+            node_types,
+            call_substs_by_node,
+        }
     }
 
     fn check_all(
         mut self,
         items: &[Item],
-    ) -> (Vec<TypeError>, Vec<EditorBinding>, Vec<EditorExpression>, HashMap<ExprKey, Ty>, HashMap<ExprKey, CallSubst>, HashMap<ExprKey, LitKind>, HashMap<usize, Ty>, HashMap<usize, CallSubst>) {
+    ) -> (
+        Vec<TypeError>,
+        Vec<EditorBinding>,
+        Vec<EditorExpression>,
+        HashMap<ExprKey, Ty>,
+        HashMap<ExprKey, CallSubst>,
+        HashMap<ExprKey, LitKind>,
+        HashMap<usize, Ty>,
+        HashMap<usize, CallSubst>,
+    ) {
         for item in items {
             match item {
                 Item::Enum(e) => {
-                    self.type_origins.insert(e.name.clone(), e.module_path.clone());
-                    self.enum_generics.insert(e.name.clone(), e.generics.clone());
+                    self.type_origins
+                        .insert(e.name.clone(), e.module_path.clone());
+                    self.enum_generics
+                        .insert(e.name.clone(), e.generics.clone());
                     self.enum_derives.insert(e.name.clone(), e.derives.clone());
                     self.enum_variants.insert(
                         e.name.clone(),
                         e.variants.iter().map(|v| v.name.clone()).collect(),
                     );
                     for variant in &e.variants {
-                        self.variant_owners.insert(variant.name.clone(), e.name.clone());
+                        self.variant_owners
+                            .insert(variant.name.clone(), e.name.clone());
                         self.variant_fields.insert(
                             (e.name.clone(), variant.name.clone()),
-                            variant.fields.iter().map(|field| field.ty.clone()).collect(),
+                            variant
+                                .fields
+                                .iter()
+                                .map(|field| field.ty.clone())
+                                .collect(),
                         );
                         self.variant_field_names.insert(
                             (e.name.clone(), variant.name.clone()),
-                            variant.fields.iter().map(|field| field.name.clone()).collect(),
+                            variant
+                                .fields
+                                .iter()
+                                .map(|field| field.name.clone())
+                                .collect(),
                         );
                     }
                 }
                 Item::Record(record) => {
-                    self.type_origins.insert(record.name.clone(), record.module_path.clone());
-                    self.record_generics.insert(record.name.clone(), record.generics.clone());
-                    self.record_derives.insert(record.name.clone(), record.derives.clone());
+                    self.type_origins
+                        .insert(record.name.clone(), record.module_path.clone());
+                    self.record_generics
+                        .insert(record.name.clone(), record.generics.clone());
+                    self.record_derives
+                        .insert(record.name.clone(), record.derives.clone());
                     self.record_fields.insert(
                         record.name.clone(),
                         record
@@ -277,10 +344,16 @@ impl Checker {
                 Item::Impl(im) => {
                     self.implementations.push(im.clone());
                     if let Some(trait_name) = &im.trait_name {
-                        if !self.trait_impls.insert((trait_name.clone(), im.type_name.clone())) {
+                        if !self
+                            .trait_impls
+                            .insert((trait_name.clone(), im.type_name.clone()))
+                        {
                             self.push(
                                 "E1054",
-                                format!("Duplicate implementation of '{}' for '{}'.", trait_name, im.type_name),
+                                format!(
+                                    "Duplicate implementation of '{}' for '{}'.",
+                                    trait_name, im.type_name
+                                ),
                             );
                         }
                     }
@@ -298,7 +371,10 @@ impl Checker {
                 Item::Enum(enumeration) => {
                     for variant in &enumeration.variants {
                         for field in &variant.fields {
-                            self.validate_declared_collection_type(&field.ty, &enumeration.generics);
+                            self.validate_declared_collection_type(
+                                &field.ty,
+                                &enumeration.generics,
+                            );
                         }
                     }
                 }
@@ -323,7 +399,10 @@ impl Checker {
         for item in items {
             if let Item::Function(f) = item {
                 if self.functions.contains_key(&f.name) {
-                    self.push("E1040", format!("Function '{}' is already defined.", f.name));
+                    self.push(
+                        "E1040",
+                        format!("Function '{}' is already defined.", f.name),
+                    );
                     continue;
                 }
                 self.functions.insert(
@@ -360,7 +439,16 @@ impl Checker {
             }
         }
         drop(copies);
-        (self.errors, self.editor_bindings, self.editor_expressions, self.expr_types, self.call_substs, self.literal_kinds, self.node_types, self.call_substs_by_node)
+        (
+            self.errors,
+            self.editor_bindings,
+            self.editor_expressions,
+            self.expr_types,
+            self.call_substs,
+            self.literal_kinds,
+            self.node_types,
+            self.call_substs_by_node,
+        )
     }
 
     fn check_function(&mut self, f: &FunctionDecl) {
@@ -416,7 +504,9 @@ impl Checker {
         let expected = self.resolve_type_in_context(&f.return_type);
         self.validate_collection_bounds(&expected);
         for param in &f.params {
-            let Some(default) = &param.default else { continue };
+            let Some(default) = &param.default else {
+                continue;
+            };
             let actual = self.infer_expr(default, &mut scope);
             let declared = self.resolve_type_in_context(&param.ty);
             if !matches!(declared, Ty::Generic(_)) && !compatible(&declared, &actual) {
@@ -471,7 +561,9 @@ impl Checker {
         let extra_bounds = HashMap::from([("Self".to_string(), self_bounds)]);
 
         for method in &trait_decl.methods {
-            let Some(body) = &method.default_body else { continue };
+            let Some(body) = &method.default_body else {
+                continue;
+            };
             let mut generics = trait_decl.generics.clone();
             generics.extend(method.generics.clone());
             let function = FunctionDecl {
@@ -496,7 +588,10 @@ impl Checker {
             generics.extend(method.generics);
             method.generics = generics;
         }
-        let owner = Type::Named(implementation.type_name.clone(), implementation.type_args.clone());
+        let owner = Type::Named(
+            implementation.type_name.clone(),
+            implementation.type_args.clone(),
+        );
         for param in &mut method.params {
             replace_self_type_with_type(&mut param.ty, &owner);
         }
@@ -521,12 +616,17 @@ impl Checker {
 
     fn validate_impl(&mut self, implementation: &ImplDecl) {
         self.validate_generic_bounds(&implementation.generics, "impl");
-        let Some(trait_name) = &implementation.trait_name else { return };
+        let Some(trait_name) = &implementation.trait_name else {
+            return;
+        };
         let trait_decl = self.traits.get(trait_name).cloned();
         if trait_decl.is_none() && !is_builtin_trait(trait_name) {
             self.push(
                 "E1054",
-                format!("Trait '{}' is not declared and is not a standard trait.", trait_name),
+                format!(
+                    "Trait '{}' is not declared and is not a standard trait.",
+                    trait_name
+                ),
             );
             return;
         }
@@ -547,13 +647,21 @@ impl Checker {
         let trait_methods = trait_decl
             .methods
             .iter()
-            .map(|method| specialize_trait_method(method, &trait_decl.generics, &implementation.trait_args))
+            .map(|method| {
+                specialize_trait_method(method, &trait_decl.generics, &implementation.trait_args)
+            })
             .collect::<Vec<_>>();
 
         let mut supertraits = Vec::new();
         let mut visiting = Vec::new();
         let mut seen = HashSet::new();
-        collect_supertraits(trait_name, &self.traits, &mut visiting, &mut seen, &mut supertraits);
+        collect_supertraits(
+            trait_name,
+            &self.traits,
+            &mut visiting,
+            &mut seen,
+            &mut supertraits,
+        );
         for supertrait in &supertraits {
             if !self
                 .trait_impls
@@ -570,7 +678,12 @@ impl Checker {
         }
 
         for required in &trait_methods {
-            if required.default_body.is_none() && !implementation.methods.iter().any(|method| method.name == required.name) {
+            if required.default_body.is_none()
+                && !implementation
+                    .methods
+                    .iter()
+                    .any(|method| method.name == required.name)
+            {
                 self.push(
                     "E1055",
                     format!(
@@ -582,7 +695,10 @@ impl Checker {
         }
 
         for method in &implementation.methods {
-            if let Some(expected) = trait_methods.iter().find(|expected| expected.name == method.name) {
+            if let Some(expected) = trait_methods
+                .iter()
+                .find(|expected| expected.name == method.name)
+            {
                 if !impl_method_signature_matches(expected, method, &implementation.type_name) {
                     self.push(
                         "E1054",
@@ -599,7 +715,10 @@ impl Checker {
     fn validate_generic_bounds(&mut self, generics: &[GenericParam], owner: &str) {
         for generic in generics {
             for bound in &generic.bounds {
-                if bound != "Dimension" && !self.traits.contains_key(bound) && !is_builtin_trait(bound) {
+                if bound != "Dimension"
+                    && !self.traits.contains_key(bound)
+                    && !is_builtin_trait(bound)
+                {
                     self.push(
                         "E1054",
                         format!(
@@ -648,13 +767,18 @@ impl Checker {
         if has_cycle {
             self.push(
                 "E1057",
-                format!("Trait inheritance cycle detected involving '{}'.", trait_decl.name),
+                format!(
+                    "Trait inheritance cycle detected involving '{}'.",
+                    trait_decl.name
+                ),
             );
         }
 
         let mut methods: HashMap<String, (TraitMethodSig, String)> = HashMap::new();
         for source_name in closure {
-            let Some(source) = self.traits.get(&source_name).cloned() else { continue };
+            let Some(source) = self.traits.get(&source_name).cloned() else {
+                continue;
+            };
             for method in source.methods {
                 if let Some((previous, previous_source)) = methods.get(&method.name) {
                     if previous_source == &source_name {
@@ -681,9 +805,13 @@ impl Checker {
         }
     }
 
-    fn impl_respects_coherence(&self, implementation: &ImplDecl, trait_decl: Option<&TraitDecl>) -> bool {
-        let trait_is_local = trait_decl
-            .is_some_and(|decl| decl.module_path == implementation.module_path);
+    fn impl_respects_coherence(
+        &self,
+        implementation: &ImplDecl,
+        trait_decl: Option<&TraitDecl>,
+    ) -> bool {
+        let trait_is_local =
+            trait_decl.is_some_and(|decl| decl.module_path == implementation.module_path);
         let type_is_local = self
             .type_origins
             .get(&implementation.type_name)
@@ -714,7 +842,11 @@ impl Checker {
             .record_generics
             .get(&implementation.type_name)
             .map(Vec::len)
-            .or_else(|| self.enum_generics.get(&implementation.type_name).map(Vec::len))
+            .or_else(|| {
+                self.enum_generics
+                    .get(&implementation.type_name)
+                    .map(Vec::len)
+            })
             .or_else(|| builtin_generic_type_arity(&implementation.type_name));
         match expected_type_arity {
             Some(arity) if implementation.type_args.len() != arity => {
@@ -747,7 +879,12 @@ impl Checker {
 
     /// Like `check_block`, but the tail expression is checked against the type the block is expected to
     /// have (so a lambda in tail position learns its parameter types).
-    fn check_block_expecting(&mut self, block: &Block, scope: &mut Scope, expected: Option<&Ty>) -> Ty {
+    fn check_block_expecting(
+        &mut self,
+        block: &Block,
+        scope: &mut Scope,
+        expected: Option<&Ty>,
+    ) -> Ty {
         let previous_scope_depth = self.editor_scope_depth;
         self.editor_scope_depth += 1;
         for stmt in &block.stmts {
@@ -766,14 +903,25 @@ impl Checker {
 
     fn check_stmt(&mut self, stmt: &Stmt, scope: &mut Scope) {
         match stmt {
-            Stmt::Binding { mut_, name, ty, value } => {
+            Stmt::Binding {
+                mut_,
+                name,
+                ty,
+                value,
+            } => {
                 let declared_early = ty.as_ref().map(|t| self.resolve_type_in_context(t));
-                let value_ty = self.infer_expr_with_expected(value, declared_early.as_ref().filter(|d| matches!(d, Ty::Fn(..))), scope);
+                let value_ty = self.infer_expr_with_expected(
+                    value,
+                    declared_early.as_ref().filter(|d| matches!(d, Ty::Fn(..))),
+                    scope,
+                );
                 let final_ty = match ty {
                     Some(t) => {
                         let declared = self.resolve_type_in_context(t);
                         self.note_expected(value, &declared);
-                        if !compatible(&declared, &value_ty) && !self.adapt_literals(value, &declared, &value_ty) {
+                        if !compatible(&declared, &value_ty)
+                            && !self.adapt_literals(value, &declared, &value_ty)
+                        {
                             self.push(
                                 "E1041",
                                 format!(
@@ -861,21 +1009,31 @@ impl Checker {
                 }
             }
             Stmt::Continue => {}
-            Stmt::Break(Some(e)) => { self.infer_expr(e, scope); }
+            Stmt::Break(Some(e)) => {
+                self.infer_expr(e, scope);
+            }
             Stmt::Break(None) => {}
-            Stmt::For { pattern, iter, body } => {
+            Stmt::For {
+                pattern,
+                iter,
+                body,
+            } => {
                 let iter_ty = self.infer_expr(iter, scope);
                 // A user type with `impl Iterator<T>` yields `T` (its `next` returns `Option<T>`).
                 let user_iterator_item = match &iter_ty {
                     Ty::Named(n) | Ty::Applied(n, _) => self
                         .implementations
                         .iter()
-                        .find(|im| im.trait_name.as_deref() == Some("Iterator") && im.type_name == *n)
+                        .find(|im| {
+                            im.trait_name.as_deref() == Some("Iterator") && im.type_name == *n
+                        })
                         .and_then(|im| im.trait_args.first().cloned())
                         .map(|t| self.resolve_type_in_context(&t)),
                     _ => None,
                 };
-                let elem_ty = iterator_element_type(&iter_ty).or(user_iterator_item).unwrap_or(iter_ty);
+                let elem_ty = iterator_element_type(&iter_ty)
+                    .or(user_iterator_item)
+                    .unwrap_or(iter_ty);
                 self.editor_bindings.push(EditorBinding {
                     name: pattern.clone(),
                     type_name: elem_ty.describe(),
@@ -893,7 +1051,10 @@ impl Checker {
                 if !compatible(&Ty::Bool, &cond_ty) {
                     self.push(
                         "E1041",
-                        format!("While condition expects 'Bool', got '{}'.", cond_ty.describe()),
+                        format!(
+                            "While condition expects 'Bool', got '{}'.",
+                            cond_ty.describe()
+                        ),
                     );
                 }
                 let mut inner = scope.clone();
@@ -906,7 +1067,9 @@ impl Checker {
                 if let Expr::FieldAccess(receiver, field) = target {
                     self.check_field_assignment_target(receiver, field, &target_ty, scope);
                 }
-                if !compatible(&target_ty, &value_ty) && !self.adapt_literals(value, &target_ty, &value_ty) {
+                if !compatible(&target_ty, &value_ty)
+                    && !self.adapt_literals(value, &target_ty, &value_ty)
+                {
                     self.push(
                         "E1041",
                         format!(
@@ -917,7 +1080,9 @@ impl Checker {
                     );
                 }
             }
-            Stmt::Expr(e) => { self.infer_expr(e, scope); }
+            Stmt::Expr(e) => {
+                self.infer_expr(e, scope);
+            }
         }
     }
 
@@ -937,32 +1102,53 @@ impl Checker {
             range = Some(*r);
             node = inner;
         }
-        let (Expr::IntLiteral(n), Some(range)) = (node, range) else { return false };
+        let (Expr::IntLiteral(n), Some(range)) = (node, range) else {
+            return false;
+        };
         let value = if negated { -(*n as i128) } else { *n as i128 };
         if !kind.fits(value) {
-            self.push("E1070", format!("Literal {value} does not fit in '{}' (range {}..={}).", kind.name(), kind.min(), kind.max()));
+            self.push(
+                "E1070",
+                format!(
+                    "Literal {value} does not fit in '{}' (range {}..={}).",
+                    kind.name(),
+                    kind.min(),
+                    kind.max()
+                ),
+            );
             return true;
         }
-        let key = ExprKey { file: self.current_source_file.clone(), start: range.start, end: range.end };
+        let key = ExprKey {
+            file: self.current_source_file.clone(),
+            start: range.start,
+            end: range.end,
+        };
         self.literal_kinds.insert(key.clone(), LitKind::Int(kind));
         self.expr_types.insert(key, Ty::Sized(kind));
         // Every layer around the literal (and a negation around them) has its type too.
         let mut layer = literal;
         loop {
-            self.node_types.insert(layer as *const Expr as usize, Ty::Sized(kind));
+            self.node_types
+                .insert(layer as *const Expr as usize, Ty::Sized(kind));
             match layer {
                 Expr::Located(inner, _) => layer = inner,
                 _ => break,
             }
         }
         if negated {
-            self.node_types.insert(expr as *const Expr as usize, Ty::Sized(kind));
-            self.node_types.insert(expr.unlocated() as *const Expr as usize, Ty::Sized(kind));
+            self.node_types
+                .insert(expr as *const Expr as usize, Ty::Sized(kind));
+            self.node_types
+                .insert(expr.unlocated() as *const Expr as usize, Ty::Sized(kind));
         }
         // The negation wrapping the literal has the literal's type too.
         if negated {
             if let Expr::Located(_, outer) = expr {
-                let outer_key = ExprKey { file: self.current_source_file.clone(), start: outer.start, end: outer.end };
+                let outer_key = ExprKey {
+                    file: self.current_source_file.clone(),
+                    start: outer.start,
+                    end: outer.end,
+                };
                 self.expr_types.insert(outer_key, Ty::Sized(kind));
             }
         }
@@ -987,7 +1173,13 @@ impl Checker {
             _ => return None,
         };
         if arg_types.len() != arity {
-            self.push("E1041", format!("'{name}' expects {arity} argument(s), got {}.", arg_types.len()));
+            self.push(
+                "E1041",
+                format!(
+                    "'{name}' expects {arity} argument(s), got {}.",
+                    arg_types.len()
+                ),
+            );
             return Some(Ty::Unknown);
         }
         let is_shape = |t: &Ty| matches!(t, Ty::List(e) if **e == Ty::Int || **e == Ty::Unknown);
@@ -996,13 +1188,26 @@ impl Checker {
             "where" => {
                 let bools = Ty::Applied("Array".to_string(), vec![Ty::Bool]);
                 if arg_types[0] != bools && arg_types[0] != Ty::Unknown {
-                    self.push("E1041", format!("'where' expects an Array<Bool> mask first, got '{}'.", arg_types[0].describe()));
+                    self.push(
+                        "E1041",
+                        format!(
+                            "'where' expects an Array<Bool> mask first, got '{}'.",
+                            arg_types[0].describe()
+                        ),
+                    );
                     return Some(Ty::Unknown);
                 }
                 let element = |t: &Ty| array_elem(t).unwrap_or_else(|| t.clone());
                 let (a, b) = (element(&arg_types[1]), element(&arg_types[2]));
                 if (a != b && a != Ty::Unknown && b != Ty::Unknown) || !is_array_scalar(&a) {
-                    self.push("E1041", format!("'where' needs two values of the same element type, got '{}' and '{}'.", arg_types[1].describe(), arg_types[2].describe()));
+                    self.push(
+                        "E1041",
+                        format!(
+                            "'where' needs two values of the same element type, got '{}' and '{}'.",
+                            arg_types[1].describe(),
+                            arg_types[2].describe()
+                        ),
+                    );
                     return Some(Ty::Unknown);
                 }
                 Some(array_of(a))
@@ -1036,29 +1241,57 @@ impl Checker {
             }
             "zeros" | "ones" => {
                 if !is_shape(&arg_types[0]) {
-                    self.push("E1041", format!("'{name}' expects a shape List<Int>, got '{}'.", arg_types[0].describe()));
+                    self.push(
+                        "E1041",
+                        format!(
+                            "'{name}' expects a shape List<Int>, got '{}'.",
+                            arg_types[0].describe()
+                        ),
+                    );
                 }
                 Some(array_of(Ty::Float))
             }
             "full" => {
                 if !is_shape(&arg_types[0]) {
-                    self.push("E1041", format!("'full' expects a shape List<Int>, got '{}'.", arg_types[0].describe()));
+                    self.push(
+                        "E1041",
+                        format!(
+                            "'full' expects a shape List<Int>, got '{}'.",
+                            arg_types[0].describe()
+                        ),
+                    );
                 }
                 if !is_array_scalar(&arg_types[1]) && arg_types[1] != Ty::Unknown {
-                    self.push("E1041", format!("'full' expects a numeric fill value, got '{}'.", arg_types[1].describe()));
+                    self.push(
+                        "E1041",
+                        format!(
+                            "'full' expects a numeric fill value, got '{}'.",
+                            arg_types[1].describe()
+                        ),
+                    );
                     return Some(Ty::Unknown);
                 }
                 Some(array_of(arg_types[1].clone()))
             }
             "arange" => {
                 if arg_types.iter().any(|t| *t != Ty::Int && *t != Ty::Unknown) {
-                    self.push("E1041", "'arange' expects two Int arguments (start, stop).".to_string());
+                    self.push(
+                        "E1041",
+                        "'arange' expects two Int arguments (start, stop).".to_string(),
+                    );
                 }
                 Some(array_of(Ty::Int))
             }
             _ => {
-                if arg_types[..2].iter().any(|t| *t != Ty::Float && *t != Ty::Unknown) || (arg_types[2] != Ty::Int && arg_types[2] != Ty::Unknown) {
-                    self.push("E1041", "'linspace' expects (Float, Float, Int).".to_string());
+                if arg_types[..2]
+                    .iter()
+                    .any(|t| *t != Ty::Float && *t != Ty::Unknown)
+                    || (arg_types[2] != Ty::Int && arg_types[2] != Ty::Unknown)
+                {
+                    self.push(
+                        "E1041",
+                        "'linspace' expects (Float, Float, Int).".to_string(),
+                    );
                 }
                 Some(array_of(Ty::Float))
             }
@@ -1075,7 +1308,13 @@ impl Checker {
             _ => return None,
         };
         if arg_types.len() != arity {
-            self.push("E1041", format!("'{name}' expects {arity} argument(s), got {}.", arg_types.len()));
+            self.push(
+                "E1041",
+                format!(
+                    "'{name}' expects {arity} argument(s), got {}.",
+                    arg_types.len()
+                ),
+            );
             return Some(Ty::Unknown);
         }
         let floats = Ty::Applied("Array".to_string(), vec![Ty::Float]);
@@ -1083,20 +1322,54 @@ impl Checker {
         let is_float_array = |t: &Ty| *t == floats || *t == Ty::Unknown;
         let is_float = |t: &Ty| *t == Ty::Float || *t == Ty::Unknown;
         let (ok, result) = match name {
-            "linfit" | "solve" => (is_float_array(&arg_types[0]) && is_float_array(&arg_types[1]), floats.clone()),
+            "linfit" | "solve" => (
+                is_float_array(&arg_types[0]) && is_float_array(&arg_types[1]),
+                floats.clone(),
+            ),
             "det" | "trace" | "norm" => (is_float_array(&arg_types[0]), Ty::Float),
             "eigvals" => (is_float_array(&arg_types[0]), floats.clone()),
             "inv" => (is_float_array(&arg_types[0]), floats.clone()),
-            "eye" => (arg_types[0] == Ty::Int || arg_types[0] == Ty::Unknown, floats.clone()),
-            "polyfit" => (is_float_array(&arg_types[0]) && is_float_array(&arg_types[1]) && (arg_types[2] == Ty::Int || arg_types[2] == Ty::Unknown), floats.clone()),
+            "eye" => (
+                arg_types[0] == Ty::Int || arg_types[0] == Ty::Unknown,
+                floats.clone(),
+            ),
+            "polyfit" => (
+                is_float_array(&arg_types[0])
+                    && is_float_array(&arg_types[1])
+                    && (arg_types[2] == Ty::Int || arg_types[2] == Ty::Unknown),
+                floats.clone(),
+            ),
             "polyval" => {
-                let result = if is_float(&arg_types[1]) && arg_types[1] != Ty::Unknown { Ty::Float } else { floats.clone() };
-                (is_float_array(&arg_types[0]) && (is_float(&arg_types[1]) || is_float_array(&arg_types[1])), result)
+                let result = if is_float(&arg_types[1]) && arg_types[1] != Ty::Unknown {
+                    Ty::Float
+                } else {
+                    floats.clone()
+                };
+                (
+                    is_float_array(&arg_types[0])
+                        && (is_float(&arg_types[1]) || is_float_array(&arg_types[1])),
+                    result,
+                )
             }
-            "histogram" => (is_float_array(&arg_types[0]) && (arg_types[1] == Ty::Int || arg_types[1] == Ty::Unknown) && is_float(&arg_types[2]) && is_float(&arg_types[3]), ints),
+            "histogram" => (
+                is_float_array(&arg_types[0])
+                    && (arg_types[1] == Ty::Int || arg_types[1] == Ty::Unknown)
+                    && is_float(&arg_types[2])
+                    && is_float(&arg_types[3]),
+                ints,
+            ),
             _ => {
-                let result = if is_float(&arg_types[0]) && arg_types[0] != Ty::Unknown { Ty::Float } else { floats.clone() };
-                ((is_float(&arg_types[0]) || is_float_array(&arg_types[0])) && is_float(&arg_types[1]) && is_float(&arg_types[2]), result)
+                let result = if is_float(&arg_types[0]) && arg_types[0] != Ty::Unknown {
+                    Ty::Float
+                } else {
+                    floats.clone()
+                };
+                (
+                    (is_float(&arg_types[0]) || is_float_array(&arg_types[0]))
+                        && is_float(&arg_types[1])
+                        && is_float(&arg_types[2]),
+                    result,
+                )
             }
         };
         if !ok {
@@ -1130,7 +1403,11 @@ impl Checker {
                 return Ty::Unknown;
             }
         };
-        let ok = arg_types.len() == expected.len() && expected.iter().zip(arg_types).all(|(e, a)| compatible(e, a));
+        let ok = arg_types.len() == expected.len()
+            && expected
+                .iter()
+                .zip(arg_types)
+                .all(|(e, a)| compatible(e, a));
         if !ok {
             self.push("E1041", format!("String method '{method}' was called with arguments of the wrong number or type."));
         }
@@ -1143,23 +1420,40 @@ impl Checker {
         let (ok, result) = match method {
             "next_float" | "normal" => (arg_types.is_empty(), Ty::Float),
             "next_int" => (arg_types.len() == 2 && ints(arg_types), Ty::Int),
-            "rand" | "randn" => (arg_types.len() == 1 && shape(&arg_types[0]), Ty::Applied("Array".to_string(), vec![Ty::Float])),
-            "randint" => (arg_types.len() == 3 && ints(&arg_types[..2]) && shape(&arg_types[2]), Ty::Applied("Array".to_string(), vec![Ty::Int])),
-            "permutation" => (arg_types.len() == 1 && ints(arg_types), Ty::Applied("Array".to_string(), vec![Ty::Int])),
+            "rand" | "randn" => (
+                arg_types.len() == 1 && shape(&arg_types[0]),
+                Ty::Applied("Array".to_string(), vec![Ty::Float]),
+            ),
+            "randint" => (
+                arg_types.len() == 3 && ints(&arg_types[..2]) && shape(&arg_types[2]),
+                Ty::Applied("Array".to_string(), vec![Ty::Int]),
+            ),
+            "permutation" => (
+                arg_types.len() == 1 && ints(arg_types),
+                Ty::Applied("Array".to_string(), vec![Ty::Int]),
+            ),
             other => {
                 self.push("E1042", format!("Rng has no method '{other}'."));
                 return Ty::Unknown;
             }
         };
         if !ok {
-            self.push("E1041", format!("Rng method '{method}' was called with arguments of the wrong number or type."));
+            self.push(
+                "E1041",
+                format!(
+                    "Rng method '{method}' was called with arguments of the wrong number or type."
+                ),
+            );
         }
         result
     }
 
     /// `sin`, `cos`, `sqrt`, …, `abs`, `pow`, `atan2`, `pi`.
     fn check_math_call(&mut self, name: &str, arg_types: &[Ty]) -> Option<Ty> {
-        const UNARY: &[&str] = &["sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh", "exp", "ln", "log10", "sqrt", "floor", "ceil", "round", "erf"];
+        const UNARY: &[&str] = &[
+            "sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh", "exp", "ln",
+            "log10", "sqrt", "floor", "ceil", "round", "erf",
+        ];
         let arity = match name {
             "pi" => 0,
             "pow" | "atan2" => 2,
@@ -1167,7 +1461,13 @@ impl Checker {
             _ => return None,
         };
         if arg_types.len() != arity {
-            self.push("E1041", format!("'{name}' expects {arity} argument(s), got {}.", arg_types.len()));
+            self.push(
+                "E1041",
+                format!(
+                    "'{name}' expects {arity} argument(s), got {}.",
+                    arg_types.len()
+                ),
+            );
             return Some(Ty::Unknown);
         }
         match name {
@@ -1192,8 +1492,15 @@ impl Checker {
                     return Some(Ty::Unknown);
                 }
                 if !ok {
-                    let hint = if matches!(elem, Ty::Int | Ty::Sized(_)) { " (convert with 'as Float' first)" } else { "" };
-                    self.push("E1041", format!("'{name}' isn't defined for '{}'{hint}.", arg.describe()));
+                    let hint = if matches!(elem, Ty::Int | Ty::Sized(_)) {
+                        " (convert with 'as Float' first)"
+                    } else {
+                        ""
+                    };
+                    self.push(
+                        "E1041",
+                        format!("'{name}' isn't defined for '{}'{hint}.", arg.describe()),
+                    );
                     return Some(Ty::Unknown);
                 }
                 Some(arg.clone())
@@ -1216,25 +1523,43 @@ impl Checker {
         let invalid = |this: &mut Self| {
             this.push(
                 "E1024",
-                format!("Invalid dimensional operation on arrays: '{}' and '{}'.", lt.describe(), rt.describe()),
+                format!(
+                    "Invalid dimensional operation on arrays: '{}' and '{}'.",
+                    lt.describe(),
+                    rt.describe()
+                ),
             );
             Some(Ty::Unknown)
         };
-        if array_elem(lt).is_some_and(|e| numeric(&e) && e != Ty::Float) || array_elem(rt).is_some_and(|e| numeric(&e) && e != Ty::Float) {
-            self.push("E1041", "Quantities combine with Array<Float>, not Array<Int> (use to_float()).".to_string());
+        if array_elem(lt).is_some_and(|e| numeric(&e) && e != Ty::Float)
+            || array_elem(rt).is_some_and(|e| numeric(&e) && e != Ty::Float)
+        {
+            self.push(
+                "E1041",
+                "Quantities combine with Array<Float>, not Array<Int> (use to_float())."
+                    .to_string(),
+            );
             return Some(Ty::Unknown);
         }
         match (op, &le, &re) {
             (Add | Sub, Ty::Quantity(a), Ty::Quantity(b)) if a == b => Some(arr(le.clone())),
-            (Eq | NotEq | Lt | Gt | LtEq | GtEq, Ty::Quantity(a), Ty::Quantity(b)) if a == b => Some(arr(Ty::Bool)),
+            (Eq | NotEq | Lt | Gt | LtEq | GtEq, Ty::Quantity(a), Ty::Quantity(b)) if a == b => {
+                Some(arr(Ty::Bool))
+            }
             (Mul, Ty::Quantity(a), Ty::Quantity(b)) => Some(arr(Ty::Quantity(dim_mul(a, b)))),
             (Div, Ty::Quantity(a), Ty::Quantity(b)) => {
                 let d = dim_div(a, b);
-                Some(arr(if dim_is_dimensionless(&d) { Ty::Float } else { Ty::Quantity(d) }))
+                Some(arr(if dim_is_dimensionless(&d) {
+                    Ty::Float
+                } else {
+                    Ty::Quantity(d)
+                }))
             }
             (Mul | Div, Ty::Quantity(_), n) if numeric(n) => Some(arr(le.clone())),
             (Mul, n, Ty::Quantity(_)) if numeric(n) => Some(arr(re.clone())),
-            (Div, n, Ty::Quantity(b)) if numeric(n) => Some(arr(Ty::Quantity(crate::types::dim_pow(b, -1)))),
+            (Div, n, Ty::Quantity(b)) if numeric(n) => {
+                Some(arr(Ty::Quantity(crate::types::dim_pow(b, -1))))
+            }
             _ => invalid(self),
         }
     }
@@ -1246,8 +1571,14 @@ impl Checker {
             let quantity = elem.clone();
             return match method {
                 "unit" if arg_types.is_empty() => Ty::String,
-                "values" if arg_types.is_empty() => Ty::Applied("Array".to_string(), vec![Ty::Float]),
-                "sum" | "min" | "max" | "mean" | "median" | "std" | "sample_std" if arg_types.is_empty() => quantity,
+                "values" if arg_types.is_empty() => {
+                    Ty::Applied("Array".to_string(), vec![Ty::Float])
+                }
+                "sum" | "min" | "max" | "mean" | "median" | "std" | "sample_std"
+                    if arg_types.is_empty() =>
+                {
+                    quantity
+                }
                 "percentile" if arg_types.len() == 1 => quantity,
                 "get" => quantity,
                 "var" | "sample_var" if arg_types.is_empty() => Ty::Quantity(dim_mul(dim, dim)),
@@ -1264,24 +1595,58 @@ impl Checker {
         }
         let list_int = Ty::List(Box::new(Ty::Int));
         let expected_count = match method {
-            "shape" | "rank" | "size" | "length" | "count" | "sum" | "min" | "max" | "mean" | "to_list" | "transpose" | "var" | "std" | "sample_var" | "sample_std" | "median" | "cumsum" | "sort" | "to_float" | "any" | "all" | "count_true" => Some(0),
+            "shape" | "rank" | "size" | "length" | "count" | "sum" | "min" | "max" | "mean"
+            | "to_list" | "transpose" | "var" | "std" | "sample_var" | "sample_std" | "median"
+            | "cumsum" | "sort" | "to_float" | "any" | "all" | "count_true" => Some(0),
             "reshape" | "sum_axis" | "dot" | "matmul" | "percentile" | "row" | "col" => Some(1),
             _ => None,
         };
         if let Some(count) = expected_count {
             if arg_types.len() != count {
-                self.push("E1041", format!("Array method '{method}' expects {count} argument(s), got {}.", arg_types.len()));
+                self.push(
+                    "E1041",
+                    format!(
+                        "Array method '{method}' expects {count} argument(s), got {}.",
+                        arg_types.len()
+                    ),
+                );
                 return Ty::Unknown;
             }
         }
         // Bool arrays are masks: only structural methods and any/all/count_true apply.
-        let bool_ok = matches!(method, "shape" | "rank" | "size" | "length" | "count" | "to_list" | "reshape" | "transpose" | "get" | "set" | "any" | "all" | "count_true" | "row" | "col");
+        let bool_ok = matches!(
+            method,
+            "shape"
+                | "rank"
+                | "size"
+                | "length"
+                | "count"
+                | "to_list"
+                | "reshape"
+                | "transpose"
+                | "get"
+                | "set"
+                | "any"
+                | "all"
+                | "count_true"
+                | "row"
+                | "col"
+        );
         if elem == Ty::Bool && !bool_ok {
-            self.push("E1041", format!("'{method}' isn't defined for arrays of Bool."));
+            self.push(
+                "E1041",
+                format!("'{method}' isn't defined for arrays of Bool."),
+            );
             return Ty::Unknown;
         }
         if elem != Ty::Bool && matches!(method, "any" | "all" | "count_true") {
-            self.push("E1041", format!("'{method}' needs an Array<Bool>, got '{}'.", receiver.describe()));
+            self.push(
+                "E1041",
+                format!(
+                    "'{method}' needs an Array<Bool>, got '{}'.",
+                    receiver.describe()
+                ),
+            );
             return Ty::Unknown;
         }
         match method {
@@ -1292,7 +1657,10 @@ impl Checker {
                 Ty::Int => Ty::Float,
                 Ty::Float | Ty::Float32 => elem,
                 other => {
-                    self.push("E1041", format!("'mean' isn't defined for arrays of '{}'.", other.describe()));
+                    self.push(
+                        "E1041",
+                        format!("'mean' isn't defined for arrays of '{}'.", other.describe()),
+                    );
                     Ty::Unknown
                 }
             },
@@ -1308,7 +1676,13 @@ impl Checker {
             "cumsum" | "sort" => receiver.clone(),
             "to_float" => {
                 if elem != Ty::Int {
-                    self.push("E1041", format!("'to_float' converts an Array<Int>, got '{}'.", receiver.describe()));
+                    self.push(
+                        "E1041",
+                        format!(
+                            "'to_float' converts an Array<Int>, got '{}'.",
+                            receiver.describe()
+                        ),
+                    );
                     return Ty::Unknown;
                 }
                 Ty::Applied("Array".to_string(), vec![Ty::Float])
@@ -1318,8 +1692,14 @@ impl Checker {
                     self.push("E1041", format!("'{method}' needs an array of Float or Float32, got '{}' (use to_float() on an Int array).", receiver.describe()));
                     return Ty::Unknown;
                 }
-                if method == "percentile" && arg_types[0] != Ty::Float && arg_types[0] != Ty::Unknown {
-                    self.push("E1041", "'percentile' expects a Float p between 0.0 and 100.0.".to_string());
+                if method == "percentile"
+                    && arg_types[0] != Ty::Float
+                    && arg_types[0] != Ty::Unknown
+                {
+                    self.push(
+                        "E1041",
+                        "'percentile' expects a Float p between 0.0 and 100.0.".to_string(),
+                    );
                 }
                 elem
             }
@@ -1338,9 +1718,20 @@ impl Checker {
             }
             "dot" | "matmul" => {
                 if !compatible(receiver, &arg_types[0]) {
-                    self.push("E1041", format!("'{method}' expects '{}', got '{}'.", receiver.describe(), arg_types[0].describe()));
+                    self.push(
+                        "E1041",
+                        format!(
+                            "'{method}' expects '{}', got '{}'.",
+                            receiver.describe(),
+                            arg_types[0].describe()
+                        ),
+                    );
                 }
-                if method == "dot" { elem } else { receiver.clone() }
+                if method == "dot" {
+                    elem
+                } else {
+                    receiver.clone()
+                }
             }
             "get" if !arg_types.is_empty() => {
                 if arg_types.iter().any(|t| *t != Ty::Int && *t != Ty::Unknown) {
@@ -1351,15 +1742,28 @@ impl Checker {
             "set" if arg_types.len() >= 2 => {
                 let (value, indices) = arg_types.split_last().expect("checked above");
                 if indices.iter().any(|t| *t != Ty::Int && *t != Ty::Unknown) {
-                    self.push("E1041", "'set' expects Int indices followed by the new value.".to_string());
+                    self.push(
+                        "E1041",
+                        "'set' expects Int indices followed by the new value.".to_string(),
+                    );
                 }
                 if !compatible(&elem, value) {
-                    self.push("E1041", format!("'set' expects a '{}' value, got '{}'.", elem.describe(), value.describe()));
+                    self.push(
+                        "E1041",
+                        format!(
+                            "'set' expects a '{}' value, got '{}'.",
+                            elem.describe(),
+                            value.describe()
+                        ),
+                    );
                 }
                 Ty::Void
             }
             "get" | "set" => {
-                self.push("E1041", format!("Array method '{method}' needs at least one index."));
+                self.push(
+                    "E1041",
+                    format!("Array method '{method}' needs at least one index."),
+                );
                 Ty::Unknown
             }
             other => {
@@ -1381,13 +1785,23 @@ impl Checker {
             range = Some(*r);
             node = inner;
         }
-        let (Expr::FloatLiteral(_), Some(range)) = (node, range) else { return false };
-        let key = ExprKey { file: self.current_source_file.clone(), start: range.start, end: range.end };
+        let (Expr::FloatLiteral(_), Some(range)) = (node, range) else {
+            return false;
+        };
+        let key = ExprKey {
+            file: self.current_source_file.clone(),
+            start: range.start,
+            end: range.end,
+        };
         self.literal_kinds.insert(key.clone(), LitKind::F32);
         self.expr_types.insert(key, Ty::Float32);
         if negated {
             if let Expr::Located(_, outer) = expr {
-                let outer_key = ExprKey { file: self.current_source_file.clone(), start: outer.start, end: outer.end };
+                let outer_key = ExprKey {
+                    file: self.current_source_file.clone(),
+                    start: outer.start,
+                    end: outer.end,
+                };
                 self.expr_types.insert(outer_key, Ty::Float32);
             }
         }
@@ -1398,7 +1812,8 @@ impl Checker {
     fn set_node_type_layers(&mut self, expr: &Expr, ty: &Ty) {
         let mut layer = expr;
         loop {
-            self.node_types.insert(layer as *const Expr as usize, ty.clone());
+            self.node_types
+                .insert(layer as *const Expr as usize, ty.clone());
             match layer {
                 Expr::Located(inner, _) => layer = inner,
                 _ => break,
@@ -1412,30 +1827,46 @@ impl Checker {
         match (expected, actual) {
             (Ty::Sized(kind), Ty::Int) => self.adapt_int_literal(expr, *kind),
             (Ty::Float32, Ty::Float) => self.adapt_float_literal(expr),
-            (Ty::List(want), Ty::List(have)) if matches!(**want, Ty::Float32) && **have == Ty::Float => {
-                let Expr::ListLiteral(items) = expr.unlocated() else { return false };
+            (Ty::List(want), Ty::List(have))
+                if matches!(**want, Ty::Float32) && **have == Ty::Float =>
+            {
+                let Expr::ListLiteral(items) = expr.unlocated() else {
+                    return false;
+                };
                 let mut all = true;
                 for item in items {
                     all &= self.adapt_float_literal(item);
                 }
                 if all {
                     if let Expr::Located(_, range) = expr {
-                        let key = ExprKey { file: self.current_source_file.clone(), start: range.start, end: range.end };
+                        let key = ExprKey {
+                            file: self.current_source_file.clone(),
+                            start: range.start,
+                            end: range.end,
+                        };
                         self.expr_types.insert(key, expected.clone());
                     }
                     self.set_node_type_layers(expr, expected);
                 }
                 all
             }
-            (Ty::List(want), Ty::List(have)) if matches!(**want, Ty::Sized(_)) && **have == Ty::Int => {
-                let Expr::ListLiteral(items) = expr.unlocated() else { return false };
+            (Ty::List(want), Ty::List(have))
+                if matches!(**want, Ty::Sized(_)) && **have == Ty::Int =>
+            {
+                let Expr::ListLiteral(items) = expr.unlocated() else {
+                    return false;
+                };
                 let mut all = true;
                 for item in items {
                     all &= self.adapt_literals(item, want, &Ty::Int);
                 }
                 if all {
                     if let Expr::Located(_, range) = expr {
-                        let key = ExprKey { file: self.current_source_file.clone(), start: range.start, end: range.end };
+                        let key = ExprKey {
+                            file: self.current_source_file.clone(),
+                            start: range.start,
+                            end: range.end,
+                        };
                         self.expr_types.insert(key, expected.clone());
                     }
                     self.set_node_type_layers(expr, expected);
@@ -1458,12 +1889,18 @@ impl Checker {
         }
         match expr {
             Expr::Located(inner, range) => {
-                let key = ExprKey { file: self.current_source_file.clone(), start: range.start, end: range.end };
+                let key = ExprKey {
+                    file: self.current_source_file.clone(),
+                    start: range.start,
+                    end: range.end,
+                };
                 if let Some(recorded) = self.expr_types.get(&key) {
                     if ty_contains_unknown(recorded) && compatible(expected, recorded) {
                         self.expr_types.insert(key, expected.clone());
-                        self.node_types.insert(expr as *const Expr as usize, expected.clone());
-                        self.node_types.insert(&**inner as *const Expr as usize, expected.clone());
+                        self.node_types
+                            .insert(expr as *const Expr as usize, expected.clone());
+                        self.node_types
+                            .insert(&**inner as *const Expr as usize, expected.clone());
                     }
                 }
                 self.note_expected_inner(inner, expected);
@@ -1500,24 +1937,50 @@ impl Checker {
                 }
             }
             Expr::Call(callee, args) | Expr::GenericCall(callee, _, args) => {
-                let Expr::Ident(name) = callee.unlocated() else { return };
-                let Some(enum_name) = self.variant_owners.get(name).cloned() else { return };
+                let Expr::Ident(name) = callee.unlocated() else {
+                    return;
+                };
+                let Some(enum_name) = self.variant_owners.get(name).cloned() else {
+                    return;
+                };
                 let type_args: Vec<Ty> = match expected {
                     Ty::Applied(n, targs) if *n == enum_name => targs.clone(),
                     Ty::Named(n) if *n == enum_name => Vec::new(),
                     _ => return,
                 };
-                let generics = self.enum_generics.get(&enum_name).cloned().unwrap_or_default();
-                let subst: HashMap<String, Ty> = generics.iter().map(|g| g.name.clone()).zip(type_args).collect();
-                let field_types = self.variant_fields.get(&(enum_name.clone(), name.clone())).cloned().unwrap_or_default();
-                let field_names = self.variant_field_names.get(&(enum_name, name.clone())).cloned().unwrap_or_default();
+                let generics = self
+                    .enum_generics
+                    .get(&enum_name)
+                    .cloned()
+                    .unwrap_or_default();
+                let subst: HashMap<String, Ty> = generics
+                    .iter()
+                    .map(|g| g.name.clone())
+                    .zip(type_args)
+                    .collect();
+                let field_types = self
+                    .variant_fields
+                    .get(&(enum_name.clone(), name.clone()))
+                    .cloned()
+                    .unwrap_or_default();
+                let field_names = self
+                    .variant_field_names
+                    .get(&(enum_name, name.clone()))
+                    .cloned()
+                    .unwrap_or_default();
                 for (position, arg) in args.iter().enumerate() {
                     let (index, value) = match arg {
                         Arg::Positional(value) => (Some(position), value),
-                        Arg::Named(field, value) => (field_names.iter().position(|n| n.as_deref() == Some(field.as_str())), value),
+                        Arg::Named(field, value) => (
+                            field_names
+                                .iter()
+                                .position(|n| n.as_deref() == Some(field.as_str())),
+                            value,
+                        ),
                     };
                     if let Some(field_ty) = index.and_then(|i| field_types.get(i)) {
-                        let field_ty = resolve_type_with_type_subst(field_ty, &subst, &HashMap::new());
+                        let field_ty =
+                            resolve_type_with_type_subst(field_ty, &subst, &HashMap::new());
                         self.note_expected(value, &field_ty);
                     }
                 }
@@ -1550,7 +2013,11 @@ impl Checker {
                 self.current_span = Some(range.start);
                 let is_call = matches!(inner.as_ref(), Expr::Call(..) | Expr::GenericCall(..));
                 if is_call {
-                    self.call_key_stack.push(ExprKey { file: self.current_source_file.clone(), start: range.start, end: range.end });
+                    self.call_key_stack.push(ExprKey {
+                        file: self.current_source_file.clone(),
+                        start: range.start,
+                        end: range.end,
+                    });
                 }
                 let ty = self.infer_expr(inner, scope);
                 if is_call {
@@ -1560,7 +2027,11 @@ impl Checker {
                 // A body can be inferred more than once (a lambda is first
                 // checked in isolation); never let a later `Unknown` erase a
                 // type that was already determined.
-                let key = ExprKey { file: self.current_source_file.clone(), start: range.start, end: range.end };
+                let key = ExprKey {
+                    file: self.current_source_file.clone(),
+                    start: range.start,
+                    end: range.end,
+                };
                 if ty != Ty::Unknown || !self.expr_types.contains_key(&key) {
                     self.expr_types.insert(key, ty.clone());
                 }
@@ -1576,7 +2047,15 @@ impl Checker {
             Expr::IntLiteral(_) => Ty::Int,
             Expr::SizedIntLiteral(value, kind) => {
                 if !kind.fits(*value) {
-                    self.push("E1070", format!("Literal {value} does not fit in '{}' (range {}..={}).", kind.name(), kind.min(), kind.max()));
+                    self.push(
+                        "E1070",
+                        format!(
+                            "Literal {value} does not fit in '{}' (range {}..={}).",
+                            kind.name(),
+                            kind.min(),
+                            kind.max()
+                        ),
+                    );
                 }
                 Ty::Sized(*kind)
             }
@@ -1612,14 +2091,16 @@ impl Checker {
                     Ty::Unknown
                 }
             }
-            Expr::Unary(UnaryOp::Neg, e)
-                if matches!(e.unlocated(), Expr::SizedIntLiteral(v, k) if k.is_signed() && *v == -k.min()) =>
+            Expr::Unary(UnaryOp::Neg, e) if matches!(e.unlocated(), Expr::SizedIntLiteral(v, k) if k.is_signed() && *v == -k.min()) =>
             {
                 // `-128i8`: the magnitude alone doesn't fit, the negated value does.
-                let Expr::SizedIntLiteral(_, kind) = e.unlocated() else { unreachable!() };
+                let Expr::SizedIntLiteral(_, kind) = e.unlocated() else {
+                    unreachable!()
+                };
                 let mut layer: &Expr = e;
                 loop {
-                    self.node_types.insert(layer as *const Expr as usize, Ty::Sized(*kind));
+                    self.node_types
+                        .insert(layer as *const Expr as usize, Ty::Sized(*kind));
                     match layer {
                         Expr::Located(inner, _) => layer = inner,
                         _ => break,
@@ -1635,7 +2116,10 @@ impl Checker {
                     UnaryOp::Neg => {
                         if let Ty::Sized(kind) = &t {
                             if !kind.is_signed() {
-                                self.push("E1041", format!("Cannot negate an unsigned '{}'.", kind.name()));
+                                self.push(
+                                    "E1041",
+                                    format!("Cannot negate an unsigned '{}'.", kind.name()),
+                                );
                             }
                         }
                         t
@@ -1671,7 +2155,9 @@ impl Checker {
             Expr::Range(start, _kind, end, step) => {
                 let st = self.infer_expr(start, scope);
                 let et = self.infer_expr(end, scope);
-                if let Some(s) = step { self.infer_expr(s, scope); }
+                if let Some(s) = step {
+                    self.infer_expr(s, scope);
+                }
                 if let (Ty::Quantity(d1), Ty::Quantity(d2)) = (&st, &et) {
                     if d1 != d2 {
                         self.push(
@@ -1687,7 +2173,9 @@ impl Checker {
                 st
             }
             Expr::Call(callee, args) => self.check_call(callee, args, scope, None),
-            Expr::GenericCall(callee, type_args, args) => self.check_call(callee, args, scope, Some(type_args)),
+            Expr::GenericCall(callee, type_args, args) => {
+                self.check_call(callee, args, scope, Some(type_args))
+            }
             Expr::FieldAccess(obj, field) => {
                 let receiver_ty = self.infer_expr(obj, scope);
                 if let Some(field_ty) = self.record_field_type(&receiver_ty, field) {
@@ -1712,7 +2200,12 @@ impl Checker {
                 match self.infer_expr(obj, scope) {
                     Ty::List(t) => *t,
                     // `a[lo until hi]` and `a[mask]` give a new array; `a[i]` an element.
-                    array if array_elem(&array).is_some() && (is_range || array_elem(&index_ty) == Some(Ty::Bool)) => array,
+                    array
+                        if array_elem(&array).is_some()
+                            && (is_range || array_elem(&index_ty) == Some(Ty::Bool)) =>
+                    {
+                        array
+                    }
                     array if array_elem(&array).is_some() => array_elem(&array).unwrap(),
                     _ => Ty::Unknown,
                 }
@@ -1732,7 +2225,11 @@ impl Checker {
                         let mut else_scope = scope.clone();
                         let else_ty = self.check_block(b, &mut else_scope);
                         if compatible(&then_ty, &else_ty) {
-                            if then_ty == Ty::Unknown { else_ty } else { then_ty }
+                            if then_ty == Ty::Unknown {
+                                else_ty
+                            } else {
+                                then_ty
+                            }
                         } else {
                             self.push(
                                 "E1041",
@@ -1752,14 +2249,14 @@ impl Checker {
                 let mut inner = scope.clone();
                 self.check_block(b, &mut inner)
             }
-            Expr::Lambda(params, body) => {
-                self.infer_lambda(params, body, None, None, scope)
-            }
+            Expr::Lambda(params, body) => self.infer_lambda(params, body, None, None, scope),
             Expr::ListLiteral(items) => {
                 let mut elem = Ty::Unknown;
                 for it in items {
                     let t = self.infer_expr(it, scope);
-                    if elem == Ty::Unknown { elem = t; }
+                    if elem == Ty::Unknown {
+                        elem = t;
+                    }
                 }
                 Ty::List(Box::new(elem))
             }
@@ -1767,7 +2264,9 @@ impl Checker {
                 let mut elem = Ty::Unknown;
                 for it in items {
                     let t = self.infer_expr(it, scope);
-                    if elem == Ty::Unknown { elem = t; }
+                    if elem == Ty::Unknown {
+                        elem = t;
+                    }
                 }
                 let ty = Ty::Set(Box::new(elem));
                 self.validate_collection_bounds(&ty);
@@ -1775,8 +2274,16 @@ impl Checker {
             }
             Expr::EmptyCollection(name, type_args) => {
                 // The written type arguments are the collection's real type.
-                let arg = |index: usize| type_args.get(index).map_or(Ty::Unknown, |t| self.resolve_type_in_context(t));
-                let ty = if name == "Map" { Ty::Map(Box::new(arg(0)), Box::new(arg(1))) } else { Ty::Set(Box::new(arg(0))) };
+                let arg = |index: usize| {
+                    type_args
+                        .get(index)
+                        .map_or(Ty::Unknown, |t| self.resolve_type_in_context(t))
+                };
+                let ty = if name == "Map" {
+                    Ty::Map(Box::new(arg(0)), Box::new(arg(1)))
+                } else {
+                    Ty::Set(Box::new(arg(0)))
+                };
                 self.validate_collection_bounds(&ty);
                 ty
             }
@@ -1786,8 +2293,12 @@ impl Checker {
                 for (k, v) in pairs {
                     let kt = self.infer_expr(k, scope);
                     let vt = self.infer_expr(v, scope);
-                    if key == Ty::Unknown { key = kt; }
-                    if value == Ty::Unknown { value = vt; }
+                    if key == Ty::Unknown {
+                        key = kt;
+                    }
+                    if value == Ty::Unknown {
+                        value = vt;
+                    }
                 }
                 let ty = Ty::Map(Box::new(key), Box::new(value));
                 self.validate_collection_bounds(&ty);
@@ -1796,20 +2307,28 @@ impl Checker {
             Expr::Try(inner, catch) => {
                 let inner_ty = self.infer_expr(inner, scope);
                 if inner_ty == Ty::Unknown {
-                    if let Some(c) = catch { self.infer_expr(c, scope); }
+                    if let Some(c) = catch {
+                        self.infer_expr(c, scope);
+                    }
                     return Ty::Unknown;
                 }
                 let Some(enclosing_return) = self.current_return_type.clone() else {
                     self.push(
                         "E1041",
-                        "'try' can only be used inside a function returning Option or Result.".to_string(),
+                        "'try' can only be used inside a function returning Option or Result."
+                            .to_string(),
                     );
-                    if let Some(c) = catch { self.infer_expr(c, scope); }
+                    if let Some(c) = catch {
+                        self.infer_expr(c, scope);
+                    }
                     return Ty::Unknown;
                 };
                 match (&inner_ty, &enclosing_return) {
                     (Ty::Applied(name, args), Ty::Applied(expected_name, expected_args))
-                        if name == "Option" && expected_name == "Option" && args.len() == 1 && expected_args.len() == 1 =>
+                        if name == "Option"
+                            && expected_name == "Option"
+                            && args.len() == 1
+                            && expected_args.len() == 1 =>
                     {
                         if catch.is_some() {
                             self.push(
@@ -1820,7 +2339,10 @@ impl Checker {
                         args[0].clone()
                     }
                     (Ty::Applied(name, args), Ty::Applied(expected_name, expected_args))
-                        if name == "Result" && expected_name == "Result" && args.len() == 2 && expected_args.len() == 2 =>
+                        if name == "Result"
+                            && expected_name == "Result"
+                            && args.len() == 2
+                            && expected_args.len() == 2 =>
                     {
                         if catch.is_none() && !compatible(&expected_args[1], &args[1]) {
                             self.push(
@@ -1833,11 +2355,13 @@ impl Checker {
                             );
                         }
                         if let Some(catch_expr) = catch {
-                            let expected_catch = Ty::Fn(
-                                vec![args[1].clone()],
-                                Box::new(expected_args[1].clone()),
+                            let expected_catch =
+                                Ty::Fn(vec![args[1].clone()], Box::new(expected_args[1].clone()));
+                            let catch_ty = self.infer_expr_with_expected(
+                                catch_expr,
+                                Some(&expected_catch),
+                                scope,
                             );
-                            let catch_ty = self.infer_expr_with_expected(catch_expr, Some(&expected_catch), scope);
                             if !compatible(&expected_catch, &catch_ty) {
                                 self.push(
                                     "E1041",
@@ -1852,7 +2376,9 @@ impl Checker {
                         args[0].clone()
                     }
                     _ => {
-                        if let Some(c) = catch { self.infer_expr(c, scope); }
+                        if let Some(c) = catch {
+                            self.infer_expr(c, scope);
+                        }
                         self.push(
                             "E1041",
                             format!(
@@ -1900,13 +2426,25 @@ impl Checker {
                         other => IntKind::from_name(other).map(Ty::Sized),
                     };
                     if let Some(target) = target {
-                        if !matches!(source_ty, Ty::Int | Ty::Float | Ty::Float32 | Ty::Sized(_) | Ty::Unknown) {
-                            self.push("E1041", format!("Cannot convert '{}' to '{}' with 'as'.", source_ty.describe(), target.describe()));
+                        if !matches!(
+                            source_ty,
+                            Ty::Int | Ty::Float | Ty::Float32 | Ty::Sized(_) | Ty::Unknown
+                        ) {
+                            self.push(
+                                "E1041",
+                                format!(
+                                    "Cannot convert '{}' to '{}' with 'as'.",
+                                    source_ty.describe(),
+                                    target.describe()
+                                ),
+                            );
                         }
                         return target;
                     }
                 }
-                if let (Expr::Ident(sym), Some(elem)) = (unit_expr.as_ref().unlocated(), array_elem(&source_ty)) {
+                if let (Expr::Ident(sym), Some(elem)) =
+                    (unit_expr.as_ref().unlocated(), array_elem(&source_ty))
+                {
                     // `times as s` gives a Float array a unit; `speeds as km/h` converts.
                     return match resolve_unit_expr(sym) {
                         Ok(dim) => {
@@ -1945,7 +2483,13 @@ impl Checker {
                                     );
                                 }
                             } else if !matches!(source_ty, Ty::Int | Ty::Float | Ty::Unknown) {
-                                self.push("E1041", format!("Cannot give unit '{sym}' to a value of type '{}'.", source_ty.describe()));
+                                self.push(
+                                    "E1041",
+                                    format!(
+                                        "Cannot give unit '{sym}' to a value of type '{}'.",
+                                        source_ty.describe()
+                                    ),
+                                );
                             }
                             Ty::Quantity(dim)
                         }
@@ -1962,7 +2506,9 @@ impl Checker {
                 self.check_block(block, &mut inner);
                 Ty::Unknown
             }
-            Expr::RecordLiteral(name, fields) => self.check_record_literal(name, fields, None, scope),
+            Expr::RecordLiteral(name, fields) => {
+                self.check_record_literal(name, fields, None, scope)
+            }
             Expr::GenericRecordLiteral(name, type_args, fields) => {
                 self.check_record_literal(name, fields, Some(type_args), scope)
             }
@@ -1974,9 +2520,13 @@ impl Checker {
                     self.check_pattern(&arm.pattern, &scrutinee_ty);
                     let mut arm_scope = scope.clone();
                     self.bind_pattern_vars_typed(&arm.pattern, &scrutinee_ty, &mut arm_scope);
-                    if let Some(g) = &arm.guard { self.infer_expr(g, &mut arm_scope); }
+                    if let Some(g) = &arm.guard {
+                        self.infer_expr(g, &mut arm_scope);
+                    }
                     let t = self.check_block(&arm.body, &mut arm_scope);
-                    if result == Ty::Unknown { result = t; }
+                    if result == Ty::Unknown {
+                        result = t;
+                    }
                 }
                 result
             }
@@ -2001,7 +2551,9 @@ impl Checker {
                 self.check_block(block, &mut inner)
             }
             Expr::Channel(element_type, capacity) => {
-                if let Some(c) = capacity { self.infer_expr(c, scope); }
+                if let Some(c) = capacity {
+                    self.infer_expr(c, scope);
+                }
                 Ty::Applied(
                     "Channel".to_string(),
                     vec![self.resolve_type_in_context(element_type)],
@@ -2039,7 +2591,9 @@ impl Checker {
         // fixed-width integer (or a list of them) take that type.
         if let Some(declared_fields) = self.record_fields.get(name).cloned() {
             for (field_name, field_type) in declared_fields {
-                let Some((_, value)) = fields.iter().find(|(n, _)| *n == field_name) else { continue };
+                let Some((_, value)) = fields.iter().find(|(n, _)| *n == field_name) else {
+                    continue;
+                };
                 let declared = self.resolve_type_in_context(&field_type);
                 if matches!(declared, Ty::Sized(_) | Ty::Float32 | Ty::List(_)) {
                     let actual = value_types.get(&field_name).cloned().unwrap_or(Ty::Unknown);
@@ -2054,14 +2608,20 @@ impl Checker {
             if explicit_type_args.is_some() {
                 self.push(
                     "E1042",
-                    format!("Record '{}' is not generic but received explicit type arguments.", name),
+                    format!(
+                        "Record '{}' is not generic but received explicit type arguments.",
+                        name
+                    ),
                 );
             }
             return Ty::Named(name.to_string());
         }
 
         let declared_fields = self.record_fields.get(name).cloned().unwrap_or_default();
-        let generic_names: HashSet<String> = generics.iter().map(|generic| generic.name.clone()).collect();
+        let generic_names: HashSet<String> = generics
+            .iter()
+            .map(|generic| generic.name.clone())
+            .collect();
         let mut type_subst = HashMap::new();
         if let Some(explicit) = explicit_type_args {
             if explicit.len() != generics.len() {
@@ -2076,14 +2636,29 @@ impl Checker {
                 );
             }
             for (generic, explicit_ty) in generics.iter().zip(explicit.iter()) {
-                type_subst.insert(generic.name.clone(), self.resolve_type_in_context(explicit_ty));
+                type_subst.insert(
+                    generic.name.clone(),
+                    self.resolve_type_in_context(explicit_ty),
+                );
             }
         }
         for (field_name, field_type) in declared_fields {
             if let Some(value_type) = value_types.get(&field_name) {
-                if let Err(message) = unify_generic_type(&field_type, value_type, &generic_names, &mut type_subst) {
-                    let code = if explicit_type_args.is_some() { "E1042" } else { "E1041" };
-                    self.push(code, format!("Invalid value for field '{}.{}': {message}", name, field_name));
+                if let Err(message) =
+                    unify_generic_type(&field_type, value_type, &generic_names, &mut type_subst)
+                {
+                    let code = if explicit_type_args.is_some() {
+                        "E1042"
+                    } else {
+                        "E1041"
+                    };
+                    self.push(
+                        code,
+                        format!(
+                            "Invalid value for field '{}.{}': {message}",
+                            name, field_name
+                        ),
+                    );
                 }
             }
         }
@@ -2091,7 +2666,12 @@ impl Checker {
             name.to_string(),
             generics
                 .iter()
-                .map(|generic| type_subst.get(&generic.name).cloned().unwrap_or(Ty::Unknown))
+                .map(|generic| {
+                    type_subst
+                        .get(&generic.name)
+                        .cloned()
+                        .unwrap_or(Ty::Unknown)
+                })
                 .collect(),
         )
     }
@@ -2124,8 +2704,12 @@ impl Checker {
         scope: &Scope,
     ) {
         let receiver_ty = self.infer_expr(receiver, &mut scope.clone());
-        let Some(record_name) = record_type_name(&receiver_ty) else { return };
-        let Some(fields) = self.record_field_mutability.get(record_name) else { return };
+        let Some(record_name) = record_type_name(&receiver_ty) else {
+            return;
+        };
+        let Some(fields) = self.record_field_mutability.get(record_name) else {
+            return;
+        };
         if !fields.get(field).copied().unwrap_or(false) {
             self.push(
                 "E1002",
@@ -2164,19 +2748,25 @@ impl Checker {
                     let belongs = matches!(
                         expected,
                         Ty::Named(type_name) | Ty::Applied(type_name, _) if type_name == owner
-                    )
-                        || *expected == Ty::Unknown;
+                    ) || *expected == Ty::Unknown;
                     if !belongs {
                         self.push(
                             "E1061",
-                            format!("Variant '{}' does not belong to type '{}'.", name, expected.describe()),
+                            format!(
+                                "Variant '{}' does not belong to type '{}'.",
+                                name,
+                                expected.describe()
+                            ),
                         );
                         return false;
                     }
                     if fields.is_some_and(|fields| !fields.is_empty()) {
                         self.push(
                             "E1061",
-                            format!("Variant '{}' carries data and must destructure its field(s).", name),
+                            format!(
+                                "Variant '{}' carries data and must destructure its field(s).",
+                                name
+                            ),
                         );
                         return false;
                     }
@@ -2201,7 +2791,10 @@ impl Checker {
             Pattern::Range(start, _, end) => {
                 let start_ty = pattern_literal_type(start);
                 let end_ty = pattern_literal_type(end);
-                if !compatible(expected, &start_ty) || !compatible(expected, &end_ty) || !compatible(&start_ty, &end_ty) {
+                if !compatible(expected, &start_ty)
+                    || !compatible(expected, &end_ty)
+                    || !compatible(&start_ty, &end_ty)
+                {
                     self.push(
                         "E1061",
                         format!(
@@ -2216,10 +2809,15 @@ impl Checker {
                 true
             }
             Pattern::Variant(name, fields) => {
-                let Some((field_names, field_types)) = self.constructor_fields(expected, name) else {
+                let Some((field_names, field_types)) = self.constructor_fields(expected, name)
+                else {
                     self.push(
                         "E1061",
-                        format!("Pattern constructor '{}' does not match '{}'.", name, expected.describe()),
+                        format!(
+                            "Pattern constructor '{}' does not match '{}'.",
+                            name,
+                            expected.describe()
+                        ),
                     );
                     return false;
                 };
@@ -2241,7 +2839,10 @@ impl Checker {
                     let Some(field_index) = indices.get(index).and_then(|index| *index) else {
                         self.push(
                             "E1061",
-                            format!("Pattern field '{}' is not declared by constructor '{}'.", fields[index].0, name),
+                            format!(
+                                "Pattern field '{}' is not declared by constructor '{}'.",
+                                fields[index].0, name
+                            ),
                         );
                         valid = false;
                         continue;
@@ -2255,7 +2856,11 @@ impl Checker {
         }
     }
 
-    fn constructor_fields(&self, expected: &Ty, constructor: &str) -> Option<(Vec<Option<String>>, Vec<Ty>)> {
+    fn constructor_fields(
+        &self,
+        expected: &Ty,
+        constructor: &str,
+    ) -> Option<(Vec<Option<String>>, Vec<Ty>)> {
         if let Some(owner) = self.variant_owners.get(constructor) {
             let type_subst = match expected {
                 Ty::Named(type_name) if type_name == owner => HashMap::new(),
@@ -2267,7 +2872,10 @@ impl Checker {
             };
             let key = (owner.clone(), constructor.to_string());
             return Some((
-                self.variant_field_names.get(&key).cloned().unwrap_or_default(),
+                self.variant_field_names
+                    .get(&key)
+                    .cloned()
+                    .unwrap_or_default(),
                 self.variant_fields
                     .get(&key)
                     .cloned()
@@ -2302,10 +2910,16 @@ impl Checker {
                 }
             }
             Pattern::Variant(constructor, fields) => {
-                let Some((field_names, field_types)) = self.constructor_fields(expected, constructor) else { return };
+                let Some((field_names, field_types)) =
+                    self.constructor_fields(expected, constructor)
+                else {
+                    return;
+                };
                 let indices = pattern_field_indices(&field_names, fields);
                 for (index, (_, subpattern)) in fields.iter().enumerate() {
-                    let Some(field_index) = indices.get(index).and_then(|index| *index) else { continue };
+                    let Some(field_index) = indices.get(index).and_then(|index| *index) else {
+                        continue;
+                    };
                     if let Some(field_type) = field_types.get(field_index) {
                         self.bind_pattern_vars_typed(subpattern, field_type, scope);
                     }
@@ -2342,7 +2956,11 @@ impl Checker {
                 return Ty::Unknown;
             }
             let elem = left_elem.or(right_elem).expect("one side is an array");
-            let array = if array_elem(&lt).is_some() { lt.clone() } else { rt.clone() };
+            let array = if array_elem(&lt).is_some() {
+                lt.clone()
+            } else {
+                rt.clone()
+            };
             let bools = Ty::Applied("Array".to_string(), vec![Ty::Bool]);
             return match op {
                 Add | Sub | Mul | Div if elem != Ty::Bool => array,
@@ -2356,7 +2974,14 @@ impl Checker {
         }
         if matches!(lt, Ty::Sized(_) | Ty::Float32) || matches!(rt, Ty::Sized(_) | Ty::Float32) {
             if matches!(op, And | Or) {
-                self.push("E1041", format!("Logical operators expect 'Bool' operands, got '{}' and '{}'.", lt.describe(), rt.describe()));
+                self.push(
+                    "E1041",
+                    format!(
+                        "Logical operators expect 'Bool' operands, got '{}' and '{}'.",
+                        lt.describe(),
+                        rt.describe()
+                    ),
+                );
                 return Ty::Bool;
             }
             return match (&lt, &rt) {
@@ -2414,7 +3039,8 @@ impl Checker {
                     _ => None,
                 };
                 if trait_name.is_some_and(|name| {
-                    self.trait_impls.contains(&(name.to_string(), left_name.clone()))
+                    self.trait_impls
+                        .contains(&(name.to_string(), left_name.clone()))
                 }) {
                     return Ty::Named(left_name.clone());
                 }
@@ -2446,25 +3072,55 @@ impl Checker {
                     Ty::Unknown
                 }
                 (Ty::String, Ty::String) => Ty::String,
-                (Ty::Float, _) | (_, Ty::Float) if lt.is_numeric_scalar() && rt.is_numeric_scalar() => Ty::Float,
+                (Ty::Float, _) | (_, Ty::Float)
+                    if lt.is_numeric_scalar() && rt.is_numeric_scalar() =>
+                {
+                    Ty::Float
+                }
                 (Ty::Int, Ty::Int) => Ty::Int,
                 _ => {
-                    self.push("E1041", format!("Cannot apply '+'/'-' to '{}' and '{}'.", lt.describe(), rt.describe()));
+                    self.push(
+                        "E1041",
+                        format!(
+                            "Cannot apply '+'/'-' to '{}' and '{}'.",
+                            lt.describe(),
+                            rt.describe()
+                        ),
+                    );
                     Ty::Unknown
                 }
             },
             Mul | Div => match (&lt, &rt) {
                 (Ty::Quantity(d1), Ty::Quantity(d2)) => {
-                    let combined = if op == Mul { dim_mul(d1, d2) } else { dim_div(d1, d2) };
-                    if op == Div && dim_is_dimensionless(&combined) { Ty::Float } else { Ty::Quantity(combined) }
+                    let combined = if op == Mul {
+                        dim_mul(d1, d2)
+                    } else {
+                        dim_div(d1, d2)
+                    };
+                    if op == Div && dim_is_dimensionless(&combined) {
+                        Ty::Float
+                    } else {
+                        Ty::Quantity(combined)
+                    }
                 }
                 (Ty::Quantity(d), t) if t.is_numeric_scalar() => Ty::Quantity(d.clone()),
-                (t, Ty::Quantity(d)) if t.is_numeric_scalar() && op == Mul => Ty::Quantity(d.clone()),
-                (t, Ty::Quantity(d)) if t.is_numeric_scalar() && op == Div => Ty::Quantity(dim_pow(d, -1)),
+                (t, Ty::Quantity(d)) if t.is_numeric_scalar() && op == Mul => {
+                    Ty::Quantity(d.clone())
+                }
+                (t, Ty::Quantity(d)) if t.is_numeric_scalar() && op == Div => {
+                    Ty::Quantity(dim_pow(d, -1))
+                }
                 (Ty::Int, Ty::Int) => Ty::Int,
                 (a, b) if a.is_numeric_scalar() && b.is_numeric_scalar() => Ty::Float,
                 _ => {
-                    self.push("E1041", format!("Cannot apply '*'//'/' to '{}' and '{}'.", lt.describe(), rt.describe()));
+                    self.push(
+                        "E1041",
+                        format!(
+                            "Cannot apply '*'//'/' to '{}' and '{}'.",
+                            lt.describe(),
+                            rt.describe()
+                        ),
+                    );
                     Ty::Unknown
                 }
             },
@@ -2472,7 +3128,14 @@ impl Checker {
                 (Ty::Int, Ty::Int) => Ty::Int,
                 (a, b) if a.is_numeric_scalar() && b.is_numeric_scalar() => Ty::Float,
                 _ => {
-                    self.push("E1041", format!("Cannot apply '%' to '{}' and '{}'.", lt.describe(), rt.describe()));
+                    self.push(
+                        "E1041",
+                        format!(
+                            "Cannot apply '%' to '{}' and '{}'.",
+                            lt.describe(),
+                            rt.describe()
+                        ),
+                    );
                     Ty::Unknown
                 }
             },
@@ -2481,7 +3144,11 @@ impl Checker {
                     if d1 != d2 {
                         self.push(
                             "E1024",
-                            format!("Cannot compare {} and {}.", dim_to_string(d1), dim_to_string(d2)),
+                            format!(
+                                "Cannot compare {} and {}.",
+                                dim_to_string(d1),
+                                dim_to_string(d2)
+                            ),
                         );
                     }
                 }
@@ -2504,7 +3171,8 @@ impl Checker {
     }
 
     fn constructor_shapes(&self, expected: &Ty, constructor: &str, depth: usize) -> Vec<Pattern> {
-        let Some((field_names, field_types)) = self.constructor_fields(expected, constructor) else {
+        let Some((field_names, field_types)) = self.constructor_fields(expected, constructor)
+        else {
             return Vec::new();
         };
         if field_types.is_empty() {
@@ -2514,7 +3182,11 @@ impl Checker {
         let mut combinations: Vec<Vec<(String, Pattern)>> = vec![Vec::new()];
         for (index, field_type) in field_types.iter().enumerate() {
             let choices = self.type_shapes(field_type, depth.saturating_sub(1));
-            let choices = if choices.is_empty() { vec![Pattern::Wildcard] } else { choices };
+            let choices = if choices.is_empty() {
+                vec![Pattern::Wildcard]
+            } else {
+                choices
+            };
             let label = field_names
                 .get(index)
                 .and_then(|name| name.clone())
@@ -2574,22 +3246,34 @@ impl Checker {
             }
             Pattern::Literal(_) | Pattern::Range(..) => false,
             Pattern::Variant(name, fields) => {
-                let Some((field_names, field_types)) = self.constructor_fields(expected, name) else {
+                let Some((field_names, field_types)) = self.constructor_fields(expected, name)
+                else {
                     return false;
                 };
                 if let Pattern::Ident(shape_name) = shape {
                     return shape_name == name && field_types.is_empty() && fields.is_empty();
                 }
-                let Pattern::Variant(shape_name, shape_fields) = shape else { return false };
-                if shape_name != name || fields.len() != field_types.len() || shape_fields.len() != field_types.len() {
+                let Pattern::Variant(shape_name, shape_fields) = shape else {
+                    return false;
+                };
+                if shape_name != name
+                    || fields.len() != field_types.len()
+                    || shape_fields.len() != field_types.len()
+                {
                     return false;
                 }
                 let pattern_indices = pattern_field_indices(&field_names, fields);
                 let shape_indices = pattern_field_indices(&field_names, shape_fields);
                 for field_index in 0..field_types.len() {
-                    let pattern_position = pattern_indices.iter().position(|index| *index == Some(field_index));
-                    let shape_position = shape_indices.iter().position(|index| *index == Some(field_index));
-                    let (Some(pattern_position), Some(shape_position)) = (pattern_position, shape_position) else {
+                    let pattern_position = pattern_indices
+                        .iter()
+                        .position(|index| *index == Some(field_index));
+                    let shape_position = shape_indices
+                        .iter()
+                        .position(|index| *index == Some(field_index));
+                    let (Some(pattern_position), Some(shape_position)) =
+                        (pattern_position, shape_position)
+                    else {
                         return false;
                     };
                     if !self.pattern_covers_shape(
@@ -2610,7 +3294,9 @@ impl Checker {
             Ty::Named(enum_name) | Ty::Applied(enum_name, _) => enum_name,
             _ => return,
         };
-        let Some(variants) = self.enum_variants.get(enum_name).cloned() else { return };
+        let Some(variants) = self.enum_variants.get(enum_name).cloned() else {
+            return;
+        };
         let patterns: Vec<&Pattern> = arms
             .iter()
             .filter(|arm| arm.guard.is_none())
@@ -2636,12 +3322,21 @@ impl Checker {
             .filter(|variant| !covered.contains(*variant))
             .map(String::as_str)
             .collect();
-        if missing.is_empty() { return; }
+        if missing.is_empty() {
+            return;
+        }
 
         let (label, list) = if missing.len() == 1 {
             ("Missing variant", format!("'{}'", missing[0]))
         } else {
-            ("Missing variants", missing.iter().map(|v| format!("'{v}'")).collect::<Vec<_>>().join(", "))
+            (
+                "Missing variants",
+                missing
+                    .iter()
+                    .map(|v| format!("'{v}'"))
+                    .collect::<Vec<_>>()
+                    .join(", "),
+            )
         };
         self.push(
             "E1060",
@@ -2657,17 +3352,30 @@ impl Checker {
         expected: Option<&Ty>,
         scope: &mut Scope,
     ) -> Ty {
-        if let (Expr::Lambda(params, body), Some(Ty::Fn(expected_params, expected_ret))) = (expr.unlocated(), expected) {
-            let inferred = self.infer_lambda(params, body, Some(expected_params), Some(expected_ret.as_ref()), scope);
+        if let (Expr::Lambda(params, body), Some(Ty::Fn(expected_params, expected_ret))) =
+            (expr.unlocated(), expected)
+        {
+            let inferred = self.infer_lambda(
+                params,
+                body,
+                Some(expected_params),
+                Some(expected_ret.as_ref()),
+                scope,
+            );
             let expected_type = Ty::Fn(expected_params.clone(), expected_ret.clone());
             let ty = refine_expected_type(&inferred, &expected_type);
             // This path bypasses `infer_expr`, so record the lambda's type here (every layer around it).
             let mut layer = expr;
             loop {
-                self.node_types.insert(layer as *const Expr as usize, ty.clone());
+                self.node_types
+                    .insert(layer as *const Expr as usize, ty.clone());
                 match layer {
                     Expr::Located(inner, range) => {
-                        let key = ExprKey { file: self.current_source_file.clone(), start: range.start, end: range.end };
+                        let key = ExprKey {
+                            file: self.current_source_file.clone(),
+                            start: range.start,
+                            end: range.end,
+                        };
                         self.expr_types.insert(key, ty.clone());
                         layer = inner
                     }
@@ -2677,14 +3385,20 @@ impl Checker {
             return ty;
         }
         let inferred = self.infer_expr(expr, scope);
-        let Some(expected) = expected else { return inferred };
+        let Some(expected) = expected else {
+            return inferred;
+        };
         let refined = refine_expected_type(&inferred, expected);
         if refined != inferred {
             self.set_node_type_layers(expr, &refined);
             let mut layer = expr;
             loop {
                 if let Expr::Located(_, range) = layer {
-                    let key = ExprKey { file: self.current_source_file.clone(), start: range.start, end: range.end };
+                    let key = ExprKey {
+                        file: self.current_source_file.clone(),
+                        start: range.start,
+                        end: range.end,
+                    };
                     self.expr_types.insert(key, refined.clone());
                     if let Expr::Located(inner, _) = layer {
                         layer = inner;
@@ -2715,7 +3429,11 @@ impl Checker {
             inner.insert(parameter.clone(), (parameter_type, false));
         }
         let previous_return_type = self.current_return_type.take();
-        let ret = self.check_block_expecting(body, &mut inner, expected_ret.filter(|r| !matches!(r, Ty::Unknown)));
+        let ret = self.check_block_expecting(
+            body,
+            &mut inner,
+            expected_ret.filter(|r| !matches!(r, Ty::Unknown)),
+        );
         self.current_return_type = previous_return_type;
         Ty::Fn(parameter_types, Box::new(ret))
     }
@@ -2749,7 +3467,9 @@ impl Checker {
             };
             // A function-typed parameter of a plain (non-generic) user function tells a lambda argument its types.
             let expected = expected.or_else(|| {
-                let Expr::Ident(name) = callee.unlocated() else { return None };
+                let Expr::Ident(name) = callee.unlocated() else {
+                    return None;
+                };
                 if scope.contains_key(name) {
                     return None;
                 }
@@ -2790,10 +3510,20 @@ impl Checker {
                 return return_type;
             }
             if self.variant_owners.contains_key(name) {
-                return self.check_variant_constructor(name, &arg_types, &arg_exprs, explicit_type_args);
+                return self.check_variant_constructor(
+                    name,
+                    &arg_types,
+                    &arg_exprs,
+                    explicit_type_args,
+                );
             }
             if let Some(sig) = self.functions.get(name) {
-                return self.check_function_call(&sig.clone(), args, &arg_types, explicit_type_args);
+                return self.check_function_call(
+                    &sig.clone(),
+                    args,
+                    &arg_types,
+                    explicit_type_args,
+                );
             }
             if let Some(result) = self.check_array_call(name, &arg_types) {
                 return result;
@@ -2805,7 +3535,8 @@ impl Checker {
                 return result;
             }
             if name == "rng" {
-                if arg_types.len() != 1 || (arg_types[0] != Ty::Int && arg_types[0] != Ty::Unknown) {
+                if arg_types.len() != 1 || (arg_types[0] != Ty::Int && arg_types[0] != Ty::Unknown)
+                {
                     self.push("E1041", "'rng' expects one Int seed.".to_string());
                 }
                 return Ty::Named("Rng".to_string());
@@ -2848,19 +3579,20 @@ impl Checker {
             if array_elem(&receiver_ty).is_some() && method != "to_string" {
                 return self.check_array_method(&receiver_ty, method, &arg_types);
             }
-            if let Some(return_type) = self.check_generic_method_call(
-                &receiver_ty,
-                method,
-                &arg_types,
-                explicit_type_args,
-            ) {
+            if let Some(return_type) =
+                self.check_generic_method_call(&receiver_ty, method, &arg_types, explicit_type_args)
+            {
                 return return_type;
             }
             if let Ty::Quantity(_) = receiver_ty {
                 if arg_types.is_empty() && (method == "value" || method == "unit") {
                     // Introspection for unit-aware code (std.viz axis labels):
                     // the number in the quantity's own unit, and that unit.
-                    return if method == "value" { Ty::Float } else { Ty::String };
+                    return if method == "value" {
+                        Ty::Float
+                    } else {
+                        Ty::String
+                    };
                 }
             }
             if method == "to_string" {
@@ -2885,13 +3617,19 @@ impl Checker {
             ) {
                 return return_type;
             }
-            if let Some(return_type) = check_concurrency_method(&receiver_ty, method, &arg_types, &mut self.errors) {
+            if let Some(return_type) =
+                check_concurrency_method(&receiver_ty, method, &arg_types, &mut self.errors)
+            {
                 return return_type;
             }
-            if let Some(return_type) = check_option_result_method(&receiver_ty, method, &arg_types, &mut self.errors) {
+            if let Some(return_type) =
+                check_option_result_method(&receiver_ty, method, &arg_types, &mut self.errors)
+            {
                 return return_type;
             }
-            if let Some(return_type) = check_collection_method(&receiver_ty, method, &arg_types, &mut self.errors) {
+            if let Some(return_type) =
+                check_collection_method(&receiver_ty, method, &arg_types, &mut self.errors)
+            {
                 return return_type;
             }
             if self.is_concrete_user_type(&receiver_ty) {
@@ -2918,8 +3656,7 @@ impl Checker {
         if explicit_type_args.is_some() {
             self.push(
                 "E1042",
-                "Explicit generic arguments require a named generic function."
-                    .to_string(),
+                "Explicit generic arguments require a named generic function.".to_string(),
             );
         }
 
@@ -2929,7 +3666,11 @@ impl Checker {
                 if params.len() != args.len() {
                     self.push(
                         "E1041",
-                        format!("Function value expects {} argument(s), got {}.", params.len(), args.len()),
+                        format!(
+                            "Function value expects {} argument(s), got {}.",
+                            params.len(),
+                            args.len()
+                        ),
                     );
                 }
                 *ret
@@ -2969,7 +3710,11 @@ impl Checker {
             .get(&(enum_name.clone(), variant_name.to_string()))
             .cloned()
             .unwrap_or_default();
-        let generic_params = self.enum_generics.get(&enum_name).cloned().unwrap_or_default();
+        let generic_params = self
+            .enum_generics
+            .get(&enum_name)
+            .cloned()
+            .unwrap_or_default();
         if field_types.len() != arg_types.len() {
             self.push(
                 "E1061",
@@ -2981,13 +3726,19 @@ impl Checker {
                 ),
             );
         }
-        let generic_names: HashSet<String> = generic_params.iter().map(|generic| generic.name.clone()).collect();
+        let generic_names: HashSet<String> = generic_params
+            .iter()
+            .map(|generic| generic.name.clone())
+            .collect();
         let mut type_subst = HashMap::new();
         if let Some(explicit) = explicit_type_args {
             if generic_params.is_empty() {
                 self.push(
                     "E1042",
-                    format!("Constructor '{}' is not generic but received explicit type arguments.", variant_name),
+                    format!(
+                        "Constructor '{}' is not generic but received explicit type arguments.",
+                        variant_name
+                    ),
                 );
             } else {
                 if explicit.len() != generic_params.len() {
@@ -3002,25 +3753,44 @@ impl Checker {
                     );
                 }
                 for (generic, explicit_ty) in generic_params.iter().zip(explicit.iter()) {
-                    type_subst.insert(generic.name.clone(), self.resolve_type_in_context(explicit_ty));
+                    type_subst.insert(
+                        generic.name.clone(),
+                        self.resolve_type_in_context(explicit_ty),
+                    );
                 }
             }
         }
-        for (index, (field_type, arg_type)) in field_types.iter().zip(arg_types.iter()).enumerate() {
+        for (index, (field_type, arg_type)) in field_types.iter().zip(arg_types.iter()).enumerate()
+        {
             // An untyped integer literal for a fixed-width field takes the field's type.
             let declared = resolve_type_with_type_subst(field_type, &type_subst, &HashMap::new());
             let adapted = match arg_exprs.get(index) {
-                Some(expr) if matches!(declared, Ty::Sized(_) | Ty::Float32 | Ty::List(_)) => self.adapt_literals(expr, &declared, arg_type),
+                Some(expr) if matches!(declared, Ty::Sized(_) | Ty::Float32 | Ty::List(_)) => {
+                    self.adapt_literals(expr, &declared, arg_type)
+                }
                 _ => false,
             };
             let arg_type = if adapted { &declared } else { arg_type };
-            if let Err(message) = unify_generic_type(field_type, arg_type, &generic_names, &mut type_subst) {
-                self.push("E1061", format!("Invalid argument for constructor '{}': {message}", variant_name));
+            if let Err(message) =
+                unify_generic_type(field_type, arg_type, &generic_names, &mut type_subst)
+            {
+                self.push(
+                    "E1061",
+                    format!(
+                        "Invalid argument for constructor '{}': {message}",
+                        variant_name
+                    ),
+                );
             }
         }
         let type_args: Vec<Ty> = generic_params
             .iter()
-            .map(|generic| type_subst.get(&generic.name).cloned().unwrap_or(Ty::Unknown))
+            .map(|generic| {
+                type_subst
+                    .get(&generic.name)
+                    .cloned()
+                    .unwrap_or(Ty::Unknown)
+            })
             .collect();
         self.variant_type(&enum_name, &type_args)
     }
@@ -3061,7 +3831,8 @@ impl Checker {
                 }
                 Arg::Named(name, _) => {
                     saw_named = true;
-                    let Some(index) = sig.params.iter().position(|param| param.name == *name) else {
+                    let Some(index) = sig.params.iter().position(|param| param.name == *name)
+                    else {
                         self.push(
                             "E1041",
                             format!("Function has no parameter named '{}'.", name),
@@ -3172,7 +3943,9 @@ impl Checker {
         if !dim_generics.is_empty() {
             for (param, arg_ty) in sig.params.iter().zip(bound_args.iter()) {
                 let Some(arg_ty) = arg_ty else { continue };
-                if let Err(message) = bind_nested_dimensions(&param.ty, arg_ty, &dim_generics, &mut dim_subst) {
+                if let Err(message) =
+                    bind_nested_dimensions(&param.ty, arg_ty, &dim_generics, &mut dim_subst)
+                {
                     self.push("E1042", message);
                 }
             }
@@ -3212,7 +3985,9 @@ impl Checker {
             .collect();
         for (param, arg_ty) in sig.params.iter().zip(bound_args.iter()) {
             let Some(arg_ty) = arg_ty else { continue };
-            if let Err(message) = unify_generic_type(&param.ty, arg_ty, &generic_names, &mut type_subst) {
+            if let Err(message) =
+                unify_generic_type(&param.ty, arg_ty, &generic_names, &mut type_subst)
+            {
                 self.push("E1042", message);
             }
         }
@@ -3251,9 +4026,15 @@ impl Checker {
         }
 
         // Remember what this call instantiated, for backends.
-        let complete = sig.generics.iter().all(|g| type_subst.contains_key(&g.name) || dim_subst.contains_key(&g.name));
+        let complete = sig
+            .generics
+            .iter()
+            .all(|g| type_subst.contains_key(&g.name) || dim_subst.contains_key(&g.name));
         if complete {
-            let recorded = CallSubst { types: type_subst.clone(), dims: dim_subst.clone() };
+            let recorded = CallSubst {
+                types: type_subst.clone(),
+                dims: dim_subst.clone(),
+            };
             if let Some(key) = self.call_key_stack.last().cloned() {
                 self.call_substs.insert(key, recorded.clone());
             }
@@ -3272,8 +4053,14 @@ impl Checker {
         arg_types: &[Ty],
         explicit_type_args: Option<&[Type]>,
     ) -> Option<Ty> {
-        let Ty::Generic(generic_name) = receiver_ty else { return None };
-        let bounds = self.current_generic_bounds.get(generic_name).cloned().unwrap_or_default();
+        let Ty::Generic(generic_name) = receiver_ty else {
+            return None;
+        };
+        let bounds = self
+            .current_generic_bounds
+            .get(generic_name)
+            .cloned()
+            .unwrap_or_default();
         let method_sig = bounds.iter().find_map(|bound| {
             self.traits
                 .get(bound)
@@ -3302,7 +4089,10 @@ impl Checker {
                 if method_sig.generics.is_empty() {
                     self.push(
                         "E1042",
-                        format!("Method '{}' is not generic but received explicit type arguments.", method),
+                        format!(
+                            "Method '{}' is not generic but received explicit type arguments.",
+                            method
+                        ),
                     );
                 } else {
                     if explicit.len() != method_sig.generics.len() {
@@ -3348,7 +4138,9 @@ impl Checker {
         }
 
         for generic in &method_sig.generics {
-            let Some(actual_ty) = method_subst.get(&generic.name) else { continue };
+            let Some(actual_ty) = method_subst.get(&generic.name) else {
+                continue;
+            };
             for bound in &generic.bounds {
                 if !self.type_satisfies_trait(actual_ty, bound) {
                     self.push(
@@ -3369,11 +4161,7 @@ impl Checker {
 
         let expected_args = method_sig.params.iter().skip(1);
         for (param, actual) in expected_args.zip(arg_types.iter()) {
-            let expected = resolve_type_with_type_subst(
-                &param.ty,
-                &substitutions,
-                &HashMap::new(),
-            );
+            let expected = resolve_type_with_type_subst(&param.ty, &substitutions, &HashMap::new());
             if !compatible(&expected, actual) {
                 self.push(
                     "E1042",
@@ -3418,17 +4206,29 @@ impl Checker {
         // (the rule `hir::arrange_arguments` applies when lowering); an
         // omitted argument takes its default, which checks as `?`.
         let params_after_self: Vec<Param> = candidate.params.iter().skip(1).cloned().collect();
-        let needs_arranging = arg_names.iter().any(|n| n.is_some()) || arg_types.len() < params_after_self.len();
-        let (arranged_types, arranged_exprs): (Vec<Ty>, Vec<&Expr>) = if needs_arranging && arg_names.len() == arg_types.len() {
+        let needs_arranging =
+            arg_names.iter().any(|n| n.is_some()) || arg_types.len() < params_after_self.len();
+        let (arranged_types, arranged_exprs): (Vec<Ty>, Vec<&Expr>) = if needs_arranging
+            && arg_names.len() == arg_types.len()
+        {
             let tagged: Vec<(Option<String>, (Ty, Option<&Expr>))> = arg_names
                 .iter()
                 .cloned()
-                .zip(arg_types.iter().cloned().zip(arg_exprs.iter().map(|e| Some(*e))))
+                .zip(
+                    arg_types
+                        .iter()
+                        .cloned()
+                        .zip(arg_exprs.iter().map(|e| Some(*e))),
+                )
                 .collect();
-            match crate::hir::arrange_arguments(&params_after_self, tagged, |_| (Ty::Unknown, None)) {
+            match crate::hir::arrange_arguments(&params_after_self, tagged, |_| (Ty::Unknown, None))
+            {
                 Ok(list) => {
                     let types = list.iter().map(|(t, _)| t.clone()).collect();
-                    let exprs = list.iter().map(|(_, e)| e.unwrap_or(&Expr::BoolLiteral(false))).collect();
+                    let exprs = list
+                        .iter()
+                        .map(|(_, e)| e.unwrap_or(&Expr::BoolLiteral(false)))
+                        .collect();
                     (types, exprs)
                 }
                 Err(message) => {
@@ -3452,7 +4252,10 @@ impl Checker {
             if candidate.generics.is_empty() {
                 self.push(
                     "E1042",
-                    format!("Method '{}' is not generic but received explicit type arguments.", method),
+                    format!(
+                        "Method '{}' is not generic but received explicit type arguments.",
+                        method
+                    ),
                 );
             } else {
                 if explicit.len() != candidate.generics.len() {
@@ -3488,7 +4291,9 @@ impl Checker {
                 }
             }
             for generic in &candidate.generics {
-                if !method_substitutions.contains_key(&generic.name) && !method_substitutions.contains_key(&format!("#dim:{}", generic.name)) {
+                if !method_substitutions.contains_key(&generic.name)
+                    && !method_substitutions.contains_key(&format!("#dim:{}", generic.name))
+                {
                     self.push(
                         "E1042",
                         format!("Cannot infer generic method parameter '{}'.", generic.name),
@@ -3498,7 +4303,9 @@ impl Checker {
         }
 
         for generic in &candidate.generics {
-            let Some(actual_ty) = method_substitutions.get(&generic.name) else { continue };
+            let Some(actual_ty) = method_substitutions.get(&generic.name) else {
+                continue;
+            };
             for bound in &generic.bounds {
                 if !self.type_satisfies_trait(actual_ty, bound) {
                     self.push(
@@ -3578,13 +4385,19 @@ impl Checker {
 
     fn concrete_method_candidate(&self, receiver_ty: &Ty, method: &str) -> Option<ConcreteMethod> {
         for implementation in &self.implementations {
-            let Some(impl_substitutions) = implementation_type_substitutions(receiver_ty, implementation) else {
+            let Some(impl_substitutions) =
+                implementation_type_substitutions(receiver_ty, implementation)
+            else {
                 continue;
             };
             if !self.implementation_bounds_satisfied(implementation, &impl_substitutions) {
                 continue;
             }
-            if let Some(declared) = implementation.methods.iter().find(|candidate| candidate.name == method) {
+            if let Some(declared) = implementation
+                .methods
+                .iter()
+                .find(|candidate| candidate.name == method)
+            {
                 return Some(ConcreteMethod {
                     generics: declared.generics.clone(),
                     params: declared.params.clone(),
@@ -3595,7 +4408,11 @@ impl Checker {
             }
             if let Some(trait_name) = &implementation.trait_name {
                 if let Some(trait_decl) = self.traits.get(trait_name) {
-                    if let Some(declared) = trait_decl.methods.iter().find(|candidate| candidate.name == method) {
+                    if let Some(declared) = trait_decl
+                        .methods
+                        .iter()
+                        .find(|candidate| candidate.name == method)
+                    {
                         let declared = specialize_trait_method(
                             declared,
                             &trait_decl.generics,
@@ -3621,7 +4438,9 @@ impl Checker {
         substitutions: &HashMap<String, Ty>,
     ) -> bool {
         implementation.generics.iter().all(|generic| {
-            let Some(actual_ty) = substitutions.get(&generic.name) else { return true };
+            let Some(actual_ty) = substitutions.get(&generic.name) else {
+                return true;
+            };
             generic
                 .bounds
                 .iter()
@@ -3683,7 +4502,9 @@ impl Checker {
         }
         let missing: Vec<&str> = ["Hash", "Eq"]
             .into_iter()
-            .filter(|trait_name| !self.collection_trait_satisfied(ty, trait_name, &mut HashSet::new()))
+            .filter(|trait_name| {
+                !self.collection_trait_satisfied(ty, trait_name, &mut HashSet::new())
+            })
             .collect();
         let key = format!("{role}:{}", ty.describe());
         if self.collection_bound_diagnostics.insert(key) {
@@ -3698,7 +4519,12 @@ impl Checker {
         }
     }
 
-    fn collection_trait_satisfied(&self, ty: &Ty, trait_name: &str, visiting: &mut HashSet<String>) -> bool {
+    fn collection_trait_satisfied(
+        &self,
+        ty: &Ty,
+        trait_name: &str,
+        visiting: &mut HashSet<String>,
+    ) -> bool {
         if ty == &Ty::Unknown {
             return true;
         }
@@ -3709,8 +4535,13 @@ impl Checker {
                 .is_some_and(|bounds| bounds.iter().any(|bound| bound == trait_name));
         }
         match (trait_name, ty) {
-            ("Hash" | "Eq", Ty::Int | Ty::Float | Ty::Bool | Ty::String | Ty::Sized(_) | Ty::Float32) => true,
-            (_, Ty::List(element) | Ty::Set(element)) => self.collection_trait_satisfied(element, trait_name, visiting),
+            (
+                "Hash" | "Eq",
+                Ty::Int | Ty::Float | Ty::Bool | Ty::String | Ty::Sized(_) | Ty::Float32,
+            ) => true,
+            (_, Ty::List(element) | Ty::Set(element)) => {
+                self.collection_trait_satisfied(element, trait_name, visiting)
+            }
             (_, Ty::Map(key, value)) => {
                 self.collection_trait_satisfied(key, trait_name, visiting)
                     && self.collection_trait_satisfied(value, trait_name, visiting)
@@ -3732,9 +4563,11 @@ impl Checker {
                     .get(name)
                     .or_else(|| self.enum_derives.get(name));
                 let direct = match trait_name {
-                    "Hash" => derives.is_some_and(|traits| traits.iter().any(|candidate| candidate == "Hash")),
+                    "Hash" => derives
+                        .is_some_and(|traits| traits.iter().any(|candidate| candidate == "Hash")),
                     "Eq" => {
-                        derives.is_some_and(|traits| traits.iter().any(|candidate| candidate == "Eq"))
+                        derives
+                            .is_some_and(|traits| traits.iter().any(|candidate| candidate == "Eq"))
                             || self.type_satisfies_trait(ty, "Eq")
                     }
                     _ => false,
@@ -3752,13 +4585,22 @@ impl Checker {
                 let field_types: Vec<Ty> = if let Some(fields) = self.record_fields.get(name) {
                     fields
                         .iter()
-                        .map(|(_, field)| resolve_type_with_type_subst(field, &generic_subst, &HashMap::new()))
+                        .map(|(_, field)| {
+                            resolve_type_with_type_subst(field, &generic_subst, &HashMap::new())
+                        })
                         .collect()
                 } else if let Some(variants) = self.enum_variants.get(name) {
                     variants
                         .iter()
-                        .flat_map(|variant| self.variant_fields.get(&(name.clone(), variant.clone())).into_iter().flatten())
-                        .map(|field| resolve_type_with_type_subst(field, &generic_subst, &HashMap::new()))
+                        .flat_map(|variant| {
+                            self.variant_fields
+                                .get(&(name.clone(), variant.clone()))
+                                .into_iter()
+                                .flatten()
+                        })
+                        .map(|field| {
+                            resolve_type_with_type_subst(field, &generic_subst, &HashMap::new())
+                        })
                         .collect()
                 } else {
                     Vec::new()
@@ -3798,10 +4640,11 @@ impl Checker {
         }
         self.implementations.iter().any(|implementation| {
             implementation.trait_name.as_deref() == Some(trait_name)
-                && implementation_type_substitutions(actual_ty, implementation)
-                    .is_some_and(|substitutions| {
+                && implementation_type_substitutions(actual_ty, implementation).is_some_and(
+                    |substitutions| {
                         self.implementation_bounds_satisfied(implementation, &substitutions)
-                    })
+                    },
+                )
         })
     }
 
@@ -3829,10 +4672,15 @@ impl Checker {
             }
             Type::Named(name, args) if !args.is_empty() => Ty::Applied(
                 name.clone(),
-                args.iter().map(|arg| self.resolve_type_in_context(arg)).collect(),
+                args.iter()
+                    .map(|arg| self.resolve_type_in_context(arg))
+                    .collect(),
             ),
             Type::Fn(params, ret) => Ty::Fn(
-                params.iter().map(|param| self.resolve_type_in_context(param)).collect(),
+                params
+                    .iter()
+                    .map(|param| self.resolve_type_in_context(param))
+                    .collect(),
                 Box::new(self.resolve_type_in_context(ret)),
             ),
             _ => resolve_type_with_subst(ty, &HashMap::new()),
@@ -3852,8 +4700,15 @@ impl Checker {
 fn is_known_base_dimension(name: &str) -> bool {
     matches!(
         name,
-        "Length" | "Mass" | "Time" | "Temperature" | "ElectricCurrent" | "AmountOfSubstance" | "LuminousIntensity"
-            | "Currency" | "Information"
+        "Length"
+            | "Mass"
+            | "Time"
+            | "Temperature"
+            | "ElectricCurrent"
+            | "AmountOfSubstance"
+            | "LuminousIntensity"
+            | "Currency"
+            | "Information"
     ) || crate::types::named_dimension(name).is_some()
         || crate::types::is_user_dimension(name)
 }
@@ -3889,42 +4744,55 @@ fn resolve_type_with_type_subst(
                 }
             }
             match name.as_str() {
-            "Int" | "Int64" => Ty::Int,
-            other if args.is_empty() && IntKind::from_name(other).is_some() => Ty::Sized(IntKind::from_name(other).unwrap()),
-            "Float" | "Float64" => Ty::Float,
-            "Float32" => Ty::Float32,
-            "Bool" => Ty::Bool,
-            "Char" => Ty::Char,
-            "String" => Ty::String,
-            "Void" => Ty::Void,
-            "Quantity" if args.len() == 1 => {
-                // A generic method's `D: Dimension` is inferred into
-                // `type_subst` as `Quantity<D>` (see `unify_generic_type`).
-                let mut dims = dim_subst.clone();
-                for (k, v) in type_subst {
-                    if let (Some(name), Ty::Quantity(d)) = (k.strip_prefix("#dim:"), v) {
-                        dims.entry(name.to_string()).or_insert_with(|| d.clone());
-                    }
+                "Int" | "Int64" => Ty::Int,
+                other if args.is_empty() && IntKind::from_name(other).is_some() => {
+                    Ty::Sized(IntKind::from_name(other).unwrap())
                 }
-                Ty::Quantity(resolve_dimension_with_subst(&args[0], &dims))
-            }
-            "List" if args.len() == 1 => Ty::List(Box::new(resolve_type_with_type_subst(&args[0], type_subst, dim_subst))),
-            "Map" if args.len() == 2 => Ty::Map(
-                Box::new(resolve_type_with_type_subst(&args[0], type_subst, dim_subst)),
-                Box::new(resolve_type_with_type_subst(&args[1], type_subst, dim_subst)),
-            ),
-            "Set" if args.len() == 1 => Ty::Set(Box::new(resolve_type_with_type_subst(&args[0], type_subst, dim_subst))),
-            _ if !args.is_empty() => Ty::Applied(
-                name.clone(),
-                args.iter()
-                    .map(|arg| resolve_type_with_type_subst(arg, type_subst, dim_subst))
-                    .collect(),
-            ),
-            _ => Ty::Named(name.clone()),
+                "Float" | "Float64" => Ty::Float,
+                "Float32" => Ty::Float32,
+                "Bool" => Ty::Bool,
+                "Char" => Ty::Char,
+                "String" => Ty::String,
+                "Void" => Ty::Void,
+                "Quantity" if args.len() == 1 => {
+                    // A generic method's `D: Dimension` is inferred into
+                    // `type_subst` as `Quantity<D>` (see `unify_generic_type`).
+                    let mut dims = dim_subst.clone();
+                    for (k, v) in type_subst {
+                        if let (Some(name), Ty::Quantity(d)) = (k.strip_prefix("#dim:"), v) {
+                            dims.entry(name.to_string()).or_insert_with(|| d.clone());
+                        }
+                    }
+                    Ty::Quantity(resolve_dimension_with_subst(&args[0], &dims))
+                }
+                "List" if args.len() == 1 => Ty::List(Box::new(resolve_type_with_type_subst(
+                    &args[0], type_subst, dim_subst,
+                ))),
+                "Map" if args.len() == 2 => Ty::Map(
+                    Box::new(resolve_type_with_type_subst(
+                        &args[0], type_subst, dim_subst,
+                    )),
+                    Box::new(resolve_type_with_type_subst(
+                        &args[1], type_subst, dim_subst,
+                    )),
+                ),
+                "Set" if args.len() == 1 => Ty::Set(Box::new(resolve_type_with_type_subst(
+                    &args[0], type_subst, dim_subst,
+                ))),
+                _ if !args.is_empty() => Ty::Applied(
+                    name.clone(),
+                    args.iter()
+                        .map(|arg| resolve_type_with_type_subst(arg, type_subst, dim_subst))
+                        .collect(),
+                ),
+                _ => Ty::Named(name.clone()),
             }
         }
         Type::Fn(params, ret) => Ty::Fn(
-            params.iter().map(|t| resolve_type_with_type_subst(t, type_subst, dim_subst)).collect(),
+            params
+                .iter()
+                .map(|t| resolve_type_with_type_subst(t, type_subst, dim_subst))
+                .collect(),
             Box::new(resolve_type_with_type_subst(ret, type_subst, dim_subst)),
         ),
         Type::Dyn(traits) if traits.len() == 1 => Ty::Dyn(traits[0].clone()),
@@ -3955,7 +4823,9 @@ fn bind_nested_dimensions(
     dims: &mut HashMap<String, Dimension>,
 ) -> Result<(), String> {
     match (param, actual) {
-        (Type::Named(name, args), Ty::Quantity(actual_dim)) if name == "Quantity" && args.len() == 1 => {
+        (Type::Named(name, args), Ty::Quantity(actual_dim))
+            if name == "Quantity" && args.len() == 1 =>
+        {
             if let Type::Named(dim, dim_args) = &args[0] {
                 if dim_args.is_empty() && dim_generics.contains(dim) {
                     if let Some(previous) = dims.get(dim) {
@@ -3974,20 +4844,26 @@ fn bind_nested_dimensions(
             }
             Ok(())
         }
-        (Type::Named(name, args), Ty::Applied(actual_name, actual_args)) if name == actual_name && args.len() == actual_args.len() => {
+        (Type::Named(name, args), Ty::Applied(actual_name, actual_args))
+            if name == actual_name && args.len() == actual_args.len() =>
+        {
             for (expected, actual) in args.iter().zip(actual_args) {
                 bind_nested_dimensions(expected, actual, dim_generics, dims)?;
             }
             Ok(())
         }
-        (Type::Named(name, args), Ty::List(elem) | Ty::Set(elem)) if (name == "List" || name == "Set") && args.len() == 1 => {
+        (Type::Named(name, args), Ty::List(elem) | Ty::Set(elem))
+            if (name == "List" || name == "Set") && args.len() == 1 =>
+        {
             bind_nested_dimensions(&args[0], elem, dim_generics, dims)
         }
         (Type::Named(name, args), Ty::Map(key, value)) if name == "Map" && args.len() == 2 => {
             bind_nested_dimensions(&args[0], key, dim_generics, dims)?;
             bind_nested_dimensions(&args[1], value, dim_generics, dims)
         }
-        (Type::Fn(params, ret), Ty::Fn(actual_params, actual_ret)) if params.len() == actual_params.len() => {
+        (Type::Fn(params, ret), Ty::Fn(actual_params, actual_ret))
+            if params.len() == actual_params.len() =>
+        {
             for (expected, actual) in params.iter().zip(actual_params) {
                 bind_nested_dimensions(expected, actual, dim_generics, dims)?;
             }
@@ -4011,7 +4887,10 @@ fn unify_generic_type(
             if let Some(previous) = subst.get(name) {
                 // An earlier, only partly known binding (`Maybe<?>` from a bare
                 // `Nothing`) yields to a fully known one.
-                if ty_contains_unknown(previous) && !ty_contains_unknown(actual) && compatible(previous, actual) {
+                if ty_contains_unknown(previous)
+                    && !ty_contains_unknown(actual)
+                    && compatible(previous, actual)
+                {
                     subst.insert(name.clone(), actual.clone());
                     return Ok(());
                 }
@@ -4028,39 +4907,55 @@ fn unify_generic_type(
             subst.insert(name.clone(), actual.clone());
             Ok(())
         }
-        Type::Named(name, args) if name == "Quantity" && args.len() == 1 => match (&args[0], actual) {
-            (Type::Named(dim, dim_args), Ty::Quantity(actual_dim)) if dim_args.is_empty() && generic_names.contains(dim) => {
-                let bound = Ty::Quantity(actual_dim.clone());
-                let dim = &format!("#dim:{dim}");
-                match subst.get(dim) {
-                    Some(previous) if *previous != bound => Err(format!(
-                        "Generic dimension '{}' was inferred as both '{}' and '{}'.",
-                        dim,
-                        previous.describe(),
-                        bound.describe()
-                    )),
-                    _ => {
-                        subst.insert(dim.clone(), bound);
-                        Ok(())
+        Type::Named(name, args) if name == "Quantity" && args.len() == 1 => {
+            match (&args[0], actual) {
+                (Type::Named(dim, dim_args), Ty::Quantity(actual_dim))
+                    if dim_args.is_empty() && generic_names.contains(dim) =>
+                {
+                    let bound = Ty::Quantity(actual_dim.clone());
+                    let dim = &format!("#dim:{dim}");
+                    match subst.get(dim) {
+                        Some(previous) if *previous != bound => Err(format!(
+                            "Generic dimension '{}' was inferred as both '{}' and '{}'.",
+                            dim,
+                            previous.describe(),
+                            bound.describe()
+                        )),
+                        _ => {
+                            subst.insert(dim.clone(), bound);
+                            Ok(())
+                        }
                     }
                 }
+                _ => Ok(()),
             }
-            _ => Ok(()),
-        },
+        }
         Type::Named(name, args) if name == "List" && args.len() == 1 => match actual {
             Ty::List(elem) => unify_generic_type(&args[0], elem, generic_names, subst),
-            _ => Err(format!("Expected '{}', got '{}'.", resolve_type(param).describe(), actual.describe())),
+            _ => Err(format!(
+                "Expected '{}', got '{}'.",
+                resolve_type(param).describe(),
+                actual.describe()
+            )),
         },
         Type::Named(name, args) if name == "Map" && args.len() == 2 => match actual {
             Ty::Map(key, value) => {
                 unify_generic_type(&args[0], key, generic_names, subst)?;
                 unify_generic_type(&args[1], value, generic_names, subst)
             }
-            _ => Err(format!("Expected '{}', got '{}'.", resolve_type(param).describe(), actual.describe())),
+            _ => Err(format!(
+                "Expected '{}', got '{}'.",
+                resolve_type(param).describe(),
+                actual.describe()
+            )),
         },
         Type::Named(name, args) if name == "Set" && args.len() == 1 => match actual {
             Ty::Set(elem) => unify_generic_type(&args[0], elem, generic_names, subst),
-            _ => Err(format!("Expected '{}', got '{}'.", resolve_type(param).describe(), actual.describe())),
+            _ => Err(format!(
+                "Expected '{}', got '{}'.",
+                resolve_type(param).describe(),
+                actual.describe()
+            )),
         },
         Type::Named(name, args) if name == "Quantity" && args.len() == 1 => {
             if matches!(actual, Ty::Quantity(_)) {
@@ -4070,20 +4965,30 @@ fn unify_generic_type(
             }
         }
         Type::Named(name, args) if !args.is_empty() => match actual {
-            Ty::Applied(actual_name, actual_args) if name == actual_name && args.len() == actual_args.len() => {
+            Ty::Applied(actual_name, actual_args)
+                if name == actual_name && args.len() == actual_args.len() =>
+            {
                 for (expected, actual) in args.iter().zip(actual_args) {
                     unify_generic_type(expected, actual, generic_names, subst)?;
                 }
                 Ok(())
             }
-            _ => Err(format!("Expected '{}', got '{}'.", resolve_type(param).describe(), actual.describe())),
+            _ => Err(format!(
+                "Expected '{}', got '{}'.",
+                resolve_type(param).describe(),
+                actual.describe()
+            )),
         },
         Type::Named(_, _) => {
             let expected = resolve_type(param);
             if compatible(&expected, actual) {
                 Ok(())
             } else {
-                Err(format!("Expected '{}', got '{}'.", expected.describe(), actual.describe()))
+                Err(format!(
+                    "Expected '{}', got '{}'.",
+                    expected.describe(),
+                    actual.describe()
+                ))
             }
         }
         Type::Fn(params, ret) => match actual {
@@ -4130,7 +5035,9 @@ fn block_always_returns(block: &Block) -> bool {
 
 pub(crate) fn expr_always_returns(expr: &Expr) -> bool {
     match expr.unlocated() {
-        Expr::If(_, then_block, Some(else_block)) => block_always_returns(then_block) && block_always_returns(else_block),
+        Expr::If(_, then_block, Some(else_block)) => {
+            block_always_returns(then_block) && block_always_returns(else_block)
+        }
         _ => false,
     }
 }
@@ -4173,11 +5080,17 @@ fn check_concurrency_method(
     arg_types: &[Ty],
     errors: &mut Vec<TypeError>,
 ) -> Option<Ty> {
-    let Ty::Applied(type_name, type_args) = receiver_ty else { return None };
-    let Some(element_type) = type_args.first().cloned() else { return None };
+    let Ty::Applied(type_name, type_args) = receiver_ty else {
+        return None;
+    };
+    let Some(element_type) = type_args.first().cloned() else {
+        return None;
+    };
 
     let expected_count = match (type_name.as_str(), method) {
-        ("Task", "join") | ("Task", "cancel") | ("Channel", "receive") | ("Channel", "close") => Some(0),
+        ("Task", "join") | ("Task", "cancel") | ("Channel", "receive") | ("Channel", "close") => {
+            Some(0)
+        }
         ("Channel", "send") => Some(1),
         _ => None,
     }?;
@@ -4199,10 +5112,7 @@ fn check_concurrency_method(
     match (type_name.as_str(), method) {
         ("Task", "join") => Some(element_type),
         ("Task", "cancel") => Some(Ty::Bool),
-        ("Channel", "receive") => Some(Ty::Applied(
-            "Option".to_string(),
-            vec![element_type],
-        )),
+        ("Channel", "receive") => Some(Ty::Applied("Option".to_string(), vec![element_type])),
         ("Channel", "close") => Some(Ty::Void),
         ("Channel", "send") => {
             if !compatible(&element_type, &arg_types[0]) {
@@ -4261,7 +5171,11 @@ fn check_collection_method(
             });
         }
     }
-    Some(collection_method_return_type(receiver_ty, method, arg_types))
+    Some(collection_method_return_type(
+        receiver_ty,
+        method,
+        arg_types,
+    ))
 }
 
 fn collection_method_expected_args(
@@ -4315,7 +5229,9 @@ fn check_option_result_method(
     arg_types: &[Ty],
     errors: &mut Vec<TypeError>,
 ) -> Option<Ty> {
-    let Ty::Applied(type_name, type_args) = receiver_ty else { return None };
+    let Ty::Applied(type_name, type_args) = receiver_ty else {
+        return None;
+    };
     let (value_type, error_type) = match type_name.as_str() {
         "Option" if type_args.len() == 1 => (type_args[0].clone(), None),
         "Result" if type_args.len() == 2 => (type_args[0].clone(), Some(type_args[1].clone())),
@@ -4328,7 +5244,10 @@ fn check_option_result_method(
         ("Option", "unwrap_or") => (vec![value_type.clone()], value_type.clone()),
         ("Option", "ok_or") => {
             let error = arg_types.first().cloned().unwrap_or(Ty::Unknown);
-            (vec![Ty::Unknown], Ty::Applied("Result".to_string(), vec![value_type.clone(), error]))
+            (
+                vec![Ty::Unknown],
+                Ty::Applied("Result".to_string(), vec![value_type.clone(), error]),
+            )
         }
         ("Option", "map") => {
             let return_type = function_return_type(arg_types.first()).unwrap_or(Ty::Unknown);
@@ -4424,7 +5343,9 @@ fn check_option_result_method(
 }
 
 fn option_result_method_expected_args(receiver_ty: &Ty, method: &str) -> Option<Vec<Ty>> {
-    let Ty::Applied(type_name, type_args) = receiver_ty else { return None };
+    let Ty::Applied(type_name, type_args) = receiver_ty else {
+        return None;
+    };
     let (value_type, error_type) = match type_name.as_str() {
         "Option" if type_args.len() == 1 => (type_args[0].clone(), None),
         "Result" if type_args.len() == 2 => (type_args[0].clone(), Some(type_args[1].clone())),
@@ -4482,54 +5403,128 @@ fn is_builtin_hashable(
         variant_fields: &HashMap<(String, String), Vec<Type>>,
         visiting: &mut HashSet<String>,
     ) -> bool {
-    match ty {
-        Ty::Int | Ty::Sized(_) | Ty::Float | Ty::Float32 | Ty::Bool | Ty::String | Ty::Unknown => true,
-        Ty::List(inner) | Ty::Set(inner) => {
-            visit(inner, record_derives, record_fields, enum_derives, enum_variants, variant_fields, visiting)
-        }
-        Ty::Map(key, value) => {
-            visit(key, record_derives, record_fields, enum_derives, enum_variants, variant_fields, visiting)
-                && visit(value, record_derives, record_fields, enum_derives, enum_variants, variant_fields, visiting)
-        }
-        Ty::Applied(name, args) if name == "Option" && args.len() == 1 => {
-            visit(&args[0], record_derives, record_fields, enum_derives, enum_variants, variant_fields, visiting)
-        }
-        Ty::Applied(name, args) if name == "Result" && args.len() == 2 => {
-            visit(&args[0], record_derives, record_fields, enum_derives, enum_variants, variant_fields, visiting)
-                && visit(&args[1], record_derives, record_fields, enum_derives, enum_variants, variant_fields, visiting)
-        }
-        Ty::Named(name) => {
-            if !visiting.insert(name.clone()) {
-                return false;
+        match ty {
+            Ty::Int
+            | Ty::Sized(_)
+            | Ty::Float
+            | Ty::Float32
+            | Ty::Bool
+            | Ty::String
+            | Ty::Unknown => true,
+            Ty::List(inner) | Ty::Set(inner) => visit(
+                inner,
+                record_derives,
+                record_fields,
+                enum_derives,
+                enum_variants,
+                variant_fields,
+                visiting,
+            ),
+            Ty::Map(key, value) => {
+                visit(
+                    key,
+                    record_derives,
+                    record_fields,
+                    enum_derives,
+                    enum_variants,
+                    variant_fields,
+                    visiting,
+                ) && visit(
+                    value,
+                    record_derives,
+                    record_fields,
+                    enum_derives,
+                    enum_variants,
+                    variant_fields,
+                    visiting,
+                )
             }
-            let record_hashable = record_derives
-                .get(name)
-                .is_some_and(|derives| derives.iter().any(|derive| derive == "Hash"))
-                && record_fields.get(name).is_some_and(|fields| {
-                    fields.iter().all(|(_, field)| {
-                        visit(&resolve_type(field), record_derives, record_fields, enum_derives, enum_variants, variant_fields, visiting)
-                    })
-                });
-            let enum_hashable = enum_derives
-                .get(name)
-                .is_some_and(|derives| derives.iter().any(|derive| derive == "Hash"))
-                && enum_variants.get(name).is_some_and(|variants| {
-                    variants.iter().all(|variant| {
-                        variant_fields.get(&(name.clone(), variant.clone())).is_some_and(|fields| {
-                            fields.iter().all(|field| {
-                                visit(&resolve_type(field), record_derives, record_fields, enum_derives, enum_variants, variant_fields, visiting)
-                            })
+            Ty::Applied(name, args) if name == "Option" && args.len() == 1 => visit(
+                &args[0],
+                record_derives,
+                record_fields,
+                enum_derives,
+                enum_variants,
+                variant_fields,
+                visiting,
+            ),
+            Ty::Applied(name, args) if name == "Result" && args.len() == 2 => {
+                visit(
+                    &args[0],
+                    record_derives,
+                    record_fields,
+                    enum_derives,
+                    enum_variants,
+                    variant_fields,
+                    visiting,
+                ) && visit(
+                    &args[1],
+                    record_derives,
+                    record_fields,
+                    enum_derives,
+                    enum_variants,
+                    variant_fields,
+                    visiting,
+                )
+            }
+            Ty::Named(name) => {
+                if !visiting.insert(name.clone()) {
+                    return false;
+                }
+                let record_hashable = record_derives
+                    .get(name)
+                    .is_some_and(|derives| derives.iter().any(|derive| derive == "Hash"))
+                    && record_fields.get(name).is_some_and(|fields| {
+                        fields.iter().all(|(_, field)| {
+                            visit(
+                                &resolve_type(field),
+                                record_derives,
+                                record_fields,
+                                enum_derives,
+                                enum_variants,
+                                variant_fields,
+                                visiting,
+                            )
                         })
-                    })
-                });
-            visiting.remove(name);
-            record_hashable || enum_hashable
+                    });
+                let enum_hashable = enum_derives
+                    .get(name)
+                    .is_some_and(|derives| derives.iter().any(|derive| derive == "Hash"))
+                    && enum_variants.get(name).is_some_and(|variants| {
+                        variants.iter().all(|variant| {
+                            variant_fields
+                                .get(&(name.clone(), variant.clone()))
+                                .is_some_and(|fields| {
+                                    fields.iter().all(|field| {
+                                        visit(
+                                            &resolve_type(field),
+                                            record_derives,
+                                            record_fields,
+                                            enum_derives,
+                                            enum_variants,
+                                            variant_fields,
+                                            visiting,
+                                        )
+                                    })
+                                })
+                        })
+                    });
+                visiting.remove(name);
+                record_hashable || enum_hashable
+            }
+            _ => false,
         }
-        _ => false,
-    }
     }
 
-    visit(ty, record_derives, record_fields, enum_derives, enum_variants, variant_fields, &mut HashSet::new())
+    visit(
+        ty,
+        record_derives,
+        record_fields,
+        enum_derives,
+        enum_variants,
+        variant_fields,
+        &mut HashSet::new(),
+    )
 }
 
 fn check_builtin_call(
@@ -4606,18 +5601,16 @@ fn check_builtin_call(
         "file_exists" => Some(Ty::Bool),
         "char_from_codepoint" => Some(Ty::String),
         "hash" => {
-            let supported = arg_types
-                .first()
-                .is_some_and(|ty| {
-                    is_builtin_hashable(
-                        ty,
-                        record_derives,
-                        record_fields,
-                        enum_derives,
-                        enum_variants,
-                        variant_fields,
-                    )
-                });
+            let supported = arg_types.first().is_some_and(|ty| {
+                is_builtin_hashable(
+                    ty,
+                    record_derives,
+                    record_fields,
+                    enum_derives,
+                    enum_variants,
+                    variant_fields,
+                )
+            });
             if !supported {
                 errors.push(TypeError {
                     code: "E1041",
@@ -4670,7 +5663,10 @@ fn check_builtin_call(
                 });
                 return Some(Ty::Unknown);
             }
-            Some(Ty::Applied("Option".to_string(), vec![channel_args[0].clone()]))
+            Some(Ty::Applied(
+                "Option".to_string(),
+                vec![channel_args[0].clone()],
+            ))
         }
         "clone" => Some(arg_types.first().cloned().unwrap_or(Ty::Unknown)),
         "drop" => Some(Ty::Void),
@@ -4679,14 +5675,15 @@ fn check_builtin_call(
         "read_file" | "write_file" => Some(Ty::Applied(
             "Result".to_string(),
             vec![
-                if name == "read_file" { Ty::String } else { Ty::Void },
+                if name == "read_file" {
+                    Ty::String
+                } else {
+                    Ty::Void
+                },
                 Ty::String,
             ],
         )),
-        "parse_int" => Some(Ty::Applied(
-            "Result".to_string(),
-            vec![Ty::Int, Ty::String],
-        )),
+        "parse_int" => Some(Ty::Applied("Result".to_string(), vec![Ty::Int, Ty::String])),
         "sum" => match &arg_types[0] {
             Ty::List(element) => Some((**element).clone()),
             _ => Some(Ty::Unknown),
@@ -4733,8 +5730,13 @@ fn pattern_literal_type(literal: &Expr) -> Ty {
         Expr::CharLiteral(_) => Ty::Char,
         Expr::BoolLiteral(_) => Ty::Bool,
         Expr::UnitLiteral(number, unit) => {
-            if matches!(number.unlocated(), Expr::IntLiteral(_) | Expr::FloatLiteral(_)) {
-                resolve_unit_expr(unit).map(Ty::Quantity).unwrap_or(Ty::Unknown)
+            if matches!(
+                number.unlocated(),
+                Expr::IntLiteral(_) | Expr::FloatLiteral(_)
+            ) {
+                resolve_unit_expr(unit)
+                    .map(Ty::Quantity)
+                    .unwrap_or(Ty::Unknown)
             } else {
                 Ty::Unknown
             }
@@ -4743,14 +5745,20 @@ fn pattern_literal_type(literal: &Expr) -> Ty {
     }
 }
 
-fn pattern_field_indices(field_names: &[Option<String>], fields: &[(String, Pattern)]) -> Vec<Option<usize>> {
+fn pattern_field_indices(
+    field_names: &[Option<String>],
+    fields: &[(String, Pattern)],
+) -> Vec<Option<usize>> {
     let all_named = field_names.iter().all(Option::is_some);
     let mut used = HashSet::new();
     fields
         .iter()
         .enumerate()
         .map(|(position, (label, _))| {
-            let candidate = if let Some(index) = label.strip_prefix('@').and_then(|index| index.parse::<usize>().ok()) {
+            let candidate = if let Some(index) = label
+                .strip_prefix('@')
+                .and_then(|index| index.parse::<usize>().ok())
+            {
                 Some(index)
             } else if let Some(index) = field_names
                 .iter()
@@ -4769,9 +5777,18 @@ fn pattern_field_indices(field_names: &[Option<String>], fields: &[(String, Patt
 
 fn resolve_dimension_with_subst(ty: &Type, subst: &HashMap<String, Dimension>) -> Dimension {
     match ty {
-        Type::Named(name, _) => subst.get(name).cloned().unwrap_or_else(|| crate::types::dimension_from_name(name)),
-        Type::Mul(a, b) => dim_mul(&resolve_dimension_with_subst(a, subst), &resolve_dimension_with_subst(b, subst)),
-        Type::Div(a, b) => dim_div(&resolve_dimension_with_subst(a, subst), &resolve_dimension_with_subst(b, subst)),
+        Type::Named(name, _) => subst
+            .get(name)
+            .cloned()
+            .unwrap_or_else(|| crate::types::dimension_from_name(name)),
+        Type::Mul(a, b) => dim_mul(
+            &resolve_dimension_with_subst(a, subst),
+            &resolve_dimension_with_subst(b, subst),
+        ),
+        Type::Div(a, b) => dim_div(
+            &resolve_dimension_with_subst(a, subst),
+            &resolve_dimension_with_subst(b, subst),
+        ),
         Type::Pow(a, n) => dim_pow(&resolve_dimension_with_subst(a, subst), *n as i32),
         _ => HashMap::new(),
     }
@@ -4791,36 +5808,61 @@ fn free_vars_in_block(block: &Block) -> HashSet<String> {
 
 fn walk_block(block: &Block, bound: &HashSet<String>, free: &mut HashSet<String>) {
     let mut local = bound.clone();
-    for stmt in &block.stmts { walk_stmt(&stmt.stmt, &mut local, free); }
-    if let Some(e) = &block.tail { walk_expr(e, &local, free); }
+    for stmt in &block.stmts {
+        walk_stmt(&stmt.stmt, &mut local, free);
+    }
+    if let Some(e) = &block.tail {
+        walk_expr(e, &local, free);
+    }
 }
 
 fn walk_stmt(stmt: &Stmt, bound: &mut HashSet<String>, free: &mut HashSet<String>) {
     match stmt {
-        Stmt::Binding { name, value, .. } => { walk_expr(value, bound, free); bound.insert(name.clone()); }
+        Stmt::Binding { name, value, .. } => {
+            walk_expr(value, bound, free);
+            bound.insert(name.clone());
+        }
         Stmt::Assign { name, value } => {
             walk_expr(value, bound, free);
-            if !bound.contains(name) { free.insert(name.clone()); }
+            if !bound.contains(name) {
+                free.insert(name.clone());
+            }
             bound.insert(name.clone());
         }
         Stmt::Return(Some(e)) | Stmt::Break(Some(e)) => walk_expr(e, bound, free),
         Stmt::Return(None) | Stmt::Break(None) | Stmt::Continue => {}
-        Stmt::For { pattern, iter, body } => {
+        Stmt::For {
+            pattern,
+            iter,
+            body,
+        } => {
             walk_expr(iter, bound, free);
             let mut inner = bound.clone();
             inner.insert(pattern.clone());
             walk_block(body, &inner, free);
         }
-        Stmt::While { cond, body } => { walk_expr(cond, bound, free); walk_block(body, bound, free); }
-        Stmt::FieldAssign { target, value } => { walk_expr(target, bound, free); walk_expr(value, bound, free); }
+        Stmt::While { cond, body } => {
+            walk_expr(cond, bound, free);
+            walk_block(body, bound, free);
+        }
+        Stmt::FieldAssign { target, value } => {
+            walk_expr(target, bound, free);
+            walk_expr(value, bound, free);
+        }
         Stmt::Expr(e) => walk_expr(e, bound, free),
     }
 }
 
 fn pattern_binds(pattern: &Pattern, out: &mut HashSet<String>) {
     match pattern {
-        Pattern::Ident(name) => { out.insert(name.clone()); }
-        Pattern::Variant(_, fields) => { for (_, sub) in fields { pattern_binds(sub, out); } }
+        Pattern::Ident(name) => {
+            out.insert(name.clone());
+        }
+        Pattern::Variant(_, fields) => {
+            for (_, sub) in fields {
+                pattern_binds(sub, out);
+            }
+        }
         Pattern::Wildcard | Pattern::Literal(_) | Pattern::Range(..) => {}
     }
 }
@@ -4881,11 +5923,13 @@ fn collect_trait_closure(
 fn trait_method_signature_matches(expected: &TraitMethodSig, actual: &TraitMethodSig) -> bool {
     expected.generics == actual.generics
         && expected.params.len() == actual.params.len()
-        && expected.params.iter().zip(&actual.params).all(|(left, right)| {
-            left.name == right.name
-                && left.is_mut == right.is_mut
-                && left.ty == right.ty
-        })
+        && expected
+            .params
+            .iter()
+            .zip(&actual.params)
+            .all(|(left, right)| {
+                left.name == right.name && left.is_mut == right.is_mut && left.ty == right.ty
+            })
         && expected.return_type == actual.return_type
 }
 
@@ -4935,7 +5979,20 @@ fn replace_type_parameters(ty: &mut Type, substitutions: &HashMap<String, Type>)
 }
 
 fn is_builtin_trait(name: &str) -> bool {
-    matches!(name, "Add" | "Sub" | "Mul" | "Div" | "Eq" | "Ord" | "Iterator" | "Printable" | "Default" | "Hash" | "Drop")
+    matches!(
+        name,
+        "Add"
+            | "Sub"
+            | "Mul"
+            | "Div"
+            | "Eq"
+            | "Ord"
+            | "Iterator"
+            | "Printable"
+            | "Default"
+            | "Hash"
+            | "Drop"
+    )
 }
 
 fn builtin_generic_type_arity(name: &str) -> Option<usize> {
@@ -4953,7 +6010,9 @@ fn implementation_type_substitutions(
     let Some((receiver_name, receiver_args)) = type_parts_for_impl_matching(receiver_ty) else {
         return None;
     };
-    if receiver_name != implementation.type_name || receiver_args.len() != implementation.type_args.len() {
+    if receiver_name != implementation.type_name
+        || receiver_args.len() != implementation.type_args.len()
+    {
         return None;
     }
     let generic_names: HashSet<String> = implementation
@@ -4966,7 +6025,9 @@ fn implementation_type_substitutions(
         .type_args
         .iter()
         .zip(receiver_args.iter())
-        .all(|(pattern, actual)| impl_type_pattern_matches(pattern, actual, &generic_names, &mut substitutions));
+        .all(|(pattern, actual)| {
+            impl_type_pattern_matches(pattern, actual, &generic_names, &mut substitutions)
+        });
     matches.then_some(substitutions)
 }
 
@@ -4988,7 +6049,11 @@ fn type_from_dimension(d: &Dimension) -> Type {
     let mut result: Option<Type> = None;
     for (name, exp) in parts {
         let base = Type::Named(name.clone(), Vec::new());
-        let term = if *exp == 1 { base } else { Type::Pow(Box::new(base), (*exp).into()) };
+        let term = if *exp == 1 {
+            base
+        } else {
+            Type::Pow(Box::new(base), (*exp).into())
+        };
         result = Some(match result {
             None => term,
             Some(acc) => Type::Mul(Box::new(acc), Box::new(term)),
@@ -5016,10 +6081,9 @@ fn type_from_ty(ty: &Ty) -> Type {
         ),
         Ty::Set(element) => Type::Named("Set".to_string(), vec![type_from_ty(element)]),
         Ty::Named(name) => Type::Named(name.clone(), Vec::new()),
-        Ty::Applied(name, args) => Type::Named(
-            name.clone(),
-            args.iter().map(type_from_ty).collect(),
-        ),
+        Ty::Applied(name, args) => {
+            Type::Named(name.clone(), args.iter().map(type_from_ty).collect())
+        }
         Ty::Generic(name) => Type::Named(name.clone(), Vec::new()),
         Ty::Dyn(name) => Type::Dyn(vec![name.clone()]),
         Ty::Sized(kind) => Type::Named(kind.name().to_string(), Vec::new()),
@@ -5067,52 +6131,78 @@ fn impl_type_pattern_matches(
             }
         }
         Type::Named(name, args) if name == "List" && args.len() == 1 => {
-            let Ty::List(element) = actual else { return false };
+            let Ty::List(element) = actual else {
+                return false;
+            };
             impl_type_pattern_matches(&args[0], element, generic_names, substitutions)
         }
         Type::Named(name, args) if name == "Map" && args.len() == 2 => {
-            let Ty::Map(key, value) = actual else { return false };
+            let Ty::Map(key, value) = actual else {
+                return false;
+            };
             impl_type_pattern_matches(&args[0], key, generic_names, substitutions)
                 && impl_type_pattern_matches(&args[1], value, generic_names, substitutions)
         }
         Type::Named(name, args) if name == "Set" && args.len() == 1 => {
-            let Ty::Set(element) = actual else { return false };
+            let Ty::Set(element) = actual else {
+                return false;
+            };
             impl_type_pattern_matches(&args[0], element, generic_names, substitutions)
         }
         Type::Named(name, args) if name == "Quantity" && args.len() == 1 => {
-            let Ty::Quantity(dimension) = actual else { return false };
+            let Ty::Quantity(dimension) = actual else {
+                return false;
+            };
             let actual_dimension = Ty::Named(dim_to_string(dimension));
             impl_type_pattern_matches(&args[0], &actual_dimension, generic_names, substitutions)
         }
         Type::Named(name, args) if !args.is_empty() => {
-            let Ty::Applied(actual_name, actual_args) = actual else { return false };
+            let Ty::Applied(actual_name, actual_args) = actual else {
+                return false;
+            };
             name == actual_name
                 && args.len() == actual_args.len()
-                && args.iter().zip(actual_args.iter()).all(|(pattern, actual)| {
-                    impl_type_pattern_matches(pattern, actual, generic_names, substitutions)
-                })
+                && args
+                    .iter()
+                    .zip(actual_args.iter())
+                    .all(|(pattern, actual)| {
+                        impl_type_pattern_matches(pattern, actual, generic_names, substitutions)
+                    })
         }
-        Type::Named(name, args) if args.is_empty() => {
-            compatible(&resolve_type(pattern), actual)
-        }
+        Type::Named(name, args) if args.is_empty() => compatible(&resolve_type(pattern), actual),
         Type::Fn(params, return_type) => {
-            let Ty::Fn(actual_params, actual_return) = actual else { return false };
+            let Ty::Fn(actual_params, actual_return) = actual else {
+                return false;
+            };
             params.len() == actual_params.len()
-                && params.iter().zip(actual_params.iter()).all(|(pattern, actual)| {
-                    impl_type_pattern_matches(pattern, actual, generic_names, substitutions)
-                })
-                && impl_type_pattern_matches(return_type, actual_return, generic_names, substitutions)
+                && params
+                    .iter()
+                    .zip(actual_params.iter())
+                    .all(|(pattern, actual)| {
+                        impl_type_pattern_matches(pattern, actual, generic_names, substitutions)
+                    })
+                && impl_type_pattern_matches(
+                    return_type,
+                    actual_return,
+                    generic_names,
+                    substitutions,
+                )
         }
         _ => false,
     }
 }
 
-fn impl_method_signature_matches(expected: &TraitMethodSig, actual: &FunctionDecl, owner: &str) -> bool {
+fn impl_method_signature_matches(
+    expected: &TraitMethodSig,
+    actual: &FunctionDecl,
+    owner: &str,
+) -> bool {
     if expected.generics != actual.generics || expected.params.len() != actual.params.len() {
         return false;
     }
     for (expected_param, actual_param) in expected.params.iter().zip(&actual.params) {
-        if expected_param.name != actual_param.name || expected_param.is_mut != actual_param.is_mut {
+        if expected_param.name != actual_param.name || expected_param.is_mut != actual_param.is_mut
+        {
             return false;
         }
         if !signature_type_matches(&expected_param.ty, &actual_param.ty, owner) {
@@ -5133,57 +6223,117 @@ fn signature_type_matches(expected: &Type, actual: &Type, owner: &str) -> bool {
 fn walk_expr(expr: &Expr, bound: &HashSet<String>, free: &mut HashSet<String>) {
     match expr {
         Expr::Located(inner, _) => walk_expr(inner, bound, free),
-        Expr::Ident(name) => { if !bound.contains(name) { free.insert(name.clone()); } }
+        Expr::Ident(name) => {
+            if !bound.contains(name) {
+                free.insert(name.clone());
+            }
+        }
         Expr::Lambda(params, body) => {
             let mut inner = bound.clone();
-            for p in params { inner.insert(p.clone()); }
+            for p in params {
+                inner.insert(p.clone());
+            }
             walk_block(body, &inner, free);
         }
-        Expr::Spawn(b) | Expr::SpawnScope(b) | Expr::Loop(b) | Expr::Block(b) => walk_block(b, bound, free),
+        Expr::Spawn(b) | Expr::SpawnScope(b) | Expr::Loop(b) | Expr::Block(b) => {
+            walk_block(b, bound, free)
+        }
         Expr::If(c, t, e) => {
             walk_expr(c, bound, free);
             walk_block(t, bound, free);
-            if let Some(e) = e { walk_block(e, bound, free); }
+            if let Some(e) = e {
+                walk_block(e, bound, free);
+            }
         }
         Expr::Match(s, arms) => {
             walk_expr(s, bound, free);
             for arm in arms {
                 let mut inner = bound.clone();
                 pattern_binds(&arm.pattern, &mut inner);
-                if let Some(g) = &arm.guard { walk_expr(g, &inner, free); }
+                if let Some(g) = &arm.guard {
+                    walk_expr(g, &inner, free);
+                }
                 walk_block(&arm.body, &inner, free);
             }
         }
-        Expr::Binary(_, l, r) | Expr::Within(l, r) => { walk_expr(l, bound, free); walk_expr(r, bound, free); }
+        Expr::Binary(_, l, r) | Expr::Within(l, r) => {
+            walk_expr(l, bound, free);
+            walk_expr(r, bound, free);
+        }
         Expr::Unary(_, e) | Expr::As(e, _) | Expr::UnitLiteral(e, _) => walk_expr(e, bound, free),
         Expr::Range(s, _, e, step) => {
             walk_expr(s, bound, free);
             walk_expr(e, bound, free);
-            if let Some(st) = step { walk_expr(st, bound, free); }
+            if let Some(st) = step {
+                walk_expr(st, bound, free);
+            }
         }
         Expr::Call(callee, args) => {
             walk_expr(callee, bound, free);
             for a in args {
-                match a { Arg::Positional(e) | Arg::Named(_, e) => walk_expr(e, bound, free) }
+                match a {
+                    Arg::Positional(e) | Arg::Named(_, e) => walk_expr(e, bound, free),
+                }
             }
         }
         Expr::GenericCall(callee, _, args) => {
             walk_expr(callee, bound, free);
             for a in args {
-                match a { Arg::Positional(e) | Arg::Named(_, e) => walk_expr(e, bound, free) }
+                match a {
+                    Arg::Positional(e) | Arg::Named(_, e) => walk_expr(e, bound, free),
+                }
             }
         }
         Expr::FieldAccess(o, _) => walk_expr(o, bound, free),
-        Expr::Index(o, i) => { walk_expr(o, bound, free); walk_expr(i, bound, free); }
-        Expr::ListLiteral(items) | Expr::SetLiteral(items) => { for it in items { walk_expr(it, bound, free); } }
+        Expr::Index(o, i) => {
+            walk_expr(o, bound, free);
+            walk_expr(i, bound, free);
+        }
+        Expr::ListLiteral(items) | Expr::SetLiteral(items) => {
+            for it in items {
+                walk_expr(it, bound, free);
+            }
+        }
         Expr::EmptyCollection(..) => {}
-        Expr::MapLiteral(pairs) => { for (k, v) in pairs { walk_expr(k, bound, free); walk_expr(v, bound, free); } }
-        Expr::Try(i, c) => { walk_expr(i, bound, free); if let Some(c) = c { walk_expr(c, bound, free); } }
-        Expr::Approximately(a, b, t) => { walk_expr(a, bound, free); walk_expr(b, bound, free); walk_expr(t, bound, free); }
-        Expr::RecordLiteral(_, fields) => { for (_, v) in fields { walk_expr(v, bound, free); } }
-        Expr::GenericRecordLiteral(_, _, fields) => { for (_, v) in fields { walk_expr(v, bound, free); } }
-        Expr::Channel(_, cap) => { if let Some(c) = cap { walk_expr(c, bound, free); } }
-        Expr::IntLiteral(_) | Expr::SizedIntLiteral(..) | Expr::FloatLiteral(_) | Expr::Float32Literal(_) | Expr::StringLiteral(_) | Expr::CharLiteral(_) | Expr::BoolLiteral(_) => {}
+        Expr::MapLiteral(pairs) => {
+            for (k, v) in pairs {
+                walk_expr(k, bound, free);
+                walk_expr(v, bound, free);
+            }
+        }
+        Expr::Try(i, c) => {
+            walk_expr(i, bound, free);
+            if let Some(c) = c {
+                walk_expr(c, bound, free);
+            }
+        }
+        Expr::Approximately(a, b, t) => {
+            walk_expr(a, bound, free);
+            walk_expr(b, bound, free);
+            walk_expr(t, bound, free);
+        }
+        Expr::RecordLiteral(_, fields) => {
+            for (_, v) in fields {
+                walk_expr(v, bound, free);
+            }
+        }
+        Expr::GenericRecordLiteral(_, _, fields) => {
+            for (_, v) in fields {
+                walk_expr(v, bound, free);
+            }
+        }
+        Expr::Channel(_, cap) => {
+            if let Some(c) = cap {
+                walk_expr(c, bound, free);
+            }
+        }
+        Expr::IntLiteral(_)
+        | Expr::SizedIntLiteral(..)
+        | Expr::FloatLiteral(_)
+        | Expr::Float32Literal(_)
+        | Expr::StringLiteral(_)
+        | Expr::CharLiteral(_)
+        | Expr::BoolLiteral(_) => {}
     }
 }
 
@@ -5216,7 +6366,10 @@ fn array_elem(ty: &Ty) -> Option<Ty> {
 }
 
 fn is_array_scalar(ty: &Ty) -> bool {
-    matches!(ty, Ty::Int | Ty::Float | Ty::Float32 | Ty::Sized(_) | Ty::Bool)
+    matches!(
+        ty,
+        Ty::Int | Ty::Float | Ty::Float32 | Ty::Sized(_) | Ty::Bool
+    )
 }
 
 /// Merge a partially inferred expression with a contextual type. Generic
@@ -5229,30 +6382,40 @@ fn refine_expected_type(actual: &Ty, expected: &Ty) -> Ty {
     }
     match (actual, expected) {
         (Ty::Unknown, expected) => expected.clone(),
-        (Ty::List(actual), Ty::List(expected)) => Ty::List(Box::new(refine_expected_type(actual, expected))),
-        (Ty::Set(actual), Ty::Set(expected)) => Ty::Set(Box::new(refine_expected_type(actual, expected))),
+        (Ty::List(actual), Ty::List(expected)) => {
+            Ty::List(Box::new(refine_expected_type(actual, expected)))
+        }
+        (Ty::Set(actual), Ty::Set(expected)) => {
+            Ty::Set(Box::new(refine_expected_type(actual, expected)))
+        }
         (Ty::Map(actual_key, actual_value), Ty::Map(expected_key, expected_value)) => Ty::Map(
             Box::new(refine_expected_type(actual_key, expected_key)),
             Box::new(refine_expected_type(actual_value, expected_value)),
         ),
         (Ty::Applied(actual_name, actual_args), Ty::Applied(expected_name, expected_args))
-            if actual_name == expected_name && actual_args.len() == expected_args.len() => Ty::Applied(
+            if actual_name == expected_name && actual_args.len() == expected_args.len() =>
+        {
+            Ty::Applied(
                 actual_name.clone(),
                 actual_args
                     .iter()
                     .zip(expected_args)
                     .map(|(actual, expected)| refine_expected_type(actual, expected))
                     .collect(),
-            ),
+            )
+        }
         (Ty::Fn(actual_params, actual_return), Ty::Fn(expected_params, expected_return))
-            if actual_params.len() == expected_params.len() => Ty::Fn(
+            if actual_params.len() == expected_params.len() =>
+        {
+            Ty::Fn(
                 actual_params
                     .iter()
                     .zip(expected_params)
                     .map(|(actual, expected)| refine_expected_type(actual, expected))
                     .collect(),
                 Box::new(refine_expected_type(actual_return, expected_return)),
-            ),
+            )
+        }
         _ => actual.clone(),
     }
 }
@@ -5346,7 +6509,22 @@ fn replace_self_type_with_type(ty: &mut Type, owner: &Type) {
 
 /// Methods of `String` (kept in step with `interpreter/strings.rs`).
 const STRING_METHOD_NAMES: &[&str] = &[
-    "length", "is_empty", "char_at", "slice", "codepoint", "trim", "to_upper", "to_lower", "contains", "starts_with", "ends_with", "replace", "split", "lines", "to_int", "to_float",
+    "length",
+    "is_empty",
+    "char_at",
+    "slice",
+    "codepoint",
+    "trim",
+    "to_upper",
+    "to_lower",
+    "contains",
+    "starts_with",
+    "ends_with",
+    "replace",
+    "split",
+    "lines",
+    "to_int",
+    "to_float",
 ];
 
 /// True when a type mentions a generic parameter anywhere inside it.

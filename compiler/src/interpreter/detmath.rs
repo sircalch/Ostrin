@@ -178,8 +178,16 @@ pub fn atan(x: f64) -> f64 {
         return x;
     }
     let ax = if x < 0.0 { -x } else { x };
-    let r = if ax > 1.0 { PIO2 - atan_core(1.0 / ax) } else { atan_core(ax) };
-    if x < 0.0 { -r } else { r }
+    let r = if ax > 1.0 {
+        PIO2 - atan_core(1.0 / ax)
+    } else {
+        atan_core(ax)
+    };
+    if x < 0.0 {
+        -r
+    } else {
+        r
+    }
 }
 
 pub fn atan2(y: f64, x: f64) -> f64 {
@@ -189,7 +197,11 @@ pub fn atan2(y: f64, x: f64) -> f64 {
     if x > 0.0 {
         atan(y / x)
     } else if x < 0.0 {
-        if y >= 0.0 { atan(y / x) + PI } else { atan(y / x) - PI }
+        if y >= 0.0 {
+            atan(y / x) + PI
+        } else {
+            atan(y / x) - PI
+        }
     } else if y > 0.0 {
         PIO2
     } else if y < 0.0 {
@@ -220,7 +232,9 @@ pub fn sinh(x: f64) -> f64 {
     let ax = if x < 0.0 { -x } else { x };
     if ax < 0.1 {
         let x2 = x * x;
-        x * (1.0 + x2 / 6.0 * (1.0 + x2 / 20.0 * (1.0 + x2 / 42.0 * (1.0 + x2 / 72.0 * (1.0 + x2 / 110.0)))))
+        x * (1.0
+            + x2 / 6.0
+                * (1.0 + x2 / 20.0 * (1.0 + x2 / 42.0 * (1.0 + x2 / 72.0 * (1.0 + x2 / 110.0)))))
     } else {
         (exp(x) - exp(-x)) / 2.0
     }
@@ -311,7 +325,11 @@ pub fn erf(x: f64) -> f64 {
         }
         1.0 - exp(-ax * ax) / SQRT_PI / t
     };
-    if x < 0.0 { -magnitude } else { magnitude }
+    if x < 0.0 {
+        -magnitude
+    } else {
+        magnitude
+    }
 }
 
 /// Density of `N(mu, sigma)` at `x`.

@@ -102,7 +102,14 @@ fn respond_error<W: Write>(writer: &mut W, id: Value, code: i64, message: &str) 
 }
 
 const TOKEN_TYPES: &[&str] = &[
-    "function", "type", "enum", "enumMember", "interface", "property", "method", "variable",
+    "function",
+    "type",
+    "enum",
+    "enumMember",
+    "interface",
+    "property",
+    "method",
+    "variable",
 ];
 
 fn handle_message<W: Write>(
@@ -379,11 +386,16 @@ fn walk_ostrin_files(root: &Path) -> Vec<PathBuf> {
     let mut files = Vec::new();
     let mut stack = vec![root.to_path_buf()];
     while let Some(dir) = stack.pop() {
-        let Ok(entries) = std::fs::read_dir(&dir) else { continue };
+        let Ok(entries) = std::fs::read_dir(&dir) else {
+            continue;
+        };
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
-                let name = path.file_name().and_then(|n| n.to_str()).unwrap_or_default();
+                let name = path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or_default();
                 if !SKIP_DIRS.contains(&name) {
                     stack.push(path);
                 }
@@ -414,7 +426,14 @@ fn analyze_workspace(entry_path: &Path, overrides: &HashMap<PathBuf, String>) ->
         .join("ostrin.toml");
     let deps = if manifest_path.is_file() {
         package::load_manifest(&manifest_path)
-            .and_then(|manifest| package::resolve_dependency_roots(&manifest, manifest_path.parent().unwrap_or_else(|| Path::new(".")), false, false))
+            .and_then(|manifest| {
+                package::resolve_dependency_roots(
+                    &manifest,
+                    manifest_path.parent().unwrap_or_else(|| Path::new(".")),
+                    false,
+                    false,
+                )
+            })
             .unwrap_or_default()
     } else {
         HashMap::new()
@@ -448,7 +467,10 @@ fn analyze_workspace(entry_path: &Path, overrides: &HashMap<PathBuf, String>) ->
             let (type_errors, bindings, expressions) =
                 Checker::new().check_program_with_editor_data(&items);
             for error in type_errors {
-                let key = error.source_file.clone().unwrap_or_else(|| entry_key.clone());
+                let key = error
+                    .source_file
+                    .clone()
+                    .unwrap_or_else(|| entry_key.clone());
                 diagnostics_by_file
                     .entry(key)
                     .or_default()
@@ -482,30 +504,54 @@ fn analyze_workspace(entry_path: &Path, overrides: &HashMap<PathBuf, String>) ->
     }
 }
 
-fn regroup_into_index(entry_key: &str, result: WorkspaceResult, index: &mut HashMap<String, FileCache>) {
+fn regroup_into_index(
+    entry_key: &str,
+    result: WorkspaceResult,
+    index: &mut HashMap<String, FileCache>,
+) {
     let mut per_file: HashMap<String, FileCache> = HashMap::new();
     for symbol in result.symbols {
-        let key = symbol.source_file.clone().unwrap_or_else(|| entry_key.to_string());
+        let key = symbol
+            .source_file
+            .clone()
+            .unwrap_or_else(|| entry_key.to_string());
         per_file.entry(key).or_default().symbols.push(symbol);
     }
     for member in result.members {
-        let key = member.source_file.clone().unwrap_or_else(|| entry_key.to_string());
+        let key = member
+            .source_file
+            .clone()
+            .unwrap_or_else(|| entry_key.to_string());
         per_file.entry(key).or_default().members.push(member);
     }
     for binding in result.bindings {
-        let key = binding.source_file.clone().unwrap_or_else(|| entry_key.to_string());
+        let key = binding
+            .source_file
+            .clone()
+            .unwrap_or_else(|| entry_key.to_string());
         per_file.entry(key).or_default().bindings.push(binding);
     }
     for expression in result.expressions {
-        let key = expression.source_file.clone().unwrap_or_else(|| entry_key.to_string());
-        per_file.entry(key).or_default().expressions.push(expression);
+        let key = expression
+            .source_file
+            .clone()
+            .unwrap_or_else(|| entry_key.to_string());
+        per_file
+            .entry(key)
+            .or_default()
+            .expressions
+            .push(expression);
     }
     for (file, cache) in per_file {
         index.insert(file, cache);
     }
 }
 
-fn publish_diagnostics<W: Write>(writer: &mut W, file: &str, diagnostics: &[DiagnosticRecord]) -> io::Result<()> {
+fn publish_diagnostics<W: Write>(
+    writer: &mut W,
+    file: &str,
+    diagnostics: &[DiagnosticRecord],
+) -> io::Result<()> {
     let uri = path_to_uri(Path::new(file));
     let diagnostics = diagnostics.iter().map(diagnostic_json).collect::<Vec<_>>();
     write_message(
@@ -544,12 +590,15 @@ fn hover(server: &Server, uri: &str, text: &str, position: Option<&Value>) -> Op
     let own_key = own_file_key(uri);
     let own_cache = own_key.as_deref().and_then(|key| server.index.get(key));
 
-    let binding = own_cache.and_then(|cache| cache.bindings.iter().find(|binding| binding.name == word));
-    let member = all_files(server).find_map(|cache| {
-        cache.members.iter().find(|member| member.name == word)
-    });
+    let binding =
+        own_cache.and_then(|cache| cache.bindings.iter().find(|binding| binding.name == word));
+    let member =
+        all_files(server).find_map(|cache| cache.members.iter().find(|member| member.name == word));
     let symbol = all_files(server).find_map(|cache| {
-        cache.symbols.iter().find(|symbol| short_name(&symbol.name) == word)
+        cache
+            .symbols
+            .iter()
+            .find(|symbol| short_name(&symbol.name) == word)
     });
     let line_one = line + 1;
     let column_one = character + 1;
@@ -563,7 +612,10 @@ fn hover(server: &Server, uri: &str, text: &str, position: Option<&Value>) -> Op
 
     let (markdown, range) = if let Some(binding) = binding {
         (
-            format!("**Ostrin local binding**\n\n`{}: {}`", binding.name, binding.type_name),
+            format!(
+                "**Ostrin local binding**\n\n`{}: {}`",
+                binding.name, binding.type_name
+            ),
             token_range(line, start, end),
         )
     } else if let Some(member) = member {
@@ -578,8 +630,16 @@ fn hover(server: &Server, uri: &str, text: &str, position: Option<&Value>) -> Op
         )
     } else if let Some(expression) = expression {
         (
-            format!("**Ostrin inferred expression**\n\n`{}`", expression.type_name),
-            span_range(expression.span.line, expression.span.col, expression.end.line, expression.end.col),
+            format!(
+                "**Ostrin inferred expression**\n\n`{}`",
+                expression.type_name
+            ),
+            span_range(
+                expression.span.line,
+                expression.span.col,
+                expression.end.line,
+                expression.end.col,
+            ),
         )
     } else {
         return None;
@@ -601,7 +661,8 @@ fn completion(server: &Server, uri: &str) -> Value {
     if let Some(cache) = own_key.as_deref().and_then(|key| server.index.get(key)) {
         for binding in &cache.bindings {
             if seen.insert(binding.name.clone()) {
-                items.push(json!({ "label": binding.name, "kind": 6, "detail": binding.type_name }));
+                items
+                    .push(json!({ "label": binding.name, "kind": 6, "detail": binding.type_name }));
             }
         }
     }
@@ -642,7 +703,11 @@ fn definition(server: &Server, uri: &str, text: &str, position: Option<&Value>) 
         return json!([location_json(&target_uri, binding.span)]);
     }
     for cache in all_files(server) {
-        if let Some(symbol) = cache.symbols.iter().find(|symbol| short_name(&symbol.name) == word) {
+        if let Some(symbol) = cache
+            .symbols
+            .iter()
+            .find(|symbol| short_name(&symbol.name) == word)
+        {
             let target_uri = symbol
                 .source_file
                 .as_deref()
@@ -670,7 +735,9 @@ fn signature_help(server: &Server, text: &str, position: Option<&Value>) -> Opti
     let mut candidates: Vec<(&str, &str)> = Vec::new();
     for cache in all_files(server) {
         for symbol in &cache.symbols {
-            if (symbol.kind == "function" || symbol.kind == "method") && short_name(&symbol.name) == name {
+            if (symbol.kind == "function" || symbol.kind == "method")
+                && short_name(&symbol.name) == name
+            {
                 candidates.push((symbol.kind, symbol.detail.as_str()));
             }
         }
@@ -850,7 +917,13 @@ fn references(server: &Server, uri: &str, text: &str, position: Option<&Value>) 
     Value::Array(locations)
 }
 
-fn rename(server: &Server, uri: &str, text: &str, position: Option<&Value>, new_name: &str) -> Option<Value> {
+fn rename(
+    server: &Server,
+    uri: &str,
+    text: &str,
+    position: Option<&Value>,
+    new_name: &str,
+) -> Option<Value> {
     if new_name.is_empty() {
         return None;
     }
@@ -935,11 +1008,15 @@ fn semantic_tokens(server: &Server, uri: &str, text: &str) -> Value {
         }
     };
     for symbol in &cache.symbols {
-        let Some(type_index) = symbol_token_type(symbol.kind) else { continue };
+        let Some(type_index) = symbol_token_type(symbol.kind) else {
+            continue;
+        };
         tag(short_name(&symbol.name), type_index);
     }
     for member in &cache.members {
-        let Some(type_index) = member_token_type(member.kind) else { continue };
+        let Some(type_index) = member_token_type(member.kind) else {
+            continue;
+        };
         tag(&member.name, type_index);
     }
     for binding in &cache.bindings {
@@ -954,7 +1031,11 @@ fn semantic_tokens(server: &Server, uri: &str, text: &str) -> Value {
     let mut previous_start = 0usize;
     for (line, start, length, type_index) in tagged {
         let delta_line = line.saturating_sub(previous_line);
-        let delta_start = if delta_line == 0 { start.saturating_sub(previous_start) } else { start };
+        let delta_start = if delta_line == 0 {
+            start.saturating_sub(previous_start)
+        } else {
+            start
+        };
         data.push(delta_line as u64);
         data.push(delta_start as u64);
         data.push(length as u64);
@@ -1098,7 +1179,8 @@ fn string_field(value: &Value, field: &str) -> String {
 fn uri_to_path(uri: &str) -> Option<PathBuf> {
     let rest = uri.strip_prefix("file://")?;
     let decoded = percent_decode(rest);
-    let decoded = if decoded.len() > 2 && decoded.starts_with('/') && decoded.as_bytes()[2] == b':' {
+    let decoded = if decoded.len() > 2 && decoded.starts_with('/') && decoded.as_bytes()[2] == b':'
+    {
         decoded[1..].to_string()
     } else {
         decoded

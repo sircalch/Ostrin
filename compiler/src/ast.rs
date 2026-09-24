@@ -261,14 +261,32 @@ pub struct LocatedStmt {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Stmt {
-    Binding { mut_: bool, name: String, ty: Option<Type>, value: Expr },
-    Assign { name: String, value: Expr },
+    Binding {
+        mut_: bool,
+        name: String,
+        ty: Option<Type>,
+        value: Expr,
+    },
+    Assign {
+        name: String,
+        value: Expr,
+    },
     Return(Option<Expr>),
     Break(Option<Expr>),
     Continue,
-    For { pattern: String, iter: Expr, body: Block },
-    While { cond: Expr, body: Block },
-    FieldAssign { target: Expr, value: Expr },
+    For {
+        pattern: String,
+        iter: Expr,
+        body: Block,
+    },
+    While {
+        cond: Expr,
+        body: Block,
+    },
+    FieldAssign {
+        target: Expr,
+        value: Expr,
+    },
     Expr(Expr),
 }
 
