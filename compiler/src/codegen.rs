@@ -9285,9 +9285,9 @@ fn generate_impl(
                 "struct {struct_name} {{\n    {elem_c}* items;\n    int64_t length;\n    int64_t capacity;\n}};\n\n"
             ));
 
-            let drop_sig = format!("static void {struct_name}_drop({struct_name}* list)");
+            let drop_sig = format!("static void {struct_name}_drop(void* raw)");
             let drop_body = format!(
-                "    if (!list) return;\n{}    if (list->items) ostrin_free(list->items);\n",
+                "    {struct_name}* list = ({struct_name}*)raw;\n    if (!list) return;\n{}    if (list->items) ostrin_free(list->items);\n",
                 if is_reference_type(&elem_ty) {
                     format!("    for (int64_t i = 0; i < list->length; i++) ostrin_release((void*)list->items[i]);\n")
                 } else {
@@ -9506,8 +9506,9 @@ fn generate_impl(
                         ""
                     };
                     list_type_decls.push_str(&format!("struct {name} {{\n    {kc}* keys;\n    {vc}* vals;\n    int64_t length;\n    int64_t capacity;\n{fields}}};\n\n"));
-                    let drop_sig = format!("static void {name}_drop({name}* m)");
-                    let mut drop_body = String::from("    if (!m) return;\n");
+                    let drop_sig = format!("static void {name}_drop(void* raw)");
+                    let mut drop_body =
+                        format!("    {name}* m = ({name}*)raw;\n    if (!m) return;\n");
                     if is_reference_type(k) {
                         drop_body.push_str("    for (int64_t i = 0; i < m->length; i++) ostrin_release((void*)m->keys[i]);\n");
                     }
@@ -9652,14 +9653,14 @@ fn generate_impl(
                         ""
                     };
                     list_type_decls.push_str(&format!("struct {name} {{\n    {tc}* items;\n    int64_t head;\n    int64_t length;\n    int64_t capacity;\n    bool closed;\n{sync_fields}}};\n\n"));
-                    let drop_sig = format!("static void {name}_drop({name}* c)");
+                    let drop_sig = format!("static void {name}_drop(void* raw)");
                     let sync_drop = if codegen.native_threads {
                         "    ostrin_mutex_destroy(&c->mutex);\n    ostrin_cond_destroy(&c->ready);\n"
                     } else {
                         ""
                     };
                     let drop_body = format!(
-                         "    if (!c) return;\n{}    if (c->items) ostrin_free(c->items);\n{sync_drop}",
+                         "    {name}* c = ({name}*)raw;\n    if (!c) return;\n{}    if (c->items) ostrin_free(c->items);\n{sync_drop}",
                          if is_reference_type(t) { "    for (int64_t i = c->head; i < c->length; i++) ostrin_release((void*)c->items[i]);\n" } else { "" },
                      );
                     funcs.push((drop_sig, drop_body));
@@ -9707,9 +9708,9 @@ fn generate_impl(
                         ""
                     };
                     list_type_decls.push_str(&format!("struct {name} {{\n    {tc}* items;\n    int64_t length;\n    int64_t capacity;\n{fields}}};\n\n"));
-                    let drop_sig = format!("static void {name}_drop({name}* s)");
+                    let drop_sig = format!("static void {name}_drop(void* raw)");
                     let drop_body = format!(
-                        "    if (!s) return;\n{}    if (s->items) ostrin_free(s->items);\n{}",
+                        "    {name}* s = ({name}*)raw;\n    if (!s) return;\n{}    if (s->items) ostrin_free(s->items);\n{}",
                         if is_reference_type(t) {
                             "    for (int64_t i = 0; i < s->length; i++) ostrin_release((void*)s->items[i]);\n"
                         } else {
@@ -10179,8 +10180,8 @@ fn generate_impl(
     drop_record_names.dedup();
     for name in drop_record_names {
         let fields = codegen.record_fields(&name).to_vec();
-        let signature = format!("static void ostrin_drop_{name}({name}* value)");
-        let mut body = String::from("    if (!value) return;\n");
+        let signature = format!("static void ostrin_drop_{name}(void* raw)");
+        let mut body = format!("    {name}* value = ({name}*)raw;\n    if (!value) return;\n");
         for (field, ty) in fields {
             if is_reference_type(&ty) {
                 body.push_str(&format!("    ostrin_release((void*)value->{field});\n"));
