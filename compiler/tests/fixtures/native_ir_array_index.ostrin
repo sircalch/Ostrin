@@ -14,6 +14,14 @@ fn make_int(values: List<Int>) -> Array<Int> {
     array(values)
 }
 
+fn make_matrix(values: List<List<Int>>) -> Array<Int> {
+    array(values)
+}
+
+fn make_cube(values: List<List<List<Int>>>) -> Array<Int> {
+    array(values)
+}
+
 fn float_summary(a: Array<Float>) -> Float {
     a.sum() + a.mean() + a.min() + a.max()
 }
@@ -75,6 +83,8 @@ fn main() -> Void {
     matrix_floats = make_float([1.0, 2.0, 3.0, 4.0])
     matrix_ints = reshape_ints(matrix_values)
     matrix_float = reshape_floats(matrix_floats)
+    matrix = make_matrix([[1, 2], [3, 4]])
+    cube = make_cube([[[1, 2], [3, 4]], [[5, 6], [7, 8]]])
     print(first_float(floats))
     print(first_int(ints))
     print(float_summary(floats))
@@ -88,4 +98,6 @@ fn main() -> Void {
     print(dot_pair(floats, floats))
     print(converted_first(ints))
     print(mutate_first(ints))
+    print(matrix.get(1, 0))
+    print(cube.get(1, 0, 1))
 }

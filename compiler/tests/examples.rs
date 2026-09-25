@@ -4305,7 +4305,7 @@ fn native_ir_emitter_handles_scalar_array_parameters_and_indexing() {
         })
         .unwrap_or(0);
     assert_eq!(
-        ir_functions, 18,
+        ir_functions, 20,
         "array constructor, parameter, index and method functions did not use the IR emitter: {report_text}"
     );
 
@@ -4342,6 +4342,8 @@ fn native_ir_emitter_handles_scalar_array_parameters_and_indexing() {
         "Array_Bool_any",
         "Array_Int_get",
         "Array_Int_set",
+        "Array_Int_from2",
+        "Array_Int_from3",
     ] {
         assert!(
             source.contains(helper),
