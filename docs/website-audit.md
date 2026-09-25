@@ -25,7 +25,7 @@ tests or an explicitly labeled early-stage surface.
 - **245** `.ostrin` source files under `examples/`, including package-project sources and
   intentional error cases.
 - **24** Markdown design documents under `docs/design/`.
-- Compiler suite: **220 integration**, **6 differential** and **2 unit** tests.
+- Compiler suite: **221 integration**, **6 differential** and **2 unit** tests.
 - WASI release smoke matrix: nine program modules covering the hello program, a local-path
   package, arguments/environment, file I/O, managed ownership and nested `Option`/`Result`
   consumers; compiler and program modules
