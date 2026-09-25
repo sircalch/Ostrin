@@ -4305,8 +4305,8 @@ fn native_ir_emitter_handles_scalar_array_parameters_and_indexing() {
         })
         .unwrap_or(0);
     assert_eq!(
-        ir_functions, 20,
-        "array constructor, parameter, index and method functions did not use the IR emitter: {report_text}"
+        ir_functions, 24,
+        "array constructor, parameter, index, binary and method functions did not use the IR emitter: {report_text}"
     );
 
     let emitted = run(&["--emit-c", &file]);
@@ -4344,6 +4344,10 @@ fn native_ir_emitter_handles_scalar_array_parameters_and_indexing() {
         "Array_Int_set",
         "Array_Int_from2",
         "Array_Int_from3",
+        "Array_Int_binop",
+        "Array_Float_scalar",
+        "Array_Int_cmp_scalar",
+        "Array_Bool_binop",
     ] {
         assert!(
             source.contains(helper),

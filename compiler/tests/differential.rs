@@ -433,7 +433,7 @@ fn native_backend_types_agree_with_the_checker() {
     // This is intentionally the current repository-wide baseline. Lower it
     // whenever a backend family moves from AST to HIR/IR; a new example that
     // increases the total must update the limit only with an explicit reason.
-    const MAX_AST_FALLBACK_FUNCTIONS: usize = 1256;
+    const MAX_AST_FALLBACK_FUNCTIONS: usize = 1255;
     assert!(
         ast_fallback <= MAX_AST_FALLBACK_FUNCTIONS,
         "AST fallback grew to {ast_fallback} functions (ratchet limit {MAX_AST_FALLBACK_FUNCTIONS})"

@@ -75,6 +75,22 @@ fn mutate_first(a: Array<Int>) -> Int {
     a.get(0)
 }
 
+fn add_ints(a: Array<Int>) -> Array<Int> {
+    a + a
+}
+
+fn scale_floats(a: Array<Float>) -> Array<Float> {
+    a * 2.0
+}
+
+fn greater_than_two(a: Array<Int>) -> Array<Bool> {
+    a > 2
+}
+
+fn bool_or(a: Array<Bool>) -> Array<Bool> {
+    a or a
+}
+
 fn main() -> Void {
     floats = make_float([1.5, 2.5])
     ints = make_int([3, 4])
@@ -100,4 +116,8 @@ fn main() -> Void {
     print(mutate_first(ints))
     print(matrix.get(1, 0))
     print(cube.get(1, 0, 1))
+    print(add_ints(ints).sum())
+    print(scale_floats(floats).sum())
+    print(greater_than_two(ints).count_true())
+    print(bool_or(bools).count_true())
 }

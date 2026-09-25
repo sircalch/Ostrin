@@ -9,7 +9,7 @@
 //! `Result<T,E>` values such as `String.to_int()`/`to_float()`; wrappers can
 //! now compose over scalar collections and over other `Option`/`Result` values
 //! with recursive ownership markers. Scalar numeric `Array<T>` 1D constructors,
-//! parameters, indexing and array methods use the same generated C array runtime. Straight-line tasks additionally use a
+//! parameters, indexing, element-wise arithmetic/comparisons and array methods use the same generated C array runtime. Straight-line tasks additionally use a
 //! generated C environment for immutable captures while larger aggregates,
 //! branching task bodies and scopes retain the verified HIR/AST fallback.
 
@@ -920,11 +920,118 @@ fn emit_instruction(
             right,
             ty,
         } => {
+            let left_ty = value_ty(values, *left)?;
+            let right_ty = value_ty(values, *right)?;
+            let left_array = array_element(&left_ty).cloned();
+            let right_array = array_element(&right_ty).cloned();
+            if left_array.is_some() || right_array.is_some() {
+                let left_is_array = left_array.is_some();
+                let right_is_array = right_array.is_some();
+                let arithmetic = match op {
+                    BinOp::Add => Some(0),
+                    BinOp::Sub => Some(1),
+                    BinOp::Mul => Some(2),
+                    BinOp::Div => Some(3),
+                    BinOp::And => Some(4),
+                    BinOp::Or => Some(5),
+                    _ => None,
+                };
+                let comparison = match op {
+                    BinOp::Eq => Some(0),
+                    BinOp::NotEq => Some(1),
+                    BinOp::Lt => Some(2),
+                    BinOp::Gt => Some(3),
+                    BinOp::LtEq => Some(4),
+                    BinOp::GtEq => Some(5),
+                    _ => None,
+                };
+                let (element, function, op_code, result_ty) =
+                    match (left_array.clone(), right_array.clone()) {
+                        (Some(element), Some(other)) if element == other => {
+                            let Some(code) = arithmetic.or(comparison) else {
+                                return Err(());
+                            };
+                            let result_ty = if comparison.is_some() {
+                                Ty::Applied("Array".to_string(), vec![Ty::Bool])
+                            } else {
+                                Ty::Applied("Array".to_string(), vec![element.clone()])
+                            };
+                            (
+                                element,
+                                if comparison.is_some() { "cmp" } else { "binop" },
+                                code,
+                                result_ty,
+                            )
+                        }
+                        (Some(element), None) if scalar(&right_ty) && right_ty == element => {
+                            let Some(code) = arithmetic.or(comparison) else {
+                                return Err(());
+                            };
+                            let result_ty = if comparison.is_some() {
+                                Ty::Applied("Array".to_string(), vec![Ty::Bool])
+                            } else {
+                                Ty::Applied("Array".to_string(), vec![element.clone()])
+                            };
+                            (
+                                element,
+                                if comparison.is_some() {
+                                    "cmp_scalar"
+                                } else {
+                                    "scalar"
+                                },
+                                code,
+                                result_ty,
+                            )
+                        }
+                        (None, Some(element)) if scalar(&left_ty) && left_ty == element => {
+                            let Some(code) = arithmetic.or(comparison) else {
+                                return Err(());
+                            };
+                            let result_ty = if comparison.is_some() {
+                                Ty::Applied("Array".to_string(), vec![Ty::Bool])
+                            } else {
+                                Ty::Applied("Array".to_string(), vec![element.clone()])
+                            };
+                            (
+                                element,
+                                if comparison.is_some() {
+                                    "cmp_scalar"
+                                } else {
+                                    "scalar"
+                                },
+                                code,
+                                result_ty,
+                            )
+                        }
+                        _ => return Err(()),
+                    };
+                if *ty != result_ty
+                    || !array_supported(&Ty::Applied("Array".to_string(), vec![element.clone()]))
+                {
+                    return Err(());
+                }
+                let array_ty = Ty::Applied("Array".to_string(), vec![element.clone()]);
+                let array_c_name = array_name(&array_ty).ok_or(())?;
+                let left_code = value_code(values, *left)?;
+                let right_code = value_code(values, *right)?;
+                let code = match function {
+                    "binop" | "cmp" if left_is_array && right_is_array => {
+                        format!("{array_c_name}_{function}({left_code}, {right_code}, {op_code})")
+                    }
+                    "scalar" | "cmp_scalar" if left_is_array => format!(
+                        "{array_c_name}_{function}({left_code}, {right_code}, {op_code}, 0)"
+                    ),
+                    "scalar" | "cmp_scalar" => format!(
+                        "{array_c_name}_{function}({right_code}, {left_code}, {op_code}, 1)"
+                    ),
+                    _ => return Err(()),
+                };
+                out.push_str(&format!("    {} = {code};\n", value_name(*dst)));
+                return Ok(());
+            }
             if (!scalar(ty) && !quantity(ty)) || *ty == Ty::Void {
                 return Err(());
             }
-            let left_ty = value_ty(values, *left)?;
-            let right_ty = value_ty(values, *right)?;
             let structural_equality = matches!(op, BinOp::Eq | BinOp::NotEq)
                 && left_ty == right_ty
                 && supported(&left_ty, records);

@@ -104,7 +104,7 @@ Sobre este IR se hacen los análisis que el texto C no permite:
    `--native-type-report` publica también `ir-generated`, `hir-generated` y `ast-fallback`.
    El mismo informe agrupa esas cifras por archivo fuente con líneas `native-source`, y la
    prueba diferencial comprueba que la suma por módulo coincide con los totales globales.
-   La prueba diferencial conserva el baseline actual de fallback (1 256 funciones agregadas
+   La prueba diferencial conserva el baseline actual de fallback (1 255 funciones agregadas
    sobre los ejemplos) y solo permite reducirlo o justificar explícitamente un aumento.
    Los destructores de tareas generados se registran con la firma ABI `void (*)(void*)` del
    runtime; la suite completa de ejemplos nativos corre bajo UBSan e incluye cancelación de
