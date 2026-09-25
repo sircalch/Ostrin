@@ -170,7 +170,7 @@ if (lab) {
   for (const figure of lab.gallery ?? []) {
     check(read(figure.source).replaceAll("\r\n", "\n") === figure.code, `viz ${figure.id}: code drifted from ${figure.source}; run node scripts/lab-data.mjs --write`);
     const svg = read(`website/${figure.svg}`);
-    check(svg.startsWith("<svg xmlns=\"http://www.w3.org/2000/svg\"") && svg.trimEnd().endsWith("</svg>"), `viz ${figure.id}: ${figure.svg} is not a recorded SVG`);
+    check(svg.startsWith("<svg") && svg.includes('xmlns="http://www.w3.org/2000/svg"') && svg.trimEnd().endsWith("</svg>"), `viz ${figure.id}: ${figure.svg} is not a recorded SVG`);
   }
   check(read("website/viz.html").includes("data-viz-gallery"), "viz.html: missing gallery container");
 }

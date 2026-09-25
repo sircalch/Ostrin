@@ -1241,7 +1241,7 @@ fn render_table(t: Table) -> String {
     top = if t.title != "" { 48 } else { 16 }
     height = top + t.row_height * (t.rows.length() + 1) + 20
     theme = t.theme
-    mut out: List<String> = [header(width, height, theme)]
+    mut out: List<String> = [header(width, height, theme).replace("<svg xmlns=\"http://www.w3.org/2000/svg\"", "<svg role=\"table\" data-ostrin-table=\"true\" xmlns=\"http://www.w3.org/2000/svg\"")]
     if t.title != "" {
         out.push(text_at(16.0, 29.0, t.title, "start", 16, theme.text, attr("font-weight", "600")))
     }
@@ -1249,26 +1249,30 @@ fn render_table(t: Table) -> String {
     header_y = top as Float
     for c in 0 until columns {
         cell_width = widths[c] as Float
-        out.push("<rect class=\"table-header\"" + attr("x", num(x)) + attr("y", num(header_y)) + attr("width", num(cell_width)) + attr("height", px(t.row_height)) + attr("fill", theme.text) + "/>" )
+        out.push("<rect class=\"table-header\"" + attr("data-table-column", c.to_string()) + attr("x", num(x)) + attr("y", num(header_y)) + attr("width", num(cell_width)) + attr("height", px(t.row_height)) + attr("fill", theme.text) + "/>" )
         heading = if t.headers.length() > 0 { t.headers[c] } else { "value" }
-        out.push(text_at(x + 12.0, header_y + (t.row_height as Float) / 2.0 + 4.0, heading, "start", 11, theme.background, attr("font-weight", "600")))
+        out.push("<text class=\"table-heading\"" + attr("data-table-column", c.to_string()) + attr("x", num(x + 12.0)) + attr("y", num(header_y + (t.row_height as Float) / 2.0 + 4.0)) + attr("text-anchor", "start") + attr("font-size", "11") + attr("fill", theme.background) + attr("font-weight", "600") + ">" + escape(heading) + "</text>")
         x = x + cell_width
     }
+    out.push("<g class=\"table-body\" role=\"rowgroup\">")
     for r in 0 until t.rows.length() {
         row = t.rows[r]
         y = header_y + (t.row_height as Float) * ((r + 1) as Float)
         fill = if r % 2 == 0 { theme.background } else { theme.grid }
         x = 10.0
+        out.push("<g class=\"table-row\" role=\"row\"" + attr("data-table-row", r.to_string()) + attr("data-table-y", num(y)) + ">")
         for c in 0 until columns {
             cell_width = widths[c] as Float
             value = if c < row.length() { row[c] } else { "" }
-            out.push("<rect class=\"table-cell\"" + attr("x", num(x)) + attr("y", num(y)) + attr("width", num(cell_width)) + attr("height", px(t.row_height)) + attr("fill", fill) + attr("stroke", theme.grid) + attr("stroke-width", "0.6") + ">" + tip(value) + "</rect>")
-            out.push(text_at(x + 12.0, y + (t.row_height as Float) / 2.0 + 4.0, value, "start", 11, theme.text, ""))
+            out.push("<rect class=\"table-cell\" role=\"cell\"" + attr("data-table-column", c.to_string()) + attr("x", num(x)) + attr("y", num(y)) + attr("width", num(cell_width)) + attr("height", px(t.row_height)) + attr("fill", fill) + attr("stroke", theme.grid) + attr("stroke-width", "0.6") + ">" + tip(value) + "</rect>")
+            out.push("<text class=\"table-value\"" + attr("data-table-column", c.to_string()) + attr("x", num(x + 12.0)) + attr("y", num(y + (t.row_height as Float) / 2.0 + 4.0)) + attr("text-anchor", "start") + attr("font-size", "11") + attr("fill", theme.text) + ">" + escape(value) + "</text>")
             x = x + cell_width
         }
+        out.push("</g>")
     }
+    out.push("</g>")
     footer = t.rows.length().to_string() + " rows · " + columns.to_string() + " columns"
-    out.push(text_at(16.0, (height - 7) as Float, footer, "start", 10, theme.muted, ""))
+    out.push("<text class=\"table-footer\" data-table-footer=\"true\"" + attr("x", "16") + attr("y", (height - 7).to_string()) + attr("text-anchor", "start") + attr("font-size", "10") + attr("fill", theme.muted) + ">" + escape(footer) + "</text>")
     out.push("</svg>\n")
     out.join("\n")
 }

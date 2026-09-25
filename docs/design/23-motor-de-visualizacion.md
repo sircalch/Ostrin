@@ -158,7 +158,11 @@ ancho de cada columna para mantener la figura manejable, alterna el fondo de las
 `<title>` por celda para inspeccionar el valor completo al pasar el ratón. `dark()`, `size()` y
 `row_height()` permiten adaptar la presentación sin introducir un formato de datos oculto: el
 programa sigue siendo responsable de convertir números, unidades y precisión. La misma tabla se
-puede abrir como SVG, guardarse con `save()` y reproducirse en intérprete, nativo y WASM.
+puede abrir como SVG, guardarse con `save()` y reproducirse en intérprete, nativo y WASM. El
+explorador web identifica las filas y columnas producidas por Ostrin y permite filtrar texto y
+ordenar columnas numéricas o textuales sin recalcular ni dibujar datos fuera de la salida SVG; el
+pie de tabla informa cuántas filas quedan visibles. La selección enlazada entre tabla y figura
+queda para una fase posterior porque requiere eventos y un contrato de datos compartido.
 
 ## 5. Unidades
 
@@ -191,7 +195,7 @@ la falta de literales científicos (`1e-9`). Ver `CONTEXTO_PROYECTO.md` §270–
 | 0.3 (parcial, hecho) | animación en bucle con `viz.animate`: fotogramas generados por Ostrin, reproducidos con CSS dentro del SVG |
 | 0.3 (hecho) | movimiento continuo con SMIL: `animate`, `moving_point` con estela, `rod`, `moving_segment`, `morph`; `no_axes` |
 | 0.3 (parcial, hecho) | controles web de play/pausa/reinicio, posición temporal y exportación WebM cuando el navegador ofrece `MediaRecorder` |
-| 0.3 (hecho) | tablas SVG reproducibles con filas alternadas, encabezados, tooltips por celda y tema oscuro (`viz.table`) |
+| 0.3 (hecho) | tablas SVG reproducibles con filas alternadas, encabezados, tooltips por celda, tema oscuro y explorador web con filtro/ordenamiento (`viz.table`) |
 | 0.4 | volúmenes, isosuperficies, campos vectoriales, cortes; cámaras en perspectiva |
 | 0.5 | backend WebGPU sobre la misma lista de series; PNG/PDF |
 | — | figuras con procedencia (hash de fuente y datos, semilla, versión del compilador) |
