@@ -7,10 +7,14 @@ enteros de ancho fijo desde esa IR. Las familias gestionadas `String`, el núcle
 con elementos escalares, las operaciones escalares de `Map<K,V>`/`Set<T>`, records concretos
 y `Option`/`Result` con payload escalar, `String`, `Record`, una colección escalar
 (`List`/`Map`/`Set`) u otro wrapper `Option`/`Result` también atraviesan ya el emisor IR.
-`Array<T>` numérico escalar también cruza la frontera en constructores 1D y parámetros:
+`Array<T>` numérico escalar también cruza la frontera en constructores 1D, parámetros,
+indexación y métodos estructurales/reducciones:
 `array(List<T>)` usa el runtime C generado (`Array_Float_from1`, `Array_Int_from1`,
 `Array_Float32_from1` o `Array_Bool_from1`), la indexación unidimensional usa sus helpers
-`*_index1` y se conserva retain/release del array.
+`*_index1`, y `shape`/`rank`/`size`, reducciones, `to_list`, `sort`/`cumsum`,
+`reshape`/`transpose`/`row`/`col`, `sum_axis`, `dot`/`matmul`, `get`/`set` y
+`to_float` usan los helpers tipados disponibles. El pase de ownership conserva
+`retain/release` de arrays y de las listas de forma consumidas por esos métodos.
 `read_file`/`write_file` añaden `Result<String, String>` y `Result<Void, String>` con errores
 de archivo administrados, comprobación de lectura/escritura/cierre y un checkpoint de cancelación
 antes de cruzar la libc; la operación de archivo sigue siendo bloqueante mientras está dentro del
@@ -42,7 +46,7 @@ esa ABI, mientras los scopes anidados y escapes complejos siguen en fallback.*
 | `TypedProgram.literal_kinds` | `typeck` | Tipo elegido para cada literal numérico |
 | `NativeTypeReport` | `codegen` | Detecta divergencias checker↔backend (0 hoy, en ~1 350 expresiones) |
 | `IrProgram` / `IrFunction` / `IrBlock` | `ir.rs` | Primera CFG con temporales explícitos, terminadores y verificador de destinos |
-| Emisor IR | `ir_c.rs` | Genera C desde SSA/CFG para funciones escalares, rangos enteros direccionales, `String`, constructores 1D, parámetros e indexación unidimensional de arrays numéricos escalares, `read_file`/`write_file` (`Result<String,String>`/`Result<Void,String>`), records concretos y records genéricos monomorfizados, iteradores de records concretos y genéricos monomorfizados mediante métodos registrados, canales (`send`/`close`/`receive`), `Option<Record>`, `List<T>` escalar, operaciones hash escalares de `Map`/`Set`, wrappers sobre `List`/`Map`/`Set` y wrappers `Option`/`Result` anidados con `match`, `Option<T>` escalar/`String` con `Some`/`None`, `try catch` con handlers globales, aliases locales sin entorno y handlers locales capturados compatibles, cierres capturados con entorno tipado y destructor, llamadas indirectas, ramas, bucles, `phi` y enteros de ancho fijo comprobados; emite ownership para las familias migradas y deja fallback seguro para lo demás |
+| Emisor IR | `ir_c.rs` | Genera C desde SSA/CFG para funciones escalares, rangos enteros direccionales, `String`, constructores 1D, parámetros, indexación y métodos de arrays numéricos escalares, `read_file`/`write_file` (`Result<String,String>`/`Result<Void,String>`), records concretos y records genéricos monomorfizados, iteradores de records concretos y genéricos monomorfizados mediante métodos registrados, canales (`send`/`close`/`receive`), `Option<Record>`, `List<T>` escalar, operaciones hash escalares de `Map`/`Set`, wrappers sobre `List`/`Map`/`Set` y wrappers `Option`/`Result` anidados con `match`, `Option<T>` escalar/`String` con `Some`/`None`, `try catch` con handlers globales, aliases locales sin entorno y handlers locales capturados compatibles, cierres capturados con entorno tipado y destructor, llamadas indirectas, ramas, bucles, `phi` y enteros de ancho fijo comprobados; emite ownership para las familias migradas y deja fallback seguro para lo demás |
 | Intérprete como oráculo | `interpreter` | Semántica de referencia; pruebas diferenciales automáticas |
 
 Por tanto el backend **ya no infiere solo**: la reinferencia que queda (`bind_type`, `expected`, `settle_literal`) es respaldo verificado.
@@ -100,13 +104,13 @@ Sobre este IR se hacen los análisis que el texto C no permite:
    `--native-type-report` publica también `ir-generated`, `hir-generated` y `ast-fallback`.
    El mismo informe agrupa esas cifras por archivo fuente con líneas `native-source`, y la
    prueba diferencial comprueba que la suma por módulo coincide con los totales globales.
-   La prueba diferencial conserva el baseline actual de fallback (1 370 funciones agregadas
+   La prueba diferencial conserva el baseline actual de fallback (1 256 funciones agregadas
    sobre los ejemplos) y solo permite reducirlo o justificar explícitamente un aumento.
    Los destructores de tareas generados se registran con la firma ABI `void (*)(void*)` del
    runtime; la suite completa de ejemplos nativos corre bajo UBSan e incluye cancelación de
    tareas para evitar regresiones de punteros a función incompatibles.
 2. Migrar el backend C por **familias de nodos** al HIR (literales/operadores → llamadas → records/enums → patrones → colecciones → genéricos), eliminando la reinferencia correspondiente en cada paso.
-3. **IR de bloques básicos** y generación de C desde el IR (el HIR deja de generar C directamente). La primera CFG observable ya existe en `--ir` y el emisor consume ramas, recursión, bucles con `phi`, rangos enteros direccionales, aritmética comprobada de ancho fijo, `String`, constructores 1D, parámetros e indexación unidimensional de `Array<T>` numérico escalar, records concretos con campos anidados, records genéricos monomorfizados con campos escalares, iteradores de records concretos y genéricos monomorfizados (`next() -> Option<T>`), canales con `send`/`close`/`receive` y `for`, `spawn {}` con CFG soportado, capturas inmutables, closures capturados con entorno tipado, `spawn_scope {}` inline con drenado de grupos, tareas anidadas con capturas propagadas y `Task.join()`, el núcleo de `List<T>`, operaciones hash escalares de `Map`/`Set` y lookups `Option` escalares/String/Record con `Some`/`None`; faltan arrays anidados y métodos de arrays, rangos con cantidades, iteradores indirectos, scopes anidados, otros `Option` gestionados, patrones anidados, agregados complejos y la retirada progresiva del fallback.
+3. **IR de bloques básicos** y generación de C desde el IR (el HIR deja de generar C directamente). La primera CFG observable ya existe en `--ir` y el emisor consume ramas, recursión, bucles con `phi`, rangos enteros direccionales, aritmética comprobada de ancho fijo, `String`, constructores 1D, parámetros, indexación y métodos de `Array<T>` numérico escalar, records concretos con campos anidados, records genéricos monomorfizados con campos escalares, iteradores de records concretos y genéricos monomorfizados (`next() -> Option<T>`), canales con `send`/`close`/`receive` y `for`, `spawn {}` con CFG soportado, capturas inmutables, closures capturados con entorno tipado, `spawn_scope {}` inline con drenado de grupos, tareas anidadas con capturas propagadas y `Task.join()`, el núcleo de `List<T>`, operaciones hash escalares de `Map`/`Set` y lookups `Option` escalares/String/Record con `Some`/`None`; faltan arrays anidados y métodos sobre elementos gestionados, rangos con cantidades, iteradores indirectos, scopes anidados, otros `Option` gestionados, patrones anidados, agregados complejos y la retirada progresiva del fallback.
 4. **RC + último uso** sobre el IR (`--leak-check`: los ejemplos deben terminar sin objetos vivos).
    El runtime ya expone `ostrin_retain`/`ostrin_release`; el emisor C cubre la primera subetapa
    de forma lineal en locales directos: aliases y campos prestados retienen, las reasignaciones

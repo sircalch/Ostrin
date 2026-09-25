@@ -14,9 +14,78 @@ fn make_int(values: List<Int>) -> Array<Int> {
     array(values)
 }
 
+fn float_summary(a: Array<Float>) -> Float {
+    a.sum() + a.mean() + a.min() + a.max()
+}
+
+fn int_summary(a: Array<Int>) -> Float {
+    a.mean()
+}
+
+fn int_shape_summary(a: Array<Int>) -> Int {
+    a.length() + a.rank() + a.size() + a.count()
+}
+
+fn sorted_first(a: Array<Int>) -> Int {
+    a.sort()[0]
+}
+
+fn list_length(a: Array<Float>) -> Int {
+    a.to_list().length()
+}
+
+fn bool_summary(a: Array<Bool>) -> Bool {
+    a.any() and a.all()
+}
+
+fn reshape_ints(a: Array<Int>) -> Array<Int> {
+    a.reshape([2, 2])
+}
+
+fn row_first(a: Array<Int>) -> Int {
+    a.row(1)[0]
+}
+
+fn reshape_floats(a: Array<Float>) -> Array<Float> {
+    a.reshape([2, 2])
+}
+
+fn sum_axis_second(a: Array<Float>) -> Float {
+    a.sum_axis(0)[1]
+}
+
+fn dot_pair(a: Array<Float>, b: Array<Float>) -> Float {
+    a.dot(b)
+}
+
+fn converted_first(a: Array<Int>) -> Float {
+    a.to_float()[0]
+}
+
+fn mutate_first(a: Array<Int>) -> Int {
+    a.set(0, 9)
+    a.get(0)
+}
+
 fn main() -> Void {
     floats = make_float([1.5, 2.5])
     ints = make_int([3, 4])
+    bools = array([true, false])
+    matrix_values = make_int([1, 2, 3, 4])
+    matrix_floats = make_float([1.0, 2.0, 3.0, 4.0])
+    matrix_ints = reshape_ints(matrix_values)
+    matrix_float = reshape_floats(matrix_floats)
     print(first_float(floats))
     print(first_int(ints))
+    print(float_summary(floats))
+    print(int_summary(ints))
+    print(int_shape_summary(ints))
+    print(sorted_first(ints))
+    print(list_length(floats))
+    print(bool_summary(bools))
+    print(row_first(matrix_ints))
+    print(sum_axis_second(matrix_float))
+    print(dot_pair(floats, floats))
+    print(converted_first(ints))
+    print(mutate_first(ints))
 }

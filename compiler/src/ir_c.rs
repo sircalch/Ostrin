@@ -9,7 +9,7 @@
 //! `Result<T,E>` values such as `String.to_int()`/`to_float()`; wrappers can
 //! now compose over scalar collections and over other `Option`/`Result` values
 //! with recursive ownership markers. Scalar numeric `Array<T>` 1D constructors,
-//! parameters and indexing use the same generated C array runtime. Straight-line tasks additionally use a
+//! parameters, indexing and array methods use the same generated C array runtime. Straight-line tasks additionally use a
 //! generated C environment for immutable captures while larger aggregates,
 //! branching task bodies and scopes retain the verified HIR/AST fallback.
 
@@ -1309,6 +1309,168 @@ fn emit_instruction(
                             )
                         }
                         _ => return Err(()),
+                    }
+                }
+                Ty::Applied(name, array_args)
+                    if name == "Array"
+                        && array_args.len() == 1
+                        && array_supported(&Ty::Applied(name.clone(), array_args.clone())) =>
+                {
+                    let array_ty = Ty::Applied(name.clone(), array_args.clone());
+                    let element = array_args[0].clone();
+                    let array_c_name = array_name(&array_ty).ok_or(())?;
+                    let codes = args
+                        .iter()
+                        .map(|arg| value_code(values, *arg))
+                        .collect::<Bail<Vec<_>>>()?;
+                    match method.as_str() {
+                        "shape" if codes.is_empty() && *ty == Ty::List(Box::new(Ty::Int)) => {
+                            format!("{array_c_name}_shape({receiver})")
+                        }
+                        "rank" if codes.is_empty() && *ty == Ty::Int => {
+                            format!("{array_c_name}_rank({receiver})")
+                        }
+                        "size" | "length" | "count" if codes.is_empty() && *ty == Ty::Int => {
+                            format!("{array_c_name}_size({receiver})")
+                        }
+                        "sum" | "min" | "max"
+                            if codes.is_empty()
+                                && *ty == element
+                                && matches!(element, Ty::Int | Ty::Float | Ty::Float32) =>
+                        {
+                            format!("{array_c_name}_{}({receiver})", method)
+                        }
+                        "mean" if codes.is_empty() => {
+                            let expected = if element == Ty::Int {
+                                Ty::Float
+                            } else {
+                                element.clone()
+                            };
+                            if *ty != expected {
+                                return Err(());
+                            }
+                            format!("{array_c_name}_mean({receiver})")
+                        }
+                        "to_list"
+                            if codes.is_empty()
+                                && *ty == Ty::List(Box::new(element.clone()))
+                                && list_supported(&element, records) =>
+                        {
+                            format!("{array_c_name}_to_list({receiver})")
+                        }
+                        "cumsum" | "sort"
+                            if codes.is_empty()
+                                && *ty == array_ty
+                                && matches!(element, Ty::Int | Ty::Float | Ty::Float32) =>
+                        {
+                            format!("{array_c_name}_{}({receiver})", method)
+                        }
+                        "any" | "all"
+                            if codes.is_empty() && *ty == Ty::Bool && element == Ty::Bool =>
+                        {
+                            format!("{array_c_name}_{}({receiver})", method)
+                        }
+                        "count_true"
+                            if codes.is_empty() && *ty == Ty::Int && element == Ty::Bool =>
+                        {
+                            format!("{array_c_name}_count_true({receiver})")
+                        }
+                        "row" | "col"
+                            if codes.len() == 1
+                                && value_ty(values, args[0])? == Ty::Int
+                                && *ty == array_ty =>
+                        {
+                            format!("{array_c_name}_{}({receiver}, {})", method, codes[0])
+                        }
+                        "reshape"
+                            if codes.len() == 1
+                                && value_ty(values, args[0])? == Ty::List(Box::new(Ty::Int))
+                                && *ty == array_ty =>
+                        {
+                            format!("{array_c_name}_reshape({receiver}, {})", codes[0])
+                        }
+                        "transpose" if codes.is_empty() && *ty == array_ty => {
+                            format!("{array_c_name}_transpose({receiver})")
+                        }
+                        "sum_axis"
+                            if codes.len() == 1
+                                && value_ty(values, args[0])? == Ty::Int
+                                && *ty == array_ty
+                                && matches!(element, Ty::Int | Ty::Float | Ty::Float32) =>
+                        {
+                            format!("{array_c_name}_sum_axis({receiver}, {})", codes[0])
+                        }
+                        "dot"
+                            if codes.len() == 1
+                                && element == Ty::Float
+                                && value_ty(values, args[0])? == array_ty
+                                && *ty == element =>
+                        {
+                            format!("{array_c_name}_dot({receiver}, {})", codes[0])
+                        }
+                        "matmul"
+                            if codes.len() == 1
+                                && element == Ty::Float
+                                && value_ty(values, args[0])? == array_ty
+                                && *ty == array_ty =>
+                        {
+                            format!("{array_c_name}_matmul({receiver}, {})", codes[0])
+                        }
+                        "to_float"
+                            if codes.is_empty()
+                                && element == Ty::Int
+                                && *ty == Ty::Applied("Array".to_string(), vec![Ty::Float]) =>
+                        {
+                            "Array_Int_to_float(".to_string() + &receiver + ")"
+                        }
+                        "get"
+                            if !codes.is_empty()
+                                && codes.iter().zip(args).all(|(code, arg)| {
+                                    !code.is_empty()
+                                        && value_ty(values, *arg)
+                                            .is_ok_and(|arg_ty| arg_ty == Ty::Int)
+                                })
+                                && *ty == element =>
+                        {
+                            format!(
+                                "{array_c_name}_get({receiver}, (int64_t[]){{ {} }}, {})",
+                                codes.join(", "),
+                                codes.len()
+                            )
+                        }
+                        "set"
+                            if codes.len() >= 2
+                                && *ty == Ty::Void
+                                && args[..args.len() - 1]
+                                    .iter()
+                                    .all(|arg| value_ty(values, *arg) == Ok(Ty::Int))
+                                && value_ty(values, *args.last().ok_or(())?)? == element =>
+                        {
+                            let (value, indices) = codes.split_last().ok_or(())?;
+                            format!(
+                                "{array_c_name}_set({receiver}, (int64_t[]){{ {} }}, {}, {value})",
+                                indices.join(", "),
+                                indices.len()
+                            )
+                        }
+                        "var" | "std" | "sample_var" | "sample_std" | "median"
+                            if codes.is_empty()
+                                && matches!(element, Ty::Float | Ty::Float32)
+                                && *ty == element =>
+                        {
+                            format!("{array_c_name}_{}({receiver})", method)
+                        }
+                        "percentile"
+                            if codes.len() == 1
+                                && matches!(element, Ty::Float | Ty::Float32)
+                                && value_ty(values, args[0])? == Ty::Float
+                                && *ty == element =>
+                        {
+                            format!("{array_c_name}_percentile({receiver}, {})", codes[0])
+                        }
+                        _ => {
+                            return Err(());
+                        }
                     }
                 }
                 Ty::Map(key, value) if map_supported(&key, &value) => {
