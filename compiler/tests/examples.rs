@@ -9096,6 +9096,16 @@ fn viz_boxplots_render_quartiles_whiskers_and_medians() {
 }
 
 #[test]
+fn viz_tables_render_headers_rows_and_tooltips() {
+    let out = interpreter_and_native_agree("viz_table.ostrin");
+    assert!(out.contains("<svg") && out.contains("ODE solver comparison"));
+    assert_eq!(out.matches("class=\"table-header\"").count(), 4);
+    assert_eq!(out.matches("class=\"table-cell\"").count(), 16);
+    assert_eq!(out.matches("<title>").count(), 16);
+    assert!(out.contains("4 rows · 4 columns"));
+}
+
+#[test]
 fn arrays_of_quantities_keep_one_unit_and_check_dimensions() {
     let out = interpreter_and_native_agree("quantity_arrays.ostrin");
     let lines: Vec<&str> = out.lines().collect();

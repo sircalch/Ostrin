@@ -150,6 +150,16 @@ Límites: SMIL no se puede pausar sin scripts ni desactivar con `prefers-reduced
 cada `<svg>` anidado (paneles de `viz.grid`) tiene su propio reloj, que arranca con la carga, así
 que los paneles quedan sincronizados en la reproducción normal.
 
+## 4.3 Tablas reproducibles
+
+`viz.table(headers, rows, title:)` convierte encabezados y filas de texto preparados por el programa
+en un SVG determinista. El renderer calcula anchos de columna a partir del contenido, limita el
+ancho de cada columna para mantener la figura manejable, alterna el fondo de las filas y añade un
+`<title>` por celda para inspeccionar el valor completo al pasar el ratón. `dark()`, `size()` y
+`row_height()` permiten adaptar la presentación sin introducir un formato de datos oculto: el
+programa sigue siendo responsable de convertir números, unidades y precisión. La misma tabla se
+puede abrir como SVG, guardarse con `save()` y reproducirse en intérprete, nativo y WASM.
+
 ## 5. Unidades
 
 `quantity_line(xs, ys)` acepta `List<Quantity<X>>` y `List<Quantity<Y>>`: toma los números en la
@@ -181,6 +191,7 @@ la falta de literales científicos (`1e-9`). Ver `CONTEXTO_PROYECTO.md` §270–
 | 0.3 (parcial, hecho) | animación en bucle con `viz.animate`: fotogramas generados por Ostrin, reproducidos con CSS dentro del SVG |
 | 0.3 (hecho) | movimiento continuo con SMIL: `animate`, `moving_point` con estela, `rod`, `moving_segment`, `morph`; `no_axes` |
 | 0.3 (parcial, hecho) | controles web de play/pausa/reinicio, posición temporal y exportación WebM cuando el navegador ofrece `MediaRecorder` |
+| 0.3 (hecho) | tablas SVG reproducibles con filas alternadas, encabezados, tooltips por celda y tema oscuro (`viz.table`) |
 | 0.4 | volúmenes, isosuperficies, campos vectoriales, cortes; cámaras en perspectiva |
 | 0.5 | backend WebGPU sobre la misma lista de series; PNG/PDF |
 | — | figuras con procedencia (hash de fuente y datos, semilla, versión del compilador) |

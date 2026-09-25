@@ -939,6 +939,19 @@ globalThis.OSTRIN_LAB = Object.freeze({
       ]
     },
     {
+      "id": "table",
+      "title": "Data table",
+      "file": "examples/viz_table.ostrin",
+      "blurb": "A formatted ODE solver comparison rendered as a tooltip-rich SVG table.",
+      "source": "examples/viz_table.ostrin",
+      "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_table.ostrin",
+      "code": "// std.viz · a deterministic data table rendered by Ostrin as SVG.\n// Formatting stays in the program so units, significant digits and labels\n// are explicit before the table reaches the renderer.\nimport std.viz\n\nfn main() -> Void {\n    headers: List<String> = [\"solver\", \"steps\", \"error\", \"runtime\"]\n    rows: List<List<String>> = [\n        [\"RK4\", \"240\", \"2.4e-4\", \"18 ms\"],\n        [\"RK45\", \"96\", \"8.1e-7\", \"11 ms\"],\n        [\"BDF\", \"42\", \"1.7e-6\", \"14 ms\"],\n        [\"exact\", \"—\", \"0\", \"1 ms\"]\n    ]\n    print(viz.table(headers, rows, title: \"ODE solver comparison\").dark().svg())\n}\n",
+      "svg": "assets/viz/table.svg",
+      "printed": [
+        ""
+      ]
+    },
+    {
       "id": "dashboard",
       "title": "Multi-panel layout",
       "file": "examples/viz_dashboard.ostrin",
