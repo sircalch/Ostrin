@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Visualization: table explorer
+- `std.viz.table` marks its rows, columns and footer in the deterministic SVG it produces. The Viz
+  explorer now filters rows and sorts numeric or textual columns in the browser while preserving
+  Ostrin as the source of the data and rendering. The live table demo exercises the same WASM output.
+
 ### Visualization: continuous motion
 - Figures can animate the motion Ostrin computes: `fig.animate(seconds)` with `moving_point`
   (an optional trail follows the distance actually travelled), `rod`, `moving_segment` and `morph`

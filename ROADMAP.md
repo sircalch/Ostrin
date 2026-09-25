@@ -24,10 +24,10 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    versión publicada de Linguist, verificar la clasificación de `.ostrin` en GitHub y
    documentar el resultado en la release y el sitio.
 6. **Continuar el frente profesional de visualización y web**: ampliar `std.viz` con
-   gráficas estadísticas, tablas interactivas y selección enlazada, mantener ejemplos
-   reproducibles en la galería, consolidar la exportación WebM y añadir exportación
-   MP4/GIF/PNG/PDF, exploración 3D, WebGPU y procedencia de figuras con evidencia en
-   intérprete, nativo y WASM.
+   gráficas estadísticas y selección enlazada, mantener tablas reproducibles con filtro y
+   ordenamiento en el explorador, conservar ejemplos verificables en la galería, consolidar la
+   exportación WebM y añadir exportación MP4/GIF/PNG/PDF, exploración 3D, WebGPU y procedencia de
+   figuras con evidencia en intérprete, nativo y WASM.
 
 ## Horizonte posterior
 

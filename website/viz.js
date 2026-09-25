@@ -157,10 +157,24 @@ function explorer() {
     animationLabel,
     animationStatus,
   ]);
+  const tableFilter = el("input", { id: "viz-table-filter", type: "search", placeholder: "Search rows", "aria-label": "Filter table rows" });
+  const tableSort = el("select", { id: "viz-table-sort", "aria-label": "Sort table by" });
+  const tableDirection = el("button", { type: "button", className: "button-quiet", text: "Ascending", "data-viz-table-direction": "" });
+  const tableStatus = el("output", { className: "viz-table-status", "aria-live": "polite", text: "" });
+  const tableTools = el("div", { className: "viz-table-tools", hidden: true }, [
+    el("span", { className: "viz-animation-caption", text: "Table" }),
+    el("label", { className: "viz-table-control" }, [el("span", { text: "Filter" }), tableFilter]),
+    el("label", { className: "viz-table-control" }, [el("span", { text: "Sort by" }), tableSort]),
+    tableDirection,
+    tableStatus,
+  ]);
   let zoom = 100;
   let svg = "";
   let animationDuration = 0;
   let animationPaused = false;
+  let tableRows = [];
+  let tableSortColumn = -1;
+  let tableAscending = true;
   const render = () => {
     zoomLabel.textContent = `${zoom}%`;
     frame.srcdoc = `<!doctype html><meta charset="utf-8"><style>html,body{margin:0;background:#fff}svg{display:block;width:${zoom}%;height:auto}</style>${svg}`;
@@ -205,6 +219,73 @@ function explorer() {
     animationPaused = false;
     requestAnimationFrame(captureAnimationFrames);
   };
+  const numericTableValue = (value) => {
+    const match = value.replace(/,/g, "").match(/[-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/i);
+    return match ? Number(match[0]) : Number.NaN;
+  };
+  const compareTableRows = (left, right) => {
+    const a = left.values[tableSortColumn] ?? "";
+    const b = right.values[tableSortColumn] ?? "";
+    const na = numericTableValue(a);
+    const nb = numericTableValue(b);
+    let result;
+    if (Number.isFinite(na) && Number.isFinite(nb)) return tableAscending ? na - nb : nb - na;
+    if (Number.isFinite(na)) return -1;
+    if (Number.isFinite(nb)) return 1;
+    result = a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
+    return tableAscending ? result : -result;
+  };
+  const applyTableState = () => {
+    if (!tableRows.length) return;
+    const query = tableFilter.value.trim().toLocaleLowerCase();
+    const matches = (row) => !query || row.values.some((value) => value.toLocaleLowerCase().includes(query));
+    const visible = tableRows.filter(matches);
+    const orderedVisible = tableSortColumn < 0 ? [...visible] : [...visible].sort(compareTableRows);
+    const hidden = tableRows.filter((row) => !matches(row));
+    const ordered = [...orderedVisible, ...hidden];
+    const firstY = Math.min(...tableRows.map((row) => row.baseY));
+    const rowHeight = Number(tableRows[0].node.querySelector(".table-cell")?.getAttribute("height")) || 30;
+    const stripes = tableRows.slice(0, 2).map((row) => row.node.querySelector(".table-cell")?.getAttribute("fill")).filter(Boolean);
+    const body = animationDocument()?.querySelector(".table-body");
+    ordered.forEach((row, index) => {
+      const isVisible = matches(row);
+      row.node.style.display = isVisible ? "" : "none";
+      if (isVisible) {
+        const slot = orderedVisible.indexOf(row);
+        row.node.setAttribute("transform", `translate(0 ${firstY + slot * rowHeight - row.baseY})`);
+        if (stripes.length) row.node.querySelectorAll(".table-cell").forEach((cell) => cell.setAttribute("fill", stripes[slot % stripes.length]));
+      } else {
+        row.node.removeAttribute("transform");
+      }
+      body?.append(row.node);
+    });
+    const footer = animationDocument()?.querySelector("[data-table-footer]");
+    const columns = tableRows[0].values.length;
+    if (footer) footer.textContent = `${visible.length} of ${tableRows.length} rows · ${columns} columns`;
+    tableStatus.textContent = `${visible.length} of ${tableRows.length} rows shown`;
+  };
+  const prepareTable = () => {
+    const document_ = animationDocument();
+    const nodes = [...(document_?.querySelectorAll("g.table-row") ?? [])];
+    tableRows = nodes.map((node, index) => ({
+      node,
+      index,
+      values: [...node.querySelectorAll(".table-cell")].map((cell) => cell.querySelector("title")?.textContent ?? ""),
+      baseY: Number(node.getAttribute("data-table-y") ?? node.querySelector(".table-cell")?.getAttribute("y") ?? 0),
+    }));
+    tableTools.hidden = !tableRows.length;
+    if (!tableRows.length) return;
+    tableFilter.value = "";
+    tableSortColumn = -1;
+    tableAscending = true;
+    tableDirection.textContent = "Ascending";
+    tableSort.replaceChildren(el("option", { value: "-1", text: "Original order" }));
+    [...document_.querySelectorAll(".table-heading")].forEach((heading, index) => {
+      tableSort.append(el("option", { value: String(index), text: heading.textContent?.trim() || `Column ${index + 1}` }));
+    });
+    tableSort.value = "-1";
+    applyTableState();
+  };
   const button = (text, label, action) => {
     const node = el("button", { type: "button", className: "button-quiet", "aria-label": label, text });
     node.addEventListener("click", action);
@@ -221,6 +302,7 @@ function explorer() {
       ]),
     ]),
     animationTools,
+    tableTools,
     el("p", { className: "sl-provenance", text: "Hover a point or bar for its values (the SVG's own <title> tooltips). Zoom rescales the vector figure; scroll to pan." }),
     frame,
   ]);
@@ -245,13 +327,27 @@ function explorer() {
     }
   });
   animationSlider.addEventListener("input", () => setAnimationTime(animationSlider.value));
-  frame.addEventListener("load", captureAnimationFrames);
+  tableFilter.addEventListener("input", applyTableState);
+  tableSort.addEventListener("change", () => {
+    tableSortColumn = Number(tableSort.value);
+    applyTableState();
+  });
+  tableDirection.addEventListener("click", () => {
+    tableAscending = !tableAscending;
+    tableDirection.textContent = tableAscending ? "Ascending" : "Descending";
+    applyTableState();
+  });
+  frame.addEventListener("load", () => {
+    captureAnimationFrames();
+    prepareTable();
+  });
   document.body.append(node);
   dialog = {
     open(title, text) {
       heading.textContent = title;
       svg = text;
       zoom = 100;
+      tableTools.hidden = true;
       prepareAnimation();
       render();
       node.showModal();
