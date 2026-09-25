@@ -229,6 +229,7 @@ fn list_supported(ty: &Ty, records: &RecordFields) -> bool {
     list_element_supported(ty)
         || record_name(ty, records).is_some()
         || matches!(ty, Ty::Applied(name, args) if name == "Channel" && args.len() == 1 && channel_supported(&args[0], records))
+        || matches!(ty, Ty::List(element) if list_supported(element, records))
 }
 
 fn map_supported(key: &Ty, value: &Ty) -> bool {
@@ -1770,21 +1771,27 @@ fn emit_instruction(
                     "(void)0".to_string()
                 }
             } else if callee == "array" && args.len() == 1 {
-                let Ty::List(element) = value_ty(values, args[0])? else {
-                    return Err(());
-                };
+                let input_ty = value_ty(values, args[0])?;
                 let Ty::Applied(name, array_args) = ty else {
                     return Err(());
                 };
-                if name != "Array"
-                    || array_args.len() != 1
-                    || array_args[0] != *element
-                    || !array_supported(ty)
-                {
+                if name != "Array" || array_args.len() != 1 || !array_supported(ty) {
                     return Err(());
                 }
                 let array_c_name = array_name(ty).ok_or(())?;
-                format!("{array_c_name}_from1({})", codes[0])
+                let mut expected = Ty::List(Box::new(array_args[0].clone()));
+                let mut depth = None;
+                for candidate in 1..=3 {
+                    if input_ty == expected {
+                        depth = Some(candidate);
+                        break;
+                    }
+                    expected = Ty::List(Box::new(expected));
+                }
+                let Some(depth) = depth else {
+                    return Err(());
+                };
+                format!("{array_c_name}_from{depth}({})", codes[0])
             } else if callee == "args" && args.is_empty() && *ty == Ty::List(Box::new(Ty::String)) {
                 "({ List_String* __ostrin_args = List_String_new_from_array((const char**)ostrin_argv, (int64_t)ostrin_argc); __ostrin_args; })".to_string()
             } else if callee == "env" && args.len() == 1 && value_ty(values, args[0])? == Ty::String
