@@ -39,6 +39,32 @@ pub fn dark() -> Theme {
     }
 }
 
+/// A compact, publication-ready table rendered as standalone SVG.
+///
+/// Cells are strings on purpose: data preparation, formatting and units stay
+/// in the Ostrin program that owns the table, while the renderer preserves
+/// the same bytes in the interpreter, native backend and WASM.
+pub record Table {
+    title: String
+    headers: List<String>
+    rows: List<List<String>>
+    mut theme: Theme
+    mut width: Int
+    mut row_height: Int
+}
+
+/// Creates a table from column headers and already-formatted cell values.
+pub fn table(headers: List<String>, rows: List<List<String>>, title: String = "") -> Table {
+    Table {
+        title: title,
+        headers: headers,
+        rows: rows,
+        theme: light(),
+        width: 760,
+        row_height: 30
+    }
+}
+
 pub record Series {
     kind: String
     xs: Array<Float>
@@ -1155,6 +1181,96 @@ impl Figure {
 
 fn motion_series(kind: String, xs: Array<Float>, ys: Array<Float>, lo: Array<Float>, hi: Array<Float>, grid: Array<Float>, label: String, color: String, width: Float, size: Float) -> Series {
     Series { kind: kind, xs: xs, ys: ys, zs: empty(), lo: lo, hi: hi, grid: grid, label: label, color: color, width: width, dash: "", size: size, colormap: "viridis", levels: 0 }
+}
+
+// ---------------------------------------------------------------- tables
+
+impl Table {
+    fn dark(mut self) -> Table {
+        self.theme = dark()
+        self
+    }
+
+    fn size(mut self, width: Int) -> Table {
+        self.width = if width >= 320 { width } else { 320 }
+        self
+    }
+
+    fn row_height(mut self, height: Int) -> Table {
+        self.row_height = if height >= 22 { height } else { 22 }
+        self
+    }
+
+    fn svg(self) -> String {
+        render_table(self)
+    }
+
+    fn save(self, path: String) -> Result<Void, String> {
+        write_file(path, render_table(self))
+    }
+}
+
+fn table_column_widths(t: Table, columns: Int) -> List<Int> {
+    mut widths: List<Int> = []
+    for c in 0 until columns {
+        heading = if t.headers.length() > 0 { t.headers[c] } else { "value" }
+        mut characters = heading.length()
+        for r in 0 until t.rows.length() {
+            row = t.rows[r]
+            if c < row.length() and row[c].length() > characters {
+                characters = row[c].length()
+            }
+        }
+        // Keep long data from making the figure unmanageably wide. The full
+        // value remains available through the SVG title tooltip below.
+        characters = if characters < 10 { 10 } else { characters }
+        characters = if characters > 24 { 24 } else { characters }
+        widths.push(24 + characters * 8)
+    }
+    widths
+}
+
+fn render_table(t: Table) -> String {
+    columns = if t.headers.length() > 0 { t.headers.length() } else { 1 }
+    widths = table_column_widths(t, columns)
+    mut content_width = 0
+    for width in widths {
+        content_width = content_width + width
+    }
+    width = if t.width > content_width + 20 { t.width } else { content_width + 20 }
+    top = if t.title != "" { 48 } else { 16 }
+    height = top + t.row_height * (t.rows.length() + 1) + 20
+    theme = t.theme
+    mut out: List<String> = [header(width, height, theme)]
+    if t.title != "" {
+        out.push(text_at(16.0, 29.0, t.title, "start", 16, theme.text, attr("font-weight", "600")))
+    }
+    mut x = 10.0
+    header_y = top as Float
+    for c in 0 until columns {
+        cell_width = widths[c] as Float
+        out.push("<rect class=\"table-header\"" + attr("x", num(x)) + attr("y", num(header_y)) + attr("width", num(cell_width)) + attr("height", px(t.row_height)) + attr("fill", theme.text) + "/>" )
+        heading = if t.headers.length() > 0 { t.headers[c] } else { "value" }
+        out.push(text_at(x + 12.0, header_y + (t.row_height as Float) / 2.0 + 4.0, heading, "start", 11, theme.background, attr("font-weight", "600")))
+        x = x + cell_width
+    }
+    for r in 0 until t.rows.length() {
+        row = t.rows[r]
+        y = header_y + (t.row_height as Float) * ((r + 1) as Float)
+        fill = if r % 2 == 0 { theme.background } else { theme.grid }
+        x = 10.0
+        for c in 0 until columns {
+            cell_width = widths[c] as Float
+            value = if c < row.length() { row[c] } else { "" }
+            out.push("<rect class=\"table-cell\"" + attr("x", num(x)) + attr("y", num(y)) + attr("width", num(cell_width)) + attr("height", px(t.row_height)) + attr("fill", fill) + attr("stroke", theme.grid) + attr("stroke-width", "0.6") + ">" + tip(value) + "</rect>")
+            out.push(text_at(x + 12.0, y + (t.row_height as Float) / 2.0 + 4.0, value, "start", 11, theme.text, ""))
+            x = x + cell_width
+        }
+    }
+    footer = t.rows.length().to_string() + " rows · " + columns.to_string() + " columns"
+    out.push(text_at(16.0, (height - 7) as Float, footer, "start", 10, theme.muted, ""))
+    out.push("</svg>\n")
+    out.join("\n")
 }
 
 // ---------------------------------------------------------------- 3D

@@ -1,0 +1,15 @@
+// std.viz · a deterministic data table rendered by Ostrin as SVG.
+// Formatting stays in the program so units, significant digits and labels
+// are explicit before the table reaches the renderer.
+import std.viz
+
+fn main() -> Void {
+    headers: List<String> = ["solver", "steps", "error", "runtime"]
+    rows: List<List<String>> = [
+        ["RK4", "240", "2.4e-4", "18 ms"],
+        ["RK45", "96", "8.1e-7", "11 ms"],
+        ["BDF", "42", "1.7e-6", "14 ms"],
+        ["exact", "—", "0", "1 ms"]
+    ]
+    print(viz.table(headers, rows, title: "ODE solver comparison").dark().svg())
+}

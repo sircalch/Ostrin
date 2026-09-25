@@ -167,7 +167,8 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   page.on("pageerror", (error) => runtimeErrors.push(error.message));
   await page.goto("./viz.html", { waitUntil: "domcontentloaded" });
   const cards = page.locator("[data-viz-gallery] .viz-card");
-  await expect(cards).toHaveCount(18);
+  await expect(cards).toHaveCount(19);
+  await expect(page.getByRole("heading", { name: "Data table" })).toBeVisible();
   for (const card of await cards.all()) {
     const image = card.locator("img.viz-image");
     await expect(image).toHaveAttribute("src", /^assets\/viz\/[a-z-]+\.svg$/);
@@ -180,6 +181,11 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   await expect(page.locator("#viz-units .sl-provenance")).toHaveAttribute("data-state", "live", { timeout: 30_000 });
   await expect(page.locator("#viz-units img.viz-image")).toHaveAttribute("src", /^data:image\/svg\+xml/);
   await expect(page.locator("#viz-units .viz-printed")).toHaveText("top speed 97.91999999999999 km/h, distance 0.764 km");
+  const tableRun = page.locator('[data-viz-run="table"]');
+  await expect(tableRun).toBeEnabled();
+  await tableRun.click();
+  await expect(page.locator("#viz-table .sl-provenance")).toHaveAttribute("data-state", "live", { timeout: 30_000 });
+  await expect(page.locator("#viz-table img.viz-image")).toHaveAttribute("src", /^data:image\/svg\+xml/);
 
   // The explorer shows the SVG in a sandboxed frame where its own tooltips and hover styles work.
   await page.locator('[data-viz-explore="scatter-fit"]').click();
@@ -187,6 +193,10 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   await expect(point.locator("title")).toHaveText(/^measurements: \(0\.5, /);
   await page.getByRole("button", { name: "Zoom in" }).click();
   await expect(page.locator(".viz-zoom")).toHaveText("150%");
+  await page.getByRole("button", { name: "Close" }).click();
+  await page.locator('[data-viz-explore="table"]').click();
+  await expect(page.frameLocator(".viz-frame-live").locator("rect.table-cell")).toHaveCount(16);
+  await expect(page.frameLocator(".viz-frame-live").locator("text=ODE solver comparison")).toHaveCount(1);
   await page.getByRole("button", { name: "Close" }).click();
   await page.locator('[data-viz-explore="animation"]').click();
   await expect(page.locator(".viz-animation-tools")).toBeVisible();

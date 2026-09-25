@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="218" viewBox="0 0 760 218" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
+<style>.pt:hover{stroke:#e2e8f0;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>
+<rect width="760" height="218" fill="#0f172a"/>
+
+<text x="16" y="29" text-anchor="start" font-size="16" fill="#e2e8f0" font-weight="600">ODE solver comparison</text>
+<rect class="table-header" x="10" y="48" width="104" height="30" fill="#e2e8f0"/>
+<text x="22" y="67" text-anchor="start" font-size="11" fill="#0f172a" font-weight="600">solver</text>
+<rect class="table-header" x="114" y="48" width="104" height="30" fill="#e2e8f0"/>
+<text x="126" y="67" text-anchor="start" font-size="11" fill="#0f172a" font-weight="600">steps</text>
+<rect class="table-header" x="218" y="48" width="104" height="30" fill="#e2e8f0"/>
+<text x="230" y="67" text-anchor="start" font-size="11" fill="#0f172a" font-weight="600">error</text>
+<rect class="table-header" x="322" y="48" width="104" height="30" fill="#e2e8f0"/>
+<text x="334" y="67" text-anchor="start" font-size="11" fill="#0f172a" font-weight="600">runtime</text>
+<rect class="table-cell" x="10" y="78" width="104" height="30" fill="#0f172a" stroke="#1e293b" stroke-width="0.6"><title>RK4</title></rect>
+<text x="22" y="97" text-anchor="start" font-size="11" fill="#e2e8f0">RK4</text>
+<rect class="table-cell" x="114" y="78" width="104" height="30" fill="#0f172a" stroke="#1e293b" stroke-width="0.6"><title>240</title></rect>
+<text x="126" y="97" text-anchor="start" font-size="11" fill="#e2e8f0">240</text>
+<rect class="table-cell" x="218" y="78" width="104" height="30" fill="#0f172a" stroke="#1e293b" stroke-width="0.6"><title>2.4e-4</title></rect>
+<text x="230" y="97" text-anchor="start" font-size="11" fill="#e2e8f0">2.4e-4</text>
+<rect class="table-cell" x="322" y="78" width="104" height="30" fill="#0f172a" stroke="#1e293b" stroke-width="0.6"><title>18 ms</title></rect>
+<text x="334" y="97" text-anchor="start" font-size="11" fill="#e2e8f0">18 ms</text>
+<rect class="table-cell" x="10" y="108" width="104" height="30" fill="#1e293b" stroke="#1e293b" stroke-width="0.6"><title>RK45</title></rect>
+<text x="22" y="127" text-anchor="start" font-size="11" fill="#e2e8f0">RK45</text>
+<rect class="table-cell" x="114" y="108" width="104" height="30" fill="#1e293b" stroke="#1e293b" stroke-width="0.6"><title>96</title></rect>
+<text x="126" y="127" text-anchor="start" font-size="11" fill="#e2e8f0">96</text>
+<rect class="table-cell" x="218" y="108" width="104" height="30" fill="#1e293b" stroke="#1e293b" stroke-width="0.6"><title>8.1e-7</title></rect>
+<text x="230" y="127" text-anchor="start" font-size="11" fill="#e2e8f0">8.1e-7</text>
+<rect class="table-cell" x="322" y="108" width="104" height="30" fill="#1e293b" stroke="#1e293b" stroke-width="0.6"><title>11 ms</title></rect>
+<text x="334" y="127" text-anchor="start" font-size="11" fill="#e2e8f0">11 ms</text>
+<rect class="table-cell" x="10" y="138" width="104" height="30" fill="#0f172a" stroke="#1e293b" stroke-width="0.6"><title>BDF</title></rect>
+<text x="22" y="157" text-anchor="start" font-size="11" fill="#e2e8f0">BDF</text>
+<rect class="table-cell" x="114" y="138" width="104" height="30" fill="#0f172a" stroke="#1e293b" stroke-width="0.6"><title>42</title></rect>
+<text x="126" y="157" text-anchor="start" font-size="11" fill="#e2e8f0">42</text>
+<rect class="table-cell" x="218" y="138" width="104" height="30" fill="#0f172a" stroke="#1e293b" stroke-width="0.6"><title>1.7e-6</title></rect>
+<text x="230" y="157" text-anchor="start" font-size="11" fill="#e2e8f0">1.7e-6</text>
+<rect class="table-cell" x="322" y="138" width="104" height="30" fill="#0f172a" stroke="#1e293b" stroke-width="0.6"><title>14 ms</title></rect>
+<text x="334" y="157" text-anchor="start" font-size="11" fill="#e2e8f0">14 ms</text>
+<rect class="table-cell" x="10" y="168" width="104" height="30" fill="#1e293b" stroke="#1e293b" stroke-width="0.6"><title>exact</title></rect>
+<text x="22" y="187" text-anchor="start" font-size="11" fill="#e2e8f0">exact</text>
+<rect class="table-cell" x="114" y="168" width="104" height="30" fill="#1e293b" stroke="#1e293b" stroke-width="0.6"><title>—</title></rect>
+<text x="126" y="187" text-anchor="start" font-size="11" fill="#e2e8f0">—</text>
+<rect class="table-cell" x="218" y="168" width="104" height="30" fill="#1e293b" stroke="#1e293b" stroke-width="0.6"><title>0</title></rect>
+<text x="230" y="187" text-anchor="start" font-size="11" fill="#e2e8f0">0</text>
+<rect class="table-cell" x="322" y="168" width="104" height="30" fill="#1e293b" stroke="#1e293b" stroke-width="0.6"><title>1 ms</title></rect>
+<text x="334" y="187" text-anchor="start" font-size="11" fill="#e2e8f0">1 ms</text>
+<text x="16" y="211" text-anchor="start" font-size="10" fill="#94a3b8">4 rows · 4 columns</text>
+</svg>

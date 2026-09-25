@@ -178,6 +178,7 @@ export const GALLERY = [
   { id: "orbits", title: "Kepler orbits (animated)", file: "examples/viz_orbits.ostrin", blurb: "Earth, Mars and a comet around the Sun; the comet visibly speeds up at perihelion, as Kepler's second law says." },
   { id: "string", title: "Plucked string (animated)", file: "examples/viz_string.ostrin", blurb: "25 standing waves summed in Ostrin; viz.morph animates the curve's shape through one period." },
   { id: "animation", title: "Animation", file: "examples/viz_animation.ostrin", blurb: "24 frames of a spreading wave packet, combined by viz.animate into one SVG that loops with CSS alone." },
+  { id: "table", title: "Data table", file: "examples/viz_table.ostrin", blurb: "A formatted ODE solver comparison rendered as a tooltip-rich SVG table." },
   { id: "dashboard", title: "Multi-panel layout", file: "examples/viz_dashboard.ostrin", blurb: "Four figures, 2D and 3D, composed with viz.grid into one SVG." },
 ];
 
