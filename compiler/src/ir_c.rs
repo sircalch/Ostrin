@@ -8,7 +8,8 @@
 //! and the scalar-key/value core of `Map<K,V>`/`Set<T>`, plus scalar-payload
 //! `Result<T,E>` values such as `String.to_int()`/`to_float()`; wrappers can
 //! now compose over scalar collections and over other `Option`/`Result` values
-//! with recursive ownership markers. Straight-line tasks additionally use a
+//! with recursive ownership markers. Scalar numeric `Array<T>` parameters and
+//! one-dimensional indexing use the same generated C array runtime. Straight-line tasks additionally use a
 //! generated C environment for immutable captures while larger aggregates,
 //! branching task bodies and scopes retain the verified HIR/AST fallback.
 
@@ -147,6 +148,9 @@ fn c_type(ty: &Ty, records: &RecordFields) -> Bail<String> {
         {
             format!("Task_{}*", mangle_task_payload(&args[0], records))
         }
+        Ty::Applied(name, args) if name == "Array" && args.len() == 1 && array_supported(ty) => {
+            format!("Array_{}*", mangle_scalar(&args[0]))
+        }
         Ty::Applied(name, args)
             if name == "Option" && args.len() == 1 && option_supported(&args[0], records) =>
         {
@@ -179,9 +183,33 @@ fn quantity(ty: &Ty) -> bool {
     matches!(ty, Ty::Quantity(_))
 }
 
+fn array_element(ty: &Ty) -> Option<&Ty> {
+    match ty {
+        Ty::Applied(name, args) if name == "Array" && args.len() == 1 => Some(&args[0]),
+        _ => None,
+    }
+}
+
+/// The generated C array runtime currently has scalar numeric and boolean
+/// instantiations. Keep this predicate aligned with `Codegen::map_type` so
+/// IR can only select helpers that the final C program actually emits.
+fn array_supported(ty: &Ty) -> bool {
+    matches!(
+        array_element(ty),
+        Some(Ty::Int | Ty::Float | Ty::Float32 | Ty::Bool)
+    )
+}
+
+fn array_name(ty: &Ty) -> Option<String> {
+    array_element(ty)
+        .filter(|element| matches!(**element, Ty::Int | Ty::Float | Ty::Float32 | Ty::Bool))
+        .map(|element| format!("Array_{}", mangle_scalar(element)))
+}
+
 fn supported(ty: &Ty, records: &RecordFields) -> bool {
     scalar(ty)
         || quantity(ty)
+        || array_supported(ty)
         || record_name(ty, records).is_some()
         || matches!(ty, Ty::List(element) if list_supported(element, records))
         || matches!(ty, Ty::Map(key, value) if map_supported(key, value))
@@ -223,7 +251,8 @@ fn option_supported(element: &Ty, records: &RecordFields) -> bool {
     matches!(
         element,
         Ty::Int | Ty::Float | Ty::Float32 | Ty::Sized(_) | Ty::Bool | Ty::String
-    ) || matches!(element, Ty::List(inner) if list_supported(inner, records))
+    ) || array_supported(element)
+        || matches!(element, Ty::List(inner) if list_supported(inner, records))
         || matches!(element, Ty::Map(key, value) if map_supported(key, value))
         || matches!(element, Ty::Set(inner) if set_supported(inner))
         || matches!(element, Ty::Applied(name, args) if name == "Option" && args.len() == 1 && option_supported(&args[0], records))
@@ -237,6 +266,7 @@ fn option_managed_payload(element: &Ty, records: &RecordFields) -> bool {
 
 fn result_payload_supported(ty: &Ty, records: &RecordFields) -> bool {
     scalar(ty)
+        || array_supported(ty)
         || matches!(ty, Ty::List(inner) if list_supported(inner, records))
         || matches!(ty, Ty::Map(key, value) if map_supported(key, value))
         || matches!(ty, Ty::Set(inner) if set_supported(inner))
@@ -256,6 +286,7 @@ fn result_managed_payload(ty: &Ty, records: &RecordFields) -> bool {
 fn managed_payload(ty: &Ty, records: &RecordFields) -> bool {
     match ty {
         Ty::String | Ty::List(_) | Ty::Map(_, _) | Ty::Set(_) => true,
+        Ty::Applied(name, args) if name == "Array" && args.len() == 1 => array_supported(ty),
         Ty::Named(name) => records.contains_key(name),
         Ty::Applied(_, _) if record_name(ty, records).is_some() => true,
         Ty::Applied(name, args) if name == "Channel" && args.len() == 1 => {
@@ -306,6 +337,9 @@ fn mangle_option_payload(ty: &Ty, records: &RecordFields) -> String {
         Ty::Set(element) if set_supported(element) => {
             format!("Set_{}", mangle_scalar(element))
         }
+        Ty::Applied(name, args) if name == "Array" && args.len() == 1 && array_supported(ty) => {
+            format!("Array_{}", mangle_scalar(&args[0]))
+        }
         Ty::Applied(name, args)
             if name == "Option" && args.len() == 1 && option_supported(&args[0], records) =>
         {
@@ -350,6 +384,9 @@ fn mangle_task_payload(ty: &Ty, records: &RecordFields) -> String {
 fn retain_payload(access: &str, ty: &Ty, records: &RecordFields) -> Option<String> {
     match ty {
         Ty::String | Ty::List(_) | Ty::Map(_, _) | Ty::Set(_) => {
+            Some(format!("ostrin_retain((void*){access})"))
+        }
+        Ty::Applied(name, args) if name == "Array" && args.len() == 1 && array_supported(ty) => {
             Some(format!("ostrin_retain((void*){access})"))
         }
         Ty::Named(name) if records.contains_key(name) => {
@@ -1172,22 +1209,36 @@ fn emit_instruction(
             index,
             ty,
         } => {
-            let Ty::List(element) = value_ty(values, *object)? else {
-                return Err(());
-            };
-            if !list_supported(&element, records)
-                || value_ty(values, *index)? != Ty::Int
-                || *ty != *element
-            {
-                return Err(());
+            let object_ty = value_ty(values, *object)?;
+            let index_code = value_code(values, *index)?;
+            let object_code = value_code(values, *object)?;
+            match object_ty {
+                Ty::List(element)
+                    if list_supported(&element, records)
+                        && value_ty(values, *index)? == Ty::Int
+                        && *ty == *element =>
+                {
+                    let list_name = format!("List_{}", mangle_option_payload(&element, records));
+                    out.push_str(&format!(
+                        "    {} = {list_name}_get({object_code}, {index_code});\n",
+                        value_name(*dst)
+                    ));
+                }
+                Ty::Applied(name, args)
+                    if name == "Array"
+                        && args.len() == 1
+                        && array_supported(&Ty::Applied(name.clone(), args.clone()))
+                        && value_ty(values, *index)? == Ty::Int
+                        && *ty == args[0] =>
+                {
+                    let array_c_name = array_name(&Ty::Applied(name, args.clone())).ok_or(())?;
+                    out.push_str(&format!(
+                        "    {} = {array_c_name}_index1({object_code}, {index_code});\n",
+                        value_name(*dst)
+                    ));
+                }
+                _ => return Err(()),
             }
-            let list_name = format!("List_{}", mangle_option_payload(&element, records));
-            out.push_str(&format!(
-                "    {} = {list_name}_get({}, {});\n",
-                value_name(*dst),
-                value_code(values, *object)?,
-                value_code(values, *index)?
-            ));
         }
         IrInstr::MethodCall {
             dst,
@@ -2080,6 +2131,14 @@ fn emit_instruction(
                         value_code(values, *value)?
                     ));
                 }
+                Ty::Applied(name, args)
+                    if name == "Array" && args.len() == 1 && array_supported(&ty) =>
+                {
+                    out.push_str(&format!(
+                        "    ostrin_retain((void*){});\n",
+                        value_code(values, *value)?
+                    ));
+                }
                 Ty::Named(name) if records.contains_key(&name) => {
                     out.push_str(&format!(
                         "    ostrin_retain((void*){});\n",
@@ -2149,6 +2208,14 @@ fn emit_instruction(
             let ty = value_ty(values, *value)?;
             match ty {
                 Ty::String | Ty::List(_) | Ty::Map(_, _) | Ty::Set(_) => {
+                    out.push_str(&format!(
+                        "    ostrin_release((void*){});\n",
+                        value_code(values, *value)?
+                    ));
+                }
+                Ty::Applied(name, args)
+                    if name == "Array" && args.len() == 1 && array_supported(&ty) =>
+                {
                     out.push_str(&format!(
                         "    ostrin_release((void*){});\n",
                         value_code(values, *value)?

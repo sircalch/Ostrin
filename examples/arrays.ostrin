@@ -1,3 +1,11 @@
+fn first_float(a: Array<Float>) -> Float {
+    a[0]
+}
+
+fn first_int(a: Array<Int>) -> Int {
+    a[0]
+}
+
 fn main() -> Void {
     a = array([1.0, 2.0, 3.0])
     b = array([10.0, 20.0, 30.0])
@@ -37,4 +45,7 @@ fn main() -> Void {
     f = array([1.5f32, 2.5f32])
     print(f * 2.0)
     print(f.mean())
+    print(first_float(a))
+    ints1 = array([3, 4])
+    print(first_int(ints1))
 }

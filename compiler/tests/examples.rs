@@ -8,6 +8,10 @@ fn example_path(rel: &str) -> String {
     format!("{}/../examples/{}", env!("CARGO_MANIFEST_DIR"), rel)
 }
 
+fn fixture_path(rel: &str) -> String {
+    format!("{}/tests/fixtures/{}", env!("CARGO_MANIFEST_DIR"), rel)
+}
+
 /// Builds the same `file://` URI shape an editor would send for a real file
 /// on disk, percent-encoding the parts (like the space in this repo's own
 /// "Lenguaje nuevo" directory name) the way `lsp.rs`'s `path_to_uri` does.
@@ -4269,6 +4273,85 @@ fn native_ir_emitter_handles_lists_and_ownership_markers() {
     assert_eq!(
         String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
         expected
+    );
+}
+
+#[test]
+fn native_ir_emitter_handles_scalar_array_parameters_and_indexing() {
+    let file = fixture_path("native_ir_array_index.ostrin");
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    let expected = stdout(&interpreted).replace("\r\n", "\n");
+
+    let report = run(&["--native-type-report", &file]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    let ir_functions = report_text
+        .lines()
+        .find_map(|line| {
+            line.strip_prefix("ir-generated: ")
+                .and_then(|n| n.trim().parse::<usize>().ok())
+        })
+        .unwrap_or(0);
+    assert!(
+        ir_functions >= 2,
+        "array parameter/index functions did not use the IR emitter: {report_text}"
+    );
+
+    let emitted = run(&["--emit-c", &file]);
+    assert!(
+        emitted.status.success(),
+        "array IR emission failed: {}",
+        stderr(&emitted)
+    );
+    let source = stdout(&emitted);
+    assert!(
+        source.contains("Array_Float_index1"),
+        "Float array indexing did not come from IR: {source}"
+    );
+    assert!(
+        source.contains("Array_Int_index1"),
+        "Int array indexing did not come from IR: {source}"
+    );
+
+    let exe = temp_artifact("native_ir_arrays.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "array IR compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run array IR binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "array IR run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "array IR ownership leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
     );
 }
 

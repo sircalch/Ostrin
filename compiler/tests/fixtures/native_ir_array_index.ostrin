@@ -1,0 +1,14 @@
+fn first_float(a: Array<Float>) -> Float {
+    a[0]
+}
+
+fn first_int(a: Array<Int>) -> Int {
+    a[0]
+}
+
+fn main() -> Void {
+    floats = array([1.5, 2.5])
+    ints = array([3, 4])
+    print(first_float(floats))
+    print(first_int(ints))
+}
