@@ -18,7 +18,7 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    como presupuesto de rendimiento.
 5. Preparar el reconocimiento de Ostrin en GitHub Linguist: reunir muestras públicas,
    redactar la definición de lenguaje (`languages.yml`, extensiones, gramática y muestras),
-   validarla contra `github-linguist` y abrir la propuesta upstream. Después de su aceptación,
+   mantener el borrador en `docs/linguist.md`, validarla contra `github-linguist` y abrir la propuesta upstream. Después de su aceptación,
    activar la clasificación de los archivos `.ostrin` en el repositorio y documentar el
    resultado en la release y el sitio.
 

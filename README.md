@@ -25,7 +25,8 @@ language. The actual Ostrin source files are the `.ostrin` programs in
 GitHub Linguist does not yet know `Ostrin` as an official language, so the
 language bar cannot display it as a stable category yet. The roadmap now includes
 the upstream submission: representative `.ostrin` samples, a language definition,
-local Linguist validation, and repository classification after acceptance.
+local Linguist validation, and repository classification after acceptance. The
+draft entry and upstream checklist live in [`docs/linguist.md`](docs/linguist.md).
 
 ## Why Ostrin?
 

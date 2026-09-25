@@ -385,8 +385,9 @@ diagnósticos JSON reales con código, ubicación, severidad y mensaje, y selecc
 diagnosticada en el editor. La versión y las métricas públicas ahora salen de
 `scripts/site-facts.mjs`/`website/site-data.js`, con una comprobación de frescura en CI. Siguiente:
 prueba responsive móvil con viewport dedicado y mejora incremental del learning funnel.
-La gramática para Linguist queda separada porque requiere uso público suficiente. El objetivo
-del siguiente ciclo es preparar y enviar la definición de Ostrin a `github/linguist`: muestras
+La gramática para Linguist queda separada porque requiere uso público suficiente; el borrador y
+el procedimiento verificable están en `docs/linguist.md`. El objetivo del siguiente ciclo es
+preparar y enviar la definición de Ostrin a `github/linguist`: muestras
 `.ostrin` representativas, extensión y color, reglas de comentarios/cadenas, detección de
 shebang cuando aplique y una prueba local con `github-linguist`. La configuración del
 repositorio para clasificar `.ostrin` se activará después de que Linguist acepte el nombre;
