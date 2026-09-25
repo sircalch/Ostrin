@@ -1,0 +1,10 @@
+// Deterministic scalar workload used by scripts/benchmark.mjs.
+// Keep the body allocation-free so the measurement compares the interpreter
+// with the native executable on the same language operation.
+fn main() -> Void {
+    mut total = 0
+    for i in 1 to 200000 {
+        total = total + ((i * 17) % 100003)
+    }
+    print(total)
+}

@@ -357,8 +357,10 @@ automáticas intérprete↔nativo sobre programas generados escalares y con owne
 iteraciones. `--native-type-report` y la prueba diferencial ya miden la cobertura del backend
 por archivo fuente y verifican la suma contra el total global. El siguiente incremento añade
 casos de compilación nativa y divergencia semántica sobre las mutaciones válidas antes de
-retirar más fallback AST; la cobertura ya deja resumen y LCOV por commit en Actions,
-pero los benchmarks nativo vs intérprete siguen pendientes.
+retirar más fallback AST; la cobertura ya deja resumen y LCOV por commit en Actions, y
+`benchmarks.yml` conserva por commit las medianas de un workload escalar determinista
+para intérprete y nativo. La batería científica y la comparación histórica todavía
+siguen pendientes.
 
 ### G. Producto
 **Homepage 3.0 (2026-09-24).** La portada muestra el estado de la release derivado de

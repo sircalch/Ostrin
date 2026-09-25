@@ -12,7 +12,10 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
 3. Añadir casos de compilación nativa y divergencia semántica al fuzzing de entradas válidas.
 4. Medir cobertura reproducible y publicar benchmarks nativo frente a intérprete.
    La cobertura queda registrada por commit en `coverage.yml` como resumen y LCOV;
-   falta añadir la comparación de tiempos nativo↔intérprete.
+   `benchmarks.yml` ejecuta ahora una carga escalar determinista y conserva el JSON
+   con las medianas de ambos caminos. Falta ampliar la batería a arrays, cantidades,
+   métodos numéricos y cargas representativas antes de usarla como presupuesto de
+   rendimiento.
 5. Preparar el reconocimiento de Ostrin en GitHub Linguist: reunir muestras públicas,
    redactar la definición de lenguaje (`languages.yml`, extensiones, gramática y muestras),
    validarla contra `github-linguist` y abrir la propuesta upstream. Después de su aceptación,
