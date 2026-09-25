@@ -146,6 +146,8 @@ function explorer() {
   const zoomLabel = el("output", { className: "viz-zoom", text: "100%" });
   const animationLabel = el("output", { className: "viz-animation-time", text: "0%" });
   const animationSlider = el("input", { type: "range", className: "viz-animation-slider", min: "0", max: "1000", value: "0", step: "1", "aria-label": "Animation position" });
+  const animationSpeedInput = el("input", { type: "range", className: "viz-animation-speed", min: "25", max: "400", value: "100", step: "25", "aria-label": "Animation speed" });
+  const animationSpeedLabel = el("output", { className: "viz-animation-speed-label", text: "1×" });
   const animationStatus = el("span", { className: "viz-animation-status", text: "" });
   const animationTools = el("div", { className: "viz-animation-tools", hidden: true }, [
     el("span", { className: "viz-animation-caption", text: "Animation" }),
@@ -155,6 +157,7 @@ function explorer() {
     el("button", { type: "button", className: "button-quiet", text: "Export WebM", "data-viz-export": "" }),
     animationSlider,
     animationLabel,
+    el("label", { className: "viz-animation-speed-control" }, [el("span", { text: "Speed" }), animationSpeedInput, animationSpeedLabel]),
     animationStatus,
   ]);
   const tableFilter = el("input", { id: "viz-table-filter", type: "search", placeholder: "Search rows", "aria-label": "Filter table rows" });
@@ -172,6 +175,7 @@ function explorer() {
   let svg = "";
   let animationDuration = 0;
   let animationPaused = false;
+  let animationRate = 1;
   let tableRows = [];
   let tableSortColumn = -1;
   let tableAscending = true;
@@ -197,16 +201,30 @@ function explorer() {
   };
   const setAnimationTime = (value, pause = true) => {
     const fraction = Number(value) / 1000;
-    const seconds = fraction * animationDuration;
+    const seconds = fraction * animationDuration / animationRate;
     const document_ = animationDocument();
     const root = document_?.documentElement;
     if (root?.setCurrentTime && animationDuration) root.setCurrentTime(seconds);
     document_?.querySelectorAll(".ostrin-frame").forEach((node) => {
-      const base = Number(node.dataset.baseDelay ?? 0);
+      const base = Number(node.dataset.baseDelay ?? 0) / animationRate;
       node.style.animationDelay = `${base - seconds * 1000}ms`;
     });
     if (pause) setAnimationState(true);
     animationLabel.textContent = `${Math.round(fraction * 100)}%`;
+  };
+  const setAnimationSpeed = (value) => {
+    animationRate = Number(value) / 100;
+    animationSpeedLabel.textContent = `${animationRate.toFixed(2).replace(/\.00$/, "")}×`;
+    const document_ = animationDocument();
+    document_?.querySelectorAll(".ostrin-frame").forEach((node) => {
+      node.style.animationDuration = `${animationDuration / animationRate}s`;
+      node.style.animationDelay = `${Number(node.dataset.baseDelay ?? 0) / animationRate}ms`;
+    });
+    document_?.querySelectorAll("animate").forEach((node) => {
+      const base = Number(node.dataset.baseDurationSeconds ?? 0);
+      if (base > 0) node.setAttribute("dur", `${base / animationRate}s`);
+    });
+    if (document_?.documentElement?.setCurrentTime && animationDuration) setAnimationTime(animationSlider.value, false);
   };
   const prepareAnimation = () => {
     const animated = /<animate\b|ostrin-frame|@keyframes/.test(svg);
@@ -215,9 +233,25 @@ function explorer() {
     const durations = [...svg.matchAll(/(?:dur="|animation:[^;]*?\s)([\d.]+)(ms|s)/g)].map((match) => Number(match[1]) * (match[2] === "ms" ? 0.001 : 1));
     animationDuration = Math.max(...durations, 1);
     animationSlider.value = "0";
+    animationSpeedInput.value = "100";
+    animationRate = 1;
+    animationSpeedLabel.textContent = "1×";
     animationStatus.textContent = "";
     animationPaused = false;
     requestAnimationFrame(captureAnimationFrames);
+  };
+  const prepareAnimationDocument = () => {
+    animationDocument()?.querySelectorAll("animate").forEach((node) => {
+      const duration = node.getAttribute("dur") ?? "";
+      const match = duration.match(/^([\d.]+)(ms|s)$/);
+      if (match) node.dataset.baseDurationSeconds = String(Number(match[1]) * (match[2] === "ms" ? 0.001 : 1));
+    });
+  };
+  const applyReducedMotion = () => {
+    if (!animationTools.hidden && globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      setAnimationTime(0, true);
+      animationStatus.textContent = "reduced motion";
+    }
   };
   const numericTableValue = (value) => {
     const match = value.replace(/,/g, "").match(/[-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/i);
@@ -327,6 +361,7 @@ function explorer() {
     }
   });
   animationSlider.addEventListener("input", () => setAnimationTime(animationSlider.value));
+  animationSpeedInput.addEventListener("input", () => setAnimationSpeed(animationSpeedInput.value));
   tableFilter.addEventListener("input", applyTableState);
   tableSort.addEventListener("change", () => {
     tableSortColumn = Number(tableSort.value);
@@ -339,7 +374,10 @@ function explorer() {
   });
   frame.addEventListener("load", () => {
     captureAnimationFrames();
+    prepareAnimationDocument();
+    setAnimationSpeed(animationSpeedInput.value);
     prepareTable();
+    applyReducedMotion();
   });
   document.body.append(node);
   dialog = {
