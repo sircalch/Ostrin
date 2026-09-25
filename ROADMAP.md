@@ -6,7 +6,8 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
 ## Siguiente ciclo
 
 1. Reducir el fallback AST con el trinquete por archivo de `--native-type-report` (baseline actual:
-   1.095 funciones IR, 455 HIR y 1.255 AST).
+   1.129 funciones IR, 475 HIR y 1.325 AST; el incremento acotado corresponde al nuevo método
+   `std.viz.boxplot`, que queda como deuda explícita para la siguiente migración).
 2. Completar ownership sobre agregados, escapes, valores `Phi`, errores y formas anidadas, con
    leak-check y sanitizers como evidencia.
 3. Añadir casos de compilación nativa y divergencia semántica al fuzzing de entradas válidas.
@@ -22,6 +23,10 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    contra `github-linguist`; y abrir la propuesta upstream. Después de su aceptación y de una
    versión publicada de Linguist, verificar la clasificación de `.ostrin` en GitHub y
    documentar el resultado en la release y el sitio.
+6. **Continuar el frente profesional de visualización y web**: ampliar `std.viz` con
+   gráficas estadísticas y tablas documentadas, mantener ejemplos reproducibles en la
+   galería y añadir controles temporales, exportación de vídeo, exploración 3D y
+   procedencia de figuras con evidencia en intérprete, nativo y WASM.
 
 ## Horizonte posterior
 

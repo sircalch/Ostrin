@@ -167,7 +167,7 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   page.on("pageerror", (error) => runtimeErrors.push(error.message));
   await page.goto("./viz.html", { waitUntil: "domcontentloaded" });
   const cards = page.locator("[data-viz-gallery] .viz-card");
-  await expect(cards).toHaveCount(17);
+  await expect(cards).toHaveCount(18);
   for (const card of await cards.all()) {
     const image = card.locator("img.viz-image");
     await expect(image).toHaveAttribute("src", /^assets\/viz\/[a-z-]+\.svg$/);
@@ -187,5 +187,11 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   await expect(point.locator("title")).toHaveText(/^measurements: \(0\.5, /);
   await page.getByRole("button", { name: "Zoom in" }).click();
   await expect(page.locator(".viz-zoom")).toHaveText("150%");
+  await page.getByRole("button", { name: "Close" }).click();
+  await page.locator('[data-viz-explore="animation"]').click();
+  await expect(page.locator(".viz-animation-tools")).toBeVisible();
+  await page.getByRole("button", { name: "Pause" }).click();
+  await page.locator(".viz-animation-slider").fill("500");
+  await expect(page.locator(".viz-animation-time")).toHaveText("50%");
   expect(runtimeErrors).toEqual([]);
 });

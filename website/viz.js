@@ -32,14 +32,65 @@ function svgOf(lines) {
 let dialog;
 function explorer() {
   if (dialog) return dialog;
-  const frame = el("iframe", { className: "viz-frame-live", sandbox: "", title: "Interactive figure" });
+  const frame = el("iframe", { className: "viz-frame-live", sandbox: "allow-same-origin", title: "Interactive figure" });
   const heading = el("h2", { className: "viz-dialog-title" });
   const zoomLabel = el("output", { className: "viz-zoom", text: "100%" });
+  const animationLabel = el("output", { className: "viz-animation-time", text: "0%" });
+  const animationSlider = el("input", { type: "range", className: "viz-animation-slider", min: "0", max: "1000", value: "0", step: "1", "aria-label": "Animation position" });
+  const animationTools = el("div", { className: "viz-animation-tools", hidden: true }, [
+    el("span", { className: "viz-animation-caption", text: "Animation" }),
+    el("button", { type: "button", className: "button-quiet", text: "Play", "data-viz-play": "" }),
+    el("button", { type: "button", className: "button-quiet", text: "Pause", "data-viz-pause": "" }),
+    el("button", { type: "button", className: "button-quiet", text: "Restart", "data-viz-restart": "" }),
+    animationSlider,
+    animationLabel,
+  ]);
   let zoom = 100;
   let svg = "";
+  let animationDuration = 0;
+  let animationPaused = false;
   const render = () => {
     zoomLabel.textContent = `${zoom}%`;
     frame.srcdoc = `<!doctype html><meta charset="utf-8"><style>html,body{margin:0;background:#fff}svg{display:block;width:${zoom}%;height:auto}</style>${svg}`;
+  };
+  const animationDocument = () => frame.contentDocument;
+  const captureAnimationFrames = () => {
+    animationDocument()?.querySelectorAll(".ostrin-frame").forEach((node) => {
+      node.dataset.baseDelay = String(parseFloat(node.style.animationDelay) || 0);
+    });
+  };
+  const setAnimationState = (paused) => {
+    const document_ = animationDocument();
+    const root = document_?.documentElement;
+    if (root?.pauseAnimations && root?.unpauseAnimations) {
+      if (paused) root.pauseAnimations();
+      else root.unpauseAnimations();
+    }
+    document_?.querySelectorAll(".ostrin-frame").forEach((node) => { node.style.animationPlayState = paused ? "paused" : "running"; });
+    animationPaused = paused;
+  };
+  const setAnimationTime = (value, pause = true) => {
+    const fraction = Number(value) / 1000;
+    const seconds = fraction * animationDuration;
+    const document_ = animationDocument();
+    const root = document_?.documentElement;
+    if (root?.setCurrentTime && animationDuration) root.setCurrentTime(seconds);
+    document_?.querySelectorAll(".ostrin-frame").forEach((node) => {
+      const base = Number(node.dataset.baseDelay ?? 0);
+      node.style.animationDelay = `${base - seconds * 1000}ms`;
+    });
+    if (pause) setAnimationState(true);
+    animationLabel.textContent = `${Math.round(fraction * 100)}%`;
+  };
+  const prepareAnimation = () => {
+    const animated = /<animate\b|ostrin-frame|@keyframes/.test(svg);
+    animationTools.hidden = !animated;
+    if (!animated) return;
+    const durations = [...svg.matchAll(/(?:dur="|animation:[^;]*?\s)([\d.]+)(ms|s)/g)].map((match) => Number(match[1]) * (match[2] === "ms" ? 0.001 : 1));
+    animationDuration = Math.max(...durations, 1);
+    animationSlider.value = "0";
+    animationPaused = false;
+    requestAnimationFrame(captureAnimationFrames);
   };
   const button = (text, label, action) => {
     const node = el("button", { type: "button", className: "button-quiet", "aria-label": label, text });
@@ -56,15 +107,26 @@ function explorer() {
         button("Close", "Close the explorer", () => node.close()),
       ]),
     ]),
+    animationTools,
     el("p", { className: "sl-provenance", text: "Hover a point or bar for its values (the SVG's own <title> tooltips). Zoom rescales the vector figure; scroll to pan." }),
     frame,
   ]);
+  animationTools.querySelector("[data-viz-play]").addEventListener("click", () => setAnimationState(false));
+  animationTools.querySelector("[data-viz-pause]").addEventListener("click", () => setAnimationState(true));
+  animationTools.querySelector("[data-viz-restart]").addEventListener("click", () => {
+    animationSlider.value = "0";
+    setAnimationTime(0, false);
+    setAnimationState(false);
+  });
+  animationSlider.addEventListener("input", () => setAnimationTime(animationSlider.value));
+  frame.addEventListener("load", captureAnimationFrames);
   document.body.append(node);
   dialog = {
     open(title, text) {
       heading.textContent = title;
       svg = text;
       zoom = 100;
+      prepareAnimation();
       render();
       node.showModal();
     },

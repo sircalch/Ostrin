@@ -1,0 +1,16 @@
+// std.viz · grouped boxplots: distribution summaries computed by Ostrin.
+import std.viz
+
+fn main() -> Void {
+    r = rng(41)
+    control = r.randn([80]) * 0.55 + 4.2
+    treatment = r.randn([80]) * 0.8 + 5.3
+    follow_up = r.randn([80]) * 0.4 + 6.1
+    fig = viz.figure("Distribution summary")
+        .describe("median, interquartile range, whiskers")
+        .labels("cohort", "response")
+        .boxplot(1.0, control, label: "control", color: "#2563eb")
+        .boxplot(2.0, treatment, label: "treatment", color: "#db2777")
+        .boxplot(3.0, follow_up, label: "follow-up", color: "#059669")
+    print(fig.svg())
+}

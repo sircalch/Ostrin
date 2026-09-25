@@ -53,7 +53,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "output": [
         "samples: 240, min x = -0.68",
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"640\" height=\"400\" viewBox=\"0 0 640 400\" font-family=\"Inter, Segoe UI, Helvetica, Arial, sans-serif\">",
-        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar{cursor:crosshair}</style>",
+        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>",
         "<rect width=\"640\" height=\"400\" fill=\"#ffffff\"/>",
         "",
         "<text x=\"66\" y=\"26\" text-anchor=\"start\" font-size=\"16\" fill=\"#1f2937\" font-weight=\"600\">x(t) = exp(-0.25 t) cos(2 t)</text>",
@@ -167,7 +167,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "output": [
         "z range: -0.6 to 0.71",
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"640\" height=\"520\" viewBox=\"0 0 640 520\" font-family=\"Inter, Segoe UI, Helvetica, Arial, sans-serif\">",
-        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar{cursor:crosshair}</style>",
+        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>",
         "<rect width=\"640\" height=\"520\" fill=\"#ffffff\"/>",
         "",
         "<text x=\"20\" y=\"26\" text-anchor=\"start\" font-size=\"16\" fill=\"#1f2937\" font-weight=\"600\">Ripple, k = 1.6</text>",
@@ -267,11 +267,11 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "output": [
         "steps 268, final angle -12.39",
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"840\" height=\"380\" viewBox=\"0 0 840 380\" font-family=\"Inter, Segoe UI, Helvetica, Arial, sans-serif\">",
-        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar{cursor:crosshair}</style>",
+        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>",
         "<rect width=\"840\" height=\"380\" fill=\"#ffffff\"/>",
         "",
         "<svg x=\"0\" y=\"0\" width=\"360\" height=\"380\" viewBox=\"0 0 360 380\" font-family=\"Inter, Segoe UI, Helvetica, Arial, sans-serif\">",
-        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar{cursor:crosshair}</style>",
+        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>",
         "<rect width=\"360\" height=\"380\" fill=\"#ffffff\"/>",
         "",
         "<text x=\"66\" y=\"26\" text-anchor=\"start\" font-size=\"16\" fill=\"#1f2937\" font-weight=\"600\">Pendulum</text>",
@@ -282,7 +282,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
         "<g fill=\"#0f172a\" fill-opacity=\"0.78\" stroke=\"#ffffff\" stroke-width=\"0.6\"><circle class=\"pt\" cx=\"203\" cy=\"186\" r=\"4\"><title>(0, 0)</title></circle></g>",
         "</g></svg>",
         "<svg x=\"420\" y=\"0\" width=\"480\" height=\"380\" viewBox=\"0 0 480 380\" font-family=\"Inter, Segoe UI, Helvetica, Arial, sans-serif\">",
-        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar{cursor:crosshair}</style>",
+        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>",
         "<rect width=\"480\" height=\"380\" fill=\"#ffffff\"/>",
         "",
         "<text x=\"66\" y=\"26\" text-anchor=\"start\" font-size=\"16\" fill=\"#1f2937\" font-weight=\"600\">Phase portrait</text>",
@@ -770,6 +770,19 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "svg": "assets/viz/histogram.svg",
       "printed": [
         "mean 3.97, sd 1.49, p95 6.42",
+        ""
+      ]
+    },
+    {
+      "id": "boxplot",
+      "title": "Grouped boxplots",
+      "file": "examples/viz_boxplot.ostrin",
+      "blurb": "Three seeded cohorts summarized by their whiskers, quartiles and median, computed in Ostrin.",
+      "source": "examples/viz_boxplot.ostrin",
+      "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_boxplot.ostrin",
+      "code": "// std.viz · grouped boxplots: distribution summaries computed by Ostrin.\nimport std.viz\n\nfn main() -> Void {\n    r = rng(41)\n    control = r.randn([80]) * 0.55 + 4.2\n    treatment = r.randn([80]) * 0.8 + 5.3\n    follow_up = r.randn([80]) * 0.4 + 6.1\n    fig = viz.figure(\"Distribution summary\")\n        .describe(\"median, interquartile range, whiskers\")\n        .labels(\"cohort\", \"response\")\n        .boxplot(1.0, control, label: \"control\", color: \"#2563eb\")\n        .boxplot(2.0, treatment, label: \"treatment\", color: \"#db2777\")\n        .boxplot(3.0, follow_up, label: \"follow-up\", color: \"#059669\")\n    print(fig.svg())\n}\n",
+      "svg": "assets/viz/boxplot.svg",
+      "printed": [
         ""
       ]
     },

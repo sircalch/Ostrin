@@ -1,10 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="960" height="680" viewBox="0 0 960 680" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
-<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar{cursor:crosshair}</style>
+<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>
 <rect width="960" height="680" fill="#ffffff"/>
 
 <text x="20" y="28" text-anchor="start" font-size="18" fill="#1f2937" font-weight="700">Ostrin Viz dashboard</text>
 <svg x="0" y="40" width="480" height="320" viewBox="0 0 480 320" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
-<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar{cursor:crosshair}</style>
+<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>
 <rect width="480" height="320" fill="#ffffff"/>
 
 <text x="66" y="26" text-anchor="start" font-size="16" fill="#1f2937" font-weight="600">Signals</text>
@@ -52,7 +52,7 @@
 <line x1="66" y1="268" x2="460" y2="268" stroke="#9ca3af" stroke-width="1"/>
 <line x1="66" y1="44" x2="66" y2="268" stroke="#9ca3af" stroke-width="1"/></svg>
 <svg x="480" y="40" width="480" height="320" viewBox="0 0 480 320" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
-<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar{cursor:crosshair}</style>
+<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>
 <rect width="480" height="320" fill="#ffffff"/>
 
 <text x="66" y="26" text-anchor="start" font-size="16" fill="#1f2937" font-weight="600">Distribution</text>
@@ -105,7 +105,7 @@
 <line x1="66" y1="268" x2="460" y2="268" stroke="#9ca3af" stroke-width="1"/>
 <line x1="66" y1="44" x2="66" y2="268" stroke="#9ca3af" stroke-width="1"/></svg>
 <svg x="0" y="360" width="480" height="320" viewBox="0 0 480 320" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
-<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar{cursor:crosshair}</style>
+<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>
 <rect width="480" height="320" fill="#ffffff"/>
 
 <text x="66" y="26" text-anchor="start" font-size="16" fill="#1f2937" font-weight="600">sin(x) cos(y)</text>
@@ -149,7 +149,7 @@
 <line x1="420" y1="156" x2="424" y2="156" stroke="#9ca3af" stroke-width="1"/><text x="427" y="159.5" text-anchor="start" font-size="10" fill="#6b7280">0.0</text>
 <line x1="420" y1="99.9" x2="424" y2="99.9" stroke="#9ca3af" stroke-width="1"/><text x="427" y="103.4" text-anchor="start" font-size="10" fill="#6b7280">0.5</text></svg>
 <svg x="480" y="360" width="480" height="320" viewBox="0 0 480 320" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
-<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar{cursor:crosshair}</style>
+<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>
 <rect width="480" height="320" fill="#ffffff"/>
 
 <text x="20" y="26" text-anchor="start" font-size="16" fill="#1f2937" font-weight="600">sin(x) cos(y)</text>
