@@ -16,11 +16,12 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    numéricos, y conserva el JSON con las medianas de ambos caminos. Falta añadir
    cargas de álgebra lineal, visualización y comparaciones históricas antes de usarlo
    como presupuesto de rendimiento.
-5. Preparar el reconocimiento de Ostrin en GitHub Linguist: reunir muestras públicas,
-   redactar la definición de lenguaje (`languages.yml`, extensiones, gramática y muestras),
-   mantener el borrador en `docs/linguist.md`, validarla contra `github-linguist` y abrir la propuesta upstream. Después de su aceptación,
-   activar la clasificación de los archivos `.ostrin` en el repositorio y documentar el
-   resultado en la release y el sitio.
+5. **Objetivo de distribución y reconocimiento en GitHub Linguist**: reunir uso público
+   distribuido y licencias trazables; preparar la definición de lenguaje (`languages.yml`,
+   extensiones, gramática y muestras); mantener el borrador en `docs/linguist.md`; validarla
+   contra `github-linguist`; y abrir la propuesta upstream. Después de su aceptación y de una
+   versión publicada de Linguist, verificar la clasificación de `.ostrin` en GitHub y
+   documentar el resultado en la release y el sitio.
 
 ## Horizonte posterior
 
