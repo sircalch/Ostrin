@@ -1,0 +1,33 @@
+name: Compiler benchmarks
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "23 3 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    name: Interpreter versus native benchmark
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@1.98.1
+      - name: Build release compiler
+        run: cargo build --release --manifest-path compiler/Cargo.toml
+      - name: Run deterministic benchmark
+        run: node scripts/benchmark.mjs --iterations 7 --warmups 1
+      - name: Publish benchmark summary
+        run: |
+          node -e 'const r=require("./target/benchmarks/benchmark.json"); console.log(`Workload: ${r.workload}`); console.log(`Interpreter median: ${r.interpreterMedianMs} ms`); console.log(`Native median: ${r.nativeMedianMs} ms`); console.log(`Median ratio: ${r.interpreterToNativeMedianRatio}x`);' >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload benchmark artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ostrin-benchmark-${{ github.sha }}
+          path: target/benchmarks/benchmark.json
+          if-no-files-found: error
+          retention-days: 14
