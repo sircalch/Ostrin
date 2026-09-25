@@ -574,6 +574,9 @@ button.button-quiet, button.button { cursor: pointer; } button.button-quiet { ba
 .viz-animation-speed-control { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font: .72rem var(--mono); }
 .viz-animation-speed { width: 96px; accent-color: var(--violet); }
 .viz-animation-speed-label { min-width: 2.4rem; color: var(--muted); font: .72rem var(--mono); }
+.viz-animation-loop-control { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font: .72rem var(--mono); }
+.viz-animation-loop { min-height: 30px; padding: 4px 8px; color: var(--white); background: var(--night-2); border: 1px solid var(--line); border-radius: 3px; font: .72rem var(--mono); }
+.viz-animation-loop:focus { outline: 2px solid var(--violet); outline-offset: 1px; }
 .viz-table-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--night); }
 .viz-table-tools[hidden] { display: none; }
 .viz-table-control { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font: .72rem var(--mono); }

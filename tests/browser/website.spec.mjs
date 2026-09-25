@@ -211,6 +211,12 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   await page.locator('[data-viz-explore="animation"]').click();
   await expect(page.locator(".viz-animation-tools")).toBeVisible();
   await page.getByRole("button", { name: "Pause" }).click();
+  await page.locator("[data-viz-loop]").selectOption("1");
+  await expect(page.locator("[data-viz-loop]")).toHaveValue("1");
+  await page.getByRole("button", { name: "Restart" }).click();
+  await expect(page.locator(".viz-animation-status")).toHaveText("completed 1 loop", { timeout: 10_000 });
+  await page.locator("[data-viz-loop]").selectOption("3");
+  await expect(page.locator(".viz-animation-status")).toHaveText("up to 3 loops");
   await page.locator(".viz-animation-speed").fill("200");
   await expect(page.locator(".viz-animation-speed-label")).toHaveText("2×");
   await page.locator(".viz-animation-speed").fill("100");
@@ -220,6 +226,7 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   await page.getByRole("button", { name: "Export WebM" }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe("animation.webm");
+  await expect(page.locator(".viz-animation-status")).toHaveText("72 frames · 8 fps · downloaded");
   await page.getByRole("button", { name: "Close" }).click();
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.locator('[data-viz-explore="double-pendulum"]').click();

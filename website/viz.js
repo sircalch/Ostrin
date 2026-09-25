@@ -92,14 +92,16 @@ function videoMimeType() {
   return ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"].find((type) => MediaRecorder.isTypeSupported(type)) ?? "";
 }
 
-async function exportAnimatedWebm(source, duration, title) {
+async function exportAnimatedWebm(source, duration, title, loops = 1) {
   const mime = videoMimeType();
   if (!mime || !HTMLCanvasElement.prototype.captureStream) throw new Error("WebM export needs MediaRecorder and canvas capture in this browser");
   const dimensions = svgDimensions(source);
   const document_ = new DOMParser().parseFromString(source, "image/svg+xml");
   const flipbookFrames = document_.querySelectorAll(".ostrin-frame").length;
   const fps = flipbookFrames ? Math.max(1, Math.round(flipbookFrames / duration)) : 15;
-  const frameCount = flipbookFrames || Math.min(180, Math.max(30, Math.ceil(duration * fps)));
+  const framesPerLoop = flipbookFrames || Math.min(180, Math.max(30, Math.ceil(duration * fps)));
+  const loopCount = Math.max(1, Math.floor(Number(loops) || 1));
+  const frameCount = framesPerLoop * loopCount;
   const canvas = document.createElement("canvas");
   canvas.width = dimensions.width;
   canvas.height = dimensions.height;
@@ -116,7 +118,8 @@ async function exportAnimatedWebm(source, duration, title) {
   recorder.start();
   try {
     for (let index = 0; index < frameCount; index += 1) {
-      const frame = await imageFromSvg(staticSvgAt(source, frameCount === 1 ? 0 : index / (frameCount - 1)));
+      const frameIndex = index % framesPerLoop;
+      const frame = await imageFromSvg(staticSvgAt(source, framesPerLoop === 1 ? 0 : frameIndex / (framesPerLoop - 1)));
       context.clearRect(0, 0, canvas.width, canvas.height);
       context.drawImage(frame, 0, 0, canvas.width, canvas.height);
       await new Promise((resolve) => setTimeout(resolve, Math.max(8, 1000 / fps)));
@@ -148,7 +151,13 @@ function explorer() {
   const animationSlider = el("input", { type: "range", className: "viz-animation-slider", min: "0", max: "1000", value: "0", step: "1", "aria-label": "Animation position" });
   const animationSpeedInput = el("input", { type: "range", className: "viz-animation-speed", min: "25", max: "400", value: "100", step: "25", "aria-label": "Animation speed" });
   const animationSpeedLabel = el("output", { className: "viz-animation-speed-label", text: "1×" });
-  const animationStatus = el("span", { className: "viz-animation-status", text: "" });
+  const animationStatus = el("span", { className: "viz-animation-status", "aria-live": "polite", text: "" });
+  const animationLoop = el("select", { className: "viz-animation-loop", "data-viz-loop": "", "aria-label": "Animation loop count" }, [
+    el("option", { value: "0", text: "∞" }),
+    el("option", { value: "1", text: "1×" }),
+    el("option", { value: "3", text: "3×" }),
+    el("option", { value: "5", text: "5×" }),
+  ]);
   const animationTools = el("div", { className: "viz-animation-tools", hidden: true }, [
     el("span", { className: "viz-animation-caption", text: "Animation" }),
     el("button", { type: "button", className: "button-quiet", text: "Play", "data-viz-play": "" }),
@@ -158,6 +167,7 @@ function explorer() {
     animationSlider,
     animationLabel,
     el("label", { className: "viz-animation-speed-control" }, [el("span", { text: "Speed" }), animationSpeedInput, animationSpeedLabel]),
+    el("label", { className: "viz-animation-loop-control" }, [el("span", { text: "Loops" }), animationLoop]),
     animationStatus,
   ]);
   const tableFilter = el("input", { id: "viz-table-filter", type: "search", placeholder: "Search rows", "aria-label": "Filter table rows" });
@@ -176,6 +186,11 @@ function explorer() {
   let animationDuration = 0;
   let animationPaused = false;
   let animationRate = 1;
+  let animationLoopLimit = 0;
+  let animationLoopCount = 0;
+  let animationFrameRequest = 0;
+  let animationClockStartedAt = 0;
+  let animationClockStartSeconds = 0;
   let tableRows = [];
   let tableSortColumn = -1;
   let tableAscending = true;
@@ -184,20 +199,73 @@ function explorer() {
     frame.srcdoc = `<!doctype html><meta charset="utf-8"><style>html,body{margin:0;background:#fff}svg{display:block;width:${zoom}%;height:auto}</style>${svg}`;
   };
   const animationDocument = () => frame.contentDocument;
+  function stopAnimationClock() {
+    if (animationFrameRequest) cancelAnimationFrame(animationFrameRequest);
+    animationFrameRequest = 0;
+  }
+  function freezeAnimationAtEnd() {
+    const document_ = animationDocument();
+    const frames = [...(document_?.querySelectorAll(".ostrin-frame") ?? [])];
+    if (frames.length) {
+      frames.forEach((node, index) => {
+        node.style.animation = "none";
+        node.style.opacity = index === frames.length - 1 ? "1" : "0";
+      });
+    } else {
+      const root = document_?.documentElement;
+      if (root?.setCurrentTime && animationDuration) root.setCurrentTime(Math.max(0, animationDuration / animationRate - 0.0001));
+    }
+    animationSlider.value = "1000";
+    animationLabel.textContent = "100%";
+  }
+  function animationTick(now) {
+    if (animationPaused || !animationDuration) return;
+    const elapsed = Math.max(0, now - animationClockStartedAt) / 1000 * animationRate;
+    const logicalSeconds = animationClockStartSeconds + elapsed;
+    const completedLoops = Math.floor(logicalSeconds / animationDuration);
+    if (animationLoopLimit > 0 && logicalSeconds >= animationDuration * animationLoopLimit) {
+      animationLoopCount = animationLoopLimit;
+      freezeAnimationAtEnd();
+      setAnimationState(true);
+      animationStatus.textContent = `completed ${animationLoopLimit} ${animationLoopLimit === 1 ? "loop" : "loops"}`;
+      return;
+    }
+    animationLoopCount = completedLoops;
+    const fraction = (logicalSeconds % animationDuration) / animationDuration;
+    animationSlider.value = String(Math.round(fraction * 1000));
+    setAnimationTime(animationSlider.value, false);
+    animationFrameRequest = requestAnimationFrame(animationTick);
+  }
+  function startAnimationClock() {
+    stopAnimationClock();
+    if (animationPaused || !animationDuration) return;
+    if (Number(animationSlider.value) >= 1000) {
+      animationLoopCount = 0;
+      setAnimationTime(0, false);
+    }
+    animationClockStartSeconds = Number(animationSlider.value) / 1000 * animationDuration;
+    animationClockStartedAt = performance.now();
+    animationFrameRequest = requestAnimationFrame(animationTick);
+  }
   const captureAnimationFrames = () => {
     animationDocument()?.querySelectorAll(".ostrin-frame").forEach((node) => {
       node.dataset.baseDelay = String(parseFloat(node.style.animationDelay) || 0);
     });
   };
   const setAnimationState = (paused) => {
+    if (paused) stopAnimationClock();
     const document_ = animationDocument();
     const root = document_?.documentElement;
     if (root?.pauseAnimations && root?.unpauseAnimations) {
       if (paused) root.pauseAnimations();
       else root.unpauseAnimations();
     }
-    document_?.querySelectorAll(".ostrin-frame").forEach((node) => { node.style.animationPlayState = paused ? "paused" : "running"; });
+    document_?.querySelectorAll(".ostrin-frame").forEach((node) => {
+      if (!paused) node.style.animation = "";
+      node.style.animationPlayState = paused ? "paused" : "running";
+    });
     animationPaused = paused;
+    if (!paused) startAnimationClock();
   };
   const setAnimationTime = (value, pause = true) => {
     const fraction = Number(value) / 1000;
@@ -225,6 +293,10 @@ function explorer() {
       if (base > 0) node.setAttribute("dur", `${base / animationRate}s`);
     });
     if (document_?.documentElement?.setCurrentTime && animationDuration) setAnimationTime(animationSlider.value, false);
+    if (!animationPaused) {
+      animationClockStartSeconds = Number(animationSlider.value) / 1000 * animationDuration;
+      animationClockStartedAt = performance.now();
+    }
   };
   const prepareAnimation = () => {
     const animated = /<animate\b|ostrin-frame|@keyframes/.test(svg);
@@ -236,8 +308,12 @@ function explorer() {
     animationSpeedInput.value = "100";
     animationRate = 1;
     animationSpeedLabel.textContent = "1×";
+    animationLoop.value = "0";
+    animationLoopLimit = 0;
+    animationLoopCount = 0;
     animationStatus.textContent = "";
     animationPaused = false;
+    stopAnimationClock();
     requestAnimationFrame(captureAnimationFrames);
   };
   const prepareAnimationDocument = () => {
@@ -343,16 +419,23 @@ function explorer() {
   animationTools.querySelector("[data-viz-play]").addEventListener("click", () => setAnimationState(false));
   animationTools.querySelector("[data-viz-pause]").addEventListener("click", () => setAnimationState(true));
   animationTools.querySelector("[data-viz-restart]").addEventListener("click", () => {
+    animationLoopCount = 0;
     animationSlider.value = "0";
     setAnimationTime(0, false);
     setAnimationState(false);
+  });
+  animationLoop.addEventListener("change", () => {
+    animationLoopLimit = Number(animationLoop.value);
+    animationLoopCount = 0;
+    animationStatus.textContent = animationLoopLimit ? `up to ${animationLoopLimit} ${animationLoopLimit === 1 ? "loop" : "loops"}` : "looping";
+    if (!animationPaused) startAnimationClock();
   });
   animationTools.querySelector("[data-viz-export]").addEventListener("click", async (event) => {
     const exportButton = event.currentTarget;
     exportButton.disabled = true;
     animationStatus.textContent = "exporting…";
     try {
-      const result = await exportAnimatedWebm(svg, animationDuration, heading.textContent);
+      const result = await exportAnimatedWebm(svg, animationDuration, heading.textContent, animationLoopLimit || 1);
       animationStatus.textContent = `${result.frameCount} frames · ${result.fps} fps · downloaded`;
     } catch (error) {
       animationStatus.textContent = error.message ?? String(error);
@@ -378,7 +461,9 @@ function explorer() {
     setAnimationSpeed(animationSpeedInput.value);
     prepareTable();
     applyReducedMotion();
+    if (!animationPaused) startAnimationClock();
   });
+  node.addEventListener("close", stopAnimationClock);
   document.body.append(node);
   dialog = {
     open(title, text) {
