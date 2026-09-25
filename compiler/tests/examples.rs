@@ -4305,8 +4305,8 @@ fn native_ir_emitter_handles_scalar_array_parameters_and_indexing() {
         })
         .unwrap_or(0);
     assert!(
-        ir_functions >= 2,
-        "array parameter/index functions did not use the IR emitter: {report_text}"
+        ir_functions >= 5,
+        "array constructor, parameter and index functions did not use the IR emitter: {report_text}"
     );
 
     let emitted = run(&["--emit-c", &file]);
@@ -4323,6 +4323,14 @@ fn native_ir_emitter_handles_scalar_array_parameters_and_indexing() {
     assert!(
         source.contains("Array_Int_index1"),
         "Int array indexing did not come from IR: {source}"
+    );
+    assert!(
+        source.contains("Array_Float_from1"),
+        "Float array construction did not come from IR: {source}"
+    );
+    assert!(
+        source.contains("Array_Int_from1"),
+        "Int array construction did not come from IR: {source}"
     );
 
     let exe = temp_artifact("native_ir_arrays.exe");

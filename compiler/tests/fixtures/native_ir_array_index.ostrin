@@ -6,9 +6,17 @@ fn first_int(a: Array<Int>) -> Int {
     a[0]
 }
 
+fn make_float(values: List<Float>) -> Array<Float> {
+    array(values)
+}
+
+fn make_int(values: List<Int>) -> Array<Int> {
+    array(values)
+}
+
 fn main() -> Void {
-    floats = array([1.5, 2.5])
-    ints = array([3, 4])
+    floats = make_float([1.5, 2.5])
+    ints = make_int([3, 4])
     print(first_float(floats))
     print(first_int(ints))
 }

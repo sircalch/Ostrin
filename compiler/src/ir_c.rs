@@ -8,8 +8,8 @@
 //! and the scalar-key/value core of `Map<K,V>`/`Set<T>`, plus scalar-payload
 //! `Result<T,E>` values such as `String.to_int()`/`to_float()`; wrappers can
 //! now compose over scalar collections and over other `Option`/`Result` values
-//! with recursive ownership markers. Scalar numeric `Array<T>` parameters and
-//! one-dimensional indexing use the same generated C array runtime. Straight-line tasks additionally use a
+//! with recursive ownership markers. Scalar numeric `Array<T>` 1D constructors,
+//! parameters and indexing use the same generated C array runtime. Straight-line tasks additionally use a
 //! generated C environment for immutable captures while larger aggregates,
 //! branching task bodies and scopes retain the verified HIR/AST fallback.
 
@@ -1607,6 +1607,22 @@ fn emit_instruction(
                 } else {
                     "(void)0".to_string()
                 }
+            } else if callee == "array" && args.len() == 1 {
+                let Ty::List(element) = value_ty(values, args[0])? else {
+                    return Err(());
+                };
+                let Ty::Applied(name, array_args) = ty else {
+                    return Err(());
+                };
+                if name != "Array"
+                    || array_args.len() != 1
+                    || array_args[0] != *element
+                    || !array_supported(ty)
+                {
+                    return Err(());
+                }
+                let array_c_name = array_name(ty).ok_or(())?;
+                format!("{array_c_name}_from1({})", codes[0])
             } else if callee == "args" && args.is_empty() && *ty == Ty::List(Box::new(Ty::String)) {
                 "({ List_String* __ostrin_args = List_String_new_from_array((const char**)ostrin_argv, (int64_t)ostrin_argc); __ostrin_args; })".to_string()
             } else if callee == "env" && args.len() == 1 && value_ty(values, args[0])? == Ty::String
