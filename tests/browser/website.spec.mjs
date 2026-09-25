@@ -193,5 +193,9 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   await page.getByRole("button", { name: "Pause" }).click();
   await page.locator(".viz-animation-slider").fill("500");
   await expect(page.locator(".viz-animation-time")).toHaveText("50%");
+  const downloadPromise = page.waitForEvent("download", { timeout: 30_000 });
+  await page.getByRole("button", { name: "Export WebM" }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe("animation.webm");
   expect(runtimeErrors).toEqual([]);
 });
