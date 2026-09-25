@@ -571,6 +571,9 @@ button.button-quiet, button.button { cursor: pointer; } button.button-quiet { ba
 .viz-animation-caption, .viz-animation-time { color: var(--muted); font: .72rem var(--mono); }
 .viz-animation-status { color: var(--muted); font: .68rem var(--mono); }
 .viz-animation-slider { flex: 1 1 180px; min-width: 120px; accent-color: var(--violet); }
+.viz-animation-speed-control { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font: .72rem var(--mono); }
+.viz-animation-speed { width: 96px; accent-color: var(--violet); }
+.viz-animation-speed-label { min-width: 2.4rem; color: var(--muted); font: .72rem var(--mono); }
 .viz-table-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--night); }
 .viz-table-tools[hidden] { display: none; }
 .viz-table-control { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font: .72rem var(--mono); }

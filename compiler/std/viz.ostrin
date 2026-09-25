@@ -597,6 +597,7 @@ fn render(fig: Figure) -> String {
     h = fig.height as Float
     mut has_grid = false
     mut has_bars = false
+    mut has_motion = false
     mut xs_lo = 1000000000000000.0
     mut xs_hi = -1000000000000000.0
     mut ys_lo = 1000000000000000.0
@@ -605,6 +606,9 @@ fn render(fig: Figure) -> String {
     mut zhi = -1000000000000000.0
     mut heat_map = "viridis"
     for s in fig.series {
+        if is_motion(s.kind) {
+            has_motion = true
+        }
         if s.kind == "hline" {
             ys_lo = if s.ys[0] < ys_lo { s.ys[0] } else { ys_lo }
             ys_hi = if s.ys[0] > ys_hi { s.ys[0] } else { ys_hi }
@@ -685,7 +689,15 @@ fn render(fig: Figure) -> String {
     sy = (bottom - top) / (y1 - y0)
     clip = uid("clip", fig.title + fig.xlabel + fig.ylabel + fig.series.length().to_string())
 
-    mut out: List<String> = [header(fig.width, fig.height, theme)]
+    root = if has_motion {
+        header(fig.width, fig.height, theme).replace("<svg xmlns=\"http://www.w3.org/2000/svg\"", "<svg data-ostrin-motion=\"true\" xmlns=\"http://www.w3.org/2000/svg\"")
+    } else {
+        header(fig.width, fig.height, theme)
+    }
+    mut out: List<String> = [root]
+    if has_motion {
+        out.push("<style>@media (prefers-reduced-motion:reduce){[data-ostrin-motion] animate{display:none!important}}</style>")
+    }
     out.push(text_at(left, 26.0, fig.title, "start", 16, theme.text, attr("font-weight", "600")))
     if fig.subtitle != "" {
         out.push(text_at(left, 45.0, fig.subtitle, "start", 12, theme.muted, ""))

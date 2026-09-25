@@ -115,8 +115,9 @@ pausa la animación y `prefers-reduced-motion` muestra solo el primer fotograma.
 
 Por qué CSS para la reproducción por defecto: CSS se ejecuta también en un `<img>` y el SVG sigue
 siendo determinista byte a byte en intérprete, nativo y WASM. El explorador web ofrece play, pause,
-reinicio, una barra temporal y exportación WebM al abrir una figura animada; esos controles actúan
-sobre la copia del SVG dentro del iframe y no cambian el programa Ostrin. La exportación rasteriza
+reinicio, una barra temporal, control de velocidad y exportación WebM al abrir una figura animada;
+esos controles actúan sobre la copia del SVG dentro del iframe y no cambian el programa Ostrin. La
+exportación rasteriza
 los fotogramas en un canvas y usa `MediaRecorder`, por lo que depende del soporte del navegador.
 Coste: el tamaño crece linealmente con los fotogramas (24 fotogramas 2D ≈ 270 kB). MP4/GIF,
 calidad configurable y exportación PNG/PDF siguen pendientes.
@@ -146,9 +147,10 @@ años), `viz_string` (cuerda pulsada, 25 modos) y la pestaña ODE del Lab (pénd
 animados, recalculados en el navegador al mover los controles). `no_axes()` oculta ticks, rejilla y
 marco para escenas tipo "escenario".
 
-Límites: SMIL no se puede pausar sin scripts ni desactivar con `prefers-reduced-motion`; en Chromium
-cada `<svg>` anidado (paneles de `viz.grid`) tiene su propio reloj, que arranca con la carga, así
-que los paneles quedan sincronizados en la reproducción normal.
+En el SVG, `@media (prefers-reduced-motion: reduce)` oculta los elementos SMIL y deja visibles sus
+valores iniciales; el explorador además pausa la copia del documento y anuncia el modo reducido.
+Límite conocido: en Chromium cada `<svg>` anidado (paneles de `viz.grid`) tiene su propio reloj, que
+arranca con la carga, así que los paneles quedan sincronizados en la reproducción normal.
 
 ## 4.3 Tablas reproducibles
 

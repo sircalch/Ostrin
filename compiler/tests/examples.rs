@@ -9334,9 +9334,9 @@ fn std_viz_animates_computed_motion_with_smil() {
         first.ends_with("energy drift below 1e-6: true"),
         "rk45 must conserve energy: {first}"
     );
-    assert!(
-        svg.starts_with("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"560\" height=\"560\"")
-    );
+    assert!(svg.starts_with(
+        "<svg data-ostrin-motion=\"true\" xmlns=\"http://www.w3.org/2000/svg\" width=\"560\" height=\"560\""
+    ));
     // Fixed rod (x2, y2), moving segment (x1, y1, x2, y2), two masses (cx, cy)
     // and one trail (dash offset): every animated attribute loops over 12 s.
     assert_eq!(
