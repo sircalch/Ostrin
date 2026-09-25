@@ -433,7 +433,11 @@ fn native_backend_types_agree_with_the_checker() {
     // This is intentionally the current repository-wide baseline. Lower it
     // whenever a backend family moves from AST to HIR/IR; a new example that
     // increases the total must update the limit only with an explicit reason.
-    const MAX_AST_FALLBACK_FUNCTIONS: usize = 1255;
+    // Boxplot is a new std.viz surface that currently uses the AST native path;
+    // the shared std.viz module is measured once for each importing example, so
+    // this adds 70 entries to the repository-wide count. Keep the increase
+    // explicit and bounded until the next std.viz migration pass moves it to IR.
+    const MAX_AST_FALLBACK_FUNCTIONS: usize = 1325;
     assert!(
         ast_fallback <= MAX_AST_FALLBACK_FUNCTIONS,
         "AST fallback grew to {ast_fallback} functions (ratchet limit {MAX_AST_FALLBACK_FUNCTIONS})"

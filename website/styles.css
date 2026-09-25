@@ -566,5 +566,9 @@ button.button-quiet, button.button { cursor: pointer; } button.button-quiet { ba
 .viz-dialog-title { margin: 0; font-size: 1rem; font-weight: 560; }
 .viz-dialog-tools { display: flex; align-items: center; gap: 8px; }
 .viz-zoom { min-width: 3.5rem; text-align: center; color: var(--muted); font: .72rem var(--mono); }
+.viz-animation-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--night); }
+.viz-animation-tools[hidden] { display: none; }
+.viz-animation-caption, .viz-animation-time { color: var(--muted); font: .72rem var(--mono); }
+.viz-animation-slider { flex: 1 1 180px; min-width: 120px; accent-color: var(--violet); }
 .viz-dialog .sl-provenance { margin: 0; padding: 8px 16px; }
 .viz-frame-live { display: block; width: 100%; height: min(72vh, 760px); border: 0; background: #fff; }

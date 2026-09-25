@@ -4,7 +4,7 @@
 // of Series) and rendered to standalone SVG by Ostrin itself, so the same
 // program draws the same bytes in the interpreter, the native backend and the
 // browser (WASM). Marks: line, scatter, area, band, error bars, bars,
-// histogram, stp, reference lines, text, heatmap, contour, and in 3D
+// histogram, boxplot, stairs, reference lines, text, heatmap, contour, and in 3D
 // surface, wireframe, trajectory and point cloud. Axes use "nice" 1-2-5
 // ticks; quantity series label their axes with the unit they carry.
 
@@ -111,7 +111,7 @@ fn empty() -> Array<Float> {
 }
 
 fn has_range(kind: String) -> Bool {
-    kind == "band" or kind == "errorbar"
+    kind == "band" or kind == "errorbar" or kind == "boxplot"
 }
 
 fn series(kind: String, xs: Array<Float>, ys: Array<Float>, label: String, color: String) -> Series {
@@ -168,7 +168,7 @@ fn header(width: Int, height: Int, theme: Theme) -> String {
         // Interaction without scripts: hovering highlights a mark and its
         // <title> shows the values, wherever the SVG is opened.
         "<style>.pt:hover{stroke:" + theme.text + ";stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}" +
-        ".series:hover>path{stroke-width:3.5px}.pt,.bar{cursor:crosshair}</style>\n" +
+        ".series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>\n" +
         "<rect" + attr("width", px(width)) + attr("height", px(height)) + attr("fill", theme.background) + "/>\n"
 }
 
@@ -463,6 +463,18 @@ impl Figure {
         self.add(Series { kind: s.kind, xs: s.xs, ys: s.ys, zs: s.zs, lo: s.lo, hi: s.hi, grid: s.grid, label: s.label, color: s.color, width: width, dash: "", size: s.size, colormap: s.colormap, levels: 0 })
     }
 
+    /// Tukey-style summary for one group: min, Q1, median, Q3 and max.
+    /// Call once per group at a distinct x position to build a grouped boxplot.
+    fn boxplot(mut self, position: Float, data: Array<Float>, label: String = "", color: String = "") -> Figure {
+        minimum = data.min()
+        q1 = data.percentile(25.0)
+        median = data.percentile(50.0)
+        q3 = data.percentile(75.0)
+        maximum = data.max()
+        s = series("boxplot", array([position]), array([median]), label, color)
+        self.add(Series { kind: s.kind, xs: s.xs, ys: s.ys, zs: s.zs, lo: array([q1]), hi: array([q3]), grid: array([minimum, q1, median, q3, maximum]), label: s.label, color: s.color, width: 1.5, dash: "", size: s.size, colormap: s.colormap, levels: 0 })
+    }
+
     fn hline(mut self, y: Float, label: String = "", color: String = "") -> Figure {
         self.add(series("hline", array([0.0]), array([y]), label, color))
     }
@@ -584,6 +596,12 @@ fn render(fig: Figure) -> String {
             xs_hi = max_of(xs_hi, s.xs.max())
             ys_lo = min_of(ys_lo, s.grid.min())
             ys_hi = max_of(ys_hi, s.grid.max())
+        } else if s.kind == "boxplot" {
+            half = min_gap(s.xs) * 0.32
+            xs_lo = min_of(xs_lo, s.xs.min() - half)
+            xs_hi = max_of(xs_hi, s.xs.max() + half)
+            ys_lo = min_of(ys_lo, s.grid[0])
+            ys_hi = max_of(ys_hi, s.grid[4])
         } else if s.xs.length() > 0 {
             half = if s.kind == "hist" { s.width / 2.0 } else if s.kind == "bar" { min_gap(s.xs) / 2.0 } else { 0.0 }
             xs_lo = if s.xs.min() - half < xs_lo { s.xs.min() - half } else { xs_lo }
@@ -805,6 +823,23 @@ fn draw_series(s: Series, color: String, left: Float, bottom: Float, x0: Float, 
         }
         edge = if kind == "hist" { attr("stroke", theme.background) + attr("stroke-width", "1") } else { "" }
         "<g" + attr("fill", color) + attr("fill-opacity", "0.85") + edge + ">" + parts.join("") + "</g>"
+    } else if kind == "boxplot" {
+        x = left + (s.xs[0] - x0) * sx
+        q1y = bottom - (s.lo[0] - y0) * sy
+        medy = bottom - (s.ys[0] - y0) * sy
+        q3y = bottom - (s.hi[0] - y0) * sy
+        miny = bottom - (s.grid[0] - y0) * sy
+        maxy = bottom - (s.grid[4] - y0) * sy
+        bw = min_gap(s.xs) * 0.64 * sx
+        box_x = x - bw / 2.0
+        label_prefix = named(s.label)
+        whiskers = seg(x, maxy, x, q3y, color, s.width, "") + seg(x, q1y, x, miny, color, s.width, "") +
+            seg(x - bw * 0.28, maxy, x + bw * 0.28, maxy, color, s.width, "") + seg(x - bw * 0.28, miny, x + bw * 0.28, miny, color, s.width, "")
+        box = "<rect class=\"boxplot\"" + attr("x", num(box_x)) + attr("y", num(q3y)) + attr("width", num(bw)) + attr("height", num(q1y - q3y)) +
+            attr("fill", color) + attr("fill-opacity", "0.25") + attr("stroke", color) + attr("stroke-width", num(s.width)) +
+            ">" + tip(label_prefix + "Q1 " + short(s.lo[0]) + ", Q3 " + short(s.hi[0])) + "</rect>"
+        median_line = "<g>" + seg(box_x, medy, box_x + bw, medy, color, 2.4, "") + tip(label_prefix + "median " + short(s.ys[0])) + "</g>"
+        whiskers + box + median_line
     } else if kind == "stairs" {
         mut parts: List<String> = []
         for i in 0 until s.xs.length() {
@@ -974,6 +1009,9 @@ fn legend(fig: Figure, left: Float, right: Float, top: Float, bottom: Float, x0:
             out = out + "<circle" + attr("cx", num(x + 15.0)) + attr("cy", num(cy)) + attr("r", "4") + attr("fill", colors[i]) + "/>"
         } else if k == "bar" or k == "hist" or k == "band" or k == "area" {
             out = out + "<rect" + attr("x", num(x + 8.0)) + attr("y", num(cy - 5.0)) + attr("width", "14") + attr("height", "10") + attr("fill", colors[i]) + attr("fill-opacity", "0.7") + "/>"
+        } else if k == "boxplot" {
+            out = out + "<rect" + attr("x", num(x + 8.0)) + attr("y", num(cy - 5.0)) + attr("width", "14") + attr("height", "10") + attr("fill", colors[i]) + attr("fill-opacity", "0.25") + attr("stroke", colors[i]) + "/>"
+            out = out + seg(x + 8.0, cy, x + 22.0, cy, colors[i], 2.0, "")
         } else {
             out = out + seg(x + 7.0, cy, x + 23.0, cy, colors[i], 2.5, "")
         }

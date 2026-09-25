@@ -38,7 +38,7 @@ aislado. El repositorio ya contiene ejemplos de:
 - concurrencia: `examples/native_concurrency.ostrin`, `examples/concurrency.ostrin`;
 - records, traits, módulos y paquetes: los ejemplos correspondientes bajo `examples/`.
 
-El inventario actual tiene 245 archivos `.ostrin`, pero todos pertenecen al
+El inventario actual tiene 246 archivos `.ostrin`, pero todos pertenecen al
 repositorio de Ostrin. Eso demuestra variedad sintáctica, no el uso distribuido
 que Linguist exige para aceptar una extensión nueva.
 

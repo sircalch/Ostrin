@@ -1,10 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
-<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar{cursor:crosshair}</style>
+<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>
 <rect width="640" height="400" fill="#ffffff"/>
 
 <style>.ostrin-frame{opacity:0;animation:ostrin-frames 3000ms step-end infinite}@keyframes ostrin-frames{0%{opacity:1}4.167%{opacity:0}}svg:hover .ostrin-frame{animation-play-state:paused}@media (prefers-reduced-motion:reduce){.ostrin-frame{animation:none}.ostrin-first{opacity:1}}</style>
 <g class="ostrin-frame ostrin-first" style="animation-delay:0ms"><svg width="640" height="400" viewBox="0 0 640 400" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
-<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar{cursor:crosshair}</style>
+<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>
 <rect width="640" height="400" fill="#ffffff"/>
 
 <text x="66" y="26" text-anchor="start" font-size="16" fill="#1f2937" font-weight="600">Wave packet, t = 0 s</text>
@@ -55,7 +55,7 @@
 <text x="343" y="388" text-anchor="middle" font-size="12" fill="#1f2937">position x</text>
 <text x="16" y="205" text-anchor="middle" font-size="12" fill="#1f2937" transform="rotate(-90 16 205)">amplitude</text></svg></g>
 <g class="ostrin-frame" style="animation-delay:125ms"><svg width="640" height="400" viewBox="0 0 640 400" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
-<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar{cursor:crosshair}</style>
+<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>
 <rect width="640" height="400" fill="#ffffff"/>
 
 <text x="66" y="26" text-anchor="start" font-size="16" fill="#1f2937" font-weight="600">Wave packet, t = 0.25 s</text>
@@ -106,7 +106,7 @@
 <text x="343" y="388" text-anchor="middle" font-size="12" fill="#1f2937">position x</text>
 <text x="16" y="205" text-anchor="middle" font-size="12" fill="#1f2937" transform="rotate(-90 16 205)">amplitude</text></svg></g>
 <g class="ostrin-frame" style="animation-delay:250ms"><svg width="640" height="400" viewBox="0 0 640 400" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
-<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar{cursor:crosshair}</style>
+<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>
 <rect width="640" height="400" fill="#ffffff"/>
 
 <text x="66" y="26" text-anchor="start" font-size="16" fill="#1f2937" font-weight="600">Wave packet, t = 0.5 s</text>
@@ -157,7 +157,7 @@
 <text x="343" y="388" text-anchor="middle" font-size="12" fill="#1f2937">position x</text>
 <text x="16" y="205" text-anchor="middle" font-size="12" fill="#1f2937" transform="rotate(-90 16 205)">amplitude</text></svg></g>
 <g class="ostrin-frame" style="animation-delay:375ms"><svg width="640" height="400" viewBox="0 0 640 400" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
-<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar{cursor:crosshair}</style>
+<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>
 <rect width="640" height="400" fill="#ffffff"/>
 
 <text x="66" y="26" text-anchor="start" font-size="16" fill="#1f2937" font-weight="600">Wave packet, t = 0.75 s</text>
@@ -208,7 +208,7 @@
 <text x="343" y="388" text-anchor="middle" font-size="12" fill="#1f2937">position x</text>
 <text x="16" y="205" text-anchor="middle" font-size="12" fill="#1f2937" transform="rotate(-90 16 205)">amplitude</text></svg></g>
 <g class="ostrin-frame" style="animation-delay:500ms"><svg width="640" height="400" viewBox="0 0 640 400" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
-<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar{cursor:crosshair}</style>
+<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>
 <rect width="640" height="400" fill="#ffffff"/>
 
 <text x="66" y="26" text-anchor="start" font-size="16" fill="#1f2937" font-weight="600">Wave packet, t = 1 s</text>
@@ -259,7 +259,7 @@
 <text x="343" y="388" text-anchor="middle" font-size="12" fill="#1f2937">position x</text>
 <text x="16" y="205" text-anchor="middle" font-size="12" fill="#1f2937" transform="rotate(-90 16 205)">amplitude</text></svg></g>
 <g class="ostrin-frame" style="animation-delay:625ms"><svg width="640" height="400" viewBox="0 0 640 400" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
-<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar{cursor:crosshair}</style>
+<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>
 <rect width="640" height="400" fill="#ffffff"/>
 
 <text x="66" y="26" text-anchor="start" font-size="16" fill="#1f2937" font-weight="600">Wave packet, t = 1.25 s</text>
@@ -310,7 +310,7 @@
 <text x="343" y="388" text-anchor="middle" font-size="12" fill="#1f2937">position x</text>
 <text x="16" y="205" text-anchor="middle" font-size="12" fill="#1f2937" transform="rotate(-90 16 205)">amplitude</text></svg></g>
 <g class="ostrin-frame" style="animation-delay:750ms"><svg width="640" height="400" viewBox="0 0 640 400" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
-<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar{cursor:crosshair}</style>
+<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>
 <rect width="640" height="400" fill="#ffffff"/>
 
 <text x="66" y="26" text-anchor="start" font-size="16" fill="#1f2937" font-weight="600">Wave packet, t = 1.5 s</text>
@@ -361,7 +361,7 @@
 <text x="343" y="388" text-anchor="middle" font-size="12" fill="#1f2937">position x</text>
 <text x="16" y="205" text-anchor="middle" font-size="12" fill="#1f2937" transform="rotate(-90 16 205)">amplitude</text></svg></g>
 <g class="ostrin-frame" style="animation-delay:875ms"><svg width="640" height="400" viewBox="0 0 640 400" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
-<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar{cursor:crosshair}</style>
+<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>
 <rect width="640" height="400" fill="#ffffff"/>
 
 <text x="66" y="26" text-anchor="start" font-size="16" fill="#1f2937" font-weight="600">Wave packet, t = 1.75 s</text>
@@ -412,7 +412,7 @@
 <text x="343" y="388" text-anchor="middle" font-size="12" fill="#1f2937">position x</text>
 <text x="16" y="205" text-anchor="middle" font-size="12" fill="#1f2937" transform="rotate(-90 16 205)">amplitude</text></svg></g>
 <g class="ostrin-frame" style="animation-delay:1000ms"><svg width="640" height="400" viewBox="0 0 640 400" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
-<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar{cursor:crosshair}</style>
+<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>
 <rect width="640" height="400" fill="#ffffff"/>
 
 <text x="66" y="26" text-anchor="start" font-size="16" fill="#1f2937" font-weight="600">Wave packet, t = 2 s</text>
@@ -463,7 +463,7 @@
 <text x="343" y="388" text-anchor="middle" font-size="12" fill="#1f2937">position x</text>
 <text x="16" y="205" text-anchor="middle" font-size="12" fill="#1f2937" transform="rotate(-90 16 205)">amplitude</text></svg></g>
 <g class="ostrin-frame" style="animation-delay:1125ms"><svg width="640" height="400" viewBox="0 0 640 400" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
-<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar{cursor:crosshair}</style>
+<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>
 <rect width="640" height="400" fill="#ffffff"/>
 
 <text x="66" y="26" text-anchor="start" font-size="16" fill="#1f2937" font-weight="600">Wave packet, t = 2.25 s</text>
@@ -514,7 +514,7 @@
 <text x="343" y="388" text-anchor="middle" font-size="12" fill="#1f2937">position x</text>
 <text x="16" y="205" text-anchor="middle" font-size="12" fill="#1f2937" transform="rotate(-90 16 205)">amplitude</text></svg></g>
 <g class="ostrin-frame" style="animation-delay:1250ms"><svg width="640" height="400" viewBox="0 0 640 400" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
-<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar{cursor:crosshair}</style>
+<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>
 <rect width="640" height="400" fill="#ffffff"/>
 
 <text x="66" y="26" text-anchor="start" font-size="16" fill="#1f2937" font-weight="600">Wave packet, t = 2.5 s</text>
@@ -565,7 +565,7 @@
 <text x="343" y="388" text-anchor="middle" font-size="12" fill="#1f2937">position x</text>
 <text x="16" y="205" text-anchor="middle" font-size="12" fill="#1f2937" transform="rotate(-90 16 205)">amplitude</text></svg></g>
 <g class="ostrin-frame" style="animation-delay:1375ms"><svg width="640" height="400" viewBox="0 0 640 400" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
-<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar{cursor:crosshair}</style>
+<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>
 <rect width="640" height="400" fill="#ffffff"/>
 
 <text x="66" y="26" text-anchor="start" font-size="16" fill="#1f2937" font-weight="600">Wave packet, t = 2.75 s</text>
@@ -616,7 +616,7 @@
 <text x="343" y="388" text-anchor="middle" font-size="12" fill="#1f2937">position x</text>
 <text x="16" y="205" text-anchor="middle" font-size="12" fill="#1f2937" transform="rotate(-90 16 205)">amplitude</text></svg></g>
 <g class="ostrin-frame" style="animation-delay:1500ms"><svg width="640" height="400" viewBox="0 0 640 400" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
-<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar{cursor:crosshair}</style>
+<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>
 <rect width="640" height="400" fill="#ffffff"/>
 
 <text x="66" y="26" text-anchor="start" font-size="16" fill="#1f2937" font-weight="600">Wave packet, t = 3 s</text>
@@ -667,7 +667,7 @@
 <text x="343" y="388" text-anchor="middle" font-size="12" fill="#1f2937">position x</text>
 <text x="16" y="205" text-anchor="middle" font-size="12" fill="#1f2937" transform="rotate(-90 16 205)">amplitude</text></svg></g>
 <g class="ostrin-frame" style="animation-delay:1625ms"><svg width="640" height="400" viewBox="0 0 640 400" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
-<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar{cursor:crosshair}</style>
+<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>
 <rect width="640" height="400" fill="#ffffff"/>
 
 <text x="66" y="26" text-anchor="start" font-size="16" fill="#1f2937" font-weight="600">Wave packet, t = 3.25 s</text>
@@ -718,7 +718,7 @@
 <text x="343" y="388" text-anchor="middle" font-size="12" fill="#1f2937">position x</text>
 <text x="16" y="205" text-anchor="middle" font-size="12" fill="#1f2937" transform="rotate(-90 16 205)">amplitude</text></svg></g>
 <g class="ostrin-frame" style="animation-delay:1750ms"><svg width="640" height="400" viewBox="0 0 640 400" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
-<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar{cursor:crosshair}</style>
+<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>
 <rect width="640" height="400" fill="#ffffff"/>
 
 <text x="66" y="26" text-anchor="start" font-size="16" fill="#1f2937" font-weight="600">Wave packet, t = 3.5 s</text>
@@ -769,7 +769,7 @@
 <text x="343" y="388" text-anchor="middle" font-size="12" fill="#1f2937">position x</text>
 <text x="16" y="205" text-anchor="middle" font-size="12" fill="#1f2937" transform="rotate(-90 16 205)">amplitude</text></svg></g>
 <g class="ostrin-frame" style="animation-delay:1875ms"><svg width="640" height="400" viewBox="0 0 640 400" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
-<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar{cursor:crosshair}</style>
+<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>
 <rect width="640" height="400" fill="#ffffff"/>
 
 <text x="66" y="26" text-anchor="start" font-size="16" fill="#1f2937" font-weight="600">Wave packet, t = 3.75 s</text>
@@ -820,7 +820,7 @@
 <text x="343" y="388" text-anchor="middle" font-size="12" fill="#1f2937">position x</text>
 <text x="16" y="205" text-anchor="middle" font-size="12" fill="#1f2937" transform="rotate(-90 16 205)">amplitude</text></svg></g>
 <g class="ostrin-frame" style="animation-delay:2000ms"><svg width="640" height="400" viewBox="0 0 640 400" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
-<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar{cursor:crosshair}</style>
+<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>
 <rect width="640" height="400" fill="#ffffff"/>
 
 <text x="66" y="26" text-anchor="start" font-size="16" fill="#1f2937" font-weight="600">Wave packet, t = 4 s</text>
@@ -871,7 +871,7 @@
 <text x="343" y="388" text-anchor="middle" font-size="12" fill="#1f2937">position x</text>
 <text x="16" y="205" text-anchor="middle" font-size="12" fill="#1f2937" transform="rotate(-90 16 205)">amplitude</text></svg></g>
 <g class="ostrin-frame" style="animation-delay:2125ms"><svg width="640" height="400" viewBox="0 0 640 400" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
-<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar{cursor:crosshair}</style>
+<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>
 <rect width="640" height="400" fill="#ffffff"/>
 
 <text x="66" y="26" text-anchor="start" font-size="16" fill="#1f2937" font-weight="600">Wave packet, t = 4.25 s</text>
@@ -922,7 +922,7 @@
 <text x="343" y="388" text-anchor="middle" font-size="12" fill="#1f2937">position x</text>
 <text x="16" y="205" text-anchor="middle" font-size="12" fill="#1f2937" transform="rotate(-90 16 205)">amplitude</text></svg></g>
 <g class="ostrin-frame" style="animation-delay:2250ms"><svg width="640" height="400" viewBox="0 0 640 400" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
-<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar{cursor:crosshair}</style>
+<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>
 <rect width="640" height="400" fill="#ffffff"/>
 
 <text x="66" y="26" text-anchor="start" font-size="16" fill="#1f2937" font-weight="600">Wave packet, t = 4.5 s</text>
@@ -973,7 +973,7 @@
 <text x="343" y="388" text-anchor="middle" font-size="12" fill="#1f2937">position x</text>
 <text x="16" y="205" text-anchor="middle" font-size="12" fill="#1f2937" transform="rotate(-90 16 205)">amplitude</text></svg></g>
 <g class="ostrin-frame" style="animation-delay:2375ms"><svg width="640" height="400" viewBox="0 0 640 400" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
-<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar{cursor:crosshair}</style>
+<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>
 <rect width="640" height="400" fill="#ffffff"/>
 
 <text x="66" y="26" text-anchor="start" font-size="16" fill="#1f2937" font-weight="600">Wave packet, t = 4.75 s</text>
@@ -1024,7 +1024,7 @@
 <text x="343" y="388" text-anchor="middle" font-size="12" fill="#1f2937">position x</text>
 <text x="16" y="205" text-anchor="middle" font-size="12" fill="#1f2937" transform="rotate(-90 16 205)">amplitude</text></svg></g>
 <g class="ostrin-frame" style="animation-delay:2500ms"><svg width="640" height="400" viewBox="0 0 640 400" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
-<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar{cursor:crosshair}</style>
+<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>
 <rect width="640" height="400" fill="#ffffff"/>
 
 <text x="66" y="26" text-anchor="start" font-size="16" fill="#1f2937" font-weight="600">Wave packet, t = 5 s</text>
@@ -1075,7 +1075,7 @@
 <text x="343" y="388" text-anchor="middle" font-size="12" fill="#1f2937">position x</text>
 <text x="16" y="205" text-anchor="middle" font-size="12" fill="#1f2937" transform="rotate(-90 16 205)">amplitude</text></svg></g>
 <g class="ostrin-frame" style="animation-delay:2625ms"><svg width="640" height="400" viewBox="0 0 640 400" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
-<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar{cursor:crosshair}</style>
+<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>
 <rect width="640" height="400" fill="#ffffff"/>
 
 <text x="66" y="26" text-anchor="start" font-size="16" fill="#1f2937" font-weight="600">Wave packet, t = 5.25 s</text>
@@ -1126,7 +1126,7 @@
 <text x="343" y="388" text-anchor="middle" font-size="12" fill="#1f2937">position x</text>
 <text x="16" y="205" text-anchor="middle" font-size="12" fill="#1f2937" transform="rotate(-90 16 205)">amplitude</text></svg></g>
 <g class="ostrin-frame" style="animation-delay:2750ms"><svg width="640" height="400" viewBox="0 0 640 400" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
-<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar{cursor:crosshair}</style>
+<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>
 <rect width="640" height="400" fill="#ffffff"/>
 
 <text x="66" y="26" text-anchor="start" font-size="16" fill="#1f2937" font-weight="600">Wave packet, t = 5.5 s</text>
@@ -1177,7 +1177,7 @@
 <text x="343" y="388" text-anchor="middle" font-size="12" fill="#1f2937">position x</text>
 <text x="16" y="205" text-anchor="middle" font-size="12" fill="#1f2937" transform="rotate(-90 16 205)">amplitude</text></svg></g>
 <g class="ostrin-frame" style="animation-delay:2875ms"><svg width="640" height="400" viewBox="0 0 640 400" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
-<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar{cursor:crosshair}</style>
+<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>
 <rect width="640" height="400" fill="#ffffff"/>
 
 <text x="66" y="26" text-anchor="start" font-size="16" fill="#1f2937" font-weight="600">Wave packet, t = 5.75 s</text>

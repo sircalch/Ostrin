@@ -9087,6 +9087,15 @@ fn viz_3d_scenes_and_heatmaps_render_their_marks() {
 }
 
 #[test]
+fn viz_boxplots_render_quartiles_whiskers_and_medians() {
+    let out = interpreter_and_native_agree("viz_boxplot.ostrin");
+    assert_eq!(out.matches("<rect class=\"boxplot\"").count(), 3);
+    assert_eq!(out.matches("Q1 ").count(), 3);
+    assert_eq!(out.matches("median ").count(), 3);
+    assert!(out.contains("<line") && out.contains("stroke-width=\"2.4\""));
+}
+
+#[test]
 fn arrays_of_quantities_keep_one_unit_and_check_dimensions() {
     let out = interpreter_and_native_agree("quantity_arrays.ostrin");
     let lines: Vec<&str> = out.lines().collect();
