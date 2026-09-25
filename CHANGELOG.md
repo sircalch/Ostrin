@@ -6,6 +6,8 @@
 - The Viz explorer adds a 0.25×–4× speed control for CSS flip-book and SMIL motion animations.
   Motion SVGs now hide SMIL animation nodes under `prefers-reduced-motion: reduce`, and the
   explorer pauses at the initial frame while announcing the reduced-motion state.
+- Playback can run once or for three or five loops, and WebM export repeats the selected number of
+  loops. The timeline now follows playback and announces when a finite run completes.
 
 ### Visualization: table explorer
 - `std.viz.table` marks its rows, columns and footer in the deterministic SVG it produces. The Viz
