@@ -385,14 +385,24 @@ diagnósticos JSON reales con código, ubicación, severidad y mensaje, y selecc
 diagnosticada en el editor. La versión y las métricas públicas ahora salen de
 `scripts/site-facts.mjs`/`website/site-data.js`, con una comprobación de frescura en CI. Siguiente:
 prueba responsive móvil con viewport dedicado y mejora incremental del learning funnel.
-La gramática para Linguist queda separada porque requiere uso público suficiente; el borrador y
-el procedimiento verificable están en `docs/linguist.md`. El objetivo del siguiente ciclo es
-preparar y enviar la definición de Ostrin a `github/linguist`: muestras
-`.ostrin` representativas, extensión y color, reglas de comentarios/cadenas, detección de
-shebang cuando aplique y una prueba local con `github-linguist`. La configuración del
-repositorio para clasificar `.ostrin` se activará después de que Linguist acepte el nombre;
-así el mapa de lenguajes de GitHub mostrará Ostrin de forma estable y no una clasificación
-local que diverja del catálogo oficial.
+### H. Distribución y reconocimiento en GitHub
+
+**Objetivo:** subir la definición de Ostrin al proyecto oficial
+[`github/linguist`](https://github.com/github-linguist/linguist) para que GitHub reconozca
+los archivos `.ostrin` y los muestre como Ostrin en el mapa de lenguajes.
+
+El trabajo se cierra con cuatro evidencias, en este orden:
+
+1. uso público distribuido suficiente y licencias trazables para las muestras;
+2. entrada `languages.yml`, gramática TextMate, muestras representativas y validación local
+   con `github-linguist`;
+3. propuesta upstream aceptada y publicada en una versión de Linguist;
+4. verificación en GitHub de la clasificación de `.ostrin`, seguida de la actualización de
+   la release, el sitio y [`docs/linguist.md`](docs/linguist.md).
+
+El borrador, el requisito de uso público y el procedimiento reproducible ya están documentados
+en [`docs/linguist.md`](docs/linguist.md). Hasta completar los puntos 1–3 no se añadirá una
+regla local de `.gitattributes` que pueda aparentar reconocimiento oficial.
 
 ---
 
