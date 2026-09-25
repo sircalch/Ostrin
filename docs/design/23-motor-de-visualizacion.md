@@ -115,9 +115,11 @@ pausa la animación y `prefers-reduced-motion` muestra solo el primer fotograma.
 
 Por qué CSS para la reproducción por defecto: CSS se ejecuta también en un `<img>` y el SVG sigue
 siendo determinista byte a byte en intérprete, nativo y WASM. El explorador web ofrece play, pause,
-reinicio y una barra temporal al abrir una figura animada; esos controles actúan sobre la copia del
-SVG dentro del iframe y no cambian el programa Ostrin. Coste: el tamaño crece linealmente con los
-fotogramas (24 fotogramas 2D ≈ 270 kB). Pendiente: exportar vídeo.
+reinicio, una barra temporal y exportación WebM al abrir una figura animada; esos controles actúan
+sobre la copia del SVG dentro del iframe y no cambian el programa Ostrin. La exportación rasteriza
+los fotogramas en un canvas y usa `MediaRecorder`, por lo que depende del soporte del navegador.
+Coste: el tamaño crece linealmente con los fotogramas (24 fotogramas 2D ≈ 270 kB). MP4/GIF,
+calidad configurable y exportación PNG/PDF siguen pendientes.
 
 ## 4.2 Movimiento continuo
 
@@ -178,7 +180,7 @@ la falta de literales científicos (`1e-9`). Ver `CONTEXTO_PROYECTO.md` §270–
 | 0.2 (resto) | selección enlazada y controles conducidos por Ostrin (requiere un backend con eventos) |
 | 0.3 (parcial, hecho) | animación en bucle con `viz.animate`: fotogramas generados por Ostrin, reproducidos con CSS dentro del SVG |
 | 0.3 (hecho) | movimiento continuo con SMIL: `animate`, `moving_point` con estela, `rod`, `moving_segment`, `morph`; `no_axes` |
-| 0.3 (parcial) | controles web de play/pausa/reinicio y posición temporal; exportar vídeo sigue pendiente |
+| 0.3 (parcial, hecho) | controles web de play/pausa/reinicio, posición temporal y exportación WebM cuando el navegador ofrece `MediaRecorder` |
 | 0.4 | volúmenes, isosuperficies, campos vectoriales, cortes; cámaras en perspectiva |
 | 0.5 | backend WebGPU sobre la misma lista de series; PNG/PDF |
 | — | figuras con procedencia (hash de fuente y datos, semilla, versión del compilador) |

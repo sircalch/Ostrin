@@ -27,6 +27,115 @@ function svgOf(lines) {
   return { svg: lines.slice(start, end + 1).join("\n"), printed: [...lines.slice(0, start), ...lines.slice(end + 1)] };
 }
 
+const SVG_NUMBER = /-?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/g;
+
+function interpolateAnimatedValue(first, second, amount) {
+  const a = first.match(SVG_NUMBER) ?? [];
+  const b = second.match(SVG_NUMBER) ?? [];
+  if (a.length !== b.length) return amount < 0.5 ? first : second;
+  let index = 0;
+  return first.replace(SVG_NUMBER, () => {
+    const value = Number(a[index]) + (Number(b[index]) - Number(a[index])) * amount;
+    index += 1;
+    return String(Number(value.toFixed(5)));
+  });
+}
+
+// Turn one instant of Ostrin's SVG animation into a static SVG. Flip-book
+// animations select one computed frame; SMIL animations interpolate their
+// numeric attributes (including morphing paths) and remove <animate> nodes.
+function staticSvgAt(source, fraction) {
+  const document_ = new DOMParser().parseFromString(source, "image/svg+xml");
+  const root = document_.documentElement;
+  const frames = [...root.querySelectorAll(".ostrin-frame")];
+  if (frames.length) {
+    const chosen = frames[Math.min(frames.length - 1, Math.floor(fraction * frames.length))];
+    for (const frame of frames) {
+      if (frame !== chosen) frame.remove();
+    }
+    chosen.style.cssText += ";animation:none!important;opacity:1!important;animation-delay:0ms!important";
+  } else {
+    for (const animation of [...root.querySelectorAll("animate")]) {
+      const target = animation.parentElement;
+      const values = (animation.getAttribute("values") ?? "").split(";");
+      const attribute = animation.getAttribute("attributeName");
+      if (!target || !attribute || !values.length) continue;
+      const position = Math.min(values.length - 1, fraction * (values.length - 1));
+      const lower = Math.floor(position);
+      const upper = Math.min(values.length - 1, lower + 1);
+      target.setAttribute(attribute, interpolateAnimatedValue(values[lower], values[upper], position - lower));
+      animation.remove();
+    }
+  }
+  return new XMLSerializer().serializeToString(root);
+}
+
+function svgDimensions(source) {
+  const root = new DOMParser().parseFromString(source, "image/svg+xml").documentElement;
+  const viewBox = (root.getAttribute("viewBox") ?? "").trim().split(/[ ,]+/).map(Number);
+  const width = Number.parseFloat(root.getAttribute("width") ?? "") || viewBox[2] || 640;
+  const height = Number.parseFloat(root.getAttribute("height") ?? "") || viewBox[3] || 400;
+  return { width: Math.max(1, Math.round(width)), height: Math.max(1, Math.round(height)) };
+}
+
+function imageFromSvg(source) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("the browser could not rasterize an SVG frame"));
+    image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(source)}`;
+  });
+}
+
+function videoMimeType() {
+  if (!globalThis.MediaRecorder?.isTypeSupported) return "";
+  return ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"].find((type) => MediaRecorder.isTypeSupported(type)) ?? "";
+}
+
+async function exportAnimatedWebm(source, duration, title) {
+  const mime = videoMimeType();
+  if (!mime || !HTMLCanvasElement.prototype.captureStream) throw new Error("WebM export needs MediaRecorder and canvas capture in this browser");
+  const dimensions = svgDimensions(source);
+  const document_ = new DOMParser().parseFromString(source, "image/svg+xml");
+  const flipbookFrames = document_.querySelectorAll(".ostrin-frame").length;
+  const fps = flipbookFrames ? Math.max(1, Math.round(flipbookFrames / duration)) : 15;
+  const frameCount = flipbookFrames || Math.min(180, Math.max(30, Math.ceil(duration * fps)));
+  const canvas = document.createElement("canvas");
+  canvas.width = dimensions.width;
+  canvas.height = dimensions.height;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("WebM export needs a 2D canvas context");
+  const stream = canvas.captureStream(fps);
+  const recorder = new MediaRecorder(stream, { mimeType: mime });
+  const chunks = [];
+  const finished = new Promise((resolve, reject) => {
+    recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); };
+    recorder.onerror = () => reject(new Error("the browser stopped WebM recording"));
+    recorder.onstop = resolve;
+  });
+  recorder.start();
+  try {
+    for (let index = 0; index < frameCount; index += 1) {
+      const frame = await imageFromSvg(staticSvgAt(source, frameCount === 1 ? 0 : index / (frameCount - 1)));
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(frame, 0, 0, canvas.width, canvas.height);
+      await new Promise((resolve) => setTimeout(resolve, Math.max(8, 1000 / fps)));
+    }
+  } finally {
+    recorder.stop();
+    stream.getTracks().forEach((track) => track.stop());
+  }
+  await finished;
+  const blob = new Blob(chunks, { type: mime });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${(title || "ostrin-viz-animation").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "ostrin-viz-animation"}.webm`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return { frameCount, fps };
+}
+
 // ---- explorer: the SVG in a sandboxed frame (no scripts) where its own hover styles and
 // <title> tooltips work; zoom rescales the vector figure and the frame scrolls to pan.
 let dialog;
@@ -37,13 +146,16 @@ function explorer() {
   const zoomLabel = el("output", { className: "viz-zoom", text: "100%" });
   const animationLabel = el("output", { className: "viz-animation-time", text: "0%" });
   const animationSlider = el("input", { type: "range", className: "viz-animation-slider", min: "0", max: "1000", value: "0", step: "1", "aria-label": "Animation position" });
+  const animationStatus = el("span", { className: "viz-animation-status", text: "" });
   const animationTools = el("div", { className: "viz-animation-tools", hidden: true }, [
     el("span", { className: "viz-animation-caption", text: "Animation" }),
     el("button", { type: "button", className: "button-quiet", text: "Play", "data-viz-play": "" }),
     el("button", { type: "button", className: "button-quiet", text: "Pause", "data-viz-pause": "" }),
     el("button", { type: "button", className: "button-quiet", text: "Restart", "data-viz-restart": "" }),
+    el("button", { type: "button", className: "button-quiet", text: "Export WebM", "data-viz-export": "" }),
     animationSlider,
     animationLabel,
+    animationStatus,
   ]);
   let zoom = 100;
   let svg = "";
@@ -89,6 +201,7 @@ function explorer() {
     const durations = [...svg.matchAll(/(?:dur="|animation:[^;]*?\s)([\d.]+)(ms|s)/g)].map((match) => Number(match[1]) * (match[2] === "ms" ? 0.001 : 1));
     animationDuration = Math.max(...durations, 1);
     animationSlider.value = "0";
+    animationStatus.textContent = "";
     animationPaused = false;
     requestAnimationFrame(captureAnimationFrames);
   };
@@ -117,6 +230,19 @@ function explorer() {
     animationSlider.value = "0";
     setAnimationTime(0, false);
     setAnimationState(false);
+  });
+  animationTools.querySelector("[data-viz-export]").addEventListener("click", async (event) => {
+    const exportButton = event.currentTarget;
+    exportButton.disabled = true;
+    animationStatus.textContent = "exporting…";
+    try {
+      const result = await exportAnimatedWebm(svg, animationDuration, heading.textContent);
+      animationStatus.textContent = `${result.frameCount} frames · ${result.fps} fps · downloaded`;
+    } catch (error) {
+      animationStatus.textContent = error.message ?? String(error);
+    } finally {
+      exportButton.disabled = false;
+    }
   });
   animationSlider.addEventListener("input", () => setAnimationTime(animationSlider.value));
   frame.addEventListener("load", captureAnimationFrames);

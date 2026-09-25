@@ -25,8 +25,8 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    documentar el resultado en la release y el sitio.
 6. **Continuar el frente profesional de visualización y web**: ampliar `std.viz` con
    gráficas estadísticas y tablas documentadas, mantener ejemplos reproducibles en la
-   galería y añadir controles temporales, exportación de vídeo, exploración 3D y
-   procedencia de figuras con evidencia en intérprete, nativo y WASM.
+   galería, consolidar la exportación WebM y añadir exportación MP4/GIF/PNG/PDF,
+   exploración 3D, WebGPU y procedencia de figuras con evidencia en intérprete, nativo y WASM.
 
 ## Horizonte posterior
 
