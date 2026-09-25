@@ -23,7 +23,7 @@ jobs:
         run: node scripts/benchmark.mjs --iterations 7 --warmups 1
       - name: Publish benchmark summary
         run: |
-          node -e 'const r=require("./target/benchmarks/benchmark.json"); console.log(`Workload: ${r.workload}`); console.log(`Interpreter median: ${r.interpreterMedianMs} ms`); console.log(`Native median: ${r.nativeMedianMs} ms`); console.log(`Median ratio: ${r.interpreterToNativeMedianRatio}x`);' >> "$GITHUB_STEP_SUMMARY"
+          node -e 'const r=require("./target/benchmarks/benchmark.json"); for (const w of r.workloads) console.log(`${w.workload}: interpreter ${w.interpreterMedianMs} ms, native ${w.nativeMedianMs} ms, ratio ${w.interpreterToNativeMedianRatio}x`);' >> "$GITHUB_STEP_SUMMARY"
       - name: Upload benchmark artifact
         uses: actions/upload-artifact@v4
         with:

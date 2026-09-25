@@ -6,12 +6,13 @@ por dos caminos:
 1. `ostrinc --run`, que comprueba y ejecuta con el intérprete.
 2. `ostrinc --compile`, seguido de la ejecución del binario nativo generado.
 
-El workload [`examples/benchmark_numeric.ostrin`](../examples/benchmark_numeric.ostrin)
-solo usa aritmética entera escalar y un rango determinista. Cada ejecución comprueba
-que ambos caminos impriman exactamente el mismo resultado antes de guardar las
-mediciones. El informe JSON incluye commit, plataforma, versión del compilador,
-mediciones individuales, mediana, tiempo de compilación nativa y la razón entre
-medianas.
+La batería predeterminada cubre [`benchmark_numeric.ostrin`](../examples/benchmark_numeric.ostrin)
+(aritmética escalar), `arrays.ostrin`, `quantity_arrays.ostrin` y
+`numeric_methods.ostrin`. Cada ejecución comprueba que ambos caminos impriman
+exactamente el mismo resultado antes de guardar las mediciones. El informe JSON
+incluye commit, plataforma, versión del compilador, hash del resultado, mediciones
+individuales, mediana, tiempo de compilación nativa y la razón entre medianas para
+cada workload.
 
 El workflow [`benchmarks.yml`](../.github/workflows/benchmarks.yml) se ejecuta
 manualmente o cada lunes y conserva el informe por commit durante 14 días. Las
@@ -25,3 +26,6 @@ Para reproducirlo localmente:
 cargo build --release --manifest-path compiler/Cargo.toml
 node scripts/benchmark.mjs --iterations 7 --warmups 1
 ```
+
+Puedes seleccionar una fuente concreta o una lista separada por comas con
+`--workloads examples/arrays.ostrin,examples/numeric_methods.ostrin`.
