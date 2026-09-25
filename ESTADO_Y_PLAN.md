@@ -46,7 +46,7 @@ Implementación: compilador + intérprete + herramientas de editor, todo en Rust
 | Léxico / parser | `lexer/`, `parser/mod.rs` | Tokens, AST con rangos de origen |
 | Módulos y paquetes | `modules.rs`, `package.rs`, `ostrin.toml` | Imports, `--project`, grafo transitivo de dependencias y lockfile portable |
 | Verificador de tipos | `typeck/mod.rs` (~3 500 l.) | Tipos, dimensiones, traits, exhaustividad, genéricos |
-| HIR/IR | `hir.rs`, `hir_c.rs`, `ir.rs`, `ir_c.rs` | HIR verificado, CFG con temporales explícitos y emisor C para escalares, `String`, constructores de arrays 1D–3D, parámetros, indexación y métodos de `Array<T>` numérico escalar, `Result<Int, String>`/`Result<Float, String>` con `try`, `try catch` inline, handlers globales, aliases locales y handlers locales capturados compatibles, wrappers `Option`/`Result` sobre `List`, `Map` y `Set` con payload gestionado, `Result<String, String>`/`Result<Void, String>` de E/S de archivos, records concretos y records genéricos monomorfizados, iteradores de records concretos (`next() -> Option<T>`), iteradores genéricos monomorfizados (`Cursor<Int>`), iteración de canales mediante `receive() -> Option<T>`, `spawn {}` con CFG y capturas inmutables, `spawn_scope {}` inline con grupos nativos, `Task.join()` y `Task.cancel()` tipados, `Option<Record>`, listas escalares, mapas/conjuntos escalares, enteros de ancho fijo y control de flujo, con fallback HIR/AST acotado |
+| HIR/IR | `hir.rs`, `hir_c.rs`, `ir.rs`, `ir_c.rs` | HIR verificado, CFG con temporales explícitos y emisor C para escalares, `String`, constructores de arrays 1D–3D, parámetros, indexación, aritmética/comparaciones elemento a elemento y métodos de `Array<T>` numérico escalar, `Result<Int, String>`/`Result<Float, String>` con `try`, `try catch` inline, handlers globales, aliases locales y handlers locales capturados compatibles, wrappers `Option`/`Result` sobre `List`, `Map` y `Set` con payload gestionado, `Result<String, String>`/`Result<Void, String>` de E/S de archivos, records concretos y records genéricos monomorfizados, iteradores de records concretos (`next() -> Option<T>`), iteradores genéricos monomorfizados (`Cursor<Int>`), iteración de canales mediante `receive() -> Option<T>`, `spawn {}` con CFG y capturas inmutables, `spawn_scope {}` inline con grupos nativos, `Task.join()` y `Task.cancel()` tipados, `Option<Record>`, listas escalares, mapas/conjuntos escalares, enteros de ancho fijo y control de flujo, con fallback HIR/AST acotado |
 | Intérprete | `interpreter/mod.rs` | Ejecución tree‑walking y scheduler cooperativo; referencia semántica |
 | Servidor de lenguaje | `lsp.rs`, `symbols.rs`, `protocol.rs` | LSP sobre stdio |
 | Adaptador de depuración | `dap.rs` + hooks del intérprete | DAP sobre stdio |
@@ -157,8 +157,8 @@ por separado en `--native-type-report` como `ir-generated`; el mismo informe exp
 `hir-generated` y `ast-fallback` para que la retirada del backend legado tenga un contador
 visible. También publica líneas `native-source` agrupadas por archivo para localizar la deuda
 por módulo; la prueba diferencial comprueba que sus sumas coinciden con el total. En el corte
-actual, la suite de ejemplos suma 1 094 funciones IR, 455 HIR y 1 256 que aún caen al emisor
-AST; `native_backend_types_agree_with_the_checker` mantiene 1 256 como trinquete y debe bajar
+actual, la suite de ejemplos suma 1 095 funciones IR, 455 HIR y 1 255 que aún caen al emisor
+AST; `native_backend_types_agree_with_the_checker` mantiene 1 255 como trinquete y debe bajar
 cuando una familia migre. Los marcadores de ownership de
 `String`, `List<T>`, los núcleos escalares de `Map<K,V>`/`Set<T>` y `Option<T>` con payload
 escalar o `String` también se consumen al generar C; `Map.get/remove` producen structs
@@ -281,8 +281,8 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
 convendría dividirlos; el backend nativo no comparte el sistema de tipos del checker
-(ya consume los tipos del checker y compara cada nodo; el informe actual suma **1 094 funciones
-generadas desde IR, 455 desde HIR y 1 256 en fallback AST** en los ejemplos, con un trinquete
+(ya consume los tipos del checker y compara cada nodo; el informe actual suma **1 095 funciones
+generadas desde IR, 455 desde HIR y 1 255 en fallback AST** en los ejemplos, con un trinquete
 que impide que el fallback aumente sin justificación; las familias migradas incluyen escalares,
 `String`, records concretos, `Option<Record>`, `List<T>` escalar, `Map`/`Set` escalares, `Option`
 escalar/String y patrones `Some/None`, `Float32`, enteros de ancho fijo, records, enums, `match`,

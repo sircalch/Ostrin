@@ -6,7 +6,7 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
 ## Siguiente ciclo
 
 1. Reducir el fallback AST con el trinquete por archivo de `--native-type-report` (baseline actual:
-   1.094 funciones IR, 455 HIR y 1.256 AST).
+   1.095 funciones IR, 455 HIR y 1.255 AST).
 2. Completar ownership sobre agregados, escapes, valores `Phi`, errores y formas anidadas, con
    leak-check y sanitizers como evidencia.
 3. Añadir casos de compilación nativa y divergencia semántica al fuzzing de entradas válidas.
