@@ -1,0 +1,29 @@
+// std.viz · a sampled 3D vector field with SVG arrowheads and tooltips.
+import std.viz
+
+fn main() -> Void {
+    mut xs: List<Float> = []
+    mut ys: List<Float> = []
+    mut zs: List<Float> = []
+    mut us: List<Float> = []
+    mut vs: List<Float> = []
+    mut ws: List<Float> = []
+    for i in 0 until 5 {
+        for j in 0 until 5 {
+            x = (i as Float) - 2.0
+            y = (j as Float) - 2.0
+            xs.push(x)
+            ys.push(y)
+            zs.push(0.0)
+            us.push(0.0 - y)
+            vs.push(x)
+            ws.push(0.35)
+        }
+    }
+    scene = viz.scene3d("Rotational vector field")
+        .describe("25 samples · v(x, y, z) = (-y, x, 0.35)")
+        .labels("x", "y", "z")
+        .view(-48.0, 28.0)
+        .vector_field(array(xs), array(ys), array(zs), array(us), array(vs), array(ws), color: "#2563eb", scale: 0.28)
+    print(scene.svg())
+}

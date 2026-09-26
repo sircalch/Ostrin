@@ -5,7 +5,7 @@
 // program draws the same bytes in the interpreter, the native backend and the
 // browser (WASM). Marks: line, scatter, area, band, error bars, bars,
 // histogram, boxplot, stairs, reference lines, text, heatmap, contour, and in 3D
-// surface, wireframe, trajectory and point cloud. Axes use "nice" 1-2-5
+// surface, wireframe, trajectory, point cloud and vector fields. Axes use "nice" 1-2-5
 // ticks; quantity series label their axes with the unit they carry.
 
 pub record Theme {
@@ -1378,6 +1378,14 @@ impl Scene3D {
         self
     }
 
+    /// A sampled 3D vector field. Each vector starts at (xs, ys, zs) and
+    /// points in (us, vs, ws); `scale` controls its length in data units.
+    fn vector_field(mut self, xs: Array<Float>, ys: Array<Float>, zs: Array<Float>, us: Array<Float>, vs: Array<Float>, ws: Array<Float>, color: String = "", scale: Float = 0.35) -> Scene3D {
+        s = series("vector3", xs, ys, "", color)
+        self.series.push(Series { kind: s.kind, xs: xs, ys: ys, zs: zs, lo: us, hi: vs, grid: ws, label: "", color: color, width: 1.4, dash: "", size: scale, colormap: "", levels: 0 })
+        self
+    }
+
     fn svg(self) -> String {
         render3d(self)
     }
@@ -1488,6 +1496,19 @@ fn render3d(scene: Scene3D) -> String {
         zz = if s.kind == "surface" or s.kind == "wire" { s.grid } else { s.zs }
         z0 = if zz.min() < z0 { zz.min() } else { z0 }
         z1 = if zz.max() > z1 { zz.max() } else { z1 }
+        if s.kind == "vector3" {
+            for i in 0 until s.xs.length() {
+                ex = s.xs[i] + s.lo[i] * s.size
+                ey = s.ys[i] + s.hi[i] * s.size
+                ez = s.zs[i] + s.grid[i] * s.size
+                x0 = if ex < x0 { ex } else { x0 }
+                x1 = if ex > x1 { ex } else { x1 }
+                y0 = if ey < y0 { ey } else { y0 }
+                y1 = if ey > y1 { ey } else { y1 }
+                z0 = if ez < z0 { ez } else { z0 }
+                z1 = if ez > z1 { ez } else { z1 }
+            }
+        }
         if s.kind == "surface" {
             cmap = s.colormap
         }
@@ -1553,6 +1574,41 @@ fn render3d(scene: Scene3D) -> String {
                     tip("(" + short(s.xs[i]) + ", " + short(s.ys[i]) + ", " + short(s.zs[i]) + ")") + "</circle>")
             }
             out.push("<g" + attr("stroke", theme.background) + attr("stroke-width", "0.5") + ">" + parts.join("") + "</g>")
+        } else if s.kind == "vector3" {
+            n = s.xs.length()
+            mut keys: List<Float> = []
+            for i in 0 until n {
+                keys.push(depth(cam, s.xs[i], s.ys[i], s.zs[i]))
+            }
+            mut parts: List<String> = []
+            for i in argsort(array(keys)) {
+                ax = project_x(cam, s.xs[i], s.ys[i])
+                ay = project_y(cam, s.xs[i], s.ys[i], s.zs[i])
+                bx = s.xs[i] + s.lo[i] * s.size
+                by = s.ys[i] + s.hi[i] * s.size
+                bz = s.zs[i] + s.grid[i] * s.size
+                cx = project_x(cam, bx, by)
+                cy = project_y(cam, bx, by, bz)
+                dx = cx - ax
+                dy = cy - ay
+                length = sqrt(dx * dx + dy * dy)
+                ux = if length > 0.000001 { dx / length } else { 0.0 }
+                uy = if length > 0.000001 { dy / length } else { 0.0 }
+                wing = 4.0
+                back = 7.0
+                left_x = cx - ux * back - uy * wing
+                left_y = cy - uy * back + ux * wing
+                right_x = cx - ux * back + uy * wing
+                right_y = cy - uy * back - ux * wing
+                color = pick(s.color, 0, theme)
+                arrow = if length > 0.000001 {
+                    "<polygon" + attr("points", num(cx) + "," + num(cy) + " " + num(left_x) + "," + num(left_y) + " " + num(right_x) + "," + num(right_y)) + attr("fill", color) + "/>"
+                } else { "" }
+                value = "(" + short(s.xs[i]) + ", " + short(s.ys[i]) + ", " + short(s.zs[i]) + ") → (" + short(s.lo[i]) + ", " + short(s.hi[i]) + ", " + short(s.grid[i]) + ")"
+                parts.push("<g class=\"vector3\"" + attr("stroke", color) + attr("stroke-width", num(s.width)) + attr("stroke-linecap", "round") + ">" +
+                    "<line" + attr("x1", num(ax)) + attr("y1", num(ay)) + attr("x2", num(cx)) + attr("y2", num(cy)) + ">" + tip(value) + "</line>" + arrow + "</g>")
+            }
+            out.push(parts.join(""))
         }
     }
     if has_bar {

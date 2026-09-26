@@ -802,6 +802,19 @@ globalThis.OSTRIN_LAB = Object.freeze({
       ]
     },
     {
+      "id": "vector-field",
+      "title": "3D vector field",
+      "file": "examples/viz_vector_field.ostrin",
+      "blurb": "A sampled rotational field with depth-sorted arrowheads and SVG tooltips.",
+      "source": "examples/viz_vector_field.ostrin",
+      "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_vector_field.ostrin",
+      "code": "// std.viz · a sampled 3D vector field with SVG arrowheads and tooltips.\nimport std.viz\n\nfn main() -> Void {\n    mut xs: List<Float> = []\n    mut ys: List<Float> = []\n    mut zs: List<Float> = []\n    mut us: List<Float> = []\n    mut vs: List<Float> = []\n    mut ws: List<Float> = []\n    for i in 0 until 5 {\n        for j in 0 until 5 {\n            x = (i as Float) - 2.0\n            y = (j as Float) - 2.0\n            xs.push(x)\n            ys.push(y)\n            zs.push(0.0)\n            us.push(0.0 - y)\n            vs.push(x)\n            ws.push(0.35)\n        }\n    }\n    scene = viz.scene3d(\"Rotational vector field\")\n        .describe(\"25 samples · v(x, y, z) = (-y, x, 0.35)\")\n        .labels(\"x\", \"y\", \"z\")\n        .view(-48.0, 28.0)\n        .vector_field(array(xs), array(ys), array(zs), array(us), array(vs), array(ws), color: \"#2563eb\", scale: 0.28)\n    print(scene.svg())\n}\n",
+      "svg": "assets/viz/vector-field.svg",
+      "printed": [
+        ""
+      ]
+    },
+    {
       "id": "scatter-fit",
       "title": "Scatter and fit",
       "file": "examples/viz_scatter_fit.ostrin",

@@ -439,7 +439,9 @@ fn native_backend_types_agree_with_the_checker() {
     // explicit and bounded until the next std.viz migration pass moves it to IR.
     // The table renderer adds 93 more measured fallback functions for the same
     // reason: nested List<String> formatting is not in the IR ownership model yet.
-    const MAX_AST_FALLBACK_FUNCTIONS: usize = 1418;
+    // The 3D vector-field renderer adds 75 more measured fallback functions:
+    // vector arrow geometry and SVG strings are still outside the IR ownership model.
+    const MAX_AST_FALLBACK_FUNCTIONS: usize = 1493;
     assert!(
         ast_fallback <= MAX_AST_FALLBACK_FUNCTIONS,
         "AST fallback grew to {ast_fallback} functions (ratchet limit {MAX_AST_FALLBACK_FUNCTIONS})"

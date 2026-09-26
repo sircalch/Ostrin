@@ -168,6 +168,7 @@ export const GALLERY = [
   { id: "histogram", title: "Histogram and density", file: "examples/viz_histogram.ostrin", blurb: "20 000 seeded normal samples with the scaled N(4, 1.5²) density on top." },
   { id: "boxplot", title: "Grouped boxplots", file: "examples/viz_boxplot.ostrin", blurb: "Three seeded cohorts summarized by their whiskers, quartiles and median, computed in Ostrin." },
   { id: "point-cloud", title: "3D point cloud", file: "examples/viz_point_cloud.ostrin", blurb: "Three Gaussian clusters, depth-sorted and colored by height." },
+  { id: "vector-field", title: "3D vector field", file: "examples/viz_vector_field.ostrin", blurb: "A sampled rotational field with depth-sorted arrowheads and SVG tooltips." },
   { id: "scatter-fit", title: "Scatter and fit", file: "examples/viz_scatter_fit.ostrin", blurb: "Calibration data, a least-squares line and its ±2σ band." },
   { id: "units", title: "Unit-aware axes", file: "examples/viz_units.ostrin", blurb: "Quantities converted to km/h: the axis labels come from the units in the data." },
   { id: "bars", title: "Bars with error bars", file: "examples/viz_bars.ostrin", blurb: "Group means ± standard deviation from seeded samples." },

@@ -163,12 +163,14 @@ test("Cookbook renders every recipe with source and recorded output", async ({ p
 });
 
 test("Viz gallery shows recorded figures and reruns them with the real compiler", async ({ page }) => {
+  test.setTimeout(45_000);
   const runtimeErrors = [];
   page.on("pageerror", (error) => runtimeErrors.push(error.message));
   await page.goto("./viz.html", { waitUntil: "domcontentloaded" });
   const cards = page.locator("[data-viz-gallery] .viz-card");
-  await expect(cards).toHaveCount(19);
+  await expect(cards).toHaveCount(20);
   await expect(page.getByRole("heading", { name: "Data table" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "3D vector field" })).toBeVisible();
   for (const card of await cards.all()) {
     const image = card.locator("img.viz-image");
     await expect(image).toHaveAttribute("src", /^assets\/viz\/[a-z-]+\.svg$/);
@@ -236,5 +238,10 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   await expect(motionFrame.locator("animate").first()).toHaveCSS("display", "none");
   await page.getByRole("button", { name: "Close" }).click();
   await page.emulateMedia({ reducedMotion: null });
+  await page.locator('[data-viz-explore="vector-field"]').click();
+  const vectorFrame = page.frameLocator(".viz-frame-live");
+  await expect(vectorFrame.locator("g.vector3")).toHaveCount(25);
+  await expect(vectorFrame.locator("g.vector3 line title").first()).toContainText("→");
+  await page.getByRole("button", { name: "Close" }).click();
   expect(runtimeErrors).toEqual([]);
 });
