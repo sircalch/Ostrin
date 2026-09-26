@@ -90,6 +90,41 @@ function imageFromSvg(source) {
   });
 }
 
+function fileStem(title, fallback = "ostrin-figure") {
+  return (title || fallback).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || fallback;
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function downloadSvg(source, title) {
+  downloadBlob(new Blob([source], { type: "image/svg+xml;charset=utf-8" }), `${fileStem(title)}.svg`);
+}
+
+async function exportPng(source, title, fraction = 0, scale = 2) {
+  const staticSource = staticSvgAt(source, fraction);
+  const dimensions = svgDimensions(staticSource);
+  const image = await imageFromSvg(staticSource);
+  const canvas = document.createElement("canvas");
+  canvas.width = dimensions.width * scale;
+  canvas.height = dimensions.height * scale;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("PNG export needs a 2D canvas context");
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+  if (!blob) throw new Error("the browser could not encode a PNG");
+  downloadBlob(blob, `${fileStem(title)}.png`);
+  return { width: canvas.width, height: canvas.height };
+}
+
 function videoMimeType() {
   if (!globalThis.MediaRecorder?.isTypeSupported) return "";
   return ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"].find((type) => MediaRecorder.isTypeSupported(type)) ?? "";
@@ -513,6 +548,24 @@ function explorer() {
     node.addEventListener("click", action);
     return node;
   };
+  const exportStatus = el("span", { className: "viz-export-status", "aria-live": "polite", text: "" });
+  const exportSvgButton = button("SVG", "Download SVG", () => {
+    downloadSvg(svg, heading.textContent);
+    exportStatus.textContent = "SVG downloaded";
+  });
+  const exportPngButton = button("PNG", "Export PNG", async () => {
+    exportPngButton.disabled = true;
+    exportStatus.textContent = "exporting PNG…";
+    try {
+      const fraction = animationDuration ? Number(animationSlider.value) / 1000 : 0;
+      const result = await exportPng(svg, heading.textContent, fraction);
+      exportStatus.textContent = `PNG downloaded · ${result.width}×${result.height}`;
+    } catch (error) {
+      exportStatus.textContent = error.message ?? String(error);
+    } finally {
+      exportPngButton.disabled = false;
+    }
+  });
   const node = el("dialog", { className: "viz-dialog", "aria-label": "Figure explorer" }, [
     el("div", { className: "viz-dialog-bar" }, [
       heading,
@@ -520,6 +573,9 @@ function explorer() {
         button("−", "Zoom out", () => { zoom = Math.max(50, zoom - 25); render(); }),
         zoomLabel,
         button("+", "Zoom in", () => { zoom = Math.min(400, zoom + 50); render(); }),
+        exportSvgButton,
+        exportPngButton,
+        exportStatus,
         button("Close", "Close the explorer", () => node.close()),
       ]),
     ]),
@@ -612,6 +668,7 @@ function explorer() {
       tableTools.hidden = true;
       selectionTools.hidden = true;
       selectionStatus.textContent = "";
+      exportStatus.textContent = "";
       prepareAnimation();
       render();
       node.showModal();

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 
 const publicPages = [
   "./",
@@ -194,6 +195,19 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   await page.locator('[data-viz-explore="scatter-fit"]').click();
   const point = page.frameLocator(".viz-frame-live").locator("circle.pt").first();
   await expect(point.locator("title")).toHaveText(/^measurements: \(0\.5, /);
+  const svgDownloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download SVG" }).click();
+  const svgDownload = await svgDownloadPromise;
+  expect(svgDownload.suggestedFilename()).toMatch(/\.svg$/);
+  const pngDownloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export PNG" }).click();
+  const pngDownload = await pngDownloadPromise;
+  expect(pngDownload.suggestedFilename()).toMatch(/\.png$/);
+  const pngBytes = await readFile(await pngDownload.path());
+  expect([...pngBytes.subarray(0, 8)]).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+  expect(pngBytes.readUInt32BE(16)).toBe(1280);
+  expect(pngBytes.readUInt32BE(20)).toBe(800);
+  await expect(page.locator(".viz-export-status")).toHaveText(/PNG downloaded · \d+×\d+/);
   await page.getByRole("button", { name: "Zoom in" }).click();
   await expect(page.locator(".viz-zoom")).toHaveText("150%");
   await page.getByRole("button", { name: "Close" }).click();

@@ -18,7 +18,7 @@ sobre la que crecerán la interacción, la animación y los backends acelerados:
    marca añade un `Series` a su lista. Renderizar es una función pura de ese valor (`fig.svg()`).
 4. **Unidades en los ejes.** Los datos con cantidades físicas etiquetan sus ejes con la unidad que
    llevan (`speed [km/h]`); convertir los datos convierte el eje.
-5. **Límites declarados.** Lo que no existe (interacción, animación, PNG/PDF, WebGPU) se dice en la
+5. **Límites declarados.** Lo que no existe (controles conducidos por Ostrin, PDF, WebGPU) se dice en la
    web y aquí; nada se simula con JavaScript.
 
 ## 2. Arquitectura
@@ -120,8 +120,9 @@ WebM del número de ciclos elegido al abrir una figura animada; esos controles a
 SVG dentro del iframe y no cambian el programa Ostrin. La
 exportación rasteriza
 los fotogramas en un canvas y usa `MediaRecorder`, por lo que depende del soporte del navegador.
-Coste: el tamaño crece linealmente con los fotogramas (24 fotogramas 2D ≈ 270 kB). MP4/GIF,
-calidad configurable y exportación PNG/PDF siguen pendientes.
+Coste: el tamaño crece linealmente con los fotogramas (24 fotogramas 2D ≈ 270 kB). El explorador
+puede descargar el SVG completo y rasterizar el instante actual a PNG 2× (también un fotograma elegido
+con la línea temporal); MP4/GIF, calidad configurable y PDF siguen pendientes.
 
 ## 4.2 Movimiento continuo
 
@@ -177,6 +178,20 @@ versión viva de la tarjeta. El botón de reinicio recupera los ángulos declara
 La interfaz anuncia el estado de renderizado y conserva el teclado y el modo de movimiento reducido.
 JavaScript coordina la interacción, mientras que Ostrin calcula la geometría y produce la figura.
 
+## 4.5 Exportación desde el explorador
+
+El explorador conserva dos rutas de publicación para cada figura:
+
+- **SVG** descarga exactamente el documento producido por Ostrin, incluidos sus datos, tooltips y
+  animaciones declarativas.
+- **PNG** convierte el SVG estático del instante actual en un canvas a escala 2× y descarga un archivo
+  compatible con editores, informes y mensajería. Para una animación, la posición de la línea temporal
+  determina el fotograma rasterizado; la exportación no depende de que el iframe permita scripts.
+
+La rasterización vive en el navegador y tiene una ruta de error explícita cuando el contexto 2D o la
+codificación PNG no están disponibles. La futura exportación PDF reutilizará el mismo documento SVG,
+pero añadirá tamaño de página y metadatos de publicación.
+
 ## 5. Unidades
 
 `quantity_line(xs, ys)` acepta `List<Quantity<X>>` y `List<Quantity<Y>>`: toma los números en la
@@ -208,11 +223,12 @@ la falta de literales científicos (`1e-9`). Ver `CONTEXTO_PROYECTO.md` §270–
 | 0.3 (parcial, hecho) | animación en bucle con `viz.animate`: fotogramas generados por Ostrin, reproducidos con CSS dentro del SVG |
 | 0.3 (hecho) | movimiento continuo con SMIL: `animate`, `moving_point` con estela, `rod`, `moving_segment`, `morph`; `no_axes` |
 | 0.3 (parcial, hecho) | controles web de play/pausa/reinicio, posición temporal, velocidad, ciclos finitos y exportación WebM cuando el navegador ofrece `MediaRecorder` |
+| 0.3 (hecho) | descarga del SVG producido y exportación PNG 2× del fotograma actual desde el explorador web |
 | 0.3 (hecho) | tablas SVG reproducibles con filas alternadas, encabezados, tooltips por celda, tema oscuro y explorador web con filtro/ordenamiento (`viz.table`) |
 | 0.4 (parcial, hecho) | campos vectoriales 3D muestreados con flechas, profundidad y tooltips |
 | 0.4 (parcial, hecho) | explorador web con acimut/elevación que vuelve a ejecutar `.view(...)` en WASM |
 | 0.4 | volúmenes, isosuperficies, cortes; cámaras en perspectiva |
-| 0.5 | backend WebGPU sobre la misma lista de series; PNG/PDF |
+| 0.5 | backend WebGPU sobre la misma lista de series; PDF con tamaño de página y metadatos |
 | — | figuras con procedencia (hash de fuente y datos, semilla, versión del compilador) |
 | — | gráficas con incertidumbre cuando exista `Measurement<T>` |
 

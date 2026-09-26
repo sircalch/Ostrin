@@ -28,14 +28,14 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
 6. **Continuar el frente profesional de visualización y web**: ampliar `std.viz` con
    gráficas estadísticas y consolidar la selección enlazada, mantener tablas reproducibles con filtro y
    ordenamiento en el explorador, conservar ejemplos verificables en la galería, consolidar la
-   exportación WebM y añadir exportación MP4/GIF/PNG/PDF, exploración 3D, WebGPU y procedencia de
+   exportación SVG/PNG/WebM y añadir exportación MP4/GIF/PDF, exploración 3D, WebGPU y procedencia de
    figuras con evidencia en intérprete, nativo y WASM.
 
 ## Horizonte posterior
 
 - Unidades afines y prefijos automáticos.
 - Autodiff inverso, más álgebra lineal y métodos numéricos.
-- Exportación PNG/PDF/HTML y controles temporales de animación.
+- Exportación PDF/HTML, MP4/GIF y controles conducidos por Ostrin; SVG/PNG/WebM ya tienen ruta web.
 - FFI C, registry público y canales de distribución adicionales.
 - Reconocimiento de Ostrin en GitHub Linguist y aparición de `.ostrin` en el mapa de lenguajes.
 - GPU/WebGPU después de estabilizar Array, IR y ownership.

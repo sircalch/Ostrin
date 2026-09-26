@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Visualization: SVG and PNG publication export
+- The Viz explorer can download the exact SVG emitted by Ostrin and rasterize the current figure (or
+  selected animation frame) to a 2× PNG through the browser canvas. Export status is announced to
+  assistive technology, and the original SVG remains the lossless route for animated figures.
+
 ### Visualization: linked table and figure selection
 - `std.viz` emits deterministic `data-viz-index` markers for scatter points and table rows. A new
   `viz_linked_data` gallery program composes both views with `viz.grid`; the browser explorer links
