@@ -164,8 +164,9 @@ programa sigue siendo responsable de convertir números, unidades y precisión. 
 puede abrir como SVG, guardarse con `save()` y reproducirse en intérprete, nativo y WASM. El
 explorador web identifica las filas y columnas producidas por Ostrin y permite filtrar texto y
 ordenar columnas numéricas o textuales sin recalcular ni dibujar datos fuera de la salida SVG; el
-pie de tabla informa cuántas filas quedan visibles. La selección enlazada entre tabla y figura
-queda para una fase posterior porque requiere eventos y un contrato de datos compartido.
+pie de tabla informa cuántas filas quedan visibles. Las figuras compuestas con `viz.grid` pueden
+enlazar puntos y filas mediante el marcador determinista `data-viz-index`; el explorador instala
+selección por clic y teclado y resalta ambas vistas dentro del iframe aislado.
 
 ## 4.4 Cámara 3D en el explorador web
 
@@ -203,7 +204,7 @@ la falta de literales científicos (`1e-9`). Ver `CONTEXTO_PROYECTO.md` §270–
 | 0.1 (hecho) | marcas 2D, heatmap/contornos, superficies/trayectorias/nubes 3D, campos vectoriales muestreados, layouts, unidades en ejes, SVG |
 | 0.1 (hecho) | boxplots agrupados con cuartiles interpolados, mediana, bigotes, tooltips y leyenda |
 | 0.2 (parcial, hecho) | tooltips `<title>` con valores y resaltado CSS al pasar el ratón, dentro del SVG y sin scripts; visor web con zoom y desplazamiento en un iframe aislado |
-| 0.2 (resto) | selección enlazada y controles conducidos por Ostrin (requiere un backend con eventos) |
+| 0.2 (parcial, hecho) | selección enlazada entre puntos y filas en figuras compuestas; los controles conducidos por Ostrin siguen pendientes |
 | 0.3 (parcial, hecho) | animación en bucle con `viz.animate`: fotogramas generados por Ostrin, reproducidos con CSS dentro del SVG |
 | 0.3 (hecho) | movimiento continuo con SMIL: `animate`, `moving_point` con estela, `rod`, `moving_segment`, `morph`; `no_axes` |
 | 0.3 (parcial, hecho) | controles web de play/pausa/reinicio, posición temporal, velocidad, ciclos finitos y exportación WebM cuando el navegador ofrece `MediaRecorder` |

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Visualization: linked table and figure selection
+- `std.viz` emits deterministic `data-viz-index` markers for scatter points and table rows. A new
+  `viz_linked_data` gallery program composes both views with `viz.grid`; the browser explorer links
+  clicks and keyboard activation across the plot and table, highlights the matching pair, and offers
+  an accessible clear-selection action.
+
 ### Visualization: live 3D camera exploration
 - The Viz explorer now exposes azimuth and elevation sliders for every 3D gallery figure. Moving a
   slider edits the example's `.view(...)` call and reruns that program through `ostrinc.wasm`; the

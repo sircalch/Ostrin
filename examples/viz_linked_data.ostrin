@@ -1,0 +1,23 @@
+// std.viz · linked selection between an Ostrin scatter plot and its table.
+// The same row order feeds both values; the browser links their data-viz-index markers.
+import std.viz
+
+fn main() -> Void {
+    samples = array([1.0, 2.0, 3.0, 4.0, 5.0])
+    measured = array([1.2, 1.9, 3.3, 3.8, 5.1])
+    rows: List<List<String>> = [
+        ["A", "1.0", "1.2", "0.2"],
+        ["B", "2.0", "1.9", "0.1"],
+        ["C", "3.0", "3.3", "0.3"],
+        ["D", "4.0", "3.8", "0.2"],
+        ["E", "5.0", "5.1", "0.1"]
+    ]
+    plot = viz.figure("Calibration observations")
+        .size(480, 360)
+        .labels("sample", "response")
+        .scatter(samples, measured, label: "measurements", color: "#7c3aed", size: 5.0)
+    table = viz.table(["id", "sample", "response", "error"], rows, title: "Measurements")
+        .size(480)
+        .row_height(28)
+    print(viz.grid([plot.svg(), table.svg()], 2, 480, 360, title: "Linked calibration data"))
+}
