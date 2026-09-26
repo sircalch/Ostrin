@@ -828,6 +828,19 @@ globalThis.OSTRIN_LAB = Object.freeze({
       ]
     },
     {
+      "id": "isosurface",
+      "title": "3D isosurface",
+      "file": "examples/viz_isosurface.ostrin",
+      "blurb": "A scalar shell polygonized from a 3D Float volume with deterministic marching tetrahedra and depth-sorted triangles.",
+      "source": "examples/viz_isosurface.ostrin",
+      "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_isosurface.ostrin",
+      "code": "import std.viz\n\nfn main() -> Void {\n    axes = linspace(-1.6, 1.6, 17)\n    volume = zeros([17, 17, 17])\n    for k in 0 until 17 {\n        for j in 0 until 17 {\n            for i in 0 until 17 {\n                x = axes[i]\n                y = axes[j]\n                z = axes[k]\n                radius = sqrt(x * x + y * y + z * z)\n                shell = exp(0.0 - (radius - 0.85) * (radius - 0.85) * 14.0)\n                volume.set(k, j, i, shell)\n            }\n        }\n    }\n    scene = viz.scene3d(\"Scalar isosurface\")\n        .describe(\"Marching tetrahedra over a 3D Float volume\")\n        .labels(\"x\", \"y\", \"z\")\n        .view(-52.0, 24.0)\n        .isosurface(axes, axes, axes, volume, 0.42, \"magma\", \"shell density\")\n    print(scene.svg())\n}\n",
+      "svg": "assets/viz/isosurface.svg",
+      "printed": [
+        ""
+      ]
+    },
+    {
       "id": "scatter-fit",
       "title": "Scatter and fit",
       "file": "examples/viz_scatter_fit.ostrin",

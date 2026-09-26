@@ -169,11 +169,12 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   page.on("pageerror", (error) => runtimeErrors.push(error.message));
   await page.goto("./viz.html", { waitUntil: "domcontentloaded" });
   const cards = page.locator("[data-viz-gallery] .viz-card");
-  await expect(cards).toHaveCount(22);
+  await expect(cards).toHaveCount(23);
   await expect(page.getByRole("heading", { name: "Data table" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Linked data selection" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "3D vector field" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "3D volume slices" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "3D isosurface" })).toBeVisible();
   for (const card of await cards.all()) {
     const image = card.locator("img.viz-image");
     await expect(image).toHaveAttribute("src", /^assets\/viz\/[a-z-]+\.svg$/);
@@ -291,6 +292,11 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   await expect(volumeFrame.locator("polygon.slice-cell")).toHaveCount(768);
   await expect(volumeFrame.locator("polygon.slice-cell title").first()).toContainText("value");
   await expect(page.locator("[data-viz-camera-azimuth]")).toBeVisible();
+  await page.getByRole("button", { name: "Close" }).click();
+  await page.locator('[data-viz-explore="isosurface"]').click();
+  const isoFrame = page.frameLocator(".viz-frame-live");
+  await expect(isoFrame.locator("polygon.isosurface-cell")).toHaveCount(4536);
+  await expect(isoFrame.locator("polygon.isosurface-cell title").first()).toContainText("isosurface level");
   await page.getByRole("button", { name: "Close" }).click();
   expect(runtimeErrors).toEqual([]);
 });

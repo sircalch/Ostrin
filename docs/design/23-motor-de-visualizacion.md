@@ -35,7 +35,7 @@ Figure / Scene3D (records)          ← API: figure(), scene3d(), métodos encad
 
 `Series` es la representación intermedia de la escena: `kind` (`line`, `scatter`, `area`, `band`,
 `errorbar`, `bar`, `hist`, `boxplot`, `stairs`, `hline`, `vline`, `heatmap`, `contour`, `surface`, `wire`,
-`line3`, `scatter3`, `vector3`, `slice_xy`, `slice_xz`, `slice_yz`), los arrays `xs`, `ys`, `zs`, `lo`, `hi`, `grid` y el estilo (`color`, `width`,
+`line3`, `scatter3`, `vector3`, `slice_xy`, `slice_xz`, `slice_yz`, `mesh3`), los arrays `xs`, `ys`, `zs`, `lo`, `hi`, `grid` y el estilo (`color`, `width`,
 `dash`, `size`, `colormap`, `levels`). Como un `Array` de Ostrin no puede estar vacío, los campos que
 una marca no usa contienen un cero y solo se leen para los `kind` que los rellenan.
 
@@ -132,7 +132,12 @@ lámina 2D y recortan el índice a los límites del volumen. Los métodos encade
 `Scene3D.slice_xy`, `.slice_xz` y `.slice_yz` colocan esas celdas en la escena 3D, las ordenan
 con el algoritmo del pintor que usan las superficies, colorean por valor con una barra de escala
 y añaden un tooltip SVG por celda. La ruta actual es un render CPU/SVG determinista; el volumen
-completo y las isosuperficies quedan para el backend WebGPU.
+completo queda para el backend WebGPU.
+
+`Scene3D.isosurface(xs, ys, zs, volume, level, colormap:, label:)` polygoniza el mismo volumen
+`[z, y, x]` con marching tetrahedra. Cada triángulo conserva sus tres vértices, se ordena por
+profundidad y recibe iluminación plana, color y tooltip en SVG. Es una superficie explícita y
+reproducible para volúmenes medianos; el render volumétrico denso sigue reservado para WebGPU.
 
 ## 4.3 Movimiento continuo
 
@@ -237,7 +242,7 @@ la falta de literales científicos (`1e-9`). Ver `CONTEXTO_PROYECTO.md` §270–
 | 0.3 (hecho) | tablas SVG reproducibles con filas alternadas, encabezados, tooltips por celda, tema oscuro y explorador web con filtro/ordenamiento (`viz.table`) |
 | 0.4 (parcial, hecho) | campos vectoriales 3D muestreados con flechas, profundidad y tooltips |
 | 0.4 (parcial, hecho) | explorador web con acimut/elevación que vuelve a ejecutar `.view(...)` en WASM |
-| 0.4 (parcial, hecho) | cortes XY/XZ/YZ de `Array<Float>` 3D, celdas coloreadas, tooltips y barra de escala; cámaras ortográficas interactivas |
+| 0.4 (parcial, hecho) | cortes XY/XZ/YZ e isosuperficies de `Array<Float>` 3D, celdas/triángulos coloreados, tooltips y barra de escala; cámaras ortográficas interactivas |
 | 0.4 | render de volúmenes completos, isosuperficies y cámaras en perspectiva |
 | 0.5 | backend WebGPU sobre la misma lista de series; PDF con tamaño de página y metadatos |
 | — | figuras con procedencia (hash de fuente y datos, semilla, versión del compilador) |

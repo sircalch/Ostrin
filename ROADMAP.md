@@ -29,7 +29,7 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    gráficas estadísticas y consolidar la selección enlazada, mantener tablas reproducibles con filtro y
    ordenamiento en el explorador, conservar ejemplos verificables en la galería, consolidar la
    exportación SVG/PNG/WebM y añadir exportación MP4/GIF/PDF, exploración 3D (ya incluye superficies,
-   campos vectoriales, cámara y cortes ortogonales de volúmenes), WebGPU y procedencia de figuras con
+   campos vectoriales, cámara, cortes ortogonales e isosuperficies de volúmenes), WebGPU y procedencia de figuras con
    evidencia en intérprete, nativo y WASM.
 
 ## Horizonte posterior

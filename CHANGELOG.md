@@ -13,6 +13,11 @@
   and per-cell tooltips. The new `viz_volume_slices` example is recorded in the live gallery and
   reruns through the interpreter, native backend and WASM.
 
+### Visualization: 3D isosurfaces
+- `Scene3D.isosurface(xs, ys, zs, volume, level, colormap:, label:)` polygonizes a scalar volume
+  with deterministic marching tetrahedra. The depth-sorted triangle mesh uses flat lighting and
+  native SVG tooltips; `viz_isosurface` is now a live, WASM-backed gallery figure.
+
 ### Visualization: linked table and figure selection
 - `std.viz` emits deterministic `data-viz-index` markers for scatter points and table rows. A new
   `viz_linked_data` gallery program composes both views with `viz.grid`; the browser explorer links
