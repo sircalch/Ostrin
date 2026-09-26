@@ -568,6 +568,12 @@ button.button-quiet, button.button { cursor: pointer; } button.button-quiet { ba
 .viz-zoom { min-width: 3.5rem; text-align: center; color: var(--muted); font: .72rem var(--mono); }
 .viz-animation-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--night); }
 .viz-animation-tools[hidden] { display: none; }
+.viz-camera-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--night); }
+.viz-camera-tools[hidden] { display: none; }
+.viz-camera-control { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font: .72rem var(--mono); }
+.viz-camera-slider { width: 112px; accent-color: var(--violet); }
+.viz-camera-angle, .viz-camera-status { min-width: 3.5rem; color: var(--muted); font: .68rem var(--mono); }
+.viz-camera-status { flex: 1 1 190px; }
 .viz-animation-caption, .viz-animation-time { color: var(--muted); font: .72rem var(--mono); }
 .viz-animation-status { color: var(--muted); font: .68rem var(--mono); }
 .viz-animation-slider { flex: 1 1 180px; min-width: 120px; accent-color: var(--violet); }
