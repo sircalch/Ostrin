@@ -35,7 +35,7 @@ Figure / Scene3D (records)          ← API: figure(), scene3d(), métodos encad
 
 `Series` es la representación intermedia de la escena: `kind` (`line`, `scatter`, `area`, `band`,
 `errorbar`, `bar`, `hist`, `boxplot`, `stairs`, `hline`, `vline`, `heatmap`, `contour`, `surface`, `wire`,
-`line3`, `scatter3`), los arrays `xs`, `ys`, `zs`, `lo`, `hi`, `grid` y el estilo (`color`, `width`,
+`line3`, `scatter3`, `vector3`), los arrays `xs`, `ys`, `zs`, `lo`, `hi`, `grid` y el estilo (`color`, `width`,
 `dash`, `size`, `colormap`, `levels`). Como un `Array` de Ostrin no puede estar vacío, los campos que
 una marca no usa contienen un cero y solo se leen para los `kind` que los rellenan.
 
@@ -191,7 +191,7 @@ la falta de literales científicos (`1e-9`). Ver `CONTEXTO_PROYECTO.md` §270–
 
 | Versión | Contenido |
 |---|---|
-| 0.1 (hecho) | marcas 2D, heatmap/contornos, superficies/trayectorias/nubes 3D, layouts, unidades en ejes, SVG |
+| 0.1 (hecho) | marcas 2D, heatmap/contornos, superficies/trayectorias/nubes 3D, campos vectoriales muestreados, layouts, unidades en ejes, SVG |
 | 0.1 (hecho) | boxplots agrupados con cuartiles interpolados, mediana, bigotes, tooltips y leyenda |
 | 0.2 (parcial, hecho) | tooltips `<title>` con valores y resaltado CSS al pasar el ratón, dentro del SVG y sin scripts; visor web con zoom y desplazamiento en un iframe aislado |
 | 0.2 (resto) | selección enlazada y controles conducidos por Ostrin (requiere un backend con eventos) |
@@ -199,7 +199,8 @@ la falta de literales científicos (`1e-9`). Ver `CONTEXTO_PROYECTO.md` §270–
 | 0.3 (hecho) | movimiento continuo con SMIL: `animate`, `moving_point` con estela, `rod`, `moving_segment`, `morph`; `no_axes` |
 | 0.3 (parcial, hecho) | controles web de play/pausa/reinicio, posición temporal, velocidad, ciclos finitos y exportación WebM cuando el navegador ofrece `MediaRecorder` |
 | 0.3 (hecho) | tablas SVG reproducibles con filas alternadas, encabezados, tooltips por celda, tema oscuro y explorador web con filtro/ordenamiento (`viz.table`) |
-| 0.4 | volúmenes, isosuperficies, campos vectoriales, cortes; cámaras en perspectiva |
+| 0.4 (parcial, hecho) | campos vectoriales 3D muestreados con flechas, profundidad y tooltips |
+| 0.4 | volúmenes, isosuperficies, cortes; cámaras en perspectiva |
 | 0.5 | backend WebGPU sobre la misma lista de series; PNG/PDF |
 | — | figuras con procedencia (hash de fuente y datos, semilla, versión del compilador) |
 | — | gráficas con incertidumbre cuando exista `Measurement<T>` |

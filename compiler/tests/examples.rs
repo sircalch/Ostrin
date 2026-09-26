@@ -9087,6 +9087,18 @@ fn viz_3d_scenes_and_heatmaps_render_their_marks() {
 }
 
 #[test]
+fn viz_3d_vector_fields_render_depth_sorted_arrowheads() {
+    let out = interpreter_and_native_agree("viz_vector_field.ostrin");
+    assert_eq!(out.matches("class=\"vector3\"").count(), 25);
+    assert_eq!(out.matches("→").count(), 25);
+    assert_eq!(
+        out.matches("<polygon points=").count(),
+        28,
+        "three axis panels plus 25 arrowheads"
+    );
+}
+
+#[test]
 fn viz_boxplots_render_quartiles_whiskers_and_medians() {
     let out = interpreter_and_native_agree("viz_boxplot.ostrin");
     assert_eq!(out.matches("<rect class=\"boxplot\"").count(), 3);

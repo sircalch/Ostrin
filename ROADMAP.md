@@ -6,8 +6,9 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
 ## Siguiente ciclo
 
 1. Reducir el fallback AST con el trinquete por archivo de `--native-type-report` (baseline actual:
-   1.207 funciones IR, 584 HIR y 1.418 AST; el incremento acotado corresponde a las superficies
-   `std.viz.boxplot` y `std.viz.table`, que quedan como deuda explícita para la siguiente migración).
+   1.243 funciones IR, 608 HIR y 1.493 AST; el incremento acotado corresponde a las superficies
+   `std.viz.boxplot`, `std.viz.table` y `std.viz.vector_field`, que quedan como deuda explícita para
+   la siguiente migración).
 2. Completar ownership sobre agregados, escapes, valores `Phi`, errores y formas anidadas, con
    leak-check y sanitizers como evidencia.
 3. Añadir casos de compilación nativa y divergencia semántica al fuzzing de entradas válidas.

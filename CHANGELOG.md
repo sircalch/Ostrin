@@ -9,6 +9,11 @@
 - Playback can run once or for three or five loops, and WebM export repeats the selected number of
   loops. The timeline now follows playback and announces when a finite run completes.
 
+### Visualization: 3D vector fields
+- `Scene3D.vector_field(xs, ys, zs, us, vs, ws, color:, scale:)` renders sampled vectors as
+  depth-sorted SVG arrows with native `<title>` tooltips. The gallery adds a rotational-field
+  example computed entirely by Ostrin.
+
 ### Visualization: table explorer
 - `std.viz.table` marks its rows, columns and footer in the deterministic SVG it produces. The Viz
   explorer now filters rows and sorts numeric or textual columns in the browser while preserving
