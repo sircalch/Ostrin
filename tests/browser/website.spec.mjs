@@ -163,7 +163,7 @@ test("Cookbook renders every recipe with source and recorded output", async ({ p
 });
 
 test("Viz gallery shows recorded figures and reruns them with the real compiler", async ({ page }) => {
-  test.setTimeout(45_000);
+  test.setTimeout(60_000);
   const runtimeErrors = [];
   page.on("pageerror", (error) => runtimeErrors.push(error.message));
   await page.goto("./viz.html", { waitUntil: "domcontentloaded" });
@@ -242,6 +242,18 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   const vectorFrame = page.frameLocator(".viz-frame-live");
   await expect(vectorFrame.locator("g.vector3")).toHaveCount(25);
   await expect(vectorFrame.locator("g.vector3 line title").first()).toContainText("→");
+  const azimuth = page.locator("[data-viz-camera-azimuth]");
+  await expect(azimuth).toBeVisible();
+  const originalX = await vectorFrame.locator("g.vector3 line").first().getAttribute("x1");
+  await azimuth.evaluate((input) => {
+    input.value = "30";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await expect(page.locator(".viz-camera-status")).toContainText("Rendered by Ostrin · azimuth 30°", { timeout: 30_000 });
+  await expect(vectorFrame.locator("g.vector3")).toHaveCount(25);
+  await expect.poll(() => vectorFrame.locator("g.vector3 line").first().getAttribute("x1")).not.toBe(originalX);
+  await page.getByRole("button", { name: "Reset view" }).click();
+  await expect(page.locator(".viz-camera-status")).toContainText("azimuth -48°", { timeout: 30_000 });
   await page.getByRole("button", { name: "Close" }).click();
   expect(runtimeErrors).toEqual([]);
 });

@@ -167,6 +167,15 @@ ordenar columnas numéricas o textuales sin recalcular ni dibujar datos fuera de
 pie de tabla informa cuántas filas quedan visibles. La selección enlazada entre tabla y figura
 queda para una fase posterior porque requiere eventos y un contrato de datos compartido.
 
+## 4.4 Cámara 3D en el explorador web
+
+Las escenas 3D de la galería exponen controles de acimut y elevación en el explorador. Cada cambio
+reemplaza el `.view(azimuth, elevation)` del ejemplo y ejecuta de nuevo el programa con
+`ostrinc.wasm`; el SVG resultante se vuelve a mostrar en el iframe aislado y se guarda como la
+versión viva de la tarjeta. El botón de reinicio recupera los ángulos declarados por el código fuente.
+La interfaz anuncia el estado de renderizado y conserva el teclado y el modo de movimiento reducido.
+JavaScript coordina la interacción, mientras que Ostrin calcula la geometría y produce la figura.
+
 ## 5. Unidades
 
 `quantity_line(xs, ys)` acepta `List<Quantity<X>>` y `List<Quantity<Y>>`: toma los números en la
@@ -200,6 +209,7 @@ la falta de literales científicos (`1e-9`). Ver `CONTEXTO_PROYECTO.md` §270–
 | 0.3 (parcial, hecho) | controles web de play/pausa/reinicio, posición temporal, velocidad, ciclos finitos y exportación WebM cuando el navegador ofrece `MediaRecorder` |
 | 0.3 (hecho) | tablas SVG reproducibles con filas alternadas, encabezados, tooltips por celda, tema oscuro y explorador web con filtro/ordenamiento (`viz.table`) |
 | 0.4 (parcial, hecho) | campos vectoriales 3D muestreados con flechas, profundidad y tooltips |
+| 0.4 (parcial, hecho) | explorador web con acimut/elevación que vuelve a ejecutar `.view(...)` en WASM |
 | 0.4 | volúmenes, isosuperficies, cortes; cámaras en perspectiva |
 | 0.5 | backend WebGPU sobre la misma lista de series; PNG/PDF |
 | — | figuras con procedencia (hash de fuente y datos, semilla, versión del compilador) |

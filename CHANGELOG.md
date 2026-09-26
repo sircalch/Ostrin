@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Visualization: live 3D camera exploration
+- The Viz explorer now exposes azimuth and elevation sliders for every 3D gallery figure. Moving a
+  slider edits the example's `.view(...)` call and reruns that program through `ostrinc.wasm`; the
+  resulting SVG replaces the frame and the card records the live camera update. A reset button
+  restores the camera declared by the Ostrin source, with a status announcement for each render.
+
 ### Visualization: animation controls
 - The Viz explorer adds a 0.25×–4× speed control for CSS flip-book and SMIL motion animations.
   Motion SVGs now hide SMIL animation nodes under `prefers-reduced-motion: reduce`, and the

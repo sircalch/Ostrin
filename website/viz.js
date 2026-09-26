@@ -181,8 +181,26 @@ function explorer() {
     tableDirection,
     tableStatus,
   ]);
+  const cameraAzimuth = el("input", { type: "range", className: "viz-camera-slider", min: "-180", max: "180", step: "1", value: "-55", "aria-label": "3D camera azimuth", "data-viz-camera-azimuth": "" });
+  const cameraAzimuthLabel = el("output", { className: "viz-camera-angle", text: "-55°" });
+  const cameraElevation = el("input", { type: "range", className: "viz-camera-slider", min: "-80", max: "80", step: "1", value: "28", "aria-label": "3D camera elevation", "data-viz-camera-elevation": "" });
+  const cameraElevationLabel = el("output", { className: "viz-camera-angle", text: "28°" });
+  const cameraStatus = el("span", { className: "viz-camera-status", "aria-live": "polite", text: "" });
+  const cameraTools = el("div", { className: "viz-camera-tools", hidden: true }, [
+    el("span", { className: "viz-animation-caption", text: "3D camera" }),
+    el("label", { className: "viz-camera-control" }, [el("span", { text: "Azimuth" }), cameraAzimuth, cameraAzimuthLabel]),
+    el("label", { className: "viz-camera-control" }, [el("span", { text: "Elevation" }), cameraElevation, cameraElevationLabel]),
+    el("button", { type: "button", className: "button-quiet", text: "Reset view", "data-viz-camera-reset": "" }),
+    cameraStatus,
+  ]);
   let zoom = 100;
   let svg = "";
+  let cameraSource = "";
+  let onCameraSvg = null;
+  let cameraTimer = 0;
+  let cameraGeneration = 0;
+  let cameraRendering = false;
+  let cameraQueued = false;
   let animationDuration = 0;
   let animationPaused = false;
   let animationRate = 1;
@@ -197,6 +215,52 @@ function explorer() {
   const render = () => {
     zoomLabel.textContent = `${zoom}%`;
     frame.srcdoc = `<!doctype html><meta charset="utf-8"><style>html,body{margin:0;background:#fff}svg{display:block;width:${zoom}%;height:auto}</style>${svg}`;
+  };
+  const sourceWithCamera = (source, azimuth, elevation) => {
+    const view = `.view(${azimuth.toFixed(1)}, ${elevation.toFixed(1)})`;
+    if (/\.view\s*\([^)]*\)/.test(source)) return source.replace(/\.view\s*\([^)]*\)/, view);
+    return source.replace(/(viz\.scene3d\("(?:\\.|[^"\\])*"\))/, `$1${view}`);
+  };
+  const renderCamera = async (generation) => {
+    if (cameraRendering) { cameraQueued = true; return; }
+    cameraRendering = true;
+    const azimuth = cameraAzimuth.valueAsNumber;
+    const elevation = cameraElevation.valueAsNumber;
+    cameraStatus.textContent = "Rendering with Ostrin…";
+    try {
+      const { runOstrinc } = await runtime();
+      const source = sourceWithCamera(cameraSource, azimuth, elevation);
+      const result = await runOstrinc({ "main.ostrin": source }, ["--run", "main.ostrin"]);
+      const stdout = result.lines.filter(([kind]) => kind === "out").map(([, text]) => text);
+      const rendered = svgOf(stdout);
+      if (generation !== cameraGeneration) return;
+      if (result.code !== 0 || !rendered.svg) {
+        const errors = result.lines.filter(([kind]) => kind === "err").map(([, text]) => text);
+        cameraStatus.textContent = errors.join(" ") || `Ostrin exited with ${result.code}`;
+        return;
+      }
+      svg = rendered.svg;
+      render();
+      onCameraSvg?.(svg);
+      cameraStatus.textContent = `Rendered by Ostrin · azimuth ${azimuth}° · elevation ${elevation}°`;
+    } catch (error) {
+      cameraStatus.textContent = `Could not render: ${error.message ?? error}`;
+    } finally {
+      cameraRendering = false;
+      if (cameraQueued || generation !== cameraGeneration) {
+        cameraQueued = false;
+        clearTimeout(cameraTimer);
+        cameraTimer = setTimeout(() => renderCamera(cameraGeneration), 0);
+      }
+    }
+  };
+  const scheduleCameraRender = () => {
+    cameraGeneration += 1;
+    cameraAzimuthLabel.textContent = `${cameraAzimuth.value}°`;
+    cameraElevationLabel.textContent = `${cameraElevation.value}°`;
+    cameraStatus.textContent = "Camera changed · waiting to render…";
+    clearTimeout(cameraTimer);
+    cameraTimer = setTimeout(() => renderCamera(cameraGeneration), 180);
   };
   const animationDocument = () => frame.contentDocument;
   function stopAnimationClock() {
@@ -411,6 +475,7 @@ function explorer() {
         button("Close", "Close the explorer", () => node.close()),
       ]),
     ]),
+    cameraTools,
     animationTools,
     tableTools,
     el("p", { className: "sl-provenance", text: "Hover a point or bar for its values (the SVG's own <title> tooltips). Zoom rescales the vector figure; scroll to pan." }),
@@ -455,6 +520,14 @@ function explorer() {
     tableDirection.textContent = tableAscending ? "Ascending" : "Descending";
     applyTableState();
   });
+  cameraAzimuth.addEventListener("input", scheduleCameraRender);
+  cameraElevation.addEventListener("input", scheduleCameraRender);
+  cameraTools.querySelector("[data-viz-camera-reset]").addEventListener("click", () => {
+    const view = cameraSource.match(/\.view\s*\(\s*(-?(?:\d+\.?\d*|\.\d+))\s*,\s*(-?(?:\d+\.?\d*|\.\d+))\s*\)/);
+    cameraAzimuth.value = view ? String(Math.round(Number(view[1]))) : "-55";
+    cameraElevation.value = view ? String(Math.round(Number(view[2]))) : "28";
+    scheduleCameraRender();
+  });
   frame.addEventListener("load", () => {
     captureAnimationFrames();
     prepareAnimationDocument();
@@ -463,13 +536,29 @@ function explorer() {
     applyReducedMotion();
     if (!animationPaused) startAnimationClock();
   });
-  node.addEventListener("close", stopAnimationClock);
+  node.addEventListener("close", () => {
+    stopAnimationClock();
+    clearTimeout(cameraTimer);
+    cameraGeneration += 1;
+    cameraQueued = false;
+  });
   document.body.append(node);
   dialog = {
-    open(title, text) {
+    open(title, text, camera = null) {
       heading.textContent = title;
       svg = text;
       zoom = 100;
+      cameraSource = camera?.source ?? "";
+      onCameraSvg = camera?.onSvg ?? null;
+      cameraTools.hidden = !cameraSource;
+      clearTimeout(cameraTimer);
+      cameraQueued = false;
+      const view = cameraSource.match(/\.view\s*\(\s*(-?(?:\d+\.?\d*|\.\d+))\s*,\s*(-?(?:\d+\.?\d*|\.\d+))\s*\)/);
+      cameraAzimuth.value = view ? String(Math.max(-180, Math.min(180, Math.round(Number(view[1]))))) : "-55";
+      cameraElevation.value = view ? String(Math.max(-80, Math.min(80, Math.round(Number(view[2]))))) : "28";
+      cameraAzimuthLabel.textContent = `${cameraAzimuth.value}°`;
+      cameraElevationLabel.textContent = `${cameraElevation.value}°`;
+      cameraStatus.textContent = cameraSource ? "Adjust the camera; Ostrin will recompute the SVG." : "";
       tableTools.hidden = true;
       prepareAnimation();
       render();
@@ -489,7 +578,16 @@ function card(figure) {
   const explore = el("button", { type: "button", className: "button-quiet", "data-viz-explore": figure.id, text: "Explore" });
   explore.addEventListener("click", async () => {
     const text = liveSvg ?? await fetch(figure.svg).then((response) => response.text());
-    explorer().open(figure.title, text);
+    const is3d = figure.code.includes("viz.scene3d(");
+    explorer().open(figure.title, text, is3d ? {
+      source: figure.code,
+      onSvg(nextSvg) {
+        liveSvg = nextSvg;
+        image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(nextSvg)}`;
+        provenance.textContent = `Camera updated live in your browser by ostrinc.wasm ${LAB.compiler}.`;
+        provenance.dataset.state = "live";
+      },
+    } : null);
   });
   const code = el("details", { className: "viz-code" }, [
     el("summary", { text: `Source · ${figure.source}` }),
