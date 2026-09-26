@@ -9107,6 +9107,17 @@ fn viz_3d_volume_slices_render_depth_sorted_cells() {
 }
 
 #[test]
+fn viz_3d_isosurfaces_render_mesh_triangles() {
+    let out = interpreter_and_native_agree("viz_isosurface.ostrin");
+    assert!(out.matches("class=\"isosurface-cell\"").count() > 1000);
+    assert!(out.contains("isosurface level 0.42"));
+    assert!(
+        out.matches("<polygon").count() > 1000,
+        "isosurface mesh missing"
+    );
+}
+
+#[test]
 fn viz_boxplots_render_quartiles_whiskers_and_medians() {
     let out = interpreter_and_native_agree("viz_boxplot.ostrin");
     assert_eq!(out.matches("<rect class=\"boxplot\"").count(), 3);

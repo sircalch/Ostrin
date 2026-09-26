@@ -1,0 +1,24 @@
+import std.viz
+
+fn main() -> Void {
+    axes = linspace(-1.6, 1.6, 17)
+    volume = zeros([17, 17, 17])
+    for k in 0 until 17 {
+        for j in 0 until 17 {
+            for i in 0 until 17 {
+                x = axes[i]
+                y = axes[j]
+                z = axes[k]
+                radius = sqrt(x * x + y * y + z * z)
+                shell = exp(0.0 - (radius - 0.85) * (radius - 0.85) * 14.0)
+                volume.set(k, j, i, shell)
+            }
+        }
+    }
+    scene = viz.scene3d("Scalar isosurface")
+        .describe("Marching tetrahedra over a 3D Float volume")
+        .labels("x", "y", "z")
+        .view(-52.0, 24.0)
+        .isosurface(axes, axes, axes, volume, 0.42, "magma", "shell density")
+    print(scene.svg())
+}

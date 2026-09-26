@@ -5,8 +5,8 @@
 // program draws the same bytes in the interpreter, the native backend and the
 // browser (WASM). Marks: line, scatter, area, band, error bars, bars,
 // histogram, boxplot, stairs, reference lines, text, heatmap, contour, and in 3D
-// surface, wireframe, trajectory, point cloud, vector fields and orthogonal volume
-// slices. Axes use "nice" 1-2-5
+// surface, wireframe, trajectory, point cloud, vector fields, volume slices and
+// isosurfaces. Axes use "nice" 1-2-5
 // ticks; quantity series label their axes with the unit they carry.
 
 pub record Theme {
@@ -1368,6 +1368,46 @@ pub fn slice_yz(volume: Array<Float>, x_index: Int) -> Array<Float> {
     plane
 }
 
+record Point3 {
+    x: Float
+    y: Float
+    z: Float
+    value: Float
+}
+
+fn iso_intersection(a: Point3, b: Point3, level: Float) -> Point3 {
+    span = b.value - a.value
+    t = if span == 0.0 { 0.5 } else { (level - a.value) / span }
+    Point3 {
+        x: a.x + (b.x - a.x) * t,
+        y: a.y + (b.y - a.y) * t,
+        z: a.z + (b.z - a.z) * t,
+        value: level
+    }
+}
+
+/// Polygonize one tetrahedron. Marching tetrahedra avoids a lookup table while
+/// keeping the output deterministic; three crossings make one triangle and
+/// four crossings are split into two triangles.
+fn tetra_isoline(tetra: List<Point3>, level: Float) -> List<Point3> {
+    mut hits: List<Point3> = []
+    edges = [[0, 1], [0, 2], [0, 3], [1, 2], [1, 3], [2, 3]]
+    for edge in edges {
+        a = tetra[edge[0]]
+        b = tetra[edge[1]]
+        if (a.value < level) != (b.value < level) {
+            hits.push(iso_intersection(a, b, level))
+        }
+    }
+    if hits.length() == 3 {
+        return hits
+    }
+    if hits.length() == 4 {
+        return [hits[0], hits[1], hits[2], hits[0], hits[2], hits[3]]
+    }
+    []
+}
+
 impl Scene3D {
     fn labels(mut self, x: String, y: String, z: String) -> Scene3D {
         self.xlabel = x
@@ -1403,6 +1443,50 @@ impl Scene3D {
         s = series("surface", xs, ys, "", "")
         self.colorbar = label
         self.series.push(Series { kind: s.kind, xs: xs, ys: ys, zs: s.zs, lo: s.lo, hi: s.hi, grid: z, label: label, color: "", width: s.width, dash: "", size: s.size, colormap: colormap, levels: 0 })
+        self
+    }
+
+    /// Add a scalar isosurface from a volume shaped [z, y, x]. The surface
+    /// uses deterministic marching tetrahedra and stores three vertices per
+    /// triangle in the scene's mesh3 series.
+    fn isosurface(mut self, xs: Array<Float>, ys: Array<Float>, zs: Array<Float>, volume: Array<Float>, level: Float, colormap: String = "viridis", label: String = "") -> Scene3D {
+        shape = volume.shape()
+        mut vx: List<Float> = []
+        mut vy: List<Float> = []
+        mut vz: List<Float> = []
+        for k in 0 until shape[0] - 1 {
+            for j in 0 until shape[1] - 1 {
+                for i in 0 until shape[2] - 1 {
+                    x0 = xs[i]
+                    x1 = xs[i + 1]
+                    y0 = ys[j]
+                    y1 = ys[j + 1]
+                    z0 = zs[k]
+                    z1 = zs[k + 1]
+                    p0 = Point3 { x: x0, y: y0, z: z0, value: volume.get(k, j, i) }
+                    p1 = Point3 { x: x1, y: y0, z: z0, value: volume.get(k, j, i + 1) }
+                    p2 = Point3 { x: x1, y: y1, z: z0, value: volume.get(k, j + 1, i + 1) }
+                    p3 = Point3 { x: x0, y: y1, z: z0, value: volume.get(k, j + 1, i) }
+                    p4 = Point3 { x: x0, y: y0, z: z1, value: volume.get(k + 1, j, i) }
+                    p5 = Point3 { x: x1, y: y0, z: z1, value: volume.get(k + 1, j, i + 1) }
+                    p6 = Point3 { x: x1, y: y1, z: z1, value: volume.get(k + 1, j + 1, i + 1) }
+                    p7 = Point3 { x: x0, y: y1, z: z1, value: volume.get(k + 1, j + 1, i) }
+                    tetrahedra = [
+                        [p0, p5, p1, p6], [p0, p5, p6, p4], [p0, p2, p6, p1],
+                        [p0, p2, p3, p6], [p0, p7, p3, p6], [p0, p4, p7, p6]
+                    ]
+                    for tetra in tetrahedra {
+                        triangles = tetra_isoline(tetra, level)
+                        for point in triangles {
+                            vx.push(point.x)
+                            vy.push(point.y)
+                            vz.push(point.z)
+                        }
+                    }
+                }
+            }
+        }
+        self.series.push(Series { kind: "mesh3", xs: array(vx), ys: array(vy), zs: array(vz), lo: empty(), hi: empty(), grid: empty(), label: label, color: "", width: 0.45, dash: "", size: level, colormap: colormap, levels: 0 })
         self
     }
 
@@ -1672,6 +1756,8 @@ fn render3d(scene: Scene3D) -> String {
     for s in scene.series {
         if s.kind == "slice_xy" or s.kind == "slice_xz" or s.kind == "slice_yz" {
             out.push(draw_slice(cam, s, theme, scalar0, scalar1))
+        } else if s.kind == "mesh3" {
+            out.push(draw_mesh3(cam, s, theme))
         } else if s.kind == "surface" or s.kind == "wire" {
             out.push(draw_surface(cam, s, theme))
         } else if s.kind == "line3" {
@@ -1867,6 +1953,34 @@ fn draw_slice(cam: Camera, s: Series, theme: Theme, scalar0: Float, scalar1: Flo
         }
         parts.push("<polygon class=\"slice-cell\"" + attr("points", points) + attr("fill", fill) + attr("stroke", theme.background) +
             attr("stroke-width", "0.35") + ">" + tip("value " + short(value)) + "</polygon>")
+    }
+    "<g" + attr("stroke-linejoin", "round") + ">" + parts.join("") + "</g>"
+}
+
+/// Draw an isosurface mesh whose vertices are stored three at a time. The
+/// painter sort is stable, and face lighting keeps the CPU/SVG fallback legible.
+fn draw_mesh3(cam: Camera, s: Series, theme: Theme) -> String {
+    count = s.xs.length() / 3
+    mut keys: List<Float> = []
+    for i in 0 until count {
+        a = i * 3
+        b = a + 1
+        c = a + 2
+        keys.push(depth(cam, (s.xs[a] + s.xs[b] + s.xs[c]) / 3.0, (s.ys[a] + s.ys[b] + s.ys[c]) / 3.0, (s.zs[a] + s.zs[b] + s.zs[c]) / 3.0))
+    }
+    denominator = if count > 1 { count - 1 } else { 1 }
+    mut parts: List<String> = []
+    for q in argsort(array(keys)) {
+        a = q * 3
+        b = a + 1
+        c = a + 2
+        light = shade(norm(s.xs[a], cam.x0, cam.x1), norm(s.ys[a], cam.y0, cam.y1), norm(s.zs[a], cam.z0, cam.z1) * 0.8,
+            norm(s.xs[b], cam.x0, cam.x1), norm(s.ys[b], cam.y0, cam.y1), norm(s.zs[b], cam.z0, cam.z1) * 0.8,
+            norm(s.xs[c], cam.x0, cam.x1), norm(s.ys[c], cam.y0, cam.y1), norm(s.zs[c], cam.z0, cam.z1) * 0.8)
+        fill = colormap(s.colormap, (q as Float) / (denominator as Float), light)
+        points = pt(cam, s.xs[a], s.ys[a], s.zs[a]) + " " + pt(cam, s.xs[b], s.ys[b], s.zs[b]) + " " + pt(cam, s.xs[c], s.ys[c], s.zs[c])
+        parts.push("<polygon class=\"isosurface-cell\"" + attr("points", points) + attr("fill", fill) + attr("stroke", theme.background) +
+            attr("stroke-width", num(s.width)) + ">" + tip("isosurface level " + short(s.size)) + "</polygon>")
     }
     "<g" + attr("stroke-linejoin", "round") + ">" + parts.join("") + "</g>"
 }

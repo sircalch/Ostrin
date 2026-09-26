@@ -446,7 +446,9 @@ fn native_backend_types_agree_with_the_checker() {
     // SVG string construction move into the IR ownership model.
     // Volume slices add 228 measured fallbacks: 3D cell geometry, volume extraction
     // and scalar colorbar strings are new std.viz paths awaiting the same migration.
-    const MAX_AST_FALLBACK_FUNCTIONS: usize = 1774;
+    // Isosurfaces add 112 more: marching tetrahedra and mesh SVG strings remain on
+    // the AST path until aggregate-heavy visualization code moves into IR.
+    const MAX_AST_FALLBACK_FUNCTIONS: usize = 1886;
     assert!(
         ast_fallback <= MAX_AST_FALLBACK_FUNCTIONS,
         "AST fallback grew to {ast_fallback} functions (ratchet limit {MAX_AST_FALLBACK_FUNCTIONS})"
