@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Visualization: kernel-density violins
+- `Figure.violin(position, data, bins:, label:, color:)` computes a deterministic Gaussian KDE in
+  Ostrin, renders a mirrored distribution shape with a median marker and adds per-figure tooltips.
+  `viz_violin.ostrin` is recorded in the browser gallery and checked in interpreter/native parity.
+
 ### Visualization: SVG and PNG publication export
 - The Viz explorer can download the exact SVG emitted by Ostrin and rasterize the current figure (or
   selected animation frame) to a 2× PNG through the browser canvas. Export status is announced to

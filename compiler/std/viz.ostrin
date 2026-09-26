@@ -4,7 +4,7 @@
 // of Series) and rendered to standalone SVG by Ostrin itself, so the same
 // program draws the same bytes in the interpreter, the native backend and the
 // browser (WASM). Marks: line, scatter, area, band, error bars, bars,
-// histogram, boxplot, stairs, reference lines, text, heatmap, contour, and in 3D
+// histogram, boxplot, violin, stairs, reference lines, text, heatmap, contour, and in 3D
 // surface, wireframe, trajectory, point cloud, vector fields, volume slices and
 // isosurfaces. Axes use "nice" 1-2-5
 // ticks; quantity series label their axes with the unit they carry.
@@ -195,7 +195,7 @@ fn header(width: Int, height: Int, theme: Theme) -> String {
         // Interaction without scripts: hovering highlights a mark and its
         // <title> shows the values, wherever the SVG is opened.
         "<style>.pt:hover{stroke:" + theme.text + ";stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}" +
-        ".series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>\n" +
+        ".series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover{fill-opacity:0.42}</style>\n" +
         "<rect" + attr("width", px(width)) + attr("height", px(height)) + attr("fill", theme.background) + "/>\n"
 }
 
@@ -502,6 +502,44 @@ impl Figure {
         self.add(Series { kind: s.kind, xs: s.xs, ys: s.ys, zs: s.zs, lo: array([q1]), hi: array([q3]), grid: array([minimum, q1, median, q3, maximum]), label: s.label, color: s.color, width: 1.5, dash: "", size: s.size, colormap: s.colormap, levels: 0 })
     }
 
+    /// Kernel-density violin for one group. `bins` controls the vertical
+    /// resolution; the deterministic Gaussian KDE is computed in Ostrin.
+    /// Call once per group at a distinct x position to build a violin plot.
+    fn violin(mut self, position: Float, data: Array<Float>, bins: Int = 40, label: String = "", color: String = "") -> Figure {
+        count = data.length()
+        minimum = data.min()
+        maximum = data.max()
+        span = if maximum > minimum { maximum - minimum } else { 1.0 }
+        steps = if bins < 8 { 8 } else { bins }
+        spacing = span / ((steps - 1) as Float)
+        sigma = data.std()
+        fallback = span / 6.0
+        mut bandwidth = 1.06 * (if sigma > 0.0 { sigma } else { fallback }) * pow(count as Float, -0.2)
+        bandwidth = if bandwidth > spacing { bandwidth } else { spacing }
+        mut values: List<Float> = []
+        mut density: List<Float> = []
+        mut peak = 0.0
+        for k in 0 until steps {
+            y = minimum + spacing * (k as Float)
+            mut total = 0.0
+            for i in 0 until count {
+                sample = data[i]
+                u = (y - sample) / bandwidth
+                total = total + exp(-0.5 * u * u)
+            }
+            d = total / ((count as Float) * bandwidth * sqrt(2.0 * pi()))
+            values.push(y)
+            density.push(d)
+            peak = if d > peak { d } else { peak }
+        }
+        mut widths: List<Float> = []
+        for d in density {
+            widths.push(if peak > 0.0 { d / peak } else { 0.0 })
+        }
+        s = series("violin", array(values), array(widths), label, color)
+        self.add(Series { kind: s.kind, xs: s.xs, ys: s.ys, zs: s.zs, lo: array([position]), hi: array([minimum, maximum, data.percentile(50.0)]), grid: s.grid, label: s.label, color: s.color, width: 0.42, dash: "", size: s.size, colormap: s.colormap, levels: 0 })
+    }
+
     fn hline(mut self, y: Float, label: String = "", color: String = "") -> Figure {
         self.add(series("hline", array([0.0]), array([y]), label, color))
     }
@@ -605,6 +643,7 @@ fn render(fig: Figure) -> String {
     mut ys_hi = -1000000000000000.0
     mut zlo = 1000000000000000.0
     mut zhi = -1000000000000000.0
+    mut violin_centers: List<Float> = []
     mut heat_map = "viridis"
     for s in fig.series {
         if is_motion(s.kind) {
@@ -633,6 +672,10 @@ fn render(fig: Figure) -> String {
             xs_hi = max_of(xs_hi, s.xs.max() + half)
             ys_lo = min_of(ys_lo, s.grid[0])
             ys_hi = max_of(ys_hi, s.grid[4])
+        } else if s.kind == "violin" {
+            violin_centers.push(s.lo[0])
+            ys_lo = min_of(ys_lo, s.xs.min())
+            ys_hi = max_of(ys_hi, s.xs.max())
         } else if s.xs.length() > 0 {
             half = if s.kind == "hist" { s.width / 2.0 } else if s.kind == "bar" { min_gap(s.xs) / 2.0 } else { 0.0 }
             xs_lo = if s.xs.min() - half < xs_lo { s.xs.min() - half } else { xs_lo }
@@ -652,6 +695,13 @@ fn render(fig: Figure) -> String {
         }
         if s.kind == "bar" or s.kind == "hist" or s.kind == "area" {
             has_bars = true
+        }
+    }
+    violin_gap = center_gap(violin_centers)
+    if violin_centers.length() > 0 {
+        for center in violin_centers {
+            xs_lo = min_of(xs_lo, center - violin_gap * 0.5)
+            xs_hi = max_of(xs_hi, center + violin_gap * 0.5)
         }
     }
     if xs_lo > xs_hi {
@@ -745,7 +795,7 @@ fn render(fig: Figure) -> String {
         if is_motion(s.kind) {
             out.push(draw_motion(s, color, fig.duration, left, bottom, x0, y0, sx, sy, theme))
         } else {
-            out.push(draw_series(s, color, left, bottom, x0, y0, sx, sy, zlo, zhi, theme, top, right))
+            out.push(draw_series(s, color, left, bottom, x0, y0, sx, sy, zlo, zhi, theme, top, right, violin_gap))
         }
     }
     for n in fig.notes {
@@ -791,6 +841,22 @@ fn min_gap(xs: Array<Float>) -> Float {
     gap
 }
 
+fn center_gap(centers: List<Float>) -> Float {
+    if centers.length() < 2 {
+        return 1.0
+    }
+    mut gap = 1000000000000000.0
+    for i in 0 until centers.length() {
+        for j in i + 1 until centers.length() {
+            d = abs(centers[i] - centers[j])
+            if d > 0.0 and d < gap {
+                gap = d
+            }
+        }
+    }
+    if gap < 1000000000000000.0 { gap } else { 1.0 }
+}
+
 fn path_of(xs: Array<Float>, ys: Array<Float>, left: Float, bottom: Float, x0: Float, y0: Float, sx: Float, sy: Float) -> String {
     mut parts: List<String> = []
     for i in 0 until xs.length() {
@@ -799,7 +865,7 @@ fn path_of(xs: Array<Float>, ys: Array<Float>, left: Float, bottom: Float, x0: F
     parts.join(" ")
 }
 
-fn draw_series(s: Series, color: String, left: Float, bottom: Float, x0: Float, y0: Float, sx: Float, sy: Float, zlo: Float, zhi: Float, theme: Theme, top: Float, right: Float) -> String {
+fn draw_series(s: Series, color: String, left: Float, bottom: Float, x0: Float, y0: Float, sx: Float, sy: Float, zlo: Float, zhi: Float, theme: Theme, top: Float, right: Float, violin_gap: Float) -> String {
     kind = s.kind
     if kind == "line" {
         dash = if s.dash != "" { attr("stroke-dasharray", s.dash) } else { "" }
@@ -862,6 +928,27 @@ fn draw_series(s: Series, color: String, left: Float, bottom: Float, x0: Float, 
         }
         edge = if kind == "hist" { attr("stroke", theme.background) + attr("stroke-width", "1") } else { "" }
         "<g" + attr("fill", color) + attr("fill-opacity", "0.85") + edge + ">" + parts.join("") + "</g>"
+    } else if kind == "violin" {
+        center = left + (s.lo[0] - x0) * sx
+        half = violin_gap * s.width * sx
+        n = s.xs.length()
+        mut parts: List<String> = []
+        for i in 0 until n {
+            y = bottom - (s.xs[i] - y0) * sy
+            dx = s.ys[i] * half
+            parts.push((if i == 0 { "M" } else { "L" }) + num(center - dx) + " " + num(y))
+        }
+        mut j = n - 1
+        while j >= 0 {
+            y = bottom - (s.xs[j] - y0) * sy
+            dx = s.ys[j] * half
+            parts.push("L" + num(center + dx) + " " + num(y))
+            j = j - 1
+        }
+        path = "<path class=\"violin\"" + attr("d", parts.join(" ") + " Z") + attr("fill", color) + attr("fill-opacity", "0.28") + attr("stroke", color) + attr("stroke-width", "1.5") + ">" +
+            tip(named(s.label) + "median " + short(s.hi[2])) + "</path>"
+        median_y = bottom - (s.hi[2] - y0) * sy
+        path + seg(center - half * 0.18, median_y, center + half * 0.18, median_y, color, 2.2, "")
     } else if kind == "boxplot" {
         x = left + (s.xs[0] - x0) * sx
         q1y = bottom - (s.lo[0] - y0) * sy
@@ -1048,7 +1135,7 @@ fn legend(fig: Figure, left: Float, right: Float, top: Float, bottom: Float, x0:
             out = out + "<circle" + attr("cx", num(x + 15.0)) + attr("cy", num(cy)) + attr("r", "4") + attr("fill", colors[i]) + "/>"
         } else if k == "bar" or k == "hist" or k == "band" or k == "area" {
             out = out + "<rect" + attr("x", num(x + 8.0)) + attr("y", num(cy - 5.0)) + attr("width", "14") + attr("height", "10") + attr("fill", colors[i]) + attr("fill-opacity", "0.7") + "/>"
-        } else if k == "boxplot" {
+        } else if k == "boxplot" or k == "violin" {
             out = out + "<rect" + attr("x", num(x + 8.0)) + attr("y", num(cy - 5.0)) + attr("width", "14") + attr("height", "10") + attr("fill", colors[i]) + attr("fill-opacity", "0.25") + attr("stroke", colors[i]) + "/>"
             out = out + seg(x + 8.0, cy, x + 22.0, cy, colors[i], 2.0, "")
         } else {
