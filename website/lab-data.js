@@ -39,7 +39,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
         "label": "std.viz source",
         "href": "https://github.com/sircalch/Ostrin/blob/main/compiler/std/viz.ostrin"
       },
-      "limits": "std.viz renders SVG: hover tooltips and looping animations (viz.animate) work without scripts; linked selection and sliders driven by Ostrin are planned, and PNG/PDF export needs a raster backend.",
+      "limits": "std.viz renders SVG: hover tooltips and looping animations (viz.animate) work without scripts; linked selection is available in the Viz explorer, while sliders driven by Ostrin and PDF export remain planned. The explorer can download SVG and rasterize the current frame to PNG.",
       "files": {
         "main.ostrin": "// Scientific Lab · Plot\n// A damped oscillator computed with arrays and drawn as SVG by std.viz.\nimport std.viz\n\nfn main() -> Void {\n    damping = 0.25\n    frequency = 2.0\n    t = linspace(0.0, 10.0, 240)\n    envelope = exp(t * (0.0 - damping))\n    x = envelope * cos(t * frequency)\n    print(\"samples: \" + t.length().to_string() + \", min x = \" + viz.num(x.min()))\n    fig = viz.figure(\"x(t) = exp(-\" + damping.to_string() + \" t) cos(\" + frequency.to_string() + \" t)\")\n        .labels(\"time t\", \"displacement x\")\n        .band(t, envelope * -1.0, envelope, label: \"envelope\")\n        .line(t, x, label: \"x(t)\")\n    print(fig.svg())\n}\n"
       },
