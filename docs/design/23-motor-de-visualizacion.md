@@ -35,7 +35,7 @@ Figure / Scene3D (records)          ← API: figure(), scene3d(), métodos encad
 
 `Series` es la representación intermedia de la escena: `kind` (`line`, `scatter`, `area`, `band`,
 `errorbar`, `bar`, `hist`, `boxplot`, `stairs`, `hline`, `vline`, `heatmap`, `contour`, `surface`, `wire`,
-`line3`, `scatter3`, `vector3`), los arrays `xs`, `ys`, `zs`, `lo`, `hi`, `grid` y el estilo (`color`, `width`,
+`line3`, `scatter3`, `vector3`, `slice_xy`, `slice_xz`, `slice_yz`), los arrays `xs`, `ys`, `zs`, `lo`, `hi`, `grid` y el estilo (`color`, `width`,
 `dash`, `size`, `colormap`, `levels`). Como un `Array` de Ostrin no puede estar vacío, los campos que
 una marca no usa contienen un cero y solo se leen para los `kind` que los rellenan.
 
@@ -124,7 +124,17 @@ Coste: el tamaño crece linealmente con los fotogramas (24 fotogramas 2D ≈ 270
 puede descargar el SVG completo y rasterizar el instante actual a PNG 2× (también un fotograma elegido
 con la línea temporal); MP4/GIF, calidad configurable y PDF siguen pendientes.
 
-## 4.2 Movimiento continuo
+## 4.2 Cortes ortogonales de volúmenes
+
+Los volúmenes científicos se almacenan como `Array<Float>` de rango 3 con forma `[z, y, x]`.
+`viz.slice_xy(volume, z)`, `viz.slice_xz(volume, y)` y `viz.slice_yz(volume, x)` extraen una
+lámina 2D y recortan el índice a los límites del volumen. Los métodos encadenables
+`Scene3D.slice_xy`, `.slice_xz` y `.slice_yz` colocan esas celdas en la escena 3D, las ordenan
+con el algoritmo del pintor que usan las superficies, colorean por valor con una barra de escala
+y añaden un tooltip SVG por celda. La ruta actual es un render CPU/SVG determinista; el volumen
+completo y las isosuperficies quedan para el backend WebGPU.
+
+## 4.3 Movimiento continuo
 
 `fig.animate(segundos)` convierte una figura en animación. Las marcas de movimiento guardan una
 posición por paso de tiempo, todas calculadas por el programa, y el SVG las interpola con SMIL
@@ -154,7 +164,7 @@ valores iniciales; el explorador además pausa la copia del documento y anuncia 
 Límite conocido: en Chromium cada `<svg>` anidado (paneles de `viz.grid`) tiene su propio reloj, que
 arranca con la carga, así que los paneles quedan sincronizados en la reproducción normal.
 
-## 4.3 Tablas reproducibles
+## 4.4 Tablas reproducibles
 
 `viz.table(headers, rows, title:)` convierte encabezados y filas de texto preparados por el programa
 en un SVG determinista. El renderer calcula anchos de columna a partir del contenido, limita el
@@ -169,7 +179,7 @@ pie de tabla informa cuántas filas quedan visibles. Las figuras compuestas con 
 enlazar puntos y filas mediante el marcador determinista `data-viz-index`; el explorador instala
 selección por clic y teclado y resalta ambas vistas dentro del iframe aislado.
 
-## 4.4 Cámara 3D en el explorador web
+## 4.5 Cámara 3D en el explorador web
 
 Las escenas 3D de la galería exponen controles de acimut y elevación en el explorador. Cada cambio
 reemplaza el `.view(azimuth, elevation)` del ejemplo y ejecuta de nuevo el programa con
@@ -178,7 +188,7 @@ versión viva de la tarjeta. El botón de reinicio recupera los ángulos declara
 La interfaz anuncia el estado de renderizado y conserva el teclado y el modo de movimiento reducido.
 JavaScript coordina la interacción, mientras que Ostrin calcula la geometría y produce la figura.
 
-## 4.5 Exportación desde el explorador
+## 4.6 Exportación desde el explorador
 
 El explorador conserva dos rutas de publicación para cada figura:
 
@@ -227,7 +237,8 @@ la falta de literales científicos (`1e-9`). Ver `CONTEXTO_PROYECTO.md` §270–
 | 0.3 (hecho) | tablas SVG reproducibles con filas alternadas, encabezados, tooltips por celda, tema oscuro y explorador web con filtro/ordenamiento (`viz.table`) |
 | 0.4 (parcial, hecho) | campos vectoriales 3D muestreados con flechas, profundidad y tooltips |
 | 0.4 (parcial, hecho) | explorador web con acimut/elevación que vuelve a ejecutar `.view(...)` en WASM |
-| 0.4 | volúmenes, isosuperficies, cortes; cámaras en perspectiva |
+| 0.4 (parcial, hecho) | cortes XY/XZ/YZ de `Array<Float>` 3D, celdas coloreadas, tooltips y barra de escala; cámaras ortográficas interactivas |
+| 0.4 | render de volúmenes completos, isosuperficies y cámaras en perspectiva |
 | 0.5 | backend WebGPU sobre la misma lista de series; PDF con tamaño de página y metadatos |
 | — | figuras con procedencia (hash de fuente y datos, semilla, versión del compilador) |
 | — | gráficas con incertidumbre cuando exista `Measurement<T>` |

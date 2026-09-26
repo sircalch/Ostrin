@@ -9099,6 +9099,14 @@ fn viz_3d_vector_fields_render_depth_sorted_arrowheads() {
 }
 
 #[test]
+fn viz_3d_volume_slices_render_depth_sorted_cells() {
+    let out = interpreter_and_native_agree("viz_volume_slices.ostrin");
+    assert_eq!(out.matches("class=\"slice-cell\"").count(), 3 * 16 * 16);
+    assert!(out.matches("<title>").count() >= 3 * 16 * 16);
+    assert!(out.contains("linearGradient"), "volume colorbar missing");
+}
+
+#[test]
 fn viz_boxplots_render_quartiles_whiskers_and_medians() {
     let out = interpreter_and_native_agree("viz_boxplot.ostrin");
     assert_eq!(out.matches("<rect class=\"boxplot\"").count(), 3);

@@ -28,8 +28,9 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
 6. **Continuar el frente profesional de visualización y web**: ampliar `std.viz` con
    gráficas estadísticas y consolidar la selección enlazada, mantener tablas reproducibles con filtro y
    ordenamiento en el explorador, conservar ejemplos verificables en la galería, consolidar la
-   exportación SVG/PNG/WebM y añadir exportación MP4/GIF/PDF, exploración 3D, WebGPU y procedencia de
-   figuras con evidencia en intérprete, nativo y WASM.
+   exportación SVG/PNG/WebM y añadir exportación MP4/GIF/PDF, exploración 3D (ya incluye superficies,
+   campos vectoriales, cámara y cortes ortogonales de volúmenes), WebGPU y procedencia de figuras con
+   evidencia en intérprete, nativo y WASM.
 
 ## Horizonte posterior
 

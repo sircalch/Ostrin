@@ -5,7 +5,8 @@
 // program draws the same bytes in the interpreter, the native backend and the
 // browser (WASM). Marks: line, scatter, area, band, error bars, bars,
 // histogram, boxplot, stairs, reference lines, text, heatmap, contour, and in 3D
-// surface, wireframe, trajectory, point cloud and vector fields. Axes use "nice" 1-2-5
+// surface, wireframe, trajectory, point cloud, vector fields and orthogonal volume
+// slices. Axes use "nice" 1-2-5
 // ticks; quantity series label their axes with the unit they carry.
 
 pub record Theme {
@@ -1320,6 +1321,53 @@ pub fn grid_of(xs: Array<Float>, ys: Array<Float>, f: fn(Float, Float) -> Float)
     z
 }
 
+/// Clamp a volume coordinate to its nearest valid index.
+fn clamp_index(index: Int, limit: Int) -> Int {
+    if limit <= 0 { return 0 }
+    if index < 0 { return 0 }
+    if index >= limit { return limit - 1 }
+    index
+}
+
+/// Extract an XY plane from a volume shaped [z, y, x].
+pub fn slice_xy(volume: Array<Float>, z_index: Int) -> Array<Float> {
+    shape = volume.shape()
+    z = clamp_index(z_index, shape[0])
+    mut plane = zeros([shape[1], shape[2]])
+    for y in 0 until shape[1] {
+        for x in 0 until shape[2] {
+            plane.set(y, x, volume.get(z, y, x))
+        }
+    }
+    plane
+}
+
+/// Extract an XZ plane from a volume shaped [z, y, x].
+pub fn slice_xz(volume: Array<Float>, y_index: Int) -> Array<Float> {
+    shape = volume.shape()
+    y = clamp_index(y_index, shape[1])
+    mut plane = zeros([shape[0], shape[2]])
+    for z in 0 until shape[0] {
+        for x in 0 until shape[2] {
+            plane.set(z, x, volume.get(z, y, x))
+        }
+    }
+    plane
+}
+
+/// Extract a YZ plane from a volume shaped [z, y, x].
+pub fn slice_yz(volume: Array<Float>, x_index: Int) -> Array<Float> {
+    shape = volume.shape()
+    x = clamp_index(x_index, shape[2])
+    mut plane = zeros([shape[0], shape[1]])
+    for z in 0 until shape[0] {
+        for y in 0 until shape[1] {
+            plane.set(z, y, volume.get(z, y, x))
+        }
+    }
+    plane
+}
+
 impl Scene3D {
     fn labels(mut self, x: String, y: String, z: String) -> Scene3D {
         self.xlabel = x
@@ -1355,6 +1403,27 @@ impl Scene3D {
         s = series("surface", xs, ys, "", "")
         self.colorbar = label
         self.series.push(Series { kind: s.kind, xs: xs, ys: ys, zs: s.zs, lo: s.lo, hi: s.hi, grid: z, label: label, color: "", width: s.width, dash: "", size: s.size, colormap: colormap, levels: 0 })
+        self
+    }
+
+    /// Add an XY plane at a fixed z coordinate. `values` is [y, x].
+    fn slice_xy(mut self, xs: Array<Float>, ys: Array<Float>, values: Array<Float>, z: Float, colormap: String = "viridis", label: String = "") -> Scene3D {
+        self.colorbar = label
+        self.series.push(Series { kind: "slice_xy", xs: xs, ys: ys, zs: array([z]), lo: values, hi: values, grid: values, label: label, color: "", width: 0.5, dash: "", size: 1.0, colormap: colormap, levels: 0 })
+        self
+    }
+
+    /// Add an XZ plane at a fixed y coordinate. `values` is [z, x].
+    fn slice_xz(mut self, xs: Array<Float>, zs: Array<Float>, values: Array<Float>, y: Float, colormap: String = "viridis", label: String = "") -> Scene3D {
+        self.colorbar = label
+        self.series.push(Series { kind: "slice_xz", xs: xs, ys: zs, zs: array([y]), lo: values, hi: values, grid: values, label: label, color: "", width: 0.5, dash: "", size: 1.0, colormap: colormap, levels: 0 })
+        self
+    }
+
+    /// Add a YZ plane at a fixed x coordinate. `values` is [z, y].
+    fn slice_yz(mut self, ys: Array<Float>, zs: Array<Float>, values: Array<Float>, x: Float, colormap: String = "viridis", label: String = "") -> Scene3D {
+        self.colorbar = label
+        self.series.push(Series { kind: "slice_yz", xs: ys, ys: zs, zs: array([x]), lo: values, hi: values, grid: values, label: label, color: "", width: 0.5, dash: "", size: 1.0, colormap: colormap, levels: 0 })
         self
     }
 
@@ -1488,14 +1557,52 @@ fn render3d(scene: Scene3D) -> String {
     mut z0 = 1000000000000000.0
     mut z1 = -1000000000000000.0
     mut cmap = ""
+    mut scalar0 = 1000000000000000.0
+    mut scalar1 = -1000000000000000.0
+    mut has_slice = false
     for s in scene.series {
-        x0 = if s.xs.min() < x0 { s.xs.min() } else { x0 }
-        x1 = if s.xs.max() > x1 { s.xs.max() } else { x1 }
-        y0 = if s.ys.min() < y0 { s.ys.min() } else { y0 }
-        y1 = if s.ys.max() > y1 { s.ys.max() } else { y1 }
-        zz = if s.kind == "surface" or s.kind == "wire" { s.grid } else { s.zs }
-        z0 = if zz.min() < z0 { zz.min() } else { z0 }
-        z1 = if zz.max() > z1 { zz.max() } else { z1 }
+        if s.kind == "slice_xy" {
+            x0 = if s.xs.min() < x0 { s.xs.min() } else { x0 }
+            x1 = if s.xs.max() > x1 { s.xs.max() } else { x1 }
+            y0 = if s.ys.min() < y0 { s.ys.min() } else { y0 }
+            y1 = if s.ys.max() > y1 { s.ys.max() } else { y1 }
+            z0 = if s.zs[0] < z0 { s.zs[0] } else { z0 }
+            z1 = if s.zs[0] > z1 { s.zs[0] } else { z1 }
+            scalar0 = if s.grid.min() < scalar0 { s.grid.min() } else { scalar0 }
+            scalar1 = if s.grid.max() > scalar1 { s.grid.max() } else { scalar1 }
+            cmap = s.colormap
+            has_slice = true
+        } else if s.kind == "slice_xz" {
+            x0 = if s.xs.min() < x0 { s.xs.min() } else { x0 }
+            x1 = if s.xs.max() > x1 { s.xs.max() } else { x1 }
+            y0 = if s.zs[0] < y0 { s.zs[0] } else { y0 }
+            y1 = if s.zs[0] > y1 { s.zs[0] } else { y1 }
+            z0 = if s.ys.min() < z0 { s.ys.min() } else { z0 }
+            z1 = if s.ys.max() > z1 { s.ys.max() } else { z1 }
+            scalar0 = if s.grid.min() < scalar0 { s.grid.min() } else { scalar0 }
+            scalar1 = if s.grid.max() > scalar1 { s.grid.max() } else { scalar1 }
+            cmap = s.colormap
+            has_slice = true
+        } else if s.kind == "slice_yz" {
+            x0 = if s.zs[0] < x0 { s.zs[0] } else { x0 }
+            x1 = if s.zs[0] > x1 { s.zs[0] } else { x1 }
+            y0 = if s.xs.min() < y0 { s.xs.min() } else { y0 }
+            y1 = if s.xs.max() > y1 { s.xs.max() } else { y1 }
+            z0 = if s.ys.min() < z0 { s.ys.min() } else { z0 }
+            z1 = if s.ys.max() > z1 { s.ys.max() } else { z1 }
+            scalar0 = if s.grid.min() < scalar0 { s.grid.min() } else { scalar0 }
+            scalar1 = if s.grid.max() > scalar1 { s.grid.max() } else { scalar1 }
+            cmap = s.colormap
+            has_slice = true
+        } else {
+            x0 = if s.xs.min() < x0 { s.xs.min() } else { x0 }
+            x1 = if s.xs.max() > x1 { s.xs.max() } else { x1 }
+            y0 = if s.ys.min() < y0 { s.ys.min() } else { y0 }
+            y1 = if s.ys.max() > y1 { s.ys.max() } else { y1 }
+            zz = if s.kind == "surface" or s.kind == "wire" { s.grid } else { s.zs }
+            z0 = if zz.min() < z0 { zz.min() } else { z0 }
+            z1 = if zz.max() > z1 { zz.max() } else { z1 }
+        }
         if s.kind == "vector3" {
             for i in 0 until s.xs.length() {
                 ex = s.xs[i] + s.lo[i] * s.size
@@ -1521,9 +1628,31 @@ fn render3d(scene: Scene3D) -> String {
         z0 = -1.0
         z1 = 1.0
     }
+    if x0 == x1 {
+        x0 = x0 - 1.0
+        x1 = x1 + 1.0
+    }
+    if y0 == y1 {
+        y0 = y0 - 1.0
+        y1 = y1 + 1.0
+    }
+    if z0 == z1 {
+        z0 = z0 - 1.0
+        z1 = z1 + 1.0
+    }
+    if scalar0 > scalar1 {
+        scalar0 = 0.0
+        scalar1 = 1.0
+    }
+    if scalar0 == scalar1 {
+        scalar0 = scalar0 - 1.0
+        scalar1 = scalar1 + 1.0
+    }
     a = scene.azimuth * pi() / 180.0
     e = scene.elevation * pi() / 180.0
     has_bar = cmap != ""
+    bar0 = if has_slice { scalar0 } else { z0 }
+    bar1 = if has_slice { scalar1 } else { z1 }
     top = if scene.subtitle != "" { 62.0 } else { 44.0 }
     plot_w = w - (if has_bar { 90.0 } else { 20.0 })
     cam = Camera {
@@ -1541,7 +1670,9 @@ fn render3d(scene: Scene3D) -> String {
     out.push(axes3d(cam, scene, theme))
 
     for s in scene.series {
-        if s.kind == "surface" or s.kind == "wire" {
+        if s.kind == "slice_xy" or s.kind == "slice_xz" or s.kind == "slice_yz" {
+            out.push(draw_slice(cam, s, theme, scalar0, scalar1))
+        } else if s.kind == "surface" or s.kind == "wire" {
             out.push(draw_surface(cam, s, theme))
         } else if s.kind == "line3" {
             n = s.xs.length()
@@ -1612,7 +1743,7 @@ fn render3d(scene: Scene3D) -> String {
         }
     }
     if has_bar {
-        out.push(colorbar(uid("cb3", scene.title + scene.zlabel), cmap, z0, z1, scene.colorbar, plot_w + 20.0, top + 30.0, h - 40.0, theme))
+        out.push(colorbar(uid("cb3", scene.title + scene.zlabel), cmap, bar0, bar1, scene.colorbar, plot_w + 20.0, top + 30.0, h - 40.0, theme))
     }
     out.push("</svg>\n")
     out.join("\n")
@@ -1696,6 +1827,48 @@ fn shade(ax: Float, ay: Float, az: Float, bx: Float, by: Float, bz: Float, cx: F
     }
     // l = normalize(-0.35, -0.45, 0.82)
     0.5 + 0.5 * abs(nx * -0.3469 + ny * -0.4461 + nz * 0.8129) / len
+}
+
+/// Draw a scalar cell grid on one of the three orthogonal volume planes.
+fn draw_slice(cam: Camera, s: Series, theme: Theme, scalar0: Float, scalar1: Float) -> String {
+    shape = s.grid.shape()
+    rows = shape[0]
+    cols = shape[1]
+    span = if scalar1 > scalar0 { scalar1 - scalar0 } else { 1.0 }
+    mut keys: List<Float> = []
+    for i in 0 until rows - 1 {
+        for j in 0 until cols - 1 {
+            if s.kind == "slice_xy" {
+                keys.push(depth(cam, (s.xs[j] + s.xs[j + 1]) / 2.0, (s.ys[i] + s.ys[i + 1]) / 2.0, s.zs[0]))
+            } else if s.kind == "slice_xz" {
+                keys.push(depth(cam, (s.xs[j] + s.xs[j + 1]) / 2.0, s.zs[0], (s.ys[i] + s.ys[i + 1]) / 2.0))
+            } else {
+                keys.push(depth(cam, s.zs[0], (s.xs[j] + s.xs[j + 1]) / 2.0, (s.ys[i] + s.ys[i + 1]) / 2.0))
+            }
+        }
+    }
+    mut parts: List<String> = []
+    for q in argsort(array(keys)) {
+        i = q / (cols - 1)
+        j = q % (cols - 1)
+        value = s.grid.get(i, j)
+        t = (value - scalar0) / span
+        fill = colormap(s.colormap, t, 0.95)
+        mut points = ""
+        if s.kind == "slice_xy" {
+            points = pt(cam, s.xs[j], s.ys[i], s.zs[0]) + " " + pt(cam, s.xs[j + 1], s.ys[i], s.zs[0]) + " " +
+                pt(cam, s.xs[j + 1], s.ys[i + 1], s.zs[0]) + " " + pt(cam, s.xs[j], s.ys[i + 1], s.zs[0])
+        } else if s.kind == "slice_xz" {
+            points = pt(cam, s.xs[j], s.zs[0], s.ys[i]) + " " + pt(cam, s.xs[j + 1], s.zs[0], s.ys[i]) + " " +
+                pt(cam, s.xs[j + 1], s.zs[0], s.ys[i + 1]) + " " + pt(cam, s.xs[j], s.zs[0], s.ys[i + 1])
+        } else {
+            points = pt(cam, s.zs[0], s.xs[j], s.ys[i]) + " " + pt(cam, s.zs[0], s.xs[j + 1], s.ys[i]) + " " +
+                pt(cam, s.zs[0], s.xs[j + 1], s.ys[i + 1]) + " " + pt(cam, s.zs[0], s.xs[j], s.ys[i + 1])
+        }
+        parts.push("<polygon class=\"slice-cell\"" + attr("points", points) + attr("fill", fill) + attr("stroke", theme.background) +
+            attr("stroke-width", "0.35") + ">" + tip("value " + short(value)) + "</polygon>")
+    }
+    "<g" + attr("stroke-linejoin", "round") + ">" + parts.join("") + "</g>"
 }
 
 /// Height fields drawn as triangles sorted back to front (painter's
