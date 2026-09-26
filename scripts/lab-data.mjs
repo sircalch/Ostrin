@@ -169,6 +169,7 @@ export const GALLERY = [
   { id: "boxplot", title: "Grouped boxplots", file: "examples/viz_boxplot.ostrin", blurb: "Three seeded cohorts summarized by their whiskers, quartiles and median, computed in Ostrin." },
   { id: "point-cloud", title: "3D point cloud", file: "examples/viz_point_cloud.ostrin", blurb: "Three Gaussian clusters, depth-sorted and colored by height." },
   { id: "vector-field", title: "3D vector field", file: "examples/viz_vector_field.ostrin", blurb: "A sampled rotational field with depth-sorted arrowheads and SVG tooltips." },
+  { id: "volume-slices", title: "3D volume slices", file: "examples/viz_volume_slices.ostrin", blurb: "Three orthogonal scalar-field cuts, extracted from an Array<Float> volume and depth-sorted as interactive SVG cells." },
   { id: "scatter-fit", title: "Scatter and fit", file: "examples/viz_scatter_fit.ostrin", blurb: "Calibration data, a least-squares line and its ±2σ band." },
   { id: "units", title: "Unit-aware axes", file: "examples/viz_units.ostrin", blurb: "Quantities converted to km/h: the axis labels come from the units in the data." },
   { id: "bars", title: "Bars with error bars", file: "examples/viz_bars.ostrin", blurb: "Group means ± standard deviation from seeded samples." },

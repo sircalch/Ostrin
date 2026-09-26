@@ -815,6 +815,19 @@ globalThis.OSTRIN_LAB = Object.freeze({
       ]
     },
     {
+      "id": "volume-slices",
+      "title": "3D volume slices",
+      "file": "examples/viz_volume_slices.ostrin",
+      "blurb": "Three orthogonal scalar-field cuts, extracted from an Array<Float> volume and depth-sorted as interactive SVG cells.",
+      "source": "examples/viz_volume_slices.ostrin",
+      "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_volume_slices.ostrin",
+      "code": "import std.viz\n\nfn main() -> Void {\n    axes = linspace(-2.0, 2.0, 17)\n    volume = zeros([17, 17, 17])\n    for k in 0 until 17 {\n        for j in 0 until 17 {\n            for i in 0 until 17 {\n                x = axes[i]\n                y = axes[j]\n                z = axes[k]\n                r2 = x * x + y * y + z * z\n                bump = (x - 0.8) * (x - 0.8) + (y + 0.5) * (y + 0.5) + (z - 0.3) * (z - 0.3)\n                volume.set(k, j, i, exp(0.0 - r2 * 0.7) + 0.35 * exp(0.0 - bump * 2.5))\n            }\n        }\n    }\n    xy = viz.slice_xy(volume, 8)\n    xz = viz.slice_xz(volume, 8)\n    yz = viz.slice_yz(volume, 8)\n    scene = viz.scene3d(\"Volume slices\")\n        .describe(\"Three orthogonal cuts through a scalar field\")\n        .labels(\"x\", \"y\", \"z\")\n        .view(-48.0, 28.0)\n        .slice_xy(axes, axes, xy, axes[8], \"magma\", \"scalar value\")\n        .slice_xz(axes, axes, xz, axes[8], \"magma\", \"scalar value\")\n        .slice_yz(axes, axes, yz, axes[8], \"magma\", \"scalar value\")\n    print(scene.svg())\n}\n",
+      "svg": "assets/viz/volume-slices.svg",
+      "printed": [
+        ""
+      ]
+    },
+    {
       "id": "scatter-fit",
       "title": "Scatter and fit",
       "file": "examples/viz_scatter_fit.ostrin",

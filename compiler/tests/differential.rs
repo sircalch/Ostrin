@@ -444,7 +444,9 @@ fn native_backend_types_agree_with_the_checker() {
     // The linked-data gallery adds 53 more: nested table/figure composition and
     // positional marker attributes still use the AST path until aggregates and
     // SVG string construction move into the IR ownership model.
-    const MAX_AST_FALLBACK_FUNCTIONS: usize = 1546;
+    // Volume slices add 228 measured fallbacks: 3D cell geometry, volume extraction
+    // and scalar colorbar strings are new std.viz paths awaiting the same migration.
+    const MAX_AST_FALLBACK_FUNCTIONS: usize = 1774;
     assert!(
         ast_fallback <= MAX_AST_FALLBACK_FUNCTIONS,
         "AST fallback grew to {ast_fallback} functions (ratchet limit {MAX_AST_FALLBACK_FUNCTIONS})"

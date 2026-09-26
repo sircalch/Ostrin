@@ -1,0 +1,29 @@
+import std.viz
+
+fn main() -> Void {
+    axes = linspace(-2.0, 2.0, 17)
+    volume = zeros([17, 17, 17])
+    for k in 0 until 17 {
+        for j in 0 until 17 {
+            for i in 0 until 17 {
+                x = axes[i]
+                y = axes[j]
+                z = axes[k]
+                r2 = x * x + y * y + z * z
+                bump = (x - 0.8) * (x - 0.8) + (y + 0.5) * (y + 0.5) + (z - 0.3) * (z - 0.3)
+                volume.set(k, j, i, exp(0.0 - r2 * 0.7) + 0.35 * exp(0.0 - bump * 2.5))
+            }
+        }
+    }
+    xy = viz.slice_xy(volume, 8)
+    xz = viz.slice_xz(volume, 8)
+    yz = viz.slice_yz(volume, 8)
+    scene = viz.scene3d("Volume slices")
+        .describe("Three orthogonal cuts through a scalar field")
+        .labels("x", "y", "z")
+        .view(-48.0, 28.0)
+        .slice_xy(axes, axes, xy, axes[8], "magma", "scalar value")
+        .slice_xz(axes, axes, xz, axes[8], "magma", "scalar value")
+        .slice_yz(axes, axes, yz, axes[8], "magma", "scalar value")
+    print(scene.svg())
+}

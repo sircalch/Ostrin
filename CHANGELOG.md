@@ -7,6 +7,12 @@
   selected animation frame) to a 2× PNG through the browser canvas. Export status is announced to
   assistive technology, and the original SVG remains the lossless route for animated figures.
 
+### Visualization: orthogonal volume slices
+- `std.viz.slice_xy`, `slice_xz` and `slice_yz` extract planes from `[z, y, x]` `Array<Float>` volumes.
+  `Scene3D` renders the three planes as depth-sorted, color-mapped SVG cells with scalar colorbars
+  and per-cell tooltips. The new `viz_volume_slices` example is recorded in the live gallery and
+  reruns through the interpreter, native backend and WASM.
+
 ### Visualization: linked table and figure selection
 - `std.viz` emits deterministic `data-viz-index` markers for scatter points and table rows. A new
   `viz_linked_data` gallery program composes both views with `viz.grid`; the browser explorer links
