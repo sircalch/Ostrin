@@ -9393,3 +9393,20 @@ fn std_viz_animates_computed_motion_with_smil() {
         "one path per step"
     );
 }
+
+#[test]
+fn std_viz_marks_linked_plot_points_and_table_rows() {
+    let out = run(&["--run", &example_path("viz_linked_data.ostrin")]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let svg = stdout(&out);
+    assert_eq!(svg.matches("data-viz-index=\"").count(), 10);
+    assert_eq!(
+        svg.matches("<circle class=\"pt\" data-viz-index=").count(),
+        5
+    );
+    assert_eq!(
+        svg.matches("<g class=\"table-row\" role=\"row\"").count(),
+        5
+    );
+    assert!(svg.contains("role=\"table\" data-ostrin-table=\"true\""));
+}

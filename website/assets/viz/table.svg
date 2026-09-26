@@ -12,7 +12,7 @@
 <rect class="table-header" data-table-column="3" x="322" y="48" width="104" height="30" fill="#e2e8f0"/>
 <text class="table-heading" data-table-column="3" x="334" y="67" text-anchor="start" font-size="11" fill="#0f172a" font-weight="600">runtime</text>
 <g class="table-body" role="rowgroup">
-<g class="table-row" role="row" data-table-row="0" data-table-y="78">
+<g class="table-row" role="row" data-table-row="0" data-viz-index="0" data-table-y="78">
 <rect class="table-cell" role="cell" data-table-column="0" x="10" y="78" width="104" height="30" fill="#0f172a" stroke="#1e293b" stroke-width="0.6"><title>RK4</title></rect>
 <text class="table-value" data-table-column="0" x="22" y="97" text-anchor="start" font-size="11" fill="#e2e8f0">RK4</text>
 <rect class="table-cell" role="cell" data-table-column="1" x="114" y="78" width="104" height="30" fill="#0f172a" stroke="#1e293b" stroke-width="0.6"><title>240</title></rect>
@@ -22,7 +22,7 @@
 <rect class="table-cell" role="cell" data-table-column="3" x="322" y="78" width="104" height="30" fill="#0f172a" stroke="#1e293b" stroke-width="0.6"><title>18 ms</title></rect>
 <text class="table-value" data-table-column="3" x="334" y="97" text-anchor="start" font-size="11" fill="#e2e8f0">18 ms</text>
 </g>
-<g class="table-row" role="row" data-table-row="1" data-table-y="108">
+<g class="table-row" role="row" data-table-row="1" data-viz-index="1" data-table-y="108">
 <rect class="table-cell" role="cell" data-table-column="0" x="10" y="108" width="104" height="30" fill="#1e293b" stroke="#1e293b" stroke-width="0.6"><title>RK45</title></rect>
 <text class="table-value" data-table-column="0" x="22" y="127" text-anchor="start" font-size="11" fill="#e2e8f0">RK45</text>
 <rect class="table-cell" role="cell" data-table-column="1" x="114" y="108" width="104" height="30" fill="#1e293b" stroke="#1e293b" stroke-width="0.6"><title>96</title></rect>
@@ -32,7 +32,7 @@
 <rect class="table-cell" role="cell" data-table-column="3" x="322" y="108" width="104" height="30" fill="#1e293b" stroke="#1e293b" stroke-width="0.6"><title>11 ms</title></rect>
 <text class="table-value" data-table-column="3" x="334" y="127" text-anchor="start" font-size="11" fill="#e2e8f0">11 ms</text>
 </g>
-<g class="table-row" role="row" data-table-row="2" data-table-y="138">
+<g class="table-row" role="row" data-table-row="2" data-viz-index="2" data-table-y="138">
 <rect class="table-cell" role="cell" data-table-column="0" x="10" y="138" width="104" height="30" fill="#0f172a" stroke="#1e293b" stroke-width="0.6"><title>BDF</title></rect>
 <text class="table-value" data-table-column="0" x="22" y="157" text-anchor="start" font-size="11" fill="#e2e8f0">BDF</text>
 <rect class="table-cell" role="cell" data-table-column="1" x="114" y="138" width="104" height="30" fill="#0f172a" stroke="#1e293b" stroke-width="0.6"><title>42</title></rect>
@@ -42,7 +42,7 @@
 <rect class="table-cell" role="cell" data-table-column="3" x="322" y="138" width="104" height="30" fill="#0f172a" stroke="#1e293b" stroke-width="0.6"><title>14 ms</title></rect>
 <text class="table-value" data-table-column="3" x="334" y="157" text-anchor="start" font-size="11" fill="#e2e8f0">14 ms</text>
 </g>
-<g class="table-row" role="row" data-table-row="3" data-table-y="168">
+<g class="table-row" role="row" data-table-row="3" data-viz-index="3" data-table-y="168">
 <rect class="table-cell" role="cell" data-table-column="0" x="10" y="168" width="104" height="30" fill="#1e293b" stroke="#1e293b" stroke-width="0.6"><title>exact</title></rect>
 <text class="table-value" data-table-column="0" x="22" y="187" text-anchor="start" font-size="11" fill="#e2e8f0">exact</text>
 <rect class="table-cell" role="cell" data-table-column="1" x="114" y="168" width="104" height="30" fill="#1e293b" stroke="#1e293b" stroke-width="0.6"><title>—</title></rect>

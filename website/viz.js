@@ -22,7 +22,10 @@ function el(tag, attributes = {}, children = []) {
 
 function svgOf(lines) {
   const start = lines.findIndex((line) => line.startsWith("<svg"));
-  const end = lines.findIndex((line, index) => index >= start && line === "</svg>");
+  // `viz.grid` returns one outer SVG containing nested panel SVGs. The first
+  // closing tag belongs to the first panel; keep the final tag so the iframe
+  // receives the complete composition and can link its table and plot nodes.
+  const end = lines.findLastIndex((line, index) => index >= start && line === "</svg>");
   if (start < 0 || end < 0) return { svg: null, printed: lines };
   return { svg: lines.slice(start, end + 1).join("\n"), printed: [...lines.slice(0, start), ...lines.slice(end + 1)] };
 }
@@ -181,6 +184,12 @@ function explorer() {
     tableDirection,
     tableStatus,
   ]);
+  const selectionStatus = el("span", { className: "viz-selection-status", "aria-live": "polite", text: "" });
+  const selectionTools = el("div", { className: "viz-selection-tools", hidden: true }, [
+    el("span", { className: "viz-animation-caption", text: "Linked selection" }),
+    selectionStatus,
+    el("button", { type: "button", className: "button-quiet", text: "Clear selection", "data-viz-selection-clear": "" }),
+  ]);
   const cameraAzimuth = el("input", { type: "range", className: "viz-camera-slider", min: "-180", max: "180", step: "1", value: "-55", "aria-label": "3D camera azimuth", "data-viz-camera-azimuth": "" });
   const cameraAzimuthLabel = el("output", { className: "viz-camera-angle", text: "-55°" });
   const cameraElevation = el("input", { type: "range", className: "viz-camera-slider", min: "-80", max: "80", step: "1", value: "28", "aria-label": "3D camera elevation", "data-viz-camera-elevation": "" });
@@ -201,6 +210,7 @@ function explorer() {
   let cameraGeneration = 0;
   let cameraRendering = false;
   let cameraQueued = false;
+  let selectedIndex = null;
   let animationDuration = 0;
   let animationPaused = false;
   let animationRate = 1;
@@ -214,7 +224,7 @@ function explorer() {
   let tableAscending = true;
   const render = () => {
     zoomLabel.textContent = `${zoom}%`;
-    frame.srcdoc = `<!doctype html><meta charset="utf-8"><style>html,body{margin:0;background:#fff}svg{display:block;width:${zoom}%;height:auto}</style>${svg}`;
+    frame.srcdoc = `<!doctype html><meta charset="utf-8"><style>html,body{margin:0;background:#fff}svg{display:block;width:${zoom}%;height:auto}[data-viz-index]{cursor:pointer}[data-viz-index]:focus{outline:2px solid #7c3aed;outline-offset:2px}.pt.viz-linked-selected{stroke:#7c3aed!important;stroke-width:3px!important;stroke-opacity:1!important}.table-row.viz-linked-selected .table-cell{stroke:#7c3aed;stroke-width:2}.table-row.viz-linked-selected .table-value{font-weight:700}</style>${svg}`;
   };
   const sourceWithCamera = (source, azimuth, elevation) => {
     const view = `.view(${azimuth.toFixed(1)}, ${elevation.toFixed(1)})`;
@@ -460,6 +470,44 @@ function explorer() {
     tableSort.value = "-1";
     applyTableState();
   };
+  const prepareLinkedSelection = () => {
+    const document_ = animationDocument();
+    const points = [...(document_?.querySelectorAll(".pt[data-viz-index]") ?? [])];
+    const rows = [...(document_?.querySelectorAll("g.table-row[data-viz-index]") ?? [])];
+    const pointByIndex = new Map(points.map((node) => [node.getAttribute("data-viz-index"), node]));
+    const rowByIndex = new Map(rows.map((node) => [node.getAttribute("data-viz-index"), node]));
+    const indices = [...pointByIndex.keys()].filter((index) => rowByIndex.has(index));
+    selectionTools.hidden = indices.length === 0;
+    selectedIndex = null;
+    if (!indices.length) return;
+    const select = (index) => {
+      selectedIndex = index;
+      points.forEach((node) => node.classList.toggle("viz-linked-selected", node.getAttribute("data-viz-index") === index));
+      rows.forEach((node) => node.classList.toggle("viz-linked-selected", node.getAttribute("data-viz-index") === index));
+      selectionStatus.textContent = `Selected row ${Number(index) + 1} of ${indices.length}`;
+    };
+    const clear = () => {
+      selectedIndex = null;
+      points.forEach((node) => node.classList.remove("viz-linked-selected"));
+      rows.forEach((node) => node.classList.remove("viz-linked-selected"));
+      selectionStatus.textContent = "Click a point or table row to link them.";
+    };
+    selectionStatus.textContent = "Click a point or table row to link them.";
+    [...pointByIndex.entries(), ...rowByIndex.entries()].forEach(([index, node]) => {
+      node.setAttribute("tabindex", "0");
+      node.setAttribute("aria-label", `Select linked row ${Number(index) + 1}`);
+      if (node.matches(".pt")) node.setAttribute("role", "button");
+      node.addEventListener("click", () => select(index));
+      node.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          select(index);
+        }
+      });
+    });
+    selectionTools.querySelector("[data-viz-selection-clear]").onclick = clear;
+    if (selectedIndex !== null) select(selectedIndex);
+  };
   const button = (text, label, action) => {
     const node = el("button", { type: "button", className: "button-quiet", "aria-label": label, text });
     node.addEventListener("click", action);
@@ -478,6 +526,7 @@ function explorer() {
     cameraTools,
     animationTools,
     tableTools,
+    selectionTools,
     el("p", { className: "sl-provenance", text: "Hover a point or bar for its values (the SVG's own <title> tooltips). Zoom rescales the vector figure; scroll to pan." }),
     frame,
   ]);
@@ -533,6 +582,7 @@ function explorer() {
     prepareAnimationDocument();
     setAnimationSpeed(animationSpeedInput.value);
     prepareTable();
+    prepareLinkedSelection();
     applyReducedMotion();
     if (!animationPaused) startAnimationClock();
   });
@@ -560,6 +610,8 @@ function explorer() {
       cameraElevationLabel.textContent = `${cameraElevation.value}°`;
       cameraStatus.textContent = cameraSource ? "Adjust the camera; Ostrin will recompute the SVG." : "";
       tableTools.hidden = true;
+      selectionTools.hidden = true;
+      selectionStatus.textContent = "";
       prepareAnimation();
       render();
       node.showModal();

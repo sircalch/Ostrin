@@ -168,8 +168,9 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   page.on("pageerror", (error) => runtimeErrors.push(error.message));
   await page.goto("./viz.html", { waitUntil: "domcontentloaded" });
   const cards = page.locator("[data-viz-gallery] .viz-card");
-  await expect(cards).toHaveCount(20);
+  await expect(cards).toHaveCount(21);
   await expect(page.getByRole("heading", { name: "Data table" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Linked data selection" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "3D vector field" })).toBeVisible();
   for (const card of await cards.all()) {
     const image = card.locator("img.viz-image");
@@ -209,6 +210,21 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   await expect(tableFrame.locator("g.table-row").first().locator("title").first()).toHaveText("BDF");
   await page.locator("[data-viz-table-direction]").click();
   await expect(tableFrame.locator("g.table-row").first().locator("title").first()).toHaveText("RK4");
+  await page.getByRole("button", { name: "Close" }).click();
+  await page.locator('[data-viz-explore="linked-data"]').click();
+  await expect(page.locator(".viz-selection-tools")).toBeVisible();
+  const linkedFrame = page.frameLocator(".viz-frame-live");
+  await expect(linkedFrame.locator("circle.pt[data-viz-index]")).toHaveCount(5);
+  await expect(linkedFrame.locator("g.table-row[data-viz-index]")).toHaveCount(5);
+  await linkedFrame.locator('g.table-row[data-viz-index="2"]').click();
+  await expect(linkedFrame.locator('circle.pt[data-viz-index="2"]')).toHaveClass(/viz-linked-selected/);
+  await expect(linkedFrame.locator('g.table-row[data-viz-index="2"]')).toHaveClass(/viz-linked-selected/);
+  await expect(page.locator(".viz-selection-status")).toHaveText("Selected row 3 of 5");
+  await linkedFrame.locator('circle.pt[data-viz-index="1"]').press("Enter");
+  await expect(page.locator(".viz-selection-status")).toHaveText("Selected row 2 of 5");
+  await expect(linkedFrame.locator('g.table-row[data-viz-index="1"]')).toHaveClass(/viz-linked-selected/);
+  await page.getByRole("button", { name: "Clear selection" }).click();
+  await expect(linkedFrame.locator('circle.pt[data-viz-index="2"]')).not.toHaveClass(/viz-linked-selected/);
   await page.getByRole("button", { name: "Close" }).click();
   await page.locator('[data-viz-explore="animation"]').click();
   await expect(page.locator(".viz-animation-tools")).toBeVisible();

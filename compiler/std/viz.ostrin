@@ -808,7 +808,7 @@ fn draw_series(s: Series, color: String, left: Float, bottom: Float, x0: Float, 
     } else if kind == "scatter" {
         mut parts: List<String> = []
         for i in 0 until s.xs.length() {
-            parts.push("<circle class=\"pt\"" + attr("cx", num(left + (s.xs[i] - x0) * sx)) + attr("cy", num(bottom - (s.ys[i] - y0) * sy)) +
+            parts.push("<circle class=\"pt\"" + attr("data-viz-index", i.to_string()) + attr("cx", num(left + (s.xs[i] - x0) * sx)) + attr("cy", num(bottom - (s.ys[i] - y0) * sy)) +
                 attr("r", num(s.size)) + ">" + tip(named(s.label) + "(" + short(s.xs[i]) + ", " + short(s.ys[i]) + ")") + "</circle>")
         }
         "<g" + attr("fill", color) + attr("fill-opacity", "0.78") + attr("stroke", theme.background) + attr("stroke-width", "0.6") + ">" +
@@ -1272,7 +1272,7 @@ fn render_table(t: Table) -> String {
         y = header_y + (t.row_height as Float) * ((r + 1) as Float)
         fill = if r % 2 == 0 { theme.background } else { theme.grid }
         x = 10.0
-        out.push("<g class=\"table-row\" role=\"row\"" + attr("data-table-row", r.to_string()) + attr("data-table-y", num(y)) + ">")
+        out.push("<g class=\"table-row\" role=\"row\"" + attr("data-table-row", r.to_string()) + attr("data-viz-index", r.to_string()) + attr("data-table-y", num(y)) + ">")
         for c in 0 until columns {
             cell_width = widths[c] as Float
             value = if c < row.length() { row[c] } else { "" }
