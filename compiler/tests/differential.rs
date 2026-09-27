@@ -454,7 +454,10 @@ fn native_backend_types_agree_with_the_checker() {
     // remain on the AST path until aggregate-heavy visualization code moves into IR.
     // Filled contours add 125 more: banded grid cells and layered isoline SVG strings
     // remain on the AST path until aggregate-heavy visualization code moves into IR.
-    const MAX_AST_FALLBACK_FUNCTIONS: usize = 2247;
+    // Quiver adds 128 more: sampled vector-field loops, arrowhead geometry and
+    // tooltip SVG strings remain on the AST path until aggregate-heavy visualization
+    // code moves into IR.
+    const MAX_AST_FALLBACK_FUNCTIONS: usize = 2375;
     assert!(
         ast_fallback <= MAX_AST_FALLBACK_FUNCTIONS,
         "AST fallback grew to {ast_fallback} functions (ratchet limit {MAX_AST_FALLBACK_FUNCTIONS})"

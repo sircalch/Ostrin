@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Visualization: 2D vector fields
+- `Figure.quiver(xs, ys, us, vs, scale:, label:, color:)` draws deterministic sampled vector
+  fields with data-unit scaling, triangular arrowheads, zero-vector markers and SVG tooltips;
+  `viz_quiver.ostrin` is recorded in the live WASM gallery and checked for interpreter/native parity.
+
 ### Visualization: filled contour bands
 - `Figure.contourf(z, x0, x1, y0, y1, levels, colormap:, label:)` renders deterministic discrete
   filled contour bands with per-cell value tooltips and a colorbar; `viz_contourf.ostrin` joins
