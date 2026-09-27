@@ -510,6 +510,13 @@ function explorer() {
     parameterControls,
     parameterStatus,
   ]);
+  const legendStatus = el("span", { className: "viz-legend-status", "aria-live": "polite", text: "" });
+  const legendControls = el("div", { className: "viz-legend-controls" });
+  const legendTools = el("div", { className: "viz-legend-tools", hidden: true }, [
+    el("span", { className: "viz-animation-caption", text: "Series" }),
+    legendControls,
+    legendStatus,
+  ]);
   let zoom = 100;
   let svg = "";
   let cameraSource = "";
@@ -533,6 +540,7 @@ function explorer() {
   let tableRows = [];
   let tableSortColumn = -1;
   let tableAscending = true;
+  let legendItems = [];
   const render = () => {
     zoomLabel.textContent = `${zoom}%`;
     frame.srcdoc = `<!doctype html><meta charset="utf-8"><style>html,body{margin:0;background:#fff}svg{display:block;width:${zoom}%;height:auto}[data-viz-index]{cursor:pointer}[data-viz-index]:focus{outline:2px solid #7c3aed;outline-offset:2px}.pt.viz-linked-selected{stroke:#7c3aed!important;stroke-width:3px!important;stroke-opacity:1!important}.table-row.viz-linked-selected .table-cell{stroke:#7c3aed;stroke-width:2}.table-row.viz-linked-selected .table-value{font-weight:700}</style>${svg}`;
@@ -828,6 +836,38 @@ function explorer() {
     selectionTools.querySelector("[data-viz-selection-clear]").onclick = clear;
     if (selectedIndex !== null) select(selectedIndex);
   };
+  const prepareLegend = () => {
+    const document_ = animationDocument();
+    const items = [...(document_?.querySelectorAll(".legend-item[data-viz-series-id]") ?? [])];
+    const seriesById = new Map([...document_?.querySelectorAll(".viz-series[data-viz-series-id]") ?? []].map((node) => [node.getAttribute("data-viz-series-id"), node]));
+    legendItems = items.map((item) => {
+      const id = item.getAttribute("data-viz-series-id");
+      const label = item.querySelector("text")?.textContent?.trim() || `Series ${Number(id) + 1}`;
+      return { id, label, series: seriesById.get(id) };
+    }).filter(({ series }) => series);
+    legendTools.hidden = legendItems.length === 0;
+    legendControls.replaceChildren(...legendItems.map(({ id, label, series }) => {
+      const toggle = el("button", {
+        type: "button",
+        className: "button-quiet viz-legend-toggle",
+        text: label,
+        "data-viz-legend-toggle": id,
+        "aria-pressed": "true",
+        "aria-label": `Hide ${label}`,
+      });
+      toggle.addEventListener("click", () => {
+        const nextVisible = toggle.getAttribute("aria-pressed") !== "true";
+        series.style.display = nextVisible ? "" : "none";
+        toggle.setAttribute("aria-pressed", String(nextVisible));
+        toggle.setAttribute("aria-label", `${nextVisible ? "Hide" : "Show"} ${label}`);
+        toggle.classList.toggle("is-hidden", !nextVisible);
+        const visibleCount = legendItems.filter(({ series: node }) => node.style.display !== "none").length;
+        legendStatus.textContent = `${visibleCount} of ${legendItems.length} series visible`;
+      });
+      return toggle;
+    }));
+    legendStatus.textContent = legendItems.length ? `${legendItems.length} series visible` : "";
+  };
   const button = (text, label, action) => {
     const node = el("button", { type: "button", className: "button-quiet", "aria-label": label, text });
     node.addEventListener("click", action);
@@ -902,11 +942,12 @@ function explorer() {
       ]),
     ]),
     parameterTools,
+    legendTools,
     cameraTools,
     animationTools,
     tableTools,
     selectionTools,
-    el("p", { className: "sl-provenance", text: "Hover a point or bar for its values (the SVG's own <title> tooltips). Zoom rescales the vector figure; scroll to pan." }),
+    el("p", { className: "sl-provenance", text: "Hover a point or bar for its values (the SVG's own <title> tooltips). Toggle legend series to focus the figure. Zoom rescales the vector figure; scroll to pan." }),
     frame,
   ]);
   animationTools.querySelector("[data-viz-play]").addEventListener("click", () => setAnimationState(false));
@@ -973,6 +1014,7 @@ function explorer() {
     captureAnimationFrames();
     prepareAnimationDocument();
     setAnimationSpeed(animationSpeedInput.value);
+    prepareLegend();
     prepareTable();
     prepareLinkedSelection();
     applyReducedMotion();
@@ -1005,6 +1047,10 @@ function explorer() {
       cameraStatus.textContent = cameraEnabled ? "Adjust the camera; Ostrin will recompute the SVG." : "";
       tableTools.hidden = true;
       selectionTools.hidden = true;
+      legendTools.hidden = true;
+      legendControls.replaceChildren();
+      legendItems = [];
+      legendStatus.textContent = "";
       selectionStatus.textContent = "";
       exportStatus.textContent = "";
       prepareAnimation();
