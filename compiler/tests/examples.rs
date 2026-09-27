@@ -9127,6 +9127,14 @@ fn viz_boxplots_render_quartiles_whiskers_and_medians() {
 }
 
 #[test]
+fn viz_violins_render_kde_shapes_and_medians() {
+    let out = interpreter_and_native_agree("viz_violin.ostrin");
+    assert_eq!(out.matches("class=\"violin\"").count(), 3);
+    assert_eq!(out.matches("median ").count(), 3);
+    assert!(out.contains("fill-opacity=\"0.28\""));
+}
+
+#[test]
 fn viz_tables_render_headers_rows_and_tooltips() {
     let out = interpreter_and_native_agree("viz_table.ostrin");
     assert!(out.contains("<svg") && out.contains("ODE solver comparison"));

@@ -167,6 +167,7 @@ export const GALLERY = [
   { id: "lorenz", title: "3D trajectory", file: "examples/viz_lorenz.ostrin", blurb: "The Lorenz attractor integrated in Ostrin and colored by time." },
   { id: "histogram", title: "Histogram and density", file: "examples/viz_histogram.ostrin", blurb: "20 000 seeded normal samples with the scaled N(4, 1.5²) density on top." },
   { id: "boxplot", title: "Grouped boxplots", file: "examples/viz_boxplot.ostrin", blurb: "Three seeded cohorts summarized by their whiskers, quartiles and median, computed in Ostrin." },
+  { id: "violin", title: "Kernel-density violins", file: "examples/viz_violin.ostrin", blurb: "Three seeded cohorts rendered as deterministic Gaussian KDE shapes with median markers." },
   { id: "point-cloud", title: "3D point cloud", file: "examples/viz_point_cloud.ostrin", blurb: "Three Gaussian clusters, depth-sorted and colored by height." },
   { id: "vector-field", title: "3D vector field", file: "examples/viz_vector_field.ostrin", blurb: "A sampled rotational field with depth-sorted arrowheads and SVG tooltips." },
   { id: "volume-slices", title: "3D volume slices", file: "examples/viz_volume_slices.ostrin", blurb: "Three orthogonal scalar-field cuts, extracted from an Array<Float> volume and depth-sorted as interactive SVG cells." },

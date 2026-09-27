@@ -53,7 +53,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "output": [
         "samples: 240, min x = -0.68",
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"640\" height=\"400\" viewBox=\"0 0 640 400\" font-family=\"Inter, Segoe UI, Helvetica, Arial, sans-serif\">",
-        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>",
+        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover{fill-opacity:0.42}</style>",
         "<rect width=\"640\" height=\"400\" fill=\"#ffffff\"/>",
         "",
         "<text x=\"66\" y=\"26\" text-anchor=\"start\" font-size=\"16\" fill=\"#1f2937\" font-weight=\"600\">x(t) = exp(-0.25 t) cos(2 t)</text>",
@@ -167,7 +167,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "output": [
         "z range: -0.6 to 0.71",
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"640\" height=\"520\" viewBox=\"0 0 640 520\" font-family=\"Inter, Segoe UI, Helvetica, Arial, sans-serif\">",
-        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>",
+        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover{fill-opacity:0.42}</style>",
         "<rect width=\"640\" height=\"520\" fill=\"#ffffff\"/>",
         "",
         "<text x=\"20\" y=\"26\" text-anchor=\"start\" font-size=\"16\" fill=\"#1f2937\" font-weight=\"600\">Ripple, k = 1.6</text>",
@@ -267,11 +267,11 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "output": [
         "steps 268, final angle -12.39",
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"840\" height=\"380\" viewBox=\"0 0 840 380\" font-family=\"Inter, Segoe UI, Helvetica, Arial, sans-serif\">",
-        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>",
+        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover{fill-opacity:0.42}</style>",
         "<rect width=\"840\" height=\"380\" fill=\"#ffffff\"/>",
         "",
         "<svg data-ostrin-motion=\"true\" xmlns=\"http://www.w3.org/2000/svg\" width=\"360\" height=\"380\" viewBox=\"0 0 360 380\" font-family=\"Inter, Segoe UI, Helvetica, Arial, sans-serif\">",
-        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>",
+        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover{fill-opacity:0.42}</style>",
         "<rect width=\"360\" height=\"380\" fill=\"#ffffff\"/>",
         "",
         "<style>@media (prefers-reduced-motion:reduce){[data-ostrin-motion] animate{display:none!important}}</style>",
@@ -283,7 +283,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
         "<g fill=\"#0f172a\" fill-opacity=\"0.78\" stroke=\"#ffffff\" stroke-width=\"0.6\"><circle class=\"pt\" data-viz-index=\"0\" cx=\"203\" cy=\"186\" r=\"4\"><title>(0, 0)</title></circle></g>",
         "</g></svg>",
         "<svg data-ostrin-motion=\"true\" xmlns=\"http://www.w3.org/2000/svg\" width=\"480\" height=\"380\" viewBox=\"0 0 480 380\" font-family=\"Inter, Segoe UI, Helvetica, Arial, sans-serif\">",
-        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}</style>",
+        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover{fill-opacity:0.42}</style>",
         "<rect width=\"480\" height=\"380\" fill=\"#ffffff\"/>",
         "",
         "<style>@media (prefers-reduced-motion:reduce){[data-ostrin-motion] animate{display:none!important}}</style>",
@@ -784,6 +784,19 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_boxplot.ostrin",
       "code": "// std.viz · grouped boxplots: distribution summaries computed by Ostrin.\nimport std.viz\n\nfn main() -> Void {\n    r = rng(41)\n    control = r.randn([80]) * 0.55 + 4.2\n    treatment = r.randn([80]) * 0.8 + 5.3\n    follow_up = r.randn([80]) * 0.4 + 6.1\n    fig = viz.figure(\"Distribution summary\")\n        .describe(\"median, interquartile range, whiskers\")\n        .labels(\"cohort\", \"response\")\n        .boxplot(1.0, control, label: \"control\", color: \"#2563eb\")\n        .boxplot(2.0, treatment, label: \"treatment\", color: \"#db2777\")\n        .boxplot(3.0, follow_up, label: \"follow-up\", color: \"#059669\")\n    print(fig.svg())\n}\n",
       "svg": "assets/viz/boxplot.svg",
+      "printed": [
+        ""
+      ]
+    },
+    {
+      "id": "violin",
+      "title": "Kernel-density violins",
+      "file": "examples/viz_violin.ostrin",
+      "blurb": "Three seeded cohorts rendered as deterministic Gaussian KDE shapes with median markers.",
+      "source": "examples/viz_violin.ostrin",
+      "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_violin.ostrin",
+      "code": "// std.viz · kernel-density violins: full distributions with median markers.\nimport std.viz\n\nfn main() -> Void {\n    r = rng(73)\n    baseline = r.randn([140]) * 0.42 + 4.2\n    shifted = r.randn([140]) * 0.75 + 5.25\n    bimodal = zeros([140])\n    for i in 0 until 140 {\n        center = if i < 70 { 5.2 } else { 6.1 }\n        spread = if i < 70 { 0.28 } else { 0.18 }\n        bimodal.set(i, r.randn([1])[0] * spread + center)\n    }\n    fig = viz.figure(\"Distribution shapes\")\n        .describe(\"Gaussian KDE violins with medians computed in Ostrin\")\n        .labels(\"cohort\", \"response\")\n        .violin(1.0, baseline, 40, \"baseline\", \"#2563eb\")\n        .violin(2.0, shifted, 40, \"shifted\", \"#db2777\")\n        .violin(3.0, bimodal, 40, \"bimodal\", \"#059669\")\n    print(fig.svg())\n}\n",
+      "svg": "assets/viz/violin.svg",
       "printed": [
         ""
       ]

@@ -34,7 +34,7 @@ Figure / Scene3D (records)          ← API: figure(), scene3d(), métodos encad
 ```
 
 `Series` es la representación intermedia de la escena: `kind` (`line`, `scatter`, `area`, `band`,
-`errorbar`, `bar`, `hist`, `boxplot`, `stairs`, `hline`, `vline`, `heatmap`, `contour`, `surface`, `wire`,
+`errorbar`, `bar`, `hist`, `boxplot`, `violin`, `stairs`, `hline`, `vline`, `heatmap`, `contour`, `surface`, `wire`,
 `line3`, `scatter3`, `vector3`, `slice_xy`, `slice_xz`, `slice_yz`, `mesh3`), los arrays `xs`, `ys`, `zs`, `lo`, `hi`, `grid` y el estilo (`color`, `width`,
 `dash`, `size`, `colormap`, `levels`). Como un `Array` de Ostrin no puede estar vacío, los campos que
 una marca no usa contienen un cero y solo se leen para los `kind` que los rellenan.
@@ -56,6 +56,7 @@ fig = viz.figure("Damped oscillator")          // 640 × 400, tema claro
     .area(xs, ys) .stairs(xs, ys) .band(xs, lo, hi) .errorbars(xs, ys, err)
     .bars(xs, heights) .histogram(data, bins)
     .boxplot(1.0, control, label: "control")  // repeat at each group position
+    .violin(1.0, control, 40, label: "control") // Gaussian KDE shape + median
     .hline(y) .vline(x) .text(x, y, "nota")
     .heatmap(z, x0, x1, y0, y1, colormap: "viridis", label: "z")
     .contour(z, x0, x1, y0, y1, levels: 8, colormap: "", color: "")
@@ -91,12 +92,14 @@ Utilidades públicas: `viz.num` (dos decimales, idéntico en todos los backends)
 - **Ticks**: paso 1, 2 o 5 × 10^k para ~8 (x) o ~6 (y) marcas; decimales según el paso; notación
   `me±k` fuera de [0.001, 100000).
 - **Dominio**: unión de los datos (con `lo`/`hi` de bandas, barras de error y cajas, los bigotes de
-  boxplots, medio paso de barras y bins); margen de 2 % (x) y 5 % (y) salvo en mapas de calor; las
+  boxplots, el rango vertical de violines, medio paso de barras y bins); margen de 2 % (x) y 5 % (y) salvo en mapas de calor; las
   barras incluyen el cero.
 - **Leyenda**: se evalúan las cuatro esquinas y se elige la que tapa menos puntos dibujados.
 - **Heatmap**: cada valor es el centro de su celda, así los contornos coinciden con el mapa; las
   celdas se solapan 0.6 px para no dejar costuras.
 - **Contornos**: marching squares sobre la rejilla, `levels` niveles equiespaciados.
+- **Violines**: KDE gaussiana de ancho de banda de Silverman, muestreada en `bins` alturas y
+  normalizada a una anchura común por grupo; la forma espejada y la mediana se escriben como SVG.
 - **3D**: datos normalizados al cubo [-1, 1]³ (z × 0.8), rotación por acimut y elevación, proyección
   ortográfica. Superficies como dos triángulos por celda, ordenados por profundidad (algoritmo del
   pintor con `argsort` estable) y sombreados con luz direccional: brillo 0.5 + 0.5 |n · l|. Suelo y
@@ -232,7 +235,7 @@ la falta de literales científicos (`1e-9`). Ver `CONTEXTO_PROYECTO.md` §270–
 | Versión | Contenido |
 |---|---|
 | 0.1 (hecho) | marcas 2D, heatmap/contornos, superficies/trayectorias/nubes 3D, campos vectoriales muestreados, layouts, unidades en ejes, SVG |
-| 0.1 (hecho) | boxplots agrupados con cuartiles interpolados, mediana, bigotes, tooltips y leyenda |
+| 0.1 (hecho) | boxplots agrupados con cuartiles interpolados, mediana, bigotes, tooltips y leyenda; violines KDE gaussianos con marcador de mediana |
 | 0.2 (parcial, hecho) | tooltips `<title>` con valores y resaltado CSS al pasar el ratón, dentro del SVG y sin scripts; visor web con zoom y desplazamiento en un iframe aislado |
 | 0.2 (parcial, hecho) | selección enlazada entre puntos y filas en figuras compuestas; los controles conducidos por Ostrin siguen pendientes |
 | 0.3 (parcial, hecho) | animación en bucle con `viz.animate`: fotogramas generados por Ostrin, reproducidos con CSS dentro del SVG |

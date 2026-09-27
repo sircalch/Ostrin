@@ -169,12 +169,13 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   page.on("pageerror", (error) => runtimeErrors.push(error.message));
   await page.goto("./viz.html", { waitUntil: "domcontentloaded" });
   const cards = page.locator("[data-viz-gallery] .viz-card");
-  await expect(cards).toHaveCount(23);
+  await expect(cards).toHaveCount(24);
   await expect(page.getByRole("heading", { name: "Data table" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Linked data selection" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "3D vector field" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "3D volume slices" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "3D isosurface" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Kernel-density violins" })).toBeVisible();
   for (const card of await cards.all()) {
     const image = card.locator("img.viz-image");
     await expect(image).toHaveAttribute("src", /^assets\/viz\/[a-z-]+\.svg$/);
@@ -297,6 +298,11 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   const isoFrame = page.frameLocator(".viz-frame-live");
   await expect(isoFrame.locator("polygon.isosurface-cell")).toHaveCount(4536);
   await expect(isoFrame.locator("polygon.isosurface-cell title").first()).toContainText("isosurface level");
+  await page.getByRole("button", { name: "Close" }).click();
+  await page.locator('[data-viz-explore="violin"]').click();
+  const violinFrame = page.frameLocator(".viz-frame-live");
+  await expect(violinFrame.locator("path.violin")).toHaveCount(3);
+  await expect(violinFrame.locator("path.violin title").first()).toContainText("median");
   await page.getByRole("button", { name: "Close" }).click();
   expect(runtimeErrors).toEqual([]);
 });
