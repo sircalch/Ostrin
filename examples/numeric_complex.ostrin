@@ -1,0 +1,36 @@
+// Complex<Float> values from std.numeric: arithmetic, polar form and powers.
+import std.numeric
+import std.numeric.{Complex}
+
+fn magnitude_of(z: Complex) -> Float { z.magnitude() }
+
+fn pair(label: String, re: Float, im: Float) -> Void {
+    print(label + " = " + re.to_string() + " + " + im.to_string() + "i")
+}
+
+fn main() -> Void {
+    z = numeric.complex(3.0, 4.0)
+    w = numeric.complex(1.0, -2.0)
+    sum = z + w
+    product = z * w
+    quotient = z / w
+    conjugate = z.conjugate()
+    square = numeric.powi(z, 2)
+    polar = numeric.polar(2.0, pi() / 3.0)
+    scalar_left = 2.0 + z
+    scaled = 2.0 * z
+    pair("sum", sum.re, sum.im)
+    pair("product", product.re, product.im)
+    pair("quotient", quotient.re, quotient.im)
+    pair("conjugate", conjugate.re, conjugate.im)
+    pair("square", square.re, square.im)
+    pair("polar", polar.re, polar.im)
+    pair("scalar left", scalar_left.re, scalar_left.im)
+    pair("scaled", scaled.re, scaled.im)
+    print("magnitude = " + magnitude_of(z).to_string())
+    print("magnitude check = " + (abs(magnitude_of(z) - 5.0) < 0.000000001).to_string())
+    e = numeric.cis(pi())
+    one = numeric.complex(1.0)
+    euler = e + one
+    print("Euler check = " + euler.magnitude().to_string())
+}

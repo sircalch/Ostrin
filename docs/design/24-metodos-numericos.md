@@ -1,9 +1,9 @@
 # 24 — Métodos numéricos: `std.numeric` 0.1
 
 Estado: implementado (2026-09-24). Código: `compiler/std/numeric.ostrin`. Ejemplos:
-`examples/numeric_methods.ostrin`, `examples/viz_ode.ostrin`, `examples/viz_fft.ostrin`,
-`examples/viz_spline.ostrin`, `examples/lab_ode.ostrin`. Web: pestaña ODE del Scientific Lab y tres
-figuras de la galería de `viz.html`.
+`examples/numeric_methods.ostrin`, `examples/numeric_complex.ostrin`, `examples/viz_ode.ostrin`,
+`examples/viz_fft.ostrin`, `examples/viz_spline.ostrin`, `examples/lab_ode.ostrin`. Web: pestañas ODE,
+Linear Algebra y Complex del Scientific Lab y figuras de la galería de `viz.html`.
 
 ## 1. Objetivo y principios
 
@@ -38,6 +38,12 @@ sol.t  sol.y  sol.evaluations  sol.component(i)  sol.final_state()  sol.length()
 spec = numeric.fft(signal)                     // Spectrum { re, im }, spec.magnitude()
 numeric.ifft(spec)  numeric.frequencies(n, dt)  numeric.amplitude(spec)
 
+z = numeric.complex(3.0, 4.0)                  // Complex backed by Float64
+w = numeric.polar(2.0, pi() / 3.0)
+z.real()  z.imag()  z.conjugate()  z.magnitude()
+numeric.cis(theta)  numeric.powi(z, n)         // exp(iθ), integer powers
+z + w  z - w  z * w  z / w                     // overloaded arithmetic
+
 qr = numeric.qr(a)                          // Result<Qr, String>, QR fino de una matriz real
 qr.q  qr.r  qr.reconstruct()                // Q ortonormal, R triangular superior, Q @ R
 qr.orthogonality()                          // ||QᵀQ − I||
@@ -70,6 +76,11 @@ ningún caso especial en el runtime. Requieren al menos dos muestras.
   resultado en el intérprete, nativo y WASM. La superficie conserva por ahora el fallback AST de
   agregados mientras `Array` dentro de records/`Result` termina de migrar a HIR/IR; el trinquete lo
   registra con un límite explícito y el siguiente ciclo lo reducirá.
+- **Complejos**: `Complex` es por ahora un record público de `Float64` con operadores `Add`, `Sub`,
+  `Mul`, `Div`, igualdad, conjugado, magnitud, forma polar, `cis` y potencias enteras. El ejemplo
+  `numeric_complex.ostrin` y la pestaña Complex del Lab verifican la misma salida en intérprete,
+  binario nativo y WASM. El tipo paramétrico, `Array<Complex>` y álgebra lineal compleja siguen
+  pendientes.
 
 ## 4. Hallazgos del compilador
 
@@ -95,4 +106,4 @@ y tipos función para enlazar `X`, y una segunda aparición con otra dimensión 
 | cuadratura adaptativa, integrales múltiples | Gauss–Kronrod |
 | optimización multivariable | Nelder–Mead, BFGS |
 | unidades en ODEs y raíces | `unit_*` cubre integrales, derivadas e interpolación; `rk45` y `newton` siguen en `Float` (un estado con dimensiones mezcladas necesitaría tuplas o records de cantidades) |
-| álgebra lineal avanzada | QR denso ya está disponible; LU, Cholesky, SVD, autovectores, mínimos cuadrados generalizados, dispersa e integración compleja siguen pendientes |
+| álgebra lineal avanzada | QR denso ya está disponible; LU, Cholesky, SVD, autovectores, mínimos cuadrados generalizados, dispersa y álgebra matricial compleja siguen pendientes |

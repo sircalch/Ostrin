@@ -1,6 +1,6 @@
 # 19. Jerarquía numérica y arrays
 
-*Estado: la fase 1 (enteros de ancho fijo) está implementada, ver §93 de CONTEXTO; el resto es propuesta. Al redactarlo solo existían `Int` (64 bits con signo), `Float` (64 bits) y `List<T>`.*
+*Estado: la fase 1 (enteros de ancho fijo) está implementada, ver §93 de CONTEXTO. `std.numeric` ya ofrece un `Complex` experimental respaldado por `Float64`; el tipo numérico genérico del lenguaje y los arrays complejos siguen en diseño.*
 
 ## 1. Principios
 
@@ -17,7 +17,7 @@
 | Enteros sin signo | `UInt8 UInt16 UInt32 UInt64 UInt128` | |
 | Reales | `Float16 BFloat16 Float32 Float64` | `Float` = alias de `Float64`; `Float128` cuando el destino lo soporte |
 | Precisión arbitraria | `BigInt`, `Decimal`, `Rational` | Biblioteca estándar |
-| Complejos | `Complex<T>` | `T` real |
+| Complejos | `Complex<T>` (objetivo); `std.numeric.Complex` (experimental actual) | El registro actual usa `Float64`; el tipo paramétrico y `Complex<Float32>` siguen pendientes |
 | Intervalos | `Interval<T>` | Aritmética de intervalos (base de la incertidumbre) |
 
 Literales: `1` es `Int` por defecto; `1u8`, `2.5f32`, `3+4i` con sufijos explícitos. Un literal sin sufijo adopta el tipo esperado si cabe exactamente (`x: UInt8 = 200` es válido, `= 300` es error de compilación).
@@ -55,7 +55,7 @@ Tensor<T, D1..Dk>   = Array<T, (D1..Dk)>
 ## 6. Implementación por fases
 
 1. **Tipos enteros de ancho fijo** (checker → intérprete → nativo con `stdint`), con literales y conversiones. Es el cambio más contenido y desbloquea el resto.
-2. **`Float32`** y conversiones; `Complex`.
+2. **`Float32`** y conversiones; promover el `std.numeric.Complex` experimental a un tipo numérico coherente.
 3. **`Array<T, Shape>` dinámico** (forma en ejecución) con aritmética, broadcasting y reducciones en el runtime C.
 4. **Formas estáticas** y verificación en el checker.
 5. **Álgebra lineal** (LU, QR, SVD, `solve`) sobre un backend intercambiable (BLAS/LAPACK opcional, implementación propia de referencia).
@@ -63,4 +63,4 @@ Tensor<T, D1..Dk>   = Array<T, (D1..Dk)>
 
 ## 7. Pruebas
 
-Cada fase añade: ejemplos en `examples/`, comparación intérprete↔nativo (ya automática), casos `*_errors.ostrin` para cada regla de conversión y de forma, y *benchmarks* frente a C y NumPy para las operaciones de rendimiento.
+Cada fase añade: ejemplos en `examples/`, comparación intérprete↔nativo (ya automática), casos `*_errors.ostrin` para cada regla de conversión y de forma, y *benchmarks* frente a C y NumPy para las operaciones de rendimiento. `examples/numeric_complex.ostrin` cubre la API experimental actual y comprueba la misma salida en ambos backends.

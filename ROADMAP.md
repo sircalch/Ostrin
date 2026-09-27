@@ -6,11 +6,13 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
 ## Siguiente ciclo
 
 1. Reducir el fallback AST con el trinquete por archivo de `--native-type-report` (baseline actual:
-   1.759 funciones IR, 920 HIR y 2.611 AST; el incremento acotado corresponde a las superficies
+   1.873 funciones IR, 1.139 HIR y 2.789 AST; el incremento acotado corresponde a las superficies
    `std.viz.boxplot`, `std.viz.violin`, `std.viz.hexbin`, `std.viz.contourf`, `std.viz.quiver`, `std.viz.streamplot`, `std.viz.table`, `std.viz.vector_field`, `std.numeric.qr` y el ejemplo compuesto de selección enlazada,
    que quedan como deuda explícita para
    la siguiente migración). QR ya está publicado en el Lab y mantiene la paridad, pero su
    ruta de agregados sigue en AST hasta que `Array` dentro de records/`Result` cruce la IR.
+   `std.numeric.Complex` ya tiene una API experimental de `Float64` y una demo live; el tipo
+   paramétrico, `Array<Complex>` y álgebra lineal compleja siguen pendientes.
 2. Completar ownership sobre agregados, escapes, valores `Phi`, errores y formas anidadas, con
    leak-check y sanitizers como evidencia.
 3. Añadir casos de compilación nativa y divergencia semántica al fuzzing de entradas válidas.

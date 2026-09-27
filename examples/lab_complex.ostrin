@@ -1,0 +1,16 @@
+// A live Scientific Lab demo for std.numeric's experimental Complex record.
+import std.numeric
+
+fn main() -> Void {
+    angle = 0.75
+    radius = 2.0
+    z = numeric.polar(radius, angle)
+    rotation = numeric.cis(angle)
+    rotated = z * rotation
+    conjugate = z.conjugate()
+    print("z = " + z.re.to_string() + " + " + z.im.to_string() + "i")
+    print("magnitude = " + z.magnitude().to_string())
+    print("conjugate = " + conjugate.re.to_string() + " + " + conjugate.im.to_string() + "i")
+    print("rotated = " + rotated.re.to_string() + " + " + rotated.im.to_string() + "i")
+    print("z² = " + numeric.powi(z, 2).re.to_string() + " + " + numeric.powi(z, 2).im.to_string() + "i")
+}

@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Scientific core: experimental complex numbers
+- `std.numeric` now exposes a `Complex` record backed by `Float64`, with rectangular and polar
+  constructors, conjugation, magnitude, equality, overloaded arithmetic, reflected scalar
+  operations and non-negative integer powers. `numeric_complex.ostrin` verifies interpreter/native
+  parity and the Scientific Lab's Complex demo recomputes the same values in WASM.
+- Complex arrays, generic `Complex<T>` promotion and complex matrix decompositions remain clearly
+  marked as future work; the FFT's existing real/imaginary `Spectrum` API is unchanged.
+
 ### Visualization: publication-quality animation export
 - WebM and GIF exports now accept an accessible 1×/2× quality selector. The browser renders the
   selected frame sequence at the requested canvas resolution, names scaled artifacts explicitly

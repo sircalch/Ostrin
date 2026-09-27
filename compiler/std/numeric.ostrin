@@ -439,7 +439,96 @@ pub fn rk45(f: fn(Float, Array<Float>) -> Array<Float>, y0: Array<Float>, t0: Fl
     solution(times, states, y0.length(), evaluations)
 }
 
-// ---------------------------------------------------------------- FFT
+// ---------------------------------------------------------------- complex numbers and FFT
+
+/// A double-precision complex number.
+///
+/// Complex values are records rather than a compiler primitive for now.  The
+/// arithmetic traits keep the public API natural while retaining the same
+/// interpreter/native/WASM semantics as the rest of `std.numeric`.
+pub record Complex {
+    re: Float
+    im: Float
+}
+
+impl Complex {
+    /// The real component.
+    fn real(self) -> Float { self.re }
+
+    /// The imaginary component.
+    fn imag(self) -> Float { self.im }
+
+    /// The complex conjugate.
+    fn conjugate(self) -> Complex { Complex { re: self.re, im: 0.0 - self.im } }
+
+    /// The Euclidean magnitude, computed without a complex backend.
+    fn magnitude(self) -> Float { sqrt(self.re * self.re + self.im * self.im) }
+
+    /// `-self`.
+    fn neg(self) -> Complex { Complex { re: 0.0 - self.re, im: 0.0 - self.im } }
+
+    /// Reflected scalar operations, so `2.0 + z` and `2.0 * z` are valid.
+    fn radd(self, k: Float) -> Complex { Complex { re: k + self.re, im: self.im } }
+    fn rsub(self, k: Float) -> Complex { Complex { re: k - self.re, im: 0.0 - self.im } }
+    fn rmul(self, k: Float) -> Complex { Complex { re: k * self.re, im: k * self.im } }
+    fn rdiv(self, k: Float) -> Complex {
+        denominator = self.re * self.re + self.im * self.im
+        Complex { re: k * self.re / denominator, im: 0.0 - k * self.im / denominator }
+    }
+}
+
+impl Add for Complex {
+    fn add(self, other: Self) -> Self { Complex { re: self.re + other.re, im: self.im + other.im } }
+}
+
+impl Sub for Complex {
+    fn sub(self, other: Self) -> Self { Complex { re: self.re - other.re, im: self.im - other.im } }
+}
+
+impl Mul for Complex {
+    fn mul(self, other: Self) -> Self {
+        Complex {
+            re: self.re * other.re - self.im * other.im,
+            im: self.re * other.im + self.im * other.re,
+        }
+    }
+}
+
+impl Div for Complex {
+    fn div(self, other: Self) -> Self {
+        denominator = other.re * other.re + other.im * other.im
+        Complex {
+            re: (self.re * other.re + self.im * other.im) / denominator,
+            im: (self.im * other.re - self.re * other.im) / denominator,
+        }
+    }
+}
+
+impl Eq for Complex {
+    fn equals(self, other: Self) -> Bool { self.re == other.re and self.im == other.im }
+}
+
+/// Construct a complex value from rectangular coordinates.
+pub fn complex(re: Float, im: Float = 0.0) -> Complex { Complex { re: re, im: im } }
+
+/// Construct `radius * exp(i angle)`.
+pub fn polar(radius: Float, angle: Float) -> Complex {
+    Complex { re: radius * cos(angle), im: radius * sin(angle) }
+}
+
+/// Construct `exp(i angle)`.
+pub fn cis(angle: Float) -> Complex { polar(1.0, angle) }
+
+/// Integer powers for non-negative exponents.
+pub fn powi(z: Complex, n: Int) -> Complex {
+    mut result = complex(1.0)
+    mut i = 0
+    while i < n {
+        result = result * z
+        i = i + 1
+    }
+    result
+}
 
 /// A complex spectrum as real and imaginary parts.
 pub record Spectrum {

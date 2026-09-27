@@ -9,7 +9,7 @@ tests or an explicitly labeled early-stage surface.
 
 | Surface | Evidence | Current state |
 | --- | --- | --- |
-| Homepage | `website/index.html`, `website/lab.js`, `website/lab-data.js`, `website/playground.js`, `website/assets/ostrin-social.png` | Hero with release status derived from `CHANGELOG.md`, eight-tab Scientific Lab that recomputes `examples/lab_*` programs and the `plot`/`autodiff` lab projects with `ostrinc.wasm`, evidence-linked capability cards, a source → HIR → IR → C pipeline recorded from the compiler, and the real playground; all public pages share a 1200x630 social preview |
+| Homepage | `website/index.html`, `website/lab.js`, `website/lab-data.js`, `website/playground.js`, `website/assets/ostrin-social.png` | Hero with release status derived from `CHANGELOG.md`, eleven-demo Scientific Lab that recomputes `examples/lab_*` programs and the `plot`/`autodiff` lab projects with `ostrinc.wasm`, evidence-linked capability cards, a source → HIR → IR → C pipeline recorded from the compiler, and the real playground; all public pages share a 1200x630 social preview |
 | Cookbook | `website/cookbook.html`, `scripts/lab-data.mjs` | The Lab programs as recipes with source, recorded output, documentation links and stated limits |
 | Guides | `website/guides.html` | Install, projects, testing, native, WASI, editor and site-evidence workflows; every command exists in `ostrinc --help` |
 | Example catalogue | `website/examples.html` | Filterable repository catalogue plus live quantity, standard library, record/enum and concurrency programs |
@@ -22,10 +22,10 @@ tests or an explicitly labeled early-stage surface.
 
 ## Verified inventory
 
-- **257** `.ostrin` source files under `examples/`, including package-project sources and
+- **259** `.ostrin` source files under `examples/`, including package-project sources and
   intentional error cases.
 - **24** Markdown design documents under `docs/design/`.
-- Compiler suite: **233 integration**, **6 differential** and **2 unit** tests.
+- Compiler suite: **234 integration**, **6 differential** and **2 unit** tests.
 - WASI release smoke matrix: nine program modules covering the hello program, a local-path
   package, arguments/environment, file I/O, managed ownership and nested `Option`/`Result`
   consumers; compiler and program modules

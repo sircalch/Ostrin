@@ -402,6 +402,45 @@ globalThis.OSTRIN_LAB = Object.freeze({
       ]
     },
     {
+      "id": "complex",
+      "title": "Complex",
+      "headline": "Typed complex arithmetic for scientific models.",
+      "file": "examples/lab_complex.ostrin",
+      "render": "text",
+      "params": [
+        {
+          "name": "angle",
+          "label": "Rotation angle (rad)",
+          "min": -3.14,
+          "max": 3.14,
+          "step": 0.1
+        }
+      ],
+      "how": "std.numeric's experimental Complex record carries real and imaginary components through overloaded addition, subtraction, multiplication and division. Polar construction, conjugation, magnitude and integer powers run in Ostrin, so the interpreter, native compiler and browser expose the same values.",
+      "docs": {
+        "label": "numeric hierarchy and arrays",
+        "href": "https://github.com/sircalch/Ostrin/blob/main/docs/design/19-jerarquia-numerica-y-arrays.md"
+      },
+      "limits": "Complex<Float> is currently a library record backed by Float64. Complex arrays, promotion across Float32/Float64 and complex matrix decompositions are planned; the FFT keeps its stable real/imaginary Spectrum API.",
+      "files": {
+        "main.ostrin": "// A live Scientific Lab demo for std.numeric's experimental Complex record.\nimport std.numeric\n\nfn main() -> Void {\n    angle = 0.75\n    radius = 2.0\n    z = numeric.polar(radius, angle)\n    rotation = numeric.cis(angle)\n    rotated = z * rotation\n    conjugate = z.conjugate()\n    print(\"z = \" + z.re.to_string() + \" + \" + z.im.to_string() + \"i\")\n    print(\"magnitude = \" + z.magnitude().to_string())\n    print(\"conjugate = \" + conjugate.re.to_string() + \" + \" + conjugate.im.to_string() + \"i\")\n    print(\"rotated = \" + rotated.re.to_string() + \" + \" + rotated.im.to_string() + \"i\")\n    print(\"z² = \" + numeric.powi(z, 2).re.to_string() + \" + \" + numeric.powi(z, 2).im.to_string() + \"i\")\n}\n"
+      },
+      "main": "main.ostrin",
+      "args": [
+        "--run",
+        "main.ostrin"
+      ],
+      "source": "examples/lab_complex.ostrin",
+      "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/lab_complex.ostrin",
+      "output": [
+        "z = 1.4633777377476418 + 1.3632775200466682i",
+        "magnitude = 2",
+        "conjugate = 1.4633777377476418 + -1.3632775200466682i",
+        "rotated = 0.14147440333540606 + 1.9949899732081087i",
+        "z² = 0.2829488066708121 + 3.9899799464162173i"
+      ]
+    },
+    {
       "id": "statistics",
       "title": "Statistics",
       "headline": "Summaries, a histogram and a calibration fit.",

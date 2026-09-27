@@ -9356,6 +9356,14 @@ fn std_numeric_solves_integrates_interpolates_and_transforms() {
 }
 
 #[test]
+fn std_numeric_complex_matches_interpreter_and_native() {
+    assert_eq!(
+        interpreter_and_native_agree("numeric_complex.ostrin"),
+        "sum = 4 + 2i\nproduct = 11 + -2i\nquotient = -1 + 2i\nconjugate = 3 + -4i\nsquare = -7 + 24i\npolar = 1.0000000000000004 + 1.732050807568877i\nscalar left = 5 + 4i\nscaled = 6 + 8i\nmagnitude = 5\nmagnitude check = true\nEuler check = 0.0000000000000001224646799076922\n"
+    );
+}
+
+#[test]
 fn std_viz_animates_frames_with_css_only() {
     let out = run(&["--run", &example_path("viz_animation.ostrin")]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
