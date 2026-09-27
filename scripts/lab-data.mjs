@@ -35,7 +35,7 @@ export const LAB = [
     ],
     how: "Ostrin computes x(t) with array operations (linspace, exp, cos) and std.viz, the visualization library written in Ostrin, lays out the axes, ticks, band, line and legend and writes the SVG text. The page only displays that SVG as an image.",
     docs: { label: "std.viz source", href: `${repository}/blob/main/compiler/std/viz.ostrin` },
-    limits: "std.viz renders SVG: hover tooltips and looping animations (viz.animate) work without scripts; linked selection is available in the Viz explorer, while sliders driven by Ostrin and PDF export remain planned. The explorer can download SVG and rasterize the current frame to PNG.",
+    limits: "std.viz renders SVG: hover tooltips and looping animations (viz.animate) work without scripts; linked selection is available in the Viz explorer, while sliders driven by Ostrin remain planned. The explorer can download SVG, rasterize the current frame to PNG, print a vector PDF and encode animated GIF/WebM when the browser supports the required APIs.",
   },
   {
     id: "surface",
@@ -65,7 +65,7 @@ export const LAB = [
     ],
     how: "std.numeric.rk45, an adaptive Dormand–Prince integrator written in Ostrin, solves θ'' = −c θ' − sin θ + A cos(0.8 t) with a lambda that captures the three parameters. interp_all resamples the solution at 25 points per second, and std.viz turns them into an animation: the pendulum swings on the left while the phase portrait (θ, ω) draws itself on the right. The browser only interpolates between positions Ostrin computed (SVG <animate>, no scripts).",
     docs: { label: "std.numeric source", href: `${repository}/blob/main/compiler/std/numeric.ostrin` },
-    limits: "Explicit solvers only (rk4, rk45): stiff systems need an implicit method, which is planned. Animations loop; there is no scrubbing or play-once control yet.",
+    limits: "Explicit solvers only (rk4, rk45): stiff systems need an implicit method, which is planned. The Viz explorer provides scrubbing and finite play-once loops; the Lab preview remains a recorded/live SVG result.",
   },
   {
     id: "linear-algebra",

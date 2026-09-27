@@ -249,6 +249,174 @@ async function exportAnimatedWebm(source, duration, title, loops = 1) {
   return { frameCount, fps };
 }
 
+// GIF is intentionally encoded here instead of adding a large runtime dependency. The fixed
+// 6×6×6 cube plus grayscale palette is deterministic, and the SVG itself remains the lossless
+// publication route. The comment extension carries the reproducibility record when one exists.
+const GIF_PALETTE = (() => {
+  const palette = [];
+  for (let red = 0; red < 6; red += 1) {
+    for (let green = 0; green < 6; green += 1) {
+      for (let blue = 0; blue < 6; blue += 1) palette.push([red * 51, green * 51, blue * 51]);
+    }
+  }
+  for (let gray = 0; palette.length < 256; gray += 1) {
+    const value = Math.round(gray * 255 / 39);
+    palette.push([value, value, value]);
+  }
+  return palette;
+})();
+
+function gifPaletteIndex(red, green, blue) {
+  const redLevel = Math.round(red / 51);
+  const greenLevel = Math.round(green / 51);
+  const blueLevel = Math.round(blue / 51);
+  const cubeIndex = redLevel * 36 + greenLevel * 6 + blueLevel;
+  const cube = GIF_PALETTE[cubeIndex];
+  const cubeDistance = (red - cube[0]) ** 2 + (green - cube[1]) ** 2 + (blue - cube[2]) ** 2;
+  const gray = Math.round((red * 299 + green * 587 + blue * 114) / 1000);
+  const grayLevel = Math.round(gray * 39 / 255);
+  const grayValue = Math.round(grayLevel * 255 / 39);
+  const grayDistance = (red - grayValue) ** 2 + (green - grayValue) ** 2 + (blue - grayValue) ** 2;
+  return grayDistance < cubeDistance ? 216 + grayLevel : cubeIndex;
+}
+
+function indexedGifPixels(imageData) {
+  const indices = new Uint8Array(imageData.data.length / 4);
+  for (let pixel = 0, offset = 0; offset < imageData.data.length; pixel += 1, offset += 4) {
+    const alpha = imageData.data[offset + 3] / 255;
+    const red = imageData.data[offset] * alpha + 255 * (1 - alpha);
+    const green = imageData.data[offset + 1] * alpha + 255 * (1 - alpha);
+    const blue = imageData.data[offset + 2] * alpha + 255 * (1 - alpha);
+    indices[pixel] = gifPaletteIndex(red, green, blue);
+  }
+  return indices;
+}
+
+function gifLzw(indices) {
+  const clearCode = 256;
+  const endCode = 257;
+  let nextCode = 258;
+  let codeSize = 9;
+  let bitBuffer = 0;
+  let bitCount = 0;
+  const bytes = [];
+  const dictionary = new Map();
+  const emit = (code) => {
+    bitBuffer |= code << bitCount;
+    bitCount += codeSize;
+    while (bitCount >= 8) {
+      bytes.push(bitBuffer & 0xff);
+      bitBuffer >>>= 8;
+      bitCount -= 8;
+    }
+  };
+  emit(clearCode);
+  let current = indices[0] ?? 0;
+  for (let index = 1; index < indices.length; index += 1) {
+    const next = indices[index];
+    const key = current * 256 + next;
+    const joined = dictionary.get(key);
+    if (joined !== undefined) {
+      current = joined;
+      continue;
+    }
+    emit(current);
+    if (nextCode < 4096) {
+      dictionary.set(key, nextCode);
+      nextCode += 1;
+      if (nextCode === (1 << codeSize) && codeSize < 12) codeSize += 1;
+    } else {
+      emit(clearCode);
+      dictionary.clear();
+      nextCode = 258;
+      codeSize = 9;
+    }
+    current = next;
+  }
+  emit(current);
+  emit(endCode);
+  if (bitCount > 0) bytes.push(bitBuffer & 0xff);
+  return bytes;
+}
+
+function gifAscii(output, text) {
+  for (const character of text) output.push(character.charCodeAt(0));
+}
+
+function gifWord(output, value) {
+  output.push(value & 0xff, (value >>> 8) & 0xff);
+}
+
+function gifSubBlocks(output, bytes) {
+  for (let offset = 0; offset < bytes.length; offset += 255) {
+    const block = bytes.slice(offset, offset + 255);
+    output.push(block.length, ...block);
+  }
+  output.push(0);
+}
+
+function encodeGif(frames, width, height, fps, loops, comment) {
+  if (width > 65535 || height > 65535) throw new Error("GIF export supports figures up to 65535×65535 pixels");
+  const output = [];
+  gifAscii(output, "GIF89a");
+  gifWord(output, width);
+  gifWord(output, height);
+  output.push(0xf7, 0, 0); // global table, 8-bit color resolution, 256 colors
+  for (const [red, green, blue] of GIF_PALETTE) output.push(red, green, blue);
+  output.push(0x21, 0xff, 0x0b);
+  gifAscii(output, "NETSCAPE2.0");
+  output.push(0x03, 0x01);
+  gifWord(output, Math.max(0, (Number(loops) || 1) - 1));
+  output.push(0);
+  if (comment) {
+    const commentBytes = new TextEncoder().encode(comment).slice(0, 2048);
+    output.push(0x21, 0xfe);
+    gifSubBlocks(output, [...commentBytes]);
+  }
+  const delay = Math.max(1, Math.min(65535, Math.round(100 / fps)));
+  for (const frame of frames) {
+    output.push(0x21, 0xf9, 0x04, 0x00);
+    gifWord(output, delay);
+    output.push(0, 0, 0x2c, 0, 0, 0, 0);
+    gifWord(output, width);
+    gifWord(output, height);
+    output.push(0x00, 0x08);
+    gifSubBlocks(output, gifLzw(frame));
+  }
+  output.push(0x3b);
+  return new Uint8Array(output);
+}
+
+async function exportAnimatedGif(source, duration, title, loops = 1) {
+  const dimensions = svgDimensions(source);
+  const document_ = new DOMParser().parseFromString(source, "image/svg+xml");
+  const flipbookFrames = document_.querySelectorAll(".ostrin-frame").length;
+  const fps = flipbookFrames ? Math.max(1, Math.round(flipbookFrames / duration)) : 15;
+  const framesPerLoop = flipbookFrames || Math.min(180, Math.max(30, Math.ceil(duration * fps)));
+  const loopCount = Math.max(1, Math.floor(Number(loops) || 1));
+  const frameCount = framesPerLoop * loopCount;
+  const canvas = document.createElement("canvas");
+  canvas.width = dimensions.width;
+  canvas.height = dimensions.height;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  if (!context) throw new Error("GIF export needs a 2D canvas context");
+  const frames = [];
+  for (let index = 0; index < frameCount; index += 1) {
+    const frameIndex = index % framesPerLoop;
+    const image = await imageFromSvg(staticSvgAt(source, framesPerLoop === 1 ? 0 : frameIndex / (framesPerLoop - 1)));
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    frames.push(indexedGifPixels(context.getImageData(0, 0, canvas.width, canvas.height)));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+  const metadata = provenanceOf(source);
+  const comment = metadata ? provenanceText(metadata, "Ostrin provenance") : "Ostrin SVG animation";
+  const blob = new Blob([encodeGif(frames, dimensions.width, dimensions.height, fps, loopCount, comment)], { type: "image/gif" });
+  downloadBlob(blob, `${fileStem(title || "ostrin-animation")}.gif`);
+  return { frameCount, fps };
+}
+
 // ---- explorer: the SVG in a sandboxed frame (no scripts) where its own hover styles and
 // <title> tooltips work; zoom rescales the vector figure and the frame scrolls to pan.
 let dialog;
@@ -274,6 +442,7 @@ function explorer() {
     el("button", { type: "button", className: "button-quiet", text: "Pause", "data-viz-pause": "" }),
     el("button", { type: "button", className: "button-quiet", text: "Restart", "data-viz-restart": "" }),
     el("button", { type: "button", className: "button-quiet", text: "Export WebM", "data-viz-export": "" }),
+    el("button", { type: "button", className: "button-quiet", text: "Export GIF", "data-viz-gif-export": "" }),
     animationSlider,
     animationLabel,
     el("label", { className: "viz-animation-speed-control" }, [el("span", { text: "Speed" }), animationSpeedInput, animationSpeedLabel]),
@@ -688,6 +857,19 @@ function explorer() {
     animationStatus.textContent = "exporting…";
     try {
       const result = await exportAnimatedWebm(svg, animationDuration, heading.textContent, animationLoopLimit || 1);
+      animationStatus.textContent = `${result.frameCount} frames · ${result.fps} fps · downloaded`;
+    } catch (error) {
+      animationStatus.textContent = error.message ?? String(error);
+    } finally {
+      exportButton.disabled = false;
+    }
+  });
+  animationTools.querySelector("[data-viz-gif-export]").addEventListener("click", async (event) => {
+    const exportButton = event.currentTarget;
+    exportButton.disabled = true;
+    animationStatus.textContent = "encoding GIF…";
+    try {
+      const result = await exportAnimatedGif(svg, animationDuration, heading.textContent, animationLoopLimit || 1);
       animationStatus.textContent = `${result.frameCount} frames · ${result.fps} fps · downloaded`;
     } catch (error) {
       animationStatus.textContent = error.message ?? String(error);
