@@ -9462,10 +9462,18 @@ fn std_numeric_cholesky_matches_interpreter_and_native() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/numeric.ostrin "))
         .unwrap_or_else(|| panic!("missing std.numeric source report: {report_text}"));
     assert!(
-        numeric_source.contains("ir=16")
+        numeric_source.contains("ir=17")
             && numeric_source.contains("hir=9")
-            && numeric_source.contains("ast=27"),
-        "QR/Cholesky regression in native lowering: {numeric_source}"
+            && numeric_source.contains("ast=30"),
+        "numeric linear algebra regression in native lowering: {numeric_source}"
+    );
+}
+
+#[test]
+fn std_numeric_lu_matches_interpreter_and_native() {
+    assert_eq!(
+        interpreter_and_native_agree("numeric_lu.ostrin"),
+        "L =\n[[1, 0, 0], [0, 1, 0], [0.5, 0.5, 1]]\nU =\n[[2, 0, 1], [0, 2, 1], [0, 0, -1]]\npermutation =\n[2, 0, 1]\ndeterminant = -4\nreconstruction residual = 0\nsolution =\n[0.5, 0.5, 2]\nsolve residual = 0\nsingular matrix = lu found a singular matrix\nnonsquare matrix = lu needs a square matrix\n"
     );
 }
 

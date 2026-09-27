@@ -17,7 +17,9 @@ generado (`Array_Float_from1`/`from2`/`from3`, y sus variantes por tipo), la ind
 `retain/release` de arrays y de las listas de forma consumidas por esos métodos.
 Los builtins numéricos `zeros`/`ones`, `norm`, `abs` escalar y `sqrt` usan también
 los helpers tipados de IR/C (`Array_Float_full`, `Array_Float_norm` y las funciones
-de `libm`), de modo que QR y Cholesky ya no necesitan el emisor AST.
+de `libm`), de modo que QR y Cholesky ya no necesitan el emisor AST. LU ya está disponible en
+`std.numeric`, pero sus records y recorridos matriciales permanecen en el fallback verificado
+hasta que el backend de agregados complete esa migración.
 `read_file`/`write_file` añaden `Result<String, String>` y `Result<Void, String>` con errores
 de archivo administrados, comprobación de lectura/escritura/cierre y un checkpoint de cancelación
 antes de cruzar la libc; la operación de archivo sigue siendo bloqueante mientras está dentro del

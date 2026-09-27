@@ -1,5 +1,5 @@
 // Scientific Lab · Linear Algebra
-// Three masses joined by springs: solve, normal modes, QR and Cholesky factorizations.
+// Three masses joined by springs: solve, normal modes, LU, QR and Cholesky factorizations.
 import std.numeric
 
 fn clean(x: Float) -> Float {
@@ -22,6 +22,17 @@ fn main() -> Void {
     print("displacement x = K⁻¹ f:")
     print(round(x * 10000.0) / 10000.0)
     print("residual |K x - f| = " + clean(norm(k @ x - force)).to_string())
+
+    pivoted = numeric.lu(k)
+    match pivoted {
+        Ok(factors) => {
+            print("LU determinant = " + clean(factors.determinant()).to_string())
+            print("LU reconstruction residual = " + clean(norm(factors.reconstruct() - k)).to_string())
+            lu_solution = factors.solve(force)
+            print("LU solve residual = " + clean(norm(k @ lu_solution - force)).to_string())
+        },
+        Err(message) => print("LU error: " + message),
+    }
 
     modes = eigvals(k)
     print("eigenvalues (squared mode frequencies):")

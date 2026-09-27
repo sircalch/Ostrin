@@ -10,6 +10,16 @@
 - `native_ir_numeric_builtins.ostrin` checks generated C markers, execution parity and
   `live_allocations=0`; the Cholesky integration test keeps a per-source native report ratchet.
 
+### Scientific core: LU factorization
+- `std.numeric.lu` now provides dense real LU decomposition with partial pivoting, explicit row
+  permutation, determinant, reconstruction and triangular solves. Singular and nonsquare inputs
+  return `Result<Lu, String>` diagnostics.
+- `numeric_lu.ostrin` compares interpreter and native output, while the Scientific Lab's Linear
+  Algebra demo now records LU residuals alongside QR and Cholesky. SVD, sparse and complex matrix
+  decompositions remain future work. The four aggregate-heavy LU methods add 68 measured AST
+  fallbacks across existing numeric consumers; the differential ratchet records this allowance
+  explicitly for the next aggregate migration.
+
 ### Scientific core: experimental complex numbers
 - `std.numeric` now exposes a `Complex` record backed by `Float64`, with rectangular and polar
   constructors, conjugation, magnitude, equality, overloaded arithmetic, reflected scalar

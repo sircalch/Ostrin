@@ -443,6 +443,138 @@ pub fn cholesky(a: Array<Float>, tol: Float = 1e-12) -> Result<Cholesky, String>
     Ok(Cholesky { l: l })
 }
 
+/// A partial-pivoting LU factorization of a dense square matrix: `P A = L U`.
+///
+/// `p[i]` is the source row of row `i` after the pivot permutations. Keeping
+/// the permutation explicit makes reconstruction and solves deterministic and
+/// keeps singular matrices in the typed `Result` path.
+pub record Lu {
+    l: Array<Float>
+    u: Array<Float>
+    p: Array<Int>
+    swaps: Int
+}
+
+impl Lu {
+    /// Reconstruct the original matrix `A`, undoing the row permutation.
+    fn reconstruct(self) -> Array<Float> {
+        n = self.u.shape()[0]
+        mut out = zeros([n, n])
+        for i in 0 until n {
+            for j in 0 until n {
+                mut value = 0.0
+                for k in 0 until n {
+                    value = value + self.l.get(i, k) * self.u.get(k, j)
+                }
+                out.set(self.p[i], j, value)
+            }
+        }
+        out
+    }
+
+    /// Solve `A x = b` by applying `P`, then forward and backward substitution.
+    fn solve(self, rhs: Array<Float>) -> Array<Float> {
+        n = self.u.shape()[0]
+        mut y = zeros([n])
+        for i in 0 until n {
+            mut value = rhs[self.p[i]]
+            for k in 0 until i {
+                value = value - self.l.get(i, k) * y[k]
+            }
+            y.set(i, value)
+        }
+        mut x = zeros([n])
+        for offset in 0 until n {
+            i = n - 1 - offset
+            mut value = y[i]
+            for k in i + 1 until n {
+                value = value - self.u.get(i, k) * x[k]
+            }
+            x.set(i, value / self.u.get(i, i))
+        }
+        x
+    }
+
+    /// Determinant from the triangular factor and the number of row swaps.
+    fn determinant(self) -> Float {
+        n = self.u.shape()[0]
+        mut value = if self.swaps % 2 == 0 { 1.0 } else { -1.0 }
+        for i in 0 until n {
+            value = value * self.u.get(i, i)
+        }
+        value
+    }
+}
+
+/// LU factorization with partial pivoting.
+///
+/// The matrix must be square. A pivot whose magnitude is at most `tol` is
+/// reported as singular instead of allowing a divide-by-zero to escape into
+/// a later solve.
+pub fn lu(a: Array<Float>, tol: Float = 1e-12) -> Result<Lu, String> {
+    shape = a.shape()
+    if shape.length() != 2 or shape[0] != shape[1] {
+        return Err("lu needs a square matrix")
+    }
+    n = shape[0]
+    mut u = zeros([n, n])
+    for i in 0 until n {
+        for j in 0 until n {
+            u.set(i, j, a.get(i, j))
+        }
+    }
+    mut l = zeros([n, n])
+    mut permutation: List<Int> = []
+    for i in 0 until n {
+        permutation.push(i)
+    }
+    mut swaps = 0
+
+    for k in 0 until n {
+        mut pivot = k
+        mut pivot_abs = abs(u.get(k, k))
+        for i in k + 1 until n {
+            candidate = abs(u.get(i, k))
+            if candidate > pivot_abs {
+                pivot = i
+                pivot_abs = candidate
+            }
+        }
+        if pivot_abs <= tol {
+            return Err("lu found a singular matrix")
+        }
+        if pivot != k {
+            for j in 0 until n {
+                temporary = u.get(k, j)
+                u.set(k, j, u.get(pivot, j))
+                u.set(pivot, j, temporary)
+            }
+            for j in 0 until k {
+                temporary = l.get(k, j)
+                l.set(k, j, l.get(pivot, j))
+                l.set(pivot, j, temporary)
+            }
+            mut reordered: List<Int> = []
+            for i in 0 until n {
+                reordered.push(if i == k { permutation[pivot] } else if i == pivot { permutation[k] } else { permutation[i] })
+            }
+            permutation = reordered
+            swaps = swaps + 1
+        }
+        l.set(k, k, 1.0)
+        pivot_value = u.get(k, k)
+        for i in k + 1 until n {
+            factor = u.get(i, k) / pivot_value
+            l.set(i, k, factor)
+            u.set(i, k, 0.0)
+            for j in k + 1 until n {
+                u.set(i, j, u.get(i, j) - factor * u.get(k, j))
+            }
+        }
+    }
+    Ok(Lu { l: l, u: u, p: array(permutation), swaps: swaps })
+}
+
 /// dy/dt = f(t, y) from t0 to t1 with `steps` classic Runge–Kutta steps.
 pub fn rk4(f: fn(Float, Array<Float>) -> Array<Float>, y0: Array<Float>, t0: Float, t1: Float, steps: Int = 1000) -> Solution {
     h = (t1 - t0) / (steps as Float)
