@@ -1,0 +1,36 @@
+// A deterministic streamline field integrated from a sampled 2D velocity grid.
+import std.viz
+
+fn main() -> Void {
+    grid_x = linspace(-3.0, 3.0, 25)
+    grid_y = linspace(-2.2, 2.2, 19)
+    mut us: List<Float> = []
+    mut vs: List<Float> = []
+    for yi in 0 until grid_y.length() {
+        y = grid_y[yi]
+        for xi in 0 until grid_x.length() {
+            x = grid_x[xi]
+            us.push(1.0 + 0.24 * sin(y))
+            vs.push(0.52 * cos(x))
+        }
+    }
+
+    seed_x = linspace(-2.5, 2.5, 9)
+    seed_y = linspace(-1.8, 1.8, 7)
+    mut seeds_x: List<Float> = []
+    mut seeds_y: List<Float> = []
+    for yi in 0 until seed_y.length() {
+        for xi in 0 until seed_x.length() {
+            seeds_x.push(seed_x[xi])
+            seeds_y.push(seed_y[yi])
+        }
+    }
+
+    fig = viz.figure("2D streamline field")
+        .describe("Bilinear interpolation with deterministic forward and backward integration")
+        .labels("x", "y")
+        .xlim(-3.0, 3.0)
+        .ylim(-2.2, 2.2)
+        .streamplot(grid_x, grid_y, array(us), array(vs), array(seeds_x), array(seeds_y), 72, 0.1, "flow", "#0f766e")
+    print(fig.svg())
+}

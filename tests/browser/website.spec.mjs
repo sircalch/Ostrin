@@ -169,7 +169,7 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   page.on("pageerror", (error) => runtimeErrors.push(error.message));
   await page.goto("./viz.html", { waitUntil: "domcontentloaded" });
   const cards = page.locator("[data-viz-gallery] .viz-card");
-  await expect(cards).toHaveCount(27);
+  await expect(cards).toHaveCount(28);
   await expect(page.getByRole("heading", { name: "Data table" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Linked data selection" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "3D vector field" })).toBeVisible();
@@ -318,6 +318,11 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   await expect(quiverFrame.locator(".quiver")).toHaveCount(17 * 13);
   await expect(quiverFrame.locator("g.quiver polygon")).toHaveCount(17 * 13 - 1);
   await expect(quiverFrame.locator(".quiver title").first()).toContainText("velocity");
+  await page.getByRole("button", { name: "Close" }).click();
+  await page.locator('[data-viz-explore="streamplot"]').click();
+  const streamFrame = page.frameLocator(".viz-frame-live");
+  await expect(streamFrame.locator("path.streamplot")).toHaveCount(9 * 7);
+  await expect(streamFrame.locator("path.streamplot title").first()).toContainText("flow streamline");
   await page.getByRole("button", { name: "Close" }).click();
   await page.locator('[data-viz-explore="hexbin"]').click();
   const hexbinFrame = page.frameLocator(".viz-frame-live");

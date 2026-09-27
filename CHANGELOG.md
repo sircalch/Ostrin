@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Visualization: 2D streamlines
+- `Figure.streamplot(grid_x, grid_y, u, v, seed_x, seed_y, steps:, step_size:, label:, color:)`
+  interpolates a sampled velocity field bilinearly and integrates deterministic streamlines in both
+  directions from each seed; paths stop at the domain boundary or at zero velocity and expose SVG
+  tooltips. `viz_streamplot.ostrin` is covered by interpreter/native parity and the live WASM gallery.
+
 ### Visualization: 2D vector fields
 - `Figure.quiver(xs, ys, us, vs, scale:, label:, color:)` draws deterministic sampled vector
   fields with data-unit scaling, triangular arrowheads, zero-vector markers and SVG tooltips;
