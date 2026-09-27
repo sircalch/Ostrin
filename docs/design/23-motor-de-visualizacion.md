@@ -235,6 +235,10 @@ los comprime con LZW en el navegador. El archivo incluye un comentario con la pr
 `data-hash`, `seed` y `compiler`) cuando la figura la declara. El límite práctico es el tamaño de los GIF
 grandes; SVG y WebM siguen siendo preferibles para publicación y alta resolución.
 
+WebM y GIF ofrecen una selección de calidad 1×/2×. La escala multiplica el canvas antes de rasterizar
+cada fotograma, se refleja en el nombre del archivo y se anuncia en el estado del explorador; el valor
+por defecto conserva la resolución base para no cambiar los flujos existentes.
+
 **HTML interactivo** empaqueta el fotograma SVG seleccionado, la procedencia y una pequeña interfaz
 autocontenida en un archivo descargable. El documento funciona sin el sitio de Ostrin ni una CDN:
 permite zoom, desplazamiento con el puntero y un crosshair accesible que vuelve a leer los títulos
@@ -305,6 +309,7 @@ la falta de literales científicos (`1e-9`). Ver `CONTEXTO_PROYECTO.md` §270–
 | 0.4 (hecho) | vista de impresión PDF con fotograma vectorial, tamaño de página y procedencia; el diálogo nativo permite guardar el PDF |
 | 0.4 (hecho) | exportación GIF con fotogramas cuantizados, compresión LZW y comentario de procedencia |
 | 0.4 (hecho) | exportación HTML autocontenida del fotograma SVG con procedencia, zoom, desplazamiento y crosshair |
+| 0.4 (hecho) | calidad 1×/2× para exportación WebM/GIF, con canvas de alta resolución, nombres explícitos y estado verificable |
 | 0.3 (hecho) | tablas SVG reproducibles con filas alternadas, encabezados, tooltips por celda, tema oscuro y explorador web con filtro/ordenamiento (`viz.table`) |
 | 0.4 (parcial, hecho) | campos vectoriales 3D muestreados con flechas, profundidad y tooltips |
 | 0.4 (parcial, hecho) | explorador web con acimut/elevación que vuelve a ejecutar `.view(...)` en WASM |

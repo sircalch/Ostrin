@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Visualization: publication-quality animation export
+- WebM and GIF exports now accept an accessible 1×/2× quality selector. The browser renders the
+  selected frame sequence at the requested canvas resolution, names scaled artifacts explicitly
+  and reports the output scale in the animation status.
+
 ### Visualization: standalone interactive HTML export
 - The Viz explorer can now download a self-contained HTML document containing the selected
   Ostrin SVG frame, its reproducibility record, accessible zoom/reset controls, pointer panning
