@@ -200,6 +200,105 @@ function sanitizeSvg(source) {
   return new XMLSerializer().serializeToString(root);
 }
 
+function exportInteractiveHtml(source, title, fraction = 0) {
+  const staticSource = sanitizeSvg(staticSvgAt(source, fraction));
+  const dimensions = svgDimensions(staticSource);
+  const metadata = provenanceOf(staticSource);
+  const safeTitle = escapeHtml(title || "Ostrin figure");
+  const provenance = escapeHtml(provenanceText(metadata, "Ostrin provenance"));
+  const html = [
+    "<!doctype html>",
+    '<html lang="en">',
+    "<head>",
+    '<meta charset="utf-8">',
+    '<meta name="viewport" content="width=device-width, initial-scale=1">',
+    "<title>" + safeTitle + " · Ostrin interactive figure</title>",
+    "<style>",
+    ":root{color-scheme:dark;--bg:#080a10;--panel:#111522;--line:#293145;--text:#f4f7fb;--muted:#a9b4c7;--accent:#a78bfa}",
+    "*{box-sizing:border-box}",
+    "html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font:14px system-ui,sans-serif}",
+    "main{display:grid;gap:14px;width:min(1200px,100% - 32px);margin:24px auto}",
+    "h1{margin:0;font-size:1.25rem}",
+    ".provenance{margin:0;color:var(--muted);font:12px ui-monospace,SFMono-Regular,Consolas,monospace;overflow-wrap:anywhere}",
+    ".toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--panel)}",
+    "button{min-height:32px;padding:5px 10px;border:1px solid var(--line);border-radius:4px;background:#171d2d;color:var(--text);cursor:pointer;font:12px ui-monospace,SFMono-Regular,Consolas,monospace}",
+    "button:hover,button:focus-visible{border-color:var(--accent);outline:2px solid color-mix(in srgb,var(--accent) 45%,transparent);outline-offset:1px}",
+    "button[aria-pressed=false]{opacity:.72}",
+    ".zoom{min-width:4rem;color:var(--muted);font:12px ui-monospace,SFMono-Regular,Consolas,monospace;text-align:center}",
+    ".status{flex:1 1 260px;color:var(--muted);font:12px ui-monospace,SFMono-Regular,Consolas,monospace}",
+    ".viewport{min-height:240px;max-height:calc(100vh - 190px);overflow:auto;padding:18px;border:1px solid var(--line);border-radius:6px;background:#fff;touch-action:none}",
+    ".art{width:max-content;transform-origin:top left;will-change:transform}",
+    ".art svg{display:block;width:" + dimensions.width + "px;height:" + dimensions.height + "px;max-width:none}",
+    ".crosshair-line{stroke:#111827;stroke-width:1;stroke-dasharray:5 4;vector-effect:non-scaling-stroke;pointer-events:none}",
+    ".crosshair-marker{fill:#fff;stroke:#111827;stroke-width:1.5;vector-effect:non-scaling-stroke;pointer-events:none}",
+    ".crosshair-label{fill:#111827;font:12px ui-monospace,SFMono-Regular,Consolas,monospace;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round;pointer-events:none}",
+    "@media (prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation-duration:.001ms!important;animation-iteration-count:1!important}}",
+    "</style>",
+    "</head>",
+    '<body><main data-ostrin-export="interactive">',
+    "<h1>" + safeTitle + "</h1>",
+    '<p class="provenance" data-ostrin-provenance="true">' + provenance + "</p>",
+    '<div class="toolbar" role="toolbar" aria-label="Figure controls">',
+    '<button type="button" id="zoom-out" aria-label="Zoom out">−</button>',
+    '<output class="zoom" id="zoom" aria-live="polite">100%</output>',
+    '<button type="button" id="zoom-in" aria-label="Zoom in">+</button>',
+    '<button type="button" id="reset" aria-label="Reset view">Reset view</button>',
+    '<button type="button" id="crosshair" aria-pressed="false">Enable crosshair</button>',
+    '<span class="status" id="status" aria-live="polite">Drag to pan · scroll to zoom · hover a mark to inspect values.</span>',
+    "</div>",
+    '<div class="viewport" id="viewport" tabindex="0" aria-label="Interactive figure viewport"><div class="art" id="art">',
+    staticSource,
+    "</div></div>",
+    "<script>",
+    "(() => {",
+    '  const viewport = document.getElementById("viewport");',
+    '  const art = document.getElementById("art");',
+    '  const svg = art.querySelector("svg");',
+    '  const zoomOutput = document.getElementById("zoom");',
+    '  const status = document.getElementById("status");',
+    '  const crosshairButton = document.getElementById("crosshair");',
+    "  let scale = 1, panX = 0, panY = 0, dragging = null, crosshairEnabled = false;",
+    "  const applyTransform = () => {",
+    '    art.style.transform = "translate(" + panX + "px," + panY + "px) scale(" + scale + ")";',
+    '    zoomOutput.textContent = Math.round(scale * 100) + "%";',
+    "  };",
+    '  const setZoom = (value) => { scale = Math.max(.5, Math.min(4, value)); applyTransform(); };',
+    '  document.getElementById("zoom-out").addEventListener("click", () => setZoom(scale - .25));',
+    '  document.getElementById("zoom-in").addEventListener("click", () => setZoom(scale + .25));',
+    '  document.getElementById("reset").addEventListener("click", () => { scale = 1; panX = 0; panY = 0; applyTransform(); status.textContent = "View reset · drag to pan · scroll to zoom."; });',
+    '  viewport.addEventListener("wheel", (event) => { event.preventDefault(); setZoom(scale * (event.deltaY < 0 ? 1.1 : .9)); }, { passive: false });',
+    '  viewport.addEventListener("pointerdown", (event) => { if (event.button !== 0) return; dragging = { x: event.clientX, y: event.clientY, panX, panY }; viewport.setPointerCapture(event.pointerId); });',
+    '  viewport.addEventListener("pointermove", (event) => { if (!dragging) return; panX = dragging.panX + event.clientX - dragging.x; panY = dragging.panY + event.clientY - dragging.y; applyTransform(); });',
+    '  viewport.addEventListener("pointerup", () => { dragging = null; });',
+    '  viewport.addEventListener("pointercancel", () => { dragging = null; });',
+    '  const inspectableSelector = "[data-viz-index],.bar,.boxplot,.violin,.hexbin-cell,.contourf-cell,.quiver,.streamplot,.viz-series";',
+    '  const namespace = "http://www.w3.org/2000/svg";',
+    "  let overlay = null;",
+    '  const hideCrosshair = () => { if (overlay) overlay.setAttribute("visibility", "hidden"); };',
+    "  if (svg && svg.querySelector(inspectableSelector)) {",
+    '    overlay = document.createElementNS(namespace, "g");',
+    '    overlay.setAttribute("aria-hidden", "true");',
+    '    overlay.setAttribute("class", "ostrin-export-crosshair");',
+    '    const makeLine = () => { const line = document.createElementNS(namespace, "line"); line.setAttribute("class", "crosshair-line"); overlay.append(line); return line; };',
+    "    const vertical = makeLine(), horizontal = makeLine();",
+    '    const marker = document.createElementNS(namespace, "circle"); marker.setAttribute("class", "crosshair-marker"); marker.setAttribute("r", "4"); overlay.append(marker);',
+    '    const label = document.createElementNS(namespace, "text"); label.setAttribute("class", "crosshair-label"); overlay.append(label);',
+    "    svg.append(overlay);",
+    '    const showCrosshair = (event) => { if (!crosshairEnabled) return; const mark = event.target instanceof Element ? event.target.closest(inspectableSelector) : null; if (!mark || mark.closest(".ostrin-export-crosshair")) { hideCrosshair(); return; } let bounds; try { bounds = mark.getBBox(); } catch { hideCrosshair(); return; } if (!bounds || (!bounds.width && !bounds.height)) { hideCrosshair(); return; } const viewBox = svg.viewBox.baseVal; const x0 = viewBox.x || 0, y0 = viewBox.y || 0; const width = viewBox.width || Number(svg.getAttribute("width")) || 1, height = viewBox.height || Number(svg.getAttribute("height")) || 1; const x = bounds.x + bounds.width / 2, y = bounds.y + bounds.height / 2; vertical.setAttribute("x1", x); vertical.setAttribute("x2", x); vertical.setAttribute("y1", y0); vertical.setAttribute("y2", y0 + height); horizontal.setAttribute("x1", x0); horizontal.setAttribute("x2", x0 + width); horizontal.setAttribute("y1", y); horizontal.setAttribute("y2", y); marker.setAttribute("cx", x); marker.setAttribute("cy", y); label.setAttribute("x", Math.min(x + 8, x0 + width - 12)); label.setAttribute("y", Math.max(y - 8, y0 + 14)); label.textContent = mark.querySelector("title")?.textContent?.trim() || mark.getAttribute("aria-label") || "Selected mark"; overlay.setAttribute("visibility", "visible"); status.textContent = label.textContent; };',
+    '    svg.addEventListener("pointermove", showCrosshair);',
+    '    svg.addEventListener("pointerleave", hideCrosshair);',
+    '    overlay.setAttribute("visibility", "hidden");',
+    '  } else { crosshairButton.disabled = true; status.textContent = "No inspectable marks in this figure."; }',
+    '  crosshairButton.addEventListener("click", () => { crosshairEnabled = !crosshairEnabled; crosshairButton.setAttribute("aria-pressed", String(crosshairEnabled)); crosshairButton.textContent = crosshairEnabled ? "Disable crosshair" : "Enable crosshair"; hideCrosshair(); status.textContent = crosshairEnabled ? "Move over a mark to inspect its values." : "Crosshair disabled."; });',
+    "  applyTransform();",
+    "})();",
+    "</script>",
+    "</body></html>",
+  ].join("\n");
+  downloadBlob(new Blob([html], { type: "text/html;charset=utf-8" }), fileStem(title) + ".html");
+  return { width: dimensions.width, height: dimensions.height };
+}
+
 function printPdf(source, title, fraction = 0) {
   const staticSource = sanitizeSvg(staticSvgAt(source, fraction));
   const dimensions = svgDimensions(staticSource);
@@ -999,6 +1098,15 @@ function explorer() {
       exportStatus.textContent = error.message ?? String(error);
     }
   });
+  const exportHtmlButton = button("HTML", "Export interactive HTML", () => {
+    try {
+      const fraction = animationDuration ? Number(animationSlider.value) / 1000 : 0;
+      const result = exportInteractiveHtml(svg, heading.textContent, fraction);
+      exportStatus.textContent = "HTML downloaded · interactive · " + result.width + "×" + result.height;
+    } catch (error) {
+      exportStatus.textContent = error.message ?? String(error);
+    }
+  });
   const prepareSourceParameters = (parameters = []) => {
     sourceControls = parameters;
     sourceValues = Object.fromEntries(parameters.map((parameter) => [parameter.name, sourceParameterValue(cameraSource, parameter)]));
@@ -1036,6 +1144,7 @@ function explorer() {
         exportSvgButton,
         exportPngButton,
         exportPdfButton,
+        exportHtmlButton,
         exportStatus,
         button("Close", "Close the explorer", () => node.close()),
       ]),
