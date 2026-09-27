@@ -1,7 +1,7 @@
 # 24 — Métodos numéricos: `std.numeric` 0.1
 
 Estado: implementado (2026-09-24). Código: `compiler/std/numeric.ostrin`. Ejemplos:
-`examples/numeric_methods.ostrin`, `examples/numeric_complex.ostrin`, `examples/numeric_cholesky.ostrin`, `examples/viz_ode.ostrin`,
+`examples/numeric_methods.ostrin`, `examples/numeric_complex.ostrin`, `examples/numeric_lu.ostrin`, `examples/numeric_cholesky.ostrin`, `examples/viz_ode.ostrin`,
 `examples/viz_fft.ostrin`, `examples/viz_spline.ostrin`, `examples/lab_ode.ostrin`. Web: pestañas ODE,
 Linear Algebra y Complex del Scientific Lab y figuras de la galería de `viz.html`.
 
@@ -52,6 +52,11 @@ chol = numeric.cholesky(a)                  // Result<Cholesky, String>, matriz 
 chol.l  chol.reconstruct()                  // L triangular inferior, L @ Lᵀ
 chol.solve(rhs)                             // sustituciones hacia delante y atrás
 
+lu = numeric.lu(a)                          // Result<Lu, String>, pivoteo parcial
+lu.l  lu.u  lu.p  lu.swaps                  // P A = L @ U; p conserva las filas originales
+lu.reconstruct()  lu.solve(rhs)              // reconstrucción de A y sustituciones triangulares
+lu.determinant()                             // determinante con el signo de los intercambios
+
 // Con unidades: xs: Array<Quantity<X>>, ys: Array<Quantity<Y>>
 numeric.unit_trapz(xs, ys)                     // Quantity<X * Y>   (km/h sobre min → km)
 numeric.unit_cumtrapz(xs, ys)                  // Array<Quantity<X * Y>>
@@ -84,6 +89,10 @@ ningún caso especial en el runtime. Requieren al menos dos muestras.
   Comprueba forma, simetría y pivotes positivos; `reconstruct` verifica `A = L @ Lᵀ` y `solve` resuelve
   el sistema mediante dos sustituciones triangulares. El ejemplo, la pestaña Linear Algebra y la suite
   intérprete/nativo/WASM cubren también el diagnóstico para matrices no definidas positivas.
+- **LU**: eliminación de Gauss con pivoteo parcial para matrices densas cuadradas. Conserva `L`, `U`,
+  la permutación `p` y el número de intercambios, rechaza pivotes singulares mediante `Result<Lu, String>`,
+  y ofrece reconstrucción, determinante y resolución triangular. `numeric_lu.ostrin`, el ejemplo de
+  Linear Algebra y la suite intérprete/nativo cubren pivoteo, matriz singular y matriz no cuadrada.
 - **Complejos**: `Complex` es por ahora un record público de `Float64` con operadores `Add`, `Sub`,
   `Mul`, `Div`, igualdad, conjugado, magnitud, forma polar, `cis` y potencias enteras. El ejemplo
   `numeric_complex.ostrin` y la pestaña Complex del Lab verifican la misma salida en intérprete,
@@ -114,4 +123,4 @@ y tipos función para enlazar `X`, y una segunda aparición con otra dimensión 
 | cuadratura adaptativa, integrales múltiples | Gauss–Kronrod |
 | optimización multivariable | Nelder–Mead, BFGS |
 | unidades en ODEs y raíces | `unit_*` cubre integrales, derivadas e interpolación; `rk45` y `newton` siguen en `Float` (un estado con dimensiones mezcladas necesitaría tuplas o records de cantidades) |
-| álgebra lineal avanzada | QR denso y Cholesky ya están disponibles; LU, SVD, autovectores, mínimos cuadrados generalizados, dispersa y álgebra matricial compleja siguen pendientes |
+| álgebra lineal avanzada | LU, QR denso y Cholesky ya están disponibles; SVD, autovectores, mínimos cuadrados generalizados, dispersa y álgebra matricial compleja siguen pendientes |

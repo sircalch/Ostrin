@@ -63,4 +63,4 @@ Tensor<T, D1..Dk>   = Array<T, (D1..Dk)>
 
 ## 7. Pruebas
 
-Cada fase añade: ejemplos en `examples/`, comparación intérprete↔nativo (ya automática), casos `*_errors.ostrin` para cada regla de conversión y de forma, y *benchmarks* frente a C y NumPy para las operaciones de rendimiento. `examples/numeric_complex.ostrin` y `examples/numeric_cholesky.ostrin` cubren las APIs experimentales actuales y comprueban la misma salida en ambos backends.
+Cada fase añade: ejemplos en `examples/`, comparación intérprete↔nativo (ya automática), casos `*_errors.ostrin` para cada regla de conversión y de forma, y *benchmarks* frente a C y NumPy para las operaciones de rendimiento. `examples/numeric_complex.ostrin`, `examples/numeric_lu.ostrin` y `examples/numeric_cholesky.ostrin` cubren las APIs experimentales actuales y comprueban la misma salida en ambos backends.

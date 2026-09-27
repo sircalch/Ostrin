@@ -356,7 +356,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
     {
       "id": "linear-algebra",
       "title": "Linear Algebra",
-      "headline": "Solve a spring system, find its normal modes and factor it with QR and Cholesky.",
+      "headline": "Solve a spring system, find its normal modes and factor it with LU, QR and Cholesky.",
       "file": "examples/lab_linear_algebra.ostrin",
       "render": "text",
       "params": [
@@ -368,14 +368,14 @@ globalThis.OSTRIN_LAB = Object.freeze({
           "step": 0.25
         }
       ],
-      "how": "The stiffness matrix is an Array<Float>; det, solve, norm, @ and eigvals are compiler built-ins. std.numeric.qr adds a modified Gram–Schmidt factorization with explicit Q/R diagnostics, while std.numeric.cholesky adds a symmetric positive-definite factor and triangular solve. All paths produce the same result in the interpreter, native C and browser.",
+      "how": "The stiffness matrix is an Array<Float>; det, solve, norm, @ and eigvals are compiler built-ins. std.numeric.lu adds partial-pivoting factors and a triangular solve, std.numeric.qr adds modified Gram–Schmidt diagnostics, and std.numeric.cholesky adds a symmetric positive-definite factor. All paths produce the same result in the interpreter, native C and browser.",
       "docs": {
         "label": "numeric hierarchy and arrays",
         "href": "https://github.com/sircalch/Ostrin/blob/main/docs/design/19-jerarquia-numerica-y-arrays.md"
       },
-      "limits": "Dense real matrices only; eigenvalues are computed for symmetric matrices, QR currently requires full column rank and Cholesky requires a symmetric positive-definite matrix. LU, SVD, sparse and complex linear algebra remain on the roadmap.",
+      "limits": "Dense real matrices only; LU requires a nonsingular square matrix, eigenvalues are computed for symmetric matrices, QR currently requires full column rank and Cholesky requires a symmetric positive-definite matrix. SVD, sparse and complex linear algebra remain on the roadmap.",
       "files": {
-        "main.ostrin": "// Scientific Lab · Linear Algebra\n// Three masses joined by springs: solve, normal modes, QR and Cholesky factorizations.\nimport std.numeric\n\nfn clean(x: Float) -> Float {\n    round(x * 10000.0) / 10000.0\n}\n\nfn main() -> Void {\n    coupling = 1.0\n    k = array([\n        [1.0 + coupling, 0.0 - coupling, 0.0],\n        [0.0 - coupling, 1.0 + 2.0 * coupling, 0.0 - coupling],\n        [0.0, 0.0 - coupling, 1.0 + coupling]\n    ])\n    force = array([1.0, 0.0, -1.0])\n\n    print(\"det(K) = \" + clean(det(k)).to_string())\n    print(\"trace(K) = \" + clean(trace(k)).to_string())\n\n    x = solve(k, force)\n    print(\"displacement x = K⁻¹ f:\")\n    print(round(x * 10000.0) / 10000.0)\n    print(\"residual |K x - f| = \" + clean(norm(k @ x - force)).to_string())\n\n    modes = eigvals(k)\n    print(\"eigenvalues (squared mode frequencies):\")\n    print(round(modes * 10000.0) / 10000.0)\n    print(\"sum of eigenvalues - trace = \" + clean(abs(modes.sum() - trace(k))).to_string())\n\n    decomposition = numeric.qr(k)\n    match decomposition {\n        Ok(factors) => {\n            print(\"Q (orthonormal basis):\")\n            print(round(factors.q * 10000.0) / 10000.0)\n            print(\"R (upper triangular):\")\n            print(round(factors.r * 10000.0) / 10000.0)\n            print(\"QR residual = \" + clean(norm(factors.reconstruct() - k)).to_string())\n            print(\"Q orthogonality = \" + clean(factors.orthogonality()).to_string())\n        },\n        Err(message) => print(\"QR error: \" + message),\n    }\n\n    positive = numeric.cholesky(k)\n    match positive {\n        Ok(factors) => {\n            print(\"Cholesky residual = \" + clean(norm(factors.reconstruct() - k)).to_string())\n            cholesky_solution = factors.solve(force)\n            print(\"Cholesky solve residual = \" + clean(norm(k @ cholesky_solution - force)).to_string())\n        },\n        Err(message) => print(\"Cholesky error: \" + message),\n    }\n}\n"
+        "main.ostrin": "// Scientific Lab · Linear Algebra\n// Three masses joined by springs: solve, normal modes, LU, QR and Cholesky factorizations.\nimport std.numeric\n\nfn clean(x: Float) -> Float {\n    round(x * 10000.0) / 10000.0\n}\n\nfn main() -> Void {\n    coupling = 1.0\n    k = array([\n        [1.0 + coupling, 0.0 - coupling, 0.0],\n        [0.0 - coupling, 1.0 + 2.0 * coupling, 0.0 - coupling],\n        [0.0, 0.0 - coupling, 1.0 + coupling]\n    ])\n    force = array([1.0, 0.0, -1.0])\n\n    print(\"det(K) = \" + clean(det(k)).to_string())\n    print(\"trace(K) = \" + clean(trace(k)).to_string())\n\n    x = solve(k, force)\n    print(\"displacement x = K⁻¹ f:\")\n    print(round(x * 10000.0) / 10000.0)\n    print(\"residual |K x - f| = \" + clean(norm(k @ x - force)).to_string())\n\n    pivoted = numeric.lu(k)\n    match pivoted {\n        Ok(factors) => {\n            print(\"LU determinant = \" + clean(factors.determinant()).to_string())\n            print(\"LU reconstruction residual = \" + clean(norm(factors.reconstruct() - k)).to_string())\n            lu_solution = factors.solve(force)\n            print(\"LU solve residual = \" + clean(norm(k @ lu_solution - force)).to_string())\n        },\n        Err(message) => print(\"LU error: \" + message),\n    }\n\n    modes = eigvals(k)\n    print(\"eigenvalues (squared mode frequencies):\")\n    print(round(modes * 10000.0) / 10000.0)\n    print(\"sum of eigenvalues - trace = \" + clean(abs(modes.sum() - trace(k))).to_string())\n\n    decomposition = numeric.qr(k)\n    match decomposition {\n        Ok(factors) => {\n            print(\"Q (orthonormal basis):\")\n            print(round(factors.q * 10000.0) / 10000.0)\n            print(\"R (upper triangular):\")\n            print(round(factors.r * 10000.0) / 10000.0)\n            print(\"QR residual = \" + clean(norm(factors.reconstruct() - k)).to_string())\n            print(\"Q orthogonality = \" + clean(factors.orthogonality()).to_string())\n        },\n        Err(message) => print(\"QR error: \" + message),\n    }\n\n    positive = numeric.cholesky(k)\n    match positive {\n        Ok(factors) => {\n            print(\"Cholesky residual = \" + clean(norm(factors.reconstruct() - k)).to_string())\n            cholesky_solution = factors.solve(force)\n            print(\"Cholesky solve residual = \" + clean(norm(k @ cholesky_solution - force)).to_string())\n        },\n        Err(message) => print(\"Cholesky error: \" + message),\n    }\n}\n"
       },
       "main": "main.ostrin",
       "args": [
@@ -390,6 +390,9 @@ globalThis.OSTRIN_LAB = Object.freeze({
         "displacement x = K⁻¹ f:",
         "[0.5, 0, -0.5]",
         "residual |K x - f| = 0",
+        "LU determinant = 8",
+        "LU reconstruction residual = 0",
+        "LU solve residual = 0",
         "eigenvalues (squared mode frequencies):",
         "[1, 2, 4]",
         "sum of eigenvalues - trace = 0",
