@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Visualization: crosshair data inspection
+- The Viz explorer now offers an accessible crosshair mode. Moving over a rendered mark reads its
+  existing SVG tooltip into a precise crosshair overlay and live status, keeping data and computation
+  in Ostrin while making point inspection easier in dense figures.
+
 ### Visualization: interactive legend toggles
 - Every labeled `std.viz` series now carries a stable identifier in the SVG. The web explorer exposes
   accessible legend buttons that hide or restore a series in place and report the visible count without

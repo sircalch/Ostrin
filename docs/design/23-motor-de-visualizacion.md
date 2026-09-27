@@ -290,6 +290,7 @@ la falta de literales científicos (`1e-9`). Ver `CONTEXTO_PROYECTO.md` §270–
 | 0.2 (parcial, hecho) | tooltips `<title>` con valores y resaltado CSS al pasar el ratón, dentro del SVG y sin scripts; visor web con zoom y desplazamiento en un iframe aislado |
 | 0.2 (parcial, hecho) | selección enlazada entre puntos y filas en figuras compuestas; parámetros declarativos de figuras se reevalúan con Ostrin en WASM |
 | 0.2 (parcial, hecho) | leyenda con identificadores de serie y controles accesibles en el explorador web para ocultar/mostrar series sin alterar los datos ni la exportación fuente |
+| 0.2 (parcial, hecho) | inspección de datos con una retícula (`crosshair`) superpuesta a las marcas SVG y lectura de sus tooltips, activable con teclado y respetando el aislamiento del iframe |
 | 0.3 (parcial, hecho) | animación en bucle con `viz.animate`: fotogramas generados por Ostrin, reproducidos con CSS dentro del SVG |
 | 0.3 (hecho) | movimiento continuo con SMIL: `animate`, `moving_point` con estela, `rod`, `moving_segment`, `morph`; `no_axes` |
 | 0.3 (parcial, hecho) | controles web de play/pausa/reinicio, posición temporal, velocidad, ciclos finitos y exportación WebM cuando el navegador ofrece `MediaRecorder` |

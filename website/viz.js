@@ -517,6 +517,13 @@ function explorer() {
     legendControls,
     legendStatus,
   ]);
+  const crosshairStatus = el("span", { className: "viz-crosshair-status", "aria-live": "polite", text: "" });
+  const crosshairToggle = el("button", { type: "button", className: "button-quiet", text: "Enable crosshair", "data-viz-crosshair-toggle": "", "aria-pressed": "false" });
+  const crosshairTools = el("div", { className: "viz-crosshair-tools", hidden: true }, [
+    el("span", { className: "viz-animation-caption", text: "Inspect" }),
+    crosshairToggle,
+    crosshairStatus,
+  ]);
   let zoom = 100;
   let svg = "";
   let cameraSource = "";
@@ -541,6 +548,8 @@ function explorer() {
   let tableSortColumn = -1;
   let tableAscending = true;
   let legendItems = [];
+  let crosshairEnabled = false;
+  let crosshairOverlay = null;
   const render = () => {
     zoomLabel.textContent = `${zoom}%`;
     frame.srcdoc = `<!doctype html><meta charset="utf-8"><style>html,body{margin:0;background:#fff}svg{display:block;width:${zoom}%;height:auto}[data-viz-index]{cursor:pointer}[data-viz-index]:focus{outline:2px solid #7c3aed;outline-offset:2px}.pt.viz-linked-selected{stroke:#7c3aed!important;stroke-width:3px!important;stroke-opacity:1!important}.table-row.viz-linked-selected .table-cell{stroke:#7c3aed;stroke-width:2}.table-row.viz-linked-selected .table-value{font-weight:700}</style>${svg}`;
@@ -868,6 +877,96 @@ function explorer() {
     }));
     legendStatus.textContent = legendItems.length ? `${legendItems.length} series visible` : "";
   };
+  const prepareCrosshair = () => {
+    const document_ = animationDocument();
+    const root = document_?.querySelector("svg");
+    const inspectableSelector = "[data-viz-index],.bar,.boxplot,.violin,.hexbin-cell,.contourf-cell,.quiver,.streamplot,.viz-series";
+    const inspectable = root?.querySelector(inspectableSelector);
+    crosshairTools.hidden = !root || !inspectable;
+    crosshairOverlay = null;
+    if (!root || !inspectable) return;
+    const namespace = "http://www.w3.org/2000/svg";
+    const overlay = document_.createElementNS(namespace, "g");
+    overlay.setAttribute("class", "viz-crosshair-overlay");
+    overlay.setAttribute("aria-hidden", "true");
+    overlay.style.pointerEvents = "none";
+    const vertical = document_.createElementNS(namespace, "line");
+    const horizontal = document_.createElementNS(namespace, "line");
+    const marker = document_.createElementNS(namespace, "circle");
+    const label = document_.createElementNS(namespace, "text");
+    [vertical, horizontal].forEach((line) => {
+      line.setAttribute("class", "viz-crosshair-line");
+      line.setAttribute("stroke", "#7c3aed");
+      line.setAttribute("stroke-width", "1");
+      line.setAttribute("stroke-dasharray", "4 4");
+    });
+    marker.setAttribute("class", "viz-crosshair-marker");
+    marker.setAttribute("r", "4");
+    marker.setAttribute("fill", "#7c3aed");
+    marker.setAttribute("stroke", "#fff");
+    marker.setAttribute("stroke-width", "1.5");
+    label.setAttribute("class", "viz-crosshair-label");
+    label.setAttribute("font-size", "11");
+    label.setAttribute("font-family", "ui-monospace, SFMono-Regular, Menlo, monospace");
+    label.setAttribute("fill", "#4c1d95");
+    label.setAttribute("paint-order", "stroke");
+    label.setAttribute("stroke", "#fff");
+    label.setAttribute("stroke-width", "3");
+    label.setAttribute("stroke-linejoin", "round");
+    overlay.append(vertical, horizontal, marker, label);
+    root.append(overlay);
+    crosshairOverlay = { overlay, vertical, horizontal, marker, label, root };
+    const hide = () => {
+      overlay.setAttribute("visibility", "hidden");
+      if (crosshairEnabled) crosshairStatus.textContent = "Move over a mark to inspect its values.";
+    };
+    const show = (event) => {
+      if (!crosshairEnabled) return;
+      const target = event.target;
+      const mark = typeof target?.closest === "function"
+        ? target.closest(inspectableSelector)
+        : null;
+      if (!mark || mark.closest?.(".viz-crosshair-overlay")) {
+        hide();
+        return;
+      }
+      const title = mark.querySelector("title")?.textContent?.trim() || mark.getAttribute("aria-label") || "Selected mark";
+      let bounds;
+      try { bounds = mark.getBBox(); } catch { hide(); return; }
+      if (!bounds || (!bounds.width && !bounds.height)) { hide(); return; }
+      const viewBox = root.viewBox?.baseVal;
+      const width = viewBox?.width || Number(root.getAttribute("width")) || 1;
+      const height = viewBox?.height || Number(root.getAttribute("height")) || 1;
+      const x = bounds.x + bounds.width / 2;
+      const y = bounds.y + bounds.height / 2;
+      vertical.setAttribute("x1", String(x));
+      vertical.setAttribute("x2", String(x));
+      vertical.setAttribute("y1", String(viewBox?.y || 0));
+      vertical.setAttribute("y2", String((viewBox?.y || 0) + height));
+      horizontal.setAttribute("x1", String(viewBox?.x || 0));
+      horizontal.setAttribute("x2", String((viewBox?.x || 0) + width));
+      horizontal.setAttribute("y1", String(y));
+      horizontal.setAttribute("y2", String(y));
+      marker.setAttribute("cx", String(x));
+      marker.setAttribute("cy", String(y));
+      label.setAttribute("x", String(Math.min(x + 8, (viewBox?.x || 0) + width - 12)));
+      label.setAttribute("y", String(Math.max(y - 8, (viewBox?.y || 0) + 14)));
+      label.textContent = title;
+      overlay.setAttribute("visibility", "visible");
+      crosshairStatus.textContent = title;
+    };
+    root.addEventListener("pointermove", show);
+    root.addEventListener("pointerleave", hide);
+    overlay.setAttribute("visibility", "hidden");
+    crosshairStatus.textContent = crosshairEnabled ? "Move over a mark to inspect its values." : "Enable the crosshair to inspect marks.";
+  };
+  const setCrosshairEnabled = (enabled) => {
+    crosshairEnabled = enabled;
+    crosshairToggle.setAttribute("aria-pressed", String(enabled));
+    crosshairToggle.textContent = enabled ? "Disable crosshair" : "Enable crosshair";
+    crosshairOverlay?.overlay?.setAttribute("visibility", "hidden");
+    crosshairStatus.textContent = enabled ? "Move over a mark to inspect its values." : "Crosshair disabled.";
+  };
   const button = (text, label, action) => {
     const node = el("button", { type: "button", className: "button-quiet", "aria-label": label, text });
     node.addEventListener("click", action);
@@ -943,11 +1042,12 @@ function explorer() {
     ]),
     parameterTools,
     legendTools,
+    crosshairTools,
     cameraTools,
     animationTools,
     tableTools,
     selectionTools,
-    el("p", { className: "sl-provenance", text: "Hover a point or bar for its values (the SVG's own <title> tooltips). Toggle legend series to focus the figure. Zoom rescales the vector figure; scroll to pan." }),
+    el("p", { className: "sl-provenance", text: "Hover a point or bar for its values (the SVG's own <title> tooltips). Toggle legend series or enable the crosshair to inspect data. Zoom rescales the vector figure; scroll to pan." }),
     frame,
   ]);
   animationTools.querySelector("[data-viz-play]").addEventListener("click", () => setAnimationState(false));
@@ -992,6 +1092,7 @@ function explorer() {
   });
   animationSlider.addEventListener("input", () => setAnimationTime(animationSlider.value));
   animationSpeedInput.addEventListener("input", () => setAnimationSpeed(animationSpeedInput.value));
+  crosshairToggle.addEventListener("click", () => setCrosshairEnabled(!crosshairEnabled));
   tableFilter.addEventListener("input", applyTableState);
   tableSort.addEventListener("change", () => {
     tableSortColumn = Number(tableSort.value);
@@ -1015,6 +1116,7 @@ function explorer() {
     prepareAnimationDocument();
     setAnimationSpeed(animationSpeedInput.value);
     prepareLegend();
+    prepareCrosshair();
     prepareTable();
     prepareLinkedSelection();
     applyReducedMotion();
@@ -1051,6 +1153,9 @@ function explorer() {
       legendControls.replaceChildren();
       legendItems = [];
       legendStatus.textContent = "";
+      setCrosshairEnabled(false);
+      crosshairTools.hidden = true;
+      crosshairStatus.textContent = "";
       selectionStatus.textContent = "";
       exportStatus.textContent = "";
       prepareAnimation();

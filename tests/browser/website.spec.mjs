@@ -215,6 +215,16 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   await firstLegendToggle.click();
   await expect(firstSeries).toBeVisible();
   await expect(firstLegendToggle).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".viz-crosshair-tools")).toBeVisible();
+  const crosshairToggle = page.locator("[data-viz-crosshair-toggle]");
+  await crosshairToggle.press("Enter");
+  await expect(crosshairToggle).toHaveAttribute("aria-pressed", "true");
+  await point.hover();
+  await expect(page.locator(".viz-crosshair-status")).toHaveText(/measurements: \(/);
+  await expect(scatterFrame.locator(".viz-crosshair-overlay")).toHaveAttribute("visibility", "visible");
+  await crosshairToggle.press("Enter");
+  await expect(crosshairToggle).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator(".viz-crosshair-status")).toHaveText("Crosshair disabled.");
   const svgDownloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download SVG" }).click();
   const svgDownload = await svgDownloadPromise;
