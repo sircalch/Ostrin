@@ -136,6 +136,13 @@ test("Scientific Lab recomputes its demos with the real compiler", async ({ page
   await expect(page.locator('#lab-panel-monte-carlo .sl-raw pre')).toContainText("estimate 40000 ");
   await expect(page.locator("#lab-panel-monte-carlo .sl-chart")).toBeVisible();
 
+  await page.getByRole("tab", { name: "Linear Algebra" }).click();
+  await expect(page.locator("#lab-panel-linear-algebra .sl-raw pre")).toContainText("QR residual");
+  await expect(page.locator("#lab-panel-linear-algebra .sl-raw pre")).toContainText("Q orthogonality");
+  await page.locator('[data-lab-run="linear-algebra"]').click();
+  await expect(page.locator('[data-lab-provenance="linear-algebra"]')).toHaveAttribute("data-state", "live", { timeout: 30_000 });
+  await expect(page.locator("#lab-panel-linear-algebra .sl-raw pre")).toContainText("QR residual = 0");
+
   // std.viz's SVG is shown as an image; the 3D view recomputes when the camera moves.
   await page.getByRole("tab", { name: "Plot" }).click();
   await page.locator('[data-lab-run="plot"]').click();

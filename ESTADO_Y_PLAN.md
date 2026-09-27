@@ -100,8 +100,8 @@ escapes complejos conservan el fallback verificado.
 galería `website/viz.html` y las pestañas Plot/3D del Lab las ejecutan en el navegador.
 
 **Métodos numéricos**: `std.numeric` (documento 24) resuelve raíces, integrales, derivadas, mínimos,
-interpolación (lineal y spline cúbico), ODEs (`rk4`, `rk45` adaptativo) y FFT, escrito en Ostrin; la
-pestaña ODE del Lab lo ejecuta en el navegador.
+interpolación (lineal y spline cúbico), ODEs (`rk4`, `rk45` adaptativo), QR denso (`Q`, `R`, residual y
+ortogonalidad) y FFT, escrito en Ostrin; las pestañas ODE y Linear Algebra del Lab lo ejecutan en el navegador.
 
 **Numérico/científico**: literales científicos (`6.022e23`), enteros de ancho fijo, `Float32`, `Array<T>` (difusión, máscaras,
 rebanadas, `@`), estadística, regresión, `det/inv/eigvals/norm`, `Rng` reproducible,

@@ -8,8 +8,8 @@ figuras de la galería de `viz.html`.
 ## 1. Objetivo y principios
 
 La fase 6 del plan (matemática científica) necesita los métodos que cualquier curso o laboratorio usa a
-diario: raíces, integrales, derivadas, mínimos, interpolación, ecuaciones diferenciales y la
-transformada de Fourier. Igual que `std.viz`:
+diario: raíces, integrales, derivadas, mínimos, interpolación, ecuaciones diferenciales, álgebra lineal
+densa y la transformada de Fourier. Igual que `std.viz`:
 
 1. **Escrito en Ostrin.** Todo es código Ostrin sobre `Array<Float>` y funciones de primera clase; no
    hay bindings a C ocultos. Así sirve también de prueba de carga para el lenguaje.
@@ -38,6 +38,10 @@ sol.t  sol.y  sol.evaluations  sol.component(i)  sol.final_state()  sol.length()
 spec = numeric.fft(signal)                     // Spectrum { re, im }, spec.magnitude()
 numeric.ifft(spec)  numeric.frequencies(n, dt)  numeric.amplitude(spec)
 
+qr = numeric.qr(a)                          // Result<Qr, String>, QR fino de una matriz real
+qr.q  qr.r  qr.reconstruct()                // Q ortonormal, R triangular superior, Q @ R
+qr.orthogonality()                          // ||QᵀQ − I||
+
 // Con unidades: xs: Array<Quantity<X>>, ys: Array<Quantity<Y>>
 numeric.unit_trapz(xs, ys)                     // Quantity<X * Y>   (km/h sobre min → km)
 numeric.unit_cumtrapz(xs, ys)                  // Array<Quantity<X * Y>>
@@ -60,6 +64,12 @@ ningún caso especial en el runtime. Requieren al menos dos muestras.
 - **FFT**: Cooley–Tukey radix 2 iterativo con inversión de bits si la longitud es potencia de dos; si
   no, una DFT directa O(n²) con el ángulo reducido módulo n para no perder precisión.
   `amplitude` normaliza a la amplitud de la sinusoide (2|X_k|/n; |X_k|/n para la componente continua y la de Nyquist).
+- **QR**: Gram–Schmidt modificado para matrices densas reales de rango columna completo. Devuelve la
+  forma delgada (`Q` de `m × n` y `R` de `n × n`) y rechaza dimensiones incompatibles o columnas
+  dependientes mediante `Result<Qr, String>`; `reconstruct` y `orthogonality` hacen verificable el
+  resultado en el intérprete, nativo y WASM. La superficie conserva por ahora el fallback AST de
+  agregados mientras `Array` dentro de records/`Result` termina de migrar a HIR/IR; el trinquete lo
+  registra con un límite explícito y el siguiente ciclo lo reducirá.
 
 ## 4. Hallazgos del compilador
 
@@ -85,3 +95,4 @@ y tipos función para enlazar `X`, y una segunda aparición con otra dimensión 
 | cuadratura adaptativa, integrales múltiples | Gauss–Kronrod |
 | optimización multivariable | Nelder–Mead, BFGS |
 | unidades en ODEs y raíces | `unit_*` cubre integrales, derivadas e interpolación; `rk45` y `newton` siguen en `Float` (un estado con dimensiones mezcladas necesitaría tuplas o records de cantidades) |
+| álgebra lineal avanzada | QR denso ya está disponible; LU, Cholesky, SVD, autovectores, mínimos cuadrados generalizados, dispersa e integración compleja siguen pendientes |
