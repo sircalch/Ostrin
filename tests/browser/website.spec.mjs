@@ -113,7 +113,7 @@ test("Scientific Lab recomputes its demos with the real compiler", async ({ page
   await page.goto("./#lab", { waitUntil: "domcontentloaded" });
   await expect(page.locator("[data-release-line]")).toHaveAttribute("data-state", /published|unreleased/);
   const tabs = page.getByRole("tab");
-  await expect(tabs).toHaveCount(10);
+  await expect(tabs).toHaveCount(11);
 
   // Recorded output first, then a live run with the same compiler must reproduce it exactly.
   await page.getByRole("tab", { name: "Units" }).click();
@@ -142,6 +142,11 @@ test("Scientific Lab recomputes its demos with the real compiler", async ({ page
   await page.locator('[data-lab-run="linear-algebra"]').click();
   await expect(page.locator('[data-lab-provenance="linear-algebra"]')).toHaveAttribute("data-state", "live", { timeout: 30_000 });
   await expect(page.locator("#lab-panel-linear-algebra .sl-raw pre")).toContainText("QR residual = 0");
+  await page.getByRole("tab", { name: "Complex" }).click();
+  await expect(page.locator("#lab-panel-complex .sl-raw pre")).toContainText("magnitude = 2");
+  await page.locator('[data-lab-run="complex"]').click();
+  await expect(page.locator('[data-lab-provenance="complex"]')).toHaveAttribute("data-state", "live", { timeout: 30_000 });
+  await expect(page.locator("#lab-panel-complex .sl-raw pre")).toContainText("z² =");
 
   // std.viz's SVG is shown as an image; the 3D view recomputes when the camera moves.
   await page.getByRole("tab", { name: "Plot" }).click();
@@ -161,7 +166,7 @@ test("Scientific Lab recomputes its demos with the real compiler", async ({ page
 
 test("Cookbook renders every recipe with source and recorded output", async ({ page }) => {
   await page.goto("./cookbook.html", { waitUntil: "domcontentloaded" });
-  await expect(page.locator("[data-cookbook] .recipe")).toHaveCount(10);
+  await expect(page.locator("[data-cookbook] .recipe")).toHaveCount(11);
   for (const recipe of await page.locator("[data-cookbook] .recipe").all()) {
     await expect(recipe.locator(".sl-code")).not.toBeEmpty();
     await expect(recipe.locator(".sl-raw pre")).not.toBeEmpty();

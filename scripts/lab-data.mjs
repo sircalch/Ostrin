@@ -79,6 +79,17 @@ export const LAB = [
     limits: "Dense real matrices only; eigenvalues are computed for symmetric matrices and QR currently requires full column rank. LU, SVD, sparse and complex linear algebra remain on the roadmap.",
   },
   {
+    id: "complex",
+    title: "Complex",
+    headline: "Typed complex arithmetic for scientific models.",
+    file: "examples/lab_complex.ostrin",
+    render: "text",
+    params: [{ name: "angle", label: "Rotation angle (rad)", min: -3.14, max: 3.14, step: 0.1 }],
+    how: "std.numeric's experimental Complex record carries real and imaginary components through overloaded addition, subtraction, multiplication and division. Polar construction, conjugation, magnitude and integer powers run in Ostrin, so the interpreter, native compiler and browser expose the same values.",
+    docs: { label: "numeric hierarchy and arrays", href: `${repository}/blob/main/docs/design/19-jerarquia-numerica-y-arrays.md` },
+    limits: "Complex<Float> is currently a library record backed by Float64. Complex arrays, promotion across Float32/Float64 and complex matrix decompositions are planned; the FFT keeps its stable real/imaginary Spectrum API.",
+  },
+  {
     id: "statistics",
     title: "Statistics",
     headline: "Summaries, a histogram and a calibration fit.",
