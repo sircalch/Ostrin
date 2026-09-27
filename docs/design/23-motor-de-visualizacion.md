@@ -141,7 +141,8 @@ exportación rasteriza
 los fotogramas en un canvas y usa `MediaRecorder`, por lo que depende del soporte del navegador.
 Coste: el tamaño crece linealmente con los fotogramas (24 fotogramas 2D ≈ 270 kB). El explorador
 puede descargar el SVG completo y rasterizar el instante actual a PNG 2× (también un fotograma elegido
-con la línea temporal); MP4/GIF, calidad configurable y PDF siguen pendientes.
+con la línea temporal). MP4/GIF y calidad configurable siguen pendientes; PDF usa la impresión nativa del
+navegador para conservar el vector sin introducir un conversor binario en el runtime.
 
 ## 4.2 Cortes ortogonales de volúmenes
 
@@ -223,8 +224,11 @@ El explorador conserva dos rutas de publicación para cada figura:
   determina el fotograma rasterizado; la exportación no depende de que el iframe permita scripts.
 
 La rasterización vive en el navegador y tiene una ruta de error explícita cuando el contexto 2D o la
-codificación PNG no están disponibles. La futura exportación PDF reutilizará el mismo documento SVG,
-pero añadirá tamaño de página y metadatos de publicación.
+codificación PNG no están disponibles. **PDF** abre una vista de impresión con el fotograma estático actual,
+el tamaño calculado del SVG y la línea de procedencia; el usuario elige `Save as PDF` en el diálogo nativo.
+Así el archivo conserva los vectores, el nodo `<ostrin-provenance>` y el tamaño de página sin subir datos a
+un servidor ni convertir la salida de Ostrin en una imagen raster. Si el navegador bloquea ventanas emergentes,
+el explorador anuncia el error y no oculta el SVG original.
 
 ## 4.7 Procedencia reproducible
 
@@ -275,12 +279,13 @@ la falta de literales científicos (`1e-9`). Ver `CONTEXTO_PROYECTO.md` §270–
 | 0.3 (hecho) | movimiento continuo con SMIL: `animate`, `moving_point` con estela, `rod`, `moving_segment`, `morph`; `no_axes` |
 | 0.3 (parcial, hecho) | controles web de play/pausa/reinicio, posición temporal, velocidad, ciclos finitos y exportación WebM cuando el navegador ofrece `MediaRecorder` |
 | 0.3 (hecho) | descarga del SVG producido y exportación PNG 2× del fotograma actual desde el explorador web |
+| 0.4 (hecho) | vista de impresión PDF con fotograma vectorial, tamaño de página y procedencia; el diálogo nativo permite guardar el PDF |
 | 0.3 (hecho) | tablas SVG reproducibles con filas alternadas, encabezados, tooltips por celda, tema oscuro y explorador web con filtro/ordenamiento (`viz.table`) |
 | 0.4 (parcial, hecho) | campos vectoriales 3D muestreados con flechas, profundidad y tooltips |
 | 0.4 (parcial, hecho) | explorador web con acimut/elevación que vuelve a ejecutar `.view(...)` en WASM |
 | 0.4 (parcial, hecho) | cortes XY/XZ/YZ e isosuperficies de `Array<Float>` 3D, celdas/triángulos coloreados, tooltips y barra de escala; cámaras ortográficas interactivas |
 | 0.4 | render de volúmenes completos, isosuperficies y cámaras en perspectiva |
-| 0.5 | backend WebGPU sobre la misma lista de series; PDF con tamaño de página y metadatos |
+| 0.5 | backend WebGPU sobre la misma lista de series; MP4/GIF y calidad configurable |
 | 0.5 (hecho) | figuras, tablas y escenas con procedencia (`source-hash`, `data-hash`, `seed`, `compiler`) embebida en SVG y mostrada en la galería |
 | — | gráficas con incertidumbre cuando exista `Measurement<T>` |
 

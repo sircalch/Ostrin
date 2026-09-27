@@ -178,6 +178,7 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   await expect(page.getByRole("heading", { name: "Kernel-density violins" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Hexbin density" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Filled contour bands" })).toBeVisible();
+  await expect(page.locator(".viz-status")).toContainText("print-ready PDF export");
   await expect(page.locator("#viz-provenance .sl-provenance")).toContainText("source sha256:");
   for (const card of await cards.all()) {
     const image = card.locator("img.viz-image");
@@ -214,6 +215,15 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   expect(pngBytes.readUInt32BE(16)).toBe(1280);
   expect(pngBytes.readUInt32BE(20)).toBe(800);
   await expect(page.locator(".viz-export-status")).toHaveText(/PNG downloaded · \d+×\d+/);
+  const pdfPopupPromise = page.waitForEvent("popup");
+  await page.getByRole("button", { name: "Print figure as PDF" }).click();
+  const pdfPopup = await pdfPopupPromise;
+  await pdfPopup.waitForLoadState("domcontentloaded");
+  await expect(pdfPopup.locator("svg")).toBeVisible();
+  await expect(pdfPopup.locator("h1")).toHaveText("Scatter and fit");
+  await expect(pdfPopup.locator("p")).toContainText("No reproducibility metadata recorded.");
+  await expect(page.locator(".viz-export-status")).toHaveText(/PDF print view opened · \d+×\d+/);
+  await pdfPopup.close();
   await page.getByRole("button", { name: "Zoom in" }).click();
   await expect(page.locator(".viz-zoom")).toHaveText("150%");
   await page.getByRole("button", { name: "Close" }).click();

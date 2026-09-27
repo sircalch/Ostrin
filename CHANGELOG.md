@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Visualization: PDF publication print
+- The Viz explorer now opens a print-ready vector view for the current figure or animation frame.
+  The page preserves SVG dimensions, embedded provenance and publication text; the browser's native
+  dialog can save it as PDF without sending the figure or data to a server. Pop-up failures are reported
+  without affecting SVG/PNG export.
+
 ### Visualization: reproducible provenance
 - `Figure`, `Scene3D` and `Table` now expose `.provenance(source_hash, data_hash, seed:, compiler:)`.
   The renderer embeds the supplied publication record as `<ostrin-provenance>` metadata in the SVG;
