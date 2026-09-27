@@ -1,0 +1,23 @@
+// Reproducible publication metadata travels with the exported SVG.
+// The hashes are supplied by the experiment's build record; the browser and
+// native backends preserve them byte-for-byte.
+import std.viz
+
+fn main() -> Void {
+    xs = linspace(0.0, 6.0, 25)
+    mut ys: List<Float> = []
+    for x in xs.to_list() {
+        ys.push(exp(0.0 - x / 4.0) * cos(2.4 * x))
+    }
+    fig = viz.figure("Reproducible damped signal")
+        .describe("The SVG carries the source, data, seed and compiler record")
+        .labels("time", "amplitude")
+        .provenance(
+            "sha256:6b96f1d1f4f1b955a7dff03d7bcf6af6e1f1ca5fbd1eea6fb3d7c2c7fb3c95d2",
+            "sha256:0a0e6b9b33e2b1bd3706d0b2d6e0f6e7a8e3e95d6b8a36b0c4c9d6af79c61d1a",
+            "2026-09-27T03:40Z / seed=42",
+            "ostrinc 0.1.0"
+        )
+        .line(xs, array(ys), "signal", "#2563eb", 2.6, "")
+    print(fig.svg())
+}

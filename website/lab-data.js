@@ -716,6 +716,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_lines.ostrin",
       "code": "// std.viz · lines: three damped oscillators, their envelope and a reference line.\nimport std.viz\n\nfn main() -> Void {\n    t = linspace(0.0, 12.0, 300)\n    envelope = exp(t * -0.2)\n    fig = viz.figure(\"Damped oscillators\")\n        .describe(\"x(t) = exp(-t/5) cos(ω t) for three frequencies\")\n        .labels(\"time t\", \"displacement x\")\n        .band(t, envelope * -1.0, envelope, label: \"envelope\")\n        .line(t, envelope * cos(t * 1.0), label: \"ω = 1\")\n        .line(t, envelope * cos(t * 2.0), label: \"ω = 2\")\n        .line(t, envelope * cos(t * 3.5), label: \"ω = 3.5\", dash: \"6 4\")\n        .hline(0.0)\n    print(fig.svg())\n}\n",
       "svg": "assets/viz/lines.svg",
+      "provenance": {},
       "printed": [
         ""
       ]
@@ -729,6 +730,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_surface.ostrin",
       "code": "// std.viz · 3D: a shaded surface with a colorbar.\nimport std.viz\n\nfn peaks(x: Float, y: Float) -> Float {\n    3.0 * (1.0 - x) * (1.0 - x) * exp(-x * x - (y + 1.0) * (y + 1.0)) -\n        10.0 * (x / 5.0 - x * x * x - y * y * y * y * y) * exp(-x * x - y * y) -\n        exp(-(x + 1.0) * (x + 1.0) - y * y) / 3.0\n}\n\nfn main() -> Void {\n    xs = linspace(-3.0, 3.0, 36)\n    ys = linspace(-3.0, 3.0, 36)\n    scene = viz.scene3d(\"peaks(x, y) as a surface\")\n        .describe(\"36 × 36 grid, 2450 shaded triangles\")\n        .labels(\"x\", \"y\", \"z\")\n        .surface(xs, ys, viz.grid_of(xs, ys, peaks), label: \"height\")\n    print(scene.svg())\n}\n",
       "svg": "assets/viz/surface.svg",
+      "provenance": {},
       "printed": [
         ""
       ]
@@ -742,6 +744,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_heatmap.ostrin",
       "code": "// std.viz · heatmap and contours of a two-dimensional field.\nimport std.viz\n\nfn peaks(x: Float, y: Float) -> Float {\n    3.0 * (1.0 - x) * (1.0 - x) * exp(-x * x - (y + 1.0) * (y + 1.0)) -\n        10.0 * (x / 5.0 - x * x * x - y * y * y * y * y) * exp(-x * x - y * y) -\n        exp(-(x + 1.0) * (x + 1.0) - y * y) / 3.0\n}\n\nfn main() -> Void {\n    xs = linspace(-3.0, 3.0, 48)\n    ys = linspace(-3.0, 3.0, 48)\n    z = viz.grid_of(xs, ys, peaks)\n    print(\"min \" + viz.num(z.min()) + \", max \" + viz.num(z.max()))\n    fig = viz.figure(\"peaks(x, y)\")\n        .describe(\"48 × 48 samples, 10 contour levels\")\n        .labels(\"x\", \"y\")\n        .size(600, 500)\n        .heatmap(z, -3.0, 3.0, -3.0, 3.0, label: \"z\")\n        .contour(z, -3.0, 3.0, -3.0, 3.0, levels: 10, color: \"#ffffff\")\n    print(fig.svg())\n}\n",
       "svg": "assets/viz/heatmap.svg",
+      "provenance": {},
       "printed": [
         "min -6.52, max 8.08",
         ""
@@ -756,6 +759,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_contourf.ostrin",
       "code": "// std.viz · filled contour bands over a deterministic scalar field.\nimport std.viz\n\nfn peaks(x: Float, y: Float) -> Float {\n    3.0 * (1.0 - x) * (1.0 - x) * exp(-x * x - (y + 1.0) * (y + 1.0)) -\n        10.0 * (x / 5.0 - x * x * x - y * y * y * y * y) * exp(-x * x - y * y) -\n        exp(-(x + 1.0) * (x + 1.0) - y * y) / 3.0\n}\n\nfn main() -> Void {\n    xs = linspace(-3.0, 3.0, 48)\n    ys = linspace(-3.0, 3.0, 48)\n    z = viz.grid_of(xs, ys, peaks)\n    fig = viz.figure(\"Filled peaks contours\")\n        .describe(\"48 × 48 samples, 9 discrete contour bands\")\n        .labels(\"x\", \"y\")\n        .size(600, 500)\n        .contourf(z, -3.0, 3.0, -3.0, 3.0, 9, \"magma\", \"z\")\n        .contour(z, -3.0, 3.0, -3.0, 3.0, 9, \"\", \"#ffffff\")\n    print(fig.svg())\n}\n",
       "svg": "assets/viz/contourf.svg",
+      "provenance": {},
       "printed": [
         ""
       ]
@@ -769,6 +773,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_quiver.ostrin",
       "code": "// A deterministic 2D rotational velocity field rendered with vector arrows.\nimport std.viz\n\nfn main() -> Void {\n    xs = linspace(-3.0, 3.0, 17)\n    ys = linspace(-2.4, 2.4, 13)\n    mut origins_x: List<Float> = []\n    mut origins_y: List<Float> = []\n    mut us: List<Float> = []\n    mut vs: List<Float> = []\n    for yi in 0 until ys.length() {\n        y = ys[yi]\n        for xi in 0 until xs.length() {\n            x = xs[xi]\n            radius = sqrt(x * x + y * y)\n            factor = if radius > 0.2 { 1.0 / (1.0 + radius * 0.35) } else { 0.0 }\n            origins_x.push(x)\n            origins_y.push(y)\n            us.push(0.0 - y * factor)\n            vs.push(x * factor)\n        }\n    }\n\n    fig = viz.figure(\"2D rotational velocity field\")\n        .describe(\"Sampled vectors with deterministic arrowheads and tooltips\")\n        .labels(\"x\", \"y\")\n        .xlim(-3.2, 3.2)\n        .ylim(-2.6, 2.6)\n        .quiver(array(origins_x), array(origins_y), array(us), array(vs), 0.24, \"velocity\", \"#2563eb\")\n    print(fig.svg())\n}\n",
       "svg": "assets/viz/quiver.svg",
+      "provenance": {},
       "printed": [
         ""
       ]
@@ -782,6 +787,26 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_streamplot.ostrin",
       "code": "// A deterministic streamline field integrated from a sampled 2D velocity grid.\nimport std.viz\n\nfn main() -> Void {\n    grid_x = linspace(-3.0, 3.0, 25)\n    grid_y = linspace(-2.2, 2.2, 19)\n    mut us: List<Float> = []\n    mut vs: List<Float> = []\n    for yi in 0 until grid_y.length() {\n        y = grid_y[yi]\n        for xi in 0 until grid_x.length() {\n            x = grid_x[xi]\n            us.push(1.0 + 0.24 * sin(y))\n            vs.push(0.52 * cos(x))\n        }\n    }\n\n    seed_x = linspace(-2.5, 2.5, 9)\n    seed_y = linspace(-1.8, 1.8, 7)\n    mut seeds_x: List<Float> = []\n    mut seeds_y: List<Float> = []\n    for yi in 0 until seed_y.length() {\n        for xi in 0 until seed_x.length() {\n            seeds_x.push(seed_x[xi])\n            seeds_y.push(seed_y[yi])\n        }\n    }\n\n    fig = viz.figure(\"2D streamline field\")\n        .describe(\"Bilinear interpolation with deterministic forward and backward integration\")\n        .labels(\"x\", \"y\")\n        .xlim(-3.0, 3.0)\n        .ylim(-2.2, 2.2)\n        .streamplot(grid_x, grid_y, array(us), array(vs), array(seeds_x), array(seeds_y), 72, 0.1, \"flow\", \"#0f766e\")\n    print(fig.svg())\n}\n",
       "svg": "assets/viz/streamplot.svg",
+      "provenance": {},
+      "printed": [
+        ""
+      ]
+    },
+    {
+      "id": "provenance",
+      "title": "Reproducible provenance",
+      "file": "examples/viz_provenance.ostrin",
+      "blurb": "A publication-ready figure carrying source and data hashes, a seed and compiler identity in its SVG metadata.",
+      "source": "examples/viz_provenance.ostrin",
+      "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_provenance.ostrin",
+      "code": "// Reproducible publication metadata travels with the exported SVG.\n// The hashes are supplied by the experiment's build record; the browser and\n// native backends preserve them byte-for-byte.\nimport std.viz\n\nfn main() -> Void {\n    xs = linspace(0.0, 6.0, 25)\n    mut ys: List<Float> = []\n    for x in xs.to_list() {\n        ys.push(exp(0.0 - x / 4.0) * cos(2.4 * x))\n    }\n    fig = viz.figure(\"Reproducible damped signal\")\n        .describe(\"The SVG carries the source, data, seed and compiler record\")\n        .labels(\"time\", \"amplitude\")\n        .provenance(\n            \"sha256:6b96f1d1f4f1b955a7dff03d7bcf6af6e1f1ca5fbd1eea6fb3d7c2c7fb3c95d2\",\n            \"sha256:0a0e6b9b33e2b1bd3706d0b2d6e0f6e7a8e3e95d6b8a36b0c4c9d6af79c61d1a\",\n            \"2026-09-27T03:40Z / seed=42\",\n            \"ostrinc 0.1.0\"\n        )\n        .line(xs, array(ys), \"signal\", \"#2563eb\", 2.6, \"\")\n    print(fig.svg())\n}\n",
+      "svg": "assets/viz/provenance.svg",
+      "provenance": {
+        "source-hash": "sha256:6b96f1d1f4f1b955a7dff03d7bcf6af6e1f1ca5fbd1eea6fb3d7c2c7fb3c95d2",
+        "data-hash": "sha256:0a0e6b9b33e2b1bd3706d0b2d6e0f6e7a8e3e95d6b8a36b0c4c9d6af79c61d1a",
+        "seed": "2026-09-27T03:40Z / seed=42",
+        "compiler": "ostrinc 0.1.0"
+      },
       "printed": [
         ""
       ]
@@ -795,6 +820,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_lorenz.ostrin",
       "code": "// std.viz · 3D trajectory: the Lorenz attractor, colored by time.\nimport std.viz\n\nfn main() -> Void {\n    sigma = 10.0\n    rho = 28.0\n    beta = 8.0 / 3.0\n    dt = 0.01\n    mut xs: List<Float> = []\n    mut ys: List<Float> = []\n    mut zs: List<Float> = []\n    mut x = 1.0\n    mut y = 1.0\n    mut z = 1.0\n    for n in 0 until 4000 {\n        dx = sigma * (y - x)\n        dy = x * (rho - z) - y\n        dz = x * y - beta * z\n        x = x + dx * dt\n        y = y + dy * dt\n        z = z + dz * dt\n        xs.push(x)\n        ys.push(y)\n        zs.push(z)\n    }\n    print(\"final state \" + viz.num(x) + \" \" + viz.num(y) + \" \" + viz.num(z))\n    scene = viz.scene3d(\"Lorenz attractor\")\n        .describe(\"σ = 10, ρ = 28, β = 8/3, 4000 Euler steps\")\n        .labels(\"x\", \"y\", \"z\")\n        .view(-60.0, 20.0)\n        .line(array(xs), array(ys), array(zs), width: 0.9, colormap: \"viridis\")\n    print(scene.svg())\n}\n",
       "svg": "assets/viz/lorenz.svg",
+      "provenance": {},
       "printed": [
         "final state 1.3 -0.01 21.92",
         ""
@@ -809,6 +835,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_histogram.ostrin",
       "code": "// std.viz · histogram: 20 000 normal samples and the scaled density on top.\nimport std.viz\n\nfn main() -> Void {\n    samples = rng(7).randn([20000]) * 1.5 + 4.0\n    bins = 48\n    width = (samples.max() - samples.min()) / (bins as Float)\n    x = linspace(samples.min(), samples.max(), 200)\n    density = norm_pdf(x, 4.0, 1.5) * (20000.0 * width)\n    print(\"mean \" + viz.num(samples.mean()) + \", sd \" + viz.num(samples.std()) + \", p95 \" + viz.num(samples.percentile(95.0)))\n    fig = viz.figure(\"Normal samples\")\n        .describe(\"20 000 draws from N(4, 1.5²), seed 7\")\n        .labels(\"value\", \"count\")\n        .histogram(samples, bins, label: \"samples\")\n        .line(x, density, label: \"N(4, 1.5²) density\", color: \"#111827\", width: 1.8)\n        .vline(4.0, color: \"#dc2626\")\n    print(fig.svg())\n}\n",
       "svg": "assets/viz/histogram.svg",
+      "provenance": {},
       "printed": [
         "mean 3.97, sd 1.49, p95 6.42",
         ""
@@ -823,6 +850,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_boxplot.ostrin",
       "code": "// std.viz · grouped boxplots: distribution summaries computed by Ostrin.\nimport std.viz\n\nfn main() -> Void {\n    r = rng(41)\n    control = r.randn([80]) * 0.55 + 4.2\n    treatment = r.randn([80]) * 0.8 + 5.3\n    follow_up = r.randn([80]) * 0.4 + 6.1\n    fig = viz.figure(\"Distribution summary\")\n        .describe(\"median, interquartile range, whiskers\")\n        .labels(\"cohort\", \"response\")\n        .boxplot(1.0, control, label: \"control\", color: \"#2563eb\")\n        .boxplot(2.0, treatment, label: \"treatment\", color: \"#db2777\")\n        .boxplot(3.0, follow_up, label: \"follow-up\", color: \"#059669\")\n    print(fig.svg())\n}\n",
       "svg": "assets/viz/boxplot.svg",
+      "provenance": {},
       "printed": [
         ""
       ]
@@ -836,6 +864,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_violin.ostrin",
       "code": "// std.viz · kernel-density violins: full distributions with median markers.\nimport std.viz\n\nfn main() -> Void {\n    r = rng(73)\n    baseline = r.randn([140]) * 0.42 + 4.2\n    shifted = r.randn([140]) * 0.75 + 5.25\n    bimodal = zeros([140])\n    for i in 0 until 140 {\n        center = if i < 70 { 5.2 } else { 6.1 }\n        spread = if i < 70 { 0.28 } else { 0.18 }\n        bimodal.set(i, r.randn([1])[0] * spread + center)\n    }\n    fig = viz.figure(\"Distribution shapes\")\n        .describe(\"Gaussian KDE violins with medians computed in Ostrin\")\n        .labels(\"cohort\", \"response\")\n        .violin(1.0, baseline, 40, \"baseline\", \"#2563eb\")\n        .violin(2.0, shifted, 40, \"shifted\", \"#db2777\")\n        .violin(3.0, bimodal, 40, \"bimodal\", \"#059669\")\n    print(fig.svg())\n}\n",
       "svg": "assets/viz/violin.svg",
+      "provenance": {},
       "printed": [
         ""
       ]
@@ -849,6 +878,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_hexbin.ostrin",
       "code": "// std.viz · hexbin density: a bivariate sample counted in Ostrin.\nimport std.viz\n\nfn main() -> Void {\n    n = 1200\n    r = rng(91)\n    noise_x = r.randn([n])\n    noise_y = r.randn([n])\n    mut xs = zeros([n])\n    mut ys = zeros([n])\n    for i in 0 until n {\n        cluster = if i < 600 { 0.0 } else { 1.0 }\n        center_x = if cluster == 0.0 { -0.85 } else { 0.95 }\n        center_y = if cluster == 0.0 { -0.55 } else { 0.7 }\n        spread_x = if cluster == 0.0 { 0.38 } else { 0.26 }\n        spread_y = if cluster == 0.0 { 0.28 } else { 0.48 }\n        xs.set(i, noise_x[i] * spread_x + center_x)\n        ys.set(i, noise_y[i] * spread_y + center_y)\n    }\n    fig = viz.figure(\"Bivariate density\")\n        .describe(\"1 200 seeded observations counted into hexagonal bins\")\n        .labels(\"x\", \"y\")\n        .hexbin(xs, ys, 18, 14, \"magma\", \"observations\")\n    print(fig.svg())\n}\n",
       "svg": "assets/viz/hexbin.svg",
+      "provenance": {},
       "printed": [
         ""
       ]
@@ -862,6 +892,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_point_cloud.ostrin",
       "code": "// std.viz · 3D scatter: three Gaussian clusters drawn back to front.\nimport std.viz\n\nfn main() -> Void {\n    r = rng(5)\n    mut xs: List<Float> = []\n    mut ys: List<Float> = []\n    mut zs: List<Float> = []\n    centers = [0.0, 0.0, 0.0, 4.0, 1.0, 2.5, 1.5, 4.0, 5.0]\n    for c in 0 until 3 {\n        px = r.randn([120]) * 0.8 + centers[c * 3]\n        py = r.randn([120]) * 0.8 + centers[c * 3 + 1]\n        pz = r.randn([120]) * 0.8 + centers[c * 3 + 2]\n        for i in 0 until 120 {\n            xs.push(px[i])\n            ys.push(py[i])\n            zs.push(pz[i])\n        }\n    }\n    scene = viz.scene3d(\"Three clusters\")\n        .describe(\"360 points colored by height\")\n        .labels(\"x\", \"y\", \"z\")\n        .view(-40.0, 22.0)\n        .scatter(array(xs), array(ys), array(zs), colormap: \"coolwarm\", size: 3.2)\n    print(scene.svg())\n}\n",
       "svg": "assets/viz/point-cloud.svg",
+      "provenance": {},
       "printed": [
         ""
       ]
@@ -875,6 +906,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_vector_field.ostrin",
       "code": "// std.viz · a sampled 3D vector field with SVG arrowheads and tooltips.\nimport std.viz\n\nfn main() -> Void {\n    mut xs: List<Float> = []\n    mut ys: List<Float> = []\n    mut zs: List<Float> = []\n    mut us: List<Float> = []\n    mut vs: List<Float> = []\n    mut ws: List<Float> = []\n    for i in 0 until 5 {\n        for j in 0 until 5 {\n            x = (i as Float) - 2.0\n            y = (j as Float) - 2.0\n            xs.push(x)\n            ys.push(y)\n            zs.push(0.0)\n            us.push(0.0 - y)\n            vs.push(x)\n            ws.push(0.35)\n        }\n    }\n    scene = viz.scene3d(\"Rotational vector field\")\n        .describe(\"25 samples · v(x, y, z) = (-y, x, 0.35)\")\n        .labels(\"x\", \"y\", \"z\")\n        .view(-48.0, 28.0)\n        .vector_field(array(xs), array(ys), array(zs), array(us), array(vs), array(ws), color: \"#2563eb\", scale: 0.28)\n    print(scene.svg())\n}\n",
       "svg": "assets/viz/vector-field.svg",
+      "provenance": {},
       "printed": [
         ""
       ]
@@ -888,6 +920,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_volume_slices.ostrin",
       "code": "import std.viz\n\nfn main() -> Void {\n    axes = linspace(-2.0, 2.0, 17)\n    volume = zeros([17, 17, 17])\n    for k in 0 until 17 {\n        for j in 0 until 17 {\n            for i in 0 until 17 {\n                x = axes[i]\n                y = axes[j]\n                z = axes[k]\n                r2 = x * x + y * y + z * z\n                bump = (x - 0.8) * (x - 0.8) + (y + 0.5) * (y + 0.5) + (z - 0.3) * (z - 0.3)\n                volume.set(k, j, i, exp(0.0 - r2 * 0.7) + 0.35 * exp(0.0 - bump * 2.5))\n            }\n        }\n    }\n    xy = viz.slice_xy(volume, 8)\n    xz = viz.slice_xz(volume, 8)\n    yz = viz.slice_yz(volume, 8)\n    scene = viz.scene3d(\"Volume slices\")\n        .describe(\"Three orthogonal cuts through a scalar field\")\n        .labels(\"x\", \"y\", \"z\")\n        .view(-48.0, 28.0)\n        .slice_xy(axes, axes, xy, axes[8], \"magma\", \"scalar value\")\n        .slice_xz(axes, axes, xz, axes[8], \"magma\", \"scalar value\")\n        .slice_yz(axes, axes, yz, axes[8], \"magma\", \"scalar value\")\n    print(scene.svg())\n}\n",
       "svg": "assets/viz/volume-slices.svg",
+      "provenance": {},
       "printed": [
         ""
       ]
@@ -901,6 +934,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_isosurface.ostrin",
       "code": "import std.viz\n\nfn main() -> Void {\n    axes = linspace(-1.6, 1.6, 17)\n    volume = zeros([17, 17, 17])\n    for k in 0 until 17 {\n        for j in 0 until 17 {\n            for i in 0 until 17 {\n                x = axes[i]\n                y = axes[j]\n                z = axes[k]\n                radius = sqrt(x * x + y * y + z * z)\n                shell = exp(0.0 - (radius - 0.85) * (radius - 0.85) * 14.0)\n                volume.set(k, j, i, shell)\n            }\n        }\n    }\n    scene = viz.scene3d(\"Scalar isosurface\")\n        .describe(\"Marching tetrahedra over a 3D Float volume\")\n        .labels(\"x\", \"y\", \"z\")\n        .view(-52.0, 24.0)\n        .isosurface(axes, axes, axes, volume, 0.42, \"magma\", \"shell density\")\n    print(scene.svg())\n}\n",
       "svg": "assets/viz/isosurface.svg",
+      "provenance": {},
       "printed": [
         ""
       ]
@@ -914,6 +948,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_scatter_fit.ostrin",
       "code": "// std.viz · scatter: noisy calibration data, a least-squares fit and its ±2σ band.\nimport std.viz\n\nfn main() -> Void {\n    r = rng(2024)\n    concentration = linspace(0.5, 10.0, 40)\n    signal = concentration * 1.8 + 2.0 + r.randn([40]) * 0.9\n    // linfit returns [slope, intercept, r²].\n    fit = linfit(concentration, signal)\n    predicted = concentration * fit[0] + fit[1]\n    residual = (signal - predicted).std()\n    print(\"slope \" + viz.num(fit[0]) + \", intercept \" + viz.num(fit[1]) + \", r2 \" + viz.num(fit[2]) + \", residual sd \" + viz.num(residual))\n    fig = viz.figure(\"Sensor calibration\")\n        .describe(\"least-squares fit with a ±2σ band\")\n        .labels(\"glucose [mmol/L]\", \"signal [mV]\")\n        .band(concentration, predicted - residual * 2.0, predicted + residual * 2.0, label: \"±2σ\")\n        .scatter(concentration, signal, label: \"measurements\")\n        .line(concentration, predicted, label: \"fit\")\n    print(fig.svg())\n}\n",
       "svg": "assets/viz/scatter-fit.svg",
+      "provenance": {},
       "printed": [
         "slope 1.8, intercept 2.19, r2 0.98, residual sd 0.8",
         ""
@@ -928,6 +963,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_units.ostrin",
       "code": "// std.viz · unit-aware plots: axes are labelled with the units the data carries.\nimport std.viz\n\nfn main() -> Void {\n    times = linspace(0.0, 40.0, 9) as s\n    speeds = array([0.0, 6.1, 11.4, 15.8, 19.4, 22.3, 24.5, 26.1, 27.2]) as m/s\n    // Converting the data converts the axis: the chart is in km/h.\n    in_kmh = speeds as km/h\n    distance = (speeds * (5 s)).cumsum()\n    print(\"top speed \" + in_kmh.max().to_string() + \", distance \" + (distance.max() as km).to_string())\n    fig = viz.figure(\"Car acceleration\")\n        .describe(\"the axis units come from the quantities\")\n        .labels(\"time\", \"speed\")\n        .unit_line(times, in_kmh, label: \"measured\")\n        .unit_scatter(times, in_kmh)\n    print(fig.svg())\n}\n",
       "svg": "assets/viz/units.svg",
+      "provenance": {},
       "printed": [
         "top speed 97.91999999999999 km/h, distance 0.764 km",
         ""
@@ -942,6 +978,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_bars.ostrin",
       "code": "// std.viz · bars with error bars: group means ± standard deviation.\nimport std.viz\n\nfn main() -> Void {\n    r = rng(11)\n    mut means: List<Float> = []\n    mut sds: List<Float> = []\n    effects = [0.0, 0.8, 1.9, 2.6, 2.9]\n    for effect in effects {\n        group = r.randn([30]) * 0.7 + (5.0 + effect)\n        means.push(group.mean())\n        sds.push(group.std())\n    }\n    doses = array([0.0, 1.0, 2.0, 3.0, 4.0])\n    fig = viz.figure(\"Dose response\")\n        .describe(\"30 subjects per dose, mean ± sd\")\n        .labels(\"dose [mg]\", \"response\")\n        .bars(doses, array(means), label: \"mean\", color: \"#93c5fd\")\n        .errorbars(doses, array(means), array(sds), label: \"± sd\", color: \"#1e3a8a\")\n    print(fig.svg())\n}\n",
       "svg": "assets/viz/bars.svg",
+      "provenance": {},
       "printed": [
         ""
       ]
@@ -955,6 +992,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_ode.ostrin",
       "code": "// std.numeric + std.viz · a damped, driven pendulum integrated with adaptive RK45.\nimport std.numeric\nimport std.viz\n\nfn pendulum(t: Float, y: Array<Float>) -> Array<Float> {\n    // y = [angle, angular velocity]; damping 0.15, drive 1.1 cos(0.8 t)\n    array([y[1], 0.0 - 0.15 * y[1] - sin(y[0]) + 1.1 * cos(0.8 * t)])\n}\n\nfn main() -> Void {\n    sol = numeric.rk45(pendulum, array([0.2, 0.0]), 0.0, 60.0, tol: 1e-9)\n    angle = sol.component(0)\n    speed = sol.component(1)\n    print(\"steps \" + sol.length().to_string() + \", evaluations \" + sol.evaluations.to_string())\n    a = viz.figure(\"Angle over time\").size(480, 320).labels(\"t\", \"θ [rad]\").no_legend()\n        .line(sol.t, angle, width: 1.4)\n    b = viz.figure(\"Phase portrait\").size(480, 320).labels(\"θ [rad]\", \"ω [rad/s]\").no_legend()\n        .line(angle, speed, color: \"#7c3aed\", width: 1.0)\n        .scatter(array([angle[0]]), array([speed[0]]), label: \"start\", color: \"#dc2626\", size: 4.0)\n    print(viz.grid([a.svg(), b.svg()], 2, 480, 320, title: \"Driven pendulum (RK45, tol 1e-9)\"))\n}\n",
       "svg": "assets/viz/ode.svg",
+      "provenance": {},
       "printed": [
         "steps 643, evaluations 4655",
         ""
@@ -969,6 +1007,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_fft.ostrin",
       "code": "// std.numeric + std.viz · a noisy two-tone signal and its spectrum.\nimport std.numeric\nimport std.viz\n\nfn main() -> Void {\n    n = 512\n    dt = 1.0 / 512.0\n    t = linspace(0.0, 1.0, n + 1)[0 until n]\n    noise = rng(42).randn([n]) * 0.4\n    signal = sin(t * (2.0 * pi() * 50.0)) + sin(t * (2.0 * pi() * 120.0)) * 0.6 + noise\n    amp = numeric.amplitude(numeric.fft(signal))\n    freqs = numeric.frequencies(n, dt)\n    print(\"peak at 50 Hz: \" + viz.num(amp[50]) + \", at 120 Hz: \" + viz.num(amp[120]))\n    a = viz.figure(\"Signal\").size(480, 320).labels(\"t [s]\", \"x\").no_legend()\n        .line(t[0 until 128], signal[0 until 128], width: 1.2)\n    b = viz.figure(\"Amplitude spectrum\").size(480, 320).labels(\"f [Hz]\", \"|X(f)|\").no_legend()\n        .area(freqs, amp, color: \"#059669\")\n    print(viz.grid([a.svg(), b.svg()], 2, 480, 320, title: \"FFT of 512 samples\"))\n}\n",
       "svg": "assets/viz/fft.svg",
+      "provenance": {},
       "printed": [
         "peak at 50 Hz: 1, at 120 Hz: 0.59",
         ""
@@ -983,6 +1022,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_spline.ostrin",
       "code": "// std.numeric + std.viz · linear and natural cubic spline interpolation.\nimport std.numeric\nimport std.viz\n\nfn main() -> Void {\n    xs = array([0.0, 1.0, 2.5, 3.5, 5.0, 6.0, 7.5, 9.0, 10.0])\n    ys = array([1.0, 2.2, 1.4, 3.1, 2.4, 4.0, 3.3, 5.2, 4.1])\n    fine = linspace(0.0, 10.0, 300)\n    curve = numeric.spline(xs, ys).sample(fine)\n    straight = numeric.interp_all(xs, ys, fine)\n    area = numeric.trapz(fine, curve)\n    print(\"area under the spline \" + viz.num(area))\n    fig = viz.figure(\"Interpolation\")\n        .describe(\"natural cubic spline vs. linear, area \" + viz.num(area))\n        .labels(\"x\", \"y\")\n        .line(fine, straight, label: \"linear\", color: \"#9ca3af\", dash: \"5 4\", width: 1.5)\n        .line(fine, curve, label: \"cubic spline\")\n        .scatter(xs, ys, label: \"data\", color: \"#dc2626\", size: 4.5)\n    print(fig.svg())\n}\n",
       "svg": "assets/viz/spline.svg",
+      "provenance": {},
       "printed": [
         "area under the spline 30.65",
         ""
@@ -997,6 +1037,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_double_pendulum.ostrin",
       "code": "// A chaotic double pendulum, integrated by std.numeric.rk45 and animated by std.viz.\n// Every position is computed in Ostrin; the SVG only interpolates between them.\nimport std.numeric\nimport std.viz\n\nfn swing(t: Float, y: Array<Float>) -> Array<Float> {\n    // y = [θ1, θ2, ω1, ω2]; equal masses and rods (1 kg, 1 m), g = 9.81 m/s².\n    g = 9.81\n    d = y[0] - y[1]\n    den = 3.0 - cos(2.0 * d)\n    a1 = (0.0 - 3.0 * g * sin(y[0]) - g * sin(y[0] - 2.0 * y[1]) - 2.0 * sin(d) * (y[3] * y[3] + y[2] * y[2] * cos(d))) / den\n    a2 = 2.0 * sin(d) * (2.0 * y[2] * y[2] + 2.0 * g * cos(y[0]) + y[3] * y[3] * cos(d)) / den\n    array([y[2], y[3], a1, a2])\n}\n\n/// Energy per unit mass: kinetic + potential (it should stay constant).\nfn energy(y: Array<Float>) -> Float {\n    g = 9.81\n    y[2] * y[2] + 0.5 * y[3] * y[3] + y[2] * y[3] * cos(y[0] - y[1]) - 2.0 * g * cos(y[0]) - g * cos(y[1])\n}\n\nfn main() -> Void {\n    seconds = 12.0\n    sol = numeric.rk45(swing, array([2.2, 2.6, 0.0, 0.0]), 0.0, seconds, tol: 1e-10)\n    // Resample at 60 samples per second so the animation runs in real time.\n    t = linspace(0.0, seconds, 721)\n    th1 = numeric.interp_all(sol.t, sol.component(0), t)\n    th2 = numeric.interp_all(sol.t, sol.component(1), t)\n    x1 = sin(th1)\n    y1 = cos(th1) * -1.0\n    x2 = x1 + sin(th2)\n    y2 = y1 - cos(th2)\n    drift = abs(energy(sol.final_state()) - energy(array([2.2, 2.6, 0.0, 0.0])))\n    print(\"rk45 steps: \" + sol.length().to_string() + \", energy drift below 1e-6: \" + (drift < 0.000001).to_string())\n    fig = viz.figure(\"Double pendulum\").describe(\"θ1 = 2.2, θ2 = 2.6 rad at rest · rk45, tol 1e-10 · 12 s in real time\")\n        .size(560, 560).xlim(-2.2, 2.2).ylim(-2.2, 2.2).labels(\"x [m]\", \"y [m]\").no_legend()\n        .animate(seconds)\n        .rod(0.0, 0.0, x1, y1, color: \"#475569\")\n        .moving_segment(x1, y1, x2, y2, color: \"#475569\")\n        .moving_point(x1, y1, color: \"#2563eb\", size: 8.0, trail: false)\n        .moving_point(x2, y2, color: \"#dc2626\", size: 8.0)\n        .scatter(array([0.0]), array([0.0]), size: 4.0, color: \"#0f172a\")\n    print(fig.svg())\n}\n",
       "svg": "assets/viz/double-pendulum.svg",
+      "provenance": {},
       "printed": [
         "rk45 steps: 1708, energy drift below 1e-6: true",
         ""
@@ -1011,6 +1052,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_orbits.ostrin",
       "code": "// Kepler orbits: Earth, Mars and a comet around the Sun, integrated with rk45\n// (units: AU and years, GM = 4π²) and animated by std.viz. Three years pass in\n// 15 seconds; the comet speeds up near the Sun, as Kepler's second law says.\nimport std.numeric\nimport std.viz\n\nfn gravity(t: Float, s: Array<Float>) -> Array<Float> {\n    // s = [x, y, vx, vy]\n    gm = 4.0 * pi() * pi()\n    r = sqrt(s[0] * s[0] + s[1] * s[1])\n    k = 0.0 - gm / (r * r * r)\n    array([s[2], s[3], k * s[0], k * s[1]])\n}\n\n/// A body starting at perihelion: distance q (AU), eccentricity e.\nfn orbit(q: Float, e: Float, t: Array<Float>) -> List<Array<Float>> {\n    speed = sqrt(4.0 * pi() * pi() * (1.0 + e) / q)\n    sol = numeric.rk45(gravity, array([q, 0.0, 0.0, speed]), 0.0, t[t.length() - 1], tol: 1e-10)\n    [numeric.interp_all(sol.t, sol.component(0), t), numeric.interp_all(sol.t, sol.component(1), t)]\n}\n\nfn main() -> Void {\n    years = 3.0\n    t = linspace(0.0, years, 901)\n    earth = orbit(0.983, 0.0167, t)\n    mars = orbit(1.381, 0.0934, t)\n    comet = orbit(0.45, 0.75, t)\n    // Kepler's third law: a = q / (1 - e), T = a^1.5 years.\n    a = 0.45 / 0.25\n    print(\"comet: a = \" + viz.num(a) + \" AU, period \" + viz.num(exp(1.5 * ln(a))) + \" years\")\n    print(\"Earth after one year: x = \" + viz.num(earth[0][300]) + \" AU\")\n    fig = viz.figure(\"Kepler orbits\").describe(\"rk45 in AU and years · 3 years in 15 s · the comet (e = 0.75) is fastest at perihelion\")\n        .size(620, 520).xlim(-3.4, 1.9).ylim(-2.2, 2.2).labels(\"x [AU]\", \"y [AU]\")\n        .animate(15.0)\n        .scatter(array([0.0]), array([0.0]), label: \"Sun\", size: 9.0, color: \"#f59e0b\")\n        .moving_point(earth[0], earth[1], label: \"Earth\", color: \"#2563eb\", size: 6.0)\n        .moving_point(mars[0], mars[1], label: \"Mars\", color: \"#dc2626\", size: 5.0)\n        .moving_point(comet[0], comet[1], label: \"comet\", color: \"#7c3aed\", size: 4.5)\n    print(fig.svg())\n}\n",
       "svg": "assets/viz/orbits.svg",
+      "provenance": {},
       "printed": [
         "comet: a = 1.8 AU, period 2.41 years",
         "Earth after one year: x = 0.98 AU",
@@ -1026,6 +1068,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_string.ostrin",
       "code": "// A plucked string: the sum of its first 25 standing waves, computed in Ostrin.\n// viz.morph animates the curve itself; the SVG interpolates between 91 shapes.\nimport std.viz\n\n/// Displacement of a string of length 1 plucked at `at` to height h, after t periods.\nfn shape(xs: Array<Float>, at: Float, h: Float, t: Float) -> Array<Float> {\n    mut y = xs * 0.0\n    for n in 1 to 25 {\n        k = (n as Float) * pi()\n        // Fourier coefficient of the triangular initial shape.\n        b = 2.0 * h * sin(k * at) / (k * k * at * (1.0 - at))\n        y = y + sin(xs * k) * (b * cos(2.0 * pi() * (n as Float) * t))\n    }\n    y\n}\n\nfn main() -> Void {\n    xs = linspace(0.0, 1.0, 81)\n    steps = 90\n    mut rows: List<Float> = []\n    for i in 0 until steps + 1 {\n        frame = shape(xs, 0.2, 0.3, (i as Float) / (steps as Float))\n        for j in 0 until xs.length() {\n            rows.push(frame[j])\n        }\n    }\n    frames = array(rows).reshape([steps + 1, xs.length()])\n    start = shape(xs, 0.2, 0.3, 0.0)\n    print(\"height at the pluck: \" + viz.num(start[16]) + \", half a period later: \" + viz.num(shape(xs, 0.2, 0.3, 0.5)[16]))\n    fig = viz.figure(\"Plucked string\").describe(\"25 standing waves summed in Ostrin · one period, looping\")\n        .size(640, 360).ylim(-0.4, 0.4).labels(\"position along the string\", \"displacement\").no_legend()\n        .animate(4.0)\n        .line(xs, start, color: \"#cbd5e1\", width: 1.2, dash: \"4 4\")\n        .morph(xs, frames, label: \"string\", color: \"#0f766e\", width: 3.0)\n    print(fig.svg())\n}\n",
       "svg": "assets/viz/string.svg",
+      "provenance": {},
       "printed": [
         "height at the pluck: 0.29, half a period later: -0.08",
         ""
@@ -1040,6 +1083,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_animation.ostrin",
       "code": "// std.viz animation: a dispersing wave packet, 24 frames played by CSS in one SVG.\n// Each frame is an ordinary figure; viz.animate loops them without scripts.\nimport std.viz\n\nfn packet(x: Array<Float>, t: Float) -> Array<Float> {\n    // Free-particle Gaussian packet: the envelope spreads as it travels.\n    width = sqrt(1.0 + t * t * 0.25)\n    center = 2.0 + 1.5 * t\n    envelope = exp((x - center) * (x - center) * (-0.5 / (width * width))) / sqrt(width)\n    envelope * cos(x * 4.0 - t * 8.0)\n}\n\nfn main() -> Void {\n    x = linspace(0.0, 12.0, 160)\n    mut frames: List<String> = []\n    for i in 0 until 24 {\n        t = (i as Float) * 0.25\n        y = packet(x, t)\n        env = exp((x - (2.0 + 1.5 * t)) * (x - (2.0 + 1.5 * t)) * (-0.5 / (1.0 + t * t * 0.25))) / sqrt(sqrt(1.0 + t * t * 0.25))\n        fig = viz.figure(\"Wave packet, t = \" + viz.num(t) + \" s\")\n            .describe(\"the envelope widens as √(1 + t²/4)\")\n            .labels(\"position x\", \"amplitude\")\n            .xlim(0.0, 12.0).ylim(-1.1, 1.1).no_legend()\n            .band(x, env * -1.0, env, color: \"#93c5fd\")\n            .line(x, y, color: \"#1d4ed8\", width: 2.0)\n        frames.push(fig.svg())\n    }\n    print(viz.animate(frames, fps: 8.0))\n}\n",
       "svg": "assets/viz/animation.svg",
+      "provenance": {},
       "printed": [
         ""
       ]
@@ -1053,6 +1097,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_table.ostrin",
       "code": "// std.viz · a deterministic data table rendered by Ostrin as SVG.\n// Formatting stays in the program so units, significant digits and labels\n// are explicit before the table reaches the renderer.\nimport std.viz\n\nfn main() -> Void {\n    headers: List<String> = [\"solver\", \"steps\", \"error\", \"runtime\"]\n    rows: List<List<String>> = [\n        [\"RK4\", \"240\", \"2.4e-4\", \"18 ms\"],\n        [\"RK45\", \"96\", \"8.1e-7\", \"11 ms\"],\n        [\"BDF\", \"42\", \"1.7e-6\", \"14 ms\"],\n        [\"exact\", \"—\", \"0\", \"1 ms\"]\n    ]\n    print(viz.table(headers, rows, title: \"ODE solver comparison\").dark().svg())\n}\n",
       "svg": "assets/viz/table.svg",
+      "provenance": {},
       "printed": [
         ""
       ]
@@ -1066,6 +1111,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_linked_data.ostrin",
       "code": "// std.viz · linked selection between an Ostrin scatter plot and its table.\n// The same row order feeds both values; the browser links their data-viz-index markers.\nimport std.viz\n\nfn main() -> Void {\n    samples = array([1.0, 2.0, 3.0, 4.0, 5.0])\n    measured = array([1.2, 1.9, 3.3, 3.8, 5.1])\n    rows: List<List<String>> = [\n        [\"A\", \"1.0\", \"1.2\", \"0.2\"],\n        [\"B\", \"2.0\", \"1.9\", \"0.1\"],\n        [\"C\", \"3.0\", \"3.3\", \"0.3\"],\n        [\"D\", \"4.0\", \"3.8\", \"0.2\"],\n        [\"E\", \"5.0\", \"5.1\", \"0.1\"]\n    ]\n    plot = viz.figure(\"Calibration observations\")\n        .size(480, 360)\n        .labels(\"sample\", \"response\")\n        .scatter(samples, measured, label: \"measurements\", color: \"#7c3aed\", size: 5.0)\n    table = viz.table([\"id\", \"sample\", \"response\", \"error\"], rows, title: \"Measurements\")\n        .size(480)\n        .row_height(28)\n    print(viz.grid([plot.svg(), table.svg()], 2, 480, 360, title: \"Linked calibration data\"))\n}\n",
       "svg": "assets/viz/linked-data.svg",
+      "provenance": {},
       "printed": [
         ""
       ]
@@ -1079,6 +1125,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_dashboard.ostrin",
       "code": "// std.viz · layout: four panels composed into one figure with viz.grid.\nimport std.viz\n\nfn wave(x: Float, y: Float) -> Float {\n    sin(x) * cos(y)\n}\n\nfn main() -> Void {\n    r = rng(3)\n    t = linspace(0.0, 6.28, 120)\n    samples = r.randn([3000])\n    grid = linspace(-3.14, 3.14, 28)\n    a = viz.figure(\"Signals\").size(480, 320).no_legend()\n        .line(t, sin(t)).line(t, cos(t))\n    b = viz.figure(\"Distribution\").size(480, 320).no_legend()\n        .histogram(samples, 30)\n    c = viz.figure(\"sin(x) cos(y)\").size(480, 320)\n        .heatmap(viz.grid_of(grid, grid, wave), -3.14, 3.14, -3.14, 3.14, colormap: \"coolwarm\")\n    d = viz.scene3d(\"sin(x) cos(y)\").size(480, 320)\n        .surface(grid, grid, viz.grid_of(grid, grid, wave), colormap: \"coolwarm\")\n    print(viz.grid([a.svg(), b.svg(), c.svg(), d.svg()], 2, 480, 320, title: \"Ostrin Viz dashboard\"))\n}\n",
       "svg": "assets/viz/dashboard.svg",
+      "provenance": {},
       "printed": [
         ""
       ]

@@ -169,7 +169,7 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   page.on("pageerror", (error) => runtimeErrors.push(error.message));
   await page.goto("./viz.html", { waitUntil: "domcontentloaded" });
   const cards = page.locator("[data-viz-gallery] .viz-card");
-  await expect(cards).toHaveCount(28);
+  await expect(cards).toHaveCount(29);
   await expect(page.getByRole("heading", { name: "Data table" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Linked data selection" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "3D vector field" })).toBeVisible();
@@ -178,6 +178,7 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   await expect(page.getByRole("heading", { name: "Kernel-density violins" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Hexbin density" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Filled contour bands" })).toBeVisible();
+  await expect(page.locator("#viz-provenance .sl-provenance")).toContainText("source sha256:");
   for (const card of await cards.all()) {
     const image = card.locator("img.viz-image");
     await expect(image).toHaveAttribute("src", /^assets\/viz\/[a-z-]+\.svg$/);

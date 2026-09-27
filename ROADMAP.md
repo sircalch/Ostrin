@@ -29,14 +29,15 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    campos vectoriales 2D (`quiver` y `streamplot`), gráficas estadísticas (incluidos violines KDE y hexbin), bandas de contorno rellenas y consolidar la selección enlazada, mantener tablas reproducibles con filtro y
    ordenamiento en el explorador, conservar ejemplos verificables en la galería, ampliar animaciones,
    vídeo y controles temporales, consolidar la exportación SVG/PNG/WebM y añadir exportación MP4/GIF/PDF, exploración 3D (ya incluye superficies,
-   campos vectoriales, cámara, cortes ortogonales e isosuperficies de volúmenes), WebGPU y procedencia de figuras con
+   campos vectoriales, cámara, cortes ortogonales e isosuperficies de volúmenes), WebGPU y ampliar la procedencia reproducible ya disponible
+   (hashes de fuente/datos, semilla y compilador) a informes y flujos de publicación con
    evidencia en intérprete, nativo y WASM.
 
 ## Horizonte posterior
 
 - Unidades afines y prefijos automáticos.
 - Autodiff inverso, más álgebra lineal y métodos numéricos.
-- Exportación PDF/HTML, MP4/GIF y controles conducidos por Ostrin; SVG/PNG/WebM ya tienen ruta web.
+- Exportación PDF/HTML, MP4/GIF y controles conducidos por Ostrin; SVG/PNG/WebM y la metadata de procedencia ya tienen ruta web.
 - FFI C, registry público y canales de distribución adicionales.
 - Reconocimiento de Ostrin en GitHub Linguist y aparición de `.ostrin` en el mapa de lenguajes.
 - GPU/WebGPU después de estabilizar Array, IR y ownership.

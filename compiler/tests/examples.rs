@@ -9173,6 +9173,20 @@ fn viz_streamplot_integrates_bidirectional_streamlines_with_tooltips() {
 }
 
 #[test]
+fn viz_exports_reproducibility_metadata_for_figures() {
+    let out = interpreter_and_native_agree("viz_provenance.ostrin");
+    assert_eq!(out.matches("<ostrin-provenance").count(), 1);
+    assert!(out.contains(
+        "source-hash=\"sha256:6b96f1d1f4f1b955a7dff03d7bcf6af6e1f1ca5fbd1eea6fb3d7c2c7fb3c95d2\""
+    ));
+    assert!(out.contains(
+        "data-hash=\"sha256:0a0e6b9b33e2b1bd3706d0b2d6e0f6e7a8e3e95d6b8a36b0c4c9d6af79c61d1a\""
+    ));
+    assert!(out.contains("seed=\"2026-09-27T03:40Z / seed=42\""));
+    assert!(out.contains("compiler=\"ostrinc 0.1.0\""));
+}
+
+#[test]
 fn viz_tables_render_headers_rows_and_tooltips() {
     let out = interpreter_and_native_agree("viz_table.ostrin");
     assert!(out.contains("<svg") && out.contains("ODE solver comparison"));

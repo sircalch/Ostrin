@@ -167,6 +167,7 @@ export const GALLERY = [
   { id: "contourf", title: "Filled contour bands", file: "examples/viz_contourf.ostrin", blurb: "A 48 × 48 scalar field rendered as nine discrete filled contour bands with isolines." },
   { id: "quiver", title: "2D vector field", file: "examples/viz_quiver.ostrin", blurb: "A sampled rotational velocity field rendered as 221 deterministic arrows with tooltips." },
   { id: "streamplot", title: "2D streamlines", file: "examples/viz_streamplot.ostrin", blurb: "63 seeded paths integrated bidirectionally through a bilinearly interpolated velocity field." },
+  { id: "provenance", title: "Reproducible provenance", file: "examples/viz_provenance.ostrin", blurb: "A publication-ready figure carrying source and data hashes, a seed and compiler identity in its SVG metadata." },
   { id: "lorenz", title: "3D trajectory", file: "examples/viz_lorenz.ostrin", blurb: "The Lorenz attractor integrated in Ostrin and colored by time." },
   { id: "histogram", title: "Histogram and density", file: "examples/viz_histogram.ostrin", blurb: "20 000 seeded normal samples with the scaled N(4, 1.5²) density on top." },
   { id: "boxplot", title: "Grouped boxplots", file: "examples/viz_boxplot.ostrin", blurb: "Three seeded cohorts summarized by their whiskers, quartiles and median, computed in Ostrin." },
@@ -341,13 +342,17 @@ export async function buildLabData() {
     const end = output.findIndex((line, index) => index >= start && line === "</svg>");
     if (start < 0 || end < 0) throw new Error(`${figure.file}: expected one SVG figure in the output`);
     const svgPath = `assets/viz/${figure.id}.svg`;
-    figures[svgPath] = `${output.slice(start, end + 1).join("\n")}\n`;
+    const svg = `${output.slice(start, end + 1).join("\n")}\n`;
+    figures[svgPath] = svg;
+    const provenanceAttributes = svg.match(/<ostrin-provenance\s+([^>]+?)\s*\/>/)?.[1] ?? "";
+    const provenance = Object.fromEntries([...provenanceAttributes.matchAll(/([a-z-]+)="([^"]*)"/g)].map(([, key, value]) => [key, value]));
     gallery.push({
       ...figure,
       source: figure.file,
       sourceUrl: `${repository}/blob/main/${figure.file}`,
       code: source,
       svg: svgPath,
+      provenance,
       printed: [...output.slice(0, start), ...output.slice(end + 1)],
     });
   }
