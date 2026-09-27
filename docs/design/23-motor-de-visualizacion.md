@@ -235,6 +235,13 @@ los comprime con LZW en el navegador. El archivo incluye un comentario con la pr
 `data-hash`, `seed` y `compiler`) cuando la figura la declara. El límite práctico es el tamaño de los GIF
 grandes; SVG y WebM siguen siendo preferibles para publicación y alta resolución.
 
+**HTML interactivo** empaqueta el fotograma SVG seleccionado, la procedencia y una pequeña interfaz
+autocontenida en un archivo descargable. El documento funciona sin el sitio de Ostrin ni una CDN:
+permite zoom, desplazamiento con el puntero y un crosshair accesible que vuelve a leer los títulos
+de los elementos producidos por Ostrin. La figura continúa siendo el SVG original sanitizado; el
+navegador solo aporta la interacción de inspección y navegación. Esto convierte una figura reproducible
+en un artefacto que se puede adjuntar a un informe o abrir localmente.
+
 ### 4.6.1 Parámetros conducidos por Ostrin
 
 Una figura de la galería puede declarar controles numéricos junto a su programa. Cada control apunta a
@@ -297,6 +304,7 @@ la falta de literales científicos (`1e-9`). Ver `CONTEXTO_PROYECTO.md` §270–
 | 0.3 (hecho) | descarga del SVG producido y exportación PNG 2× del fotograma actual desde el explorador web |
 | 0.4 (hecho) | vista de impresión PDF con fotograma vectorial, tamaño de página y procedencia; el diálogo nativo permite guardar el PDF |
 | 0.4 (hecho) | exportación GIF con fotogramas cuantizados, compresión LZW y comentario de procedencia |
+| 0.4 (hecho) | exportación HTML autocontenida del fotograma SVG con procedencia, zoom, desplazamiento y crosshair |
 | 0.3 (hecho) | tablas SVG reproducibles con filas alternadas, encabezados, tooltips por celda, tema oscuro y explorador web con filtro/ordenamiento (`viz.table`) |
 | 0.4 (parcial, hecho) | campos vectoriales 3D muestreados con flechas, profundidad y tooltips |
 | 0.4 (parcial, hecho) | explorador web con acimut/elevación que vuelve a ejecutar `.view(...)` en WASM |

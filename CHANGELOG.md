@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Visualization: standalone interactive HTML export
+- The Viz explorer can now download a self-contained HTML document containing the selected
+  Ostrin SVG frame, its reproducibility record, accessible zoom/reset controls, pointer panning
+  and an embedded crosshair inspector. The export has no site or CDN dependency and keeps the
+  rendered data inside the downloaded document.
+
 ### Visualization: crosshair data inspection
 - The Viz explorer now offers an accessible crosshair mode. Moving over a rendered mark reads its
   existing SVG tooltip into a precise crosshair overlay and live status, keeping data and computation
