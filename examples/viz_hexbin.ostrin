@@ -1,0 +1,25 @@
+// std.viz · hexbin density: a bivariate sample counted in Ostrin.
+import std.viz
+
+fn main() -> Void {
+    n = 1200
+    r = rng(91)
+    noise_x = r.randn([n])
+    noise_y = r.randn([n])
+    mut xs = zeros([n])
+    mut ys = zeros([n])
+    for i in 0 until n {
+        cluster = if i < 600 { 0.0 } else { 1.0 }
+        center_x = if cluster == 0.0 { -0.85 } else { 0.95 }
+        center_y = if cluster == 0.0 { -0.55 } else { 0.7 }
+        spread_x = if cluster == 0.0 { 0.38 } else { 0.26 }
+        spread_y = if cluster == 0.0 { 0.28 } else { 0.48 }
+        xs.set(i, noise_x[i] * spread_x + center_x)
+        ys.set(i, noise_y[i] * spread_y + center_y)
+    }
+    fig = viz.figure("Bivariate density")
+        .describe("1 200 seeded observations counted into hexagonal bins")
+        .labels("x", "y")
+        .hexbin(xs, ys, 18, 14, "magma", "observations")
+    print(fig.svg())
+}

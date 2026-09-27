@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Visualization: hexbin density plots
+- `Figure.hexbin(xs, ys, xbins, ybins, colormap:, label:)` counts bivariate observations in Ostrin,
+  renders deterministic hexagonal cells with count tooltips and a colorbar, and is available in the
+  live WASM gallery as `viz_hexbin.ostrin`.
+
 ### Visualization: kernel-density violins
 - `Figure.violin(position, data, bins:, label:, color:)` computes a deterministic Gaussian KDE in
   Ostrin, renders a mirrored distribution shape with a median marker and adds per-figure tooltips.

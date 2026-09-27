@@ -53,7 +53,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "output": [
         "samples: 240, min x = -0.68",
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"640\" height=\"400\" viewBox=\"0 0 640 400\" font-family=\"Inter, Segoe UI, Helvetica, Arial, sans-serif\">",
-        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover{fill-opacity:0.42}</style>",
+        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover{fill-opacity:0.9}</style>",
         "<rect width=\"640\" height=\"400\" fill=\"#ffffff\"/>",
         "",
         "<text x=\"66\" y=\"26\" text-anchor=\"start\" font-size=\"16\" fill=\"#1f2937\" font-weight=\"600\">x(t) = exp(-0.25 t) cos(2 t)</text>",
@@ -167,7 +167,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "output": [
         "z range: -0.6 to 0.71",
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"640\" height=\"520\" viewBox=\"0 0 640 520\" font-family=\"Inter, Segoe UI, Helvetica, Arial, sans-serif\">",
-        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover{fill-opacity:0.42}</style>",
+        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover{fill-opacity:0.9}</style>",
         "<rect width=\"640\" height=\"520\" fill=\"#ffffff\"/>",
         "",
         "<text x=\"20\" y=\"26\" text-anchor=\"start\" font-size=\"16\" fill=\"#1f2937\" font-weight=\"600\">Ripple, k = 1.6</text>",
@@ -267,11 +267,11 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "output": [
         "steps 268, final angle -12.39",
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"840\" height=\"380\" viewBox=\"0 0 840 380\" font-family=\"Inter, Segoe UI, Helvetica, Arial, sans-serif\">",
-        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover{fill-opacity:0.42}</style>",
+        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover{fill-opacity:0.9}</style>",
         "<rect width=\"840\" height=\"380\" fill=\"#ffffff\"/>",
         "",
         "<svg data-ostrin-motion=\"true\" xmlns=\"http://www.w3.org/2000/svg\" width=\"360\" height=\"380\" viewBox=\"0 0 360 380\" font-family=\"Inter, Segoe UI, Helvetica, Arial, sans-serif\">",
-        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover{fill-opacity:0.42}</style>",
+        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover{fill-opacity:0.9}</style>",
         "<rect width=\"360\" height=\"380\" fill=\"#ffffff\"/>",
         "",
         "<style>@media (prefers-reduced-motion:reduce){[data-ostrin-motion] animate{display:none!important}}</style>",
@@ -283,7 +283,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
         "<g fill=\"#0f172a\" fill-opacity=\"0.78\" stroke=\"#ffffff\" stroke-width=\"0.6\"><circle class=\"pt\" data-viz-index=\"0\" cx=\"203\" cy=\"186\" r=\"4\"><title>(0, 0)</title></circle></g>",
         "</g></svg>",
         "<svg data-ostrin-motion=\"true\" xmlns=\"http://www.w3.org/2000/svg\" width=\"480\" height=\"380\" viewBox=\"0 0 480 380\" font-family=\"Inter, Segoe UI, Helvetica, Arial, sans-serif\">",
-        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover{fill-opacity:0.42}</style>",
+        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover{fill-opacity:0.9}</style>",
         "<rect width=\"480\" height=\"380\" fill=\"#ffffff\"/>",
         "",
         "<style>@media (prefers-reduced-motion:reduce){[data-ostrin-motion] animate{display:none!important}}</style>",
@@ -797,6 +797,19 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_violin.ostrin",
       "code": "// std.viz · kernel-density violins: full distributions with median markers.\nimport std.viz\n\nfn main() -> Void {\n    r = rng(73)\n    baseline = r.randn([140]) * 0.42 + 4.2\n    shifted = r.randn([140]) * 0.75 + 5.25\n    bimodal = zeros([140])\n    for i in 0 until 140 {\n        center = if i < 70 { 5.2 } else { 6.1 }\n        spread = if i < 70 { 0.28 } else { 0.18 }\n        bimodal.set(i, r.randn([1])[0] * spread + center)\n    }\n    fig = viz.figure(\"Distribution shapes\")\n        .describe(\"Gaussian KDE violins with medians computed in Ostrin\")\n        .labels(\"cohort\", \"response\")\n        .violin(1.0, baseline, 40, \"baseline\", \"#2563eb\")\n        .violin(2.0, shifted, 40, \"shifted\", \"#db2777\")\n        .violin(3.0, bimodal, 40, \"bimodal\", \"#059669\")\n    print(fig.svg())\n}\n",
       "svg": "assets/viz/violin.svg",
+      "printed": [
+        ""
+      ]
+    },
+    {
+      "id": "hexbin",
+      "title": "Hexbin density",
+      "file": "examples/viz_hexbin.ostrin",
+      "blurb": "1 200 seeded bivariate observations counted into color-mapped hexagonal cells in Ostrin.",
+      "source": "examples/viz_hexbin.ostrin",
+      "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_hexbin.ostrin",
+      "code": "// std.viz · hexbin density: a bivariate sample counted in Ostrin.\nimport std.viz\n\nfn main() -> Void {\n    n = 1200\n    r = rng(91)\n    noise_x = r.randn([n])\n    noise_y = r.randn([n])\n    mut xs = zeros([n])\n    mut ys = zeros([n])\n    for i in 0 until n {\n        cluster = if i < 600 { 0.0 } else { 1.0 }\n        center_x = if cluster == 0.0 { -0.85 } else { 0.95 }\n        center_y = if cluster == 0.0 { -0.55 } else { 0.7 }\n        spread_x = if cluster == 0.0 { 0.38 } else { 0.26 }\n        spread_y = if cluster == 0.0 { 0.28 } else { 0.48 }\n        xs.set(i, noise_x[i] * spread_x + center_x)\n        ys.set(i, noise_y[i] * spread_y + center_y)\n    }\n    fig = viz.figure(\"Bivariate density\")\n        .describe(\"1 200 seeded observations counted into hexagonal bins\")\n        .labels(\"x\", \"y\")\n        .hexbin(xs, ys, 18, 14, \"magma\", \"observations\")\n    print(fig.svg())\n}\n",
+      "svg": "assets/viz/hexbin.svg",
       "printed": [
         ""
       ]
