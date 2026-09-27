@@ -2,7 +2,7 @@
 
 *Corte: 2026-09-27 · rama `main` · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 230 de integración y 2 unitarias en verde.*
 
-Validación remota: Pages y CI pasaron para `c374b28` en Windows, Linux, macOS y web. La
+Validación remota: Pages y CI pasaron para `412e885` en Windows, Linux, macOS y web. La
 compuerta oficial exige `cargo fmt --check`, Clippy con el lint `suspicious`, la suite del
 compilador y las comprobaciones del sitio; los workflows de auditoría de dependencias,
 CodeQL, sanitizers nativos y cobertura quedan registrados para el ciclo P5.
