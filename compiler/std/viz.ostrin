@@ -4,7 +4,7 @@
 // of Series) and rendered to standalone SVG by Ostrin itself, so the same
 // program draws the same bytes in the interpreter, the native backend and the
 // browser (WASM). Marks: line, scatter, area, band, error bars, bars,
-// histogram, boxplot, violin, hexbin, contourf, quiver, stairs, reference lines, text, heatmap, contour, and in 3D
+// histogram, boxplot, violin, hexbin, contourf, quiver, streamplot, stairs, reference lines, text, heatmap, contour, and in 3D
 // surface, wireframe, trajectory, point cloud, vector fields, volume slices and
 // isosurfaces. Axes use "nice" 1-2-5
 // ticks; quantity series label their axes with the unit they carry.
@@ -87,6 +87,11 @@ pub record Note {
     x: Float
     y: Float
     text: String
+}
+
+record StreamPath {
+    xs: List<Float>
+    ys: List<Float>
 }
 
 pub record Figure {
@@ -195,7 +200,7 @@ fn header(width: Int, height: Int, theme: Theme) -> String {
         // Interaction without scripts: hovering highlights a mark and its
         // <title> shows the values, wherever the SVG is opened.
         "<style>.pt:hover{stroke:" + theme.text + ";stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}" +
-        ".series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell,.contourf-cell,.quiver{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover,.contourf-cell:hover{fill-opacity:0.9}.quiver:hover>line{stroke-width:2.6px}.quiver:hover>polygon{filter:brightness(0.78)}</style>\n" +
+        ".series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell,.contourf-cell,.quiver,.streamplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover,.contourf-cell:hover{fill-opacity:0.9}.quiver:hover>line{stroke-width:2.6px}.quiver:hover>polygon{filter:brightness(0.78)}.streamplot:hover{stroke-width:2.7px}</style>\n" +
         "<rect" + attr("width", px(width)) + attr("height", px(height)) + attr("fill", theme.background) + "/>\n"
 }
 
@@ -581,6 +586,39 @@ impl Figure {
         self.add(Series { kind: s.kind, xs: s.xs, ys: s.ys, zs: us, lo: vs, hi: s.hi, grid: s.grid, label: s.label, color: s.color, width: 1.35, dash: "", size: if scale > 0.0 { scale } else { 0.18 }, colormap: s.colormap, levels: 0 })
     }
 
+    /// Integrates streamlines through a sampled 2D vector field. `xs` and
+    /// `ys` are ascending grid axes; `us` and `vs` are flattened row-major
+    /// fields with `xs.length() * ys.length()` values. Each seed is traced in
+    /// both directions with bilinear interpolation and an arc-length step.
+    fn streamplot(mut self, xs: Array<Float>, ys: Array<Float>, us: Array<Float>, vs: Array<Float>, seed_xs: Array<Float>, seed_ys: Array<Float>, steps: Int = 48, step_size: Float = 0.08, label: String = "", color: String = "") -> Figure {
+        nx = xs.length()
+        ny = ys.length()
+        if nx < 2 or ny < 2 { return self }
+        count = if steps < 4 { 4 } else if steps > 240 { 240 } else { steps }
+        spacing = if step_size > 0.0 { step_size } else { 0.08 }
+        for i in 0 until seed_xs.length() {
+            backward = integrate_stream(seed_xs[i], seed_ys[i], xs, ys, us, vs, count, spacing, -1.0)
+            forward = integrate_stream(seed_xs[i], seed_ys[i], xs, ys, us, vs, count, spacing, 1.0)
+            mut path_x: List<Float> = []
+            mut path_y: List<Float> = []
+            mut j = backward.xs.length() - 1
+            while j >= 0 {
+                path_x.push(backward.xs[j])
+                path_y.push(backward.ys[j])
+                j = j - 1
+            }
+            j = 1
+            while j < forward.xs.length() {
+                path_x.push(forward.xs[j])
+                path_y.push(forward.ys[j])
+                j = j + 1
+            }
+            s = series("streamplot", array(path_x), array(path_y), if i == 0 { label } else { "" }, color)
+            self.add(Series { kind: s.kind, xs: s.xs, ys: s.ys, zs: s.zs, lo: s.lo, hi: s.hi, grid: s.grid, label: s.label, color: s.color, width: 1.45, dash: "", size: 0.0, colormap: s.colormap, levels: 0 })
+        }
+        self
+    }
+
     fn hline(mut self, y: Float, label: String = "", color: String = "") -> Figure {
         self.add(series("hline", array([0.0]), array([y]), label, color))
     }
@@ -919,6 +957,62 @@ fn path_of(xs: Array<Float>, ys: Array<Float>, left: Float, bottom: Float, x0: F
     parts.join(" ")
 }
 
+fn stream_value(values: Array<Float>, index: Int) -> Float {
+    if index < 0 or index >= values.length() { 0.0 } else { values[index] }
+}
+
+/// Bilinear interpolation for a row-major field over ascending grid axes.
+fn sample_stream(values: Array<Float>, xs: Array<Float>, ys: Array<Float>, x: Float, y: Float) -> Float {
+    nx = xs.length()
+    ny = ys.length()
+    xspan = xs[nx - 1] - xs[0]
+    yspan = ys[ny - 1] - ys[0]
+    gx = ((x - xs[0]) / xspan) * ((nx - 1) as Float)
+    gy = ((y - ys[0]) / yspan) * ((ny - 1) as Float)
+    mut ix = floor(gx) as Int
+    mut iy = floor(gy) as Int
+    ix = if ix < 0 { 0 } else if ix >= nx - 1 { nx - 2 } else { ix }
+    iy = if iy < 0 { 0 } else if iy >= ny - 1 { ny - 2 } else { iy }
+    tx = gx - (ix as Float)
+    ty = gy - (iy as Float)
+    row = nx
+    a = stream_value(values, iy * row + ix)
+    b = stream_value(values, iy * row + ix + 1)
+    c = stream_value(values, (iy + 1) * row + ix)
+    d = stream_value(values, (iy + 1) * row + ix + 1)
+    a * (1.0 - tx) * (1.0 - ty) + b * tx * (1.0 - ty) + c * (1.0 - tx) * ty + d * tx * ty
+}
+
+fn stream_inside(x: Float, y: Float, xs: Array<Float>, ys: Array<Float>) -> Bool {
+    x >= xs[0] and x <= xs[xs.length() - 1] and y >= ys[0] and y <= ys[ys.length() - 1]
+}
+
+/// Integrate one seed in one direction using normalized vector speed so
+/// neighboring streamlines advance by the same approximate arc length.
+fn integrate_stream(seed_x: Float, seed_y: Float, xs: Array<Float>, ys: Array<Float>, us: Array<Float>, vs: Array<Float>, steps: Int, step_size: Float, direction: Float) -> StreamPath {
+    mut out_x: List<Float> = [seed_x]
+    mut out_y: List<Float> = [seed_y]
+    mut x = seed_x
+    mut y = seed_y
+    mut k = 0
+    while k < steps {
+        if not stream_inside(x, y, xs, ys) { break }
+        u = sample_stream(us, xs, ys, x, y)
+        v = sample_stream(vs, xs, ys, x, y)
+        speed = sqrt(u * u + v * v)
+        if speed < 0.000001 { break }
+        next_x = x + direction * u / speed * step_size
+        next_y = y + direction * v / speed * step_size
+        if not stream_inside(next_x, next_y, xs, ys) { break }
+        out_x.push(next_x)
+        out_y.push(next_y)
+        x = next_x
+        y = next_y
+        k = k + 1
+    }
+    StreamPath { xs: out_x, ys: out_y }
+}
+
 fn draw_series(s: Series, color: String, left: Float, bottom: Float, x0: Float, y0: Float, sx: Float, sy: Float, zlo: Float, zhi: Float, theme: Theme, top: Float, right: Float, violin_gap: Float) -> String {
     kind = s.kind
     if kind == "line" {
@@ -926,6 +1020,10 @@ fn draw_series(s: Series, color: String, left: Float, bottom: Float, x0: Float, 
         line = "<path" + attr("d", path_of(s.xs, s.ys, left, bottom, x0, y0, sx, sy)) + attr("fill", "none") + attr("stroke", color) +
             attr("stroke-width", num(s.width)) + attr("stroke-linejoin", "round") + attr("stroke-linecap", "round") + dash + "/>"
         if s.label == "" { line } else { "<g class=\"series\">" + tip(s.label) + line + "</g>" }
+    } else if kind == "streamplot" {
+        line = "<path class=\"streamplot\"" + attr("d", path_of(s.xs, s.ys, left, bottom, x0, y0, sx, sy)) + attr("fill", "none") + attr("stroke", color) +
+            attr("stroke-width", num(s.width)) + attr("stroke-linejoin", "round") + attr("stroke-linecap", "round") + ">" + tip(if s.label == "" { "streamline" } else { s.label + " streamline" }) + "</path>"
+        line
     } else if kind == "scatter" {
         mut parts: List<String> = []
         for i in 0 until s.xs.length() {

@@ -59,10 +59,10 @@ Decisiones:
 Limitaciones conocidas: una lista vacía literal no permite inferir `T` (`lists.sorted([])` exige
 una variable tipada); el ordenamiento es O(n²) por inserción.
 
-## `std.viz` (2026-09-24)
+## `std.viz` (2026-09-27)
 
 Módulo de visualización escrito en Ostrin: figuras 2D (líneas, dispersión, áreas, bandas, barras de
-error, barras, histogramas, boxplots agrupados, violines KDE, hexbin, `contourf`, `quiver`, escalones, líneas de referencia, heatmaps y contornos), escenas 3D
+error, barras, histogramas, boxplots agrupados, violines KDE, hexbin, `contourf`, `quiver`, `streamplot`, escalones, líneas de referencia, heatmaps y contornos), escenas 3D
 (superficies sombreadas, mallas, trayectorias, nubes de puntos) y composición en rejilla, todo
 renderizado a SVG determinista. Diseño completo en el documento 23.
 

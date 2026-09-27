@@ -9165,6 +9165,14 @@ fn viz_quiver_renders_2d_vectors_with_arrowheads_and_tooltips() {
 }
 
 #[test]
+fn viz_streamplot_integrates_bidirectional_streamlines_with_tooltips() {
+    let out = interpreter_and_native_agree("viz_streamplot.ostrin");
+    assert_eq!(out.matches("class=\"streamplot\"").count(), 9 * 7);
+    assert_eq!(out.matches("flow streamline").count(), 1);
+    assert!(out.contains("2D streamline field"));
+}
+
+#[test]
 fn viz_tables_render_headers_rows_and_tooltips() {
     let out = interpreter_and_native_agree("viz_table.ostrin");
     assert!(out.contains("<svg") && out.contains("ODE solver comparison"));
