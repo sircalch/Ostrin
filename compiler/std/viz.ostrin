@@ -4,7 +4,7 @@
 // of Series) and rendered to standalone SVG by Ostrin itself, so the same
 // program draws the same bytes in the interpreter, the native backend and the
 // browser (WASM). Marks: line, scatter, area, band, error bars, bars,
-// histogram, boxplot, violin, hexbin, stairs, reference lines, text, heatmap, contour, and in 3D
+// histogram, boxplot, violin, hexbin, contourf, stairs, reference lines, text, heatmap, contour, and in 3D
 // surface, wireframe, trajectory, point cloud, vector fields, volume slices and
 // isosurfaces. Axes use "nice" 1-2-5
 // ticks; quantity series label their axes with the unit they carry.
@@ -195,7 +195,7 @@ fn header(width: Int, height: Int, theme: Theme) -> String {
         // Interaction without scripts: hovering highlights a mark and its
         // <title> shows the values, wherever the SVG is opened.
         "<style>.pt:hover{stroke:" + theme.text + ";stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}" +
-        ".series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover{fill-opacity:0.9}</style>\n" +
+        ".series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell,.contourf-cell{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover,.contourf-cell:hover{fill-opacity:0.9}</style>\n" +
         "<rect" + attr("width", px(width)) + attr("height", px(height)) + attr("fill", theme.background) + "/>\n"
 }
 
@@ -600,6 +600,14 @@ impl Figure {
         self.add(Series { kind: s.kind, xs: s.xs, ys: s.ys, zs: s.zs, lo: s.lo, hi: s.hi, grid: z, label: "", color: color, width: 1.2, dash: "", size: s.size, colormap: colormap, levels: levels })
     }
 
+    /// Filled, discrete contour bands over a 2D grid. Each cell is assigned
+    /// to the band of its mean corner value for deterministic SVG output.
+    fn contourf(mut self, z: Array<Float>, x0: Float, x1: Float, y0: Float, y1: Float, levels: Int = 8, colormap: String = "viridis", label: String = "") -> Figure {
+        s = series("contourf", array([x0, x1]), array([y0, y1]), label, "")
+        self.colorbar = label
+        self.add(Series { kind: s.kind, xs: s.xs, ys: s.ys, zs: s.zs, lo: s.lo, hi: s.hi, grid: z, label: "", color: "", width: 0.35, dash: "", size: s.size, colormap: colormap, levels: levels })
+    }
+
     /// Line of two arrays of quantities (`Array<Quantity<D>>`): the numbers
     /// in each array's unit, and the axes labelled with those units.
     fn unit_line<X: Dimension, Y: Dimension>(mut self, xs: Array<Quantity<X>>, ys: Array<Quantity<Y>>, label: String = "", color: String = "", width: Float = 2.0, dash: String = "") -> Figure {
@@ -660,7 +668,7 @@ fn axis_title(name: String, unit_name: String) -> String {
 }
 
 fn is_grid(kind: String) -> Bool {
-    kind == "heatmap" or kind == "contour" or kind == "hexbin"
+    kind == "heatmap" or kind == "contour" or kind == "contourf" or kind == "hexbin"
 }
 
 fn render(fig: Figure) -> String {
@@ -727,7 +735,7 @@ fn render(fig: Figure) -> String {
             has_grid = true
             zlo = if s.grid.min() < zlo { s.grid.min() } else { zlo }
             zhi = if s.grid.max() > zhi { s.grid.max() } else { zhi }
-            if s.kind == "heatmap" or s.kind == "hexbin" {
+            if s.kind == "heatmap" or s.kind == "contourf" or s.kind == "hexbin" {
                 heat_map = s.colormap
             }
         }
@@ -1026,6 +1034,8 @@ fn draw_series(s: Series, color: String, left: Float, bottom: Float, x0: Float, 
         draw_heatmap(s, left, bottom, x0, y0, sx, sy, zlo, zhi)
     } else if kind == "contour" {
         draw_contour(s, color, left, bottom, x0, y0, sx, sy, theme)
+    } else if kind == "contourf" {
+        draw_contourf(s, left, bottom, x0, y0, sx, sy, zlo, zhi, theme)
     } else if kind == "hexbin" {
         draw_hexbin(s, left, bottom, x0, y0, sx, sy, zlo, zhi, theme)
     } else {
@@ -1112,6 +1122,36 @@ fn draw_contour(s: Series, color: String, left: Float, bottom: Float, x0: Float,
         out.push("<path" + attr("d", d.join(" ")) + attr("fill", "none") + attr("stroke", stroke) + attr("stroke-width", num(s.width)) + attr("stroke-linecap", "round") + "/>")
     }
     out.join("")
+}
+
+/// Discrete filled contour bands over grid cells. This keeps the renderer
+/// deterministic and lightweight while exposing the level boundaries through
+/// a stable class and SVG tooltip for every cell.
+fn draw_contourf(s: Series, left: Float, bottom: Float, x0: Float, y0: Float, sx: Float, sy: Float, zlo: Float, zhi: Float, theme: Theme) -> String {
+    shape = s.grid.shape()
+    rows = shape[0]
+    cols = shape[1]
+    dx = (s.xs[1] - s.xs[0]) / ((cols - 1) as Float)
+    dy = (s.ys[1] - s.ys[0]) / ((rows - 1) as Float)
+    bands = if s.levels < 2 { 2 } else { s.levels }
+    span = if zhi > zlo { zhi - zlo } else { 1.0 }
+    mut cells: List<String> = []
+    for r in 0 until rows - 1 {
+        for c in 0 until cols - 1 {
+            a = s.grid.get(r, c)
+            b = s.grid.get(r, c + 1)
+            e = s.grid.get(r + 1, c + 1)
+            f = s.grid.get(r + 1, c)
+            value = (a + b + e + f) / 4.0
+            mut band = floor((value - zlo) / span * (bands as Float)) as Int
+            band = if band < 0 { 0 } else if band >= bands { bands - 1 } else { band }
+            tone = ((band as Float) + 0.5) / (bands as Float)
+            x = left + (s.xs[0] + (c as Float) * dx - x0) * sx
+            y = bottom - (s.ys[0] + ((r + 1) as Float) * dy - y0) * sy
+            cells.push("<rect class=\"contourf-cell\"" + attr("x", num(x)) + attr("y", num(y)) + attr("width", num(dx * sx + 0.35)) + attr("height", num(dy * sy + 0.35)) + attr("fill", colormap(s.colormap, tone, 1.0)) + attr("fill-opacity", "0.92") + attr("stroke", theme.background) + attr("stroke-width", num(s.width)) + ">" + tip(named(s.label) + "band " + (band + 1).to_string() + "/" + bands.to_string() + ", value " + short(value)) + "</rect>")
+        }
+    }
+    "<g>" + cells.join("") + "</g>"
 }
 
 fn draw_hexbin(s: Series, left: Float, bottom: Float, x0: Float, y0: Float, sx: Float, sy: Float, zlo: Float, zhi: Float, theme: Theme) -> String {

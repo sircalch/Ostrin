@@ -169,7 +169,7 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   page.on("pageerror", (error) => runtimeErrors.push(error.message));
   await page.goto("./viz.html", { waitUntil: "domcontentloaded" });
   const cards = page.locator("[data-viz-gallery] .viz-card");
-  await expect(cards).toHaveCount(25);
+  await expect(cards).toHaveCount(26);
   await expect(page.getByRole("heading", { name: "Data table" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Linked data selection" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "3D vector field" })).toBeVisible();
@@ -177,6 +177,7 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   await expect(page.getByRole("heading", { name: "3D isosurface" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Kernel-density violins" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Hexbin density" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Filled contour bands" })).toBeVisible();
   for (const card of await cards.all()) {
     const image = card.locator("img.viz-image");
     await expect(image).toHaveAttribute("src", /^assets\/viz\/[a-z-]+\.svg$/);
@@ -304,6 +305,13 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   const violinFrame = page.frameLocator(".viz-frame-live");
   await expect(violinFrame.locator("path.violin")).toHaveCount(3);
   await expect(violinFrame.locator("path.violin title").first()).toContainText("median");
+  await page.getByRole("button", { name: "Close" }).click();
+  await page.locator('[data-viz-explore="contourf"]').click();
+  const contourfFrame = page.frameLocator(".viz-frame-live");
+  await expect(contourfFrame.locator("rect.contourf-cell")).toHaveCount(47 * 47);
+  await expect(contourfFrame.locator("rect.contourf-cell title").first()).toContainText("band");
+  await expect(contourfFrame.locator("path")).toHaveCount(9);
+  await expect(contourfFrame.locator("linearGradient")).toHaveCount(1);
   await page.getByRole("button", { name: "Close" }).click();
   await page.locator('[data-viz-explore="hexbin"]').click();
   const hexbinFrame = page.frameLocator(".viz-frame-live");

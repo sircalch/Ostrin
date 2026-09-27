@@ -53,7 +53,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "output": [
         "samples: 240, min x = -0.68",
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"640\" height=\"400\" viewBox=\"0 0 640 400\" font-family=\"Inter, Segoe UI, Helvetica, Arial, sans-serif\">",
-        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover{fill-opacity:0.9}</style>",
+        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell,.contourf-cell{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover,.contourf-cell:hover{fill-opacity:0.9}</style>",
         "<rect width=\"640\" height=\"400\" fill=\"#ffffff\"/>",
         "",
         "<text x=\"66\" y=\"26\" text-anchor=\"start\" font-size=\"16\" fill=\"#1f2937\" font-weight=\"600\">x(t) = exp(-0.25 t) cos(2 t)</text>",
@@ -167,7 +167,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "output": [
         "z range: -0.6 to 0.71",
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"640\" height=\"520\" viewBox=\"0 0 640 520\" font-family=\"Inter, Segoe UI, Helvetica, Arial, sans-serif\">",
-        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover{fill-opacity:0.9}</style>",
+        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell,.contourf-cell{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover,.contourf-cell:hover{fill-opacity:0.9}</style>",
         "<rect width=\"640\" height=\"520\" fill=\"#ffffff\"/>",
         "",
         "<text x=\"20\" y=\"26\" text-anchor=\"start\" font-size=\"16\" fill=\"#1f2937\" font-weight=\"600\">Ripple, k = 1.6</text>",
@@ -267,11 +267,11 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "output": [
         "steps 268, final angle -12.39",
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"840\" height=\"380\" viewBox=\"0 0 840 380\" font-family=\"Inter, Segoe UI, Helvetica, Arial, sans-serif\">",
-        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover{fill-opacity:0.9}</style>",
+        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell,.contourf-cell{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover,.contourf-cell:hover{fill-opacity:0.9}</style>",
         "<rect width=\"840\" height=\"380\" fill=\"#ffffff\"/>",
         "",
         "<svg data-ostrin-motion=\"true\" xmlns=\"http://www.w3.org/2000/svg\" width=\"360\" height=\"380\" viewBox=\"0 0 360 380\" font-family=\"Inter, Segoe UI, Helvetica, Arial, sans-serif\">",
-        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover{fill-opacity:0.9}</style>",
+        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell,.contourf-cell{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover,.contourf-cell:hover{fill-opacity:0.9}</style>",
         "<rect width=\"360\" height=\"380\" fill=\"#ffffff\"/>",
         "",
         "<style>@media (prefers-reduced-motion:reduce){[data-ostrin-motion] animate{display:none!important}}</style>",
@@ -283,7 +283,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
         "<g fill=\"#0f172a\" fill-opacity=\"0.78\" stroke=\"#ffffff\" stroke-width=\"0.6\"><circle class=\"pt\" data-viz-index=\"0\" cx=\"203\" cy=\"186\" r=\"4\"><title>(0, 0)</title></circle></g>",
         "</g></svg>",
         "<svg data-ostrin-motion=\"true\" xmlns=\"http://www.w3.org/2000/svg\" width=\"480\" height=\"380\" viewBox=\"0 0 480 380\" font-family=\"Inter, Segoe UI, Helvetica, Arial, sans-serif\">",
-        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover{fill-opacity:0.9}</style>",
+        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell,.contourf-cell{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover,.contourf-cell:hover{fill-opacity:0.9}</style>",
         "<rect width=\"480\" height=\"380\" fill=\"#ffffff\"/>",
         "",
         "<style>@media (prefers-reduced-motion:reduce){[data-ostrin-motion] animate{display:none!important}}</style>",
@@ -744,6 +744,19 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "svg": "assets/viz/heatmap.svg",
       "printed": [
         "min -6.52, max 8.08",
+        ""
+      ]
+    },
+    {
+      "id": "contourf",
+      "title": "Filled contour bands",
+      "file": "examples/viz_contourf.ostrin",
+      "blurb": "A 48 × 48 scalar field rendered as nine discrete filled contour bands with isolines.",
+      "source": "examples/viz_contourf.ostrin",
+      "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_contourf.ostrin",
+      "code": "// std.viz · filled contour bands over a deterministic scalar field.\nimport std.viz\n\nfn peaks(x: Float, y: Float) -> Float {\n    3.0 * (1.0 - x) * (1.0 - x) * exp(-x * x - (y + 1.0) * (y + 1.0)) -\n        10.0 * (x / 5.0 - x * x * x - y * y * y * y * y) * exp(-x * x - y * y) -\n        exp(-(x + 1.0) * (x + 1.0) - y * y) / 3.0\n}\n\nfn main() -> Void {\n    xs = linspace(-3.0, 3.0, 48)\n    ys = linspace(-3.0, 3.0, 48)\n    z = viz.grid_of(xs, ys, peaks)\n    fig = viz.figure(\"Filled peaks contours\")\n        .describe(\"48 × 48 samples, 9 discrete contour bands\")\n        .labels(\"x\", \"y\")\n        .size(600, 500)\n        .contourf(z, -3.0, 3.0, -3.0, 3.0, 9, \"magma\", \"z\")\n        .contour(z, -3.0, 3.0, -3.0, 3.0, 9, \"\", \"#ffffff\")\n    print(fig.svg())\n}\n",
+      "svg": "assets/viz/contourf.svg",
+      "printed": [
         ""
       ]
     },
