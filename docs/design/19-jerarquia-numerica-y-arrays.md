@@ -58,9 +58,9 @@ Tensor<T, D1..Dk>   = Array<T, (D1..Dk)>
 2. **`Float32`** y conversiones; promover el `std.numeric.Complex` experimental a un tipo numérico coherente.
 3. **`Array<T, Shape>` dinámico** (forma en ejecución) con aritmética, broadcasting y reducciones en el runtime C.
 4. **Formas estáticas** y verificación en el checker.
-5. **Álgebra lineal** (LU, QR, SVD, `solve`) sobre un backend intercambiable (BLAS/LAPACK opcional, implementación propia de referencia).
+5. **Álgebra lineal** (LU, QR, Cholesky, SVD, `solve`) sobre un backend intercambiable (BLAS/LAPACK opcional, implementación propia de referencia).
 6. `Measured` e `Interval`.
 
 ## 7. Pruebas
 
-Cada fase añade: ejemplos en `examples/`, comparación intérprete↔nativo (ya automática), casos `*_errors.ostrin` para cada regla de conversión y de forma, y *benchmarks* frente a C y NumPy para las operaciones de rendimiento. `examples/numeric_complex.ostrin` cubre la API experimental actual y comprueba la misma salida en ambos backends.
+Cada fase añade: ejemplos en `examples/`, comparación intérprete↔nativo (ya automática), casos `*_errors.ostrin` para cada regla de conversión y de forma, y *benchmarks* frente a C y NumPy para las operaciones de rendimiento. `examples/numeric_complex.ostrin` y `examples/numeric_cholesky.ostrin` cubren las APIs experimentales actuales y comprueban la misma salida en ambos backends.

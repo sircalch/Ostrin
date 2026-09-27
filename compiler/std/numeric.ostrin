@@ -369,6 +369,80 @@ pub fn qr(a: Array<Float>, tol: Float = 1e-12) -> Result<Qr, String> {
     Ok(Qr { q: q, r: r })
 }
 
+/// A lower-triangular Cholesky factor of a dense symmetric matrix: `a = l @ l.T`.
+pub record Cholesky {
+    l: Array<Float>
+}
+
+impl Cholesky {
+    /// Reconstruct the positive-definite matrix represented by this factor.
+    fn reconstruct(self) -> Array<Float> {
+        self.l @ self.l.transpose()
+    }
+
+    /// Solve `a x = b` with forward and backward triangular substitution.
+    /// The right-hand side must have the same length as the factor dimension.
+    fn solve(self, rhs: Array<Float>) -> Array<Float> {
+        n = self.l.shape()[0]
+        mut y = zeros([n])
+        for i in 0 until n {
+            mut value = rhs[i]
+            for k in 0 until i {
+                value = value - self.l.get(i, k) * y[k]
+            }
+            y.set(i, value / self.l.get(i, i))
+        }
+        mut x = zeros([n])
+        for offset in 0 until n {
+            i = n - 1 - offset
+            mut value = y[i]
+            for k in i + 1 until n {
+                value = value - self.l.get(k, i) * x[k]
+            }
+            x.set(i, value / self.l.get(i, i))
+        }
+        x
+    }
+}
+
+/// Cholesky factorization by the textbook lower-triangular algorithm.
+///
+/// The input must be a square, symmetric, positive-definite dense real matrix.
+/// Shape, symmetry and non-positive pivots return a diagnostic instead of
+/// producing an invalid factor.
+pub fn cholesky(a: Array<Float>, tol: Float = 1e-12) -> Result<Cholesky, String> {
+    shape = a.shape()
+    if shape.length() != 2 or shape[0] != shape[1] {
+        return Err("cholesky needs a square matrix")
+    }
+    n = shape[0]
+    for i in 0 until n {
+        for j in i + 1 until n {
+            if abs(a.get(i, j) - a.get(j, i)) > tol {
+                return Err("cholesky needs a symmetric matrix")
+            }
+        }
+    }
+    mut l = zeros([n, n])
+    for i in 0 until n {
+        for j in 0 until i + 1 {
+            mut value = a.get(i, j)
+            for k in 0 until j {
+                value = value - l.get(i, k) * l.get(j, k)
+            }
+            if i == j {
+                if value <= tol {
+                    return Err("cholesky needs a positive-definite matrix")
+                }
+                l.set(i, j, sqrt(value))
+            } else {
+                l.set(i, j, value / l.get(j, j))
+            }
+        }
+    }
+    Ok(Cholesky { l: l })
+}
+
 /// dy/dt = f(t, y) from t0 to t1 with `steps` classic Runge–Kutta steps.
 pub fn rk4(f: fn(Float, Array<Float>) -> Array<Float>, y0: Array<Float>, t0: Float, t1: Float, steps: Int = 1000) -> Solution {
     h = (t1 - t0) / (steps as Float)

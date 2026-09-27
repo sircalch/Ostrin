@@ -1,7 +1,7 @@
 # 24 — Métodos numéricos: `std.numeric` 0.1
 
 Estado: implementado (2026-09-24). Código: `compiler/std/numeric.ostrin`. Ejemplos:
-`examples/numeric_methods.ostrin`, `examples/numeric_complex.ostrin`, `examples/viz_ode.ostrin`,
+`examples/numeric_methods.ostrin`, `examples/numeric_complex.ostrin`, `examples/numeric_cholesky.ostrin`, `examples/viz_ode.ostrin`,
 `examples/viz_fft.ostrin`, `examples/viz_spline.ostrin`, `examples/lab_ode.ostrin`. Web: pestañas ODE,
 Linear Algebra y Complex del Scientific Lab y figuras de la galería de `viz.html`.
 
@@ -48,6 +48,10 @@ qr = numeric.qr(a)                          // Result<Qr, String>, QR fino de un
 qr.q  qr.r  qr.reconstruct()                // Q ortonormal, R triangular superior, Q @ R
 qr.orthogonality()                          // ||QᵀQ − I||
 
+chol = numeric.cholesky(a)                  // Result<Cholesky, String>, matriz SPD
+chol.l  chol.reconstruct()                  // L triangular inferior, L @ Lᵀ
+chol.solve(rhs)                             // sustituciones hacia delante y atrás
+
 // Con unidades: xs: Array<Quantity<X>>, ys: Array<Quantity<Y>>
 numeric.unit_trapz(xs, ys)                     // Quantity<X * Y>   (km/h sobre min → km)
 numeric.unit_cumtrapz(xs, ys)                  // Array<Quantity<X * Y>>
@@ -76,6 +80,10 @@ ningún caso especial en el runtime. Requieren al menos dos muestras.
   resultado en el intérprete, nativo y WASM. La superficie conserva por ahora el fallback AST de
   agregados mientras `Array` dentro de records/`Result` termina de migrar a HIR/IR; el trinquete lo
   registra con un límite explícito y el siguiente ciclo lo reducirá.
+- **Cholesky**: algoritmo triangular inferior para matrices densas, simétricas y definidas positivas.
+  Comprueba forma, simetría y pivotes positivos; `reconstruct` verifica `A = L @ Lᵀ` y `solve` resuelve
+  el sistema mediante dos sustituciones triangulares. El ejemplo, la pestaña Linear Algebra y la suite
+  intérprete/nativo/WASM cubren también el diagnóstico para matrices no definidas positivas.
 - **Complejos**: `Complex` es por ahora un record público de `Float64` con operadores `Add`, `Sub`,
   `Mul`, `Div`, igualdad, conjugado, magnitud, forma polar, `cis` y potencias enteras. El ejemplo
   `numeric_complex.ostrin` y la pestaña Complex del Lab verifican la misma salida en intérprete,
@@ -106,4 +114,4 @@ y tipos función para enlazar `X`, y una segunda aparición con otra dimensión 
 | cuadratura adaptativa, integrales múltiples | Gauss–Kronrod |
 | optimización multivariable | Nelder–Mead, BFGS |
 | unidades en ODEs y raíces | `unit_*` cubre integrales, derivadas e interpolación; `rk45` y `newton` siguen en `Float` (un estado con dimensiones mezcladas necesitaría tuplas o records de cantidades) |
-| álgebra lineal avanzada | QR denso ya está disponible; LU, Cholesky, SVD, autovectores, mínimos cuadrados generalizados, dispersa y álgebra matricial compleja siguen pendientes |
+| álgebra lineal avanzada | QR denso y Cholesky ya están disponibles; LU, SVD, autovectores, mínimos cuadrados generalizados, dispersa y álgebra matricial compleja siguen pendientes |

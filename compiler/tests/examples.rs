@@ -9364,6 +9364,14 @@ fn std_numeric_complex_matches_interpreter_and_native() {
 }
 
 #[test]
+fn std_numeric_cholesky_matches_interpreter_and_native() {
+    assert_eq!(
+        interpreter_and_native_agree("numeric_cholesky.ostrin"),
+        "L =\n[[2, 0, 0], [0.5, 1.6583, 0], [0.5, -0.1508, 1.3143]]\nreconstruction residual = 0\nsolution =\n[-0.3684, 0.7895, 1.6842]\nsolve residual = 0\ninvalid matrix = cholesky needs a positive-definite matrix\nnonsymmetric matrix = cholesky needs a symmetric matrix\nnonsquare matrix = cholesky needs a square matrix\n"
+    );
+}
+
+#[test]
 fn std_viz_animates_frames_with_css_only() {
     let out = run(&["--run", &example_path("viz_animation.ostrin")]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));

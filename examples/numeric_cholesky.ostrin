@@ -1,0 +1,42 @@
+// std.numeric: Cholesky factorization and triangular solves for SPD matrices.
+import std.numeric
+
+fn clean(x: Float) -> Float {
+    round(x * 10000.0) / 10000.0
+}
+
+fn main() -> Void {
+    a = array([
+        [4.0, 1.0, 1.0],
+        [1.0, 3.0, 0.0],
+        [1.0, 0.0, 2.0]
+    ])
+    rhs = array([1.0, 2.0, 3.0])
+    match numeric.cholesky(a) {
+        Ok(factors) => {
+            print("L =")
+            print(round(factors.l * 10000.0) / 10000.0)
+            print("reconstruction residual = " + clean(norm(factors.reconstruct() - a)).to_string())
+            solution = factors.solve(rhs)
+            print("solution =")
+            print(round(solution * 10000.0) / 10000.0)
+            print("solve residual = " + clean(norm(a @ solution - rhs)).to_string())
+        },
+        Err(message) => print("unexpected error: " + message),
+    }
+
+    match numeric.cholesky(array([[1.0, 2.0], [2.0, 1.0]])) {
+        Ok(_) => print("unexpected success"),
+        Err(message) => print("invalid matrix = " + message),
+    }
+
+    match numeric.cholesky(array([[1.0, 2.0], [0.0, 1.0]])) {
+        Ok(_) => print("unexpected success"),
+        Err(message) => print("nonsymmetric matrix = " + message),
+    }
+
+    match numeric.cholesky(array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]])) {
+        Ok(_) => print("unexpected success"),
+        Err(message) => print("nonsquare matrix = " + message),
+    }
+}
