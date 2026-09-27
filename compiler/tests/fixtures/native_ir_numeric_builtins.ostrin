@@ -1,0 +1,20 @@
+fn make(shape: List<Int>) -> Array<Float> {
+    zeros(shape)
+}
+
+fn make_ones(shape: List<Int>) -> Array<Float> {
+    ones(shape)
+}
+
+fn measure(value: Array<Float>) -> Float {
+    norm(value)
+}
+
+fn main() -> Void {
+    values = make([2, 2])
+    values.set(0, 0, 3.0)
+    values.set(0, 1, 4.0)
+    print(measure(values))
+    print(sqrt(9.0))
+    print(make_ones([1])[0])
+}

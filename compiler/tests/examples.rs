@@ -4386,6 +4386,80 @@ fn native_ir_emitter_handles_scalar_array_parameters_and_indexing() {
 }
 
 #[test]
+fn native_ir_emitter_handles_numeric_array_builtins() {
+    let file = fixture_path("native_ir_numeric_builtins.ostrin");
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    let expected = stdout(&interpreted).replace("\r\n", "\n");
+
+    let report = run(&["--native-type-report", &file]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.lines().any(|line| line == "ir-generated: 4"),
+        "numeric array builtins did not use IR: {report_text}"
+    );
+    assert!(
+        report_text.lines().any(|line| line == "ast-fallback: 0"),
+        "numeric array builtins unexpectedly fell back to AST: {report_text}"
+    );
+
+    let emitted = run(&["--emit-c", &file]);
+    assert!(
+        emitted.status.success(),
+        "numeric array builtin IR emission failed: {}",
+        stderr(&emitted)
+    );
+    let source = stdout(&emitted);
+    for marker in ["Array_Float_full", "Array_Float_norm", "sqrt("] {
+        assert!(
+            source.contains(marker),
+            "expected numeric array IR marker '{marker}' in generated C: {source}"
+        );
+    }
+
+    let exe = temp_artifact("native_ir_numeric_builtins.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "numeric array builtin compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run numeric array builtin binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "numeric array builtin binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "numeric array builtin IR ownership leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn native_ir_emitter_handles_record_lists() {
     let file = example_path("native_ir_record_lists.ostrin");
     let expected = "3\n2\npt\n1\n2\n";
@@ -9368,6 +9442,30 @@ fn std_numeric_cholesky_matches_interpreter_and_native() {
     assert_eq!(
         interpreter_and_native_agree("numeric_cholesky.ostrin"),
         "L =\n[[2, 0, 0], [0.5, 1.6583, 0], [0.5, -0.1508, 1.3143]]\nreconstruction residual = 0\nsolution =\n[-0.3684, 0.7895, 1.6842]\nsolve residual = 0\ninvalid matrix = cholesky needs a positive-definite matrix\nnonsymmetric matrix = cholesky needs a symmetric matrix\nnonsquare matrix = cholesky needs a square matrix\n"
+    );
+
+    let report = run(&[
+        "--native-type-report",
+        &example_path("numeric_cholesky.ostrin"),
+    ]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "numeric type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    let numeric_source = report_text
+        .lines()
+        .find(|line| line.starts_with("native-source: <ostrin-std>/numeric.ostrin "))
+        .unwrap_or_else(|| panic!("missing std.numeric source report: {report_text}"));
+    assert!(
+        numeric_source.contains("ir=16")
+            && numeric_source.contains("hir=9")
+            && numeric_source.contains("ast=27"),
+        "QR/Cholesky regression in native lowering: {numeric_source}"
     );
 }
 

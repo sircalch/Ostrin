@@ -462,13 +462,14 @@ fn native_backend_types_agree_with_the_checker() {
     // heavy visualization code moves into IR.
     // Provenance adds 73 more: metadata records and SVG attribute construction
     // remain on the AST path until aggregate-heavy visualization code moves into IR.
-    // Dense QR adds 45 more: modified Gram–Schmidt over Array<Float> and the
-    // Result<Qr, String> aggregate currently use the safe AST path until
-    // array-valued records and nested Result payloads migrate into IR.
-    // Complex adds 133 and Cholesky adds 67 more: public record-valued scientific
-    // APIs are intentionally kept on the safe aggregate path until records carrying
-    // numeric arrays are represented directly in HIR/IR.
-    const MAX_AST_FALLBACK_FUNCTIONS: usize = 2856;
+    // Numeric array builtins (`zeros`/`ones`, `norm`, scalar `abs` and `sqrt`)
+    // now share the IR/C lowering used by QR and Cholesky. This removes 348
+    // previously measured fallback functions across the shared standard-library
+    // consumers; keep the new baseline explicit until the next migration pass.
+    // Complex array promotion, aggregate-heavy scientific helpers and SVG-heavy
+    // visualization paths remain on the verified fallback until their ownership
+    // contracts are migrated.
+    const MAX_AST_FALLBACK_FUNCTIONS: usize = 2508;
     assert!(
         ast_fallback <= MAX_AST_FALLBACK_FUNCTIONS,
         "AST fallback grew to {ast_fallback} functions (ratchet limit {MAX_AST_FALLBACK_FUNCTIONS})"

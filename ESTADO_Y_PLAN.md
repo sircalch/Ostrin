@@ -108,6 +108,8 @@ Complex del Lab lo ejecutan en el navegador.
 rebanadas, `@`), estadística, regresión, `det/inv/eigvals/norm`, `Rng` reproducible,
 funciones elementales deterministas (idénticas en intérprete y nativo), y `std.numeric.Complex`
 experimental con operaciones aritméticas, forma polar, conjugado, magnitud y potencias enteras.
+Los constructores `zeros`/`ones`, `norm`, `abs` escalar y `sqrt` también tienen lowering IR/C
+tipado; QR y Cholesky los usan sin caer al AST.
 
 **Datos**: métodos de `String`, `parse_csv`; `Map` y `Set` usan índice hash para claves/elementos
 hashables, incluyendo colecciones estructurales, y conservan orden de iteración. Los records/enums
@@ -159,10 +161,14 @@ por separado en `--native-type-report` como `ir-generated`; el mismo informe exp
 `hir-generated` y `ast-fallback` para que la retirada del backend legado tenga un contador
 visible. También publica líneas `native-source` agrupadas por archivo para localizar la deuda
 por módulo; la prueba diferencial comprueba que sus sumas coinciden con el total. En el corte
-actual, la suite de ejemplos suma 1 884 funciones IR, 1 148 HIR y 2 856 que aún caen al emisor
-AST; `native_backend_types_agree_with_the_checker` mantiene 2 856 como trinquete temporal: las
-superficies `std.viz.boxplot`, `std.viz.violin`, `std.viz.hexbin`, `std.viz.contourf`, `std.viz.quiver`, `std.viz.streamplot`, `std.viz.table` y `std.viz.vector_field`, junto con `std.numeric.qr`, `std.numeric.Cholesky` y `std.numeric.Complex`, añaden funciones AST
-compartidas por sus consumidores y deben migrarse en la siguiente pasada. Los marcadores de ownership de
+actual, la suite de ejemplos suma 2 232 funciones IR, 1 148 HIR y 2 508 que aún caen al emisor
+AST; `native_backend_types_agree_with_the_checker` mantiene 2 508 como trinquete temporal.
+El puente IR de `zeros`/`ones`, `norm`, `abs` escalar y `sqrt` redujo el fallback en 348 funciones;
+QR y Cholesky ya se emiten desde IR/C, con `std.numeric` medido en `ir=16`, `hir=9`, `ast=27`
+por consumidor. Las superficies `std.viz.boxplot`, `std.viz.violin`, `std.viz.hexbin`,
+`std.viz.contourf`, `std.viz.quiver`, `std.viz.streamplot`, `std.viz.table` y
+`std.viz.vector_field`, además de funciones numéricas auxiliares y agregados SVG, siguen
+compartiendo funciones AST y forman la siguiente deuda verificable. Los marcadores de ownership de
 `String`, `List<T>`, los núcleos escalares de `Map<K,V>`/`Set<T>` y `Option<T>` con payload
 escalar o `String` también se consumen al generar C; `Map.get/remove` producen structs
 `Option_<T>` por valor y retienen/transfieren sus strings correctamente. Los `for` sobre rangos
@@ -284,8 +290,8 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
 convendría dividirlos; el backend nativo no comparte el sistema de tipos del checker
-(ya consume los tipos del checker y compara cada nodo; el informe actual suma **1 884 funciones
-generadas desde IR, 1 148 desde HIR y 2 856 en fallback AST** en los ejemplos, con un trinquete
+(ya consume los tipos del checker y compara cada nodo; el informe actual suma **2 232 funciones
+generadas desde IR, 1 148 desde HIR y 2 508 en fallback AST** en los ejemplos, con un trinquete
 que impide que el fallback aumente sin justificación; las familias migradas incluyen escalares,
 `String`, records concretos, `Option<Record>`, `List<T>` escalar, `Map`/`Set` escalares, `Option`
 escalar/String y patrones `Some/None`, `Float32`, enteros de ancho fijo, records, enums, `match`,

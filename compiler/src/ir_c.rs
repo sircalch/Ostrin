@@ -1899,6 +1899,39 @@ fn emit_instruction(
                     return Err(());
                 };
                 format!("{array_c_name}_from{depth}({})", codes[0])
+            } else if (callee == "zeros" || callee == "ones")
+                && args.len() == 1
+                && value_ty(values, args[0])? == Ty::List(Box::new(Ty::Int))
+                && *ty == Ty::Applied("Array".to_string(), vec![Ty::Float])
+            {
+                // Keep the IR path aligned with Codegen::gen_builtin: these
+                // constructors always produce dense Float arrays, filled with
+                // the requested constant.
+                let fill = if callee == "ones" { "1.0" } else { "0.0" };
+                format!("Array_Float_full({}, {fill})", codes[0])
+            } else if callee == "norm"
+                && args.len() == 1
+                && value_ty(values, args[0])? == Ty::Applied("Array".to_string(), vec![Ty::Float])
+                && *ty == Ty::Float
+            {
+                "Array_Float_norm(".to_string() + &codes[0] + ")"
+            } else if callee == "abs" && args.len() == 1 {
+                let arg_ty = value_ty(values, args[0])?;
+                let function = match arg_ty {
+                    Ty::Float if *ty == Ty::Float => "fabs",
+                    Ty::Float32 if *ty == Ty::Float32 => "fabsf",
+                    Ty::Int if *ty == Ty::Int => "ostrin_abs_i64",
+                    _ => return Err(()),
+                };
+                format!("{function}({})", codes[0])
+            } else if callee == "sqrt" && args.len() == 1 {
+                let arg_ty = value_ty(values, args[0])?;
+                let function = match arg_ty {
+                    Ty::Float if *ty == Ty::Float => "sqrt",
+                    Ty::Float32 if *ty == Ty::Float32 => "sqrtf",
+                    _ => return Err(()),
+                };
+                format!("{function}({})", codes[0])
             } else if callee == "args" && args.is_empty() && *ty == Ty::List(Box::new(Ty::String)) {
                 "({ List_String* __ostrin_args = List_String_new_from_array((const char**)ostrin_argv, (int64_t)ostrin_argc); __ostrin_args; })".to_string()
             } else if callee == "env" && args.len() == 1 && value_ty(values, args[0])? == Ty::String

@@ -6,11 +6,13 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
 ## Siguiente ciclo
 
 1. Reducir el fallback AST con el trinquete por archivo de `--native-type-report` (baseline actual:
-   1.884 funciones IR, 1.148 HIR y 2.856 AST; el incremento acotado corresponde a las superficies
-   `std.viz.boxplot`, `std.viz.violin`, `std.viz.hexbin`, `std.viz.contourf`, `std.viz.quiver`, `std.viz.streamplot`, `std.viz.table`, `std.viz.vector_field`, `std.numeric.qr`, `std.numeric.cholesky` y el ejemplo compuesto de selección enlazada,
-   que quedan como deuda explícita para
-   la siguiente migración). QR y Cholesky ya están publicados en el Lab y mantienen la paridad, pero sus
-   las rutas de agregados siguen en AST hasta que `Array` dentro de records/`Result` cruce la IR.
+   2.232 funciones IR, 1.148 HIR y 2.508 AST). El puente IR para los constructores numéricos
+   `zeros`/`ones`, `norm`, `abs` escalar y `sqrt` migró 348 funciones compartidas por la suite;
+   QR y Cholesky ya cruzan la IR y conservan la paridad publicada en el Lab. La deuda restante
+   se concentra en las superficies `std.viz.boxplot`, `std.viz.violin`, `std.viz.hexbin`,
+   `std.viz.contourf`, `std.viz.quiver`, `std.viz.streamplot`, `std.viz.table`,
+   `std.viz.vector_field`, funciones numéricas auxiliares y el ejemplo compuesto de selección
+   enlazada, cuyos agregados y SVG siguen necesitando la migración gradual.
    `std.numeric.Complex` ya tiene una API experimental de `Float64` y una demo live; el tipo
    paramétrico, `Array<Complex>` y álgebra lineal compleja siguen pendientes.
 2. Completar ownership sobre agregados, escapes, valores `Phi`, errores y formas anidadas, con
