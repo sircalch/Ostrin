@@ -28,7 +28,7 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
 6. **Continuar el frente profesional de visualización y web**: ampliar `std.viz` con
    campos vectoriales 2D (`quiver` y `streamplot`), gráficas estadísticas (incluidos violines KDE y hexbin), bandas de contorno rellenas y consolidar la selección enlazada, mantener tablas reproducibles con filtro y
    ordenamiento en el explorador, conservar ejemplos verificables en la galería, ampliar animaciones,
-   vídeo, controles temporales, interruptores de series desde la leyenda y parámetros conducidos por Ostrin, consolidar la exportación SVG/PNG/WebM/GIF, mantener el flujo PDF vectorial y añadir exportación MP4, exploración 3D (ya incluye superficies,
+   vídeo, controles temporales, interruptores de series desde la leyenda, crosshair de inspección y parámetros conducidos por Ostrin, consolidar la exportación SVG/PNG/WebM/GIF, mantener el flujo PDF vectorial y añadir exportación MP4, exploración 3D (ya incluye superficies,
    campos vectoriales, cámara, cortes ortogonales e isosuperficies de volúmenes), WebGPU y ampliar la procedencia reproducible ya disponible
    (hashes de fuente/datos, semilla y compilador) a informes y flujos de publicación con
    evidencia en intérprete, nativo y WASM.
