@@ -9143,6 +9143,19 @@ fn viz_hexbins_render_density_cells_and_colorbar() {
 }
 
 #[test]
+fn viz_contourf_renders_discrete_filled_bands_and_lines() {
+    let out = interpreter_and_native_agree("viz_contourf.ostrin");
+    assert_eq!(out.matches("class=\"contourf-cell\"").count(), 47 * 47);
+    assert_eq!(out.matches("band ").count(), 47 * 47);
+    assert_eq!(
+        out.matches("stroke=\"#ffffff\" stroke-width=\"1.2\"")
+            .count(),
+        9
+    );
+    assert!(out.contains("linearGradient"), "contourf colorbar missing");
+}
+
+#[test]
 fn viz_tables_render_headers_rows_and_tooltips() {
     let out = interpreter_and_native_agree("viz_table.ostrin");
     assert!(out.contains("<svg") && out.contains("ODE solver comparison"));

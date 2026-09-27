@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Visualization: filled contour bands
+- `Figure.contourf(z, x0, x1, y0, y1, levels, colormap:, label:)` renders deterministic discrete
+  filled contour bands with per-cell value tooltips and a colorbar; `viz_contourf.ostrin` joins
+  the live WASM gallery and can layer marching-squares isolines on top.
+
 ### Visualization: hexbin density plots
 - `Figure.hexbin(xs, ys, xbins, ybins, colormap:, label:)` counts bivariate observations in Ostrin,
   renders deterministic hexagonal cells with count tooltips and a colorbar, and is available in the

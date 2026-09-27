@@ -1,0 +1,21 @@
+// std.viz · filled contour bands over a deterministic scalar field.
+import std.viz
+
+fn peaks(x: Float, y: Float) -> Float {
+    3.0 * (1.0 - x) * (1.0 - x) * exp(-x * x - (y + 1.0) * (y + 1.0)) -
+        10.0 * (x / 5.0 - x * x * x - y * y * y * y * y) * exp(-x * x - y * y) -
+        exp(-(x + 1.0) * (x + 1.0) - y * y) / 3.0
+}
+
+fn main() -> Void {
+    xs = linspace(-3.0, 3.0, 48)
+    ys = linspace(-3.0, 3.0, 48)
+    z = viz.grid_of(xs, ys, peaks)
+    fig = viz.figure("Filled peaks contours")
+        .describe("48 × 48 samples, 9 discrete contour bands")
+        .labels("x", "y")
+        .size(600, 500)
+        .contourf(z, -3.0, 3.0, -3.0, 3.0, 9, "magma", "z")
+        .contour(z, -3.0, 3.0, -3.0, 3.0, 9, "", "#ffffff")
+    print(fig.svg())
+}
