@@ -598,6 +598,12 @@ function explorer() {
     selectionStatus,
     el("button", { type: "button", className: "button-quiet", text: "Clear selection", "data-viz-selection-clear": "" }),
   ]);
+  const contractStatus = el("span", { className: "viz-contract-status", "aria-live": "polite", text: "" });
+  const contractTools = el("div", { className: "viz-contract-tools", hidden: true }, [
+    el("span", { className: "viz-animation-caption", text: "Event contracts" }),
+    contractStatus,
+    el("button", { type: "button", className: "button-quiet", text: "Clear linked events", "data-viz-contract-clear": "" }),
+  ]);
   const cameraAzimuth = el("input", { type: "range", className: "viz-camera-slider", min: "-180", max: "180", step: "1", value: "-55", "aria-label": "3D camera azimuth", "data-viz-camera-azimuth": "" });
   const cameraAzimuthLabel = el("output", { className: "viz-camera-angle", text: "-55°" });
   const cameraElevation = el("input", { type: "range", className: "viz-camera-slider", min: "-80", max: "80", step: "1", value: "28", "aria-label": "3D camera elevation", "data-viz-camera-elevation": "" });
@@ -643,6 +649,8 @@ function explorer() {
   let cameraRendering = false;
   let cameraQueued = false;
   let selectedIndex = null;
+  let eventContracts = [];
+  let contractState = new Map();
   let animationDuration = 0;
   let animationPaused = false;
   let animationRate = 1;
@@ -659,7 +667,7 @@ function explorer() {
   let crosshairOverlay = null;
   const render = () => {
     zoomLabel.textContent = `${zoom}%`;
-    frame.srcdoc = `<!doctype html><meta charset="utf-8"><style>html,body{margin:0;background:#fff}svg{display:block;width:${zoom}%;height:auto}[data-viz-index]{cursor:pointer}[data-viz-index]:focus{outline:2px solid #7c3aed;outline-offset:2px}.pt.viz-linked-selected{stroke:#7c3aed!important;stroke-width:3px!important;stroke-opacity:1!important}.table-row.viz-linked-selected .table-cell{stroke:#7c3aed;stroke-width:2}.table-row.viz-linked-selected .table-value{font-weight:700}</style>${svg}`;
+    frame.srcdoc = `<!doctype html><meta charset="utf-8"><style>html,body{margin:0;background:#fff}body>svg{display:block;width:${zoom}%;height:auto}body>svg svg{display:block;width:auto;height:auto}[data-viz-index]{cursor:pointer}[data-viz-index]:focus{outline:2px solid #7c3aed;outline-offset:2px}.pt.viz-linked-selected{stroke:#7c3aed!important;stroke-width:3px!important;stroke-opacity:1!important}.table-row.viz-linked-selected .table-cell{stroke:#7c3aed;stroke-width:2}.table-row.viz-linked-selected .table-value{font-weight:700}.viz-contract-hover{filter:drop-shadow(0 0 3px #f59e0b)}.viz-contract-focus{filter:drop-shadow(0 0 3px #0ea5e9)}.viz-contract-selected{filter:drop-shadow(0 0 4px #db2777)}.table-row.viz-contract-hover .table-cell,.table-row.viz-contract-focus .table-cell,.table-row.viz-contract-selected .table-cell{stroke-width:2.5}.table-row.viz-contract-selected .table-value{font-weight:700}</style>${svg}`;
   };
   const sourceWithCamera = (source, azimuth, elevation) => {
     const view = `.view(${azimuth.toFixed(1)}, ${elevation.toFixed(1)})`;
@@ -915,6 +923,91 @@ function explorer() {
     tableSort.value = "-1";
     applyTableState();
   };
+  const prepareEventContracts = () => {
+    const document_ = animationDocument();
+    eventContracts = [];
+    contractState = new Map();
+    const channels = new Map();
+    for (const root of document_?.querySelectorAll("svg[data-ostrin-bind]") ?? []) {
+      const nodes = [...root.querySelectorAll("[data-viz-index]")];
+      if (!nodes.length) continue;
+      for (const raw of (root.getAttribute("data-ostrin-bind") ?? "").split(",")) {
+        const [channel, event = "select"] = raw.split(":", 2).map((part) => part.trim());
+        if (!channel || !["hover", "focus", "select"].includes(event)) continue;
+        const contract = channels.get(channel) ?? { channel, events: new Set(), nodes: new Map() };
+        contract.events.add(event);
+        for (const node of nodes) {
+          const index = node.getAttribute("data-viz-index");
+          if (!index) continue;
+          const linked = contract.nodes.get(index) ?? [];
+          linked.push(node);
+          contract.nodes.set(index, linked);
+        }
+        channels.set(channel, contract);
+      }
+    }
+    eventContracts = [...channels.values()].filter((contract) => contract.nodes.size > 0);
+    contractTools.hidden = eventContracts.length === 0;
+    const apply = (contract) => {
+      const state = contractState.get(contract.channel) ?? {};
+      for (const [index, nodes] of contract.nodes) {
+        nodes.forEach((node) => {
+          node.classList.toggle("viz-contract-hover", state.hoverIndex === index);
+          node.classList.toggle("viz-contract-focus", state.focusIndex === index);
+          node.classList.toggle("viz-contract-selected", state.selectedIndex === index);
+        });
+      }
+    };
+    const clear = () => {
+      contractState = new Map();
+      eventContracts.forEach(apply);
+      contractStatus.textContent = eventContracts.length ? `${eventContracts.length} linked channel${eventContracts.length === 1 ? "" : "s"} ready.` : "";
+    };
+    const update = (contract, kind, index) => {
+      const state = contractState.get(contract.channel) ?? {};
+      if (kind === "select") state.selectedIndex = index;
+      else state[`${kind}Index`] = index;
+      contractState.set(contract.channel, state);
+      apply(contract);
+      const ordinal = Number(index) + 1;
+      contractStatus.textContent = `${contract.channel} · ${kind} row ${ordinal}`;
+    };
+    const clearTransient = (contract, kind, index, relatedTarget) => {
+      if (relatedTarget && [...(contract.nodes.get(index) ?? [])].some((node) => node.contains?.(relatedTarget))) return;
+      const state = contractState.get(contract.channel) ?? {};
+      if (state[`${kind}Index`] !== index) return;
+      delete state[`${kind}Index`];
+      contractState.set(contract.channel, state);
+      apply(contract);
+      contractStatus.textContent = `${contract.channel} · linked channel ready.`;
+    };
+    for (const contract of eventContracts) {
+      for (const event of contract.events) {
+        for (const [index, nodes] of contract.nodes) {
+          nodes.forEach((node) => {
+            if (event === "hover") {
+              node.addEventListener("pointerover", () => update(contract, "hover", index));
+              node.addEventListener("pointerout", (event_) => clearTransient(contract, "hover", index, event_.relatedTarget));
+            } else if (event === "focus") {
+              node.addEventListener("focusin", () => update(contract, "focus", index));
+              node.addEventListener("focusout", (event_) => clearTransient(contract, "focus", index, event_.relatedTarget));
+            } else {
+              node.setAttribute("tabindex", "0");
+              node.addEventListener("click", () => update(contract, "select", index));
+              node.addEventListener("keydown", (event_) => {
+                if (event_.key === "Enter" || event_.key === " ") {
+                  event_.preventDefault();
+                  update(contract, "select", index);
+                }
+              });
+            }
+          });
+        }
+      }
+    }
+    contractTools.querySelector("[data-viz-contract-clear]").onclick = clear;
+    clear();
+  };
   const prepareLinkedSelection = () => {
     const document_ = animationDocument();
     const points = [...(document_?.querySelectorAll(".pt[data-viz-index]") ?? [])];
@@ -1165,6 +1258,7 @@ function explorer() {
     animationTools,
     tableTools,
     selectionTools,
+    contractTools,
     el("p", { className: "sl-provenance", text: "Hover a point or bar for its values (the SVG's own <title> tooltips). Toggle legend series or enable the crosshair to inspect data. Zoom rescales the vector figure; scroll to pan." }),
     frame,
   ]);
@@ -1238,6 +1332,7 @@ function explorer() {
     prepareLegend();
     prepareCrosshair();
     prepareTable();
+    prepareEventContracts();
     prepareLinkedSelection();
     applyReducedMotion();
     if (!animationPaused) startAnimationClock();
@@ -1269,6 +1364,10 @@ function explorer() {
       cameraStatus.textContent = cameraEnabled ? "Adjust the camera; Ostrin will recompute the SVG." : "";
       tableTools.hidden = true;
       selectionTools.hidden = true;
+      contractTools.hidden = true;
+      contractStatus.textContent = "";
+      eventContracts = [];
+      contractState = new Map();
       legendTools.hidden = true;
       legendControls.replaceChildren();
       legendItems = [];

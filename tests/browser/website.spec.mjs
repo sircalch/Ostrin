@@ -301,9 +301,13 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   await page.getByRole("button", { name: "Close" }).click();
   await page.locator('[data-viz-explore="linked-data"]').click();
   await expect(page.locator(".viz-selection-tools")).toBeVisible();
+  await expect(page.locator(".viz-contract-tools")).toBeVisible();
   const linkedFrame = page.frameLocator(".viz-frame-live");
   await expect(linkedFrame.locator("circle.pt[data-viz-index]")).toHaveCount(5);
   await expect(linkedFrame.locator("g.table-row[data-viz-index]")).toHaveCount(5);
+  await linkedFrame.locator('circle.pt[data-viz-index="2"]').hover();
+  await expect(linkedFrame.locator('g.table-row[data-viz-index="2"]')).toHaveClass(/viz-contract-hover/);
+  await expect(page.locator(".viz-contract-status")).toContainText("calibration · hover row 3");
   await linkedFrame.locator('g.table-row[data-viz-index="2"]').click();
   await expect(linkedFrame.locator('circle.pt[data-viz-index="2"]')).toHaveClass(/viz-linked-selected/);
   await expect(linkedFrame.locator('g.table-row[data-viz-index="2"]')).toHaveClass(/viz-linked-selected/);

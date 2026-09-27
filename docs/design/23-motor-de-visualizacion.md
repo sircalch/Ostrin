@@ -18,7 +18,7 @@ sobre la que crecerán la interacción, la animación y los backends acelerados:
    marca añade un `Series` a su lista. Renderizar es una función pura de ese valor (`fig.svg()`).
 4. **Unidades en los ejes.** Los datos con cantidades físicas etiquetan sus ejes con la unidad que
    llevan (`speed [km/h]`); convertir los datos convierte el eje.
-5. **Límites declarados.** Lo que no existe (contratos de eventos ricos, MP4, WebGPU) se dice en la
+5. **Límites declarados.** Lo que no existe (MP4, WebGPU) se dice en la
    web y aquí; nada se simula con JavaScript.
 
 ## 2. Arquitectura
@@ -253,7 +253,10 @@ una asignación simple (`nombre = literal`) del código fuente, conserva el tipo
 ese valor antes de volver a ejecutar `ostrinc.wasm`. La salida sigue siendo el SVG producido por Ostrin;
 el navegador solo presenta el control, aplica el valor y muestra el estado de la ejecución. La superficie
 3D expone `scale` y el atractor de Lorenz expone `rho` como ejemplos verificables. Los contratos de eventos
-entre varias figuras todavía requieren una API explícita.
+entre varias figuras se declaran con `.bind(channel, event)` en una `Figure`, `Table` o `Scene3D`.
+El contrato queda en `data-ostrin-bind="channel:event"` dentro del SVG y el explorador enlaza los
+elementos indexados de paneles anidados para `hover`, `focus` o `select`, manteniendo la salida de
+Ostrin como fuente de datos y dejando la interacción en el host web.
 
 ## 4.7 Procedencia reproducible
 
@@ -299,7 +302,7 @@ la falta de literales científicos (`1e-9`). Ver `CONTEXTO_PROYECTO.md` §270–
 | 0.1 (hecho) | `quiver` con campos vectoriales 2D muestreados, puntas triangulares, escala en unidades de datos y tooltips |
 | 0.1 (hecho) | `streamplot` con interpolación bilineal, integración bidireccional desde semillas, recorte al dominio y tooltips |
 | 0.2 (parcial, hecho) | tooltips `<title>` con valores y resaltado CSS al pasar el ratón, dentro del SVG y sin scripts; visor web con zoom y desplazamiento en un iframe aislado |
-| 0.2 (parcial, hecho) | selección enlazada entre puntos y filas en figuras compuestas; parámetros declarativos de figuras se reevalúan con Ostrin en WASM |
+| 0.2 (hecho) | selección enlazada entre puntos y filas en figuras compuestas; contratos `.bind(channel, event)` para `hover`, `focus` y `select`; parámetros declarativos de figuras se reevalúan con Ostrin en WASM |
 | 0.2 (parcial, hecho) | leyenda con identificadores de serie y controles accesibles en el explorador web para ocultar/mostrar series sin alterar los datos ni la exportación fuente |
 | 0.2 (parcial, hecho) | inspección de datos con una retícula (`crosshair`) superpuesta a las marcas SVG y lectura de sus tooltips, activable con teclado y respetando el aislamiento del iframe |
 | 0.3 (parcial, hecho) | animación en bucle con `viz.animate`: fotogramas generados por Ostrin, reproducidos con CSS dentro del SVG |

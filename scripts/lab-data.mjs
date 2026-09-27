@@ -35,7 +35,7 @@ export const LAB = [
     ],
     how: "Ostrin computes x(t) with array operations (linspace, exp, cos) and std.viz, the visualization library written in Ostrin, lays out the axes, ticks, band, line and legend and writes the SVG text. The page only displays that SVG as an image.",
     docs: { label: "std.viz source", href: `${repository}/blob/main/compiler/std/viz.ostrin` },
-    limits: "std.viz renders SVG: hover tooltips and looping animations (viz.animate) work without scripts; the Lab and Viz explorer rewrite declared source parameters and rerun Ostrin, while richer event contracts remain planned. The explorer can download SVG, rasterize the current frame to PNG, print a vector PDF and encode animated GIF/WebM when the browser supports the required APIs.",
+    limits: "std.viz renders SVG: hover tooltips and looping animations (viz.animate) work without scripts; the Lab and Viz explorer rewrite declared source parameters and rerun Ostrin, while `.bind(channel, event)` links indexed marks across nested panels. The explorer can download SVG, rasterize the current frame to PNG, print a vector PDF and encode animated GIF/WebM when the browser supports the required APIs.",
   },
   {
     id: "surface",

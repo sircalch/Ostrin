@@ -7,6 +7,11 @@
   selected frame sequence at the requested canvas resolution, names scaled artifacts explicitly
   and reports the output scale in the animation status.
 
+### Visualization: declarative event contracts
+- `Figure`, `Table` and `Scene3D` now expose `.bind(channel, event)` for `hover`, `focus` and
+  `select`. The contract is embedded in the SVG and the web explorer links indexed marks across
+  nested panels while keeping the data and rendering in Ostrin.
+
 ### Visualization: standalone interactive HTML export
 - The Viz explorer can now download a self-contained HTML document containing the selected
   Ostrin SVG frame, its reproducibility record, accessible zoom/reset controls, pointer panning
@@ -27,7 +32,8 @@
 - The Viz explorer now exposes declarative numeric controls for gallery programs. Each control replaces
   one `name = literal` assignment and reruns that source with `ostrinc.wasm`; the returned SVG, status
   and provenance remain the compiler's output. The 3D surface (`scale`) and Lorenz trajectory (`rho`)
-  demonstrate live scientific parameter exploration. Rich cross-figure event contracts remain planned.
+  demonstrate live scientific parameter exploration. Cross-figure event contracts now use
+  `.bind(channel, event)` and are handled by the explorer.
 
 ### Visualization: animated GIF export
 - The Viz explorer can encode Ostrin's static SVG frames as a browser-side GIF with deterministic

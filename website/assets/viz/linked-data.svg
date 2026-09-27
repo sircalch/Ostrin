@@ -3,7 +3,7 @@
 <rect width="960" height="400" fill="#ffffff"/>
 
 <text x="20" y="28" text-anchor="start" font-size="18" fill="#1f2937" font-weight="700">Linked calibration data</text>
-<svg x="0" y="40" width="480" height="360" viewBox="0 0 480 360" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
+<svg x="0" y="40" data-ostrin-bind="calibration:hover" xmlns="http://www.w3.org/2000/svg" width="480" height="360" viewBox="0 0 480 360" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
 <style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell,.contourf-cell,.quiver,.streamplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover,.contourf-cell:hover{fill-opacity:0.9}.quiver:hover>line{stroke-width:2.6px}.quiver:hover>polygon{filter:brightness(0.78)}.streamplot:hover{stroke-width:2.7px}</style>
 <rect width="480" height="360" fill="#ffffff"/>
 
@@ -68,7 +68,7 @@
 <text x="263" y="348" text-anchor="middle" font-size="12" fill="#1f2937">sample</text>
 <text x="16" y="176" text-anchor="middle" font-size="12" fill="#1f2937" transform="rotate(-90 16 176)">response</text>
 <g class="legend"><rect x="76" y="54" width="113.2" height="28" rx="6" fill="#ffffff" fill-opacity="0.88" stroke="#e5e7eb"/><g class="legend-item" data-viz-series-id="0"><circle cx="91" cy="68" r="4" fill="#7c3aed"/><text x="104" y="72" text-anchor="start" font-size="11" fill="#1f2937">measurements</text></g></g></svg>
-<svg role="table" data-ostrin-table="true" xmlns="http://www.w3.org/2000/svg" width="480" height="236" viewBox="0 0 480 236" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
+<svg x="480" y="40" role="table" data-ostrin-table="true" data-ostrin-bind="calibration:select" xmlns="http://www.w3.org/2000/svg" width="480" height="236" viewBox="0 0 480 236" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
 <style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell,.contourf-cell,.quiver,.streamplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover,.contourf-cell:hover{fill-opacity:0.9}.quiver:hover>line{stroke-width:2.6px}.quiver:hover>polygon{filter:brightness(0.78)}.streamplot:hover{stroke-width:2.7px}</style>
 <rect width="480" height="236" fill="#ffffff"/>
 

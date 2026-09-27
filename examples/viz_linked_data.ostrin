@@ -16,8 +16,10 @@ fn main() -> Void {
         .size(480, 360)
         .labels("sample", "response")
         .scatter(samples, measured, label: "measurements", color: "#7c3aed", size: 5.0)
+        .bind("calibration", "hover")
     table = viz.table(["id", "sample", "response", "error"], rows, title: "Measurements")
         .size(480)
         .row_height(28)
+        .bind("calibration", "select")
     print(viz.grid([plot.svg(), table.svg()], 2, 480, 360, title: "Linked calibration data"))
 }
