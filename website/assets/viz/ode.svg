@@ -3,7 +3,7 @@
 <rect width="960" height="360" fill="#ffffff"/>
 
 <text x="20" y="28" text-anchor="start" font-size="18" fill="#1f2937" font-weight="700">Driven pendulum (RK45, tol 1e-9)</text>
-<svg x="0" y="40" width="480" height="320" viewBox="0 0 480 320" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
+<svg x="0" y="40" xmlns="http://www.w3.org/2000/svg" width="480" height="320" viewBox="0 0 480 320" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
 <style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell,.contourf-cell,.quiver,.streamplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover,.contourf-cell:hover{fill-opacity:0.9}.quiver:hover>line{stroke-width:2.6px}.quiver:hover>polygon{filter:brightness(0.78)}.streamplot:hover{stroke-width:2.7px}</style>
 <rect width="480" height="320" fill="#ffffff"/>
 
@@ -52,7 +52,7 @@
 <line x1="66" y1="44" x2="66" y2="268" stroke="#9ca3af" stroke-width="1"/>
 <text x="263" y="308" text-anchor="middle" font-size="12" fill="#1f2937">t</text>
 <text x="16" y="156" text-anchor="middle" font-size="12" fill="#1f2937" transform="rotate(-90 16 156)">θ [rad]</text></svg>
-<svg x="480" y="40" width="480" height="320" viewBox="0 0 480 320" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
+<svg x="480" y="40" xmlns="http://www.w3.org/2000/svg" width="480" height="320" viewBox="0 0 480 320" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
 <style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell,.contourf-cell,.quiver,.streamplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover,.contourf-cell:hover{fill-opacity:0.9}.quiver:hover>line{stroke-width:2.6px}.quiver:hover>polygon{filter:brightness(0.78)}.streamplot:hover{stroke-width:2.7px}</style>
 <rect width="480" height="320" fill="#ffffff"/>
 

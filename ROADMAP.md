@@ -37,7 +37,7 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
 
 - Unidades afines y prefijos automáticos.
 - Autodiff inverso, más álgebra lineal y métodos numéricos.
-- Exportación MP4 y contratos de eventos ricos; la exportación HTML autocontenida, los controles numéricos declarativos conducidos por Ostrin, SVG/PNG/WebM/GIF y el flujo PDF vectorial con metadata de procedencia ya tienen ruta web.
+- Exportación MP4; los contratos de eventos ricos ya están disponibles con `.bind(channel, event)` para enlazar marcas indexadas entre figuras, y la exportación HTML autocontenida, los controles numéricos declarativos conducidos por Ostrin, SVG/PNG/WebM/GIF y el flujo PDF vectorial con metadata de procedencia ya tienen ruta web.
 - FFI C, registry público y canales de distribución adicionales.
 - Reconocimiento de Ostrin en GitHub Linguist y aparición de `.ostrin` en el mapa de lenguajes.
 - GPU/WebGPU después de estabilizar Array, IR y ownership.

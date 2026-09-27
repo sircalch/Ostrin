@@ -9488,4 +9488,6 @@ fn std_viz_marks_linked_plot_points_and_table_rows() {
         5
     );
     assert!(svg.contains("role=\"table\" data-ostrin-table=\"true\""));
+    assert!(svg.contains("data-ostrin-bind=\"calibration:hover\""));
+    assert!(svg.contains("data-ostrin-bind=\"calibration:select\""));
 }

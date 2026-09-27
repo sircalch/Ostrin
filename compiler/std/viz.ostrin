@@ -56,6 +56,7 @@ pub record Table {
     mut data_hash: String
     mut seed: String
     mut compiler: String
+    mut bindings: List<String>
 }
 
 /// Creates a table from column headers and already-formatted cell values.
@@ -70,7 +71,8 @@ pub fn table(headers: List<String>, rows: List<List<String>>, title: String = ""
         source_hash: "",
         data_hash: "",
         seed: "",
-        compiler: ""
+        compiler: "",
+        bindings: []
     }
 }
 
@@ -129,6 +131,7 @@ pub record Figure {
     mut data_hash: String
     mut seed: String
     mut compiler: String
+    mut bindings: List<String>
 }
 
 pub record Scene3D {
@@ -148,6 +151,7 @@ pub record Scene3D {
     mut data_hash: String
     mut seed: String
     mut compiler: String
+    mut bindings: List<String>
 }
 
 // ---------------------------------------------------------------- helpers
@@ -197,6 +201,22 @@ fn escape(text: String) -> String {
 
 fn attr(name: String, value: String) -> String {
     " " + name + "=\"" + value + "\""
+}
+
+fn escape_attr(text: String) -> String {
+    escape(text).replace("\"", "&quot;").replace("'", "&#39;")
+}
+
+// Declarative interaction contracts live on each SVG root so a web host can
+// connect indexed marks from several nested panels without changing the data.
+// Each entry is `channel:event`; supported events are hover, focus and select.
+fn binding_attr(bindings: List<String>) -> String {
+    if bindings.length() == 0 { "" } else { attr("data-ostrin-bind", escape_attr(bindings.join(","))) }
+}
+
+fn binding_name(channel_name: String, event: String) -> String {
+    kind = if event == "hover" or event == "focus" or event == "select" { event } else { "select" }
+    channel_name + ":" + kind
 }
 
 /// Machine-readable reproducibility metadata embedded in every exported SVG.
@@ -416,7 +436,8 @@ pub fn figure(title: String) -> Figure {
         source_hash: "",
         data_hash: "",
         seed: "",
-        compiler: ""
+        compiler: "",
+        bindings: []
     }
 }
 
@@ -491,6 +512,13 @@ impl Figure {
         self.data_hash = data_hash
         self.seed = seed
         self.compiler = compiler
+        self
+    }
+
+    /// Declare an interaction channel for indexed marks in this figure.
+    /// `event` may be `hover`, `focus` or `select`; unknown values use `select`.
+    fn bind(mut self, channel_name: String, event: String = "select") -> Figure {
+        self.bindings.push(binding_name(channel_name, event))
         self
     }
 
@@ -878,9 +906,9 @@ fn render(fig: Figure) -> String {
     clip = uid("clip", fig.title + fig.xlabel + fig.ylabel + fig.series.length().to_string())
 
     root = if has_motion {
-        header(fig.width, fig.height, theme).replace("<svg xmlns=\"http://www.w3.org/2000/svg\"", "<svg data-ostrin-motion=\"true\" xmlns=\"http://www.w3.org/2000/svg\"")
+        header(fig.width, fig.height, theme).replace("<svg xmlns=\"http://www.w3.org/2000/svg\"", "<svg data-ostrin-motion=\"true\"" + binding_attr(fig.bindings) + " xmlns=\"http://www.w3.org/2000/svg\"")
     } else {
-        header(fig.width, fig.height, theme)
+        header(fig.width, fig.height, theme).replace("<svg xmlns=\"http://www.w3.org/2000/svg\"", "<svg" + binding_attr(fig.bindings) + " xmlns=\"http://www.w3.org/2000/svg\"")
     }
     mut out: List<String> = [root]
     metadata = provenance_metadata(fig.source_hash, fig.data_hash, fig.seed, fig.compiler)
@@ -1613,6 +1641,12 @@ impl Table {
         self
     }
 
+    /// Declare an interaction channel for indexed table rows.
+    fn bind(mut self, channel_name: String, event: String = "select") -> Table {
+        self.bindings.push(binding_name(channel_name, event))
+        self
+    }
+
     fn svg(self) -> String {
         render_table(self)
     }
@@ -1653,7 +1687,7 @@ fn render_table(t: Table) -> String {
     top = if t.title != "" { 48 } else { 16 }
     height = top + t.row_height * (t.rows.length() + 1) + 20
     theme = t.theme
-    mut out: List<String> = [header(width, height, theme).replace("<svg xmlns=\"http://www.w3.org/2000/svg\"", "<svg role=\"table\" data-ostrin-table=\"true\" xmlns=\"http://www.w3.org/2000/svg\"")]
+    mut out: List<String> = [header(width, height, theme).replace("<svg xmlns=\"http://www.w3.org/2000/svg\"", "<svg role=\"table\" data-ostrin-table=\"true\"" + binding_attr(t.bindings) + " xmlns=\"http://www.w3.org/2000/svg\"")]
     metadata = provenance_metadata(t.source_hash, t.data_hash, t.seed, t.compiler)
     if metadata != "" {
         out.push(metadata)
@@ -1713,7 +1747,8 @@ pub fn scene3d(title: String) -> Scene3D {
         source_hash: "",
         data_hash: "",
         seed: "",
-        compiler: ""
+        compiler: "",
+        bindings: []
     }
 }
 
@@ -1851,6 +1886,12 @@ impl Scene3D {
         self.data_hash = data_hash
         self.seed = seed
         self.compiler = compiler
+        self
+    }
+
+    /// Declare an interaction channel for indexed 3D marks.
+    fn bind(mut self, channel_name: String, event: String = "select") -> Scene3D {
+        self.bindings.push(binding_name(channel_name, event))
         self
     }
 
@@ -2162,7 +2203,7 @@ fn render3d(scene: Scene3D) -> String {
         x0: x0, x1: x1, y0: y0, y1: y1, z0: z0, z1: z1
     }
 
-    mut out: List<String> = [header(scene.width, scene.height, theme)]
+    mut out: List<String> = [header(scene.width, scene.height, theme).replace("<svg xmlns=\"http://www.w3.org/2000/svg\"", "<svg" + binding_attr(scene.bindings) + " xmlns=\"http://www.w3.org/2000/svg\"")]
     metadata = provenance_metadata(scene.source_hash, scene.data_hash, scene.seed, scene.compiler)
     if metadata != "" {
         out.push(metadata)
@@ -2486,7 +2527,10 @@ pub fn grid(panels: List<String>, cols: Int, cell_width: Int, cell_height: Int, 
         // top-level "</svg>" line.
         panel = panels[i].trim()
         body = panel.slice(0, panel.length() - 6).trim()
-        placed = body.replace("<svg xmlns=\"http://www.w3.org/2000/svg\"", "<svg" + attr("x", x.to_string()) + attr("y", y.to_string()))
+        // Panel roots may carry interaction metadata before the namespace;
+        // anchor placement on the opening tag itself so bindings never drop
+        // the panel's grid position.
+        placed = body.replace("<svg", "<svg" + attr("x", x.to_string()) + attr("y", y.to_string()))
         out.push(placed + "</svg>")
     }
     out.push("</svg>\n")
