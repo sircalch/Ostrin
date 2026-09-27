@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Visualization: animated GIF export
+- The Viz explorer can encode Ostrin's static SVG frames as a browser-side GIF with deterministic
+  256-color quantization and LZW compression. The selected finite loop count is respected and a GIF
+  comment records the figure's reproducibility metadata when available. MP4 remains dependent on a
+  browser codec path and is still planned.
+
 ### Visualization: PDF publication print
 - The Viz explorer now opens a print-ready vector view for the current figure or animation frame.
   The page preserves SVG dimensions, embedded provenance and publication text; the browser's native
