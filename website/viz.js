@@ -30,6 +30,30 @@ function svgOf(lines) {
   return { svg: lines.slice(start, end + 1).join("\n"), printed: [...lines.slice(0, start), ...lines.slice(end + 1)] };
 }
 
+function provenanceOf(source) {
+  if (!source) return null;
+  const root = new DOMParser().parseFromString(source, "image/svg+xml").documentElement;
+  const node = root.querySelector("ostrin-provenance");
+  if (!node) return null;
+  return {
+    sourceHash: node.getAttribute("source-hash") ?? "",
+    dataHash: node.getAttribute("data-hash") ?? "",
+    seed: node.getAttribute("seed") ?? "",
+    compiler: node.getAttribute("compiler") ?? "",
+  };
+}
+
+function provenanceText(metadata, prefix = "Provenance") {
+  if (!metadata) return `${prefix}: no reproducibility metadata recorded.`;
+  const values = [
+    metadata.sourceHash ? `source ${metadata.sourceHash}` : "source hash unavailable",
+    metadata.dataHash ? `data ${metadata.dataHash}` : "data hash unavailable",
+    metadata.seed ? `seed ${metadata.seed}` : "seed unavailable",
+    metadata.compiler ? metadata.compiler : "compiler unavailable",
+  ];
+  return `${prefix}: ${values.join(" · ")}.`;
+}
+
 const SVG_NUMBER = /-?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/g;
 
 function interpolateAnimatedValue(first, second, amount) {
@@ -680,7 +704,15 @@ function explorer() {
 function card(figure) {
   const image = el("img", { className: "viz-image", src: figure.svg, alt: `${figure.title}: SVG produced by the Ostrin program ${figure.source}`, loading: "lazy", decoding: "async" });
   const printed = el("pre", { className: "viz-printed", text: figure.printed.join("\n") });
-  const provenance = el("p", { className: "sl-provenance", text: `Recorded by ostrinc ${LAB.compiler} from ${figure.source}.` });
+  const recordedProvenance = figure.provenance && Object.keys(figure.provenance).length
+    ? {
+        sourceHash: figure.provenance["source-hash"] ?? "",
+        dataHash: figure.provenance["data-hash"] ?? "",
+        seed: figure.provenance.seed ?? "",
+        compiler: figure.provenance.compiler ?? "",
+      }
+    : null;
+  const provenance = el("p", { className: "sl-provenance", text: provenanceText(recordedProvenance, `Recorded from ${figure.source}`) });
   const run = el("button", { type: "button", className: "button", disabled: true, "data-viz-run": figure.id, text: "Run live" });
   const status = el("span", { className: "sl-status", text: "loading compiler…" });
   let liveSvg = null;
@@ -693,7 +725,7 @@ function card(figure) {
       onSvg(nextSvg) {
         liveSvg = nextSvg;
         image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(nextSvg)}`;
-        provenance.textContent = `Camera updated live in your browser by ostrinc.wasm ${LAB.compiler}.`;
+        provenance.textContent = provenanceText(provenanceOf(nextSvg), "Camera updated live");
         provenance.dataset.state = "live";
       },
     } : null);
@@ -717,7 +749,7 @@ function card(figure) {
         liveSvg = svg;
         image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
         printed.textContent = text.join("\n");
-        provenance.textContent = `Computed live in your browser by ostrinc.wasm ${LAB.compiler} in ${elapsed} ms.`;
+        provenance.textContent = provenanceText(provenanceOf(svg), `Computed live in your browser by ostrinc.wasm ${LAB.compiler} in ${elapsed} ms`);
         provenance.dataset.state = "live";
         status.textContent = `ok · ${elapsed} ms`;
       } else {

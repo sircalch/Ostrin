@@ -460,7 +460,9 @@ fn native_backend_types_agree_with_the_checker() {
     // Streamplot adds 163 more: bilinear interpolation, bidirectional integration
     // and streamline tooltip SVG strings remain on the AST path until aggregate-
     // heavy visualization code moves into IR.
-    const MAX_AST_FALLBACK_FUNCTIONS: usize = 2538;
+    // Provenance adds 73 more: metadata records and SVG attribute construction
+    // remain on the AST path until aggregate-heavy visualization code moves into IR.
+    const MAX_AST_FALLBACK_FUNCTIONS: usize = 2611;
     assert!(
         ast_fallback <= MAX_AST_FALLBACK_FUNCTIONS,
         "AST fallback grew to {ast_fallback} functions (ratchet limit {MAX_AST_FALLBACK_FUNCTIONS})"

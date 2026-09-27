@@ -226,6 +226,19 @@ La rasterización vive en el navegador y tiene una ruta de error explícita cuan
 codificación PNG no están disponibles. La futura exportación PDF reutilizará el mismo documento SVG,
 pero añadirá tamaño de página y metadatos de publicación.
 
+## 4.7 Procedencia reproducible
+
+`Figure`, `Scene3D` y `Table` aceptan `.provenance(source_hash, data_hash, seed, compiler)`.
+El método no recalcula hashes ni inventa una fuente: el programa o su pipeline de construcción pasa
+los identificadores verificables del experimento. `seed` puede incluir la fecha de ejecución y la
+semilla usada por el generador aleatorio; `compiler` conserva la versión exacta de `ostrinc`.
+
+El renderizador escribe esos cuatro valores como un nodo `<metadata><ostrin-provenance .../>` dentro
+del SVG. Por eso sobreviven a la descarga, a la exportación PNG/WebM que parte del SVG y a la
+reproducción en intérprete, C nativo y WASM. La galería lee el nodo y lo muestra en cada tarjeta,
+incluido el resultado recalculado con **Run live**. Un archivo sin `.provenance(...)` sigue siendo
+válido y declara que no tiene registro de procedencia.
+
 ## 5. Unidades
 
 `quantity_line(xs, ys)` acepta `List<Quantity<X>>` y `List<Quantity<Y>>`: toma los números en la
@@ -268,7 +281,7 @@ la falta de literales científicos (`1e-9`). Ver `CONTEXTO_PROYECTO.md` §270–
 | 0.4 (parcial, hecho) | cortes XY/XZ/YZ e isosuperficies de `Array<Float>` 3D, celdas/triángulos coloreados, tooltips y barra de escala; cámaras ortográficas interactivas |
 | 0.4 | render de volúmenes completos, isosuperficies y cámaras en perspectiva |
 | 0.5 | backend WebGPU sobre la misma lista de series; PDF con tamaño de página y metadatos |
-| — | figuras con procedencia (hash de fuente y datos, semilla, versión del compilador) |
+| 0.5 (hecho) | figuras, tablas y escenas con procedencia (`source-hash`, `data-hash`, `seed`, `compiler`) embebida en SVG y mostrada en la galería |
 | — | gráficas con incertidumbre cuando exista `Measurement<T>` |
 
 Límites actuales: renderizado SVG en CPU, cómodo hasta unos miles de triángulos; los SVG 3D grandes

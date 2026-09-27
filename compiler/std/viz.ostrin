@@ -52,6 +52,10 @@ pub record Table {
     mut theme: Theme
     mut width: Int
     mut row_height: Int
+    mut source_hash: String
+    mut data_hash: String
+    mut seed: String
+    mut compiler: String
 }
 
 /// Creates a table from column headers and already-formatted cell values.
@@ -62,7 +66,11 @@ pub fn table(headers: List<String>, rows: List<List<String>>, title: String = ""
         rows: rows,
         theme: light(),
         width: 760,
-        row_height: 30
+        row_height: 30,
+        source_hash: "",
+        data_hash: "",
+        seed: "",
+        compiler: ""
     }
 }
 
@@ -117,6 +125,10 @@ pub record Figure {
     mut colorbar: String
     mut duration: Float
     mut axes: Bool
+    mut source_hash: String
+    mut data_hash: String
+    mut seed: String
+    mut compiler: String
 }
 
 pub record Scene3D {
@@ -132,6 +144,10 @@ pub record Scene3D {
     mut azimuth: Float
     mut elevation: Float
     mut colorbar: String
+    mut source_hash: String
+    mut data_hash: String
+    mut seed: String
+    mut compiler: String
 }
 
 // ---------------------------------------------------------------- helpers
@@ -181,6 +197,22 @@ fn escape(text: String) -> String {
 
 fn attr(name: String, value: String) -> String {
     " " + name + "=\"" + value + "\""
+}
+
+/// Machine-readable reproducibility metadata embedded in every exported SVG.
+/// Hashes are supplied by the program or its build pipeline so a figure can
+/// be traced back to the exact source and data used to produce it.
+fn provenance_metadata(source_hash: String, data_hash: String, seed: String, compiler: String) -> String {
+    if source_hash == "" and data_hash == "" and seed == "" and compiler == "" {
+        ""
+    } else {
+        "<metadata><ostrin-provenance" +
+            attr("source-hash", escape(source_hash)) +
+            attr("data-hash", escape(data_hash)) +
+            attr("seed", escape(seed)) +
+            attr("compiler", escape(compiler)) +
+            "/></metadata>\n"
+    }
 }
 
 fn text_at(x: Float, y: Float, content: String, anchor: String, size: Int, fill: String, extra: String) -> String {
@@ -380,7 +412,11 @@ pub fn figure(title: String) -> Figure {
         y1: 1.0,
         colorbar: "",
         duration: 0.0,
-        axes: true
+        axes: true,
+        source_hash: "",
+        data_hash: "",
+        seed: "",
+        compiler: ""
     }
 }
 
@@ -446,6 +482,15 @@ impl Figure {
 
     fn no_legend(mut self) -> Figure {
         self.legend = false
+        self
+    }
+
+    /// Attach source/data hashes, a random seed and compiler identity to the SVG.
+    fn provenance(mut self, source_hash: String, data_hash: String, seed: String = "", compiler: String = "") -> Figure {
+        self.source_hash = source_hash
+        self.data_hash = data_hash
+        self.seed = seed
+        self.compiler = compiler
         self
     }
 
@@ -838,6 +883,10 @@ fn render(fig: Figure) -> String {
         header(fig.width, fig.height, theme)
     }
     mut out: List<String> = [root]
+    metadata = provenance_metadata(fig.source_hash, fig.data_hash, fig.seed, fig.compiler)
+    if metadata != "" {
+        out.push(metadata)
+    }
     if has_motion {
         out.push("<style>@media (prefers-reduced-motion:reduce){[data-ostrin-motion] animate{display:none!important}}</style>")
     }
@@ -1546,6 +1595,15 @@ impl Table {
         self
     }
 
+    /// Attach source/data hashes, a random seed and compiler identity to the SVG.
+    fn provenance(mut self, source_hash: String, data_hash: String, seed: String = "", compiler: String = "") -> Table {
+        self.source_hash = source_hash
+        self.data_hash = data_hash
+        self.seed = seed
+        self.compiler = compiler
+        self
+    }
+
     fn svg(self) -> String {
         render_table(self)
     }
@@ -1587,6 +1645,10 @@ fn render_table(t: Table) -> String {
     height = top + t.row_height * (t.rows.length() + 1) + 20
     theme = t.theme
     mut out: List<String> = [header(width, height, theme).replace("<svg xmlns=\"http://www.w3.org/2000/svg\"", "<svg role=\"table\" data-ostrin-table=\"true\" xmlns=\"http://www.w3.org/2000/svg\"")]
+    metadata = provenance_metadata(t.source_hash, t.data_hash, t.seed, t.compiler)
+    if metadata != "" {
+        out.push(metadata)
+    }
     if t.title != "" {
         out.push(text_at(16.0, 29.0, t.title, "start", 16, theme.text, attr("font-weight", "600")))
     }
@@ -1638,7 +1700,11 @@ pub fn scene3d(title: String) -> Scene3D {
         series: [],
         azimuth: -55.0,
         elevation: 28.0,
-        colorbar: ""
+        colorbar: "",
+        source_hash: "",
+        data_hash: "",
+        seed: "",
+        compiler: ""
     }
 }
 
@@ -1767,6 +1833,15 @@ impl Scene3D {
 
     fn dark(mut self) -> Scene3D {
         self.theme = dark()
+        self
+    }
+
+    /// Attach source/data hashes, a random seed and compiler identity to the SVG.
+    fn provenance(mut self, source_hash: String, data_hash: String, seed: String = "", compiler: String = "") -> Scene3D {
+        self.source_hash = source_hash
+        self.data_hash = data_hash
+        self.seed = seed
+        self.compiler = compiler
         self
     }
 
@@ -2079,6 +2154,10 @@ fn render3d(scene: Scene3D) -> String {
     }
 
     mut out: List<String> = [header(scene.width, scene.height, theme)]
+    metadata = provenance_metadata(scene.source_hash, scene.data_hash, scene.seed, scene.compiler)
+    if metadata != "" {
+        out.push(metadata)
+    }
     out.push(text_at(20.0, 26.0, scene.title, "start", 16, theme.text, attr("font-weight", "600")))
     if scene.subtitle != "" {
         out.push(text_at(20.0, 45.0, scene.subtitle, "start", 12, theme.muted, ""))

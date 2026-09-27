@@ -323,9 +323,9 @@ h4 { font-size: .86rem; }
 .learn-status.available { color: #82d6b2; }
 .learn-status.early { color: #f0ba72; }
 .command-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); }
-.command { padding: 20px; background: var(--night-2); }
+.command { min-width: 0; padding: 20px; background: var(--night-2); }
 .command span { display: block; margin-bottom: 8px; color: var(--muted-2); font: .64rem var(--mono); text-transform: uppercase; }
-.command code { color: var(--violet-2); font: .73rem var(--mono); }
+.command code { color: var(--violet-2); font: .73rem var(--mono); overflow-wrap: anywhere; word-break: break-word; }
 
 .timeline { margin-top: 70px; border-top: 1px solid var(--line); }
 .timeline-item { display: grid; grid-template-columns: 150px 17px minmax(0, 1fr); gap: 25px; padding: 30px 0; border-bottom: 1px solid var(--line); }

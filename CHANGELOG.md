@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Visualization: reproducible provenance
+- `Figure`, `Scene3D` and `Table` now expose `.provenance(source_hash, data_hash, seed:, compiler:)`.
+  The renderer embeds the supplied publication record as `<ostrin-provenance>` metadata in the SVG;
+  the gallery reads it back and shows the source/data hashes, seed and compiler for recorded and live
+  renders. `viz_provenance.ostrin` covers interpreter/native parity and the browser gallery.
+
 ### Visualization: 2D streamlines
 - `Figure.streamplot(grid_x, grid_y, u, v, seed_x, seed_y, steps:, step_size:, label:, color:)`
   interpolates a sampled velocity field bilinearly and integrates deterministic streamlines in both
