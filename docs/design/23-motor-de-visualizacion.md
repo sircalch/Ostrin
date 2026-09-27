@@ -18,7 +18,7 @@ sobre la que crecerán la interacción, la animación y los backends acelerados:
    marca añade un `Series` a su lista. Renderizar es una función pura de ese valor (`fig.svg()`).
 4. **Unidades en los ejes.** Los datos con cantidades físicas etiquetan sus ejes con la unidad que
    llevan (`speed [km/h]`); convertir los datos convierte el eje.
-5. **Límites declarados.** Lo que no existe (controles conducidos por Ostrin, MP4, WebGPU) se dice en la
+5. **Límites declarados.** Lo que no existe (contratos de eventos ricos, MP4, WebGPU) se dice en la
    web y aquí; nada se simula con JavaScript.
 
 ## 2. Arquitectura
@@ -235,6 +235,15 @@ los comprime con LZW en el navegador. El archivo incluye un comentario con la pr
 `data-hash`, `seed` y `compiler`) cuando la figura la declara. El límite práctico es el tamaño de los GIF
 grandes; SVG y WebM siguen siendo preferibles para publicación y alta resolución.
 
+### 4.6.1 Parámetros conducidos por Ostrin
+
+Una figura de la galería puede declarar controles numéricos junto a su programa. Cada control apunta a
+una asignación simple (`nombre = literal`) del código fuente, conserva el tipo literal y sustituye solo
+ese valor antes de volver a ejecutar `ostrinc.wasm`. La salida sigue siendo el SVG producido por Ostrin;
+el navegador solo presenta el control, aplica el valor y muestra el estado de la ejecución. La superficie
+3D expone `scale` y el atractor de Lorenz expone `rho` como ejemplos verificables. Los contratos de eventos
+entre varias figuras todavía requieren una API explícita.
+
 ## 4.7 Procedencia reproducible
 
 `Figure`, `Scene3D` y `Table` aceptan `.provenance(source_hash, data_hash, seed, compiler)`.
@@ -279,7 +288,7 @@ la falta de literales científicos (`1e-9`). Ver `CONTEXTO_PROYECTO.md` §270–
 | 0.1 (hecho) | `quiver` con campos vectoriales 2D muestreados, puntas triangulares, escala en unidades de datos y tooltips |
 | 0.1 (hecho) | `streamplot` con interpolación bilineal, integración bidireccional desde semillas, recorte al dominio y tooltips |
 | 0.2 (parcial, hecho) | tooltips `<title>` con valores y resaltado CSS al pasar el ratón, dentro del SVG y sin scripts; visor web con zoom y desplazamiento en un iframe aislado |
-| 0.2 (parcial, hecho) | selección enlazada entre puntos y filas en figuras compuestas; los controles conducidos por Ostrin siguen pendientes |
+| 0.2 (parcial, hecho) | selección enlazada entre puntos y filas en figuras compuestas; parámetros declarativos de figuras se reevalúan con Ostrin en WASM |
 | 0.3 (parcial, hecho) | animación en bucle con `viz.animate`: fotogramas generados por Ostrin, reproducidos con CSS dentro del SVG |
 | 0.3 (hecho) | movimiento continuo con SMIL: `animate`, `moving_point` con estela, `rod`, `moving_segment`, `morph`; `no_axes` |
 | 0.3 (parcial, hecho) | controles web de play/pausa/reinicio, posición temporal, velocidad, ciclos finitos y exportación WebM cuando el navegador ofrece `MediaRecorder` |

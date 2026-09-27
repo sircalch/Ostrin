@@ -118,6 +118,31 @@ function fileStem(title, fallback = "ostrin-figure") {
   return (title || fallback).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || fallback;
 }
 
+const SOURCE_NUMBER = "-?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][+-]?\\d+)?";
+
+function sourceParameterPattern(name) {
+  const escaped = String(name).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`^(\\s*)${escaped}\\s*=\\s*(${SOURCE_NUMBER})$`, "m");
+}
+
+function sourceParameterValue(source, parameter) {
+  return source.match(sourceParameterPattern(parameter.name))?.[2] ?? String(parameter.min);
+}
+
+function sourceParameterLiteral(value, original) {
+  const text = String(Number(value));
+  return original.includes(".") && !text.includes(".") ? `${text}.0` : text;
+}
+
+function applySourceParameters(source, parameters, values) {
+  let text = source;
+  for (const parameter of parameters) {
+    const original = sourceParameterValue(source, parameter);
+    text = text.replace(sourceParameterPattern(parameter.name), (_, indent) => `${indent}${parameter.name} = ${sourceParameterLiteral(values[parameter.name], original)}`);
+  }
+  return text;
+}
+
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -478,9 +503,19 @@ function explorer() {
     el("button", { type: "button", className: "button-quiet", text: "Reset view", "data-viz-camera-reset": "" }),
     cameraStatus,
   ]);
+  const parameterStatus = el("span", { className: "viz-parameter-status", "aria-live": "polite", text: "" });
+  const parameterControls = el("div", { className: "viz-parameter-controls" });
+  const parameterTools = el("div", { className: "viz-parameter-tools", hidden: true }, [
+    el("span", { className: "viz-animation-caption", text: "Ostrin parameters" }),
+    parameterControls,
+    parameterStatus,
+  ]);
   let zoom = 100;
   let svg = "";
   let cameraSource = "";
+  let cameraEnabled = false;
+  let sourceControls = [];
+  let sourceValues = {};
   let onCameraSvg = null;
   let cameraTimer = 0;
   let cameraGeneration = 0;
@@ -507,15 +542,20 @@ function explorer() {
     if (/\.view\s*\([^)]*\)/.test(source)) return source.replace(/\.view\s*\([^)]*\)/, view);
     return source.replace(/(viz\.scene3d\("(?:\\.|[^"\\])*"\))/, `$1${view}`);
   };
+  const sourceForRun = () => {
+    const parameterized = applySourceParameters(cameraSource, sourceControls, sourceValues);
+    return cameraEnabled ? sourceWithCamera(parameterized, cameraAzimuth.valueAsNumber, cameraElevation.valueAsNumber) : parameterized;
+  };
   const renderCamera = async (generation) => {
     if (cameraRendering) { cameraQueued = true; return; }
     cameraRendering = true;
     const azimuth = cameraAzimuth.valueAsNumber;
     const elevation = cameraElevation.valueAsNumber;
-    cameraStatus.textContent = "Rendering with Ostrin…";
+    const status = cameraEnabled ? cameraStatus : parameterStatus;
+    status.textContent = "Rendering with Ostrin…";
     try {
       const { runOstrinc } = await runtime();
-      const source = sourceWithCamera(cameraSource, azimuth, elevation);
+      const source = sourceForRun();
       const result = await runOstrinc({ "main.ostrin": source }, ["--run", "main.ostrin"]);
       const stdout = result.lines.filter(([kind]) => kind === "out").map(([, text]) => text);
       const rendered = svgOf(stdout);
@@ -528,9 +568,12 @@ function explorer() {
       svg = rendered.svg;
       render();
       onCameraSvg?.(svg);
-      cameraStatus.textContent = `Rendered by Ostrin · azimuth ${azimuth}° · elevation ${elevation}°`;
+      const parameterSummary = sourceControls.map((parameter) => `${parameter.label ?? parameter.name} ${sourceValues[parameter.name]}`).join(" · ");
+      status.textContent = cameraEnabled
+        ? `Rendered by Ostrin · azimuth ${azimuth}° · elevation ${elevation}°${parameterSummary ? ` · ${parameterSummary}` : ""}`
+        : `Rendered by Ostrin${parameterSummary ? ` · ${parameterSummary}` : ""}`;
     } catch (error) {
-      cameraStatus.textContent = `Could not render: ${error.message ?? error}`;
+      status.textContent = `Could not render: ${error.message ?? error}`;
     } finally {
       cameraRendering = false;
       if (cameraQueued || generation !== cameraGeneration) {
@@ -544,7 +587,8 @@ function explorer() {
     cameraGeneration += 1;
     cameraAzimuthLabel.textContent = `${cameraAzimuth.value}°`;
     cameraElevationLabel.textContent = `${cameraElevation.value}°`;
-    cameraStatus.textContent = "Camera changed · waiting to render…";
+    const status = cameraEnabled ? cameraStatus : parameterStatus;
+    status.textContent = cameraEnabled ? "Camera or parameter changed · waiting to render…" : "Parameter changed · waiting to render…";
     clearTimeout(cameraTimer);
     cameraTimer = setTimeout(() => renderCamera(cameraGeneration), 180);
   };
@@ -816,6 +860,33 @@ function explorer() {
       exportStatus.textContent = error.message ?? String(error);
     }
   });
+  const prepareSourceParameters = (parameters = []) => {
+    sourceControls = parameters;
+    sourceValues = Object.fromEntries(parameters.map((parameter) => [parameter.name, sourceParameterValue(cameraSource, parameter)]));
+    parameterControls.replaceChildren(...parameters.map((parameter) => {
+      const id = `viz-parameter-${parameter.name}`;
+      const original = sourceParameterValue(cameraSource, parameter);
+      const output = el("output", { for: id, text: sourceParameterLiteral(sourceValues[parameter.name], original) });
+      const input = el("input", {
+        id,
+        type: "range",
+        min: parameter.min,
+        max: parameter.max,
+        step: parameter.step,
+        value: Number(sourceValues[parameter.name]),
+        "aria-label": parameter.label ?? parameter.name,
+        "data-viz-parameter": parameter.name,
+      });
+      input.addEventListener("input", () => {
+        sourceValues[parameter.name] = input.value;
+        output.textContent = sourceParameterLiteral(input.value, original);
+        scheduleCameraRender();
+      });
+      return el("label", { className: "viz-parameter-control", for: id }, [el("span", { text: parameter.label ?? parameter.name }), input, output]);
+    }));
+    parameterTools.hidden = parameters.length === 0;
+    parameterStatus.textContent = parameters.length ? "Parameters are evaluated by Ostrin." : "";
+  };
   const node = el("dialog", { className: "viz-dialog", "aria-label": "Figure explorer" }, [
     el("div", { className: "viz-dialog-bar" }, [
       heading,
@@ -830,6 +901,7 @@ function explorer() {
         button("Close", "Close the explorer", () => node.close()),
       ]),
     ]),
+    parameterTools,
     cameraTools,
     animationTools,
     tableTools,
@@ -919,8 +991,10 @@ function explorer() {
       svg = text;
       zoom = 100;
       cameraSource = camera?.source ?? "";
+      cameraEnabled = Boolean(camera?.camera);
+      prepareSourceParameters(camera?.controls ?? []);
       onCameraSvg = camera?.onSvg ?? null;
-      cameraTools.hidden = !cameraSource;
+      cameraTools.hidden = !cameraEnabled;
       clearTimeout(cameraTimer);
       cameraQueued = false;
       const view = cameraSource.match(/\.view\s*\(\s*(-?(?:\d+\.?\d*|\.\d+))\s*,\s*(-?(?:\d+\.?\d*|\.\d+))\s*\)/);
@@ -928,7 +1002,7 @@ function explorer() {
       cameraElevation.value = view ? String(Math.max(-80, Math.min(80, Math.round(Number(view[2]))))) : "28";
       cameraAzimuthLabel.textContent = `${cameraAzimuth.value}°`;
       cameraElevationLabel.textContent = `${cameraElevation.value}°`;
-      cameraStatus.textContent = cameraSource ? "Adjust the camera; Ostrin will recompute the SVG." : "";
+      cameraStatus.textContent = cameraEnabled ? "Adjust the camera; Ostrin will recompute the SVG." : "";
       tableTools.hidden = true;
       selectionTools.hidden = true;
       selectionStatus.textContent = "";
@@ -960,15 +1034,18 @@ function card(figure) {
   explore.addEventListener("click", async () => {
     const text = liveSvg ?? await fetch(figure.svg).then((response) => response.text());
     const is3d = figure.code.includes("viz.scene3d(");
-    explorer().open(figure.title, text, is3d ? {
+    const explorerConfig = (is3d || figure.controls?.length) ? {
       source: figure.code,
+      camera: is3d,
+      controls: figure.controls ?? [],
       onSvg(nextSvg) {
         liveSvg = nextSvg;
         image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(nextSvg)}`;
-        provenance.textContent = provenanceText(provenanceOf(nextSvg), "Camera updated live");
+        provenance.textContent = provenanceText(provenanceOf(nextSvg), "Source updated live");
         provenance.dataset.state = "live";
       },
-    } : null);
+    } : null;
+    explorer().open(figure.title, text, explorerConfig);
   });
   const code = el("details", { className: "viz-code" }, [
     el("summary", { text: `Source · ${figure.source}` }),

@@ -25,7 +25,7 @@ fn main() -> Void {
     }
     print("final state " + viz.num(x) + " " + viz.num(y) + " " + viz.num(z))
     scene = viz.scene3d("Lorenz attractor")
-        .describe("σ = 10, ρ = 28, β = 8/3, 4000 Euler steps")
+        .describe("σ = 10, ρ = " + viz.num(rho) + ", β = 8/3, 4000 Euler steps")
         .labels("x", "y", "z")
         .view(-60.0, 20.0)
         .line(array(xs), array(ys), array(zs), width: 0.9, colormap: "viridis")
