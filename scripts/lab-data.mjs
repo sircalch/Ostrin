@@ -35,7 +35,7 @@ export const LAB = [
     ],
     how: "Ostrin computes x(t) with array operations (linspace, exp, cos) and std.viz, the visualization library written in Ostrin, lays out the axes, ticks, band, line and legend and writes the SVG text. The page only displays that SVG as an image.",
     docs: { label: "std.viz source", href: `${repository}/blob/main/compiler/std/viz.ostrin` },
-    limits: "std.viz renders SVG: hover tooltips and looping animations (viz.animate) work without scripts; linked selection is available in the Viz explorer, while sliders driven by Ostrin remain planned. The explorer can download SVG, rasterize the current frame to PNG, print a vector PDF and encode animated GIF/WebM when the browser supports the required APIs.",
+    limits: "std.viz renders SVG: hover tooltips and looping animations (viz.animate) work without scripts; the Lab and Viz explorer rewrite declared source parameters and rerun Ostrin, while richer event contracts remain planned. The explorer can download SVG, rasterize the current frame to PNG, print a vector PDF and encode animated GIF/WebM when the browser supports the required APIs.",
   },
   {
     id: "surface",
@@ -162,13 +162,13 @@ export const LAB = [
 // is written to website/assets/viz/<id>.svg and checked for drift like the Lab outputs.
 export const GALLERY = [
   { id: "lines", title: "Lines, bands and legends", file: "examples/viz_lines.ostrin", blurb: "Three damped oscillators, the envelope as a shaded band and a reference line." },
-  { id: "surface", title: "Shaded 3D surface", file: "examples/viz_surface.ostrin", blurb: "peaks(x, y) on a 36 × 36 grid: 2450 triangles sorted back to front and lit." },
+  { id: "surface", title: "Shaded 3D surface", file: "examples/viz_surface.ostrin", blurb: "peaks(x, y) on a 36 × 36 grid: 2450 triangles sorted back to front and lit.", controls: [{ name: "scale", label: "Spatial scale", min: 0.5, max: 2, step: 0.1 }] },
   { id: "heatmap", title: "Heatmap and contours", file: "examples/viz_heatmap.ostrin", blurb: "A 48 × 48 field with a colorbar and ten marching-squares contour levels." },
   { id: "contourf", title: "Filled contour bands", file: "examples/viz_contourf.ostrin", blurb: "A 48 × 48 scalar field rendered as nine discrete filled contour bands with isolines." },
   { id: "quiver", title: "2D vector field", file: "examples/viz_quiver.ostrin", blurb: "A sampled rotational velocity field rendered as 221 deterministic arrows with tooltips." },
   { id: "streamplot", title: "2D streamlines", file: "examples/viz_streamplot.ostrin", blurb: "63 seeded paths integrated bidirectionally through a bilinearly interpolated velocity field." },
   { id: "provenance", title: "Reproducible provenance", file: "examples/viz_provenance.ostrin", blurb: "A publication-ready figure carrying source and data hashes, a seed and compiler identity in its SVG metadata." },
-  { id: "lorenz", title: "3D trajectory", file: "examples/viz_lorenz.ostrin", blurb: "The Lorenz attractor integrated in Ostrin and colored by time." },
+  { id: "lorenz", title: "3D trajectory", file: "examples/viz_lorenz.ostrin", blurb: "The Lorenz attractor integrated in Ostrin and colored by time.", controls: [{ name: "rho", label: "ρ (Rayleigh parameter)", min: 20, max: 40, step: 1 }] },
   { id: "histogram", title: "Histogram and density", file: "examples/viz_histogram.ostrin", blurb: "20 000 seeded normal samples with the scaled N(4, 1.5²) density on top." },
   { id: "boxplot", title: "Grouped boxplots", file: "examples/viz_boxplot.ostrin", blurb: "Three seeded cohorts summarized by their whiskers, quartiles and median, computed in Ostrin." },
   { id: "violin", title: "Kernel-density violins", file: "examples/viz_violin.ostrin", blurb: "Three seeded cohorts rendered as deterministic Gaussian KDE shapes with median markers." },
@@ -230,6 +230,13 @@ export function demoInputs(demo) {
     return { files: projectFiles(demo.project), main, args: ["--run", "--project", name], source: `${demo.project}/${main.slice(name.length + 1)}` };
   }
   return { files: { "main.ostrin": readText(demo.file) }, main: "main.ostrin", args: ["--run", "main.ostrin"], source: demo.file };
+}
+
+const SOURCE_NUMBER = "-?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][+-]?\\d+)?";
+
+function sourceAssignmentPattern(name) {
+  const escaped = String(name).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`^\\s*${escaped}\\s*=\\s*${SOURCE_NUMBER}$`, "m");
 }
 
 // Runs ostrinc.wasm on `files` in a child Node process and returns its stdout lines. Each run
@@ -299,7 +306,7 @@ export async function buildLabData() {
   for (const demo of LAB) {
     const { files, main, args, source } = demoInputs(demo);
     for (const param of demo.params) {
-      if (!new RegExp(`^\\s*${param.name} = -?[0-9.]+$`, "m").test(files[main])) {
+      if (!sourceAssignmentPattern(param.name).test(files[main])) {
         throw new Error(`${source}: parameter ${param.name} needs a 'name = number' line`);
       }
     }
@@ -337,6 +344,14 @@ export async function buildLabData() {
   const figures = {};
   for (const figure of GALLERY) {
     const source = readText(figure.file);
+    for (const param of figure.controls ?? []) {
+      if (!sourceAssignmentPattern(param.name).test(source)) {
+        throw new Error(`${figure.file}: Viz control ${param.name} needs a 'name = number' line`);
+      }
+      if (!(Number.isFinite(param.min) && Number.isFinite(param.max) && Number.isFinite(param.step) && param.min < param.max && param.step > 0)) {
+        throw new Error(`${figure.file}: Viz control ${param.name} has invalid range metadata`);
+      }
+    }
     const output = await runWasm(module, { "main.ostrin": source }, ["--run", "main.ostrin"]);
     const start = output.findIndex((line) => line.startsWith("<svg"));
     const end = output.findIndex((line, index) => index >= start && line === "</svg>");

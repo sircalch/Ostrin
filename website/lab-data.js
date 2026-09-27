@@ -39,7 +39,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
         "label": "std.viz source",
         "href": "https://github.com/sircalch/Ostrin/blob/main/compiler/std/viz.ostrin"
       },
-      "limits": "std.viz renders SVG: hover tooltips and looping animations (viz.animate) work without scripts; linked selection is available in the Viz explorer, while sliders driven by Ostrin remain planned. The explorer can download SVG, rasterize the current frame to PNG, print a vector PDF and encode animated GIF/WebM when the browser supports the required APIs.",
+      "limits": "std.viz renders SVG: hover tooltips and looping animations (viz.animate) work without scripts; the Lab and Viz explorer rewrite declared source parameters and rerun Ostrin, while richer event contracts remain planned. The explorer can download SVG, rasterize the current frame to PNG, print a vector PDF and encode animated GIF/WebM when the browser supports the required APIs.",
       "files": {
         "main.ostrin": "// Scientific Lab · Plot\n// A damped oscillator computed with arrays and drawn as SVG by std.viz.\nimport std.viz\n\nfn main() -> Void {\n    damping = 0.25\n    frequency = 2.0\n    t = linspace(0.0, 10.0, 240)\n    envelope = exp(t * (0.0 - damping))\n    x = envelope * cos(t * frequency)\n    print(\"samples: \" + t.length().to_string() + \", min x = \" + viz.num(x.min()))\n    fig = viz.figure(\"x(t) = exp(-\" + damping.to_string() + \" t) cos(\" + frequency.to_string() + \" t)\")\n        .labels(\"time t\", \"displacement x\")\n        .band(t, envelope * -1.0, envelope, label: \"envelope\")\n        .line(t, x, label: \"x(t)\")\n    print(fig.svg())\n}\n"
       },
@@ -726,9 +726,18 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "title": "Shaded 3D surface",
       "file": "examples/viz_surface.ostrin",
       "blurb": "peaks(x, y) on a 36 × 36 grid: 2450 triangles sorted back to front and lit.",
+      "controls": [
+        {
+          "name": "scale",
+          "label": "Spatial scale",
+          "min": 0.5,
+          "max": 2,
+          "step": 0.1
+        }
+      ],
       "source": "examples/viz_surface.ostrin",
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_surface.ostrin",
-      "code": "// std.viz · 3D: a shaded surface with a colorbar.\nimport std.viz\n\nfn peaks(x: Float, y: Float) -> Float {\n    3.0 * (1.0 - x) * (1.0 - x) * exp(-x * x - (y + 1.0) * (y + 1.0)) -\n        10.0 * (x / 5.0 - x * x * x - y * y * y * y * y) * exp(-x * x - y * y) -\n        exp(-(x + 1.0) * (x + 1.0) - y * y) / 3.0\n}\n\nfn main() -> Void {\n    xs = linspace(-3.0, 3.0, 36)\n    ys = linspace(-3.0, 3.0, 36)\n    scene = viz.scene3d(\"peaks(x, y) as a surface\")\n        .describe(\"36 × 36 grid, 2450 shaded triangles\")\n        .labels(\"x\", \"y\", \"z\")\n        .surface(xs, ys, viz.grid_of(xs, ys, peaks), label: \"height\")\n    print(scene.svg())\n}\n",
+      "code": "// std.viz · 3D: a shaded surface with a colorbar.\nimport std.viz\n\nfn peaks(x: Float, y: Float) -> Float {\n    3.0 * (1.0 - x) * (1.0 - x) * exp(-x * x - (y + 1.0) * (y + 1.0)) -\n        10.0 * (x / 5.0 - x * x * x - y * y * y * y * y) * exp(-x * x - y * y) -\n        exp(-(x + 1.0) * (x + 1.0) - y * y) / 3.0\n}\n\nfn main() -> Void {\n    scale = 1.0\n    xs = linspace(-3.0, 3.0, 36)\n    ys = linspace(-3.0, 3.0, 36)\n    scene = viz.scene3d(\"peaks(x, y) as a surface\")\n        .describe(\"36 × 36 grid, 2450 shaded triangles · scale = \" + viz.num(scale))\n        .labels(\"x\", \"y\", \"z\")\n        .surface(xs, ys, viz.grid_of(xs, ys, fn(x, y) { peaks(x * scale, y * scale) }), label: \"height\")\n    print(scene.svg())\n}\n",
       "svg": "assets/viz/surface.svg",
       "provenance": {},
       "printed": [
@@ -816,9 +825,18 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "title": "3D trajectory",
       "file": "examples/viz_lorenz.ostrin",
       "blurb": "The Lorenz attractor integrated in Ostrin and colored by time.",
+      "controls": [
+        {
+          "name": "rho",
+          "label": "ρ (Rayleigh parameter)",
+          "min": 20,
+          "max": 40,
+          "step": 1
+        }
+      ],
       "source": "examples/viz_lorenz.ostrin",
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_lorenz.ostrin",
-      "code": "// std.viz · 3D trajectory: the Lorenz attractor, colored by time.\nimport std.viz\n\nfn main() -> Void {\n    sigma = 10.0\n    rho = 28.0\n    beta = 8.0 / 3.0\n    dt = 0.01\n    mut xs: List<Float> = []\n    mut ys: List<Float> = []\n    mut zs: List<Float> = []\n    mut x = 1.0\n    mut y = 1.0\n    mut z = 1.0\n    for n in 0 until 4000 {\n        dx = sigma * (y - x)\n        dy = x * (rho - z) - y\n        dz = x * y - beta * z\n        x = x + dx * dt\n        y = y + dy * dt\n        z = z + dz * dt\n        xs.push(x)\n        ys.push(y)\n        zs.push(z)\n    }\n    print(\"final state \" + viz.num(x) + \" \" + viz.num(y) + \" \" + viz.num(z))\n    scene = viz.scene3d(\"Lorenz attractor\")\n        .describe(\"σ = 10, ρ = 28, β = 8/3, 4000 Euler steps\")\n        .labels(\"x\", \"y\", \"z\")\n        .view(-60.0, 20.0)\n        .line(array(xs), array(ys), array(zs), width: 0.9, colormap: \"viridis\")\n    print(scene.svg())\n}\n",
+      "code": "// std.viz · 3D trajectory: the Lorenz attractor, colored by time.\nimport std.viz\n\nfn main() -> Void {\n    sigma = 10.0\n    rho = 28.0\n    beta = 8.0 / 3.0\n    dt = 0.01\n    mut xs: List<Float> = []\n    mut ys: List<Float> = []\n    mut zs: List<Float> = []\n    mut x = 1.0\n    mut y = 1.0\n    mut z = 1.0\n    for n in 0 until 4000 {\n        dx = sigma * (y - x)\n        dy = x * (rho - z) - y\n        dz = x * y - beta * z\n        x = x + dx * dt\n        y = y + dy * dt\n        z = z + dz * dt\n        xs.push(x)\n        ys.push(y)\n        zs.push(z)\n    }\n    print(\"final state \" + viz.num(x) + \" \" + viz.num(y) + \" \" + viz.num(z))\n    scene = viz.scene3d(\"Lorenz attractor\")\n        .describe(\"σ = 10, ρ = \" + viz.num(rho) + \", β = 8/3, 4000 Euler steps\")\n        .labels(\"x\", \"y\", \"z\")\n        .view(-60.0, 20.0)\n        .line(array(xs), array(ys), array(zs), width: 0.9, colormap: \"viridis\")\n    print(scene.svg())\n}\n",
       "svg": "assets/viz/lorenz.svg",
       "provenance": {},
       "printed": [

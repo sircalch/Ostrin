@@ -8,11 +8,12 @@ fn peaks(x: Float, y: Float) -> Float {
 }
 
 fn main() -> Void {
+    scale = 1.0
     xs = linspace(-3.0, 3.0, 36)
     ys = linspace(-3.0, 3.0, 36)
     scene = viz.scene3d("peaks(x, y) as a surface")
-        .describe("36 × 36 grid, 2450 shaded triangles")
+        .describe("36 × 36 grid, 2450 shaded triangles · scale = " + viz.num(scale))
         .labels("x", "y", "z")
-        .surface(xs, ys, viz.grid_of(xs, ys, peaks), label: "height")
+        .surface(xs, ys, viz.grid_of(xs, ys, fn(x, y) { peaks(x * scale, y * scale) }), label: "height")
     print(scene.svg())
 }

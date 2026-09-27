@@ -3,7 +3,7 @@
 <rect width="640" height="520" fill="#ffffff"/>
 
 <text x="20" y="26" text-anchor="start" font-size="16" fill="#1f2937" font-weight="600">peaks(x, y) as a surface</text>
-<text x="20" y="45" text-anchor="start" font-size="12" fill="#6b7280">36 × 36 grid, 2450 shaded triangles</text>
+<text x="20" y="45" text-anchor="start" font-size="12" fill="#6b7280">36 × 36 grid, 2450 shaded triangles · scale = 1</text>
 <polygon points="70.5,386.33 243.88,502.58 491.5,421.18 318.12,304.94" fill="#e5e7eb" fill-opacity="0.35" stroke="#9ca3af" stroke-width="0.8"/>
 <polygon points="70.5,386.33 318.12,304.94 318.12,91.42 70.5,172.82" fill="#e5e7eb" fill-opacity="0.35" stroke="#9ca3af" stroke-width="0.8"/>
 <polygon points="318.12,304.94 491.5,421.18 491.5,207.67 318.12,91.42" fill="#e5e7eb" fill-opacity="0.35" stroke="#9ca3af" stroke-width="0.8"/>

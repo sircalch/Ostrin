@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Visualization: Ostrin-driven parameter controls
+- The Viz explorer now exposes declarative numeric controls for gallery programs. Each control replaces
+  one `name = literal` assignment and reruns that source with `ostrinc.wasm`; the returned SVG, status
+  and provenance remain the compiler's output. The 3D surface (`scale`) and Lorenz trajectory (`rho`)
+  demonstrate live scientific parameter exploration. Rich cross-figure event contracts remain planned.
+
 ### Visualization: animated GIF export
 - The Viz explorer can encode Ostrin's static SVG frames as a browser-side GIF with deterministic
   256-color quantization and LZW compression. The selected finite loop count is respected and a GIF
