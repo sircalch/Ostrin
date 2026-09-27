@@ -149,6 +149,54 @@ async function exportPng(source, title, fraction = 0, scale = 2) {
   return { width: canvas.width, height: canvas.height };
 }
 
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function sanitizeSvg(source) {
+  const document_ = new DOMParser().parseFromString(source, "image/svg+xml");
+  const root = document_.documentElement;
+  if (!root || root.localName !== "svg") throw new Error("the figure did not produce a valid SVG");
+  root.querySelectorAll("script,foreignObject").forEach((node) => node.remove());
+  for (const element of [root, ...root.querySelectorAll("*")]) {
+    for (const attribute of [...element.attributes]) {
+      const name = attribute.name.toLowerCase();
+      const value = attribute.value.trim().toLowerCase();
+      if (name.startsWith("on") || ((name === "href" || name === "xlink:href") && value.startsWith("javascript:"))) {
+        element.removeAttribute(attribute.name);
+      }
+    }
+  }
+  return new XMLSerializer().serializeToString(root);
+}
+
+function printPdf(source, title, fraction = 0) {
+  const staticSource = sanitizeSvg(staticSvgAt(source, fraction));
+  const dimensions = svgDimensions(staticSource);
+  const metadata = provenanceOf(staticSource);
+  const popup = window.open("", "_blank");
+  if (!popup) throw new Error("PDF export was blocked; allow pop-ups for this site");
+  const safeTitle = escapeHtml(title || "Ostrin figure");
+  const provenance = metadata
+    ? escapeHtml(provenanceText(metadata, "Provenance"))
+    : "No reproducibility metadata recorded.";
+  // The browser's print pipeline preserves the original SVG vectors and metadata.
+  // Users can choose “Save as PDF” in the native dialog; no raster or server is involved.
+  popup.document.open();
+  popup.document.write(`<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${safeTitle} · Ostrin PDF</title><style>@page{size:${dimensions.width}px ${dimensions.height}px;margin:12mm}*{box-sizing:border-box}html,body{margin:0;color:#172033;background:#fff;font:14px system-ui,sans-serif}main{display:grid;gap:12px;max-width:${dimensions.width}px;margin:0 auto}h1{font-size:18px;margin:0}p{margin:0;color:#4b5563;font-size:11px;overflow-wrap:anywhere}svg{display:block;width:100%;height:auto;max-height:calc(100vh - 78px)}@media print{p{color:#172033}}</style></head><body><main><h1>${safeTitle}</h1><p>${provenance}</p>${staticSource}</main></body></html>`);
+  popup.document.close();
+  popup.focus();
+  const print = () => popup.print();
+  if (popup.document.readyState === "complete") setTimeout(print, 0);
+  else popup.addEventListener("load", print, { once: true });
+  return { width: dimensions.width, height: dimensions.height };
+}
+
 function videoMimeType() {
   if (!globalThis.MediaRecorder?.isTypeSupported) return "";
   return ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"].find((type) => MediaRecorder.isTypeSupported(type)) ?? "";
@@ -590,6 +638,15 @@ function explorer() {
       exportPngButton.disabled = false;
     }
   });
+  const exportPdfButton = button("PDF", "Print figure as PDF", () => {
+    try {
+      const fraction = animationDuration ? Number(animationSlider.value) / 1000 : 0;
+      const result = printPdf(svg, heading.textContent, fraction);
+      exportStatus.textContent = `PDF print view opened · ${result.width}×${result.height}`;
+    } catch (error) {
+      exportStatus.textContent = error.message ?? String(error);
+    }
+  });
   const node = el("dialog", { className: "viz-dialog", "aria-label": "Figure explorer" }, [
     el("div", { className: "viz-dialog-bar" }, [
       heading,
@@ -599,6 +656,7 @@ function explorer() {
         button("+", "Zoom in", () => { zoom = Math.min(400, zoom + 50); render(); }),
         exportSvgButton,
         exportPngButton,
+        exportPdfButton,
         exportStatus,
         button("Close", "Close the explorer", () => node.close()),
       ]),
