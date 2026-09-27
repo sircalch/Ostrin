@@ -4,7 +4,7 @@
 // of Series) and rendered to standalone SVG by Ostrin itself, so the same
 // program draws the same bytes in the interpreter, the native backend and the
 // browser (WASM). Marks: line, scatter, area, band, error bars, bars,
-// histogram, boxplot, violin, hexbin, contourf, stairs, reference lines, text, heatmap, contour, and in 3D
+// histogram, boxplot, violin, hexbin, contourf, quiver, stairs, reference lines, text, heatmap, contour, and in 3D
 // surface, wireframe, trajectory, point cloud, vector fields, volume slices and
 // isosurfaces. Axes use "nice" 1-2-5
 // ticks; quantity series label their axes with the unit they carry.
@@ -195,7 +195,7 @@ fn header(width: Int, height: Int, theme: Theme) -> String {
         // Interaction without scripts: hovering highlights a mark and its
         // <title> shows the values, wherever the SVG is opened.
         "<style>.pt:hover{stroke:" + theme.text + ";stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}" +
-        ".series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell,.contourf-cell{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover,.contourf-cell:hover{fill-opacity:0.9}</style>\n" +
+        ".series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell,.contourf-cell,.quiver{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover,.contourf-cell:hover{fill-opacity:0.9}.quiver:hover>line{stroke-width:2.6px}.quiver:hover>polygon{filter:brightness(0.78)}</style>\n" +
         "<rect" + attr("width", px(width)) + attr("height", px(height)) + attr("fill", theme.background) + "/>\n"
 }
 
@@ -571,6 +571,14 @@ impl Figure {
         }
         self.colorbar = label
         self.add(Series { kind: "hexbin", xs: array(xcenters), ys: array(ycenters), zs: empty(), lo: array([xmin, xmax]), hi: array([ymin, ymax]), grid: counts, label: label, color: "", width: 0.8, dash: "", size: 0.0, colormap: colormap, levels: 0 })
+    }
+
+    /// A sampled 2D vector field. `xs`/`ys` are arrow origins and `us`/`vs`
+    /// are the vector components. `scale` is measured in data units, so the
+    /// same source remains deterministic when the figure is resized.
+    fn quiver(mut self, xs: Array<Float>, ys: Array<Float>, us: Array<Float>, vs: Array<Float>, scale: Float = 0.18, label: String = "", color: String = "") -> Figure {
+        s = series("quiver", xs, ys, label, color)
+        self.add(Series { kind: s.kind, xs: s.xs, ys: s.ys, zs: us, lo: vs, hi: s.hi, grid: s.grid, label: s.label, color: s.color, width: 1.35, dash: "", size: if scale > 0.0 { scale } else { 0.18 }, colormap: s.colormap, levels: 0 })
     }
 
     fn hline(mut self, y: Float, label: String = "", color: String = "") -> Figure {
@@ -1038,9 +1046,42 @@ fn draw_series(s: Series, color: String, left: Float, bottom: Float, x0: Float, 
         draw_contourf(s, left, bottom, x0, y0, sx, sy, zlo, zhi, theme)
     } else if kind == "hexbin" {
         draw_hexbin(s, left, bottom, x0, y0, sx, sy, zlo, zhi, theme)
+    } else if kind == "quiver" {
+        draw_quiver(s, color, left, bottom, x0, y0, sx, sy, theme)
     } else {
         ""
     }
+}
+
+/// Draw sampled vectors with deterministic triangular arrowheads and tooltips.
+fn draw_quiver(s: Series, color: String, left: Float, bottom: Float, x0: Float, y0: Float, sx: Float, sy: Float, theme: Theme) -> String {
+    mut parts: List<String> = []
+    for i in 0 until s.xs.length() {
+        x = left + (s.xs[i] - x0) * sx
+        y = bottom - (s.ys[i] - y0) * sy
+        dx = s.zs[i] * s.size * sx
+        dy = 0.0 - s.lo[i] * s.size * sy
+        length = sqrt(dx * dx + dy * dy)
+        label = named(s.label) + "(" + short(s.xs[i]) + ", " + short(s.ys[i]) + ") → (" + short(s.zs[i]) + ", " + short(s.lo[i]) + ")"
+        if length < 0.000001 {
+            parts.push("<circle class=\"quiver\"" + attr("cx", num(x)) + attr("cy", num(y)) + attr("r", "1.8") + attr("fill", color) + ">" + tip(label) + "</circle>")
+        } else {
+            tip_x = x + dx
+            tip_y = y + dy
+            ux = dx / length
+            uy = dy / length
+            head = if length * 0.28 < 8.0 { length * 0.28 } else { 8.0 }
+            half = head * 0.46
+            base_x = tip_x - ux * head
+            base_y = tip_y - uy * head
+            side_x = 0.0 - uy * half
+            side_y = ux * half
+            points = num(tip_x) + "," + num(tip_y) + " " + num(base_x + side_x) + "," + num(base_y + side_y) + " " + num(base_x - side_x) + "," + num(base_y - side_y)
+            parts.push("<g class=\"quiver\">" + seg(x, y, tip_x, tip_y, color, s.width, "") +
+                "<polygon" + attr("points", points) + attr("fill", color) + attr("stroke", theme.background) + attr("stroke-width", "0.5") + ">" + tip(label) + "</polygon></g>")
+        }
+    }
+    parts.join("")
 }
 
 fn draw_heatmap(s: Series, left: Float, bottom: Float, x0: Float, y0: Float, sx: Float, sy: Float, zlo: Float, zhi: Float) -> String {

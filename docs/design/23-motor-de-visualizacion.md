@@ -34,7 +34,7 @@ Figure / Scene3D (records)          ← API: figure(), scene3d(), métodos encad
 ```
 
 `Series` es la representación intermedia de la escena: `kind` (`line`, `scatter`, `area`, `band`,
-`errorbar`, `bar`, `hist`, `boxplot`, `violin`, `hexbin`, `contourf`, `stairs`, `hline`, `vline`, `heatmap`, `contour`, `surface`, `wire`,
+`errorbar`, `bar`, `hist`, `boxplot`, `violin`, `hexbin`, `contourf`, `quiver`, `stairs`, `hline`, `vline`, `heatmap`, `contour`, `surface`, `wire`,
 `line3`, `scatter3`, `vector3`, `slice_xy`, `slice_xz`, `slice_yz`, `mesh3`), los arrays `xs`, `ys`, `zs`, `lo`, `hi`, `grid` y el estilo (`color`, `width`,
 `dash`, `size`, `colormap`, `levels`). Como un `Array` de Ostrin no puede estar vacío, los campos que
 una marca no usa contienen un cero y solo se leen para los `kind` que los rellenan.
@@ -59,6 +59,7 @@ fig = viz.figure("Damped oscillator")          // 640 × 400, tema claro
     .violin(1.0, control, 40, label: "control") // Gaussian KDE shape + median
     .hexbin(xs, ys, 18, 14, "magma", "observations") // counted 2D density
     .contourf(z, -3.0, 3.0, -3.0, 3.0, 9, "magma", "z") // filled contour bands
+    .quiver(xorig, yorig, u, v, 0.24, "velocity", "#2563eb") // sampled 2D vector field
     .hline(y) .vline(x) .text(x, y, "nota")
     .heatmap(z, x0, x1, y0, y1, colormap: "viridis", label: "z")
     .contour(z, x0, x1, y0, y1, levels: 8, colormap: "", color: "")
@@ -107,6 +108,9 @@ Utilidades públicas: `viz.num` (dos decimales, idéntico en todos los backends)
 - **Contornos rellenos**: `contourf` divide una rejilla en bandas discretas; cada celda toma la
   banda del promedio de sus cuatro esquinas, conserva un colorbar y un tooltip de valor, y puede
   combinarse con `contour` para dibujar las isolíneas sobre la misma figura.
+- **Campos vectoriales 2D**: `quiver` conserva los orígenes y componentes `(u, v)` calculados por
+  Ostrin, escala cada flecha en unidades de datos y dibuja línea, punta triangular y tooltip dentro
+  del área recortada. Los vectores de longitud cero quedan como puntos, evitando geometría inválida.
 - **3D**: datos normalizados al cubo [-1, 1]³ (z × 0.8), rotación por acimut y elevación, proyección
   ortográfica. Superficies como dos triángulos por celda, ordenados por profundidad (algoritmo del
   pintor con `argsort` estable) y sombreados con luz direccional: brillo 0.5 + 0.5 |n · l|. Suelo y
@@ -245,6 +249,7 @@ la falta de literales científicos (`1e-9`). Ver `CONTEXTO_PROYECTO.md` §270–
 | 0.1 (hecho) | boxplots agrupados con cuartiles interpolados, mediana, bigotes, tooltips y leyenda; violines KDE gaussianos con marcador de mediana |
 | 0.1 (hecho) | hexbin 2D con conteo de puntos, celdas hexagonales color-mapeadas, tooltips y colorbar |
 | 0.1 (hecho) | `contourf` con bandas discretas rellenas, colorbar, tooltips y combinación con isolíneas |
+| 0.1 (hecho) | `quiver` con campos vectoriales 2D muestreados, puntas triangulares, escala en unidades de datos y tooltips |
 | 0.2 (parcial, hecho) | tooltips `<title>` con valores y resaltado CSS al pasar el ratón, dentro del SVG y sin scripts; visor web con zoom y desplazamiento en un iframe aislado |
 | 0.2 (parcial, hecho) | selección enlazada entre puntos y filas en figuras compuestas; los controles conducidos por Ostrin siguen pendientes |
 | 0.3 (parcial, hecho) | animación en bucle con `viz.animate`: fotogramas generados por Ostrin, reproducidos con CSS dentro del SVG |

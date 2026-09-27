@@ -53,7 +53,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "output": [
         "samples: 240, min x = -0.68",
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"640\" height=\"400\" viewBox=\"0 0 640 400\" font-family=\"Inter, Segoe UI, Helvetica, Arial, sans-serif\">",
-        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell,.contourf-cell{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover,.contourf-cell:hover{fill-opacity:0.9}</style>",
+        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell,.contourf-cell,.quiver{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover,.contourf-cell:hover{fill-opacity:0.9}.quiver:hover>line{stroke-width:2.6px}.quiver:hover>polygon{filter:brightness(0.78)}</style>",
         "<rect width=\"640\" height=\"400\" fill=\"#ffffff\"/>",
         "",
         "<text x=\"66\" y=\"26\" text-anchor=\"start\" font-size=\"16\" fill=\"#1f2937\" font-weight=\"600\">x(t) = exp(-0.25 t) cos(2 t)</text>",
@@ -167,7 +167,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "output": [
         "z range: -0.6 to 0.71",
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"640\" height=\"520\" viewBox=\"0 0 640 520\" font-family=\"Inter, Segoe UI, Helvetica, Arial, sans-serif\">",
-        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell,.contourf-cell{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover,.contourf-cell:hover{fill-opacity:0.9}</style>",
+        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell,.contourf-cell,.quiver{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover,.contourf-cell:hover{fill-opacity:0.9}.quiver:hover>line{stroke-width:2.6px}.quiver:hover>polygon{filter:brightness(0.78)}</style>",
         "<rect width=\"640\" height=\"520\" fill=\"#ffffff\"/>",
         "",
         "<text x=\"20\" y=\"26\" text-anchor=\"start\" font-size=\"16\" fill=\"#1f2937\" font-weight=\"600\">Ripple, k = 1.6</text>",
@@ -267,11 +267,11 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "output": [
         "steps 268, final angle -12.39",
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"840\" height=\"380\" viewBox=\"0 0 840 380\" font-family=\"Inter, Segoe UI, Helvetica, Arial, sans-serif\">",
-        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell,.contourf-cell{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover,.contourf-cell:hover{fill-opacity:0.9}</style>",
+        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell,.contourf-cell,.quiver{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover,.contourf-cell:hover{fill-opacity:0.9}.quiver:hover>line{stroke-width:2.6px}.quiver:hover>polygon{filter:brightness(0.78)}</style>",
         "<rect width=\"840\" height=\"380\" fill=\"#ffffff\"/>",
         "",
         "<svg data-ostrin-motion=\"true\" xmlns=\"http://www.w3.org/2000/svg\" width=\"360\" height=\"380\" viewBox=\"0 0 360 380\" font-family=\"Inter, Segoe UI, Helvetica, Arial, sans-serif\">",
-        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell,.contourf-cell{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover,.contourf-cell:hover{fill-opacity:0.9}</style>",
+        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell,.contourf-cell,.quiver{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover,.contourf-cell:hover{fill-opacity:0.9}.quiver:hover>line{stroke-width:2.6px}.quiver:hover>polygon{filter:brightness(0.78)}</style>",
         "<rect width=\"360\" height=\"380\" fill=\"#ffffff\"/>",
         "",
         "<style>@media (prefers-reduced-motion:reduce){[data-ostrin-motion] animate{display:none!important}}</style>",
@@ -283,7 +283,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
         "<g fill=\"#0f172a\" fill-opacity=\"0.78\" stroke=\"#ffffff\" stroke-width=\"0.6\"><circle class=\"pt\" data-viz-index=\"0\" cx=\"203\" cy=\"186\" r=\"4\"><title>(0, 0)</title></circle></g>",
         "</g></svg>",
         "<svg data-ostrin-motion=\"true\" xmlns=\"http://www.w3.org/2000/svg\" width=\"480\" height=\"380\" viewBox=\"0 0 480 380\" font-family=\"Inter, Segoe UI, Helvetica, Arial, sans-serif\">",
-        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell,.contourf-cell{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover,.contourf-cell:hover{fill-opacity:0.9}</style>",
+        "<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell,.contourf-cell,.quiver{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover,.contourf-cell:hover{fill-opacity:0.9}.quiver:hover>line{stroke-width:2.6px}.quiver:hover>polygon{filter:brightness(0.78)}</style>",
         "<rect width=\"480\" height=\"380\" fill=\"#ffffff\"/>",
         "",
         "<style>@media (prefers-reduced-motion:reduce){[data-ostrin-motion] animate{display:none!important}}</style>",
@@ -756,6 +756,19 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_contourf.ostrin",
       "code": "// std.viz · filled contour bands over a deterministic scalar field.\nimport std.viz\n\nfn peaks(x: Float, y: Float) -> Float {\n    3.0 * (1.0 - x) * (1.0 - x) * exp(-x * x - (y + 1.0) * (y + 1.0)) -\n        10.0 * (x / 5.0 - x * x * x - y * y * y * y * y) * exp(-x * x - y * y) -\n        exp(-(x + 1.0) * (x + 1.0) - y * y) / 3.0\n}\n\nfn main() -> Void {\n    xs = linspace(-3.0, 3.0, 48)\n    ys = linspace(-3.0, 3.0, 48)\n    z = viz.grid_of(xs, ys, peaks)\n    fig = viz.figure(\"Filled peaks contours\")\n        .describe(\"48 × 48 samples, 9 discrete contour bands\")\n        .labels(\"x\", \"y\")\n        .size(600, 500)\n        .contourf(z, -3.0, 3.0, -3.0, 3.0, 9, \"magma\", \"z\")\n        .contour(z, -3.0, 3.0, -3.0, 3.0, 9, \"\", \"#ffffff\")\n    print(fig.svg())\n}\n",
       "svg": "assets/viz/contourf.svg",
+      "printed": [
+        ""
+      ]
+    },
+    {
+      "id": "quiver",
+      "title": "2D vector field",
+      "file": "examples/viz_quiver.ostrin",
+      "blurb": "A sampled rotational velocity field rendered as 221 deterministic arrows with tooltips.",
+      "source": "examples/viz_quiver.ostrin",
+      "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_quiver.ostrin",
+      "code": "// A deterministic 2D rotational velocity field rendered with vector arrows.\nimport std.viz\n\nfn main() -> Void {\n    xs = linspace(-3.0, 3.0, 17)\n    ys = linspace(-2.4, 2.4, 13)\n    mut origins_x: List<Float> = []\n    mut origins_y: List<Float> = []\n    mut us: List<Float> = []\n    mut vs: List<Float> = []\n    for yi in 0 until ys.length() {\n        y = ys[yi]\n        for xi in 0 until xs.length() {\n            x = xs[xi]\n            radius = sqrt(x * x + y * y)\n            factor = if radius > 0.2 { 1.0 / (1.0 + radius * 0.35) } else { 0.0 }\n            origins_x.push(x)\n            origins_y.push(y)\n            us.push(0.0 - y * factor)\n            vs.push(x * factor)\n        }\n    }\n\n    fig = viz.figure(\"2D rotational velocity field\")\n        .describe(\"Sampled vectors with deterministic arrowheads and tooltips\")\n        .labels(\"x\", \"y\")\n        .xlim(-3.2, 3.2)\n        .ylim(-2.6, 2.6)\n        .quiver(array(origins_x), array(origins_y), array(us), array(vs), 0.24, \"velocity\", \"#2563eb\")\n    print(fig.svg())\n}\n",
+      "svg": "assets/viz/quiver.svg",
       "printed": [
         ""
       ]

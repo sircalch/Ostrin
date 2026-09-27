@@ -9156,6 +9156,15 @@ fn viz_contourf_renders_discrete_filled_bands_and_lines() {
 }
 
 #[test]
+fn viz_quiver_renders_2d_vectors_with_arrowheads_and_tooltips() {
+    let out = interpreter_and_native_agree("viz_quiver.ostrin");
+    assert_eq!(out.matches("class=\"quiver\"").count(), 17 * 13);
+    assert_eq!(out.matches("<polygon").count(), 17 * 13 - 1);
+    assert_eq!(out.matches("velocity:").count(), 17 * 13);
+    assert!(out.contains("2D rotational velocity field"));
+}
+
+#[test]
 fn viz_tables_render_headers_rows_and_tooltips() {
     let out = interpreter_and_native_agree("viz_table.ostrin");
     assert!(out.contains("<svg") && out.contains("ODE solver comparison"));
