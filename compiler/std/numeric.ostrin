@@ -307,6 +307,68 @@ fn solution(times: List<Float>, states: List<Float>, dim: Int, evaluations: Int)
     Solution { t: array(times), y: array(states).reshape([times.length(), dim]), evaluations: evaluations }
 }
 
+// ---------------------------------------------------------------- linear algebra
+
+/// A thin QR decomposition of a dense real matrix: `a = q @ r`.
+///
+/// `q` has orthonormal columns and `r` is upper triangular. The modified
+/// Gram–Schmidt implementation keeps the algorithm in std.numeric, so the
+/// interpreter, native compiler and browser use the same public API.
+pub record Qr {
+    q: Array<Float>
+    r: Array<Float>
+}
+
+impl Qr {
+    /// Reconstruct the matrix represented by this factorization.
+    fn reconstruct(self) -> Array<Float> {
+        self.q @ self.r
+    }
+
+    /// ||QᵀQ − I||, useful as a compact orthogonality diagnostic.
+    fn orthogonality(self) -> Float {
+        n = self.r.shape()[0]
+        norm(self.q.transpose() @ self.q - eye(n))
+    }
+}
+
+/// Thin QR decomposition by modified Gram–Schmidt.
+///
+/// The input must be a dense, full-column-rank real matrix with at least as
+/// many rows as columns. A `Result` makes rank and shape failures explicit to
+/// callers instead of returning a silently unstable factorization.
+pub fn qr(a: Array<Float>, tol: Float = 1e-12) -> Result<Qr, String> {
+    shape = a.shape()
+    if shape.length() != 2 {
+        return Err("qr needs a two-dimensional matrix")
+    }
+    m = shape[0]
+    n = shape[1]
+    if m < n {
+        return Err("qr needs at least as many rows as columns")
+    }
+    mut q = zeros([m, n])
+    mut r = zeros([n, n])
+    for j in 0 until n {
+        mut v = a.col(j)
+        for i in 0 until j {
+            qi = q.col(i)
+            rij = qi.dot(v)
+            r.set(i, j, rij)
+            v = v - qi * rij
+        }
+        rjj = norm(v)
+        if rjj <= tol {
+            return Err("qr found a linearly dependent column")
+        }
+        r.set(j, j, rjj)
+        for k in 0 until m {
+            q.set(k, j, v[k] / rjj)
+        }
+    }
+    Ok(Qr { q: q, r: r })
+}
+
 /// dy/dt = f(t, y) from t0 to t1 with `steps` classic Runge–Kutta steps.
 pub fn rk4(f: fn(Float, Array<Float>) -> Array<Float>, y0: Array<Float>, t0: Float, t1: Float, steps: Int = 1000) -> Solution {
     h = (t1 - t0) / (steps as Float)

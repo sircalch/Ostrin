@@ -1,5 +1,7 @@
 // Scientific Lab · Linear Algebra
-// Three masses joined by springs: stiffness matrix, static response and normal modes.
+// Three masses joined by springs: solve, normal modes and a QR factorization.
+import std.numeric
+
 fn clean(x: Float) -> Float {
     round(x * 10000.0) / 10000.0
 }
@@ -25,4 +27,17 @@ fn main() -> Void {
     print("eigenvalues (squared mode frequencies):")
     print(round(modes * 10000.0) / 10000.0)
     print("sum of eigenvalues - trace = " + clean(abs(modes.sum() - trace(k))).to_string())
+
+    decomposition = numeric.qr(k)
+    match decomposition {
+        Ok(factors) => {
+            print("Q (orthonormal basis):")
+            print(round(factors.q * 10000.0) / 10000.0)
+            print("R (upper triangular):")
+            print(round(factors.r * 10000.0) / 10000.0)
+            print("QR residual = " + clean(norm(factors.reconstruct() - k)).to_string())
+            print("Q orthogonality = " + clean(factors.orthogonality()).to_string())
+        },
+        Err(message) => print("QR error: " + message),
+    }
 }

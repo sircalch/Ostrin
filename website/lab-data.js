@@ -356,7 +356,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
     {
       "id": "linear-algebra",
       "title": "Linear Algebra",
-      "headline": "Solve a spring system and find its normal modes.",
+      "headline": "Solve a spring system, find its normal modes and factor it with QR.",
       "file": "examples/lab_linear_algebra.ostrin",
       "render": "text",
       "params": [
@@ -368,14 +368,14 @@ globalThis.OSTRIN_LAB = Object.freeze({
           "step": 0.25
         }
       ],
-      "how": "The stiffness matrix is an Array<Float>; det, solve, norm, @ and eigvals are compiler built-ins that give identical results in the interpreter and in native C.",
+      "how": "The stiffness matrix is an Array<Float>; det, solve, norm, @ and eigvals are compiler built-ins. std.numeric.qr adds a modified Gram–Schmidt factorization with explicit Q/R diagnostics, and all paths produce the same result in the interpreter, native C and browser.",
       "docs": {
         "label": "numeric hierarchy and arrays",
         "href": "https://github.com/sircalch/Ostrin/blob/main/docs/design/19-jerarquia-numerica-y-arrays.md"
       },
-      "limits": "Dense matrices only; eigenvalues are computed for symmetric matrices. Sparse and complex linear algebra are planned.",
+      "limits": "Dense real matrices only; eigenvalues are computed for symmetric matrices and QR currently requires full column rank. LU, SVD, sparse and complex linear algebra remain on the roadmap.",
       "files": {
-        "main.ostrin": "// Scientific Lab · Linear Algebra\n// Three masses joined by springs: stiffness matrix, static response and normal modes.\nfn clean(x: Float) -> Float {\n    round(x * 10000.0) / 10000.0\n}\n\nfn main() -> Void {\n    coupling = 1.0\n    k = array([\n        [1.0 + coupling, 0.0 - coupling, 0.0],\n        [0.0 - coupling, 1.0 + 2.0 * coupling, 0.0 - coupling],\n        [0.0, 0.0 - coupling, 1.0 + coupling]\n    ])\n    force = array([1.0, 0.0, -1.0])\n\n    print(\"det(K) = \" + clean(det(k)).to_string())\n    print(\"trace(K) = \" + clean(trace(k)).to_string())\n\n    x = solve(k, force)\n    print(\"displacement x = K⁻¹ f:\")\n    print(round(x * 10000.0) / 10000.0)\n    print(\"residual |K x - f| = \" + clean(norm(k @ x - force)).to_string())\n\n    modes = eigvals(k)\n    print(\"eigenvalues (squared mode frequencies):\")\n    print(round(modes * 10000.0) / 10000.0)\n    print(\"sum of eigenvalues - trace = \" + clean(abs(modes.sum() - trace(k))).to_string())\n}\n"
+        "main.ostrin": "// Scientific Lab · Linear Algebra\n// Three masses joined by springs: solve, normal modes and a QR factorization.\nimport std.numeric\n\nfn clean(x: Float) -> Float {\n    round(x * 10000.0) / 10000.0\n}\n\nfn main() -> Void {\n    coupling = 1.0\n    k = array([\n        [1.0 + coupling, 0.0 - coupling, 0.0],\n        [0.0 - coupling, 1.0 + 2.0 * coupling, 0.0 - coupling],\n        [0.0, 0.0 - coupling, 1.0 + coupling]\n    ])\n    force = array([1.0, 0.0, -1.0])\n\n    print(\"det(K) = \" + clean(det(k)).to_string())\n    print(\"trace(K) = \" + clean(trace(k)).to_string())\n\n    x = solve(k, force)\n    print(\"displacement x = K⁻¹ f:\")\n    print(round(x * 10000.0) / 10000.0)\n    print(\"residual |K x - f| = \" + clean(norm(k @ x - force)).to_string())\n\n    modes = eigvals(k)\n    print(\"eigenvalues (squared mode frequencies):\")\n    print(round(modes * 10000.0) / 10000.0)\n    print(\"sum of eigenvalues - trace = \" + clean(abs(modes.sum() - trace(k))).to_string())\n\n    decomposition = numeric.qr(k)\n    match decomposition {\n        Ok(factors) => {\n            print(\"Q (orthonormal basis):\")\n            print(round(factors.q * 10000.0) / 10000.0)\n            print(\"R (upper triangular):\")\n            print(round(factors.r * 10000.0) / 10000.0)\n            print(\"QR residual = \" + clean(norm(factors.reconstruct() - k)).to_string())\n            print(\"Q orthogonality = \" + clean(factors.orthogonality()).to_string())\n        },\n        Err(message) => print(\"QR error: \" + message),\n    }\n}\n"
       },
       "main": "main.ostrin",
       "args": [
@@ -392,7 +392,13 @@ globalThis.OSTRIN_LAB = Object.freeze({
         "residual |K x - f| = 0",
         "eigenvalues (squared mode frequencies):",
         "[1, 2, 4]",
-        "sum of eigenvalues - trace = 0"
+        "sum of eigenvalues - trace = 0",
+        "Q (orthonormal basis):",
+        "[[0.8944, 0.4082, 0.1826], [-0.4472, 0.8165, 0.3651], [0, -0.4082, 0.9129]]",
+        "R (upper triangular):",
+        "[[2.2361, -2.2361, 0.4472], [0, 2.4495, -1.633], [0, 0, 1.4606]]",
+        "QR residual = 0",
+        "Q orthogonality = 0"
       ]
     },
     {

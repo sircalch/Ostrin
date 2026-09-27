@@ -462,7 +462,10 @@ fn native_backend_types_agree_with_the_checker() {
     // heavy visualization code moves into IR.
     // Provenance adds 73 more: metadata records and SVG attribute construction
     // remain on the AST path until aggregate-heavy visualization code moves into IR.
-    const MAX_AST_FALLBACK_FUNCTIONS: usize = 2611;
+    // Dense QR adds 45 more: modified Gram–Schmidt over Array<Float> and the
+    // Result<Qr, String> aggregate currently use the safe AST path until
+    // array-valued records and nested Result payloads migrate into IR.
+    const MAX_AST_FALLBACK_FUNCTIONS: usize = 2656;
     assert!(
         ast_fallback <= MAX_AST_FALLBACK_FUNCTIONS,
         "AST fallback grew to {ast_fallback} functions (ratchet limit {MAX_AST_FALLBACK_FUNCTIONS})"
