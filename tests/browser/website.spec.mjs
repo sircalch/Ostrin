@@ -166,7 +166,7 @@ test("Scientific Lab recomputes its demos with the real compiler", async ({ page
 
 test("Cookbook renders every recipe with source and recorded output", async ({ page }) => {
   await page.goto("./cookbook.html", { waitUntil: "domcontentloaded" });
-  await expect(page.locator("[data-cookbook] .recipe")).toHaveCount(10);
+  await expect(page.locator("[data-cookbook] .recipe")).toHaveCount(11);
   for (const recipe of await page.locator("[data-cookbook] .recipe").all()) {
     await expect(recipe.locator(".sl-code")).not.toBeEmpty();
     await expect(recipe.locator(".sl-raw pre")).not.toBeEmpty();
