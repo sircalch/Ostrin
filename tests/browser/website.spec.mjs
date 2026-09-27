@@ -321,6 +321,9 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   await expect(page.locator("[data-viz-loop]")).toHaveValue("1");
   await page.getByRole("button", { name: "Restart" }).click();
   await expect(page.locator(".viz-animation-status")).toHaveText("completed 1 loop", { timeout: 10_000 });
+  const animationQuality = page.locator("[data-viz-quality]");
+  await expect(animationQuality).toHaveValue("1");
+  await expect(animationQuality.locator("option")).toHaveCount(2);
   await page.locator("[data-viz-loop]").selectOption("3");
   await expect(page.locator(".viz-animation-status")).toHaveText("up to 3 loops");
   await page.locator(".viz-animation-speed").fill("200");
@@ -334,22 +337,23 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   expect(download.suggestedFilename()).toBe("animation.webm");
   await expect(page.locator(".viz-animation-status")).toHaveText("72 frames · 8 fps · downloaded");
   await page.locator("[data-viz-loop]").selectOption("1");
+  await animationQuality.selectOption("2");
   const gifDownloadPromise = page.waitForEvent("download", { timeout: 30_000 });
   await page.getByRole("button", { name: "Export GIF" }).click();
   const gifDownload = await gifDownloadPromise;
-  expect(gifDownload.suggestedFilename()).toBe("animation.gif");
+  expect(gifDownload.suggestedFilename()).toBe("animation-2x.gif");
   const gifBytes = await readFile(await gifDownload.path());
   expect(gifBytes.subarray(0, 6).toString("ascii")).toBe("GIF89a");
-  expect(gifBytes.readUInt16LE(6)).toBe(640);
-  expect(gifBytes.readUInt16LE(8)).toBe(400);
+  expect(gifBytes.readUInt16LE(6)).toBe(1280);
+  expect(gifBytes.readUInt16LE(8)).toBe(800);
   const decodedGif = await page.evaluate((base64) => new Promise((resolve) => {
     const image = new Image();
     image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight });
     image.onerror = () => resolve({ error: "browser could not decode GIF" });
     image.src = `data:image/gif;base64,${base64}`;
   }), gifBytes.toString("base64"));
-  expect(decodedGif).toEqual({ width: 640, height: 400 });
-  await expect(page.locator(".viz-animation-status")).toHaveText("24 frames · 8 fps · downloaded");
+  expect(decodedGif).toEqual({ width: 1280, height: 800 });
+  await expect(page.locator(".viz-animation-status")).toHaveText("24 frames · 8 fps · downloaded · 2×");
   await page.getByRole("button", { name: "Close" }).click();
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.locator('[data-viz-explore="double-pendulum"]').click();

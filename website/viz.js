@@ -326,10 +326,11 @@ function videoMimeType() {
   return ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"].find((type) => MediaRecorder.isTypeSupported(type)) ?? "";
 }
 
-async function exportAnimatedWebm(source, duration, title, loops = 1) {
+async function exportAnimatedWebm(source, duration, title, loops = 1, scale = 1) {
   const mime = videoMimeType();
   if (!mime || !HTMLCanvasElement.prototype.captureStream) throw new Error("WebM export needs MediaRecorder and canvas capture in this browser");
   const dimensions = svgDimensions(source);
+  const renderScale = Math.max(1, Math.min(2, Number(scale) || 1));
   const document_ = new DOMParser().parseFromString(source, "image/svg+xml");
   const flipbookFrames = document_.querySelectorAll(".ostrin-frame").length;
   const fps = flipbookFrames ? Math.max(1, Math.round(flipbookFrames / duration)) : 15;
@@ -337,8 +338,8 @@ async function exportAnimatedWebm(source, duration, title, loops = 1) {
   const loopCount = Math.max(1, Math.floor(Number(loops) || 1));
   const frameCount = framesPerLoop * loopCount;
   const canvas = document.createElement("canvas");
-  canvas.width = dimensions.width;
-  canvas.height = dimensions.height;
+  canvas.width = dimensions.width * renderScale;
+  canvas.height = dimensions.height * renderScale;
   const context = canvas.getContext("2d");
   if (!context) throw new Error("WebM export needs a 2D canvas context");
   const stream = canvas.captureStream(fps);
@@ -367,10 +368,11 @@ async function exportAnimatedWebm(source, duration, title, loops = 1) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `${(title || "ostrin-viz-animation").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "ostrin-viz-animation"}.webm`;
+  const stem = (title || "ostrin-viz-animation").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "ostrin-viz-animation";
+  link.download = stem + (renderScale === 1 ? "" : "-" + renderScale + "x") + ".webm";
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-  return { frameCount, fps };
+  return { frameCount, fps, scale: renderScale };
 }
 
 // GIF is intentionally encoded here instead of adding a large runtime dependency. The fixed
@@ -511,8 +513,9 @@ function encodeGif(frames, width, height, fps, loops, comment) {
   return new Uint8Array(output);
 }
 
-async function exportAnimatedGif(source, duration, title, loops = 1) {
+async function exportAnimatedGif(source, duration, title, loops = 1, scale = 1) {
   const dimensions = svgDimensions(source);
+  const renderScale = Math.max(1, Math.min(2, Number(scale) || 1));
   const document_ = new DOMParser().parseFromString(source, "image/svg+xml");
   const flipbookFrames = document_.querySelectorAll(".ostrin-frame").length;
   const fps = flipbookFrames ? Math.max(1, Math.round(flipbookFrames / duration)) : 15;
@@ -520,8 +523,8 @@ async function exportAnimatedGif(source, duration, title, loops = 1) {
   const loopCount = Math.max(1, Math.floor(Number(loops) || 1));
   const frameCount = framesPerLoop * loopCount;
   const canvas = document.createElement("canvas");
-  canvas.width = dimensions.width;
-  canvas.height = dimensions.height;
+  canvas.width = dimensions.width * renderScale;
+  canvas.height = dimensions.height * renderScale;
   const context = canvas.getContext("2d", { willReadFrequently: true });
   if (!context) throw new Error("GIF export needs a 2D canvas context");
   const frames = [];
@@ -536,9 +539,9 @@ async function exportAnimatedGif(source, duration, title, loops = 1) {
   }
   const metadata = provenanceOf(source);
   const comment = metadata ? provenanceText(metadata, "Ostrin provenance") : "Ostrin SVG animation";
-  const blob = new Blob([encodeGif(frames, dimensions.width, dimensions.height, fps, loopCount, comment)], { type: "image/gif" });
-  downloadBlob(blob, `${fileStem(title || "ostrin-animation")}.gif`);
-  return { frameCount, fps };
+  const blob = new Blob([encodeGif(frames, canvas.width, canvas.height, fps, loopCount, comment)], { type: "image/gif" });
+  downloadBlob(blob, fileStem(title || "ostrin-animation") + (renderScale === 1 ? "" : "-" + renderScale + "x") + ".gif");
+  return { frameCount, fps, scale: renderScale };
 }
 
 // ---- explorer: the SVG in a sandboxed frame (no scripts) where its own hover styles and
@@ -560,6 +563,10 @@ function explorer() {
     el("option", { value: "3", text: "3×" }),
     el("option", { value: "5", text: "5×" }),
   ]);
+  const animationQuality = el("select", { className: "viz-animation-loop", "data-viz-quality": "", "aria-label": "Animation export quality" }, [
+    el("option", { value: "1", text: "1×" }),
+    el("option", { value: "2", text: "2×" }),
+  ]);
   const animationTools = el("div", { className: "viz-animation-tools", hidden: true }, [
     el("span", { className: "viz-animation-caption", text: "Animation" }),
     el("button", { type: "button", className: "button-quiet", text: "Play", "data-viz-play": "" }),
@@ -571,6 +578,7 @@ function explorer() {
     animationLabel,
     el("label", { className: "viz-animation-speed-control" }, [el("span", { text: "Speed" }), animationSpeedInput, animationSpeedLabel]),
     el("label", { className: "viz-animation-loop-control" }, [el("span", { text: "Loops" }), animationLoop]),
+    el("label", { className: "viz-animation-loop-control" }, [el("span", { text: "Quality" }), animationQuality]),
     animationStatus,
   ]);
   const tableFilter = el("input", { id: "viz-table-filter", type: "search", placeholder: "Search rows", "aria-label": "Filter table rows" });
@@ -819,6 +827,7 @@ function explorer() {
     animationRate = 1;
     animationSpeedLabel.textContent = "1×";
     animationLoop.value = "0";
+    animationQuality.value = "1";
     animationLoopLimit = 0;
     animationLoopCount = 0;
     animationStatus.textContent = "";
@@ -1178,8 +1187,9 @@ function explorer() {
     exportButton.disabled = true;
     animationStatus.textContent = "exporting…";
     try {
-      const result = await exportAnimatedWebm(svg, animationDuration, heading.textContent, animationLoopLimit || 1);
-      animationStatus.textContent = `${result.frameCount} frames · ${result.fps} fps · downloaded`;
+      const result = await exportAnimatedWebm(svg, animationDuration, heading.textContent, animationLoopLimit || 1, animationQuality.value);
+      const qualitySuffix = result.scale > 1 ? " · " + result.scale + "×" : "";
+      animationStatus.textContent = result.frameCount + " frames · " + result.fps + " fps · downloaded" + qualitySuffix;
     } catch (error) {
       animationStatus.textContent = error.message ?? String(error);
     } finally {
@@ -1191,8 +1201,9 @@ function explorer() {
     exportButton.disabled = true;
     animationStatus.textContent = "encoding GIF…";
     try {
-      const result = await exportAnimatedGif(svg, animationDuration, heading.textContent, animationLoopLimit || 1);
-      animationStatus.textContent = `${result.frameCount} frames · ${result.fps} fps · downloaded`;
+      const result = await exportAnimatedGif(svg, animationDuration, heading.textContent, animationLoopLimit || 1, animationQuality.value);
+      const qualitySuffix = result.scale > 1 ? " · " + result.scale + "×" : "";
+      animationStatus.textContent = result.frameCount + " frames · " + result.fps + " fps · downloaded" + qualitySuffix;
     } catch (error) {
       animationStatus.textContent = error.message ?? String(error);
     } finally {
