@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Native IR: numeric array builtins and linear algebra
+- The native IR emitter now lowers `zeros`/`ones`, `norm`, scalar `abs` and `sqrt` through
+  the typed array/runtime helpers. Dense QR and Cholesky therefore compile through IR/C while
+  preserving interpreter/native parity; the full example suite moves from 2,856 to 2,508 AST
+  fallback functions (2,232 IR, 1,148 HIR).
+- `native_ir_numeric_builtins.ostrin` checks generated C markers, execution parity and
+  `live_allocations=0`; the Cholesky integration test keeps a per-source native report ratchet.
+
 ### Scientific core: experimental complex numbers
 - `std.numeric` now exposes a `Complex` record backed by `Float64`, with rectangular and polar
   constructors, conjugation, magnitude, equality, overloaded arithmetic, reflected scalar
