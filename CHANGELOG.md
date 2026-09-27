@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Visualization: interactive legend toggles
+- Every labeled `std.viz` series now carries a stable identifier in the SVG. The web explorer exposes
+  accessible legend buttons that hide or restore a series in place and report the visible count without
+  changing Ostrin's data, source output or export provenance.
+
 ### Visualization: Ostrin-driven parameter controls
 - The Viz explorer now exposes declarative numeric controls for gallery programs. Each control replaces
   one `name = literal` assignment and reruns that source with `ostrinc.wasm`; the returned SVG, status

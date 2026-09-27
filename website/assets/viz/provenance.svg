@@ -59,11 +59,11 @@
 <line x1="61" y1="75" x2="66" y2="75" stroke="#9ca3af" stroke-width="1"/>
 <text x="58" y="79" text-anchor="end" font-size="11" fill="#6b7280">1.0</text>
 <g clip-path="url(#clip4796110287609473969)">
-<g class="series"><title>signal</title><path d="M76.65 75 L98.85 108.88 L121.04 177.57 L143.24 254.19 L165.44 312.38 L187.63 335 L209.83 318.72 L232.02 273.52 L254.22 217.78 L276.41 171.26 L298.61 148.29 L320.8 153.74 L343 182.46 L365.2 222.18 L387.39 258.43 L409.59 279.59 L431.78 280.41 L453.98 263.01 L476.17 235.3 L498.37 207.69 L520.56 189.33 L542.76 185.23 L564.96 195.06 L587.15 213.94 L609.35 234.53" fill="none" stroke="#2563eb" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/></g>
+<g class="viz-series" data-viz-series-id="0"><g class="series"><title>signal</title><path d="M76.65 75 L98.85 108.88 L121.04 177.57 L143.24 254.19 L165.44 312.38 L187.63 335 L209.83 318.72 L232.02 273.52 L254.22 217.78 L276.41 171.26 L298.61 148.29 L320.8 153.74 L343 182.46 L365.2 222.18 L387.39 258.43 L409.59 279.59 L431.78 280.41 L453.98 263.01 L476.17 235.3 L498.37 207.69 L520.56 189.33 L542.76 185.23 L564.96 195.06 L587.15 213.94 L609.35 234.53" fill="none" stroke="#2563eb" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/></g></g>
 </g>
 <line x1="66" y1="348" x2="620" y2="348" stroke="#9ca3af" stroke-width="1"/>
 <line x1="66" y1="62" x2="66" y2="348" stroke="#9ca3af" stroke-width="1"/>
 <text x="343" y="388" text-anchor="middle" font-size="12" fill="#1f2937">time</text>
 <text x="16" y="205" text-anchor="middle" font-size="12" fill="#1f2937" transform="rotate(-90 16 205)">amplitude</text>
-<g><rect x="536.4" y="72" width="73.6" height="28" rx="6" fill="#ffffff" fill-opacity="0.88" stroke="#e5e7eb"/><line x1="543.4" y1="86" x2="559.4" y2="86" stroke="#2563eb" stroke-width="2.5"/><text x="564.4" y="90" text-anchor="start" font-size="11" fill="#1f2937">signal</text></g>
+<g class="legend"><rect x="536.4" y="72" width="73.6" height="28" rx="6" fill="#ffffff" fill-opacity="0.88" stroke="#e5e7eb"/><g class="legend-item" data-viz-series-id="0"><line x1="543.4" y1="86" x2="559.4" y2="86" stroke="#2563eb" stroke-width="2.5"/><text x="564.4" y="90" text-anchor="start" font-size="11" fill="#1f2937">signal</text></g></g>
 </svg>

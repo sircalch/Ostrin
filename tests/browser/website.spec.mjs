@@ -200,8 +200,21 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
 
   // The explorer shows the SVG in a sandboxed frame where its own tooltips and hover styles work.
   await page.locator('[data-viz-explore="scatter-fit"]').click();
-  const point = page.frameLocator(".viz-frame-live").locator("circle.pt").first();
+  const scatterFrame = page.frameLocator(".viz-frame-live");
+  const point = scatterFrame.locator("circle.pt").first();
   await expect(point.locator("title")).toHaveText(/^measurements: \(0\.5, /);
+  await expect(page.locator(".viz-legend-tools")).toBeVisible();
+  const firstLegendToggle = page.locator("[data-viz-legend-toggle]").first();
+  const firstSeriesId = await firstLegendToggle.getAttribute("data-viz-legend-toggle");
+  const firstSeries = scatterFrame.locator(`.viz-series[data-viz-series-id="${firstSeriesId}"]`);
+  await expect(firstSeries).toBeVisible();
+  await firstLegendToggle.click();
+  await expect(firstSeries).toHaveCSS("display", "none");
+  await expect(firstLegendToggle).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator(".viz-legend-status")).toHaveText(/2 of 3 series visible/);
+  await firstLegendToggle.click();
+  await expect(firstSeries).toBeVisible();
+  await expect(firstLegendToggle).toHaveAttribute("aria-pressed", "true");
   const svgDownloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download SVG" }).click();
   const svgDownload = await svgDownloadPromise;

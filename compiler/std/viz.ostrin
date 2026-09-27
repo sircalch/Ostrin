@@ -927,17 +927,21 @@ fn render(fig: Figure) -> String {
     // Marks, in order, clipped to the plot area.
     out.push("<g" + attr("clip-path", "url(#" + clip + ")") + ">")
     mut index = 0
+    mut series_id = 0
     for s in fig.series {
         reference = s.kind == "hline" or s.kind == "vline"
         color = if reference and s.color == "" { theme.muted } else { pick(s.color, index, theme) }
         if not is_grid(s.kind) and not reference {
             index = index + 1
         }
+        mut drawn = ""
         if is_motion(s.kind) {
-            out.push(draw_motion(s, color, fig.duration, left, bottom, x0, y0, sx, sy, theme))
+            drawn = draw_motion(s, color, fig.duration, left, bottom, x0, y0, sx, sy, theme)
         } else {
-            out.push(draw_series(s, color, left, bottom, x0, y0, sx, sy, zlo, zhi, theme, top, right, violin_gap))
+            drawn = draw_series(s, color, left, bottom, x0, y0, sx, sy, zlo, zhi, theme, top, right, violin_gap)
         }
+        out.push("<g class=\"viz-series\"" + attr("data-viz-series-id", series_id.to_string()) + ">" + drawn + "</g>")
+        series_id = series_id + 1
     }
     for n in fig.notes {
         out.push(text_at(left + (n.x - x0) * sx, bottom - (n.y - y0) * sy, n.text, "start", 11, theme.text, ""))
@@ -1372,7 +1376,9 @@ fn legend(fig: Figure, left: Float, right: Float, top: Float, bottom: Float, x0:
     mut labels: List<String> = []
     mut colors: List<String> = []
     mut kinds: List<String> = []
+    mut ids: List<String> = []
     mut index = 0
+    mut series_id = 0
     for s in fig.series {
         reference = s.kind == "hline" or s.kind == "vline"
         if not is_grid(s.kind) {
@@ -1380,11 +1386,13 @@ fn legend(fig: Figure, left: Float, right: Float, top: Float, bottom: Float, x0:
                 labels.push(s.label)
                 colors.push(if reference and s.color == "" { theme.muted } else { pick(s.color, index, theme) })
                 kinds.push(s.kind)
+                ids.push(series_id.to_string())
             }
             if not reference {
                 index = index + 1
             }
         }
+        series_id = series_id + 1
     }
     if labels.length() == 0 {
         return ""
@@ -1420,22 +1428,23 @@ fn legend(fig: Figure, left: Float, right: Float, top: Float, bottom: Float, x0:
     }
     x = if best % 2 == 0 { right - bw - 10.0 } else { left + 10.0 }
     y = if best < 2 { top + 10.0 } else { bottom - bh - 10.0 }
-    mut out = "<g><rect" + attr("x", num(x)) + attr("y", num(y)) + attr("width", num(bw)) + attr("height", num(bh)) +
+    mut out = "<g class=\"legend\"><rect" + attr("x", num(x)) + attr("y", num(y)) + attr("width", num(bw)) + attr("height", num(bh)) +
         attr("rx", "6") + attr("fill", theme.background) + attr("fill-opacity", "0.88") + attr("stroke", theme.grid) + "/>"
     for i in 0 until labels.length() {
         cy = y + 14.0 + (i as Float) * 18.0
         k = kinds[i]
+        mut item = "<g class=\"legend-item\"" + attr("data-viz-series-id", ids[i]) + ">"
         if k == "scatter" or k == "errorbar" or k == "moving" {
-            out = out + "<circle" + attr("cx", num(x + 15.0)) + attr("cy", num(cy)) + attr("r", "4") + attr("fill", colors[i]) + "/>"
+            item = item + "<circle" + attr("cx", num(x + 15.0)) + attr("cy", num(cy)) + attr("r", "4") + attr("fill", colors[i]) + "/>"
         } else if k == "bar" or k == "hist" or k == "band" or k == "area" {
-            out = out + "<rect" + attr("x", num(x + 8.0)) + attr("y", num(cy - 5.0)) + attr("width", "14") + attr("height", "10") + attr("fill", colors[i]) + attr("fill-opacity", "0.7") + "/>"
+            item = item + "<rect" + attr("x", num(x + 8.0)) + attr("y", num(cy - 5.0)) + attr("width", "14") + attr("height", "10") + attr("fill", colors[i]) + attr("fill-opacity", "0.7") + "/>"
         } else if k == "boxplot" or k == "violin" {
-            out = out + "<rect" + attr("x", num(x + 8.0)) + attr("y", num(cy - 5.0)) + attr("width", "14") + attr("height", "10") + attr("fill", colors[i]) + attr("fill-opacity", "0.25") + attr("stroke", colors[i]) + "/>"
-            out = out + seg(x + 8.0, cy, x + 22.0, cy, colors[i], 2.0, "")
+            item = item + "<rect" + attr("x", num(x + 8.0)) + attr("y", num(cy - 5.0)) + attr("width", "14") + attr("height", "10") + attr("fill", colors[i]) + attr("fill-opacity", "0.25") + attr("stroke", colors[i]) + "/>"
+            item = item + seg(x + 8.0, cy, x + 22.0, cy, colors[i], 2.0, "")
         } else {
-            out = out + seg(x + 7.0, cy, x + 23.0, cy, colors[i], 2.5, "")
+            item = item + seg(x + 7.0, cy, x + 23.0, cy, colors[i], 2.5, "")
         }
-        out = out + text_at(x + 28.0, cy + 4.0, labels[i], "start", 11, theme.text, "")
+        out = out + item + text_at(x + 28.0, cy + 4.0, labels[i], "start", 11, theme.text, "") + "</g>"
     }
     out + "</g>"
 }

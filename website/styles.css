@@ -582,6 +582,11 @@ button.button-quiet, button.button { cursor: pointer; } button.button-quiet { ba
 .viz-parameter-control input { width: 112px; accent-color: var(--violet); }
 .viz-parameter-control output, .viz-parameter-status { min-width: 3.5rem; color: var(--muted); font: .68rem var(--mono); }
 .viz-parameter-status { flex: 1 1 190px; }
+.viz-legend-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--night); }
+.viz-legend-tools[hidden] { display: none; }
+.viz-legend-controls { display: flex; flex-wrap: wrap; gap: 6px; }
+.viz-legend-toggle[aria-pressed="false"] { opacity: .52; text-decoration: line-through; }
+.viz-legend-status { flex: 1 1 190px; color: var(--muted); font: .68rem var(--mono); }
 .viz-animation-caption, .viz-animation-time { color: var(--muted); font: .72rem var(--mono); }
 .viz-animation-status { color: var(--muted); font: .68rem var(--mono); }
 .viz-animation-slider { flex: 1 1 180px; min-width: 120px; accent-color: var(--violet); }
