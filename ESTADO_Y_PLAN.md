@@ -1,8 +1,8 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-24 · rama `main` · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 225 de integración y 2 unitarias en verde.*
+*Corte: 2026-09-26 · rama `main` · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 229 de integración y 2 unitarias en verde.*
 
-Validación remota: Pages y CI pasaron para `770e41c` en Windows, Linux, macOS y web. La
+Validación remota: Pages y CI pasaron para `6dce6ff` en Windows, Linux, macOS y web. La
 compuerta oficial exige `cargo fmt --check`, Clippy con el lint `suspicious`, la suite del
 compilador y las comprobaciones del sitio; los workflows de auditoría de dependencias,
 CodeQL, sanitizers nativos y cobertura quedan registrados para el ciclo P5.
@@ -157,9 +157,9 @@ por separado en `--native-type-report` como `ir-generated`; el mismo informe exp
 `hir-generated` y `ast-fallback` para que la retirada del backend legado tenga un contador
 visible. También publica líneas `native-source` agrupadas por archivo para localizar la deuda
 por módulo; la prueba diferencial comprueba que sus sumas coinciden con el total. En el corte
-actual, la suite de ejemplos suma 1 243 funciones IR, 608 HIR y 1 493 que aún caen al emisor
-AST; `native_backend_types_agree_with_the_checker` mantiene 1 493 como trinquete temporal: las
-superficies `std.viz.boxplot`, `std.viz.table` y `std.viz.vector_field` añaden funciones AST
+actual, la suite de ejemplos suma 1 507 funciones IR, 728 HIR y 2 122 que aún caen al emisor
+AST; `native_backend_types_agree_with_the_checker` mantiene 2 122 como trinquete temporal: las
+superficies `std.viz.boxplot`, `std.viz.violin`, `std.viz.hexbin`, `std.viz.table` y `std.viz.vector_field` añaden funciones AST
 compartidas por sus consumidores y deben migrarse en la siguiente pasada. Los marcadores de ownership de
 `String`, `List<T>`, los núcleos escalares de `Map<K,V>`/`Set<T>` y `Option<T>` con payload
 escalar o `String` también se consumen al generar C; `Map.get/remove` producen structs
@@ -271,7 +271,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Biblioteca estándar | Incluye `std.math`, `std.lists`, `std.strings` (incluidos `trim`, `split`, `lines`, `is_blank`, `format_text`, `format_float`, `char_at`, `slice` y `codepoint`), `std.time` (calendario gregoriano determinista, validación, ordinales, día de semana, ISO y `Result` de parseo), `std.json` (DOM, parser/serializer estricto y Unicode), `std.args`, `std.env`, `std.maps` (consultas genéricas de `Map<K,V>` con `Hash + Eq`), `std.viz` y `std.numeric` (raíces, cuadratura, interpolación, ODEs `rk4`/`rk45`, FFT, e integrales/derivadas/interpolación con unidades sobre `Array<Quantity<D>>`; documento 24); red, métodos implícitos para sistemas rígidos y optimización multivariable siguen pendientes |
 | Mensajes de error de E/S | `strerror` ≠ texto de Rust (difieren entre backends) |
 | Unidades | `as` convierte a unidades compuestas (`v as km/h`) y comprueba la dimensión (E1026); `*`/`/` producen unidades canónicas (`kg*m^2/s^2`, `90 km/h * 30 min` → `45 km`); catálogo con N, J, W, Pa, Hz, V… y dimensiones con nombre (`Energy`, `Velocity`); `q.value()`/`q.unit()`. `Array<Quantity<D>>` (una unidad por array, aritmética elemento a elemento, reducciones con unidad, `as` sobre arrays, paridad nativa). `dimension`/`unit`/`define` declarados por el programa (registrados antes de analizar expresiones, con tabla nativa). Pendiente: unidades afines (°C) y unidades con prefijos automáticos |
-| Visualización | `std.viz` 0.1 (documento 23): marcas 2D, boxplots agrupados con cuartiles y bigotes, violines KDE gaussianos, heatmap/contornos, superficies/trayectorias/nubes 3D, campos vectoriales 3D muestreados con flechas, cortes ortogonales XY/XZ/YZ e isosuperficies de `Array<Float>` 3D, layouts y ejes con unidades, SVG determinista idéntico en intérprete, nativo y WASM, tablas formateadas (`viz.table`) con filas/columnas marcadas, tooltips y resaltado al pasar el ratón sin scripts, filtro y ordenamiento en el explorador web, selección enlazada entre puntos y filas con marcadores deterministas, animaciones por fotogramas (`viz.animate`) y de movimiento continuo (`moving_point`, `rod`, `morph`; SMIL dentro del SVG) con control de velocidad, ciclos finitos y modo `prefers-reduced-motion`, controles temporales en la web, cámara 3D interactiva que vuelve a ejecutar `.view(...)` en WASM, exportación WebM mediante `MediaRecorder` y descarga SVG/PNG 2× del explorador cuando el navegador dispone de canvas. Pendiente: render volumétrico completo, controles conducidos por Ostrin, exportación MP4/GIF/PDF, WebGPU y procedencia; la galería nativa deja ~300 asignaciones vivas al salir (textos de unidades de cantidades), la salida es correcta |
+| Visualización | `std.viz` 0.1 (documento 23): marcas 2D, boxplots agrupados con cuartiles y bigotes, violines KDE gaussianos, hexbin 2D, heatmap/contornos, superficies/trayectorias/nubes 3D, campos vectoriales 3D muestreados con flechas, cortes ortogonales XY/XZ/YZ e isosuperficies de `Array<Float>` 3D, layouts y ejes con unidades, SVG determinista idéntico en intérprete, nativo y WASM, tablas formateadas (`viz.table`) con filas/columnas marcadas, tooltips y resaltado al pasar el ratón sin scripts, filtro y ordenamiento en el explorador web, selección enlazada entre puntos y filas con marcadores deterministas, animaciones por fotogramas (`viz.animate`) y de movimiento continuo (`moving_point`, `rod`, `morph`; SMIL dentro del SVG) con control de velocidad, ciclos finitos y modo `prefers-reduced-motion`, controles temporales en la web, cámara 3D interactiva que vuelve a ejecutar `.view(...)` en WASM, exportación WebM mediante `MediaRecorder` y descarga SVG/PNG 2× del explorador cuando el navegador dispone de canvas. Pendiente: render volumétrico completo, controles conducidos por Ostrin, exportación MP4/GIF/PDF, WebGPU y procedencia; la galería nativa deja ~300 asignaciones vivas al salir (textos de unidades de cantidades), la salida es correcta |
 | `Result<Void,E>` | Campo de valor de relleno (`char`) en C |
 | Migración HIR/IR | HIR cubre escalares, records, enums/match, Option/Result, colecciones, cierres y formas genéricas; la IR/C ya emite instancias concretas soportadas de funciones y métodos genéricos (incluidos casos recursivos), closures anidadas con capturas transitivas y ownership de entornos, con paridad y leak-check; records/enums genéricos aplicados y retornos complejos conservan el fallback verificado |
 | Paquetes | `--project` usa `entry`; resolución transitiva de manifiestos con alias globales sin colisión; lockfiles deterministas con rutas relativas, versión y SHA-256 de `ostrin.toml`/fuentes `.ostrin`; Git solo mediante `--fetch`, con caché local y commit resuelto; builds normales reutilizan y validan el lock, `--locked` lo exige; sin registro remoto |
@@ -282,8 +282,8 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
 convendría dividirlos; el backend nativo no comparte el sistema de tipos del checker
-(ya consume los tipos del checker y compara cada nodo; el informe actual suma **1 243 funciones
-generadas desde IR, 608 desde HIR y 1 546 en fallback AST** en los ejemplos, con un trinquete
+(ya consume los tipos del checker y compara cada nodo; el informe actual suma **1 507 funciones
+generadas desde IR, 728 desde HIR y 2 122 en fallback AST** en los ejemplos, con un trinquete
 que impide que el fallback aumente sin justificación; las familias migradas incluyen escalares,
 `String`, records concretos, `Option<Record>`, `List<T>` escalar, `Map`/`Set` escalares, `Option`
 escalar/String y patrones `Some/None`, `Float32`, enteros de ancho fijo, records, enums, `match`,
@@ -432,7 +432,7 @@ sus evidencias y validación upstream.
 
 ```powershell
 cd compiler
-    cargo test                                   # 6 diferenciales + 225 de integración + 2 unitarias
+    cargo test                                   # 6 diferenciales + 229 de integración + 2 unitarias
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```

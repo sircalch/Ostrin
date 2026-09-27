@@ -9135,6 +9135,14 @@ fn viz_violins_render_kde_shapes_and_medians() {
 }
 
 #[test]
+fn viz_hexbins_render_density_cells_and_colorbar() {
+    let out = interpreter_and_native_agree("viz_hexbin.ostrin");
+    assert_eq!(out.matches("class=\"hexbin-cell\"").count(), 18 * 14);
+    assert_eq!(out.matches("count ").count(), 18 * 14);
+    assert!(out.contains("linearGradient"), "hexbin colorbar missing");
+}
+
+#[test]
 fn viz_tables_render_headers_rows_and_tooltips() {
     let out = interpreter_and_native_agree("viz_table.ostrin");
     assert!(out.contains("<svg") && out.contains("ODE solver comparison"));

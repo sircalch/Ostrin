@@ -4,7 +4,7 @@
 // of Series) and rendered to standalone SVG by Ostrin itself, so the same
 // program draws the same bytes in the interpreter, the native backend and the
 // browser (WASM). Marks: line, scatter, area, band, error bars, bars,
-// histogram, boxplot, violin, stairs, reference lines, text, heatmap, contour, and in 3D
+// histogram, boxplot, violin, hexbin, stairs, reference lines, text, heatmap, contour, and in 3D
 // surface, wireframe, trajectory, point cloud, vector fields, volume slices and
 // isosurfaces. Axes use "nice" 1-2-5
 // ticks; quantity series label their axes with the unit they carry.
@@ -195,7 +195,7 @@ fn header(width: Int, height: Int, theme: Theme) -> String {
         // Interaction without scripts: hovering highlights a mark and its
         // <title> shows the values, wherever the SVG is opened.
         "<style>.pt:hover{stroke:" + theme.text + ";stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}" +
-        ".series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover{fill-opacity:0.42}</style>\n" +
+        ".series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover{fill-opacity:0.9}</style>\n" +
         "<rect" + attr("width", px(width)) + attr("height", px(height)) + attr("fill", theme.background) + "/>\n"
 }
 
@@ -540,6 +540,39 @@ impl Figure {
         self.add(Series { kind: s.kind, xs: s.xs, ys: s.ys, zs: s.zs, lo: array([position]), hi: array([minimum, maximum, data.percentile(50.0)]), grid: s.grid, label: s.label, color: s.color, width: 0.42, dash: "", size: s.size, colormap: s.colormap, levels: 0 })
     }
 
+    /// Color-mapped 2D density bins with hexagonal cells.
+    /// Counts are computed in Ostrin so the SVG is deterministic across backends.
+    fn hexbin(mut self, xs: Array<Float>, ys: Array<Float>, xbins: Int, ybins: Int, colormap: String = "viridis", label: String = "") -> Figure {
+        cols = if xbins < 2 { 2 } else { xbins }
+        rows = if ybins < 2 { 2 } else { ybins }
+        xmin = xs.min()
+        xmax = xs.max()
+        ymin = ys.min()
+        ymax = ys.max()
+        xspan = if xmax > xmin { xmax - xmin } else { 1.0 }
+        yspan = if ymax > ymin { ymax - ymin } else { 1.0 }
+        xwidth = xspan / (cols as Float)
+        yheight = yspan / (rows as Float)
+        mut xcenters: List<Float> = []
+        mut ycenters: List<Float> = []
+        for c in 0 until cols {
+            xcenters.push(xmin + ((c as Float) + 0.5) * xwidth)
+        }
+        for r in 0 until rows {
+            ycenters.push(ymin + ((r as Float) + 0.5) * yheight)
+        }
+        counts = zeros([rows, cols])
+        for i in 0 until xs.length() {
+            mut ix = floor((xs[i] - xmin) / xwidth) as Int
+            mut iy = floor((ys[i] - ymin) / yheight) as Int
+            ix = if ix < 0 { 0 } else if ix >= cols { cols - 1 } else { ix }
+            iy = if iy < 0 { 0 } else if iy >= rows { rows - 1 } else { iy }
+            counts.set(iy, ix, counts.get(iy, ix) + 1.0)
+        }
+        self.colorbar = label
+        self.add(Series { kind: "hexbin", xs: array(xcenters), ys: array(ycenters), zs: empty(), lo: array([xmin, xmax]), hi: array([ymin, ymax]), grid: counts, label: label, color: "", width: 0.8, dash: "", size: 0.0, colormap: colormap, levels: 0 })
+    }
+
     fn hline(mut self, y: Float, label: String = "", color: String = "") -> Figure {
         self.add(series("hline", array([0.0]), array([y]), label, color))
     }
@@ -627,7 +660,7 @@ fn axis_title(name: String, unit_name: String) -> String {
 }
 
 fn is_grid(kind: String) -> Bool {
-    kind == "heatmap" or kind == "contour"
+    kind == "heatmap" or kind == "contour" or kind == "hexbin"
 }
 
 fn render(fig: Figure) -> String {
@@ -676,6 +709,11 @@ fn render(fig: Figure) -> String {
             violin_centers.push(s.lo[0])
             ys_lo = min_of(ys_lo, s.xs.min())
             ys_hi = max_of(ys_hi, s.xs.max())
+        } else if s.kind == "hexbin" {
+            xs_lo = min_of(xs_lo, s.lo[0])
+            xs_hi = max_of(xs_hi, s.lo[1])
+            ys_lo = min_of(ys_lo, s.hi[0])
+            ys_hi = max_of(ys_hi, s.hi[1])
         } else if s.xs.length() > 0 {
             half = if s.kind == "hist" { s.width / 2.0 } else if s.kind == "bar" { min_gap(s.xs) / 2.0 } else { 0.0 }
             xs_lo = if s.xs.min() - half < xs_lo { s.xs.min() - half } else { xs_lo }
@@ -689,7 +727,7 @@ fn render(fig: Figure) -> String {
             has_grid = true
             zlo = if s.grid.min() < zlo { s.grid.min() } else { zlo }
             zhi = if s.grid.max() > zhi { s.grid.max() } else { zhi }
-            if s.kind == "heatmap" {
+            if s.kind == "heatmap" or s.kind == "hexbin" {
                 heat_map = s.colormap
             }
         }
@@ -731,7 +769,7 @@ fn render(fig: Figure) -> String {
     y0 = if fig.yfixed { fig.y0 } else if has_bars and ys_lo == 0.0 { 0.0 } else { ys_lo - ypad }
     y1 = if fig.yfixed { fig.y1 } else { ys_hi + ypad }
 
-    heat = fig.series.any(fn(s) { s.kind == "heatmap" })
+    heat = fig.series.any(fn(s) { is_grid(s.kind) })
     left = 66.0
     right = w - (if heat { 86.0 } else { 20.0 })
     top = if fig.subtitle != "" { 62.0 } else { 44.0 }
@@ -988,6 +1026,8 @@ fn draw_series(s: Series, color: String, left: Float, bottom: Float, x0: Float, 
         draw_heatmap(s, left, bottom, x0, y0, sx, sy, zlo, zhi)
     } else if kind == "contour" {
         draw_contour(s, color, left, bottom, x0, y0, sx, sy, theme)
+    } else if kind == "hexbin" {
+        draw_hexbin(s, left, bottom, x0, y0, sx, sy, zlo, zhi, theme)
     } else {
         ""
     }
@@ -1072,6 +1112,32 @@ fn draw_contour(s: Series, color: String, left: Float, bottom: Float, x0: Float,
         out.push("<path" + attr("d", d.join(" ")) + attr("fill", "none") + attr("stroke", stroke) + attr("stroke-width", num(s.width)) + attr("stroke-linecap", "round") + "/>")
     }
     out.join("")
+}
+
+fn draw_hexbin(s: Series, left: Float, bottom: Float, x0: Float, y0: Float, sx: Float, sy: Float, zlo: Float, zhi: Float, theme: Theme) -> String {
+    shape = s.grid.shape()
+    rows = shape[0]
+    cols = shape[1]
+    dx = (s.xs[1] - s.xs[0]) * sx
+    dy = (s.ys[1] - s.ys[0]) * sy
+    span = if zhi > zlo { zhi - zlo } else { 1.0 }
+    mut cells: List<String> = []
+    for r in 0 until rows {
+        for c in 0 until cols {
+            value = s.grid.get(r, c)
+            x = left + (s.xs[c] - x0) * sx
+            y = bottom - (s.ys[r] - y0) * sy
+            points = num(x - dx * 0.5) + "," + num(y) + " " +
+                num(x - dx * 0.25) + "," + num(y - dy * 0.5) + " " +
+                num(x + dx * 0.25) + "," + num(y - dy * 0.5) + " " +
+                num(x + dx * 0.5) + "," + num(y) + " " +
+                num(x + dx * 0.25) + "," + num(y + dy * 0.5) + " " +
+                num(x - dx * 0.25) + "," + num(y + dy * 0.5)
+            opacity = 0.14 + 0.76 * ((value - zlo) / span)
+            cells.push("<polygon class=\"hexbin-cell\"" + attr("points", points) + attr("fill", colormap(s.colormap, (value - zlo) / span, 1.0)) + attr("fill-opacity", num(opacity)) + attr("stroke", theme.background) + attr("stroke-width", num(s.width)) + ">" + tip(named(s.label) + "count " + short(value)) + "</polygon>")
+        }
+    }
+    "<g>" + cells.join("") + "</g>"
 }
 
 fn legend(fig: Figure, left: Float, right: Float, top: Float, bottom: Float, x0: Float, y0: Float, sx: Float, sy: Float, theme: Theme) -> String {

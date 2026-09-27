@@ -1,5 +1,5 @@
 <svg data-ostrin-motion="true" xmlns="http://www.w3.org/2000/svg" width="560" height="560" viewBox="0 0 560 560" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
-<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover{fill-opacity:0.42}</style>
+<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover{fill-opacity:0.9}</style>
 <rect width="560" height="560" fill="#ffffff"/>
 
 <style>@media (prefers-reduced-motion:reduce){[data-ostrin-motion] animate{display:none!important}}</style>

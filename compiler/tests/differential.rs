@@ -450,7 +450,9 @@ fn native_backend_types_agree_with_the_checker() {
     // the AST path until aggregate-heavy visualization code moves into IR.
     // Violins add 116 more: KDE loops and mirrored SVG paths remain on the AST
     // path until aggregate-heavy visualization code moves into IR.
-    const MAX_AST_FALLBACK_FUNCTIONS: usize = 2002;
+    // Hexbins add 120 more: bivariate binning and polygon/colorbar SVG strings
+    // remain on the AST path until aggregate-heavy visualization code moves into IR.
+    const MAX_AST_FALLBACK_FUNCTIONS: usize = 2122;
     assert!(
         ast_fallback <= MAX_AST_FALLBACK_FUNCTIONS,
         "AST fallback grew to {ast_fallback} functions (ratchet limit {MAX_AST_FALLBACK_FUNCTIONS})"
