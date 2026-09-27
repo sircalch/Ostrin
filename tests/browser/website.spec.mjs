@@ -142,6 +142,8 @@ test("Scientific Lab recomputes its demos with the real compiler", async ({ page
   await page.locator('[data-lab-run="linear-algebra"]').click();
   await expect(page.locator('[data-lab-provenance="linear-algebra"]')).toHaveAttribute("data-state", "live", { timeout: 30_000 });
   await expect(page.locator("#lab-panel-linear-algebra .sl-raw pre")).toContainText("QR residual = 0");
+  await expect(page.locator("#lab-panel-linear-algebra .sl-raw pre")).toContainText("Cholesky residual = 0");
+  await expect(page.locator("#lab-panel-linear-algebra .sl-raw pre")).toContainText("Cholesky solve residual = 0");
   await page.getByRole("tab", { name: "Complex" }).click();
   await expect(page.locator("#lab-panel-complex .sl-raw pre")).toContainText("magnitude = 2");
   await page.locator('[data-lab-run="complex"]').click();

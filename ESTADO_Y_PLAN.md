@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-27 · rama `main` · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 234 de integración y 2 unitarias en verde.*
+*Corte: 2026-09-27 · rama `main` · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 235 de integración y 2 unitarias en verde.*
 
 Validación remota: Pages, CI, CodeQL y auditoría de seguridad pasaron para `6dba35a` en Windows, Linux, macOS y web. La
 compuerta oficial exige `cargo fmt --check`, Clippy con el lint `suspicious`, la suite del
@@ -100,8 +100,9 @@ escapes complejos conservan el fallback verificado.
 galería `website/viz.html` y las pestañas Plot/3D del Lab las ejecutan en el navegador.
 
 **Métodos numéricos**: `std.numeric` (documento 24) resuelve raíces, integrales, derivadas, mínimos,
-interpolación (lineal y spline cúbico), ODEs (`rk4`, `rk45` adaptativo), QR denso (`Q`, `R`, residual y
-ortogonalidad) y FFT, escrito en Ostrin; las pestañas ODE, Linear Algebra y Complex del Lab lo ejecutan en el navegador.
+interpolación (lineal y spline cúbico), ODEs (`rk4`, `rk45` adaptativo), QR denso, Cholesky (`L`,
+reconstrucción y resolución triangular) y FFT, escrito en Ostrin; las pestañas ODE, Linear Algebra y
+Complex del Lab lo ejecutan en el navegador.
 
 **Numérico/científico**: literales científicos (`6.022e23`), enteros de ancho fijo, `Float32`, `Array<T>` (difusión, máscaras,
 rebanadas, `@`), estadística, regresión, `det/inv/eigvals/norm`, `Rng` reproducible,
@@ -158,9 +159,9 @@ por separado en `--native-type-report` como `ir-generated`; el mismo informe exp
 `hir-generated` y `ast-fallback` para que la retirada del backend legado tenga un contador
 visible. También publica líneas `native-source` agrupadas por archivo para localizar la deuda
 por módulo; la prueba diferencial comprueba que sus sumas coinciden con el total. En el corte
-actual, la suite de ejemplos suma 1 873 funciones IR, 1 139 HIR y 2 789 que aún caen al emisor
-AST; `native_backend_types_agree_with_the_checker` mantiene 2 789 como trinquete temporal: las
-superficies `std.viz.boxplot`, `std.viz.violin`, `std.viz.hexbin`, `std.viz.contourf`, `std.viz.quiver`, `std.viz.streamplot`, `std.viz.table` y `std.viz.vector_field`, junto con `std.numeric.Complex`, añaden funciones AST
+actual, la suite de ejemplos suma 1 884 funciones IR, 1 148 HIR y 2 856 que aún caen al emisor
+AST; `native_backend_types_agree_with_the_checker` mantiene 2 856 como trinquete temporal: las
+superficies `std.viz.boxplot`, `std.viz.violin`, `std.viz.hexbin`, `std.viz.contourf`, `std.viz.quiver`, `std.viz.streamplot`, `std.viz.table` y `std.viz.vector_field`, junto con `std.numeric.qr`, `std.numeric.Cholesky` y `std.numeric.Complex`, añaden funciones AST
 compartidas por sus consumidores y deben migrarse en la siguiente pasada. Los marcadores de ownership de
 `String`, `List<T>`, los núcleos escalares de `Map<K,V>`/`Set<T>` y `Option<T>` con payload
 escalar o `String` también se consumen al generar C; `Map.get/remove` producen structs
@@ -283,8 +284,8 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
 convendría dividirlos; el backend nativo no comparte el sistema de tipos del checker
-(ya consume los tipos del checker y compara cada nodo; el informe actual suma **1 873 funciones
-generadas desde IR, 1 139 desde HIR y 2 789 en fallback AST** en los ejemplos, con un trinquete
+(ya consume los tipos del checker y compara cada nodo; el informe actual suma **1 884 funciones
+generadas desde IR, 1 148 desde HIR y 2 856 en fallback AST** en los ejemplos, con un trinquete
 que impide que el fallback aumente sin justificación; las familias migradas incluyen escalares,
 `String`, records concretos, `Option<Record>`, `List<T>` escalar, `Map`/`Set` escalares, `Option`
 escalar/String y patrones `Some/None`, `Float32`, enteros de ancho fijo, records, enums, `match`,
@@ -433,7 +434,7 @@ sus evidencias y validación upstream.
 
 ```powershell
 cd compiler
-    cargo test                                   # 6 diferenciales + 234 de integración + 2 unitarias
+    cargo test                                   # 6 diferenciales + 235 de integración + 2 unitarias
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```

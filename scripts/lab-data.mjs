@@ -70,13 +70,13 @@ export const LAB = [
   {
     id: "linear-algebra",
     title: "Linear Algebra",
-    headline: "Solve a spring system, find its normal modes and factor it with QR.",
+    headline: "Solve a spring system, find its normal modes and factor it with QR and Cholesky.",
     file: "examples/lab_linear_algebra.ostrin",
     render: "text",
     params: [{ name: "coupling", label: "Spring coupling", min: 0.25, max: 4, step: 0.25 }],
-    how: "The stiffness matrix is an Array<Float>; det, solve, norm, @ and eigvals are compiler built-ins. std.numeric.qr adds a modified Gram–Schmidt factorization with explicit Q/R diagnostics, and all paths produce the same result in the interpreter, native C and browser.",
+    how: "The stiffness matrix is an Array<Float>; det, solve, norm, @ and eigvals are compiler built-ins. std.numeric.qr adds a modified Gram–Schmidt factorization with explicit Q/R diagnostics, while std.numeric.cholesky adds a symmetric positive-definite factor and triangular solve. All paths produce the same result in the interpreter, native C and browser.",
     docs: { label: "numeric hierarchy and arrays", href: `${repository}/blob/main/docs/design/19-jerarquia-numerica-y-arrays.md` },
-    limits: "Dense real matrices only; eigenvalues are computed for symmetric matrices and QR currently requires full column rank. LU, SVD, sparse and complex linear algebra remain on the roadmap.",
+    limits: "Dense real matrices only; eigenvalues are computed for symmetric matrices, QR currently requires full column rank and Cholesky requires a symmetric positive-definite matrix. LU, SVD, sparse and complex linear algebra remain on the roadmap.",
   },
   {
     id: "complex",

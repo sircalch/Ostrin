@@ -1,5 +1,5 @@
 // Scientific Lab · Linear Algebra
-// Three masses joined by springs: solve, normal modes and a QR factorization.
+// Three masses joined by springs: solve, normal modes, QR and Cholesky factorizations.
 import std.numeric
 
 fn clean(x: Float) -> Float {
@@ -39,5 +39,15 @@ fn main() -> Void {
             print("Q orthogonality = " + clean(factors.orthogonality()).to_string())
         },
         Err(message) => print("QR error: " + message),
+    }
+
+    positive = numeric.cholesky(k)
+    match positive {
+        Ok(factors) => {
+            print("Cholesky residual = " + clean(norm(factors.reconstruct() - k)).to_string())
+            cholesky_solution = factors.solve(force)
+            print("Cholesky solve residual = " + clean(norm(k @ cholesky_solution - force)).to_string())
+        },
+        Err(message) => print("Cholesky error: " + message),
     }
 }

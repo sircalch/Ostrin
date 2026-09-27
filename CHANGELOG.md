@@ -10,6 +10,12 @@
 - Complex arrays, generic `Complex<T>` promotion and complex matrix decompositions remain clearly
   marked as future work; the FFT's existing real/imaginary `Spectrum` API is unchanged.
 
+### Scientific core: Cholesky factorization
+- `std.numeric.cholesky` now factors dense symmetric positive-definite real matrices into a lower
+  triangular `L`, with reconstruction and triangular solves.
+- The interpreter/native/WASM parity suite, invalid-matrix diagnostic and Scientific Lab Linear
+  Algebra demo cover the new API alongside QR.
+
 ### Visualization: publication-quality animation export
 - WebM and GIF exports now accept an accessible 1×/2× quality selector. The browser renders the
   selected frame sequence at the requested canvas resolution, names scaled artifacts explicitly
