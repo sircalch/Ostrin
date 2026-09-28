@@ -9462,9 +9462,9 @@ fn std_numeric_cholesky_matches_interpreter_and_native() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/numeric.ostrin "))
         .unwrap_or_else(|| panic!("missing std.numeric source report: {report_text}"));
     assert!(
-        numeric_source.contains("ir=20")
+        numeric_source.contains("ir=22")
             && numeric_source.contains("hir=9")
-            && numeric_source.contains("ast=35"),
+            && numeric_source.contains("ast=36"),
         "numeric linear algebra regression in native lowering: {numeric_source}"
     );
 }
@@ -9499,10 +9499,42 @@ fn std_numeric_svd_matches_interpreter_and_native() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/numeric.ostrin "))
         .unwrap_or_else(|| panic!("missing std.numeric source report: {report_text}"));
     assert!(
-        numeric_source.contains("ir=20")
+        numeric_source.contains("ir=22")
             && numeric_source.contains("hir=9")
-            && numeric_source.contains("ast=35"),
+            && numeric_source.contains("ast=36"),
         "numeric SVD lowering report changed unexpectedly: {numeric_source}"
+    );
+}
+
+#[test]
+fn std_numeric_eigen_matches_interpreter_and_native() {
+    assert_eq!(
+        interpreter_and_native_agree("numeric_eigen.ostrin"),
+        "eigenvalues =\n[1, 3]\neigenvectors =\n[[0.7071, 0.7071], [-0.7071, 0.7071]]\nreconstruction residual = 0\nnonsymmetric input = eigen needs a symmetric matrix\nnonsquare input = eigen needs a square matrix\n"
+    );
+
+    let report = run(&[
+        "--native-type-report",
+        &example_path("numeric_eigen.ostrin"),
+    ]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "numeric eigen type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    let numeric_source = report_text
+        .lines()
+        .find(|line| line.starts_with("native-source: <ostrin-std>/numeric.ostrin "))
+        .unwrap_or_else(|| panic!("missing std.numeric source report: {report_text}"));
+    assert!(
+        numeric_source.contains("ir=22")
+            && numeric_source.contains("hir=9")
+            && numeric_source.contains("ast=36"),
+        "numeric eigen lowering report changed unexpectedly: {numeric_source}"
     );
 }
 

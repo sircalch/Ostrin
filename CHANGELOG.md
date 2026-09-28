@@ -30,6 +30,13 @@
   fallbacks, and the condition-number method adds 14 more to the current ratchet until records
   and arrays complete their IR ownership lowering.
 
+### Scientific core: symmetric eigenpairs
+- `std.numeric.eigen` now exposes ascending eigenvalues and orthonormal eigenvectors for dense real
+  symmetric matrices, with reconstruction and explicit shape/symmetry diagnostics. The new
+  `numeric_eigen.ostrin` example and Linear Algebra Lab output verify interpreter/native/WASM parity.
+  The aggregate implementation adds 52 measured AST fallbacks until records and arrays complete
+  their IR ownership lowering.
+
 ### Scientific core: experimental complex numbers
 - `std.numeric` now exposes a `Complex` record backed by `Float64`, with rectangular and polar
   constructors, conjugation, magnitude, equality, overloaded arithmetic, reflected scalar

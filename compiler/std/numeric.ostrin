@@ -540,6 +540,87 @@ fn eigen_order(values: Array<Float>, count: Int) -> List<Int> {
     order
 }
 
+/// Select the smallest eigenvalues first, with a stable index tie-break.
+fn eigen_order_ascending(values: Array<Float>, count: Int) -> List<Int> {
+    n = values.length()
+    mut used: List<Bool> = []
+    for i in 0 until n {
+        used.push(false)
+    }
+    mut order: List<Int> = []
+    for rank_index in 0 until count {
+        mut best = -1
+        mut best_value = 0.0
+        for i in 0 until n {
+            if not used[i] and (best < 0 or values[i] < best_value) {
+                best = i
+                best_value = values[i]
+            }
+        }
+        if best >= 0 {
+            order.push(best)
+            used = mark_used(used, best)
+        }
+    }
+    order
+}
+
+/// Eigenvalues and orthonormal eigenvectors of a dense real symmetric matrix.
+/// Eigenvalues are ascending and eigenvectors are stored as columns.
+pub record Eigen {
+    values: Array<Float>
+    vectors: Array<Float>
+}
+
+impl Eigen {
+    /// Reconstruct the symmetric matrix from `V * diag(values) * Vᵀ`.
+    fn reconstruct(self) -> Array<Float> {
+        n = self.values.length()
+        mut out = zeros([n, n])
+        for i in 0 until n {
+            for j in 0 until n {
+                mut value = 0.0
+                for k in 0 until n {
+                    value = value + self.vectors.get(i, k) * self.values[k] * self.vectors.get(j, k)
+                }
+                out.set(i, j, value)
+            }
+        }
+        out
+    }
+}
+
+/// Eigenpairs for a dense real symmetric matrix, ordered by ascending value.
+pub fn eigen(a: Array<Float>, tol: Float = 1e-12) -> Result<Eigen, String> {
+    shape = a.shape()
+    if shape.length() != 2 or shape[0] != shape[1] {
+        return Err("eigen needs a square matrix")
+    }
+    n = shape[0]
+    if n < 1 {
+        return Err("eigen needs a non-empty matrix")
+    }
+    for i in 0 until n {
+        for j in i + 1 until n {
+            if abs(a.get(i, j) - a.get(j, i)) > tol {
+                return Err("eigen needs a symmetric matrix")
+            }
+        }
+    }
+    raw = symmetric_eigen(a)
+    order = eigen_order_ascending(raw.values, n)
+    mut values = zeros([n])
+    mut vectors = zeros([n, n])
+    for column in 0 until n {
+        index = order[column]
+        values.set(column, raw.values[index])
+        for row in 0 until n {
+            vectors.set(row, column, raw.vectors.get(row, index))
+        }
+    }
+    Ok(Eigen { values: values, vectors: vectors })
+}
+
 /// Thin real singular value decomposition `A = U * diag(s) * Vᵀ`.
 ///
 /// The implementation diagonalizes `AᵀA` with deterministic Jacobi rotations.
