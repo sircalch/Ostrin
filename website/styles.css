@@ -224,11 +224,11 @@ h4 { font-size: .86rem; }
 .filter-button { padding: 8px 12px; border: 1px solid var(--line); border-radius: 3px; background: transparent; color: var(--muted); cursor: pointer; font: .67rem var(--mono); text-transform: uppercase; letter-spacing: .06em; }
 .filter-button:hover, .filter-button.active { border-color: var(--violet); color: var(--white); background: rgba(118, 92, 255, .1); }
 .example-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); }
-.example-card { min-height: 215px; padding: 24px; background: var(--night-2); transition: background 160ms ease; }
+.example-card { min-width: 0; min-height: 215px; padding: 24px; background: var(--night-2); transition: background 160ms ease; }
 .example-card:hover { background: #141824; }
 .example-card.is-hidden { display: none; }
 .example-card .example-tag { color: var(--violet); font: .64rem var(--mono); letter-spacing: .08em; text-transform: uppercase; }
-.example-card h3 { margin: 37px 0 9px; font-size: 1rem; }
+.example-card h3 { margin: 37px 0 9px; font-size: 1rem; overflow-wrap: anywhere; }
 .example-card p { min-height: 43px; margin: 0; color: var(--muted); font-size: .82rem; }
 .example-card .example-link { display: inline-flex; gap: 7px; margin-top: 20px; color: var(--violet-2); font-size: .76rem; }
 .live-examples { margin-top: 110px; padding-top: 80px; border-top: 1px solid var(--line); }
