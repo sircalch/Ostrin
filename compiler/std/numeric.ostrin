@@ -443,6 +443,220 @@ pub fn cholesky(a: Array<Float>, tol: Float = 1e-12) -> Result<Cholesky, String>
     Ok(Cholesky { l: l })
 }
 
+// ---------------------------------------------------------------- singular value decomposition
+
+record SymmetricEigen {
+    values: Array<Float>
+    vectors: Array<Float>
+}
+
+fn mark_used(flags: List<Bool>, index: Int) -> List<Bool> {
+    mut out: List<Bool> = []
+    for i in 0 until flags.length() {
+        out.push(if i == index { true } else { flags[i] })
+    }
+    out
+}
+
+/// Eigenpairs of a real symmetric matrix by cyclic Jacobi rotations.
+/// Eigenvectors are stored as columns and the fixed iteration order keeps the
+/// interpreter, native compiler and browser on the same deterministic path.
+fn symmetric_eigen(input: Array<Float>) -> SymmetricEigen {
+    n = input.shape()[0]
+    mut matrix = zeros([n, n])
+    for i in 0 until n {
+        for j in 0 until n {
+            matrix.set(i, j, input.get(i, j))
+        }
+    }
+    mut vectors = eye(n)
+    for sweep in 0 until 100 {
+        mut rotated = false
+        for p in 0 until n {
+            for q in p + 1 until n {
+                apq = matrix.get(p, q)
+                if abs(apq) <= 1e-15 * (abs(matrix.get(p, p)) + abs(matrix.get(q, q))) {
+                    continue
+                }
+                rotated = true
+                theta = (matrix.get(q, q) - matrix.get(p, p)) / (2.0 * apq)
+                sign = if theta < 0.0 { -1.0 } else { 1.0 }
+                t = sign / (abs(theta) + sqrt(theta * theta + 1.0))
+                c = 1.0 / sqrt(t * t + 1.0)
+                s = t * c
+                for k in 0 until n {
+                    akp = matrix.get(k, p)
+                    akq = matrix.get(k, q)
+                    matrix.set(k, p, c * akp - s * akq)
+                    matrix.set(k, q, s * akp + c * akq)
+                }
+                for k in 0 until n {
+                    apk = matrix.get(p, k)
+                    aqk = matrix.get(q, k)
+                    matrix.set(p, k, c * apk - s * aqk)
+                    matrix.set(q, k, s * apk + c * aqk)
+                }
+                for k in 0 until n {
+                    vkp = vectors.get(k, p)
+                    vkq = vectors.get(k, q)
+                    vectors.set(k, p, c * vkp - s * vkq)
+                    vectors.set(k, q, s * vkp + c * vkq)
+                }
+            }
+        }
+        if not rotated {
+            break
+        }
+    }
+    mut values = zeros([n])
+    for i in 0 until n {
+        values.set(i, matrix.get(i, i))
+    }
+    SymmetricEigen { values: values, vectors: vectors }
+}
+
+/// Select the largest eigenvalues first, with a stable index tie-break.
+fn eigen_order(values: Array<Float>, count: Int) -> List<Int> {
+    n = values.length()
+    mut used: List<Bool> = []
+    for i in 0 until n {
+        used.push(false)
+    }
+    mut order: List<Int> = []
+    for rank_index in 0 until count {
+        mut best = -1
+        mut best_value = -1.0
+        for i in 0 until n {
+            if not used[i] and values[i] > best_value {
+                best = i
+                best_value = values[i]
+            }
+        }
+        if best >= 0 {
+            order.push(best)
+            used = mark_used(used, best)
+        }
+    }
+    order
+}
+
+/// Thin real singular value decomposition `A = U * diag(s) * Vᵀ`.
+///
+/// The implementation diagonalizes `AᵀA` with deterministic Jacobi rotations.
+/// It is intended for dense scientific examples and diagnostics; large or
+/// ill-conditioned production workloads should eventually use a LAPACK FFI.
+pub record Svd {
+    u: Array<Float>
+    s: Array<Float>
+    vt: Array<Float>
+}
+
+impl Svd {
+    /// Reconstruct the input matrix from the thin factors.
+    fn reconstruct(self) -> Array<Float> {
+        m = self.u.shape()[0]
+        r = self.s.length()
+        n = self.vt.shape()[1]
+        mut out = zeros([m, n])
+        for i in 0 until m {
+            for j in 0 until n {
+                mut value = 0.0
+                for k in 0 until r {
+                    value = value + self.u.get(i, k) * self.s[k] * self.vt.get(k, j)
+                }
+                out.set(i, j, value)
+            }
+        }
+        out
+    }
+
+    /// Number of singular values above `tol`.
+    fn rank(self, tol: Float = 1e-12) -> Int {
+        mut count = 0
+        for i in 0 until self.s.length() {
+            if self.s[i] > tol {
+                count = count + 1
+            }
+        }
+        count
+    }
+
+    /// Least-squares or minimum-norm solution using the pseudoinverse.
+    /// `rhs` must be a vector with one entry per matrix row.
+    fn solve(self, rhs: Array<Float>, tol: Float = 1e-12) -> Array<Float> {
+        m = self.u.shape()[0]
+        n = self.vt.shape()[1]
+        r = self.s.length()
+        mut projected = zeros([r])
+        for i in 0 until r {
+            mut value = 0.0
+            for k in 0 until m {
+                value = value + self.u.get(k, i) * rhs[k]
+            }
+            projected.set(i, if self.s[i] > tol { value / self.s[i] } else { 0.0 })
+        }
+        mut solution = zeros([n])
+        for j in 0 until n {
+            mut value = 0.0
+            for i in 0 until r {
+                value = value + self.vt.get(i, j) * projected[i]
+            }
+            solution.set(j, value)
+        }
+        solution
+    }
+}
+
+/// Dense real thin SVD. Singular values are returned in descending order.
+pub fn svd(a: Array<Float>, tol: Float = 1e-12) -> Result<Svd, String> {
+    shape = a.shape()
+    if shape.length() != 2 {
+        return Err("svd needs a two-dimensional matrix")
+    }
+    m = shape[0]
+    n = shape[1]
+    if m < 1 or n < 1 {
+        return Err("svd needs a non-empty matrix")
+    }
+    r = if m < n { m } else { n }
+    // Form AᵀA with scalar reads so this routine does not consume the input
+    // array through a native matrix-multiply temporary.
+    mut gram = zeros([n, n])
+    for i in 0 until n {
+        for j in 0 until n {
+            mut value = 0.0
+            for k in 0 until m {
+                value = value + a.get(k, i) * a.get(k, j)
+            }
+            gram.set(i, j, value)
+        }
+    }
+    eigen = symmetric_eigen(gram)
+    order = eigen_order(eigen.values, r)
+    mut u = zeros([m, r])
+    mut vt = zeros([r, n])
+    mut singular: List<Float> = []
+    for column in 0 until r {
+        index = order[column]
+        lambda = eigen.values[index]
+        sigma = sqrt(if lambda > 0.0 { lambda } else { 0.0 })
+        singular.push(sigma)
+        for j in 0 until n {
+            vt.set(column, j, eigen.vectors.get(j, index))
+        }
+        if sigma > tol {
+            for i in 0 until m {
+                mut value = 0.0
+                for j in 0 until n {
+                    value = value + a.get(i, j) * vt.get(column, j)
+                }
+                u.set(i, column, value / sigma)
+            }
+        }
+    }
+    Ok(Svd { u: u, s: array(singular), vt: vt })
+}
+
 /// A partial-pivoting LU factorization of a dense square matrix: `P A = L U`.
 ///
 /// `p[i]` is the source row of row `i` after the pivot permutations. Keeping

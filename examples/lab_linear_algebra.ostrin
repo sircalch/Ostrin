@@ -1,5 +1,5 @@
 // Scientific Lab · Linear Algebra
-// Three masses joined by springs: solve, normal modes, LU, QR and Cholesky factorizations.
+// Three masses joined by springs: solve, normal modes, LU, QR, SVD and Cholesky factorizations.
 import std.numeric
 
 fn clean(x: Float) -> Float {
@@ -50,6 +50,19 @@ fn main() -> Void {
             print("Q orthogonality = " + clean(factors.orthogonality()).to_string())
         },
         Err(message) => print("QR error: " + message),
+    }
+
+    singular = numeric.svd(k)
+    match singular {
+        Ok(factors) => {
+            print("SVD singular values:")
+            print(round(factors.s * 10000.0) / 10000.0)
+            print("SVD rank = " + factors.rank().to_string())
+            print("SVD reconstruction residual = " + clean(norm(factors.reconstruct() - k)).to_string())
+            svd_solution = factors.solve(clone(force))
+            print("SVD solve residual = " + clean(norm(k @ svd_solution - force)).to_string())
+        },
+        Err(message) => print("SVD error: " + message),
     }
 
     positive = numeric.cholesky(k)

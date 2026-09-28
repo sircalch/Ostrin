@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-27 · rama `main` · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 237 de integración y 2 unitarias en verde.*
+*Corte: 2026-09-27 · rama `codex/numeric-svd` · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 238 de integración y 2 unitarias en verde.*
 
 Validación remota: Pages, CI, CodeQL y auditoría de seguridad pasaron para `aef63a8` (PR #63, LU con pivoteo parcial) en Windows, Linux, macOS y web. La
 compuerta oficial exige `cargo fmt --check`, Clippy con el lint `suspicious`, la suite del
@@ -101,12 +101,12 @@ galería `website/viz.html` y las pestañas Plot/3D del Lab las ejecutan en el n
 
 **Métodos numéricos**: `std.numeric` (documento 24) resuelve raíces, integrales, derivadas, mínimos,
 interpolación (lineal y spline cúbico), ODEs (`rk4`, `rk45` adaptativo), LU con pivoteo parcial, QR denso,
-Cholesky (`L`, reconstrucción y resolución triangular) y FFT, escrito en Ostrin; las pestañas ODE, Linear Algebra y
+SVD fina (`U`, `s`, `Vᵀ`, rango y pseudoinversa), Cholesky (`L`, reconstrucción y resolución triangular) y FFT, escrito en Ostrin; las pestañas ODE, Linear Algebra y
 Complex del Lab lo ejecutan en el navegador.
 
 **Numérico/científico**: literales científicos (`6.022e23`), enteros de ancho fijo, `Float32`, `Array<T>` (difusión, máscaras,
 rebanadas, `@`), estadística, regresión, `det/inv/eigvals/norm`, `Rng` reproducible,
-funciones elementales deterministas (idénticas en intérprete y nativo), LU/QR/Cholesky verificables y `std.numeric.Complex`
+funciones elementales deterministas (idénticas en intérprete y nativo), LU/QR/SVD/Cholesky verificables y `std.numeric.Complex`
 experimental con operaciones aritméticas, forma polar, conjugado, magnitud y potencias enteras.
 Los constructores `zeros`/`ones`, `norm`, `abs` escalar y `sqrt` también tienen lowering IR/C
 tipado; QR y Cholesky usan esos lowering sin caer al AST en sus consumidores medidos, mientras LU
@@ -162,12 +162,12 @@ por separado en `--native-type-report` como `ir-generated`; el mismo informe exp
 `hir-generated` y `ast-fallback` para que la retirada del backend legado tenga un contador
 visible. También publica líneas `native-source` agrupadas por archivo para localizar la deuda
 por módulo; la prueba diferencial comprueba que sus sumas coinciden con el total. En el corte
-actual, la suite de ejemplos suma 2 261 funciones IR, 1 157 HIR y 2 576 que aún caen al emisor
-AST; `native_backend_types_agree_with_the_checker` mantiene 2 576 como trinquete temporal.
+actual, la suite de ejemplos suma 2 320 funciones IR, 1 166 HIR y 2 664 que aún caen al emisor
+AST; `native_backend_types_agree_with_the_checker` mantiene 2 664 como trinquete temporal.
 El puente IR de `zeros`/`ones`, `norm`, `abs` escalar y `sqrt` redujo el fallback en 348 funciones;
 QR y Cholesky ya se emiten desde IR/C; al sumar LU, `std.numeric` queda medido en `ir=17`, `hir=9`, `ast=30`
-por consumidor. Las cuatro funciones de LU basadas en records agregan 68 fallbacks medidos y quedan
-registradas como deuda explícita para la migración de agregados. Las superficies `std.viz.boxplot`, `std.viz.violin`, `std.viz.hexbin`,
+por consumidor. Las cuatro funciones de LU basadas en records agregan 68 fallbacks medidos y SVD agrega 88 más;
+ambas cifras quedan registradas como deuda explícita para la migración de agregados. Las superficies `std.viz.boxplot`, `std.viz.violin`, `std.viz.hexbin`,
 `std.viz.contourf`, `std.viz.quiver`, `std.viz.streamplot`, `std.viz.table` y
 `std.viz.vector_field`, además de funciones numéricas auxiliares y agregados SVG, siguen
 compartiendo funciones AST y forman la siguiente deuda verificable. Los marcadores de ownership de
@@ -292,8 +292,8 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
 convendría dividirlos; el backend nativo no comparte el sistema de tipos del checker
-(ya consume los tipos del checker y compara cada nodo; el informe actual suma **2 261 funciones
-generadas desde IR, 1 157 desde HIR y 2 576 en fallback AST** en los ejemplos, con un trinquete
+(ya consume los tipos del checker y compara cada nodo; el informe actual suma **2 320 funciones
+generadas desde IR, 1 166 desde HIR y 2 664 en fallback AST** en los ejemplos, con un trinquete
 que impide que el fallback aumente sin justificación; las familias migradas incluyen escalares,
 `String`, records concretos, `Option<Record>`, `List<T>` escalar, `Map`/`Set` escalares, `Option`
 escalar/String y patrones `Some/None`, `Float32`, enteros de ancho fijo, records, enums, `match`,
@@ -442,7 +442,7 @@ sus evidencias y validación upstream.
 
 ```powershell
 cd compiler
-    cargo test                                   # 6 diferenciales + 237 de integración + 2 unitarias
+    cargo test                                   # 6 diferenciales + 238 de integración + 2 unitarias
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```

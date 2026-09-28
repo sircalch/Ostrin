@@ -15,10 +15,18 @@
   permutation, determinant, reconstruction and triangular solves. Singular and nonsquare inputs
   return `Result<Lu, String>` diagnostics.
 - `numeric_lu.ostrin` compares interpreter and native output, while the Scientific Lab's Linear
-  Algebra demo now records LU residuals alongside QR and Cholesky. SVD, sparse and complex matrix
-  decompositions remain future work. The four aggregate-heavy LU methods add 68 measured AST
-  fallbacks across existing numeric consumers; the differential ratchet records this allowance
-  explicitly for the next aggregate migration.
+  Algebra demo now records LU residuals alongside QR and Cholesky. The four aggregate-heavy LU
+  methods add 68 measured AST fallbacks across existing numeric consumers; the differential ratchet
+  records this allowance explicitly for the next aggregate migration.
+
+### Scientific core: thin SVD
+- `std.numeric.svd` now provides a dense real thin singular value decomposition with descending
+  singular values, reconstruction, rank and least-squares/minimum-norm solving through the
+  pseudoinverse. It uses deterministic Jacobi rotations of `AᵀA`, with a documented LAPACK FFI
+  path reserved for large or ill-conditioned workloads.
+- `numeric_svd.ostrin` and the Scientific Lab verify interpreter/native/WASM parity, including a
+  rank-deficient input diagnostic path. The aggregate SVD implementation adds 88 measured AST
+  fallbacks to the current ratchet until records and arrays complete their IR ownership lowering.
 
 ### Scientific core: experimental complex numbers
 - `std.numeric` now exposes a `Complex` record backed by `Float64`, with rectangular and polar

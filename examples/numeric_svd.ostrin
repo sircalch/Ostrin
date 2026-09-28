@@ -1,0 +1,39 @@
+// std.numeric: dense real thin singular value decomposition.
+import std.numeric
+
+fn clean(x: Float) -> Float {
+    round(x * 10000.0) / 10000.0
+}
+
+fn main() -> Void {
+    a = array([
+        [3.0, 1.0],
+        [0.0, 2.0],
+        [0.0, 0.0]
+    ])
+    match numeric.svd(a) {
+        Ok(factors) => {
+            print("singular values =")
+            print(round(factors.s * 10000.0) / 10000.0)
+            print("rank = " + factors.rank().to_string())
+            print("reconstruction residual = " + clean(norm(factors.reconstruct() - a)).to_string())
+            rhs = array([5.0, 4.0, 0.0])
+            expected = clone(rhs)
+            solution = factors.solve(rhs)
+            print("least-squares solution =")
+            print(round(solution * 10000.0) / 10000.0)
+            print("solve residual = " + clean(norm(a @ solution - expected)).to_string())
+        },
+        Err(message) => print("unexpected SVD error: " + message),
+    }
+
+    match numeric.svd(array([[1.0, 2.0], [2.0, 4.0]])) {
+        Ok(factors) => print("singular rank = " + factors.rank().to_string()),
+        Err(message) => print("unexpected singular SVD error: " + message),
+    }
+
+    match numeric.svd(array([1.0, 2.0, 3.0])) {
+        Ok(_) => print("unexpected success"),
+        Err(message) => print("nonsquare input = " + message),
+    }
+}
