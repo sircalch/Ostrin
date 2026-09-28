@@ -1056,6 +1056,48 @@ fn emit_instruction(
                 out.push_str(&format!("    {} = {code};\n", value_name(*dst)));
                 return Ok(());
             }
+            // User-defined record operators use the same concrete method
+            // symbols as the AST/HIR emitters. Keep the IR path in lockstep
+            // for closed record operands (for example `Complex * Complex`),
+            // while leaving reflected scalar operators and ordering traits on
+            // their established fallback until their ABI is explicit here.
+            if let (Some(record), Some(other_record)) = (
+                record_name(&left_ty, records),
+                record_name(&right_ty, records),
+            ) {
+                if record == other_record {
+                    let method = match op {
+                        BinOp::Add => Some("add"),
+                        BinOp::Sub => Some("sub"),
+                        BinOp::Mul => Some("mul"),
+                        BinOp::Div => Some("div"),
+                        BinOp::Eq | BinOp::NotEq => Some("equals"),
+                        _ => None,
+                    };
+                    if let Some(method) = method {
+                        if let Some(c_name) = methods.get(&(record, method.to_string())) {
+                            let result_is_bool = matches!(op, BinOp::Eq | BinOp::NotEq);
+                            if (result_is_bool && *ty != Ty::Bool)
+                                || (!result_is_bool && *ty != left_ty)
+                            {
+                                return Err(());
+                            }
+                            let call = format!(
+                                "{c_name}({}, {})",
+                                value_code(values, *left)?,
+                                value_code(values, *right)?
+                            );
+                            let code = if *op == BinOp::NotEq {
+                                format!("(!({call}))")
+                            } else {
+                                call
+                            };
+                            out.push_str(&format!("    {} = {code};\n", value_name(*dst)));
+                            return Ok(());
+                        }
+                    }
+                }
+            }
             if (!scalar(ty) && !quantity(ty)) || *ty == Ty::Void {
                 return Err(());
             }

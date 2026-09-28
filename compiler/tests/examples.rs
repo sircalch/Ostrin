@@ -9439,9 +9439,34 @@ fn std_numeric_solves_integrates_interpolates_and_transforms() {
 
 #[test]
 fn std_numeric_complex_matches_interpreter_and_native() {
+    let expected = "sum = 4 + 2i\nproduct = 11 + -2i\nquotient = -1 + 2i\nconjugate = 3 + -4i\nsquare = -7 + 24i\npolar = 1.0000000000000004 + 1.732050807568877i\nscalar left = 5 + 4i\nscaled = 6 + 8i\nmagnitude = 5\nmagnitude check = true\nEuler check = 0.0000000000000001224646799076922\n";
     assert_eq!(
         interpreter_and_native_agree("numeric_complex.ostrin"),
-        "sum = 4 + 2i\nproduct = 11 + -2i\nquotient = -1 + 2i\nconjugate = 3 + -4i\nsquare = -7 + 24i\npolar = 1.0000000000000004 + 1.732050807568877i\nscalar left = 5 + 4i\nscaled = 6 + 8i\nmagnitude = 5\nmagnitude check = true\nEuler check = 0.0000000000000001224646799076922\n"
+        expected
+    );
+
+    let exe = temp_artifact("numeric_complex_leak.exe");
+    let compile = run(&[
+        "--compile",
+        "--leak-check",
+        "--out",
+        &exe,
+        &example_path("numeric_complex.ostrin"),
+    ]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(compile.status.success(), "stderr: {}", stderr(&compile));
+    let native = Command::new(&exe).output().unwrap();
+    let _ = fs::remove_file(&exe);
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0 "),
+        "Complex operator lowering leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
     );
 }
 
@@ -9470,9 +9495,9 @@ fn std_numeric_cholesky_matches_interpreter_and_native() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/numeric.ostrin "))
         .unwrap_or_else(|| panic!("missing std.numeric source report: {report_text}"));
     assert!(
-        numeric_source.contains("ir=35")
+        numeric_source.contains("ir=36")
             && numeric_source.contains("hir=8")
-            && numeric_source.contains("ast=34"),
+            && numeric_source.contains("ast=33"),
         "numeric linear algebra regression in native lowering: {numeric_source}"
     );
 }
@@ -9507,9 +9532,9 @@ fn std_numeric_svd_matches_interpreter_and_native() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/numeric.ostrin "))
         .unwrap_or_else(|| panic!("missing std.numeric source report: {report_text}"));
     assert!(
-        numeric_source.contains("ir=35")
+        numeric_source.contains("ir=36")
             && numeric_source.contains("hir=8")
-            && numeric_source.contains("ast=34"),
+            && numeric_source.contains("ast=33"),
         "numeric SVD lowering report changed unexpectedly: {numeric_source}"
     );
 }
@@ -9539,9 +9564,9 @@ fn std_numeric_eigen_matches_interpreter_and_native() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/numeric.ostrin "))
         .unwrap_or_else(|| panic!("missing std.numeric source report: {report_text}"));
     assert!(
-        numeric_source.contains("ir=35")
+        numeric_source.contains("ir=36")
             && numeric_source.contains("hir=8")
-            && numeric_source.contains("ast=34"),
+            && numeric_source.contains("ast=33"),
         "numeric eigen lowering report changed unexpectedly: {numeric_source}"
     );
 }
@@ -9571,9 +9596,9 @@ fn std_numeric_complex_linear_algebra_matches_interpreter_and_native() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/numeric.ostrin "))
         .unwrap_or_else(|| panic!("missing std.numeric source report: {report_text}"));
     assert!(
-        numeric_source.contains("ir=35")
+        numeric_source.contains("ir=36")
             && numeric_source.contains("hir=8")
-            && numeric_source.contains("ast=34"),
+            && numeric_source.contains("ast=33"),
         "numeric complex lowering report changed unexpectedly: {numeric_source}"
     );
 }
@@ -9647,9 +9672,9 @@ fn std_numeric_quantity_arrays_use_the_ir_boundary() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/numeric.ostrin "))
         .unwrap_or_else(|| panic!("missing std.numeric source report: {report_text}"));
     assert!(
-        numeric_source.contains("ir=38")
+        numeric_source.contains("ir=39")
             && numeric_source.contains("hir=8")
-            && numeric_source.contains("ast=35"),
+            && numeric_source.contains("ast=34"),
         "quantity-array IR coverage regressed: {numeric_source}"
     );
 }
