@@ -16,6 +16,10 @@ const defaultWorkloads = [
   "examples/arrays.ostrin",
   "examples/quantity_arrays.ostrin",
   "examples/numeric_methods.ostrin",
+  "examples/numeric_lu.ostrin",
+  "examples/numeric_svd.ostrin",
+  "examples/numeric_complex_linear_algebra.ostrin",
+  "examples/viz_scatter_fit.ostrin",
 ];
 
 function option(name, fallback) {

@@ -5,6 +5,7 @@ const publicPages = [
   "./",
   "./community.html",
   "./cookbook.html",
+  "./benchmarks.html",
   "./docs.html",
   "./ecosystem.html",
   "./examples.html",
@@ -18,6 +19,10 @@ const publicPages = [
 ];
 
 async function expectNoHorizontalOverflow(page, route, width) {
+  await page.evaluate(async () => {
+    if (document.fonts?.ready) await document.fonts.ready;
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  });
   const dimensions = await page.evaluate(() => ({
     viewport: document.documentElement.clientWidth,
     document: document.documentElement.scrollWidth,
@@ -105,6 +110,18 @@ test("all public pages fit phone and tablet viewports", async ({ page }) => {
       await expectNoHorizontalOverflow(page, route, width);
     }
   }
+});
+
+test("benchmark page renders the recorded workload report", async ({ page }) => {
+  const runtimeErrors = [];
+  page.on("pageerror", (error) => runtimeErrors.push(error.message));
+  await page.goto("./benchmarks.html", { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Measure the work");
+  await expect(page.locator("[data-benchmark-state]")).toContainText("Recorded benchmark");
+  await expect(page.locator("[data-benchmark-rows] tr")).toHaveCount(8);
+  await expect(page.locator("[data-benchmark-commit]")).not.toHaveText("—");
+  await expectNoHorizontalOverflow(page, "benchmarks.html", 1280);
+  expect(runtimeErrors).toEqual([]);
 });
 
 test("Scientific Lab recomputes its demos with the real compiler", async ({ page }) => {
