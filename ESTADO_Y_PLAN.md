@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-28 · rama `main` · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 239 de integración y 2 unitarias en verde.*
+*Corte: 2026-09-28 · rama `main` · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 240 de integración y 2 unitarias en verde.*
 
 Validación remota: Pages, CI, CodeQL, sanitizers y auditoría de seguridad pasaron para `afe677d` (PR #66, autovectores simétricos) en Windows, Linux, macOS y web. La
 compuerta oficial exige `cargo fmt --check`, Clippy con el lint `suspicious`, la suite del
@@ -101,13 +101,13 @@ galería `website/viz.html` y las pestañas Plot/3D del Lab las ejecutan en el n
 
 **Métodos numéricos**: `std.numeric` (documento 24) resuelve raíces, integrales, derivadas, mínimos,
 interpolación (lineal y spline cúbico), ODEs (`rk4`, `rk45` adaptativo), LU con pivoteo parcial, QR denso,
-autovectores simétricos (`Eigen.values`, `Eigen.vectors`, reconstrucción), SVD fina (`U`, `s`, `Vᵀ`, rango, número de condición y pseudoinversa), Cholesky (`L`, reconstrucción y resolución triangular) y FFT, escrito en Ostrin; las pestañas ODE, Linear Algebra y
+autovectores simétricos (`Eigen.values`, `Eigen.vectors`, reconstrucción), SVD fina (`U`, `s`, `Vᵀ`, rango, número de condición y pseudoinversa), Cholesky (`L`, reconstrucción y resolución triangular), FFT y álgebra compleja densa (`ComplexVector`, `ComplexMatrix`, adjunta, `matmul`, producto matriz-vector y `solve`), escrito en Ostrin; las pestañas ODE, Linear Algebra y
 Complex del Lab lo ejecutan en el navegador.
 
 **Numérico/científico**: literales científicos (`6.022e23`), enteros de ancho fijo, `Float32`, `Array<T>` (difusión, máscaras,
 rebanadas, `@`), estadística, regresión, `det/inv/eigvals/norm`, `Rng` reproducible,
 funciones elementales deterministas (idénticas en intérprete y nativo), LU/QR/SVD/Cholesky verificables y `std.numeric.Complex`
-experimental con operaciones aritméticas, forma polar, conjugado, magnitud y potencias enteras.
+experimental con operaciones aritméticas, forma polar, conjugado, magnitud, potencias enteras y matrices/vectores complejos densos con partes separadas.
 Los constructores `zeros`/`ones`, `norm`, `abs` escalar y `sqrt` también tienen lowering IR/C
 tipado; QR y Cholesky usan esos lowering sin caer al AST en sus consumidores medidos, mientras LU
 mantiene el fallback verificado de agregados.
@@ -162,12 +162,13 @@ por separado en `--native-type-report` como `ir-generated`; el mismo informe exp
 `hir-generated` y `ast-fallback` para que la retirada del backend legado tenga un contador
 visible. También publica líneas `native-source` agrupadas por archivo para localizar la deuda
 por módulo; la prueba diferencial comprueba que sus sumas coinciden con el total. En el corte
-actual, la suite de ejemplos suma 2 370 funciones IR, 1 175 HIR y 2 730 que aún caen al emisor
-AST; `native_backend_types_agree_with_the_checker` mantiene 2 730 como trinquete temporal.
+actual, la suite de ejemplos suma 2 424 funciones IR, 1 184 HIR y 2 896 que aún caen al emisor
+AST; `native_backend_types_agree_with_the_checker` mantiene 2 896 como trinquete temporal.
 El puente IR de `zeros`/`ones`, `norm`, `abs` escalar y `sqrt` redujo el fallback en 348 funciones;
-QR y Cholesky ya se emiten desde IR/C; al sumar LU, `std.numeric` queda medido en `ir=17`, `hir=9`, `ast=30`
-por consumidor. Las cuatro funciones de LU basadas en records agregan 68 fallbacks medidos; SVD agrega 88,
-su número de condición 14 y los autovectores públicos 52 más;
+QR y Cholesky ya se emiten desde IR/C; con LU, SVD, número de condición, autovectores y álgebra compleja densa,
+`std.numeric` queda medido en `ir=24`, `hir=9`, `ast=44` por consumidor. Las cuatro funciones de LU basadas
+en records agregan 68 fallbacks medidos; SVD agrega 88, su número de condición 14, los autovectores públicos
+52 y `ComplexVector`/`ComplexMatrix` 166 más;
 ambas cifras quedan registradas como deuda explícita para la migración de agregados. Las superficies `std.viz.boxplot`, `std.viz.violin`, `std.viz.hexbin`,
 `std.viz.contourf`, `std.viz.quiver`, `std.viz.streamplot`, `std.viz.table` y
 `std.viz.vector_field`, además de funciones numéricas auxiliares y agregados SVG, siguen
@@ -293,8 +294,8 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
 convendría dividirlos; el backend nativo no comparte el sistema de tipos del checker
-(ya consume los tipos del checker y compara cada nodo; el informe actual suma **2 370 funciones
-generadas desde IR, 1 175 desde HIR y 2 730 en fallback AST** en los ejemplos, con un trinquete
+(ya consume los tipos del checker y compara cada nodo; el informe actual suma **2 424 funciones
+generadas desde IR, 1 184 desde HIR y 2 896 en fallback AST** en los ejemplos, con un trinquete
 que impide que el fallback aumente sin justificación; las familias migradas incluyen escalares,
 `String`, records concretos, `Option<Record>`, `List<T>` escalar, `Map`/`Set` escalares, `Option`
 escalar/String y patrones `Some/None`, `Float32`, enteros de ancho fijo, records, enums, `match`,
@@ -443,7 +444,7 @@ sus evidencias y validación upstream.
 
 ```powershell
 cd compiler
-    cargo test                                   # 6 diferenciales + 239 de integración + 2 unitarias
+    cargo test                                   # 6 diferenciales + 240 de integración + 2 unitarias
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```

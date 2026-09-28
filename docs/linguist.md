@@ -34,11 +34,12 @@ La propuesta debe llevar muestras reales y representativas, no un `hello world`
 aislado. El repositorio ya contiene ejemplos de:
 
 - cantidades y conversiones: `examples/physics.ostrin`, `examples/quantity_arrays.ostrin`;
-- arrays y métodos numéricos: `examples/arrays.ostrin`, `examples/numeric_methods.ostrin`;
+- arrays y métodos numéricos: `examples/arrays.ostrin`, `examples/numeric_methods.ostrin`,
+  `examples/numeric_complex_linear_algebra.ostrin`;
 - concurrencia: `examples/native_concurrency.ostrin`, `examples/concurrency.ostrin`;
 - records, traits, módulos y paquetes: los ejemplos correspondientes bajo `examples/`.
 
-El inventario actual tiene 263 archivos `.ostrin`, pero todos pertenecen al
+El inventario actual tiene 264 archivos `.ostrin`, pero todos pertenecen al
 repositorio de Ostrin. Eso demuestra variedad sintáctica, no el uso distribuido
 que Linguist exige para aceptar una extensión nueva.
 

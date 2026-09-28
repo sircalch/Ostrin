@@ -1047,6 +1047,204 @@ pub fn powi(z: Complex, n: Int) -> Complex {
     result
 }
 
+/// A dense complex vector stored as separate real and imaginary arrays.
+///
+/// The split representation keeps the current Array engine portable across
+/// the interpreter, native backend and WASM while `Array<Complex>` is still
+/// being designed as a first-class element type.
+pub record ComplexVector {
+    re: Array<Float>
+    im: Array<Float>
+}
+
+impl ComplexVector {
+    fn length(self) -> Int { self.re.length() }
+
+    fn at(self, i: Int) -> Complex {
+        complex(self.re[i], self.im[i])
+    }
+
+    fn magnitude(self) -> Array<Float> {
+        sqrt(self.re * self.re + self.im * self.im)
+    }
+}
+
+/// Build a dense complex vector from matching real and imaginary parts.
+pub fn complex_vector(re: Array<Float>, im: Array<Float>) -> Result<ComplexVector, String> {
+    if re.length() != im.length() {
+        return Err("complex_vector needs real and imaginary arrays with the same length")
+    }
+    if re.length() == 0 {
+        return Err("complex_vector needs a non-empty vector")
+    }
+    Ok(ComplexVector { re: re, im: im })
+}
+
+/// A dense complex matrix stored in row-major split-complex form.
+///
+/// `re` and `im` contain `rows * cols` values. Keeping the storage explicit
+/// makes shape, layout and reproducibility visible instead of hiding a
+/// complex allocation behind a backend-specific primitive.
+pub record ComplexMatrix {
+    rows: Int
+    cols: Int
+    re: Array<Float>
+    im: Array<Float>
+}
+
+impl ComplexMatrix {
+    fn at(self, row: Int, col: Int) -> Complex {
+        index = row * self.cols + col
+        complex(self.re[index], self.im[index])
+    }
+
+    fn conjugate_transpose(self) -> ComplexMatrix {
+        mut out_re: List<Float> = []
+        mut out_im: List<Float> = []
+        for col in 0 until self.cols {
+            for row in 0 until self.rows {
+                value = self.at(row, col)
+                out_re.push(value.re)
+                out_im.push(0.0 - value.im)
+            }
+        }
+        ComplexMatrix {
+            rows: self.cols,
+            cols: self.rows,
+            re: array(out_re),
+            im: array(out_im),
+        }
+    }
+
+    fn matmul(self, other: ComplexMatrix) -> Result<ComplexMatrix, String> {
+        if self.cols != other.rows {
+            return Err("complex matmul needs compatible matrix dimensions")
+        }
+        mut out_re: List<Float> = []
+        mut out_im: List<Float> = []
+        for row in 0 until self.rows {
+            for col in 0 until other.cols {
+                mut total = complex(0.0)
+                for k in 0 until self.cols {
+                    total = total + self.at(row, k) * other.at(k, col)
+                }
+                out_re.push(total.re)
+                out_im.push(total.im)
+            }
+        }
+        Ok(ComplexMatrix {
+            rows: self.rows,
+            cols: other.cols,
+            re: array(out_re),
+            im: array(out_im),
+        })
+    }
+
+    fn mul_vector(self, vector: ComplexVector) -> Result<ComplexVector, String> {
+        if self.cols != vector.length() {
+            return Err("complex matrix-vector multiplication needs compatible dimensions")
+        }
+        mut out_re: List<Float> = []
+        mut out_im: List<Float> = []
+        for row in 0 until self.rows {
+            mut total = complex(0.0)
+            for col in 0 until self.cols {
+                total = total + self.at(row, col) * vector.at(col)
+            }
+            out_re.push(total.re)
+            out_im.push(total.im)
+        }
+        Ok(ComplexVector { re: array(out_re), im: array(out_im) })
+    }
+
+    /// Solve `A x = b` with complex Gaussian elimination and partial pivoting.
+    fn solve(self, rhs: ComplexVector, tol: Float = 1e-12) -> Result<ComplexVector, String> {
+        if self.rows != self.cols {
+            return Err("complex solve needs a square matrix")
+        }
+        if rhs.length() != self.rows {
+            return Err("complex solve needs a right-hand side with one value per row")
+        }
+        n = self.rows
+        mut ar = array(self.re.to_list())
+        mut ai = array(self.im.to_list())
+        mut br = array(rhs.re.to_list())
+        mut bi = array(rhs.im.to_list())
+
+        for col in 0 until n {
+            mut pivot = col
+            mut pivot_abs = sqrt(ar[col * n + col] * ar[col * n + col] + ai[col * n + col] * ai[col * n + col])
+            for row in col + 1 until n {
+                candidate = sqrt(ar[row * n + col] * ar[row * n + col] + ai[row * n + col] * ai[row * n + col])
+                if candidate > pivot_abs {
+                    pivot = row
+                    pivot_abs = candidate
+                }
+            }
+            if pivot_abs <= tol {
+                return Err("complex solve found a singular or rank-deficient matrix")
+            }
+            if pivot != col {
+                for j in col until n {
+                    swap_re = ar[col * n + j]
+                    swap_im = ai[col * n + j]
+                    ar.set(col * n + j, ar[pivot * n + j])
+                    ai.set(col * n + j, ai[pivot * n + j])
+                    ar.set(pivot * n + j, swap_re)
+                    ai.set(pivot * n + j, swap_im)
+                }
+                swap_re = br[col]
+                swap_im = bi[col]
+                br.set(col, br[pivot])
+                bi.set(col, bi[pivot])
+                br.set(pivot, swap_re)
+                bi.set(pivot, swap_im)
+            }
+
+            pivot_value = complex(ar[col * n + col], ai[col * n + col])
+            for row in col + 1 until n {
+                factor = complex(ar[row * n + col], ai[row * n + col]) / pivot_value
+                ar.set(row * n + col, 0.0)
+                ai.set(row * n + col, 0.0)
+                for j in col + 1 until n {
+                    value = complex(ar[row * n + j], ai[row * n + j]) - factor * complex(ar[col * n + j], ai[col * n + j])
+                    ar.set(row * n + j, value.re)
+                    ai.set(row * n + j, value.im)
+                }
+                right = complex(br[row], bi[row]) - factor * complex(br[col], bi[col])
+                br.set(row, right.re)
+                bi.set(row, right.im)
+            }
+        }
+
+        mut xr = zeros([n])
+        mut xi = zeros([n])
+        mut row = n - 1
+        while row >= 0 {
+            mut total = complex(br[row], bi[row])
+            for col in row + 1 until n {
+                total = total - complex(ar[row * n + col], ai[row * n + col]) * complex(xr[col], xi[col])
+            }
+            value = total / complex(ar[row * n + row], ai[row * n + row])
+            xr.set(row, value.re)
+            xi.set(row, value.im)
+            row = row - 1
+        }
+        Ok(ComplexVector { re: xr, im: xi })
+    }
+}
+
+/// Build a dense complex matrix from row-major real and imaginary parts.
+pub fn complex_matrix(re: Array<Float>, im: Array<Float>, rows: Int, cols: Int) -> Result<ComplexMatrix, String> {
+    if rows < 1 or cols < 1 {
+        return Err("complex_matrix needs positive row and column counts")
+    }
+    if re.length() != rows * cols or im.length() != rows * cols {
+        return Err("complex_matrix data length must equal rows * cols")
+    }
+    Ok(ComplexMatrix { rows: rows, cols: cols, re: re, im: im })
+}
+
 /// A complex spectrum as real and imaginary parts.
 pub record Spectrum {
     re: Array<Float>
