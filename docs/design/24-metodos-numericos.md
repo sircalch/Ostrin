@@ -1,7 +1,7 @@
 # 24 — Métodos numéricos: `std.numeric` 0.1
 
 Estado: implementado (2026-09-24). Código: `compiler/std/numeric.ostrin`. Ejemplos:
-`examples/numeric_methods.ostrin`, `examples/numeric_complex.ostrin`, `examples/numeric_lu.ostrin`, `examples/numeric_cholesky.ostrin`, `examples/viz_ode.ostrin`,
+`examples/numeric_methods.ostrin`, `examples/numeric_complex.ostrin`, `examples/numeric_lu.ostrin`, `examples/numeric_svd.ostrin`, `examples/numeric_cholesky.ostrin`, `examples/viz_ode.ostrin`,
 `examples/viz_fft.ostrin`, `examples/viz_spline.ostrin`, `examples/lab_ode.ostrin`. Web: pestañas ODE,
 Linear Algebra y Complex del Scientific Lab y figuras de la galería de `viz.html`.
 
@@ -57,6 +57,11 @@ lu.l  lu.u  lu.p  lu.swaps                  // P A = L @ U; p conserva las filas
 lu.reconstruct()  lu.solve(rhs)              // reconstrucción de A y sustituciones triangulares
 lu.determinant()                             // determinante con el signo de los intercambios
 
+svd = numeric.svd(a)                        // Result<Svd, String>, SVD fina real densa
+svd.u  svd.s  svd.vt                         // A = U @ diag(s) @ Vᵀ, singular values descendentes
+svd.reconstruct()  svd.rank()                // reconstrucción y rango numérico
+svd.solve(rhs)                               // solución de mínimos cuadrados/pseudoinversa
+
 // Con unidades: xs: Array<Quantity<X>>, ys: Array<Quantity<Y>>
 numeric.unit_trapz(xs, ys)                     // Quantity<X * Y>   (km/h sobre min → km)
 numeric.unit_cumtrapz(xs, ys)                  // Array<Quantity<X * Y>>
@@ -93,6 +98,11 @@ ningún caso especial en el runtime. Requieren al menos dos muestras.
   la permutación `p` y el número de intercambios, rechaza pivotes singulares mediante `Result<Lu, String>`,
   y ofrece reconstrucción, determinante y resolución triangular. `numeric_lu.ostrin`, el ejemplo de
   Linear Algebra y la suite intérprete/nativo cubren pivoteo, matriz singular y matriz no cuadrada.
+- **SVD**: la SVD fina forma `AᵀA`, diagonaliza la matriz simétrica con rotaciones cíclicas de Jacobi,
+  ordena los autovalores de mayor a menor y calcula `U`, `s` y `Vᵀ`. `reconstruct` verifica la
+  factorización; `solve` aplica la pseudoinversa con un umbral de rango. La ruta es determinista y
+  adecuada para matrices densas pequeñas/medianas; LAPACK/FFI queda reservado para problemas
+  grandes o mal condicionados.
 - **Complejos**: `Complex` es por ahora un record público de `Float64` con operadores `Add`, `Sub`,
   `Mul`, `Div`, igualdad, conjugado, magnitud, forma polar, `cis` y potencias enteras. El ejemplo
   `numeric_complex.ostrin` y la pestaña Complex del Lab verifican la misma salida en intérprete,
@@ -123,4 +133,4 @@ y tipos función para enlazar `X`, y una segunda aparición con otra dimensión 
 | cuadratura adaptativa, integrales múltiples | Gauss–Kronrod |
 | optimización multivariable | Nelder–Mead, BFGS |
 | unidades en ODEs y raíces | `unit_*` cubre integrales, derivadas e interpolación; `rk45` y `newton` siguen en `Float` (un estado con dimensiones mezcladas necesitaría tuplas o records de cantidades) |
-| álgebra lineal avanzada | LU, QR denso y Cholesky ya están disponibles; SVD, autovectores, mínimos cuadrados generalizados, dispersa y álgebra matricial compleja siguen pendientes |
+| álgebra lineal avanzada | LU, QR denso, Cholesky y SVD fina ya están disponibles; autovectores públicos, mínimos cuadrados generalizados, dispersa y álgebra matricial compleja siguen pendientes |

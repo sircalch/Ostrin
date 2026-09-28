@@ -19,7 +19,9 @@ Los builtins numéricos `zeros`/`ones`, `norm`, `abs` escalar y `sqrt` usan tamb
 los helpers tipados de IR/C (`Array_Float_full`, `Array_Float_norm` y las funciones
 de `libm`), de modo que QR y Cholesky ya no necesitan el emisor AST. LU ya está disponible en
 `std.numeric`, pero sus records y recorridos matriciales permanecen en el fallback verificado
-hasta que el backend de agregados complete esa migración.
+hasta que el backend de agregados complete esa migración. La SVD densa (`std.numeric.svd`) añade
+el mismo tipo de record y recorridos Jacobi, por lo que su paridad está cubierta pero sus 88
+funciones medidas permanecen como deuda explícita del lowering de agregados.
 `read_file`/`write_file` añaden `Result<String, String>` y `Result<Void, String>` con errores
 de archivo administrados, comprobación de lectura/escritura/cierre y un checkpoint de cancelación
 antes de cruzar la libc; la operación de archivo sigue siendo bloqueante mientras está dentro del
