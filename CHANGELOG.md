@@ -6,15 +6,20 @@
 - Numeric scalar `to_string()` methods now lower through IR/C for `Int`, `Float`, `Float32` and
   fixed-width integers. `std.numeric.secant` and `std.numeric.newton` therefore keep their
   convergence diagnostics on the typed native path; the per-consumer report is now
-  `ir=35`, `hir=8`, `ast=34`.
+  `ir=36`, `hir=8`, `ast=33`.
+
+### Native IR: record arithmetic dispatch
+- Binary `+`, `-`, `*`, `/`, `==` and `!=` now dispatch closed record operands to their registered
+  operator methods in IR/C. `std.numeric.powi` is the first verified consumer, including the
+  `Complex * Complex` loop, and keeps interpreter/native output identical.
 
 ### Native IR: scalar casts and deterministic math
 - The IR/C emitter now lowers explicit `as<Float>`/`as<Float32>` conversions, `abs` over numeric
   arrays, and deterministic numeric builtins including `sin`, `cos`, `ln`, `exp`, `pi`, `eye` and
   their scalar/array forms. This moves numerical integration, RK methods, FFT utilities and polar
   helpers through the typed native path while preserving interpreter/native output.
-- The differential ratchet now records 2,823 IR functions, 1,136 HIR functions and 2,545 AST
-  fallbacks across the example suite; the numeric consumer report is `ir=35`, `hir=8`, `ast=34`.
+- The differential ratchet now records 2,840 IR functions, 1,136 HIR functions and 2,528 AST
+  fallbacks across the example suite; the numeric consumer report is `ir=36`, `hir=8`, `ast=33`.
 
 ### Native IR: quantity-array boundary
 - `Array<Quantity<D>>` now has a typed IR/C boundary for parameters, ownership, indexing and
