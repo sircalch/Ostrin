@@ -70,13 +70,13 @@ export const LAB = [
   {
     id: "linear-algebra",
     title: "Linear Algebra",
-    headline: "Solve a spring system, inspect eigenvectors and factor it with LU, QR, SVD and Cholesky.",
+    headline: "Solve a spring system, inspect eigenvectors, complex systems and dense factorizations.",
     file: "examples/lab_linear_algebra.ostrin",
     render: "text",
     params: [{ name: "coupling", label: "Spring coupling", min: 0.25, max: 4, step: 0.25 }],
-    how: "The stiffness matrix is an Array<Float>; det, solve, norm, @ and eigvals are compiler built-ins. std.numeric.eigen adds ascending eigenvalues, orthonormal eigenvectors and reconstruction for symmetric matrices. std.numeric.lu adds partial-pivoting factors and a triangular solve, std.numeric.qr adds modified Gram–Schmidt diagnostics, std.numeric.svd adds thin singular values with reconstruction, rank, condition-number diagnostics and least-squares solving, and std.numeric.cholesky adds a symmetric positive-definite factor. All paths produce the same result in the interpreter, native C and browser.",
+    how: "The stiffness matrix is an Array<Float>; det, solve, norm, @ and eigvals are compiler built-ins. std.numeric.eigen adds ascending eigenvalues, orthonormal eigenvectors and reconstruction for symmetric matrices. std.numeric.lu adds partial-pivoting factors and a triangular solve, std.numeric.qr adds modified Gram–Schmidt diagnostics, std.numeric.svd adds thin singular values with reconstruction, rank, condition-number diagnostics and least-squares solving, and std.numeric.cholesky adds a symmetric positive-definite factor. The same tab now solves a dense complex system with split real/imaginary storage, conjugate transpose and complex matrix-vector multiplication. All paths produce the same result in the interpreter, native C and browser.",
     docs: { label: "numeric hierarchy and arrays", href: `${repository}/blob/main/docs/design/19-jerarquia-numerica-y-arrays.md` },
-    limits: "Dense real matrices only; eigenpairs require a symmetric square matrix, LU requires a nonsingular square matrix, QR currently requires full column rank, SVD uses a deterministic Jacobi solve of AᵀA, and Cholesky requires a symmetric positive-definite matrix. Sparse and complex linear algebra remain on the roadmap.",
+    limits: "Dense matrices only; real eigenpairs require a symmetric square matrix, LU requires a nonsingular square matrix, QR currently requires full column rank, SVD uses a deterministic Jacobi solve of AᵀA, Cholesky requires a symmetric positive-definite matrix, and complex matrices use split real/imaginary arrays with Gaussian elimination. Parametric Array<Complex>, sparse matrices, complex decompositions and WebGPU remain on the roadmap.",
   },
   {
     id: "complex",
@@ -87,7 +87,7 @@ export const LAB = [
     params: [{ name: "angle", label: "Rotation angle (rad)", min: -3.14, max: 3.14, step: 0.1 }],
     how: "std.numeric's experimental Complex record carries real and imaginary components through overloaded addition, subtraction, multiplication and division. Polar construction, conjugation, magnitude and integer powers run in Ostrin, so the interpreter, native compiler and browser expose the same values.",
     docs: { label: "numeric hierarchy and arrays", href: `${repository}/blob/main/docs/design/19-jerarquia-numerica-y-arrays.md` },
-    limits: "Complex<Float> is currently a library record backed by Float64. Complex arrays, promotion across Float32/Float64 and complex matrix decompositions are planned; the FFT keeps its stable real/imaginary Spectrum API.",
+    limits: "Complex<Float> is currently a library record backed by Float64. Parametric Complex arrays, promotion across Float32/Float64 and complex matrix decompositions beyond dense solve/matmul are planned; the FFT keeps its stable real/imaginary Spectrum API.",
   },
   {
     id: "statistics",

@@ -9462,9 +9462,9 @@ fn std_numeric_cholesky_matches_interpreter_and_native() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/numeric.ostrin "))
         .unwrap_or_else(|| panic!("missing std.numeric source report: {report_text}"));
     assert!(
-        numeric_source.contains("ir=22")
+        numeric_source.contains("ir=24")
             && numeric_source.contains("hir=9")
-            && numeric_source.contains("ast=36"),
+            && numeric_source.contains("ast=44"),
         "numeric linear algebra regression in native lowering: {numeric_source}"
     );
 }
@@ -9499,9 +9499,9 @@ fn std_numeric_svd_matches_interpreter_and_native() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/numeric.ostrin "))
         .unwrap_or_else(|| panic!("missing std.numeric source report: {report_text}"));
     assert!(
-        numeric_source.contains("ir=22")
+        numeric_source.contains("ir=24")
             && numeric_source.contains("hir=9")
-            && numeric_source.contains("ast=36"),
+            && numeric_source.contains("ast=44"),
         "numeric SVD lowering report changed unexpectedly: {numeric_source}"
     );
 }
@@ -9531,10 +9531,42 @@ fn std_numeric_eigen_matches_interpreter_and_native() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/numeric.ostrin "))
         .unwrap_or_else(|| panic!("missing std.numeric source report: {report_text}"));
     assert!(
-        numeric_source.contains("ir=22")
+        numeric_source.contains("ir=24")
             && numeric_source.contains("hir=9")
-            && numeric_source.contains("ast=36"),
+            && numeric_source.contains("ast=44"),
         "numeric eigen lowering report changed unexpectedly: {numeric_source}"
+    );
+}
+
+#[test]
+fn std_numeric_complex_linear_algebra_matches_interpreter_and_native() {
+    assert_eq!(
+        interpreter_and_native_agree("numeric_complex_linear_algebra.ostrin"),
+        "solution[0] = 0.8 + -0.6i\nsolution[1] = -0.2 + 0.4i\nsolve residual = 0\nadjoint product [0,0] = 6 + 0i\ninvalid matrix = complex_matrix data length must equal rows * cols\nsingular solve = complex solve found a singular or rank-deficient matrix\n"
+    );
+
+    let report = run(&[
+        "--native-type-report",
+        &example_path("numeric_complex_linear_algebra.ostrin"),
+    ]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "numeric complex type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    let numeric_source = report_text
+        .lines()
+        .find(|line| line.starts_with("native-source: <ostrin-std>/numeric.ostrin "))
+        .unwrap_or_else(|| panic!("missing std.numeric source report: {report_text}"));
+    assert!(
+        numeric_source.contains("ir=24")
+            && numeric_source.contains("hir=9")
+            && numeric_source.contains("ast=44"),
+        "numeric complex lowering report changed unexpectedly: {numeric_source}"
     );
 }
 

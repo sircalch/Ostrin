@@ -42,8 +42,12 @@
   constructors, conjugation, magnitude, equality, overloaded arithmetic, reflected scalar
   operations and non-negative integer powers. `numeric_complex.ostrin` verifies interpreter/native
   parity and the Scientific Lab's Complex demo recomputes the same values in WASM.
-- Complex arrays, generic `Complex<T>` promotion and complex matrix decompositions remain clearly
-  marked as future work; the FFT's existing real/imaginary `Spectrum` API is unchanged.
+- Dense complex linear algebra now adds `ComplexVector` and `ComplexMatrix` using explicit real and
+  imaginary arrays, with adjoint, matrix/matrix and matrix/vector products and Gaussian solve with
+  partial pivoting. `numeric_complex_linear_algebra.ostrin` and the Linear Algebra Lab tab verify
+  the solution, zero residual and singular-matrix diagnostic in interpreter/native/WASM.
+- Parametric `Array<Complex>`, generic `Complex<T>` promotion, sparse matrices and complex matrix
+  decompositions remain future work; the FFT's existing real/imaginary `Spectrum` API is unchanged.
 
 ### Scientific core: Cholesky factorization
 - `std.numeric.cholesky` now factors dense symmetric positive-definite real matrices into a lower

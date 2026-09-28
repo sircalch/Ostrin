@@ -1,0 +1,62 @@
+// std.numeric · dense complex matrix algebra with split-complex storage.
+import std.numeric
+
+fn clean(x: Float) -> Float {
+    round(x * 10000.0) / 10000.0
+}
+
+fn main() -> Void {
+    a = numeric.complex_matrix(
+        array([1.0, 2.0, 3.0, 4.0]),
+        array([1.0, 0.0, 0.0, -1.0]),
+        2,
+        2
+    )
+    rhs = numeric.complex_vector(array([1.0, 2.0]), array([1.0, 0.0]))
+    match a {
+        Ok(matrix) => {
+            match rhs {
+                Ok(vector) => {
+                    match matrix.solve(vector) {
+                        Ok(solution) => {
+                            recovered = matrix.mul_vector(solution)
+                            match recovered {
+                                Ok(value) => {
+                                    residual = sqrt((value.re - vector.re) * (value.re - vector.re) + (value.im - vector.im) * (value.im - vector.im)).max()
+                                    print("solution[0] = " + clean(solution.re[0]).to_string() + " + " + clean(solution.im[0]).to_string() + "i")
+                                    print("solution[1] = " + clean(solution.re[1]).to_string() + " + " + clean(solution.im[1]).to_string() + "i")
+                                    print("solve residual = " + clean(residual).to_string())
+                                },
+                                Err(message) => print("unexpected multiplication error = " + message),
+                            }
+                        },
+                        Err(message) => print("unexpected solve error = " + message),
+                    }
+                },
+                Err(message) => print("unexpected vector error = " + message),
+            }
+            adjoint = matrix.conjugate_transpose()
+            match matrix.matmul(adjoint) {
+                Ok(product) => print("adjoint product [0,0] = " + clean(product.at(0, 0).re).to_string() + " + " + clean(product.at(0, 0).im).to_string() + "i"),
+                Err(message) => print("unexpected matmul error = " + message),
+            }
+        },
+        Err(message) => print("unexpected matrix error = " + message),
+    }
+
+    match numeric.complex_matrix(array([1.0, 2.0]), array([0.0]), 1, 2) {
+        Ok(_) => print("unexpected success"),
+        Err(message) => print("invalid matrix = " + message),
+    }
+
+    match numeric.complex_matrix(array([1.0, 2.0, 2.0, 4.0]), array([0.0, 0.0, 0.0, 0.0]), 2, 2) {
+        Ok(singular) => match numeric.complex_vector(array([1.0, 1.0]), array([0.0, 0.0])) {
+            Ok(vector) => match singular.solve(vector) {
+                Ok(_) => print("unexpected singular success"),
+                Err(message) => print("singular solve = " + message),
+            },
+            Err(message) => print("unexpected vector error = " + message),
+        },
+        Err(message) => print("unexpected singular matrix error = " + message),
+    }
+}

@@ -88,4 +88,29 @@ fn main() -> Void {
         },
         Err(message) => print("Cholesky error: " + message),
     }
+
+    complex_k = numeric.complex_matrix(
+        array([1.0, 2.0, 3.0, 4.0]),
+        array([1.0, 0.0, 0.0, -1.0]),
+        2,
+        2
+    )
+    complex_force = numeric.complex_vector(array([1.0, 2.0]), array([1.0, 0.0]))
+    match complex_k {
+        Ok(matrix) => match complex_force {
+            Ok(rhs) => match matrix.solve(rhs) {
+                Ok(solution) => match matrix.mul_vector(solution) {
+                    Ok(recovered) => {
+                        residual = sqrt((recovered.re - rhs.re) * (recovered.re - rhs.re) + (recovered.im - rhs.im) * (recovered.im - rhs.im)).max()
+                        print("complex solution x[0] = " + clean(solution.re[0]).to_string() + " + " + clean(solution.im[0]).to_string() + "i")
+                        print("complex solve residual = " + clean(residual).to_string())
+                    },
+                    Err(message) => print("complex multiplication error: " + message),
+                },
+                Err(message) => print("complex solve error: " + message),
+            },
+            Err(message) => print("complex vector error: " + message),
+        },
+        Err(message) => print("complex matrix error: " + message),
+    }
 }

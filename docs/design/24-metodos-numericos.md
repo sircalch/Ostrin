@@ -1,7 +1,7 @@
 # 24 — Métodos numéricos: `std.numeric` 0.1
 
 Estado: implementado (2026-09-24). Código: `compiler/std/numeric.ostrin`. Ejemplos:
-`examples/numeric_methods.ostrin`, `examples/numeric_complex.ostrin`, `examples/numeric_lu.ostrin`, `examples/numeric_svd.ostrin`, `examples/numeric_cholesky.ostrin`, `examples/viz_ode.ostrin`,
+`examples/numeric_methods.ostrin`, `examples/numeric_complex.ostrin`, `examples/numeric_complex_linear_algebra.ostrin`, `examples/numeric_lu.ostrin`, `examples/numeric_svd.ostrin`, `examples/numeric_cholesky.ostrin`, `examples/viz_ode.ostrin`,
 `examples/viz_fft.ostrin`, `examples/viz_spline.ostrin`, `examples/lab_ode.ostrin`. Web: pestañas ODE,
 Linear Algebra y Complex del Scientific Lab y figuras de la galería de `viz.html`.
 
@@ -67,6 +67,12 @@ eigen = numeric.eigen(a)                     // Result<Eigen, String>, matriz si
 eigen.values  eigen.vectors                  // valores ascendentes; vectores por columnas
 eigen.reconstruct()                          // V @ diag(values) @ Vᵀ
 
+cv = numeric.complex_vector(re, im)          // vector complejo denso, partes separadas
+cm = numeric.complex_matrix(re, im, rows, cols) // matriz compleja densa, orden fila
+cm.at(i, j)  cm.conjugate_transpose()        // acceso y adjunta
+cm.matmul(other)  cm.mul_vector(cv)          // multiplicación compleja
+cm.solve(cv)                                  // eliminación con pivoteo parcial
+
 // Con unidades: xs: Array<Quantity<X>>, ys: Array<Quantity<Y>>
 numeric.unit_trapz(xs, ys)                     // Quantity<X * Y>   (km/h sobre min → km)
 numeric.unit_cumtrapz(xs, ys)                  // Array<Quantity<X * Y>>
@@ -112,13 +118,16 @@ ningún caso especial en el runtime. Requieren al menos dos muestras.
 - **Autovectores**: `numeric.eigen` reutiliza las rotaciones de Jacobi para matrices densas reales
   simétricas, valida forma y simetría, ordena los autovalores de menor a mayor y expone los
   autovectores ortonormales por columnas. `reconstruct` permite comprobar `A = V diag(λ) Vᵀ`;
-  matrices no simétricas devuelven un diagnóstico explícito. La API compleja y matrices dispersas
-  siguen pendientes.
+  matrices no simétricas devuelven un diagnóstico explícito. Las matrices dispersas y los
+  problemas no simétricos generales siguen pendientes.
 - **Complejos**: `Complex` es por ahora un record público de `Float64` con operadores `Add`, `Sub`,
-  `Mul`, `Div`, igualdad, conjugado, magnitud, forma polar, `cis` y potencias enteras. El ejemplo
-  `numeric_complex.ostrin` y la pestaña Complex del Lab verifican la misma salida en intérprete,
-  binario nativo y WASM. El tipo paramétrico, `Array<Complex>` y álgebra lineal compleja siguen
-  pendientes.
+  `Mul`, `Div`, igualdad, conjugado, magnitud, forma polar, `cis` y potencias enteras. La capa
+  `ComplexVector`/`ComplexMatrix` conserva partes reales e imaginarias en arrays densos, ofrece
+  adjunta, producto matriz-matriz, producto matriz-vector y `solve` por eliminación gaussiana con
+  pivoteo parcial. `numeric_complex_linear_algebra.ostrin`, la pestaña Linear Algebra y la suite
+  intérprete/nativo/WASM verifican la misma solución, residuo cero y diagnóstico de singularidad.
+  El tipo paramétrico `Array<Complex>`, las descomposiciones complejas y las matrices dispersas
+  siguen pendientes.
 
 ## 4. Hallazgos del compilador
 
@@ -144,4 +153,4 @@ y tipos función para enlazar `X`, y una segunda aparición con otra dimensión 
 | cuadratura adaptativa, integrales múltiples | Gauss–Kronrod |
 | optimización multivariable | Nelder–Mead, BFGS |
 | unidades en ODEs y raíces | `unit_*` cubre integrales, derivadas e interpolación; `rk45` y `newton` siguen en `Float` (un estado con dimensiones mezcladas necesitaría tuplas o records de cantidades) |
-| álgebra lineal avanzada | LU, QR denso, Cholesky, SVD fina y autovectores simétricos ya están disponibles; mínimos cuadrados generalizados, dispersa y álgebra matricial compleja siguen pendientes |
+| álgebra lineal avanzada | LU, QR denso, Cholesky, SVD fina, autovectores simétricos y álgebra compleja densa (matmul, adjunta y solve) ya están disponibles; mínimos cuadrados generalizados, dispersa, `Array<Complex>` y descomposiciones complejas siguen pendientes |

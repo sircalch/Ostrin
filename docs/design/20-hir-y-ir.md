@@ -111,9 +111,10 @@ Sobre este IR se hacen los análisis que el texto C no permite:
    `--native-type-report` publica también `ir-generated`, `hir-generated` y `ast-fallback`.
    El mismo informe agrupa esas cifras por archivo fuente con líneas `native-source`, y la
    prueba diferencial comprueba que la suma por módulo coincide con los totales globales.
-   La prueba diferencial conserva el baseline actual de fallback (2 730 funciones agregadas
+   La prueba diferencial conserva el baseline actual de fallback (2 896 funciones agregadas
    sobre los ejemplos); el incremento acotado incluye las superficies `std.viz.boxplot` y
-   `std.viz.table`, además de los agregados de LU, SVD, número de condición y autovectores,
+   `std.viz.table`, además de los agregados de LU, SVD, número de condición, autovectores y
+   `ComplexVector`/`ComplexMatrix`,
    que quedan pendientes de migrar a IR, y solo permite reducirlo o justificar explícitamente
    otro aumento.
    Los destructores de tareas generados se registran con la firma ABI `void (*)(void*)` del
