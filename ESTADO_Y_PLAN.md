@@ -162,11 +162,14 @@ por separado en `--native-type-report` como `ir-generated`; el mismo informe exp
 `hir-generated` y `ast-fallback` para que la retirada del backend legado tenga un contador
 visible. También publica líneas `native-source` agrupadas por archivo para localizar la deuda
 por módulo; la prueba diferencial comprueba que sus sumas coinciden con el total. En el corte
-actual, la suite de ejemplos suma 2 424 funciones IR, 1 184 HIR y 2 896 que aún caen al emisor
-AST; `native_backend_types_agree_with_the_checker` mantiene 2 896 como trinquete temporal.
+actual, la suite de ejemplos suma 2 657 funciones IR, 1 136 HIR y 2 711 que aún caen al emisor
+AST; `native_backend_types_agree_with_the_checker` mantiene 2 711 como trinquete temporal.
 El puente IR de `zeros`/`ones`, `norm`, `abs` escalar y `sqrt` redujo el fallback en 348 funciones;
+esta pasada añade conversiones escalares `as<Float/Float32>`, `abs` sobre arrays y funciones matemáticas
+deterministas (`sin`, `cos`, `ln`, `exp`, `pi`, `eye` y relacionadas), reduciendo de nuevo el fallback
+con paridad.
 QR y Cholesky ya se emiten desde IR/C; con LU, SVD, número de condición, autovectores y álgebra compleja densa,
-`std.numeric` queda medido en `ir=24`, `hir=9`, `ast=44` por consumidor. Las cuatro funciones de LU basadas
+`std.numeric` queda medido en `ir=33`, `hir=8`, `ast=36` por consumidor. Las cuatro funciones de LU basadas
 en records agregan 68 fallbacks medidos; SVD agrega 88, su número de condición 14, los autovectores públicos
 52 y `ComplexVector`/`ComplexMatrix` 166 más;
 ambas cifras quedan registradas como deuda explícita para la migración de agregados. Las superficies `std.viz.boxplot`, `std.viz.violin`, `std.viz.hexbin`,
@@ -294,8 +297,8 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
 convendría dividirlos; el backend nativo no comparte el sistema de tipos del checker
-(ya consume los tipos del checker y compara cada nodo; el informe actual suma **2 424 funciones
-generadas desde IR, 1 184 desde HIR y 2 896 en fallback AST** en los ejemplos, con un trinquete
+(ya consume los tipos del checker y compara cada nodo; el informe actual suma **2 657 funciones
+generadas desde IR, 1 136 desde HIR y 2 711 en fallback AST** en los ejemplos, con un trinquete
 que impide que el fallback aumente sin justificación; las familias migradas incluyen escalares,
 `String`, records concretos, `Option<Record>`, `List<T>` escalar, `Map`/`Set` escalares, `Option`
 escalar/String y patrones `Some/None`, `Float32`, enteros de ancho fijo, records, enums, `match`,

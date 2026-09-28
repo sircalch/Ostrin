@@ -466,6 +466,11 @@ fn native_backend_types_agree_with_the_checker() {
     // now share the IR/C lowering used by QR and Cholesky. This removes 348
     // previously measured fallback functions across the shared standard-library
     // consumers; keep the new baseline explicit until the next migration pass.
+    // Scalar casts to Float/Float32, array `abs` mapping and deterministic math
+    // builtins (`sin`/`cos`/`ln`/`exp`/`pi`/`eye`, among others) now use the same
+    // typed IR/C path. The change moves the verified suite baseline to 2,711
+    // AST fallbacks (2,657 IR and 1,136 HIR functions); lower this ratchet only
+    // when another backend family is migrated with parity evidence.
     // LU is now a real std.numeric API. Its four aggregate-heavy factorization
     // methods add 68 measured AST functions across the twelve existing numeric
     // consumers plus the new numeric_lu example; this is an explicit feature
@@ -477,7 +482,7 @@ fn native_backend_types_agree_with_the_checker() {
     // ComplexVector/ComplexMatrix add 166 aggregate-heavy scientific functions
     // to the verified fallback until their ownership contracts are migrated.
     // Complex array promotion and SVG-heavy visualization paths remain pending.
-    const MAX_AST_FALLBACK_FUNCTIONS: usize = 2896;
+    const MAX_AST_FALLBACK_FUNCTIONS: usize = 2711;
     assert!(
         ast_fallback <= MAX_AST_FALLBACK_FUNCTIONS,
         "AST fallback grew to {ast_fallback} functions (ratchet limit {MAX_AST_FALLBACK_FUNCTIONS})"

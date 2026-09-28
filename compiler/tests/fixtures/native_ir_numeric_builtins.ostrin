@@ -10,6 +10,14 @@ fn measure(value: Array<Float>) -> Float {
     norm(value)
 }
 
+fn scalar_cast(value: Int) -> Float {
+    value as Float
+}
+
+fn mapped(value: Array<Float>) -> Array<Float> {
+    abs(value)
+}
+
 fn main() -> Void {
     values = make([2, 2])
     values.set(0, 0, 3.0)
@@ -17,4 +25,9 @@ fn main() -> Void {
     print(measure(values))
     print(sqrt(9.0))
     print(make_ones([1])[0])
+    print(scalar_cast(3))
+    print(sin(pi() / 2.0))
+    print(exp(ln(2.0)))
+    print(mapped(array([-3.0, 4.0]))[0])
+    print(eye(2).get(1, 1))
 }

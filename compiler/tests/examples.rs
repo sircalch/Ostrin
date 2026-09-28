@@ -4407,7 +4407,7 @@ fn native_ir_emitter_handles_numeric_array_builtins() {
     );
     let report_text = stdout(&report);
     assert!(
-        report_text.lines().any(|line| line == "ir-generated: 4"),
+        report_text.lines().any(|line| line == "ir-generated: 6"),
         "numeric array builtins did not use IR: {report_text}"
     );
     assert!(
@@ -4422,7 +4422,15 @@ fn native_ir_emitter_handles_numeric_array_builtins() {
         stderr(&emitted)
     );
     let source = stdout(&emitted);
-    for marker in ["Array_Float_full", "Array_Float_norm", "sqrt("] {
+    for marker in [
+        "Array_Float_full",
+        "Array_Float_norm",
+        "Array_Float_map",
+        "Array_Float_eye",
+        "ostrin_dm_sin",
+        "ostrin_dm_ln",
+        "sqrt(",
+    ] {
         assert!(
             source.contains(marker),
             "expected numeric array IR marker '{marker}' in generated C: {source}"
@@ -9462,9 +9470,9 @@ fn std_numeric_cholesky_matches_interpreter_and_native() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/numeric.ostrin "))
         .unwrap_or_else(|| panic!("missing std.numeric source report: {report_text}"));
     assert!(
-        numeric_source.contains("ir=24")
-            && numeric_source.contains("hir=9")
-            && numeric_source.contains("ast=44"),
+        numeric_source.contains("ir=33")
+            && numeric_source.contains("hir=8")
+            && numeric_source.contains("ast=36"),
         "numeric linear algebra regression in native lowering: {numeric_source}"
     );
 }
@@ -9499,9 +9507,9 @@ fn std_numeric_svd_matches_interpreter_and_native() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/numeric.ostrin "))
         .unwrap_or_else(|| panic!("missing std.numeric source report: {report_text}"));
     assert!(
-        numeric_source.contains("ir=24")
-            && numeric_source.contains("hir=9")
-            && numeric_source.contains("ast=44"),
+        numeric_source.contains("ir=33")
+            && numeric_source.contains("hir=8")
+            && numeric_source.contains("ast=36"),
         "numeric SVD lowering report changed unexpectedly: {numeric_source}"
     );
 }
@@ -9531,9 +9539,9 @@ fn std_numeric_eigen_matches_interpreter_and_native() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/numeric.ostrin "))
         .unwrap_or_else(|| panic!("missing std.numeric source report: {report_text}"));
     assert!(
-        numeric_source.contains("ir=24")
-            && numeric_source.contains("hir=9")
-            && numeric_source.contains("ast=44"),
+        numeric_source.contains("ir=33")
+            && numeric_source.contains("hir=8")
+            && numeric_source.contains("ast=36"),
         "numeric eigen lowering report changed unexpectedly: {numeric_source}"
     );
 }
@@ -9563,9 +9571,9 @@ fn std_numeric_complex_linear_algebra_matches_interpreter_and_native() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/numeric.ostrin "))
         .unwrap_or_else(|| panic!("missing std.numeric source report: {report_text}"));
     assert!(
-        numeric_source.contains("ir=24")
-            && numeric_source.contains("hir=9")
-            && numeric_source.contains("ast=44"),
+        numeric_source.contains("ir=33")
+            && numeric_source.contains("hir=8")
+            && numeric_source.contains("ast=36"),
         "numeric complex lowering report changed unexpectedly: {numeric_source}"
     );
 }
@@ -9639,7 +9647,9 @@ fn std_numeric_quantity_arrays_use_the_ir_boundary() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/numeric.ostrin "))
         .unwrap_or_else(|| panic!("missing std.numeric source report: {report_text}"));
     assert!(
-        numeric_source.contains("ir=27") && numeric_source.contains("hir=9"),
+        numeric_source.contains("ir=36")
+            && numeric_source.contains("hir=8")
+            && numeric_source.contains("ast=37"),
         "quantity-array IR coverage regressed: {numeric_source}"
     );
 }

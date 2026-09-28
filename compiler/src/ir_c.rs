@@ -12,6 +12,8 @@
 //! parameters, indexing, element-wise arithmetic/comparisons and array methods use the same generated C array runtime. Quantity arrays share that storage with a unit tag for typed parameters, indexing and list conversion; unit-aware array arithmetic remains on the HIR/AST path. Straight-line tasks additionally use a
 //! generated C environment for immutable captures while larger aggregates,
 //! branching task bodies and scopes retain the verified HIR/AST fallback.
+//! The same boundary now also handles scalar casts, deterministic scalar/array
+//! math builtins and array mapping helpers for numeric `abs`.
 
 use std::collections::{HashMap, HashSet};
 
@@ -1967,21 +1969,82 @@ fn emit_instruction(
                 "Array_Float_norm(".to_string() + &codes[0] + ")"
             } else if callee == "abs" && args.len() == 1 {
                 let arg_ty = value_ty(values, args[0])?;
-                let function = match arg_ty {
-                    Ty::Float if *ty == Ty::Float => "fabs",
-                    Ty::Float32 if *ty == Ty::Float32 => "fabsf",
-                    Ty::Int if *ty == Ty::Int => "ostrin_abs_i64",
-                    _ => return Err(()),
-                };
-                format!("{function}({})", codes[0])
-            } else if callee == "sqrt" && args.len() == 1 {
+                if let Some(element) = array_element(&arg_ty) {
+                    if *ty != arg_ty || !array_supported(&arg_ty) {
+                        return Err(());
+                    }
+                    let function = match element {
+                        Ty::Float => "fabs",
+                        Ty::Float32 => "fabsf",
+                        Ty::Int => "ostrin_abs_i64",
+                        _ => return Err(()),
+                    };
+                    let array_c_name = array_name(&arg_ty).ok_or(())?;
+                    format!("{array_c_name}_map({}, {function})", codes[0])
+                } else {
+                    let function = match arg_ty {
+                        Ty::Float if *ty == Ty::Float => "fabs",
+                        Ty::Float32 if *ty == Ty::Float32 => "fabsf",
+                        Ty::Int if *ty == Ty::Int => "ostrin_abs_i64",
+                        _ => return Err(()),
+                    };
+                    format!("{function}({})", codes[0])
+                }
+            } else if matches!(
+                callee.as_str(),
+                "sin"
+                    | "cos"
+                    | "tan"
+                    | "asin"
+                    | "acos"
+                    | "atan"
+                    | "sinh"
+                    | "cosh"
+                    | "tanh"
+                    | "exp"
+                    | "ln"
+                    | "log10"
+                    | "sqrt"
+                    | "floor"
+                    | "ceil"
+                    | "round"
+                    | "erf"
+            ) && args.len() == 1
+            {
                 let arg_ty = value_ty(values, args[0])?;
-                let function = match arg_ty {
-                    Ty::Float if *ty == Ty::Float => "sqrt",
-                    Ty::Float32 if *ty == Ty::Float32 => "sqrtf",
-                    _ => return Err(()),
+                let exact = matches!(callee.as_str(), "sqrt" | "floor" | "ceil" | "round");
+                let base = if exact {
+                    callee.to_string()
+                } else {
+                    format!("ostrin_dm_{callee}")
                 };
-                format!("{function}({})", codes[0])
+                if let Some(element) = array_element(&arg_ty) {
+                    if *ty != arg_ty || !array_supported(&arg_ty) {
+                        return Err(());
+                    }
+                    let function = match element {
+                        Ty::Float => base,
+                        Ty::Float32 => format!("{base}f"),
+                        _ => return Err(()),
+                    };
+                    let array_c_name = array_name(&arg_ty).ok_or(())?;
+                    format!("{array_c_name}_map({}, {function})", codes[0])
+                } else {
+                    let function = match arg_ty {
+                        Ty::Float if *ty == Ty::Float => base,
+                        Ty::Float32 if *ty == Ty::Float32 => format!("{base}f"),
+                        _ => return Err(()),
+                    };
+                    format!("{function}({})", codes[0])
+                }
+            } else if callee == "pi" && args.is_empty() && *ty == Ty::Float {
+                "3.141592653589793".to_string()
+            } else if callee == "eye"
+                && args.len() == 1
+                && value_ty(values, args[0])? == Ty::Int
+                && *ty == Ty::Applied("Array".to_string(), vec![Ty::Float])
+            {
+                "Array_Float_eye(".to_string() + &codes[0] + ")"
             } else if callee == "args" && args.is_empty() && *ty == Ty::List(Box::new(Ty::String)) {
                 "({ List_String* __ostrin_args = List_String_new_from_array((const char**)ostrin_argv, (int64_t)ostrin_argc); __ostrin_args; })".to_string()
             } else if callee == "env" && args.len() == 1 && value_ty(values, args[0])? == Ty::String
@@ -2735,6 +2798,27 @@ fn emit_instruction(
                 "    {} = (fabs(({value}) - ({expected})) <= ({tolerance}));\n",
                 value_name(*dst)
             ));
+        }
+        IrInstr::Opaque {
+            dst: Some(dst),
+            op,
+            inputs,
+            ty,
+        } if inputs.len() == 1
+            && matches!(op.as_str(), "as<Float>" | "as<Float32>")
+            && matches!(ty, Ty::Float | Ty::Float32) =>
+        {
+            let source_ty = value_ty(values, inputs[0])?;
+            if !scalar(&source_ty) || source_ty == Ty::Void || source_ty == Ty::String {
+                return Err(());
+            }
+            let source = value_code(values, inputs[0])?;
+            let cast = if *ty == Ty::Float {
+                format!("((double)({source}))")
+            } else {
+                format!("((float)({source}))")
+            };
+            out.push_str(&format!("    {} = {cast};\n", value_name(*dst)));
         }
         IrInstr::Opaque {
             dst: Some(dst),
