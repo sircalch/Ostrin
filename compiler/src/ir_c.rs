@@ -1369,15 +1369,25 @@ fn emit_instruction(
             if !records
                 .get(&record)
                 .is_some_and(|fields| fields.iter().any(|name| name == field))
-                || !scalar(&value_ty)
+                || !supported(&value_ty, records)
             {
                 return Err(());
             }
+            let object_code = value_code(values, *object)?;
+            let value_code = value_code(values, *value)?;
+            let field_access = format!("({object_code})->{field}");
+            // Record fields own their managed payloads. Retain the incoming
+            // value before releasing the old field so self-assignment and
+            // aliases remain valid while the destructor-visible field changes.
+            if let Some(retain) = retain_payload(&value_code, &value_ty, records) {
+                out.push_str(&format!("    {retain};\n"));
+            }
+            if let Some(release) = release_payload(&field_access, &value_ty, records) {
+                out.push_str(&format!("    {release};\n"));
+            }
             out.push_str(&format!(
                 "    ({})->{} = {};\n",
-                value_code(values, *object)?,
-                field,
-                value_code(values, *value)?
+                object_code, field, value_code
             ));
         }
         IrInstr::Index {

@@ -162,19 +162,21 @@ por separado en `--native-type-report` como `ir-generated`; el mismo informe exp
 `hir-generated` y `ast-fallback` para que la retirada del backend legado tenga un contador
 visible. También publica líneas `native-source` agrupadas por archivo para localizar la deuda
 por módulo; la prueba diferencial comprueba que sus sumas coinciden con el total. En el corte
-actual, la suite de ejemplos suma 2 840 funciones IR, 1 136 HIR y 2 528 que aún caen al emisor
-AST; `native_backend_types_agree_with_the_checker` mantiene 2 528 como trinquete temporal.
+actual, la suite de ejemplos suma 5 035 funciones IR, 286 HIR y 1 183 que aún caen al emisor
+AST; `native_backend_types_agree_with_the_checker` mantiene 1 183 como trinquete temporal. Los métodos
+de records y enums concretos comparten ahora IR/C cuando sus campos y ownership son compatibles; los
+records recursivos conservan HIR/AST hasta cerrar su contrato de ownership.
 El puente IR de `zeros`/`ones`, `norm`, `abs` escalar y `sqrt` redujo el fallback en 348 funciones;
 esta pasada añade conversiones escalares `as<Float/Float32>`, `abs` sobre arrays y funciones matemáticas
 deterministas (`sin`, `cos`, `ln`, `exp`, `pi`, `eye` y relacionadas), reduciendo de nuevo el fallback
 con paridad.
 QR y Cholesky ya se emiten desde IR/C; con LU, SVD, número de condición, autovectores y álgebra compleja densa,
-`std.numeric` queda medido en `ir=36`, `hir=8`, `ast=33` por consumidor: los diagnósticos de convergencia de
+`std.numeric` queda medido en `ir=72`, `hir=0`, `ast=5` por consumidor (`Array<Quantity<D>>`: `ir=75`,
+`hir=0`, `ast=6`): los diagnósticos de convergencia de
 `secant` y `newton` ya convierten sus límites enteros a texto desde IR/C, y `powi` despacha `Complex` mediante
-el operador `mul` registrado. Las cuatro funciones de LU basadas
-en records agregan 68 fallbacks medidos; SVD agrega 88, su número de condición 14, los autovectores públicos
-52 y `ComplexVector`/`ComplexMatrix` 166 más;
-ambas cifras quedan registradas como deuda explícita para la migración de agregados. Las superficies `std.viz.boxplot`, `std.viz.violin`, `std.viz.hexbin`,
+el operador `mul` registrado. Las cifras históricas de deuda por función de LU, SVD y álgebra compleja
+quedaron superadas por la migración de métodos; el informe actual deja como deuda verificable los
+recorridos y helpers que aún requieren agregados anidados y ownership no lineal. Las superficies `std.viz.boxplot`, `std.viz.violin`, `std.viz.hexbin`,
 `std.viz.contourf`, `std.viz.quiver`, `std.viz.streamplot`, `std.viz.table` y
 `std.viz.vector_field`, además de funciones numéricas auxiliares y agregados SVG, siguen
 compartiendo funciones AST y forman la siguiente deuda verificable. Los marcadores de ownership de
@@ -299,9 +301,11 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
 convendría dividirlos; el backend nativo no comparte el sistema de tipos del checker
-(ya consume los tipos del checker y compara cada nodo; el informe actual suma **2 840 funciones
-generadas desde IR, 1 136 desde HIR y 2 528 en fallback AST** en los ejemplos, con un trinquete
-que impide que el fallback aumente sin justificación; las familias migradas incluyen escalares,
+(ya consume los tipos del checker y compara cada nodo; el informe actual suma **5 035 funciones
+generadas desde IR, 286 desde HIR y 1 183 en fallback AST** en los ejemplos, con un trinquete
+que impide que el fallback aumente sin justificación; los métodos de records y enums concretos
+entran ahora en IR/C cuando sus campos y ownership son compatibles, mientras los records recursivos
+conservan el fallback verificado; las familias migradas incluyen escalares,
 `String`, records concretos, `Option<Record>`, `List<T>` escalar, `Map`/`Set` escalares, `Option`
 escalar/String y patrones `Some/None`, `Float32`, enteros de ancho fijo, records, enums, `match`,
 `Option`/`Result`, listas/colecciones, cierres, instancias concretas de genéricos, records/enums

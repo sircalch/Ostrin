@@ -6,7 +6,9 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
 ## Siguiente ciclo
 
 1. Reducir el fallback AST con el trinquete por archivo de `--native-type-report` (baseline actual:
-   2.840 funciones IR, 1.136 HIR y 2.528 AST). El puente IR para los constructores numéricos
+   5.035 funciones IR, 286 HIR y 1.183 AST). Los métodos de records y enums concretos ya comparten
+   la ruta IR/C cuando sus campos y ownership son compatibles; los records recursivos permanecen
+   deliberadamente en HIR/AST hasta cerrar ese contrato. El puente IR para los constructores numéricos
    `zeros`/`ones`, `norm`, `abs` escalar y `sqrt` migró 348 funciones compartidas por la suite;
    LU ya está disponible con paridad publicada en el Lab; QR y Cholesky cruzan la IR y conservan esa
    paridad. La deuda restante
@@ -21,9 +23,9 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    ahora cubre eliminación con pivoteo parcial, reconstrucción, determinante y resolución triangular;
    `std.numeric.eigen` añade autovalores y autovectores ortonormales para matrices simétricas;
    `std.numeric.svd` añade SVD fina densa, rango, número de condición y resolución por pseudoinversa. Sus métodos con
-   records agregan 68 fallbacks medidos para LU, 88 para SVD, 14 más para su número de condición y
-   52 para los autovectores públicos, como deuda explícita del siguiente
-   pase de agregados; dispersa y métodos complejos avanzados siguen pendientes. La primera
+   las cifras históricas de deuda de LU, SVD y autovectores quedaron superadas por la migración
+   de métodos; los recorridos matriciales y agregados que aún requieren ownership anidado siguen
+   pendientes del siguiente pase. La primera
    migración de arrays gestionados ya está en la IR/C: `Array<Quantity<D>>` conserva la unidad
    al indexar y al construir arrays desde listas, y `std.numeric` usa ese camino en sus
    integrales e interpolación con cantidades; la aritmética elemento a elemento de arrays con
