@@ -1,6 +1,6 @@
 # Ostrin website audit
 
-*Cut: 2026-09-27 · source counts and public fallbacks are checked by `scripts/website-check.mjs`.*
+*Cut: 2026-09-28 · source counts and public fallbacks are checked by `scripts/website-check.mjs`.*
 
 This is a current inventory, not a roadmap claim. Public statements should remain tied to code,
 tests or an explicitly labeled early-stage surface.
@@ -16,6 +16,7 @@ tests or an explicitly labeled early-stage surface.
 | Browser playground | `website/playground.html`, `website/playground.js`, `.github/workflows/pages.yml` | Generated `ostrinc.wasm`; Run, Check, Test, Format, share links and source diagnostics execute in an in-memory WASI filesystem and are exercised in Chromium before CI passes or Pages uploads |
 | Learn and Reference | `website/docs.html`, `website/reference.html`, `website/language.html`, `docs/design/` | Guided 14-step learning path; Reference indexes all 24 design documents and the CLI flags, checked against `ostrinc --help` |
 | Showcase | `website/showcase.html` | Four repository-backed demonstrations; every displayed output line is verified against its program by `scripts/lab-data.mjs` |
+| Benchmarks | `website/benchmarks.html`, `website/benchmark-data.js`, `scripts/benchmark.mjs` | Eight deterministic workloads compare interpreter and native process medians; the page publishes commit, environment, sampling and output provenance without cross-language claims |
 | Community | `website/community.html`, `CONTRIBUTING.md`, issue templates | Contribution path and repository channels; no unverified chat, registry or external community is claimed |
 | Ecosystem and roadmap | `website/ecosystem.html`, `website/roadmap.html` | Current capabilities, early areas and future work are distinguished |
 | Deployment and editor | `.github/workflows/pages.yml`, `vscode-ostrin/`, LSP/DAP sources | Pages builds and checks the WASM artifact; editor support is implemented, Marketplace publication is not claimed |
@@ -32,6 +33,9 @@ tests or an explicitly labeled early-stage surface.
   are executed under Node WASI.
 - The browser playground uses the generated compiler WASM and the real CLI in an in-memory WASI
   filesystem; it is not a JavaScript reimplementation of the language.
+- The benchmark page records one deliberate run at a time. Its ratios compare Ostrin's
+  interpreter and native executable on the same machine; they do not represent Python, Julia,
+  Rust or another platform.
 
 `website/site-data.js` is generated from the repository and holds the public display facts consumed
 by every page before `website/site.js` runs. `scripts/site-facts.mjs` derives the expected version
@@ -48,7 +52,7 @@ fail before publication.
   release; installer scripts require a maintainer-published matching tag.
 - Some compiler/runtime and scientific-library capabilities remain explicitly early or incomplete;
   the site should preserve those maturity labels and avoid implying production readiness.
-- Chromium regression coverage now checks all nine pages at phone/tablet widths, mobile/tablet
+- Chromium regression coverage now checks all fourteen pages at phone/tablet widths, mobile/tablet
   navigation, the real compiler output and a real diagnostic. Firefox/WebKit behavior, broader
   screen-reader checks and visual baselines are not covered yet.
 - Keep external services, analytics and community-channel claims out of the site until they have a

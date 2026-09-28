@@ -301,6 +301,22 @@ h4 { font-size: .86rem; }
 .showcase-output .ok { color: var(--green); }
 .showcase-links { display: flex; flex-wrap: wrap; gap: 12px 20px; margin-top: 18px; font-size: .73rem; }
 .showcase-links a { color: var(--violet-2); }
+.benchmark-meta { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; margin-top: 35px; background: var(--line); border: 1px solid var(--line); }
+.benchmark-meta-card { min-width: 0; min-height: 125px; padding: 22px; background: var(--night-2); }
+.benchmark-meta-card .tag { display: block; margin-bottom: 28px; color: var(--violet); font: .64rem var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+.benchmark-meta-card strong { display: block; overflow-wrap: anywhere; color: var(--white); font: .78rem var(--mono); font-weight: 400; }
+.benchmark-table-wrap { overflow-x: auto; margin-top: 35px; border: 1px solid var(--line); }
+.benchmark-table { width: 100%; min-width: 700px; border-collapse: collapse; background: var(--night-2); font: .76rem/1.5 var(--mono); }
+.benchmark-table caption { padding: 18px 20px; border-bottom: 1px solid var(--line); color: var(--muted); text-align: left; }
+.benchmark-table th, .benchmark-table td { padding: 14px 16px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+.benchmark-table th:first-child, .benchmark-table td:first-child { text-align: left; }
+.benchmark-table thead th { color: var(--muted-2); font-size: .65rem; font-weight: 400; letter-spacing: .07em; text-transform: uppercase; }
+.benchmark-table tbody th { color: var(--violet-2); font-weight: 400; }
+.benchmark-table tbody td { color: var(--muted); }
+.benchmark-table tbody td:nth-child(3), .benchmark-table tbody td:nth-child(4) { color: var(--green); }
+.benchmark-table tr:last-child th, .benchmark-table tr:last-child td { border-bottom: 0; }
+.benchmark-note { margin-top: 24px; }
+.benchmark-command { margin: 27px 0 0; overflow-x: auto; }
 .community-card .tool-icon { display: block; }
 .community-card h3 { margin-top: 25px; }
 .community-card .button-quiet { margin-top: 28px; }
@@ -379,7 +395,7 @@ h4 { font-size: .86rem; }
   .rule-row { grid-template-columns: 36px 1fr; gap: 14px; }
   .rule-row code { grid-column: 2; justify-self: start; }
   .dark-band .section, .paper-band { padding: 88px 0; }
-  .feature-grid, .feature-page-grid, .paper-grid, .example-grid, .live-example-grid, .showcase-grid, .community-grid, .tool-grid, .ecosystem-status, .docs-index, .learn-grid, .command-list { grid-template-columns: minmax(0, 1fr); }
+  .feature-grid, .feature-page-grid, .paper-grid, .example-grid, .live-example-grid, .showcase-grid, .community-grid, .tool-grid, .ecosystem-status, .docs-index, .learn-grid, .command-list, .benchmark-meta { grid-template-columns: minmax(0, 1fr); }
   .feature-card { min-height: 195px; }
   .feature-number { margin-bottom: 30px; }
   .page-hero { padding: 80px 0 65px; }

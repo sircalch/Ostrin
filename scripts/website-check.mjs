@@ -232,6 +232,16 @@ for (const marker of ["examples/physics.ostrin", "examples/data_project", "examp
   check(showcase.includes(marker), `showcase.html: missing evidence link ${marker}`);
 }
 
+const benchmarks = read("website/benchmarks.html");
+check(benchmarks.includes('<script src="benchmark-data.js" defer></script>'), "benchmarks.html: missing generated benchmark data");
+check(benchmarks.includes('<script src="benchmarks.js" defer></script>'), "benchmarks.html: missing benchmark renderer");
+check(benchmarks.includes("data-benchmark-rows"), "benchmarks.html: missing benchmark table");
+const benchmarkData = read("website/benchmark-data.js");
+check(benchmarkData.includes("globalThis.OSTRIN_BENCHMARK") && benchmarkData.includes('"schema": 1'),
+  "website/benchmark-data.js: missing generated benchmark record");
+check(read("benchmarks/README.md").includes("interpreter-versus-native"),
+  "benchmarks/README.md: missing benchmark contract");
+
 const community = read("website/community.html");
 for (const marker of ["issues/new/choose", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md", "community-labels.md"]) {
   check(community.includes(marker), `community.html: missing contribution link ${marker}`);

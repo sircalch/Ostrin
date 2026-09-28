@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Performance evidence: reproducible benchmark dashboard
+- `scripts/benchmark.mjs` now measures eight deterministic workloads spanning scalar loops,
+  arrays, quantities, numerical methods, dense real and complex linear algebra, and SVG
+  visualization. Interpreter and native output must match before timing is recorded.
+- `website/benchmarks.html` publishes the captured commit, compiler, environment, sampling,
+  output hashes and medians without presenting a local ratio as a cross-language benchmark.
+  `benchmarks/README.md` documents the contract and the scheduled workflow keeps the raw JSON
+  available as an artifact.
+
 ### Native IR: numeric array builtins and linear algebra
 - The native IR emitter now lowers `zeros`/`ones`, `norm`, scalar `abs` and `sqrt` through
   the typed array/runtime helpers. Dense QR and Cholesky therefore compile through IR/C while

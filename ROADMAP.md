@@ -29,10 +29,12 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
 3. Añadir casos de compilación nativa y divergencia semántica al fuzzing de entradas válidas.
 4. Medir cobertura reproducible y publicar benchmarks nativo frente a intérprete.
    La cobertura queda registrada por commit en `coverage.yml` como resumen y LCOV;
-   `benchmarks.yml` ejecuta ahora cargas escalares, de arrays, cantidades y métodos
-   numéricos, y conserva el JSON con las medianas de ambos caminos. Falta añadir
-   cargas de álgebra lineal, visualización y comparaciones históricas antes de usarlo
-   como presupuesto de rendimiento.
+   `benchmarks.yml` ejecuta ahora cargas escalares, de arrays, cantidades, métodos
+   numéricos, álgebra lineal densa, álgebra compleja y visualización SVG, y conserva
+   el JSON con las medianas de ambos caminos. `website/benchmarks.html` publica un
+   registro reproducible con commit, entorno, muestras, hashes de salida y método;
+   faltan comparaciones históricas y mediciones externas antes de usarlo como presupuesto
+   de rendimiento entre versiones o lenguajes.
 5. **Objetivo de distribución y reconocimiento en GitHub Linguist**: reunir uso público
    distribuido y licencias trazables; preparar la definición de lenguaje (`languages.yml`,
    extensiones, gramática y muestras); mantener el borrador en `docs/linguist.md`; validarla

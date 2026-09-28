@@ -372,8 +372,10 @@ por archivo fuente y verifican la suma contra el total global. El siguiente incr
 casos de compilación nativa y divergencia semántica sobre las mutaciones válidas antes de
 retirar más fallback AST; la cobertura ya deja resumen y LCOV por commit en Actions, y
 `benchmarks.yml` conserva por commit las medianas de cargas escalares, arrays,
-cantidades y métodos numéricos para intérprete y nativo. Las cargas de álgebra lineal,
-visualización y la comparación histórica todavía siguen pendientes.
+cantidades, métodos numéricos, álgebra lineal densa, álgebra compleja y visualización SVG
+para intérprete y nativo. `website/benchmarks.html` publica el registro con commit,
+entorno, iteraciones y hashes de salida; las comparaciones históricas y externas siguen
+pendientes y no se presentan como resultados actuales.
 
 ### G. Producto
 **Homepage 3.0 (2026-09-24).** La portada muestra el estado de la release derivado de
@@ -397,7 +399,8 @@ sin prometer capacidades no implementadas. El playground y sus live examples ren
 diagnósticos JSON reales con código, ubicación, severidad y mensaje, y seleccionan la línea
 diagnosticada en el editor. La versión y las métricas públicas ahora salen de
 `scripts/site-facts.mjs`/`website/site-data.js`, con una comprobación de frescura en CI. Siguiente:
-prueba responsive móvil con viewport dedicado y mejora incremental del learning funnel.
+el panel público de benchmarks debe crecer con histórico por commit sin mezclar entornos ni
+convertir ratios locales en comparaciones entre lenguajes.
 ### H. Distribución y reconocimiento en GitHub
 
 **Objetivo:** subir la definición de Ostrin al proyecto oficial
