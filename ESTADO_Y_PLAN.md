@@ -101,7 +101,7 @@ galería `website/viz.html` y las pestañas Plot/3D del Lab las ejecutan en el n
 
 **Métodos numéricos**: `std.numeric` (documento 24) resuelve raíces, integrales, derivadas, mínimos,
 interpolación (lineal y spline cúbico), ODEs (`rk4`, `rk45` adaptativo), LU con pivoteo parcial, QR denso,
-SVD fina (`U`, `s`, `Vᵀ`, rango y pseudoinversa), Cholesky (`L`, reconstrucción y resolución triangular) y FFT, escrito en Ostrin; las pestañas ODE, Linear Algebra y
+SVD fina (`U`, `s`, `Vᵀ`, rango, número de condición y pseudoinversa), Cholesky (`L`, reconstrucción y resolución triangular) y FFT, escrito en Ostrin; las pestañas ODE, Linear Algebra y
 Complex del Lab lo ejecutan en el navegador.
 
 **Numérico/científico**: literales científicos (`6.022e23`), enteros de ancho fijo, `Float32`, `Array<T>` (difusión, máscaras,
@@ -162,11 +162,12 @@ por separado en `--native-type-report` como `ir-generated`; el mismo informe exp
 `hir-generated` y `ast-fallback` para que la retirada del backend legado tenga un contador
 visible. También publica líneas `native-source` agrupadas por archivo para localizar la deuda
 por módulo; la prueba diferencial comprueba que sus sumas coinciden con el total. En el corte
-actual, la suite de ejemplos suma 2 320 funciones IR, 1 166 HIR y 2 664 que aún caen al emisor
-AST; `native_backend_types_agree_with_the_checker` mantiene 2 664 como trinquete temporal.
+actual, la suite de ejemplos suma 2 320 funciones IR, 1 166 HIR y 2 678 que aún caen al emisor
+AST; `native_backend_types_agree_with_the_checker` mantiene 2 678 como trinquete temporal.
 El puente IR de `zeros`/`ones`, `norm`, `abs` escalar y `sqrt` redujo el fallback en 348 funciones;
 QR y Cholesky ya se emiten desde IR/C; al sumar LU, `std.numeric` queda medido en `ir=17`, `hir=9`, `ast=30`
-por consumidor. Las cuatro funciones de LU basadas en records agregan 68 fallbacks medidos y SVD agrega 88 más;
+por consumidor. Las cuatro funciones de LU basadas en records agregan 68 fallbacks medidos; SVD agrega 88 y
+su número de condición 14 más;
 ambas cifras quedan registradas como deuda explícita para la migración de agregados. Las superficies `std.viz.boxplot`, `std.viz.violin`, `std.viz.hexbin`,
 `std.viz.contourf`, `std.viz.quiver`, `std.viz.streamplot`, `std.viz.table` y
 `std.viz.vector_field`, además de funciones numéricas auxiliares y agregados SVG, siguen
@@ -293,7 +294,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
 convendría dividirlos; el backend nativo no comparte el sistema de tipos del checker
 (ya consume los tipos del checker y compara cada nodo; el informe actual suma **2 320 funciones
-generadas desde IR, 1 166 desde HIR y 2 664 en fallback AST** en los ejemplos, con un trinquete
+generadas desde IR, 1 166 desde HIR y 2 678 en fallback AST** en los ejemplos, con un trinquete
 que impide que el fallback aumente sin justificación; las familias migradas incluyen escalares,
 `String`, records concretos, `Option<Record>`, `List<T>` escalar, `Map`/`Set` escalares, `Option`
 escalar/String y patrones `Some/None`, `Float32`, enteros de ancho fijo, records, enums, `match`,

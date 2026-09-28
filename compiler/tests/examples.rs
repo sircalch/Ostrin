@@ -9464,7 +9464,7 @@ fn std_numeric_cholesky_matches_interpreter_and_native() {
     assert!(
         numeric_source.contains("ir=20")
             && numeric_source.contains("hir=9")
-            && numeric_source.contains("ast=34"),
+            && numeric_source.contains("ast=35"),
         "numeric linear algebra regression in native lowering: {numeric_source}"
     );
 }
@@ -9481,7 +9481,7 @@ fn std_numeric_lu_matches_interpreter_and_native() {
 fn std_numeric_svd_matches_interpreter_and_native() {
     assert_eq!(
         interpreter_and_native_agree("numeric_svd.ostrin"),
-        "singular values =\n[3.2566, 1.8424]\nrank = 2\nreconstruction residual = 0\nleast-squares solution =\n[1, 2]\nsolve residual = 0\nsingular rank = 1\nnonsquare input = svd needs a two-dimensional matrix\n"
+        "singular values =\n[3.2566, 1.8424]\nrank = 2\ncondition number = 1.7676\nreconstruction residual = 0\nleast-squares solution =\n[1, 2]\nsolve residual = 0\nsingular rank = 1\nsingular condition error = condition number is undefined for a rank-deficient matrix\nnonsquare input = svd needs a two-dimensional matrix\n"
     );
 
     let report = run(&["--native-type-report", &example_path("numeric_svd.ostrin")]);
@@ -9501,7 +9501,7 @@ fn std_numeric_svd_matches_interpreter_and_native() {
     assert!(
         numeric_source.contains("ir=20")
             && numeric_source.contains("hir=9")
-            && numeric_source.contains("ast=34"),
+            && numeric_source.contains("ast=35"),
         "numeric SVD lowering report changed unexpectedly: {numeric_source}"
     );
 }

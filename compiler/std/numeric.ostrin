@@ -581,6 +581,22 @@ impl Svd {
         count
     }
 
+    /// The 2-norm condition number of a full-rank matrix.
+    ///
+    /// A rank-deficient matrix has no finite condition number at the requested
+    /// tolerance and returns a diagnostic instead of exposing an infinity that
+    /// would be easy to mistake for a usable numerical result.
+    fn condition_number(self, tol: Float = 1e-12) -> Result<Float, String> {
+        if self.s.length() == 0 {
+            return Err("condition number needs at least one singular value")
+        }
+        smallest = self.s[self.s.length() - 1]
+        if smallest <= tol {
+            return Err("condition number is undefined for a rank-deficient matrix")
+        }
+        Ok(self.s[0] / smallest)
+    }
+
     /// Least-squares or minimum-norm solution using the pseudoinverse.
     /// `rhs` must be a vector with one entry per matrix row.
     fn solve(self, rhs: Array<Float>, tol: Float = 1e-12) -> Array<Float> {

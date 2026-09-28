@@ -21,12 +21,14 @@
 
 ### Scientific core: thin SVD
 - `std.numeric.svd` now provides a dense real thin singular value decomposition with descending
-  singular values, reconstruction, rank and least-squares/minimum-norm solving through the
+  singular values, reconstruction, rank, 2-norm condition-number diagnostics and
+  least-squares/minimum-norm solving through the
   pseudoinverse. It uses deterministic Jacobi rotations of `AᵀA`, with a documented LAPACK FFI
   path reserved for large or ill-conditioned workloads.
 - `numeric_svd.ostrin` and the Scientific Lab verify interpreter/native/WASM parity, including a
   rank-deficient input diagnostic path. The aggregate SVD implementation adds 88 measured AST
-  fallbacks to the current ratchet until records and arrays complete their IR ownership lowering.
+  fallbacks, and the condition-number method adds 14 more to the current ratchet until records
+  and arrays complete their IR ownership lowering.
 
 ### Scientific core: experimental complex numbers
 - `std.numeric` now exposes a `Complex` record backed by `Float64`, with rectangular and polar
