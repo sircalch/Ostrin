@@ -2,7 +2,7 @@
 
 *Corte: 2026-09-27 · rama `main` · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 238 de integración y 2 unitarias en verde.*
 
-Validación remota: Pages, CI, CodeQL, sanitizers y auditoría de seguridad pasaron para `0c43289` (PR #64, SVD fina densa) en Windows, Linux, macOS y web. La
+Validación remota: Pages, CI, CodeQL, sanitizers y auditoría de seguridad pasaron para `4ea9da3` (PR #65, número de condición SVD) en Windows, Linux, macOS y web. La
 compuerta oficial exige `cargo fmt --check`, Clippy con el lint `suspicious`, la suite del
 compilador y las comprobaciones del sitio; los workflows de auditoría de dependencias,
 CodeQL, sanitizers nativos y cobertura quedan registrados para el ciclo P5.
