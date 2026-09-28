@@ -60,6 +60,7 @@ lu.determinant()                             // determinante con el signo de los
 svd = numeric.svd(a)                        // Result<Svd, String>, SVD fina real densa
 svd.u  svd.s  svd.vt                         // A = U @ diag(s) @ Vᵀ, singular values descendentes
 svd.reconstruct()  svd.rank()                // reconstrucción y rango numérico
+svd.condition_number()                       // número de condición 2-norma o diagnóstico de rango
 svd.solve(rhs)                               // solución de mínimos cuadrados/pseudoinversa
 
 // Con unidades: xs: Array<Quantity<X>>, ys: Array<Quantity<Y>>
@@ -100,9 +101,10 @@ ningún caso especial en el runtime. Requieren al menos dos muestras.
   Linear Algebra y la suite intérprete/nativo cubren pivoteo, matriz singular y matriz no cuadrada.
 - **SVD**: la SVD fina forma `AᵀA`, diagonaliza la matriz simétrica con rotaciones cíclicas de Jacobi,
   ordena los autovalores de mayor a menor y calcula `U`, `s` y `Vᵀ`. `reconstruct` verifica la
-  factorización; `solve` aplica la pseudoinversa con un umbral de rango. La ruta es determinista y
-  adecuada para matrices densas pequeñas/medianas; LAPACK/FFI queda reservado para problemas
-  grandes o mal condicionados.
+  factorización; `rank` cuenta los valores singulares efectivos; `condition_number` devuelve el
+  número de condición 2-norma o un diagnóstico si la matriz es deficiente de rango; `solve` aplica
+  la pseudoinversa con un umbral de rango. La ruta es determinista y adecuada para matrices densas
+  pequeñas/medianas; LAPACK/FFI queda reservado para problemas grandes o mal condicionados.
 - **Complejos**: `Complex` es por ahora un record público de `Float64` con operadores `Add`, `Sub`,
   `Mul`, `Div`, igualdad, conjugado, magnitud, forma polar, `cis` y potencias enteras. El ejemplo
   `numeric_complex.ostrin` y la pestaña Complex del Lab verifican la misma salida en intérprete,

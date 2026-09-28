@@ -58,6 +58,10 @@ fn main() -> Void {
             print("SVD singular values:")
             print(round(factors.s * 10000.0) / 10000.0)
             print("SVD rank = " + factors.rank().to_string())
+            match factors.condition_number() {
+                Ok(value) => print("SVD condition number = " + clean(value).to_string()),
+                Err(message) => print("SVD condition error = " + message),
+            }
             print("SVD reconstruction residual = " + clean(norm(factors.reconstruct() - k)).to_string())
             svd_solution = factors.solve(clone(force))
             print("SVD solve residual = " + clean(norm(k @ svd_solution - force)).to_string())

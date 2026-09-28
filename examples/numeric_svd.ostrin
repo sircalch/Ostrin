@@ -16,6 +16,10 @@ fn main() -> Void {
             print("singular values =")
             print(round(factors.s * 10000.0) / 10000.0)
             print("rank = " + factors.rank().to_string())
+            match factors.condition_number() {
+                Ok(value) => print("condition number = " + clean(value).to_string()),
+                Err(message) => print("condition number error = " + message),
+            }
             print("reconstruction residual = " + clean(norm(factors.reconstruct() - a)).to_string())
             rhs = array([5.0, 4.0, 0.0])
             expected = clone(rhs)
@@ -28,7 +32,13 @@ fn main() -> Void {
     }
 
     match numeric.svd(array([[1.0, 2.0], [2.0, 4.0]])) {
-        Ok(factors) => print("singular rank = " + factors.rank().to_string()),
+        Ok(factors) => {
+            print("singular rank = " + factors.rank().to_string())
+            match factors.condition_number() {
+                Ok(value) => print("singular condition number = " + clean(value).to_string()),
+                Err(message) => print("singular condition error = " + message),
+            }
+        },
         Err(message) => print("unexpected singular SVD error: " + message),
     }
 
