@@ -9620,6 +9620,31 @@ fn std_numeric_integrates_and_differentiates_quantity_arrays() {
 }
 
 #[test]
+fn std_numeric_quantity_arrays_use_the_ir_boundary() {
+    let report = run(&[
+        "--native-type-report",
+        &example_path("numeric_units.ostrin"),
+    ]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "quantity-array type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    let numeric_source = report_text
+        .lines()
+        .find(|line| line.starts_with("native-source: <ostrin-std>/numeric.ostrin "))
+        .unwrap_or_else(|| panic!("missing std.numeric source report: {report_text}"));
+    assert!(
+        numeric_source.contains("ir=27") && numeric_source.contains("hir=9"),
+        "quantity-array IR coverage regressed: {numeric_source}"
+    );
+}
+
+#[test]
 fn dimension_generics_bind_inside_arrays() {
     let out = run(&["--check", &example_path("unit_generic_errors.ostrin")]);
     assert!(!out.status.success());

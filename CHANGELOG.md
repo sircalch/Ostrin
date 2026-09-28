@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Native IR: quantity-array boundary
+- `Array<Quantity<D>>` now has a typed IR/C boundary for parameters, ownership, indexing and
+  conversion from `List<Quantity<D>>`. Indexed values preserve the array unit tag, so the unit
+  integration and interpolation routines in `std.numeric` can run through the same native CFG
+  path as scalar arrays while keeping interpreter/native output identical.
+- Unit-aware array arithmetic and shape-changing methods remain on the verified HIR/AST path
+  until dedicated IR helpers preserve units for every result.
+
 ### Performance evidence: reproducible benchmark dashboard
 - `scripts/benchmark.mjs` now measures eight deterministic workloads spanning scalar loops,
   arrays, quantities, numerical methods, dense real and complex linear algebra, and SVG
