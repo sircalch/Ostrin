@@ -9,7 +9,7 @@
 //! `Result<T,E>` values such as `String.to_int()`/`to_float()`; wrappers can
 //! now compose over scalar collections and over other `Option`/`Result` values
 //! with recursive ownership markers. Scalar numeric `Array<T>` 1D constructors,
-//! parameters, indexing, element-wise arithmetic/comparisons and array methods use the same generated C array runtime. Straight-line tasks additionally use a
+//! parameters, indexing, element-wise arithmetic/comparisons and array methods use the same generated C array runtime. Quantity arrays share that storage with a unit tag for typed parameters, indexing and list conversion; unit-aware array arithmetic remains on the HIR/AST path. Straight-line tasks additionally use a
 //! generated C environment for immutable captures while larger aggregates,
 //! branching task bodies and scopes retain the verified HIR/AST fallback.
 
@@ -149,7 +149,7 @@ fn c_type(ty: &Ty, records: &RecordFields) -> Bail<String> {
             format!("Task_{}*", mangle_task_payload(&args[0], records))
         }
         Ty::Applied(name, args) if name == "Array" && args.len() == 1 && array_supported(ty) => {
-            format!("Array_{}*", mangle_scalar(&args[0]))
+            format!("{}*", array_name(ty).ok_or(())?)
         }
         Ty::Applied(name, args)
             if name == "Option" && args.len() == 1 && option_supported(&args[0], records) =>
@@ -196,14 +196,22 @@ fn array_element(ty: &Ty) -> Option<&Ty> {
 fn array_supported(ty: &Ty) -> bool {
     matches!(
         array_element(ty),
-        Some(Ty::Int | Ty::Float | Ty::Float32 | Ty::Bool)
+        Some(Ty::Int | Ty::Float | Ty::Float32 | Ty::Bool | Ty::Quantity(_))
     )
 }
 
 fn array_name(ty: &Ty) -> Option<String> {
     array_element(ty)
-        .filter(|element| matches!(**element, Ty::Int | Ty::Float | Ty::Float32 | Ty::Bool))
-        .map(|element| format!("Array_{}", mangle_scalar(element)))
+        .filter(|element| {
+            matches!(
+                **element,
+                Ty::Int | Ty::Float | Ty::Float32 | Ty::Bool | Ty::Quantity(_)
+            )
+        })
+        .map(|element| match element {
+            Ty::Quantity(_) => "Array_Float".to_string(),
+            _ => format!("Array_{}", mangle_scalar(element)),
+        })
 }
 
 fn supported(ty: &Ty, records: &RecordFields) -> bool {
@@ -222,7 +230,7 @@ fn supported(ty: &Ty, records: &RecordFields) -> bool {
 }
 
 fn list_element_supported(ty: &Ty) -> bool {
-    scalar(ty) && *ty != Ty::Void
+    (scalar(ty) && *ty != Ty::Void) || quantity(ty)
 }
 
 fn list_supported(ty: &Ty, records: &RecordFields) -> bool {
@@ -325,6 +333,13 @@ fn mangle_scalar(ty: &Ty) -> String {
 
 fn mangle_option_payload(ty: &Ty, records: &RecordFields) -> String {
     match ty {
+        Ty::Quantity(dimension) => format!(
+            "Q_{}",
+            crate::types::dim_to_string(dimension)
+                .chars()
+                .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+                .collect::<String>()
+        ),
         Ty::Named(name) if records.contains_key(name) => name.clone(),
         Ty::Applied(_, _) if record_name(ty, records).is_some() => {
             record_name(ty, records).unwrap_or_default()
@@ -924,6 +939,16 @@ fn emit_instruction(
             let right_ty = value_ty(values, *right)?;
             let left_array = array_element(&left_ty).cloned();
             let right_array = array_element(&right_ty).cloned();
+            // Quantity arrays carry their unit in the runtime header. The
+            // scalar array helpers do not preserve that tag, so keep their
+            // element-wise arithmetic on the established HIR/AST path until
+            // the IR has unit-aware array operators of its own.
+            if matches!(
+                left_array.as_ref().or(right_array.as_ref()),
+                Some(Ty::Quantity(_))
+            ) {
+                return Err(());
+            }
             if left_array.is_some() || right_array.is_some() {
                 let left_is_array = left_array.is_some();
                 let right_is_array = right_array.is_some();
@@ -1340,10 +1365,14 @@ fn emit_instruction(
                         && *ty == args[0] =>
                 {
                     let array_c_name = array_name(&Ty::Applied(name, args.clone())).ok_or(())?;
-                    out.push_str(&format!(
-                        "    {} = {array_c_name}_index1({object_code}, {index_code});\n",
-                        value_name(*dst)
-                    ));
+                    let code = if quantity(&args[0]) {
+                        format!(
+                            "((Qty){{ {array_c_name}_index1({object_code}, {index_code}), {object_code}->unit }})"
+                        )
+                    } else {
+                        format!("{array_c_name}_index1({object_code}, {index_code})")
+                    };
+                    out.push_str(&format!("    {} = {code};\n", value_name(*dst),));
                 }
                 _ => return Err(()),
             }
@@ -1462,6 +1491,7 @@ fn emit_instruction(
                         "to_list"
                             if codes.is_empty()
                                 && *ty == Ty::List(Box::new(element.clone()))
+                                && !quantity(&element)
                                 && list_supported(&element, records) =>
                         {
                             format!("{array_c_name}_to_list({receiver})")
@@ -1486,6 +1516,7 @@ fn emit_instruction(
                         "row" | "col"
                             if codes.len() == 1
                                 && value_ty(values, args[0])? == Ty::Int
+                                && !quantity(&element)
                                 && *ty == array_ty =>
                         {
                             format!("{array_c_name}_{}({receiver}, {})", method, codes[0])
@@ -1493,11 +1524,14 @@ fn emit_instruction(
                         "reshape"
                             if codes.len() == 1
                                 && value_ty(values, args[0])? == Ty::List(Box::new(Ty::Int))
+                                && !quantity(&element)
                                 && *ty == array_ty =>
                         {
                             format!("{array_c_name}_reshape({receiver}, {})", codes[0])
                         }
-                        "transpose" if codes.is_empty() && *ty == array_ty => {
+                        "transpose"
+                            if codes.is_empty() && !quantity(&element) && *ty == array_ty =>
+                        {
                             format!("{array_c_name}_transpose({receiver})")
                         }
                         "sum_axis"
@@ -1540,15 +1574,21 @@ fn emit_instruction(
                                 })
                                 && *ty == element =>
                         {
-                            format!(
+                            let access = format!(
                                 "{array_c_name}_get({receiver}, (int64_t[]){{ {} }}, {})",
                                 codes.join(", "),
                                 codes.len()
-                            )
+                            );
+                            if quantity(&element) {
+                                format!("((Qty){{ {access}, {receiver}->unit }})")
+                            } else {
+                                access
+                            }
                         }
                         "set"
                             if codes.len() >= 2
                                 && *ty == Ty::Void
+                                && !quantity(&element)
                                 && args[..args.len() - 1]
                                     .iter()
                                     .all(|arg| value_ty(values, *arg) == Ok(Ty::Int))
@@ -1886,19 +1926,29 @@ fn emit_instruction(
                     return Err(());
                 }
                 let array_c_name = array_name(ty).ok_or(())?;
-                let mut expected = Ty::List(Box::new(array_args[0].clone()));
-                let mut depth = None;
-                for candidate in 1..=3 {
-                    if input_ty == expected {
-                        depth = Some(candidate);
-                        break;
+                if quantity(&array_args[0]) && input_ty == Ty::List(Box::new(array_args[0].clone()))
+                {
+                    let list_name =
+                        format!("List_{}", mangle_option_payload(&array_args[0], records));
+                    format!(
+                        "({{ {list_name}* __ostrin_q_list = {source}; if (__ostrin_q_list->length < 1) OSTRIN_FAIL(\"an array can't be empty\"); int64_t __ostrin_q_shape[1] = {{ __ostrin_q_list->length }}; Array_Float* __ostrin_q_array = Array_Float_alloc(1, __ostrin_q_shape); for (int64_t __ostrin_q_i = 0; __ostrin_q_i < __ostrin_q_list->length; __ostrin_q_i++) __ostrin_q_array->data[__ostrin_q_i] = ostrin_convert(__ostrin_q_list->items[__ostrin_q_i].v, __ostrin_q_list->items[__ostrin_q_i].u, __ostrin_q_list->items[0].u); ostrin_qa_tag(__ostrin_q_array, __ostrin_q_list->items[0].u); __ostrin_q_array; }})",
+                        source = codes[0]
+                    )
+                } else {
+                    let mut expected = Ty::List(Box::new(array_args[0].clone()));
+                    let mut depth = None;
+                    for candidate in 1..=3 {
+                        if input_ty == expected {
+                            depth = Some(candidate);
+                            break;
+                        }
+                        expected = Ty::List(Box::new(expected));
                     }
-                    expected = Ty::List(Box::new(expected));
+                    let Some(depth) = depth else {
+                        return Err(());
+                    };
+                    format!("{array_c_name}_from{depth}({})", codes[0])
                 }
-                let Some(depth) = depth else {
-                    return Err(());
-                };
-                format!("{array_c_name}_from{depth}({})", codes[0])
             } else if (callee == "zeros" || callee == "ones")
                 && args.len() == 1
                 && value_ty(values, args[0])? == Ty::List(Box::new(Ty::Int))

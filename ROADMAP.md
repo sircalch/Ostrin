@@ -23,7 +23,11 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    `std.numeric.svd` añade SVD fina densa, rango, número de condición y resolución por pseudoinversa. Sus métodos con
    records agregan 68 fallbacks medidos para LU, 88 para SVD, 14 más para su número de condición y
    52 para los autovectores públicos, como deuda explícita del siguiente
-   pase de agregados; dispersa y métodos complejos avanzados siguen pendientes.
+   pase de agregados; dispersa y métodos complejos avanzados siguen pendientes. La primera
+   migración de arrays gestionados ya está en la IR/C: `Array<Quantity<D>>` conserva la unidad
+   al indexar y al construir arrays desde listas, y `std.numeric` usa ese camino en sus
+   integrales e interpolación con cantidades; la aritmética elemento a elemento de arrays con
+   unidades sigue deliberadamente en HIR/AST hasta tener helpers IR que preserven la etiqueta.
 2. Completar ownership sobre agregados, escapes, valores `Phi`, errores y formas anidadas, con
    leak-check y sanitizers como evidencia.
 3. Añadir casos de compilación nativa y divergencia semántica al fuzzing de entradas válidas.
