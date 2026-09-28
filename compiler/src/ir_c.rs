@@ -1389,6 +1389,38 @@ fn emit_instruction(
             let receiver_ty = value_ty(values, *receiver)?;
             let receiver = value_code(values, *receiver)?;
             let call = match receiver_ty {
+                Ty::Int => match (method.as_str(), args.as_slice(), ty) {
+                    ("to_string", [], Ty::String) => {
+                        format!("ostrin_int_to_string({receiver})")
+                    }
+                    _ => return Err(()),
+                },
+                Ty::Float => match (method.as_str(), args.as_slice(), ty) {
+                    ("to_string", [], Ty::String) => {
+                        format!("ostrin_float_to_string({receiver})")
+                    }
+                    _ => return Err(()),
+                },
+                Ty::Float32 => match (method.as_str(), args.as_slice(), ty) {
+                    ("to_string", [], Ty::String) => {
+                        format!("ostrin_single_to_string({receiver})")
+                    }
+                    _ => return Err(()),
+                },
+                Ty::Sized(kind) if kind.is_signed() => {
+                    match (method.as_str(), args.as_slice(), ty) {
+                        ("to_string", [], Ty::String) => {
+                            format!("ostrin_int_to_string({receiver})")
+                        }
+                        _ => return Err(()),
+                    }
+                }
+                Ty::Sized(_) => match (method.as_str(), args.as_slice(), ty) {
+                    ("to_string", [], Ty::String) => {
+                        format!("ostrin_uint_to_string({receiver})")
+                    }
+                    _ => return Err(()),
+                },
                 Ty::String => {
                     let string_args = args
                         .iter()
