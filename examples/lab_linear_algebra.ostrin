@@ -39,6 +39,16 @@ fn main() -> Void {
     print(round(modes * 10000.0) / 10000.0)
     print("sum of eigenvalues - trace = " + clean(abs(modes.sum() - trace(k))).to_string())
 
+    eigenpairs = numeric.eigen(k)
+    match eigenpairs {
+        Ok(factors) => {
+            print("eigenvectors (columns):")
+            print(round(factors.vectors * 10000.0) / 10000.0)
+            print("eigen reconstruction residual = " + clean(norm(factors.reconstruct() - k)).to_string())
+        },
+        Err(message) => print("eigen error: " + message),
+    }
+
     decomposition = numeric.qr(k)
     match decomposition {
         Ok(factors) => {

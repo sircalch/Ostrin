@@ -1,0 +1,33 @@
+// std.numeric: eigenvalues and eigenvectors of a real symmetric matrix.
+import std.numeric
+
+fn clean(x: Float) -> Float {
+    round(x * 10000.0) / 10000.0
+}
+
+fn main() -> Void {
+    a = array([
+        [2.0, 1.0],
+        [1.0, 2.0]
+    ])
+    match numeric.eigen(a) {
+        Ok(factors) => {
+            print("eigenvalues =")
+            print(round(factors.values * 10000.0) / 10000.0)
+            print("eigenvectors =")
+            print(round(factors.vectors * 10000.0) / 10000.0)
+            print("reconstruction residual = " + clean(norm(factors.reconstruct() - a)).to_string())
+        },
+        Err(message) => print("unexpected eigen error: " + message),
+    }
+
+    match numeric.eigen(array([[1.0, 2.0], [3.0, 4.0]])) {
+        Ok(_) => print("unexpected nonsymmetric success"),
+        Err(message) => print("nonsymmetric input = " + message),
+    }
+
+    match numeric.eigen(array([1.0, 2.0, 3.0])) {
+        Ok(_) => print("unexpected nonsquare success"),
+        Err(message) => print("nonsquare input = " + message),
+    }
+}

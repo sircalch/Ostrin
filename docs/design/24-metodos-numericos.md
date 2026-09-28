@@ -63,6 +63,10 @@ svd.reconstruct()  svd.rank()                // reconstrucción y rango numéric
 svd.condition_number()                       // número de condición 2-norma o diagnóstico de rango
 svd.solve(rhs)                               // solución de mínimos cuadrados/pseudoinversa
 
+eigen = numeric.eigen(a)                     // Result<Eigen, String>, matriz simétrica real
+eigen.values  eigen.vectors                  // valores ascendentes; vectores por columnas
+eigen.reconstruct()                          // V @ diag(values) @ Vᵀ
+
 // Con unidades: xs: Array<Quantity<X>>, ys: Array<Quantity<Y>>
 numeric.unit_trapz(xs, ys)                     // Quantity<X * Y>   (km/h sobre min → km)
 numeric.unit_cumtrapz(xs, ys)                  // Array<Quantity<X * Y>>
@@ -105,6 +109,11 @@ ningún caso especial en el runtime. Requieren al menos dos muestras.
   número de condición 2-norma o un diagnóstico si la matriz es deficiente de rango; `solve` aplica
   la pseudoinversa con un umbral de rango. La ruta es determinista y adecuada para matrices densas
   pequeñas/medianas; LAPACK/FFI queda reservado para problemas grandes o mal condicionados.
+- **Autovectores**: `numeric.eigen` reutiliza las rotaciones de Jacobi para matrices densas reales
+  simétricas, valida forma y simetría, ordena los autovalores de menor a mayor y expone los
+  autovectores ortonormales por columnas. `reconstruct` permite comprobar `A = V diag(λ) Vᵀ`;
+  matrices no simétricas devuelven un diagnóstico explícito. La API compleja y matrices dispersas
+  siguen pendientes.
 - **Complejos**: `Complex` es por ahora un record público de `Float64` con operadores `Add`, `Sub`,
   `Mul`, `Div`, igualdad, conjugado, magnitud, forma polar, `cis` y potencias enteras. El ejemplo
   `numeric_complex.ostrin` y la pestaña Complex del Lab verifican la misma salida en intérprete,
@@ -135,4 +144,4 @@ y tipos función para enlazar `X`, y una segunda aparición con otra dimensión 
 | cuadratura adaptativa, integrales múltiples | Gauss–Kronrod |
 | optimización multivariable | Nelder–Mead, BFGS |
 | unidades en ODEs y raíces | `unit_*` cubre integrales, derivadas e interpolación; `rk45` y `newton` siguen en `Float` (un estado con dimensiones mezcladas necesitaría tuplas o records de cantidades) |
-| álgebra lineal avanzada | LU, QR denso, Cholesky y SVD fina ya están disponibles; autovectores públicos, mínimos cuadrados generalizados, dispersa y álgebra matricial compleja siguen pendientes |
+| álgebra lineal avanzada | LU, QR denso, Cholesky, SVD fina y autovectores simétricos ya están disponibles; mínimos cuadrados generalizados, dispersa y álgebra matricial compleja siguen pendientes |

@@ -6,7 +6,7 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
 ## Siguiente ciclo
 
 1. Reducir el fallback AST con el trinquete por archivo de `--native-type-report` (baseline actual:
-   2.320 funciones IR, 1.166 HIR y 2.678 AST). El puente IR para los constructores numéricos
+   2.370 funciones IR, 1.175 HIR y 2.730 AST). El puente IR para los constructores numéricos
    `zeros`/`ones`, `norm`, `abs` escalar y `sqrt` migró 348 funciones compartidas por la suite;
    LU ya está disponible con paridad publicada en el Lab; QR y Cholesky cruzan la IR y conservan esa
    paridad. La deuda restante
@@ -17,9 +17,10 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    `std.numeric.Complex` ya tiene una API experimental de `Float64` y una demo live; el tipo
    paramétrico, `Array<Complex>` y álgebra lineal compleja siguen pendientes. `std.numeric.lu`
    ahora cubre eliminación con pivoteo parcial, reconstrucción, determinante y resolución triangular;
+   `std.numeric.eigen` añade autovalores y autovectores ortonormales para matrices simétricas;
    `std.numeric.svd` añade SVD fina densa, rango, número de condición y resolución por pseudoinversa. Sus métodos con
-   records agregan 68 fallbacks medidos para LU, 88 para SVD y 14 más para su número de condición,
-   como deuda explícita del siguiente
+   records agregan 68 fallbacks medidos para LU, 88 para SVD, 14 más para su número de condición y
+   52 para los autovectores públicos, como deuda explícita del siguiente
    pase de agregados; dispersa y métodos complejos siguen pendientes.
 2. Completar ownership sobre agregados, escapes, valores `Phi`, errores y formas anidadas, con
    leak-check y sanitizers como evidencia.
