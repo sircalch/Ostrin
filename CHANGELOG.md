@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Native IR: scalar casts and deterministic math
+- The IR/C emitter now lowers explicit `as<Float>`/`as<Float32>` conversions, `abs` over numeric
+  arrays, and deterministic numeric builtins including `sin`, `cos`, `ln`, `exp`, `pi`, `eye` and
+  their scalar/array forms. This moves numerical integration, RK methods, FFT utilities and polar
+  helpers through the typed native path while preserving interpreter/native output.
+- The differential ratchet now records 2,657 IR functions, 1,136 HIR functions and 2,711 AST
+  fallbacks across the example suite; the numeric consumer report is `ir=33`, `hir=8`, `ast=36`.
+
 ### Native IR: quantity-array boundary
 - `Array<Quantity<D>>` now has a typed IR/C boundary for parameters, ownership, indexing and
   conversion from `List<Quantity<D>>`. Indexed values preserve the array unit tag, so the unit

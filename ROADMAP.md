@@ -6,7 +6,7 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
 ## Siguiente ciclo
 
 1. Reducir el fallback AST con el trinquete por archivo de `--native-type-report` (baseline actual:
-   2.424 funciones IR, 1.184 HIR y 2.896 AST). El puente IR para los constructores numéricos
+   2.657 funciones IR, 1.136 HIR y 2.711 AST). El puente IR para los constructores numéricos
    `zeros`/`ones`, `norm`, `abs` escalar y `sqrt` migró 348 funciones compartidas por la suite;
    LU ya está disponible con paridad publicada en el Lab; QR y Cholesky cruzan la IR y conservan esa
    paridad. La deuda restante
@@ -28,6 +28,9 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    al indexar y al construir arrays desde listas, y `std.numeric` usa ese camino en sus
    integrales e interpolación con cantidades; la aritmética elemento a elemento de arrays con
    unidades sigue deliberadamente en HIR/AST hasta tener helpers IR que preserven la etiqueta.
+   Las conversiones escalares `as<Float/Float32>`, `abs` sobre arrays y las funciones matemáticas
+   deterministas (`sin`, `cos`, `ln`, `exp`, `pi`, `eye` y relacionadas) ya cruzan IR/C; esta pasada
+   redujo el fallback AST medido sin cambiar la salida del intérprete ni del nativo.
 2. Completar ownership sobre agregados, escapes, valores `Phi`, errores y formas anidadas, con
    leak-check y sanitizers como evidencia.
 3. Añadir casos de compilación nativa y divergencia semántica al fuzzing de entradas válidas.
