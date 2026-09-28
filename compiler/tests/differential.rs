@@ -468,24 +468,16 @@ fn native_backend_types_agree_with_the_checker() {
     // consumers; keep the new baseline explicit until the next migration pass.
     // Scalar casts to Float/Float32, array `abs` mapping and deterministic math
     // builtins (`sin`/`cos`/`ln`/`exp`/`pi`/`eye`, among others) now use the same
-    // typed IR/C path. Scalar `to_string` now uses that path too; this removes
-    // 166 repeated numeric-consumer fallbacks from the measured suite. Closed
-    // record arithmetic dispatch removes 17 more through `Complex * Complex`
-    // in `std.numeric.powi`. The verified baseline is now 2,528 AST fallbacks
-    // (2,840 IR and 1,136 HIR functions); lower this ratchet only when another
-    // backend family is migrated with parity evidence.
-    // LU is now a real std.numeric API. Its four aggregate-heavy factorization
-    // methods add 68 measured AST functions across the twelve existing numeric
-    // consumers plus the new numeric_lu example; this is an explicit feature
-    // allowance, not an untracked backend regression. The thin SVD adds 88
-    // measured fallbacks, its condition-number method adds 14 more, and the
-    // public symmetric eigenpair API adds 52 through aggregate consumers;
-    // the next aggregate migration must remove both allowances before another
-    // increase is accepted.
-    // ComplexVector/ComplexMatrix add 166 aggregate-heavy scientific functions
-    // to the verified fallback until their ownership contracts are migrated.
-    // Complex array promotion and SVG-heavy visualization paths remain pending.
-    const MAX_AST_FALLBACK_FUNCTIONS: usize = 2528;
+    // typed IR/C path. Scalar `to_string` now uses that path too; closed record
+    // arithmetic dispatch removes the repeated `Complex * Complex` fallback in
+    // `std.numeric.powi`. Record and enum methods now enter the same IR/C path
+    // as free functions whenever their concrete fields and ownership contract
+    // are supported. This migrates the numeric and visualization method families
+    // together and lowers the verified baseline to 1,183 AST fallbacks (5,035 IR
+    // and 286 HIR functions). Keep this ratchet explicit until the next aggregate
+    // family moves with parity evidence; aggregate-heavy SVG paths and complex
+    // array promotion remain pending.
+    const MAX_AST_FALLBACK_FUNCTIONS: usize = 1183;
     assert!(
         ast_fallback <= MAX_AST_FALLBACK_FUNCTIONS,
         "AST fallback grew to {ast_fallback} functions (ratchet limit {MAX_AST_FALLBACK_FUNCTIONS})"

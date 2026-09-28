@@ -168,6 +168,109 @@ fn is_reference_type(ty: &CType) -> bool {
     )
 }
 
+/// Finds records whose field graph contains a cycle. The IR emitter can
+/// represent a record containing arrays and non-recursive managed fields, but
+/// recursive records need the established HIR/AST ownership path until their
+/// nested retain/release contract is explicit.
+fn recursive_record_names(records: &HashMap<String, Vec<(String, CType)>>) -> HashSet<String> {
+    fn children(ty: &CType, out: &mut Vec<String>) {
+        match ty {
+            CType::Record(name) => out.push(name.clone()),
+            CType::List(inner)
+            | CType::Option(inner)
+            | CType::Set(inner)
+            | CType::Channel(inner)
+            | CType::Task(inner)
+            | CType::Array(inner)
+            | CType::OkLit(inner)
+            | CType::ErrLit(inner) => children(inner, out),
+            CType::Map(key, value) | CType::Result(key, value) => {
+                children(key, out);
+                children(value, out);
+            }
+            CType::Fn(params, ret) => {
+                for param in params {
+                    children(param, out);
+                }
+                children(ret, out);
+            }
+            _ => {}
+        }
+    }
+
+    fn visit(
+        name: &str,
+        records: &HashMap<String, Vec<(String, CType)>>,
+        visiting: &mut HashSet<String>,
+        finished: &mut HashSet<String>,
+        recursive: &mut HashSet<String>,
+    ) -> bool {
+        if recursive.contains(name) {
+            return true;
+        }
+        if visiting.contains(name) {
+            recursive.insert(name.to_string());
+            return true;
+        }
+        if finished.contains(name) {
+            return false;
+        }
+        let Some(fields) = records.get(name) else {
+            finished.insert(name.to_string());
+            return false;
+        };
+        visiting.insert(name.to_string());
+        let mut found = false;
+        for (_, ty) in fields {
+            let mut nested = Vec::new();
+            children(ty, &mut nested);
+            for child in nested {
+                if visit(&child, records, visiting, finished, recursive) {
+                    found = true;
+                }
+            }
+        }
+        visiting.remove(name);
+        finished.insert(name.to_string());
+        if found {
+            recursive.insert(name.to_string());
+        }
+        found
+    }
+
+    let mut visiting = HashSet::new();
+    let mut finished = HashSet::new();
+    let mut recursive = HashSet::new();
+    for name in records.keys() {
+        visit(name, records, &mut visiting, &mut finished, &mut recursive);
+    }
+    recursive
+}
+
+fn contains_recursive_record(ty: &CType, recursive: &HashSet<String>) -> bool {
+    match ty {
+        CType::Record(name) => recursive.contains(name),
+        CType::List(inner)
+        | CType::Option(inner)
+        | CType::Set(inner)
+        | CType::Channel(inner)
+        | CType::Task(inner)
+        | CType::Array(inner)
+        | CType::OkLit(inner)
+        | CType::ErrLit(inner) => contains_recursive_record(inner, recursive),
+        CType::Map(key, value) | CType::Result(key, value) => {
+            contains_recursive_record(key, recursive) || contains_recursive_record(value, recursive)
+        }
+        CType::Fn(params, ret) => {
+            params
+                .iter()
+                .any(|param| contains_recursive_record(param, recursive))
+                || contains_recursive_record(ret, recursive)
+        }
+        _ => false,
+    }
+}
+
 fn c_type_name(ty: &CType) -> String {
     match ty {
         CType::Int => "int64_t".to_string(),
@@ -9134,6 +9237,7 @@ fn generate_impl(
                 .map(move |(method, info)| ((record.clone(), method.clone()), info.c_name.clone()))
         })
         .collect();
+    let recursive_records = recursive_record_names(&codegen.records);
     for f in &functions {
         if !f.generics.is_empty() {
             continue;
@@ -9258,24 +9362,96 @@ fn generate_impl(
     for (self_ty, param_types, return_type, c_name, decl) in method_infos {
         let params = render_params(&param_types, &decl.params);
         let signature = format!("{} {}({})", c_type_name(&return_type), c_name, params);
-        let hir_method = match (&hir, &self_ty, std::env::var_os("OSTRIN_NO_HIR_CODEGEN")) {
-            (Some(h), CType::Record(record) | CType::Enum(record), None) => {
-                let wanted = format!("{record}.{}", decl.name);
-                h.functions
+        let method_ir_safe = !contains_recursive_record(&self_ty, &recursive_records)
+            && !contains_recursive_record(&return_type, &recursive_records)
+            && param_types
+                .iter()
+                .all(|ty| !contains_recursive_record(ty, &recursive_records));
+        let hir_name = match &self_ty {
+            CType::Record(record) | CType::Enum(record) => Some(format!("{record}.{}", decl.name)),
+            _ => None,
+        };
+        let from_ir = match (
+            &ir,
+            hir_name.as_deref(),
+            std::env::var_os("OSTRIN_NO_IR_CODEGEN"),
+        ) {
+            (Some(program), Some(wanted), None) if method_ir_safe => program
+                .functions
+                .iter()
+                .find(|function| function.name == wanted && !ir_unresolved.contains(&function.name))
+                .and_then(|function| {
+                    crate::ir_c::generate_with_helpers(
+                        function,
+                        &ir_functions,
+                        &ir_methods,
+                        &ir_records,
+                        &mut |request, left, right, ty| {
+                            let ctype = codegen.ty_to_ctype(ty)?;
+                            match request {
+                                crate::ir_c::HelperRequest::Show => {
+                                    codegen.show_expr(left, &ctype).ok()
+                                }
+                                crate::ir_c::HelperRequest::Equality => {
+                                    codegen.eq_expr(left, right, &ctype).ok()
+                                }
+                            }
+                        },
+                    )
+                    .map(|generated| {
+                        for declaration in generated.declarations {
+                            ir_helper_prototypes.push(declaration);
+                        }
+                        for (helper_signature, helper_body) in generated.helpers {
+                            ir_helper_prototypes.push(format!("{helper_signature};"));
+                            bodies.push((helper_signature, helper_body));
+                        }
+                        generated.body
+                    })
+                }),
+            _ => None,
+        };
+        let hir_method = if from_ir.is_none() {
+            match (
+                &hir,
+                hir_name.as_deref(),
+                std::env::var_os("OSTRIN_NO_HIR_CODEGEN"),
+            ) {
+                (Some(h), Some(wanted), None) => h
+                    .functions
                     .iter()
                     .find(|hf| hf.name == wanted)
-                    .and_then(|hf| crate::hir_c::generate(hf, &hir_world))
+                    .and_then(|hf| crate::hir_c::generate(hf, &hir_world)),
+                _ => None,
             }
-            _ => None,
+        } else {
+            None
         };
         let self_subst: HashMap<String, CType> = HashMap::from([("Self".to_string(), self_ty)]);
         let mut body = String::new();
         codegen.current_file = decl.source_file.clone();
-        match hir_method {
+        let used_ir = from_ir.is_some();
+        if std::env::var_os("OSTRIN_IR_DEBUG").is_some()
+            || std::env::var_os("OSTRIN_HIR_DEBUG").is_some()
+        {
+            eprintln!(
+                "native-codegen {}: ir={} hir={}",
+                hir_name.as_deref().unwrap_or(&decl.name),
+                used_ir,
+                hir_method.is_some()
+            );
+        }
+        match from_ir.or(hir_method) {
             Some(text) => {
-                codegen.type_report.hir_generated += 1;
-                native_source_report(&mut codegen.type_report, decl.source_file.as_deref())
-                    .hir_generated += 1;
+                if used_ir {
+                    codegen.type_report.ir_generated += 1;
+                    native_source_report(&mut codegen.type_report, decl.source_file.as_deref())
+                        .ir_generated += 1;
+                } else {
+                    codegen.type_report.hir_generated += 1;
+                    native_source_report(&mut codegen.type_report, decl.source_file.as_deref())
+                        .hir_generated += 1;
+                }
                 body = text;
             }
             None => {

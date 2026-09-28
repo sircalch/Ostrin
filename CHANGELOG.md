@@ -8,6 +8,15 @@
   convergence diagnostics on the typed native path; the per-consumer report is now
   `ir=36`, `hir=8`, `ast=33`.
 
+### Native IR: concrete record and enum methods
+- Methods on concrete non-recursive records and enums now attempt the typed IR/C path after
+  ownership lowering, including registered operator methods and numeric record APIs. Recursive
+  record graphs remain on the verified HIR/AST path until nested ownership and pattern handling
+  are complete; this guard keeps `std.json.Value` leak-free and semantically identical.
+- The differential baseline is now **5,035 IR / 286 HIR / 1,183 AST fallbacks**. The measured
+  numeric consumer report is `ir=72`, `hir=0`, `ast=5` (`Array<Quantity<D>>`: `ir=75`, `hir=0`,
+  `ast=6`).
+
 ### Native IR: record arithmetic dispatch
 - Binary `+`, `-`, `*`, `/`, `==` and `!=` now dispatch closed record operands to their registered
   operator methods in IR/C. `std.numeric.powi` is the first verified consumer, including the
@@ -18,8 +27,9 @@
   arrays, and deterministic numeric builtins including `sin`, `cos`, `ln`, `exp`, `pi`, `eye` and
   their scalar/array forms. This moves numerical integration, RK methods, FFT utilities and polar
   helpers through the typed native path while preserving interpreter/native output.
-- The differential ratchet now records 2,840 IR functions, 1,136 HIR functions and 2,528 AST
-  fallbacks across the example suite; the numeric consumer report is `ir=36`, `hir=8`, `ast=33`.
+- At the time of this earlier scalar-cast migration, the differential ratchet recorded 2,840 IR
+  functions, 1,136 HIR functions and 2,528 AST fallbacks; the later record-method migration is
+  the current baseline documented above.
 
 ### Native IR: quantity-array boundary
 - `Array<Quantity<D>>` now has a typed IR/C boundary for parameters, ownership, indexing and

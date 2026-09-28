@@ -18,10 +18,13 @@ generado (`Array_Float_from1`/`from2`/`from3`, y sus variantes por tipo), la ind
 Los builtins numéricos `zeros`/`ones`, `norm`, `abs` escalar y `sqrt` usan también
 los helpers tipados de IR/C (`Array_Float_full`, `Array_Float_norm` y las funciones
 de `libm`), de modo que QR y Cholesky ya no necesitan el emisor AST. LU ya está disponible en
-`std.numeric`, pero sus records y recorridos matriciales permanecen en el fallback verificado
-hasta que el backend de agregados complete esa migración. La SVD densa (`std.numeric.svd`) añade
-el mismo tipo de record y recorridos Jacobi, por lo que su paridad está cubierta pero sus 88
-funciones medidas permanecen como deuda explícita del lowering de agregados.
+`std.numeric`, y los métodos de records concretos no recursivos ya intentan la ruta IR/C cuando
+sus campos y ownership son compatibles. Los records recursivos y los recorridos matriciales que
+requieren ownership anidado permanecen en el fallback verificado hasta que el backend de agregados
+complete esa migración. La SVD densa (`std.numeric.svd`) añade
+el mismo tipo de record y recorridos Jacobi; su paridad está cubierta y los métodos concretos
+compatibles ya usan IR/C, mientras los recorridos que requieren agregados anidados siguen como
+deuda explícita del lowering de agregados.
 `read_file`/`write_file` añaden `Result<String, String>` y `Result<Void, String>` con errores
 de archivo administrados, comprobación de lectura/escritura/cierre y un checkpoint de cancelación
 antes de cruzar la libc; la operación de archivo sigue siendo bloqueante mientras está dentro del
@@ -111,11 +114,13 @@ Sobre este IR se hacen los análisis que el texto C no permite:
    `--native-type-report` publica también `ir-generated`, `hir-generated` y `ast-fallback`.
    El mismo informe agrupa esas cifras por archivo fuente con líneas `native-source`, y la
    prueba diferencial comprueba que la suma por módulo coincide con los totales globales.
-   La prueba diferencial conserva el baseline actual de fallback (2 896 funciones agregadas
-   sobre los ejemplos); el incremento acotado incluye las superficies `std.viz.boxplot` y
+   La prueba diferencial conserva el baseline actual de fallback (1 183 funciones AST, con
+   5 035 funciones IR y 286 HIR agregadas sobre los ejemplos); el incremento acotado incluye
+   las superficies `std.viz.boxplot` y
    `std.viz.table`, además de los agregados de LU, SVD, número de condición, autovectores y
    `ComplexVector`/`ComplexMatrix`,
-   que quedan pendientes de migrar a IR, y solo permite reducirlo o justificar explícitamente
+   que quedan pendientes de migrar a IR, mientras los métodos de records recursivos conservan
+   HIR/AST por seguridad, y solo permite reducirlo o justificar explícitamente
    otro aumento.
    Los destructores de tareas generados se registran con la firma ABI `void (*)(void*)` del
    runtime; la suite completa de ejemplos nativos corre bajo UBSan e incluye cancelación de
