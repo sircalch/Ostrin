@@ -2379,6 +2379,28 @@ fn emit_instruction(
                     };
                     format!("{array_c_name}_from{depth}({})", codes[0])
                 }
+            } else if callee == "parse_csv"
+                && args.len() == 1
+                && value_ty(values, args[0])? == Ty::String
+                && *ty == Ty::List(Box::new(Ty::List(Box::new(Ty::String))))
+            {
+                // `ostrin_s_csv` returns owned row buffers and retained
+                // strings.  Build the nested list through the generated
+                // helpers, then release each temporary layer after the next
+                // layer has retained it.  This keeps the IR path equivalent
+                // to the interpreter while making leak-check meaningful for
+                // data programs that parse quoted CSV.
+                let inner_ty = Ty::List(Box::new(Ty::String));
+                let outer_ty = Ty::List(Box::new(inner_ty.clone()));
+                let inner_name = format!("List_{}", mangle_option_payload(&Ty::String, records));
+                let outer_name = format!("List_{}", mangle_option_payload(&inner_ty, records));
+                let inner_c = c_type(&inner_ty, records)?;
+                let outer_c = c_type(&outer_ty, records)?;
+                let inner_items_c = format!("{inner_c}*");
+                format!(
+                    "({{ int64_t __ostrin_csv_row_count; int64_t* __ostrin_csv_col_counts; const char*** __ostrin_csv_rows = ostrin_s_csv({source}, &__ostrin_csv_row_count, &__ostrin_csv_col_counts); {inner_items_c} __ostrin_csv_lists = ({inner_items_c})ostrin_alloc(sizeof(*__ostrin_csv_lists) * (size_t)(__ostrin_csv_row_count + 1)); for (int64_t __ostrin_csv_row = 0; __ostrin_csv_row < __ostrin_csv_row_count; __ostrin_csv_row++) {{ __ostrin_csv_lists[__ostrin_csv_row] = {inner_name}_new_from_array(__ostrin_csv_rows[__ostrin_csv_row], __ostrin_csv_col_counts[__ostrin_csv_row]); for (int64_t __ostrin_csv_col = 0; __ostrin_csv_col < __ostrin_csv_col_counts[__ostrin_csv_row]; __ostrin_csv_col++) ostrin_release((void*)__ostrin_csv_rows[__ostrin_csv_row][__ostrin_csv_col]); ostrin_free((void*)__ostrin_csv_rows[__ostrin_csv_row]); }} {outer_c} __ostrin_csv_result = {outer_name}_new_from_array(__ostrin_csv_lists, __ostrin_csv_row_count); for (int64_t __ostrin_csv_row = 0; __ostrin_csv_row < __ostrin_csv_row_count; __ostrin_csv_row++) ostrin_release((void*)__ostrin_csv_lists[__ostrin_csv_row]); ostrin_free((void*)__ostrin_csv_lists); ostrin_free((void*)__ostrin_csv_rows); ostrin_free((void*)__ostrin_csv_col_counts); __ostrin_csv_result; }})",
+                    source = codes[0]
+                )
             } else if (callee == "zeros" || callee == "ones")
                 && args.len() == 1
                 && value_ty(values, args[0])? == Ty::List(Box::new(Ty::Int))

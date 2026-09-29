@@ -2785,6 +2785,62 @@ fn native_backend_compiles_and_runs_list_combinators_with_captures() {
 }
 
 #[test]
+fn native_ir_emitter_handles_nested_csv_lists_and_ownership() {
+    let file = example_path("csv_parse.ostrin");
+    let expected = "2\n3\na|b|c\n3\n1|2|3\n3\n2\nnombre|nota\n2\nPerez, Ana|9.5\n2\ndijo \"hola\"|7\n1\n3\nx|linea1\nlinea2|z\n2\n3\n||\n1\n\n0\ncabecera: invalid digit found in string\n3\n";
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed for csv_parse.ostrin: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "native type report failed for csv_parse.ostrin: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("ir-generated: 2")
+            && report_text.contains("hir-generated: 0")
+            && report_text.contains("ast-fallback: 0"),
+        "nested CSV lists did not stay on the IR path: {report_text}"
+    );
+
+    let exe = temp_artifact("native_ir_csv_parse.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    assert!(
+        compile.status.success(),
+        "native CSV compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run native csv_parse binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "native CSV run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "nested CSV lists leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn native_backend_compiles_the_original_dyn_trait_example() {
     // The project's own dyn_trait.ostrin: List<dyn Shape>, .fold() with a
     // lambda calling a trait method through the vtable, and Float printing
