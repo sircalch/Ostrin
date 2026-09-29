@@ -1,6 +1,7 @@
 mod ast;
 mod codegen;
 mod dap;
+mod effects;
 mod fmt;
 mod hir;
 mod hir_c;
@@ -52,6 +53,7 @@ fn real_main() -> ExitCode {
     let types_only = args.iter().any(|a| a == "--types");
     let typed_report = args.iter().any(|a| a == "--typed-report");
     let native_type_report = args.iter().any(|a| a == "--native-type-report");
+    let effect_report = args.iter().any(|a| a == "--effect-report");
     let hir_mode = args.iter().any(|a| a == "--hir");
     let ir_mode = args.iter().any(|a| a == "--ir");
     let ownership_report = args.iter().any(|a| a == "--ownership-report");
@@ -309,6 +311,64 @@ fn real_main() -> ExitCode {
                 ExitCode::FAILURE
             }
         };
+    }
+
+    if effect_report {
+        let report = effects::analyze(&items);
+        if json {
+            let sites: Vec<_> = report
+                .sites
+                .iter()
+                .map(|site| {
+                    serde_json::json!({
+                        "effect": site.effect,
+                        "operation": site.operation,
+                        "function": site.function,
+                        "file": site.file,
+                        "line": site.line,
+                        "col": site.col,
+                    })
+                })
+                .collect();
+            println!(
+                "{}",
+                serde_json::json!({
+                    "schema": "ostrin.effect-report/v0",
+                    "experimental": true,
+                    "conservative": true,
+                    "effects": report.effects,
+                    "sites": sites,
+                })
+            );
+        } else {
+            println!("effect-report: experimental conservative syntactic inventory");
+            if report.effects.is_empty() {
+                println!("effects: none known (absence is not a purity proof)");
+            } else {
+                println!(
+                    "effects: {}",
+                    report
+                        .effects
+                        .iter()
+                        .cloned()
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                );
+                for effect in &report.effects {
+                    println!("  {effect}: {}", effects::effect_description(effect));
+                }
+            }
+            println!("sites: {}", report.sites.len());
+            for site in &report.sites {
+                let file = site.file.as_deref().unwrap_or("<unknown>");
+                println!(
+                    "  {}:{}:{} {} -> {} ({})",
+                    file, site.line, site.col, site.function, site.operation, site.effect
+                );
+            }
+            println!("note: this report is evidence for future effect checking; it is not a static guarantee");
+        }
+        return ExitCode::SUCCESS;
     }
 
     if typed_report {
@@ -869,6 +929,7 @@ fn print_help() {
     println!("  --dap         Run the debug adapter over stdio");
     println!("  --hir         Print the typed, verified HIR");
     println!("  --ir          Lower HIR to explicit basic blocks and temporaries");
+    println!("  --effect-report  Inventory known scientific effects (experimental, conservative)");
     println!("  --ownership-report  Report conservative managed values and last-use candidates");
     println!("  --ownership-ir      Insert proof-guided linear release markers into a cloned IR");
     println!("  --ownership-check   Detect managed values used after channel send (E1101)");

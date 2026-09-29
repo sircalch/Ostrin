@@ -7305,9 +7305,38 @@ fn cli_exposes_help_and_version() {
     assert!(stdout(&help).contains("--symbols"));
     assert!(stdout(&help).contains("--members"));
     assert!(stdout(&help).contains("--types"));
+    assert!(stdout(&help).contains("--effect-report"));
     assert!(stdout(&help).contains("--project"));
     assert!(stdout(&help).contains("--native-threads"));
     assert!(stdout(&help).contains("wasm32-wasi"));
+}
+
+#[test]
+fn experimental_effect_report_exposes_measurement_and_io_sites() {
+    let out = run(&[
+        "--effect-report",
+        &example_path("measurement_scalar.ostrin"),
+    ]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let text = stdout(&out);
+    assert!(text.contains("effect-report: experimental conservative syntactic inventory"));
+    assert!(
+        text.contains("measurement"),
+        "missing measurement effect: {text}"
+    );
+    assert!(text.contains("io"), "missing IO effect from print: {text}");
+    assert!(text.contains("std.measurements::standard"));
+
+    let json = run(&[
+        "--effect-report",
+        "--json",
+        &example_path("measurement_scalar.ostrin"),
+    ]);
+    assert!(json.status.success(), "stderr: {}", stderr(&json));
+    let json_text = stdout(&json);
+    assert!(json_text.contains("\"schema\":\"ostrin.effect-report/v0\""));
+    assert!(json_text.contains("\"conservative\":true"));
+    assert!(json_text.contains("\"effect\":\"measurement\""));
 }
 
 #[test]

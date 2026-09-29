@@ -22,7 +22,9 @@
 
 - Added a prior-art-reviewed proposal for effect rows, explicit capabilities, seeded randomness,
   reproducibility levels R0–R3 and W3C PROV-inspired artifacts across native, WASI and web targets.
-  It is design-only: no effect syntax or runtime guarantee is advertised as available.
+-  Added the experimental `ostrinc --effect-report` inventory, with text and JSON output for known
+  randomness, clock, host I/O, network, concurrency, measurement and provenance sites. It is
+  conservative evidence for future checking, not an effect or reproducibility guarantee.
 
 ### Cross-browser web smoke coverage
 
