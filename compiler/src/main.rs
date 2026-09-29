@@ -15,6 +15,7 @@ mod ownership;
 mod package;
 mod parser;
 mod protocol;
+mod provenance;
 mod symbols;
 mod typeck;
 mod types;
@@ -54,6 +55,7 @@ fn real_main() -> ExitCode {
     let typed_report = args.iter().any(|a| a == "--typed-report");
     let native_type_report = args.iter().any(|a| a == "--native-type-report");
     let effect_report = args.iter().any(|a| a == "--effect-report");
+    let provenance_report = args.iter().any(|a| a == "--provenance-report");
     let hir_mode = args.iter().any(|a| a == "--hir");
     let ir_mode = args.iter().any(|a| a == "--ir");
     let ownership_report = args.iter().any(|a| a == "--ownership-report");
@@ -367,6 +369,31 @@ fn real_main() -> ExitCode {
                 );
             }
             println!("note: this report is evidence for future effect checking; it is not a static guarantee");
+        }
+        return ExitCode::SUCCESS;
+    }
+
+    if provenance_report {
+        let source = match fs::read(entry_path) {
+            Ok(source) => source,
+            Err(error) => {
+                eprintln!("error: could not read '{path}': {error}");
+                return ExitCode::FAILURE;
+            }
+        };
+        let target = argument_value(&args, "--target").unwrap_or_else(|| "native".to_string());
+        let effects = effects::analyze(&items);
+        let report = provenance::build_report(entry_path, &source, &target, &effects);
+        if json {
+            match serde_json::to_string_pretty(&report) {
+                Ok(serialized) => println!("{serialized}"),
+                Err(error) => {
+                    eprintln!("error: could not serialize provenance report: {error}");
+                    return ExitCode::FAILURE;
+                }
+            }
+        } else {
+            println!("{}", provenance::text_summary(&report));
         }
         return ExitCode::SUCCESS;
     }
@@ -930,6 +957,7 @@ fn print_help() {
     println!("  --hir         Print the typed, verified HIR");
     println!("  --ir          Lower HIR to explicit basic blocks and temporaries");
     println!("  --effect-report  Inventory known scientific effects (experimental, conservative)");
+    println!("  --provenance-report  Emit an experimental reproducibility artifact");
     println!("  --ownership-report  Report conservative managed values and last-use candidates");
     println!("  --ownership-ir      Insert proof-guided linear release markers into a cloned IR");
     println!("  --ownership-check   Detect managed values used after channel send (E1101)");

@@ -12,6 +12,7 @@ const publicPages = [
   "./guides.html",
   "./language.html",
   "./playground.html",
+  "./provenance.html",
   "./reference.html",
   "./roadmap.html",
   "./showcase.html",
@@ -172,6 +173,20 @@ test("benchmark page renders the recorded workload report", async ({ page }) => 
   await expect(page.locator("[data-benchmark-rows] tr")).toHaveCount(8);
   await expect(page.locator("[data-benchmark-commit]")).not.toHaveText("—");
   await expectNoHorizontalOverflow(page, "benchmarks.html", 1280);
+  expect(runtimeErrors).toEqual([]);
+});
+
+test("provenance page renders the generated reproducibility artifact", async ({ page }) => {
+  const runtimeErrors = [];
+  page.on("pageerror", (error) => runtimeErrors.push(error.message));
+  await page.goto("./provenance.html", { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("inspectable");
+  await expect(page.locator("[data-provenance-schema]")).toHaveText("ostrin.provenance/v0");
+  await expect(page.locator("[data-provenance-source]")).toContainText("sha256:");
+  await expect(page.locator("[data-provenance-effects]")).toContainText("measurement");
+  await expect(page.locator("[data-provenance-level]")).toHaveText("unverified");
+  await expect(page.locator("[data-provenance-json]")).toContainText('"source_hash"');
+  await expectNoHorizontalOverflow(page, "provenance.html", 1280);
   expect(runtimeErrors).toEqual([]);
 });
 

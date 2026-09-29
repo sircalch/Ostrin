@@ -18,6 +18,7 @@ tests or an explicitly labeled early-stage surface.
 | Learn and Reference | `website/docs.html`, `website/reference.html`, `website/language.html`, `docs/design/` | Guided 14-step learning path; Reference indexes all 26 design documents and the CLI flags, checked against `ostrinc --help` |
 | Showcase | `website/showcase.html` | Four repository-backed demonstrations; every displayed output line is verified against its program by `scripts/lab-data.mjs` |
 | Benchmarks | `website/benchmarks.html`, `website/benchmark-data.js`, `scripts/benchmark.mjs` | Eight deterministic workloads compare interpreter and native process medians; the page publishes commit, environment, sampling and output provenance without cross-language claims |
+| Provenance artifact | `website/provenance.html`, `website/provenance-data.js`, `website/provenance.js`, `scripts/provenance-page.mjs`, `compiler/src/provenance.rs` | Experimental machine-readable source hash, target and effect inventory with explicit replay limitations; regenerated and checked before Pages deployment |
 | Community | `website/community.html`, `CONTRIBUTING.md`, issue templates | Contribution path and repository channels; no unverified chat, registry or external community is claimed |
 | Ecosystem and roadmap | `website/ecosystem.html`, `website/roadmap.html` | Current capabilities, early areas and future work are distinguished |
 | Deployment and editor | `.github/workflows/pages.yml`, `vscode-ostrin/`, LSP/DAP sources | Pages builds and checks the WASM artifact; editor support is implemented, Marketplace publication is not claimed |
@@ -27,7 +28,7 @@ tests or an explicitly labeled early-stage surface.
 - **265** `.ostrin` source files under `examples/`, including package-project sources and
   intentional error cases.
 - **26** Markdown design documents under `docs/design/`.
-- Compiler suite: **246 integration**, **6 differential** and **2 unit** tests.
+- Compiler suite: **247 integration**, **6 differential** and **2 unit** tests.
 - WASI release smoke matrix: nine program modules covering the hello program, a local-path
   package, arguments/environment, file I/O, managed ownership and nested `Option`/`Result`
   consumers; compiler and program modules
@@ -53,8 +54,8 @@ fail before publication.
   release; installer scripts require a maintainer-published matching tag.
 - Some compiler/runtime and scientific-library capabilities remain explicitly early or incomplete;
   the site should preserve those maturity labels and avoid implying production readiness.
-- Chromium regression coverage checks the full compiler, playground, Lab and Viz flows. A Firefox and
-  WebKit smoke matrix now checks all fourteen pages at phone/desktop widths, mobile navigation,
+- Chromium regression coverage checks the full compiler, playground, Lab, Viz and provenance flows. A Firefox and
+  WebKit smoke matrix now checks all fifteen pages at phone/desktop widths, mobile navigation,
   keyboard Escape recovery, filter and tab semantics, overflow and page errors. Broader screen-reader
   checks and visual baselines remain outside the automated gate.
 - Keep external services, analytics and community-channel claims out of the site until they have a

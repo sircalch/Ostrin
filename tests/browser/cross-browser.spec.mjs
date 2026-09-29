@@ -11,6 +11,7 @@ const publicPages = [
   "./guides.html",
   "./language.html",
   "./playground.html",
+  "./provenance.html",
   "./reference.html",
   "./roadmap.html",
   "./showcase.html",

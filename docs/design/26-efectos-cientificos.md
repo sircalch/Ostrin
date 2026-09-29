@@ -297,7 +297,10 @@ en una consola de logs.
 4. **Semillas y capacidades:** ofrecer handles explícitos para RNG y E/S, primero en ejemplos de prueba y
    sin alterar la semántica estable del resto del lenguaje.
 5. **Artefacto de procedencia:** implementar JSON versionado, hashes de fuente/datos/salida y niveles R0–R3
-   en una orden CLI experimental.
+   en una orden CLI experimental. La primera superficie ya existe como `ostrinc --provenance-report` y
+   [`website/provenance.html`](../../website/provenance.html): normaliza el hash de fuente, registra target
+   y sitios de efecto, y marca explícitamente la salida como experimental/no verificada. Aún faltan
+   snapshots de entradas, hashes de salida, lockfiles y metadatos de runtime para reclamar R2/R3.
 6. **Frontera WASM:** conectar la tabla con permisos del Scientific Lab; denegar red/E/S no declaradas y
    hacer visible la razón.
 7. **Visualización y notebook:** incrustar procedencia en figuras, tablas y estados compartibles; añadir

@@ -50,7 +50,7 @@ traits, pattern matching, quantities and two concurrency modes: deterministic
 cooperative scheduling by default, plus opt-in native threads for compiled
 programs.
 
-The compiler suite currently passes **246 integration tests, 2 unit tests and 6 differential
+The compiler suite currently passes **247 integration tests, 2 unit tests and 6 differential
 interpreter↔native tests**. Function calls
 support named/default arguments, scalar and `String` collection lookups preserve `Option<T>`
 through the native IR path; concrete records and simple `Option<Record>` values
@@ -179,7 +179,14 @@ ostrinc --compile --native-threads file.ostrin # compile with OS threads and blo
 ostrinc --run --project path/to/project # use the entry declared by ostrin.toml
 ostrinc --fetch --run --project path/to/project # explicitly fetch Git dependencies
 ostrinc --locked --run --project path/to/project # require the existing lockfile/cache
+ostrinc --effect-report file.ostrin           # conservative effect inventory
+ostrinc --provenance-report --json file.ostrin # source hash, target and replay limits
 ```
+
+`--provenance-report` emits the experimental `ostrin.provenance/v0` artifact used by the
+[public provenance page](https://sircalch.github.io/Ostrin/provenance.html). It records a normalized
+source hash, compiler target and known effect sites. Inputs, output hashes, lockfiles and runtime
+snapshots are still required before Ostrin can claim static purity or reproducibility levels R2/R3.
 
 ## Visual Studio Code
 
