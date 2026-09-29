@@ -29,6 +29,10 @@
 -  Added the experimental `ostrinc --effect-report` inventory, with text and JSON output for known
   randomness, clock, host I/O, network, concurrency, measurement and provenance sites. It is
   conservative evidence for future checking, not an effect or reproducibility guarantee.
+- Added `ostrinc --provenance-report`, a versioned JSON artifact and text summary containing the
+  normalized source hash, compiler target, effect sites and explicit replay limitations. The generated
+  artifact is checked in as `website/provenance-data.js` and rendered at `website/provenance.html`;
+  it remains experimental and does not claim static purity or R2/R3 reproducibility.
 
 ### Cross-browser web smoke coverage
 

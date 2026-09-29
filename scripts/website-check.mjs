@@ -242,6 +242,17 @@ check(benchmarkData.includes("globalThis.OSTRIN_BENCHMARK") && benchmarkData.inc
 check(read("benchmarks/README.md").includes("interpreter-versus-native"),
   "benchmarks/README.md: missing benchmark contract");
 
+const provenance = read("website/provenance.html");
+check(provenance.includes('<script src="provenance-data.js" defer></script>'),
+  "provenance.html: missing generated provenance data");
+check(provenance.includes('<script src="provenance.js" defer></script>'),
+  "provenance.html: missing provenance renderer");
+const provenanceData = read("website/provenance-data.js");
+check(provenanceData.includes("globalThis.OSTRIN_PROVENANCE") && provenanceData.includes('"schema": "ostrin.provenance/v0"'),
+  "website/provenance-data.js: missing generated provenance artifact");
+check(read("website/provenance.js").includes("data-provenance-json"),
+  "website/provenance.js: missing artifact JSON renderer");
+
 const community = read("website/community.html");
 for (const marker of ["issues/new/choose", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md", "community-labels.md"]) {
   check(community.includes(marker), `community.html: missing contribution link ${marker}`);

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#080a10">
+    <meta name="description" content="Inspect the experimental Ostrin provenance artifact: source hash, compiler target, effect inventory and explicit reproducibility limits.">
+    <link rel="canonical" href="https://sircalch.github.io/Ostrin/provenance.html">
+    <meta property="og:site_name" content="Ostrin">
+    <meta property="og:title" content="Ostrin Provenance — Inspect Reproducible Computation">
+    <meta property="og:description" content="Inspect the experimental Ostrin provenance artifact: source hash, compiler target, effect inventory and explicit reproducibility limits.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://sircalch.github.io/Ostrin/provenance.html">
+    <meta property="og:image" content="https://sircalch.github.io/Ostrin/assets/ostrin-social.png">
+    <meta property="og:image:type" content="image/png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Ostrin programming language: scientific-first, general-purpose, native C and WASI.">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Ostrin Provenance — Inspect Reproducible Computation">
+    <meta name="twitter:description" content="Inspect the experimental Ostrin provenance artifact: source hash, compiler target, effect inventory and explicit reproducibility limits.">
+    <meta name="twitter:image" content="https://sircalch.github.io/Ostrin/assets/ostrin-social.png">
+    <meta name="twitter:image:alt" content="Ostrin programming language: scientific-first, general-purpose, native C and WASI.">
+    <link rel="icon" href="assets/ostrin-logo.png">
+    <link rel="stylesheet" href="styles.css">
+    <script src="site-data.js" defer></script>
+    <script src="site.js" defer></script>
+    <script src="provenance-data.js" defer></script>
+    <script src="provenance.js" defer></script>
+    <title>Ostrin Provenance — Inspect Reproducible Computation</title>
+  </head>
+  <body>
+    <header class="site-header"><a class="brand" href="index.html"><img src="assets/ostrin-logo.png" alt="" width="36" height="36"><span>OSTRIN</span></a><div class="header-right"><span class="version"></span><button class="menu-toggle" aria-label="Open navigation" aria-expanded="false"><span></span><span></span></button><nav class="site-nav" aria-label="Main navigation"><a href="docs.html">Learn</a><a href="reference.html">Reference</a><a href="guides.html">Guides</a><a href="examples.html">Examples</a><a href="cookbook.html">Cookbook</a><a href="viz.html">Viz</a><a href="playground.html">Playground</a><a href="https://github.com/sircalch/Ostrin">GitHub <span aria-hidden="true">↗</span></a></nav></div></header>
+    <main>
+      <section class="page-hero shell"><p class="eyebrow">Scientific provenance</p><h1>Make the computation<br><em>inspectable.</em></h1><p class="lede">Ostrin can now emit a machine-readable artifact that records the source hash, compiler target and conservative effect inventory behind a program. The report makes missing evidence visible before anyone calls a result reproducible.</p><div class="button-row"><a class="button" href="https://github.com/sircalch/Ostrin/blob/main/examples/measurement_scalar.ostrin" data-evidence="examples/measurement_scalar.ostrin">Open the source ↗</a><a class="button-quiet" href="guides.html#effects">Read the CLI guide →</a></div></section>
+      <section class="section shell" id="artifact"><div class="section-header"><p class="eyebrow">Recorded artifact</p><div><h2>One report, every assumption visible.</h2><p class="lede">This page is generated from <span class="mono">ostrinc --provenance-report --json --target wasm32-wasi</span> and checked against the source during the website build.</p></div></div><div class="benchmark-meta"><article class="benchmark-meta-card"><span class="tag">schema</span><strong data-provenance-schema>—</strong></article><article class="benchmark-meta-card"><span class="tag">source hash</span><strong data-provenance-source>—</strong></article><article class="benchmark-meta-card"><span class="tag">effects</span><strong data-provenance-effects>—</strong></article><article class="benchmark-meta-card"><span class="tag">replay level</span><strong data-provenance-level>—</strong></article></div><pre class="code" data-provenance-json aria-label="Ostrin provenance JSON">Loading provenance artifact…</pre></section>
+      <section class="section shell" id="limits"><div class="section-header"><p class="eyebrow">Evidence boundary</p><div><h2>Honest about what is missing.</h2><p class="lede">The artifact is deliberately conservative. It is useful evidence for tooling and publication workflows, and it does not silently turn an effect inventory into a proof.</p></div></div><div class="page-grid"><div class="guide-list"><article class="guide"><h2>Available now</h2><p>Source hashes are normalized across line endings, effect sites are serialized with stable paths, the target is explicit, and the report is available as text or JSON for native, WASI and browser tooling.</p></article><article class="guide"><h2>Next evidence layer</h2><p>Input snapshots, output hashes, lockfiles, runtime metadata and platform tolerances will raise the report toward R2/R3 reproducibility. The design contract is documented in <a class="text-link violet" href="https://github.com/sircalch/Ostrin/blob/main/docs/design/26-efectos-cientificos.md" data-evidence="docs/design/26-efectos-cientificos.md">scientific effects and provenance ↗</a>.</p></article></div></div></section>
+    </main>
+    <footer class="site-footer shell"><a class="brand" href="index.html"><img src="assets/ostrin-logo.png" alt="" width="30" height="30"><span>OSTRIN</span></a><span>Open development · MIT License</span><div class="footer-links"><a href="language.html">Language</a><a href="ecosystem.html">Ecosystem</a><a href="showcase.html">Showcase</a><a href="community.html">Community</a><a href="roadmap.html">Roadmap</a><a href="provenance.html" aria-current="page">Provenance</a><a href="https://github.com/sircalch/Ostrin">GitHub ↗</a></div></footer>
+  </body>
+</html>

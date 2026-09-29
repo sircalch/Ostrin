@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-29 · rama `main` · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 246 de integración y 2 unitarias en verde.*
+*Corte: 2026-09-29 · rama `main` · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 247 de integración y 2 unitarias en verde.*
 
 Validación remota: Pages, CI, CodeQL, sanitizers y auditoría de seguridad pasaron para `0ea7c6e` (PR #89, mediciones escalares experimentales y demo Scientific Lab) en Windows, Linux, macOS y web. La
 compuerta oficial exige `cargo fmt --check`, Clippy con el lint `suspicious`, la suite del
@@ -18,8 +18,8 @@ del lenguaje, `docs/design/` (26 documentos). La auditoría del sitio vive en
 |---|---|
 | **Implementado** | Compilador + intérprete (referencia semántica), checker con cantidades físicas, records/enums/traits/genéricos, `Option`/`Result`, colecciones, `Array<T>`, módulos y paquetes con lockfile, concurrencia cooperativa determinista, `--native-threads`, backend C con `--leak-check`, build WASI, playground WASM, LSP/DAP y extensión VS Code (VSIX local) |
 | **En fallback** | El backend nativo emite desde IR las familias cubiertas (§5); records/enums genéricos aplicados, iteradores indirectos, scopes anidados, handlers no lineales y agregados/escapes complejos caen de forma verificada a HIR y después al AST |
-| **Experimental** | Todo el lenguaje (versión 0.x, sin garantía de estabilidad); `--native-threads`; `std.viz` (visualización 2D/3D en SVG); `std.measurements` (mediciones escalares con fuentes de sensibilidad y estados `Exact`/`Standard`/`Unknown`); efectos científicos, determinismo y procedencia en propuesta de diseño (`docs/design/26-efectos-cientificos.md`); paquetes científicos de ejemplo `tables`, `plot`, `autodiff` (modo directo); dependencias Git con `--fetch` |
-| **Pendiente** | Retirar el fallback AST, ownership completo, Quantity/arrays/covarianza/Monte Carlo de `Measurement<T>`, implementación de efectos científicos y procedencia, red, registry público, GPU, autodiff inverso, canales de distribución (Homebrew, winget, Scoop, Chocolatey, AUR), extensión en Marketplace y reconocimiento upstream de Ostrin en GitHub Linguist; la propuesta machine-readable y su gate local ya están preparados |
+| **Experimental** | Todo el lenguaje (versión 0.x, sin garantía de estabilidad); `--native-threads`; `std.viz` (visualización 2D/3D en SVG); `std.measurements` (mediciones escalares con fuentes de sensibilidad y estados `Exact`/`Standard`/`Unknown`); inventarios `--effect-report` y `--provenance-report` con artefacto público en `website/provenance.html`; efectos científicos, determinismo y procedencia siguen en propuesta de diseño (`docs/design/26-efectos-cientificos.md`); paquetes científicos de ejemplo `tables`, `plot`, `autodiff` (modo directo); dependencias Git con `--fetch` |
+| **Pendiente** | Retirar el fallback AST, ownership completo, Quantity/arrays/covarianza/Monte Carlo de `Measurement<T>`, checking estático y niveles R2/R3 de efectos/procedencia, red, registry público, GPU, autodiff inverso, canales de distribución (Homebrew, winget, Scoop, Chocolatey, AUR), extensión en Marketplace y reconocimiento upstream de Ostrin en GitHub Linguist; la propuesta machine-readable y su gate local ya están preparados |
 | **Release** | [`v0.1.0`](https://github.com/sircalch/Ostrin/releases/tag/v0.1.0) publicada el 2026-09-24 con tres archivos (Linux x86_64, macOS ARM64, Windows x64) y sus `.sha256`; instaladores verificados contra ella en runners limpios (`install-check.yml`); workflows de CI, release y WASI en verde |
 
 ---
@@ -51,7 +51,7 @@ Implementación: compilador + intérprete + herramientas de editor, todo en Rust
 | Servidor de lenguaje | `lsp.rs`, `symbols.rs`, `protocol.rs` | LSP sobre stdio |
 | Adaptador de depuración | `dap.rs` + hooks del intérprete | DAP sobre stdio |
 | **Backend nativo** | `codegen.rs`, `hir_c.rs` y runtimes C | Transpila a C y compila con gcc/clang/cc |
-| CLI | `main.rs` | `--check --run --ast --tokens --json --lsp --dap --emit-c --compile --native-threads --effect-report` (inventario experimental conservador) |
+| CLI | `main.rs` | `--check --run --ast --tokens --json --lsp --dap --emit-c --compile --native-threads --effect-report --provenance-report` (inventarios experimentales conservadores) |
 | Editor | `vscode-ostrin/` (v0.4.0) | Resaltado, LSP, DAP, comandos, VSIX |
 
 Regla de oro del proyecto: **el intérprete es la referencia**. Cada capacidad del
@@ -472,7 +472,7 @@ sus evidencias y validación upstream.
 
 ```powershell
 cd compiler
-    cargo test                                   # 6 diferenciales + 246 de integración + 2 unitarias
+    cargo test                                   # 6 diferenciales + 247 de integración + 2 unitarias
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```

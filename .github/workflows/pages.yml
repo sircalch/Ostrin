@@ -6,6 +6,7 @@ on:
     paths:
       - 'website/**'
       - 'compiler/**'
+      - 'scripts/provenance-page.mjs'
       - 'scripts/website-check.mjs'
       - 'tests/browser/**'
       - '.github/actions/website-verify/**'

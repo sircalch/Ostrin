@@ -7306,6 +7306,7 @@ fn cli_exposes_help_and_version() {
     assert!(stdout(&help).contains("--members"));
     assert!(stdout(&help).contains("--types"));
     assert!(stdout(&help).contains("--effect-report"));
+    assert!(stdout(&help).contains("--provenance-report"));
     assert!(stdout(&help).contains("--project"));
     assert!(stdout(&help).contains("--native-threads"));
     assert!(stdout(&help).contains("wasm32-wasi"));
@@ -7337,6 +7338,39 @@ fn experimental_effect_report_exposes_measurement_and_io_sites() {
     assert!(json_text.contains("\"schema\":\"ostrin.effect-report/v0\""));
     assert!(json_text.contains("\"conservative\":true"));
     assert!(json_text.contains("\"effect\":\"measurement\""));
+}
+
+#[test]
+fn experimental_provenance_report_contains_source_hash_and_effects() {
+    let out = run(&[
+        "--provenance-report",
+        "--json",
+        "--target",
+        "wasm32-wasi",
+        &example_path("measurement_scalar.ostrin"),
+    ]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let artifact: serde_json::Value =
+        serde_json::from_str(&stdout(&out)).expect("provenance report must be JSON");
+    assert_eq!(artifact["schema"], "ostrin.provenance/v0");
+    assert_eq!(artifact["experimental"], true);
+    assert_eq!(artifact["verified"], false);
+    assert_eq!(artifact["compiler"]["target"], "wasm32-wasi");
+    assert!(artifact["program"]["source_hash"]
+        .as_str()
+        .is_some_and(|hash| hash.starts_with("sha256:") && hash.len() == 71));
+    assert!(artifact["activity"]["effects"]
+        .as_array()
+        .is_some_and(|effects| effects.iter().any(|effect| effect == "measurement")));
+    assert_eq!(artifact["reproducibility"]["level"], "unverified");
+
+    let text = run(&[
+        "--provenance-report",
+        &example_path("measurement_scalar.ostrin"),
+    ]);
+    assert!(text.status.success(), "stderr: {}", stderr(&text));
+    assert!(stdout(&text).contains("provenance-report: experimental artifact"));
+    assert!(stdout(&text).contains("source-hash: sha256:"));
 }
 
 #[test]
