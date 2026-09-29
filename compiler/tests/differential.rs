@@ -416,8 +416,8 @@ fn native_backend_types_agree_with_the_checker() {
     // explicit IR lowering (the migration of the native backend).
     let native_generated = hir_generated + ir_generated;
     assert!(
-        native_generated >= 6426,
-        "only {native_generated} functions were generated from HIR/IR (expected at least 6426)"
+        native_generated >= 6428,
+        "only {native_generated} functions were generated from HIR/IR (expected at least 6428)"
     );
     println!("functions generated from HIR/IR: {native_generated} (HIR {hir_generated}, IR {ir_generated})");
     println!("functions still using AST fallback: {ast_fallback}");
@@ -474,7 +474,7 @@ fn native_backend_types_agree_with_the_checker() {
     // through the same IR/C path. HIR now
     // substitutes the concrete owner for `Self` in trait method signatures,
     // allowing Complex arithmetic/equality to use IR/C. The verified baseline is
-    // 121 AST fallbacks (6,401 IR and 25 HIR functions). The experimental
+    // 121 AST fallbacks (6,403 IR and 25 HIR functions). The experimental
     // `std.measurements` module contributes 21 additional IR functions and has
     // no fallback; Rng, closure-backed list combinators and nested `parse_csv`
     // lists remove six more fallbacks in the current baseline.

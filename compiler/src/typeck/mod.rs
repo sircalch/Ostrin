@@ -1027,8 +1027,16 @@ impl Checker {
                         .find(|im| {
                             im.trait_name.as_deref() == Some("Iterator") && im.type_name == *n
                         })
-                        .and_then(|im| im.trait_args.first().cloned())
-                        .map(|t| self.resolve_type_in_context(&t)),
+                        .and_then(|im| {
+                            let substitutions = implementation_type_substitutions(&iter_ty, im)?;
+                            let mut item = im.trait_args.first()?.clone();
+                            substitute_impl_type_parameters(&mut item, &substitutions);
+                            Some(resolve_type_with_type_subst(
+                                &item,
+                                &HashMap::new(),
+                                &HashMap::new(),
+                            ))
+                        }),
                     _ => None,
                 };
                 let elem_ty = iterator_element_type(&iter_ty)
