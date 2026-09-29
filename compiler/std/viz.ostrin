@@ -896,7 +896,15 @@ fn render(fig: Figure) -> String {
     y0 = if fig.yfixed { fig.y0 } else if has_bars and ys_lo == 0.0 { 0.0 } else { ys_lo - ypad }
     y1 = if fig.yfixed { fig.y1 } else { ys_hi + ypad }
 
-    heat = fig.series.any(fn(s) { is_grid(s.kind) })
+    // Keep the renderer on the explicit IR path. The closure form of `any`
+    // captures a record with managed array fields and therefore had to use the
+    // AST compatibility emitter; this equivalent scan has no closure payload.
+    mut heat = false
+    for candidate in fig.series {
+        if is_grid(candidate.kind) {
+            heat = true
+        }
+    }
     left = 66.0
     right = w - (if heat { 86.0 } else { 20.0 })
     top = if fig.subtitle != "" { 62.0 } else { 44.0 }

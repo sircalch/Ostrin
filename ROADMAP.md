@@ -6,19 +6,17 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
 ## Siguiente ciclo
 
 1. Reducir el fallback AST con el trinquete por archivo de `--native-type-report` (baseline actual:
-   6.131 funciones IR, 124 HIR y 249 AST). Los métodos de records y enums concretos ya comparten
+   6.163 funciones IR, 124 HIR y 217 AST). Los métodos de records y enums concretos ya comparten
    la ruta IR/C cuando sus campos y ownership son compatibles; los records recursivos permanecen
    deliberadamente en HIR/AST hasta cerrar ese contrato. El puente IR para los constructores numéricos
    `zeros`/`ones`, `norm`, `abs` escalar y `sqrt` migró 348 funciones compartidas por la suite;
    LU ya está disponible con paridad publicada en el Lab; QR y Cholesky cruzan la IR y conservan esa
-   paridad. La deuda restante
-   se concentra en las superficies `std.viz.hexbin`,
-   `std.viz.contourf`, `std.viz.quiver`, `std.viz.streamplot`, `std.viz.table`,
-   `std.viz.vector_field`, funciones numéricas auxiliares y el ejemplo compuesto de selección
-   enlazada, cuyos agregados y SVG siguen necesitando la migración gradual. La preparación numérica
+   paridad. El renderer de `std.viz` y sus superficies 2D/3D ya cruzan IR/C; quedan dos
+   instanciaciones genéricas de trazado con `Quantity`, funciones numéricas auxiliares y el ejemplo
+   compuesto de selección enlazada, cuyos agregados y ownership siguen necesitando la migración gradual. La preparación numérica
    de histogramas y violines ya cruza IR/C mediante `histogram`, `linspace` y `pow`, y los ids
-   deterministas de `std.viz::uid` usan `hash(String)` en IR/C; el renderer SVG y sus agregados
-   anidados siguen pendientes.
+   deterministas de `std.viz::uid` usan `hash(String)` en IR/C y el renderer usa un recorrido IR
+   explícito sobre sus series.
    `std.numeric.Complex` ya tiene una API experimental de `Float64` y una demo live; `ComplexVector`
    y `ComplexMatrix` añaden almacenamiento denso dividido, adjunta, multiplicación y `solve` con
    pivoteo parcial, con una demo live en Linear Algebra. El tipo paramétrico, `Array<Complex>`,

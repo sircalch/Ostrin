@@ -434,19 +434,9 @@ fn native_backend_types_agree_with_the_checker() {
     // whenever a backend family moves from AST to HIR/IR; a new example that
     // increases the total must update the limit only with an explicit reason.
     // The shared std.viz module is measured once for each importing example. Its
-    // deterministic String hash helper now lowers through IR/C, so `uid` no
-    // longer contributes one AST fallback per visualization consumer.
-    // The table renderer adds 93 more measured fallback functions for the same
-    // reason: nested List<String> formatting is not in the IR ownership model yet.
-    // The 3D vector-field renderer adds 75 more measured fallback functions:
-    // vector arrow geometry and SVG strings are still outside the IR ownership model.
-    // The linked-data gallery adds 53 more: nested table/figure composition and
-    // positional marker attributes still use the AST path until aggregates and
-    // SVG string construction move into the IR ownership model.
-    // Volume slices add 228 measured fallbacks: 3D cell geometry, volume extraction
-    // and scalar colorbar strings are new std.viz paths awaiting the same migration.
-    // Isosurfaces add 112 more: marching tetrahedra and mesh SVG strings remain on
-    // the AST path until aggregate-heavy visualization code moves into IR.
+    // deterministic String hash helper and renderer grid scan now lower through
+    // IR/C; only two generic quantity plotting instantiations remain outside the
+    // explicit IR ownership model.
     // Histogram and violin data preparation now use the typed IR/C path: the
     // native emitter covers `histogram`, `linspace` and two-argument `pow`,
     // removing 65 measured fallbacks across the shared std.viz consumers.
@@ -477,13 +467,14 @@ fn native_backend_types_agree_with_the_checker() {
     // allocated joined result and removes another 545 AST fallbacks across the
     // shared standard-library consumers. Checked integer casts unlock the
     // numeric and color helpers used by std.viz and remove 290 more fallbacks.
-    // String hashing for deterministic SVG ids now uses the same stable runtime
-    // helper as the legacy emitter and removes 32 more measured fallbacks.
-    // The verified baseline is 249 AST fallbacks (6,131 IR and 124 HIR functions).
+    // String hashing for deterministic SVG ids and the explicit renderer scan use
+    // the same stable runtime helpers as the legacy emitter and remove 64 more
+    // measured fallbacks in total. The verified baseline is 217 AST fallbacks
+    // (6,163 IR and 124 HIR functions).
     // Keep this ratchet explicit until
     // the next aggregate family moves with parity evidence; aggregate-heavy SVG
     // paths and complex array promotion remain pending.
-    const MAX_AST_FALLBACK_FUNCTIONS: usize = 249;
+    const MAX_AST_FALLBACK_FUNCTIONS: usize = 217;
     assert!(
         ast_fallback <= MAX_AST_FALLBACK_FUNCTIONS,
         "AST fallback grew to {ast_fallback} functions (ratchet limit {MAX_AST_FALLBACK_FUNCTIONS})"

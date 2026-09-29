@@ -17,6 +17,14 @@
 - The differential ratchet is now **6,131 IR / 124 HIR / 249 AST fallbacks** across 205 measured
   source modules; aggregate-heavy SVG rendering remains the next migration boundary.
 
+### Native IR: visualization renderer grid scan
+- `std.viz::render` no longer uses a closure over `Figure.series` to detect grid-backed marks;
+  an explicit record-list scan now lowers the complete renderer through IR/C while preserving
+  the exact SVG bytes in interpreter, native and WASM execution.
+- Together with scalar string hashing, this removes 64 measured visualization fallbacks from the
+  previous 6,099 IR / 124 HIR / 281 AST baseline. The verified ratchet is now **6,163 IR /
+  124 HIR / 217 AST fallbacks** across 205 measured source modules.
+
 ### Native IR: checked numeric casts
 - Explicit casts from `Float`/`Float32` and integer families to `Int` or fixed-width integers now
   lower through IR/C with the same truncation, NaN and range checks as the established native
