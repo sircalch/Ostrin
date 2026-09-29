@@ -9,6 +9,14 @@
   repository check and a negative fixture test; upstream submission remains gated on independent
   public usage evidence.
 
+### Native IR: deterministic visualization ids
+- Scalar `hash(String)` calls now lower through IR/C and reuse the stable
+  `ostrin_hash_string` runtime helper. `std.viz::uid` therefore generates the same
+  deterministic SVG ids in the interpreter, native backend and WASM without its shared AST
+  fallback.
+- The differential ratchet is now **6,131 IR / 124 HIR / 249 AST fallbacks** across 205 measured
+  source modules; aggregate-heavy SVG rendering remains the next migration boundary.
+
 ### Native IR: checked numeric casts
 - Explicit casts from `Float`/`Float32` and integer families to `Int` or fixed-width integers now
   lower through IR/C with the same truncation, NaN and range checks as the established native

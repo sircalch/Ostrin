@@ -433,10 +433,9 @@ fn native_backend_types_agree_with_the_checker() {
     // This is intentionally the current repository-wide baseline. Lower it
     // whenever a backend family moves from AST to HIR/IR; a new example that
     // increases the total must update the limit only with an explicit reason.
-    // Boxplot is a new std.viz surface that currently uses the AST native path;
-    // the shared std.viz module is measured once for each importing example, so
-    // this adds 70 entries to the repository-wide count. Keep the increase
-    // explicit and bounded until the next std.viz migration pass moves it to IR.
+    // The shared std.viz module is measured once for each importing example. Its
+    // deterministic String hash helper now lowers through IR/C, so `uid` no
+    // longer contributes one AST fallback per visualization consumer.
     // The table renderer adds 93 more measured fallback functions for the same
     // reason: nested List<String> formatting is not in the IR ownership model yet.
     // The 3D vector-field renderer adds 75 more measured fallback functions:
@@ -478,11 +477,13 @@ fn native_backend_types_agree_with_the_checker() {
     // allocated joined result and removes another 545 AST fallbacks across the
     // shared standard-library consumers. Checked integer casts unlock the
     // numeric and color helpers used by std.viz and remove 290 more fallbacks.
-    // The verified baseline is 281 AST fallbacks (6,099 IR and 124 HIR functions).
+    // String hashing for deterministic SVG ids now uses the same stable runtime
+    // helper as the legacy emitter and removes 32 more measured fallbacks.
+    // The verified baseline is 249 AST fallbacks (6,131 IR and 124 HIR functions).
     // Keep this ratchet explicit until
     // the next aggregate family moves with parity evidence; aggregate-heavy SVG
     // paths and complex array promotion remain pending.
-    const MAX_AST_FALLBACK_FUNCTIONS: usize = 281;
+    const MAX_AST_FALLBACK_FUNCTIONS: usize = 249;
     assert!(
         ast_fallback <= MAX_AST_FALLBACK_FUNCTIONS,
         "AST fallback grew to {ast_fallback} functions (ratchet limit {MAX_AST_FALLBACK_FUNCTIONS})"

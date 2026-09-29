@@ -9352,8 +9352,8 @@ fn viz_histograms_render_bins_and_use_numeric_ir() {
         stderr(&report)
     );
     assert!(
-        stdout(&report).contains("native-source: <ostrin-std>/viz.ostrin ir=142 hir=3 ast=2"),
-        "histogram did not use the numeric IR path: {}",
+        stdout(&report).contains("native-source: <ostrin-std>/viz.ostrin ir=143 hir=3 ast=1"),
+        "histogram did not use the visualization IR path: {}",
         stdout(&report)
     );
 
@@ -9403,8 +9403,8 @@ fn viz_violins_render_kde_shapes_and_medians() {
         stderr(&report)
     );
     assert!(
-        stdout(&report).contains("native-source: <ostrin-std>/viz.ostrin ir=142 hir=3 ast=2"),
-        "violin did not use the numeric IR path: {}",
+        stdout(&report).contains("native-source: <ostrin-std>/viz.ostrin ir=143 hir=3 ast=1"),
+        "violin did not use the visualization IR path: {}",
         stdout(&report)
     );
 }
