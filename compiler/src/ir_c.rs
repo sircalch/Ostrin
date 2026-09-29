@@ -587,6 +587,50 @@ fn c_int_literal(value: i128) -> String {
 
 const OVERFLOW_ABORT: &str = "fprintf(stderr, \"runtime error: integer overflow\\n\"); exit(1);";
 
+/// Emit the same checked numeric conversion used by the AST/C backend for
+/// explicit `as Int` and fixed-width integer casts.  Keeping the range checks
+/// here is important: a direct C cast from a floating value outside the target
+/// range is undefined, while Ostrin's interpreter reports a runtime error.
+fn integer_conversion_code(source: &str, source_ty: &Ty, target: &Ty) -> Bail<String> {
+    let (min, max, c_type) = match target {
+        Ty::Int => (i64::MIN as i128, i64::MAX as i128, "int64_t"),
+        Ty::Sized(kind) => (kind.min(), kind.max(), kind.c_type()),
+        _ => return Err(()),
+    };
+    let source = if *source_ty == Ty::Float32 {
+        format!("((double)({source}))")
+    } else {
+        source.to_string()
+    };
+    let fail =
+        "fprintf(stderr, \"runtime error: value does not fit in the target integer type\\n\"); exit(1);";
+    let temp = "__ostrin_ir_convert";
+    if matches!(source_ty, Ty::Float | Ty::Float32) {
+        // Truncate toward zero, then range-check exactly as the established
+        // AST emitter does.  The NaN check prevents an undefined conversion.
+        let low_check = if min == 0 {
+            "-1.0".to_string()
+        } else if min == i64::MIN as i128 {
+            "-9223372036854775809.0".to_string()
+        } else {
+            format!("(double)({})", c_int_literal(min - 1))
+        };
+        let low_cmp = if min == i64::MIN as i128 { "<" } else { "<=" };
+        let high = format!("{}.0", max + 1);
+        Ok(format!(
+            "({{ double {temp} = {source}; if ({temp} != {temp} || {temp} {low_cmp} {low_check} || {temp} >= {high}) {{ {fail} }} ({c_type}){temp}; }})"
+        ))
+    } else if matches!(source_ty, Ty::Int | Ty::Sized(_)) {
+        Ok(format!(
+            "({{ __int128 {temp} = (__int128)({source}); if ({temp} < (__int128){} || {temp} > (__int128){}) {{ {fail} }} ({c_type}){temp}; }})",
+            c_int_literal(min),
+            c_int_literal(max),
+        ))
+    } else {
+        Err(())
+    }
+}
+
 fn unary_code(op: UnaryOp, operand: &str, ty: &Ty) -> Bail<String> {
     match (op, ty) {
         (UnaryOp::Neg, Ty::Int | Ty::Float | Ty::Float32) => Ok(format!("(-{operand})")),
@@ -2943,6 +2987,40 @@ fn emit_instruction(
             } else {
                 format!("((float)({source}))")
             };
+            out.push_str(&format!("    {} = {cast};\n", value_name(*dst)));
+        }
+        IrInstr::Opaque {
+            dst: Some(dst),
+            op,
+            inputs,
+            ty,
+        } if inputs.len() == 1
+            && op
+                .strip_prefix("as<")
+                .and_then(|target| target.strip_suffix('>'))
+                .is_some_and(|target| {
+                    matches!(target, "Int" | "Int64")
+                        || crate::ast::IntKind::from_name(target).is_some()
+                }) =>
+        {
+            let Some(target_name) = op
+                .strip_prefix("as<")
+                .and_then(|target| target.strip_suffix('>'))
+            else {
+                return Err(());
+            };
+            let target_ty = match target_name {
+                "Int" | "Int64" => Ty::Int,
+                other => crate::ast::IntKind::from_name(other)
+                    .map(Ty::Sized)
+                    .ok_or(())?,
+            };
+            if *ty != target_ty {
+                return Err(());
+            }
+            let source_ty = value_ty(values, inputs[0])?;
+            let source = value_code(values, inputs[0])?;
+            let cast = integer_conversion_code(&source, &source_ty, &target_ty)?;
             out.push_str(&format!("    {} = {cast};\n", value_name(*dst)));
         }
         IrInstr::Opaque {

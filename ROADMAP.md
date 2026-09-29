@@ -6,7 +6,7 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
 ## Siguiente ciclo
 
 1. Reducir el fallback AST con el trinquete por archivo de `--native-type-report` (baseline actual:
-   5.744 funciones IR, 124 HIR y 636 AST). Los métodos de records y enums concretos ya comparten
+   6.034 funciones IR, 124 HIR y 346 AST). Los métodos de records y enums concretos ya comparten
    la ruta IR/C cuando sus campos y ownership son compatibles; los records recursivos permanecen
    deliberadamente en HIR/AST hasta cerrar ese contrato. El puente IR para los constructores numéricos
    `zeros`/`ones`, `norm`, `abs` escalar y `sqrt` migró 348 funciones compartidas por la suite;
@@ -30,7 +30,8 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    al indexar y al construir arrays desde listas, y `std.numeric` usa ese camino en sus
    integrales e interpolación con cantidades; la aritmética elemento a elemento de arrays con
    unidades sigue deliberadamente en HIR/AST hasta tener helpers IR que preserven la etiqueta.
-   Las conversiones escalares `as<Float/Float32>`, `abs` sobre arrays y las funciones matemáticas
+   Las conversiones escalares `as<Float/Float32>` y las conversiones comprobadas a `Int`/enteros de ancho fijo,
+   `abs` sobre arrays y las funciones matemáticas
    deterministas (`sin`, `cos`, `ln`, `exp`, `pi`, `eye` y relacionadas) ya cruzan IR/C; esta pasada
    redujo el fallback AST medido sin cambiar la salida del intérprete ni del nativo. `Int.to_string`,
    `Float.to_string`, `Float32.to_string` y enteros de ancho fijo ya están disponibles en IR/C, con
