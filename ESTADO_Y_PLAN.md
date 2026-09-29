@@ -2,7 +2,7 @@
 
 *Corte: 2026-09-28 · rama `main` · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 243 de integración y 2 unitarias en verde.*
 
-Validación remota: Pages, CI, CodeQL, sanitizers y auditoría de seguridad pasaron para `b954111` (PR #78, preparación numérica de visualización) en Windows, Linux, macOS y web. La
+Validación remota: Pages, CI, CodeQL, sanitizers y auditoría de seguridad pasaron para `877ac8e` (PR #79, migración de hash escalar y uid de visualización) en Windows, Linux, macOS y web. La
 compuerta oficial exige `cargo fmt --check`, Clippy con el lint `suspicious`, la suite del
 compilador y las comprobaciones del sitio; los workflows de auditoría de dependencias,
 CodeQL, sanitizers nativos y cobertura quedan registrados para el ciclo P5.
@@ -162,8 +162,8 @@ por separado en `--native-type-report` como `ir-generated`; el mismo informe exp
 `hir-generated` y `ast-fallback` para que la retirada del backend legado tenga un contador
 visible. También publica líneas `native-source` agrupadas por archivo para localizar la deuda
 por módulo; la prueba diferencial comprueba que sus sumas coinciden con el total. En el corte
-actual, la suite de ejemplos suma 6 131 funciones IR, 124 HIR y 249 que aún caen al emisor
-AST; `native_backend_types_agree_with_the_checker` mantiene 249 como trinquete temporal. Los métodos
+actual, la suite de ejemplos suma 6 163 funciones IR, 124 HIR y 217 que aún caen al emisor
+AST; `native_backend_types_agree_with_the_checker` mantiene 217 como trinquete temporal. Los métodos
 de records y enums concretos comparten ahora IR/C cuando sus campos y ownership son compatibles; los
 records recursivos conservan HIR/AST hasta cerrar su contrato de ownership.
 El puente IR de `zeros`/`ones`, `norm`, `abs` escalar y `sqrt` redujo el fallback en 348 funciones;
@@ -172,17 +172,20 @@ esta pasada añade conversiones escalares `as<Float/Float32>` y conversiones com
 deterministas (`sin`, `cos`, `ln`, `exp`, `pi`, `eye` y relacionadas), además de `histogram`,
 `linspace` y `pow` binario para la preparación de histogramas y violines, reduciendo de nuevo el
 fallback con paridad. `hash(String)` comparte ahora el helper estable del runtime con el emisor
-legado, por lo que `std.viz::uid` también cruza IR/C y conserva ids SVG deterministas.
+legado, por lo que `std.viz::uid` también cruza IR/C y conserva ids SVG deterministas. El renderer
+`std.viz::render` reemplazó la lambda que inspeccionaba `Figure.series` por un recorrido explícito;
+la función completa ya cruza IR/C y mantiene bytes SVG idénticos.
 QR y Cholesky ya se emiten desde IR/C; con LU, SVD, número de condición, autovectores y álgebra compleja densa,
 `std.numeric` queda medido en `ir=72`, `hir=0`, `ast=5` por consumidor (`Array<Quantity<D>>`: `ir=75`,
 `hir=0`, `ast=6`): los diagnósticos de convergencia de
 `secant` y `newton` ya convierten sus límites enteros a texto desde IR/C, y `powi` despacha `Complex` mediante
 el operador `mul` registrado. Las cifras históricas de deuda por función de LU, SVD y álgebra compleja
 quedaron superadas por la migración de métodos; el informe actual deja como deuda verificable los
-recorridos y helpers que aún requieren agregados anidados y ownership no lineal. Las superficies `std.viz.hexbin`,
-`std.viz.contourf`, `std.viz.quiver`, `std.viz.streamplot`, `std.viz.table` y
-`std.viz.vector_field`, además de funciones numéricas auxiliares y agregados SVG, siguen
-compartiendo funciones AST y forman la siguiente deuda verificable. Los marcadores de ownership de
+recorridos y helpers que aún requieren agregados anidados y ownership no lineal. La deuda de
+`std.viz` queda reducida a dos instanciaciones genéricas de trazado con `Quantity`; las superficies
+hexbin, contourf, quiver, streamplot, tablas, campos vectoriales y el renderer SVG ya comparten
+IR/C. Las funciones numéricas auxiliares y los agregados no lineales forman la siguiente deuda
+verificable. Los marcadores de ownership de
 `String`, `List<T>`, los núcleos escalares de `Map<K,V>`/`Set<T>` y `Option<T>` con payload
 escalar o `String` también se consumen al generar C; `Map.get/remove` producen structs
 `Option_<T>` por valor y retienen/transfieren sus strings correctamente. Los `for` sobre rangos
@@ -304,12 +307,12 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
 convendría dividirlos; el backend nativo no comparte el sistema de tipos del checker
-(ya consume los tipos del checker y compara cada nodo; el informe actual suma **6 131 funciones
-generadas desde IR, 124 desde HIR y 249 en fallback AST** en los ejemplos, con un trinquete
+(ya consume los tipos del checker y compara cada nodo; el informe actual suma **6 163 funciones
+generadas desde IR, 124 desde HIR y 217 en fallback AST** en los ejemplos, con un trinquete
 que impide que el fallback aumente sin justificación; los métodos de records y enums concretos
 entran ahora en IR/C cuando sus campos y ownership son compatibles, mientras los records recursivos
 conservan el fallback verificado; las familias migradas incluyen escalares,
-`String` (incluidos `char_at`, `slice`, `codepoint` y `hash(String)`), `std.viz::uid` y `List<String>.join`, conversiones numéricas comprobadas,
+`String` (incluidos `char_at`, `slice`, `codepoint` y `hash(String)`), `std.viz::uid`, el recorrido IR de `std.viz::render` y `List<String>.join`, conversiones numéricas comprobadas,
 records concretos, `Option<Record>`, `List<T>` escalar, `Map`/`Set` escalares, `Option`
 escalar/String y patrones `Some/None`, `Float32`, enteros de ancho fijo, records, enums, `match`,
 `Option`/`Result`, listas/colecciones, cierres, instancias concretas de genéricos, records/enums
