@@ -1,0 +1,29 @@
+// Experimental std.measurements scalar API: explicit sources preserve correlation.
+import std.measurements
+
+fn main() -> Void {
+    match measurements.standard(12.30, 0.02, "caliper") {
+        Ok(x) => match measurements.standard(1.50, 0.03, "reference") {
+            Ok(y) => {
+                print("x = " + measurements.summary(x))
+                print("x + x = " + measurements.summary(measurements.add(x, x).unwrap()))
+                print("x - x = " + measurements.summary(measurements.sub(x, x).unwrap()))
+                print("x + y = " + measurements.summary(measurements.add(x, y).unwrap()))
+                print("2x = " + measurements.summary(measurements.mul(x, measurements.exact(2.0)).unwrap()))
+                print("x / x = " + measurements.summary(measurements.div(x, x).unwrap()))
+                print("unknown = " + measurements.summary(measurements.scale(measurements.unknown(4.0, "sensor offline"), 2.0)))
+            },
+            Err(message) => print("reference error: " + message),
+        },
+        Err(message) => print("caliper error: " + message),
+    }
+
+    match measurements.standard(1.0, -0.1, "bad") {
+        Ok(_) => print("invalid sigma accepted"),
+        Err(message) => print("invalid sigma = " + message),
+    }
+    match measurements.standard(1.0, 0.1, "") {
+        Ok(_) => print("empty source accepted"),
+        Err(message) => print("empty source = " + message),
+    }
+}

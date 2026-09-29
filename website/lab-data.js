@@ -688,6 +688,41 @@ globalThis.OSTRIN_LAB = Object.freeze({
       ]
     },
     {
+      "id": "measurements",
+      "title": "Measurements",
+      "headline": "Carry standard uncertainty and source correlation through scalar arithmetic.",
+      "file": "examples/measurement_scalar.ostrin",
+      "render": "text",
+      "params": [],
+      "how": "std.measurements keeps a value, explicit standard-deviation sources and an uncertainty-known state together. Reusing the same source preserves correlation (`x - x = 0 ± 0`); independent sources combine through the linearized variance rule. The browser runs the same module through ostrinc.wasm as the interpreter and native compiler.",
+      "docs": {
+        "label": "measurement design",
+        "href": "https://github.com/sircalch/Ostrin/blob/main/docs/design/25-mediciones-e-incertidumbre.md"
+      },
+      "limits": "This first scalar API is experimental and function-based: Quantity integration, arrays, covariance blocks, Monte Carlo, coverage intervals and uncertainty-aware error bars remain planned. Unknown uncertainty propagates explicitly and is never treated as zero.",
+      "files": {
+        "main.ostrin": "// Experimental std.measurements scalar API: explicit sources preserve correlation.\nimport std.measurements\n\nfn main() -> Void {\n    match measurements.standard(12.30, 0.02, \"caliper\") {\n        Ok(x) => match measurements.standard(1.50, 0.03, \"reference\") {\n            Ok(y) => {\n                print(\"x = \" + measurements.summary(x))\n                print(\"x + x = \" + measurements.summary(measurements.add(x, x).unwrap()))\n                print(\"x - x = \" + measurements.summary(measurements.sub(x, x).unwrap()))\n                print(\"x + y = \" + measurements.summary(measurements.add(x, y).unwrap()))\n                print(\"2x = \" + measurements.summary(measurements.mul(x, measurements.exact(2.0)).unwrap()))\n                print(\"x / x = \" + measurements.summary(measurements.div(x, x).unwrap()))\n                print(\"unknown = \" + measurements.summary(measurements.scale(measurements.unknown(4.0, \"sensor offline\"), 2.0)))\n            },\n            Err(message) => print(\"reference error: \" + message),\n        },\n        Err(message) => print(\"caliper error: \" + message),\n    }\n\n    match measurements.standard(1.0, -0.1, \"bad\") {\n        Ok(_) => print(\"invalid sigma accepted\"),\n        Err(message) => print(\"invalid sigma = \" + message),\n    }\n    match measurements.standard(1.0, 0.1, \"\") {\n        Ok(_) => print(\"empty source accepted\"),\n        Err(message) => print(\"empty source = \" + message),\n    }\n}\n"
+      },
+      "main": "main.ostrin",
+      "args": [
+        "--run",
+        "main.ostrin"
+      ],
+      "source": "examples/measurement_scalar.ostrin",
+      "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/measurement_scalar.ostrin",
+      "output": [
+        "x = 12.3 ± 0.02",
+        "x + x = 24.6 ± 0.04",
+        "x - x = 0 ± 0",
+        "x + y = 13.8 ± 0.03605551275463989",
+        "2x = 24.6 ± 0.04",
+        "x / x = 1 ± 0",
+        "unknown = unknown: scale received a measurement with unknown uncertainty",
+        "invalid sigma = measurement sigma must be non-negative",
+        "empty source = measurement source label must not be empty"
+      ]
+    },
+    {
       "id": "data",
       "title": "Data",
       "headline": "Parse CSV and summarize each group.",

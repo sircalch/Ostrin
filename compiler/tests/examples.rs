@@ -9696,6 +9696,35 @@ fn std_numeric_cholesky_matches_interpreter_and_native() {
 }
 
 #[test]
+fn std_measurements_scalar_matches_interpreter_and_native() {
+    assert_eq!(
+        interpreter_and_native_agree("measurement_scalar.ostrin"),
+        "x = 12.3 ± 0.02\nx + x = 24.6 ± 0.04\nx - x = 0 ± 0\nx + y = 13.8 ± 0.03605551275463989\n2x = 24.6 ± 0.04\nx / x = 1 ± 0\nunknown = unknown: scale received a measurement with unknown uncertainty\ninvalid sigma = measurement sigma must be non-negative\nempty source = measurement source label must not be empty\n"
+    );
+
+    let report = run(&[
+        "--native-type-report",
+        &example_path("measurement_scalar.ostrin"),
+    ]);
+    assert!(
+        report.status.success(),
+        "measurement type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    let measurement_source = report_text
+        .lines()
+        .find(|line| line.starts_with("native-source: <ostrin-std>/measurements.ostrin "))
+        .unwrap_or_else(|| panic!("missing std.measurements source report: {report_text}"));
+    assert!(
+        measurement_source.contains("ir=17")
+            && measurement_source.contains("hir=0")
+            && measurement_source.contains("ast=0"),
+        "measurement lowering regressed: {measurement_source}"
+    );
+}
+
+#[test]
 fn std_numeric_lu_matches_interpreter_and_native() {
     assert_eq!(
         interpreter_and_native_agree("numeric_lu.ostrin"),

@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Experimental scalar measurements
+
+- Added `std.measurements` with `Measurement<Float>`, explicit `Exact`/`Standard`/`Unknown`
+  states, named sensitivity sources and uncertainty propagation for scale, sum, subtraction,
+  product and division. Reusing a source preserves correlated cancellation; unknown uncertainty
+  remains explicit.
+- Added `examples/measurement_scalar.ostrin` and a Scientific Lab card executed by the same
+  `ostrinc.wasm` artifact used in the browser. The API is intentionally function-based and does
+  not yet claim `Quantity<T>`, arrays, Monte Carlo, coverage intervals or error bars.
+
 ### Measurement and uncertainty design
 
 - Added a prior-art-reviewed design proposal for `Measurement<T>`, standard uncertainty, correlated

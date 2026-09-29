@@ -1,7 +1,7 @@
 # 25 — Mediciones e incertidumbre
 
-**Estado:** propuesta de diseño; no forma parte todavía de la sintaxis estable ni de la
-biblioteca estándar publicada.
+**Estado:** propuesta en implementación experimental; `std.measurements` ya ofrece un API escalar
+funcional, mientras la sintaxis estable, `Quantity<T>`, arrays y Monte Carlo siguen pendientes.
 
 **Fecha:** 2026-09-29
 
@@ -21,8 +21,19 @@ componible:
 - la dimensión física cuando el valor es una `Quantity`;
 - la procedencia opcional que permite explicar cómo se obtuvo.
 
-Este documento fija interfaces y contratos para una futura implementación. No declara que
-`Measurement<T>` exista hoy.
+Este documento fija interfaces y contratos para una implementación gradual. La primera fase
+ejecutable vive en `compiler/std/measurements.ostrin`: conserva fuentes de sensibilidad explícitas
+para `Measurement<Float>`, propaga suma/resta/producto/cociente y representa incertidumbre
+desconocida sin convertirla en cero. La superficie sigue siendo experimental y funcional; todavía
+no declara semántica de operadores ni integración completa con `Quantity<T>`.
+
+### 1.1 Evidencia de la fase escalar
+
+`examples/measurement_scalar.ostrin` cubre construcciones `exact`, `standard` y `unknown`,
+validación de sigma y etiquetas, combinación de fuentes independientes, cancelación correlacionada
+(`x - x = 0 ± 0`) y paridad intérprete/native. El Scientific Lab ejecuta el mismo ejemplo con
+`ostrinc.wasm`. Esta evidencia no habilita todavía barras de error, intervalos de cobertura ni
+Monte Carlo.
 
 ## 2. Revisión de antecedentes
 
@@ -263,8 +274,10 @@ de procedencia de [`23-motor-de-visualizacion.md`](23-motor-de-visualizacion.md)
 ## 11. Plan de implementación
 
 1. Revisar este documento contra `Quantity`, arrays y el modelo de efectos.
-2. Implementar `Exact` y `Standard` para escalares en el intérprete con operaciones básicas.
-3. Añadir fuentes correlacionadas y pruebas de cancelación.
+2. Implementar `Exact` y `Standard` para escalares en el intérprete con operaciones básicas. **En
+   curso:** `std.measurements` experimental cubre también `Unknown`.
+3. Añadir fuentes correlacionadas y pruebas de cancelación. **Disponible para escalares:** las
+   fuentes se combinan por etiqueta y conservan la correlación en intérprete/native/WASM.
 4. Integrar `Measurement<Quantity<Dim>>` y conversiones de unidades.
 5. Llevar la representación al HIR/IR y comprobar ownership en nativo.
 6. Añadir arrays, covarianza y salida de contribuciones.

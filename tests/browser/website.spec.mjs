@@ -181,7 +181,7 @@ test("Scientific Lab recomputes its demos with the real compiler", async ({ page
   await page.goto("./#lab", { waitUntil: "domcontentloaded" });
   await expect(page.locator("[data-release-line]")).toHaveAttribute("data-state", /published|unreleased/);
   const tabs = page.getByRole("tab");
-  await expect(tabs).toHaveCount(11);
+  await expect(tabs).toHaveCount(12);
 
   // Recorded output first, then a live run with the same compiler must reproduce it exactly.
   await page.getByRole("tab", { name: "Units" }).click();
@@ -253,7 +253,7 @@ test("Scientific Lab links preserve the selected demo and parameters", async ({ 
 
 test("Cookbook renders every recipe with source and recorded output", async ({ page }) => {
   await page.goto("./cookbook.html", { waitUntil: "domcontentloaded" });
-  await expect(page.locator("[data-cookbook] .recipe")).toHaveCount(11);
+  await expect(page.locator("[data-cookbook] .recipe")).toHaveCount(12);
   for (const recipe of await page.locator("[data-cookbook] .recipe").all()) {
     await expect(recipe.locator(".sl-code")).not.toBeEmpty();
     await expect(recipe.locator(".sl-raw pre")).not.toBeEmpty();
