@@ -1,4 +1,7 @@
 // std.viz · bars with error bars: group means ± standard deviation.
+// Each group is represented as a Measurement<Float> before it reaches the
+// renderer, so the uncertainty channel stays explicit and reproducible.
+import std.measurements
 import std.viz
 
 fn main() -> Void {
@@ -11,11 +14,25 @@ fn main() -> Void {
         means.push(group.mean())
         sds.push(group.std())
     }
-    doses = array([0.0, 1.0, 2.0, 3.0, 4.0])
-    fig = viz.figure("Dose response")
-        .describe("30 subjects per dose, mean ± sd")
-        .labels("dose [mg]", "response")
-        .bars(doses, array(means), label: "mean", color: "#93c5fd")
-        .errorbars(doses, array(means), array(sds), label: "± sd", color: "#1e3a8a")
-    print(fig.svg())
+    match measurements.standard(means[0], sds[0], "dose-0") {
+        Ok(first) => {
+            mut observations = [first]
+            for i in 1 until means.length() {
+                match measurements.standard(means[i], sds[i], "dose-" + i.to_string()) {
+                    Ok(item) => observations.push(item),
+                    Err(message) => print("measurement error: " + message),
+                }
+            }
+            measured = array(measurements.values(clone(observations)))
+            errors = array(measurements.uncertainties(observations).unwrap())
+            doses = array([0.0, 1.0, 2.0, 3.0, 4.0])
+            fig = viz.figure("Dose response")
+                .describe("30 subjects per dose, standard uncertainty from Measurement<Float>")
+                .labels("dose [mg]", "response")
+                .bars(doses, measured, label: "mean", color: "#93c5fd")
+                .errorbars(doses, measured, errors, label: "standard uncertainty", color: "#1e3a8a")
+            print(fig.svg())
+        },
+        Err(message) => print("measurement error: " + message),
+    }
 }

@@ -154,7 +154,7 @@ export const LAB = [
     params: [],
     how: "std.measurements keeps a value, explicit standard-deviation sources and an uncertainty-known state together. Reusing the same source preserves correlation (`x - x = 0 ± 0`); independent sources combine through the linearized variance rule. The browser runs the same module through ostrinc.wasm as the interpreter and native compiler.",
     docs: { label: "measurement design", href: `${repository}/blob/main/docs/design/25-mediciones-e-incertidumbre.md` },
-    limits: "This first scalar API is experimental and function-based: Quantity integration, arrays, covariance blocks, Monte Carlo, coverage intervals and uncertainty-aware error bars remain planned. Unknown uncertainty propagates explicitly and is never treated as zero.",
+    limits: "This experimental API now projects a List<Measurement<Float>> into nominal values and standard uncertainties for std.viz.errorbars; Quantity integration, Array<Measurement>, covariance blocks, Monte Carlo and coverage intervals remain planned. Unknown uncertainty propagates explicitly and is never treated as zero.",
   },
   {
     id: "data",
@@ -201,7 +201,7 @@ export const GALLERY = [
   { id: "isosurface", title: "3D isosurface", file: "examples/viz_isosurface.ostrin", blurb: "A scalar shell polygonized from a 3D Float volume with deterministic marching tetrahedra and depth-sorted triangles." },
   { id: "scatter-fit", title: "Scatter and fit", file: "examples/viz_scatter_fit.ostrin", blurb: "Calibration data, a least-squares line and its ±2σ band." },
   { id: "units", title: "Unit-aware axes", file: "examples/viz_units.ostrin", blurb: "Quantities converted to km/h: the axis labels come from the units in the data." },
-  { id: "bars", title: "Bars with error bars", file: "examples/viz_bars.ostrin", blurb: "Group means ± standard deviation from seeded samples." },
+  { id: "bars", title: "Bars with error bars", file: "examples/viz_bars.ostrin", blurb: "Group means with standard uncertainties projected from Measurement<Float> sources." },
   { id: "ode", title: "Adaptive ODE solver", file: "examples/viz_ode.ostrin", blurb: "A pendulum solved with std.numeric.rk45: angle over time and the phase portrait, side by side." },
   { id: "fft", title: "Spectrum with the FFT", file: "examples/viz_fft.ostrin", blurb: "A noisy two-tone signal and its amplitude spectrum from std.numeric.fft: peaks at 50 Hz and 120 Hz." },
   { id: "spline", title: "Cubic spline", file: "examples/viz_spline.ostrin", blurb: "Eight measurements, a natural cubic spline through them and the area under it by Simpson's rule." },

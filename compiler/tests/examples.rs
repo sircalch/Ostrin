@@ -9728,7 +9728,7 @@ fn std_numeric_cholesky_matches_interpreter_and_native() {
 fn std_measurements_scalar_matches_interpreter_and_native() {
     assert_eq!(
         interpreter_and_native_agree("measurement_scalar.ostrin"),
-        "x = 12.3 ± 0.02\nx + x = 24.6 ± 0.04\nx - x = 0 ± 0\nx + y = 13.8 ± 0.03605551275463989\n2x = 24.6 ± 0.04\nx / x = 1 ± 0\nunknown = unknown: scale received a measurement with unknown uncertainty\ninvalid sigma = measurement sigma must be non-negative\nempty source = measurement source label must not be empty\n"
+        "x = 12.3 ± 0.02\nx + x = 24.6 ± 0.04\nx - x = 0 ± 0\nx + y = 13.8 ± 0.03605551275463989\n2x = 24.6 ± 0.04\nx / x = 1 ± 0\nunknown = unknown: scale received a measurement with unknown uncertainty\ninvalid sigma = measurement sigma must be non-negative\nempty source = measurement source label must not be empty\nunknown series = series offline\n"
     );
 
     let report = run(&[
@@ -9746,10 +9746,24 @@ fn std_measurements_scalar_matches_interpreter_and_native() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/measurements.ostrin "))
         .unwrap_or_else(|| panic!("missing std.measurements source report: {report_text}"));
     assert!(
-        measurement_source.contains("ir=17")
+        measurement_source.contains("ir=21")
             && measurement_source.contains("hir=0")
             && measurement_source.contains("ast=0"),
         "measurement lowering regressed: {measurement_source}"
+    );
+}
+
+#[test]
+fn std_measurements_series_feeds_reproducible_error_bars() {
+    let out = interpreter_and_native_agree("viz_bars.ostrin");
+    assert!(
+        out.starts_with("<svg") && out.contains("Dose response"),
+        "measurement SVG output changed: {}",
+        out.lines().take(3).collect::<Vec<_>>().join("\\n")
+    );
+    assert!(
+        out.contains("standard uncertainty") && out.contains("mean"),
+        "the SVG is missing its uncertainty series: {out}"
     );
 }
 
