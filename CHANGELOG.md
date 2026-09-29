@@ -25,6 +25,13 @@
   previous 6,099 IR / 124 HIR / 281 AST baseline. The verified ratchet is now **6,163 IR /
   124 HIR / 217 AST fallbacks** across 205 measured source modules.
 
+### Native IR: concrete `Self` in trait methods
+- HIR now repeats the checker's `Self` substitution for implementation parameter and return types.
+  `Complex` trait operators (`add`, `sub`, `mul`, `div` and `equals`) therefore use the existing
+  ownership-aware IR/C emitter with the same interpreter/native/WASM behavior.
+- The verified ratchet is now **6,248 IR / 125 HIR / 131 AST fallbacks** across 205 measured
+  source modules; the numeric standard library reports `ir=77`, `hir=0`, `ast=0` per consumer.
+
 ### Native IR: checked numeric casts
 - Explicit casts from `Float`/`Float32` and integer families to `Int` or fixed-width integers now
   lower through IR/C with the same truncation, NaN and range checks as the established native

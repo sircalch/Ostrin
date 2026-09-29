@@ -114,11 +114,13 @@ Sobre este IR se hacen los análisis que el texto C no permite:
    `--native-type-report` publica también `ir-generated`, `hir-generated` y `ast-fallback`.
    El mismo informe agrupa esas cifras por archivo fuente con líneas `native-source`, y la
    prueba diferencial comprueba que la suma por módulo coincide con los totales globales.
-   La prueba diferencial conserva el baseline actual de fallback (217 funciones AST, con
-   6 163 funciones IR y 124 HIR agregadas sobre los ejemplos); el incremento acotado incluye
+   La prueba diferencial conserva el baseline actual de fallback (131 funciones AST, con
+   6 248 funciones IR y 125 HIR agregadas sobre los ejemplos); el incremento acotado incluye
    la preparación numérica de histogramas y violines ya atraviesa IR/C mediante `histogram`,
    `linspace` y `pow`, `std.viz::uid` usa `hash(String)` en IR/C y `std.viz::render` recorre
-   explícitamente sus series; quedan dos instanciaciones genéricas de trazado con `Quantity`,
+   explícitamente sus series. HIR sustituye `Self` por el propietario concreto en las firmas de
+   métodos de traits, por lo que los operadores de `Complex` también cruzan IR/C; quedan dos
+   instanciaciones genéricas de trazado con `Quantity`,
    además de los agregados de LU, SVD, número de condición, autovectores y `ComplexVector`/`ComplexMatrix`,
    que quedan pendientes de migrar a IR, mientras los métodos de records recursivos conservan
    HIR/AST por seguridad, y solo permite reducirlo o justificar explícitamente

@@ -469,12 +469,14 @@ fn native_backend_types_agree_with_the_checker() {
     // numeric and color helpers used by std.viz and remove 290 more fallbacks.
     // String hashing for deterministic SVG ids and the explicit renderer scan use
     // the same stable runtime helpers as the legacy emitter and remove 64 more
-    // measured fallbacks in total. The verified baseline is 217 AST fallbacks
-    // (6,163 IR and 124 HIR functions).
+    // measured fallbacks in total. HIR now substitutes the concrete owner for
+    // `Self` in trait method signatures, allowing Complex arithmetic/equality
+    // to use IR/C and removing 86 further shared fallbacks. The verified
+    // baseline is 131 AST fallbacks (6,248 IR and 125 HIR functions).
     // Keep this ratchet explicit until
     // the next aggregate family moves with parity evidence; aggregate-heavy SVG
     // paths and complex array promotion remain pending.
-    const MAX_AST_FALLBACK_FUNCTIONS: usize = 217;
+    const MAX_AST_FALLBACK_FUNCTIONS: usize = 131;
     assert!(
         ast_fallback <= MAX_AST_FALLBACK_FUNCTIONS,
         "AST fallback grew to {ast_fallback} functions (ratchet limit {MAX_AST_FALLBACK_FUNCTIONS})"
