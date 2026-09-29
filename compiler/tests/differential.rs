@@ -416,8 +416,8 @@ fn native_backend_types_agree_with_the_checker() {
     // explicit IR lowering (the migration of the native backend).
     let native_generated = hir_generated + ir_generated;
     assert!(
-        native_generated >= 131,
-        "only {native_generated} functions were generated from HIR/IR (expected at least 131)"
+        native_generated >= 6375,
+        "only {native_generated} functions were generated from HIR/IR (expected at least 6375)"
     );
     println!("functions generated from HIR/IR: {native_generated} (HIR {hir_generated}, IR {ir_generated})");
     println!("functions still using AST fallback: {ast_fallback}");
@@ -434,9 +434,8 @@ fn native_backend_types_agree_with_the_checker() {
     // whenever a backend family moves from AST to HIR/IR; a new example that
     // increases the total must update the limit only with an explicit reason.
     // The shared std.viz module is measured once for each importing example. Its
-    // deterministic String hash helper and renderer grid scan now lower through
-    // IR/C; only two generic quantity plotting instantiations remain outside the
-    // explicit IR ownership model.
+    // deterministic String hash helper, renderer grid scan, dark-theme field
+    // stores and generic quantity plotting instantiations now lower through IR/C.
     // Histogram and violin data preparation now use the typed IR/C path: the
     // native emitter covers `histogram`, `linspace` and two-argument `pow`,
     // removing 65 measured fallbacks across the shared std.viz consumers.
@@ -469,14 +468,15 @@ fn native_backend_types_agree_with_the_checker() {
     // numeric and color helpers used by std.viz and remove 290 more fallbacks.
     // String hashing for deterministic SVG ids and the explicit renderer scan use
     // the same stable runtime helpers as the legacy emitter and remove 64 more
-    // measured fallbacks in total. HIR now substitutes the concrete owner for
-    // `Self` in trait method signatures, allowing Complex arithmetic/equality
-    // to use IR/C and removing 86 further shared fallbacks. The verified
-    // baseline is 131 AST fallbacks (6,248 IR and 125 HIR functions).
+    // measured fallbacks in total. Field stores now transfer fresh managed strings
+    // safely, which lets the remaining visualization methods use IR/C. HIR now
+    // substitutes the concrete owner for `Self` in trait method signatures,
+    // allowing Complex arithmetic/equality to use IR/C. The verified baseline is
+    // 129 AST fallbacks (6,346 IR and 29 HIR functions).
     // Keep this ratchet explicit until
     // the next aggregate family moves with parity evidence; aggregate-heavy SVG
     // paths and complex array promotion remain pending.
-    const MAX_AST_FALLBACK_FUNCTIONS: usize = 131;
+    const MAX_AST_FALLBACK_FUNCTIONS: usize = 129;
     assert!(
         ast_fallback <= MAX_AST_FALLBACK_FUNCTIONS,
         "AST fallback grew to {ast_fallback} functions (ratchet limit {MAX_AST_FALLBACK_FUNCTIONS})"

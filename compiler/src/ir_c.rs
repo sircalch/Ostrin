@@ -1632,6 +1632,16 @@ fn emit_instruction(
                         .map(|arg| value_code(values, *arg))
                         .collect::<Bail<Vec<_>>>()?;
                     match method.as_str() {
+                        "unit" if codes.is_empty() && quantity(&element) && *ty == Ty::String => {
+                            format!("ostrin_unit_cat({receiver}->unit, \"\", \"\")")
+                        }
+                        "values"
+                            if codes.is_empty()
+                                && quantity(&element)
+                                && *ty == Ty::Applied("Array".to_string(), vec![Ty::Float]) =>
+                        {
+                            format!("ostrin_qa_tag(ostrin_qa_copy({receiver}), NULL)")
+                        }
                         "shape" if codes.is_empty() && *ty == Ty::List(Box::new(Ty::Int)) => {
                             format!("{array_c_name}_shape({receiver})")
                         }

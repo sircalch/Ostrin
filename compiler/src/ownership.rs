@@ -877,7 +877,8 @@ fn safe_release_site(instruction: &IrInstr) -> bool {
     // These are the ownership transfers modeled by this first pass: binding a
     // value into a local with no later read, moving it into a channel, passing
     // it to a borrowing print/method call, or consuming it through an
-    // aggregate/index operation whose native helper retains borrowed values.
+    // aggregate/index operation whose native helper retains borrowed values, or
+    // a field store that retains the incoming managed value before replacing it.
     match instruction {
         IrInstr::StoreLocal { .. }
         | IrInstr::Spawn { .. }
@@ -887,6 +888,7 @@ fn safe_release_site(instruction: &IrInstr) -> bool {
         | IrInstr::TaskJoin { .. }
         | IrInstr::Aggregate { .. }
         | IrInstr::ClosureMake { .. }
+        | IrInstr::FieldStore { .. }
         | IrInstr::Index { .. }
         | IrInstr::Field { .. }
         | IrInstr::Binary { .. }
@@ -928,6 +930,7 @@ fn safe_release_site(instruction: &IrInstr) -> bool {
                 | "get"
                 | "shape"
                 | "rank"
+                | "unit"
                 | "size"
                 | "sum"
                 | "min"

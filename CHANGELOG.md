@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Native IR: quantity plotting and managed field stores
+- `Array<Quantity<D>>.unit()` and `.values()` now lower through the ownership-aware IR/C
+  emitter. Generic `Figure.unit_line` and `Figure.unit_scatter` therefore compile natively
+  with the same unit labels, numeric samples and SVG bytes as the interpreter.
+- Field stores now count as ownership transfer points for fresh managed values, allowing
+  visualization methods that assign generated unit strings to record fields to use IR/C safely.
+  The verified ratchet moves to **6,346 IR / 29 HIR / 129 AST fallbacks** across 205 measured
+  source modules.
+
 ### Viz: capability-detected MP4 export
 - Animated figures now expose an MP4 export action when the browser provides an H.264
   `MediaRecorder` codec. Browsers that only support WebM keep the button disabled with an
