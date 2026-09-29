@@ -1,0 +1,14 @@
+# Proposal for github/linguist/lib/linguist/languages.yml.
+# Keep this fragment synchronized with docs/linguist.md and validate it with
+# node scripts/linguist-check.mjs before opening an upstream pull request.
+Ostrin:
+  type: programming
+  color: "#5B3DF5"
+  aliases:
+    - ostrin
+  extensions:
+    - ".ostrin"
+  interpreters:
+    - ostrinc
+  tm_scope: source.ostrin
+  ace_mode: text
