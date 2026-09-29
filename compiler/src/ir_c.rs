@@ -2311,6 +2311,19 @@ fn emit_instruction(
                 && *ty == Ty::Applied("Result".to_string(), vec![Ty::Void, Ty::String])
             {
                 write_file_result_code(&codes[0], &codes[1])
+            } else if callee == "format"
+                && args.len() == 2
+                && value_ty(values, args[0])? == Ty::String
+                && value_ty(values, args[1])? == Ty::List(Box::new(Ty::String))
+                && *ty == Ty::String
+            {
+                // `format` borrows the replacement list while constructing a
+                // fresh String, so keep the same temporary-list shape as the
+                // legacy emitter and avoid consuming the caller's list.
+                format!(
+                    "({{ List_String* __ostrin_format_values = {}; ostrin_s_format({}, __ostrin_format_values->items, __ostrin_format_values->length); }})",
+                    codes[1], codes[0]
+                )
             } else if callee == "format_float_value"
                 && args.len() == 2
                 && value_ty(values, args[0])? == Ty::Float
