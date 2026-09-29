@@ -2,7 +2,7 @@
 
 *Corte: 2026-09-28 · rama `main` · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 241 de integración y 2 unitarias en verde.*
 
-Validación remota: Pages, CI, CodeQL, sanitizers y auditoría de seguridad pasaron para `b29e14e` (PR #73, métodos de records y enums concretos en IR/C) en Windows, Linux, macOS y web. La
+Validación remota: Pages, CI, CodeQL, sanitizers y auditoría de seguridad pasaron para `9aa529e` (PR #74, preparación de Linguist) en Windows, Linux, macOS y web. La
 compuerta oficial exige `cargo fmt --check`, Clippy con el lint `suspicious`, la suite del
 compilador y las comprobaciones del sitio; los workflows de auditoría de dependencias,
 CodeQL, sanitizers nativos y cobertura quedan registrados para el ciclo P5.
@@ -156,14 +156,14 @@ Monomorfización bajo demanda (funciones, records, enums, métodos, vtables, lis
 La primera familia de funciones ya se emite desde la IR explícita: funciones escalares, la
 familia gestionada `String` y la familia escalar de `Quantity` convierten temporales SSA en
 temporales C, preservan división entera, aritmética comprobada de enteros de ancho fijo,
-concatenación/comparación/impresión
-de texto y salida numérica, emiten ramas, recursión, bucles con estado y `phi`, y se cuentan
+concatenación/comparación/impresión de texto, incluidos `char_at`, `slice` y `codepoint`, y
+salida numérica, emiten ramas, recursión, bucles con estado y `phi`, y se cuentan
 por separado en `--native-type-report` como `ir-generated`; el mismo informe expone ahora
 `hir-generated` y `ast-fallback` para que la retirada del backend legado tenga un contador
 visible. También publica líneas `native-source` agrupadas por archivo para localizar la deuda
 por módulo; la prueba diferencial comprueba que sus sumas coinciden con el total. En el corte
-actual, la suite de ejemplos suma 5 035 funciones IR, 286 HIR y 1 183 que aún caen al emisor
-AST; `native_backend_types_agree_with_the_checker` mantiene 1 183 como trinquete temporal. Los métodos
+actual, la suite de ejemplos suma 5 037 funciones IR, 286 HIR y 1 181 que aún caen al emisor
+AST; `native_backend_types_agree_with_the_checker` mantiene 1 181 como trinquete temporal. Los métodos
 de records y enums concretos comparten ahora IR/C cuando sus campos y ownership son compatibles; los
 records recursivos conservan HIR/AST hasta cerrar su contrato de ownership.
 El puente IR de `zeros`/`ones`, `norm`, `abs` escalar y `sqrt` redujo el fallback en 348 funciones;
@@ -301,12 +301,12 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
 convendría dividirlos; el backend nativo no comparte el sistema de tipos del checker
-(ya consume los tipos del checker y compara cada nodo; el informe actual suma **5 035 funciones
-generadas desde IR, 286 desde HIR y 1 183 en fallback AST** en los ejemplos, con un trinquete
+(ya consume los tipos del checker y compara cada nodo; el informe actual suma **5 037 funciones
+generadas desde IR, 286 desde HIR y 1 181 en fallback AST** en los ejemplos, con un trinquete
 que impide que el fallback aumente sin justificación; los métodos de records y enums concretos
 entran ahora en IR/C cuando sus campos y ownership son compatibles, mientras los records recursivos
 conservan el fallback verificado; las familias migradas incluyen escalares,
-`String`, records concretos, `Option<Record>`, `List<T>` escalar, `Map`/`Set` escalares, `Option`
+`String` (incluidos `char_at`, `slice` y `codepoint`), records concretos, `Option<Record>`, `List<T>` escalar, `Map`/`Set` escalares, `Option`
 escalar/String y patrones `Some/None`, `Float32`, enteros de ancho fijo, records, enums, `match`,
 `Option`/`Result`, listas/colecciones, cierres, instancias concretas de genéricos, records/enums
 aplicados y métodos genéricos centrales, módulo `hir_c`); el resto sigue por el AST;

@@ -906,6 +906,9 @@ fn safe_release_site(instruction: &IrInstr) -> bool {
             method.as_str(),
             "length"
                 | "count"
+                | "char_at"
+                | "slice"
+                | "codepoint"
                 | "push"
                 | "remove_at"
                 | "is_empty"
