@@ -18,6 +18,12 @@
   sources, Quantity integration, reproducible propagation and future uncertainty-aware figures.
   The document is explicitly a proposal; no unimplemented semantics are advertised as available.
 
+### Scientific effects and provenance design
+
+- Added a prior-art-reviewed proposal for effect rows, explicit capabilities, seeded randomness,
+  reproducibility levels R0–R3 and W3C PROV-inspired artifacts across native, WASI and web targets.
+  It is design-only: no effect syntax or runtime guarantee is advertised as available.
+
 ### Cross-browser web smoke coverage
 
 - The website verification action now installs Chromium, Firefox and WebKit. The full compiler and
