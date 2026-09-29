@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Viz: capability-detected MP4 export
+- Animated figures now expose an MP4 export action when the browser provides an H.264
+  `MediaRecorder` codec. Browsers that only support WebM keep the button disabled with an
+  explicit explanation; Ostrin never uploads frames or claims an unavailable codec.
+- WebM and MP4 share the same Ostrin-produced SVG frame pipeline, loop count and 1×/2× canvas
+  quality. The design document and gallery status now describe the capability boundary.
+
 ### Web Lab and Viz: shareable scientific states
 - The Scientific Lab and Viz explorer now write the selected program, numeric source parameters
   and (for 3D) camera angles to the URL. `Copy link` produces a reproducible browser address

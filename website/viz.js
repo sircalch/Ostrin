@@ -358,14 +358,32 @@ function printPdf(source, title, fraction = 0) {
   return { width: dimensions.width, height: dimensions.height };
 }
 
-function videoMimeType() {
+const VIDEO_MIME_CANDIDATES = {
+  webm: ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"],
+  // MP4 is deliberately capability-detected. Chromium builds commonly expose
+  // WebM only, while Safari and some installed codecs expose H.264 through the
+  // same MediaRecorder API. Never offer a file that the browser cannot encode.
+  mp4: ["video/mp4;codecs=avc1.42E01E,mp4a.40.2", "video/mp4;codecs=avc1.4D401E", "video/mp4"],
+};
+
+function videoMimeType(format = "webm") {
   if (!globalThis.MediaRecorder?.isTypeSupported) return "";
-  return ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"].find((type) => MediaRecorder.isTypeSupported(type)) ?? "";
+  const candidates = VIDEO_MIME_CANDIDATES[format] ?? VIDEO_MIME_CANDIDATES.webm;
+  return candidates.find((type) => {
+    try {
+      return MediaRecorder.isTypeSupported(type);
+    } catch {
+      return false;
+    }
+  }) ?? "";
 }
 
-async function exportAnimatedWebm(source, duration, title, loops = 1, scale = 1) {
-  const mime = videoMimeType();
-  if (!mime || !HTMLCanvasElement.prototype.captureStream) throw new Error("WebM export needs MediaRecorder and canvas capture in this browser");
+async function exportAnimatedVideo(source, duration, title, format = "webm", loops = 1, scale = 1) {
+  const mime = videoMimeType(format);
+  const label = format.toUpperCase();
+  if (!mime || !HTMLCanvasElement.prototype.captureStream) {
+    throw new Error(`${label} export needs a compatible MediaRecorder codec and canvas capture in this browser`);
+  }
   const dimensions = svgDimensions(source);
   const renderScale = Math.max(1, Math.min(2, Number(scale) || 1));
   const document_ = new DOMParser().parseFromString(source, "image/svg+xml");
@@ -378,13 +396,13 @@ async function exportAnimatedWebm(source, duration, title, loops = 1, scale = 1)
   canvas.width = dimensions.width * renderScale;
   canvas.height = dimensions.height * renderScale;
   const context = canvas.getContext("2d");
-  if (!context) throw new Error("WebM export needs a 2D canvas context");
+  if (!context) throw new Error(`${label} export needs a 2D canvas context`);
   const stream = canvas.captureStream(fps);
   const recorder = new MediaRecorder(stream, { mimeType: mime });
   const chunks = [];
   const finished = new Promise((resolve, reject) => {
     recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); };
-    recorder.onerror = () => reject(new Error("the browser stopped WebM recording"));
+    recorder.onerror = () => reject(new Error(`the browser stopped ${label} recording`));
     recorder.onstop = resolve;
   });
   recorder.start();
@@ -406,10 +424,10 @@ async function exportAnimatedWebm(source, duration, title, loops = 1, scale = 1)
   const link = document.createElement("a");
   link.href = url;
   const stem = (title || "ostrin-viz-animation").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "ostrin-viz-animation";
-  link.download = stem + (renderScale === 1 ? "" : "-" + renderScale + "x") + ".webm";
+  link.download = stem + (renderScale === 1 ? "" : "-" + renderScale + "x") + `.${format}`;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-  return { frameCount, fps, scale: renderScale };
+  return { frameCount, fps, scale: renderScale, format };
 }
 
 // GIF is intentionally encoded here instead of adding a large runtime dependency. The fixed
@@ -604,12 +622,22 @@ function explorer() {
     el("option", { value: "1", text: "1×" }),
     el("option", { value: "2", text: "2×" }),
   ]);
+  const mp4Supported = Boolean(globalThis.HTMLCanvasElement?.prototype?.captureStream && videoMimeType("mp4"));
+  const mp4Button = el("button", {
+    type: "button",
+    className: "button-quiet",
+    text: "Export MP4",
+    "data-viz-mp4-export": "",
+    disabled: !mp4Supported,
+    title: mp4Supported ? "Export an H.264 MP4 when supported by this browser" : "This browser does not expose an MP4 MediaRecorder codec",
+  });
   const animationTools = el("div", { className: "viz-animation-tools", hidden: true }, [
     el("span", { className: "viz-animation-caption", text: "Animation" }),
     el("button", { type: "button", className: "button-quiet", text: "Play", "data-viz-play": "" }),
     el("button", { type: "button", className: "button-quiet", text: "Pause", "data-viz-pause": "" }),
     el("button", { type: "button", className: "button-quiet", text: "Restart", "data-viz-restart": "" }),
     el("button", { type: "button", className: "button-quiet", text: "Export WebM", "data-viz-export": "" }),
+    mp4Button,
     el("button", { type: "button", className: "button-quiet", text: "Export GIF", "data-viz-gif-export": "" }),
     animationSlider,
     animationLabel,
@@ -1342,13 +1370,26 @@ function explorer() {
     exportButton.disabled = true;
     animationStatus.textContent = "exporting…";
     try {
-      const result = await exportAnimatedWebm(svg, animationDuration, heading.textContent, animationLoopLimit || 1, animationQuality.value);
+      const result = await exportAnimatedVideo(svg, animationDuration, heading.textContent, "webm", animationLoopLimit || 1, animationQuality.value);
       const qualitySuffix = result.scale > 1 ? " · " + result.scale + "×" : "";
       animationStatus.textContent = result.frameCount + " frames · " + result.fps + " fps · downloaded" + qualitySuffix;
     } catch (error) {
       animationStatus.textContent = error.message ?? String(error);
     } finally {
       exportButton.disabled = false;
+    }
+  });
+  mp4Button.addEventListener("click", async () => {
+    mp4Button.disabled = true;
+    animationStatus.textContent = "encoding MP4…";
+    try {
+      const result = await exportAnimatedVideo(svg, animationDuration, heading.textContent, "mp4", animationLoopLimit || 1, animationQuality.value);
+      const qualitySuffix = result.scale > 1 ? " · " + result.scale + "×" : "";
+      animationStatus.textContent = result.frameCount + " frames · " + result.fps + " fps · downloaded" + qualitySuffix;
+    } catch (error) {
+      animationStatus.textContent = error.message ?? String(error);
+    } finally {
+      mp4Button.disabled = !mp4Supported;
     }
   });
   animationTools.querySelector("[data-viz-gif-export]").addEventListener("click", async (event) => {
