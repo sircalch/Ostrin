@@ -2088,6 +2088,22 @@ fn emit_instruction(
                 } else {
                     "(void)0".to_string()
                 }
+            } else if callee == "hash" && args.len() == 1 && *ty == Ty::Int {
+                // Keep scalar hash calls on the same stable runtime helpers as
+                // the legacy emitter.  `std.viz::uid` uses String hashing to
+                // derive deterministic SVG ids; lowering it here removes a
+                // shared visualization fallback without changing semantics.
+                let arg_ty = value_ty(values, args[0])?;
+                let hash = match arg_ty {
+                    Ty::String => format!("ostrin_hash_string({})", codes[0]),
+                    Ty::Int | Ty::Bool | Ty::Sized(_) => {
+                        format!("ostrin_hash_u64((uint64_t)({}))", codes[0])
+                    }
+                    Ty::Float => format!("ostrin_hash_float((double)({}))", codes[0]),
+                    Ty::Float32 => format!("ostrin_hash_float32((float)({}))", codes[0]),
+                    _ => return Err(()),
+                };
+                format!("(int64_t)({hash})")
             } else if callee == "array" && args.len() == 1 {
                 let input_ty = value_ty(values, args[0])?;
                 let Ty::Applied(name, array_args) = ty else {
