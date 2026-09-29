@@ -9,7 +9,7 @@ CodeQL, sanitizers nativos y cobertura quedan registrados para el ciclo P5.
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
 Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–266); para el diseño
-del lenguaje, `docs/design/` (25 documentos). La auditoría del sitio vive en
+del lenguaje, `docs/design/` (26 documentos). La auditoría del sitio vive en
 `docs/website-audit.md`.
 
 ## 0. Estado de un vistazo
@@ -18,8 +18,8 @@ del lenguaje, `docs/design/` (25 documentos). La auditoría del sitio vive en
 |---|---|
 | **Implementado** | Compilador + intérprete (referencia semántica), checker con cantidades físicas, records/enums/traits/genéricos, `Option`/`Result`, colecciones, `Array<T>`, módulos y paquetes con lockfile, concurrencia cooperativa determinista, `--native-threads`, backend C con `--leak-check`, build WASI, playground WASM, LSP/DAP y extensión VS Code (VSIX local) |
 | **En fallback** | El backend nativo emite desde IR las familias cubiertas (§5); records/enums genéricos aplicados, iteradores indirectos, scopes anidados, handlers no lineales y agregados/escapes complejos caen de forma verificada a HIR y después al AST |
-| **Experimental** | Todo el lenguaje (versión 0.x, sin garantía de estabilidad); `--native-threads`; `std.viz` (visualización 2D/3D en SVG); `std.measurements` (mediciones escalares con fuentes de sensibilidad y estados `Exact`/`Standard`/`Unknown`); paquetes científicos de ejemplo `tables`, `plot`, `autodiff` (modo directo); dependencias Git con `--fetch` |
-| **Pendiente** | Retirar el fallback AST, ownership completo, Quantity/arrays/covarianza/Monte Carlo de `Measurement<T>`, red, registry público, GPU, autodiff inverso, canales de distribución (Homebrew, winget, Scoop, Chocolatey, AUR), extensión en Marketplace y reconocimiento upstream de Ostrin en GitHub Linguist; la propuesta machine-readable y su gate local ya están preparados |
+| **Experimental** | Todo el lenguaje (versión 0.x, sin garantía de estabilidad); `--native-threads`; `std.viz` (visualización 2D/3D en SVG); `std.measurements` (mediciones escalares con fuentes de sensibilidad y estados `Exact`/`Standard`/`Unknown`); efectos científicos, determinismo y procedencia en propuesta de diseño (`docs/design/26-efectos-cientificos.md`); paquetes científicos de ejemplo `tables`, `plot`, `autodiff` (modo directo); dependencias Git con `--fetch` |
+| **Pendiente** | Retirar el fallback AST, ownership completo, Quantity/arrays/covarianza/Monte Carlo de `Measurement<T>`, implementación de efectos científicos y procedencia, red, registry público, GPU, autodiff inverso, canales de distribución (Homebrew, winget, Scoop, Chocolatey, AUR), extensión en Marketplace y reconocimiento upstream de Ostrin en GitHub Linguist; la propuesta machine-readable y su gate local ya están preparados |
 | **Release** | [`v0.1.0`](https://github.com/sircalch/Ostrin/releases/tag/v0.1.0) publicada el 2026-09-24 con tres archivos (Linux x86_64, macOS ARM64, Windows x64) y sus `.sha256`; instaladores verificados contra ella en runners limpios (`install-check.yml`); workflows de CI, release y WASI en verde |
 
 ---

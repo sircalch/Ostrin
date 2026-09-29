@@ -77,10 +77,13 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
 7. **Extender el núcleo científico de mediciones**: validar el API escalar experimental de
    `std.measurements` con `Quantity<T>`, arrays y covarianza antes de añadir Monte Carlo,
    intervalos de cobertura, error bars o semántica de operadores.
+8. **Diseñar efectos científicos y procedencia**: convertir la propuesta de [documento 26](docs/design/26-efectos-cientificos.md)
+   en un inventario interno de efectos, capacidades explícitas, niveles R0–R3 y un artefacto JSON
+   reproducible antes de fijar sintaxis pública.
 
 ## Horizonte posterior
 
-- Integración completa de Measurement<T> e incertidumbre en [docs/design/25-mediciones-e-incertidumbre.md](docs/design/25-mediciones-e-incertidumbre.md); la fase escalar experimental ya tiene `std.measurements`, ejemplo y demo WASM. Quantity, arrays, covarianza, Monte Carlo y error bars siguen condicionados a revisión de modelo, paridad y pruebas.
+- Integración completa de Measurement<T> e incertidumbre en [docs/design/25-mediciones-e-incertidumbre.md](docs/design/25-mediciones-e-incertidumbre.md), junto con efectos científicos y procedencia en [docs/design/26-efectos-cientificos.md](docs/design/26-efectos-cientificos.md); la fase escalar experimental ya tiene `std.measurements`, ejemplo y demo WASM. Quantity, arrays, covarianza, Monte Carlo y error bars siguen condicionados a revisión de modelo, paridad y pruebas.
 - Unidades afines y prefijos automáticos.
 - Autodiff inverso, más álgebra lineal y métodos numéricos.
 - Mayor calidad de vídeo y codecs adicionales; los contratos de eventos ricos ya están disponibles con `.bind(channel, event)` para enlazar marcas indexadas entre figuras, y la exportación HTML autocontenida, los controles numéricos declarativos conducidos por Ostrin, SVG/PNG/WebM/GIF, MP4 cuando existe el codec y el flujo PDF vectorial con metadata de procedencia ya tienen ruta web.
