@@ -128,6 +128,7 @@ fn c_type(ty: &Ty, records: &RecordFields) -> Bail<String> {
         Ty::Bool => "bool".to_string(),
         Ty::String => "const char*".to_string(),
         Ty::Quantity(_) => "Qty".to_string(),
+        Ty::Named(name) if name == "Rng" => "OstrinRng*".to_string(),
         Ty::List(element) if list_supported(element, records) => {
             format!("List_{}*", mangle_option_payload(element, records))
         }
@@ -220,6 +221,7 @@ fn supported(ty: &Ty, records: &RecordFields) -> bool {
     scalar(ty)
         || quantity(ty)
         || array_supported(ty)
+        || matches!(ty, Ty::Named(name) if name == "Rng")
         || record_name(ty, records).is_some()
         || matches!(ty, Ty::List(element) if list_supported(element, records))
         || matches!(ty, Ty::Map(key, value) if map_supported(key, value))
@@ -298,6 +300,7 @@ fn managed_payload(ty: &Ty, records: &RecordFields) -> bool {
     match ty {
         Ty::String | Ty::List(_) | Ty::Map(_, _) | Ty::Set(_) => true,
         Ty::Applied(name, args) if name == "Array" && args.len() == 1 => array_supported(ty),
+        Ty::Named(name) if name == "Rng" => true,
         Ty::Named(name) => records.contains_key(name),
         Ty::Applied(_, _) if record_name(ty, records).is_some() => true,
         Ty::Applied(name, args) if name == "Channel" && args.len() == 1 => {
@@ -407,6 +410,7 @@ fn retain_payload(access: &str, ty: &Ty, records: &RecordFields) -> Option<Strin
         Ty::Applied(name, args) if name == "Array" && args.len() == 1 && array_supported(ty) => {
             Some(format!("ostrin_retain((void*){access})"))
         }
+        Ty::Named(name) if name == "Rng" => Some(format!("ostrin_retain((void*){access})")),
         Ty::Named(name) if records.contains_key(name) => {
             Some(format!("ostrin_retain((void*){access})"))
         }
@@ -1524,6 +1528,55 @@ fn emit_instruction(
                     }
                     _ => return Err(()),
                 },
+                Ty::Named(name) if name == "Rng" => {
+                    let codes = args
+                        .iter()
+                        .map(|arg| value_code(values, *arg))
+                        .collect::<Bail<Vec<_>>>()?;
+                    match method.as_str() {
+                        "next_float" if codes.is_empty() && *ty == Ty::Float => {
+                            format!("ostrin_rng_float({receiver})")
+                        }
+                        "normal" if codes.is_empty() && *ty == Ty::Float => {
+                            format!("ostrin_rng_normal({receiver})")
+                        }
+                        "next_int"
+                            if codes.len() == 2
+                                && value_ty(values, args[0])? == Ty::Int
+                                && value_ty(values, args[1])? == Ty::Int
+                                && *ty == Ty::Int =>
+                        {
+                            format!("ostrin_rng_int({receiver}, {}, {})", codes[0], codes[1])
+                        }
+                        "rand" | "randn"
+                            if codes.len() == 1
+                                && value_ty(values, args[0])? == Ty::List(Box::new(Ty::Int))
+                                && *ty == Ty::Applied("Array".to_string(), vec![Ty::Float]) =>
+                        {
+                            format!("Array_Float_{method}({receiver}, {})", codes[0])
+                        }
+                        "randint"
+                            if codes.len() == 3
+                                && value_ty(values, args[0])? == Ty::Int
+                                && value_ty(values, args[1])? == Ty::Int
+                                && value_ty(values, args[2])? == Ty::List(Box::new(Ty::Int))
+                                && *ty == Ty::Applied("Array".to_string(), vec![Ty::Int]) =>
+                        {
+                            format!(
+                                "Array_Int_randint({receiver}, {}, {}, {})",
+                                codes[0], codes[1], codes[2]
+                            )
+                        }
+                        "permutation"
+                            if codes.len() == 1
+                                && value_ty(values, args[0])? == Ty::Int
+                                && *ty == Ty::Applied("Array".to_string(), vec![Ty::Int]) =>
+                        {
+                            format!("Array_Int_permutation({receiver}, {})", codes[0])
+                        }
+                        _ => return Err(()),
+                    }
+                }
                 Ty::String => {
                     let codes = args
                         .iter()
@@ -2114,6 +2167,12 @@ fn emit_instruction(
                     _ => return Err(()),
                 };
                 format!("(int64_t)({hash})")
+            } else if callee == "rng"
+                && args.len() == 1
+                && value_ty(values, args[0])? == Ty::Int
+                && *ty == Ty::Named("Rng".to_string())
+            {
+                format!("ostrin_rng_new({})", codes[0])
             } else if callee == "array" && args.len() == 1 {
                 let input_ty = value_ty(values, args[0])?;
                 let Ty::Applied(name, array_args) = ty else {
@@ -2812,6 +2871,12 @@ fn emit_instruction(
                         value_code(values, *value)?
                     ));
                 }
+                Ty::Named(name) if name == "Rng" => {
+                    out.push_str(&format!(
+                        "    ostrin_retain((void*){});\n",
+                        value_code(values, *value)?
+                    ));
+                }
                 Ty::Named(name) if records.contains_key(&name) => {
                     out.push_str(&format!(
                         "    ostrin_retain((void*){});\n",
@@ -2889,6 +2954,12 @@ fn emit_instruction(
                 Ty::Applied(name, args)
                     if name == "Array" && args.len() == 1 && array_supported(&ty) =>
                 {
+                    out.push_str(&format!(
+                        "    ostrin_release((void*){});\n",
+                        value_code(values, *value)?
+                    ));
+                }
+                Ty::Named(name) if name == "Rng" => {
                     out.push_str(&format!(
                         "    ostrin_release((void*){});\n",
                         value_code(values, *value)?
