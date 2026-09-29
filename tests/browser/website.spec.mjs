@@ -74,7 +74,8 @@ test("mobile navigation is operable and labelled", async ({ page }) => {
     await expect(menuButton).toHaveAttribute("aria-expanded", "false");
     await expect(navigation).toBeHidden();
     await menuButton.click();
-    await expect(menuButton).toHaveAttribute("aria-expanded", "true");
+    const openMenuButton = page.locator(".menu-toggle");
+    await expect(openMenuButton).toHaveAttribute("aria-expanded", "true");
     const docsLink = navigation.getByRole("link", { name: "Learn" });
     await expect(docsLink).toBeVisible();
     await docsLink.click();
@@ -83,6 +84,56 @@ test("mobile navigation is operable and labelled", async ({ page }) => {
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     await expectNoHorizontalOverflow(page, "docs.html", width);
   }
+});
+
+test("navigation closes with Escape and restores focus", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("./", { waitUntil: "domcontentloaded" });
+
+  const menuButton = page.locator(".menu-toggle");
+  const navigation = page.getByRole("navigation", { name: "Main navigation" });
+  await menuButton.focus();
+  await page.keyboard.press("Enter");
+  await expect(menuButton).toHaveAttribute("aria-expanded", "true");
+  await expect(menuButton).toHaveAccessibleName("Close navigation");
+  await expect(navigation.getByRole("link", { name: "Learn" })).toBeFocused();
+
+  await page.keyboard.press("Escape");
+  await expect(menuButton).toHaveAttribute("aria-expanded", "false");
+  await expect(menuButton).toHaveAccessibleName("Open navigation");
+  await expect(menuButton).toBeFocused();
+});
+
+test("example tabs expose selection and keyboard navigation", async ({ page }) => {
+  await page.goto("./examples.html", { waitUntil: "domcontentloaded" });
+
+  const tabs = page.getByRole("tab");
+  await expect(tabs).toHaveCount(3);
+  await expect(tabs.nth(0)).toHaveAttribute("aria-selected", "true");
+  await expect(tabs.nth(1)).toHaveAttribute("aria-selected", "false");
+  await expect(page.locator("#physics-tab")).toBeVisible();
+  await expect(page.locator("#concurrency-tab")).toBeHidden();
+
+  await tabs.nth(0).focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(tabs.nth(1)).toBeFocused();
+  await expect(tabs.nth(1)).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator("#concurrency-tab")).toBeVisible();
+  await expect(page.locator("#physics-tab")).toBeHidden();
+
+  await page.keyboard.press("End");
+  await expect(tabs.nth(2)).toBeFocused();
+  await expect(tabs.nth(2)).toHaveAttribute("aria-selected", "true");
+});
+
+test("example filters expose the active state", async ({ page }) => {
+  await page.goto("./examples.html", { waitUntil: "domcontentloaded" });
+  const filterToolbar = page.getByRole("toolbar", { name: "Filter examples" });
+  const filters = filterToolbar.getByRole("button");
+  await expect(filters.nth(0)).toHaveAttribute("aria-pressed", "true");
+  await filterToolbar.getByRole("button", { name: "Types" }).click();
+  await expect(filterToolbar.getByRole("button", { name: "Types" })).toHaveAttribute("aria-pressed", "true");
+  await expect(filterToolbar.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "false");
 });
 
 test("header switches at its tablet breakpoint without overflow", async ({ page }) => {
