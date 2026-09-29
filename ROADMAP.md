@@ -6,14 +6,14 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
 ## Siguiente ciclo
 
 1. Reducir el fallback AST con el trinquete por archivo de `--native-type-report` (baseline actual:
-   6.248 funciones IR, 125 HIR y 131 AST). Los métodos de records y enums concretos ya comparten
+   6.346 funciones IR, 29 HIR y 129 AST). Los métodos de records y enums concretos ya comparten
    la ruta IR/C cuando sus campos y ownership son compatibles; los records recursivos permanecen
    deliberadamente en HIR/AST hasta cerrar ese contrato. El puente IR para los constructores numéricos
    `zeros`/`ones`, `norm`, `abs` escalar y `sqrt` migró 348 funciones compartidas por la suite;
    LU ya está disponible con paridad publicada en el Lab; QR y Cholesky cruzan la IR y conservan esa
-   paridad. El renderer de `std.viz` y sus superficies 2D/3D ya cruzan IR/C; quedan dos
-   instanciaciones genéricas de trazado con `Quantity`, funciones numéricas auxiliares y el ejemplo
-   compuesto de selección enlazada, cuyos agregados y ownership siguen necesitando la migración gradual. La preparación numérica
+   paridad. El renderer de `std.viz` y sus superficies 2D/3D ya cruzan IR/C; las
+   instanciaciones genéricas de trazado con `Quantity` ya comparten esa ruta; quedan funciones
+   numéricas auxiliares y el ejemplo compuesto de selección enlazada, cuyos agregados y ownership siguen necesitando la migración gradual. La preparación numérica
    de histogramas y violines ya cruza IR/C mediante `histogram`, `linspace` y `pow`, y los ids
    deterministas de `std.viz::uid` usan `hash(String)` en IR/C y el renderer usa un recorrido IR
    explícito sobre sus series.
