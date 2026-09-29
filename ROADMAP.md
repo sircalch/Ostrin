@@ -77,6 +77,7 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
 
 ## Horizonte posterior
 
+- Diseño de Measurement<T> e incertidumbre en [docs/design/25-mediciones-e-incertidumbre.md](docs/design/25-mediciones-e-incertidumbre.md); la implementación queda condicionada a revisión de modelo, paridad y pruebas.
 - Unidades afines y prefijos automáticos.
 - Autodiff inverso, más álgebra lineal y métodos numéricos.
 - Mayor calidad de vídeo y codecs adicionales; los contratos de eventos ricos ya están disponibles con `.bind(channel, event)` para enlazar marcas indexadas entre figuras, y la exportación HTML autocontenida, los controles numéricos declarativos conducidos por Ostrin, SVG/PNG/WebM/GIF, MP4 cuando existe el codec y el flujo PDF vectorial con metadata de procedencia ya tienen ruta web.
