@@ -2136,6 +2136,26 @@ fn emit_instruction(
                 && *ty == Ty::Float
             {
                 "Array_Float_norm(".to_string() + &codes[0] + ")"
+            } else if callee == "histogram"
+                && args.len() == 4
+                && value_ty(values, args[0])? == Ty::Applied("Array".to_string(), vec![Ty::Float])
+                && value_ty(values, args[1])? == Ty::Int
+                && value_ty(values, args[2])? == Ty::Float
+                && value_ty(values, args[3])? == Ty::Float
+                && *ty == Ty::Applied("Array".to_string(), vec![Ty::Int])
+            {
+                "Array_Float_histogram(".to_string() + &codes.join(", ") + ")"
+            } else if callee == "linspace"
+                && args.len() == 3
+                && value_ty(values, args[0])? == Ty::Float
+                && value_ty(values, args[1])? == Ty::Float
+                && value_ty(values, args[2])? == Ty::Int
+                && *ty == Ty::Applied("Array".to_string(), vec![Ty::Float])
+            {
+                format!(
+                    "Array_Float_linspace({}, {}, {})",
+                    codes[0], codes[1], codes[2]
+                )
             } else if callee == "abs" && args.len() == 1 {
                 let arg_ty = value_ty(values, args[0])?;
                 if let Some(element) = array_element(&arg_ty) {
@@ -2208,6 +2228,13 @@ fn emit_instruction(
                 }
             } else if callee == "pi" && args.is_empty() && *ty == Ty::Float {
                 "3.141592653589793".to_string()
+            } else if callee == "pow"
+                && args.len() == 2
+                && value_ty(values, args[0])? == Ty::Float
+                && value_ty(values, args[1])? == Ty::Float
+                && *ty == Ty::Float
+            {
+                format!("pow({}, {})", codes[0], codes[1])
             } else if callee == "eye"
                 && args.len() == 1
                 && value_ty(values, args[0])? == Ty::Int

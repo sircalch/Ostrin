@@ -17,6 +17,13 @@
 - The differential ratchet is now **6,034 IR / 124 HIR / 346 AST fallbacks** across 205 measured
   source modules. Positive and negative casts have native leak-check coverage.
 
+### Native IR: histogram and violin preparation
+- `std.viz::Figure.histogram` now lowers its `histogram` and `linspace` calls through IR/C, while
+  `Figure.violin` lowers its two-argument `pow` call. Interpreter/native SVG output remains byte-
+  equivalent, and both gallery examples assert the migrated standard-library source report.
+- The differential ratchet is now **6,099 IR / 124 HIR / 281 AST fallbacks** across 205 measured
+  source modules; the remaining fallback is concentrated in aggregate-heavy SVG rendering.
+
 ### Native IR: string indexing and codepoints
 - `String.char_at`, `String.slice` and `String.codepoint` now lower through the ownership-aware
   IR/C emitter. Their existing runtime bounds and single-codepoint diagnostics remain intact;

@@ -9334,11 +9334,79 @@ fn viz_boxplots_render_quartiles_whiskers_and_medians() {
 }
 
 #[test]
+fn viz_histograms_render_bins_and_use_numeric_ir() {
+    let out = interpreter_and_native_agree("viz_histogram.ostrin");
+    assert_eq!(out.matches("class=\"bar\"").count(), 48);
+    assert!(out.contains("N(4, 1.5²) density"));
+
+    let report = run(&[
+        "--native-type-report",
+        &example_path("viz_histogram.ostrin"),
+    ]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "type report failed: {}",
+        stderr(&report)
+    );
+    assert!(
+        stdout(&report).contains("native-source: <ostrin-std>/viz.ostrin ir=142 hir=3 ast=2"),
+        "histogram did not use the numeric IR path: {}",
+        stdout(&report)
+    );
+
+    let exe = temp_artifact("viz_histogram_ir.exe");
+    let compiled = run(&[
+        "--compile",
+        "--leak-check",
+        "--out",
+        &exe,
+        &example_path("viz_histogram.ostrin"),
+    ]);
+    assert!(
+        compiled.status.success(),
+        "leak-check compile failed: {}",
+        stderr(&compiled)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run histogram leak-check binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "histogram leak-check run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations="),
+        "histogram leak-check did not report allocations: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn viz_violins_render_kde_shapes_and_medians() {
     let out = interpreter_and_native_agree("viz_violin.ostrin");
     assert_eq!(out.matches("class=\"violin\"").count(), 3);
     assert_eq!(out.matches("median ").count(), 3);
     assert!(out.contains("fill-opacity=\"0.28\""));
+
+    let report = run(&["--native-type-report", &example_path("viz_violin.ostrin")]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "type report failed: {}",
+        stderr(&report)
+    );
+    assert!(
+        stdout(&report).contains("native-source: <ostrin-std>/viz.ostrin ir=142 hir=3 ast=2"),
+        "violin did not use the numeric IR path: {}",
+        stdout(&report)
+    );
 }
 
 #[test]
