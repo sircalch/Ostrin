@@ -969,6 +969,13 @@ fn safe_release_site(instruction: &IrInstr) -> bool {
                 | "values"
                 | "add"
                 | "remove"
+                | "next_float"
+                | "next_int"
+                | "normal"
+                | "rand"
+                | "randn"
+                | "randint"
+                | "permutation"
         ),
         _ => false,
     }
