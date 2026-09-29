@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Web accessibility controls
+- The shared site navigation now exposes `aria-controls`, a stateful accessible name, keyboard
+  focus restoration and Escape-to-close behavior on compact layouts.
+- The examples catalogue now exposes filter state with `aria-pressed` and gives its preview tabs
+  complete `aria-selected`/`aria-controls` state, roving tab focus and Arrow/Home/End navigation.
+  Chromium coverage exercises those interactions alongside the existing live compiler and Viz
+  checks.
+
 ### Native IR: quantity plotting and managed field stores
 - `Array<Quantity<D>>.unit()` and `.values()` now lower through the ownership-aware IR/C
   emitter. Generic `Figure.unit_line` and `Figure.unit_scatter` therefore compile natively

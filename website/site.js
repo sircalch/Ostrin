@@ -33,27 +33,55 @@
 
   const header = document.querySelector('.site-header');
   const menuButton = document.querySelector('.menu-toggle');
+  const navigation = header?.querySelector('.site-nav');
 
-  if (header && menuButton) {
-    menuButton.addEventListener('click', function () {
-      const active = header.classList.toggle('menu-active');
+  if (header && menuButton && navigation) {
+    if (!navigation.id) navigation.id = 'site-navigation';
+    menuButton.setAttribute('aria-controls', navigation.id);
+
+    function setMenu(active, restoreFocus) {
+      header.classList.toggle('menu-active', active);
       document.body.classList.toggle('menu-open', active);
       menuButton.setAttribute('aria-expanded', String(active));
+      menuButton.setAttribute('aria-label', active ? 'Close navigation' : 'Open navigation');
+      if (active && restoreFocus) navigation.querySelector('a')?.focus();
+      if (!active && restoreFocus) menuButton.focus();
+    }
+
+    menuButton.addEventListener('click', function () {
+      setMenu(!header.classList.contains('menu-active'), true);
     });
+
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape' && header.classList.contains('menu-active')) {
+        event.preventDefault();
+        setMenu(false, true);
+      }
+    });
+
+    setMenu(false, false);
   }
 
   document.querySelectorAll('.site-nav a').forEach(function (link) {
     link.addEventListener('click', function () {
-      if (header) header.classList.remove('menu-active');
-      document.body.classList.remove('menu-open');
+      if (header && menuButton && navigation) {
+        header.classList.contains('menu-active') && menuButton.focus();
+        header.classList.remove('menu-active');
+        document.body.classList.remove('menu-open');
+        menuButton.setAttribute('aria-expanded', 'false');
+        menuButton.setAttribute('aria-label', 'Open navigation');
+      }
     });
   });
 
-  document.querySelectorAll('.filter-button').forEach(function (button) {
+  const filterButtons = document.querySelectorAll('.filter-button');
+  filterButtons.forEach(function (button) {
+    button.setAttribute('aria-pressed', String(button.classList.contains('active')));
     button.addEventListener('click', function () {
       const filter = button.dataset.filter;
-      document.querySelectorAll('.filter-button').forEach(function (item) {
+      filterButtons.forEach(function (item) {
         item.classList.toggle('active', item === button);
+        item.setAttribute('aria-pressed', String(item === button));
       });
       document.querySelectorAll('.example-card').forEach(function (card) {
         card.classList.toggle('is-hidden', filter !== 'all' && card.dataset.category !== filter);
@@ -61,15 +89,47 @@
     });
   });
 
-  document.querySelectorAll('.tab-button').forEach(function (button) {
+  const tabs = [...document.querySelectorAll('.tab-button')];
+  function selectTab(button, moveFocus) {
+    const target = button.dataset.tab;
+    tabs.forEach(function (item) {
+      const active = item === button;
+      item.classList.toggle('active', active);
+      item.setAttribute('aria-selected', String(active));
+      item.tabIndex = active ? 0 : -1;
+    });
+    document.querySelectorAll('.tab-panel').forEach(function (panel) {
+      const active = panel.id === target;
+      panel.classList.toggle('active', active);
+      panel.hidden = !active;
+      if (active) panel.setAttribute('aria-labelledby', button.id);
+    });
+    if (moveFocus) button.focus();
+  }
+
+  tabs.forEach(function (button, index) {
+    const target = button.dataset.tab;
+    if (!button.id) button.id = `tab-${target}`;
+    button.setAttribute('aria-controls', target);
+    button.setAttribute('aria-selected', String(button.classList.contains('active')));
+    button.tabIndex = button.classList.contains('active') ? 0 : -1;
+    const panel = document.getElementById(target);
+    if (panel) {
+      panel.setAttribute('aria-labelledby', button.id);
+      panel.hidden = !button.classList.contains('active');
+    }
     button.addEventListener('click', function () {
-      const target = button.dataset.tab;
-      document.querySelectorAll('.tab-button').forEach(function (item) {
-        item.classList.toggle('active', item === button);
-      });
-      document.querySelectorAll('.tab-panel').forEach(function (panel) {
-        panel.classList.toggle('active', panel.id === target);
-      });
+      selectTab(button, false);
+    });
+    button.addEventListener('keydown', function (event) {
+      if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key) || tabs.length < 2) return;
+      event.preventDefault();
+      const next = event.key === 'Home'
+        ? 0
+        : event.key === 'End'
+          ? tabs.length - 1
+          : (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+      selectTab(tabs[next], true);
     });
   });
 

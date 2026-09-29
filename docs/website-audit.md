@@ -1,6 +1,6 @@
 # Ostrin website audit
 
-*Cut: 2026-09-28 · source counts and public fallbacks are checked by `scripts/website-check.mjs`.*
+*Cut: 2026-09-29 · source counts and public fallbacks are checked by `scripts/website-check.mjs`.*
 
 This is a current inventory, not a roadmap claim. Public statements should remain tied to code,
 tests or an explicitly labeled early-stage surface.
@@ -54,8 +54,9 @@ fail before publication.
 - Some compiler/runtime and scientific-library capabilities remain explicitly early or incomplete;
   the site should preserve those maturity labels and avoid implying production readiness.
 - Chromium regression coverage now checks all fourteen pages at phone/tablet widths, mobile/tablet
-  navigation, the real compiler output and a real diagnostic. Firefox/WebKit behavior, broader
-  screen-reader checks and visual baselines are not covered yet.
+  navigation, keyboard Escape recovery, filter and tab semantics, the real compiler output and a
+  real diagnostic. Firefox/WebKit behavior, broader screen-reader checks and visual baselines are
+  not covered yet.
 - Keep external services, analytics and community-channel claims out of the site until they have a
   real operational contract and explicit review.
 

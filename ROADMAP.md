@@ -69,7 +69,10 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    (hashes de fuente/datos, semilla y compilador) a informes y flujos de publicación con
    evidencia en intérprete, nativo y WASM.
    El Scientific Lab ya conserva la demo activa y sus parámetros en la URL para compartir y
-   restaurar experimentos reproducibles desde el navegador.
+   restaurar experimentos reproducibles desde el navegador. La navegación compacta y el catálogo
+   de ejemplos ya tienen estados ARIA, foco de teclado, Escape, pestañas con flechas/Home/End y
+   filtros anunciados; quedan auditorías más amplias con lectores de pantalla, Firefox/WebKit y
+   baselines visuales.
 
 ## Horizonte posterior
 
