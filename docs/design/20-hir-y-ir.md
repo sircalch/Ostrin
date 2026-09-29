@@ -115,10 +115,11 @@ Sobre este IR se hacen los análisis que el texto C no permite:
    El mismo informe agrupa esas cifras por archivo fuente con líneas `native-source`, y la
    prueba diferencial comprueba que la suma por módulo coincide con los totales globales.
    La prueba diferencial conserva el baseline actual de fallback (121 funciones AST, con
-   6 401 funciones IR y 25 HIR agregadas sobre los ejemplos); el incremento acotado incluye
+   6 403 funciones IR y 25 HIR agregadas sobre los ejemplos); el incremento acotado incluye
    también `Rng` (constructor, métodos escalares, muestreo de arrays y permutación), con
    liberación gestionada y paridad intérprete/nativo. Los combinadores de listas (`map`, `filter`,
-   `fold`, `any`, `all`, `find`) aceptan cierres IR con capturas. `parse_csv` ya construye
+   `fold`, `any`, `all`, `find`) aceptan cierres IR con capturas. Los iteradores genéricos
+   sustituyen su elemento concreto para payloads gestionados anidados. `parse_csv` ya construye
    `List<List<String>>` desde IR/C con liberación de filas temporales y validación WASI; los agregados anidados e
    iteradores compuestos permanecen en la cola de migración.
    La preparación numérica de histogramas y violines ya atraviesa IR/C mediante `histogram`,

@@ -79,6 +79,12 @@ const programs = [
     args: ["native_generic_iterator.wasm"],
     expected: "7\n7\n7\n",
   },
+  {
+    name: "native_generic_iterator_nested",
+    source: "examples/native_generic_iterator_nested.ostrin",
+    args: ["native_generic_iterator_nested.wasm"],
+    expected: "a|b\na|b\n",
+  },
 ];
 
 function fail(message) {

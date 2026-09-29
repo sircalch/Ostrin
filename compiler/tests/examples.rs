@@ -3537,6 +3537,63 @@ fn native_ir_emitter_handles_generic_iterator_protocol() {
 }
 
 #[test]
+fn native_ir_emitter_handles_generic_iterators_with_nested_managed_values() {
+    let file = example_path("native_generic_iterator_nested.ostrin");
+    let expected = "a|b\na|b\n";
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("ir-generated: 2")
+            && report_text.contains("hir-generated: 0")
+            && report_text.contains("ast-fallback: 0")
+            && report_text.contains("divergences: 0"),
+        "nested generic iterator did not stay on the verified IR path: {report_text}"
+    );
+
+    let exe = temp_artifact("native_ir_generic_iterator_nested.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run nested generic iterator binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "nested generic iterator leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn native_ir_emitter_handles_channel_iterator_protocol() {
     let file = example_path("native_ir_channel_iterator.ostrin");
     let expected = "3\ntrue\n";
