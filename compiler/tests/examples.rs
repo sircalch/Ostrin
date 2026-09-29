@@ -4472,6 +4472,127 @@ fn native_ir_emitter_handles_numeric_array_builtins() {
 }
 
 #[test]
+fn native_ir_emitter_checks_float_and_integer_casts() {
+    let file = fixture_path("native_ir_numeric_casts.ostrin");
+    let expected = "3\n-3\n255\n3\n300\n";
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.lines().any(|line| line == "ir-generated: 1"),
+        "numeric casts did not use IR: {report_text}"
+    );
+    assert!(
+        report_text.lines().any(|line| line == "ast-fallback: 0"),
+        "numeric casts unexpectedly fell back to AST: {report_text}"
+    );
+
+    let emitted = run(&["--emit-c", &file]);
+    assert!(
+        emitted.status.success(),
+        "numeric cast IR emission failed: {}",
+        stderr(&emitted)
+    );
+    let source = stdout(&emitted);
+    for marker in [
+        "value does not fit in the target integer type",
+        "__int128 __ostrin_ir_convert",
+        "int8_t",
+        "uint16_t",
+    ] {
+        assert!(
+            source.contains(marker),
+            "expected checked numeric cast marker '{marker}' in generated C"
+        );
+    }
+
+    let exe = temp_artifact("native_ir_numeric_casts.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "numeric cast compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run numeric cast binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "numeric cast binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "numeric cast IR ownership leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+
+    let overflow_file = fixture_path("native_ir_numeric_cast_overflow.ostrin");
+    let overflow_interpreted = run(&["--run", &overflow_file]);
+    assert!(
+        !overflow_interpreted.status.success(),
+        "out-of-range numeric cast unexpectedly succeeded in the interpreter"
+    );
+    assert!(
+        stderr(&overflow_interpreted).contains("does not fit"),
+        "interpreter reported the wrong cast error: {}",
+        stderr(&overflow_interpreted)
+    );
+    let overflow_exe = temp_artifact("native_ir_numeric_cast_overflow.exe");
+    let overflow_compile = run(&[
+        "--compile",
+        "--leak-check",
+        "--out",
+        &overflow_exe,
+        &overflow_file,
+    ]);
+    if skip_if_no_c_compiler(&overflow_compile) {
+        return;
+    }
+    assert!(
+        overflow_compile.status.success(),
+        "out-of-range numeric cast compile failed: {}",
+        stderr(&overflow_compile)
+    );
+    let overflow_native = Command::new(&overflow_exe)
+        .output()
+        .expect("failed to run numeric cast overflow binary");
+    let _ = fs::remove_file(&overflow_exe);
+    assert!(
+        !overflow_native.status.success(),
+        "out-of-range numeric cast unexpectedly succeeded natively"
+    );
+    assert!(
+        String::from_utf8_lossy(&overflow_native.stderr).contains("value does not fit"),
+        "native reported the wrong cast error: {}",
+        String::from_utf8_lossy(&overflow_native.stderr)
+    );
+}
+
+#[test]
 fn native_ir_emitter_handles_record_lists() {
     let file = example_path("native_ir_record_lists.ostrin");
     let expected = "3\n2\npt\n1\n2\n";

@@ -466,7 +466,8 @@ fn native_backend_types_agree_with_the_checker() {
     // now share the IR/C lowering used by QR and Cholesky. This removes 348
     // previously measured fallback functions across the shared standard-library
     // consumers; keep the new baseline explicit until the next migration pass.
-    // Scalar casts to Float/Float32, array `abs` mapping and deterministic math
+    // Scalar casts to Float/Float32 and checked casts to Int/fixed-width integers,
+    // array `abs` mapping and deterministic math
     // builtins (`sin`/`cos`/`ln`/`exp`/`pi`/`eye`, among others) now use the same
     // typed IR/C path. Scalar `to_string` now uses that path too; closed record
     // arithmetic dispatch removes the repeated `Complex * Complex` fallback in
@@ -474,11 +475,13 @@ fn native_backend_types_agree_with_the_checker() {
     // as free functions whenever their concrete fields and ownership contract
     // are supported. `List<String>.join` now uses the same path for its freshly
     // allocated joined result and removes another 545 AST fallbacks across the
-    // shared standard-library consumers. The verified baseline is 636 AST
-    // fallbacks (5,744 IR and 124 HIR functions). Keep this ratchet explicit until
+    // shared standard-library consumers. Checked integer casts unlock the
+    // numeric and color helpers used by std.viz and remove 290 more fallbacks.
+    // The verified baseline is 346 AST fallbacks (6,034 IR and 124 HIR functions).
+    // Keep this ratchet explicit until
     // the next aggregate family moves with parity evidence; aggregate-heavy SVG
     // paths and complex array promotion remain pending.
-    const MAX_AST_FALLBACK_FUNCTIONS: usize = 636;
+    const MAX_AST_FALLBACK_FUNCTIONS: usize = 346;
     assert!(
         ast_fallback <= MAX_AST_FALLBACK_FUNCTIONS,
         "AST fallback grew to {ast_fallback} functions (ratchet limit {MAX_AST_FALLBACK_FUNCTIONS})"

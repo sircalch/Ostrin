@@ -9,6 +9,14 @@
   repository check and a negative fixture test; upstream submission remains gated on independent
   public usage evidence.
 
+### Native IR: checked numeric casts
+- Explicit casts from `Float`/`Float32` and integer families to `Int` or fixed-width integers now
+  lower through IR/C with the same truncation, NaN and range checks as the established native
+  backend. This migrates color, axis-label and scale helpers used by `std.viz` without changing
+  interpreter/native output; out-of-range values still fail with a runtime diagnostic.
+- The differential ratchet is now **6,034 IR / 124 HIR / 346 AST fallbacks** across 205 measured
+  source modules. Positive and negative casts have native leak-check coverage.
+
 ### Native IR: string indexing and codepoints
 - `String.char_at`, `String.slice` and `String.codepoint` now lower through the ownership-aware
   IR/C emitter. Their existing runtime bounds and single-codepoint diagnostics remain intact;

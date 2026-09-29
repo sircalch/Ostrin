@@ -1,0 +1,3 @@
+fn main() -> Void {
+    print(256.0 as UInt8)
+}
