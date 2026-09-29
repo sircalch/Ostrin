@@ -1,5 +1,5 @@
 name: Verify Ostrin website
-description: Build the real WASM compiler, run static checks and test the site in Chromium.
+description: Build the real WASM compiler, run static checks and test the site across Chromium, Firefox and WebKit.
 runs:
   using: composite
   steps:
@@ -17,10 +17,10 @@ runs:
       shell: bash
       working-directory: tests/browser
       run: npm ci
-    - name: Install Chromium and operating-system dependencies
+    - name: Install browser engines and operating-system dependencies
       shell: bash
       working-directory: tests/browser
-      run: npx playwright install --with-deps chromium
+      run: npx playwright install --with-deps chromium firefox webkit
     - name: Build compiler WASM and run browser regressions
       shell: bash
       working-directory: tests/browser
