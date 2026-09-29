@@ -448,8 +448,9 @@ fn native_backend_types_agree_with_the_checker() {
     // and scalar colorbar strings are new std.viz paths awaiting the same migration.
     // Isosurfaces add 112 more: marching tetrahedra and mesh SVG strings remain on
     // the AST path until aggregate-heavy visualization code moves into IR.
-    // Violins add 116 more: KDE loops and mirrored SVG paths remain on the AST
-    // path until aggregate-heavy visualization code moves into IR.
+    // Histogram and violin data preparation now use the typed IR/C path: the
+    // native emitter covers `histogram`, `linspace` and two-argument `pow`,
+    // removing 65 measured fallbacks across the shared std.viz consumers.
     // Hexbins add 120 more: bivariate binning and polygon/colorbar SVG strings
     // remain on the AST path until aggregate-heavy visualization code moves into IR.
     // Filled contours add 125 more: banded grid cells and layered isoline SVG strings
@@ -477,11 +478,11 @@ fn native_backend_types_agree_with_the_checker() {
     // allocated joined result and removes another 545 AST fallbacks across the
     // shared standard-library consumers. Checked integer casts unlock the
     // numeric and color helpers used by std.viz and remove 290 more fallbacks.
-    // The verified baseline is 346 AST fallbacks (6,034 IR and 124 HIR functions).
+    // The verified baseline is 281 AST fallbacks (6,099 IR and 124 HIR functions).
     // Keep this ratchet explicit until
     // the next aggregate family moves with parity evidence; aggregate-heavy SVG
     // paths and complex array promotion remain pending.
-    const MAX_AST_FALLBACK_FUNCTIONS: usize = 346;
+    const MAX_AST_FALLBACK_FUNCTIONS: usize = 281;
     assert!(
         ast_fallback <= MAX_AST_FALLBACK_FUNCTIONS,
         "AST fallback grew to {ast_fallback} functions (ratchet limit {MAX_AST_FALLBACK_FUNCTIONS})"

@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-28 · rama `main` · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 242 de integración y 2 unitarias en verde.*
+*Corte: 2026-09-28 · rama `main` · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 243 de integración y 2 unitarias en verde.*
 
 Validación remota: Pages, CI, CodeQL, sanitizers y auditoría de seguridad pasaron para `9aa529e` (PR #74, preparación de Linguist) en Windows, Linux, macOS y web. La
 compuerta oficial exige `cargo fmt --check`, Clippy con el lint `suspicious`, la suite del
@@ -162,22 +162,23 @@ por separado en `--native-type-report` como `ir-generated`; el mismo informe exp
 `hir-generated` y `ast-fallback` para que la retirada del backend legado tenga un contador
 visible. También publica líneas `native-source` agrupadas por archivo para localizar la deuda
 por módulo; la prueba diferencial comprueba que sus sumas coinciden con el total. En el corte
-actual, la suite de ejemplos suma 6 034 funciones IR, 124 HIR y 346 que aún caen al emisor
-AST; `native_backend_types_agree_with_the_checker` mantiene 346 como trinquete temporal. Los métodos
+actual, la suite de ejemplos suma 6 099 funciones IR, 124 HIR y 281 que aún caen al emisor
+AST; `native_backend_types_agree_with_the_checker` mantiene 281 como trinquete temporal. Los métodos
 de records y enums concretos comparten ahora IR/C cuando sus campos y ownership son compatibles; los
 records recursivos conservan HIR/AST hasta cerrar su contrato de ownership.
 El puente IR de `zeros`/`ones`, `norm`, `abs` escalar y `sqrt` redujo el fallback en 348 funciones;
 esta pasada añade conversiones escalares `as<Float/Float32>` y conversiones comprobadas a `Int`/enteros de ancho fijo,
 `abs` sobre arrays y funciones matemáticas
-deterministas (`sin`, `cos`, `ln`, `exp`, `pi`, `eye` y relacionadas), reduciendo de nuevo el fallback
-con paridad.
+deterministas (`sin`, `cos`, `ln`, `exp`, `pi`, `eye` y relacionadas), además de `histogram`,
+`linspace` y `pow` binario para la preparación de histogramas y violines, reduciendo de nuevo el
+fallback con paridad.
 QR y Cholesky ya se emiten desde IR/C; con LU, SVD, número de condición, autovectores y álgebra compleja densa,
 `std.numeric` queda medido en `ir=72`, `hir=0`, `ast=5` por consumidor (`Array<Quantity<D>>`: `ir=75`,
 `hir=0`, `ast=6`): los diagnósticos de convergencia de
 `secant` y `newton` ya convierten sus límites enteros a texto desde IR/C, y `powi` despacha `Complex` mediante
 el operador `mul` registrado. Las cifras históricas de deuda por función de LU, SVD y álgebra compleja
 quedaron superadas por la migración de métodos; el informe actual deja como deuda verificable los
-recorridos y helpers que aún requieren agregados anidados y ownership no lineal. Las superficies `std.viz.boxplot`, `std.viz.violin`, `std.viz.hexbin`,
+recorridos y helpers que aún requieren agregados anidados y ownership no lineal. Las superficies `std.viz.boxplot`, `std.viz.hexbin`,
 `std.viz.contourf`, `std.viz.quiver`, `std.viz.streamplot`, `std.viz.table` y
 `std.viz.vector_field`, además de funciones numéricas auxiliares y agregados SVG, siguen
 compartiendo funciones AST y forman la siguiente deuda verificable. Los marcadores de ownership de
@@ -302,8 +303,8 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
 convendría dividirlos; el backend nativo no comparte el sistema de tipos del checker
-(ya consume los tipos del checker y compara cada nodo; el informe actual suma **6 034 funciones
-generadas desde IR, 124 desde HIR y 346 en fallback AST** en los ejemplos, con un trinquete
+(ya consume los tipos del checker y compara cada nodo; el informe actual suma **6 099 funciones
+generadas desde IR, 124 desde HIR y 281 en fallback AST** en los ejemplos, con un trinquete
 que impide que el fallback aumente sin justificación; los métodos de records y enums concretos
 entran ahora en IR/C cuando sus campos y ownership son compatibles, mientras los records recursivos
 conservan el fallback verificado; las familias migradas incluyen escalares,
@@ -458,7 +459,7 @@ sus evidencias y validación upstream.
 
 ```powershell
 cd compiler
-    cargo test                                   # 6 diferenciales + 240 de integración + 2 unitarias
+    cargo test                                   # 6 diferenciales + 243 de integración + 2 unitarias
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```
