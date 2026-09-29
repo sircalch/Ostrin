@@ -460,6 +460,7 @@ h4 { font-size: .86rem; }
 .sl-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 14px 16px; border-top: 1px solid var(--line); }
 .sl-actions button:disabled { opacity: .5; cursor: progress; }
 .sl-status { color: var(--muted-2); font: .68rem var(--mono); }
+.sl-status[aria-live] { min-width: 8rem; }
 .sl-result { flex: 1; min-width: 0; padding: 16px; }
 .sl-output-text { margin: 0 0 12px; color: #e3e3f2; font: .74rem/1.7 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
 .sl-figure { margin: 0 0 16px; }
@@ -583,7 +584,7 @@ button.button-quiet, button.button { cursor: pointer; } button.button-quiet { ba
 .viz-dialog-title { margin: 0; font-size: 1rem; font-weight: 560; }
 .viz-dialog-tools { display: flex; align-items: center; gap: 8px; }
 .viz-zoom { min-width: 3.5rem; text-align: center; color: var(--muted); font: .72rem var(--mono); }
-.viz-export-status { color: var(--muted); font: .68rem var(--mono); }
+.viz-export-status, .viz-share-status { color: var(--muted); font: .68rem var(--mono); }
 .viz-animation-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--night); }
 .viz-animation-tools[hidden] { display: none; }
 .viz-camera-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--night); }

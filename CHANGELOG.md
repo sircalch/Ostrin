@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Web Lab and Viz: shareable scientific states
+- The Scientific Lab and Viz explorer now write the selected program, numeric source parameters
+  and (for 3D) camera angles to the URL. `Copy link` produces a reproducible browser address
+  without a server-side session; reload, direct navigation and browser Back/Forward restore the
+  same figure, source and controls.
+- The homepage and gallery explain the share contract; browser coverage exercises an initial 3D
+  state, navigation history and the clipboard fallback message.
+
 ### GitHub Linguist readiness
 - Added a machine-readable Linguist proposal at `docs/linguist-language.yml` and a local
   `scripts/linguist-check.mjs` gate that validates the `.ostrin` extension, `ostrinc` interpreter,

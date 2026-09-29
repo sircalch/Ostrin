@@ -67,6 +67,8 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    campos vectoriales, cámara, cortes ortogonales e isosuperficies de volúmenes), WebGPU y ampliar la procedencia reproducible ya disponible
    (hashes de fuente/datos, semilla y compilador) a informes y flujos de publicación con
    evidencia en intérprete, nativo y WASM.
+   El Scientific Lab ya conserva la demo activa y sus parámetros en la URL para compartir y
+   restaurar experimentos reproducibles desde el navegador.
 
 ## Horizonte posterior
 

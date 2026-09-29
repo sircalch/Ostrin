@@ -183,6 +183,23 @@ test("Scientific Lab recomputes its demos with the real compiler", async ({ page
   expect(runtimeErrors).toEqual([]);
 });
 
+test("Scientific Lab links preserve the selected demo and parameters", async ({ page }) => {
+  await page.goto("./?lab=surface&waves=1.6&azimuth=-30&elevation=24#lab-surface", { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("tab", { name: "3D" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator("#lab-surface-waves")).toHaveValue("1.6");
+  await expect(page.locator("#lab-surface-azimuth")).toHaveValue("-30");
+  await expect(page.locator("#lab-panel-surface .sl-code")).toContainText("waves = 1.6");
+
+  await page.getByRole("tab", { name: "Plot" }).click();
+  await expect(page).toHaveURL(/\?lab=plot[^#]*#lab-plot$/);
+  await page.goBack();
+  await expect(page.getByRole("tab", { name: "3D" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator("#lab-surface-waves")).toHaveValue("1.6");
+
+  await page.locator('[data-lab-share="surface"]').click();
+  await expect(page.locator('#lab-panel-surface .sl-status[aria-live]')).toHaveText(/Link copied|Share URL ready/);
+});
+
 test("Cookbook renders every recipe with source and recorded output", async ({ page }) => {
   await page.goto("./cookbook.html", { waitUntil: "domcontentloaded" });
   await expect(page.locator("[data-cookbook] .recipe")).toHaveCount(11);
@@ -456,4 +473,16 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   await expect(hexbinFrame.locator("linearGradient")).toHaveCount(1);
   await page.getByRole("button", { name: "Close" }).click();
   expect(runtimeErrors).toEqual([]);
+});
+
+test("Viz explorer links restore parameters and 3D camera", async ({ page }) => {
+  await page.goto("./viz.html?figure=surface&scale=1.6&azimuth=30&elevation=36#viz-surface", { waitUntil: "domcontentloaded" });
+  await expect(page.locator(".viz-dialog[open]")).toBeVisible();
+  await expect(page.locator('[data-viz-parameter="scale"]')).toHaveValue("1.6");
+  await expect(page.locator("[data-viz-camera-azimuth]")).toHaveValue("30");
+  await expect(page.locator("[data-viz-camera-elevation]")).toHaveValue("36");
+  await expect(page.locator(".viz-camera-status")).toContainText("Spatial scale 1.6", { timeout: 30_000 });
+
+  await page.getByRole("button", { name: "Copy share link" }).click();
+  await expect(page.locator(".viz-dialog .viz-share-status")).toHaveText(/Link copied|Share URL ready/);
 });
