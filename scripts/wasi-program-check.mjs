@@ -56,6 +56,12 @@ const programs = [
     expected: "nested\ninner none\nok\nnested error\nnested\nouter fallback\nok\nok fallback\nnested\n",
   },
   {
+    name: "csv_parse",
+    source: "examples/csv_parse.ostrin",
+    args: ["csv_parse.wasm"],
+    expected: "2\n3\na|b|c\n3\n1|2|3\n3\n2\nnombre|nota\n2\nPerez, Ana|9.5\n2\ndijo \"hola\"|7\n1\n3\nx|linea1\nlinea2|z\n2\n3\n||\n1\n\n0\ncabecera: invalid digit found in string\n3\n",
+  },
+  {
     name: "native_ir_function_values",
     source: "examples/native_ir_function_values.ostrin",
     args: ["native_ir_function_values.wasm"],

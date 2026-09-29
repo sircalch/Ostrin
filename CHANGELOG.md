@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Native IR: nested CSV lists
+
+- `parse_csv` now lowers through IR/C for `List<List<String>>`, preserving quoted fields and
+  empty records while releasing temporary row buffers, field strings and inner lists.
+- `examples/csv_parse.ostrin` verifies interpreter/native parity with `--leak-check`; the WASI
+  matrix also compiles and runs the same data program.
+
 ### Experimental scalar measurements
 
 - Added `std.measurements` with `Measurement<Float>`, explicit `Exact`/`Standard`/`Unknown`

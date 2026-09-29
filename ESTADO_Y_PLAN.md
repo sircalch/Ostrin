@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-29 · rama `main` · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 247 de integración y 2 unitarias en verde.*
+*Corte: 2026-09-29 · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 248 de integración y 2 unitarias en verde.*
 
 Validación remota: Pages, CI, CodeQL, sanitizers y auditoría de seguridad pasaron para `0ea7c6e` (PR #89, mediciones escalares experimentales y demo Scientific Lab) en Windows, Linux, macOS y web. La
 compuerta oficial exige `cargo fmt --check`, Clippy con el lint `suspicious`, la suite del
@@ -162,8 +162,8 @@ por separado en `--native-type-report` como `ir-generated`; el mismo informe exp
 `hir-generated` y `ast-fallback` para que la retirada del backend legado tenga un contador
 visible. También publica líneas `native-source` agrupadas por archivo para localizar la deuda
 por módulo; la prueba diferencial comprueba que sus sumas coinciden con el total. En el corte
-actual, la suite de ejemplos suma 6 399 funciones IR, 25 HIR y 123 que aún caen al emisor
-AST; `native_backend_types_agree_with_the_checker` mantiene 123 como trinquete temporal. Los métodos
+actual, la suite de ejemplos suma 6 401 funciones IR, 25 HIR y 121 que aún caen al emisor
+AST; `native_backend_types_agree_with_the_checker` mantiene 121 como trinquete temporal. Los métodos
 de records y enums concretos comparten ahora IR/C cuando sus campos y ownership son compatibles; los
 records recursivos conservan HIR/AST hasta cerrar su contrato de ownership.
 La familia `Rng` también cruza IR/C: constructor, generación escalar, muestreo de arrays y
@@ -171,6 +171,8 @@ permutaciones conservan el stream reproducible del runtime y liberan sus referen
 ownership que el backend legado.
 Los combinadores `map`, `filter`, `fold`, `any`, `all` y `find` de listas escalar/gestionadas
 usan ahora cierres IR con capturas y liberación de resultados, con paridad intérprete/nativo.
+El builtin de datos `parse_csv` construye `List<List<String>>` desde IR/C, libera sus buffers
+temporales y mantiene paridad en nativo y WASI.
 El puente IR de `zeros`/`ones`, `norm`, `abs` escalar y `sqrt` redujo el fallback en 348 funciones;
 esta pasada añade conversiones escalares `as<Float/Float32>` y conversiones comprobadas a `Int`/enteros de ancho fijo,
 `abs` sobre arrays y funciones matemáticas
@@ -312,12 +314,12 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
 convendría dividirlos; el backend nativo no comparte el sistema de tipos del checker
-(ya consume los tipos del checker y compara cada nodo; el informe actual suma **6 399 funciones
-generadas desde IR, 25 desde HIR y 123 en fallback AST** en los ejemplos, con un trinquete
+(ya consume los tipos del checker y compara cada nodo; el informe actual suma **6 401 funciones
+generadas desde IR, 25 desde HIR y 121 en fallback AST** en los ejemplos, con un trinquete
 que impide que el fallback aumente sin justificación; los métodos de records y enums concretos
 entran ahora en IR/C cuando sus campos y ownership son compatibles, mientras los records recursivos
 conservan el fallback verificado; las familias migradas incluyen escalares,
-`String` (incluidos `char_at`, `slice`, `codepoint`, `hash(String)` y el builtin `format`), `std.strings::format_text`, `std.viz::uid`, el recorrido IR de `std.viz::render`, `Complex` (con sustitución de `Self`) y `List<String>.join`, conversiones numéricas comprobadas,
+`String` (incluidos `char_at`, `slice`, `codepoint`, `hash(String)` y el builtin `format`), `std.strings::format_text`, `std.viz::uid`, el recorrido IR de `std.viz::render`, `Complex` (con sustitución de `Self`), `List<String>.join` y `parse_csv` sobre `List<List<String>>`, conversiones numéricas comprobadas,
 records concretos, `Option<Record>`, `List<T>` escalar, `Map`/`Set` escalares, `Option`
 escalar/String y patrones `Some/None`, `Float32`, enteros de ancho fijo, records, enums, `match`,
 `Option`/`Result`, listas/colecciones, cierres, instancias concretas de genéricos, records/enums
