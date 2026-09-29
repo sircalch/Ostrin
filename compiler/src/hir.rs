@@ -62,6 +62,45 @@ pub fn impl_method_name(im: &ImplDecl, method: &str) -> String {
     }
 }
 
+/// Resolve a declaration type after replacing the trait/inherent-method
+/// placeholder `Self` with the concrete implementation owner. Type checking
+/// already performs this substitution on its checked copy; HIR must repeat it
+/// because it lowers the original AST declaration so node identities remain
+/// stable for diagnostics and differential checks.
+fn resolve_declared_type(ty: &Type, owner: Option<&Type>) -> Ty {
+    let Some(owner) = owner else {
+        return crate::typeck::resolve_type(ty);
+    };
+    let mut rewritten = ty.clone();
+    replace_self_type(&mut rewritten, owner);
+    crate::typeck::resolve_type(&rewritten)
+}
+
+fn replace_self_type(ty: &mut Type, owner: &Type) {
+    match ty {
+        Type::Named(name, args) if name == "Self" && args.is_empty() => {
+            *ty = owner.clone();
+        }
+        Type::Named(_, args) => {
+            for arg in args {
+                replace_self_type(arg, owner);
+            }
+        }
+        Type::Mul(left, right) | Type::Div(left, right) => {
+            replace_self_type(left, owner);
+            replace_self_type(right, owner);
+        }
+        Type::Pow(base, _) => replace_self_type(base, owner),
+        Type::Fn(params, ret) => {
+            for param in params {
+                replace_self_type(param, owner);
+            }
+            replace_self_type(ret, owner);
+        }
+        Type::Dyn(_) => {}
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct HirBlock {
     pub stmts: Vec<HirStmt>,
@@ -649,55 +688,61 @@ pub fn lower<'a>(items: &'a [Item], typed: &'a TypedProgram) -> HirProgram {
     }
     let signatures = &signatures;
     let mut functions = Vec::new();
-    let lower_fn =
-        |name: String, f: &FunctionDecl, extra_generics: &[GenericParam], self_ty: Ty| {
-            let mut lowerer = Lowerer {
-                typed,
-                signatures,
-                file: f.source_file.clone(),
-                scopes: vec![HashSet::new()],
-                local_types: Default::default(),
-            };
-            for p in &f.params {
-                lowerer.declare(&p.name);
-                let ty = if p.name == "self" {
-                    self_ty.clone()
-                } else {
-                    crate::typeck::resolve_type(&p.ty)
-                };
-                lowerer.local_types.insert(p.name.clone(), ty);
-            }
-            let body = lowerer.block(&f.body);
-            HirFunction {
-                name,
-                generics: extra_generics
-                    .iter()
-                    .chain(&f.generics)
-                    .map(|g| g.name.clone())
-                    .collect(),
-                params: f
-                    .params
-                    .iter()
-                    .map(|p| {
-                        (
-                            p.name.clone(),
-                            if p.name == "self" {
-                                self_ty.clone()
-                            } else {
-                                crate::typeck::resolve_type(&p.ty)
-                            },
-                        )
-                    })
-                    .collect(),
-                ret: crate::typeck::resolve_type(&f.return_type),
-                body,
-                source_file: f.source_file.clone(),
-            }
+    let lower_fn = |name: String,
+                    f: &FunctionDecl,
+                    extra_generics: &[GenericParam],
+                    self_ty: Ty,
+                    owner_type: Option<&Type>| {
+        let mut lowerer = Lowerer {
+            typed,
+            signatures,
+            file: f.source_file.clone(),
+            scopes: vec![HashSet::new()],
+            local_types: Default::default(),
         };
+        for p in &f.params {
+            lowerer.declare(&p.name);
+            let ty = if p.name == "self" {
+                self_ty.clone()
+            } else {
+                resolve_declared_type(&p.ty, owner_type)
+            };
+            lowerer.local_types.insert(p.name.clone(), ty);
+        }
+        let body = lowerer.block(&f.body);
+        HirFunction {
+            name,
+            generics: extra_generics
+                .iter()
+                .chain(&f.generics)
+                .map(|g| g.name.clone())
+                .collect(),
+            params: f
+                .params
+                .iter()
+                .map(|p| {
+                    (
+                        p.name.clone(),
+                        if p.name == "self" {
+                            self_ty.clone()
+                        } else {
+                            resolve_declared_type(&p.ty, owner_type)
+                        },
+                    )
+                })
+                .collect(),
+            ret: resolve_declared_type(&f.return_type, owner_type),
+            body,
+            source_file: f.source_file.clone(),
+        }
+    };
     for item in items {
         match item {
-            Item::Function(f) => functions.push(lower_fn(f.name.clone(), f, &[], Ty::Unknown)),
+            Item::Function(f) => {
+                functions.push(lower_fn(f.name.clone(), f, &[], Ty::Unknown, None))
+            }
             Item::Impl(im) => {
+                let owner_type = Type::Named(im.type_name.clone(), im.type_args.clone());
                 let self_ty = if im.type_args.is_empty() {
                     Ty::Named(im.type_name.clone())
                 } else {
@@ -715,6 +760,7 @@ pub fn lower<'a>(items: &'a [Item], typed: &'a TypedProgram) -> HirProgram {
                         m,
                         &im.generics,
                         self_ty.clone(),
+                        Some(&owner_type),
                     ));
                 }
             }
