@@ -2,7 +2,7 @@
 
 *Corte: 2026-09-29 · rama `main` · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 244 de integración y 2 unitarias en verde.*
 
-Validación remota: Pages, CI, CodeQL, sanitizers y auditoría de seguridad pasaron para `98d28f7` (PR #86, controles de accesibilidad web y mejoras acumuladas del backend) en Windows, Linux, macOS y web. La
+Validación remota: Pages, CI, CodeQL, sanitizers y auditoría de seguridad pasaron para `0ea7c6e` (PR #89, mediciones escalares experimentales y demo Scientific Lab) en Windows, Linux, macOS y web. La
 compuerta oficial exige `cargo fmt --check`, Clippy con el lint `suspicious`, la suite del
 compilador y las comprobaciones del sitio; los workflows de auditoría de dependencias,
 CodeQL, sanitizers nativos y cobertura quedan registrados para el ciclo P5.
@@ -162,7 +162,7 @@ por separado en `--native-type-report` como `ir-generated`; el mismo informe exp
 `hir-generated` y `ast-fallback` para que la retirada del backend legado tenga un contador
 visible. También publica líneas `native-source` agrupadas por archivo para localizar la deuda
 por módulo; la prueba diferencial comprueba que sus sumas coinciden con el total. En el corte
-actual, la suite de ejemplos suma 6 348 funciones IR, 29 HIR y 127 que aún caen al emisor
+actual, la suite de ejemplos suma 6 366 funciones IR, 29 HIR y 127 que aún caen al emisor
 AST; `native_backend_types_agree_with_the_checker` mantiene 127 como trinquete temporal. Los métodos
 de records y enums concretos comparten ahora IR/C cuando sus campos y ownership son compatibles; los
 records recursivos conservan HIR/AST hasta cerrar su contrato de ownership.
@@ -307,7 +307,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
 convendría dividirlos; el backend nativo no comparte el sistema de tipos del checker
-(ya consume los tipos del checker y compara cada nodo; el informe actual suma **6 348 funciones
+(ya consume los tipos del checker y compara cada nodo; el informe actual suma **6 366 funciones
 generadas desde IR, 29 desde HIR y 127 en fallback AST** en los ejemplos, con un trinquete
 que impide que el fallback aumente sin justificación; los métodos de records y enums concretos
 entran ahora en IR/C cuando sus campos y ownership son compatibles, mientras los records recursivos

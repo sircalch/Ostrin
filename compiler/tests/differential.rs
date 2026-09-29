@@ -474,7 +474,9 @@ fn native_backend_types_agree_with_the_checker() {
     // through the same IR/C path. HIR now
     // substitutes the concrete owner for `Self` in trait method signatures,
     // allowing Complex arithmetic/equality to use IR/C. The verified baseline is
-    // 127 AST fallbacks (6,348 IR and 29 HIR functions).
+    // 127 AST fallbacks (6,366 IR and 29 HIR functions). The experimental
+    // `std.measurements` module contributes 18 additional IR functions and has
+    // no fallback, so the AST ratchet remains unchanged.
     // Keep this ratchet explicit until
     // the next aggregate family moves with parity evidence; aggregate-heavy SVG
     // paths and complex array promotion remain pending.
