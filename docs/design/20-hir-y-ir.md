@@ -114,11 +114,12 @@ Sobre este IR se hacen los análisis que el texto C no permite:
    `--native-type-report` publica también `ir-generated`, `hir-generated` y `ast-fallback`.
    El mismo informe agrupa esas cifras por archivo fuente con líneas `native-source`, y la
    prueba diferencial comprueba que la suma por módulo coincide con los totales globales.
-   La prueba diferencial conserva el baseline actual de fallback (125 funciones AST, con
-   6 393 funciones IR y 29 HIR agregadas sobre los ejemplos); el incremento acotado incluye
+   La prueba diferencial conserva el baseline actual de fallback (123 funciones AST, con
+   6 399 funciones IR y 25 HIR agregadas sobre los ejemplos); el incremento acotado incluye
    también `Rng` (constructor, métodos escalares, muestreo de arrays y permutación), con
-   liberación gestionada y paridad intérprete/nativo; las combinaciones de listas con cierres y
-   los agregados compuestos permanecen en la cola de migración.
+   liberación gestionada y paridad intérprete/nativo. Los combinadores de listas (`map`, `filter`,
+   `fold`, `any`, `all`, `find`) aceptan cierres IR con capturas; los agregados anidados e
+   iteradores compuestos permanecen en la cola de migración.
    La preparación numérica de histogramas y violines ya atraviesa IR/C mediante `histogram`,
    `linspace` y `pow`, `std.viz::uid` usa `hash(String)` en IR/C y `std.viz::render` recorre
    explícitamente sus series. HIR sustituye `Self` por el propietario concreto en las firmas de
