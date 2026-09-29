@@ -976,6 +976,10 @@ fn safe_release_site(instruction: &IrInstr) -> bool {
                 | "randn"
                 | "randint"
                 | "permutation"
+                | "map"
+                | "filter"
+                | "fold"
+                | "find"
         ),
         _ => false,
     }

@@ -904,6 +904,162 @@ fn format_float_result_code(value: &str, digits: &str) -> String {
     )
 }
 
+/// Emits the closure-backed list combinators that HIR previously expanded
+/// inline.  Keeping the loop in the IR emitter lets the closure body stay on
+/// the same typed CFG path while the generated list helpers retain elements
+/// using their normal ownership contract.
+fn list_combinator_call(
+    method: &str,
+    receiver: &str,
+    receiver_ty: &Ty,
+    args: &[ValueId],
+    ty: &Ty,
+    dst: ValueId,
+    values: &Values,
+    records: &RecordFields,
+) -> Bail<String> {
+    let Ty::List(element) = receiver_ty else {
+        return Err(());
+    };
+    if args.is_empty() {
+        return Err(());
+    }
+    let list_name = format!("List_{}", mangle_option_payload(element, records));
+    let list_c = c_type(receiver_ty, records)?;
+    let closure_value = if method == "fold" {
+        *args.last().ok_or(())?
+    } else {
+        args[0]
+    };
+    let Ty::Fn(params, ret) = value_ty(values, closure_value)? else {
+        return Err(());
+    };
+    if !supported(&ret, records) {
+        return Err(());
+    }
+    let closure_code = value_code(values, closure_value)?;
+    let closure_name = format!("__ir_list_{dst}_closure");
+    let fn_type = closure_fn_type(&params, &ret, records)?;
+    let call = |arguments: String| {
+        format!(
+            "(({}){closure_name}.fn)({closure_name}.env{arguments})",
+            fn_type
+        )
+    };
+    let index = format!("__ir_list_{dst}_index");
+    let closure_decl = format!("OstrinClosure {closure_name} = {closure_code};");
+    let loop_head = format!("for (int64_t {index} = 0; {index} < {receiver}->length; {index}++)");
+
+    match method {
+        "map" => {
+            if args.len() != 1 || params.as_slice() != [(*element.clone())] || *ty == Ty::Void {
+                return Err(());
+            }
+            let Ty::List(out_element) = ty else {
+                return Err(());
+            };
+            if *ret != **out_element || !list_supported(out_element, records) {
+                return Err(());
+            }
+            let out_name = format!("List_{}", mangle_option_payload(out_element, records));
+            let out_ty = Ty::List(out_element.clone());
+            let out_c = c_type(&out_ty, records)?;
+            let out_elem_c = c_type(out_element, records)?;
+            let out = format!("__ir_list_{dst}_out");
+            let item = format!("__ir_list_{dst}_item");
+            let release = release_payload(&item, out_element, records)
+                .map(|code| format!("{code};"))
+                .unwrap_or_default();
+            let item_call = call(format!(", {receiver}->items[{index}]"));
+            Ok(format!(
+                "({{ {closure_decl} {out_c} {out} = {out_name}_new_from_array(NULL, 0); {loop_head} {{ {out_elem_c} {item} = {item_call}; {out_name}_push({out}, {item}); {release} }} {out}; }})"
+            ))
+        }
+        "filter" => {
+            if args.len() != 1
+                || params.as_slice() != [(*element.clone())]
+                || *ret != Ty::Bool
+                || *ty != *receiver_ty
+            {
+                return Err(());
+            }
+            let out = format!("__ir_list_{dst}_out");
+            let predicate = call(format!(", {receiver}->items[{index}]"));
+            Ok(format!(
+                "({{ {closure_decl} {list_c} {out} = {list_name}_new_from_array(NULL, 0); {loop_head} {{ if ({predicate}) {list_name}_push({out}, {receiver}->items[{index}]); }} {out}; }})"
+            ))
+        }
+        "fold" => {
+            if args.len() != 2
+                || params.len() != 2
+                || params[1] != **element
+                || params[0] != value_ty(values, args[0])?
+                || *ret != *ty
+            {
+                return Err(());
+            }
+            let acc_ty = value_ty(values, args[0])?;
+            if acc_ty != *ty || !supported(&acc_ty, records) {
+                return Err(());
+            }
+            let acc_c = c_type(&acc_ty, records)?;
+            let acc = format!("__ir_list_{dst}_acc");
+            let next = format!("__ir_list_{dst}_next");
+            let initial = value_code(values, args[0])?;
+            let retain_initial = retain_payload(&acc, &acc_ty, records)
+                .map(|code| format!("{code};"))
+                .unwrap_or_default();
+            let release_acc = release_payload(&acc, &acc_ty, records)
+                .map(|code| format!("{code};"))
+                .unwrap_or_default();
+            let folded = call(format!(", {acc}, {receiver}->items[{index}]"));
+            Ok(format!(
+                "({{ {closure_decl} {acc_c} {acc} = {initial}; {retain_initial} {loop_head} {{ {acc_c} {next} = {folded}; {release_acc} {acc} = {next}; }} {acc}; }})"
+            ))
+        }
+        "any" | "all" => {
+            if args.len() != 1
+                || params.as_slice() != [(*element.clone())]
+                || *ret != Ty::Bool
+                || *ty != Ty::Bool
+            {
+                return Err(());
+            }
+            let result = format!("__ir_list_{dst}_result");
+            let initial = if method == "any" { "false" } else { "true" };
+            let wanted = if method == "any" { "true" } else { "false" };
+            let predicate = call(format!(", {receiver}->items[{index}]"));
+            let test = if method == "any" {
+                predicate.clone()
+            } else {
+                format!("!({predicate})")
+            };
+            Ok(format!(
+                "({{ {closure_decl} bool {result} = {initial}; {loop_head} {{ if ({test}) {{ {result} = {wanted}; break; }} }} {result}; }})"
+            ))
+        }
+        "find" => {
+            if args.len() != 1 || params.as_slice() != [(*element.clone())] || *ret != Ty::Bool {
+                return Err(());
+            }
+            let expected = Ty::Applied("Option".to_string(), vec![(*element.clone())]);
+            if *ty != expected || !option_supported(element, records) {
+                return Err(());
+            }
+            let option_c = c_type(ty, records)?;
+            let found = format!("__ir_list_{dst}_found");
+            let predicate = call(format!(", {receiver}->items[{index}]"));
+            let retain = retain_payload(&format!("{found}.value"), element, records)
+                .map(|code| format!("{code};"))
+                .unwrap_or_default();
+            Ok(format!(
+                "({{ {closure_decl} {option_c} {found}; memset(&{found}, 0, sizeof {found}); {loop_head} {{ if ({predicate}) {{ {found}.has = true; {found}.value = {receiver}->items[{index}]; {retain} break; }} }} {found}; }})"
+            ))
+        }
+        _ => Err(()),
+    }
+}
+
 fn emit_instruction(
     instruction: &IrInstr,
     values: &Values,
@@ -1633,43 +1789,61 @@ fn emit_instruction(
                     }
                 }
                 Ty::List(element) if list_supported(&element, records) => {
-                    let list_name = format!("List_{}", mangle_option_payload(&element, records));
-                    match method.as_str() {
-                        "length" | "count" if args.is_empty() && *ty == Ty::Int => {
-                            format!("{list_name}_length({receiver})")
+                    if matches!(
+                        method.as_str(),
+                        "map" | "filter" | "fold" | "any" | "all" | "find"
+                    ) {
+                        let dst = (*dst).ok_or(())?;
+                        list_combinator_call(
+                            method,
+                            &receiver,
+                            &Ty::List(element.clone()),
+                            args,
+                            ty,
+                            dst,
+                            values,
+                            records,
+                        )?
+                    } else {
+                        let list_name =
+                            format!("List_{}", mangle_option_payload(&element, records));
+                        match method.as_str() {
+                            "length" | "count" if args.is_empty() && *ty == Ty::Int => {
+                                format!("{list_name}_length({receiver})")
+                            }
+                            "push"
+                                if args.len() == 1
+                                    && *ty == Ty::Void
+                                    && value_ty(values, args[0])? == *element =>
+                            {
+                                format!(
+                                    "{list_name}_push({receiver}, {})",
+                                    value_code(values, args[0])?
+                                )
+                            }
+                            "remove_at"
+                                if args.len() == 1
+                                    && *ty == *element
+                                    && value_ty(values, args[0])? == Ty::Int =>
+                            {
+                                format!(
+                                    "{list_name}_remove_at({receiver}, {})",
+                                    value_code(values, args[0])?
+                                )
+                            }
+                            "join"
+                                if args.len() == 1
+                                    && *element == Ty::String
+                                    && *ty == Ty::String
+                                    && value_ty(values, args[0])? == Ty::String =>
+                            {
+                                format!(
+                                    "ostrin_s_join({receiver}->items, {receiver}->length, {})",
+                                    value_code(values, args[0])?
+                                )
+                            }
+                            _ => return Err(()),
                         }
-                        "push"
-                            if args.len() == 1
-                                && *ty == Ty::Void
-                                && value_ty(values, args[0])? == *element =>
-                        {
-                            format!(
-                                "{list_name}_push({receiver}, {})",
-                                value_code(values, args[0])?
-                            )
-                        }
-                        "remove_at"
-                            if args.len() == 1
-                                && *ty == *element
-                                && value_ty(values, args[0])? == Ty::Int =>
-                        {
-                            format!(
-                                "{list_name}_remove_at({receiver}, {})",
-                                value_code(values, args[0])?
-                            )
-                        }
-                        "join"
-                            if args.len() == 1
-                                && *element == Ty::String
-                                && *ty == Ty::String
-                                && value_ty(values, args[0])? == Ty::String =>
-                        {
-                            format!(
-                                "ostrin_s_join({receiver}->items, {receiver}->length, {})",
-                                value_code(values, args[0])?
-                            )
-                        }
-                        _ => return Err(()),
                     }
                 }
                 Ty::Applied(name, array_args)

@@ -2762,6 +2762,20 @@ fn native_backend_compiles_and_runs_list_combinators_with_captures() {
         "compile failed: {}",
         stderr(&compile)
     );
+    let report = run(&[
+        "--native-type-report",
+        &example_path("native_closures.ostrin"),
+    ]);
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("ir-generated: 1") && report_text.contains("ast-fallback: 0"),
+        "list combinators did not stay on the IR path: {report_text}"
+    );
     let run_output = Command::new(&exe).output().unwrap();
     let _ = fs::remove_file(&exe);
     assert_eq!(

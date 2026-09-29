@@ -6,7 +6,7 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
 ## Siguiente ciclo
 
 1. Reducir el fallback AST con el trinquete por archivo de `--native-type-report` (baseline actual:
-   6.393 funciones IR, 29 HIR y 125 AST). Los métodos de records y enums concretos ya comparten
+   6.399 funciones IR, 25 HIR y 123 AST). Los métodos de records y enums concretos ya comparten
    la ruta IR/C cuando sus campos y ownership son compatibles; los records recursivos permanecen
    deliberadamente en HIR/AST hasta cerrar ese contrato. El puente IR para los constructores numéricos
    `zeros`/`ones`, `norm`, `abs` escalar y `sqrt` migró 348 funciones compartidas por la suite;
@@ -34,8 +34,10 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    integrales e interpolación con cantidades; la aritmética elemento a elemento de arrays con
    unidades sigue deliberadamente en HIR/AST hasta tener helpers IR que preserven la etiqueta.
    `Rng` y sus métodos escalares y de muestreo (`rand`, `randn`, `randint`, `permutation`) ya
-   comparten IR/C con ownership explícito y paridad intérprete/nativo; la siguiente familia sigue
-   siendo la de agregados y cierres sobre listas.
+   comparten IR/C con ownership explícito y paridad intérprete/nativo. Los combinadores de listas
+   (`map`, `filter`, `fold`, `any`, `all`, `find`) también cruzan IR/C, incluidos cierres con
+   capturas y resultados gestionados; la siguiente familia es ownership sobre agregados anidados
+   e iteradores.
    Las conversiones escalares `as<Float/Float32>` y las conversiones comprobadas a `Int`/enteros de ancho fijo,
    `abs` sobre arrays y las funciones matemáticas
    deterministas (`sin`, `cos`, `ln`, `exp`, `pi`, `eye` y relacionadas) ya cruzan IR/C; esta pasada
