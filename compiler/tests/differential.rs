@@ -416,8 +416,8 @@ fn native_backend_types_agree_with_the_checker() {
     // explicit IR lowering (the migration of the native backend).
     let native_generated = hir_generated + ir_generated;
     assert!(
-        native_generated >= 6375,
-        "only {native_generated} functions were generated from HIR/IR (expected at least 6375)"
+        native_generated >= 6377,
+        "only {native_generated} functions were generated from HIR/IR (expected at least 6377)"
     );
     println!("functions generated from HIR/IR: {native_generated} (HIR {hir_generated}, IR {ir_generated})");
     println!("functions still using AST fallback: {ast_fallback}");
@@ -469,14 +469,16 @@ fn native_backend_types_agree_with_the_checker() {
     // String hashing for deterministic SVG ids and the explicit renderer scan use
     // the same stable runtime helpers as the legacy emitter and remove 64 more
     // measured fallbacks in total. Field stores now transfer fresh managed strings
-    // safely, which lets the remaining visualization methods use IR/C. HIR now
+    // safely, which lets the remaining visualization methods use IR/C. The
+    // standard-library `format_text` wrapper now lowers its `format` builtin
+    // through the same IR/C path. HIR now
     // substitutes the concrete owner for `Self` in trait method signatures,
     // allowing Complex arithmetic/equality to use IR/C. The verified baseline is
-    // 129 AST fallbacks (6,346 IR and 29 HIR functions).
+    // 127 AST fallbacks (6,348 IR and 29 HIR functions).
     // Keep this ratchet explicit until
     // the next aggregate family moves with parity evidence; aggregate-heavy SVG
     // paths and complex array promotion remain pending.
-    const MAX_AST_FALLBACK_FUNCTIONS: usize = 129;
+    const MAX_AST_FALLBACK_FUNCTIONS: usize = 127;
     assert!(
         ast_fallback <= MAX_AST_FALLBACK_FUNCTIONS,
         "AST fallback grew to {ast_fallback} functions (ratchet limit {MAX_AST_FALLBACK_FUNCTIONS})"

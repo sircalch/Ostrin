@@ -11,6 +11,12 @@
   The verified ratchet moves to **6,346 IR / 29 HIR / 129 AST fallbacks** across 205 measured
   source modules.
 
+### Native IR: standard-library formatting
+- The `format(template, values)` builtin now lowers through IR/C for `String` templates and
+  `List<String>` replacements. `std.strings::format_text` therefore keeps native/interpreter
+  parity without its AST fallback. The differential baseline is now **6,348 IR / 29 HIR /
+  127 AST fallbacks** across 205 measured source modules.
+
 ### Viz: capability-detected MP4 export
 - Animated figures now expose an MP4 export action when the browser provides an H.264
   `MediaRecorder` codec. Browsers that only support WebM keep the button disabled with an
