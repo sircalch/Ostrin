@@ -26,7 +26,10 @@ GitHub Linguist does not yet know `Ostrin` as an official language, so the
 language bar cannot display it as a stable category yet. The roadmap now includes
 the upstream submission: representative `.ostrin` samples, a language definition,
 local Linguist validation, and repository classification after acceptance. The
-draft entry and upstream checklist live in [`docs/linguist.md`](docs/linguist.md).
+draft entry and upstream checklist live in [`docs/linguist.md`](docs/linguist.md),
+with the machine-readable proposal in [`docs/linguist-language.yml`](docs/linguist-language.yml).
+Run `node scripts/linguist-check.mjs` to validate the proposal, TextMate scope,
+license and representative samples before opening an upstream request.
 
 ## Why Ostrin?
 

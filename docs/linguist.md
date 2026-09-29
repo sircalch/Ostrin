@@ -8,6 +8,9 @@ aceptación de `github/linguist`.
 
 La entrada que se llevaría a `lib/linguist/languages.yml` es:
 
+La versión machine-readable se conserva en [`docs/linguist-language.yml`](linguist-language.yml)
+y se valida con `node scripts/linguist-check.mjs`.
+
 ```yaml
 Ostrin:
   type: programming

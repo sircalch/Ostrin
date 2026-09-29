@@ -28,6 +28,8 @@ runs:
     - name: Validate website, WASM and distribution contracts
       shell: bash
       run: |
+        node scripts/linguist-check.mjs
+        node --test scripts/linguist-check.test.mjs
         node scripts/website-metadata.mjs
         node --no-warnings scripts/lab-data.mjs
         node scripts/website-check.mjs --wasm

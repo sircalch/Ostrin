@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### GitHub Linguist readiness
+- Added a machine-readable Linguist proposal at `docs/linguist-language.yml` and a local
+  `scripts/linguist-check.mjs` gate that validates the `.ostrin` extension, `ostrinc` interpreter,
+  TextMate scope, MIT license and representative samples. The website CI runs both the positive
+  repository check and a negative fixture test; upstream submission remains gated on independent
+  public usage evidence.
+
 ### Native IR: scalar formatting
 - Numeric scalar `to_string()` methods now lower through IR/C for `Int`, `Float`, `Float32` and
   fixed-width integers. `std.numeric.secant` and `std.numeric.newton` therefore keep their

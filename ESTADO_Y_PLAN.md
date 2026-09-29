@@ -2,7 +2,7 @@
 
 *Corte: 2026-09-28 · rama `main` · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 241 de integración y 2 unitarias en verde.*
 
-Validación remota: Pages, CI, CodeQL, sanitizers y auditoría de seguridad pasaron para `83c40ef` (PR #70, casts escalares y matemáticas deterministas en IR/C) en Windows, Linux, macOS y web. La
+Validación remota: Pages, CI, CodeQL, sanitizers y auditoría de seguridad pasaron para `b29e14e` (PR #73, métodos de records y enums concretos en IR/C) en Windows, Linux, macOS y web. La
 compuerta oficial exige `cargo fmt --check`, Clippy con el lint `suspicious`, la suite del
 compilador y las comprobaciones del sitio; los workflows de auditoría de dependencias,
 CodeQL, sanitizers nativos y cobertura quedan registrados para el ciclo P5.
@@ -19,7 +19,7 @@ del lenguaje, `docs/design/` (24 documentos). La auditoría del sitio vive en
 | **Implementado** | Compilador + intérprete (referencia semántica), checker con cantidades físicas, records/enums/traits/genéricos, `Option`/`Result`, colecciones, `Array<T>`, módulos y paquetes con lockfile, concurrencia cooperativa determinista, `--native-threads`, backend C con `--leak-check`, build WASI, playground WASM, LSP/DAP y extensión VS Code (VSIX local) |
 | **En fallback** | El backend nativo emite desde IR las familias cubiertas (§5); records/enums genéricos aplicados, iteradores indirectos, scopes anidados, handlers no lineales y agregados/escapes complejos caen de forma verificada a HIR y después al AST |
 | **Experimental** | Todo el lenguaje (versión 0.x, sin garantía de estabilidad); `--native-threads`; `std.viz` (visualización 2D/3D en SVG); paquetes científicos de ejemplo `tables`, `plot`, `autodiff` (modo directo); dependencias Git con `--fetch` |
-| **Pendiente** | Retirar el fallback AST, ownership completo, red, registry público, GPU, autodiff inverso, canales de distribución (Homebrew, winget, Scoop, Chocolatey, AUR), extensión en Marketplace y reconocimiento upstream de Ostrin en GitHub Linguist |
+| **Pendiente** | Retirar el fallback AST, ownership completo, red, registry público, GPU, autodiff inverso, canales de distribución (Homebrew, winget, Scoop, Chocolatey, AUR), extensión en Marketplace y reconocimiento upstream de Ostrin en GitHub Linguist; la propuesta machine-readable y su gate local ya están preparados |
 | **Release** | [`v0.1.0`](https://github.com/sircalch/Ostrin/releases/tag/v0.1.0) publicada el 2026-09-24 con tres archivos (Linux x86_64, macOS ARM64, Windows x64) y sus `.sha256`; instaladores verificados contra ella en runners limpios (`install-check.yml`); workflows de CI, release y WASI en verde |
 
 ---
