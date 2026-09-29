@@ -919,6 +919,7 @@ fn safe_release_site(instruction: &IrInstr) -> bool {
                 | "starts_with"
                 | "ends_with"
                 | "replace"
+                | "join"
                 | "split"
                 | "lines"
                 | "to_int"

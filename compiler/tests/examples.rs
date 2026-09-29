@@ -4186,7 +4186,7 @@ fn native_ir_emitter_releases_managed_loop_phi_values() {
 #[test]
 fn native_ir_emitter_handles_lists_and_ownership_markers() {
     let file = example_path("native_ir_lists.ostrin");
-    let expected = "4\n4\n5\n4\n4\n0\n2\nA-one\n1\n";
+    let expected = "4\n4\n5\n4\n4\n0\n2\nA-one|B-two\nA-one\n1\n";
     let interpreted = run(&["--run", &file]);
     assert!(
         interpreted.status.success(),
@@ -4240,6 +4240,10 @@ fn native_ir_emitter_handles_lists_and_ownership_markers() {
     assert!(
         source.contains("List_Int_remove_at"),
         "list removal did not come from IR: {source}"
+    );
+    assert!(
+        source.contains("ostrin_s_join"),
+        "managed string list join did not come from IR: {source}"
     );
     assert!(
         source.contains("ostrin_release((void*)__ir_v"),

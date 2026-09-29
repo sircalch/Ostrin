@@ -6,7 +6,7 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
 ## Siguiente ciclo
 
 1. Reducir el fallback AST con el trinquete por archivo de `--native-type-report` (baseline actual:
-   5.037 funciones IR, 286 HIR y 1.181 AST). Los métodos de records y enums concretos ya comparten
+   5.744 funciones IR, 124 HIR y 636 AST). Los métodos de records y enums concretos ya comparten
    la ruta IR/C cuando sus campos y ownership son compatibles; los records recursivos permanecen
    deliberadamente en HIR/AST hasta cerrar ese contrato. El puente IR para los constructores numéricos
    `zeros`/`ones`, `norm`, `abs` escalar y `sqrt` migró 348 funciones compartidas por la suite;
@@ -38,7 +38,8 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    los operadores aritméticos definidos por records ahora pueden despacharse desde IR cuando ambos
    operandos tienen el mismo record concreto. Los métodos de texto `String.char_at`, `String.slice`
    y `String.codepoint` también cruzan IR/C, con liberación lineal del receptor y paridad nativo/
-   intérprete comprobada.
+   intérprete comprobada. `List<String>.join` también usa la ruta IR/C y conserva ownership
+   lineal al construir la cadena unida.
 2. Completar ownership sobre agregados, escapes, valores `Phi`, errores y formas anidadas, con
    leak-check y sanitizers como evidencia.
 3. Añadir casos de compilación nativa y divergencia semántica al fuzzing de entradas válidas.
