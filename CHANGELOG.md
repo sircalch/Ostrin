@@ -14,7 +14,15 @@
   IR/C emitter. Their existing runtime bounds and single-codepoint diagnostics remain intact;
   the native example exercises chaining through `codepoint().unwrap()` with zero live allocations.
 - The ownership pass recognizes these methods as safe receiver transfer points. The differential
-  ratchet moves to **5,037 IR / 286 HIR / 1,181 AST fallbacks** across 205 measured source modules.
+  ratchet first moved to **5,037 IR / 286 HIR / 1,181 AST fallbacks** across 205 measured source
+  modules.
+
+### Native IR: joined string lists
+- `List<String>.join(separator)` now lowers through IR/C and calls the existing runtime join helper,
+  preserving the fresh result's ownership while the list remains borrowed. CSV and table-oriented
+  examples therefore use the same native path as scalar string methods.
+- The updated ratchet is **5,744 IR / 124 HIR / 636 AST fallbacks** across 205 measured source
+  modules.
 
 ### Native IR: scalar formatting
 - Numeric scalar `to_string()` methods now lower through IR/C for `Int`, `Float`, `Float32` and

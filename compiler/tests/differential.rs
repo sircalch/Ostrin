@@ -472,12 +472,13 @@ fn native_backend_types_agree_with_the_checker() {
     // arithmetic dispatch removes the repeated `Complex * Complex` fallback in
     // `std.numeric.powi`. Record and enum methods now enter the same IR/C path
     // as free functions whenever their concrete fields and ownership contract
-    // are supported. This migrates the numeric and visualization method families
-    // together and lowers the verified baseline to 1,183 AST fallbacks (5,035 IR
-    // and 286 HIR functions). Keep this ratchet explicit until the next aggregate
-    // family moves with parity evidence; aggregate-heavy SVG paths and complex
-    // array promotion remain pending.
-    const MAX_AST_FALLBACK_FUNCTIONS: usize = 1183;
+    // are supported. `List<String>.join` now uses the same path for its freshly
+    // allocated joined result and removes another 545 AST fallbacks across the
+    // shared standard-library consumers. The verified baseline is 636 AST
+    // fallbacks (5,744 IR and 124 HIR functions). Keep this ratchet explicit until
+    // the next aggregate family moves with parity evidence; aggregate-heavy SVG
+    // paths and complex array promotion remain pending.
+    const MAX_AST_FALLBACK_FUNCTIONS: usize = 636;
     assert!(
         ast_fallback <= MAX_AST_FALLBACK_FUNCTIONS,
         "AST fallback grew to {ast_fallback} functions (ratchet limit {MAX_AST_FALLBACK_FUNCTIONS})"

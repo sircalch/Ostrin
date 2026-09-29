@@ -1561,6 +1561,17 @@ fn emit_instruction(
                                 value_code(values, args[0])?
                             )
                         }
+                        "join"
+                            if args.len() == 1
+                                && *element == Ty::String
+                                && *ty == Ty::String
+                                && value_ty(values, args[0])? == Ty::String =>
+                        {
+                            format!(
+                                "ostrin_s_join({receiver}->items, {receiver}->length, {})",
+                                value_code(values, args[0])?
+                            )
+                        }
                         _ => return Err(()),
                     }
                 }
