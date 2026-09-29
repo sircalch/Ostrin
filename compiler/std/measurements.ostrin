@@ -68,6 +68,59 @@ pub fn source_count(measurement: Measurement<Float>) -> Int {
     measurement.sources.length()
 }
 
+// Project a series into nominal values without discarding the original
+// measurements. Callers can pair this with `uncertainties` and pass both
+// arrays to `std.viz.errorbars`.
+pub fn values(measurements: List<Measurement<Float>>) -> List<Float> {
+    mut output: List<Float> = []
+    for measurement in measurements {
+        output.push(measurement.value)
+    }
+    output
+}
+
+// Return one standard uncertainty per element. Unknown uncertainty remains an
+// explicit error so a plot cannot silently turn missing information into zero.
+pub fn uncertainties(measurements: List<Measurement<Float>>) -> Result<List<Float>, String> {
+    mut output: List<Float> = []
+    for measurement in measurements {
+        match uncertainty(measurement) {
+            Ok(sigma) => output.push(sigma),
+            Err(message) => { return Err(message) },
+        }
+    }
+    Ok(output)
+}
+
+// Sum a finite series while retaining source correlation. Reusing the same
+// source label therefore contributes once with the accumulated coefficient.
+pub fn sum(measurements: List<Measurement<Float>>) -> Result<Measurement<Float>, String> {
+    if measurements.length() == 0 {
+        return Err("measurement sum needs at least one item")
+    }
+    mut total = exact(0.0)
+    for measurement in measurements {
+        match add(total, measurement) {
+            Ok(next) => { total = next },
+            Err(message) => { return Err(message) },
+        }
+    }
+    Ok(total)
+}
+
+// Arithmetic mean implemented in terms of sum and scale so it shares the
+// same correlation and unknown-state rules as scalar operations.
+pub fn mean(measurements: List<Measurement<Float>>) -> Result<Measurement<Float>, String> {
+    count = measurements.length()
+    if count == 0 {
+        return Err("measurement mean needs at least one item")
+    }
+    match sum(measurements) {
+        Ok(total) => Ok(scale(total, 1.0 / (count as Float))),
+        Err(message) => Err(message),
+    }
+}
+
 pub fn uncertainty(measurement: Measurement<Float>) -> Result<Float, String> {
     if not measurement.known {
         return Err(measurement.reason)

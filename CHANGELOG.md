@@ -10,7 +10,11 @@
   remains explicit.
 - Added `examples/measurement_scalar.ostrin` and a Scientific Lab card executed by the same
   `ostrinc.wasm` artifact used in the browser. The API is intentionally function-based and does
-  not yet claim `Quantity<T>`, arrays, Monte Carlo, coverage intervals or error bars.
+  not yet claim `Quantity<T>`, `Array<Measurement<T>>`, Monte Carlo or coverage intervals.
+- Added series projections `measurements.values`, `measurements.uncertainties`, `measurements.sum`
+  and `measurements.mean`, preserving explicit unknown states and correlated sources. The
+  `viz_bars.ostrin` gallery figure feeds those projections into `std.viz.errorbars` and is checked
+  for interpreter/native parity.
 
 ### Measurement and uncertainty design
 

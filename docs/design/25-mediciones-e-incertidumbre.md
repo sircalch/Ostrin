@@ -1,7 +1,8 @@
 # 25 — Mediciones e incertidumbre
 
-**Estado:** propuesta en implementación experimental; `std.measurements` ya ofrece un API escalar
-funcional, mientras la sintaxis estable, `Quantity<T>`, arrays y Monte Carlo siguen pendientes.
+**Estado:** propuesta en implementación experimental; `std.measurements` ofrece un API escalar
+funcional y una proyección de series `List<Measurement<Float>>` para valores e incertidumbres,
+mientras la sintaxis estable, `Quantity<T>`, `Array<Measurement<T>>` y Monte Carlo siguen pendientes.
 
 **Fecha:** 2026-09-29
 
@@ -31,9 +32,11 @@ no declara semántica de operadores ni integración completa con `Quantity<T>`.
 
 `examples/measurement_scalar.ostrin` cubre construcciones `exact`, `standard` y `unknown`,
 validación de sigma y etiquetas, combinación de fuentes independientes, cancelación correlacionada
-(`x - x = 0 ± 0`) y paridad intérprete/native. El Scientific Lab ejecuta el mismo ejemplo con
-`ostrinc.wasm`. Esta evidencia no habilita todavía barras de error, intervalos de cobertura ni
-Monte Carlo.
+(`x - x = 0 ± 0`) y paridad intérprete/native. `examples/viz_bars.ostrin` añade una serie de
+cinco grupos y proyecta `values`/`uncertainties` hacia `std.viz.errorbars`, también con paridad
+intérprete/native y una figura SVG reproducible en la galería. El Scientific Lab ejecuta el
+ejemplo escalar con `ostrinc.wasm`. Esta evidencia no habilita todavía `Array<Measurement<T>>`,
+intervalos de cobertura ni Monte Carlo.
 
 ## 2. Revisión de antecedentes
 
@@ -187,7 +190,8 @@ tolerancia documentados.
 
 ### 6.4 Arrays y matrices
 
-`Array<Measurement<T>>` puede ser la primera superficie de arrays. La API debe ofrecer después:
+`Array<Measurement<T>>` puede ser la primera superficie de arrays. La API de series ya ofrece una
+proyección explícita para `List<Measurement<Float>>`; la API de arrays debe ofrecer después:
 
 - valores nominales;
 - incertidumbres por elemento;
@@ -280,9 +284,11 @@ de procedencia de [`23-motor-de-visualizacion.md`](23-motor-de-visualizacion.md)
    fuentes se combinan por etiqueta y conservan la correlación en intérprete/native/WASM.
 4. Integrar `Measurement<Quantity<Dim>>` y conversiones de unidades.
 5. Llevar la representación al HIR/IR y comprobar ownership en nativo.
-6. Añadir arrays, covarianza y salida de contribuciones.
+6. **En curso:** proyectar series escalares a valores e incertidumbres para error bars; añadir
+   después arrays, covarianza y salida de contribuciones.
 7. Añadir propagación Monte Carlo explícita y semilla reproducible.
-8. Integrar error bars/bands con procedencia en `std.viz`.
+8. **Parcial:** las series escalares proyectan incertidumbres estándar a `std.viz.errorbars`;
+   falta conectar `Quantity`, covarianza, bandas con nivel declarado y procedencia completa.
 9. Habilitar WASM y la galería únicamente cuando las tres rutas tengan paridad.
 
 ## 12. Evidencia y pruebas necesarias

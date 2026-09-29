@@ -26,4 +26,8 @@ fn main() -> Void {
         Ok(_) => print("empty source accepted"),
         Err(message) => print("empty source = " + message),
     }
+    match measurements.uncertainties([measurements.unknown(4.0, "series offline")]) {
+        Ok(_) => print("unknown series accepted"),
+        Err(message) => print("unknown series = " + message),
+    }
 }
