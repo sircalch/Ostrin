@@ -143,6 +143,43 @@ function applySourceParameters(source, parameters, values) {
   return text;
 }
 
+// A gallery URL identifies a real Ostrin program and the inputs that produced its current
+// frame.  This keeps a figure shareable without uploading source, data or rendered output.
+const VIZ_PARAMETER_NAMES = new Set((LAB?.gallery ?? []).flatMap((figure) => (figure.controls ?? []).map((parameter) => parameter.name)));
+
+function readVizState() {
+  const url = new URL(window.location.href);
+  const hashFigure = url.hash.startsWith("#viz-") ? url.hash.slice("#viz-".length) : "";
+  const requested = url.searchParams.get("figure") || hashFigure;
+  const figure = LAB.gallery.find((candidate) => candidate.id === requested);
+  if (!figure) return null;
+  const parameters = {};
+  for (const parameter of figure.controls ?? []) {
+    const raw = url.searchParams.get(parameter.name);
+    if (raw === null || !Number.isFinite(Number(raw))) continue;
+    parameters[parameter.name] = String(Math.max(parameter.min, Math.min(parameter.max, Number(raw))));
+  }
+  const readAngle = (name, min, max) => {
+    const raw = Number(url.searchParams.get(name));
+    return Number.isFinite(raw) ? Math.max(min, Math.min(max, raw)) : null;
+  };
+  return { figureId: figure.id, parameters, azimuth: readAngle("azimuth", -180, 180), elevation: readAngle("elevation", -80, 80) };
+}
+
+function writeVizState(figureId, parameters = {}, azimuth = null, elevation = null, mode = "replace") {
+  const url = new URL(window.location.href);
+  url.searchParams.set("figure", figureId);
+  for (const name of VIZ_PARAMETER_NAMES) url.searchParams.delete(name);
+  url.searchParams.delete("azimuth");
+  url.searchParams.delete("elevation");
+  for (const [name, value] of Object.entries(parameters)) url.searchParams.set(name, String(value));
+  if (azimuth !== null && azimuth !== undefined) url.searchParams.set("azimuth", String(azimuth));
+  if (elevation !== null && elevation !== undefined) url.searchParams.set("elevation", String(elevation));
+  url.hash = `viz-${figureId}`;
+  const method = mode === "push" ? "pushState" : "replaceState";
+  window.history[method]({ figure: figureId }, "", url.href);
+}
+
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -665,6 +702,7 @@ function explorer() {
   let legendItems = [];
   let crosshairEnabled = false;
   let crosshairOverlay = null;
+  let shareState = null;
   const render = () => {
     zoomLabel.textContent = `${zoom}%`;
     frame.srcdoc = `<!doctype html><meta charset="utf-8"><style>html,body{margin:0;background:#fff}body>svg{display:block;width:${zoom}%;height:auto}body>svg svg{display:block;width:auto;height:auto}[data-viz-index]{cursor:pointer}[data-viz-index]:focus{outline:2px solid #7c3aed;outline-offset:2px}.pt.viz-linked-selected{stroke:#7c3aed!important;stroke-width:3px!important;stroke-opacity:1!important}.table-row.viz-linked-selected .table-cell{stroke:#7c3aed;stroke-width:2}.table-row.viz-linked-selected .table-value{font-weight:700}.viz-contract-hover{filter:drop-shadow(0 0 3px #f59e0b)}.viz-contract-focus{filter:drop-shadow(0 0 3px #0ea5e9)}.viz-contract-selected{filter:drop-shadow(0 0 4px #db2777)}.table-row.viz-contract-hover .table-cell,.table-row.viz-contract-focus .table-cell,.table-row.viz-contract-selected .table-cell{stroke-width:2.5}.table-row.viz-contract-selected .table-value{font-weight:700}</style>${svg}`;
@@ -1174,6 +1212,21 @@ function explorer() {
     return node;
   };
   const exportStatus = el("span", { className: "viz-export-status", "aria-live": "polite", text: "" });
+  const shareStatus = el("span", { className: "viz-share-status", "aria-live": "polite", text: "" });
+  const syncShareState = (mode = "replace") => {
+    if (!shareState?.id) return;
+    writeVizState(shareState.id, sourceValues, cameraEnabled ? cameraAzimuth.value : null, cameraEnabled ? cameraElevation.value : null, mode);
+  };
+  const shareButton = button("Link", "Copy share link", async () => {
+    syncShareState("replace");
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("Clipboard API unavailable");
+      await navigator.clipboard.writeText(window.location.href);
+      shareStatus.textContent = "Link copied.";
+    } catch {
+      shareStatus.textContent = "Share URL ready — copy it from the address bar.";
+    }
+  });
   const exportSvgButton = button("SVG", "Download SVG", () => {
     downloadSvg(svg, heading.textContent);
     exportStatus.textContent = "SVG downloaded";
@@ -1209,9 +1262,14 @@ function explorer() {
       exportStatus.textContent = error.message ?? String(error);
     }
   });
-  const prepareSourceParameters = (parameters = []) => {
+  const prepareSourceParameters = (parameters = [], initialValues = {}) => {
     sourceControls = parameters;
-    sourceValues = Object.fromEntries(parameters.map((parameter) => [parameter.name, sourceParameterValue(cameraSource, parameter)]));
+    sourceValues = Object.fromEntries(parameters.map((parameter) => {
+      const fallback = sourceParameterValue(cameraSource, parameter);
+      const candidate = Number(initialValues[parameter.name]);
+      const value = Number.isFinite(candidate) ? Math.max(parameter.min, Math.min(parameter.max, candidate)) : Number(fallback);
+      return [parameter.name, String(value)];
+    }));
     parameterControls.replaceChildren(...parameters.map((parameter) => {
       const id = `viz-parameter-${parameter.name}`;
       const original = sourceParameterValue(cameraSource, parameter);
@@ -1229,6 +1287,7 @@ function explorer() {
       input.addEventListener("input", () => {
         sourceValues[parameter.name] = input.value;
         output.textContent = sourceParameterLiteral(input.value, original);
+        syncShareState("replace");
         scheduleCameraRender();
       });
       return el("label", { className: "viz-parameter-control", for: id }, [el("span", { text: parameter.label ?? parameter.name }), input, output]);
@@ -1247,7 +1306,9 @@ function explorer() {
         exportPngButton,
         exportPdfButton,
         exportHtmlButton,
+        shareButton,
         exportStatus,
+        shareStatus,
         button("Close", "Close the explorer", () => node.close()),
       ]),
     ]),
@@ -1317,12 +1378,13 @@ function explorer() {
     tableDirection.textContent = tableAscending ? "Ascending" : "Descending";
     applyTableState();
   });
-  cameraAzimuth.addEventListener("input", scheduleCameraRender);
-  cameraElevation.addEventListener("input", scheduleCameraRender);
+  cameraAzimuth.addEventListener("input", () => { syncShareState("replace"); scheduleCameraRender(); });
+  cameraElevation.addEventListener("input", () => { syncShareState("replace"); scheduleCameraRender(); });
   cameraTools.querySelector("[data-viz-camera-reset]").addEventListener("click", () => {
     const view = cameraSource.match(/\.view\s*\(\s*(-?(?:\d+\.?\d*|\.\d+))\s*,\s*(-?(?:\d+\.?\d*|\.\d+))\s*\)/);
     cameraAzimuth.value = view ? String(Math.round(Number(view[1]))) : "-55";
     cameraElevation.value = view ? String(Math.round(Number(view[2]))) : "28";
+    syncShareState("replace");
     scheduleCameraRender();
   });
   frame.addEventListener("load", () => {
@@ -1351,14 +1413,19 @@ function explorer() {
       zoom = 100;
       cameraSource = camera?.source ?? "";
       cameraEnabled = Boolean(camera?.camera);
-      prepareSourceParameters(camera?.controls ?? []);
+      shareState = camera?.id ? { id: camera.id, initial: camera.initialState ?? null } : null;
+      prepareSourceParameters(camera?.controls ?? [], camera?.initialState?.parameters ?? {});
       onCameraSvg = camera?.onSvg ?? null;
       cameraTools.hidden = !cameraEnabled;
       clearTimeout(cameraTimer);
       cameraQueued = false;
       const view = cameraSource.match(/\.view\s*\(\s*(-?(?:\d+\.?\d*|\.\d+))\s*,\s*(-?(?:\d+\.?\d*|\.\d+))\s*\)/);
-      cameraAzimuth.value = view ? String(Math.max(-180, Math.min(180, Math.round(Number(view[1]))))) : "-55";
-      cameraElevation.value = view ? String(Math.max(-80, Math.min(80, Math.round(Number(view[2]))))) : "28";
+      cameraAzimuth.value = camera?.initialState?.azimuth !== null && camera?.initialState?.azimuth !== undefined
+        ? String(camera.initialState.azimuth)
+        : (view ? String(Math.max(-180, Math.min(180, Math.round(Number(view[1]))))) : "-55");
+      cameraElevation.value = camera?.initialState?.elevation !== null && camera?.initialState?.elevation !== undefined
+        ? String(camera.initialState.elevation)
+        : (view ? String(Math.max(-80, Math.min(80, Math.round(Number(view[2]))))) : "28");
       cameraAzimuthLabel.textContent = `${cameraAzimuth.value}°`;
       cameraElevationLabel.textContent = `${cameraElevation.value}°`;
       cameraStatus.textContent = cameraEnabled ? "Adjust the camera; Ostrin will recompute the SVG." : "";
@@ -1380,6 +1447,8 @@ function explorer() {
       prepareAnimation();
       render();
       node.showModal();
+      syncShareState(camera?.initialState ? "replace" : "push");
+      if (camera?.initialState) scheduleCameraRender();
     },
   };
   return dialog;
@@ -1404,17 +1473,20 @@ function card(figure) {
   explore.addEventListener("click", async () => {
     const text = liveSvg ?? await fetch(figure.svg).then((response) => response.text());
     const is3d = figure.code.includes("viz.scene3d(");
-    const explorerConfig = (is3d || figure.controls?.length) ? {
+    const state = readVizState();
+    const explorerConfig = {
+      id: figure.id,
       source: figure.code,
       camera: is3d,
       controls: figure.controls ?? [],
+      initialState: state?.figureId === figure.id ? state : null,
       onSvg(nextSvg) {
         liveSvg = nextSvg;
         image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(nextSvg)}`;
         provenance.textContent = provenanceText(provenanceOf(nextSvg), "Source updated live");
         provenance.dataset.state = "live";
       },
-    } : null;
+    };
     explorer().open(figure.title, text, explorerConfig);
   });
   const code = el("details", { className: "viz-code" }, [
@@ -1453,8 +1525,10 @@ function card(figure) {
   });
 
   return {
+    id: figure.id,
     run,
     status,
+    explore,
     node: el("article", { className: "viz-card", id: `viz-${figure.id}` }, [
       el("a", { className: "viz-frame", href: figure.svg, "aria-label": `Open the ${figure.title} SVG` }, [image]),
       el("div", { className: "viz-body" }, [
@@ -1472,6 +1546,11 @@ function card(figure) {
 function mountGallery(root) {
   const cards = LAB.gallery.map(card);
   root.replaceChildren(...cards.map((item) => item.node));
+  const initial = readVizState();
+  if (initial) {
+    const target = cards.find((item) => item.id === initial.figureId);
+    if (target) queueMicrotask(() => target.explore.click());
+  }
   runtime().then(({ loadCompiler }) => loadCompiler()).then(
     () => cards.forEach(({ run, status }) => { run.disabled = false; status.textContent = ""; }),
     (error) => cards.forEach(({ status }) => { status.textContent = `compiler unavailable: ${error.message ?? error}`; }),

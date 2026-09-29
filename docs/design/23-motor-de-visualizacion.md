@@ -258,6 +258,24 @@ El contrato queda en `data-ostrin-bind="channel:event"` dentro del SVG y el expl
 elementos indexados de paneles anidados para `hover`, `focus` o `select`, manteniendo la salida de
 Ostrin como fuente de datos y dejando la interacción en el host web.
 
+El explorador de la galería usa el mismo contrato de estado para compartir una figura concreta:
+`?figure=<id>` identifica el programa, los nombres de los controles conservan sus valores y
+`azimuth`/`elevation` guardan la cámara 3D. El fragmento `#viz-<id>` permite enlazar directamente
+al experimento; al abrirlo, el navegador vuelve a ejecutar Ostrin en WASM para reconstruir la
+figura. La interfaz ofrece `Copy share link` y mantiene un fallback de barra de direcciones
+cuando la Clipboard API no está disponible.
+
+### 4.6.2 Estado compartible del Scientific Lab
+
+El Lab de la portada usa una URL como estado serializado del experimento. El parámetro `lab`
+identifica la demo, cada control numérico conserva su nombre (`waves`, `azimuth`, `rho`, etc.) y
+el fragmento `#lab-<id>` mantiene la navegación accesible hacia el panel. Los cambios de controles
+usan `replaceState` para no llenar el historial; cambiar de pestaña usa `pushState`, de modo que
+Atrás/Adelante restaura la selección y vuelve a aplicar los valores al código fuente mostrado.
+`Copy link` intenta la Clipboard API y deja la URL visible para copiarla manualmente cuando el
+navegador no concede permisos. No se suben fuentes, datos ni resultados a un servidor: al abrir
+el enlace, `ostrinc.wasm` vuelve a ejecutar el programa si el visitante pulsa **Run**.
+
 ## 4.7 Procedencia reproducible
 
 `Figure`, `Scene3D` y `Table` aceptan `.provenance(source_hash, data_hash, seed, compiler)`.

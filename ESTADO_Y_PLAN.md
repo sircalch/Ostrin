@@ -404,7 +404,10 @@ ante cualquier deriva; `website-check.mjs` valida evidencias, enlaces al reposit
 release. La documentación se separa en Learn, Reference, Guides, Examples y Cookbook.
 
 El sitio web y el playground real WASM ya están publicados; la primera base de descubrimiento
-añade SEO técnico, cifras centralizadas, una demo viva en la portada y enlaces compartibles.
+añade SEO técnico, cifras centralizadas, una demo viva en la portada y enlaces compartibles. El
+Scientific Lab ahora guarda en la URL la pestaña activa y sus parámetros numéricos: un enlace
+copiado puede reconstruir el mismo experimento sin servidor ni estado oculto, y el botón Atrás
+restaura la configuración anterior.
 El catálogo ya tiene demos live para cantidades, biblioteca estándar, records/enums y concurrencia,
 con Run/Check/Reset/Copy sobre el mismo módulo WASM. CI valida ahora enlaces, metadata, sitemap,
 robots, el artefacto WASM generado por Pages y la metadata generada de versión/métricas. `showcase.html` expone programas source-backed de

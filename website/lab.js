@@ -54,6 +54,40 @@ function applyParams(source, params, values) {
   return text;
 }
 
+// The Lab URL is a reproducible input to the demo, not just a navigation hint.  Keeping the
+// selected program and its source parameters in the address bar makes a result shareable in a
+// paper, issue or classroom without storing anything on a server.
+const LAB_PARAMETER_NAMES = new Set((LAB?.demos ?? []).flatMap((demo) => demo.params.map((param) => param.name)));
+
+function defaultDemoValues(demo) {
+  return Object.fromEntries(demo.params.map((param) => [param.name, initialValue(demo.files[demo.main], param)]));
+}
+
+function readLabState() {
+  const url = new URL(window.location.href);
+  const hashDemo = url.hash.startsWith("#lab-") ? url.hash.slice("#lab-".length) : "";
+  const requested = url.searchParams.get("lab") || hashDemo;
+  const demo = LAB.demos.find((candidate) => candidate.id === requested) ?? LAB.demos[0];
+  const values = defaultDemoValues(demo);
+  for (const param of demo.params) {
+    const raw = url.searchParams.get(param.name);
+    if (raw === null || !Number.isFinite(Number(raw))) continue;
+    const value = Number(raw);
+    values[param.name] = String(Math.max(param.min, Math.min(param.max, value)));
+  }
+  return { demoId: demo.id, values };
+}
+
+function writeLabState(demoId, values, mode = "replace") {
+  const url = new URL(window.location.href);
+  url.searchParams.set("lab", demoId);
+  for (const name of LAB_PARAMETER_NAMES) url.searchParams.delete(name);
+  for (const [name, value] of Object.entries(values)) url.searchParams.set(name, String(value));
+  url.hash = `lab-${demoId}`;
+  const method = mode === "push" ? "pushState" : "replaceState";
+  window.history[method]({ lab: demoId }, "", url.href);
+}
+
 // ---- output rendering -------------------------------------------------------------------------
 
 function splitSvg(lines) {
@@ -154,13 +188,15 @@ function codeBlock(text, label) {
 
 // ---- Scientific Lab ------------------------------------------------------------------------
 
-function buildDemoPanel(demo, index) {
-  const values = Object.fromEntries(demo.params.map((param) => [param.name, initialValue(demo.files[demo.main], param)]));
+function buildDemoPanel(demo, index, { initialValues = {}, onStateChange = () => {} } = {}) {
+  const values = { ...defaultDemoValues(demo), ...initialValues };
   const code = codeBlock(demo.files[demo.main], `Program file ${demo.source}`);
   const result = el("div", { className: "sl-result", "data-lab-result": demo.id, role: "status", "aria-live": "polite" });
   const provenance = el("p", { className: "sl-provenance", "data-lab-provenance": demo.id });
   const run = el("button", { type: "button", className: "button", "data-lab-run": demo.id, disabled: true, text: "Run" });
   const reset = el("button", { type: "button", className: "button-quiet", text: "Reset" });
+  const share = el("button", { type: "button", className: "button-quiet", "data-lab-share": demo.id, text: "Copy link" });
+  const shareStatus = el("span", { className: "sl-status", "aria-live": "polite" });
   const status = el("span", { className: "sl-status", text: "loading compiler…" });
 
   const packages = Object.keys(demo.files).filter((name) => name !== demo.main && name.endsWith(".ostrin"));
@@ -172,6 +208,7 @@ function buildDemoPanel(demo, index) {
       values[param.name] = input.value;
       output.textContent = literal(input.value, initialValue(demo.files[demo.main], param));
       refreshSource();
+      onStateChange(demo.id, values, "replace");
       scheduleRun();
     });
     return el("label", { className: "sl-param", for: id }, [el("span", { text: param.label }), input, output]);
@@ -187,6 +224,21 @@ function buildDemoPanel(demo, index) {
     renderResult(result, demo, demo.output, []);
     provenance.textContent = `Recorded output: ${demo.source} run by ostrinc ${LAB.compiler} (${LAB.recordedWith}) when the site was built. Press Run to recompute it in your browser.`;
     provenance.dataset.state = "recorded";
+  }
+
+  function setValues(nextValues, showRecordedOutput = true) {
+    clearTimeout(timer);
+    for (const param of demo.params) {
+      if (nextValues[param.name] !== undefined) values[param.name] = nextValues[param.name];
+    }
+    controls.forEach((label) => {
+      const input = label.querySelector("input");
+      const value = values[input.dataset.labParam];
+      input.value = Number(value);
+      label.querySelector("output").textContent = literal(value, initialValue(demo.files[demo.main], { name: input.dataset.labParam }));
+    });
+    refreshSource();
+    if (showRecordedOutput) showRecorded();
   }
 
   let timer;
@@ -223,16 +275,21 @@ function buildDemoPanel(demo, index) {
 
   run.addEventListener("click", execute);
   reset.addEventListener("click", () => {
-    for (const param of demo.params) values[param.name] = initialValue(demo.files[demo.main], param);
-    controls.forEach((label) => {
-      const input = label.querySelector("input");
-      input.value = Number(values[input.dataset.labParam]);
-      label.querySelector("output").textContent = values[input.dataset.labParam];
-    });
-    refreshSource();
-    showRecorded();
+    setValues(defaultDemoValues(demo));
+    onStateChange(demo.id, values, "replace");
     status.textContent = "";
   });
+  share.addEventListener("click", async () => {
+    onStateChange(demo.id, values, "replace");
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("Clipboard API unavailable");
+      await navigator.clipboard.writeText(window.location.href);
+      shareStatus.textContent = "Link copied.";
+    } catch {
+      shareStatus.textContent = "Share URL ready — copy it from the address bar.";
+    }
+  });
+  refreshSource();
   showRecorded();
 
   const panel = el("div", { className: "sl-panel", role: "tabpanel", id: `lab-panel-${demo.id}`, "aria-labelledby": `lab-tab-${demo.id}`, hidden: index !== 0 }, [
@@ -245,7 +302,7 @@ function buildDemoPanel(demo, index) {
         el("div", { className: "code-title" }, [el("span", { className: "mono", text: demo.source }), packages.length ? el("span", { className: "dim", text: `+ ${packages.join(", ")}` }) : null]),
         code,
         controls.length ? el("div", { className: "sl-params" }, controls) : null,
-        el("div", { className: "sl-actions" }, [run, reset, status]),
+        el("div", { className: "sl-actions" }, [run, reset, share, status, shareStatus]),
       ]),
       el("div", { className: "sl-out" }, [el("div", { className: "code-title" }, [el("span", { text: "result" })]), result, provenance]),
     ]),
@@ -256,21 +313,33 @@ function buildDemoPanel(demo, index) {
     ]),
     el("p", { className: "sl-limits" }, [el("strong", { text: "Current limits: " }), demo.limits]),
   ]);
-  return { panel, run };
+  return {
+    panel,
+    run,
+    getValues: () => ({ ...values }),
+    setValues,
+  };
 }
 
 function mountLab(root) {
   const tabs = el("div", { className: "sl-tabs", role: "tablist", "aria-label": "Scientific Lab demos" });
   const panels = el("div", { className: "sl-panels" });
   const runs = [];
+  const controllers = [];
+  const initialState = readLabState();
   const buttons = LAB.demos.map((demo, index) => {
     const button = el("button", { type: "button", role: "tab", id: `lab-tab-${demo.id}`, "aria-controls": `lab-panel-${demo.id}`, "aria-selected": String(index === 0), tabindex: index === 0 ? "0" : "-1", className: "sl-tab", text: demo.title });
-    const { panel, run } = buildDemoPanel(demo, index);
+    const controller = buildDemoPanel(demo, index, {
+      initialValues: demo.id === initialState.demoId ? initialState.values : undefined,
+      onStateChange: writeLabState,
+    });
+    const { panel, run } = controller;
     panels.append(panel);
     runs.push(run);
+    controllers.push(controller);
     return button;
   });
-  function select(index, focus) {
+  function select(index, focus, updateUrl = false, historyMode = "push") {
     buttons.forEach((button, current) => {
       const active = current === index;
       button.setAttribute("aria-selected", String(active));
@@ -278,21 +347,32 @@ function mountLab(root) {
       panels.children[current].hidden = !active;
     });
     if (focus) buttons[index].focus();
+    if (updateUrl) writeLabState(LAB.demos[index].id, controllers[index].getValues(), historyMode);
   }
   buttons.forEach((button, index) => {
-    button.addEventListener("click", () => select(index, false));
+    button.addEventListener("click", () => select(index, false, true));
     button.addEventListener("keydown", (event) => {
       const moves = { ArrowRight: 1, ArrowLeft: -1 };
       if (event.key in moves) {
         event.preventDefault();
-        select((index + moves[event.key] + buttons.length) % buttons.length, true);
+        select((index + moves[event.key] + buttons.length) % buttons.length, true, true);
       }
     });
   });
   tabs.append(...buttons);
   root.replaceChildren(tabs, panels);
-  const fromHash = LAB.demos.findIndex((demo) => location.hash === `#lab-${demo.id}`);
-  if (fromHash >= 0) select(fromHash, false);
+  const initialIndex = LAB.demos.findIndex((demo) => demo.id === initialState.demoId);
+  select(initialIndex >= 0 ? initialIndex : 0, false);
+
+  const applyUrlState = () => {
+    const state = readLabState();
+    const index = LAB.demos.findIndex((demo) => demo.id === state.demoId);
+    if (index < 0) return;
+    controllers[index].setValues(state.values);
+    select(index, false);
+  };
+  window.addEventListener("popstate", applyUrlState);
+  window.addEventListener("hashchange", applyUrlState);
 
   loadCompiler().then(
     () => runs.forEach((run) => {
