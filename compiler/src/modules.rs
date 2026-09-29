@@ -162,6 +162,7 @@ const STD_MODULES: &[(&str, &str)] = &[
     ("maps", include_str!("../std/maps.ostrin")),
     ("viz", include_str!("../std/viz.ostrin")),
     ("numeric", include_str!("../std/numeric.ostrin")),
+    ("measurements", include_str!("../std/measurements.ostrin")),
 ];
 
 fn std_module_source(file_path: &Path) -> Option<io::Result<String>> {

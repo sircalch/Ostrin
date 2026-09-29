@@ -1,0 +1,215 @@
+// std.measurements: experimental scalar measurements with explicit sensitivity sources.
+//
+// This is phase 1 of docs/design/25-mediciones-e-incertidumbre.md. It deliberately
+// exposes functions instead of operator overloading while the generic scientific
+// type contract is reviewed. Each standard measurement must name its independent
+// source; derived values retain the source coefficients so correlated cancellation
+// is exact when the same source is reused.
+
+pub record Sensitivity {
+    label: String
+    coefficient: Float
+    sigma: Float
+}
+
+pub record Measurement<T> {
+    value: T
+    sources: List<Sensitivity>
+    known: Bool
+    reason: String
+}
+
+pub fn exact(value: Float) -> Measurement<Float> {
+    Measurement {
+        value: value,
+        sources: [],
+        known: true,
+        reason: "",
+    }
+}
+
+pub fn standard(value: Float, sigma: Float, label: String) -> Result<Measurement<Float>, String> {
+    if sigma < 0.0 {
+        return Err("measurement sigma must be non-negative")
+    }
+    if label.length() == 0 {
+        return Err("measurement source label must not be empty")
+    }
+    Ok(Measurement {
+        value: value,
+        sources: [Sensitivity { label: label, coefficient: 1.0, sigma: sigma }],
+        known: true,
+        reason: "",
+    })
+}
+
+pub fn unknown(value: Float, reason: String) -> Measurement<Float> {
+    Measurement {
+        value: value,
+        sources: [],
+        known: false,
+        reason: reason,
+    }
+}
+
+pub fn value(measurement: Measurement<Float>) -> Float {
+    measurement.value
+}
+
+pub fn is_known(measurement: Measurement<Float>) -> Bool {
+    measurement.known
+}
+
+pub fn is_exact(measurement: Measurement<Float>) -> Bool {
+    measurement.known and measurement.sources.length() == 0
+}
+
+pub fn source_count(measurement: Measurement<Float>) -> Int {
+    measurement.sources.length()
+}
+
+pub fn uncertainty(measurement: Measurement<Float>) -> Result<Float, String> {
+    if not measurement.known {
+        return Err(measurement.reason)
+    }
+    variance(measurement.sources)
+}
+
+pub fn summary(measurement: Measurement<Float>) -> String {
+    if not measurement.known {
+        return "unknown: " + measurement.reason
+    }
+    match uncertainty(measurement) {
+        Ok(sigma) => measurement.value.to_string() + " ± " + sigma.to_string(),
+        Err(message) => "invalid: " + message,
+    }
+}
+
+fn variance(sources: List<Sensitivity>) -> Result<Float, String> {
+    mut total = 0.0
+    for source in sources {
+        if source.sigma < 0.0 {
+            return Err("measurement source sigma must be non-negative")
+        }
+        total = total + source.coefficient * source.coefficient * source.sigma * source.sigma
+    }
+    Ok(sqrt(total))
+}
+
+// Add a scaled sensitivity list, merging equal source labels. A label represents
+// one independent source and must keep one standard deviation throughout a graph.
+fn merge_scaled(result: List<Sensitivity>, input: List<Sensitivity>, factor: Float) -> Result<List<Sensitivity>, String> {
+    mut output: List<Sensitivity> = result
+    for item in input {
+        mut merged: List<Sensitivity> = []
+        mut found = false
+        for current in output {
+            if current.label == item.label {
+                if current.sigma != item.sigma {
+                    return Err("measurement source label was reused with a different sigma")
+                }
+                merged.push(Sensitivity {
+                    label: current.label,
+                    coefficient: current.coefficient + factor * item.coefficient,
+                    sigma: current.sigma,
+                })
+                found = true
+            } else {
+                merged.push(current)
+            }
+        }
+        if not found {
+            merged.push(Sensitivity {
+                label: item.label,
+                coefficient: factor * item.coefficient,
+                sigma: item.sigma,
+            })
+        }
+        output = merged
+    }
+    Ok(output)
+}
+
+fn unknown_from(operation: String, value: Float) -> Measurement<Float> {
+    unknown(value, operation + " received a measurement with unknown uncertainty")
+}
+
+pub fn scale(measurement: Measurement<Float>, factor: Float) -> Measurement<Float> {
+    if not measurement.known {
+        return unknown_from("scale", measurement.value * factor)
+    }
+    match merge_scaled([], measurement.sources, factor) {
+        Ok(sources) => Measurement {
+            value: measurement.value * factor,
+            sources: sources,
+            known: true,
+            reason: "",
+        },
+        Err(message) => unknown(measurement.value * factor, message),
+    }
+}
+
+pub fn add(a: Measurement<Float>, b: Measurement<Float>) -> Result<Measurement<Float>, String> {
+    if not a.known {
+        return Ok(unknown_from("add", a.value + b.value))
+    }
+    if not b.known {
+        return Ok(unknown_from("add", a.value + b.value))
+    }
+    match merge_scaled([], a.sources, 1.0) {
+        Ok(left) => match merge_scaled(left, b.sources, 1.0) {
+            Ok(sources) => Ok(Measurement { value: a.value + b.value, sources: sources, known: true, reason: "" }),
+            Err(message) => Err(message),
+        },
+        Err(message) => Err(message),
+    }
+}
+
+pub fn sub(a: Measurement<Float>, b: Measurement<Float>) -> Result<Measurement<Float>, String> {
+    if not a.known {
+        return Ok(unknown_from("sub", a.value - b.value))
+    }
+    if not b.known {
+        return Ok(unknown_from("sub", a.value - b.value))
+    }
+    match merge_scaled([], a.sources, 1.0) {
+        Ok(left) => match merge_scaled(left, b.sources, -1.0) {
+            Ok(sources) => Ok(Measurement { value: a.value - b.value, sources: sources, known: true, reason: "" }),
+            Err(message) => Err(message),
+        },
+        Err(message) => Err(message),
+    }
+}
+
+pub fn mul(a: Measurement<Float>, b: Measurement<Float>) -> Result<Measurement<Float>, String> {
+    result = a.value * b.value
+    if not a.known or not b.known {
+        return Ok(unknown_from("mul", result))
+    }
+    match merge_scaled([], a.sources, b.value) {
+        Ok(left) => match merge_scaled(left, b.sources, a.value) {
+            Ok(sources) => Ok(Measurement { value: result, sources: sources, known: true, reason: "" }),
+            Err(message) => Err(message),
+        },
+        Err(message) => Err(message),
+    }
+}
+
+pub fn div(a: Measurement<Float>, b: Measurement<Float>) -> Result<Measurement<Float>, String> {
+    if b.value == 0.0 {
+        return Err("measurement division by zero")
+    }
+    result = a.value / b.value
+    if not a.known or not b.known {
+        return Ok(unknown_from("div", result))
+    }
+    a_factor = 1.0 / b.value
+    b_factor = 0.0 - a.value / (b.value * b.value)
+    match merge_scaled([], a.sources, a_factor) {
+        Ok(left) => match merge_scaled(left, b.sources, b_factor) {
+            Ok(sources) => Ok(Measurement { value: result, sources: sources, known: true, reason: "" }),
+            Err(message) => Err(message),
+        },
+        Err(message) => Err(message),
+    }
+}

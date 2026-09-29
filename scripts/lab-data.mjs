@@ -146,6 +146,17 @@ export const LAB = [
     limits: "as converts to compound units (km/h, m/s^2), derived units print simplified (kg*m^2/s^2) Array<Quantity<D>> keeps one unit per array, and programs declare their own units with unit/dimension/define. Affine units (°C) are not supported yet.",
   },
   {
+    id: "measurements",
+    title: "Measurements",
+    headline: "Carry standard uncertainty and source correlation through scalar arithmetic.",
+    file: "examples/measurement_scalar.ostrin",
+    render: "text",
+    params: [],
+    how: "std.measurements keeps a value, explicit standard-deviation sources and an uncertainty-known state together. Reusing the same source preserves correlation (`x - x = 0 ± 0`); independent sources combine through the linearized variance rule. The browser runs the same module through ostrinc.wasm as the interpreter and native compiler.",
+    docs: { label: "measurement design", href: `${repository}/blob/main/docs/design/25-mediciones-e-incertidumbre.md` },
+    limits: "This first scalar API is experimental and function-based: Quantity integration, arrays, covariance blocks, Monte Carlo, coverage intervals and uncertainty-aware error bars remain planned. Unknown uncertainty propagates explicitly and is never treated as zero.",
+  },
+  {
     id: "data",
     title: "Data",
     headline: "Parse CSV and summarize each group.",
