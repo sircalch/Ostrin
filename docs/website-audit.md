@@ -12,7 +12,7 @@ tests or an explicitly labeled early-stage surface.
 | Homepage | `website/index.html`, `website/lab.js`, `website/lab-data.js`, `website/playground.js`, `website/assets/ostrin-social.png` | Hero with release status derived from `CHANGELOG.md`, twelve-demo Scientific Lab that recomputes repository programs (including scalar measurements) and the `plot`/`autodiff` lab projects with `ostrinc.wasm`, shareable URL state for the active demo and parameters, evidence-linked capability cards, a source → HIR → IR → C pipeline recorded from the compiler, and the real playground; all public pages share a 1200x630 social preview |
 | Cookbook | `website/cookbook.html`, `scripts/lab-data.mjs` | The Lab programs as recipes with source, recorded output, documentation links and stated limits |
 | Viz gallery | `website/viz.html`, `website/viz.js`, `website/lab-data.js` | Twenty-nine repository-backed figures with live WASM reruns, 2D/3D exploration, animation/table controls, exports and shareable URLs that restore parameters and camera state |
-| Guides | `website/guides.html` | Install, projects, testing, native, WASI, editor and site-evidence workflows; every command exists in `ostrinc --help` |
+| Guides | `website/guides.html` | Install, projects, testing, native, WASI, editor, experimental effect inventory and site-evidence workflows; every command exists in `ostrinc --help` |
 | Example catalogue | `website/examples.html` | Filterable repository catalogue plus live quantity, standard library, record/enum and concurrency programs |
 | Browser playground | `website/playground.html`, `website/playground.js`, `.github/workflows/pages.yml` | Generated `ostrinc.wasm`; Run, Check, Test, Format, share links and source diagnostics execute in an in-memory WASI filesystem and are exercised in Chromium before CI passes or Pages uploads |
 | Learn and Reference | `website/docs.html`, `website/reference.html`, `website/language.html`, `docs/design/` | Guided 14-step learning path; Reference indexes all 26 design documents and the CLI flags, checked against `ostrinc --help` |
@@ -27,7 +27,7 @@ tests or an explicitly labeled early-stage surface.
 - **265** `.ostrin` source files under `examples/`, including package-project sources and
   intentional error cases.
 - **26** Markdown design documents under `docs/design/`.
-- Compiler suite: **244 integration**, **6 differential** and **2 unit** tests.
+- Compiler suite: **245 integration**, **6 differential** and **2 unit** tests.
 - WASI release smoke matrix: nine program modules covering the hello program, a local-path
   package, arguments/environment, file I/O, managed ownership and nested `Option`/`Result`
   consumers; compiler and program modules

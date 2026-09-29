@@ -1,6 +1,8 @@
 # 26 — Efectos científicos, determinismo y procedencia
 
-**Estado:** propuesta de diseño; no modifica la sintaxis estable ni añade capacidades de runtime por sí sola.
+**Estado:** propuesta de diseño con inventario experimental; `ostrinc --effect-report` ya expone
+evidencia sintáctica conservadora, pero todavía no modifica la sintaxis estable ni añade filas de
+efectos al HIR.
 
 **Fecha:** 2026-09-29
 
@@ -286,7 +288,8 @@ en una consola de logs.
 ## 13. Plan de implementación
 
 1. **Inventario (sin sintaxis nueva):** clasificar builtins, módulos, ejemplos y fronteras FFI por efecto;
-   añadir una tabla interna solo para diagnósticos.
+   `ostrinc --effect-report` ya registra sitios conocidos en texto o JSON, con una advertencia explícita
+   de que el resultado es conservador y no es una garantía estática.
 2. **Representación interna:** definir nombres, argumentos y uniones de filas; publicar errores estables
    para llamadas puras incompatibles.
 3. **HIR/IR:** propagar `pure`, `random(seed)`, `io`, `network`, `concurrency`, `provenance` y

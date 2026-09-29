@@ -78,8 +78,9 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    `std.measurements` con `Quantity<T>`, arrays y covarianza antes de añadir Monte Carlo,
    intervalos de cobertura, error bars o semántica de operadores.
 8. **Diseñar efectos científicos y procedencia**: convertir la propuesta de [documento 26](docs/design/26-efectos-cientificos.md)
-   en un inventario interno de efectos, capacidades explícitas, niveles R0–R3 y un artefacto JSON
-   reproducible antes de fijar sintaxis pública.
+   en un sistema de efectos interno con capacidades explícitas, niveles R0–R3 y un artefacto JSON
+   reproducible antes de fijar sintaxis pública. El primer inventario experimental ya está disponible
+   con `ostrinc --effect-report`; aún no es checking estático.
 
 ## Horizonte posterior
 
