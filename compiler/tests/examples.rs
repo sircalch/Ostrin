@@ -4755,7 +4755,7 @@ fn native_ir_string_methods_cross_block_ownership_and_short_circuit() {
     for (file, expected, minimum_ir) in [
         (
             "native_ir_string_methods.ostrin",
-            "OSTRIN!\nmixed\na+b+c\n0\n30\n5\ntrue\n4\n2\n",
+            "OSTRIN!\nmixed\na+b+c\n0\n30\n5\ntrue\n4\n2\ns\nstr\n115\n",
             3usize,
         ),
         (

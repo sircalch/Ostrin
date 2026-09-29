@@ -23,4 +23,7 @@ fn main() -> Void {
     print("file.ostrin".ends_with(".ostrin"))
     print("a,b,,c".split(",").length())
     print("l1\nl2\r\n".lines().length())
+    print("Ostrin".char_at(1))
+    print("Ostrin".slice(1, 4))
+    print("Ostrin".char_at(1).codepoint().unwrap())
 }

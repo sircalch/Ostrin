@@ -828,6 +828,13 @@ fn parse_float_result_code(receiver: &str) -> String {
         + "; int __ostrin_check = ostrin_s_float_check(__ostrin_text); if (__ostrin_check == 1) { __ostrin_result.error = \"cannot parse float from empty string\"; } else if (__ostrin_check == 2) { __ostrin_result.error = \"invalid float literal\"; } else { __ostrin_result.ok = true; __ostrin_result.value = strtod(__ostrin_text, NULL); } __ostrin_result; })"
 }
 
+fn codepoint_result_code(receiver: &str) -> String {
+    "({ Result_Int_String __ostrin_result; memset(&__ostrin_result, 0, sizeof __ostrin_result); const char* __ostrin_text = "
+        .to_string()
+        + receiver
+        + "; int64_t __ostrin_point = ostrin_s_codepoint(__ostrin_text); if (__ostrin_point < 0) { __ostrin_result.error = \"codepoint expects exactly one character\"; } else { __ostrin_result.ok = true; __ostrin_result.value = __ostrin_point; } __ostrin_result; })"
+}
+
 fn read_file_result_code(path: &str) -> String {
     format!(
         "({{ OstrinFileOutcome __ostrin_outcome = ostrin_file_read_cancelable({path}); Result_String_String __ostrin_result; memset(&__ostrin_result, 0, sizeof __ostrin_result); if (__ostrin_outcome.ok) {{ __ostrin_result.ok = true; __ostrin_result.value = ostrin_s_dup(__ostrin_outcome.value, strlen(__ostrin_outcome.value)); }} else {{ __ostrin_result.error = ostrin_s_dup(__ostrin_outcome.error, strlen(__ostrin_outcome.error)); }} ostrin_file_outcome_dispose(&__ostrin_outcome); __ostrin_result; }})",
@@ -1474,15 +1481,37 @@ fn emit_instruction(
                     _ => return Err(()),
                 },
                 Ty::String => {
-                    let string_args = args
+                    let codes = args
                         .iter()
-                        .map(|arg| {
-                            (value_ty(values, *arg) == Ok(Ty::String))
-                                .then(|| value_code(values, *arg))
-                        })
-                        .collect::<Option<Bail<Vec<_>>>>()
-                        .ok_or(())??;
-                    match (method.as_str(), string_args.as_slice(), ty) {
+                        .map(|arg| value_code(values, *arg))
+                        .collect::<Bail<Vec<_>>>()?;
+                    if method == "char_at"
+                        && args.len() == 1
+                        && value_ty(values, args[0])? == Ty::Int
+                        && *ty == Ty::String
+                    {
+                        format!("ostrin_s_char_at({receiver}, {})", codes[0])
+                    } else if method == "slice"
+                        && args.len() == 2
+                        && args.iter().all(|arg| value_ty(values, *arg) == Ok(Ty::Int))
+                        && *ty == Ty::String
+                    {
+                        format!("ostrin_s_slice({receiver}, {}, {})", codes[0], codes[1])
+                    } else if method == "codepoint"
+                        && args.is_empty()
+                        && *ty == Ty::Applied("Result".to_string(), vec![Ty::Int, Ty::String])
+                    {
+                        codepoint_result_code(&receiver)
+                    } else {
+                        let string_args = args
+                            .iter()
+                            .map(|arg| {
+                                (value_ty(values, *arg) == Ok(Ty::String))
+                                    .then(|| value_code(values, *arg))
+                            })
+                            .collect::<Option<Bail<Vec<_>>>>()
+                            .ok_or(())??;
+                        match (method.as_str(), string_args.as_slice(), ty) {
                         ("length", [], Ty::Int) => format!("ostrin_s_length({receiver})"),
                         ("is_empty", [], Ty::Bool) => format!("(*({receiver}) == 0)"),
                         ("trim", [], Ty::String) => format!("ostrin_s_trim({receiver})"),
@@ -1503,6 +1532,7 @@ fn emit_instruction(
                         ("to_float", [], Ty::Applied(name, args))
                             if name == "Result" && args == &vec![Ty::Float, Ty::String] => parse_float_result_code(&receiver),
                         _ => return Err(()),
+                    }
                     }
                 }
                 Ty::List(element) if list_supported(&element, records) => {

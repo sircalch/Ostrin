@@ -9,6 +9,13 @@
   repository check and a negative fixture test; upstream submission remains gated on independent
   public usage evidence.
 
+### Native IR: string indexing and codepoints
+- `String.char_at`, `String.slice` and `String.codepoint` now lower through the ownership-aware
+  IR/C emitter. Their existing runtime bounds and single-codepoint diagnostics remain intact;
+  the native example exercises chaining through `codepoint().unwrap()` with zero live allocations.
+- The ownership pass recognizes these methods as safe receiver transfer points. The differential
+  ratchet moves to **5,037 IR / 286 HIR / 1,181 AST fallbacks** across 205 measured source modules.
+
 ### Native IR: scalar formatting
 - Numeric scalar `to_string()` methods now lower through IR/C for `Int`, `Float`, `Float32` and
   fixed-width integers. `std.numeric.secant` and `std.numeric.newton` therefore keep their
