@@ -230,7 +230,8 @@ The design is documented in [`docs/design/`](docs/design/), including:
 - concurrency;
 - memory model;
 - derive and dynamic traits;
-- packages and the consolidated language reference.
+- packages and the consolidated language reference;
+- the proposed Measurement<T> and uncertainty model.
 
 The project website is published at [sircalch.github.io/Ostrin](https://sircalch.github.io/Ostrin/)
 when GitHub Pages is enabled.

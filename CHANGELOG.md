@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Measurement and uncertainty design
+
+- Added a prior-art-reviewed design proposal for `Measurement<T>`, standard uncertainty, correlated
+  sources, Quantity integration, reproducible propagation and future uncertainty-aware figures.
+  The document is explicitly a proposal; no unimplemented semantics are advertised as available.
+
 ### Cross-browser web smoke coverage
 
 - The website verification action now installs Chromium, Firefox and WebKit. The full compiler and

@@ -9,7 +9,7 @@ CodeQL, sanitizers nativos y cobertura quedan registrados para el ciclo P5.
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
 Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–266); para el diseño
-del lenguaje, `docs/design/` (24 documentos). La auditoría del sitio vive en
+del lenguaje, `docs/design/` (25 documentos). La auditoría del sitio vive en
 `docs/website-audit.md`.
 
 ## 0. Estado de un vistazo
