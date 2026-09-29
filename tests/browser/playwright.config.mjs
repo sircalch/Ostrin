@@ -15,11 +15,27 @@ export default defineConfig({
   outputDir: path.join(os.tmpdir(), "ostrin-playwright-results"),
   use: {
     baseURL,
-    browserName: "chromium",
     headless: true,
     screenshot: "only-on-failure",
     trace: "retain-on-failure",
   },
+  projects: [
+    {
+      name: "chromium",
+      testMatch: "website.spec.mjs",
+      use: { browserName: "chromium" },
+    },
+    {
+      name: "firefox-smoke",
+      testMatch: "cross-browser.spec.mjs",
+      use: { browserName: "firefox" },
+    },
+    {
+      name: "webkit-smoke",
+      testMatch: "cross-browser.spec.mjs",
+      use: { browserName: "webkit" },
+    },
+  ],
   webServer: {
     command: "node server.mjs",
     url: baseURL,

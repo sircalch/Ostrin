@@ -71,7 +71,8 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    El Scientific Lab ya conserva la demo activa y sus parámetros en la URL para compartir y
    restaurar experimentos reproducibles desde el navegador. La navegación compacta y el catálogo
    de ejemplos ya tienen estados ARIA, foco de teclado, Escape, pestañas con flechas/Home/End y
-   filtros anunciados; quedan auditorías más amplias con lectores de pantalla, Firefox/WebKit y
+   filtros anunciados; Chromium cubre los flujos completos y Firefox/WebKit ya recorren las catorce
+   páginas públicas con una matriz de humo; quedan auditorías más amplias con lectores de pantalla y
    baselines visuales.
 
 ## Horizonte posterior

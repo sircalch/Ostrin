@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Cross-browser web smoke coverage
+
+- The website verification action now installs Chromium, Firefox and WebKit. The full compiler and
+  visualization suite remains on Chromium, while a Firefox/WebKit smoke matrix checks all public
+  pages, responsive overflow and keyboard navigation semantics.
+
 ### Web accessibility controls
 - The shared site navigation now exposes `aria-controls`, a stateful accessible name, keyboard
   focus restoration and Escape-to-close behavior on compact layouts.

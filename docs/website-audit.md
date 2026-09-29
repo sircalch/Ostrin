@@ -27,7 +27,7 @@ tests or an explicitly labeled early-stage surface.
 - **264** `.ostrin` source files under `examples/`, including package-project sources and
   intentional error cases.
 - **24** Markdown design documents under `docs/design/`.
-- Compiler suite: **241 integration**, **6 differential** and **2 unit** tests.
+- Compiler suite: **243 integration**, **6 differential** and **2 unit** tests.
 - WASI release smoke matrix: nine program modules covering the hello program, a local-path
   package, arguments/environment, file I/O, managed ownership and nested `Option`/`Result`
   consumers; compiler and program modules
@@ -53,10 +53,10 @@ fail before publication.
   release; installer scripts require a maintainer-published matching tag.
 - Some compiler/runtime and scientific-library capabilities remain explicitly early or incomplete;
   the site should preserve those maturity labels and avoid implying production readiness.
-- Chromium regression coverage now checks all fourteen pages at phone/tablet widths, mobile/tablet
-  navigation, keyboard Escape recovery, filter and tab semantics, the real compiler output and a
-  real diagnostic. Firefox/WebKit behavior, broader screen-reader checks and visual baselines are
-  not covered yet.
+- Chromium regression coverage checks the full compiler, playground, Lab and Viz flows. A Firefox and
+  WebKit smoke matrix now checks all fourteen pages at phone/desktop widths, mobile navigation,
+  keyboard Escape recovery, filter and tab semantics, overflow and page errors. Broader screen-reader
+  checks and visual baselines remain outside the automated gate.
 - Keep external services, analytics and community-channel claims out of the site until they have a
   real operational contract and explicit review.
 
