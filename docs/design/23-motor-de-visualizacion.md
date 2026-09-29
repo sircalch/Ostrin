@@ -18,7 +18,7 @@ sobre la que crecerán la interacción, la animación y los backends acelerados:
    marca añade un `Series` a su lista. Renderizar es una función pura de ese valor (`fig.svg()`).
 4. **Unidades en los ejes.** Los datos con cantidades físicas etiquetan sus ejes con la unidad que
    llevan (`speed [km/h]`); convertir los datos convierte el eje.
-5. **Límites declarados.** Lo que no existe (MP4, WebGPU) se dice en la
+5. **Límites declarados.** WebGPU y los codecs que el navegador no exponga se dicen en la
    web y aquí; nada se simula con JavaScript.
 
 ## 2. Arquitectura
@@ -135,14 +135,17 @@ pausa la animación y `prefers-reduced-motion` muestra solo el primer fotograma.
 Por qué CSS para la reproducción por defecto: CSS se ejecuta también en un `<img>` y el SVG sigue
 siendo determinista byte a byte en intérprete, nativo y WASM. El explorador web ofrece play, pause,
 reinicio, una barra temporal, control de velocidad, reproducción por uno o varios ciclos y exportación
-WebM del número de ciclos elegido al abrir una figura animada; esos controles actúan sobre la copia del
+WebM o MP4 del número de ciclos elegido cuando el navegador expone el códec correspondiente a través
+de `MediaRecorder`; esos controles actúan sobre la copia del
 SVG dentro del iframe y no cambian el programa Ostrin. La
 exportación rasteriza
 los fotogramas en un canvas y usa `MediaRecorder`, por lo que depende del soporte del navegador.
 Coste: el tamaño crece linealmente con los fotogramas (24 fotogramas 2D ≈ 270 kB). El explorador
 puede descargar el SVG completo y rasterizar el instante actual a PNG 2× (también un fotograma elegido
-con la línea temporal). MP4 y calidad configurable siguen pendientes; PDF usa la impresión nativa del
-navegador para conservar el vector sin introducir un conversor binario en el runtime.
+con la línea temporal). MP4 no se anuncia cuando el navegador no expone un codificador compatible;
+no se suben datos a un servidor ni se introduce un conversor binario en el runtime. La calidad
+configurable ya se aplica a WebM/GIF y también a MP4 cuando está disponible; PDF usa la impresión
+nativa del navegador para conservar el vector.
 
 ## 4.2 Cortes ortogonales de volúmenes
 
@@ -325,18 +328,19 @@ la falta de literales científicos (`1e-9`). Ver `CONTEXTO_PROYECTO.md` §270–
 | 0.2 (parcial, hecho) | inspección de datos con una retícula (`crosshair`) superpuesta a las marcas SVG y lectura de sus tooltips, activable con teclado y respetando el aislamiento del iframe |
 | 0.3 (parcial, hecho) | animación en bucle con `viz.animate`: fotogramas generados por Ostrin, reproducidos con CSS dentro del SVG |
 | 0.3 (hecho) | movimiento continuo con SMIL: `animate`, `moving_point` con estela, `rod`, `moving_segment`, `morph`; `no_axes` |
-| 0.3 (parcial, hecho) | controles web de play/pausa/reinicio, posición temporal, velocidad, ciclos finitos y exportación WebM cuando el navegador ofrece `MediaRecorder` |
+| 0.3 (parcial, hecho) | controles web de play/pausa/reinicio, posición temporal, velocidad, ciclos finitos y exportación WebM/MP4 cuando el navegador ofrece `MediaRecorder` y el códec correspondiente |
 | 0.3 (hecho) | descarga del SVG producido y exportación PNG 2× del fotograma actual desde el explorador web |
 | 0.4 (hecho) | vista de impresión PDF con fotograma vectorial, tamaño de página y procedencia; el diálogo nativo permite guardar el PDF |
 | 0.4 (hecho) | exportación GIF con fotogramas cuantizados, compresión LZW y comentario de procedencia |
 | 0.4 (hecho) | exportación HTML autocontenida del fotograma SVG con procedencia, zoom, desplazamiento y crosshair |
 | 0.4 (hecho) | calidad 1×/2× para exportación WebM/GIF, con canvas de alta resolución, nombres explícitos y estado verificable |
+| 0.4 (hecho) | detección de códec MP4/H.264 en el navegador, botón accesible y extensión `.mp4` solo cuando `MediaRecorder` puede producirla |
 | 0.3 (hecho) | tablas SVG reproducibles con filas alternadas, encabezados, tooltips por celda, tema oscuro y explorador web con filtro/ordenamiento (`viz.table`) |
 | 0.4 (parcial, hecho) | campos vectoriales 3D muestreados con flechas, profundidad y tooltips |
 | 0.4 (parcial, hecho) | explorador web con acimut/elevación que vuelve a ejecutar `.view(...)` en WASM |
 | 0.4 (parcial, hecho) | cortes XY/XZ/YZ e isosuperficies de `Array<Float>` 3D, celdas/triángulos coloreados, tooltips y barra de escala; cámaras ortográficas interactivas |
 | 0.4 | render de volúmenes completos, isosuperficies y cámaras en perspectiva |
-| 0.5 | backend WebGPU sobre la misma lista de series; MP4 y calidad configurable |
+| 0.5 | backend WebGPU sobre la misma lista de series; mayor calidad y codecs de vídeo adicionales cuando el navegador los exponga |
 | 0.5 (hecho) | figuras, tablas y escenas con procedencia (`source-hash`, `data-hash`, `seed`, `compiler`) embebida en SVG y mostrada en la galería |
 | — | gráficas con incertidumbre cuando exista `Measurement<T>` |
 

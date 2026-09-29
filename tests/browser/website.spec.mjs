@@ -368,6 +368,13 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   await page.getByRole("button", { name: "Close" }).click();
   await page.locator('[data-viz-explore="animation"]').click();
   await expect(page.locator(".viz-animation-tools")).toBeVisible();
+  const mp4Button = page.locator("[data-viz-mp4-export]");
+  await expect(mp4Button).toHaveCount(1);
+  if (await mp4Button.isDisabled()) {
+    await expect(mp4Button).toHaveAttribute("title", /does not expose an MP4 MediaRecorder codec/);
+  } else {
+    await expect(mp4Button).not.toHaveAttribute("title", /does not expose an MP4 MediaRecorder codec/);
+  }
   await page.getByRole("button", { name: "Pause" }).click();
   await page.locator("[data-viz-loop]").selectOption("1");
   await expect(page.locator("[data-viz-loop]")).toHaveValue("1");

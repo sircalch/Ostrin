@@ -63,7 +63,7 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
 6. **Continuar el frente profesional de visualización y web**: ampliar `std.viz` con
    campos vectoriales 2D (`quiver` y `streamplot`), gráficas estadísticas (incluidos violines KDE y hexbin), bandas de contorno rellenas y consolidar la selección enlazada, mantener tablas reproducibles con filtro y
    ordenamiento en el explorador, conservar ejemplos verificables en la galería, ampliar animaciones,
-   vídeo, controles temporales, calidad 1×/2×, interruptores de series desde la leyenda, crosshair de inspección y parámetros conducidos por Ostrin, consolidar la exportación SVG/PNG/HTML/WebM/GIF, mantener el flujo PDF vectorial y añadir exportación MP4, exploración 3D (ya incluye superficies,
+   vídeo, controles temporales, calidad 1×/2×, interruptores de series desde la leyenda, crosshair de inspección y parámetros conducidos por Ostrin, consolidar la exportación SVG/PNG/HTML/WebM/GIF, mantener el flujo PDF vectorial y ofrecer MP4 cuando el navegador exponga un códec compatible, exploración 3D (ya incluye superficies,
    campos vectoriales, cámara, cortes ortogonales e isosuperficies de volúmenes), WebGPU y ampliar la procedencia reproducible ya disponible
    (hashes de fuente/datos, semilla y compilador) a informes y flujos de publicación con
    evidencia en intérprete, nativo y WASM.
@@ -74,7 +74,7 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
 
 - Unidades afines y prefijos automáticos.
 - Autodiff inverso, más álgebra lineal y métodos numéricos.
-- Exportación MP4; los contratos de eventos ricos ya están disponibles con `.bind(channel, event)` para enlazar marcas indexadas entre figuras, y la exportación HTML autocontenida, los controles numéricos declarativos conducidos por Ostrin, SVG/PNG/WebM/GIF y el flujo PDF vectorial con metadata de procedencia ya tienen ruta web.
+- Mayor calidad de vídeo y codecs adicionales; los contratos de eventos ricos ya están disponibles con `.bind(channel, event)` para enlazar marcas indexadas entre figuras, y la exportación HTML autocontenida, los controles numéricos declarativos conducidos por Ostrin, SVG/PNG/WebM/GIF, MP4 cuando existe el codec y el flujo PDF vectorial con metadata de procedencia ya tienen ruta web.
 - FFI C, registry público y canales de distribución adicionales.
 - Reconocimiento de Ostrin en GitHub Linguist y aparición de `.ostrin` en el mapa de lenguajes.
 - GPU/WebGPU después de estabilizar Array, IR y ownership.
