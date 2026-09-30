@@ -7,7 +7,8 @@ export const REPOSITORY = "sircalch/Ostrin";
 export const EXTENSION = ".ostrin";
 export const USAGE_THRESHOLD = 2_000;
 // The repository is excluded explicitly. The report never scans examples/ or counts local files.
-export const QUERY = `extension:ostrin -repo:${REPOSITORY}`;
+// Exclude forks explicitly so the snapshot matches the Linguist contribution gate.
+export const QUERY = `NOT is:fork extension:ostrin -repo:${REPOSITORY}`;
 export const API_ENDPOINT = `search/code?q=${encodeURIComponent(QUERY)}`;
 export const SEARCH_URL = `https://github.com/search?q=${encodeURIComponent(QUERY)}&type=code`;
 

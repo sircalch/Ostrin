@@ -11,14 +11,14 @@ reconozca `.ostrin` como lenguaje.
 
 | Campo | Resultado |
 | --- | --- |
-| Consulta | [`extension:ostrin -repo:sircalch/Ostrin`](https://github.com/search?q=extension%3Aostrin%20-repo%3Asircalch%2FOstrin&type=code) |
+| Consulta | [`NOT is:fork extension:ostrin -repo:sircalch/Ostrin`](https://github.com/search?q=NOT%20is%3Afork%20extension%3Aostrin%20-repo%3Asircalch%2FOstrin&type=code) |
 | Archivos públicos `.ostrin` indexados | **0** |
 | Umbral de Linguist para una extensión común | **2.000** archivos en el último año |
 | Distribución entre repositorios y usuarios | Pendiente de revisión manual |
 | Propuesta upstream | **No lista para abrirse** |
 
-Los **266** archivos `.ostrin` del repositorio propio son muestras de sintaxis y
-capacidad del lenguaje. No se suman a esta evidencia de uso público. Mientras el
+Los **282** archivos `.ostrin` rastreados en el repositorio propio (**266** bajo `examples/`)
+son muestras de sintaxis y capacidad del lenguaje. No se suman a esta evidencia de uso público. Mientras el
 contador sea 0 no se debe abrir un PR en Linguist ni presentar el mapa de lenguajes
 como si ya incluyera Ostrin.
 
@@ -36,7 +36,7 @@ node scripts/linguist-usage-report.mjs --json --output .tmp/linguist-usage.json
 La consulta se ejecuta explícitamente como:
 
 ```text
-gh api search/code?q=extension%3Aostrin%20-repo%3Asircalch%2FOstrin
+gh api --method GET search/code -f q='NOT is:fork extension:ostrin -repo:sircalch/Ostrin'
 ```
 
 El script falla si `gh` no está instalado, si no existe una sesión autenticada, si
