@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Native HIR: nested list payload ownership
+
+- `List<Option<String>>` now retains and releases the active `String` payload in
+  the generated list helpers.
+- HIR tracks managed references nested inside `Option` and `Result` values and
+  releases owned temporaries passed to `List.push` and list literals.
+- Added interpreter/native/WASI parity and native leak-check coverage; the
+  compiler suite now has **257 integration tests**.
+
 ### Web: featured scientific workflows
 
 - Added three metadata-driven paths to the Viz page: simulate a system, analyze data and explore
