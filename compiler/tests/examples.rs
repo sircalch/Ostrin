@@ -9638,6 +9638,12 @@ fn viz_histograms_render_bins_and_use_numeric_ir() {
         "histogram did not use the visualization IR path: {}",
         stdout(&report)
     );
+    assert!(
+        stdout(&report).contains("native-source: examples/viz_histogram.ostrin ir=1 hir=0 ast=0")
+            && stdout(&report).contains("ast-fallback: 0"),
+        "histogram entry point did not use the numeric IR path: {}",
+        stdout(&report)
+    );
 
     let exe = temp_artifact("viz_histogram_ir.exe");
     let compiled = run(&[
@@ -9664,6 +9670,89 @@ fn viz_histograms_render_bins_and_use_numeric_ir() {
     assert!(
         String::from_utf8_lossy(&native.stderr).contains("live_allocations="),
         "histogram leak-check did not report allocations: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn normal_distribution_pdf_and_cdf_use_numeric_ir_for_scalar_and_arrays() {
+    let file = temp_source(
+        "native_ir_normal_distribution.ostrin",
+        r#"
+fn main() -> Void {
+    print(norm_pdf(0.0, 0.0, 1.0))
+    print(norm_cdf(0.0, 0.0, 1.0))
+    xs = array([-1.0, 0.0, 1.0])
+    print(norm_pdf(xs, 0.0, 1.0))
+    print(norm_cdf(xs, 0.0, 1.0))
+}
+"#,
+    );
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "normal distribution interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    let expected = stdout(&interpreted).replace("\r\n", "\n");
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "normal distribution type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("ir-generated: 1")
+            && report_text.contains("hir-generated: 0")
+            && report_text.contains("ast-fallback: 0")
+            && report_text.contains("divergences: 0"),
+        "normal distribution did not stay on the IR path: {report_text}"
+    );
+
+    let wasm = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasm.status.success(),
+        "normal distribution WASI emission failed: {}",
+        stderr(&wasm)
+    );
+    let wasm_c = stdout(&wasm);
+    assert!(
+        wasm_c.contains("Array_Float_norm_map") && wasm_c.contains("ostrin_dm_norm_cdf"),
+        "WASI C emission omitted normal distribution helpers"
+    );
+
+    let exe = temp_artifact("native_ir_normal_distribution.exe");
+    let compiled = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compiled) {
+        let _ = fs::remove_file(&file);
+        return;
+    }
+    assert!(
+        compiled.status.success(),
+        "normal distribution leak-check compile failed: {}",
+        stderr(&compiled)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run normal distribution leak-check binary");
+    let _ = fs::remove_file(&exe);
+    let _ = fs::remove_file(&file);
+    assert!(
+        native.status.success(),
+        "normal distribution leak-check run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected,
+        "normal distribution output differs between interpreter and native"
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations="),
+        "normal distribution leak-check did not report allocations: {}",
         String::from_utf8_lossy(&native.stderr)
     );
 }

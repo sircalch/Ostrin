@@ -2838,6 +2838,30 @@ fn emit_instruction(
                 && *ty == Ty::Applied("Array".to_string(), vec![Ty::Int])
             {
                 "Array_Float_histogram(".to_string() + &codes.join(", ") + ")"
+            } else if matches!(callee.as_str(), "norm_pdf" | "norm_cdf")
+                && args.len() == 3
+                && value_ty(values, args[1])? == Ty::Float
+                && value_ty(values, args[2])? == Ty::Float
+            {
+                let cdf = if callee == "norm_cdf" { 1 } else { 0 };
+                let x_ty = value_ty(values, args[0])?;
+                match x_ty {
+                    Ty::Float if *ty == Ty::Float => format!(
+                        "({{ double __ostrin_norm_sigma = {}; if (!(__ostrin_norm_sigma > 0.0)) OSTRIN_FAIL(\"the normal distribution needs sigma > 0\"); ostrin_dm_{}({}, {}, __ostrin_norm_sigma); }})",
+                        codes[2], callee, codes[0], codes[1]
+                    ),
+                    Ty::Applied(name, element)
+                        if name == "Array"
+                            && element.as_slice() == [Ty::Float]
+                            && *ty == Ty::Applied("Array".to_string(), vec![Ty::Float]) =>
+                    {
+                        format!(
+                            "Array_Float_norm_map({}, {}, {}, {})",
+                            codes[0], codes[1], codes[2], cdf
+                        )
+                    }
+                    _ => return Err(()),
+                }
             } else if callee == "linspace"
                 && args.len() == 3
                 && value_ty(values, args[0])? == Ty::Float

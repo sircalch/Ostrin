@@ -56,7 +56,7 @@ esa ABI, mientras los scopes anidados y escapes complejos siguen en fallback.*
 | `TypedProgram.literal_kinds` | `typeck` | Tipo elegido para cada literal numérico |
 | `NativeTypeReport` | `codegen` | Detecta divergencias checker↔backend (0 hoy, en ~1 350 expresiones) |
 | `IrProgram` / `IrFunction` / `IrBlock` | `ir.rs` | Primera CFG con temporales explícitos, terminadores y verificador de destinos |
-| Emisor IR | `ir_c.rs` | Genera C desde SSA/CFG para funciones escalares, rangos enteros direccionales, `String` (incluidos `char_at`, `slice` y `codepoint`), `hash(String)` y otros hashes escalares estables, conversiones numéricas comprobadas a `Int` y enteros de ancho fijo, constructores 1D–3D, parámetros, indexación y métodos de arrays numéricos escalares, builtins científicos `histogram`, `linspace` y `pow`, `parse_csv` con ownership de `List<List<String>>`, `read_file`/`write_file` (`Result<String,String>`/`Result<Void,String>`), records concretos y records genéricos monomorfizados, iteradores de records concretos y genéricos monomorfizados mediante métodos registrados, canales (`send`/`close`/`receive`), `Option<Record>`, `List<T>` escalar (incluido `List<String>.join`), operaciones hash escalares de `Map`/`Set`, wrappers sobre `List`/`Map`/`Set` y wrappers `Option`/`Result` anidados con `match`, `Option<T>` escalar/`String` con `Some`/`None`, `try catch` con handlers globales, aliases locales sin entorno y handlers locales capturados compatibles, cierres capturados con entorno tipado y destructor, llamadas indirectas, ramas, bucles, `phi` y enteros de ancho fijo comprobados; emite ownership para las familias migradas y deja fallback seguro para lo demás |
+| Emisor IR | `ir_c.rs` | Genera C desde SSA/CFG para funciones escalares, rangos enteros direccionales, `String` (incluidos `char_at`, `slice` y `codepoint`), `hash(String)` y otros hashes escalares estables, conversiones numéricas comprobadas a `Int` y enteros de ancho fijo, constructores 1D–3D, parámetros, indexación y métodos de arrays numéricos escalares, builtins científicos `histogram`, `linspace`, `pow`, `norm_pdf` y `norm_cdf`, `parse_csv` con ownership de `List<List<String>>`, `read_file`/`write_file` (`Result<String,String>`/`Result<Void,String>`), records concretos y records genéricos monomorfizados, iteradores de records concretos y genéricos monomorfizados mediante métodos registrados, canales (`send`/`close`/`receive`), `Option<Record>`, `List<T>` escalar (incluido `List<String>.join`), operaciones hash escalares de `Map`/`Set`, wrappers sobre `List`/`Map`/`Set` y wrappers `Option`/`Result` anidados con `match`, `Option<T>` escalar/`String` con `Some`/`None`, `try catch` con handlers globales, aliases locales sin entorno y handlers locales capturados compatibles, cierres capturados con entorno tipado y destructor, llamadas indirectas, ramas, bucles, `phi` y enteros de ancho fijo comprobados; emite ownership para las familias migradas y deja fallback seguro para lo demás |
 | Intérprete como oráculo | `interpreter` | Semántica de referencia; pruebas diferenciales automáticas |
 
 Por tanto el backend **ya no infiere solo**: la reinferencia que queda (`bind_type`, `expected`, `settle_literal`) es respaldo verificado.
@@ -114,8 +114,8 @@ Sobre este IR se hacen los análisis que el texto C no permite:
    `--native-type-report` publica también `ir-generated`, `hir-generated` y `ast-fallback`.
    El mismo informe agrupa esas cifras por archivo fuente con líneas `native-source`, y la
    prueba diferencial comprueba que la suma por módulo coincide con los totales globales.
-   La prueba diferencial conserva el baseline actual de fallback (81 funciones AST, con
-   6 447 funciones IR y 21 HIR agregadas sobre los ejemplos); el incremento acotado incluye
+   La prueba diferencial conserva el baseline actual de fallback (80 funciones AST, con
+   6 448 funciones IR y 21 HIR agregadas sobre los ejemplos); el incremento acotado incluye
    también `Rng` (constructor, métodos escalares, muestreo de arrays y permutación), con
    liberación gestionada y paridad intérprete/nativo. Los combinadores de listas (`map`, `filter`,
    `fold`, `any`, `all`, `find`) aceptan cierres IR con capturas. Los iteradores genéricos
@@ -130,7 +130,7 @@ Sobre este IR se hacen los análisis que el texto C no permite:
    permite bajar cadenas de construcción de `Figure`, `Table` y `Scene3D` sin una lista manual
    de nombres; `viz_hexbin` es la regresión representativa con `ast=0`.
    La preparación numérica de histogramas y violines ya atraviesa IR/C mediante `histogram`,
-   `linspace` y `pow`, `std.viz::uid` usa `hash(String)` en IR/C y `std.viz::render` recorre
+   `linspace`, `pow`, `norm_pdf` y `norm_cdf`, `std.viz::uid` usa `hash(String)` en IR/C y `std.viz::render` recorre
    explícitamente sus series. HIR sustituye `Self` por el propietario concreto en las firmas de
    métodos de traits, por lo que los operadores de `Complex` también cruzan IR/C; las
    instanciaciones genéricas de trazado con `Quantity` ya cruzan IR/C,

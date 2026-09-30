@@ -10,10 +10,19 @@
   be released after any method call without a method-name allow-list.
 - Visualization builder chains (`Figure`, `Table` and `Scene3D`) therefore
   stay on the ownership-aware IR/C path. Interpreter/native output remains
-  identical; the verified ratchet moves to **6,447 IR / 21 HIR / 81 AST
+  identical; the verified ratchet moves to **6,448 IR / 21 HIR / 80 AST
   fallbacks** across the measured examples.
 - `viz_hexbin.ostrin` now asserts that its entry point is IR-generated, and
   the visualization suite keeps interpreter/native parity coverage.
+
+### Native IR: normal distribution numerics
+
+- `norm_pdf` and `norm_cdf` now lower through IR/C for scalar `Float` and
+  `Array<Float>` inputs, reusing the deterministic runtime helpers and the
+  array map implementation with checked `sigma > 0` validation.
+- `viz_histogram.ostrin` now has no AST fallback at its entry point. The
+  scalar/array PDF and CDF paths have interpreter/native/WASI parity and
+  leak-check coverage.
 
 ### Native IR: DataFrame error paths and correlation
 
