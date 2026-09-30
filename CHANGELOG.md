@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Native IR: trait defaults and quantity-array ownership
+
+- Default method bodies from traits now lower once per concrete implementation,
+  removing nine AST fallbacks while preserving checker node identity and
+  interpreter/native parity. The verified ratchet is **6,459 IR / 21 HIR / 69
+  AST fallbacks** across the measured examples.
+- Compound unit labels created for `Array<Quantity<D>>` are now owned by the
+  array runtime and borrowed by slices. Native leak-check coverage confirms
+  `m/s` labels are released exactly once.
+
 ### Native IR: nested numeric array lists
 
 - `List<Array<Int|Float|Float32|Bool>>` now uses the generated pointer-backed
@@ -9,8 +19,8 @@
   them from the list destructor.
 - `viz_orbits.ostrin` now lowers `orbit` and `main` through IR/C with
   interpreter/native/WASI parity and `live_allocations=0` under the native
-  leak check. The verified ratchet moves to **6,450 IR / 21 HIR / 78 AST
-  fallbacks** across the measured examples.
+  leak check. The prior ratchet was **6,450 IR / 21 HIR / 78 AST fallbacks**;
+  the current trait-default pass is tracked above.
 
 ### Native IR: borrowed method ownership
 

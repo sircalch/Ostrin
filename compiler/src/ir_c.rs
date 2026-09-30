@@ -1100,7 +1100,7 @@ fn quantity_array_binary_code(
                 )
             } else {
                 format!(
-                    "({{ double __ostrin_qa_scale; const char* __ostrin_qa_unit = ostrin_unit_combine({left_unit}, {right_unit}, {}, &__ostrin_qa_scale); Array_Float* __ostrin_qa_product = {product}; if (__ostrin_qa_scale != 1.0) ostrin_qa_scale(__ostrin_qa_product, __ostrin_qa_scale); ostrin_qa_tag(__ostrin_qa_product, __ostrin_qa_unit); __ostrin_qa_product; }})",
+                    "({{ double __ostrin_qa_scale; const char* __ostrin_qa_unit = ostrin_unit_combine({left_unit}, {right_unit}, {}, &__ostrin_qa_scale); Array_Float* __ostrin_qa_product = {product}; if (__ostrin_qa_scale != 1.0) ostrin_qa_scale(__ostrin_qa_product, __ostrin_qa_scale); ostrin_qa_tag_owned(__ostrin_qa_product, __ostrin_qa_unit); __ostrin_qa_product; }})",
                     i32::from(divide)
                 )
             };
@@ -1156,7 +1156,7 @@ fn quantity_array_binary_code(
             }
             let body = if divide {
                 format!(
-                    "({{ double __ostrin_qa_scale; const char* __ostrin_qa_unit = ostrin_unit_combine(\"\", {right_unit}, 1, &__ostrin_qa_scale); Array_Float* __ostrin_qa_product = {product}; if (__ostrin_qa_scale != 1.0) ostrin_qa_scale(__ostrin_qa_product, __ostrin_qa_scale); ostrin_qa_tag(__ostrin_qa_product, __ostrin_qa_unit); __ostrin_qa_product; }})"
+                    "({{ double __ostrin_qa_scale; const char* __ostrin_qa_unit = ostrin_unit_combine(\"\", {right_unit}, 1, &__ostrin_qa_scale); Array_Float* __ostrin_qa_product = {product}; if (__ostrin_qa_scale != 1.0) ostrin_qa_scale(__ostrin_qa_product, __ostrin_qa_scale); ostrin_qa_tag_owned(__ostrin_qa_product, __ostrin_qa_unit); __ostrin_qa_product; }})"
                 )
             } else {
                 format!("ostrin_qa_tag({product}, {right_unit})")

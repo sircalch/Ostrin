@@ -689,18 +689,21 @@ pub fn lower<'a>(items: &'a [Item], typed: &'a TypedProgram) -> HirProgram {
     let signatures = &signatures;
     let mut functions = Vec::new();
     let lower_fn = |name: String,
-                    f: &FunctionDecl,
-                    extra_generics: &[GenericParam],
+                    params: &[Param],
+                    generics: &[GenericParam],
+                    return_type: &Type,
+                    body: &Block,
+                    source_file: Option<String>,
                     self_ty: Ty,
                     owner_type: Option<&Type>| {
         let mut lowerer = Lowerer {
             typed,
             signatures,
-            file: f.source_file.clone(),
+            file: source_file.clone(),
             scopes: vec![HashSet::new()],
             local_types: Default::default(),
         };
-        for p in &f.params {
+        for p in params {
             lowerer.declare(&p.name);
             let ty = if p.name == "self" {
                 self_ty.clone()
@@ -709,16 +712,11 @@ pub fn lower<'a>(items: &'a [Item], typed: &'a TypedProgram) -> HirProgram {
             };
             lowerer.local_types.insert(p.name.clone(), ty);
         }
-        let body = lowerer.block(&f.body);
+        let body = lowerer.block(body);
         HirFunction {
             name,
-            generics: extra_generics
-                .iter()
-                .chain(&f.generics)
-                .map(|g| g.name.clone())
-                .collect(),
-            params: f
-                .params
+            generics: generics.iter().map(|g| g.name.clone()).collect(),
+            params: params
                 .iter()
                 .map(|p| {
                     (
@@ -731,16 +729,23 @@ pub fn lower<'a>(items: &'a [Item], typed: &'a TypedProgram) -> HirProgram {
                     )
                 })
                 .collect(),
-            ret: resolve_declared_type(&f.return_type, owner_type),
+            ret: resolve_declared_type(return_type, owner_type),
             body,
-            source_file: f.source_file.clone(),
+            source_file,
         }
     };
     for item in items {
         match item {
-            Item::Function(f) => {
-                functions.push(lower_fn(f.name.clone(), f, &[], Ty::Unknown, None))
-            }
+            Item::Function(f) => functions.push(lower_fn(
+                f.name.clone(),
+                &f.params,
+                &f.generics,
+                &f.return_type,
+                &f.body,
+                f.source_file.clone(),
+                Ty::Unknown,
+                None,
+            )),
             Item::Impl(im) => {
                 let owner_type = Type::Named(im.type_name.clone(), im.type_args.clone());
                 let self_ty = if im.type_args.is_empty() {
@@ -755,13 +760,59 @@ pub fn lower<'a>(items: &'a [Item], typed: &'a TypedProgram) -> HirProgram {
                     )
                 };
                 for m in &im.methods {
+                    let generics = im
+                        .generics
+                        .iter()
+                        .chain(&m.generics)
+                        .cloned()
+                        .collect::<Vec<_>>();
                     functions.push(lower_fn(
                         impl_method_name(im, &m.name),
-                        m,
-                        &im.generics,
+                        &m.params,
+                        &generics,
+                        &m.return_type,
+                        &m.body,
+                        m.source_file.clone(),
                         self_ty.clone(),
                         Some(&owner_type),
                     ));
+                }
+
+                // Trait default bodies are compiled once per concrete impl,
+                // just like the native backend's synthesized declarations.
+                // Borrow the original body so the checker node-type table
+                // remains keyed by the same AST nodes it validated.
+                if let Some(trait_name) = &im.trait_name {
+                    if let Some(Item::Trait(trait_decl)) = items
+                        .iter()
+                        .find(|item| matches!(item, Item::Trait(decl) if &decl.name == trait_name))
+                    {
+                        for method in &trait_decl.methods {
+                            let Some(body) = method.default_body.as_ref() else {
+                                continue;
+                            };
+                            if im.methods.iter().any(|decl| decl.name == method.name) {
+                                continue;
+                            }
+                            let generics = trait_decl
+                                .generics
+                                .iter()
+                                .chain(&im.generics)
+                                .chain(&method.generics)
+                                .cloned()
+                                .collect::<Vec<_>>();
+                            functions.push(lower_fn(
+                                impl_method_name(im, &method.name),
+                                &method.params,
+                                &generics,
+                                &method.return_type,
+                                body,
+                                None,
+                                self_ty.clone(),
+                                Some(&owner_type),
+                            ));
+                        }
+                    }
                 }
             }
             _ => {}

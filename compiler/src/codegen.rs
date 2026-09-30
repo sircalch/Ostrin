@@ -513,7 +513,24 @@ const QTY_RUNTIME: &str = include_str!("qty_runtime.c");
 /// `Array<Quantity<D>>` helpers (`Array_Float` plus a unit), mirroring `interpreter/qarray.rs`.
 const QUANTITY_ARRAY_RUNTIME: &str = "\
 /* Array<Quantity<D>>: an Array_Float whose `unit` names the unit of its numbers. */
-static Array_Float* ostrin_qa_tag(Array_Float* a, const char* unit) { a->unit = unit; return a; }
+/* Borrow an existing unit label. String literals are not registered, while
+ * dynamically combined labels gain one reference for the new array. */
+static Array_Float* ostrin_qa_tag(Array_Float* a, const char* unit) {
+    if (a->unit != unit) {
+        ostrin_release((void*)a->unit);
+        if (unit) ostrin_retain((void*)unit);
+        a->unit = unit;
+    }
+    return a;
+}
+/* Transfer the caller's reference for a freshly allocated unit expression. */
+static Array_Float* ostrin_qa_tag_owned(Array_Float* a, const char* unit) {
+    if (a->unit != unit) {
+        ostrin_release((void*)a->unit);
+        a->unit = unit;
+    }
+    return a;
+}
 static Array_Float* ostrin_qa_copy(Array_Float* a) {
     Array_Float* r = Array_Float_alloc(a->rank, a->shape);
     memcpy(r->data, a->data, sizeof(double) * (size_t)a->size);
@@ -6059,7 +6076,7 @@ impl<'a> Codegen<'a> {
                             )
                         } else {
                             format!(
-                                "({{ double __s; const char* __u = ostrin_unit_combine({ua}, {ub}, {}, &__s); Array_Float* __p = {product}; if (__s != 1.0) ostrin_qa_scale(__p, __s); ostrin_qa_tag(__p, __u); }})",
+                                "({{ double __s; const char* __u = ostrin_unit_combine({ua}, {ub}, {}, &__s); Array_Float* __p = {product}; if (__s != 1.0) ostrin_qa_scale(__p, __s); ostrin_qa_tag_owned(__p, __u); }})",
                                 i32::from(divide)
                             )
                         };
@@ -6084,7 +6101,7 @@ impl<'a> Codegen<'a> {
                         let product = num(&a, a_arr, &b, b_arr, false, code);
                         let db = db.expect("unit implies dimension");
                         if divide {
-                            let body = format!("({{ double __s; const char* __u = ostrin_unit_combine(\"\", {ub}, 1, &__s); Array_Float* __p = {product}; if (__s != 1.0) ostrin_qa_scale(__p, __s); ostrin_qa_tag(__p, __u); }})");
+                            let body = format!("({{ double __s; const char* __u = ostrin_unit_combine(\"\", {ub}, 1, &__s); Array_Float* __p = {product}; if (__s != 1.0) ostrin_qa_scale(__p, __s); ostrin_qa_tag_owned(__p, __u); }})");
                             Ok((
                                 wrap(body, None),
                                 array_of(CType::Quantity(crate::types::dim_pow(&db, -1))),

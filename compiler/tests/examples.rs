@@ -7443,6 +7443,25 @@ fn native_backend_quantities_match_the_interpreter() {
 }
 
 #[test]
+fn native_trait_defaults_are_lowered_to_ir() {
+    let report = run(&[
+        "--native-type-report",
+        &example_path("native_trait_defaults.ostrin"),
+    ]);
+    assert!(
+        report.status.success(),
+        "trait-default report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text
+            .contains("native-source: examples/native_trait_defaults.ostrin ir=4 hir=0 ast=2"),
+        "trait defaults regressed to the legacy backend: {report_text}"
+    );
+}
+
+#[test]
 fn native_ir_emitter_handles_scalar_quantities() {
     let file = temp_source(
         "native-ir-quantities.ostrin",
@@ -7495,6 +7514,65 @@ fn native_ir_emitter_handles_scalar_quantities() {
     assert!(
         String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
         "quantity IR path leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn native_quantity_array_compound_units_release_owned_labels() {
+    // Array<Quantity<D>> stores one shared unit label. A result such as
+    // `m/s` comes from unit_combine and must be owned by the array, while a
+    // slice borrows that same label. The native path must retain/release both
+    // references without leaking or freeing the label twice.
+    let file = temp_source(
+        "native-quantity-array-unit-ownership.ostrin",
+        "fn main() -> Void {\n    _base = linspace(0.0, 1.0, 3)\n    distances = array([1 m, 2 m, 3 m])\n    speeds = distances / (1 s)\n    sliced = speeds[0 until 2]\n    print(sliced)\n}\n",
+    );
+    let expected = "[1, 2] m/s\n";
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    if skip_if_no_c_compiler(&report) {
+        let _ = fs::remove_file(&file);
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "native report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ir-generated: 1"), "{report_text}");
+    assert!(report_text.contains("hir-generated: 0"), "{report_text}");
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+
+    let exe = temp_artifact("native-quantity-array-unit-ownership.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run quantity-array ownership binary");
+    let _ = fs::remove_file(&exe);
+    let _ = fs::remove_file(&file);
+    assert!(native.status.success(), "native binary failed");
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "quantity-array unit ownership leaked: {}",
         String::from_utf8_lossy(&native.stderr)
     );
 }
