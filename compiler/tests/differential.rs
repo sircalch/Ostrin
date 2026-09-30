@@ -474,7 +474,8 @@ fn native_backend_types_agree_with_the_checker() {
     // through the same IR/C path. HIR now
     // substitutes the concrete owner for `Self` in trait method signatures,
     // allowing Complex arithmetic/equality to use IR/C. The verified baseline is
-    // 63 AST fallbacks (6,465 IR and 21 HIR functions). Trait default methods
+    // 62 AST fallbacks (6,466 IR and 21 HIR functions). Numeric array selection
+    // (`a[mask]`, `where`, `not`) now follows the same typed IR/C path. Trait default methods
     // now lower once per concrete impl through the same typed IR path, while
     // compound quantity-array labels have explicit ownership in the native
     // runtime. The experimental
@@ -497,7 +498,7 @@ fn native_backend_types_agree_with_the_checker() {
     // three test helpers in both `testing.ostrin` and `testing_failure.ostrin`.
     // This removes six more fallback functions while preserving their exact
     // failure messages and leak-check behavior.
-    const MAX_AST_FALLBACK_FUNCTIONS: usize = 63;
+    const MAX_AST_FALLBACK_FUNCTIONS: usize = 62;
     assert!(
         ast_fallback <= MAX_AST_FALLBACK_FUNCTIONS,
         "AST fallback grew to {ast_fallback} functions (ratchet limit {MAX_AST_FALLBACK_FUNCTIONS})"

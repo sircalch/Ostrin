@@ -6,7 +6,7 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
 ## Siguiente ciclo
 
 1. Reducir el fallback AST con el trinquete por archivo de `--native-type-report` (baseline actual:
-   6.465 funciones IR, 21 HIR y 63 AST). Los métodos de records y enums concretos ya comparten
+   6.466 funciones IR, 21 HIR y 62 AST). Los métodos de records y enums concretos ya comparten
    la ruta IR/C cuando sus campos y ownership son compatibles; los records recursivos permanecen
    deliberadamente en HIR/AST hasta cerrar ese contrato. El puente IR para los constructores numéricos
    `zeros`/`ones`, `norm`, `abs` escalar y `sqrt` migró 348 funciones compartidas por la suite;
@@ -18,6 +18,10 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    `norm_cdf`, y los ids
    deterministas de `std.viz::uid` usan `hash(String)` en IR/C y el renderer usa un recorrido IR
    explícito sobre sus series.
+   La selección numérica `a[mask]`, `where(mask, a, b)`, `not` sobre `Array<Bool>` y los
+   cortes `to`/`until` ya usan los kernels IR/C para `Int`, `Float`, `Float32` y `Bool`, con
+   temporales escalares de `where` liberados dentro del C generado; Quantity queda fuera de
+   esta pasada.
    El builtin `format` para `String` y `List<String>` ya cruza IR/C y `std.strings::format_text`
    dejó el fallback AST. `std.numeric.Complex` ya tiene una API experimental de `Float64` y una demo live; sus métodos de
    trait con `Self` se sustituyen en HIR y ya bajan a IR/C; `ComplexVector`

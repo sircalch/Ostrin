@@ -450,10 +450,12 @@ pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
                 if let Some((value, _)) =
                     alias_destination(instruction).filter(|(_, ty)| requires_management(ty))
                 {
-                    retain_after
-                        .entry((block.id, index + 1))
-                        .or_default()
-                        .push(value);
+                    if !is_fresh_array_mask_index(instruction, &definitions) {
+                        retain_after
+                            .entry((block.id, index + 1))
+                            .or_default()
+                            .push(value);
+                    }
                 }
             }
         }
@@ -1145,6 +1147,42 @@ fn alias_destination(instruction: &IrInstr) -> Option<(ValueId, Ty)> {
         | IrInstr::TryErrorValue { dst, ty, .. } => Some((*dst, ty.clone())),
         _ => None,
     }
+}
+
+/// Array mask indexing allocates a new dense array. It is represented by the
+/// same `Index` instruction as borrowed list/field indexing, but unlike those
+/// operations the result already owns its first reference and must not be
+/// retained again before returning from a function.
+fn is_fresh_array_mask_index(
+    instruction: &IrInstr,
+    definitions: &HashMap<ValueId, (Ty, usize, usize)>,
+) -> bool {
+    let IrInstr::Index {
+        object, index, ty, ..
+    } = instruction
+    else {
+        return false;
+    };
+    let Some((object_ty, _, _)) = definitions.get(object) else {
+        return false;
+    };
+    let Some((index_ty, _, _)) = definitions.get(index) else {
+        return false;
+    };
+    object_ty == ty
+        && matches!(
+            object_ty,
+            Ty::Applied(name, args) if name == "Array" && args.len() == 1
+        )
+        && matches!(
+            object_ty,
+            Ty::Applied(_, args)
+                if matches!(args.as_slice(), [Ty::Int | Ty::Float | Ty::Float32 | Ty::Bool])
+        )
+        && matches!(
+            index_ty,
+            Ty::Applied(name, args) if name == "Array" && args.as_slice() == [Ty::Bool]
+        )
 }
 
 fn analyze_function(function: &crate::ir::IrFunction, report: &mut OwnershipReport) {

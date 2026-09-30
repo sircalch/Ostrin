@@ -1457,6 +1457,19 @@ fn emit_instruction(
             operand,
             ty,
         } => {
+            if *op == UnaryOp::Not
+                && matches!(array_element(ty), Some(Ty::Bool))
+                && value_ty(values, *operand)? == *ty
+                && array_supported(ty)
+            {
+                let array_c_name = array_name(ty).ok_or(())?;
+                out.push_str(&format!(
+                    "    {} = {array_c_name}_not({});\n",
+                    value_name(*dst),
+                    value_code(values, *operand)?
+                ));
+                return Ok(());
+            }
             if *op == UnaryOp::Neg
                 && matches!(array_element(ty), Some(Ty::Quantity(_)))
                 && value_ty(values, *operand)? == *ty
@@ -1958,6 +1971,26 @@ fn emit_instruction(
                     let list_name = format!("List_{}", mangle_option_payload(&element, records));
                     out.push_str(&format!(
                         "    {} = {list_name}_get({object_code}, {index_code});\n",
+                        value_name(*dst)
+                    ));
+                }
+                Ty::Applied(name, args)
+                    if name == "Array"
+                        && args.len() == 1
+                        && array_supported(&Ty::Applied(name.clone(), args.clone()))
+                        && *ty == Ty::Applied(name.clone(), args.clone())
+                        && matches!(value_ty(values, *index)?, Ty::Applied(mask_name, mask_args) if mask_name == "Array" && mask_args.as_slice() == [Ty::Bool]) =>
+                {
+                    // `a[mask]` is a dense selection. Quantity arrays keep
+                    // their established HIR path until unit-aware mask
+                    // ownership is made explicit; scalar numeric and boolean
+                    // arrays share one generated runtime kernel.
+                    if matches!(args[0], Ty::Quantity(_)) {
+                        return Err(());
+                    }
+                    let array_c_name = array_name(&Ty::Applied(name, args.clone())).ok_or(())?;
+                    out.push_str(&format!(
+                        "    {} = {array_c_name}_mask({object_code}, {index_code});\n",
                         value_name(*dst)
                     ));
                 }
@@ -2805,6 +2838,88 @@ fn emit_instruction(
                     };
                     format!("{array_c_name}_from{depth}({})", codes[0])
                 }
+            } else if callee == "where" && args.len() == 3 {
+                let mask_ty = Ty::Applied("Array".to_string(), vec![Ty::Bool]);
+                let Ty::Applied(result_name, result_args) = ty else {
+                    return Err(());
+                };
+                if result_name != "Array" || result_args.len() != 1 {
+                    return Err(());
+                }
+                let element = result_args[0].clone();
+                if !matches!(element, Ty::Int | Ty::Float | Ty::Float32 | Ty::Bool) {
+                    return Err(());
+                }
+                if value_ty(values, args[0])? != mask_ty {
+                    return Err(());
+                }
+                let result_ty = Ty::Applied("Array".to_string(), vec![element.clone()]);
+                if *ty != result_ty || !array_supported(&result_ty) {
+                    return Err(());
+                }
+                let scalar_or_array = |value: ValueId| {
+                    let value_ty = value_ty(values, value)?;
+                    if value_ty == result_ty {
+                        Ok(true)
+                    } else if value_ty == element {
+                        Ok(false)
+                    } else {
+                        Err(())
+                    }
+                };
+                let left_is_array = scalar_or_array(args[1])?;
+                let right_is_array = scalar_or_array(args[2])?;
+                let array_c_name = array_name(&result_ty).ok_or(())?;
+                let operand = |value: ValueId, is_array: bool, slot: &str| {
+                    let code = value_code(values, value)?;
+                    if is_array {
+                        Ok((code, String::new()))
+                    } else {
+                        let temp = format!("__ostrin_where_{slot}");
+                        Ok((format!("{array_c_name}_from_scalar({code})"), temp))
+                    }
+                };
+                let (left, left_temp) = operand(args[1], left_is_array, "left")?;
+                let (right, right_temp) = operand(args[2], right_is_array, "right")?;
+                let mask = codes[0].clone();
+                let code = if left_is_array && right_is_array {
+                    format!("{array_c_name}_where({mask}, {left}, {right})")
+                } else {
+                    let left_setup = if left_is_array {
+                        String::new()
+                    } else {
+                        format!("{array_c_name}* {left_temp} = {left}; ")
+                    };
+                    let right_setup = if right_is_array {
+                        String::new()
+                    } else {
+                        format!("{array_c_name}* {right_temp} = {right}; ")
+                    };
+                    let left_arg = if left_is_array {
+                        left
+                    } else {
+                        left_temp.clone()
+                    };
+                    let right_arg = if right_is_array {
+                        right
+                    } else {
+                        right_temp.clone()
+                    };
+                    let left_release = if left_is_array {
+                        String::new()
+                    } else {
+                        format!("ostrin_release((void*){left_temp}); ")
+                    };
+                    let right_release = if right_is_array {
+                        String::new()
+                    } else {
+                        format!("ostrin_release((void*){right_temp}); ")
+                    };
+                    format!(
+                        "({{ {left_setup}{right_setup}{array_c_name}* __ostrin_where_result = {array_c_name}_where({mask}, {left_arg}, {right_arg}); {left_release}{right_release}__ostrin_where_result; }})"
+                    )
+                };
+                code
             } else if callee == "parse_csv"
                 && args.len() == 1
                 && value_ty(values, args[0])? == Ty::String
