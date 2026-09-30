@@ -51,6 +51,17 @@ fn main() -&gt; Void {
     print(fig.svg())   // axes: "time [s]" and "speed [km/h]"
 }</code></pre></div>
       </section>
+      <section class="section shell viz-workflows" aria-labelledby="viz-workflows-title">
+        <div class="section-header"><p class="eyebrow">Featured workflows</p><div><h2 id="viz-workflows-title">Follow a scientific question from source to evidence.</h2><p class="lede">These guided paths reuse the same source-backed figures below. Select a path to share it with <span class="mono">?workflow=...</span>, then open its plot, table, animation or provenance record.</p></div></div>
+        <div class="viz-workflow-grid" data-viz-workflows>
+          <noscript>
+            <div class="viz-workflow-fallback">
+              <p class="dim">JavaScript is needed for live selection. The recorded figures remain available in the gallery below.</p>
+              <ul><li><a class="text-link violet" href="viz.html?workflow=simulate">Simulate a system</a> · <a class="text-link" href="viz.html?figure=ode">ODE figure</a> · <a class="text-link" href="viz.html?figure=double-pendulum">animation</a></li><li><a class="text-link violet" href="viz.html?workflow=analyze">Analyze data</a> · <a class="text-link" href="viz.html?figure=scatter-fit">fit</a> · <a class="text-link" href="viz.html?figure=table">table</a></li><li><a class="text-link violet" href="viz.html?workflow=explore-3d">Explore 3D fields</a> · <a class="text-link" href="viz.html?figure=surface">surface</a> · <a class="text-link" href="viz.html?figure=volume-slices">volume slices</a></li></ul>
+            </div>
+          </noscript>
+        </div>
+      </section>
       <section class="section shell"><div class="section-header"><p class="eyebrow">Gallery</p><div><h2>Every figure is a program you can run.</h2><p class="lede">Each image below is the SVG its program printed when this site was built with <span class="mono">ostrinc.wasm</span>. Press <strong>Run live</strong> to recompute it in this page. Explore a figure and copy its URL to share the selected parameters or 3D camera.</p></div></div>
         <div class="viz-gallery" data-viz-gallery><noscript><p class="dim">The gallery needs JavaScript to list the figures; the programs are under <a class="text-link violet" href="https://github.com/sircalch/Ostrin/tree/main/examples">examples/viz_*.ostrin ↗</a>.</p></noscript></div>
       </section>

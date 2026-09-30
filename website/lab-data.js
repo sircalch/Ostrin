@@ -1245,5 +1245,111 @@ globalThis.OSTRIN_LAB = Object.freeze({
         ""
       ]
     }
+  ],
+  "workflows": [
+    {
+      "id": "simulate",
+      "title": "Simulate a system",
+      "status": "available",
+      "summary": "Start with an adaptive ODE, inspect its motion and carry the result into a reproducible figure.",
+      "steps": [
+        {
+          "figure": "ode",
+          "kind": "figure",
+          "title": "Solve and plot",
+          "detail": "rk45 integrates the pendulum and renders the trajectory with a phase portrait.",
+          "source": "examples/viz_ode.ostrin",
+          "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_ode.ostrin"
+        },
+        {
+          "figure": "double-pendulum",
+          "kind": "animation",
+          "title": "Watch the dynamics",
+          "detail": "The same visualization layer exposes continuous SVG motion with scrubbing and video export.",
+          "source": "examples/viz_double_pendulum.ostrin",
+          "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_double_pendulum.ostrin"
+        },
+        {
+          "figure": "provenance",
+          "kind": "provenance",
+          "title": "Record the evidence",
+          "detail": "Inspect source and data hashes, seed and compiler identity in the SVG.",
+          "source": "examples/viz_provenance.ostrin",
+          "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_provenance.ostrin"
+        }
+      ]
+    },
+    {
+      "id": "analyze",
+      "title": "Analyze data",
+      "status": "experimental",
+      "summary": "Move from observations to a fitted figure, a sortable table and explicit uncertainty evidence.",
+      "steps": [
+        {
+          "figure": "scatter-fit",
+          "kind": "figure",
+          "title": "Fit the observations",
+          "detail": "Calibration points, a least-squares line and its ±2σ band are computed in Ostrin.",
+          "source": "examples/viz_scatter_fit.ostrin",
+          "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_scatter_fit.ostrin"
+        },
+        {
+          "figure": "table",
+          "kind": "table",
+          "title": "Inspect the rows",
+          "detail": "Filter and sort an SVG table while keeping the values visible and source-linked.",
+          "source": "examples/viz_table.ostrin",
+          "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_table.ostrin"
+        },
+        {
+          "figure": "bars",
+          "kind": "figure",
+          "title": "Show uncertainty",
+          "detail": "Measurement-derived standard uncertainties become error bars in the figure.",
+          "source": "examples/viz_bars.ostrin",
+          "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_bars.ostrin"
+        },
+        {
+          "figure": "provenance",
+          "kind": "provenance",
+          "title": "Record the evidence",
+          "detail": "Inspect the source and data hashes, seed and compiler identity carried by a figure.",
+          "source": "examples/viz_provenance.ostrin",
+          "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_provenance.ostrin"
+        }
+      ]
+    },
+    {
+      "id": "explore-3d",
+      "title": "Explore 3D fields",
+      "status": "experimental",
+      "summary": "Change a parameter, move the camera and compare geometric views of a scalar or vector field.",
+      "steps": [
+        {
+          "figure": "surface",
+          "kind": "figure",
+          "title": "Rotate a surface",
+          "detail": "The camera and spatial scale rerun the Ostrin source in the browser.",
+          "source": "examples/viz_surface.ostrin",
+          "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_surface.ostrin"
+        },
+        {
+          "figure": "lorenz",
+          "kind": "animation",
+          "title": "Change a trajectory",
+          "detail": "Adjust ρ and inspect how the 3D trajectory changes before exporting a frame or animation.",
+          "source": "examples/viz_lorenz.ostrin",
+          "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_lorenz.ostrin"
+        },
+        {
+          "figure": "volume-slices",
+          "kind": "figure",
+          "title": "Slice a volume",
+          "detail": "Orthogonal slices expose a sampled scalar volume with inspectable SVG cells.",
+          "source": "examples/viz_volume_slices.ostrin",
+          "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_volume_slices.ostrin"
+        }
+      ]
+    }
   ]
 });

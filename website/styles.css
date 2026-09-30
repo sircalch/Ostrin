@@ -558,6 +558,34 @@ button.button-quiet, button.button { cursor: pointer; } button.button-quiet { ba
 .viz-steps p { margin: 0; }
 .viz-snippet .sl-code { max-height: none; }
 .viz-gallery, .viz-matrix { margin-top: 48px; }
+.viz-workflow-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 36px; }
+.viz-workflow-card { display: flex; min-width: 0; flex-direction: column; gap: 12px; padding: 20px; background: var(--night-2); border: 1px solid var(--line); border-radius: 4px; transition: border-color 160ms ease, transform 160ms ease; }
+.viz-workflow-card[data-active="true"] { border-color: var(--violet); box-shadow: 0 0 0 1px rgba(124, 58, 237, .18); transform: translateY(-2px); }
+.viz-workflow-card h3 { margin: 0; font-size: 1.1rem; font-weight: 560; }
+.viz-workflow-card > p { min-height: 58px; margin: 0; font-size: .82rem; }
+.viz-workflow-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.viz-workflow-card-head > div { display: flex; align-items: center; gap: 10px; }
+.viz-workflow-number { color: var(--muted-2); font: .68rem var(--mono); letter-spacing: .08em; }
+.viz-workflow-status { color: var(--violet-2); font: .64rem var(--mono); letter-spacing: .07em; text-transform: uppercase; }
+.viz-workflow-status::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 6px; border-radius: 50%; background: var(--violet); }
+.viz-workflow-status.available { color: var(--green); }
+.viz-workflow-status.available::before { background: var(--green); }
+.viz-workflow-card-head .button-quiet { min-height: 30px; padding: 6px 9px; font-size: .65rem; }
+.viz-workflow-steps { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.viz-workflow-step { display: grid; gap: 4px; min-width: 0; padding-top: 10px; border-top: 1px solid var(--line); }
+.viz-workflow-step-link { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 9px; align-items: start; min-width: 0; padding: 6px 0; color: var(--white); }
+.viz-workflow-step-link:hover { color: var(--white); }
+.viz-workflow-step-index { color: var(--muted-2); font: .68rem var(--mono); }
+.viz-workflow-step-copy { display: grid; gap: 3px; min-width: 0; }
+.viz-workflow-step-copy strong { font-size: .82rem; font-weight: 560; }
+.viz-workflow-step-copy .muted { font-size: .74rem; line-height: 1.45; }
+.viz-workflow-step-kind { color: var(--violet-2); font: .62rem var(--mono); letter-spacing: .06em; text-transform: uppercase; }
+.viz-workflow-step-arrow { color: var(--violet-2); font-size: 1rem; }
+.viz-workflow-step > .text-link { padding-left: 37px; color: var(--muted); font: .64rem var(--mono); overflow-wrap: anywhere; }
+.viz-workflow-selection { margin: 16px 0 0; color: var(--muted); font: .68rem var(--mono); }
+.viz-workflow-fallback { grid-column: 1 / -1; padding: 18px 20px; background: var(--night-2); border: 1px solid var(--line); }
+.viz-workflow-fallback p { margin: 0 0 10px; }
+.viz-workflow-fallback ul { display: grid; gap: 6px; margin: 0; padding-left: 18px; color: var(--muted); font-size: .84rem; }
 .viz-gallery { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
 .viz-card { display: flex; flex-direction: column; min-width: 0; background: var(--night-2); border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
 .viz-frame { display: block; background: #fff; border-bottom: 1px solid var(--line); }
@@ -588,7 +616,7 @@ button.button-quiet, button.button { cursor: pointer; } button.button-quiet { ba
 .artifact-body p { margin: 0; color: var(--muted); font-size: .84rem; }
 .artifact-body .text-link { margin-top: auto; padding-top: 8px; }
 @media (max-width: 860px) {
-  .viz-intro, .viz-gallery, .viz-matrix, .home-viz, .artifact-grid { grid-template-columns: minmax(0, 1fr); }
+  .viz-intro, .viz-workflow-grid, .viz-gallery, .viz-matrix, .home-viz, .artifact-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
 .viz-dialog { width: min(1100px, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 0; background: var(--night-2); color: var(--white); border: 1px solid var(--line); border-radius: 6px; }

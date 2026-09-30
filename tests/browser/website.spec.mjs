@@ -559,3 +559,27 @@ test("Viz explorer links restore parameters and 3D camera", async ({ page }) => 
   await page.getByRole("button", { name: "Copy share link" }).click();
   await expect(page.locator(".viz-dialog .viz-share-status")).toHaveText(/Link copied|Share URL ready/);
 });
+
+test("Featured Viz workflows select source-backed paths", async ({ page }) => {
+  await page.goto("./viz.html?workflow=analyze", { waitUntil: "domcontentloaded" });
+  const workflows = page.locator("[data-viz-workflows] [data-viz-workflow]");
+  await expect(workflows).toHaveCount(3);
+  await expect(page.locator('[data-viz-workflow="analyze"]')).toHaveAttribute("data-active", "true");
+  await expect(page.locator('[data-viz-workflow="analyze"] .viz-workflow-status')).toHaveText("experimental");
+  await expect(page.locator('[data-viz-workflow="analyze"] .viz-workflow-step')).toHaveCount(4);
+  await expect(page.locator('[data-viz-workflow="analyze"] [data-viz-workflow-source="scatter-fit"]')).toHaveAttribute(
+    "href",
+    "https://github.com/sircalch/Ostrin/blob/main/examples/viz_scatter_fit.ostrin",
+  );
+  await expect(page.locator('[data-viz-workflow="analyze"] [data-viz-workflow-step="table"]')).toHaveAttribute(
+    "href",
+    /workflow=analyze&figure=table#viz-table$/,
+  );
+  await expect(page.locator(".viz-workflow-selection")).toHaveText(/Analyze data selected/);
+
+  await page.locator('[data-viz-workflow-select="simulate"]').click();
+  await expect(page).toHaveURL(/workflow=simulate#workflow-simulate$/);
+  await expect(page.locator('[data-viz-workflow="simulate"]')).toHaveAttribute("data-active", "true");
+  await expect(page.locator('[data-viz-workflow="analyze"]')).toHaveAttribute("data-active", "false");
+  await expect(page.locator(".viz-workflow-selection")).toHaveText(/Simulate a system selected/);
+});
