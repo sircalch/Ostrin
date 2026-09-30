@@ -168,6 +168,65 @@ fn is_reference_type(ty: &CType) -> bool {
     )
 }
 
+/// Returns a retain operation for a value that may contain managed references
+/// behind a by-value aggregate such as `Option<String>` or
+/// `Result<List<String>, String>`. Direct references keep the existing ABI;
+/// aggregate cases walk only the active payload, so scalar-only wrappers do
+/// not emit any runtime calls.
+fn retain_managed_value(access: &str, ty: &CType) -> Option<String> {
+    match ty {
+        CType::Option(inner) => retain_managed_value(&format!("({access}).value"), inner)
+            .map(|body| format!("if (({access}).has) {{ {body}; }}")),
+        CType::Result(ok, err) => {
+            let ok_body = retain_managed_value(&format!("({access}).value"), ok);
+            let err_body = retain_managed_value(&format!("({access}).error"), err);
+            match (ok_body, err_body) {
+                (Some(ok_body), Some(err_body)) => Some(format!(
+                    "if (({access}).ok) {{ {ok_body}; }} else {{ {err_body}; }}"
+                )),
+                (Some(ok_body), None) => Some(format!("if (({access}).ok) {{ {ok_body}; }}")),
+                (None, Some(err_body)) => Some(format!("if (!({access}).ok) {{ {err_body}; }}")),
+                (None, None) => None,
+            }
+        }
+        CType::Fn(..) => Some(format!("ostrin_retain((void*)({access}).env)")),
+        _ if is_reference_type(ty) => Some(format!("ostrin_retain((void*)({access}))")),
+        _ => None,
+    }
+}
+
+/// Returns a normal release operation for an owned field/collection element.
+/// Nested payloads use `ostrin_release`; the enclosing local/temporary is the
+/// only place that may need `ostrin_release_owned` for task-handle bookkeeping.
+fn release_managed_value(access: &str, ty: &CType) -> Option<String> {
+    retain_managed_value(access, ty).map(|body| body.replace("ostrin_retain", "ostrin_release"))
+}
+
+/// Releases an owned value, preserving the task-handle bookkeeping used by
+/// the existing direct-reference cleanup path. Aggregate payloads recurse into
+/// their active fields and therefore never cast a by-value wrapper to `void*`.
+fn release_owned_managed_value(access: &str, ty: &CType) -> Option<String> {
+    match ty {
+        CType::Option(inner) => release_managed_value(&format!("({access}).value"), inner)
+            .map(|body| format!("if (({access}).has) {{ {body}; }}")),
+        CType::Result(ok, err) => {
+            let ok_body = release_managed_value(&format!("({access}).value"), ok);
+            let err_body = release_managed_value(&format!("({access}).error"), err);
+            match (ok_body, err_body) {
+                (Some(ok_body), Some(err_body)) => Some(format!(
+                    "if (({access}).ok) {{ {ok_body}; }} else {{ {err_body}; }}"
+                )),
+                (Some(ok_body), None) => Some(format!("if (({access}).ok) {{ {ok_body}; }}")),
+                (None, Some(err_body)) => Some(format!("if (!({access}).ok) {{ {err_body}; }}")),
+                (None, None) => None,
+            }
+        }
+        CType::Fn(..) => Some(format!("ostrin_release_owned((void*)({access}).env)")),
+        _ if is_reference_type(ty) => Some(format!("ostrin_release_owned((void*)({access}))")),
+        _ => None,
+    }
+}
+
 /// Finds records whose field graph contains a cycle. The IR emitter can
 /// represent a record containing arrays and non-recursive managed fields, but
 /// recursive records need the established HIR/AST ownership path until their
@@ -2516,8 +2575,9 @@ impl<'a> Codegen<'a> {
                 .expect("field checked above");
             let code = self.coerce(&code, &ty, &field_ty)?;
             body.push_str(&format!("{temp}->{field_name} = {code}; "));
-            if is_reference_type(&field_ty) {
-                body.push_str(&format!("ostrin_retain((void*){temp}->{field_name}); "));
+            if let Some(retain) = retain_managed_value(&format!("{temp}->{field_name}"), &field_ty)
+            {
+                body.push_str(&format!("{retain}; "));
             }
         }
         Ok((format!("({{ {body} {temp}; }})"), CType::Record(inst)))
@@ -2727,11 +2787,16 @@ impl<'a> Codegen<'a> {
     fn track_owned_local(&mut self, name: &str, ty: &CType, borrowed: bool, out: &mut String) {
         // `scopes[0]` is the generator's outer frame; a callable's direct
         // locals live in the frame pushed by `gen_callable_body`.
-        if !self.ownership_active || self.lambda_depth != 0 || !is_reference_type(ty) {
+        if !self.ownership_active
+            || self.lambda_depth != 0
+            || retain_managed_value(name, ty).is_none()
+        {
             return;
         }
         if borrowed {
-            out.push_str(&format!("    ostrin_retain((void*){name});\n"));
+            if let Some(retain) = retain_managed_value(name, ty) {
+                out.push_str(&format!("    {retain};\n"));
+            }
         }
         if self.scopes.len() == 2 {
             if !self
@@ -2783,10 +2848,12 @@ impl<'a> Codegen<'a> {
         out: &mut String,
     ) {
         for (name, ty) in bindings.iter().rev() {
-            if transfer == Some(name.as_str()) || !is_reference_type(ty) {
+            if transfer == Some(name.as_str()) {
                 continue;
             }
-            out.push_str(&format!("    ostrin_release_owned((void*){name});\n"));
+            if let Some(release) = release_owned_managed_value(name, ty) {
+                out.push_str(&format!("    {release};\n"));
+            }
         }
     }
 
@@ -2861,12 +2928,14 @@ impl<'a> Codegen<'a> {
         ty: CType,
         out: &mut String,
     ) {
-        if is_reference_type(&ty) {
+        if release_owned_managed_value("value", &ty).is_some() {
             let temp = self.next_temp();
             out.push_str(&format!("    {} {temp} = {code};\n", c_type_name(&ty)));
             let transfer = expr.and_then(|value| self.owned_local_name(value));
             if transfer.is_none() && expr.is_some_and(borrowed_reference_expr) {
-                out.push_str(&format!("    ostrin_retain((void*){temp});\n"));
+                if let Some(retain) = retain_managed_value(&temp, &ty) {
+                    out.push_str(&format!("    {retain};\n"));
+                }
             }
             self.emit_owned_cleanup(out, transfer.as_deref());
             out.push_str(&format!("    return {temp};\n"));
@@ -3390,14 +3459,16 @@ impl<'a> Codegen<'a> {
             "({{ {body} {} {result} = {tail_code};\n",
             c_type_name(&tail_ty)
         );
-        if is_reference_type(&tail_ty)
+        if retain_managed_value(&result, &tail_ty).is_some()
             && transfer.is_none()
             && block
                 .tail
                 .as_ref()
                 .is_some_and(|value| borrowed_reference_expr(value))
         {
-            code.push_str(&format!("    ostrin_retain((void*){result});\n"));
+            if let Some(retain) = retain_managed_value(&result, &tail_ty) {
+                code.push_str(&format!("    {retain};\n"));
+            }
         }
         Self::emit_owned_bindings_cleanup(&owned, transfer.as_deref(), &mut code);
         code.push_str(&format!("    {result}; }})"));
@@ -3493,20 +3564,25 @@ impl<'a> Codegen<'a> {
                     // aliasing a value released at the end of its block.
                     if self.ownership_active
                         && self.lambda_depth == 0
-                        && existing.as_ref().is_some_and(is_reference_type)
+                        && existing
+                            .as_ref()
+                            .is_some_and(|ty| retain_managed_value(name, ty).is_some())
                         && self.owned_local_name_by_str(name).is_some()
                     {
                         let temp = self.next_temp();
+                        let existing_ty = existing.as_ref().expect("checked above");
                         out.push_str(&format!(
                             "    {} {temp} = {code};\n",
-                            c_type_name(existing.as_ref().expect("checked above"))
+                            c_type_name(existing_ty)
                         ));
                         if borrowed_reference_expr(value) {
-                            out.push_str(&format!("    ostrin_retain((void*){temp});\n"));
+                            if let Some(retain) = retain_managed_value(&temp, existing_ty) {
+                                out.push_str(&format!("    {retain};\n"));
+                            }
                         }
-                        out.push_str(&format!(
-                            "    ostrin_release_owned((void*){name}); {name} = {temp};\n"
-                        ));
+                        let release = release_owned_managed_value(name, existing_ty)
+                            .expect("managed local must have release code");
+                        out.push_str(&format!("    {release}; {name} = {temp};\n"));
                     } else {
                         out.push_str(&format!("    {name} = {code};\n"));
                     }
@@ -3582,11 +3658,17 @@ impl<'a> Codegen<'a> {
                     .expect("checked above");
                 let (value_code, value_ty) = self.gen_expr_hint(value, Some(field_ty.clone()))?;
                 let value_code = self.coerce(&value_code, &value_ty, &field_ty)?;
-                if is_reference_type(&field_ty) {
+                if retain_managed_value(&format!("{obj_code}->{field_name}"), &field_ty).is_some() {
                     let temp = self.next_temp();
+                    let retain = retain_managed_value(&temp, &field_ty).unwrap();
+                    let release = release_owned_managed_value(
+                        &format!("{obj_code}->{field_name}"),
+                        &field_ty,
+                    )
+                    .unwrap();
                     out.push_str(&format!(
-                        "    {} {temp} = {value_code}; ostrin_retain((void*){temp}); ostrin_release_owned((void*){obj_code}->{field_name}); {obj_code}->{field_name} = {temp};\n",
-                        c_type_name(&field_ty)
+                        "    {} {temp} = {value_code}; {retain}; {release}; {obj_code}->{field_name} = {temp};\n",
+                        c_type_name(&field_ty),
                     ));
                 } else {
                     out.push_str(&format!("    {obj_code}->{field_name} = {value_code};\n"));
@@ -4582,8 +4664,8 @@ impl<'a> Codegen<'a> {
                         c_type_name(&obj_ty),
                         c_type_name(&field_ty),
                     );
-                    if is_reference_type(&field_ty) {
-                        body.push_str(&format!("ostrin_retain((void*){value}); "));
+                    if let Some(retain) = retain_managed_value(&value, &field_ty) {
+                        body.push_str(&format!("{retain}; "));
                     }
                     body.push_str(&format!(
                         "ostrin_release_owned((void*){object}); {value}; }})"
@@ -10427,9 +10509,10 @@ fn generate_impl(
     // loop above has finished discovering it from actual usage.
     out.push_str(&list_type_decls);
 
-    // Record instances own any direct reference fields they contain. The
-    // callback is registered with the allocation table and releases children
-    // before the record storage itself is returned to malloc.
+    // Record instances own any managed fields they contain, including
+    // references nested inside by-value Option/Result wrappers. The callback
+    // is registered with the allocation table and releases children before
+    // the record storage itself is returned to malloc.
     let mut drop_record_names = records
         .iter()
         .map(|record| record.name.clone())
@@ -10448,8 +10531,8 @@ fn generate_impl(
         let signature = format!("static void ostrin_drop_{name}(void* raw)");
         let mut body = format!("    {name}* value = ({name}*)raw;\n    if (!value) return;\n");
         for (field, ty) in fields {
-            if is_reference_type(&ty) {
-                body.push_str(&format!("    ostrin_release((void*)value->{field});\n"));
+            if let Some(release) = release_managed_value(&format!("value->{field}"), &ty) {
+                body.push_str(&format!("    {release};\n"));
             }
         }
         list_helper_prototypes.push(format!("{signature};"));

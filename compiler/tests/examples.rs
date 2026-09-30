@@ -6774,6 +6774,61 @@ fn native_ir_emitter_handles_records_and_option_record_ownership() {
 }
 
 #[test]
+fn native_ir_nested_record_option_payload_ownership() {
+    let file = temp_source(
+        "native-ir-nested-record-option.ostrin",
+        "record Boxed {\n    value: Option<String>\n}\n\nfn main() -> Void {\n    item = Boxed { value: Some(\"le\" + \"ak\") }\n    print(item.value.unwrap())\n}\n",
+    );
+    let expected = "leak\n";
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    if skip_if_no_c_compiler(&report) {
+        let _ = fs::remove_file(&file);
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ir-generated: 1"), "{report_text}");
+    assert!(report_text.contains("hir-generated: 0"), "{report_text}");
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+
+    let exe = temp_artifact("native-ir-nested-record-option.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run nested record option binary");
+    let _ = fs::remove_file(&exe);
+    let _ = fs::remove_file(&file);
+    assert!(native.status.success(), "native binary failed");
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "nested record option payload leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn native_ir_emitter_preserves_checked_fixed_width_arithmetic() {
     let file = example_path("native_ir_sized.ostrin");
     let expected = "120\n-4\n-7\n";
