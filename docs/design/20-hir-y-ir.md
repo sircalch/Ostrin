@@ -20,6 +20,10 @@ generado (`Array_Float_from1`/`from2`/`from3`, y sus variantes por tipo), la ind
 `reshape`/`transpose`/`row`/`col`, `sum_axis`, `dot`/`matmul`, `get`/`set` y
 `to_float` usan los helpers tipados disponibles. El pase de ownership conserva
 `retain/release` de arrays y de las listas de forma consumidas por esos métodos.
+La selección booleana (`a[mask]`), la negación elemento a elemento de `Array<Bool>`,
+los cortes `to`/`until` y `where(mask, a, b)` para `Int`, `Float`, `Float32` y `Bool`
+también bajan a los kernels tipados de IR/C; los operandos escalares de `where` se
+materializan y liberan dentro del mismo temporal nativo.
 Los builtins numéricos `zeros`/`ones`, `norm`, `abs` escalar y `sqrt` usan también
 los helpers tipados de IR/C (`Array_Float_full`, `Array_Float_norm` y las funciones
 de `libm`), de modo que QR y Cholesky ya no necesitan el emisor AST. LU ya está disponible en
@@ -119,8 +123,8 @@ Sobre este IR se hacen los análisis que el texto C no permite:
    `--native-type-report` publica también `ir-generated`, `hir-generated` y `ast-fallback`.
    El mismo informe agrupa esas cifras por archivo fuente con líneas `native-source`, y la
    prueba diferencial comprueba que la suma por módulo coincide con los totales globales.
-   La prueba diferencial conserva el baseline actual de fallback (63 funciones AST, con
-   6 465 funciones IR y 21 HIR agregadas sobre los ejemplos); el incremento acotado incluye
+   La prueba diferencial conserva el baseline actual de fallback (62 funciones AST, con
+   6 466 funciones IR y 21 HIR agregadas sobre los ejemplos); el incremento acotado incluye
    también `Rng` (constructor, métodos escalares, muestreo de arrays y permutación), con
    liberación gestionada y paridad intérprete/nativo. Los combinadores de listas (`map`, `filter`,
    `fold`, `any`, `all`, `find`) aceptan cierres IR con capturas. Los iteradores genéricos
@@ -147,7 +151,7 @@ Sobre este IR se hacen los análisis que el texto C no permite:
    runtime; la suite completa de ejemplos nativos corre bajo UBSan e incluye cancelación de
    tareas para evitar regresiones de punteros a función incompatibles.
 2. Migrar el backend C por **familias de nodos** al HIR (literales/operadores → llamadas → records/enums → patrones → colecciones → genéricos), eliminando la reinferencia correspondiente en cada paso.
-3. **IR de bloques básicos** y generación de C desde el IR (el HIR deja de generar C directamente). La primera CFG observable ya existe en `--ir` y el emisor consume ramas, recursión, bucles con `phi`, rangos enteros direccionales, aritmética comprobada de ancho fijo, `String`, constructores 1D–3D, parámetros, indexación y métodos de `Array<T>` numérico escalar, aritmética y reducciones de `Array<Quantity<D>>` con etiqueta de unidad, records concretos con campos anidados, records genéricos monomorfizados con campos escalares, iteradores de records concretos y genéricos monomorfizados (`next() -> Option<T>`), canales con `send`/`close`/`receive` y `for`, `spawn {}` con CFG soportado, capturas inmutables, closures capturados con entorno tipado, `spawn_scope {}` inline con drenado de grupos, tareas anidadas con capturas propagadas y `Task.join()`, el núcleo de `List<T>`, operaciones hash escalares de `Map`/`Set` y lookups `Option` escalares/String/Record con `Some`/`None`; faltan otras familias de arrays cuyo elemento sea gestionado, rangos con cantidades, cambios de forma complejos, iteradores indirectos, scopes anidados, otros `Option` gestionados, patrones anidados, agregados complejos y la retirada progresiva del fallback.
+3. **IR de bloques básicos** y generación de C desde el IR (el HIR deja de generar C directamente). La primera CFG observable ya existe en `--ir` y el emisor consume ramas, recursión, bucles con `phi`, rangos enteros direccionales, aritmética comprobada de ancho fijo, `String`, constructores 1D–3D, parámetros, indexación, selección booleana `a[mask]`, cortes `to`/`until`, `not` sobre `Array<Bool>`, `where(mask, a, b)` y métodos de `Array<T>` numérico escalar, aritmética y reducciones de `Array<Quantity<D>>` con etiqueta de unidad, records concretos con campos anidados, records genéricos monomorfizados con campos escalares, iteradores de records concretos y genéricos monomorfizados (`next() -> Option<T>`), canales con `send`/`close`/`receive` y `for`, `spawn {}` con CFG soportado, capturas inmutables, closures capturados con entorno tipado, `spawn_scope {}` inline con drenado de grupos, tareas anidadas con capturas propagadas y `Task.join()`, el núcleo de `List<T>`, operaciones hash escalares de `Map`/`Set` y lookups `Option` escalares/String/Record con `Some`/`None`; faltan otras familias de arrays cuyo elemento sea gestionado, rangos con cantidades, cambios de forma complejos, iteradores indirectos, scopes anidados, otros `Option` gestionados, patrones anidados, agregados complejos y la retirada progresiva del fallback.
 4. **RC + último uso** sobre el IR (`--leak-check`: los ejemplos deben terminar sin objetos vivos).
    El runtime ya expone `ostrin_retain`/`ostrin_release`; el emisor C cubre la primera subetapa
    de forma lineal en locales directos: aliases y campos prestados retienen, las reasignaciones

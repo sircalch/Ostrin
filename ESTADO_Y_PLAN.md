@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-30 · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 258 de integración y 2 unitarias en verde.*
+*Corte: 2026-09-30 · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 259 de integración y 2 unitarias en verde.*
 
 Validación remota: Pages, CI, CodeQL, sanitizers y auditoría de seguridad pasaron para el
 ciclo actual en Windows, Linux, macOS y web. La compuerta oficial exige `cargo fmt --check`, Clippy con el lint `suspicious`, la suite del
@@ -46,7 +46,7 @@ Implementación: compilador + intérprete + herramientas de editor, todo en Rust
 | Léxico / parser | `lexer/`, `parser/mod.rs` | Tokens, AST con rangos de origen |
 | Módulos y paquetes | `modules.rs`, `package.rs`, `ostrin.toml` | Imports, `--project`, grafo transitivo de dependencias y lockfile portable |
 | Verificador de tipos | `typeck/mod.rs` (~3 500 l.) | Tipos, dimensiones, traits, exhaustividad, genéricos |
-| HIR/IR | `hir.rs`, `hir_c.rs`, `ir.rs`, `ir_c.rs` | HIR verificado, CFG con temporales explícitos y emisor C para escalares, `String`, constructores de arrays 1D–3D, parámetros, indexación, aritmética/comparaciones elemento a elemento y métodos de `Array<T>` numérico escalar, `Array<Quantity<D>>` en parámetros, indexación, ownership, `unit()`/`values()` y conversión desde `List<Quantity<D>>` conservando la unidad, `Figure.unit_line`/`unit_scatter` genéricos, `Result<Int, String>`/`Result<Float, String>` con `try`, `try catch` inline, handlers globales, aliases locales y handlers locales capturados compatibles, wrappers `Option`/`Result` sobre `List`, `Map` y `Set` con payload gestionado, `Result<String, String>`/`Result<Void, String>` de E/S de archivos, records concretos y records genéricos monomorfizados, iteradores de records concretos (`next() -> Option<T>`), iteradores genéricos monomorfizados (`Cursor<Int>`), iteración de canales mediante `receive() -> Option<T>`, `spawn {}` con CFG y capturas inmutables, `spawn_scope {}` inline con grupos nativos, `Task.join()` y `Task.cancel()` tipados, `Option<Record>`, listas escalares y de cantidades, mapas/conjuntos escalares, enteros de ancho fijo y control de flujo, con fallback HIR/AST acotado |
+| HIR/IR | `hir.rs`, `hir_c.rs`, `ir.rs`, `ir_c.rs` | HIR verificado, CFG con temporales explícitos y emisor C para escalares, `String`, constructores de arrays 1D–3D, parámetros, indexación, selección booleana `a[mask]`, cortes `to`/`until`, `not` sobre `Array<Bool>`, `where(mask, a, b)` para `Int`/`Float`/`Float32`/`Bool`, aritmética/comparaciones elemento a elemento y métodos de `Array<T>` numérico escalar, `Array<Quantity<D>>` en parámetros, indexación, ownership, `unit()`/`values()` y conversión desde `List<Quantity<D>>` conservando la unidad, `Figure.unit_line`/`unit_scatter` genéricos, `Result<Int, String>`/`Result<Float, String>` con `try`, `try catch` inline, handlers globales, aliases locales y handlers locales capturados compatibles, wrappers `Option`/`Result` sobre `List`, `Map` y `Set` con payload gestionado, `Result<String, String>`/`Result<Void, String>` de E/S de archivos, records concretos y records genéricos monomorfizados, iteradores de records concretos (`next() -> Option<T>`), iteradores genéricos monomorfizados (`Cursor<Int>`), iteración de canales mediante `receive() -> Option<T>`, `spawn {}` con CFG y capturas inmutables, `spawn_scope {}` inline con grupos nativos, `Task.join()` y `Task.cancel()` tipados, `Option<Record>`, listas escalares y de cantidades, mapas/conjuntos escalares, enteros de ancho fijo y control de flujo, con fallback HIR/AST acotado |
 | Intérprete | `interpreter/mod.rs` | Ejecución tree‑walking y scheduler cooperativo; referencia semántica |
 | Servidor de lenguaje | `lsp.rs`, `symbols.rs`, `protocol.rs` | LSP sobre stdio |
 | Adaptador de depuración | `dap.rs` + hooks del intérprete | DAP sobre stdio |
@@ -105,7 +105,7 @@ autovectores simétricos (`Eigen.values`, `Eigen.vectors`, reconstrucción), SVD
 Complex del Lab lo ejecutan en el navegador.
 
 **Numérico/científico**: literales científicos (`6.022e23`), enteros de ancho fijo, `Float32`, `Array<T>` (difusión, máscaras,
-rebanadas, `@`), estadística, regresión, `det/inv/eigvals/norm`, `Rng` reproducible,
+selección `a[mask]`, `where(mask, a, b)`, `not` sobre máscaras, rebanadas `to`/`until`, `@`), estadística, regresión, `det/inv/eigvals/norm`, `Rng` reproducible,
 funciones elementales deterministas (idénticas en intérprete y nativo), LU/QR/SVD/Cholesky verificables y `std.numeric.Complex`
 experimental con operaciones aritméticas, forma polar, conjugado, magnitud, potencias enteras y matrices/vectores complejos densos con partes separadas.
 Los constructores `zeros`/`ones`, `norm`, `abs` escalar y `sqrt` también tienen lowering IR/C
@@ -162,8 +162,8 @@ por separado en `--native-type-report` como `ir-generated`; el mismo informe exp
 `hir-generated` y `ast-fallback` para que la retirada del backend legado tenga un contador
 visible. También publica líneas `native-source` agrupadas por archivo para localizar la deuda
 por módulo; la prueba diferencial comprueba que sus sumas coinciden con el total. En el corte
-actual, la suite de ejemplos suma 6 465 funciones IR, 21 HIR y 63 que aún caen al emisor
-AST; `native_backend_types_agree_with_the_checker` mantiene 63 como trinquete temporal. Los métodos
+actual, la suite de ejemplos suma 6 466 funciones IR, 21 HIR y 62 que aún caen al emisor
+AST; `native_backend_types_agree_with_the_checker` mantiene 62 como trinquete temporal. Los métodos
 de records y enums concretos comparten ahora IR/C cuando sus campos y ownership son compatibles; los
 records recursivos conservan HIR/AST hasta cerrar su contrato de ownership.
 El lowering de ownership aplica el mismo contrato de llamada prestada a receptores y argumentos de
@@ -337,8 +337,8 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
 convendría dividirlos; el backend nativo no comparte el sistema de tipos del checker
-(ya consume los tipos del checker y compara cada nodo; el informe actual suma **6 465 funciones
-generadas desde IR, 21 desde HIR y 63 en fallback AST** en los ejemplos, con un trinquete
+(ya consume los tipos del checker y compara cada nodo; el informe actual suma **6 466 funciones
+generadas desde IR, 21 desde HIR y 62 en fallback AST** en los ejemplos, con un trinquete
 que impide que el fallback aumente sin justificación; los métodos de records y enums concretos
 entran ahora en IR/C cuando sus campos y ownership son compatibles, mientras los records recursivos
 conservan el fallback verificado; las familias migradas incluyen escalares,
@@ -503,7 +503,7 @@ sus evidencias y validación upstream.
 
 ```powershell
 cd compiler
-    cargo test                                   # 6 diferenciales + 258 de integración + 2 unitarias
+    cargo test                                   # 6 diferenciales + 259 de integración + 2 unitarias
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```

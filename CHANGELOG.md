@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Native IR: numeric array selection
+
+- `a[mask]`, `not` over `Array<Bool>`, `to`/`until` slices and `where(mask, a, b)`
+  now lower through the typed IR/C array kernels for `Int`, `Float`, `Float32` and
+  `Bool`; `Quantity` arrays remain on their verified fallback for this pass.
+- Scalar `where` operands are materialized as temporary arrays and released inside
+  the generated C expression. The new regression covers interpreter/native/WASI
+  emission parity and native `live_allocations=0`.
+
 ### Native HIR: nested list payload ownership
 
 - `List<Option<String>>` now retains and releases the active `String` payload in
@@ -9,7 +18,7 @@
 - HIR tracks managed references nested inside `Option` and `Result` values and
   releases owned temporaries passed to `List.push` and list literals.
 - Added interpreter/native/WASI parity and native leak-check coverage; the
-  compiler suite now has **258 integration tests**.
+  compiler suite now has **259 integration tests**.
 
 ### Web: featured scientific workflows
 
@@ -24,8 +33,8 @@
 
 - Default method bodies from traits now lower once per concrete implementation,
   removing nine AST fallbacks while preserving checker node identity and
-  interpreter/native parity. The verified ratchet is **6,465 IR / 21 HIR / 63
-  AST fallbacks** across the measured examples. `assert` and `assert_eq` now
+  interpreter/native parity. The verified ratchet before numeric array selection was
+  **6,465 IR / 21 HIR / 63 AST fallbacks** across the measured examples. `assert` and `assert_eq` now
   use the same typed IR/C path, including their exact native failure messages.
 - Compound unit labels created for `Array<Quantity<D>>` are now owned by the
   array runtime and borrowed by slices. Native leak-check coverage confirms

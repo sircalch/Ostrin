@@ -1,0 +1,62 @@
+fn select_int(a: Array<Int>, mask: Array<Bool>) -> Array<Int> {
+    a[mask]
+}
+
+fn select_float(a: Array<Float>, mask: Array<Bool>) -> Array<Float> {
+    a[mask]
+}
+
+fn select_single(a: Array<Float32>, mask: Array<Bool>) -> Array<Float32> {
+    a[mask]
+}
+
+fn select_bool(a: Array<Bool>, mask: Array<Bool>) -> Array<Bool> {
+    a[mask]
+}
+
+fn invert(mask: Array<Bool>) -> Array<Bool> {
+    not mask
+}
+
+fn slice_until(a: Array<Int>) -> Array<Int> {
+    a[1 until 4]
+}
+
+fn slice_to(a: Array<Int>) -> Array<Int> {
+    a[1 to 3]
+}
+
+fn choose_int(mask: Array<Bool>, a: Array<Int>) -> Array<Int> {
+    where(mask, a, 0)
+}
+
+fn choose_float(mask: Array<Bool>, a: Array<Float>) -> Array<Float> {
+    where(mask, 0.0, a)
+}
+
+fn choose_single(mask: Array<Bool>, a: Array<Float32>) -> Array<Float32> {
+    where(mask, a, 0.0f32)
+}
+
+fn choose_bool(mask: Array<Bool>, a: Array<Bool>) -> Array<Bool> {
+    where(mask, a, false)
+}
+
+fn main() -> Void {
+    mask = array([true, false, true, false])
+    ints = array([10, 20, 30, 40])
+    floats = array([1.5, 2.5, 3.5, 4.5])
+    singles: Array<Float32> = array([1.5f32, 2.5f32, 3.5f32, 4.5f32])
+    bools = array([true, false, false, true])
+    print(select_int(ints, mask))
+    print(select_float(floats, mask))
+    print(select_single(singles, mask))
+    print(select_bool(bools, mask))
+    print(invert(mask))
+    print(slice_until(ints))
+    print(slice_to(ints))
+    print(choose_int(mask, ints))
+    print(choose_float(mask, floats))
+    print(choose_single(mask, singles))
+    print(choose_bool(mask, bools))
+}
