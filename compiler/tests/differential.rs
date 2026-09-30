@@ -416,8 +416,8 @@ fn native_backend_types_agree_with_the_checker() {
     // explicit IR lowering (the migration of the native backend).
     let native_generated = hir_generated + ir_generated;
     assert!(
-        native_generated >= 6432,
-        "only {native_generated} functions were generated from HIR/IR (expected at least 6432)"
+        native_generated >= 6469,
+        "only {native_generated} functions were generated from HIR/IR (expected at least 6469)"
     );
     println!("functions generated from HIR/IR: {native_generated} (HIR {hir_generated}, IR {ir_generated})");
     println!("functions still using AST fallback: {ast_fallback}");
@@ -474,14 +474,20 @@ fn native_backend_types_agree_with_the_checker() {
     // through the same IR/C path. HIR now
     // substitutes the concrete owner for `Self` in trait method signatures,
     // allowing Complex arithmetic/equality to use IR/C. The verified baseline is
-    // 114 AST fallbacks (6,410 IR and 25 HIR functions). The experimental
+    // 80 AST fallbacks (6,448 IR and 21 HIR functions). The experimental
     // `std.measurements` module contributes 21 additional IR functions and has
     // no fallback; Rng, closure-backed list combinators and nested `parse_csv`
     // lists remove six more fallbacks in the current baseline.
-    // Keep this ratchet explicit until
-    // the next aggregate family moves with parity evidence; aggregate-heavy SVG
-    // paths and complex array promotion remain pending.
-    const MAX_AST_FALLBACK_FUNCTIONS: usize = 114;
+    // Method receivers and arguments now use the same borrowed-call contract
+    // as ordinary calls. This moves record builders (including std.viz
+    // Figure/Table/Scene3D chains) through the ownership-lowered IR without
+    // changing their interpreter/native output. Keep the new ratchet explicit
+    // until the next aggregate family moves with parity evidence; complex
+    // array promotion and non-linear aggregates remain pending.
+    // Normal-distribution PDF/CDF calls now share the numeric IR/C path for
+    // scalar and Array<Float> inputs, removing the histogram example's last
+    // entry-point fallback while retaining interpreter/native/WASI parity.
+    const MAX_AST_FALLBACK_FUNCTIONS: usize = 80;
     assert!(
         ast_fallback <= MAX_AST_FALLBACK_FUNCTIONS,
         "AST fallback grew to {ast_fallback} functions (ratchet limit {MAX_AST_FALLBACK_FUNCTIONS})"
