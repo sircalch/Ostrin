@@ -35,6 +35,9 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    comparaciones, reducciones, negación, cortes por rango, conversiones y `to_list` de arrays
    con unidades, con helpers IR que preservan la etiqueta; quedan cambios de forma complejos y
    agregados anidados para ciclos posteriores.
+   La representación de arrays consume ahora sus temporales de texto; `quantity_arrays.ostrin`
+   registra `live_allocations=14` bajo leak-check nativo. Las expresiones escalares y las etiquetas
+   de arrays que escapan a valores/listas quedan como deuda de ownership para un pase posterior.
    `Rng` y sus métodos escalares y de muestreo (`rand`, `randn`, `randint`, `permutation`) ya
    comparten IR/C con ownership explícito y paridad intérprete/nativo. Los combinadores de listas
    (`map`, `filter`, `fold`, `any`, `all`, `find`) también cruzan IR/C, incluidos cierres con

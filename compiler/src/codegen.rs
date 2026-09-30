@@ -538,7 +538,10 @@ static Array_Float* ostrin_qa_scale(Array_Float* a, double s) {
 }
 static const char* ostrin_qa_show(Array_Float* a, const char* shown) {
     if (!a->unit || !*a->unit) return shown;
-    const char* out = ostrin_str_concat(ostrin_str_concat(shown, \" \"), a->unit);
+    const char* spaced = ostrin_str_concat(shown, \" \");
+    const char* out = ostrin_str_concat(spaced, a->unit);
+    ostrin_release((void*)shown);
+    ostrin_release((void*)spaced);
     return out;
 }
 ";
@@ -6052,7 +6055,7 @@ impl<'a> Codegen<'a> {
                         let product = num(&a, a_arr, &b, b_arr, false, code);
                         let body = if dim_is_dimensionless(&dim) {
                             format!(
-                                "({{ double __s; const char* __u = ostrin_unit_combine({ua}, {ub}, 0, &__s); Array_Float* __p = {product}; if (__s != 1.0) ostrin_qa_scale(__p, __s); if (*__u) ostrin_qa_scale(__p, ostrin_unit_expr_factor(__u)); __p; }})"
+                                "({{ double __s; const char* __u = ostrin_unit_combine({ua}, {ub}, 0, &__s); Array_Float* __p = {product}; if (__s != 1.0) ostrin_qa_scale(__p, __s); if (*__u) ostrin_qa_scale(__p, ostrin_unit_expr_factor(__u)); ostrin_release((void*)__u); __p; }})"
                             )
                         } else {
                             format!(

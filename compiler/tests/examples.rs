@@ -9798,6 +9798,47 @@ fn arrays_of_quantities_keep_one_unit_and_check_dimensions() {
             "[0, 100, 200, 300] m",
         ]
     );
+
+    // Array rendering must not retain the temporary strings created for each
+    // element. Quantity unit expressions (including array tags that can
+    // escape into scalar/list values) still have a separate ownership
+    // backlog, so keep this as a non-regression ceiling rather than requiring
+    // zero for the whole gallery.
+    let exe = temp_artifact("quantity_arrays_leaks.exe");
+    let compile = run(&[
+        "--compile",
+        "--leak-check",
+        "--out",
+        &exe,
+        &example_path("quantity_arrays.ostrin"),
+    ]);
+    if !skip_if_no_c_compiler(&compile) {
+        assert!(
+            compile.status.success(),
+            "leak-check compile failed: {}",
+            stderr(&compile)
+        );
+        let native = Command::new(&exe)
+            .output()
+            .expect("run quantity-array leak-check binary");
+        let _ = fs::remove_file(&exe);
+        assert!(
+            native.status.success(),
+            "quantity-array binary failed: {}",
+            stderr(&native)
+        );
+        let report = stderr(&native);
+        let live = report
+            .split("live_allocations=")
+            .nth(1)
+            .and_then(|tail| tail.split_whitespace().next())
+            .and_then(|value| value.parse::<usize>().ok())
+            .expect("quantity-array leak-check did not report live allocations");
+        assert!(
+            live <= 14,
+            "array rendering ownership regressed: live_allocations={live}; report: {report}"
+        );
+    }
     let errors = run(&["--check", &example_path("quantity_arrays_errors.ostrin")]);
     assert!(!errors.status.success());
     let err = stderr(&errors);

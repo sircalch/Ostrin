@@ -1085,7 +1085,7 @@ fn quantity_array_binary_code(
             )?;
             let body = if dim_is_dimensionless(&combined) {
                 format!(
-                    "({{ double __ostrin_qa_scale; const char* __ostrin_qa_unit = ostrin_unit_combine({left_unit}, {right_unit}, 0, &__ostrin_qa_scale); Array_Float* __ostrin_qa_product = {product}; if (__ostrin_qa_scale != 1.0) ostrin_qa_scale(__ostrin_qa_product, __ostrin_qa_scale); if (*__ostrin_qa_unit) ostrin_qa_scale(__ostrin_qa_product, ostrin_unit_expr_factor(__ostrin_qa_unit)); __ostrin_qa_product; }})"
+                    "({{ double __ostrin_qa_scale; const char* __ostrin_qa_unit = ostrin_unit_combine({left_unit}, {right_unit}, 0, &__ostrin_qa_scale); Array_Float* __ostrin_qa_product = {product}; if (__ostrin_qa_scale != 1.0) ostrin_qa_scale(__ostrin_qa_product, __ostrin_qa_scale); if (*__ostrin_qa_unit) ostrin_qa_scale(__ostrin_qa_product, ostrin_unit_expr_factor(__ostrin_qa_unit)); ostrin_release((void*)__ostrin_qa_unit); __ostrin_qa_product; }})"
                 )
             } else {
                 format!(
