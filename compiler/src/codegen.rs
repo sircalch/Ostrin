@@ -9303,6 +9303,10 @@ fn generate_impl(
                             ir_helper_prototypes.push(format!("{helper_signature};"));
                             bodies.push((helper_signature, helper_body));
                         }
+                        if generated.body.contains("ostrin_qa_") {
+                            codegen.uses_quantity_arrays = true;
+                            codegen.register_list_types(&CType::Array(Box::new(CType::Float)));
+                        }
                         generated.body
                     })
                 }),
@@ -9426,6 +9430,10 @@ fn generate_impl(
                             ir_helper_prototypes.push(format!("{helper_signature};"));
                             bodies.push((helper_signature, helper_body));
                         }
+                        if generated.body.contains("ostrin_qa_") {
+                            codegen.uses_quantity_arrays = true;
+                            codegen.register_list_types(&CType::Array(Box::new(CType::Float)));
+                        }
                         generated.body
                     })
                 }),
@@ -9488,6 +9496,14 @@ fn generate_impl(
             }
         }
         bodies.push((signature, body));
+    }
+    // The IR emitter can lower Array<Quantity<D>> operations without visiting
+    // the legacy expression path that registers collection runtimes. Its C
+    // body still stores the scalar payload in Array<Float>, so queue that
+    // backing runtime before draining the pending collection types.
+    let uses_quantity_array_body = bodies.iter().any(|(_, body)| body.contains("ostrin_qa_"));
+    if codegen.uses_quantity_arrays || uses_quantity_array_body {
+        codegen.register_list_types(&CType::Array(Box::new(CType::Float)));
     }
     // A generic instantiation's body can call another generic function (or
     // box a record into a `dyn Trait`) for the first time, and a `dyn`
@@ -10173,6 +10189,10 @@ fn generate_impl(
                         ir_helper_prototypes.push(format!("{helper_signature};"));
                         bodies.push((helper_signature, helper_body));
                     }
+                    if generated.body.contains("ostrin_qa_") {
+                        codegen.uses_quantity_arrays = true;
+                        codegen.register_list_types(&CType::Array(Box::new(CType::Float)));
+                    }
                     generated.body
                 })
             });
@@ -10494,7 +10514,10 @@ fn generate_impl(
     // passing through the legacy `register_list_types` path. Detect those
     // calls before splicing the late runtime block so the C translation unit
     // always contains the definitions required by both emitters.
-    if codegen.uses_quantity_arrays || bodies.iter().any(|(_, body)| body.contains("ostrin_qa_")) {
+    if codegen.uses_quantity_arrays
+        || uses_quantity_array_body
+        || bodies.iter().any(|(_, body)| body.contains("ostrin_qa_"))
+    {
         late_array_blocks.push(QUANTITY_ARRAY_RUNTIME.to_string());
     }
     // Array runtimes: full definitions, after every prototype they call.

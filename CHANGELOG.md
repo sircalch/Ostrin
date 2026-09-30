@@ -11,6 +11,8 @@
 - Compound unit labels created for `Array<Quantity<D>>` are now owned by the
   array runtime and borrowed by slices. Native leak-check coverage confirms
   `m/s` labels are released exactly once.
+- IR-generated programs that use only `Array<Quantity<D>>` now materialize the
+  `Array<Float>` backing runtime, including native and WASI C emission.
 
 ### Native IR: nested numeric array lists
 
