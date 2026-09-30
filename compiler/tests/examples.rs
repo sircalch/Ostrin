@@ -7526,7 +7526,7 @@ fn native_quantity_array_compound_units_release_owned_labels() {
     // references without leaking or freeing the label twice.
     let file = temp_source(
         "native-quantity-array-unit-ownership.ostrin",
-        "fn main() -> Void {\n    _base = linspace(0.0, 1.0, 3)\n    distances = array([1 m, 2 m, 3 m])\n    speeds = distances / (1 s)\n    sliced = speeds[0 until 2]\n    print(sliced)\n}\n",
+        "fn main() -> Void {\n    distances = array([1 m, 2 m, 3 m])\n    speeds = distances / (1 s)\n    sliced = speeds[0 until 2]\n    print(sliced)\n}\n",
     );
     let expected = "[1, 2] m/s\n";
 
@@ -7552,6 +7552,22 @@ fn native_quantity_array_compound_units_release_owned_labels() {
     assert!(report_text.contains("ir-generated: 1"), "{report_text}");
     assert!(report_text.contains("hir-generated: 0"), "{report_text}");
     assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "WASI C emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("struct Array_Float {"),
+        "WASI source omitted the Array<Float> backing runtime"
+    );
+    assert!(
+        wasi_source.contains("Array_Float_alloc("),
+        "WASI source omitted Array<Float> allocation support"
+    );
 
     let exe = temp_artifact("native-quantity-array-unit-ownership.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
