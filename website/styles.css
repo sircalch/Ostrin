@@ -578,8 +578,17 @@ button.button-quiet, button.button { cursor: pointer; } button.button-quiet { ba
 .home-viz figure { margin: 0; background: #fff; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
 .home-viz img { display: block; width: 100%; height: auto; }
 .home-viz figcaption { padding: 8px 10px; background: var(--night-2); color: var(--muted); font: .66rem var(--mono); }
+.artifact-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 48px; }
+.artifact-card { display: flex; min-width: 0; flex-direction: column; background: var(--night-2); border: 1px solid var(--line); border-radius: 4px; overflow: hidden; transition: border-color 160ms ease, transform 160ms ease; }
+.artifact-card:hover { border-color: var(--violet); color: inherit; transform: translateY(-2px); }
+.artifact-card img { display: block; width: 100%; aspect-ratio: 1.24; object-fit: contain; background: #fff; border-bottom: 1px solid var(--line); }
+.artifact-body { display: flex; flex: 1; flex-direction: column; gap: 10px; padding: 20px; }
+.artifact-body .tag { color: var(--violet); font: .64rem var(--mono); letter-spacing: .06em; text-transform: uppercase; }
+.artifact-body h3 { margin: 0; font-size: 1.12rem; }
+.artifact-body p { margin: 0; color: var(--muted); font-size: .84rem; }
+.artifact-body .text-link { margin-top: auto; padding-top: 8px; }
 @media (max-width: 860px) {
-  .viz-intro, .viz-gallery, .viz-matrix, .home-viz { grid-template-columns: minmax(0, 1fr); }
+  .viz-intro, .viz-gallery, .viz-matrix, .home-viz, .artifact-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
 .viz-dialog { width: min(1100px, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 0; background: var(--night-2); color: var(--white); border: 1px solid var(--line); border-radius: 6px; }

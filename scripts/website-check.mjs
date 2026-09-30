@@ -186,6 +186,11 @@ for (const marker of ["data-lab", "data-hero", "data-pipeline", '<script src="la
 }
 check(read("website/cookbook.html").includes("data-cookbook"), "cookbook.html: missing recipes container");
 check(homepage.includes('id="try-ostrin"'), "index.html: missing homepage playground anchor");
+check(homepage.includes('id="visual-artifacts"')
+  && homepage.includes('href="viz.html?figure=orbits"')
+  && homepage.includes('href="viz.html?figure=table"')
+  && homepage.includes('href="viz.html?figure=provenance"'),
+"index.html: visual artifact entry points are missing");
 check(homepage.includes('type="module" src="playground.js"'), "index.html: missing real playground module");
 check(homepage.includes('data-site-value="examples"'), "index.html: missing centralized project facts");
 check(homepage.includes('id="source-status" class="source-status"'), "index.html: source location status is missing");
