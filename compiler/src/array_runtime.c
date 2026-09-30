@@ -8,6 +8,10 @@
 /* Releasing an array frees its shape and data too. */
 static void @N@_drop(void* p) {
     @N@* a = (@N@*)p;
+    /* Quantity arrays store their unit label in the shared array header. A
+     * label may be a string literal (release is a no-op) or an owned result
+     * from unit_combine; both follow the runtime retain/release ABI. */
+    ostrin_release((void*)a->unit);
     ostrin_release((void*)a->shape);
     ostrin_release((void*)a->data);
 }

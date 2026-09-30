@@ -117,8 +117,8 @@ Sobre este IR se hacen los análisis que el texto C no permite:
    `--native-type-report` publica también `ir-generated`, `hir-generated` y `ast-fallback`.
    El mismo informe agrupa esas cifras por archivo fuente con líneas `native-source`, y la
    prueba diferencial comprueba que la suma por módulo coincide con los totales globales.
-   La prueba diferencial conserva el baseline actual de fallback (78 funciones AST, con
-   6 450 funciones IR y 21 HIR agregadas sobre los ejemplos); el incremento acotado incluye
+   La prueba diferencial conserva el baseline actual de fallback (69 funciones AST, con
+   6 459 funciones IR y 21 HIR agregadas sobre los ejemplos); el incremento acotado incluye
    también `Rng` (constructor, métodos escalares, muestreo de arrays y permutación), con
    liberación gestionada y paridad intérprete/nativo. Los combinadores de listas (`map`, `filter`,
    `fold`, `any`, `all`, `find`) aceptan cierres IR con capturas. Los iteradores genéricos
