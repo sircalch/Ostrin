@@ -2841,6 +2841,100 @@ fn native_ir_emitter_handles_nested_csv_lists_and_ownership() {
 }
 
 #[test]
+fn native_ir_emitter_handles_dataframe_panics_and_array_correlation() {
+    let file = example_path("dataframe.ostrin");
+    let expected = "5\nciudad,temp,lluvia\ntemp: n=5 mean=16.5 std=5.244044240850758 min=10 max=23.5\nlluvia: n=5 mean=2.1 std=1.7146428199482247 min=0 max=4.5\n2\ntemp: n=2 mean=22.5 std=1 min=21.5 max=23.5\n-0.9675629734578927\n";
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed for dataframe.ostrin: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "native type report failed for dataframe.ostrin: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("ir-generated: 7")
+            && report_text.contains("hir-generated: 0")
+            && report_text.contains("ast-fallback: 0")
+            && report_text.contains("divergences: 0"),
+        "dataframe did not stay on the verified IR path: {report_text}"
+    );
+
+    let exe = temp_artifact("native_ir_dataframe.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    assert!(
+        compile.status.success(),
+        "native dataframe compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run native dataframe binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "native dataframe run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "dataframe native path leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+
+    let panic_file = temp_source(
+        "native_ir_panic.ostrin",
+        "fn main() -> Void {\n    panic(\"boom\")\n}\n",
+    );
+    let panic_report = run(&["--native-type-report", &panic_file]);
+    assert!(
+        panic_report.status.success(),
+        "panic report failed: {}",
+        stderr(&panic_report)
+    );
+    assert!(
+        stdout(&panic_report).contains("ir-generated: 1")
+            && stdout(&panic_report).contains("ast-fallback: 0"),
+        "panic builtin did not stay on the IR path: {}",
+        stdout(&panic_report)
+    );
+    let panic_exe = temp_artifact("native_ir_panic.exe");
+    let panic_compile = run(&["--compile", "--out", &panic_exe, &panic_file]);
+    assert!(
+        panic_compile.status.success(),
+        "panic native compile failed: {}",
+        stderr(&panic_compile)
+    );
+    let panic_native = Command::new(&panic_exe)
+        .output()
+        .expect("failed to run native panic binary");
+    let _ = fs::remove_file(&panic_exe);
+    assert!(
+        !panic_native.status.success(),
+        "panic binary unexpectedly succeeded"
+    );
+    assert!(
+        String::from_utf8_lossy(&panic_native.stderr).contains("runtime error: panic: boom"),
+        "native panic message changed: {}",
+        String::from_utf8_lossy(&panic_native.stderr)
+    );
+}
+
+#[test]
 fn native_backend_compiles_the_original_dyn_trait_example() {
     // The project's own dyn_trait.ostrin: List<dyn Shape>, .fold() with a
     // lambda calling a trait method through the vtable, and Float printing

@@ -2325,6 +2325,15 @@ fn emit_instruction(
                 } else {
                     "(void)0".to_string()
                 }
+            } else if callee == "panic"
+                && args.len() == 1
+                && *ty == Ty::Void
+                && value_ty(values, args[0])? == Ty::String
+            {
+                format!(
+                    "({{ fprintf(stderr, \"runtime error: panic: %s\\n\", {}); exit(1); }})",
+                    codes[0]
+                )
             } else if callee == "hash" && args.len() == 1 && *ty == Ty::Int {
                 // Keep scalar hash calls on the same stable runtime helpers as
                 // the legacy emitter.  `std.viz::uid` uses String hashing to
@@ -2341,6 +2350,28 @@ fn emit_instruction(
                     _ => return Err(()),
                 };
                 format!("(int64_t)({hash})")
+            } else if matches!(callee.as_str(), "cov" | "corr") && args.len() == 2 {
+                let left_ty = value_ty(values, args[0])?;
+                let right_ty = value_ty(values, args[1])?;
+                let (Ty::Applied(left_name, left_args), Ty::Applied(right_name, right_args)) =
+                    (&left_ty, &right_ty)
+                else {
+                    return Err(());
+                };
+                if left_name != "Array"
+                    || right_name != "Array"
+                    || left_args.len() != 1
+                    || right_args.len() != 1
+                    || left_args[0] != right_args[0]
+                    || !matches!(left_args[0], Ty::Float | Ty::Float32)
+                    || *ty != left_args[0]
+                    || !array_supported(&left_ty)
+                    || !array_supported(&right_ty)
+                {
+                    return Err(());
+                }
+                let array_c_name = array_name(&left_ty).ok_or(())?;
+                format!("{array_c_name}_{callee}({}, {})", codes[0], codes[1])
             } else if callee == "rng"
                 && args.len() == 1
                 && value_ty(values, args[0])? == Ty::Int

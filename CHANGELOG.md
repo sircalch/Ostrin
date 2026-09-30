@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Native IR: DataFrame error paths and correlation
+
+- `panic(String)` and array `cov`/`corr` now lower through the verified IR/C backend for
+  `Float` and `Float32` arrays.
+- `examples/dataframe.ostrin` keeps its nested `List<List<String>>` column traversal on IR/C
+  with interpreter/native/WASI parity, a checked native panic message and zero leaks.
+
 ### Native IR: nested CSV lists
 
 - `parse_csv` now lowers through IR/C for `List<List<String>>`, preserving quoted fields and
