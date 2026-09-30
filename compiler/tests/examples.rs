@@ -3179,6 +3179,66 @@ fn native_ir_emitter_handles_scalar_functions() {
 }
 
 #[test]
+fn native_ir_assert_builtins_preserve_parity() {
+    let file = example_path("testing.ostrin");
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    let expected = stdout(&interpreted).replace("\r\n", "\n");
+
+    let report = run(&["--native-type-report", &file]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("ast-fallback: 0"),
+        "assert/assert_eq helpers left an AST fallback: {report_text}"
+    );
+    assert!(
+        report_text.contains("ir-generated: 5"),
+        "assert/assert_eq helpers did not lower all test functions: {report_text}"
+    );
+
+    let exe = temp_artifact("native_ir_assert_builtins.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run native assert binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "native assert helpers leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn channel_move_analysis_respects_mutually_exclusive_cfg_paths() {
     let file = temp_source(
         "e1101-exclusive-paths.ostrin",

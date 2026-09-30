@@ -3159,6 +3159,26 @@ fn emit_instruction(
                 } else {
                     return Err(());
                 }
+            } else if callee == "assert"
+                && args.len() == 1
+                && *ty == Ty::Void
+                && value_ty(values, args[0])? == Ty::Bool
+            {
+                format!(
+                    "({{ if (!({})) {{ fprintf(stderr, \"runtime error: assertion failed\\n\"); exit(1); }} }})",
+                    codes[0]
+                )
+            } else if callee == "assert_eq" && args.len() == 2 && *ty == Ty::Void {
+                let left_ty = value_ty(values, args[0])?;
+                let right_ty = value_ty(values, args[1])?;
+                if left_ty != right_ty || !supported(&left_ty, records) {
+                    return Err(());
+                }
+                let equal =
+                    helper(HelperRequest::Equality, &codes[0], &codes[1], &left_ty).ok_or(())?;
+                format!(
+                    "({{ if (!{equal}) {{ fprintf(stderr, \"runtime error: assertion failed: left != right\\n\"); exit(1); }} }})"
+                )
             } else {
                 let Some(c_function) = known_functions.get(callee) else {
                     return Err(());

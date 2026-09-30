@@ -474,7 +474,7 @@ fn native_backend_types_agree_with_the_checker() {
     // through the same IR/C path. HIR now
     // substitutes the concrete owner for `Self` in trait method signatures,
     // allowing Complex arithmetic/equality to use IR/C. The verified baseline is
-    // 69 AST fallbacks (6,459 IR and 21 HIR functions). Trait default methods
+    // 63 AST fallbacks (6,465 IR and 21 HIR functions). Trait default methods
     // now lower once per concrete impl through the same typed IR path, while
     // compound quantity-array labels have explicit ownership in the native
     // runtime. The experimental
@@ -493,7 +493,11 @@ fn native_backend_types_agree_with_the_checker() {
     // List<Array<Int|Float|Float32|Bool>> now uses the generated pointer-backed
     // list runtime as well. `viz_orbits` removes its two entry-point fallbacks,
     // keeps interpreter/native/WASI parity and reaches zero live allocations.
-    const MAX_AST_FALLBACK_FUNCTIONS: usize = 69;
+    // The assertion builtins now lower through IR/C as well, covering the
+    // three test helpers in both `testing.ostrin` and `testing_failure.ostrin`.
+    // This removes six more fallback functions while preserving their exact
+    // failure messages and leak-check behavior.
+    const MAX_AST_FALLBACK_FUNCTIONS: usize = 63;
     assert!(
         ast_fallback <= MAX_AST_FALLBACK_FUNCTIONS,
         "AST fallback grew to {ast_fallback} functions (ratchet limit {MAX_AST_FALLBACK_FUNCTIONS})"
