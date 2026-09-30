@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-29 · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 254 de integración y 2 unitarias en verde.*
+*Corte: 2026-09-29 · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 255 de integración y 2 unitarias en verde.*
 
 Validación remota: Pages, CI, CodeQL, sanitizers y auditoría de seguridad pasaron para el
 ciclo actual en Windows, Linux, macOS y web. La compuerta oficial exige `cargo fmt --check`, Clippy con el lint `suspicious`, la suite del
@@ -469,8 +469,9 @@ El trabajo se cierra con cuatro evidencias, en este orden:
    la release, el sitio y [`docs/linguist.md`](docs/linguist.md).
 
 El borrador, el requisito de uso público y el procedimiento reproducible ya están documentados
-en [`docs/linguist.md`](docs/linguist.md). Hasta completar los puntos 1–3 no se añadirá una
-regla local de `.gitattributes` que pueda aparentar reconocimiento oficial.
+en [`docs/linguist.md`](docs/linguist.md), y el snapshot ejecutable de búsqueda pública queda
+registrado en [`docs/linguist-usage.md`](docs/linguist-usage.md). Hasta completar los puntos 1–3
+no se añadirá una regla local de `.gitattributes` que pueda aparentar reconocimiento oficial.
 
 ---
 
@@ -499,7 +500,7 @@ sus evidencias y validación upstream.
 
 ```powershell
 cd compiler
-    cargo test                                   # 6 diferenciales + 254 de integración + 2 unitarias
+    cargo test                                   # 6 diferenciales + 255 de integración + 2 unitarias
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```

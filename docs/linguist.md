@@ -4,6 +4,10 @@ Ostrin todavía no aparece como lenguaje oficial en GitHub. Esta página separa 
 que ya está preparado en el repositorio de lo que depende de uso público y de la
 aceptación de `github/linguist`.
 
+El snapshot reproducible de la búsqueda de uso público y sus límites se mantiene en
+[`docs/linguist-usage.md`](linguist-usage.md); un contador del repositorio propio no
+se presenta como evidencia de adopción externa.
+
 ## Entrada propuesta
 
 La entrada que se llevaría a `lib/linguist/languages.yml` es:

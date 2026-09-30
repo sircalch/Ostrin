@@ -78,9 +78,11 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
 5. **Objetivo de distribución y reconocimiento en GitHub Linguist**: reunir uso público
    distribuido y licencias trazables; preparar la definición de lenguaje (`languages.yml`,
    extensiones, gramática y muestras); mantener el borrador en `docs/linguist.md`; validarla
-   contra `github-linguist`; y abrir la propuesta upstream. Después de su aceptación y de una
-   versión publicada de Linguist, verificar la clasificación de `.ostrin` en GitHub y
-   documentar el resultado en la release y el sitio.
+   contra `github-linguist`; conservar el snapshot reproducible de uso en
+   [`docs/linguist-usage.md`](docs/linguist-usage.md); y abrir la propuesta upstream solo
+   cuando se cumplan los criterios de uso. Después de su aceptación y de una versión publicada
+   de Linguist, verificar la clasificación de `.ostrin` en GitHub y documentar el resultado en
+   la release y el sitio.
 6. **Continuar el frente profesional de visualización y web**: ampliar `std.viz` con
    campos vectoriales 2D (`quiver` y `streamplot`), gráficas estadísticas (incluidos violines KDE y hexbin), bandas de contorno rellenas y consolidar la selección enlazada, mantener tablas reproducibles con filtro y
    ordenamiento en el explorador, conservar ejemplos verificables en la galería, ampliar animaciones,
