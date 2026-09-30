@@ -204,12 +204,12 @@ fn array_supported(ty: &Ty) -> bool {
 }
 
 /// Lists of arrays use the generated pointer-backed list runtime. Quantity
-/// arrays keep a unit tag and remain on their established fallback until a
-/// nested ownership contract covers that tag as well.
+/// arrays share the `Array_Float` backing and carry their unit tag in the
+/// array header, so the existing retain/release contract applies to them too.
 fn list_array_supported(ty: &Ty) -> bool {
     matches!(
         array_element(ty),
-        Some(Ty::Int | Ty::Float | Ty::Float32 | Ty::Bool)
+        Some(Ty::Int | Ty::Float | Ty::Float32 | Ty::Bool | Ty::Quantity(_))
     )
 }
 
@@ -370,7 +370,10 @@ fn mangle_option_payload(ty: &Ty, records: &RecordFields) -> String {
             format!("Set_{}", mangle_scalar(element))
         }
         Ty::Applied(name, args) if name == "Array" && args.len() == 1 && array_supported(ty) => {
-            format!("Array_{}", mangle_scalar(&args[0]))
+            match &args[0] {
+                Ty::Quantity(_) => "Array_Float".to_string(),
+                element => format!("Array_{}", mangle_scalar(element)),
+            }
         }
         Ty::Applied(name, args)
             if name == "Option" && args.len() == 1 && option_supported(&args[0], records) =>

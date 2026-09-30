@@ -7649,6 +7649,85 @@ fn native_quantity_array_compound_units_release_owned_labels() {
 }
 
 #[test]
+fn native_list_of_quantity_arrays_matches_interpreter_and_wasi() {
+    let file = temp_source(
+        "native-list-quantity-arrays.ostrin",
+        "fn main() -> Void {\n    first = array([1 m, 2 m]) / (1 s)\n    second = array([3 m, 4 m]) / (1 s)\n    grouped: List<Array<Quantity<Length / Time>>> = [first, second]\n    print(grouped.length())\n    print(grouped[0])\n    print(grouped[1])\n}\n",
+    );
+    let expected = "2\n[1, 2] m/s\n[3, 4] m/s\n";
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    if skip_if_no_c_compiler(&report) {
+        let _ = fs::remove_file(&file);
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "native report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ir-generated: 1"), "{report_text}");
+    assert!(report_text.contains("hir-generated: 0"), "{report_text}");
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "WASI C emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("struct List_Array_Float {"),
+        "WASI source omitted List<Array<Quantity<D>>> runtime"
+    );
+    assert!(
+        wasi_source.contains("struct Array_Float {"),
+        "WASI source omitted Array<Quantity<D>> backing runtime"
+    );
+    assert!(
+        wasi_source.contains("ostrin_qa_tag_owned"),
+        "WASI source omitted owned quantity-array unit tagging"
+    );
+
+    let exe = temp_artifact("native-list-quantity-arrays.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run list quantity-array binary");
+    let _ = fs::remove_file(&exe);
+    let _ = fs::remove_file(&file);
+    assert!(
+        native.status.success(),
+        "native binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "list quantity-array ownership leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn native_backend_monomorphizes_one_list_struct_per_element_type() {
     let out = run(&["--emit-c", &example_path("native_lists.ostrin")]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));

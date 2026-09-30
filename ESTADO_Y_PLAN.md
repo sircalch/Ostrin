@@ -181,6 +181,9 @@ temporales y mantiene paridad en nativo y WASI.
 Las listas de arrays numéricos (`List<Array<Int|Float|Float32|Bool>>`) también usan IR/C:
 el runtime retiene cada array al insertarlo y el destructor de la lista libera sus elementos.
 `viz_orbits.ostrin` conserva paridad intérprete/nativo/WASI y termina con `live_allocations=0`.
+Las listas de arrays con cantidades (`List<Array<Quantity<D>>>`) reutilizan el backing
+`Array_Float`, conservan su etiqueta de unidad y liberan cada array desde el destructor
+de la lista; la prueba nativa confirma paridad y `live_allocations=0`.
 Los iteradores genéricos sustituyen el elemento concreto de `impl Iterator<T>` también para
 payloads gestionados anidados como `List<String>`, con paridad y `live_allocations=0` bajo
 `--leak-check`.
