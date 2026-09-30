@@ -7021,6 +7021,94 @@ fn native_hir_handles_collections_core() {
 }
 
 #[test]
+fn native_hir_list_option_string_ownership() {
+    let file = temp_source(
+        "native-hir-list-option-string.ostrin",
+        r#"
+fn main() -> Void {
+    mut pushed: List<Option<String>> = []
+    pushed.push(Some("push " + "payload"))
+    pushed.push(None<String>())
+
+    literal: List<Option<String>> = [Some("literal " + "payload"), None<String>()]
+    print(pushed[0].unwrap())
+    print(pushed[1].is_none())
+    print(literal[0].unwrap())
+    print(literal[1].is_none())
+}
+"#,
+    );
+    let expected = "push payload\ntrue\nliteral payload\ntrue\n";
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    if skip_if_no_c_compiler(&report) {
+        let _ = fs::remove_file(&file);
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("hir-generated: 1") && report_text.contains("ast-fallback: 0"),
+        "List<Option<String>> did not stay on HIR: {report_text}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "List<Option<String>> WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("struct List_Option_String")
+            && wasi_source.contains("List_Option_String_push")
+            && wasi_source.contains(".has")
+            && wasi_source.contains("ostrin_retain")
+            && wasi_source.contains("ostrin_release"),
+        "WASI C omitted recursive List<Option<String>> ownership helpers"
+    );
+
+    let exe = temp_artifact("native-hir-list-option-string.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    assert!(
+        compile.status.success(),
+        "native leak-check compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run List<Option<String>> binary");
+    let _ = fs::remove_file(&exe);
+    let _ = fs::remove_file(&file);
+    assert!(
+        native.status.success(),
+        "native List<Option<String>> run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "List<Option<String>> leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn native_ir_handles_captured_closures_core() {
     // Captured closures, including a nested closure with a transitive
     // environment, a named function used as a value and the list combinators

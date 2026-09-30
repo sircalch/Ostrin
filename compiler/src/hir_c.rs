@@ -277,12 +277,46 @@ impl Emitter<'_> {
     }
 
     fn managed(&self, ty: &Ty) -> bool {
+        self.retain_managed_value("__hir_managed", ty).is_some()
+    }
+
+    /// Emits a retain for a value that may contain a managed reference behind
+    /// a by-value Option/Result wrapper. HIR values use the same ref-counted
+    /// runtime as the AST/IR emitters, but wrappers themselves are C structs,
+    /// so they must never be cast to `void*` directly.
+    fn retain_managed_value(&self, access: &str, ty: &Ty) -> Option<String> {
         match ty {
-            Ty::String | Ty::List(_) | Ty::Map(_, _) | Ty::Set(_) => true,
-            Ty::Named(name) => self.world.records.contains_key(name),
-            Ty::Applied(..) => self.world.applied_records.contains_key(&ty.describe()),
-            _ => false,
+            Ty::String | Ty::List(_) | Ty::Map(_, _) | Ty::Set(_) => {
+                Some(format!("ostrin_retain((void*)({access}))"))
+            }
+            Ty::Named(name) if self.world.records.contains_key(name) => {
+                Some(format!("ostrin_retain((void*)({access}))"))
+            }
+            Ty::Applied(..) if self.world.applied_records.contains_key(&ty.describe()) => {
+                Some(format!("ostrin_retain((void*)({access}))"))
+            }
+            Ty::Applied(name, args) if name == "Option" && args.len() == 1 => self
+                .retain_managed_value(&format!("({access}).value"), &args[0])
+                .map(|body| format!("if (({access}).has) {{ {body}; }}")),
+            Ty::Applied(name, args) if name == "Result" && args.len() == 2 => {
+                let ok = self.retain_managed_value(&format!("({access}).value"), &args[0]);
+                let err = self.retain_managed_value(&format!("({access}).error"), &args[1]);
+                match (ok, err) {
+                    (Some(ok), Some(err)) => {
+                        Some(format!("if (({access}).ok) {{ {ok}; }} else {{ {err}; }}"))
+                    }
+                    (Some(ok), None) => Some(format!("if (({access}).ok) {{ {ok}; }}")),
+                    (None, Some(err)) => Some(format!("if (!({access}).ok) {{ {err}; }}")),
+                    (None, None) => None,
+                }
+            }
+            _ => None,
         }
+    }
+
+    fn release_managed_value(&self, access: &str, ty: &Ty) -> Option<String> {
+        self.retain_managed_value(access, ty)
+            .map(|body| body.replace("ostrin_retain", "ostrin_release"))
     }
 
     fn borrowed_expr(expr: &HirExpr) -> bool {
@@ -312,7 +346,9 @@ impl Emitter<'_> {
             return;
         }
         if borrowed {
-            out.push_str(&format!("    ostrin_retain((void*){name});\n"));
+            if let Some(retain) = self.retain_managed_value(name, ty) {
+                out.push_str(&format!("    {retain};\n"));
+            }
         }
         if self.scopes.len() == 1 {
             if !self.owned_local(name) {
@@ -333,14 +369,18 @@ impl Emitter<'_> {
                 if transfer == Some(name.as_str()) || !self.managed(ty) {
                     continue;
                 }
-                out.push_str(&format!("    ostrin_release((void*){name});\n"));
+                if let Some(release) = self.release_managed_value(name, ty) {
+                    out.push_str(&format!("    {release};\n"));
+                }
             }
         }
         for (name, ty) in self.owned_locals.iter().rev() {
             if transfer == Some(name.as_str()) || !self.managed(ty) {
                 continue;
             }
-            out.push_str(&format!("    ostrin_release((void*){name});\n"));
+            if let Some(release) = self.release_managed_value(name, ty) {
+                out.push_str(&format!("    {release};\n"));
+            }
         }
     }
 
@@ -351,7 +391,9 @@ impl Emitter<'_> {
         for frame in self.owned_block_locals[start..].iter().rev() {
             for (name, ty) in frame.iter().rev() {
                 if self.managed(ty) {
-                    out.push_str(&format!("    ostrin_release((void*){name});\n"));
+                    if let Some(release) = self.release_managed_value(name, ty) {
+                        out.push_str(&format!("    {release};\n"));
+                    }
                 }
             }
         }
@@ -367,7 +409,9 @@ impl Emitter<'_> {
     fn end_loop(&mut self, frame: usize, out: &mut String) {
         for (name, ty) in self.owned_block_locals[frame].iter().rev() {
             if self.managed(ty) {
-                out.push_str(&format!("    ostrin_release((void*){name});\n"));
+                if let Some(release) = self.release_managed_value(name, ty) {
+                    out.push_str(&format!("    {release};\n"));
+                }
             }
         }
         self.owned_block_locals
@@ -391,7 +435,9 @@ impl Emitter<'_> {
             out.push_str(&format!("    {cty} {temp} = {code};\n"));
             let transfer = expr.and_then(|value| self.owned_local_expr(value));
             if transfer.is_none() && expr.is_some_and(Self::borrowed_expr) {
-                out.push_str(&format!("    ostrin_retain((void*){temp});\n"));
+                if let Some(retain) = self.retain_managed_value(&temp, ty) {
+                    out.push_str(&format!("    {retain};\n"));
+                }
             }
             self.cleanup(out, transfer.as_deref());
             out.push_str(&format!("    return {temp};\n"));
@@ -456,7 +502,9 @@ impl Emitter<'_> {
         self.scopes.pop();
         for (name, ty) in self.owned_block_locals[frame].iter().rev() {
             if self.managed(ty) {
-                out.push_str(&format!("    ostrin_release((void*){name});\n"));
+                if let Some(release) = self.release_managed_value(name, ty) {
+                    out.push_str(&format!("    {release};\n"));
+                }
             }
         }
         self.owned_block_locals
@@ -493,11 +541,12 @@ impl Emitter<'_> {
                         let ty = self.c_type(&value.ty)?;
                         out.push_str(&format!("    {ty} {temp} = {code};\n"));
                         if Self::borrowed_expr(value) {
-                            out.push_str(&format!("    ostrin_retain((void*){temp});\n"));
+                            if let Some(retain) = self.retain_managed_value(&temp, &value.ty) {
+                                out.push_str(&format!("    {retain};\n"));
+                            }
                         }
-                        out.push_str(&format!(
-                            "    ostrin_release((void*){name}); {name} = {temp};\n"
-                        ));
+                        let release = self.release_managed_value(name, &value.ty).ok_or(())?;
+                        out.push_str(&format!("    {release}; {name} = {temp};\n"));
                     } else {
                         out.push_str(&format!("    {name} = {code};\n"));
                     }
@@ -519,12 +568,16 @@ impl Emitter<'_> {
                     return Err(());
                 }
                 let (o, v) = (self.expr(obj)?, self.expr(value)?);
-                if Self::managed_c_type(&field_ty) {
+                if self.managed(&value.ty) {
                     // Same ownership as the AST path: the field keeps its own
                     // reference to the new value and drops the old one.
                     let temp = self.next_temp();
+                    let retain = self.retain_managed_value(&temp, &value.ty).ok_or(())?;
+                    let release = self
+                        .release_managed_value(&format!("({o})->{field}"), &value.ty)
+                        .ok_or(())?;
                     out.push_str(&format!(
-                        "    {field_ty} {temp} = {v}; ostrin_retain((void*){temp}); ostrin_release_owned((void*)({o})->{field}); ({o})->{field} = {temp};\n"
+                        "    {field_ty} {temp} = {v}; {retain}; {release}; ({o})->{field} = {temp};\n"
                     ));
                 } else {
                     out.push_str(&format!("    {o}->{field} = {v};\n"));
@@ -884,13 +937,17 @@ impl Emitter<'_> {
             let temp = self.next_temp();
             body.push_str(&format!("    {cty} {temp} = {tail};\n"));
             if transfer.is_none() && tail_expr.is_some_and(|value| Self::borrowed_expr(value)) {
-                body.push_str(&format!("    ostrin_retain((void*){temp});\n"));
+                if let Some(retain) = self.retain_managed_value(&temp, &tail_ty) {
+                    body.push_str(&format!("    {retain};\n"));
+                }
             }
             for (name, ty) in self.owned_block_locals[frame].iter().rev() {
                 if transfer == Some(name.clone()) || !self.managed(ty) {
                     continue;
                 }
-                body.push_str(&format!("    ostrin_release((void*){name});\n"));
+                if let Some(release) = self.release_managed_value(name, ty) {
+                    body.push_str(&format!("    {release};\n"));
+                }
             }
             format!("({{ {body} {temp}; }})")
         } else {
@@ -898,7 +955,9 @@ impl Emitter<'_> {
                 if !self.managed(ty) {
                     continue;
                 }
-                body.push_str(&format!("    ostrin_release((void*){name});\n"));
+                if let Some(release) = self.release_managed_value(name, ty) {
+                    body.push_str(&format!("    {release};\n"));
+                }
             }
             format!("({{ {body} {tail}; }})")
         };
@@ -1368,8 +1427,11 @@ impl Emitter<'_> {
         let value = self.expr(&args[0].value)?;
         if self.managed(&expected) && Self::borrowed_expr(&args[0].value) {
             let temp = self.next_temp();
+            let retain = self
+                .retain_managed_value(&format!("{temp}.{field}"), &expected)
+                .ok_or(())?;
             Ok(format!(
-                "({{ {container} {temp} = (({container}){{ {flag}, .{field} = {value} }}); ostrin_retain((void*){temp}.{field}); {temp}; }})"
+                "({{ {container} {temp} = (({container}){{ {flag}, .{field} = {value} }}); {retain}; {temp}; }})"
             ))
         } else {
             Ok(format!("(({container}){{ {flag}, .{field} = {value} }})"))
@@ -1657,22 +1719,28 @@ impl Emitter<'_> {
             return Err(());
         };
         let elem_c = self.c_type(elem)?;
-        let mut codes = Vec::with_capacity(values.len());
-        for value in values {
-            if !c_compatible(&self.c_type(&value.ty)?, &elem_c) {
-                return Err(());
-            }
-            codes.push(self.expr(value)?);
-        }
         let name = self.mangle_type(&e.ty)?;
         if values.is_empty() {
             return Ok(format!("{name}_new_from_array(NULL, 0)"));
         }
-        Ok(format!(
-            "{name}_new_from_array(({elem_c}[]){{ {} }}, {})",
-            codes.join(", "),
-            values.len()
-        ))
+        let temp = self.next_temp();
+        let mut body = format!("{name}* {temp} = {name}_new_from_array(NULL, 0); ");
+        for value in values {
+            if !c_compatible(&self.c_type(&value.ty)?, &elem_c) {
+                return Err(());
+            }
+            let code = self.expr(value)?;
+            if self.managed(elem) && !Self::borrowed_expr(value) {
+                let item = self.next_temp();
+                let release = self.release_managed_value(&item, elem).ok_or(())?;
+                body.push_str(&format!(
+                    "{elem_c} {item} = {code}; {name}_push({temp}, {item}); {release}; "
+                ));
+            } else {
+                body.push_str(&format!("{name}_push({temp}, {code}); "));
+            }
+        }
+        Ok(format!("({{ {body} {temp}; }})"))
     }
 
     fn set_literal(&mut self, e: &HirExpr, values: &[HirExpr]) -> Bail<String> {
@@ -1749,7 +1817,15 @@ impl Emitter<'_> {
                     return Err(());
                 }
                 let value = self.expr(&args[0].value)?;
-                Ok(format!("{name}_push({recv_code}, {value})"))
+                if self.managed(elem) && !Self::borrowed_expr(&args[0].value) {
+                    let temp = self.next_temp();
+                    let release = self.release_managed_value(&temp, elem).ok_or(())?;
+                    Ok(format!(
+                        "({{ {elem_c} {temp} = {value}; {name}_push({recv_code}, {temp}); {release}; }})"
+                    ))
+                } else {
+                    Ok(format!("{name}_push({recv_code}, {value})"))
+                }
             }
             "remove_at" if args.len() == 1 && e.ty == **elem => {
                 if args[0].value.ty != Ty::Int {
@@ -1815,11 +1891,15 @@ impl Emitter<'_> {
                 let out_name = self.mangle_type(&out_ty)?;
                 let out_temp = self.next_temp();
                 let fn_type = self.closure_fn_type(params, ret)?;
+                let release_item = self
+                    .release_managed_value("__hir_item", ret)
+                    .map(|code| format!(" {code};"))
+                    .unwrap_or_default();
                 head.push_str(&format!(
                     "{closure_code}; {out_name}* {out_temp} = {out_name}_new_from_array(NULL, 0); for (int64_t {index_temp} = 0; {index_temp} < {list_temp}->length; {index_temp}++) {{ {out_c} __hir_item = (({fn_type}){closure_temp}.fn)({closure_temp}.env, {list_temp}->items[{index_temp}]); "
                 ));
                 head.push_str(&format!(
-                    "{out_name}_push({out_temp}, __hir_item); }} {out_temp}; }})"
+                    "{out_name}_push({out_temp}, __hir_item);{release_item} }} {out_temp}; }})"
                 ));
                 return Ok(head);
             }

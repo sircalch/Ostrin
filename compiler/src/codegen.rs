@@ -9631,15 +9631,19 @@ fn generate_impl(
             ));
 
             let drop_sig = format!("static void {struct_name}_drop(void* raw)");
+            let drop_items = release_managed_value("list->items[i]", &elem_ty)
+                .map(|body| {
+                    format!("    for (int64_t i = 0; i < list->length; i++) {{ {body}; }}\n")
+                })
+                .unwrap_or_default();
             let drop_body = format!(
                 "    {struct_name}* list = ({struct_name}*)raw;\n    if (!list) return;\n{}    if (list->items) ostrin_free(list->items);\n",
-                if is_reference_type(&elem_ty) {
-                    format!("    for (int64_t i = 0; i < list->length; i++) ostrin_release((void*)list->items[i]);\n")
-                } else {
-                    String::new()
-                }
+                drop_items
             );
             let new_sig = format!("static {struct_name}* {struct_name}_new_from_array({elem_c}* src_items, int64_t count)");
+            let retain_new_item = retain_managed_value("list->items[i]", &elem_ty)
+                .map(|body| format!(" {body};"))
+                .unwrap_or_default();
             let new_body = format!(
                 "    {struct_name}* list = ({struct_name}*)ostrin_alloc_with_drop(sizeof({struct_name}), (void (*)(void*)){struct_name}_drop);\n\
                  \x20   if (!list) {{ fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); }}\n\
@@ -9649,11 +9653,14 @@ fn generate_impl(
                  \x20   if (!list->items) {{ fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); }}\n\
                  \x20   for (int64_t i = 0; i < count; i++) {{ list->items[i] = src_items[i];{retain} }}\n\
                   \x20   return list;\n",
-                retain = if is_reference_type(&elem_ty) { " ostrin_retain((void*)list->items[i]);" } else { "" }
+                retain = retain_new_item
             );
 
             let push_sig =
                 format!("static void {struct_name}_push({struct_name}* list, {elem_c} value)");
+            let retain_push_item = retain_managed_value("value", &elem_ty)
+                .map(|body| format!(" {body};"))
+                .unwrap_or_default();
             let push_body = format!(
                 "    if (list->length >= list->capacity) {{\n\
                  \x20       list->capacity = list->capacity == 0 ? 4 : list->capacity * 2;\n\
@@ -9662,7 +9669,7 @@ fn generate_impl(
                  \x20   }}\n\
                  \x20   list->items[list->length] = value;{retain}\n\
                  \x20   list->length = list->length + 1;\n",
-                retain = if is_reference_type(&elem_ty) { " ostrin_retain((void*)value);" } else { "" }
+                retain = retain_push_item
             );
 
             let length_sig = format!("static int64_t {struct_name}_length({struct_name}* list)");
