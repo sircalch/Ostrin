@@ -13,6 +13,9 @@
   `m/s` labels are released exactly once.
 - IR-generated programs that use only `Array<Quantity<D>>` now materialize the
   `Array<Float>` backing runtime, including native and WASI C emission.
+- `List<Array<Quantity<D>>>` now uses the pointer-backed list runtime over the
+  existing `Array<Float>` storage, with interpreter/native/WASI parity and a
+  native leak-check proving `live_allocations=0`.
 - Native record destructors now release references nested inside `Option` and
   `Result` fields, with leak-check coverage for `Option<String>` payloads.
 

@@ -35,7 +35,9 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    integrales e interpolación con cantidades. Esta pasada añade aritmética elemento a elemento,
    comparaciones, reducciones, negación, cortes por rango, conversiones y `to_list` de arrays
    con unidades, con helpers IR que preservan la etiqueta; quedan cambios de forma complejos y
-   agregados anidados para ciclos posteriores.
+   agregados anidados para ciclos posteriores. `List<Array<Quantity<D>>>` ya reutiliza el backing
+   `Array_Float`, conserva la etiqueta de unidad y libera cada array desde el destructor de la lista,
+   con paridad intérprete/nativo/WASI y `live_allocations=0` en la prueba dedicada.
    La representación de arrays consume ahora sus temporales de texto; `quantity_arrays.ostrin`
    registra `live_allocations=14` bajo leak-check nativo. Las expresiones escalares y las etiquetas
    de arrays que escapan a valores/listas quedan como deuda de ownership para un pase posterior.

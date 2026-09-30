@@ -2773,6 +2773,20 @@ impl<'a> Codegen<'a> {
             self.ensure_list(elem);
         }
     }
+
+    /// IR can construct a nested list directly in a function body, without
+    /// exposing that collection in a signature or a legacy `gen_expr` path.
+    /// Queue the shared `Array_Float` backing and its pointer-backed list when
+    /// the IR body uses `List<Array<Quantity<D>>>`.
+    fn register_ir_generated_collection_types(&mut self, body: &str) {
+        if body.contains("ostrin_qa_") {
+            self.uses_quantity_arrays = true;
+            self.register_list_types(&CType::Array(Box::new(CType::Float)));
+        }
+        if body.contains("List_Array_Float") {
+            self.register_list_types(&CType::List(Box::new(CType::Array(Box::new(CType::Float)))));
+        }
+    }
 }
 
 impl<'a> Codegen<'a> {
@@ -9385,10 +9399,7 @@ fn generate_impl(
                             ir_helper_prototypes.push(format!("{helper_signature};"));
                             bodies.push((helper_signature, helper_body));
                         }
-                        if generated.body.contains("ostrin_qa_") {
-                            codegen.uses_quantity_arrays = true;
-                            codegen.register_list_types(&CType::Array(Box::new(CType::Float)));
-                        }
+                        codegen.register_ir_generated_collection_types(&generated.body);
                         generated.body
                     })
                 }),
@@ -9512,10 +9523,7 @@ fn generate_impl(
                             ir_helper_prototypes.push(format!("{helper_signature};"));
                             bodies.push((helper_signature, helper_body));
                         }
-                        if generated.body.contains("ostrin_qa_") {
-                            codegen.uses_quantity_arrays = true;
-                            codegen.register_list_types(&CType::Array(Box::new(CType::Float)));
-                        }
+                        codegen.register_ir_generated_collection_types(&generated.body);
                         generated.body
                     })
                 }),
@@ -9579,10 +9587,10 @@ fn generate_impl(
         }
         bodies.push((signature, body));
     }
-    // The IR emitter can lower Array<Quantity<D>> operations without visiting
-    // the legacy expression path that registers collection runtimes. Its C
-    // body still stores the scalar payload in Array<Float>, so queue that
-    // backing runtime before draining the pending collection types.
+    // The IR emitter can lower Array<Quantity<D>> operations and nested lists
+    // without visiting the legacy expression path that registers collection
+    // runtimes. Queue their shared backing and pointer-list instantiations
+    // before draining the pending collection types.
     let uses_quantity_array_body = bodies.iter().any(|(_, body)| body.contains("ostrin_qa_"));
     if codegen.uses_quantity_arrays || uses_quantity_array_body {
         codegen.register_list_types(&CType::Array(Box::new(CType::Float)));
@@ -10271,10 +10279,7 @@ fn generate_impl(
                         ir_helper_prototypes.push(format!("{helper_signature};"));
                         bodies.push((helper_signature, helper_body));
                     }
-                    if generated.body.contains("ostrin_qa_") {
-                        codegen.uses_quantity_arrays = true;
-                        codegen.register_list_types(&CType::Array(Box::new(CType::Float)));
-                    }
+                    codegen.register_ir_generated_collection_types(&generated.body);
                     generated.body
                 })
             });
