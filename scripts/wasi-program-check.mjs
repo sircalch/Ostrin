@@ -62,6 +62,12 @@ const programs = [
     expected: "2\n3\na|b|c\n3\n1|2|3\n3\n2\nnombre|nota\n2\nPerez, Ana|9.5\n2\ndijo \"hola\"|7\n1\n3\nx|linea1\nlinea2|z\n2\n3\n||\n1\n\n0\ncabecera: invalid digit found in string\n3\n",
   },
   {
+    name: "dataframe",
+    source: "examples/dataframe.ostrin",
+    args: ["dataframe.wasm"],
+    expected: "5\nciudad,temp,lluvia\ntemp: n=5 mean=16.5 std=5.244044240850758 min=10 max=23.5\nlluvia: n=5 mean=2.1 std=1.7146428199482247 min=0 max=4.5\n2\ntemp: n=2 mean=22.5 std=1 min=21.5 max=23.5\n-0.9675629734578927\n",
+  },
+  {
     name: "native_ir_function_values",
     source: "examples/native_ir_function_values.ostrin",
     args: ["native_ir_function_values.wasm"],

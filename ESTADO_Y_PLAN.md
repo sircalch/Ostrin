@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-29 · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 249 de integración y 2 unitarias en verde.*
+*Corte: 2026-09-29 · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 250 de integración y 2 unitarias en verde.*
 
 Validación remota: Pages, CI, CodeQL, sanitizers y auditoría de seguridad pasaron para el
 ciclo actual en Windows, Linux, macOS y web. La compuerta oficial exige `cargo fmt --check`, Clippy con el lint `suspicious`, la suite del
@@ -162,8 +162,8 @@ por separado en `--native-type-report` como `ir-generated`; el mismo informe exp
 `hir-generated` y `ast-fallback` para que la retirada del backend legado tenga un contador
 visible. También publica líneas `native-source` agrupadas por archivo para localizar la deuda
 por módulo; la prueba diferencial comprueba que sus sumas coinciden con el total. En el corte
-actual, la suite de ejemplos suma 6 403 funciones IR, 25 HIR y 121 que aún caen al emisor
-AST; `native_backend_types_agree_with_the_checker` mantiene 121 como trinquete temporal. Los métodos
+actual, la suite de ejemplos suma 6 406 funciones IR, 25 HIR y 118 que aún caen al emisor
+AST; `native_backend_types_agree_with_the_checker` mantiene 118 como trinquete temporal. Los métodos
 de records y enums concretos comparten ahora IR/C cuando sus campos y ownership son compatibles; los
 records recursivos conservan HIR/AST hasta cerrar su contrato de ownership.
 La familia `Rng` también cruza IR/C: constructor, generación escalar, muestreo de arrays y
@@ -176,6 +176,8 @@ temporales y mantiene paridad en nativo y WASI.
 Los iteradores genéricos sustituyen el elemento concreto de `impl Iterator<T>` también para
 payloads gestionados anidados como `List<String>`, con paridad y `live_allocations=0` bajo
 `--leak-check`.
+El ejemplo `dataframe.ostrin` ya cruza IR/C en sus recorridos de `List<List<String>>`, ramas
+`panic` y correlación de arrays, con salida idéntica y cero fallos AST en la prueba nativa.
 El puente IR de `zeros`/`ones`, `norm`, `abs` escalar y `sqrt` redujo el fallback en 348 funciones;
 esta pasada añade conversiones escalares `as<Float/Float32>` y conversiones comprobadas a `Int`/enteros de ancho fijo,
 `abs` sobre arrays y funciones matemáticas
@@ -317,8 +319,8 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
 convendría dividirlos; el backend nativo no comparte el sistema de tipos del checker
-(ya consume los tipos del checker y compara cada nodo; el informe actual suma **6 403 funciones
-generadas desde IR, 25 desde HIR y 121 en fallback AST** en los ejemplos, con un trinquete
+(ya consume los tipos del checker y compara cada nodo; el informe actual suma **6 406 funciones
+generadas desde IR, 25 desde HIR y 118 en fallback AST** en los ejemplos, con un trinquete
 que impide que el fallback aumente sin justificación; los métodos de records y enums concretos
 entran ahora en IR/C cuando sus campos y ownership son compatibles, mientras los records recursivos
 conservan el fallback verificado; las familias migradas incluyen escalares,
@@ -376,7 +378,7 @@ canales de distribución adicionales (la release `v0.1.0`, la CI con matriz y lo
 ### E. Backends adicionales
 El compilador, un programa Ostrin independiente y un proyecto con dependencia `path` ya se
 construyen como `wasm32-wasip1` mediante el workflow WASI, con toolchain fijado, ejecución bajo
-Node WASI y checksums reproducibles. La matriz de once programas también compila y ejecuta un
+Node WASI y checksums reproducibles. La matriz de doce programas también compila y ejecuta un
 contrato real de `args`/`env`, E/S de archivos, ownership gestionado y consumidores anidados
 `Option`/`Result`; un script único captura stdout/stderr,
 compara salidas exactas y limpia los artefactos temporales. La compilación usa el triple vigente
@@ -482,7 +484,7 @@ sus evidencias y validación upstream.
 
 ```powershell
 cd compiler
-    cargo test                                   # 6 diferenciales + 249 de integración + 2 unitarias
+    cargo test                                   # 6 diferenciales + 250 de integración + 2 unitarias
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```
