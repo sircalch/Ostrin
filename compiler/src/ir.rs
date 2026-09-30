@@ -2103,6 +2103,24 @@ impl Builder {
             }
             HirKind::Index(object, index) => {
                 let object = self.lower_expr(object);
+                if let HirKind::Range(start, kind, end, step) = &index.kind {
+                    // Keep range indexing explicit in the IR.  The endpoint
+                    // type is still `Int` in the language, so preserving the
+                    // range kind here avoids losing the slice shape before
+                    // the native backend sees the operation.
+                    let mut inputs = vec![object, self.lower_expr(start), self.lower_expr(end)];
+                    if let Some(step) = step {
+                        inputs.push(self.lower_expr(step));
+                    }
+                    let dst = self.fresh();
+                    self.emit(IrInstr::Opaque {
+                        dst: Some(dst),
+                        op: format!("index_range<{kind:?}>"),
+                        inputs,
+                        ty: expression.ty.clone(),
+                    });
+                    return dst;
+                }
                 let index = self.lower_expr(index);
                 let dst = self.fresh();
                 self.emit(IrInstr::Index {

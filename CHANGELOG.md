@@ -186,8 +186,10 @@
   conversion from `List<Quantity<D>>`. Indexed values preserve the array unit tag, so the unit
   integration and interpolation routines in `std.numeric` can run through the same native CFG
   path as scalar arrays while keeping interpreter/native output identical.
-- Unit-aware array arithmetic and shape-changing methods remain on the verified HIR/AST path
-  until dedicated IR helpers preserve units for every result.
+- Unit-aware elementwise arithmetic, comparisons, negation, reductions, range slices, `as<unit>`
+  conversion and `to_list` now use dedicated IR/C helpers that preserve the unit tag. The
+  `quantity_arrays.ostrin` example matches across interpreter, native and WASI; native leak-check
+  still reports live allocations from the existing unit-text rendering path.
 
 ### Performance evidence: reproducible benchmark dashboard
 - `scripts/benchmark.mjs` now measures eight deterministic workloads spanning scalar loops,

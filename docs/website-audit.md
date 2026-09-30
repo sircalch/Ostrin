@@ -29,7 +29,7 @@ tests or an explicitly labeled early-stage surface.
   intentional error cases.
 - **26** Markdown design documents under `docs/design/`.
 - Compiler suite: **250 integration**, **6 differential** and **2 unit** tests.
-- WASI release smoke matrix: twelve program modules covering the hello program, a local-path
+- WASI release smoke matrix: thirteen program modules covering the hello program, quantity arrays, a local-path
   package, arguments/environment, file I/O, managed ownership and nested `Option`/`Result`
   consumers; compiler and program modules
   are executed under Node WASI.

@@ -9,7 +9,7 @@
 //! `Result<T,E>` values such as `String.to_int()`/`to_float()`; wrappers can
 //! now compose over scalar collections and over other `Option`/`Result` values
 //! with recursive ownership markers. Scalar numeric `Array<T>` 1D constructors,
-//! parameters, indexing, element-wise arithmetic/comparisons and array methods use the same generated C array runtime. Quantity arrays share that storage with a unit tag for typed parameters, indexing and list conversion; unit-aware array arithmetic remains on the HIR/AST path. Straight-line tasks additionally use a
+//! parameters, indexing, element-wise arithmetic/comparisons and array methods use the same generated C array runtime. Quantity arrays share that storage with a unit tag for typed parameters, indexing, list conversion, slices, reductions and unit-aware element-wise arithmetic. Straight-line tasks additionally use a
 //! generated C environment for immutable captures while larger aggregates,
 //! branching task bodies and scopes retain the verified HIR/AST fallback.
 //! The same boundary now also handles scalar casts, deterministic scalar/array
@@ -846,6 +846,318 @@ fn binary_code(
     Ok(format!("(({left}) {symbol} ({right}))"))
 }
 
+fn numeric_scalar(ty: &Ty) -> bool {
+    matches!(ty, Ty::Int | Ty::Float | Ty::Float32 | Ty::Sized(_))
+}
+
+/// Lower the unit-aware array operators that the legacy C emitter already
+/// defines for `Array<Quantity<D>>`.  The quantity array runtime stores the
+/// values in one canonical unit and keeps that unit on the array header; this
+/// helper performs the same conversion and dimension checks before calling
+/// the ordinary `Array_Float` kernels.
+fn quantity_array_binary_code(
+    dst: ValueId,
+    op: BinOp,
+    left: &str,
+    left_ty: &Ty,
+    right: &str,
+    right_ty: &Ty,
+    ty: &Ty,
+) -> Bail<Option<String>> {
+    let left_element = array_element(left_ty).cloned();
+    let right_element = array_element(right_ty).cloned();
+    let involved = matches!(left_element, Some(Ty::Quantity(_)))
+        || matches!(right_element, Some(Ty::Quantity(_)))
+        || matches!(left_ty, Ty::Quantity(_)) && right_element.is_some()
+        || matches!(right_ty, Ty::Quantity(_)) && left_element.is_some();
+    if !involved {
+        return Ok(None);
+    }
+
+    let describe = |name: &str,
+                    ty: &Ty|
+     -> Bail<(
+        String,
+        bool,
+        Option<String>,
+        Option<crate::types::Dimension>,
+    )> {
+        match ty {
+            Ty::Applied(name_ty, args) if name_ty == "Array" && args.len() == 1 => {
+                if !matches!(args[0], Ty::Float | Ty::Quantity(_)) {
+                    return Err(());
+                }
+                let dimension = match &args[0] {
+                    Ty::Quantity(dimension) => Some(dimension.clone()),
+                    _ => None,
+                };
+                let unit = dimension.as_ref().map(|_| format!("({name})->unit"));
+                Ok((name.to_string(), true, unit, dimension))
+            }
+            Ty::Quantity(dimension) => Ok((
+                format!("({name}).v"),
+                false,
+                Some(format!("({name}).u")),
+                Some(dimension.clone()),
+            )),
+            ty if numeric_scalar(ty) => Ok((format!("(double)({name})"), false, None, None)),
+            _ => Err(()),
+        }
+    };
+    let (left_number, left_array, left_unit, left_dimension) =
+        describe("__ostrin_qa_left", left_ty)?;
+    let (right_number, right_array, right_unit, right_dimension) =
+        describe("__ostrin_qa_right", right_ty)?;
+    let left_name = "__ostrin_qa_left";
+    let right_name = "__ostrin_qa_right";
+    let left_decl = if left_array {
+        format!("Array_Float* {left_name} = {left};")
+    } else if matches!(left_ty, Ty::Quantity(_)) {
+        format!("Qty {left_name} = {left};")
+    } else {
+        format!("double {left_name} = (double)({left});")
+    };
+    let right_decl = if right_array {
+        format!("Array_Float* {right_name} = {right};")
+    } else if matches!(right_ty, Ty::Quantity(_)) {
+        format!("Qty {right_name} = {right};")
+    } else {
+        format!("double {right_name} = (double)({right});")
+    };
+    let arithmetic = match op {
+        BinOp::Add => Some(0),
+        BinOp::Sub => Some(1),
+        BinOp::Mul => Some(2),
+        BinOp::Div => Some(3),
+        _ => None,
+    };
+    let comparison = match op {
+        BinOp::Eq => Some(0),
+        BinOp::NotEq => Some(1),
+        BinOp::Lt => Some(2),
+        BinOp::Gt => Some(3),
+        BinOp::LtEq => Some(4),
+        BinOp::GtEq => Some(5),
+        _ => None,
+    };
+    let num = |left_code: &str,
+               left_is_array: bool,
+               right_code: &str,
+               right_is_array: bool,
+               comparison: bool,
+               code: i32|
+     -> Bail<String> {
+        let (array_pair, array_scalar) = if comparison {
+            ("cmp", "cmp_scalar")
+        } else {
+            ("binop", "scalar")
+        };
+        Ok(match (left_is_array, right_is_array) {
+            (true, true) => format!("Array_Float_{array_pair}({left_code}, {right_code}, {code})"),
+            (true, false) => {
+                format!("Array_Float_{array_scalar}({left_code}, {right_code}, {code}, 0)")
+            }
+            (false, true) => {
+                format!("Array_Float_{array_scalar}({right_code}, {left_code}, {code}, 1)")
+            }
+            (false, false) => return Err(()),
+        })
+    };
+    let result_array = match ty {
+        Ty::Applied(name, args) if name == "Array" && args.len() == 1 => args[0].clone(),
+        _ => return Err(()),
+    };
+    let result_c = if result_array == Ty::Bool {
+        "Array_Bool*"
+    } else {
+        "Array_Float*"
+    };
+    let result_name = format!("__ostrin_qa_result_{dst}");
+
+    let mut declarations = format!("{left_decl} {right_decl}");
+    let mut release = String::new();
+    let mut right_code = right_number.clone();
+    let mut right_is_array = right_array;
+    let right_unit_for_operation = right_unit.clone();
+    let right_dimension_for_operation = right_dimension.clone();
+    let mut converted_right = None::<String>;
+    let mut converted_scalar = None::<String>;
+    let mut convert_right = |left_unit: &str| {
+        if right_array {
+            let Some(right_unit) = right_unit.as_deref() else {
+                return;
+            };
+            let name = format!("__ostrin_qa_converted_{dst}");
+            declarations.push_str(&format!(
+                " Array_Float* {name} = ostrin_qa_converted({right_name}, {right_unit}, {left_unit});"
+            ));
+            release = format!("ostrin_release((void*){name});");
+            right_code = name.clone();
+            right_is_array = true;
+            converted_right = Some(name);
+        } else if matches!(right_ty, Ty::Quantity(_)) {
+            let name = format!("__ostrin_qa_scalar_{dst}");
+            declarations.push_str(&format!(
+                " double {name} = ostrin_convert(({right_name}).v, ({right_name}).u, {left_unit});"
+            ));
+            right_code = name.clone();
+            right_is_array = false;
+            converted_scalar = Some(name);
+        }
+    };
+
+    if matches!(op, BinOp::Add | BinOp::Sub) || comparison.is_some() {
+        let left_dimension = left_dimension.clone().ok_or(())?;
+        let right_dimension = right_dimension_for_operation.ok_or(())?;
+        if right_dimension != left_dimension {
+            return Err(());
+        }
+        let left_unit = left_unit.as_deref().ok_or(())?;
+        convert_right(left_unit);
+        let code = num(
+            &left_number,
+            left_array,
+            &right_code,
+            right_is_array,
+            comparison.is_some(),
+            comparison.or(arithmetic).ok_or(())?,
+        )?;
+        let body = if comparison.is_some() {
+            code
+        } else {
+            format!("ostrin_qa_tag({code}, {left_unit})")
+        };
+        let expected = if comparison.is_some() {
+            Ty::Applied("Array".to_string(), vec![Ty::Bool])
+        } else {
+            Ty::Applied("Array".to_string(), vec![Ty::Quantity(left_dimension)])
+        };
+        if *ty != expected {
+            return Err(());
+        }
+        let _ = converted_right;
+        let _ = converted_scalar;
+        return Ok(Some(format!(
+            "({{ {declarations} {result_c} {result_name} = {body}; {release} {result_name}; }})"
+        )));
+    }
+
+    if !matches!(op, BinOp::Mul | BinOp::Div) {
+        return Err(());
+    }
+    let divide = op == BinOp::Div;
+    let code = arithmetic.ok_or(())?;
+    match (left_unit.clone(), right_unit_for_operation.clone()) {
+        (Some(left_unit), Some(right_unit)) => {
+            let left_dimension = left_dimension.clone().ok_or(())?;
+            let right_dimension = right_dimension_for_operation.ok_or(())?;
+            let combined = if divide {
+                dim_div(&left_dimension, &right_dimension)
+            } else {
+                dim_mul(&left_dimension, &right_dimension)
+            };
+            if divide && dim_is_dimensionless(&combined) {
+                convert_right(&left_unit);
+                let body = num(
+                    &left_number,
+                    left_array,
+                    &right_code,
+                    right_is_array,
+                    false,
+                    code,
+                )?;
+                if *ty != Ty::Applied("Array".to_string(), vec![Ty::Float]) {
+                    return Err(());
+                }
+                let _ = converted_right;
+                let _ = converted_scalar;
+                return Ok(Some(format!(
+                    "({{ {declarations} {result_c} {result_name} = {body}; {release} {result_name}; }})"
+                )));
+            }
+            let product = num(
+                &left_number,
+                left_array,
+                &right_number,
+                right_array,
+                false,
+                code,
+            )?;
+            let body = if dim_is_dimensionless(&combined) {
+                format!(
+                    "({{ double __ostrin_qa_scale; const char* __ostrin_qa_unit = ostrin_unit_combine({left_unit}, {right_unit}, 0, &__ostrin_qa_scale); Array_Float* __ostrin_qa_product = {product}; if (__ostrin_qa_scale != 1.0) ostrin_qa_scale(__ostrin_qa_product, __ostrin_qa_scale); if (*__ostrin_qa_unit) ostrin_qa_scale(__ostrin_qa_product, ostrin_unit_expr_factor(__ostrin_qa_unit)); __ostrin_qa_product; }})"
+                )
+            } else {
+                format!(
+                    "({{ double __ostrin_qa_scale; const char* __ostrin_qa_unit = ostrin_unit_combine({left_unit}, {right_unit}, {}, &__ostrin_qa_scale); Array_Float* __ostrin_qa_product = {product}; if (__ostrin_qa_scale != 1.0) ostrin_qa_scale(__ostrin_qa_product, __ostrin_qa_scale); ostrin_qa_tag(__ostrin_qa_product, __ostrin_qa_unit); __ostrin_qa_product; }})",
+                    i32::from(divide)
+                )
+            };
+            let expected = if dim_is_dimensionless(&combined) {
+                Ty::Applied("Array".to_string(), vec![Ty::Float])
+            } else {
+                Ty::Applied("Array".to_string(), vec![Ty::Quantity(combined)])
+            };
+            if *ty != expected {
+                return Err(());
+            }
+            Ok(Some(format!(
+                "({{ {declarations} {result_c} {result_name} = {body}; {release} {result_name}; }})"
+            )))
+        }
+        (Some(left_unit), None) => {
+            let left_dimension = left_dimension.clone().ok_or(())?;
+            let product = num(
+                &left_number,
+                left_array,
+                &right_number,
+                right_array,
+                false,
+                code,
+            )?;
+            let expected = Ty::Applied("Array".to_string(), vec![Ty::Quantity(left_dimension)]);
+            if *ty != expected {
+                return Err(());
+            }
+            let body = format!("ostrin_qa_tag({product}, {left_unit})");
+            Ok(Some(format!(
+                "({{ {declarations} {result_c} {result_name} = {body}; {release} {result_name}; }})"
+            )))
+        }
+        (None, Some(right_unit)) => {
+            let product = num(
+                &left_number,
+                left_array,
+                &right_number,
+                right_array,
+                false,
+                code,
+            )?;
+            let right_dimension = right_dimension_for_operation.ok_or(())?;
+            let result_dimension = if divide {
+                dim_pow(&right_dimension, -1)
+            } else {
+                right_dimension
+            };
+            let expected = Ty::Applied("Array".to_string(), vec![Ty::Quantity(result_dimension)]);
+            if *ty != expected {
+                return Err(());
+            }
+            let body = if divide {
+                format!(
+                    "({{ double __ostrin_qa_scale; const char* __ostrin_qa_unit = ostrin_unit_combine(\"\", {right_unit}, 1, &__ostrin_qa_scale); Array_Float* __ostrin_qa_product = {product}; if (__ostrin_qa_scale != 1.0) ostrin_qa_scale(__ostrin_qa_product, __ostrin_qa_scale); ostrin_qa_tag(__ostrin_qa_product, __ostrin_qa_unit); __ostrin_qa_product; }})"
+                )
+            } else {
+                format!("ostrin_qa_tag({product}, {right_unit})")
+            };
+            Ok(Some(format!(
+                "({{ {declarations} {result_c} {result_name} = {body}; {release} {result_name}; }})"
+            )))
+        }
+        (None, None) => Err(()),
+    }
+}
+
 fn print_code(value: &str, ty: &Ty) -> Bail<String> {
     Ok(match ty {
         Ty::Int => format!("printf(\"%lld\\n\", (long long)({value}))"),
@@ -1131,6 +1443,17 @@ fn emit_instruction(
             operand,
             ty,
         } => {
+            if *op == UnaryOp::Neg
+                && matches!(array_element(ty), Some(Ty::Quantity(_)))
+                && value_ty(values, *operand)? == *ty
+            {
+                let operand_code = value_code(values, *operand)?;
+                let result = format!(
+                    "({{ Array_Float* __ostrin_qa_neg = {operand_code}; Array_Float* __ostrin_qa_result = Array_Float_neg(__ostrin_qa_neg); ostrin_qa_tag(__ostrin_qa_result, __ostrin_qa_neg->unit); __ostrin_qa_result; }})"
+                );
+                out.push_str(&format!("    {} = {result};\n", value_name(*dst)));
+                return Ok(());
+            }
             if (!scalar(ty) && !quantity(ty)) || *ty == Ty::Void {
                 return Err(());
             }
@@ -1152,17 +1475,19 @@ fn emit_instruction(
             let right_ty = value_ty(values, *right)?;
             let left_array = array_element(&left_ty).cloned();
             let right_array = array_element(&right_ty).cloned();
-            // Quantity arrays carry their unit in the runtime header. The
-            // scalar array helpers do not preserve that tag, so keep their
-            // element-wise arithmetic on the established HIR/AST path until
-            // the IR has unit-aware array operators of its own.
-            if matches!(
-                left_array.as_ref().or(right_array.as_ref()),
-                Some(Ty::Quantity(_))
-            ) {
-                return Err(());
-            }
             if left_array.is_some() || right_array.is_some() {
+                if let Some(code) = quantity_array_binary_code(
+                    *dst,
+                    *op,
+                    &value_code(values, *left)?,
+                    &left_ty,
+                    &value_code(values, *right)?,
+                    &right_ty,
+                    ty,
+                )? {
+                    out.push_str(&format!("    {} = {code};\n", value_name(*dst)));
+                    return Ok(());
+                }
                 let left_is_array = left_array.is_some();
                 let right_is_array = right_array.is_some();
                 let arithmetic = match op {
@@ -1858,6 +2183,13 @@ fn emit_instruction(
                         .iter()
                         .map(|arg| value_code(values, *arg))
                         .collect::<Bail<Vec<_>>>()?;
+                    let with_args = |codes: &[String]| {
+                        if codes.is_empty() {
+                            String::new()
+                        } else {
+                            format!(", {}", codes.join(", "))
+                        }
+                    };
                     match method.as_str() {
                         "unit" if codes.is_empty() && quantity(&element) && *ty == Ty::String => {
                             format!("ostrin_unit_cat({receiver}->unit, \"\", \"\")")
@@ -1868,6 +2200,55 @@ fn emit_instruction(
                                 && *ty == Ty::Applied("Array".to_string(), vec![Ty::Float]) =>
                         {
                             format!("ostrin_qa_tag(ostrin_qa_copy({receiver}), NULL)")
+                        }
+                        "sum" | "min" | "max" | "mean" | "median" | "std" | "sample_std"
+                            if quantity(&element) && codes.is_empty() && *ty == element =>
+                        {
+                            format!(
+                                "((Qty){{ Array_Float_{method}({receiver}), {receiver}->unit }})"
+                            )
+                        }
+                        "percentile"
+                            if quantity(&element)
+                                && codes.len() == 1
+                                && value_ty(values, args[0])? == Ty::Float
+                                && *ty == element =>
+                        {
+                            format!(
+                                "((Qty){{ Array_Float_percentile({receiver}, {}), {receiver}->unit }})",
+                                codes[0]
+                            )
+                        }
+                        "var" | "sample_var" if quantity(&element) && codes.is_empty() => {
+                            let Ty::Quantity(dimension) = &element else {
+                                return Err(());
+                            };
+                            let expected = Ty::Quantity(dim_mul(dimension, dimension));
+                            if *ty != expected {
+                                return Err(());
+                            }
+                            format!(
+                                "({{ double __ostrin_q_var_scale; (Qty){{ Array_Float_{method}({receiver}), ostrin_unit_combine({receiver}->unit, {receiver}->unit, 0, &__ostrin_q_var_scale) }}; }})"
+                            )
+                        }
+                        "to_list"
+                            if quantity(&element)
+                                && codes.is_empty()
+                                && *ty == Ty::List(Box::new(element.clone())) =>
+                        {
+                            let list_name =
+                                format!("List_{}", mangle_option_payload(&element, records));
+                            format!(
+                                "({{ {list_name}* __ostrin_q_list = {list_name}_new_from_array(NULL, 0); for (int64_t __ostrin_q_i = 0; __ostrin_q_i < {receiver}->size; __ostrin_q_i++) {list_name}_push(__ostrin_q_list, ((Qty){{ {receiver}->data[__ostrin_q_i], {receiver}->unit }})); __ostrin_q_list; }})"
+                            )
+                        }
+                        "cumsum" | "sort" | "transpose" | "reshape" | "row" | "col"
+                            if quantity(&element) && *ty == array_ty =>
+                        {
+                            format!(
+                                "({{ Array_Float* __ostrin_q_result = Array_Float_{method}({receiver}{}); ostrin_qa_tag(__ostrin_q_result, {receiver}->unit); __ostrin_q_result; }})",
+                                with_args(&codes)
+                            )
                         }
                         "shape" if codes.is_empty() && *ty == Ty::List(Box::new(Ty::Int)) => {
                             format!("{array_c_name}_shape({receiver})")
@@ -2722,7 +3103,15 @@ fn emit_instruction(
                     return Err(());
                 }
                 let arg_ty = value_ty(values, args[0])?;
-                if scalar(&arg_ty) || quantity(&arg_ty) {
+                if matches!(array_element(&arg_ty), Some(Ty::Quantity(_))) {
+                    let float_array = Ty::Applied("Array".to_string(), vec![Ty::Float]);
+                    let shown = helper(HelperRequest::Show, "__ostrin_q_show", "", &float_array)
+                        .ok_or(())?;
+                    format!(
+                        "({{ Array_Float* __ostrin_q_show = {}; const char* __ostrin_q_text = ostrin_qa_show(__ostrin_q_show, {shown}); printf(\"%s\\n\", __ostrin_q_text); ostrin_release((void*)__ostrin_q_text); }})",
+                        codes[0]
+                    )
+                } else if scalar(&arg_ty) || quantity(&arg_ty) {
                     print_code(&codes[0], &arg_ty)?
                 } else if supported(&arg_ty, records) {
                     // Collections, options and records print through the generated
@@ -3315,6 +3704,42 @@ fn emit_instruction(
             op,
             inputs,
             ty,
+        } if inputs.len() == 3
+            && matches!(op.as_str(), "index_range<To>" | "index_range<Until>")
+            && matches!(ty, Ty::Applied(name, args) if name == "Array" && args.len() == 1)
+            && *ty == value_ty(values, inputs[0])? =>
+        {
+            let object_ty = value_ty(values, inputs[0])?;
+            let Some(element) = array_element(&object_ty) else {
+                return Err(());
+            };
+            if value_ty(values, inputs[1])? != Ty::Int || value_ty(values, inputs[2])? != Ty::Int {
+                return Err(());
+            }
+            let array_c_name = array_name(&object_ty).ok_or(())?;
+            let object = value_code(values, inputs[0])?;
+            let start = value_code(values, inputs[1])?;
+            let end = value_code(values, inputs[2])?;
+            let end = if op == "index_range<To>" {
+                format!("(({end}) + 1)")
+            } else {
+                end
+            };
+            let slice = format!("{array_c_name}_slice({object}, {start}, {end})");
+            let code = if quantity(element) {
+                format!(
+                    "({{ Array_Float* __ostrin_q_slice = {slice}; ostrin_qa_tag(__ostrin_q_slice, {object}->unit); __ostrin_q_slice; }})"
+                )
+            } else {
+                slice
+            };
+            out.push_str(&format!("    {} = {code};\n", value_name(*dst)));
+        }
+        IrInstr::Opaque {
+            dst: Some(dst),
+            op,
+            inputs,
+            ty,
         } if *ty == Ty::Bool && op == "approximately" && inputs.len() == 3 => {
             let as_f64 = |value: ValueId| -> Bail<String> {
                 let code = value_code(values, value)?;
@@ -3331,6 +3756,38 @@ fn emit_instruction(
                 "    {} = (fabs(({value}) - ({expected})) <= ({tolerance}));\n",
                 value_name(*dst)
             ));
+        }
+        IrInstr::Opaque {
+            dst: Some(dst),
+            op,
+            inputs,
+            ty,
+        } if inputs.len() == 1
+            && op
+                .strip_prefix("as<")
+                .and_then(|unit| unit.strip_suffix('>'))
+                .is_some_and(|_| matches!(array_element(ty), Some(Ty::Quantity(_)))) =>
+        {
+            let unit = op
+                .strip_prefix("as<")
+                .and_then(|unit| unit.strip_suffix('>'))
+                .ok_or(())?;
+            let source_ty = value_ty(values, inputs[0])?;
+            let source = value_code(values, inputs[0])?;
+            let code = match array_element(&source_ty) {
+                Some(Ty::Quantity(_)) => {
+                    format!(
+                        "ostrin_qa_as({source}, {})",
+                        crate::codegen::c_string_literal(unit)
+                    )
+                }
+                Some(Ty::Float) => format!(
+                    "ostrin_qa_tag(ostrin_qa_copy({source}), {})",
+                    crate::codegen::c_string_literal(unit)
+                ),
+                _ => return Err(()),
+            };
+            out.push_str(&format!("    {} = {code};\n", value_name(*dst)));
         }
         IrInstr::Opaque {
             dst: Some(dst),
