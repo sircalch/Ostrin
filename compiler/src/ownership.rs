@@ -267,9 +267,11 @@ pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
                         instruction: index,
                     });
                 }
-                if matches!(instruction, IrInstr::Opaque { .. }) {
-                    for value in used_values(instruction) {
-                        opaque_values.insert(value);
+                if let IrInstr::Opaque { op, .. } = instruction {
+                    if !(op.starts_with("as<") || op.starts_with("index_range<")) {
+                        for value in used_values(instruction) {
+                            opaque_values.insert(value);
+                        }
                     }
                 }
             }
@@ -904,6 +906,12 @@ fn safe_release_site(instruction: &IrInstr) -> bool {
         // well because its constructor retains the payload before returning
         // the option value.
         IrInstr::Call { .. } | IrInstr::ClosureCall { .. } => true,
+        // These opaque array operations borrow their source and return a fresh
+        // allocation, so the source can be released immediately after the
+        // operation when it has no later uses.
+        IrInstr::Opaque { op, .. } if op.starts_with("as<") || op.starts_with("index_range<") => {
+            true
+        }
         IrInstr::MethodCall { method, .. } => matches!(
             method.as_str(),
             "length"

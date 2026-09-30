@@ -9410,9 +9410,7 @@ fn function_typed_parameters_shadow_global_functions() {
 
 #[test]
 fn unit_algebra_simplifies_and_converts_compound_units() {
-    let out = run(&["--run", &example_path("unit_algebra.ostrin")]);
-    assert!(out.status.success(), "stderr: {}", stderr(&out));
-    let text = stdout(&out).replace("\r\n", "\n");
+    let text = interpreter_and_native_agree("unit_algebra.ostrin");
     let lines: Vec<&str> = text.lines().collect();
     assert_eq!(
         lines,
@@ -9757,6 +9755,25 @@ fn viz_tables_render_headers_rows_and_tooltips() {
 
 #[test]
 fn arrays_of_quantities_keep_one_unit_and_check_dimensions() {
+    let report = run(&[
+        "--native-type-report",
+        &example_path("quantity_arrays.ostrin"),
+    ]);
+    if !skip_if_no_c_compiler(&report) {
+        assert!(
+            report.status.success(),
+            "quantity-array report failed: {}",
+            stderr(&report)
+        );
+        let report_text = stdout(&report);
+        assert!(
+            report_text.contains("ir-generated: 2")
+                && report_text.contains("hir-generated: 0")
+                && report_text.contains("ast-fallback: 0")
+                && report_text.contains("divergences: 0"),
+            "quantity arrays did not stay on the verified IR path: {report_text}"
+        );
+    }
     let out = interpreter_and_native_agree("quantity_arrays.ostrin");
     let lines: Vec<&str> = out.lines().collect();
     assert_eq!(

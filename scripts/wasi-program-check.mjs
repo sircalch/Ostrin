@@ -68,6 +68,12 @@ const programs = [
     expected: "5\nciudad,temp,lluvia\ntemp: n=5 mean=16.5 std=5.244044240850758 min=10 max=23.5\nlluvia: n=5 mean=2.1 std=1.7146428199482247 min=0 max=4.5\n2\ntemp: n=2 mean=22.5 std=1 min=21.5 max=23.5\n-0.9675629734578927\n",
   },
   {
+    name: "quantity_arrays",
+    source: "examples/quantity_arrays.ostrin",
+    args: ["quantity_arrays.wasm"],
+    expected: "[0, 1, 2, 3, 4] s\n[0, 3, 12, 27, 48] m\n48 m\n[0, 10.799999999999999, 43.199999999999996, 97.19999999999999, 172.79999999999998] km/h\n[0, 0.009, 0.144, 0.729, 2.304] kJ\n0.048 km\n18 m\n17.69745744450315 m\n313.2 m^2\n[1000, 1003, 1012, 1027, 1048] m\n[false, false, true, true, true]\n[0, 0.003, 0.012, 0.027, 0.048]\n[-3, -12] m\nm\n[0 m, 3 m, 12 m, 27 m, 48 m]\n[1, 0.5, 0.3333333333333333, 0.25] 1/s\n[0, 100, 200, 300] m\n",
+  },
+  {
     name: "native_ir_function_values",
     source: "examples/native_ir_function_values.ostrin",
     args: ["native_ir_function_values.wasm"],

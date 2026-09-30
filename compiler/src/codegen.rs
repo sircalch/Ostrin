@@ -10470,7 +10470,11 @@ fn generate_impl(
         out.push_str("\n\n");
     }
 
-    if codegen.uses_quantity_arrays {
+    // IR-generated functions can introduce quantity-array helpers without
+    // passing through the legacy `register_list_types` path. Detect those
+    // calls before splicing the late runtime block so the C translation unit
+    // always contains the definitions required by both emitters.
+    if codegen.uses_quantity_arrays || bodies.iter().any(|(_, body)| body.contains("ostrin_qa_")) {
         late_array_blocks.push(QUANTITY_ARRAY_RUNTIME.to_string());
     }
     // Array runtimes: full definitions, after every prototype they call.
