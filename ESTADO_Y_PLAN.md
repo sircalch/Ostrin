@@ -162,10 +162,15 @@ por separado en `--native-type-report` como `ir-generated`; el mismo informe exp
 `hir-generated` y `ast-fallback` para que la retirada del backend legado tenga un contador
 visible. También publica líneas `native-source` agrupadas por archivo para localizar la deuda
 por módulo; la prueba diferencial comprueba que sus sumas coinciden con el total. En el corte
-actual, la suite de ejemplos suma 6 410 funciones IR, 25 HIR y 114 que aún caen al emisor
-AST; `native_backend_types_agree_with_the_checker` mantiene 114 como trinquete temporal. Los métodos
+actual, la suite de ejemplos suma 6 447 funciones IR, 21 HIR y 81 que aún caen al emisor
+AST; `native_backend_types_agree_with_the_checker` mantiene 81 como trinquete temporal. Los métodos
 de records y enums concretos comparten ahora IR/C cuando sus campos y ownership son compatibles; los
 records recursivos conservan HIR/AST hasta cerrar su contrato de ownership.
+El lowering de ownership aplica el mismo contrato de llamada prestada a receptores y argumentos de
+métodos que a llamadas ordinarias: los emisores nativos retienen valores gestionados que almacenan o
+devuelven y liberan el último alias local después de cualquier método. Las cadenas de construcción de
+`std.viz::Figure`, `Table` y `Scene3D` ya no fuerzan el `main` al AST; `viz_hexbin` conserva paridad
+intérprete/nativo con `ir=1, hir=0, ast=0` en su informe.
 La familia `Rng` también cruza IR/C: constructor, generación escalar, muestreo de arrays y
 permutaciones conservan el stream reproducible del runtime y liberan sus referencias con el mismo
 ownership que el backend legado.
@@ -326,8 +331,8 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
 convendría dividirlos; el backend nativo no comparte el sistema de tipos del checker
-(ya consume los tipos del checker y compara cada nodo; el informe actual suma **6 410 funciones
-generadas desde IR, 25 desde HIR y 114 en fallback AST** en los ejemplos, con un trinquete
+(ya consume los tipos del checker y compara cada nodo; el informe actual suma **6 447 funciones
+generadas desde IR, 21 desde HIR y 81 en fallback AST** en los ejemplos, con un trinquete
 que impide que el fallback aumente sin justificación; los métodos de records y enums concretos
 entran ahora en IR/C cuando sus campos y ownership son compatibles, mientras los records recursivos
 conservan el fallback verificado; las familias migradas incluyen escalares,

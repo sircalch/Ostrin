@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Native IR: borrowed method ownership
+
+- Ownership lowering now treats method receivers and arguments with the same
+  borrowed-call contract as ordinary function calls. Native method emitters
+  retain managed values they store or return, so the last local reference can
+  be released after any method call without a method-name allow-list.
+- Visualization builder chains (`Figure`, `Table` and `Scene3D`) therefore
+  stay on the ownership-aware IR/C path. Interpreter/native output remains
+  identical; the verified ratchet moves to **6,447 IR / 21 HIR / 81 AST
+  fallbacks** across the measured examples.
+- `viz_hexbin.ostrin` now asserts that its entry point is IR-generated, and
+  the visualization suite keeps interpreter/native parity coverage.
+
 ### Native IR: DataFrame error paths and correlation
 
 - `panic(String)` and array `cov`/`corr` now lower through the verified IR/C backend for

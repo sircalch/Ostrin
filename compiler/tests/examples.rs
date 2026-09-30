@@ -9697,6 +9697,25 @@ fn viz_hexbins_render_density_cells_and_colorbar() {
     assert_eq!(out.matches("class=\"hexbin-cell\"").count(), 18 * 14);
     assert_eq!(out.matches("count ").count(), 18 * 14);
     assert!(out.contains("linearGradient"), "hexbin colorbar missing");
+
+    // The figure builder chain used to force the whole entry point through
+    // the AST because ownership lowering kept a manual method allow-list.
+    // Every method now follows the borrowed-call contract, so this concrete
+    // visualization remains on the ownership-aware IR/C path.
+    let report = run(&["--native-type-report", &example_path("viz_hexbin.ostrin")]);
+    if !skip_if_no_c_compiler(&report) {
+        assert!(
+            report.status.success(),
+            "hexbin native type report failed: {}",
+            stderr(&report)
+        );
+        let report_text = stdout(&report);
+        assert!(
+            report_text.contains("native-source: examples/viz_hexbin.ostrin ir=1 hir=0 ast=0")
+                && report_text.contains("ast-fallback: 0"),
+            "hexbin entry point did not use the ownership-aware IR path: {report_text}"
+        );
+    }
 }
 
 #[test]

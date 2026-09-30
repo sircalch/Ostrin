@@ -6,7 +6,7 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
 ## Siguiente ciclo
 
 1. Reducir el fallback AST con el trinquete por archivo de `--native-type-report` (baseline actual:
-   6.410 funciones IR, 25 HIR y 114 AST). Los métodos de records y enums concretos ya comparten
+   6.447 funciones IR, 21 HIR y 81 AST). Los métodos de records y enums concretos ya comparten
    la ruta IR/C cuando sus campos y ownership son compatibles; los records recursivos permanecen
    deliberadamente en HIR/AST hasta cerrar ese contrato. El puente IR para los constructores numéricos
    `zeros`/`ones`, `norm`, `abs` escalar y `sqrt` migró 348 funciones compartidas por la suite;
@@ -59,6 +59,10 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    IR/C, libera las filas temporales y conserva paridad en nativo y WASI.
    El flujo `dataframe.ostrin` también baja sus ramas `panic` y `corr` de arrays desde IR/C,
    dejando sus recorridos de columnas anidadas sin fallback AST y con leak-check.
+   El lowering de ownership aplica ahora un contrato uniforme de llamada prestada a los métodos:
+   los constructores encadenados de `Figure`, `Table` y `Scene3D` liberan sus aliases locales
+   después de cada llamada y ya no fuerzan el `main` completo al AST; `viz_hexbin` conserva
+   paridad intérprete/nativo y una aserción de `ir=1, ast=0`.
 2. Completar ownership sobre agregados, escapes, valores `Phi`, errores y formas anidadas, con
    leak-check y sanitizers como evidencia.
 3. Añadir casos de compilación nativa y divergencia semántica al fuzzing de entradas válidas.

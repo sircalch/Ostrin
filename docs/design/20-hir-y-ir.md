@@ -114,8 +114,8 @@ Sobre este IR se hacen los análisis que el texto C no permite:
    `--native-type-report` publica también `ir-generated`, `hir-generated` y `ast-fallback`.
    El mismo informe agrupa esas cifras por archivo fuente con líneas `native-source`, y la
    prueba diferencial comprueba que la suma por módulo coincide con los totales globales.
-   La prueba diferencial conserva el baseline actual de fallback (114 funciones AST, con
-   6 410 funciones IR y 25 HIR agregadas sobre los ejemplos); el incremento acotado incluye
+   La prueba diferencial conserva el baseline actual de fallback (81 funciones AST, con
+   6 447 funciones IR y 21 HIR agregadas sobre los ejemplos); el incremento acotado incluye
    también `Rng` (constructor, métodos escalares, muestreo de arrays y permutación), con
    liberación gestionada y paridad intérprete/nativo. Los combinadores de listas (`map`, `filter`,
    `fold`, `any`, `all`, `find`) aceptan cierres IR con capturas. Los iteradores genéricos
@@ -124,6 +124,11 @@ Sobre este IR se hacen los análisis que el texto C no permite:
    iteradores compuestos permanecen en la cola de migración. El flujo `dataframe.ostrin` usa
    además el builtin `panic` y `corr` de arrays desde IR/C, con recorrido de columnas anidadas
    y salida nativa comprobada.
+   El pase de ownership considera los receptores y argumentos de métodos como llamadas prestadas,
+   igual que los parámetros de una función: los emisores nativos retienen lo que un método
+   almacena o devuelve y el caller puede liberar su último alias después de la llamada. Esto
+   permite bajar cadenas de construcción de `Figure`, `Table` y `Scene3D` sin una lista manual
+   de nombres; `viz_hexbin` es la regresión representativa con `ast=0`.
    La preparación numérica de histogramas y violines ya atraviesa IR/C mediante `histogram`,
    `linspace` y `pow`, `std.viz::uid` usa `hash(String)` en IR/C y `std.viz::render` recorre
    explícitamente sus series. HIR sustituye `Self` por el propietario concreto en las firmas de
