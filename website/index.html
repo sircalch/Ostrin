@@ -4,11 +4,11 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#080a10">
-    <meta name="description" content="Ostrin is an open-source scientific-first, general-purpose programming language for scientific computing, reproducible software, safe concurrency and native execution.">
+    <meta name="description" content="Ostrin is an open-source scientific-first, general-purpose programming language for reproducible software, native execution, plots, 3D scenes, animations and tables in the browser.">
     <link rel="canonical" href="https://sircalch.github.io/Ostrin/">
     <meta property="og:site_name" content="Ostrin">
     <meta property="og:title" content="Ostrin Programming Language — Scientific-First, General-Purpose">
-    <meta property="og:description" content="Scientific meaning, reproducible software and native execution in a programming language built in the open.">
+    <meta property="og:description" content="Scientific meaning, reproducible software, native execution and browser-ready plots, 3D scenes, animations and tables in a programming language built in the open.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://sircalch.github.io/Ostrin/">
     <meta property="og:image" content="https://sircalch.github.io/Ostrin/assets/ostrin-social.png">
@@ -18,7 +18,7 @@
     <meta property="og:image:alt" content="Ostrin programming language: scientific-first, general-purpose, native C and WASI.">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Ostrin Programming Language — Scientific-First, General-Purpose">
-    <meta name="twitter:description" content="Scientific meaning, reproducible software and native execution in a programming language built in the open.">
+    <meta name="twitter:description" content="Scientific meaning, reproducible software, native execution and browser-ready plots, 3D scenes, animations and tables in a programming language built in the open.">
     <meta name="twitter:image" content="https://sircalch.github.io/Ostrin/assets/ostrin-social.png">
     <meta name="twitter:image:alt" content="Ostrin programming language: scientific-first, general-purpose, native C and WASI.">
     <link rel="icon" href="assets/ostrin-logo.png">
@@ -96,6 +96,24 @@
           <figure><img src="assets/viz/lorenz.svg" alt="Lorenz attractor trajectory rendered by std.viz" loading="lazy" width="640" height="520"><figcaption>examples/viz_lorenz.ostrin</figcaption></figure>
         </div>
         <div class="button-row"><a class="button" href="viz.html">Open the Viz gallery <span>→</span></a><a class="button-quiet" href="#lab">Rotate a surface in the Lab (3D tab) <span>→</span></a></div>
+      </section>
+
+      <section class="section shell" id="visual-artifacts" aria-labelledby="visual-artifacts-title">
+        <div class="section-header"><p class="eyebrow">Scientific artifacts</p><div><h2 id="visual-artifacts-title">Explore, inspect and export the result.</h2><p class="lede">The browser is part of the workflow: open a shareable figure, scrub an animation, inspect a table or export a reproducible artifact. Each tile opens the real Ostrin program behind it.</p></div></div>
+        <div class="artifact-grid">
+          <a class="artifact-card" href="viz.html?figure=orbits">
+            <img src="assets/viz/orbits.svg" alt="Animated Kepler orbits rendered by std.viz" loading="lazy" width="640" height="520">
+            <div class="artifact-body"><span class="tag">animation · video</span><h3>See motion over time</h3><p>Play, pause, seek and export an animated SVG to WebM or GIF when the browser supports it.</p><span class="text-link violet">Open Kepler orbits →</span></div>
+          </a>
+          <a class="artifact-card" href="viz.html?figure=table">
+            <img src="assets/viz/table.svg" alt="Formatted scientific data table rendered by std.viz" loading="lazy" width="640" height="520">
+            <div class="artifact-body"><span class="tag">tables · linked data</span><h3>Keep values inspectable</h3><p>Filter, sort and select rows while linked marks in a figure stay synchronized.</p><span class="text-link violet">Open the data table →</span></div>
+          </a>
+          <a class="artifact-card" href="viz.html?figure=provenance">
+            <img src="assets/viz/provenance.svg" alt="Scientific figure with reproducibility provenance metadata" loading="lazy" width="640" height="520">
+            <div class="artifact-body"><span class="tag">reproducibility · export</span><h3>Carry the evidence with the figure</h3><p>Source hash, data hash, seed and compiler identity travel with SVG, PNG, HTML and video exports.</p><span class="text-link violet">Inspect provenance →</span></div>
+          </a>
+        </div>
       </section>
 
       <section class="live-demo-band" id="try-ostrin">

@@ -9,7 +9,7 @@ tests or an explicitly labeled early-stage surface.
 
 | Surface | Evidence | Current state |
 | --- | --- | --- |
-| Homepage | `website/index.html`, `website/lab.js`, `website/lab-data.js`, `website/playground.js`, `website/assets/ostrin-social.png` | Hero with release status derived from `CHANGELOG.md`, twelve-demo Scientific Lab that recomputes repository programs (including scalar measurements) and the `plot`/`autodiff` lab projects with `ostrinc.wasm`, shareable URL state for the active demo and parameters, evidence-linked capability cards, a source → HIR → IR → C pipeline recorded from the compiler, and the real playground; all public pages share a 1200x630 social preview |
+| Homepage | `website/index.html`, `website/lab.js`, `website/lab-data.js`, `website/playground.js`, `website/assets/ostrin-social.png` | Hero with release status derived from `CHANGELOG.md`, twelve-demo Scientific Lab that recomputes repository programs (including scalar measurements) and the `plot`/`autodiff` lab projects with `ostrinc.wasm`, shareable URL state for the active demo and parameters, evidence-linked capability cards, a source → HIR → IR → C pipeline recorded from the compiler, the real playground, and direct entry points for animated, tabular and provenance-carrying visual artifacts; all public pages share a 1200x630 social preview |
 | Cookbook | `website/cookbook.html`, `scripts/lab-data.mjs` | The Lab programs as recipes with source, recorded output, documentation links and stated limits |
 | Viz gallery | `website/viz.html`, `website/viz.js`, `website/lab-data.js` | Twenty-nine repository-backed figures with live WASM reruns, 2D/3D exploration, measurement error bars, animation/table controls, exports and shareable URLs that restore parameters and camera state |
 | Guides | `website/guides.html` | Install, projects, testing, native, WASI, editor, experimental effect inventory and site-evidence workflows; every command exists in `ostrinc --help` |
@@ -28,7 +28,7 @@ tests or an explicitly labeled early-stage surface.
 - **266** `.ostrin` source files under `examples/`, including package-project sources and
   intentional error cases.
 - **26** Markdown design documents under `docs/design/`.
-- Compiler suite: **250 integration**, **6 differential** and **2 unit** tests.
+- Compiler suite: **252 integration**, **6 differential** and **2 unit** tests.
 - WASI release smoke matrix: thirteen program modules covering the hello program, quantity arrays, a local-path
   package, arguments/environment, file I/O, managed ownership and nested `Option`/`Result`
   consumers; compiler and program modules
@@ -50,8 +50,9 @@ fail before publication.
 
 ## Remaining constraints
 
-- The site is static GitHub Pages. There is no public package registry or default published compiler
-  release; installer scripts require a maintainer-published matching tag.
+- The site is static GitHub Pages. The experimental `v0.1.0` compiler release is published, but
+  there is no public package registry or additional distribution channel; installer scripts require
+  a maintainer-published matching tag.
 - Some compiler/runtime and scientific-library capabilities remain explicitly early or incomplete;
   the site should preserve those maturity labels and avoid implying production readiness.
 - Chromium regression coverage checks the full compiler, playground, Lab, Viz and provenance flows. A Firefox and
