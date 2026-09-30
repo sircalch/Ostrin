@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Web: featured scientific workflows
+
+- Added three metadata-driven paths to the Viz page: simulate a system, analyze data and explore
+  3D fields. Each reuses recorded Ostrin figures, exposes its `.ostrin` source link and points to
+  the existing figure, table, animation or provenance explorer.
+- Workflow selection is shareable through `?workflow=...`; static links remain available when
+  JavaScript is disabled, and `available`/`experimental` labels preserve the current maturity
+  boundary.
+
 ### Native IR: trait defaults and quantity-array ownership
 
 - Default method bodies from traits now lower once per concrete implementation,

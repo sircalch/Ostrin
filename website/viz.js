@@ -166,6 +166,23 @@ function readVizState() {
   return { figureId: figure.id, parameters, azimuth: readAngle("azimuth", -180, 180), elevation: readAngle("elevation", -80, 80) };
 }
 
+function readWorkflowState() {
+  const id = new URL(window.location.href).searchParams.get("workflow");
+  return (LAB?.workflows ?? []).find((workflow) => workflow.id === id) ?? null;
+}
+
+function writeWorkflowState(workflowId, mode = "replace") {
+  const url = new URL(window.location.href);
+  url.searchParams.set("workflow", workflowId);
+  url.searchParams.delete("figure");
+  for (const parameter of VIZ_PARAMETER_NAMES) url.searchParams.delete(parameter);
+  url.searchParams.delete("azimuth");
+  url.searchParams.delete("elevation");
+  url.hash = `workflow-${workflowId}`;
+  const method = mode === "push" ? "pushState" : "replaceState";
+  window.history[method]({ workflow: workflowId }, "", url.href);
+}
+
 function writeVizState(figureId, parameters = {}, azimuth = null, elevation = null, mode = "replace") {
   const url = new URL(window.location.href);
   url.searchParams.set("figure", figureId);
@@ -1584,6 +1601,91 @@ function card(figure) {
   };
 }
 
+const WORKFLOW_KIND_LABELS = {
+  figure: "figure",
+  table: "table",
+  animation: "animation · video",
+  provenance: "provenance",
+};
+
+function workflowFigureHref(workflow, step) {
+  return `viz.html?workflow=${encodeURIComponent(workflow.id)}&figure=${encodeURIComponent(step.figure)}#viz-${encodeURIComponent(step.figure)}`;
+}
+
+function mountWorkflows(root) {
+  const galleryById = new Map((LAB?.gallery ?? []).map((figure) => [figure.id, figure]));
+  const workflowCards = [];
+  const selectionStatus = el("p", { className: "viz-workflow-selection", "aria-live": "polite", text: "" });
+
+  const updateSelection = (selectedId) => {
+    for (const { workflow, node, select } of workflowCards) {
+      const selected = workflow.id === selectedId;
+      node.dataset.active = String(selected);
+      select.setAttribute("aria-pressed", String(selected));
+      select.textContent = selected ? "Selected" : "Select workflow";
+    }
+    const selected = (LAB?.workflows ?? []).find((workflow) => workflow.id === selectedId);
+    selectionStatus.textContent = selected
+      ? `${selected.title} selected · shareable as ?workflow=${selected.id}`
+      : "Choose a workflow to highlight its path.";
+  };
+
+  for (const workflow of LAB?.workflows ?? []) {
+    const select = el("button", {
+      type: "button",
+      className: "button-quiet",
+      "data-viz-workflow-select": workflow.id,
+      "aria-pressed": "false",
+      text: "Select workflow",
+    });
+    const stepNodes = workflow.steps.map((step, index) => {
+      const figure = galleryById.get(step.figure);
+      if (!figure) return null;
+      const kind = WORKFLOW_KIND_LABELS[step.kind] ?? step.kind;
+      const source = el("a", {
+        className: "text-link",
+        href: step.sourceUrl,
+        "data-viz-workflow-source": step.figure,
+        text: `Source · ${step.source}`,
+      });
+      const figureLink = el("a", {
+        className: "viz-workflow-step-link",
+        href: workflowFigureHref(workflow, step),
+        "data-viz-workflow-step": step.figure,
+        "aria-label": `Open ${step.title} in the Viz explorer`,
+      }, [
+        el("span", { className: "viz-workflow-step-index", text: String(index + 1).padStart(2, "0") }),
+        el("span", { className: "viz-workflow-step-copy" }, [
+          el("span", { className: "viz-workflow-step-kind", text: kind }),
+          el("strong", { text: step.title }),
+          el("span", { className: "muted", text: step.detail }),
+        ]),
+        el("span", { className: "viz-workflow-step-arrow", "aria-hidden": "true", text: "→" }),
+      ]);
+      return el("li", { className: "viz-workflow-step" }, [figureLink, source]);
+    }).filter(Boolean);
+    const node = el("article", { className: "viz-workflow-card", "data-viz-workflow": workflow.id, "data-active": "false" }, [
+      el("div", { className: "viz-workflow-card-head" }, [
+        el("div", {}, [el("span", { className: "viz-workflow-number", text: workflow.id === "explore-3d" ? "03" : workflow.id === "analyze" ? "02" : "01" }), el("span", { className: `viz-workflow-status ${workflow.status}`, text: workflow.status })]),
+        select,
+      ]),
+      el("h3", { text: workflow.title }),
+      el("p", { className: "muted", text: workflow.summary }),
+      el("ol", { className: "viz-workflow-steps" }, stepNodes),
+    ]);
+    select.addEventListener("click", () => {
+      writeWorkflowState(workflow.id, "push");
+      updateSelection(workflow.id);
+      node.scrollIntoView({ block: "nearest", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    });
+    workflowCards.push({ workflow, node, select });
+  }
+
+  root.replaceChildren(...workflowCards.map(({ node }) => node), selectionStatus);
+  const initial = readWorkflowState();
+  updateSelection(initial?.id ?? "");
+}
+
 function mountGallery(root) {
   const cards = LAB.gallery.map(card);
   root.replaceChildren(...cards.map((item) => item.node));
@@ -1598,4 +1700,5 @@ function mountGallery(root) {
   );
 }
 
+if (LAB?.workflows) document.querySelectorAll("[data-viz-workflows]").forEach(mountWorkflows);
 if (LAB?.gallery) document.querySelectorAll("[data-viz-gallery]").forEach(mountGallery);

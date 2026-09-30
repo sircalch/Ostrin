@@ -172,7 +172,29 @@ if (lab) {
     const svg = read(`website/${figure.svg}`);
     check(svg.startsWith("<svg") && svg.includes('xmlns="http://www.w3.org/2000/svg"') && svg.trimEnd().endsWith("</svg>"), `viz ${figure.id}: ${figure.svg} is not a recorded SVG`);
   }
+  const galleryById = new Map((lab.gallery ?? []).map((figure) => [figure.id, figure]));
+  const workflows = lab.workflows ?? [];
+  const requiredWorkflowIds = ["simulate", "analyze", "explore-3d"];
+  const workflowKinds = new Set();
+  check(workflows.length >= requiredWorkflowIds.length, "website/lab-data.js: featured workflows are missing");
+  for (const id of requiredWorkflowIds) check(workflows.some((workflow) => workflow.id === id), `workflow ${id}: missing featured path`);
+  for (const workflow of workflows) {
+    check(["available", "experimental"].includes(workflow.status), `workflow ${workflow.id}: invalid maturity status`);
+    check(Boolean(workflow.title) && Boolean(workflow.summary) && Array.isArray(workflow.steps) && workflow.steps.length >= 3,
+      `workflow ${workflow.id}: needs title, summary and at least three steps`);
+    for (const step of workflow.steps ?? []) {
+      workflowKinds.add(step.kind);
+      const figure = galleryById.get(step.figure);
+      check(Boolean(figure), `workflow ${workflow.id}: unknown gallery figure ${step.figure}`);
+      if (!figure) continue;
+      check(step.source === figure.source && step.sourceUrl === figure.sourceUrl,
+        `workflow ${workflow.id}: ${step.figure} source metadata drifted; run node scripts/lab-data.mjs --write`);
+      check(["figure", "table", "animation", "provenance"].includes(step.kind), `workflow ${workflow.id}: invalid step kind ${step.kind}`);
+    }
+  }
+  for (const kind of ["figure", "table", "animation", "provenance"]) check(workflowKinds.has(kind), `featured workflows: missing ${kind} step`);
   check(read("website/viz.html").includes("data-viz-gallery"), "viz.html: missing gallery container");
+  check(read("website/viz.html").includes("data-viz-workflows"), "viz.html: missing featured workflow container");
 }
 
 const reference = read("website/reference.html");

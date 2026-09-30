@@ -12,6 +12,7 @@ tests or an explicitly labeled early-stage surface.
 | Homepage | `website/index.html`, `website/lab.js`, `website/lab-data.js`, `website/playground.js`, `website/assets/ostrin-social.png` | Hero with release status derived from `CHANGELOG.md`, twelve-demo Scientific Lab that recomputes repository programs (including scalar measurements) and the `plot`/`autodiff` lab projects with `ostrinc.wasm`, shareable URL state for the active demo and parameters, evidence-linked capability cards, a source → HIR → IR → C pipeline recorded from the compiler, the real playground, and direct entry points for animated, tabular and provenance-carrying visual artifacts; all public pages share a 1200x630 social preview |
 | Cookbook | `website/cookbook.html`, `scripts/lab-data.mjs` | The Lab programs as recipes with source, recorded output, documentation links and stated limits |
 | Viz gallery | `website/viz.html`, `website/viz.js`, `website/lab-data.js` | Twenty-nine repository-backed figures with live WASM reruns, 2D/3D exploration, measurement error bars, animation/table controls, exports and shareable URLs that restore parameters and camera state |
+| Featured workflows | `scripts/lab-data.mjs`, `website/viz.html`, `website/viz.js` | Three source-backed paths — simulate, analyze and explore 3D — group existing figures, tables, animations and provenance records behind shareable `?workflow=...` URLs; available and experimental labels remain explicit |
 | Guides | `website/guides.html` | Install, projects, testing, native, WASI, editor, experimental effect inventory and site-evidence workflows; every command exists in `ostrinc --help` |
 | Example catalogue | `website/examples.html` | Filterable repository catalogue plus live quantity, standard library, record/enum and concurrency programs |
 | Browser playground | `website/playground.html`, `website/playground.js`, `.github/workflows/pages.yml` | Generated `ostrinc.wasm`; Run, Check, Test, Format, share links and source diagnostics execute in an in-memory WASI filesystem and are exercised in Chromium before CI passes or Pages uploads |
@@ -68,3 +69,7 @@ Continue closing the production path in dependency order: ownership and memory b
 control-flow boundaries; native backend correctness; real concurrency stress and cancellation;
 standard-library and package contracts; then WASM distribution and broader platform tests. Keep
 each block linked to executable tests, update the development log, and push only after checks pass.
+
+The featured workflows are a web discovery layer over existing evidence, not new scientific
+results. The next visual block can add machine-readable artifact bundles (source, data, selected
+frame and provenance) after the compiler and standard-library contracts are stable.

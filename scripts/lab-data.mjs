@@ -214,6 +214,46 @@ export const GALLERY = [
   { id: "dashboard", title: "Multi-panel layout", file: "examples/viz_dashboard.ostrin", blurb: "Four figures, 2D and 3D, composed with viz.grid into one SVG." },
 ];
 
+// Curated paths through the gallery. These are discovery metadata only: every step points to
+// an existing source-backed figure, so the page can explain a scientific workflow without
+// inventing a second set of results or maintaining a separate demo implementation.
+export const WORKFLOWS = [
+  {
+    id: "simulate",
+    title: "Simulate a system",
+    status: "available",
+    summary: "Start with an adaptive ODE, inspect its motion and carry the result into a reproducible figure.",
+    steps: [
+      { figure: "ode", kind: "figure", title: "Solve and plot", detail: "rk45 integrates the pendulum and renders the trajectory with a phase portrait." },
+      { figure: "double-pendulum", kind: "animation", title: "Watch the dynamics", detail: "The same visualization layer exposes continuous SVG motion with scrubbing and video export." },
+      { figure: "provenance", kind: "provenance", title: "Record the evidence", detail: "Inspect source and data hashes, seed and compiler identity in the SVG." },
+    ],
+  },
+  {
+    id: "analyze",
+    title: "Analyze data",
+    status: "experimental",
+    summary: "Move from observations to a fitted figure, a sortable table and explicit uncertainty evidence.",
+    steps: [
+      { figure: "scatter-fit", kind: "figure", title: "Fit the observations", detail: "Calibration points, a least-squares line and its ±2σ band are computed in Ostrin." },
+      { figure: "table", kind: "table", title: "Inspect the rows", detail: "Filter and sort an SVG table while keeping the values visible and source-linked." },
+      { figure: "bars", kind: "figure", title: "Show uncertainty", detail: "Measurement-derived standard uncertainties become error bars in the figure." },
+      { figure: "provenance", kind: "provenance", title: "Record the evidence", detail: "Inspect the source and data hashes, seed and compiler identity carried by a figure." },
+    ],
+  },
+  {
+    id: "explore-3d",
+    title: "Explore 3D fields",
+    status: "experimental",
+    summary: "Change a parameter, move the camera and compare geometric views of a scalar or vector field.",
+    steps: [
+      { figure: "surface", kind: "figure", title: "Rotate a surface", detail: "The camera and spatial scale rerun the Ostrin source in the browser." },
+      { figure: "lorenz", kind: "animation", title: "Change a trajectory", detail: "Adjust ρ and inspect how the 3D trajectory changes before exporting a frame or animation." },
+      { figure: "volume-slices", kind: "figure", title: "Slice a volume", detail: "Orthogonal slices expose a sampled scalar volume with inspectable SVG cells." },
+    ],
+  },
+];
+
 // A tiny function shown through every compiler stage on the homepage.
 export const PIPELINE = { file: "examples/lab_pipeline.ostrin", function: "kinetic" };
 
@@ -393,8 +433,21 @@ export async function buildLabData() {
       printed: [...output.slice(0, start), ...output.slice(end + 1)],
     });
   }
+  const galleryIds = new Set(gallery.map((figure) => figure.id));
+  const workflows = WORKFLOWS.map((workflow) => ({
+    ...workflow,
+    steps: workflow.steps.map((step) => {
+      if (!galleryIds.has(step.figure)) throw new Error(`${workflow.id}: unknown gallery figure ${step.figure}`);
+      const figure = gallery.find((candidate) => candidate.id === step.figure);
+      return {
+        ...step,
+        source: figure.source,
+        sourceUrl: figure.sourceUrl,
+      };
+    }),
+  }));
 
-  return { compiler: collectSiteFacts().version, recordedWith: "ostrinc.wasm (wasm32-wasip1) under Node WASI", hero, demos, pipeline, gallery, figures };
+  return { compiler: collectSiteFacts().version, recordedWith: "ostrinc.wasm (wasm32-wasip1) under Node WASI", hero, demos, pipeline, gallery, workflows, figures };
 }
 
 export function renderLabData(data) {

@@ -96,8 +96,10 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    restaurar experimentos reproducibles desde el navegador. La navegación compacta y el catálogo
    de ejemplos ya tienen estados ARIA, foco de teclado, Escape, pestañas con flechas/Home/End y
    filtros anunciados; Chromium cubre los flujos completos y Firefox/WebKit ya recorren las catorce
-   páginas públicas con una matriz de humo; quedan auditorías más amplias con lectores de pantalla y
-   baselines visuales.
+   páginas públicas con una matriz de humo; la galería añade ahora tres recorridos source-backed
+   (`simulate`, `analyze` y `explore-3d`) que agrupan figuras, tablas, animaciones y procedencia
+   mediante `?workflow=...`, con etiquetas `available`/`experimental`; quedan auditorías más amplias
+   con lectores de pantalla y baselines visuales.
 7. **Extender el núcleo científico de mediciones**: validar el API escalar experimental de
    `std.measurements`; la proyección de series `List<Measurement<Float>>` a valores e
    incertidumbres ya alimenta `std.viz.errorbars` con paridad intérprete/native/WASM. El siguiente
