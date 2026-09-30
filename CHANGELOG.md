@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Native IR: nested numeric array lists
+
+- `List<Array<Int|Float|Float32|Bool>>` now uses the generated pointer-backed
+  list runtime from IR/C, retaining array elements on insertion and releasing
+  them from the list destructor.
+- `viz_orbits.ostrin` now lowers `orbit` and `main` through IR/C with
+  interpreter/native/WASI parity and `live_allocations=0` under the native
+  leak check. The verified ratchet moves to **6,450 IR / 21 HIR / 78 AST
+  fallbacks** across the measured examples.
+
 ### Native IR: borrowed method ownership
 
 - Ownership lowering now treats method receivers and arguments with the same

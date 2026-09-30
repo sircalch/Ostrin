@@ -9675,6 +9675,78 @@ fn viz_histograms_render_bins_and_use_numeric_ir() {
 }
 
 #[test]
+fn viz_orbits_use_ir_for_nested_numeric_array_lists() {
+    let out = interpreter_and_native_agree("viz_orbits.ostrin");
+    assert!(out.starts_with("comet: a = 1.8 AU, period 2.41 years\n"));
+    assert!(out.contains("Earth after one year: x = 0.98 AU\n"));
+    assert!(out.contains("<svg") && out.contains("Kepler orbits"));
+
+    let report = run(&["--native-type-report", &example_path("viz_orbits.ostrin")]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "nested array-list type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("native-source: examples/viz_orbits.ostrin ir=3 hir=0 ast=0")
+            && report_text.contains("ast-fallback: 0"),
+        "viz_orbits did not use the nested array-list IR path: {report_text}"
+    );
+
+    let wasm = run(&[
+        "--emit-c",
+        "--target",
+        "wasm32-wasi",
+        &example_path("viz_orbits.ostrin"),
+    ]);
+    assert!(
+        wasm.status.success(),
+        "nested array-list WASI emission failed: {}",
+        stderr(&wasm)
+    );
+    let wasm_c = stdout(&wasm);
+    assert!(
+        wasm_c.contains("List_Array_Float_new_from_array") && wasm_c.contains("ostrin_fn_orbit"),
+        "WASI C emission omitted the nested array-list helpers"
+    );
+
+    let exe = temp_artifact("viz_orbits_nested_array_list.exe");
+    let compiled = run(&[
+        "--compile",
+        "--leak-check",
+        "--out",
+        &exe,
+        &example_path("viz_orbits.ostrin"),
+    ]);
+    if skip_if_no_c_compiler(&compiled) {
+        return;
+    }
+    assert!(
+        compiled.status.success(),
+        "nested array-list leak-check compile failed: {}",
+        stderr(&compiled)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run nested array-list leak-check binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "nested array-list leak-check run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "nested array-list leak-check found live allocations: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn normal_distribution_pdf_and_cdf_use_numeric_ir_for_scalar_and_arrays() {
     let file = temp_source(
         "native_ir_normal_distribution.ostrin",

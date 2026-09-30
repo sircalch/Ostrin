@@ -203,6 +203,16 @@ fn array_supported(ty: &Ty) -> bool {
     )
 }
 
+/// Lists of arrays use the generated pointer-backed list runtime. Quantity
+/// arrays keep a unit tag and remain on their established fallback until a
+/// nested ownership contract covers that tag as well.
+fn list_array_supported(ty: &Ty) -> bool {
+    matches!(
+        array_element(ty),
+        Some(Ty::Int | Ty::Float | Ty::Float32 | Ty::Bool)
+    )
+}
+
 fn array_name(ty: &Ty) -> Option<String> {
     array_element(ty)
         .filter(|element| {
@@ -239,6 +249,7 @@ fn list_element_supported(ty: &Ty) -> bool {
 
 fn list_supported(ty: &Ty, records: &RecordFields) -> bool {
     list_element_supported(ty)
+        || list_array_supported(ty)
         || record_name(ty, records).is_some()
         || matches!(ty, Ty::Applied(name, args) if name == "Channel" && args.len() == 1 && channel_supported(&args[0], records))
         || matches!(ty, Ty::List(element) if list_supported(element, records))
