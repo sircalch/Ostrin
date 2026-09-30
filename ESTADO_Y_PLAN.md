@@ -182,8 +182,9 @@ El ejemplo `dataframe.ostrin` ya cruza IR/C en sus recorridos de `List<List<Stri
 comparaciones, negación, reducciones (`sum`/`min`/`max`/`mean`/`median`/`std`/`percentile`),
 varianza con unidad al cuadrado, cortes por rango, `as<unit>` y `to_list`; `quantity_arrays.ostrin`
 mantiene salida idéntica entre intérprete, nativo y WASI. El `--leak-check` de esta galería sigue
-mostrando asignaciones vivas de las rutas de texto de unidades, por lo que la liberación completa
-de esos temporales permanece como deuda explícita.
+mostrando `live_allocations=14`: la representación de arrays consume ahora sus temporales de texto;
+las asignaciones restantes pertenecen a expresiones escalares de unidades y a etiquetas de arrays
+que pueden escapar a valores escalares/listas, por lo que su ownership queda como deuda separada.
 El puente IR de `zeros`/`ones`, `norm`, `abs` escalar y `sqrt` redujo el fallback en 348 funciones;
 esta pasada añade conversiones escalares `as<Float/Float32>` y conversiones comprobadas a `Int`/enteros de ancho fijo,
 `abs` sobre arrays y funciones matemáticas

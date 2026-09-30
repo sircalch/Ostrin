@@ -188,8 +188,10 @@
   path as scalar arrays while keeping interpreter/native output identical.
 - Unit-aware elementwise arithmetic, comparisons, negation, reductions, range slices, `as<unit>`
   conversion and `to_list` now use dedicated IR/C helpers that preserve the unit tag. The
-  `quantity_arrays.ostrin` example matches across interpreter, native and WASI; native leak-check
-  still reports live allocations from the existing unit-text rendering path.
+  `quantity_arrays.ostrin` example matches across interpreter, native and WASI. Array rendering
+  now consumes intermediate text strings; its native leak-check is down to `live_allocations=14`.
+  Scalar unit expressions and array tags that escape into scalar/list values remain tracked as a
+  separate ownership follow-up.
 
 ### Performance evidence: reproducible benchmark dashboard
 - `scripts/benchmark.mjs` now measures eight deterministic workloads spanning scalar loops,

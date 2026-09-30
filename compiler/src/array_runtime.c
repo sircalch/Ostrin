@@ -436,8 +436,8 @@ static const char* @N@_show_rec(@N@* a, int64_t dim, int64_t off) {
     for (int64_t k = dim + 1; k < a->rank; k++) stride *= a->shape[k];
     const char* s = "[";
     for (int64_t i = 0; i < a->shape[dim]; i++) {
-        if (i > 0) s = ostrin_str_concat(s, ", ");
-        s = ostrin_str_concat(s, @N@_show_rec(a, dim + 1, off + i * stride));
+        if (i > 0) s = ostrin_show_cat(s, ", ");
+        s = ostrin_show_catf(s, @N@_show_rec(a, dim + 1, off + i * stride));
     }
-    return ostrin_str_concat(s, "]");
+    return ostrin_show_cat(s, "]");
 }
