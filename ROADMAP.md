@@ -6,8 +6,8 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
 ## Siguiente ciclo
 
 1. Reducir el fallback AST con el trinquete por archivo de `--native-type-report` (baseline actual:
-   6.490 funciones generadas por HIR/IR (6.474 IR + 16 HIR) y 59 AST). Los patrones superficiales de records con campos escalares
-   y los enums no genéricos con payloads escalares, variantes unitarias y patrones simples ya
+   6.491 funciones generadas por HIR/IR (6.476 IR + 15 HIR) y 58 AST). Los patrones superficiales de records con campos escalares
+   y los enums no genéricos con payloads escalares, incluidos los enteros de ancho fijo, variantes unitarias y patrones simples ya
    comparten IR/C; los literales/rangos escalares siguen pendientes junto con payloads gestionados,
    enums genéricos y patrones anidados.
    Los métodos de records y enums concretos ya comparten

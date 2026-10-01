@@ -9,11 +9,11 @@
   resolved from HIR metadata.
 - Added interpreter/native/WASI parity and native leak-check coverage for nested record patterns;
   fresh record literals passed to ordinary HIR calls are released after the call.
-- Plain non-generic enum constructors, unit variants, scalar payload bindings and simple
-  `match` tests now lower through IR/C. Managed payloads, generic enums, nested patterns and
+- Plain non-generic enum constructors, unit variants, scalar and fixed-width payload bindings
+  and simple `match` tests now lower through IR/C. Managed payloads, generic enums, nested patterns and
   scalar literal/range tests remain outside this slice.
-- The differential ratchet now records **6,490 HIR/IR-generated functions (6,474 IR + 16 HIR) /
-  59 AST** functions.
+- The differential ratchet now records **6,491 HIR/IR-generated functions (6,476 IR + 15 HIR) /
+  58 AST** functions.
 
 ### Native IR: numeric array selection
 
