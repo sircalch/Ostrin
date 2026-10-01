@@ -326,6 +326,10 @@ impl Emitter<'_> {
         )
     }
 
+    fn owned_record_literal(expr: &HirExpr) -> bool {
+        matches!(expr.kind, HirKind::Record { .. })
+    }
+
     fn owned_local(&self, name: &str) -> bool {
         self.owned_block_locals
             .iter()
@@ -1367,17 +1371,40 @@ impl Emitter<'_> {
                 } else if !c_compatible(&self.c_type(&e.ty)?, &ret) {
                     return Err(());
                 }
-                let codes = args
-                    .iter()
-                    .map(|a| self.expr(&a.value))
-                    .collect::<Bail<Vec<_>>>()?;
                 let emitted_name = self
                     .world
                     .function_c_names
                     .get(name)
                     .cloned()
                     .unwrap_or_else(|| (self.world.c_name)(name));
-                Ok(format!("{}({})", emitted_name, codes.join(", ")))
+                let mut setup = String::new();
+                let mut cleanup = String::new();
+                let mut codes = Vec::with_capacity(args.len());
+                for arg in args {
+                    let code = self.expr(&arg.value)?;
+                    if Self::owned_record_literal(&arg.value) {
+                        let temp = self.next_temp();
+                        let cty = self.c_type(&arg.value.ty)?;
+                        setup.push_str(&format!("{cty} {temp} = {code}; "));
+                        let release = self.release_managed_value(&temp, &arg.value.ty).ok_or(())?;
+                        cleanup.push_str(&format!("{release}; "));
+                        codes.push(temp);
+                    } else {
+                        codes.push(code);
+                    }
+                }
+                let call = format!("{}({})", emitted_name, codes.join(", "));
+                if setup.is_empty() {
+                    Ok(call)
+                } else if e.ty == Ty::Void {
+                    Ok(format!("({{ {setup} {call}; {cleanup} (void)0; }})"))
+                } else {
+                    let result = self.next_temp();
+                    let result_ty = self.c_type(&e.ty)?;
+                    Ok(format!(
+                        "({{ {setup} {result_ty} {result} = {call}; {cleanup} {result}; }})"
+                    ))
+                }
             }
             HirKind::If(cond, then_block, Some(else_block)) if e.ty != Ty::Void => {
                 let c = self.expr(cond)?;

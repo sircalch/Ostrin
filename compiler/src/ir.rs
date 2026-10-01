@@ -277,6 +277,8 @@ struct Builder {
     next_value: ValueId,
     locals: Vec<HashMap<String, ValueId>>,
     iterator_items: HashMap<String, IteratorInfo>,
+    record_fields: HashMap<String, Vec<(String, Ty)>>,
+    record_generics: HashMap<String, Vec<String>>,
     function_globals: HashMap<ValueId, String>,
     break_targets: Vec<(BlockId, BlockId, usize)>,
     loop_edges: Vec<LoopEdges>,
@@ -287,7 +289,12 @@ struct Builder {
 }
 
 impl Builder {
-    fn new(function: &HirFunction, iterator_items: &HashMap<String, IteratorInfo>) -> Self {
+    fn new(
+        function: &HirFunction,
+        iterator_items: &HashMap<String, IteratorInfo>,
+        record_fields: &HashMap<String, Vec<(String, Ty)>>,
+        record_generics: &HashMap<String, Vec<String>>,
+    ) -> Self {
         let entry = IrBlock {
             id: 0,
             instructions: Vec::new(),
@@ -306,6 +313,8 @@ impl Builder {
             next_value: 0,
             locals: vec![HashMap::new()],
             iterator_items: iterator_items.clone(),
+            record_fields: record_fields.clone(),
+            record_generics: record_generics.clone(),
             function_globals: HashMap::new(),
             break_targets: Vec::new(),
             loop_edges: Vec::new(),
@@ -453,7 +462,12 @@ impl Builder {
             body: body.clone(),
             source_file: Some(self.function.name.clone()),
         };
-        let body_ir = lower_function(&child, &self.iterator_items);
+        let body_ir = lower_function(
+            &child,
+            &self.iterator_items,
+            &self.record_fields,
+            &self.record_generics,
+        );
         self.function.closures.push(IrClosure {
             name: closure_name,
             params: child_params,
@@ -527,6 +541,30 @@ impl Builder {
                     .filter(|(id, _)| *id == value)
                     .map(|(_, ty)| ty)
             })
+    }
+
+    fn record_field_type(&self, subject_ty: &Ty, field: &str) -> Option<Ty> {
+        let (name, args) = match subject_ty {
+            Ty::Named(name) => (name, &[][..]),
+            Ty::Applied(name, args) => (name, args.as_slice()),
+            _ => return None,
+        };
+        let declared = self.record_fields.get(name)?;
+        let generic_names = self.record_generics.get(name).cloned().unwrap_or_default();
+        if generic_names.len() != args.len() {
+            return declared
+                .iter()
+                .find(|(declared_name, _)| declared_name == field)
+                .map(|(_, ty)| ty.clone());
+        }
+        let substitutions: HashMap<String, Ty> = generic_names
+            .into_iter()
+            .zip(args.iter().cloned())
+            .collect();
+        declared
+            .iter()
+            .find(|(declared_name, _)| declared_name == field)
+            .map(|(_, ty)| substitute_record_generics(ty.clone(), &substitutions))
     }
 
     fn patch_phi(&mut self, destination: ValueId, incoming: Vec<(BlockId, ValueId)>) {
@@ -1776,7 +1814,7 @@ impl Builder {
                 let ty = if path.is_empty() {
                     subject_ty
                 } else {
-                    match subject_ty {
+                    match &subject_ty {
                         Ty::Applied(name, args)
                             if name == "Option" && args.len() == 1 && path.len() == 1 =>
                         {
@@ -1791,6 +1829,9 @@ impl Builder {
                                 _ => Ty::Unknown,
                             }
                         }
+                        _ if path.len() == 1 => self
+                            .record_field_type(&subject_ty, &path[0])
+                            .unwrap_or(Ty::Unknown),
                         _ => Ty::Unknown,
                     }
                 };
@@ -2498,12 +2539,45 @@ fn assigned_in(text: &str, name: &str) -> bool {
     text.contains(&format!("Assign {{ name: {name:?}"))
 }
 
+fn substitute_record_generics(ty: Ty, substitutions: &HashMap<String, Ty>) -> Ty {
+    match ty {
+        Ty::Named(name) => substitutions.get(&name).cloned().unwrap_or(Ty::Named(name)),
+        Ty::List(inner) => Ty::List(Box::new(substitute_record_generics(*inner, substitutions))),
+        Ty::Map(key, value) => Ty::Map(
+            Box::new(substitute_record_generics(*key, substitutions)),
+            Box::new(substitute_record_generics(*value, substitutions)),
+        ),
+        Ty::Set(inner) => Ty::Set(Box::new(substitute_record_generics(*inner, substitutions))),
+        Ty::Applied(name, args) => Ty::Applied(
+            name,
+            args.into_iter()
+                .map(|arg| substitute_record_generics(arg, substitutions))
+                .collect(),
+        ),
+        Ty::Fn(params, ret) => Ty::Fn(
+            params
+                .into_iter()
+                .map(|param| substitute_record_generics(param, substitutions))
+                .collect(),
+            Box::new(substitute_record_generics(*ret, substitutions)),
+        ),
+        other => other,
+    }
+}
+
 pub fn lower(program: &HirProgram) -> IrProgram {
     IrProgram {
         functions: program
             .functions
             .iter()
-            .map(|function| lower_function(function, &program.iterator_items))
+            .map(|function| {
+                lower_function(
+                    function,
+                    &program.iterator_items,
+                    &program.record_fields,
+                    &program.record_generics,
+                )
+            })
             .collect(),
     }
 }
@@ -2511,8 +2585,10 @@ pub fn lower(program: &HirProgram) -> IrProgram {
 fn lower_function(
     function: &HirFunction,
     iterator_items: &HashMap<String, IteratorInfo>,
+    record_fields: &HashMap<String, Vec<(String, Ty)>>,
+    record_generics: &HashMap<String, Vec<String>>,
 ) -> IrFunction {
-    let mut builder = Builder::new(function, iterator_items);
+    let mut builder = Builder::new(function, iterator_items, record_fields, record_generics);
     for (index, (name, ty)) in function.params.iter().enumerate() {
         let value = builder.fresh();
         builder.emit(IrInstr::Param {

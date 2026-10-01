@@ -10245,6 +10245,14 @@ fn generate_impl(
                         .as_ref()
                         .map(|program| program.iterator_items.clone())
                         .unwrap_or_default(),
+                    record_fields: hir
+                        .as_ref()
+                        .map(|program| program.record_fields.clone())
+                        .unwrap_or_default(),
+                    record_generics: hir
+                        .as_ref()
+                        .map(|program| program.record_generics.clone())
+                        .unwrap_or_default(),
                 };
                 let (program, summary) =
                     crate::ownership::lower_linear(&crate::ir::lower(&program));
