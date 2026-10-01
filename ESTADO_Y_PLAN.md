@@ -429,6 +429,11 @@ para intérprete y nativo. `website/benchmarks.html` publica el registro con com
 entorno, iteraciones y hashes de salida; las comparaciones históricas y externas siguen
 pendientes y no se presentan como resultados actuales.
 
+La matriz de compilación ejecuta además ambos generadores diferenciales con ocho semillas
+por generador en cada sistema operativo; el job de AddressSanitizer repite ese corpus con
+dieciséis semillas y `--leak-check`. El valor local continúa siendo cuatro semillas salvo
+que se defina `OSTRIN_FUZZ_SEEDS`, de modo que el gate ampliado queda explícito y reproducible.
+
 ### G. Producto
 **Homepage 3.0 (2026-09-24).** La portada muestra el estado de la release derivado de
 `CHANGELOG.md`, un Scientific Lab de doce demos (Plot, Linear Algebra, Complex, Statistics, Monte Carlo,

@@ -40,3 +40,9 @@ jobs:
         run: cargo clippy --all-targets --all-features --manifest-path compiler/Cargo.toml -- -A clippy::all -D clippy::suspicious
       - name: Run tests
         run: cargo test --manifest-path compiler/Cargo.toml
+      - name: Run generated differential corpus
+        env:
+          # Exercise both deterministic generators with a wider corpus than
+          # the default local smoke run, on every supported host.
+          OSTRIN_FUZZ_SEEDS: "8"
+        run: cargo test --manifest-path compiler/Cargo.toml --test examples generated_ -- --test-threads=1

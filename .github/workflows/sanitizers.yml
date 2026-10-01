@@ -29,6 +29,12 @@ jobs:
         run: sudo apt-get update && sudo apt-get install --yes clang
       - name: Run native examples under sanitizers
         run: cargo test --manifest-path compiler/Cargo.toml --test examples -- --test-threads=1
+      - name: Run generated differential corpus under AddressSanitizer
+        env:
+          # Keep this larger than the matrix smoke corpus so generated
+          # ownership paths are exercised with ASan as well as leak-check.
+          OSTRIN_FUZZ_SEEDS: "16"
+        run: cargo test --manifest-path compiler/Cargo.toml --test examples generated_ -- --test-threads=1
       - name: Run front-end fuzz checks
         env:
           OSTRIN_FUZZ_ROUNDS: "8"
