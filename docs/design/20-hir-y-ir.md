@@ -43,7 +43,7 @@ patrones simples
 como valores —incluidas closures anidadas con capturas transitivas— también cruzan ahora la IR
 mediante `ClosureMake`/`ClosureCall` y adaptadores al ABI `(env, args...)`; el backend mantiene
 HIR/AST como fallback verificado para otros payloads gestionados e iteradores propios indirectos,
-patrones anidados, agregados complejos y escapes mientras la migración crece. Los `for`
+patrones anidados con payloads gestionados, agregados complejos y escapes mientras la migración crece. Los `for`
 sobre rangos enteros —incluidos `to`/`until`, pasos positivos/negativos y paso cero— ya
 se bajan a CFG y se emiten desde IR. Los iteradores de records concretos y los genéricos
 monomorfizados con
@@ -124,9 +124,10 @@ Sobre este IR se hacen los análisis que el texto C no permite:
    El mismo informe agrupa esas cifras por archivo fuente con líneas `native-source`, y la
    prueba diferencial comprueba que la suma por módulo coincide con los totales globales.
    La prueba diferencial conserva el baseline actual de fallback (58 funciones AST, con
-   6 491 funciones generadas por HIR/IR —6 476 IR y 15 HIR— sobre los ejemplos); los patrones superficiales de
-   records con campos escalares y genéricos ya usan IR/C con paridad intérprete/nativo/WASI; los
-   literales/rangos escalares siguen fuera del slice.
+   6 491 funciones generadas por HIR/IR —6 478 IR y 13 HIR— sobre los ejemplos); los patrones superficiales de
+   records con campos escalares y genéricos, junto con enums no genéricos por valor y sus patrones anidados,
+   ya usan IR/C con paridad intérprete/nativo/WASI; los literales/rangos escalares, payloads gestionados y
+   enums genéricos siguen fuera del slice.
    El incremento acotado incluye
    también `Rng` (constructor, métodos escalares, muestreo de arrays y permutación), con
    liberación gestionada y paridad intérprete/nativo. Los combinadores de listas (`map`, `filter`,
@@ -154,7 +155,7 @@ Sobre este IR se hacen los análisis que el texto C no permite:
    runtime; la suite completa de ejemplos nativos corre bajo UBSan e incluye cancelación de
    tareas para evitar regresiones de punteros a función incompatibles.
 2. Migrar el backend C por **familias de nodos** al HIR (literales/operadores → llamadas → records/enums → patrones → colecciones → genéricos), eliminando la reinferencia correspondiente en cada paso.
-3. **IR de bloques básicos** y generación de C desde el IR (el HIR deja de generar C directamente). La primera CFG observable ya existe en `--ir` y el emisor consume ramas, recursión, bucles con `phi`, rangos enteros direccionales, aritmética comprobada de ancho fijo, `String`, constructores 1D–3D, parámetros, indexación, selección booleana `a[mask]`, cortes `to`/`until`, `not` sobre `Array<Bool>`, `where(mask, a, b)` y métodos de `Array<T>` numérico escalar, aritmética y reducciones de `Array<Quantity<D>>` con etiqueta de unidad, records concretos con campos anidados, records genéricos monomorfizados con campos escalares, iteradores de records concretos y genéricos monomorfizados (`next() -> Option<T>`), canales con `send`/`close`/`receive` y `for`, `spawn {}` con CFG soportado, capturas inmutables, closures capturados con entorno tipado, `spawn_scope {}` inline con drenado de grupos, tareas anidadas con capturas propagadas y `Task.join()`, el núcleo de `List<T>`, operaciones hash escalares de `Map`/`Set` y lookups `Option` escalares/String/Record con `Some`/`None`; faltan otras familias de arrays cuyo elemento sea gestionado, rangos con cantidades, cambios de forma complejos, iteradores indirectos, scopes anidados, otros `Option` gestionados, patrones anidados, agregados complejos y la retirada progresiva del fallback.
+3. **IR de bloques básicos** y generación de C desde el IR (el HIR deja de generar C directamente). La primera CFG observable ya existe en `--ir` y el emisor consume ramas, recursión, bucles con `phi`, rangos enteros direccionales, aritmética comprobada de ancho fijo, `String`, constructores 1D–3D, parámetros, indexación, selección booleana `a[mask]`, cortes `to`/`until`, `not` sobre `Array<Bool>`, `where(mask, a, b)` y métodos de `Array<T>` numérico escalar, aritmética y reducciones de `Array<Quantity<D>>` con etiqueta de unidad, records concretos con campos anidados, records genéricos monomorfizados con campos escalares, iteradores de records concretos y genéricos monomorfizados (`next() -> Option<T>`), canales con `send`/`close`/`receive` y `for`, `spawn {}` con CFG soportado, capturas inmutables, closures capturados con entorno tipado, `spawn_scope {}` inline con drenado de grupos, tareas anidadas con capturas propagadas y `Task.join()`, el núcleo de `List<T>`, operaciones hash escalares de `Map`/`Set` y lookups `Option` escalares/String/Record con `Some`/`None`; faltan otras familias de arrays cuyo elemento sea gestionado, rangos con cantidades, cambios de forma complejos, iteradores indirectos, scopes anidados, otros `Option` gestionados, patrones anidados con payloads gestionados, agregados complejos y la retirada progresiva del fallback.
 4. **RC + último uso** sobre el IR (`--leak-check`: los ejemplos deben terminar sin objetos vivos).
    El runtime ya expone `ostrin_retain`/`ostrin_release`; el emisor C cubre la primera subetapa
    de forma lineal en locales directos: aliases y campos prestados retienen, las reasignaciones
@@ -168,7 +169,7 @@ Sobre este IR se hacen los análisis que el texto C no permite:
    tipados y retienen sus campos. `Option` escalar se copia por valor y `Option<String>`/
    `Option<Record>` retienen/liberan condicionalmente su payload en constructores, lookups y
    binds simples; la IR aún deja barreras explícitas para otros `Option` gestionados, patrones
-   anidados, llamadas que transfieren ownership, scopes anidados y escapes complejos. Las cadenas
+   anidados con payloads gestionados, llamadas que transfieren ownership, scopes anidados y escapes complejos. Las cadenas
    lineales de `unwrap`/`unwrap_or`/`ok`/`ok_or` sobre `Option<Option<String>>` y
    `Result<Option<String>, String>` ya extraen y retienen payloads recursivos en IR/C; el ejemplo
    `native_ir_nested_wrappers.ostrin` comprueba ramas y fallbacks con paridad y cero fugas.
