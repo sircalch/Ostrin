@@ -478,6 +478,22 @@ en [`docs/linguist.md`](docs/linguist.md), y el snapshot ejecutable de búsqueda
 registrado en [`docs/linguist-usage.md`](docs/linguist-usage.md). Hasta completar los puntos 1–3
 no se añadirá una regla local de `.gitattributes` que pueda aparentar reconocimiento oficial.
 
+**Presencia, adopción y distribución (trabajo previo a Linguist).** La calidad del sitio no
+sustituye la adopción independiente; por eso el plan mantiene un frente explícito para:
+
+- publicar la extensión de VS Code y mejorar instaladores documentados antes de abrir canales
+  adicionales como Homebrew, winget, Scoop, Chocolatey o AUR;
+- definir un registry de paquetes y plantillas públicas para proyectos científicos, con una guía
+  de publicación que permita a usuarios reales crear repositorios propios con `.ostrin`;
+- añadir una página de releases y novedades, búsqueda de documentación, casos de estudio y una
+  galería de proyectos externos verificables, sin fabricar repositorios ni contar forks;
+- convertir cada experimento de Viz en un bundle reproducible descargable con `source.ostrin`,
+  datos, figuras, `provenance.json`, manifest, commit, hashes, semilla, parámetros, cámara y
+  comando de replay;
+- publicar benchmarks históricos por commit y métricas de adopción solo con una política de
+  privacidad clara. Estas evidencias alimentan después el snapshot de Linguist y la propuesta
+  upstream, pero no se presentan como adopción hasta que existan usuarios y proyectos externos.
+
 ---
 
 ## 8. Ruta sugerida
