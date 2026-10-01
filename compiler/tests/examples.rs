@@ -2652,6 +2652,93 @@ fn native_backend_compiles_and_runs_exhaustive_enum_match() {
 }
 
 #[test]
+fn native_ir_enum_fixed_width_payloads_preserve_parity() {
+    // The enum payload slice is deliberately limited to fixed-width scalar
+    // values here. Literal/range patterns, managed payloads, generic enums
+    // and nested patterns remain on their existing paths.
+    let file = example_path("sized_ints_contexts.ostrin");
+    let expected = "-128\n-1\n15\n215\n42\n7\n";
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(
+        stdout(&interpreted).replace("\r\n", "\n"),
+        expected,
+        "interpreter output"
+    );
+
+    let report = run(&["--native-type-report", &file]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("native-source: examples/sized_ints_contexts.ostrin ir=3 hir=0 ast=0"),
+        "fixed-width enum functions did not stay on IR/C: {report_text}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "WASI fixed-width enum emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        !wasi_source.contains("#define OSTRIN_NATIVE_THREADS"),
+        "WASI fixed-width enum emission unexpectedly enabled native threads"
+    );
+    for marker in [
+        "struct Sample",
+        "uint8_t f0",
+        "int16_t f0",
+        "(__ir_v0).data.Reading.f0",
+        "(__ir_v0).data.Pair.f0",
+    ] {
+        assert!(
+            wasi_source.contains(marker),
+            "WASI C omitted fixed-width enum IR marker '{marker}'"
+        );
+    }
+
+    let exe = temp_artifact("native-ir-enum-fixed-width.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    assert!(
+        compile.status.success(),
+        "fixed-width enum native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run fixed-width enum binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "fixed-width enum native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected,
+        "native output"
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "fixed-width enum IR path leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn native_backend_compiles_and_runs_generic_functions() {
     // Monomorphization: `identity<T>` is called with Int, String and a
     // record (Pair), so it must be emitted three times — once per concrete

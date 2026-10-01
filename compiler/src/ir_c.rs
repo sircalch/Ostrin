@@ -225,13 +225,13 @@ fn record_pattern_scalar(ty: &Ty) -> bool {
     )
 }
 
-/// The first enum slice deliberately excludes fixed-width integer payloads.
-/// Their checked arithmetic and cast contexts need a separate ABI audit before
-/// enum constructors and projections can share this path.
+/// The first enum slice includes fixed-width integer payloads because their
+/// checked arithmetic, casts and C ABI are already covered by the scalar path.
+/// Managed/generic payloads and nested patterns remain outside this slice.
 fn enum_pattern_scalar(ty: &Ty) -> bool {
     matches!(
         ty,
-        Ty::Int | Ty::Float | Ty::Float32 | Ty::Bool | Ty::Quantity(_)
+        Ty::Int | Ty::Float | Ty::Float32 | Ty::Sized(_) | Ty::Bool | Ty::Quantity(_)
     )
 }
 

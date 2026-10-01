@@ -1963,6 +1963,22 @@ impl Builder {
                 }
                 dst
             }
+            HirKind::Unary(UnaryOp::Neg, operand)
+                if matches!(
+                    &operand.kind,
+                    HirKind::Sized(value, kind)
+                        if kind.is_signed() && *value == -kind.min()
+                ) =>
+            {
+                // Match the checker/interpreter/native AST special case for
+                // literals such as `-128i8`: the magnitude is represented by
+                // the child literal, while the negated minimum is valid in
+                // the signed target type.
+                let HirKind::Sized(_, kind) = &operand.kind else {
+                    unreachable!()
+                };
+                self.const_value(kind.min().to_string(), expression.ty.clone())
+            }
             HirKind::Unary(op, operand) => {
                 let operand = self.lower_expr(operand);
                 let dst = self.fresh();
