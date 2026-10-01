@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 
 const publicPages = [
@@ -294,6 +295,16 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   await expect(page.getByRole("heading", { name: "Filled contour bands" })).toBeVisible();
   await expect(page.locator(".viz-status")).toContainText("print-ready PDF export");
   await expect(page.locator("#viz-provenance .sl-provenance")).toContainText("source sha256:");
+  const bundleDownloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download experiment bundle" }).click();
+  const bundleDownload = await bundleDownloadPromise;
+  expect(bundleDownload.suggestedFilename()).toBe("reproducible-provenance.ostrin-experiment.json");
+  const bundle = JSON.parse(await readFile(await bundleDownload.path(), "utf8"));
+  expect(bundle.schema).toBe("ostrin.experiment/v0");
+  expect(bundle.reproducibility.level).toBe("R0");
+  for (const entry of bundle.manifest.files) {
+    expect(entry.sha256).toBe(`sha256:${createHash("sha256").update(bundle.files[entry.path], "utf8").digest("hex")}`);
+  }
   for (const card of await cards.all()) {
     const image = card.locator("img.viz-image");
     await expect(image).toHaveAttribute("src", /^assets\/viz\/[a-z-]+\.svg$/);

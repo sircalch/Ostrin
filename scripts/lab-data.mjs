@@ -189,7 +189,7 @@ export const GALLERY = [
   { id: "contourf", title: "Filled contour bands", file: "examples/viz_contourf.ostrin", blurb: "A 48 × 48 scalar field rendered as nine discrete filled contour bands with isolines." },
   { id: "quiver", title: "2D vector field", file: "examples/viz_quiver.ostrin", blurb: "A sampled rotational velocity field rendered as 221 deterministic arrows with tooltips." },
   { id: "streamplot", title: "2D streamlines", file: "examples/viz_streamplot.ostrin", blurb: "63 seeded paths integrated bidirectionally through a bilinearly interpolated velocity field." },
-  { id: "provenance", title: "Reproducible provenance", file: "examples/viz_provenance.ostrin", blurb: "A publication-ready figure carrying source and data hashes, a seed and compiler identity in its SVG metadata." },
+  { id: "provenance", title: "Reproducible provenance", file: "examples/viz_provenance.ostrin", blurb: "A publication-ready figure carrying source and data hashes, a seed and compiler identity in its SVG metadata.", bundle: "assets/experiments/provenance.ostrin-experiment.json" },
   { id: "lorenz", title: "3D trajectory", file: "examples/viz_lorenz.ostrin", blurb: "The Lorenz attractor integrated in Ostrin and colored by time.", controls: [{ name: "rho", label: "ρ (Rayleigh parameter)", min: 20, max: 40, step: 1 }] },
   { id: "histogram", title: "Histogram and density", file: "examples/viz_histogram.ostrin", blurb: "20 000 seeded normal samples with the scaled N(4, 1.5²) density on top." },
   { id: "boxplot", title: "Grouped boxplots", file: "examples/viz_boxplot.ostrin", blurb: "Three seeded cohorts summarized by their whiskers, quartiles and median, computed in Ostrin." },

@@ -40,6 +40,7 @@ export function collectSiteFacts() {
     releaseUrl: released ? `https://github.com/sircalch/Ostrin/releases/tag/v${version}` : "",
     designDocs: String(filesUnder("docs/design").filter((file) => file.endsWith(".md")).length),
     examples: String(filesUnder("examples").filter((file) => file.endsWith(".ostrin")).length),
+    experimentBundles: String(filesUnder("website/assets/experiments").filter((file) => file.endsWith(".ostrin-experiment.json")).length),
     integrationTests: String(countRustTests("compiler/tests/examples.rs")),
     differentialTests: String(countRustTests("compiler/tests/differential.rs")),
     unitTests: String(countRustTests("compiler/src/fmt.rs")),

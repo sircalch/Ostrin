@@ -100,9 +100,12 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    campos vectoriales, cámara, cortes ortogonales e isosuperficies de volúmenes), WebGPU y ampliar la procedencia reproducible ya disponible
    (hashes de fuente/datos, semilla y compilador) a informes y flujos de publicación con
    evidencia en intérprete, nativo y WASM.
-   El siguiente artefacto web de alto retorno es un bundle descargable por experimento con código,
-   datos, figuras, manifest, procedencia, parámetros, cámara y comando de replay; la galería debe
-   funcionar como superficie de publicación científica además de demo.
+   El primer artefacto web de alto retorno ya está implementado como fixture source-backed:
+   `ostrin.experiment/v0` descarga código, entradas declaradas, SVG, manifest y `provenance.json`
+   con hashes calculados y etiqueta R0; R1 queda como replay verificable planificado y no se
+   reclaman R2/R3. El siguiente paso es extender el contrato a cada experimento de la galería,
+   incluyendo parámetros y cámara seleccionados, para que la galería funcione como superficie de
+   publicación científica además de demo.
    El Scientific Lab ya conserva la demo activa y sus parámetros en la URL para compartir y
    restaurar experimentos reproducibles desde el navegador. La navegación compacta y el catálogo
    de ejemplos ya tienen estados ARIA, foco de teclado, Escape, pestañas con flechas/Home/End y

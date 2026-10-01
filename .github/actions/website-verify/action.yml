@@ -32,6 +32,8 @@ runs:
         node --test scripts/linguist-check.test.mjs
         node scripts/website-metadata.mjs
         node --no-warnings scripts/lab-data.mjs
+        node scripts/experiment-bundle.mjs
+        node --test scripts/experiment-bundle.test.mjs
         node scripts/provenance-page.mjs --check
         node scripts/website-check.mjs --wasm
         node scripts/distribution-check.mjs
