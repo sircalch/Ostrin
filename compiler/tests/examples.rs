@@ -5034,6 +5034,91 @@ fn native_ir_array_selection_matches_interpreter_native_and_wasi() {
 }
 
 #[test]
+fn native_ir_quantity_array_selection_preserves_unit_and_ownership() {
+    let file = fixture_path("native_ir_quantity_array_selection.ostrin");
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    let expected = stdout(&interpreted).replace("\r\n", "\n");
+
+    let report = run(&["--native-type-report", &file]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.lines().any(|line| {
+            line.strip_prefix("ir-generated: ")
+                .and_then(|value| value.parse::<usize>().ok())
+                .is_some_and(|count| count > 0)
+        }),
+        "quantity array selection did not use IR: {report_text}"
+    );
+    assert!(
+        report_text.lines().any(|line| line == "ast-fallback: 0"),
+        "quantity array selection unexpectedly fell back to AST: {report_text}"
+    );
+
+    let emitted = run(&["--emit-c", &file]);
+    assert!(
+        emitted.status.success(),
+        "quantity array selection IR emission failed: {}",
+        stderr(&emitted)
+    );
+    let source = stdout(&emitted);
+    assert!(
+        source.contains("Array_Float_mask") && source.contains("ostrin_qa_tag"),
+        "native C omitted quantity array mask tagging: {source}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "WASI quantity array selection emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("Array_Float_mask") && wasi_source.contains("ostrin_qa_tag"),
+        "WASI C omitted quantity array mask tagging"
+    );
+
+    let exe = temp_artifact("native_ir_quantity_array_selection.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    assert!(
+        compile.status.success(),
+        "quantity array selection native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run quantity array selection binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "quantity array selection native binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "quantity array selection IR ownership leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn native_ir_emitter_checks_float_and_integer_casts() {
     let file = fixture_path("native_ir_numeric_casts.ostrin");
     let expected = "3\n-3\n255\n3\n300\n";

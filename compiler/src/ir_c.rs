@@ -2279,18 +2279,21 @@ fn emit_instruction(
                         && *ty == Ty::Applied(name.clone(), args.clone())
                         && matches!(value_ty(values, *index)?, Ty::Applied(mask_name, mask_args) if mask_name == "Array" && mask_args.as_slice() == [Ty::Bool]) =>
                 {
-                    // `a[mask]` is a dense selection. Quantity arrays keep
-                    // their established HIR path until unit-aware mask
-                    // ownership is made explicit; scalar numeric and boolean
-                    // arrays share one generated runtime kernel.
-                    if matches!(args[0], Ty::Quantity(_)) {
-                        return Err(());
-                    }
                     let array_c_name = array_name(&Ty::Applied(name, args.clone())).ok_or(())?;
-                    out.push_str(&format!(
-                        "    {} = {array_c_name}_mask({object_code}, {index_code});\n",
-                        value_name(*dst)
-                    ));
+                    let code = if matches!(args[0], Ty::Quantity(_)) {
+                        // Quantity arrays use the Array_Float backing but keep
+                        // one shared unit label on the array header.  The
+                        // mask kernel returns a fresh untagged array, so
+                        // retain the source label for the result before the
+                        // source value can be released by the IR ownership
+                        // pass.
+                        format!(
+                            "ostrin_qa_tag({array_c_name}_mask({object_code}, {index_code}), ({object_code})->unit)"
+                        )
+                    } else {
+                        format!("{array_c_name}_mask({object_code}, {index_code})")
+                    };
+                    out.push_str(&format!("    {} = {code};\n", value_name(*dst)));
                 }
                 Ty::Applied(name, args)
                     if name == "Array"

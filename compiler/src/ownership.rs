@@ -1177,7 +1177,10 @@ fn is_fresh_array_mask_index(
         && matches!(
             object_ty,
             Ty::Applied(_, args)
-                if matches!(args.as_slice(), [Ty::Int | Ty::Float | Ty::Float32 | Ty::Bool])
+                if matches!(
+                    args.as_slice(),
+                    [Ty::Int | Ty::Float | Ty::Float32 | Ty::Bool | Ty::Quantity(_)]
+                )
         )
         && matches!(
             index_ty,
