@@ -9562,6 +9562,58 @@ fn quantity_impls_dispatch_by_dimension_argument() {
 }
 
 #[test]
+fn native_ir_quantity_impls_dispatch_by_dimension() {
+    let file = example_path("quantity_impl_dispatch.ostrin");
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "quantity impl report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text
+            .contains("native-source: examples/quantity_impl_dispatch.ostrin ir=3 hir=0 ast=0"),
+        "quantity impl methods did not use the IR path: {report_text}"
+    );
+
+    let expected = run(&["--run", &file]);
+    assert!(
+        expected.status.success(),
+        "quantity impl interpreter failed: {}",
+        stderr(&expected)
+    );
+    let exe = temp_artifact("quantity_impl_dispatch_ir.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "quantity impl native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run quantity impl binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "quantity impl native binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        stdout(&expected).replace("\r\n", "\n")
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "quantity impl native binary leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn multi_file_project_resolves_qualified_alias_and_named_imports() {
     let out = run(&["--run", &example_path("proj1/main.ostrin")]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));

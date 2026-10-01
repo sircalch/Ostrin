@@ -790,6 +790,13 @@ pub fn lower<'a>(items: &'a [Item], typed: &'a TypedProgram) -> HirProgram {
                 let owner_type = Type::Named(im.type_name.clone(), im.type_args.clone());
                 let self_ty = if im.type_args.is_empty() {
                     Ty::Named(im.type_name.clone())
+                } else if im.type_name == "Quantity" && im.type_args.len() == 1 {
+                    // `Quantity<D>` has a dedicated scalar representation in
+                    // the typed HIR. Keeping an impl receiver as the generic
+                    // `Applied("Quantity", ..)` spelling would make the IR
+                    // emitter reject an otherwise concrete quantity method,
+                    // even though the native ABI already uses `Qty`.
+                    crate::typeck::resolve_type(&owner_type)
                 } else {
                     Ty::Applied(
                         im.type_name.clone(),
