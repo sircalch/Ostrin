@@ -6,6 +6,14 @@ fn make_ones(shape: List<Int>) -> Array<Float> {
     ones(shape)
 }
 
+fn make_full(shape: List<Int>, value: Int) -> Array<Int> {
+    full(shape, value)
+}
+
+fn make_range(start: Int, stop: Int) -> Array<Int> {
+    arange(start, stop)
+}
+
 fn measure(value: Array<Float>) -> Float {
     norm(value)
 }
@@ -30,4 +38,6 @@ fn main() -> Void {
     print(exp(ln(2.0)))
     print(mapped(array([-3.0, 4.0]))[0])
     print(eye(2).get(1, 1))
+    print(make_full([2, 2], 7))
+    print(make_range(0, 5))
 }
