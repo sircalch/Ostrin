@@ -109,8 +109,8 @@ selección `a[mask]`, `where(mask, a, b)`, `not` sobre máscaras, rebanadas `to`
 funciones elementales deterministas (idénticas en intérprete y nativo), LU/QR/SVD/Cholesky verificables y `std.numeric.Complex`
 experimental con operaciones aritméticas, forma polar, conjugado, magnitud, potencias enteras y matrices/vectores complejos densos con partes separadas.
 Los constructores `zeros`/`ones`, `norm`, `abs` escalar y `sqrt` también tienen lowering IR/C
-tipado; QR y Cholesky usan esos lowering sin caer al AST en sus consumidores medidos, mientras LU
-mantiene el fallback verificado de agregados.
+tipado; QR, Cholesky y LU usan esos lowering sin caer al AST en los consumidores medidos, mientras
+los agregados científicos que todavía no tienen representación IR conservan el fallback verificado.
 
 **Datos**: métodos de `String`, `parse_csv`; `Map` y `Set` usan índice hash para claves/elementos
 hashables, incluyendo colecciones estructurales, y conservan orden de iteración. Los records/enums
@@ -493,10 +493,11 @@ sustituye la adopción independiente; por eso el plan mantiene un frente explíc
   galería de proyectos externos verificables, sin fabricar repositorios ni contar forks;
 - convertir cada experimento de Viz en un bundle reproducible descargable con `source.ostrin`,
   datos, figuras, `provenance.json`, manifest, commit, hashes, semilla, parámetros, cámara y
-  comando de replay. El primer fixture source-backed ya publica `ostrin.experiment/v0` como un
-  artefacto R0 con cuatro archivos y hashes calculados; R1 queda etiquetado como replay verificable
-  planificado, y R2/R3 no se reclaman. Falta extenderlo a todos los experimentos y serializar
-  parámetros/cámara seleccionados;
+  comando de replay. Los fixtures source-backed `provenance` y `surface` ya publican
+  `ostrin.experiment/v0` como artefactos R0 con cuatro archivos y hashes calculados; el bundle 3D
+  registra además sus parámetros y cámara. R1 queda etiquetado como replay verificable planificado,
+  y R2/R3 no se reclaman. Falta extenderlo a todos los experimentos y serializar el estado vivo
+  seleccionado desde el explorador;
 - publicar benchmarks históricos por commit y métricas de adopción solo con una política de
   privacidad clara. Estas evidencias alimentan después el snapshot de Linguist y la propuesta
   upstream, pero no se presentan como adopción hasta que existan usuarios y proyectos externos.

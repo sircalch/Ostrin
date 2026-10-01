@@ -1,0 +1,11 @@
+{
+  "seed": "deterministic",
+  "parameters": {
+    "scale": 1.0
+  },
+  "camera": {
+    "azimuth": -55.0,
+    "elevation": 28.0
+  },
+  "description": "Default parameters and camera for the recorded 3D peaks surface fixture."
+}

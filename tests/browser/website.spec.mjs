@@ -296,7 +296,7 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   await expect(page.locator(".viz-status")).toContainText("print-ready PDF export");
   await expect(page.locator("#viz-provenance .sl-provenance")).toContainText("source sha256:");
   const bundleDownloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Download experiment bundle" }).click();
+  await page.locator("#viz-provenance").getByRole("button", { name: "Download experiment bundle" }).click();
   const bundleDownload = await bundleDownloadPromise;
   expect(bundleDownload.suggestedFilename()).toBe("reproducible-provenance.ostrin-experiment.json");
   const bundle = JSON.parse(await readFile(await bundleDownload.path(), "utf8"));
@@ -557,6 +557,23 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   await expect(hexbinFrame.locator("linearGradient")).toHaveCount(1);
   await page.getByRole("button", { name: "Close" }).click();
   expect(runtimeErrors).toEqual([]);
+});
+
+test("Viz exposes the recorded 3D surface experiment bundle", async ({ page }) => {
+  await page.goto("./viz.html", { waitUntil: "domcontentloaded" });
+  const bundleDownloadPromise = page.waitForEvent("download");
+  await page.locator('[data-viz-bundle="surface"]').click();
+  const bundleDownload = await bundleDownloadPromise;
+  expect(bundleDownload.suggestedFilename()).toBe("shaded-3d-surface.ostrin-experiment.json");
+  const bundle = JSON.parse(await readFile(await bundleDownload.path(), "utf8"));
+  expect(bundle.id).toBe("surface");
+  expect(bundle.provenance.parameters).toEqual({ scale: 1 });
+  expect(bundle.provenance.camera).toEqual({ azimuth: -55, elevation: 28 });
+  expect(bundle.reproducibility.level).toBe("R0");
+  expect(bundle.files["figure.svg"]).toContain("<ostrin-provenance");
+  for (const entry of bundle.manifest.files) {
+    expect(entry.sha256).toBe(`sha256:${createHash("sha256").update(bundle.files[entry.path], "utf8").digest("hex")}`);
+  }
 });
 
 test("Viz explorer links restore parameters and 3D camera", async ({ page }) => {

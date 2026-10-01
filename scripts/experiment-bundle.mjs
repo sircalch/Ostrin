@@ -28,6 +28,17 @@ export const experimentFixtures = Object.freeze({
     // This keeps verification deterministic in shallow CI checkouts.
     sourceRevision: "0ecc9c6e81d4a7000904db67446a4a377e9dd20d",
   }),
+  surface: Object.freeze({
+    id: "surface",
+    title: "3D surface",
+    sourcePath: "examples/viz_surface.ostrin",
+    inputPath: "experiments/surface.inputs.json",
+    figurePath: "website/assets/viz/surface.svg",
+    outputPath: "website/assets/experiments/surface.ostrin-experiment.json",
+    // The input record is committed before this registry entry so shallow CI
+    // can resolve the complete source/input/figure set deterministically.
+    sourceRevision: "47e84fabcbfa144830e37a294a298698c267e21a",
+  }),
 });
 
 // Short alias for callers that only need to enumerate the registry.
@@ -86,11 +97,14 @@ function fixtureCommit(root, fixture) {
 }
 
 function normalizeFigureMetadata(svg, metadata) {
-  return svg
+  const attributes = `source-hash="${metadata.sourceHash}" data-hash="${metadata.dataHash}" seed="seed=${metadata.seed}" compiler="${metadata.compiler}"`;
+  const normalized = svg
     .replace(/source-hash="[^"]*"/, `source-hash="${metadata.sourceHash}"`)
     .replace(/data-hash="[^"]*"/, `data-hash="${metadata.dataHash}"`)
     .replace(/seed="[^"]*"/, `seed="seed=${metadata.seed}"`)
     .replace(/compiler="[^"]*"/, `compiler="${metadata.compiler}"`);
+  if (normalized.includes("<ostrin-provenance ")) return normalized;
+  return normalized.replace("</svg>", `  <ostrin-provenance ${attributes} />\n</svg>`);
 }
 
 function bundleFiles(root, fixture) {
@@ -169,6 +183,7 @@ function provenanceFor(root, fixture, files, manifest) {
     target: "wasm32-wasip1",
     command: "ostrinc --run --target wasm32-wasi source.ostrin",
     parameters: inputs.parameters,
+    ...(inputs.camera ? { camera: inputs.camera } : {}),
     seed: inputs.seed,
     manifest_schema: manifest.schema,
     limits: "R0 recorded artifact. The bundle does not include external snapshots, lockfiles, runtime captures or an R2/R3 replay guarantee.",
