@@ -8078,6 +8078,83 @@ fn native_quantity_array_compound_units_release_owned_labels() {
 }
 
 #[test]
+fn native_quantity_list_escape_retains_array_unit_labels() {
+    // `Array<Quantity<D>>.to_list()` copies the array's unit pointer into
+    // each by-value `Qty`. The list must retain that label before the array
+    // is released; otherwise a dynamically combined unit (such as `m^2`)
+    // becomes a dangling pointer and native output diverges from the
+    // interpreter.
+    let file = temp_source(
+        "native-quantity-list-escape.ostrin",
+        "fn main() -> Void {\n    values = array([1 m, 2 m]) * array([1 m, 2 m])\n    escaped = values.to_list()\n    print(escaped)\n}\n",
+    );
+    let expected = "[1 m^2, 4 m^2]\n";
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    if skip_if_no_c_compiler(&report) {
+        let _ = fs::remove_file(&file);
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "native report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ir-generated: 1"), "{report_text}");
+    assert!(report_text.contains("hir-generated: 0"), "{report_text}");
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "WASI C emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("List_Q_Length_drop")
+            && wasi_source.contains("ostrin_retain((void*)(list->items[i]).u)"),
+        "WASI source omitted quantity-list label ownership"
+    );
+
+    let exe = temp_artifact("native-quantity-list-escape.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run quantity-list escape binary");
+    let _ = fs::remove_file(&exe);
+    let _ = fs::remove_file(&file);
+    assert!(
+        native.status.success(),
+        "native binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "quantity-list unit label leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn native_list_of_quantity_arrays_matches_interpreter_and_wasi() {
     let file = temp_source(
         "native-list-quantity-arrays.ostrin",

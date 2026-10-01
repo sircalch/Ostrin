@@ -218,6 +218,9 @@ static const char* ostrin_qty_to_string(Qty q) {
     char buf[64];
     ostrin_fmt_double(q.v, buf, sizeof buf);
     if (!*q.u) return ostrin_unit_cat(buf, "", "");
-    return ostrin_unit_cat(ostrin_unit_cat(buf, " ", ""), q.u, "");
+    const char* spaced = ostrin_unit_cat(buf, " ", "");
+    const char* out = ostrin_unit_cat(spaced, q.u, "");
+    ostrin_release((void*)spaced);
+    return out;
 }
 
