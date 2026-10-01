@@ -36,7 +36,10 @@ test("the fixture registry stays source-backed and parameterizable", () => {
   assert.ok(fixture);
   for (const path of [fixture.sourcePath, fixture.inputPath, fixture.figurePath]) assert.match(path, /^(examples|experiments|website)\//);
   assert.equal(outputPathFor("provenance"), outputPath);
-  assert.equal(buildExperimentBundle("provenance").id, fixture.id);
+  const bundle = buildExperimentBundle("provenance");
+  assert.equal(bundle.id, fixture.id);
+  assert.match(fixture.sourceRevision, /^[0-9a-f]{40}$/);
+  assert.equal(bundle.provenance.commit, fixture.sourceRevision);
   assert.throws(() => buildExperimentBundle("missing"), /unknown experiment fixture/);
 });
 

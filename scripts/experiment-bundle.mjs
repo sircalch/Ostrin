@@ -24,6 +24,9 @@ export const experimentFixtures = Object.freeze({
     inputPath: "experiments/provenance.inputs.json",
     figurePath: "website/assets/viz/provenance.svg",
     outputPath: "website/assets/experiments/provenance.ostrin-experiment.json",
+    // Pin the revision that introduced this complete source/input/figure set.
+    // This keeps verification deterministic in shallow CI checkouts.
+    sourceRevision: "0ecc9c6e81d4a7000904db67446a4a377e9dd20d",
   }),
 });
 
@@ -66,6 +69,7 @@ function compilerVersion(root) {
 }
 
 function fixtureCommit(root, fixture) {
+  if (fixture.sourceRevision) return fixture.sourceRevision;
   try {
     // Resolve the revision from the recorded inputs rather than HEAD. This
     // keeps a checked bundle stable when the generator itself changes later.
