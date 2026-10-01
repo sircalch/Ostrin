@@ -6,8 +6,11 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
 ## Siguiente ciclo
 
 1. Reducir el fallback AST con el trinquete por archivo de `--native-type-report` (baseline actual:
-   6.468 funciones IR, 21 HIR y 60 AST). Los patrones superficiales de records con campos escalares
-   ya comparten IR/C, incluidos records genéricos; los métodos de records y enums concretos ya comparten
+   6.490 funciones generadas por HIR/IR (6.474 IR + 16 HIR) y 59 AST). Los patrones superficiales de records con campos escalares
+   y los enums no genéricos con payloads escalares, variantes unitarias y patrones simples ya
+   comparten IR/C; los literales/rangos escalares siguen pendientes junto con payloads gestionados,
+   enums genéricos y patrones anidados.
+   Los métodos de records y enums concretos ya comparten
    la ruta IR/C cuando sus campos y ownership son compatibles; los records recursivos permanecen
    deliberadamente en HIR/AST hasta cerrar ese contrato. El puente IR para los constructores numéricos
    `zeros`/`ones`, `norm`, `abs` escalar y `sqrt` migró 348 funciones compartidas por la suite;

@@ -9334,13 +9334,36 @@ fn generate_impl(
         codegen.register_hir_types(program);
         codegen.sync_hir_instances(&mut hir_world);
     }
-    let ir_records: crate::ir_c::RecordFields = codegen
+    let mut ir_records: crate::ir_c::RecordFields = codegen
         .records
         .iter()
         .map(|(name, fields)| {
             (
                 name.clone(),
                 fields.iter().map(|(field, _)| field.clone()).collect(),
+            )
+        })
+        .collect();
+    // Plain enums are passed by value in the generated C ABI.  Keep their
+    // names alongside record metadata for the shared IR representation, but
+    // keep variant details in a separate table so record ownership helpers
+    // never mistake an enum for a heap record.
+    for variant in hir_world.variants.values() {
+        ir_records
+            .entry(crate::ir_c::enum_marker(&variant.enum_name))
+            .or_default();
+    }
+    let ir_variants: crate::ir_c::VariantFields = hir_world
+        .variants
+        .iter()
+        .map(|(name, variant)| {
+            (
+                (variant.enum_name.clone(), name.clone()),
+                crate::ir_c::VariantInfo {
+                    name: name.clone(),
+                    tag: variant.tag,
+                    fields: variant.fields.clone(),
+                },
             )
         })
         .collect();
@@ -9379,6 +9402,7 @@ fn generate_impl(
                         &ir_functions,
                         &ir_methods,
                         &ir_records,
+                        &ir_variants,
                         &mut |request, left, right, ty| {
                             let ctype = codegen.ty_to_ctype(ty)?;
                             match request {
@@ -9503,6 +9527,7 @@ fn generate_impl(
                         &ir_functions,
                         &ir_methods,
                         &ir_records,
+                        &ir_variants,
                         &mut |request, left, right, ty| {
                             let ctype = codegen.ty_to_ctype(ty)?;
                             match request {
@@ -10253,6 +10278,10 @@ fn generate_impl(
                         .as_ref()
                         .map(|program| program.record_generics.clone())
                         .unwrap_or_default(),
+                    enum_variants: hir
+                        .as_ref()
+                        .map(|program| program.enum_variants.clone())
+                        .unwrap_or_default(),
                 };
                 let (program, summary) =
                     crate::ownership::lower_linear(&crate::ir::lower(&program));
@@ -10274,6 +10303,7 @@ fn generate_impl(
                     &known_functions,
                     &ir_methods,
                     &ir_records,
+                    &ir_variants,
                     &mut |request, left, right, ty| {
                         let ctype = codegen.ty_to_ctype(ty)?;
                         match request {
