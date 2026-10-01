@@ -202,6 +202,23 @@ fn release_managed_value(access: &str, ty: &CType) -> Option<String> {
     retain_managed_value(access, ty).map(|body| body.replace("ostrin_retain", "ostrin_release"))
 }
 
+/// A `Quantity` is a by-value C struct, but its runtime unit expression may
+/// point at an owned string produced by `unit_combine`. Lists of quantities
+/// therefore need to retain/release the unit pointer for each element. The
+/// runtime retain ABI is a no-op for the string literals used by unit
+/// literals, so this also covers borrowed labels from quantity arrays without
+/// changing their representation.
+fn retain_list_item(access: &str, ty: &CType) -> Option<String> {
+    match ty {
+        CType::Quantity(_) => Some(format!("ostrin_retain((void*)({access}).u)")),
+        _ => retain_managed_value(access, ty),
+    }
+}
+
+fn release_list_item(access: &str, ty: &CType) -> Option<String> {
+    retain_list_item(access, ty).map(|body| body.replace("ostrin_retain", "ostrin_release"))
+}
+
 /// Releases an owned value, preserving the task-handle bookkeeping used by
 /// the existing direct-reference cleanup path. Aggregate payloads recurse into
 /// their active fields and therefore never cast a by-value wrapper to `void*`.
@@ -9656,7 +9673,7 @@ fn generate_impl(
             ));
 
             let drop_sig = format!("static void {struct_name}_drop(void* raw)");
-            let drop_items = release_managed_value("list->items[i]", &elem_ty)
+            let drop_items = release_list_item("list->items[i]", &elem_ty)
                 .map(|body| {
                     format!("    for (int64_t i = 0; i < list->length; i++) {{ {body}; }}\n")
                 })
@@ -9666,7 +9683,7 @@ fn generate_impl(
                 drop_items
             );
             let new_sig = format!("static {struct_name}* {struct_name}_new_from_array({elem_c}* src_items, int64_t count)");
-            let retain_new_item = retain_managed_value("list->items[i]", &elem_ty)
+            let retain_new_item = retain_list_item("list->items[i]", &elem_ty)
                 .map(|body| format!(" {body};"))
                 .unwrap_or_default();
             let new_body = format!(
@@ -9683,7 +9700,7 @@ fn generate_impl(
 
             let push_sig =
                 format!("static void {struct_name}_push({struct_name}* list, {elem_c} value)");
-            let retain_push_item = retain_managed_value("value", &elem_ty)
+            let retain_push_item = retain_list_item("value", &elem_ty)
                 .map(|body| format!(" {body};"))
                 .unwrap_or_default();
             let push_body = format!(

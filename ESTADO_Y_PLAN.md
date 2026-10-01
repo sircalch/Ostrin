@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-30 · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 262 de integración y 2 unitarias en verde.*
+*Corte: 2026-09-30 · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 263 de integración y 2 unitarias en verde.*
 
 Validación remota: Pages, CI, CodeQL, sanitizers y auditoría de seguridad pasaron para el
 ciclo actual en Windows, Linux, macOS y web. La compuerta oficial exige `cargo fmt --check`, Clippy con el lint `suspicious`, la suite del
@@ -196,10 +196,11 @@ El ejemplo `dataframe.ostrin` ya cruza IR/C en sus recorridos de `List<List<Stri
 `Array<Quantity<D>>` ya cruza IR/C para aritmética elemento a elemento con conversión de unidades,
 comparaciones, negación, reducciones (`sum`/`min`/`max`/`mean`/`median`/`std`/`percentile`),
 varianza con unidad al cuadrado, cortes por rango, `as<unit>` y `to_list`; `quantity_arrays.ostrin`
-mantiene salida idéntica entre intérprete, nativo y WASI. El `--leak-check` de esta galería sigue
-mostrando `live_allocations=14`: la representación de arrays consume ahora sus temporales de texto;
-las asignaciones restantes pertenecen a expresiones escalares de unidades y a etiquetas de arrays
-que pueden escapar a valores escalares/listas, por lo que su ownership queda como deuda separada.
+mantiene salida idéntica entre intérprete, nativo y WASI. El `--leak-check` de esta galería
+registra `live_allocations=4`: la representación de arrays consume ahora sus temporales de texto;
+`Array<Quantity<D>>.to_list()` retiene las etiquetas dinámicas por elemento y las libera con el
+destructor de la lista. Las asignaciones restantes pertenecen a expresiones escalares de unidades
+y a etiquetas que escapan a valores escalares, por lo que su ownership queda como deuda separada.
 El puente IR de `zeros`/`ones`, `norm`, `abs` escalar y `sqrt` redujo el fallback en 348 funciones;
 esta pasada añade conversiones escalares `as<Float/Float32>` y conversiones comprobadas a `Int`/enteros de ancho fijo,
 `abs` sobre arrays y funciones matemáticas
@@ -526,7 +527,7 @@ sus evidencias y validación upstream.
 
 ```powershell
 cd compiler
-    cargo test                                   # 6 diferenciales + 262 de integración + 2 unitarias
+    cargo test                                   # 6 diferenciales + 263 de integración + 2 unitarias
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```

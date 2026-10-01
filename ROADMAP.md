@@ -47,8 +47,10 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    `Array_Float`, conserva la etiqueta de unidad y libera cada array desde el destructor de la lista,
    con paridad intérprete/nativo/WASI y `live_allocations=0` en la prueba dedicada.
    La representación de arrays consume ahora sus temporales de texto; `quantity_arrays.ostrin`
-   registra `live_allocations=14` bajo leak-check nativo. Las expresiones escalares y las etiquetas
-   de arrays que escapan a valores/listas quedan como deuda de ownership para un pase posterior.
+   registra `live_allocations=4` bajo leak-check nativo. `Array<Quantity<D>>.to_list()` retiene
+   ahora las etiquetas dinámicas por elemento y las libera con el destructor de la lista; las
+   expresiones escalares y las etiquetas que escapan a valores escalares siguen como deuda de
+   ownership para un pase posterior.
    `Rng` y sus métodos escalares y de muestreo (`rand`, `randn`, `randint`, `permutation`) ya
    comparten IR/C con ownership explícito y paridad intérprete/nativo. Los combinadores de listas
    (`map`, `filter`, `fold`, `any`, `all`, `find`) también cruzan IR/C, incluidos cierres con
