@@ -124,10 +124,10 @@ Sobre este IR se hacen los análisis que el texto C no permite:
    El mismo informe agrupa esas cifras por archivo fuente con líneas `native-source`, y la
    prueba diferencial comprueba que la suma por módulo coincide con los totales globales.
    La prueba diferencial conserva el baseline actual de fallback (58 funciones AST, con
-   6 491 funciones generadas por HIR/IR —6 478 IR y 13 HIR— sobre los ejemplos); los patrones superficiales de
+   6 492 funciones generadas por HIR/IR —6 479 IR y 13 HIR— sobre los ejemplos); los patrones superficiales de
    records con campos escalares y genéricos, junto con enums no genéricos por valor y sus patrones anidados,
-   ya usan IR/C con paridad intérprete/nativo/WASI; los literales/rangos escalares, payloads gestionados y
-   enums genéricos siguen fuera del slice.
+   ya usan IR/C con paridad intérprete/nativo/WASI; los payloads gestionados y enums genéricos siguen fuera
+   del slice.
    El incremento acotado incluye
    también `Rng` (constructor, métodos escalares, muestreo de arrays y permutación), con
    liberación gestionada y paridad intérprete/nativo. Los combinadores de listas (`map`, `filter`,

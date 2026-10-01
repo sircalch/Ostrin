@@ -2547,12 +2547,13 @@ fn native_backend_compiles_and_runs_enums_and_match() {
     // A named-field variant (`Circle(radius: Int)`, constructed with a
     // named argument), a positional-field variant (`Rectangle(Int, Int)`,
     // whose fields the pattern `Rectangle(width, height)` must resolve by
-    // position, not name), a unit variant, and a `match` over a plain Int
-    // exercising a literal, a range, a guard that reads its own binding,
-    // and a wildcard fallback.
+    // position, not name), a unit variant, and matches over a plain Int and
+    // scalar enum payloads. The plain Int match stays on HIR; enum
+    // literal/range predicates use the typed IR/C path.
     let exe = temp_artifact("enums.exe");
     let compile = run(&[
         "--compile",
+        "--leak-check",
         "--out",
         &exe,
         &example_path("native_enums.ostrin"),
@@ -2572,9 +2573,29 @@ fn native_backend_compiles_and_runs_enums_and_match() {
         stderr(&report)
     );
     assert!(
-        stdout(&report).contains("native-source: examples/native_enums.ostrin ir=2 hir=1 ast=0"),
-        "plain enum functions did not stay on IR/C while literal/range matching remains HIR: {}",
+        stdout(&report).contains("native-source: examples/native_enums.ostrin ir=3 hir=1 ast=0"),
+        "plain enum functions did not stay on IR/C while scalar literal/range matching was migrated: {}",
         stdout(&report)
+    );
+
+    let wasi = run(&[
+        "--emit-c",
+        "--target",
+        "wasm32-wasi",
+        &example_path("native_enums.ostrin"),
+    ]);
+    assert!(
+        wasi.status.success(),
+        "WASI scalar enum pattern emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains(".data.Number.f0) == INT64_C(0)")
+            && wasi_source.contains(".data.Number.f0) >= INT64_C(1)")
+            && wasi_source.contains(".data.Flag.f0) == true")
+            && !wasi_source.contains("#define OSTRIN_NATIVE_THREADS"),
+        "WASI scalar enum predicates were not emitted from IR: {wasi_source}"
     );
 
     let run_output = Command::new(&exe)
@@ -2587,8 +2608,13 @@ fn native_backend_compiles_and_runs_enums_and_match() {
     );
     assert_eq!(
         String::from_utf8_lossy(&run_output.stdout).replace("\r\n", "\n"),
-        "27\n20\n0\nzero\nsmall\nnegative\nlarge\n",
+        "27\n20\n0\nzero\nsmall\nnegative\nlarge\nzero token\nsmall token\n9\nyes token\nno token\ndone token\n",
         "native binary should match the interpreter's output for the same program"
+    );
+    assert!(
+        String::from_utf8_lossy(&run_output.stderr).contains("live_allocations=0"),
+        "scalar enum patterns leaked native allocations: {}",
+        String::from_utf8_lossy(&run_output.stderr)
     );
 }
 
@@ -9108,6 +9134,13 @@ fn native_ir_record_patterns_match_interpreter_native_and_wasi() {
             wasi_source.contains(marker),
             "WASI C omitted the IR record field projection for {file}: {marker}"
         );
+        if file == "match_nested.ostrin" {
+            assert!(
+                wasi_source.contains("Ready.f0) >= INT64_C(40)")
+                    && wasi_source.contains("Ready.f0) <= INT64_C(50)"),
+                "WASI C omitted the nested enum scalar range predicate: {wasi_source}"
+            );
+        }
         assert!(
             !wasi_source.contains("#define OSTRIN_NATIVE_THREADS"),
             "WASI record pattern emission unexpectedly enabled native threads for {file}"

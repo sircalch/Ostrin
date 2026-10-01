@@ -12,12 +12,40 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
 
-use crate::ast::{BinOp, RangeKind, UnaryOp};
+use crate::ast::{BinOp, Expr, RangeKind, UnaryOp};
 use crate::hir::{HirBlock, HirExpr, HirFunction, HirKind, HirProgram, HirStmt, IteratorInfo};
 use crate::types::Ty;
 
 pub type ValueId = usize;
 pub type BlockId = usize;
+
+/// Scalar values captured from a checked enum pattern.  Keeping the value
+/// typed in IR lets the C backend emit the same comparison without parsing a
+/// `Debug` string or re-running expression inference.
+#[derive(Debug, Clone)]
+pub enum IrScalarValue {
+    Int(i64),
+    Sized(i128, crate::ast::IntKind),
+    Float(f64),
+    Float32(f32),
+    Bool(bool),
+}
+
+#[derive(Debug, Clone)]
+pub enum IrScalarPattern {
+    Literal {
+        path: Vec<(String, usize)>,
+        value: IrScalarValue,
+        ty: Ty,
+    },
+    Range {
+        path: Vec<(String, usize)>,
+        kind: RangeKind,
+        start: IrScalarValue,
+        end: IrScalarValue,
+        ty: Ty,
+    },
+}
 
 #[derive(Debug, Clone)]
 pub struct IrProgram {
@@ -175,6 +203,10 @@ pub enum IrInstr {
         /// beside the debug pattern lets the C backend lower nested by-value
         /// enums without parsing a `Debug` string or guessing field names.
         enum_tests: Vec<(Vec<(String, usize)>, String)>,
+        /// Scalar payload predicates required by this pattern.  These are
+        /// intentionally limited to copyable scalar payloads; managed and
+        /// generic values continue through the established fallback.
+        scalar_tests: Vec<IrScalarPattern>,
     },
     PatternBind {
         dst: ValueId,
@@ -596,6 +628,46 @@ impl Builder {
         result
     }
 
+    fn scalar_pattern_value(expr: &Expr, ty: &Ty) -> Option<IrScalarValue> {
+        match (expr.unlocated(), ty) {
+            (Expr::IntLiteral(value), Ty::Int) => Some(IrScalarValue::Int(*value)),
+            (Expr::SizedIntLiteral(value, kind), Ty::Sized(expected)) if kind == expected => {
+                Some(IrScalarValue::Sized(*value, *kind))
+            }
+            (Expr::FloatLiteral(value), Ty::Float) => Some(IrScalarValue::Float(*value)),
+            (Expr::Float32Literal(value), Ty::Float32) => Some(IrScalarValue::Float32(*value)),
+            (Expr::BoolLiteral(value), Ty::Bool) => Some(IrScalarValue::Bool(*value)),
+            (Expr::Unary(UnaryOp::Neg, operand), Ty::Int) => {
+                let IrScalarValue::Int(value) = Self::scalar_pattern_value(operand, ty)? else {
+                    return None;
+                };
+                value.checked_neg().map(IrScalarValue::Int)
+            }
+            (Expr::Unary(UnaryOp::Neg, operand), Ty::Sized(kind)) if kind.is_signed() => {
+                let value = match Self::scalar_pattern_value(operand, ty)? {
+                    IrScalarValue::Sized(value, _) => value,
+                    _ => return None,
+                };
+                value
+                    .checked_neg()
+                    .map(|value| IrScalarValue::Sized(value, *kind))
+            }
+            (Expr::Unary(UnaryOp::Neg, operand), Ty::Float) => {
+                let IrScalarValue::Float(value) = Self::scalar_pattern_value(operand, ty)? else {
+                    return None;
+                };
+                Some(IrScalarValue::Float(-value))
+            }
+            (Expr::Unary(UnaryOp::Neg, operand), Ty::Float32) => {
+                let IrScalarValue::Float32(value) = Self::scalar_pattern_value(operand, ty)? else {
+                    return None;
+                };
+                Some(IrScalarValue::Float32(-value))
+            }
+            _ => None,
+        }
+    }
+
     /// Resolve a path produced while recursively binding an enum pattern.
     /// Records and wrapper patterns retain their source field paths; enum
     /// fields use the collision-free marker emitted by `bind_pattern`.
@@ -632,6 +704,7 @@ impl Builder {
         pattern: &crate::ast::Pattern,
         path: Vec<(String, usize)>,
         tests: &mut Vec<(Vec<(String, usize)>, String)>,
+        scalar_tests: &mut Vec<IrScalarPattern>,
     ) {
         match pattern {
             crate::ast::Pattern::Ident(name) => {
@@ -650,12 +723,37 @@ impl Builder {
                     };
                     let mut nested_path = path.clone();
                     nested_path.push((name.clone(), index));
-                    self.enum_pattern_tests(field_ty, subpattern, nested_path, tests);
+                    self.enum_pattern_tests(field_ty, subpattern, nested_path, tests, scalar_tests);
                 }
             }
-            crate::ast::Pattern::Wildcard
-            | crate::ast::Pattern::Literal(_)
-            | crate::ast::Pattern::Range(..) => {}
+            crate::ast::Pattern::Literal(literal) => {
+                if !path.is_empty() {
+                    if let Some(value) = Self::scalar_pattern_value(literal, ty) {
+                        scalar_tests.push(IrScalarPattern::Literal {
+                            path,
+                            value,
+                            ty: ty.clone(),
+                        });
+                    }
+                }
+            }
+            crate::ast::Pattern::Range(start, kind, end) => {
+                if !path.is_empty() {
+                    if let (Some(start), Some(end)) = (
+                        Self::scalar_pattern_value(start, ty),
+                        Self::scalar_pattern_value(end, ty),
+                    ) {
+                        scalar_tests.push(IrScalarPattern::Range {
+                            path,
+                            kind: *kind,
+                            start,
+                            end,
+                            ty: ty.clone(),
+                        });
+                    }
+                }
+            }
+            crate::ast::Pattern::Wildcard => {}
         }
     }
 
@@ -1565,12 +1663,20 @@ impl Builder {
             self.current = test_block;
             let test = self.fresh();
             let mut enum_tests = Vec::new();
-            self.enum_pattern_tests(&subject.ty, &arm.pattern, Vec::new(), &mut enum_tests);
+            let mut scalar_tests = Vec::new();
+            self.enum_pattern_tests(
+                &subject.ty,
+                &arm.pattern,
+                Vec::new(),
+                &mut enum_tests,
+                &mut scalar_tests,
+            );
             self.emit(IrInstr::PatternTest {
                 dst: test,
                 subject: subject_value,
                 pattern: format!("{:?}", arm.pattern),
                 enum_tests,
+                scalar_tests,
             });
             self.terminate(IrTerminator::Branch {
                 condition: test,
