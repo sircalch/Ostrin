@@ -21,7 +21,7 @@ use crate::ast::{BinOp, RangeKind, UnaryOp};
 use crate::ir::{
     BlockId, IrFunction, IrInstr, IrScalarPattern, IrScalarValue, IrTerminator, ValueId,
 };
-use crate::types::{dim_div, dim_is_dimensionless, dim_mul, dim_pow, Ty};
+use crate::types::{dim_div, dim_is_dimensionless, dim_mul, dim_pow, dim_to_string, Ty};
 
 type Bail<T> = Result<T, ()>;
 type Values = HashMap<ValueId, (String, Ty)>;
@@ -117,6 +117,20 @@ fn mangle_record_type(ty: &Ty, records: &RecordFields) -> String {
         Ty::Generic(name) => name.clone(),
         Ty::Unknown => "Unknown".to_string(),
     }
+}
+
+/// The native codegen registers user methods on a concrete quantity under
+/// the same key it uses for its `CType::Quantity` method table (`Q_Length`,
+/// `Q_Length_Time^-1`, ...). Keep the IR method dispatcher in that namespace
+/// so a method call on a scalar `Quantity<D>` can share the generated body.
+fn mangle_quantity_type(dimension: &std::collections::HashMap<String, i32>) -> String {
+    format!(
+        "Q_{}",
+        dim_to_string(dimension)
+            .chars()
+            .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+            .collect::<String>()
+    )
 }
 
 #[derive(Clone, Copy)]
@@ -2325,6 +2339,22 @@ fn emit_instruction(
             let receiver_ty = value_ty(values, *receiver)?;
             let receiver = value_code(values, *receiver)?;
             let call = match receiver_ty {
+                Ty::Quantity(dimension) => {
+                    let key = mangle_quantity_type(&dimension);
+                    let c_name = methods.get(&(key, method.clone())).ok_or(())?;
+                    if !supported(ty, records) {
+                        return Err(());
+                    }
+                    let mut call_args = Vec::with_capacity(args.len() + 1);
+                    call_args.push(receiver.clone());
+                    for arg in args {
+                        if !supported(&value_ty(values, *arg)?, records) {
+                            return Err(());
+                        }
+                        call_args.push(value_code(values, *arg)?);
+                    }
+                    format!("{c_name}({})", call_args.join(", "))
+                }
                 Ty::Int => match (method.as_str(), args.as_slice(), ty) {
                     ("to_string", [], Ty::String) => {
                         format!("ostrin_int_to_string({receiver})")

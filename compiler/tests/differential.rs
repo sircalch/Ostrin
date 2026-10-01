@@ -416,8 +416,8 @@ fn native_backend_types_agree_with_the_checker() {
     // explicit IR lowering (the migration of the native backend).
     let native_generated = hir_generated + ir_generated;
     assert!(
-        native_generated >= 6492,
-        "only {native_generated} functions were generated from HIR/IR (expected at least 6492)"
+        native_generated >= 6498,
+        "only {native_generated} functions were generated from HIR/IR (expected at least 6498)"
     );
     println!("functions generated from HIR/IR: {native_generated} (HIR {hir_generated}, IR {ir_generated})");
     println!("functions still using AST fallback: {ast_fallback}");
@@ -474,7 +474,7 @@ fn native_backend_types_agree_with_the_checker() {
     // through the same IR/C path. HIR now
     // substitutes the concrete owner for `Self` in trait method signatures,
     // allowing Complex arithmetic/equality to use IR/C. The verified baseline is
-    // 58 AST fallbacks (6,492 HIR/IR-generated: 6,479 IR and 13 HIR functions). Plain non-generic enum
+    // 53 AST fallbacks (6,498 HIR/IR-generated: 6,485 IR and 13 HIR functions). Plain non-generic enum
     // constructors, fixed-width scalar payload bindings, unit variants, simple match tests, nested
     // by-value enum patterns and scalar literal/range predicates now use IR/C; managed payloads and
     // generic enums remain outside this slice. Shallow record patterns
@@ -486,6 +486,9 @@ fn native_backend_types_agree_with_the_checker() {
     // `std.measurements` module contributes 21 additional IR functions and has
     // no fallback; Rng, closure-backed list combinators and nested `parse_csv`
     // lists remove six more fallbacks in the current baseline.
+    // Quantity impl receivers now use the scalar Quantity HIR representation;
+    // dimension-specific trait methods dispatch through the IR method table
+    // and no longer force their bodies through the AST emitter.
     // Method receivers and arguments now use the same borrowed-call contract
     // as ordinary calls. This moves record builders (including std.viz
     // Figure/Table/Scene3D chains) through the ownership-lowered IR without
@@ -502,7 +505,7 @@ fn native_backend_types_agree_with_the_checker() {
     // three test helpers in both `testing.ostrin` and `testing_failure.ostrin`.
     // This removes six more fallback functions while preserving their exact
     // failure messages and leak-check behavior.
-    const MAX_AST_FALLBACK_FUNCTIONS: usize = 58;
+    const MAX_AST_FALLBACK_FUNCTIONS: usize = 53;
     assert!(
         ast_fallback <= MAX_AST_FALLBACK_FUNCTIONS,
         "AST fallback grew to {ast_fallback} functions (ratchet limit {MAX_AST_FALLBACK_FUNCTIONS})"

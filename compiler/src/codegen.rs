@@ -4143,6 +4143,14 @@ impl<'a> Codegen<'a> {
     }
 
     fn register_hir_type(&mut self, ty: &Ty) {
+        // Quantity methods are discovered lazily by the AST emitter because
+        // their concrete dimension is only known at a call site. The IR
+        // emitter needs the same method table before it lowers the first
+        // function, so publish every concrete quantity type present in HIR
+        // during the existing type-registration pass.
+        if let Ty::Quantity(dimension) = ty {
+            self.ensure_quantity_methods(dimension);
+        }
         if let Some(ctype) = self.ty_to_ctype(ty) {
             self.register_list_types(&ctype);
         }
