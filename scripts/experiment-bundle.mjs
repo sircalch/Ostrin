@@ -1,26 +1,52 @@
-// Build and verify the first downloadable Ostrin experiment contract.
-// The v0 bundle is deliberately an R0 recorded artifact: it carries source,
-// declared inputs, the recorded figure and machine-readable provenance with
-// hashes. It does not claim server-side replay or R2/R3 guarantees.
+// Build and verify recorded Ostrin experiment contracts.
+//
+// The v0 bundles are deliberately R0 recorded artifacts: each one carries its
+// source, declared inputs, recorded figure and machine-readable provenance
+// with hashes. They do not claim server-side replay or R2/R3 guarantees.
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 export const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const schema = "ostrin.experiment/v0";
-export const outputPath = path.join(repositoryRoot, "website", "assets", "experiments", "provenance.ostrin-experiment.json");
+export const defaultFixtureId = "provenance";
 
-const fixture = Object.freeze({
-  id: "provenance",
-  title: "Reproducible provenance",
-  sourcePath: "examples/viz_provenance.ostrin",
-  inputPath: "experiments/provenance.inputs.json",
-  figurePath: "website/assets/viz/provenance.svg",
+// A fixture is complete only when all three recorded inputs are present. Keep
+// this registry source-backed so a future bundle cannot silently grow a second
+// set of hand-written source, data or figure content.
+export const experimentFixtures = Object.freeze({
+  provenance: Object.freeze({
+    id: "provenance",
+    title: "Reproducible provenance",
+    sourcePath: "examples/viz_provenance.ostrin",
+    inputPath: "experiments/provenance.inputs.json",
+    figurePath: "website/assets/viz/provenance.svg",
+    outputPath: "website/assets/experiments/provenance.ostrin-experiment.json",
+  }),
 });
 
-function normalizedText(relativePath) {
-  return readFileSync(path.join(repositoryRoot, relativePath), "utf8").replaceAll("\r\n", "\n");
+// Short alias for callers that only need to enumerate the registry.
+export const fixtures = experimentFixtures;
+
+function fixtureFor(fixtureId = defaultFixtureId) {
+  const fixture = experimentFixtures[fixtureId];
+  if (!fixture) {
+    const available = Object.keys(experimentFixtures).join(", ");
+    throw new Error(`unknown experiment fixture ${JSON.stringify(fixtureId)} (available: ${available})`);
+  }
+  return fixture;
+}
+
+export function outputPathFor(fixtureId = defaultFixtureId, root = repositoryRoot) {
+  return path.join(root, fixtureFor(fixtureId).outputPath);
+}
+
+export const outputPath = outputPathFor();
+
+function normalizedText(root, relativePath) {
+  return readFileSync(path.join(root, relativePath), "utf8").replaceAll("\r\n", "\n");
 }
 
 function sha256(value) {
@@ -35,25 +61,24 @@ function canonicalJson(value) {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
 
-function compilerVersion() {
-  return normalizedText("compiler/Cargo.toml").match(/^version\s*=\s*"([^"]+)"/m)?.[1] ?? "unknown";
+function compilerVersion(root) {
+  return normalizedText(root, "compiler/Cargo.toml").match(/^version\s*=\s*"([^"]+)"/m)?.[1] ?? "unknown";
 }
 
-function bundleFiles() {
-  const source = normalizedText(fixture.sourcePath);
-  const data = canonicalJson(JSON.parse(normalizedText(fixture.inputPath)));
-  const recordedFigure = normalizedText(fixture.figurePath);
-  const figure = normalizeFigureMetadata(recordedFigure, {
-    sourceHash: sha256(source),
-    dataHash: sha256(data),
-    seed: JSON.parse(data).seed,
-    compiler: `ostrinc ${compilerVersion()}`,
-  });
-  return {
-    "source.ostrin": source,
-    "data.json": data,
-    "figure.svg": figure,
-  };
+function fixtureCommit(root, fixture) {
+  try {
+    // Resolve the revision from the recorded inputs rather than HEAD. This
+    // keeps a checked bundle stable when the generator itself changes later.
+    const commit = execFileSync("git", [
+      "log", "-1", "--format=%H", "--",
+      fixture.sourcePath,
+      fixture.inputPath,
+      fixture.figurePath,
+    ], { cwd: root, encoding: "utf8" }).trim();
+    return commit || "unknown";
+  } catch {
+    return "unknown";
+  }
 }
 
 function normalizeFigureMetadata(svg, metadata) {
@@ -64,25 +89,47 @@ function normalizeFigureMetadata(svg, metadata) {
     .replace(/compiler="[^"]*"/, `compiler="${metadata.compiler}"`);
 }
 
+function bundleFiles(root, fixture) {
+  const source = normalizedText(root, fixture.sourcePath);
+  const data = canonicalJson(JSON.parse(normalizedText(root, fixture.inputPath)));
+  const recordedFigure = normalizedText(root, fixture.figurePath);
+  const inputs = JSON.parse(data);
+  const figure = normalizeFigureMetadata(recordedFigure, {
+    sourceHash: sha256(source),
+    dataHash: sha256(data),
+    seed: inputs.seed,
+    compiler: `ostrinc ${compilerVersion(root)}`,
+  });
+  return {
+    "source.ostrin": source,
+    "data.json": data,
+    "figure.svg": figure,
+  };
+}
+
 function manifestFor(files) {
-  const entries = Object.entries(files).sort(([left], [right]) => left.localeCompare(right)).map(([filePath, content]) => ({
-    path: filePath,
-    kind: filePath === "source.ostrin" ? "source" : filePath === "figure.svg" ? "figure" : filePath === "provenance.json" ? "provenance" : "input",
-    media_type: filePath.endsWith(".ostrin") ? "text/x-ostrin" : filePath.endsWith(".svg") ? "image/svg+xml" : "application/json",
-    bytes: bytes(content),
-    sha256: sha256(content),
-  }));
+  const entries = Object.entries(files)
+    // Use code-unit ordering so output does not depend on the host locale.
+    .sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)
+    .map(([filePath, content]) => ({
+      path: filePath,
+      kind: filePath === "source.ostrin" ? "source" : filePath === "figure.svg" ? "figure" : filePath === "provenance.json" ? "provenance" : "input",
+      media_type: filePath.endsWith(".ostrin") ? "text/x-ostrin" : filePath.endsWith(".svg") ? "image/svg+xml" : "application/json",
+      bytes: bytes(content),
+      sha256: sha256(content),
+    }));
   return {
     schema: "ostrin.manifest/v0",
     files: entries,
   };
 }
 
-function provenanceFor(files, manifest) {
+function provenanceFor(root, fixture, files, manifest) {
   const source = files["source.ostrin"];
   const data = files["data.json"];
   const figure = files["figure.svg"];
   const inputs = JSON.parse(data);
+  const compiler = `ostrinc ${compilerVersion(root)}`;
   return {
     schema: "ostrin.provenance/v0",
     level: "R0",
@@ -111,9 +158,10 @@ function provenanceFor(files, manifest) {
       source_hash: sha256(source),
       data_hash: sha256(data),
       seed: `seed=${inputs.seed}`,
-      compiler: `ostrinc ${compilerVersion()}`,
+      compiler,
     },
-    compiler: `ostrinc ${compilerVersion()}`,
+    compiler,
+    commit: fixtureCommit(root, fixture),
     target: "wasm32-wasip1",
     command: "ostrinc --run --target wasm32-wasi source.ostrin",
     parameters: inputs.parameters,
@@ -123,14 +171,14 @@ function provenanceFor(files, manifest) {
   };
 }
 
-export function buildExperimentBundle(root = repositoryRoot) {
-  if (root !== repositoryRoot) throw new Error("experiment bundle currently supports the repository root only");
+export function buildExperimentBundle(fixtureId = defaultFixtureId, root = repositoryRoot) {
+  const fixture = fixtureFor(fixtureId);
   for (const relativePath of [fixture.sourcePath, fixture.inputPath, fixture.figurePath]) {
     if (!existsSync(path.join(root, relativePath))) throw new Error(`missing experiment input ${relativePath}`);
   }
-  const files = bundleFiles();
+  const files = bundleFiles(root, fixture);
   const manifest = manifestFor(files);
-  const provenance = provenanceFor(files, manifest);
+  const provenance = provenanceFor(root, fixture, files, manifest);
   const provenanceFile = canonicalJson(provenance);
   const allFiles = { ...files, "provenance.json": provenanceFile };
   const completeManifest = manifestFor(allFiles);
@@ -159,8 +207,8 @@ export function renderExperimentBundle(bundle) {
   return canonicalJson(bundle);
 }
 
-function expectedText() {
-  return renderExperimentBundle(buildExperimentBundle());
+function expectedText(fixtureId = defaultFixtureId, root = repositoryRoot) {
+  return renderExperimentBundle(buildExperimentBundle(fixtureId, root));
 }
 
 function checkHash(entry, content, errors) {
@@ -172,8 +220,16 @@ function checkHash(entry, content, errors) {
   if (entry.sha256 !== sha256(content)) errors.push(`${entry.path}: sha256 does not match manifest`);
 }
 
-export function verifyExperimentBundle(bundle, { expected = buildExperimentBundle() } = {}) {
+export function verifyExperimentBundle(bundle, { expected, fixtureId } = {}) {
   const errors = [];
+  let fixture;
+  try {
+    fixture = fixtureFor(fixtureId ?? bundle?.id ?? defaultFixtureId);
+  } catch (error) {
+    errors.push(error.message);
+    fixture = fixtureFor(defaultFixtureId);
+  }
+  expected ??= buildExperimentBundle(fixture.id);
   if (!bundle || typeof bundle !== "object") errors.push("bundle is not an object");
   if (bundle?.schema !== schema) errors.push(`schema must be ${schema}`);
   if (bundle?.id !== fixture.id) errors.push(`id must be ${fixture.id}`);
@@ -193,6 +249,7 @@ export function verifyExperimentBundle(bundle, { expected = buildExperimentBundl
   try { provenanceFile = JSON.parse(files?.["provenance.json"] ?? "null"); } catch { provenanceFile = null; }
   if (JSON.stringify(bundle?.provenance) !== JSON.stringify(provenanceFile)) errors.push("provenance.json is not the embedded provenance object");
   if (JSON.stringify(bundle?.experiment) !== JSON.stringify(expected?.experiment)) errors.push("experiment file map drifted");
+  if (bundle?.provenance?.commit !== expected?.provenance?.commit) errors.push("provenance commit drifted from the source-backed fixture revision");
   const embedded = files?.["figure.svg"]?.match(/<ostrin-provenance\s+([^>]+?)\s*\/>/)?.[1] ?? "";
   const embeddedMetadata = Object.fromEntries([...embedded.matchAll(/([a-z-]+)="([^"]*)"/g)].map(([, key, value]) => [key, value]));
   const figureMetadata = bundle?.provenance?.figure_metadata;
@@ -207,7 +264,7 @@ export function verifyExperimentBundle(bundle, { expected = buildExperimentBundl
   return { ok: errors.length === 0, errors };
 }
 
-export function verifyBundleFile(filePath = outputPath) {
+export function verifyBundleFile(filePath = outputPath, fixtureId) {
   if (!existsSync(filePath)) return { ok: false, errors: [`missing ${path.relative(repositoryRoot, filePath)}`] };
   let bundle;
   try {
@@ -215,26 +272,45 @@ export function verifyBundleFile(filePath = outputPath) {
   } catch (error) {
     return { ok: false, errors: [`invalid JSON: ${error.message}`] };
   }
-  const result = verifyExperimentBundle(bundle);
-  const actual = readFileSync(filePath, "utf8").replaceAll("\r\n", "\n");
-  if (actual !== expectedText()) result.errors.push("bundle is stale; run node scripts/experiment-bundle.mjs --write");
+  const selectedFixtureId = fixtureId ?? bundle?.id ?? defaultFixtureId;
+  let result;
+  try {
+    result = verifyExperimentBundle(bundle, { fixtureId: selectedFixtureId });
+  } catch (error) {
+    result = { ok: false, errors: [error.message] };
+  }
+  try {
+    const actual = readFileSync(filePath, "utf8").replaceAll("\r\n", "\n");
+    if (actual !== expectedText(selectedFixtureId)) result.errors.push("bundle is stale; run node scripts/experiment-bundle.mjs --write");
+  } catch (error) {
+    result.errors.push(error.message);
+  }
   return { ok: result.errors.length === 0, errors: result.errors };
 }
 
+function fixtureArgument(argv) {
+  const inline = argv.find((argument) => argument.startsWith("--fixture="));
+  if (inline) return inline.slice("--fixture=".length);
+  const index = argv.indexOf("--fixture");
+  if (index >= 0 && argv[index + 1]) return argv[index + 1];
+  return defaultFixtureId;
+}
+
 function main() {
-  const expected = expectedText();
+  const fixtureId = fixtureArgument(process.argv.slice(2));
+  const target = outputPathFor(fixtureId);
   if (process.argv.includes("--write")) {
-    mkdirSync(path.dirname(outputPath), { recursive: true });
-    writeFileSync(outputPath, expected, "utf8");
-    console.log(`experiment-bundle: wrote ${path.relative(repositoryRoot, outputPath)}`);
+    mkdirSync(path.dirname(target), { recursive: true });
+    writeFileSync(target, expectedText(fixtureId), "utf8");
+    console.log(`experiment-bundle: wrote ${path.relative(repositoryRoot, target)}`);
     return;
   }
-  const result = verifyBundleFile();
+  const result = verifyBundleFile(target, fixtureId);
   if (!result.ok) {
     console.error(result.errors.map((error) => `experiment-bundle: ${error}`).join("\n"));
     process.exitCode = 1;
   } else {
-    console.log("experiment-bundle: ok (ostrin.experiment/v0 · R0)");
+    console.log(`experiment-bundle: ok (${schema} · ${fixtureId} · R0)`);
   }
 }
 

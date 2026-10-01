@@ -2,7 +2,15 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { outputPath, renderExperimentBundle, verifyBundleFile, verifyExperimentBundle } from "./experiment-bundle.mjs";
+import {
+  buildExperimentBundle,
+  experimentFixtures,
+  outputPath,
+  outputPathFor,
+  renderExperimentBundle,
+  verifyBundleFile,
+  verifyExperimentBundle,
+} from "./experiment-bundle.mjs";
 
 test("the v0 experiment bundle has calculated hashes and explicit R0/R1 labels", () => {
   const result = verifyBundleFile(outputPath);
@@ -13,6 +21,7 @@ test("the v0 experiment bundle has calculated hashes and explicit R0/R1 labels",
   assert.match(bundle.reproducibility.next, /^R1/);
   assert.equal(bundle.provenance.figure_metadata.policy,
     "The bundle generator normalizes the recorded SVG metadata to these calculated hashes; bundle manifest hashes are authoritative.");
+  assert.match(bundle.provenance.commit, /^[0-9a-f]{40}$/);
   assert.match(bundle.files["figure.svg"], new RegExp(`source-hash="${bundle.provenance.figure_metadata.source_hash}"`));
   assert.match(bundle.files["figure.svg"], new RegExp(`data-hash="${bundle.provenance.figure_metadata.data_hash}"`));
   assert.equal(bundle.manifest.files.length, 4);
@@ -20,6 +29,15 @@ test("the v0 experiment bundle has calculated hashes and explicit R0/R1 labels",
     assert.equal(entry.sha256, `sha256:${createHash("sha256").update(Buffer.from(bundle.files[entry.path], "utf8")).digest("hex")}`);
     assert.equal(entry.bytes, Buffer.byteLength(bundle.files[entry.path], "utf8"));
   }
+});
+
+test("the fixture registry stays source-backed and parameterizable", () => {
+  const fixture = experimentFixtures.provenance;
+  assert.ok(fixture);
+  for (const path of [fixture.sourcePath, fixture.inputPath, fixture.figurePath]) assert.match(path, /^(examples|experiments|website)\//);
+  assert.equal(outputPathFor("provenance"), outputPath);
+  assert.equal(buildExperimentBundle("provenance").id, fixture.id);
+  assert.throws(() => buildExperimentBundle("missing"), /unknown experiment fixture/);
 });
 
 test("tampering with bundled content is rejected by the hash gate", () => {

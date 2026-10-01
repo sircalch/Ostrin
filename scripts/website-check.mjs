@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { collectSiteFacts } from "./site-facts.mjs";
-import { verifyBundleFile } from "./experiment-bundle.mjs";
+import { experimentFixtures, verifyBundleFile } from "./experiment-bundle.mjs";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const websiteRoot = path.join(repositoryRoot, "website");
@@ -70,6 +70,16 @@ const projectStatus = read("ESTADO_Y_PLAN.md");
 check(projectStatus.includes(`· ${facts.differentialTests} pruebas diferenciales, ${facts.integrationTests} de integración y ${facts.unitTests} unitarias en verde.`)
   && projectStatus.includes(`# ${facts.differentialTests} diferenciales + ${facts.integrationTests} de integración + ${facts.unitTests} unitarias`),
   "ESTADO_Y_PLAN.md: compiler test counts drifted from source");
+
+// Every registered experiment must have a checked, source-backed download.
+for (const [fixtureId, fixture] of Object.entries(experimentFixtures)) {
+  const bundlePath = path.join(repositoryRoot, fixture.outputPath);
+  check(existsSync(bundlePath), `experiment ${fixtureId}: bundle ${fixture.outputPath} is missing`);
+  if (existsSync(bundlePath)) {
+    const bundleResult = verifyBundleFile(bundlePath, fixtureId);
+    for (const error of bundleResult.errors) check(false, `experiment ${fixtureId}: ${error}`);
+  }
+}
 
 for (const page of publicPages) {
   const html = read(`website/${page}`);
