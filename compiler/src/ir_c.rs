@@ -3169,6 +3169,30 @@ fn emit_instruction(
                     };
                     format!("{array_c_name}_from{depth}({})", codes[0])
                 }
+            } else if callee == "full"
+                && args.len() == 2
+                && value_ty(values, args[0])? == Ty::List(Box::new(Ty::Int))
+            {
+                let Ty::Applied(name, array_args) = ty else {
+                    return Err(());
+                };
+                if name != "Array"
+                    || array_args.len() != 1
+                    || !matches!(array_args[0], Ty::Int | Ty::Float | Ty::Float32 | Ty::Bool)
+                    || value_ty(values, args[1])? != array_args[0]
+                    || !array_supported(ty)
+                {
+                    return Err(());
+                }
+                let array_c_name = array_name(ty).ok_or(())?;
+                format!("{array_c_name}_full({}, {})", codes[0], codes[1])
+            } else if callee == "arange"
+                && args.len() == 2
+                && value_ty(values, args[0])? == Ty::Int
+                && value_ty(values, args[1])? == Ty::Int
+                && *ty == Ty::Applied("Array".to_string(), vec![Ty::Int])
+            {
+                format!("Array_Int_arange({}, {})", codes[0], codes[1])
             } else if callee == "where" && args.len() == 3 {
                 let mask_ty = Ty::Applied("Array".to_string(), vec![Ty::Bool]);
                 let Ty::Applied(result_name, result_args) = ty else {

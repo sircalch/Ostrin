@@ -4875,7 +4875,7 @@ fn native_ir_emitter_handles_numeric_array_builtins() {
     );
     let report_text = stdout(&report);
     assert!(
-        report_text.lines().any(|line| line == "ir-generated: 6"),
+        report_text.lines().any(|line| line == "ir-generated: 8"),
         "numeric array builtins did not use IR: {report_text}"
     );
     assert!(
@@ -4892,6 +4892,8 @@ fn native_ir_emitter_handles_numeric_array_builtins() {
     let source = stdout(&emitted);
     for marker in [
         "Array_Float_full",
+        "Array_Int_full",
+        "Array_Int_arange",
         "Array_Float_norm",
         "Array_Float_map",
         "Array_Float_eye",
@@ -4932,6 +4934,22 @@ fn native_ir_emitter_handles_numeric_array_builtins() {
         String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
         "numeric array builtin IR ownership leaked: {}",
         String::from_utf8_lossy(&native.stderr)
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "WASI numeric array builtin emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("Array_Int_full") && wasi_source.contains("Array_Int_arange"),
+        "WASI C omitted full/arange helpers: {wasi_source}"
+    );
+    assert!(
+        !wasi_source.contains("#define OSTRIN_NATIVE_THREADS"),
+        "WASI C unexpectedly enabled native threads"
     );
 }
 
