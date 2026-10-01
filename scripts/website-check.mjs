@@ -20,6 +20,11 @@ function read(relativePath) {
   return existsSync(absolutePath) ? readFileSync(absolutePath, "utf8") : "";
 }
 
+function svgProvenance(svg) {
+  const attributes = svg.match(/<ostrin-provenance\s+([^>]+?)\s*\/>/)?.[1] ?? "";
+  return Object.fromEntries([...attributes.matchAll(/([a-z-]+)="([^"]*)"/g)].map(([, key, value]) => [key, value]));
+}
+
 const pages = readdirSync(websiteRoot)
   .filter((name) => name.endsWith(".html"))
   .sort();
@@ -193,6 +198,18 @@ if (lab) {
       if (existsSync(bundlePath)) {
         const bundleResult = verifyBundleFile(bundlePath);
         for (const error of bundleResult.errors) check(false, `viz ${figure.id}: ${error}`);
+        try {
+          const bundle = JSON.parse(readFileSync(bundlePath, "utf8"));
+          const expected = bundle.provenance?.figure_metadata ?? {};
+          const visible = svgProvenance(svg);
+          const recorded = figure.provenance ?? {};
+          for (const [svgKey, bundleKey] of [["source-hash", "source_hash"], ["data-hash", "data_hash"], ["seed", "seed"], ["compiler", "compiler"]]) {
+            check(visible[svgKey] === expected[bundleKey], `viz ${figure.id}: visible SVG ${svgKey} diverges from bundle metadata`);
+            check(recorded[svgKey] === expected[bundleKey], `viz ${figure.id}: lab-data ${svgKey} diverges from bundle metadata`);
+          }
+        } catch (error) {
+          check(false, `viz ${figure.id}: could not compare visible provenance with bundle (${error.message})`);
+        }
       }
     }
   }

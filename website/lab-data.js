@@ -837,7 +837,12 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_surface.ostrin",
       "code": "// std.viz · 3D: a shaded surface with a colorbar.\nimport std.viz\n\nfn peaks(x: Float, y: Float) -> Float {\n    3.0 * (1.0 - x) * (1.0 - x) * exp(-x * x - (y + 1.0) * (y + 1.0)) -\n        10.0 * (x / 5.0 - x * x * x - y * y * y * y * y) * exp(-x * x - y * y) -\n        exp(-(x + 1.0) * (x + 1.0) - y * y) / 3.0\n}\n\nfn main() -> Void {\n    scale = 1.0\n    xs = linspace(-3.0, 3.0, 36)\n    ys = linspace(-3.0, 3.0, 36)\n    scene = viz.scene3d(\"peaks(x, y) as a surface\")\n        .describe(\"36 × 36 grid, 2450 shaded triangles · scale = \" + viz.num(scale))\n        .labels(\"x\", \"y\", \"z\")\n        .surface(xs, ys, viz.grid_of(xs, ys, fn(x, y) { peaks(x * scale, y * scale) }), label: \"height\")\n    print(scene.svg())\n}\n",
       "svg": "assets/viz/surface.svg",
-      "provenance": {},
+      "provenance": {
+        "source-hash": "sha256:7e2f944b0f350af40da94d82dd7c0c3383429eef8643208e55e2a32e39f6ad53",
+        "data-hash": "sha256:2b7e55d539b9bdf1d4cd5a97609d169c165f886f416b5e06c8ef1aec440d0086",
+        "seed": "seed=deterministic",
+        "compiler": "ostrinc 0.1.0"
+      },
       "printed": [
         ""
       ]
@@ -910,9 +915,9 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "code": "// Reproducible publication metadata travels with the exported SVG.\n// The hashes are supplied by the experiment's build record; the browser and\n// native backends preserve them byte-for-byte.\nimport std.viz\n\nfn main() -> Void {\n    xs = linspace(0.0, 6.0, 25)\n    mut ys: List<Float> = []\n    for x in xs.to_list() {\n        ys.push(exp(0.0 - x / 4.0) * cos(2.4 * x))\n    }\n    fig = viz.figure(\"Reproducible damped signal\")\n        .describe(\"The SVG carries the source, data, seed and compiler record\")\n        .labels(\"time\", \"amplitude\")\n        .provenance(\n            \"sha256:6b96f1d1f4f1b955a7dff03d7bcf6af6e1f1ca5fbd1eea6fb3d7c2c7fb3c95d2\",\n            \"sha256:0a0e6b9b33e2b1bd3706d0b2d6e0f6e7a8e3e95d6b8a36b0c4c9d6af79c61d1a\",\n            \"2026-09-27T03:40Z / seed=42\",\n            \"ostrinc 0.1.0\"\n        )\n        .line(xs, array(ys), \"signal\", \"#2563eb\", 2.6, \"\")\n    print(fig.svg())\n}\n",
       "svg": "assets/viz/provenance.svg",
       "provenance": {
-        "source-hash": "sha256:6b96f1d1f4f1b955a7dff03d7bcf6af6e1f1ca5fbd1eea6fb3d7c2c7fb3c95d2",
-        "data-hash": "sha256:0a0e6b9b33e2b1bd3706d0b2d6e0f6e7a8e3e95d6b8a36b0c4c9d6af79c61d1a",
-        "seed": "2026-09-27T03:40Z / seed=42",
+        "source-hash": "sha256:ea9e89db161e9034fb2f9ab4b1013ffff1efe5a659671e6728395fc1e7646167",
+        "data-hash": "sha256:085cd36f9fd90d563529ca3aea965b826c2efed5938b6641e6bbb8f9cebc234e",
+        "seed": "seed=42",
         "compiler": "ostrinc 0.1.0"
       },
       "printed": [

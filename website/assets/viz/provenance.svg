@@ -2,7 +2,7 @@
 <style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell,.contourf-cell,.quiver,.streamplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover,.contourf-cell:hover{fill-opacity:0.9}.quiver:hover>line{stroke-width:2.6px}.quiver:hover>polygon{filter:brightness(0.78)}.streamplot:hover{stroke-width:2.7px}</style>
 <rect width="640" height="400" fill="#ffffff"/>
 
-<metadata><ostrin-provenance source-hash="sha256:6b96f1d1f4f1b955a7dff03d7bcf6af6e1f1ca5fbd1eea6fb3d7c2c7fb3c95d2" data-hash="sha256:0a0e6b9b33e2b1bd3706d0b2d6e0f6e7a8e3e95d6b8a36b0c4c9d6af79c61d1a" seed="2026-09-27T03:40Z / seed=42" compiler="ostrinc 0.1.0"/></metadata>
+<metadata><ostrin-provenance source-hash="sha256:ea9e89db161e9034fb2f9ab4b1013ffff1efe5a659671e6728395fc1e7646167" data-hash="sha256:085cd36f9fd90d563529ca3aea965b826c2efed5938b6641e6bbb8f9cebc234e" seed="seed=42" compiler="ostrinc 0.1.0"/></metadata>
 
 <text x="66" y="26" text-anchor="start" font-size="16" fill="#1f2937" font-weight="600">Reproducible damped signal</text>
 <text x="66" y="45" text-anchor="start" font-size="12" fill="#6b7280">The SVG carries the source, data, seed and compiler record</text>
