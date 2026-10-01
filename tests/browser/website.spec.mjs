@@ -576,6 +576,25 @@ test("Viz exposes the recorded 3D surface experiment bundle", async ({ page }) =
   }
 });
 
+test("Viz publishes structured data for its scientific source", async ({ page }) => {
+  await page.goto("./viz.html", { waitUntil: "domcontentloaded" });
+  const structuredData = await page.locator('script[type="application/ld+json"]').evaluateAll((scripts) =>
+    scripts.map((script) => JSON.parse(script.textContent)),
+  );
+  const pageSchema = structuredData.find((entry) => entry["@type"] === "CollectionPage");
+  expect(pageSchema).toMatchObject({
+    "@context": "https://schema.org",
+    "@id": "https://sircalch.github.io/Ostrin/viz.html#page",
+    url: "https://sircalch.github.io/Ostrin/viz.html",
+    about: {
+      "@type": "SoftwareSourceCode",
+      name: "std.viz",
+      codeRepository: "https://github.com/sircalch/Ostrin/blob/main/compiler/std/viz.ostrin",
+      programmingLanguage: { "@type": "ComputerLanguage", name: "Ostrin" },
+    },
+  });
+});
+
 test("Viz explorer links restore parameters and 3D camera", async ({ page }) => {
   await page.goto("./viz.html?figure=surface&scale=1.6&azimuth=30&elevation=36#viz-surface", { waitUntil: "domcontentloaded" });
   await expect(page.locator(".viz-dialog[open]")).toBeVisible();
