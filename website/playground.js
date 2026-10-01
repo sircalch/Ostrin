@@ -337,6 +337,7 @@ record Point {
 
 fn inspect(value: Outer) -> Int {
     match value {
+        Wrapped(Ready(40 to 50)) => 42,
         Wrapped(Ready(value)) => value,
         _ => 0,
     }
