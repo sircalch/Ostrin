@@ -89,7 +89,10 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    [`docs/linguist-usage.md`](docs/linguist-usage.md); y abrir la propuesta upstream solo
    cuando se cumplan los criterios de uso. Después de su aceptación y de una versión publicada
    de Linguist, verificar la clasificación de `.ostrin` en GitHub y documentar el resultado en
-   la release y el sitio.
+   la release y el sitio. Antes de esa propuesta, el frente de adopción debe publicar la
+   extensión de VS Code, instaladores y plantillas de proyectos; definir el registry de paquetes;
+   reunir casos de estudio y proyectos externos verificables; y mantener una página de releases,
+   búsqueda de documentación y benchmarks históricos sin inflar métricas con forks.
 6. **Continuar el frente profesional de visualización y web**: ampliar `std.viz` con
    campos vectoriales 2D (`quiver` y `streamplot`), gráficas estadísticas (incluidos violines KDE y hexbin), bandas de contorno rellenas y consolidar la selección enlazada, mantener tablas reproducibles con filtro y
    ordenamiento en el explorador, conservar ejemplos verificables en la galería, ampliar animaciones,
@@ -97,6 +100,9 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    campos vectoriales, cámara, cortes ortogonales e isosuperficies de volúmenes), WebGPU y ampliar la procedencia reproducible ya disponible
    (hashes de fuente/datos, semilla y compilador) a informes y flujos de publicación con
    evidencia en intérprete, nativo y WASM.
+   El siguiente artefacto web de alto retorno es un bundle descargable por experimento con código,
+   datos, figuras, manifest, procedencia, parámetros, cámara y comando de replay; la galería debe
+   funcionar como superficie de publicación científica además de demo.
    El Scientific Lab ya conserva la demo activa y sus parámetros en la URL para compartir y
    restaurar experimentos reproducibles desde el navegador. La navegación compacta y el catálogo
    de ejemplos ya tienen estados ARIA, foco de teclado, Escape, pestañas con flechas/Home/End y
