@@ -27,6 +27,32 @@ pub type RecordFields = HashMap<String, Vec<String>>;
 pub type MethodNames = HashMap<(String, String), String>;
 pub type FunctionNames = HashMap<String, String>;
 
+/// Metadata for the plain, non-generic enum ABI emitted by `codegen.rs`.
+/// Field types are already validated by the checker and the IR builder; the
+/// C emitter only needs the generated union member names to construct and
+/// project scalar payloads safely.
+#[derive(Debug, Clone)]
+pub struct VariantInfo {
+    pub name: String,
+    pub tag: usize,
+    pub fields: Vec<(String, String)>,
+}
+
+pub type VariantFields = HashMap<(String, String), VariantInfo>;
+
+const ENUM_MARKER: &str = "__ostrin_enum__";
+
+/// `RecordFields` is shared by the existing recursive ownership helpers.  A
+/// private marker entry lets those helpers recognize a by-value enum without
+/// widening every recursive helper signature with a second type table.
+pub fn enum_marker(name: &str) -> String {
+    format!("{ENUM_MARKER}{name}")
+}
+
+fn is_plain_enum(ty: &Ty, records: &RecordFields) -> bool {
+    matches!(ty, Ty::Named(name) if records.contains_key(&enum_marker(name)))
+}
+
 fn record_name(ty: &Ty, records: &RecordFields) -> Option<String> {
     match ty {
         Ty::Named(name) if records.contains_key(name) => Some(name.clone()),
@@ -129,6 +155,7 @@ fn c_type(ty: &Ty, records: &RecordFields) -> Bail<String> {
         Ty::String => "const char*".to_string(),
         Ty::Quantity(_) => "Qty".to_string(),
         Ty::Named(name) if name == "Rng" => "OstrinRng*".to_string(),
+        Ty::Named(name) if records.contains_key(&enum_marker(name)) => name.clone(),
         Ty::List(element) if list_supported(element, records) => {
             format!("List_{}*", mangle_option_payload(element, records))
         }
@@ -198,6 +225,16 @@ fn record_pattern_scalar(ty: &Ty) -> bool {
     )
 }
 
+/// The first enum slice deliberately excludes fixed-width integer payloads.
+/// Their checked arithmetic and cast contexts need a separate ABI audit before
+/// enum constructors and projections can share this path.
+fn enum_pattern_scalar(ty: &Ty) -> bool {
+    matches!(
+        ty,
+        Ty::Int | Ty::Float | Ty::Float32 | Ty::Bool | Ty::Quantity(_)
+    )
+}
+
 /// Returns the source-level constructor name from the debug representation
 /// stored by `IrInstr::PatternTest`.  Record patterns are represented as
 /// `Variant("Record", [...])`, just like enum payload patterns, so the C
@@ -228,6 +265,47 @@ fn record_pattern_type(pattern: &str, subject_ty: &Ty, records: &RecordFields) -
         .split_once("__")
         .map_or(record.as_str(), |(base, _)| base);
     (pattern_name == base).then_some(record)
+}
+
+/// Extracts the source-level constructor name from the debug form used by
+/// `IrInstr::PatternTest`.  Plain enum patterns are intentionally limited to
+/// one constructor level in this first IR slice.
+fn enum_pattern_name(pattern: &str) -> Option<&str> {
+    if let Some(rest) = pattern.strip_prefix("Ident(\"") {
+        return rest.strip_suffix("\")");
+    }
+    let rest = pattern.strip_prefix("Variant(\"")?;
+    let end = rest.find("\", [")?;
+    Some(&rest[..end])
+}
+
+fn is_simple_enum_pattern(pattern: &str) -> bool {
+    (pattern.starts_with("Ident(\"") || pattern.starts_with("Variant(\""))
+        && pattern.matches("Variant(\"").count() <= 1
+        && !pattern.contains("Literal(")
+        && !pattern.contains("Range(")
+        && !pattern.contains("Ident(\"None\")")
+}
+
+fn enum_field_path(path: &[String]) -> Option<(&str, usize)> {
+    let field = path.first()?.strip_prefix("__ostrin_enum_field__")?;
+    let (variant, index) = field.rsplit_once("__")?;
+    Some((variant, index.parse().ok()?))
+}
+
+fn enum_variant<'a>(
+    subject_ty: &Ty,
+    name: &str,
+    variants: &'a VariantFields,
+    records: &RecordFields,
+) -> Option<&'a VariantInfo> {
+    let Ty::Named(enum_name) = subject_ty else {
+        return None;
+    };
+    if !is_plain_enum(subject_ty, records) {
+        return None;
+    }
+    variants.get(&(enum_name.clone(), name.to_string()))
 }
 
 fn array_element(ty: &Ty) -> Option<&Ty> {
@@ -276,6 +354,7 @@ fn supported(ty: &Ty, records: &RecordFields) -> bool {
         || quantity(ty)
         || array_supported(ty)
         || matches!(ty, Ty::Named(name) if name == "Rng")
+        || is_plain_enum(ty, records)
         || record_name(ty, records).is_some()
         || matches!(ty, Ty::List(element) if list_supported(element, records))
         || matches!(ty, Ty::Map(key, value) if map_supported(key, value))
@@ -1437,6 +1516,7 @@ fn emit_instruction(
     known_functions: &FunctionNames,
     methods: &MethodNames,
     records: &RecordFields,
+    variants: &VariantFields,
     spawn_helpers: &SpawnHelpers,
     closure_helpers: &ClosureHelpers,
     helper: &mut HelperGenerator<'_>,
@@ -1468,6 +1548,21 @@ fn emit_instruction(
                     "    {} = ((OstrinClosure){{ (void*){}, NULL }});\n",
                     value_name(*dst),
                     adapter
+                ));
+            }
+            Ty::Named(_)
+                if enum_variant(ty, name, variants, records)
+                    .is_some_and(|variant| variant.fields.is_empty()) =>
+            {
+                let variant = enum_variant(ty, name, variants, records).ok_or(())?;
+                let enum_name = match ty {
+                    Ty::Named(name) => name,
+                    _ => return Err(()),
+                };
+                out.push_str(&format!(
+                    "    {} = (({enum_name}){{ .tag = {} }});\n",
+                    value_name(*dst),
+                    variant.tag
                 ));
             }
             _ => return Err(()),
@@ -3338,6 +3433,34 @@ fn emit_instruction(
                 format!(
                     "({{ if (!{equal}) {{ fprintf(stderr, \"runtime error: assertion failed: left != right\\n\"); exit(1); }} }})"
                 )
+            } else if let Some(variant) = enum_variant(ty, callee, variants, records) {
+                if variant.fields.len() != args.len()
+                    || variant.fields.is_empty()
+                    || !args.iter().all(|value| {
+                        let Ok(arg_ty) = value_ty(values, *value) else {
+                            return false;
+                        };
+                        enum_pattern_scalar(&arg_ty)
+                    })
+                {
+                    return Err(());
+                }
+                let enum_name = match ty {
+                    Ty::Named(name) => name,
+                    _ => return Err(()),
+                };
+                let fields = variant
+                    .fields
+                    .iter()
+                    .zip(codes.iter())
+                    .map(|((field, _), code)| format!(".{field} = {code}"))
+                    .collect::<Vec<_>>();
+                format!(
+                    "(({enum_name}){{ .tag = {}, .data.{} = {{ {} }} }})",
+                    variant.tag,
+                    variant.name,
+                    fields.join(", ")
+                )
             } else {
                 let Some(c_function) = known_functions.get(callee) else {
                     return Err(());
@@ -3478,6 +3601,21 @@ fn emit_instruction(
                         return Err(());
                     }
                 }
+                _ if pattern == "Wildcard" => "true".to_string(),
+                _ if is_plain_enum(&subject_ty, records)
+                    && is_simple_enum_pattern(pattern)
+                    && enum_pattern_name(pattern)
+                        .and_then(|name| enum_variant(&subject_ty, name, variants, records))
+                        .is_some() =>
+                {
+                    let name = enum_pattern_name(pattern).ok_or(())?;
+                    let variant = enum_variant(&subject_ty, name, variants, records).ok_or(())?;
+                    if pattern.starts_with("Ident(\"") && !variant.fields.is_empty() {
+                        return Err(());
+                    }
+                    format!("({subject}).tag == {}", variant.tag)
+                }
+                _ if pattern.starts_with("Ident(\"") => "true".to_string(),
                 _ if record_pattern_type(pattern, &subject_ty, records).is_some() => {
                     // A checked record pattern has a single concrete record
                     // type, so its runtime test is true. Field names and
@@ -3525,6 +3663,27 @@ fn emit_instruction(
                         (
                             format!("({}).{}", value_code(values, *subject)?, field.0),
                             field.1,
+                        )
+                    }
+                    _ if is_plain_enum(&subject_ty, records)
+                        && path.len() == 1
+                        && enum_field_path(path).is_some()
+                        && enum_pattern_scalar(ty) =>
+                    {
+                        let (variant_name, index) = enum_field_path(path).ok_or(())?;
+                        let variant =
+                            enum_variant(&subject_ty, variant_name, variants, records).ok_or(())?;
+                        let Some((field, _)) = variant.fields.get(index) else {
+                            return Err(());
+                        };
+                        (
+                            format!(
+                                "({}).data.{}.{}",
+                                value_code(values, *subject)?,
+                                variant.name,
+                                field
+                            ),
+                            ty.clone(),
                         )
                     }
                     _ if path.len() == 1
@@ -3790,6 +3949,14 @@ fn emit_instruction(
                         ));
                     }
                 }
+                Ty::Named(_) if is_plain_enum(&ty, records) => {
+                    // Plain enum payloads in this slice are scalar, so the
+                    // by-value tagged union owns no native reference.  The
+                    // ownership pass still emits Retain around branch joins;
+                    // accepting it as a no-op keeps enum values in the same
+                    // linear path as their scalar fields.
+                    let _ = value_code(values, *value)?;
+                }
                 Ty::Fn(_, _) => {
                     out.push_str(&format!(
                         "    ostrin_retain((void*)({}).env);\n",
@@ -3877,6 +4044,9 @@ fn emit_instruction(
                             err.unwrap_or_default()
                         ));
                     }
+                }
+                Ty::Named(_) if is_plain_enum(&ty, records) => {
+                    let _ = value_code(values, *value)?;
                 }
                 Ty::Fn(_, _) => {
                     out.push_str(&format!(
@@ -4424,6 +4594,7 @@ fn build_spawn_helpers(
     known_functions: &FunctionNames,
     methods: &MethodNames,
     records: &RecordFields,
+    variants: &VariantFields,
     spawn_helpers: &mut SpawnHelpers,
     closure_helpers: &ClosureHelpers,
     helper: &mut HelperGenerator<'_>,
@@ -4650,6 +4821,7 @@ fn build_spawn_helpers(
                     known_functions,
                     methods,
                     records,
+                    variants,
                     spawn_helpers,
                     closure_helpers,
                     helper,
@@ -4678,6 +4850,7 @@ fn build_closure_helpers(
     known_functions: &FunctionNames,
     methods: &MethodNames,
     records: &RecordFields,
+    variants: &VariantFields,
     helper: &mut HelperGenerator<'_>,
 ) -> Bail<(ClosureHelpers, Vec<String>, Vec<(String, String)>)> {
     let mut closure_helpers = ClosureHelpers::new();
@@ -4702,9 +4875,15 @@ fn build_closure_helpers(
             .into_iter()
             .next()
             .ok_or(())?;
-        let generated =
-            generate_with_helpers(&lowered_body, known_functions, methods, records, helper)
-                .ok_or(())?;
+        let generated = generate_with_helpers(
+            &lowered_body,
+            known_functions,
+            methods,
+            records,
+            variants,
+            helper,
+        )
+        .ok_or(())?;
         declarations.extend(generated.declarations);
         helpers.extend(generated.helpers);
 
@@ -4822,14 +5001,22 @@ pub fn generate(
     known_functions: &FunctionNames,
     methods: &MethodNames,
     records: &RecordFields,
+    variants: &VariantFields,
     show: &mut dyn FnMut(&str, &Ty) -> Option<String>,
 ) -> Option<String> {
     let mut helper = |request: HelperRequest, left: &str, _right: &str, ty: &Ty| match request {
         HelperRequest::Show => show(left, ty),
         HelperRequest::Equality => None,
     };
-    generate_with_helpers(function, known_functions, methods, records, &mut helper)
-        .map(|generated| generated.body)
+    generate_with_helpers(
+        function,
+        known_functions,
+        methods,
+        records,
+        variants,
+        &mut helper,
+    )
+    .map(|generated| generated.body)
 }
 
 pub fn generate_with_helpers(
@@ -4837,6 +5024,7 @@ pub fn generate_with_helpers(
     known_functions: &FunctionNames,
     methods: &MethodNames,
     records: &RecordFields,
+    variants: &VariantFields,
     helper: &mut HelperGenerator<'_>,
 ) -> Option<Generated> {
     if function.entry >= function.blocks.len()
@@ -4860,8 +5048,15 @@ pub fn generate_with_helpers(
     let values = collect_values(function, records).ok()?;
     let mut spawn_helpers = SpawnHelpers::new();
     let mut helper_declarations = Vec::new();
-    let (closure_helpers, closure_declarations, mut helpers) =
-        build_closure_helpers(function, known_functions, methods, records, helper).ok()?;
+    let (closure_helpers, closure_declarations, mut helpers) = build_closure_helpers(
+        function,
+        known_functions,
+        methods,
+        records,
+        variants,
+        helper,
+    )
+    .ok()?;
     helper_declarations.extend(closure_declarations);
     helpers.extend(build_closure_adapters(function, known_functions, records).ok()?);
     let (spawn_declarations, spawn_helper_bodies) = build_spawn_helpers(
@@ -4870,6 +5065,7 @@ pub fn generate_with_helpers(
         known_functions,
         methods,
         records,
+        variants,
         &mut spawn_helpers,
         &closure_helpers,
         helper,
@@ -4937,19 +5133,23 @@ pub fn generate_with_helpers(
         }
         out.push_str(&format!("{}:\n", block_label(block.id)));
         for instruction in &block.instructions {
-            emit_instruction(
+            if emit_instruction(
                 instruction,
                 &values,
                 &function.name,
                 known_functions,
                 methods,
                 records,
+                variants,
                 &spawn_helpers,
                 &closure_helpers,
                 helper,
                 &mut out,
             )
-            .ok()?;
+            .is_err()
+            {
+                return None;
+            }
         }
         emit_terminator(
             function,

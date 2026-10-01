@@ -162,10 +162,12 @@ por separado en `--native-type-report` como `ir-generated`; el mismo informe exp
 `hir-generated` y `ast-fallback` para que la retirada del backend legado tenga un contador
 visible. También publica líneas `native-source` agrupadas por archivo para localizar la deuda
 por módulo; la prueba diferencial comprueba que sus sumas coinciden con el total. En el corte
-actual, la suite de ejemplos suma 6 468 funciones IR, 21 HIR y 60 que aún caen al emisor
-AST; `native_backend_types_agree_with_the_checker` mantiene 60 como trinquete temporal. Los patrones
-superficiales de records con campos escalares ya bajan por IR/C, incluidos records genéricos, con
-paridad intérprete/nativo/WASI y `live_allocations=0`. Los métodos
+actual, la suite de ejemplos suma 6 474 funciones IR, 16 HIR y 59 que aún caen al emisor
+AST; `native_backend_types_agree_with_the_checker` mantiene 59 como trinquete temporal. Los patrones
+superficiales de records con campos escalares y los enums no genéricos con variantes unitarias,
+payloads escalares y patrones simples ya bajan por IR/C, incluidos records genéricos, con paridad
+intérprete/nativo/diferencial. Payloads gestionados, enums genéricos, patrones anidados y literales/
+rangos escalares siguen fuera de este slice. Los métodos
 de records y enums concretos comparten ahora IR/C cuando sus campos y ownership son compatibles; los
 records recursivos conservan HIR/AST hasta cerrar su contrato de ownership.
 El lowering de ownership aplica el mismo contrato de llamada prestada a receptores y argumentos de

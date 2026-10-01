@@ -2,14 +2,18 @@
 
 ## Unreleased
 
-### Native IR: scalar record patterns
+### Native IR: scalar record and enum patterns
 
 - Shallow patterns for concrete records with scalar `Int`, sized integer, `Float`, `Bool` and
   `Quantity` fields now lower through IR/C, including generic record fields whose types are
   resolved from HIR metadata.
 - Added interpreter/native/WASI parity and native leak-check coverage for nested record patterns;
   fresh record literals passed to ordinary HIR calls are released after the call.
-- The differential ratchet now records **6,468 IR / 21 HIR / 60 AST** functions.
+- Plain non-generic enum constructors, unit variants, scalar payload bindings and simple
+  `match` tests now lower through IR/C. Managed payloads, generic enums, nested patterns and
+  scalar literal/range tests remain outside this slice.
+- The differential ratchet now records **6,490 HIR/IR-generated functions (6,474 IR + 16 HIR) /
+  59 AST** functions.
 
 ### Native IR: numeric array selection
 

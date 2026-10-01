@@ -29,6 +29,11 @@ pub struct HirProgram {
     /// the IR sees a concrete `Record<Args>` type.
     pub record_fields: HashMap<String, Vec<(String, Ty)>>,
     pub record_generics: HashMap<String, Vec<String>>,
+    /// Fields of each source enum variant in declaration order.  The IR keeps
+    /// positional enum bindings indexed by constructor and field position so
+    /// the C emitter can map them to its `f0`, `f1`, ... union members while
+    /// retaining their checker types.
+    pub enum_variants: HashMap<(String, String), Vec<(Option<String>, Ty)>>,
 }
 
 #[derive(Debug, Clone)]
@@ -663,6 +668,7 @@ pub fn lower<'a>(items: &'a [Item], typed: &'a TypedProgram) -> HirProgram {
     let mut arities = std::collections::HashMap::new();
     let mut record_fields = HashMap::new();
     let mut record_generics = HashMap::new();
+    let mut enum_variants = HashMap::new();
     for item in items {
         match item {
             Item::Function(f) => {
@@ -688,6 +694,15 @@ pub fn lower<'a>(items: &'a [Item], typed: &'a TypedProgram) -> HirProgram {
                         v.fields.iter().map(|f| f.name.clone()).collect(),
                     );
                     arities.insert(v.name.clone(), v.fields.len());
+                    enum_variants.insert(
+                        (e.name.clone(), v.name.clone()),
+                        v.fields
+                            .iter()
+                            .map(|field| {
+                                (field.name.clone(), crate::typeck::resolve_type(&field.ty))
+                            })
+                            .collect(),
+                    );
                 }
             }
             Item::Record(record) => {
@@ -875,6 +890,7 @@ pub fn lower<'a>(items: &'a [Item], typed: &'a TypedProgram) -> HirProgram {
         iterator_items,
         record_fields,
         record_generics,
+        enum_variants,
     }
 }
 

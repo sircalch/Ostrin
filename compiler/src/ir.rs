@@ -279,6 +279,7 @@ struct Builder {
     iterator_items: HashMap<String, IteratorInfo>,
     record_fields: HashMap<String, Vec<(String, Ty)>>,
     record_generics: HashMap<String, Vec<String>>,
+    enum_variants: HashMap<(String, String), Vec<(Option<String>, Ty)>>,
     function_globals: HashMap<ValueId, String>,
     break_targets: Vec<(BlockId, BlockId, usize)>,
     loop_edges: Vec<LoopEdges>,
@@ -294,6 +295,7 @@ impl Builder {
         iterator_items: &HashMap<String, IteratorInfo>,
         record_fields: &HashMap<String, Vec<(String, Ty)>>,
         record_generics: &HashMap<String, Vec<String>>,
+        enum_variants: &HashMap<(String, String), Vec<(Option<String>, Ty)>>,
     ) -> Self {
         let entry = IrBlock {
             id: 0,
@@ -315,6 +317,7 @@ impl Builder {
             iterator_items: iterator_items.clone(),
             record_fields: record_fields.clone(),
             record_generics: record_generics.clone(),
+            enum_variants: enum_variants.clone(),
             function_globals: HashMap::new(),
             break_targets: Vec::new(),
             loop_edges: Vec::new(),
@@ -467,6 +470,7 @@ impl Builder {
             &self.iterator_items,
             &self.record_fields,
             &self.record_generics,
+            &self.enum_variants,
         );
         self.function.closures.push(IrClosure {
             name: closure_name,
@@ -1831,6 +1835,18 @@ impl Builder {
                         }
                         _ if path.len() == 1 => self
                             .record_field_type(&subject_ty, &path[0])
+                            .or_else(|| {
+                                let encoded = path[0].strip_prefix("__ostrin_enum_field__")?;
+                                let (variant, index) = encoded.rsplit_once("__")?;
+                                let index = index.parse::<usize>().ok()?;
+                                let Ty::Named(enum_name) = &subject_ty else {
+                                    return None;
+                                };
+                                self.enum_variants
+                                    .get(&(enum_name.clone(), variant.to_string()))
+                                    .and_then(|fields| fields.get(index))
+                                    .map(|(_, ty)| ty.clone())
+                            })
                             .unwrap_or(Ty::Unknown),
                         _ => Ty::Unknown,
                     }
@@ -1848,7 +1864,26 @@ impl Builder {
                     .expect("match scope")
                     .insert(name.clone(), dst);
             }
-            crate::ast::Pattern::Variant(_, fields) => {
+            crate::ast::Pattern::Variant(pattern_variant, fields) => {
+                // Keep the declaration position and constructor name in the
+                // path for plain enum payloads.  The C ABI stores positional
+                // fields as `f0`, `f1`, ... while the source pattern uses its
+                // binding names (`Rectangle(width, height)`), so the emitter
+                // cannot recover the union member from the binding name alone.
+                // Records and the built-in Option/Result wrappers retain their
+                // existing field paths.
+                let plain_enum = if path.is_empty() {
+                    match self.known_value_type(subject) {
+                        Some(Ty::Named(name))
+                            if name != "Rng" && !self.record_fields.contains_key(&name) =>
+                        {
+                            true
+                        }
+                        _ => false,
+                    }
+                } else {
+                    false
+                };
                 let result_variant = if path.is_empty() {
                     matches!(
                         self.known_value_type(subject),
@@ -1861,12 +1896,16 @@ impl Builder {
                     crate::ast::Pattern::Variant(name, _) if result_variant => Some(name.clone()),
                     _ => None,
                 };
-                for (field, subpattern) in fields {
+                for (index, (field, subpattern)) in fields.iter().enumerate() {
                     let mut nested = path.clone();
                     if let Some(variant) = &variant_name {
                         nested.push(variant.clone());
                     }
-                    nested.push(field.clone());
+                    if plain_enum {
+                        nested.push(format!("__ostrin_enum_field__{pattern_variant}__{index}"));
+                    } else {
+                        nested.push(field.clone());
+                    }
                     self.bind_pattern(subject, subpattern, nested);
                 }
             }
@@ -2576,6 +2615,7 @@ pub fn lower(program: &HirProgram) -> IrProgram {
                     &program.iterator_items,
                     &program.record_fields,
                     &program.record_generics,
+                    &program.enum_variants,
                 )
             })
             .collect(),
@@ -2587,8 +2627,15 @@ fn lower_function(
     iterator_items: &HashMap<String, IteratorInfo>,
     record_fields: &HashMap<String, Vec<(String, Ty)>>,
     record_generics: &HashMap<String, Vec<String>>,
+    enum_variants: &HashMap<(String, String), Vec<(Option<String>, Ty)>>,
 ) -> IrFunction {
-    let mut builder = Builder::new(function, iterator_items, record_fields, record_generics);
+    let mut builder = Builder::new(
+        function,
+        iterator_items,
+        record_fields,
+        record_generics,
+        enum_variants,
+    );
     for (index, (name, ty)) in function.params.iter().enumerate() {
         let value = builder.fresh();
         builder.emit(IrInstr::Param {

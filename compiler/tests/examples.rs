@@ -2565,6 +2565,17 @@ fn native_backend_compiles_and_runs_enums_and_match() {
         "compile failed: {}",
         stderr(&compile)
     );
+    let report = run(&["--native-type-report", &example_path("native_enums.ostrin")]);
+    assert!(
+        report.status.success(),
+        "native enum type report failed: {}",
+        stderr(&report)
+    );
+    assert!(
+        stdout(&report).contains("native-source: examples/native_enums.ostrin ir=2 hir=1 ast=0"),
+        "plain enum functions did not stay on IR/C while literal/range matching remains HIR: {}",
+        stdout(&report)
+    );
 
     let run_output = Command::new(&exe)
         .output()
@@ -2578,6 +2589,65 @@ fn native_backend_compiles_and_runs_enums_and_match() {
         String::from_utf8_lossy(&run_output.stdout).replace("\r\n", "\n"),
         "27\n20\n0\nzero\nsmall\nnegative\nlarge\n",
         "native binary should match the interpreter's output for the same program"
+    );
+}
+
+#[test]
+fn native_backend_compiles_and_runs_exhaustive_enum_match() {
+    let file = example_path("match_exhaustive.ostrin");
+    let exe = temp_artifact("match-exhaustive-enums.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "enum match compile failed: {}",
+        stderr(&compile)
+    );
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "enum match type report failed: {}",
+        stderr(&report)
+    );
+    assert!(
+        stdout(&report)
+            .contains("native-source: examples/match_exhaustive.ostrin ir=2 hir=0 ast=0"),
+        "exhaustive enum match did not stay on IR/C: {}",
+        stdout(&report)
+    );
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "WASI enum match emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("struct TrafficLight")
+            && wasi_source.contains("(__ir_v0).tag == 0")
+            && wasi_source.contains(".tag = 2"),
+        "WASI enum match emission omitted tagged-union IR: {wasi_source}"
+    );
+    assert!(!wasi_source.contains("#define OSTRIN_NATIVE_THREADS"));
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run native exhaustive enum match");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "native exhaustive enum match failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        "red\nyellow\ngreen\n"
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "enum match leaked native allocations: {}",
+        String::from_utf8_lossy(&native.stderr)
     );
 }
 
