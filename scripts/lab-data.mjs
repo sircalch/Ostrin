@@ -184,7 +184,7 @@ export const LAB = [
 // is written to website/assets/viz/<id>.svg and checked for drift like the Lab outputs.
 export const GALLERY = [
   { id: "lines", title: "Lines, bands and legends", file: "examples/viz_lines.ostrin", blurb: "Three damped oscillators, the envelope as a shaded band and a reference line." },
-  { id: "surface", title: "Shaded 3D surface", file: "examples/viz_surface.ostrin", blurb: "peaks(x, y) on a 36 × 36 grid: 2450 triangles sorted back to front and lit.", controls: [{ name: "scale", label: "Spatial scale", min: 0.5, max: 2, step: 0.1 }] },
+  { id: "surface", title: "Shaded 3D surface", file: "examples/viz_surface.ostrin", blurb: "peaks(x, y) on a 36 × 36 grid: 2450 triangles sorted back to front and lit.", controls: [{ name: "scale", label: "Spatial scale", min: 0.5, max: 2, step: 0.1 }], bundle: "assets/experiments/surface.ostrin-experiment.json" },
   { id: "heatmap", title: "Heatmap and contours", file: "examples/viz_heatmap.ostrin", blurb: "A 48 × 48 field with a colorbar and ten marching-squares contour levels." },
   { id: "contourf", title: "Filled contour bands", file: "examples/viz_contourf.ostrin", blurb: "A 48 × 48 scalar field rendered as nine discrete filled contour bands with isolines." },
   { id: "quiver", title: "2D vector field", file: "examples/viz_quiver.ostrin", blurb: "A sampled rotational velocity field rendered as 221 deterministic arrows with tooltips." },

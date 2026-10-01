@@ -43,6 +43,22 @@ test("the fixture registry stays source-backed and parameterizable", () => {
   assert.throws(() => buildExperimentBundle("missing"), /unknown experiment fixture/);
 });
 
+test("every registered fixture produces a verified recorded bundle", () => {
+  for (const [id, fixture] of Object.entries(experimentFixtures)) {
+    const bundle = buildExperimentBundle(id);
+    assert.equal(bundle.id, id);
+    assert.equal(bundle.title, fixture.title);
+    assert.match(fixture.sourceRevision, /^[0-9a-f]{40}$/);
+    assert.deepEqual(verifyExperimentBundle(bundle, { fixtureId: id }).errors, []);
+    if (id === "surface") {
+      assert.deepEqual(bundle.provenance.parameters, { scale: 1 });
+      assert.deepEqual(bundle.provenance.camera, { azimuth: -55, elevation: 28 });
+    }
+    const fileResult = verifyBundleFile(outputPathFor(id), id);
+    assert.deepEqual(fileResult.errors, [], `${id}: ${fileResult.errors.join("; ")}`);
+  }
+});
+
 test("tampering with bundled content is rejected by the hash gate", () => {
   const bundle = JSON.parse(readFileSync(outputPath, "utf8"));
   bundle.files["figure.svg"] += "\n";

@@ -493,10 +493,11 @@ sustituye la adopción independiente; por eso el plan mantiene un frente explíc
   galería de proyectos externos verificables, sin fabricar repositorios ni contar forks;
 - convertir cada experimento de Viz en un bundle reproducible descargable con `source.ostrin`,
   datos, figuras, `provenance.json`, manifest, commit, hashes, semilla, parámetros, cámara y
-  comando de replay. El primer fixture source-backed ya publica `ostrin.experiment/v0` como un
-  artefacto R0 con cuatro archivos y hashes calculados; R1 queda etiquetado como replay verificable
-  planificado, y R2/R3 no se reclaman. Falta extenderlo a todos los experimentos y serializar
-  parámetros/cámara seleccionados;
+  comando de replay. Los fixtures source-backed `provenance` y `surface` ya publican
+  `ostrin.experiment/v0` como artefactos R0 con cuatro archivos y hashes calculados; el bundle 3D
+  registra además sus parámetros y cámara. R1 queda etiquetado como replay verificable planificado,
+  y R2/R3 no se reclaman. Falta extenderlo a todos los experimentos y serializar el estado vivo
+  seleccionado desde el explorador;
 - publicar benchmarks históricos por commit y métricas de adopción solo con una política de
   privacidad clara. Estas evidencias alimentan después el snapshot de Linguist y la propuesta
   upstream, pero no se presentan como adopción hasta que existan usuarios y proyectos externos.

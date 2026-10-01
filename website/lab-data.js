@@ -832,6 +832,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
           "step": 0.1
         }
       ],
+      "bundle": "assets/experiments/surface.ostrin-experiment.json",
       "source": "examples/viz_surface.ostrin",
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_surface.ostrin",
       "code": "// std.viz · 3D: a shaded surface with a colorbar.\nimport std.viz\n\nfn peaks(x: Float, y: Float) -> Float {\n    3.0 * (1.0 - x) * (1.0 - x) * exp(-x * x - (y + 1.0) * (y + 1.0)) -\n        10.0 * (x / 5.0 - x * x * x - y * y * y * y * y) * exp(-x * x - y * y) -\n        exp(-(x + 1.0) * (x + 1.0) - y * y) / 3.0\n}\n\nfn main() -> Void {\n    scale = 1.0\n    xs = linspace(-3.0, 3.0, 36)\n    ys = linspace(-3.0, 3.0, 36)\n    scene = viz.scene3d(\"peaks(x, y) as a surface\")\n        .describe(\"36 × 36 grid, 2450 shaded triangles · scale = \" + viz.num(scale))\n        .labels(\"x\", \"y\", \"z\")\n        .surface(xs, ys, viz.grid_of(xs, ys, fn(x, y) { peaks(x * scale, y * scale) }), label: \"height\")\n    print(scene.svg())\n}\n",

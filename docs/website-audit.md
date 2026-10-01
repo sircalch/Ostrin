@@ -20,7 +20,7 @@ tests or an explicitly labeled early-stage surface.
 | Showcase | `website/showcase.html` | Four repository-backed demonstrations; every displayed output line is verified against its program by `scripts/lab-data.mjs` |
 | Benchmarks | `website/benchmarks.html`, `website/benchmark-data.js`, `scripts/benchmark.mjs` | Eight deterministic workloads compare interpreter and native process medians; the page publishes commit, environment, sampling and output provenance without cross-language claims |
 | Provenance artifact | `website/provenance.html`, `website/provenance-data.js`, `website/provenance.js`, `scripts/provenance-page.mjs`, `compiler/src/provenance.rs` | Experimental machine-readable source hash, target and effect inventory with explicit replay limitations; regenerated and checked before Pages deployment |
-| Experiment bundle | `scripts/experiment-bundle.mjs`, `scripts/experiment-bundle.test.mjs`, `website/assets/experiments/provenance.ostrin-experiment.json`, `website/viz.js` | Parametrizable `ostrin.experiment/v0` source-backed download registry: the provenance fixture is a four-file R0 bundle (source, declared inputs, SVG and provenance) with calculated SHA-256/byte hashes and a deterministic source revision; R1 replay verification is labelled planned and R2/R3 are not claimed |
+| Experiment bundle | `scripts/experiment-bundle.mjs`, `scripts/experiment-bundle.test.mjs`, `website/assets/experiments/*.ostrin-experiment.json`, `website/viz.js` | Parametrizable `ostrin.experiment/v0` source-backed download registry: the provenance and 3D surface fixtures are four-file R0 bundles (source, declared inputs, SVG and provenance) with calculated SHA-256/byte hashes, parameters/camera where declared and deterministic source revisions; R1 replay verification is labelled planned and R2/R3 are not claimed |
 | Community | `website/community.html`, `CONTRIBUTING.md`, issue templates | Contribution path and repository channels; no unverified chat, registry or external community is claimed |
 | Ecosystem and roadmap | `website/ecosystem.html`, `website/roadmap.html` | Current capabilities, early areas and future work are distinguished |
 | Deployment and editor | `.github/workflows/pages.yml`, `vscode-ostrin/`, LSP/DAP sources | Pages builds and checks the WASM artifact; editor support is implemented, Marketplace publication is not claimed |
@@ -72,8 +72,7 @@ standard-library and package contracts; then WASM distribution and broader platf
 each block linked to executable tests, update the development log, and push only after checks pass.
 
 The featured workflows are a web discovery layer over existing evidence, not new scientific
-results. The provenance gallery fixture now has a machine-readable `ostrin.experiment/v0` R0
-bundle with source, declared inputs, selected SVG and calculated hashes. Extending this to every
-figure and verifying R1 replay (including parameters and camera state) remains follow-up work;
-the bundle does not claim R2/R3. A second 3D bundle is intentionally deferred until an existing
-source, declared input record and recorded SVG can be migrated together without inventing data.
+results. The provenance and surface gallery fixtures now have machine-readable
+`ostrin.experiment/v0` R0 bundles with source, declared inputs, selected SVG, calculated hashes and
+the surface parameters/camera snapshot. Extending this to every figure and verifying R1 replay
+(including live parameter and camera state) remains follow-up work; the bundles do not claim R2/R3.
