@@ -169,6 +169,12 @@ pub enum IrInstr {
         dst: ValueId,
         subject: ValueId,
         pattern: String,
+        /// Plain enum discriminants required by this pattern.  Each entry is
+        /// `(parent_variant_path, variant_name)`, where a path segment is
+        /// `(parent_variant, field_index)`.  Keeping this semantic metadata
+        /// beside the debug pattern lets the C backend lower nested by-value
+        /// enums without parsing a `Debug` string or guessing field names.
+        enum_tests: Vec<(Vec<(String, usize)>, String)>,
     },
     PatternBind {
         dst: ValueId,
@@ -569,6 +575,88 @@ impl Builder {
             .iter()
             .find(|(declared_name, _)| declared_name == field)
             .map(|(_, ty)| substitute_record_generics(ty.clone(), &substitutions))
+    }
+
+    /// Returns metadata for a plain, non-generic enum variant.  The IR slice
+    /// only uses this for by-value enum fields, so a missing entry keeps the
+    /// function on the established HIR/AST fallback.
+    fn enum_variant_fields(&self, ty: &Ty, variant: &str) -> Option<&Vec<(Option<String>, Ty)>> {
+        let Ty::Named(enum_name) = ty else {
+            return None;
+        };
+        self.enum_variants
+            .get(&(enum_name.clone(), variant.to_string()))
+    }
+
+    fn enum_field_type(&self, ty: &Ty, variant: &str, index: usize) -> Option<Ty> {
+        let result = self
+            .enum_variant_fields(ty, variant)
+            .and_then(|fields| fields.get(index))
+            .map(|(_, field_ty)| field_ty.clone());
+        result
+    }
+
+    /// Resolve a path produced while recursively binding an enum pattern.
+    /// Records and wrapper patterns retain their source field paths; enum
+    /// fields use the collision-free marker emitted by `bind_pattern`.
+    fn pattern_path_type(&self, mut ty: Ty, path: &[String]) -> Option<Ty> {
+        for component in path {
+            if let Some(encoded) = component.strip_prefix("__ostrin_enum_field__") {
+                let (variant, index) = encoded.rsplit_once("__")?;
+                let index = index.parse::<usize>().ok()?;
+                ty = self.enum_field_type(&ty, variant, index)?;
+                continue;
+            }
+            ty = match &ty {
+                Ty::Applied(name, args) if name == "Option" && args.len() == 1 => args[0].clone(),
+                Ty::Applied(name, args) if name == "Result" && args.len() == 2 => {
+                    match component.as_str() {
+                        "Ok" => args[0].clone(),
+                        "Err" => args[1].clone(),
+                        _ => return self.record_field_type(&ty, component),
+                    }
+                }
+                _ => self.record_field_type(&ty, component)?,
+            };
+        }
+        Some(ty)
+    }
+
+    /// Collect discriminant tests for nested plain enum patterns.  Payloads
+    /// remain by-value, so this does not introduce ownership operations.  A
+    /// later `PatternBind` check still rejects managed or generic payloads,
+    /// preserving the conservative fallback boundary.
+    fn enum_pattern_tests(
+        &self,
+        ty: &Ty,
+        pattern: &crate::ast::Pattern,
+        path: Vec<(String, usize)>,
+        tests: &mut Vec<(Vec<(String, usize)>, String)>,
+    ) {
+        match pattern {
+            crate::ast::Pattern::Ident(name) => {
+                if self.enum_variant_fields(ty, name).is_some() {
+                    tests.push((path, name.clone()));
+                }
+            }
+            crate::ast::Pattern::Variant(name, fields) => {
+                let Some(variant_fields) = self.enum_variant_fields(ty, name) else {
+                    return;
+                };
+                tests.push((path.clone(), name.clone()));
+                for (index, (_, subpattern)) in fields.iter().enumerate() {
+                    let Some((_, field_ty)) = variant_fields.get(index) else {
+                        return;
+                    };
+                    let mut nested_path = path.clone();
+                    nested_path.push((name.clone(), index));
+                    self.enum_pattern_tests(field_ty, subpattern, nested_path, tests);
+                }
+            }
+            crate::ast::Pattern::Wildcard
+            | crate::ast::Pattern::Literal(_)
+            | crate::ast::Pattern::Range(..) => {}
+        }
     }
 
     fn patch_phi(&mut self, destination: ValueId, incoming: Vec<(BlockId, ValueId)>) {
@@ -1476,10 +1564,13 @@ impl Builder {
             let next_test = self.new_block();
             self.current = test_block;
             let test = self.fresh();
+            let mut enum_tests = Vec::new();
+            self.enum_pattern_tests(&subject.ty, &arm.pattern, Vec::new(), &mut enum_tests);
             self.emit(IrInstr::PatternTest {
                 dst: test,
                 subject: subject_value,
                 pattern: format!("{:?}", arm.pattern),
+                enum_tests,
             });
             self.terminate(IrTerminator::Branch {
                 condition: test,
@@ -1817,6 +1908,12 @@ impl Builder {
                 let subject_ty = self.known_value_type(subject).unwrap_or(Ty::Unknown);
                 let ty = if path.is_empty() {
                     subject_ty
+                } else if path
+                    .iter()
+                    .all(|part| part.starts_with("__ostrin_enum_field__"))
+                {
+                    self.pattern_path_type(subject_ty.clone(), &path)
+                        .unwrap_or(Ty::Unknown)
                 } else {
                     match &subject_ty {
                         Ty::Applied(name, args)
@@ -1872,18 +1969,15 @@ impl Builder {
                 // cannot recover the union member from the binding name alone.
                 // Records and the built-in Option/Result wrappers retain their
                 // existing field paths.
-                let plain_enum = if path.is_empty() {
-                    match self.known_value_type(subject) {
-                        Some(Ty::Named(name))
-                            if name != "Rng" && !self.record_fields.contains_key(&name) =>
-                        {
-                            true
-                        }
-                        _ => false,
-                    }
-                } else {
-                    false
-                };
+                let plain_enum = self
+                    .known_value_type(subject)
+                    .and_then(|subject_ty| self.pattern_path_type(subject_ty, &path))
+                    .is_some_and(|current_ty| {
+                        matches!(current_ty, Ty::Named(ref name) if self
+                            .enum_variants
+                            .keys()
+                            .any(|(enum_name, _)| enum_name == name))
+                    });
                 let result_variant = if path.is_empty() {
                     matches!(
                         self.known_value_type(subject),
@@ -3114,6 +3208,7 @@ fn display_instruction(instruction: &IrInstr) -> String {
             dst,
             subject,
             pattern,
+            ..
         } => format!("%{dst} = pattern_test %{subject} {pattern}"),
         IrInstr::PatternBind {
             dst,

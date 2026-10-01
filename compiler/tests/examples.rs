@@ -9067,8 +9067,8 @@ fn native_ir_record_patterns_match_interpreter_native_and_wasi() {
     for (file, expected_report, marker) in [
         (
             "match_nested.ostrin",
-            "native-source: examples/match_nested.ostrin ir=1 hir=2 ast=0",
-            "(__ir_v0)->x",
+            "native-source: examples/match_nested.ostrin ir=3 hir=0 ast=0",
+            "(__ir_v0).data.Wrapped.f0).data.Ready.f0",
         ),
         (
             "generic_nested_patterns.ostrin",

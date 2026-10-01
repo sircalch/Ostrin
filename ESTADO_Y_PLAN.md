@@ -162,12 +162,12 @@ por separado en `--native-type-report` como `ir-generated`; el mismo informe exp
 `hir-generated` y `ast-fallback` para que la retirada del backend legado tenga un contador
 visible. También publica líneas `native-source` agrupadas por archivo para localizar la deuda
 por módulo; la prueba diferencial comprueba que sus sumas coinciden con el total. En el corte
-actual, la suite de ejemplos suma 6 476 funciones IR, 15 HIR y 58 que aún caen al emisor
+actual, la suite de ejemplos suma 6 478 funciones IR, 13 HIR y 58 que aún caen al emisor
 AST; `native_backend_types_agree_with_the_checker` mantiene 58 como trinquete temporal. Los patrones
 superficiales de records con campos escalares y los enums no genéricos con variantes unitarias,
-payloads escalares (incluidos enteros de ancho fijo) y patrones simples ya bajan por IR/C, incluidos records genéricos, con paridad
-intérprete/nativo/diferencial. Payloads gestionados, enums genéricos, patrones anidados y literales/
-rangos escalares siguen fuera de este slice. Los métodos
+payloads escalares (incluidos enteros de ancho fijo), patrones simples y patrones anidados de enums por
+valor ya bajan por IR/C, incluidos records genéricos, con paridad intérprete/nativo/diferencial. Payloads
+gestionados, enums genéricos y literales/rangos escalares siguen fuera de este slice. Los métodos
 de records y enums concretos comparten ahora IR/C cuando sus campos y ownership son compatibles; los
 records recursivos conservan HIR/AST hasta cerrar su contrato de ownership.
 El lowering de ownership aplica el mismo contrato de llamada prestada a receptores y argumentos de
@@ -274,7 +274,7 @@ propietarios directos al retornar; el mismo contrato se aplica al emisor HIR y a
 `clone(x)` y `drop(x)` siguen disponibles para probar explícitamente el contrato en programas
 nativos. El emisor también limpia bindings de referencia creados por expresiones de bloque
 anidadas y por ramas/iteraciones de `while`/`for`, incluyendo `break`/`continue`; los escapes
-complejos, los patrones anidados y la bajada completa de ownership sobre la IR siguen pendientes
+complejos, los patrones anidados con payloads gestionados y la bajada completa de ownership sobre la IR siguen pendientes
 fuera de las familias y consumidores cubiertos; las cadenas lineales de consumidores sobre los
 wrappers anidados soportados ya tienen cobertura IR/C.
 
@@ -341,8 +341,8 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
 convendría dividirlos; el backend nativo no comparte el sistema de tipos del checker
-(ya consume los tipos del checker y compara cada nodo; el informe actual suma **6 476 funciones
-generadas desde IR, 15 desde HIR y 58 en fallback AST** en los ejemplos, con un trinquete
+(ya consume los tipos del checker y compara cada nodo; el informe actual suma **6 478 funciones
+generadas desde IR, 13 desde HIR y 58 en fallback AST** en los ejemplos, con un trinquete
 que impide que el fallback aumente sin justificación; los métodos de records y enums concretos
 entran ahora en IR/C cuando sus campos y ownership son compatibles, mientras los records recursivos
 conservan el fallback verificado; las familias migradas incluyen escalares,

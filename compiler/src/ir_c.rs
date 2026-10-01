@@ -235,6 +235,53 @@ fn enum_pattern_scalar(ty: &Ty) -> bool {
     )
 }
 
+fn plain_enum_value_supported(
+    ty: &Ty,
+    variants: &VariantFields,
+    records: &RecordFields,
+    visiting: &mut HashSet<String>,
+) -> bool {
+    if enum_pattern_scalar(ty) {
+        return true;
+    }
+    let Ty::Named(name) = ty else {
+        return false;
+    };
+    if !is_plain_enum(ty, records) || !visiting.insert(name.clone()) {
+        return false;
+    }
+    let supported = variants
+        .iter()
+        .filter(|((enum_name, _), _)| enum_name == name)
+        .all(|(_, variant)| {
+            variant.fields.iter().all(|(_, field_c_type)| {
+                matches!(
+                    field_c_type.as_str(),
+                    "int64_t"
+                        | "double"
+                        | "float"
+                        | "bool"
+                        | "int8_t"
+                        | "int16_t"
+                        | "int32_t"
+                        | "uint8_t"
+                        | "uint16_t"
+                        | "uint32_t"
+                        | "uint64_t"
+                        | "Qty"
+                ) || (records.contains_key(&enum_marker(field_c_type))
+                    && plain_enum_value_supported(
+                        &Ty::Named(field_c_type.clone()),
+                        variants,
+                        records,
+                        visiting,
+                    ))
+            })
+        });
+    visiting.remove(name);
+    supported
+}
+
 /// Returns the source-level constructor name from the debug representation
 /// stored by `IrInstr::PatternTest`.  Record patterns are represented as
 /// `Variant("Record", [...])`, just like enum payload patterns, so the C
@@ -267,21 +314,8 @@ fn record_pattern_type(pattern: &str, subject_ty: &Ty, records: &RecordFields) -
     (pattern_name == base).then_some(record)
 }
 
-/// Extracts the source-level constructor name from the debug form used by
-/// `IrInstr::PatternTest`.  Plain enum patterns are intentionally limited to
-/// one constructor level in this first IR slice.
-fn enum_pattern_name(pattern: &str) -> Option<&str> {
-    if let Some(rest) = pattern.strip_prefix("Ident(\"") {
-        return rest.strip_suffix("\")");
-    }
-    let rest = pattern.strip_prefix("Variant(\"")?;
-    let end = rest.find("\", [")?;
-    Some(&rest[..end])
-}
-
 fn is_simple_enum_pattern(pattern: &str) -> bool {
     (pattern.starts_with("Ident(\"") || pattern.starts_with("Variant(\""))
-        && pattern.matches("Variant(\"").count() <= 1
         && !pattern.contains("Literal(")
         && !pattern.contains("Range(")
         && !pattern.contains("Ident(\"None\")")
@@ -291,6 +325,72 @@ fn enum_field_path(path: &[String]) -> Option<(&str, usize)> {
     let field = path.first()?.strip_prefix("__ostrin_enum_field__")?;
     let (variant, index) = field.rsplit_once("__")?;
     Some((variant, index.parse().ok()?))
+}
+
+/// Projects a nested by-value enum path through the generated tagged-union
+/// layout.  Every segment carries its parent variant and positional index, so
+/// source binding names never affect the C member selected.  The helper is
+/// intentionally limited to plain enums; a managed payload would require the
+/// ownership protocol that still belongs to the HIR/AST fallback.
+fn nested_enum_field_code(
+    subject_code: &str,
+    subject_ty: &Ty,
+    path: &[String],
+    expected_ty: &Ty,
+    variants: &VariantFields,
+    records: &RecordFields,
+) -> Option<String> {
+    if path.is_empty()
+        || path
+            .iter()
+            .any(|part| !part.starts_with("__ostrin_enum_field__"))
+    {
+        return None;
+    }
+    let mut code = subject_code.to_string();
+    let mut current_ty = subject_ty.clone();
+    for (segment_index, part) in path.iter().enumerate() {
+        let (variant_name, index) = enum_field_path(std::slice::from_ref(part))?;
+        let variant = enum_variant(&current_ty, variant_name, variants, records)?;
+        let (field_name, field_c_type) = variant.fields.get(index)?;
+        code = format!("({code}).data.{}.{}", variant.name, field_name);
+        if segment_index + 1 == path.len() {
+            return (c_type(expected_ty, records).ok()?.as_str() == field_c_type).then_some(code);
+        }
+        if !records.contains_key(&enum_marker(field_c_type)) {
+            return None;
+        }
+        current_ty = Ty::Named(field_c_type.clone());
+    }
+    None
+}
+
+/// Project an enum field path whose final value is itself a plain enum.  The
+/// type names in `VariantInfo` are C ABI names, so the marker table is enough
+/// to recover the next semantic enum type without widening the backend data
+/// structure.
+fn nested_enum_projection_code(
+    subject_code: &str,
+    subject_ty: &Ty,
+    path: &[(String, usize)],
+    variants: &VariantFields,
+    records: &RecordFields,
+) -> Option<(String, Ty)> {
+    if path.is_empty() {
+        return Some((subject_code.to_string(), subject_ty.clone()));
+    }
+    let mut code = subject_code.to_string();
+    let mut current_ty = subject_ty.clone();
+    for (variant_name, index) in path {
+        let variant = enum_variant(&current_ty, variant_name, variants, records)?;
+        let (field_name, field_c_type) = variant.fields.get(*index)?;
+        if !records.contains_key(&enum_marker(field_c_type)) {
+            return None;
+        }
+        code = format!("({code}).data.{}.{}", variant.name, field_name);
+        current_ty = Ty::Named(field_c_type.clone());
+    }
+    Some((code, current_ty))
 }
 
 fn enum_variant<'a>(
@@ -3440,7 +3540,7 @@ fn emit_instruction(
                         let Ok(arg_ty) = value_ty(values, *value) else {
                             return false;
                         };
-                        enum_pattern_scalar(&arg_ty)
+                        plain_enum_value_supported(&arg_ty, variants, records, &mut HashSet::new())
                     })
                 {
                     return Err(());
@@ -3571,6 +3671,7 @@ fn emit_instruction(
             dst,
             subject,
             pattern,
+            enum_tests,
         } => {
             let subject_ty = value_ty(values, *subject)?;
             let subject = value_code(values, *subject)?;
@@ -3603,17 +3704,36 @@ fn emit_instruction(
                 }
                 _ if pattern == "Wildcard" => "true".to_string(),
                 _ if is_plain_enum(&subject_ty, records)
+                    && plain_enum_value_supported(
+                        &subject_ty,
+                        variants,
+                        records,
+                        &mut HashSet::new(),
+                    )
                     && is_simple_enum_pattern(pattern)
-                    && enum_pattern_name(pattern)
-                        .and_then(|name| enum_variant(&subject_ty, name, variants, records))
-                        .is_some() =>
+                    && !enum_tests.is_empty() =>
                 {
-                    let name = enum_pattern_name(pattern).ok_or(())?;
-                    let variant = enum_variant(&subject_ty, name, variants, records).ok_or(())?;
-                    if pattern.starts_with("Ident(\"") && !variant.fields.is_empty() {
-                        return Err(());
+                    let mut conditions = Vec::with_capacity(enum_tests.len());
+                    for (path, name) in enum_tests {
+                        let (projected, projected_ty) = nested_enum_projection_code(
+                            &subject,
+                            &subject_ty,
+                            path,
+                            variants,
+                            records,
+                        )
+                        .ok_or(())?;
+                        let variant =
+                            enum_variant(&projected_ty, name, variants, records).ok_or(())?;
+                        if path.is_empty()
+                            && pattern.starts_with("Ident(\"")
+                            && !variant.fields.is_empty()
+                        {
+                            return Err(());
+                        }
+                        conditions.push(format!("({projected}).tag == {}", variant.tag));
                     }
-                    format!("({subject}).tag == {}", variant.tag)
+                    conditions.join(" && ")
                 }
                 _ if pattern.starts_with("Ident(\"") => "true".to_string(),
                 _ if record_pattern_type(pattern, &subject_ty, records).is_some() => {
@@ -3666,25 +3786,28 @@ fn emit_instruction(
                         )
                     }
                     _ if is_plain_enum(&subject_ty, records)
-                        && path.len() == 1
-                        && enum_field_path(path).is_some()
+                        && plain_enum_value_supported(
+                            &subject_ty,
+                            variants,
+                            records,
+                            &mut HashSet::new(),
+                        )
+                        && path
+                            .iter()
+                            .all(|part| part.starts_with("__ostrin_enum_field__"))
+                        && !path.is_empty()
                         && enum_pattern_scalar(ty) =>
                     {
-                        let (variant_name, index) = enum_field_path(path).ok_or(())?;
-                        let variant =
-                            enum_variant(&subject_ty, variant_name, variants, records).ok_or(())?;
-                        let Some((field, _)) = variant.fields.get(index) else {
-                            return Err(());
-                        };
-                        (
-                            format!(
-                                "({}).data.{}.{}",
-                                value_code(values, *subject)?,
-                                variant.name,
-                                field
-                            ),
-                            ty.clone(),
+                        let code = nested_enum_field_code(
+                            &value_code(values, *subject)?,
+                            &subject_ty,
+                            path,
+                            ty,
+                            variants,
+                            records,
                         )
+                        .ok_or(())?;
+                        (code, ty.clone())
                     }
                     _ if path.len() == 1
                         && record_pattern_scalar(ty)
