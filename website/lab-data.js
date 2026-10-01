@@ -903,6 +903,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "title": "Reproducible provenance",
       "file": "examples/viz_provenance.ostrin",
       "blurb": "A publication-ready figure carrying source and data hashes, a seed and compiler identity in its SVG metadata.",
+      "bundle": "assets/experiments/provenance.ostrin-experiment.json",
       "source": "examples/viz_provenance.ostrin",
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_provenance.ostrin",
       "code": "// Reproducible publication metadata travels with the exported SVG.\n// The hashes are supplied by the experiment's build record; the browser and\n// native backends preserve them byte-for-byte.\nimport std.viz\n\nfn main() -> Void {\n    xs = linspace(0.0, 6.0, 25)\n    mut ys: List<Float> = []\n    for x in xs.to_list() {\n        ys.push(exp(0.0 - x / 4.0) * cos(2.4 * x))\n    }\n    fig = viz.figure(\"Reproducible damped signal\")\n        .describe(\"The SVG carries the source, data, seed and compiler record\")\n        .labels(\"time\", \"amplitude\")\n        .provenance(\n            \"sha256:6b96f1d1f4f1b955a7dff03d7bcf6af6e1f1ca5fbd1eea6fb3d7c2c7fb3c95d2\",\n            \"sha256:0a0e6b9b33e2b1bd3706d0b2d6e0f6e7a8e3e95d6b8a36b0c4c9d6af79c61d1a\",\n            \"2026-09-27T03:40Z / seed=42\",\n            \"ostrinc 0.1.0\"\n        )\n        .line(xs, array(ys), \"signal\", \"#2563eb\", 2.6, \"\")\n    print(fig.svg())\n}\n",

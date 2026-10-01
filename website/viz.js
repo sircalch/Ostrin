@@ -210,6 +210,13 @@ function downloadSvg(source, title) {
   downloadBlob(new Blob([source], { type: "image/svg+xml;charset=utf-8" }), `${fileStem(title)}.svg`);
 }
 
+async function downloadExperimentBundle(url, title) {
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) throw new Error(`experiment bundle unavailable (HTTP ${response.status})`);
+  const blob = await response.blob();
+  downloadBlob(blob, `${fileStem(title)}.ostrin-experiment.json`);
+}
+
 async function exportPng(source, title, fraction = 0, scale = 2) {
   const staticSource = staticSvgAt(source, fraction);
   const dimensions = svgDimensions(staticSource);
@@ -1528,6 +1535,21 @@ function card(figure) {
   const status = el("span", { className: "sl-status", text: "loading compiler…" });
   let liveSvg = null;
   const explore = el("button", { type: "button", className: "button-quiet", "data-viz-explore": figure.id, text: "Explore" });
+  const bundle = figure.bundle
+    ? el("button", { type: "button", className: "button-quiet", "aria-label": "Download experiment bundle", "data-viz-bundle": figure.id, text: "Bundle" })
+    : null;
+  bundle?.addEventListener("click", async () => {
+    bundle.disabled = true;
+    status.textContent = "preparing bundle…";
+    try {
+      await downloadExperimentBundle(figure.bundle, figure.title);
+      status.textContent = "bundle downloaded · R0";
+    } catch (error) {
+      status.textContent = error.message ?? String(error);
+    } finally {
+      bundle.disabled = false;
+    }
+  });
   explore.addEventListener("click", async () => {
     const text = liveSvg ?? await fetch(figure.svg).then((response) => response.text());
     const is3d = figure.code.includes("viz.scene3d(");
@@ -1593,7 +1615,7 @@ function card(figure) {
         el("h3", { text: figure.title }),
         el("p", { className: "muted", text: figure.blurb }),
         figure.printed.length ? printed : null,
-        el("div", { className: "sl-actions" }, [run, explore, status, el("a", { className: "text-link", href: figure.sourceUrl, text: "View source ↗" })]),
+        el("div", { className: "sl-actions" }, [run, explore, bundle, status, el("a", { className: "text-link", href: figure.sourceUrl, text: "View source ↗" })]),
         provenance,
         code,
       ]),

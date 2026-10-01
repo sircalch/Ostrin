@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { collectSiteFacts } from "./site-facts.mjs";
+import { verifyBundleFile } from "./experiment-bundle.mjs";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const websiteRoot = path.join(repositoryRoot, "website");
@@ -171,6 +172,14 @@ if (lab) {
     check(read(figure.source).replaceAll("\r\n", "\n") === figure.code, `viz ${figure.id}: code drifted from ${figure.source}; run node scripts/lab-data.mjs --write`);
     const svg = read(`website/${figure.svg}`);
     check(svg.startsWith("<svg") && svg.includes('xmlns="http://www.w3.org/2000/svg"') && svg.trimEnd().endsWith("</svg>"), `viz ${figure.id}: ${figure.svg} is not a recorded SVG`);
+    if (figure.bundle) {
+      const bundlePath = path.join(websiteRoot, figure.bundle);
+      check(existsSync(bundlePath), `viz ${figure.id}: experiment bundle ${figure.bundle} is missing`);
+      if (existsSync(bundlePath)) {
+        const bundleResult = verifyBundleFile(bundlePath);
+        for (const error of bundleResult.errors) check(false, `viz ${figure.id}: ${error}`);
+      }
+    }
   }
   const galleryById = new Map((lab.gallery ?? []).map((figure) => [figure.id, figure]));
   const workflows = lab.workflows ?? [];
@@ -195,6 +204,7 @@ if (lab) {
   for (const kind of ["figure", "table", "animation", "provenance"]) check(workflowKinds.has(kind), `featured workflows: missing ${kind} step`);
   check(read("website/viz.html").includes("data-viz-gallery"), "viz.html: missing gallery container");
   check(read("website/viz.html").includes("data-viz-workflows"), "viz.html: missing featured workflow container");
+  check(read("website/viz.js").includes("Download experiment bundle"), "viz.js: missing experiment bundle download control");
 }
 
 const reference = read("website/reference.html");

@@ -1,0 +1,11 @@
+{
+  "seed": 42,
+  "parameters": {
+    "start": 0.0,
+    "stop": 6.0,
+    "samples": 25,
+    "decay": 4.0,
+    "frequency": 2.4
+  },
+  "description": "Inputs for the deterministic damped signal provenance fixture."
+}
