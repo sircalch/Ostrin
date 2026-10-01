@@ -17,8 +17,10 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::ast::{BinOp, UnaryOp};
-use crate::ir::{BlockId, IrFunction, IrInstr, IrTerminator, ValueId};
+use crate::ast::{BinOp, RangeKind, UnaryOp};
+use crate::ir::{
+    BlockId, IrFunction, IrInstr, IrScalarPattern, IrScalarValue, IrTerminator, ValueId,
+};
 use crate::types::{dim_div, dim_is_dimensionless, dim_mul, dim_pow, Ty};
 
 type Bail<T> = Result<T, ()>;
@@ -235,6 +237,18 @@ fn enum_pattern_scalar(ty: &Ty) -> bool {
     )
 }
 
+fn scalar_pattern_value_code(value: &IrScalarValue) -> String {
+    match value {
+        IrScalarValue::Int(value) => format!("INT64_C({value})"),
+        IrScalarValue::Sized(value, kind) => {
+            format!("(({}){})", kind.c_type(), c_int_literal(*value))
+        }
+        IrScalarValue::Float(value) => format!("{value:?}"),
+        IrScalarValue::Float32(value) => format!("((float){value:e}f)"),
+        IrScalarValue::Bool(value) => value.to_string(),
+    }
+}
+
 fn plain_enum_value_supported(
     ty: &Ty,
     variants: &VariantFields,
@@ -363,6 +377,51 @@ fn nested_enum_field_code(
         current_ty = Ty::Named(field_c_type.clone());
     }
     None
+}
+
+fn enum_scalar_pattern_code(
+    subject_code: &str,
+    subject_ty: &Ty,
+    pattern: &IrScalarPattern,
+    variants: &VariantFields,
+    records: &RecordFields,
+) -> Option<String> {
+    let (path, ty, condition) = match pattern {
+        IrScalarPattern::Literal { path, value, ty } => {
+            (path, ty, format!("== {}", scalar_pattern_value_code(value)))
+        }
+        IrScalarPattern::Range {
+            path,
+            kind,
+            start,
+            end,
+            ty,
+        } => {
+            let upper = if *kind == RangeKind::To { "<=" } else { "<" };
+            (
+                path,
+                ty,
+                format!(
+                    ">= {} && {{value}} {upper} {}",
+                    scalar_pattern_value_code(start),
+                    scalar_pattern_value_code(end)
+                ),
+            )
+        }
+    };
+    let encoded_path: Vec<String> = path
+        .iter()
+        .map(|(variant, index)| format!("__ostrin_enum_field__{variant}__{index}"))
+        .collect();
+    let projected = nested_enum_field_code(
+        subject_code,
+        subject_ty,
+        &encoded_path,
+        ty,
+        variants,
+        records,
+    )?;
+    Some(format!("({projected}) {condition}").replace("{value}", &format!("({projected})")))
 }
 
 /// Project an enum field path whose final value is itself a plain enum.  The
@@ -3672,6 +3731,7 @@ fn emit_instruction(
             subject,
             pattern,
             enum_tests,
+            scalar_tests,
         } => {
             let subject_ty = value_ty(values, *subject)?;
             let subject = value_code(values, *subject)?;
@@ -3710,10 +3770,10 @@ fn emit_instruction(
                         records,
                         &mut HashSet::new(),
                     )
-                    && is_simple_enum_pattern(pattern)
-                    && !enum_tests.is_empty() =>
+                    && (is_simple_enum_pattern(pattern) || !scalar_tests.is_empty())
+                    && (!enum_tests.is_empty() || !scalar_tests.is_empty()) =>
                 {
-                    let mut conditions = Vec::with_capacity(enum_tests.len());
+                    let mut conditions = Vec::with_capacity(enum_tests.len() + scalar_tests.len());
                     for (path, name) in enum_tests {
                         let (projected, projected_ty) = nested_enum_projection_code(
                             &subject,
@@ -3732,6 +3792,18 @@ fn emit_instruction(
                             return Err(());
                         }
                         conditions.push(format!("({projected}).tag == {}", variant.tag));
+                    }
+                    for scalar_test in scalar_tests {
+                        conditions.push(
+                            enum_scalar_pattern_code(
+                                &subject,
+                                &subject_ty,
+                                scalar_test,
+                                variants,
+                                records,
+                            )
+                            .ok_or(())?,
+                        );
                     }
                     conditions.join(" && ")
                 }

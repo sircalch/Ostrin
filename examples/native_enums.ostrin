@@ -4,6 +4,12 @@ enum Shape {
     Origin
 }
 
+enum Token {
+    Number(Int)
+    Flag(Bool)
+    Done
+}
+
 fn area(shape: Shape) -> Int {
     match shape {
         Circle(radius) => radius * radius * 3,
@@ -21,6 +27,18 @@ fn classify(n: Int) -> String {
     }
 }
 
+fn classify_token(token: Token) -> String {
+    match token {
+        Number(0) => "zero token",
+        Number(1 to 3) => "small token",
+        Number(value) => value.to_string(),
+        Flag(true) => "yes token",
+        Flag(false) => "no token",
+        Done => "done token",
+        _ => "fallback token",
+    }
+}
+
 fn main() -> Void {
     print(area(Circle(radius: 3)))
     print(area(Rectangle(4, 5)))
@@ -30,4 +48,11 @@ fn main() -> Void {
     print(classify(5))
     print(classify(-3))
     print(classify(100))
+
+    print(classify_token(Number(0)))
+    print(classify_token(Number(2)))
+    print(classify_token(Number(9)))
+    print(classify_token(Flag(true)))
+    print(classify_token(Flag(false)))
+    print(classify_token(Done))
 }

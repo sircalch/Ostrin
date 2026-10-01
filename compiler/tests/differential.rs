@@ -416,8 +416,8 @@ fn native_backend_types_agree_with_the_checker() {
     // explicit IR lowering (the migration of the native backend).
     let native_generated = hir_generated + ir_generated;
     assert!(
-        native_generated >= 6491,
-        "only {native_generated} functions were generated from HIR/IR (expected at least 6491)"
+        native_generated >= 6492,
+        "only {native_generated} functions were generated from HIR/IR (expected at least 6492)"
     );
     println!("functions generated from HIR/IR: {native_generated} (HIR {hir_generated}, IR {ir_generated})");
     println!("functions still using AST fallback: {ast_fallback}");
@@ -474,10 +474,10 @@ fn native_backend_types_agree_with_the_checker() {
     // through the same IR/C path. HIR now
     // substitutes the concrete owner for `Self` in trait method signatures,
     // allowing Complex arithmetic/equality to use IR/C. The verified baseline is
-    // 58 AST fallbacks (6,491 HIR/IR-generated: 6,478 IR and 13 HIR functions). Plain non-generic enum
-    // constructors, fixed-width scalar payload bindings, unit variants, simple match tests and nested
-    // by-value enum patterns now use IR/C; managed payloads, generic enums and scalar literal/range
-    // patterns remain outside this slice. Shallow record patterns
+    // 58 AST fallbacks (6,492 HIR/IR-generated: 6,479 IR and 13 HIR functions). Plain non-generic enum
+    // constructors, fixed-width scalar payload bindings, unit variants, simple match tests, nested
+    // by-value enum patterns and scalar literal/range predicates now use IR/C; managed payloads and
+    // generic enums remain outside this slice. Shallow record patterns
     // with scalar fields now lower through the typed IR/C path. Numeric array selection
     // (`a[mask]`, `where`, `not`) now follows the same typed IR/C path. Trait default methods
     // now lower once per concrete impl through the same typed IR path, while
