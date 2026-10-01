@@ -109,8 +109,8 @@ selección `a[mask]`, `where(mask, a, b)`, `not` sobre máscaras, rebanadas `to`
 funciones elementales deterministas (idénticas en intérprete y nativo), LU/QR/SVD/Cholesky verificables y `std.numeric.Complex`
 experimental con operaciones aritméticas, forma polar, conjugado, magnitud, potencias enteras y matrices/vectores complejos densos con partes separadas.
 Los constructores `zeros`/`ones`, `norm`, `abs` escalar y `sqrt` también tienen lowering IR/C
-tipado; QR y Cholesky usan esos lowering sin caer al AST en sus consumidores medidos, mientras LU
-mantiene el fallback verificado de agregados.
+tipado; QR, Cholesky y LU usan esos lowering sin caer al AST en los consumidores medidos, mientras
+los agregados científicos que todavía no tienen representación IR conservan el fallback verificado.
 
 **Datos**: métodos de `String`, `parse_csv`; `Map` y `Set` usan índice hash para claves/elementos
 hashables, incluyendo colecciones estructurales, y conservan orden de iteración. Los records/enums
