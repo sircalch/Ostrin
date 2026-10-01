@@ -416,8 +416,8 @@ fn native_backend_types_agree_with_the_checker() {
     // explicit IR lowering (the migration of the native backend).
     let native_generated = hir_generated + ir_generated;
     assert!(
-        native_generated >= 6498,
-        "only {native_generated} functions were generated from HIR/IR (expected at least 6498)"
+        native_generated >= 6499,
+        "only {native_generated} functions were generated from HIR/IR (expected at least 6499)"
     );
     println!("functions generated from HIR/IR: {native_generated} (HIR {hir_generated}, IR {ir_generated})");
     println!("functions still using AST fallback: {ast_fallback}");
@@ -474,7 +474,7 @@ fn native_backend_types_agree_with_the_checker() {
     // through the same IR/C path. HIR now
     // substitutes the concrete owner for `Self` in trait method signatures,
     // allowing Complex arithmetic/equality to use IR/C. The verified baseline is
-    // 53 AST fallbacks (6,498 HIR/IR-generated: 6,485 IR and 13 HIR functions). Plain non-generic enum
+    // 52 AST fallbacks (6,499 HIR/IR-generated: 6,486 IR and 13 HIR functions). Plain non-generic enum
     // constructors, fixed-width scalar payload bindings, unit variants, simple match tests, nested
     // by-value enum patterns and scalar literal/range predicates now use IR/C; managed payloads and
     // generic enums remain outside this slice. Shallow record patterns
@@ -504,8 +504,10 @@ fn native_backend_types_agree_with_the_checker() {
     // The assertion builtins now lower through IR/C as well, covering the
     // three test helpers in both `testing.ostrin` and `testing_failure.ostrin`.
     // This removes six more fallback functions while preserving their exact
-    // failure messages and leak-check behavior.
-    const MAX_AST_FALLBACK_FUNCTIONS: usize = 53;
+    // failure messages and leak-check behavior. Numeric array negation now
+    // uses the generated `_neg` kernels too, removing the last fallback in
+    // `examples/array_syntax.ostrin`.
+    const MAX_AST_FALLBACK_FUNCTIONS: usize = 52;
     assert!(
         ast_fallback <= MAX_AST_FALLBACK_FUNCTIONS,
         "AST fallback grew to {ast_fallback} functions (ratchet limit {MAX_AST_FALLBACK_FUNCTIONS})"
