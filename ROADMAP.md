@@ -6,7 +6,7 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
 ## Siguiente ciclo
 
 1. Reducir el fallback AST con el trinquete por archivo de `--native-type-report` (baseline actual:
-   6.492 funciones generadas por HIR/IR (6.479 IR + 13 HIR) y 58 AST). Los patrones superficiales de records con campos escalares
+   6.498 funciones generadas por HIR/IR (6.485 IR + 13 HIR) y 53 AST). Los patrones superficiales de records con campos escalares
    y los enums no genéricos con payloads escalares, incluidos los enteros de ancho fijo, variantes unitarias, patrones simples y
    patrones anidados de enums por valor y sus literales/rangos escalares ya comparten IR/C; quedan pendientes los payloads
    gestionados y enums genéricos.
@@ -24,8 +24,9 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    explícito sobre sus series.
    La selección numérica `a[mask]`, `where(mask, a, b)`, `not` sobre `Array<Bool>` y los
    cortes `to`/`until` ya usan los kernels IR/C para `Int`, `Float`, `Float32` y `Bool`, con
-   temporales escalares de `where` liberados dentro del C generado; Quantity queda fuera de
-   esta pasada.
+   temporales escalares de `where` liberados dentro del C generado; la selección enmascarada
+   de `Array<Quantity<D>>` conserva su unidad mediante el mismo camino IR/C. `where` y otras
+   formas complejas sobre `Quantity` siguen fuera de esta pasada.
    El builtin `format` para `String` y `List<String>` ya cruza IR/C y `std.strings::format_text`
    dejó el fallback AST. `std.numeric.Complex` ya tiene una API experimental de `Float64` y una demo live; sus métodos de
    trait con `Self` se sustituyen en HIR y ya bajan a IR/C; `ComplexVector`

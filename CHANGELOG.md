@@ -12,14 +12,15 @@
 - Plain non-generic enum constructors, unit variants, scalar and fixed-width payload bindings,
   simple `match` tests and scalar literal/range predicates now lower through IR/C. Nested by-value
   enum patterns use the same path; managed payloads and generic enums remain outside this slice.
-- The differential ratchet now records **6,492 HIR/IR-generated functions (6,479 IR + 13 HIR) /
-  58 AST** functions.
+- The differential ratchet now records **6,498 HIR/IR-generated functions (6,485 IR + 13 HIR) /
+  53 AST** functions.
 
 ### Native IR: numeric array selection
 
 - `a[mask]`, `not` over `Array<Bool>`, `to`/`until` slices and `where(mask, a, b)`
   now lower through the typed IR/C array kernels for `Int`, `Float`, `Float32` and
-  `Bool`; `Quantity` arrays remain on their verified fallback for this pass.
+  `Bool`; masked selection for `Array<Quantity<D>>` now preserves its unit through
+  the same IR/C path, while `where` on `Quantity` remains outside this pass.
 - Scalar `where` operands are materialized as temporary arrays and released inside
   the generated C expression. The new regression covers interpreter/native/WASI
   emission parity and native `live_allocations=0`.
