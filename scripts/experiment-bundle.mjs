@@ -96,7 +96,7 @@ function fixtureCommit(root, fixture) {
   }
 }
 
-function normalizeFigureMetadata(svg, metadata) {
+export function normalizeFigureMetadata(svg, metadata) {
   const attributes = `source-hash="${metadata.sourceHash}" data-hash="${metadata.dataHash}" seed="seed=${metadata.seed}" compiler="${metadata.compiler}"`;
   const normalized = svg
     .replace(/source-hash="[^"]*"/, `source-hash="${metadata.sourceHash}"`)
@@ -107,17 +107,25 @@ function normalizeFigureMetadata(svg, metadata) {
   return normalized.replace("</svg>", `  <ostrin-provenance ${attributes} />\n</svg>`);
 }
 
-function bundleFiles(root, fixture) {
+export function metadataForFixture(fixtureId = defaultFixtureId, root = repositoryRoot) {
+  const fixture = fixtureFor(fixtureId);
   const source = normalizedText(root, fixture.sourcePath);
   const data = canonicalJson(JSON.parse(normalizedText(root, fixture.inputPath)));
-  const recordedFigure = normalizedText(root, fixture.figurePath);
   const inputs = JSON.parse(data);
-  const figure = normalizeFigureMetadata(recordedFigure, {
+  return {
     sourceHash: sha256(source),
     dataHash: sha256(data),
     seed: inputs.seed,
     compiler: `ostrinc ${compilerVersion(root)}`,
-  });
+  };
+}
+
+function bundleFiles(root, fixture) {
+  const source = normalizedText(root, fixture.sourcePath);
+  const data = canonicalJson(JSON.parse(normalizedText(root, fixture.inputPath)));
+  const recordedFigure = normalizedText(root, fixture.figurePath);
+  const metadata = metadataForFixture(fixture.id, root);
+  const figure = normalizeFigureMetadata(recordedFigure, metadata);
   return {
     "source.ostrin": source,
     "data.json": data,
@@ -143,11 +151,10 @@ function manifestFor(files) {
 }
 
 function provenanceFor(root, fixture, files, manifest) {
-  const source = files["source.ostrin"];
   const data = files["data.json"];
   const figure = files["figure.svg"];
   const inputs = JSON.parse(data);
-  const compiler = `ostrinc ${compilerVersion(root)}`;
+  const metadata = metadataForFixture(fixture.id, root);
   return {
     schema: "ostrin.provenance/v0",
     level: "R0",
@@ -157,13 +164,13 @@ function provenanceFor(root, fixture, files, manifest) {
     },
     program: {
       source: "source.ostrin",
-      source_hash: sha256(source),
+      source_hash: metadata.sourceHash,
       entry: "main",
     },
     inputs: [{
       id: "data.json",
       kind: "parameters",
-      sha256: sha256(data),
+      sha256: metadata.dataHash,
       seed: inputs.seed,
     }],
     outputs: [{
@@ -173,12 +180,12 @@ function provenanceFor(root, fixture, files, manifest) {
     }],
     figure_metadata: {
       policy: "The bundle generator normalizes the recorded SVG metadata to these calculated hashes; bundle manifest hashes are authoritative.",
-      source_hash: sha256(source),
-      data_hash: sha256(data),
+      source_hash: metadata.sourceHash,
+      data_hash: metadata.dataHash,
       seed: `seed=${inputs.seed}`,
-      compiler,
+      compiler: metadata.compiler,
     },
-    compiler,
+    compiler: metadata.compiler,
     commit: fixtureCommit(root, fixture),
     target: "wasm32-wasip1",
     command: "ostrinc --run --target wasm32-wasi source.ostrin",

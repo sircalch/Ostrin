@@ -2,10 +2,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
+import path from "node:path";
 import {
   buildExperimentBundle,
   experimentFixtures,
+  metadataForFixture,
+  normalizeFigureMetadata,
   outputPath,
+  repositoryRoot,
   outputPathFor,
   renderExperimentBundle,
   verifyBundleFile,
@@ -31,6 +35,34 @@ test("the v0 experiment bundle has calculated hashes and explicit R0/R1 labels",
   }
 });
 
+test("shared fixture metadata stays identical across normalized SVG and bundle", () => {
+  for (const id of Object.keys(experimentFixtures)) {
+    const metadata = metadataForFixture(id);
+    const bundle = buildExperimentBundle(id);
+    const normalized = normalizeFigureMetadata("<svg><ostrin-provenance source-hash=\"old\" data-hash=\"old\" seed=\"old\" compiler=\"old\"/></svg>", metadata);
+    const embedded = Object.fromEntries([...normalized.matchAll(/([a-z-]+)=\"([^\"]*)\"/g)].map(([, key, value]) => [key, value]));
+    assert.deepEqual(embedded, {
+      "source-hash": metadata.sourceHash,
+      "data-hash": metadata.dataHash,
+      seed: `seed=${metadata.seed}`,
+      compiler: metadata.compiler,
+    });
+    assert.equal(bundle.provenance.figure_metadata.source_hash, metadata.sourceHash);
+    assert.equal(bundle.provenance.figure_metadata.data_hash, metadata.dataHash);
+    assert.equal(bundle.provenance.figure_metadata.seed, `seed=${metadata.seed}`);
+    assert.equal(bundle.provenance.figure_metadata.compiler, metadata.compiler);
+
+    const visible = readFileSync(path.join(repositoryRoot, experimentFixtures[id].figurePath), "utf8");
+    const visibleAttributes = visible.match(/<ostrin-provenance\s+([^>]+?)\s*\/>/)?.[1] ?? "";
+    const visibleMetadata = Object.fromEntries([...visibleAttributes.matchAll(/([a-z-]+)=\"([^\"]*)\"/g)].map(([, key, value]) => [key, value]));
+    assert.deepEqual(visibleMetadata, {
+      "source-hash": bundle.provenance.figure_metadata.source_hash,
+      "data-hash": bundle.provenance.figure_metadata.data_hash,
+      seed: bundle.provenance.figure_metadata.seed,
+      compiler: bundle.provenance.figure_metadata.compiler,
+    });
+  }
+});
 test("the fixture registry stays source-backed and parameterizable", () => {
   const fixture = experimentFixtures.provenance;
   assert.ok(fixture);

@@ -15,6 +15,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 import { collectSiteFacts, repositoryRoot } from "./site-facts.mjs";
+import { experimentFixtures, metadataForFixture, normalizeFigureMetadata } from "./experiment-bundle.mjs";
 
 const repository = "https://github.com/sircalch/Ostrin";
 const wasmPath = path.join(repositoryRoot, "website", "ostrinc.wasm");
@@ -419,7 +420,13 @@ export async function buildLabData() {
     const end = output.findIndex((line, index) => index >= start && line === "</svg>");
     if (start < 0 || end < 0) throw new Error(`${figure.file}: expected one SVG figure in the output`);
     const svgPath = `assets/viz/${figure.id}.svg`;
-    const svg = `${output.slice(start, end + 1).join("\n")}\n`;
+    const rawSvg = `${output.slice(start, end + 1).join("\n")}\n`;
+    const fixture = Object.values(experimentFixtures).find((candidate) => candidate.sourcePath === figure.file);
+    // Experiment fixtures use the same calculated metadata as their downloadable bundle.
+    // R0 remains a recorded artifact: this only removes drift between published surfaces.
+    const svg = fixture
+      ? normalizeFigureMetadata(rawSvg, metadataForFixture(fixture.id))
+      : rawSvg;
     figures[svgPath] = svg;
     const provenanceAttributes = svg.match(/<ostrin-provenance\s+([^>]+?)\s*\/>/)?.[1] ?? "";
     const provenance = Object.fromEntries([...provenanceAttributes.matchAll(/([a-z-]+)="([^"]*)"/g)].map(([, key, value]) => [key, value]));
