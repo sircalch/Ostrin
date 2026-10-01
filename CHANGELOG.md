@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Native IR: scalar record patterns
+
+- Shallow patterns for concrete records with scalar `Int`, sized integer, `Float`, `Bool` and
+  `Quantity` fields now lower through IR/C, including generic record fields whose types are
+  resolved from HIR metadata.
+- Added interpreter/native/WASI parity and native leak-check coverage for nested record patterns;
+  fresh record literals passed to ordinary HIR calls are released after the call.
+- The differential ratchet now records **6,468 IR / 21 HIR / 60 AST** functions.
+
 ### Native IR: numeric array selection
 
 - `a[mask]`, `not` over `Array<Bool>`, `to`/`until` slices and `where(mask, a, b)`
@@ -18,7 +27,7 @@
 - HIR tracks managed references nested inside `Option` and `Result` values and
   releases owned temporaries passed to `List.push` and list literals.
 - Added interpreter/native/WASI parity and native leak-check coverage; the
-  compiler suite now has **259 integration tests**.
+  compiler suite now has **260 integration tests**.
 
 ### Web: featured scientific workflows
 

@@ -24,6 +24,11 @@ pub struct HirProgram {
     /// Receiver pattern and element type for each user-defined `Iterator<T>` impl.
     /// Generic receiver patterns are specialized at the IR boundary.
     pub iterator_items: HashMap<String, IteratorInfo>,
+    /// Source record declarations, retained for IR pattern lowering. Field
+    /// types use `Ty::Named` for generic parameters and are instantiated when
+    /// the IR sees a concrete `Record<Args>` type.
+    pub record_fields: HashMap<String, Vec<(String, Ty)>>,
+    pub record_generics: HashMap<String, Vec<String>>,
 }
 
 #[derive(Debug, Clone)]
@@ -656,6 +661,8 @@ pub fn lower<'a>(items: &'a [Item], typed: &'a TypedProgram) -> HirProgram {
         variants: Default::default(),
     };
     let mut arities = std::collections::HashMap::new();
+    let mut record_fields = HashMap::new();
+    let mut record_generics = HashMap::new();
     for item in items {
         match item {
             Item::Function(f) => {
@@ -682,6 +689,24 @@ pub fn lower<'a>(items: &'a [Item], typed: &'a TypedProgram) -> HirProgram {
                     );
                     arities.insert(v.name.clone(), v.fields.len());
                 }
+            }
+            Item::Record(record) => {
+                record_fields.insert(
+                    record.name.clone(),
+                    record
+                        .fields
+                        .iter()
+                        .map(|field| (field.name.clone(), crate::typeck::resolve_type(&field.ty)))
+                        .collect(),
+                );
+                record_generics.insert(
+                    record.name.clone(),
+                    record
+                        .generics
+                        .iter()
+                        .map(|generic| generic.name.clone())
+                        .collect(),
+                );
             }
             _ => {}
         }
@@ -848,6 +873,8 @@ pub fn lower<'a>(items: &'a [Item], typed: &'a TypedProgram) -> HirProgram {
         functions,
         arities,
         iterator_items,
+        record_fields,
+        record_generics,
     }
 }
 

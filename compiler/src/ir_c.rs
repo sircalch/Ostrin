@@ -186,6 +186,50 @@ fn quantity(ty: &Ty) -> bool {
     matches!(ty, Ty::Quantity(_))
 }
 
+/// The first record-pattern slice is deliberately limited to values whose C
+/// representation can be copied without touching managed ownership.  The HIR
+/// and AST emitters already handle richer fields; keeping this predicate
+/// narrow lets the IR emitter migrate the scalar cases without inventing a
+/// second ownership protocol for nested patterns.
+fn record_pattern_scalar(ty: &Ty) -> bool {
+    matches!(
+        ty,
+        Ty::Int | Ty::Float | Ty::Float32 | Ty::Sized(_) | Ty::Bool | Ty::Quantity(_)
+    )
+}
+
+/// Returns the source-level constructor name from the debug representation
+/// stored by `IrInstr::PatternTest`.  Record patterns are represented as
+/// `Variant("Record", [...])`, just like enum payload patterns, so the C
+/// emitter must verify the subject type before treating one as a record.
+fn record_pattern_name(pattern: &str) -> Option<&str> {
+    let rest = pattern.strip_prefix("Variant(\"")?;
+    let end = rest.find("\", [")?;
+    Some(&rest[..end])
+}
+
+/// Only accept one-level record patterns.  Nested variants, literals and
+/// ranges require their own runtime representation and remain on HIR/AST.
+fn is_shallow_record_pattern(pattern: &str) -> bool {
+    pattern.starts_with("Variant(\"")
+        && pattern.matches("Variant(\"").count() == 1
+        && !pattern.contains("Literal(")
+        && !pattern.contains("Range(")
+        && !pattern.contains("Ident(\"None\")")
+}
+
+fn record_pattern_type(pattern: &str, subject_ty: &Ty, records: &RecordFields) -> Option<String> {
+    if !is_shallow_record_pattern(pattern) {
+        return None;
+    }
+    let pattern_name = record_pattern_name(pattern)?;
+    let record = record_name(subject_ty, records)?;
+    let base = record
+        .split_once("__")
+        .map_or(record.as_str(), |(base, _)| base);
+    (pattern_name == base).then_some(record)
+}
+
 fn array_element(ty: &Ty) -> Option<&Ty> {
     match ty {
         Ty::Applied(name, args) if name == "Array" && args.len() == 1 => Some(&args[0]),
@@ -3405,32 +3449,42 @@ fn emit_instruction(
             subject,
             pattern,
         } => {
-            let Ty::Applied(name, args) = value_ty(values, *subject)? else {
-                return Err(());
-            };
+            let subject_ty = value_ty(values, *subject)?;
             let subject = value_code(values, *subject)?;
-            let test = if name == "Option" && args.len() == 1 && option_supported(&args[0], records)
-            {
-                if pattern == "Ident(\"None\")" {
-                    format!("!({subject}).has")
-                } else if pattern.starts_with("Variant(\"Some\",") {
-                    format!("({subject}).has")
-                } else {
-                    return Err(());
+            let test = match &subject_ty {
+                Ty::Applied(name, args)
+                    if name == "Option"
+                        && args.len() == 1
+                        && option_supported(&args[0], records) =>
+                {
+                    if pattern == "Ident(\"None\")" {
+                        format!("!({subject}).has")
+                    } else if pattern.starts_with("Variant(\"Some\",") {
+                        format!("({subject}).has")
+                    } else {
+                        return Err(());
+                    }
                 }
-            } else if name == "Result"
-                && args.len() == 2
-                && result_supported(&args[0], &args[1], records)
-            {
-                if pattern.starts_with("Variant(\"Ok\",") {
-                    format!("({subject}).ok")
-                } else if pattern.starts_with("Variant(\"Err\",") {
-                    format!("!({subject}).ok")
-                } else {
-                    return Err(());
+                Ty::Applied(name, args)
+                    if name == "Result"
+                        && args.len() == 2
+                        && result_supported(&args[0], &args[1], records) =>
+                {
+                    if pattern.starts_with("Variant(\"Ok\",") {
+                        format!("({subject}).ok")
+                    } else if pattern.starts_with("Variant(\"Err\",") {
+                        format!("!({subject}).ok")
+                    } else {
+                        return Err(());
+                    }
                 }
-            } else {
-                return Err(());
+                _ if record_pattern_type(pattern, &subject_ty, records).is_some() => {
+                    // A checked record pattern has a single concrete record
+                    // type, so its runtime test is true. Field names and
+                    // binding types are validated by `PatternBind` below.
+                    "true".to_string()
+                }
+                _ => return Err(()),
             };
             out.push_str(&format!("    {} = {test};\n", value_name(*dst)));
         }
@@ -3445,34 +3499,48 @@ fn emit_instruction(
             let (code, bound_ty) = if path.is_empty() {
                 (value_code(values, *subject)?, subject_ty)
             } else {
-                let Ty::Applied(name, args) = subject_ty else {
-                    return Err(());
-                };
-                if name == "Option"
-                    && args.len() == 1
-                    && option_supported(&args[0], records)
-                    && path.len() == 1
-                {
-                    (
-                        format!("({}).value", value_code(values, *subject)?),
-                        args[0].clone(),
-                    )
-                } else if name == "Result"
-                    && args.len() == 2
-                    && result_supported(&args[0], &args[1], records)
-                    && path.len() == 2
-                {
-                    let field = match path[0].as_str() {
-                        "Ok" => ("value", args[0].clone()),
-                        "Err" => ("error", args[1].clone()),
-                        _ => return Err(()),
-                    };
-                    (
-                        format!("({}).{}", value_code(values, *subject)?, field.0),
-                        field.1,
-                    )
-                } else {
-                    return Err(());
+                match &subject_ty {
+                    Ty::Applied(name, args)
+                        if name == "Option"
+                            && args.len() == 1
+                            && option_supported(&args[0], records)
+                            && path.len() == 1 =>
+                    {
+                        (
+                            format!("({}).value", value_code(values, *subject)?),
+                            args[0].clone(),
+                        )
+                    }
+                    Ty::Applied(name, args)
+                        if name == "Result"
+                            && args.len() == 2
+                            && result_supported(&args[0], &args[1], records)
+                            && path.len() == 2 =>
+                    {
+                        let field = match path[0].as_str() {
+                            "Ok" => ("value", args[0].clone()),
+                            "Err" => ("error", args[1].clone()),
+                            _ => return Err(()),
+                        };
+                        (
+                            format!("({}).{}", value_code(values, *subject)?, field.0),
+                            field.1,
+                        )
+                    }
+                    _ if path.len() == 1
+                        && record_pattern_scalar(ty)
+                        && record_name(&subject_ty, records).is_some_and(|record| {
+                            records
+                                .get(&record)
+                                .is_some_and(|fields| fields.iter().any(|field| field == &path[0]))
+                        }) =>
+                    {
+                        (
+                            format!("({})->{}", value_code(values, *subject)?, path[0]),
+                            ty.clone(),
+                        )
+                    }
+                    _ => return Err(()),
                 }
             };
             if bound_ty != *ty {

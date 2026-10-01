@@ -8906,6 +8906,86 @@ fn generic_enum_and_record_patterns_are_instantiated() {
 }
 
 #[test]
+fn native_ir_record_patterns_match_interpreter_native_and_wasi() {
+    for (file, expected_report, marker) in [
+        (
+            "match_nested.ostrin",
+            "native-source: examples/match_nested.ostrin ir=1 hir=2 ast=0",
+            "(__ir_v0)->x",
+        ),
+        (
+            "generic_nested_patterns.ostrin",
+            "native-source: examples/generic_nested_patterns.ostrin ir=1 hir=2 ast=1",
+            "(__ir_v0)->first",
+        ),
+    ] {
+        let file_path = example_path(file);
+        let interpreted = run(&["--run", &file_path]);
+        assert!(
+            interpreted.status.success(),
+            "interpreter failed for {file}: {}",
+            stderr(&interpreted)
+        );
+        let expected = stdout(&interpreted).replace("\r\n", "\n");
+
+        let report = run(&["--native-type-report", &file_path]);
+        assert!(
+            report.status.success(),
+            "native type report failed for {file}: {}",
+            stderr(&report)
+        );
+        assert!(
+            stdout(&report).contains(expected_report),
+            "record pattern did not use the IR emitter for {file}: {}",
+            stdout(&report)
+        );
+
+        let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file_path]);
+        assert!(
+            wasi.status.success(),
+            "WASI record pattern emission failed for {file}: {}",
+            stderr(&wasi)
+        );
+        let wasi_source = stdout(&wasi);
+        assert!(
+            wasi_source.contains(marker),
+            "WASI C omitted the IR record field projection for {file}: {marker}"
+        );
+        assert!(
+            !wasi_source.contains("#define OSTRIN_NATIVE_THREADS"),
+            "WASI record pattern emission unexpectedly enabled native threads for {file}"
+        );
+
+        let exe = temp_artifact(&format!("record-pattern-{file}.exe"));
+        let compile = run(&["--compile", "--leak-check", "--out", &exe, &file_path]);
+        assert!(
+            compile.status.success(),
+            "native record pattern compile failed for {file}: {}",
+            stderr(&compile)
+        );
+        let native = Command::new(&exe)
+            .output()
+            .expect("failed to run native record pattern binary");
+        let _ = fs::remove_file(&exe);
+        assert!(
+            native.status.success(),
+            "native record pattern binary failed for {file}: {}",
+            String::from_utf8_lossy(&native.stderr)
+        );
+        assert_eq!(
+            String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+            expected,
+            "native record pattern output mismatch for {file}"
+        );
+        assert!(
+            String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+            "native record pattern leaked for {file}: {}",
+            String::from_utf8_lossy(&native.stderr)
+        );
+    }
+}
+
+#[test]
 fn nested_generic_match_reports_missing_inner_combination() {
     let out = run(&[&example_path("generic_nested_patterns_error.ostrin")]);
     assert!(!out.status.success());
