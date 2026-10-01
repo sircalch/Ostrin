@@ -1,0 +1,9 @@
+fn select_lengths(values: Array<Quantity<Length>>, mask: Array<Bool>) -> Array<Quantity<Length>> {
+    values[mask]
+}
+
+fn main() -> Void {
+    values = array([1 m, 2 m, 3 m])
+    mask = array([true, false, true])
+    print(select_lengths(values, mask))
+}
