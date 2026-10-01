@@ -159,6 +159,70 @@ La procedencia no es la incertidumbre. Puede registrar opcionalmente:
 La procedencia debe ser un metadato compartido o de artefacto. No debe hacer que cada `Float`
 lleve una estructura pesada cuando el usuario no la solicita.
 
+### 5.5 Contrato propuesto para identidad de fuentes y composición
+
+Esta sección fija una decisión de diseño para la siguiente fase; no describe una capacidad ya
+implementada. La implementación escalar actual usa `Sensitivity.label` como clave de correlación:
+dos elementos con la misma etiqueta se combinan y una etiqueta reutilizada con otra `sigma` produce
+un error. La prueba `std_measurements_scalar_matches_interpreter_and_native` y
+`examples/measurement_scalar.ostrin` respaldan esa semántica provisional, pero una etiqueta humana
+no es una identidad suficiente para una API vectorial.
+
+La representación futura debe separar tres conceptos:
+
+| Concepto | Contrato propuesto |
+| --- | --- |
+| Identidad de fuente | Referencia opaca, estable dentro de una evaluación y preservada al copiar, mover, cortar o derivar una medición. No depende de una dirección de memoria, un timestamp ni del orden accidental de un recorrido. |
+| Etiqueta | Texto opcional para mostrar el instrumento o el dato. Dos fuentes pueden compartir etiqueta sin quedar correlacionadas. |
+| Nodo derivado | Expresión que conserva las referencias de fuente y sus sensibilidades; no duplica la identidad al hacer una copia del valor. |
+
+La construcción de una fuente debe declarar si crea una fuente nueva o reutiliza una referencia
+existente. Una etiqueta repetida no debe crear alias implícitos en la API final. Durante la migración,
+`standard(value, sigma, label)` conserva la regla escalar vigente y seguirá documentada como una
+conveniencia experimental; el constructor explícito de fuentes será el requisito para arrays y
+covarianzas. La serialización de una evaluación podrá incluir una clave estable suministrada por el
+usuario, pero no expondrá punteros ni convertirá una etiqueta en identidad global entre ejecuciones.
+
+Para `Array<Measurement<T>>` se adopta el siguiente contrato de composición:
+
+- Cada elemento conserva su grafo de fuentes; la posición del elemento no es una fuente implícita.
+- `slice`, `map`, concatenación y vistas preservan las referencias de las mediciones que reciben.
+- Crear observaciones independientes dentro de un array exige una política explícita de fuentes;
+  copiar el array no crea observaciones nuevas.
+- `values` y `uncertainties` siguen siendo proyecciones ordenadas. Una reducción vuelve a construir
+  el grafo y suma sensibilidades por identidad, de modo que una fuente compartida no se trate como
+  independiente.
+- La matriz de covarianza se expresa sobre un orden canónico de identidades de fuente, separado del
+  orden de los elementos del array. Esto permite usar una matriz densa para un bloque pequeño y una
+  representación dispersa para un conjunto grande sin cambiar el significado.
+
+La primera representación de covarianza debe validar valores finitos, simetría y semidefinitud
+positiva dentro de una tolerancia documentada. Las entradas diagonales de fuentes independientes
+pueden derivarse de `sigma²`; las covarianzas fuera de la diagonal requieren una declaración
+explícita. Una matriz inválida produce un diagnóstico; no se corrige silenciosamente. La
+propagación linealizada sigue siendo `J · Σ · Jᵀ`, y el resultado conserva el orden de fuentes para
+exponer contribuciones y permitir una serialización determinista.
+
+La composición con `Quantity<D>` queda definida por tipos antes de elegir una representación de
+runtime:
+
+- `Measurement<Quantity<D>>` tiene incertidumbre de dimensión `D`; una incertidumbre de otra
+  dimensión es un error de tipos.
+- Una conversión de unidad transforma el valor nominal y su incertidumbre con la misma conversión,
+  incluyendo la regla específica de unidades con offset.
+- Suma y resta requieren dimensiones compatibles. Producto, cociente y potencias transforman la
+  dimensión resultante y la dimensión de cada sensibilidad según la derivada de la operación.
+- La unidad concreta de un `Quantity` no se usa como identidad de fuente. El instrumento o dataset
+  debe declararse por separado.
+- `Measurement<Quantity<D>>` no se convierte implícitamente a `Quantity<D>`; una proyección debe
+  indicar que descarta la incertidumbre.
+
+Este contrato no habilita todavía `Array<Measurement<T>>`, covarianza ni `Measurement<Quantity<D>>`.
+Antes de implementar cualquiera de ellas se requieren pruebas de alias explícito, independencia de
+etiquetas repetidas, reducciones con fuentes compartidas, validación de covarianza, conversiones de
+unidades y paridad intérprete/native/WASM. También se necesitan leak-check, ASan y UBSan para los
+buffers o grafos gestionados.
+
 ## 6. Operaciones y reglas
 
 ### 6.1 Operaciones algebraicas
@@ -190,14 +254,16 @@ tolerancia documentados.
 
 ### 6.4 Arrays y matrices
 
-`Array<Measurement<T>>` puede ser la primera superficie de arrays. La API de series ya ofrece una
-proyección explícita para `List<Measurement<Float>>`; la API de arrays debe ofrecer después:
+`Array<Measurement<T>>` puede ser la primera superficie de arrays después de fijar el contrato de
+identidad de §5.5. La API de series ya ofrece una proyección explícita para
+`List<Measurement<Float>>`; la API de arrays debe ofrecer después:
 
 - valores nominales;
 - incertidumbres por elemento;
-- matriz de covarianza cuando el modelo la requiera;
+- matriz de covarianza indexada por fuentes, cuando el modelo la requiera;
 - reducciones que respeten correlaciones;
-- vistas sin copiar metadatos innecesariamente.
+- vistas sin copiar metadatos innecesariamente;
+- una política explícita para crear fuentes nuevas por elemento.
 
 Una reducción no puede sumar desviaciones como si todos los elementos fueran independientes si
 el grafo de fuentes demuestra lo contrario.
