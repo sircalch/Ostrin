@@ -296,7 +296,7 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   await expect(page.locator(".viz-status")).toContainText("print-ready PDF export");
   await expect(page.locator("#viz-provenance .sl-provenance")).toContainText("source sha256:");
   const bundleDownloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Download experiment bundle" }).click();
+  await page.locator("#viz-provenance").getByRole("button", { name: "Download experiment bundle" }).click();
   const bundleDownload = await bundleDownloadPromise;
   expect(bundleDownload.suggestedFilename()).toBe("reproducible-provenance.ostrin-experiment.json");
   const bundle = JSON.parse(await readFile(await bundleDownload.path(), "utf8"));
