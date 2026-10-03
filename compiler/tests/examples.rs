@@ -7747,6 +7747,102 @@ fn main() -> Void {
 }
 
 #[test]
+fn native_ir_list_map_set_ownership() {
+    let file = temp_source(
+        "native-ir-list-map-set.ostrin",
+        r#"
+fn main() -> Void {
+    mut maps: List<Map<Int, String>> = []
+    mut first_map = Map<Int, String>()
+    first_map.set(1, "one " + "value")
+    maps.push(first_map)
+
+    mut sets: List<Set<Int>> = []
+    mut first_set = Set<Int>()
+    first_set.add(7)
+    sets.push(first_set)
+
+    print(maps[0].get(1).unwrap())
+    print(maps[0].contains_key(1))
+    print(sets[0].contains(7))
+    print(sets[0].count())
+}
+"#,
+    );
+    let expected = "one value\ntrue\ntrue\n1\n";
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    if skip_if_no_c_compiler(&report) {
+        let _ = fs::remove_file(&file);
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("ir-generated: 1")
+            && report_text.contains("hir-generated: 0")
+            && report_text.contains("ast-fallback: 0"),
+        "List<Map<Int, String>>/List<Set<Int>> did not use the IR path: {report_text}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "List<Map<Int, String>>/List<Set<Int>> WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("struct List_Map_Int_String")
+            && wasi_source.contains("List_Map_Int_String_push")
+            && wasi_source.contains("struct List_Set_Int")
+            && wasi_source.contains("List_Set_Int_push")
+            && wasi_source.contains("ostrin_retain")
+            && wasi_source.contains("ostrin_release"),
+        "WASI C omitted nested map/set list ownership helpers"
+    );
+
+    let exe = temp_artifact("native-ir-list-map-set.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    assert!(
+        compile.status.success(),
+        "native leak-check compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run List<Map>/List<Set> binary");
+    let _ = fs::remove_file(&exe);
+    let _ = fs::remove_file(&file);
+    assert!(
+        native.status.success(),
+        "native List<Map>/List<Set> run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "List<Map<Int, String>>/List<Set<Int>> leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn native_ir_handles_captured_closures_core() {
     // Captured closures, including a nested closure with a transitive
     // environment, a named function used as a value and the list combinators
