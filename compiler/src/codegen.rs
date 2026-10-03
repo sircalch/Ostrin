@@ -4357,6 +4357,7 @@ impl<'a> Codegen<'a> {
         recorded: &crate::typeck::CallSubst,
     ) -> Option<String> {
         let decl = self.generic_functions.get(name).copied()?;
+        self.type_report.calls_from_checker += 1;
         let mut subst = HashMap::new();
         let mut hir_subst = HashMap::new();
         for generic in &decl.generics {
@@ -9013,41 +9014,20 @@ fn generate_impl(
     let record_names: HashSet<String> = records.iter().map(|r| r.name.clone()).collect();
     let enum_names: HashSet<String> = enums.iter().map(|e| e.name.clone()).collect();
     let trait_names: HashSet<String> = traits.iter().map(|t| t.name.clone()).collect();
-    let hir = typed.map(|t| crate::hir::lower(items, t));
+    let mut hir = typed.map(|t| crate::hir::lower(items, t));
     // The first IR-backed C emitter is deliberately conservative. It receives
     // the ownership-lowered IR, so the backend already has a single place to
     // consume future retain/release facts as managed families are migrated.
-    let (ir, ir_unresolved) = match hir
-        .as_ref()
-        .map(|program| crate::ownership::lower_linear(&crate::ir::lower(program)))
-    {
-        Some((program, summary)) => (Some(program), summary.unresolved_functions),
-        None => (None, HashSet::new()),
-    };
+    // The actual lowering happens after the checker-recorded generic-call
+    // prepass below, so HIR is lowered only once with concrete callees.
+    let mut ir: Option<crate::ir::IrProgram> = None;
+    let mut ir_unresolved = HashSet::new();
     let non_generic_function_names: HashSet<String> = functions
         .iter()
         .filter(|function| function.generics.is_empty())
         .map(|function| function.name.clone())
         .collect();
-    let mut ir_functions: crate::ir_c::FunctionNames = ir
-        .as_ref()
-        .into_iter()
-        .flat_map(|program| {
-            program
-                .functions
-                .iter()
-                .filter(|function| {
-                    non_generic_function_names.contains(&function.name)
-                        && !ir_unresolved.contains(&function.name)
-                        && !function
-                            .params
-                            .iter()
-                            .any(|(_, ty)| matches!(ty, Ty::Dyn(_)))
-                        && !matches!(function.ret, Ty::Dyn(_))
-                })
-                .map(|function| (function.name.clone(), c_function_name(&function.name)))
-        })
-        .collect();
+    let mut ir_functions: crate::ir_c::FunctionNames = HashMap::new();
     let mut codegen = Codegen {
         signatures: HashMap::new(),
         generic_functions: HashMap::new(),
@@ -9248,6 +9228,61 @@ fn generate_impl(
         codegen.register_impl_methods(im, &im.type_name, &self_ty, &self_subst, false);
     }
 
+    // Resolve checker-recorded generic calls in ordinary HIR functions before
+    // lowering the program to explicit IR.  The legacy ordering discovered
+    // generic instances only while emitting AST/HIR bodies, which meant an
+    // otherwise IR-safe caller still fell back when its callee had not yet
+    // acquired a monomorphized C name.  The resolver uses the exact
+    // substitutions recorded by the checker, queues each concrete instance,
+    // and rewrites the HIR callee to that stable symbol before IR lowering.
+    // Generic method calls remain lazy in this first slice; their established
+    // HIR/AST path is unchanged until the method table can be updated in the
+    // same prepass.
+    if let Some(program) = hir.as_mut() {
+        for function in &mut program.functions {
+            if !non_generic_function_names.contains(&function.name) {
+                continue;
+            }
+            let mut resolver = |call: crate::hir::GenericCall<'_>| match call {
+                crate::hir::GenericCall::Function { name, subst } => {
+                    codegen.ensure_hir_generic_instance(name, subst)
+                }
+                crate::hir::GenericCall::Method { .. } => None,
+            };
+            crate::hir::resolve_generic_calls(function, &mut resolver);
+        }
+        codegen.flush_instances()?;
+        let (resolved, summary) = crate::ownership::lower_linear(&crate::ir::lower(program));
+        ir = Some(resolved);
+        ir_unresolved = summary.unresolved_functions;
+        ir_functions = ir
+            .as_ref()
+            .into_iter()
+            .flat_map(|program| {
+                program
+                    .functions
+                    .iter()
+                    .filter(|function| {
+                        non_generic_function_names.contains(&function.name)
+                            && !ir_unresolved.contains(&function.name)
+                            && !function
+                                .params
+                                .iter()
+                                .any(|(_, ty)| matches!(ty, Ty::Dyn(_)))
+                            && !matches!(function.ret, Ty::Dyn(_))
+                    })
+                    .map(|function| (function.name.clone(), c_function_name(&function.name)))
+            })
+            .collect();
+        ir_functions.extend(
+            codegen
+                .instantiations
+                .keys()
+                .cloned()
+                .map(|name| (name.clone(), name)),
+        );
+    }
+
     codegen.flush_instances()?;
 
     let mut out = String::new();
@@ -9355,6 +9390,15 @@ fn generate_impl(
         closure_bodies: std::cell::RefCell::new(Vec::new()),
         closure_counter: std::cell::Cell::new(0),
     };
+    for (name, (params, ret)) in &codegen.instantiations {
+        hir_world.functions.insert(
+            name.clone(),
+            (params.iter().map(c_type_name).collect(), c_type_name(ret)),
+        );
+        hir_world
+            .function_c_names
+            .insert(name.clone(), name.clone());
+    }
     if let Some(program) = &hir {
         codegen.register_hir_types(program);
         codegen.sync_hir_instances(&mut hir_world);

@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Native IR: checker-resolved generic calls
+
+- Ordinary HIR functions now resolve checker-recorded generic call
+  substitutions before the explicit IR is built. Concrete instantiations are
+  queued once and their C symbols are visible to the caller, so
+  `numeric_units.ostrin` no longer needs an AST entry-point fallback.
+- Interpreter/native/WASI parity remains covered, and the differential ratchet
+  advances to **6,512 HIR/IR-generated functions (6,498 IR + 14 HIR) / 39 AST**
+  functions.
+
 ### Native IR: array and quantity string formatting
 
 - `Array<Float32>.to_string()` now uses the generated native show helper from

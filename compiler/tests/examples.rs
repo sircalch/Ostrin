@@ -9583,7 +9583,7 @@ fn native_ir_record_patterns_match_interpreter_native_and_wasi() {
         ),
         (
             "generic_nested_patterns.ostrin",
-            "native-source: examples/generic_nested_patterns.ostrin ir=1 hir=2 ast=1",
+            "native-source: examples/generic_nested_patterns.ostrin ir=1 hir=3 ast=0",
             "(__ir_v0)->first",
         ),
     ] {
@@ -11713,6 +11713,16 @@ fn std_numeric_quantity_arrays_use_the_ir_boundary() {
             && numeric_source.contains("hir=0")
             && numeric_source.contains("ast=0"),
         "quantity-array IR coverage regressed: {numeric_source}"
+    );
+    let entry_source = report_text
+        .lines()
+        .find(|line| line.starts_with("native-source: examples/numeric_units.ostrin "))
+        .unwrap_or_else(|| panic!("missing numeric_units source report: {report_text}"));
+    assert!(
+        entry_source.contains("ir=1")
+            && entry_source.contains("hir=0")
+            && entry_source.contains("ast=0"),
+        "generic-call IR prepass regressed: {entry_source}"
     );
 }
 
