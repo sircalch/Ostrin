@@ -71,6 +71,7 @@ test("public pages expose a keyboard skip link", async ({ page }) => {
     await skipLink.focus();
     await page.keyboard.press("Enter");
     await expect(page.locator("#main-content")).toBeFocused();
+    await expect(page.locator("#main-content")).toHaveCSS("outline-width", "2px");
   }
 });
 
