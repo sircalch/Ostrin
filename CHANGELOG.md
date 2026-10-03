@@ -18,6 +18,14 @@
 - The regression covers both managed branches, interpreter/native parity,
   WASI C emission and a native leak-check with `live_allocations=0`.
 
+### Native IR: lists of maps and sets
+
+- `List<Map<K, V>>` and `List<Set<T>>` now lower through the typed IR/C path
+  for the scalar key, value and element families already supported by the
+  native map and set runtimes.
+- The regression covers nested collection ownership, interpreter/native
+  parity, WASI C emission and a native leak-check with `live_allocations=0`.
+
 ### Native IR: Float32 array scalar promotion
 
 - `Array<Float32>` arithmetic with the checker-approved `Float` scalar promotion now uses

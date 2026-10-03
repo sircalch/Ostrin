@@ -555,6 +555,8 @@ fn list_supported(ty: &Ty, records: &RecordFields) -> bool {
         // leaves scalar `None` entries untouched.
         || matches!(ty, Ty::Applied(name, args) if name == "Option" && args.len() == 1 && option_supported(&args[0], records))
         || matches!(ty, Ty::Applied(name, args) if name == "Result" && args.len() == 2 && result_supported(&args[0], &args[1], records))
+        || matches!(ty, Ty::Map(key, value) if map_supported(key, value))
+        || matches!(ty, Ty::Set(element) if set_supported(element))
 }
 
 fn map_supported(key: &Ty, value: &Ty) -> bool {
