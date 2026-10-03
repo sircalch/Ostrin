@@ -7,6 +7,8 @@ enteros de ancho fijo desde esa IR. Las familias gestionadas `String` (incluidos
 con elementos escalares, las operaciones escalares de `Map<K,V>`/`Set<T>`, records concretos
 y `Option`/`Result` con payload escalar, `String`, `Record`, una colección escalar
 (`List`/`Map`/`Set`) u otro wrapper `Option`/`Result` también atraviesan ya el emisor IR.
+La forma anidada `List<Option<String>>` comparte ahora ese emisor: cada helper de
+lista conserva el payload activo de `Option` y deja los valores `None` sin referencias.
 Las listas de arrays numéricos (`List<Array<Int|Float|Float32|Bool>>`) usan el mismo
 runtime C con ownership retenido por el destructor de la lista; `viz_orbits` valida
 la ruta IR/C, WASI y `live_allocations=0`. Las listas de arrays con cantidades
