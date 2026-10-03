@@ -407,17 +407,20 @@ fn native_backend_types_agree_with_the_checker() {
     }
     assert!(agreed > 1300, "only {agreed} expressions were compared");
     // The same comparison over *every* AST node (operands included), by node address.
+    // The Float32 array `to_string()` migration removes the entire `arrays_3d`
+    // entry point from the AST emitter, so its 96 AST nodes no longer pass
+    // through this comparison. Keep a lower bound with room for later slices.
     assert!(
-        node_agreed > 3000,
-        "only {node_agreed} AST nodes were compared with the checker's per-node types"
+        node_agreed > 2850,
+        "only {node_agreed} AST nodes were compared with the checker's per-node types (ratchet 2850)"
     );
     // Ratchet: expressions the backend cannot compare (the checker has no type).
     // Ratchet: functions whose C is generated from the typed HIR or its
     // explicit IR lowering (the migration of the native backend).
     let native_generated = hir_generated + ir_generated;
     assert!(
-        native_generated >= 6502,
-        "only {native_generated} functions were generated from HIR/IR (expected at least 6502)"
+        native_generated >= 6503,
+        "only {native_generated} functions were generated from HIR/IR (expected at least 6503)"
     );
     println!("functions generated from HIR/IR: {native_generated} (HIR {hir_generated}, IR {ir_generated})");
     println!("functions still using AST fallback: {ast_fallback}");
@@ -474,9 +477,10 @@ fn native_backend_types_agree_with_the_checker() {
     // through the same IR/C path. HIR now
     // substitutes the concrete owner for `Self` in trait method signatures,
     // allowing Complex arithmetic/equality to use IR/C. The verified baseline is
-    // 49 AST fallbacks (6,502 HIR/IR-generated: 6,489 IR and 13 HIR functions). Scalar quantity
-    // `to_string()` now calls the existing quantity runtime helper from IR/C, so enum methods
-    // with quantity payloads no longer need the AST emitter. Plain non-generic enum
+    // 48 AST fallbacks (6,503 HIR/IR-generated: 6,490 IR and 13 HIR functions). Scalar quantity
+    // `to_string()` now calls the existing quantity runtime helper from IR/C, and numeric
+    // arrays can use the generated show helper for `to_string()`, so enum methods with quantity
+    // payloads and the `arrays_3d` entry point no longer need the AST emitter. Plain non-generic enum
     // constructors, fixed-width scalar payload bindings, unit variants, simple match tests, nested
     // by-value enum patterns and scalar literal/range predicates now use IR/C; managed payloads and
     // generic enums remain outside this slice. Shallow record patterns
@@ -512,7 +516,7 @@ fn native_backend_types_agree_with_the_checker() {
     // Float32 arrays also accept the checker's Float scalar promotion through
     // the generated scalar kernels, removing `examples/arrays.ostrin`'s
     // entry-point fallback while preserving the legacy C ABI conversion.
-    const MAX_AST_FALLBACK_FUNCTIONS: usize = 49;
+    const MAX_AST_FALLBACK_FUNCTIONS: usize = 48;
     assert!(
         ast_fallback <= MAX_AST_FALLBACK_FUNCTIONS,
         "AST fallback grew to {ast_fallback} functions (ratchet limit {MAX_AST_FALLBACK_FUNCTIONS})"

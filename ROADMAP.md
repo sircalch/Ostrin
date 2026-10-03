@@ -6,7 +6,7 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
 ## Siguiente ciclo
 
 1. Reducir el fallback AST con el trinquete por archivo de `--native-type-report` (baseline actual:
-   6.502 funciones generadas por HIR/IR (6.489 IR + 13 HIR) y 49 AST). El `to_string()` de `Quantity` escalar ya usa el helper de runtime desde IR/C, lo que permite que métodos de enums con payloads de cantidad compartan esta ruta. Los patrones superficiales de records con campos escalares
+   6.503 funciones generadas por HIR/IR (6.490 IR + 13 HIR) y 48 AST). `Quantity.to_string()` escalar y `Array<Float32>.to_string()` ya usan helpers nativos desde IR/C; el segundo elimina el fallback del punto de entrada de `arrays_3d`. Los patrones superficiales de records con campos escalares
    y los enums no genéricos con payloads escalares, incluidos los enteros de ancho fijo, variantes unitarias, patrones simples y
    patrones anidados de enums por valor y sus literales/rangos escalares ya comparten IR/C; quedan pendientes los payloads
    gestionados y enums genéricos.

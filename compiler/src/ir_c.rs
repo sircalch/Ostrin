@@ -2617,6 +2617,9 @@ fn emit_instruction(
                         }
                     };
                     match method.as_str() {
+                        "to_string" if codes.is_empty() && *ty == Ty::String => {
+                            helper(HelperRequest::Show, &receiver, "", &array_ty).ok_or(())?
+                        }
                         "unit" if codes.is_empty() && quantity(&element) && *ty == Ty::String => {
                             format!("ostrin_unit_cat({receiver}->unit, \"\", \"\")")
                         }

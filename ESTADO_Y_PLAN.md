@@ -162,8 +162,8 @@ por separado en `--native-type-report` como `ir-generated`; el mismo informe exp
 `hir-generated` y `ast-fallback` para que la retirada del backend legado tenga un contador
 visible. También publica líneas `native-source` agrupadas por archivo para localizar la deuda
 por módulo; la prueba diferencial comprueba que sus sumas coinciden con el total. En el corte
-actual, la suite de ejemplos suma 6 489 funciones IR, 13 HIR y 49 que aún caen al emisor
-AST; `native_backend_types_agree_with_the_checker` mantiene 49 como trinquete temporal. `Quantity.to_string()` escalar ya llama al helper de runtime desde IR/C y permite bajar a IR los métodos de enums con payloads de cantidad. Los patrones
+actual, la suite de ejemplos suma 6 490 funciones IR, 13 HIR y 48 que aún caen al emisor
+AST; `native_backend_types_agree_with_the_checker` mantiene 48 como trinquete temporal. `Quantity.to_string()` escalar y `Array<Float32>.to_string()` ya llaman a helpers nativos desde IR/C; el segundo elimina el fallback del punto de entrada de `arrays_3d`. Los patrones
 superficiales de records con campos escalares y los enums no genéricos con variantes unitarias,
 payloads escalares (incluidos enteros de ancho fijo), patrones simples y patrones anidados de enums por
 valor ya bajan por IR/C, incluidos records genéricos, con paridad intérprete/nativo/diferencial. Payloads
