@@ -7565,7 +7565,7 @@ fn native_hir_handles_collections_core() {
 }
 
 #[test]
-fn native_hir_list_option_string_ownership() {
+fn native_ir_list_option_string_ownership() {
     let file = temp_source(
         "native-hir-list-option-string.ostrin",
         r#"
@@ -7604,8 +7604,10 @@ fn main() -> Void {
     );
     let report_text = stdout(&report);
     assert!(
-        report_text.contains("hir-generated: 1") && report_text.contains("ast-fallback: 0"),
-        "List<Option<String>> did not stay on HIR: {report_text}"
+        report_text.contains("ir-generated: 1")
+            && report_text.contains("hir-generated: 0")
+            && report_text.contains("ast-fallback: 0"),
+        "List<Option<String>> did not use the IR path: {report_text}"
     );
 
     let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
@@ -7624,7 +7626,7 @@ fn main() -> Void {
         "WASI C omitted recursive List<Option<String>> ownership helpers"
     );
 
-    let exe = temp_artifact("native-hir-list-option-string.exe");
+    let exe = temp_artifact("native-ir-list-option-string.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
     assert!(
         compile.status.success(),

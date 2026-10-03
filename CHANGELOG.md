@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Native IR: nested optional list ownership
+
+- `List<Option<String>>` now lowers through the typed IR/C path.  Its list
+  helpers retain and release only the active `String` payload, preserving the
+  existing `None` representation and native ownership contract.
+- The regression covers interpreter/native parity, WASI C emission and a
+  native leak-check with `live_allocations=0`.
+
 ### Native IR: Float32 array scalar promotion
 
 - `Array<Float32>` arithmetic with the checker-approved `Float` scalar promotion now uses

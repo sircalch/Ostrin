@@ -549,6 +549,11 @@ fn list_supported(ty: &Ty, records: &RecordFields) -> bool {
         || record_name(ty, records).is_some()
         || matches!(ty, Ty::Applied(name, args) if name == "Channel" && args.len() == 1 && channel_supported(&args[0], records))
         || matches!(ty, Ty::List(element) if list_supported(element, records))
+        // A list stores its element by value.  `Option<T>` is safe here when
+        // the wrapper's own recursive retain/release contract is available:
+        // the generated list destructor visits only the active payload and
+        // leaves scalar `None` entries untouched.
+        || matches!(ty, Ty::Applied(name, args) if name == "Option" && args.len() == 1 && option_supported(&args[0], records))
 }
 
 fn map_supported(key: &Ty, value: &Ty) -> bool {
