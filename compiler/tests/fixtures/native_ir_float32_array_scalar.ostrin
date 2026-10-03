@@ -14,10 +14,15 @@ fn divided(values: Array<Float32>) -> Array<Float32> {
     values / 2.0
 }
 
+fn shown(values: Array<Float32>) -> String {
+    values.to_string()
+}
+
 fn main() -> Void {
     values = array([1.5f32, 2.5f32, 4.0f32])
     print(scale(values))
     print(reflected(values))
     print(shifted(values))
     print(divided(values))
+    print(shown(values))
 }

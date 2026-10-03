@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Native IR: array and quantity string formatting
+
+- `Array<Float32>.to_string()` now uses the generated native show helper from
+  IR/C, so `arrays_3d.ostrin` no longer falls back to the AST emitter.
+- Scalar `Quantity<D>.to_string()` uses the existing quantity runtime helper
+  from IR/C; interpreter/native/WASI output and leak checks remain aligned.
+- The differential ratchet now records **6,503 HIR/IR-generated functions
+  (6,490 IR + 13 HIR) / 48 AST** functions.
+
 ### Native IR: nested optional list ownership
 
 - `List<Option<String>>` now lowers through the typed IR/C path.  Its list

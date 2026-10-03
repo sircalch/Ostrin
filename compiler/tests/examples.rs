@@ -4975,7 +4975,7 @@ fn native_ir_float32_array_scalars_match_interpreter_native_and_wasi() {
     );
     let report_text = stdout(&report);
     assert!(
-        report_text.lines().any(|line| line == "ir-generated: 5"),
+        report_text.lines().any(|line| line == "ir-generated: 6"),
         "Float32 array scalar functions did not use IR: {report_text}"
     );
     assert!(
@@ -4990,8 +4990,9 @@ fn native_ir_float32_array_scalars_match_interpreter_native_and_wasi() {
         stderr(&emitted)
     );
     assert!(
-        stdout(&emitted).contains("Array_Float32_scalar"),
-        "native C omitted the Float32 scalar kernel"
+        stdout(&emitted).contains("Array_Float32_scalar")
+            && stdout(&emitted).contains("Array_Float32_show"),
+        "native C omitted the Float32 scalar or show helper"
     );
 
     let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
@@ -5002,8 +5003,8 @@ fn native_ir_float32_array_scalars_match_interpreter_native_and_wasi() {
     );
     let wasi_source = stdout(&wasi);
     assert!(
-        wasi_source.contains("Array_Float32_scalar"),
-        "WASI C omitted the Float32 scalar kernel"
+        wasi_source.contains("Array_Float32_scalar") && wasi_source.contains("Array_Float32_show"),
+        "WASI C omitted the Float32 scalar or show helper"
     );
     assert!(
         !wasi_source.contains("#define OSTRIN_NATIVE_THREADS"),
