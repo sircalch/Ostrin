@@ -1782,6 +1782,23 @@ fn emit_instruction(
                 ));
                 return Ok(());
             }
+            // Numeric arrays use the same element-wise negation kernel as the
+            // legacy emitter. Keep this in IR alongside boolean `not` so an
+            // expression such as `where(mask, values * 2, -values)` does not
+            // force its whole containing function through the AST fallback.
+            if *op == UnaryOp::Neg
+                && matches!(array_element(ty), Some(Ty::Int | Ty::Float | Ty::Float32))
+                && value_ty(values, *operand)? == *ty
+                && array_supported(ty)
+            {
+                let array_c_name = array_name(ty).ok_or(())?;
+                out.push_str(&format!(
+                    "    {} = {array_c_name}_neg({});\n",
+                    value_name(*dst),
+                    value_code(values, *operand)?
+                ));
+                return Ok(());
+            }
             if *op == UnaryOp::Neg
                 && matches!(array_element(ty), Some(Ty::Quantity(_)))
                 && value_ty(values, *operand)? == *ty

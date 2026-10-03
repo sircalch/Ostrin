@@ -4975,7 +4975,7 @@ fn native_ir_array_selection_matches_interpreter_native_and_wasi() {
     );
     let report_text = stdout(&report);
     assert!(
-        report_text.lines().any(|line| line == "ir-generated: 12"),
+        report_text.lines().any(|line| line == "ir-generated: 15"),
         "array selection functions did not use IR: {report_text}"
     );
     assert!(
@@ -5001,6 +5001,9 @@ fn native_ir_array_selection_matches_interpreter_native_and_wasi() {
         "Array_Float_where",
         "Array_Float32_where",
         "Array_Bool_where",
+        "Array_Int_neg",
+        "Array_Float_neg",
+        "Array_Float32_neg",
     ] {
         assert!(
             source.contains(marker),

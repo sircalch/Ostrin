@@ -18,6 +18,18 @@ fn invert(mask: Array<Bool>) -> Array<Bool> {
     not mask
 }
 
+fn negate_int(a: Array<Int>) -> Array<Int> {
+    -a
+}
+
+fn negate_float(a: Array<Float>) -> Array<Float> {
+    -a
+}
+
+fn negate_single(a: Array<Float32>) -> Array<Float32> {
+    -a
+}
+
 fn slice_until(a: Array<Int>) -> Array<Int> {
     a[1 until 4]
 }
@@ -53,6 +65,9 @@ fn main() -> Void {
     print(select_single(singles, mask))
     print(select_bool(bools, mask))
     print(invert(mask))
+    print(negate_int(ints))
+    print(negate_float(floats))
+    print(negate_single(singles))
     print(slice_until(ints))
     print(slice_to(ints))
     print(choose_int(mask, ints))
