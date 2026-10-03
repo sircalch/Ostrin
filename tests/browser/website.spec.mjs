@@ -63,6 +63,17 @@ test("homepage runs the real compiler and renders its diagnostics", async ({ pag
   expect(runtimeErrors).toEqual([]);
 });
 
+test("public pages expose a keyboard skip link", async ({ page }) => {
+  for (const route of publicPages) {
+    await page.goto(route, { waitUntil: "domcontentloaded" });
+    const skipLink = page.locator("a.skip-link");
+    await expect(skipLink).toHaveAttribute("href", "#main-content");
+    await skipLink.focus();
+    await page.keyboard.press("Enter");
+    await expect(page.locator("#main-content")).toBeFocused();
+  }
+});
+
 test("mobile navigation is operable and labelled", async ({ page }) => {
   for (const width of [390, 768]) {
     await page.setViewportSize({ width, height: 844 });
