@@ -1,0 +1,23 @@
+fn scale(values: Array<Float32>) -> Array<Float32> {
+    values * 2.0
+}
+
+fn reflected(values: Array<Float32>) -> Array<Float32> {
+    2.0 - values
+}
+
+fn shifted(values: Array<Float32>) -> Array<Float32> {
+    values + 0.5
+}
+
+fn divided(values: Array<Float32>) -> Array<Float32> {
+    values / 2.0
+}
+
+fn main() -> Void {
+    values = array([1.5f32, 2.5f32, 4.0f32])
+    print(scale(values))
+    print(reflected(values))
+    print(shifted(values))
+    print(divided(values))
+}
