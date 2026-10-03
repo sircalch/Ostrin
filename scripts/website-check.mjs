@@ -92,6 +92,8 @@ for (const [fixtureId, fixture] of Object.entries(experimentFixtures)) {
 for (const page of publicPages) {
   const html = read(`website/${page}`);
   check(html.includes('<script src="site-data.js" defer></script>'), `${page}: missing generated site data script`);
+  check(html.includes('<a class="skip-link" href="#main-content">Skip to content</a>'), `${page}: missing keyboard skip link`);
+  check(html.includes('<main id="main-content" tabindex="-1">'), `${page}: main content is not a keyboard skip target`);
   check(/<title>[^<]+<\/title>/i.test(html), `${page}: missing title`);
   check(/<link rel="canonical" href="[^"]+">/i.test(html), `${page}: missing canonical`);
   check(/property="og:title"/i.test(html), `${page}: missing og:title`);

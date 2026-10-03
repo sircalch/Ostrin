@@ -39,6 +39,28 @@ button { color: inherit; font: inherit; }
   outline: 2px solid var(--violet-2);
   outline-offset: 3px;
 }
+.skip-link {
+  position: fixed;
+  z-index: 100;
+  top: 8px;
+  left: 8px;
+  padding: 9px 13px;
+  color: var(--ink);
+  background: var(--violet-3);
+  border-radius: 3px;
+  transform: translateY(-180%);
+  transition: transform 160ms ease;
+}
+.skip-link:focus { transform: translateY(0); }
+main:focus { outline: 2px solid var(--violet-2); outline-offset: 4px; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+}
 
 .shell { width: min(1180px, calc(100% - 64px)); margin: 0 auto; }
 .wide-shell { width: min(1320px, calc(100% - 64px)); margin: 0 auto; }
