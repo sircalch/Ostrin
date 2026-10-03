@@ -2378,7 +2378,13 @@ fn emit_instruction(
             let receiver = value_code(values, *receiver)?;
             let call = match receiver_ty {
                 Ty::Quantity(dimension) => {
-                    if method == "value" && args.is_empty() && *ty == Ty::Float {
+                    if method == "to_string" && args.is_empty() && *ty == Ty::String {
+                        // Keep scalar quantity formatting on the same native
+                        // runtime helper used by the legacy emitter. The
+                        // dimension remains part of the checker type, while
+                        // the unit label is carried by the Qty value.
+                        format!("ostrin_qty_to_string({receiver})")
+                    } else if method == "value" && args.is_empty() && *ty == Ty::Float {
                         format!("({receiver}).v")
                     } else {
                         let key = mangle_quantity_type(&dimension);

@@ -8317,6 +8317,20 @@ fn native_backend_quantities_match_the_interpreter() {
         ir_count >= 3,
         "quantity arithmetic regressed to the legacy backend: {source_line}"
     );
+
+    let shapes_report = run(&["--native-type-report", &example_path("shapes.ostrin")]);
+    assert!(
+        shapes_report.status.success(),
+        "shapes report failed: {}",
+        stderr(&shapes_report)
+    );
+    assert!(
+        stdout(&shapes_report)
+            .lines()
+            .any(|line| line == "native-source: examples/shapes.ostrin ir=2 hir=0 ast=1"),
+        "scalar quantity to_string did not use the IR path in Shape.describe: {}",
+        stdout(&shapes_report)
+    );
 }
 
 #[test]
@@ -8342,9 +8356,9 @@ fn native_trait_defaults_are_lowered_to_ir() {
 fn native_ir_emitter_handles_scalar_quantities() {
     let file = temp_source(
         "native-ir-quantities.ostrin",
-        "fn main() -> Void {\n    d = 1500 m\n    print(d within (1 km to 2 km))\n    print(d approximately 1499 m tolerance 2 m)\n    print(-d)\n    print(d as km)\n    print(d + 500 m)\n}\n",
+        "fn main() -> Void {\n    d = 1500 m\n    print(d within (1 km to 2 km))\n    print(d approximately 1499 m tolerance 2 m)\n    print(-d)\n    print(d as km)\n    print(d + 500 m)\n    print(d.to_string())\n}\n",
     );
-    let expected = "true\ntrue\n-1500 m\n1.5 km\n2000 m\n";
+    let expected = "true\ntrue\n-1500 m\n1.5 km\n2000 m\n1500 m\n";
 
     let interpreted = run(&["--run", &file]);
     assert!(

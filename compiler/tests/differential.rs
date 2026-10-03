@@ -416,8 +416,8 @@ fn native_backend_types_agree_with_the_checker() {
     // explicit IR lowering (the migration of the native backend).
     let native_generated = hir_generated + ir_generated;
     assert!(
-        native_generated >= 6501,
-        "only {native_generated} functions were generated from HIR/IR (expected at least 6501)"
+        native_generated >= 6502,
+        "only {native_generated} functions were generated from HIR/IR (expected at least 6502)"
     );
     println!("functions generated from HIR/IR: {native_generated} (HIR {hir_generated}, IR {ir_generated})");
     println!("functions still using AST fallback: {ast_fallback}");
@@ -474,7 +474,9 @@ fn native_backend_types_agree_with_the_checker() {
     // through the same IR/C path. HIR now
     // substitutes the concrete owner for `Self` in trait method signatures,
     // allowing Complex arithmetic/equality to use IR/C. The verified baseline is
-    // 50 AST fallbacks (6,501 HIR/IR-generated: 6,488 IR and 13 HIR functions). Plain non-generic enum
+    // 49 AST fallbacks (6,502 HIR/IR-generated: 6,489 IR and 13 HIR functions). Scalar quantity
+    // `to_string()` now calls the existing quantity runtime helper from IR/C, so enum methods
+    // with quantity payloads no longer need the AST emitter. Plain non-generic enum
     // constructors, fixed-width scalar payload bindings, unit variants, simple match tests, nested
     // by-value enum patterns and scalar literal/range predicates now use IR/C; managed payloads and
     // generic enums remain outside this slice. Shallow record patterns
@@ -510,7 +512,7 @@ fn native_backend_types_agree_with_the_checker() {
     // Float32 arrays also accept the checker's Float scalar promotion through
     // the generated scalar kernels, removing `examples/arrays.ostrin`'s
     // entry-point fallback while preserving the legacy C ABI conversion.
-    const MAX_AST_FALLBACK_FUNCTIONS: usize = 50;
+    const MAX_AST_FALLBACK_FUNCTIONS: usize = 49;
     assert!(
         ast_fallback <= MAX_AST_FALLBACK_FUNCTIONS,
         "AST fallback grew to {ast_fallback} functions (ratchet limit {MAX_AST_FALLBACK_FUNCTIONS})"
