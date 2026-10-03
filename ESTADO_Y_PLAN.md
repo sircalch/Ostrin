@@ -162,8 +162,8 @@ por separado en `--native-type-report` como `ir-generated`; el mismo informe exp
 `hir-generated` y `ast-fallback` para que la retirada del backend legado tenga un contador
 visible. También publica líneas `native-source` agrupadas por archivo para localizar la deuda
 por módulo; la prueba diferencial comprueba que sus sumas coinciden con el total. En el corte
-actual, la suite de ejemplos suma 6 490 funciones IR, 13 HIR y 48 que aún caen al emisor
-AST; `native_backend_types_agree_with_the_checker` mantiene 48 como trinquete temporal. `Quantity.to_string()` escalar y `Array<Float32>.to_string()` ya llaman a helpers nativos desde IR/C; el segundo elimina el fallback del punto de entrada de `arrays_3d`. Los patrones
+actual, la suite de ejemplos suma 6 498 funciones IR, 14 HIR y 39 que aún caen al emisor
+AST; `native_backend_types_agree_with_the_checker` mantiene 39 como trinquete temporal. Las llamadas genéricas registradas por el checker se resuelven ahora en HIR antes de construir la IR, de modo que `numeric_units.ostrin` ya no necesita fallback AST. `Quantity.to_string()` escalar y `Array<Float32>.to_string()` ya llaman a helpers nativos desde IR/C; el segundo elimina el fallback del punto de entrada de `arrays_3d`. Los patrones
 superficiales de records con campos escalares y los enums no genéricos con variantes unitarias,
 payloads escalares (incluidos enteros de ancho fijo), patrones simples y patrones anidados de enums por
 valor ya bajan por IR/C, incluidos records genéricos, con paridad intérprete/nativo/diferencial. Payloads
@@ -343,8 +343,8 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
 convendría dividirlos; el backend nativo no comparte el sistema de tipos del checker
-(ya consume los tipos del checker y compara cada nodo; el informe actual suma **6 490 funciones
-generadas desde IR, 13 desde HIR y 48 en fallback AST** en los ejemplos, con un trinquete
+(ya consume los tipos del checker y compara cada nodo; el informe actual suma **6 498 funciones
+generadas desde IR, 14 desde HIR y 39 en fallback AST** en los ejemplos, con un trinquete
 que impide que el fallback aumente sin justificación; los métodos de records y enums concretos
 entran ahora en IR/C cuando sus campos y ownership son compatibles, mientras los records recursivos
 conservan el fallback verificado; las familias migradas incluyen escalares,
