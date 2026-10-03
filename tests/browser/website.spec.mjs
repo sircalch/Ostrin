@@ -592,6 +592,23 @@ test("Viz publishes structured data for its scientific source", async ({ page })
       codeRepository: "https://github.com/sircalch/Ostrin/blob/main/compiler/std/viz.ostrin",
       programmingLanguage: { "@type": "ComputerLanguage", name: "Ostrin" },
     },
+    mainEntity: { "@id": "https://sircalch.github.io/Ostrin/viz.html#gallery" },
+  });
+  const gallerySchema = structuredData.find((entry) => entry["@type"] === "ItemList");
+  expect(gallerySchema).toMatchObject({
+    "@context": "https://schema.org",
+    "@id": "https://sircalch.github.io/Ostrin/viz.html#gallery",
+    numberOfItems: 29,
+  });
+  expect(gallerySchema.itemListElement).toHaveLength(29);
+  expect(gallerySchema.itemListElement[1]).toMatchObject({
+    position: 2,
+    item: {
+      "@type": "ImageObject",
+      name: "Shaded 3D surface",
+      contentUrl: "https://sircalch.github.io/Ostrin/assets/viz/surface.svg",
+      isBasedOn: "https://github.com/sircalch/Ostrin/blob/main/examples/viz_surface.ostrin",
+    },
   });
 });
 
