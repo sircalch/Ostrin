@@ -6625,6 +6625,19 @@ fn std_library_modules_agree_between_backends_and_pass_their_own_tests() {
 #[test]
 fn json_standard_library_matches_between_backends_and_is_leak_free() {
     let path = example_path("json_library.ostrin");
+    let report = run(&["--native-type-report", &path]);
+    assert!(
+        report.status.success(),
+        "JSON native type report failed: {}",
+        stderr(&report)
+    );
+    assert!(
+        stdout(&report)
+            .lines()
+            .any(|line| line == "native-source: <ostrin-std>/json.ostrin ir=32 hir=3 ast=1"),
+        "JSON parser should lower string escapes through IR: {}",
+        stdout(&report)
+    );
     let interpreted = run(&["--run", &path]);
     assert!(
         interpreted.status.success(),

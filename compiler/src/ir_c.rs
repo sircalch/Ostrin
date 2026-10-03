@@ -3475,6 +3475,12 @@ fn emit_instruction(
                 )
             } else if callee == "cwd" && args.is_empty() && *ty == Ty::String {
                 "ostrin_cwd()".to_string()
+            } else if callee == "char_from_codepoint"
+                && args.len() == 1
+                && value_ty(values, args[0])? == Ty::Int
+                && *ty == Ty::String
+            {
+                format!("ostrin_s_from_codepoint({})", codes[0])
             } else if callee == "path_join"
                 && args.len() == 2
                 && args
