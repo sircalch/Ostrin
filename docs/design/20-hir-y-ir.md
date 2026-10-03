@@ -9,6 +9,8 @@ y `Option`/`Result` con payload escalar, `String`, `Record`, una colección esca
 (`List`/`Map`/`Set`) u otro wrapper `Option`/`Result` también atraviesan ya el emisor IR.
 La forma anidada `List<Option<String>>` comparte ahora ese emisor: cada helper de
 lista conserva el payload activo de `Option` y deja los valores `None` sin referencias.
+La forma `List<Result<T,E>>` reutiliza el mismo contrato para conservar y liberar
+únicamente el payload activo de `Ok` o `Err`.
 Las listas de arrays numéricos (`List<Array<Int|Float|Float32|Bool>>`) usan el mismo
 runtime C con ownership retenido por el destructor de la lista; `viz_orbits` valida
 la ruta IR/C, WASI y `live_allocations=0`. Las listas de arrays con cantidades
