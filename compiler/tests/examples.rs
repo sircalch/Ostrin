@@ -11659,9 +11659,7 @@ fn std_viz_animates_frames_with_css_only() {
 
 #[test]
 fn std_numeric_integrates_and_differentiates_quantity_arrays() {
-    let out = run(&["--run", &example_path("numeric_units.ostrin")]);
-    assert!(out.status.success(), "stderr: {}", stderr(&out));
-    let text = stdout(&out).replace("\r\n", "\n");
+    let text = interpreter_and_native_agree("numeric_units.ostrin");
     let lines: Vec<&str> = text.lines().collect();
     assert_eq!(
         lines,
@@ -11696,9 +11694,9 @@ fn std_numeric_quantity_arrays_use_the_ir_boundary() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/numeric.ostrin "))
         .unwrap_or_else(|| panic!("missing std.numeric source report: {report_text}"));
     assert!(
-        numeric_source.contains("ir=80")
+        numeric_source.contains("ir=81")
             && numeric_source.contains("hir=0")
-            && numeric_source.contains("ast=1"),
+            && numeric_source.contains("ast=0"),
         "quantity-array IR coverage regressed: {numeric_source}"
     );
 }

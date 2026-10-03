@@ -26,6 +26,13 @@
 - The regression covers nested collection ownership, interpreter/native
   parity, WASI C emission and a native leak-check with `live_allocations=0`.
 
+### Native IR: scalar quantity values
+
+- `Quantity<D>.value()` now lowers directly through IR/C, so generic unit-aware
+  numeric interpolation no longer falls back to the AST emitter.
+- `numeric_units` keeps interpreter/native/WASI parity and lowers its standard
+  library source to `ir=81`, `hir=0`, `ast=0`.
+
 ### Native IR: Float32 array scalar promotion
 
 - `Array<Float32>` arithmetic with the checker-approved `Float` scalar promotion now uses

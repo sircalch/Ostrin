@@ -2378,20 +2378,24 @@ fn emit_instruction(
             let receiver = value_code(values, *receiver)?;
             let call = match receiver_ty {
                 Ty::Quantity(dimension) => {
-                    let key = mangle_quantity_type(&dimension);
-                    let c_name = methods.get(&(key, method.clone())).ok_or(())?;
-                    if !supported(ty, records) {
-                        return Err(());
-                    }
-                    let mut call_args = Vec::with_capacity(args.len() + 1);
-                    call_args.push(receiver.clone());
-                    for arg in args {
-                        if !supported(&value_ty(values, *arg)?, records) {
+                    if method == "value" && args.is_empty() && *ty == Ty::Float {
+                        format!("({receiver}).v")
+                    } else {
+                        let key = mangle_quantity_type(&dimension);
+                        let c_name = methods.get(&(key, method.clone())).ok_or(())?;
+                        if !supported(ty, records) {
                             return Err(());
                         }
-                        call_args.push(value_code(values, *arg)?);
+                        let mut call_args = Vec::with_capacity(args.len() + 1);
+                        call_args.push(receiver.clone());
+                        for arg in args {
+                            if !supported(&value_ty(values, *arg)?, records) {
+                                return Err(());
+                            }
+                            call_args.push(value_code(values, *arg)?);
+                        }
+                        format!("{c_name}({})", call_args.join(", "))
                     }
-                    format!("{c_name}({})", call_args.join(", "))
                 }
                 Ty::Int => match (method.as_str(), args.as_slice(), ty) {
                     ("to_string", [], Ty::String) => {
