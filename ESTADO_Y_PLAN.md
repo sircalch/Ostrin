@@ -162,8 +162,8 @@ por separado en `--native-type-report` como `ir-generated`; el mismo informe exp
 `hir-generated` y `ast-fallback` para que la retirada del backend legado tenga un contador
 visible. También publica líneas `native-source` agrupadas por archivo para localizar la deuda
 por módulo; la prueba diferencial comprueba que sus sumas coinciden con el total. En el corte
-actual, la suite de ejemplos suma 6 486 funciones IR, 13 HIR y 52 que aún caen al emisor
-AST; `native_backend_types_agree_with_the_checker` mantiene 52 como trinquete temporal. Los patrones
+actual, la suite de ejemplos suma 6 487 funciones IR, 13 HIR y 51 que aún caen al emisor
+AST; `native_backend_types_agree_with_the_checker` mantiene 51 como trinquete temporal. Los patrones
 superficiales de records con campos escalares y los enums no genéricos con variantes unitarias,
 payloads escalares (incluidos enteros de ancho fijo), patrones simples y patrones anidados de enums por
 valor ya bajan por IR/C, incluidos records genéricos, con paridad intérprete/nativo/diferencial. Payloads
@@ -343,8 +343,8 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
 convendría dividirlos; el backend nativo no comparte el sistema de tipos del checker
-(ya consume los tipos del checker y compara cada nodo; el informe actual suma **6 486 funciones
-generadas desde IR, 13 desde HIR y 52 en fallback AST** en los ejemplos, con un trinquete
+(ya consume los tipos del checker y compara cada nodo; el informe actual suma **6 487 funciones
+generadas desde IR, 13 desde HIR y 51 en fallback AST** en los ejemplos, con un trinquete
 que impide que el fallback aumente sin justificación; los métodos de records y enums concretos
 entran ahora en IR/C cuando sus campos y ownership son compatibles, mientras los records recursivos
 conservan el fallback verificado; las familias migradas incluyen escalares,

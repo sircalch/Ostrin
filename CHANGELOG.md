@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Native IR: Float32 array scalar promotion
+
+- `Array<Float32>` arithmetic with the checker-approved `Float` scalar promotion now uses
+  the generated IR/C scalar kernels for both operand orders and for `+`, `-`, `*` and `/`.
+- Added interpreter/native/WASI emission parity and native leak-check coverage in
+  `native_ir_float32_array_scalar.ostrin`; the measured baseline is now **6,500 HIR/IR
+  functions (6,487 IR + 13 HIR) / 51 AST** functions.
+
 ### Native IR: scalar record and enum patterns
 
 - Shallow patterns for concrete records with scalar `Int`, sized integer, `Float`, `Bool` and
@@ -12,8 +20,8 @@
 - Plain non-generic enum constructors, unit variants, scalar and fixed-width payload bindings,
   simple `match` tests and scalar literal/range predicates now lower through IR/C. Nested by-value
   enum patterns use the same path; managed payloads and generic enums remain outside this slice.
-- The differential ratchet now records **6,499 HIR/IR-generated functions (6,486 IR + 13 HIR) /
-  52 AST** functions.
+- The differential ratchet now records **6,500 HIR/IR-generated functions (6,487 IR + 13 HIR) /
+  51 AST** functions.
 
 ### Native IR: numeric array selection
 

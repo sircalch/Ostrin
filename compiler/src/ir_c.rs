@@ -1160,6 +1160,14 @@ fn numeric_scalar(ty: &Ty) -> bool {
     matches!(ty, Ty::Int | Ty::Float | Ty::Float32 | Ty::Sized(_))
 }
 
+/// The checker permits a `Float` scalar to operate on an `Array<Float32>`;
+/// the scalar is converted by the generated C ABI. Keep that promotion
+/// explicit at the IR boundary so the operation does not fall back to the
+/// legacy AST emitter merely because the two scalar spellings differ.
+fn array_scalar_compatible(element: &Ty, scalar_ty: &Ty) -> bool {
+    element == scalar_ty || (*element == Ty::Float32 && *scalar_ty == Ty::Float)
+}
+
 /// Lower the unit-aware array operators that the legacy C emitter already
 /// defines for `Array<Quantity<D>>`.  The quantity array runtime stores the
 /// values in one canonical unit and keeps that unit on the array header; this
@@ -1882,7 +1890,10 @@ fn emit_instruction(
                                 result_ty,
                             )
                         }
-                        (Some(element), None) if scalar(&right_ty) && right_ty == element => {
+                        (Some(element), None)
+                            if scalar(&right_ty)
+                                && array_scalar_compatible(&element, &right_ty) =>
+                        {
                             let Some(code) = arithmetic.or(comparison) else {
                                 return Err(());
                             };
@@ -1902,7 +1913,9 @@ fn emit_instruction(
                                 result_ty,
                             )
                         }
-                        (None, Some(element)) if scalar(&left_ty) && left_ty == element => {
+                        (None, Some(element))
+                            if scalar(&left_ty) && array_scalar_compatible(&element, &left_ty) =>
+                        {
                             let Some(code) = arithmetic.or(comparison) else {
                                 return Err(());
                             };
