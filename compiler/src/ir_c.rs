@@ -554,6 +554,7 @@ fn list_supported(ty: &Ty, records: &RecordFields) -> bool {
         // the generated list destructor visits only the active payload and
         // leaves scalar `None` entries untouched.
         || matches!(ty, Ty::Applied(name, args) if name == "Option" && args.len() == 1 && option_supported(&args[0], records))
+        || matches!(ty, Ty::Applied(name, args) if name == "Result" && args.len() == 2 && result_supported(&args[0], &args[1], records))
 }
 
 fn map_supported(key: &Ty, value: &Ty) -> bool {

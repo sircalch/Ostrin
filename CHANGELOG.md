@@ -10,6 +10,14 @@
 - The regression covers interpreter/native parity, WASI C emission and a
   native leak-check with `live_allocations=0`.
 
+### Native IR: result lists with managed payloads
+
+- `List<Result<T, E>>` now lowers through the typed IR/C path when both result
+  payloads are already supported. The generated list helpers retain and
+  release only the active `Ok` or `Err` payload.
+- The regression covers both managed branches, interpreter/native parity,
+  WASI C emission and a native leak-check with `live_allocations=0`.
+
 ### Native IR: Float32 array scalar promotion
 
 - `Array<Float32>` arithmetic with the checker-approved `Float` scalar promotion now uses
