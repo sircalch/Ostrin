@@ -3,12 +3,15 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { collectSiteFacts } from "./site-facts.mjs";
 import { experimentFixtures, verifyBundleFile } from "./experiment-bundle.mjs";
+import { checkVizStructuredData } from "./viz-jsonld.mjs";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const websiteRoot = path.join(repositoryRoot, "website");
 const failures = [];
 const socialCardPath = "website/assets/ostrin-social.png";
 const socialCardUrl = "https://sircalch.github.io/Ostrin/assets/ostrin-social.png";
+
+for (const failure of checkVizStructuredData(repositoryRoot)) check(false, failure);
 
 function check(condition, message) {
   if (!condition) failures.push(message);
