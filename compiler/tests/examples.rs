@@ -4962,8 +4962,15 @@ fn native_ir_emitter_handles_numeric_array_builtins() {
 }
 
 #[test]
-fn native_ir_math_functions_lower_atan2() {
+fn native_ir_math_functions_lower_atan2_and_sized_abs() {
     let file = example_path("math_functions.ostrin");
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "math functions interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    let expected = stdout(&interpreted).replace("\r\n", "\n");
     let report = run(&["--native-type-report", &file]);
     if skip_if_no_c_compiler(&report) {
         return;
@@ -4977,8 +4984,8 @@ fn native_ir_math_functions_lower_atan2() {
     assert!(
         report_text
             .lines()
-            .any(|line| line == "native-source: examples/math_functions.ostrin ir=3 hir=0 ast=1"),
-        "atan2 helper did not use the IR path: {report_text}"
+            .any(|line| line == "native-source: examples/math_functions.ostrin ir=4 hir=0 ast=0"),
+        "math functions did not use the IR path for atan2 and sized abs: {report_text}"
     );
 
     let emitted = run(&["--emit-c", &file]);
@@ -4992,8 +4999,80 @@ fn native_ir_math_functions_lower_atan2() {
         source.contains("double ostrin_fn_angle(double y, double x)")
             && source.contains("__ir_v2 = ostrin_dm_atan2(__ir_v0, __ir_v1);")
             && source.contains("float ostrin_fn_angle32(float y, float x)")
-            && source.contains("__ir_v2 = ostrin_dm_atan2f(__ir_v0, __ir_v1);"),
-        "atan2 helper did not use the native IR emitter: {source}"
+            && source.contains("__ir_v2 = ostrin_dm_atan2f(__ir_v0, __ir_v1);")
+            && source.contains("__ostrin_ir_abs")
+            && source.contains("int8_t __ostrin_ir_abs"),
+        "atan2 or sized abs did not use the native IR emitter: {source}"
+    );
+
+    let exe = temp_artifact("math-functions-sized-abs.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    assert!(
+        compile.status.success(),
+        "math functions native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run math functions native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "math functions native binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "math functions native ownership leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "math functions WASI C emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("__ostrin_ir_abs")
+            && wasi_source.contains("int8_t __ostrin_ir_abs")
+            && !wasi_source.contains("#define OSTRIN_NATIVE_THREADS"),
+        "math functions WASI C omitted sized abs lowering: {wasi_source}"
+    );
+
+    let min_file = temp_source(
+        "sized-abs-min.ostrin",
+        "fn main() -> Void {\n    print(abs(-128i8))\n}\n",
+    );
+    let min_interpreted = run(&["--run", &min_file]);
+    assert!(!min_interpreted.status.success());
+    assert!(
+        stderr(&min_interpreted).contains("integer overflow: abs(-128) does not fit in Int8"),
+        "interpreter did not reject the signed minimum: {}",
+        stderr(&min_interpreted)
+    );
+    let min_exe = temp_artifact("sized-abs-min.exe");
+    let min_compile = run(&["--compile", "--out", &min_exe, &min_file]);
+    let _ = fs::remove_file(&min_file);
+    assert!(
+        min_compile.status.success(),
+        "minimum sized abs native compile failed: {}",
+        stderr(&min_compile)
+    );
+    let min_native = Command::new(&min_exe)
+        .output()
+        .expect("run minimum sized abs native binary");
+    let _ = fs::remove_file(&min_exe);
+    assert!(!min_native.status.success());
+    assert!(
+        String::from_utf8_lossy(&min_native.stderr).contains("runtime error: integer overflow"),
+        "native did not reject the signed minimum: {}",
+        String::from_utf8_lossy(&min_native.stderr)
     );
 }
 
