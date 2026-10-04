@@ -6,6 +6,7 @@
 
 - Scalar `abs` now lowers through IR/C for every fixed-width integer type while
   preserving the checked overflow error for the minimum signed value.
+  Public website inventory and generated site data now track the 270-test compiler suite.
 - `math_functions.ostrin` now reports `ir=4, hir=0, ast=0` and covers
   interpreter/native parity, leak-check, WASI emission, and the minimum-value
   error path. The differential ratchet advances to **6,522 HIR/IR-generated
