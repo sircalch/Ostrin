@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Scalar generic method prepass
+
+- Concrete scalar and record receivers for generic methods now resolve through
+  the checker/HIR prepass and reuse the typed IR/C method dispatcher. Quantity
+  and dimension-sensitive visualization methods remain on the verified fallback
+  until their ownership contract is complete.
+- The differential ratchet advances to **6,523 HIR/IR-generated functions
+  (6,509 IR + 14 HIR) / 32 AST** after the concrete generic-method slice.
+
 ### Quantity visualization ownership status
 
 - Corrected the roadmap and HIR/IR design notes: generic `Figure.unit_line` and
