@@ -18,7 +18,7 @@ tests or an explicitly labeled early-stage surface.
 | Guides | `website/guides.html` | Install, projects, testing, native, WASI, editor, experimental effect inventory and site-evidence workflows; every command exists in `ostrinc --help` |
 | Example catalogue | `website/examples.html` | Filterable repository catalogue plus live quantity, standard library, record/enum and concurrency programs |
 | Browser playground | `website/playground.html`, `website/playground.js`, `.github/workflows/pages.yml` | Generated `ostrinc.wasm`; Run, Check, Test, Format, share links and source diagnostics execute in an in-memory WASI filesystem and are exercised in Chromium before CI passes or Pages uploads |
-| Learn and Reference | `website/docs.html`, `website/reference.html`, `website/language.html`, `docs/design/` | Guided 14-step learning path; Reference indexes all 26 design documents and the CLI flags, checked against `ostrinc --help` |
+| Learn and Reference | `website/docs.html`, `website/reference.html`, `website/language.html`, `docs/design/` | Guided 14-step learning path; Reference indexes all 27 design documents and the CLI flags, checked against `ostrinc --help` |
 | Showcase | `website/showcase.html` | Four repository-backed demonstrations; every displayed output line is verified against its program by `scripts/lab-data.mjs` |
 | Benchmarks | `website/benchmarks.html`, `website/benchmark-data.js`, `scripts/benchmark.mjs` | Eight deterministic workloads compare interpreter and native process medians; the page publishes commit, environment, sampling and output provenance without cross-language claims |
 | Provenance artifact | `website/provenance.html`, `website/provenance-data.js`, `website/provenance.js`, `scripts/provenance-page.mjs`, `compiler/src/provenance.rs` | Experimental machine-readable source hash, target and effect inventory with explicit replay limitations; regenerated and checked before Pages deployment |
@@ -32,8 +32,8 @@ tests or an explicitly labeled early-stage surface.
 
 - **266** `.ostrin` source files under `examples/`, including package-project sources and
   intentional error cases.
-- **26** Markdown design documents under `docs/design/`.
-- Compiler suite: **270 integration**, **6 differential** and **2 unit** tests.
+- **27** Markdown design documents under `docs/design/`.
+- Compiler suite: **271 integration**, **6 differential** and **2 unit** tests.
 - WASI release smoke matrix: thirteen program modules covering the hello program, quantity arrays, a local-path
   package, arguments/environment, file I/O, managed ownership and nested `Option`/`Result`
   consumers; compiler and program modules
