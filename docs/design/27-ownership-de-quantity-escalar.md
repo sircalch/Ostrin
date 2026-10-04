@@ -1,6 +1,6 @@
 # 27. Ownership de `Quantity` escalar y etiquetas de unidad
 
-*Estado: diseño técnico para revisión. No habilita todavía la bajada de
+*Estado: fase 1 implementada y validada. No habilita todavía la bajada de
 `Figure.unit_line`/`unit_scatter` a IR/C.*
 
 Depende de [01-variables-tipos-unidades.md](01-variables-tipos-unidades.md),
@@ -55,8 +55,15 @@ El experimento conservado como artefacto local fuera del repositorio durante
 esta auditoría hizo visible la secuencia con `examples/viz_units.ostrin`: después de
 `distance.max()` se liberó el array y el uso posterior de la unidad produjo
 `runtime error: unknown unit` con bytes ya liberados. El parche experimental no
-se integró. El estado verificado de `main` mantiene esas instanciaciones en
-fallback HIR/AST y conserva la paridad existente.
+se integró. La fase 1 implementa ahora el contrato para el emisor IR/C y deja
+`examples/viz_units.ostrin` en fallback verificado hasta completar los
+productores genéricos de visualización.
+
+La regresión `native_quantity_scalar_escape_retains_array_unit_labels` reproduce
+el caso mínimo con una etiqueta dinámica: `array([1 m, 2 m, 3 m]) / (1 s)`,
+`peak = values.max()` y `print(peak)` después del último uso del array. La
+salida esperada es `3 m/s`; la prueba comprueba intérprete, IR/C nativo,
+emisión WASI y `--leak-check` (`live_allocations=0`).
 
 ## 2. Invariantes que debe preservar la solución
 
@@ -170,9 +177,8 @@ contenedor que pueda liberar la etiqueta.
 
 ### 4.2 IR y último uso
 
-Cuando el ABI esté listo, `Ty::Quantity(_)` puede entrar en
-`ownership::requires_management`. La modificación debe ser simultánea en el
-análisis y el emisor:
+La fase 1 activa `Ty::Quantity(_)` en `ownership::requires_management` y emite
+los marcadores tipados en paralelo. El flujo implementado es:
 
 1. `Param` se marca como prestado.
 2. `Call`, `MethodCall`, `Binary`, `Unary` y productores `Opaque` de `Qty`
@@ -188,15 +194,17 @@ análisis y el emisor:
 7. `Retain`/`Release` de la IR se emiten como `ostrin_qty_retain/release`, no
    como un cast de `Qty` a `void*`.
 
-El análisis debe tratar `Opaque` que extrae un escalar desde un array como un
-productor con ownership conocido. Si encuentra una operación C opaca cuyo
-contrato no declara si devuelve préstamo, copia o transferencia, debe marcar
-la función como no elegible para IR/C.
+El análisis trata `Opaque` que extrae un escalar desde un array como un
+productor con ownership conocido. `within` y `approximately` son lecturas
+puras y no bloquean la liberación del último uso. Una operación C opaca cuyo
+contrato no declara si devuelve préstamo, copia o transferencia mantiene la
+función fuera de IR/C.
 
 ### 4.3 Records y wrappers
 
 El soporte de `Quantity` en `retain_payload`/`release_payload` debe ser
-recursivo. La primera fase puede habilitar:
+recursivo. Una fase posterior, después de completar destructores y pruebas,
+puede habilitar:
 
 - `record` no recursivo con campos `Quantity` y campos escalares;
 - `List<Quantity<D>>`;
@@ -215,12 +223,12 @@ referencia a la etiqueta mediante `from_borrowed`. Por ello esta secuencia debe
 ser válida después de que el array muera:
 
 ```ostrin
-values = array([1 m, 2 m]) * array([1 m, 2 m])
+values = array([1 m, 2 m, 3 m]) / (1 s)
 peak = values.max()
 print(peak)
 ```
 
-`peak` debe imprimir `4 m^2` aunque el análisis libere `values` inmediatamente
+`peak` debe imprimir `3 m/s` aunque el análisis libere `values` inmediatamente
 después de `max`. La misma regla cubre `values[0]`, `percentile`, `mean` y
 `to_list`.
 
@@ -266,7 +274,7 @@ positiva, salida diferencial y leak-check cuando aplique:
 
 | Caso | Native | WASI | Sanitizers | Criterio |
 |---|---:|---:|---:|---|
-| `array([1 m, 2 m]).max()` después del último uso del array | sí | sí | ASan/UBSan | sin UAF, salida estable |
+| `array([1 m, 2 m, 3 m]) / (1 s)` y `.max()` después del último uso del array | sí | sí | ASan/UBSan | sin UAF, `3 m/s`, cero fugas |
 | producto dinámico `m * m` y conversión posterior | sí | sí | ASan/UBSan | `m^2` correcto, cero fugas |
 | `index`, `mean`, `percentile` y `to_list` | sí | sí | ASan/UBSan | cada copia conserva su etiqueta |
 | parámetro `fn id(q) -> Quantity` y retorno del parámetro | sí | sí | ASan/UBSan | el caller recibe una copia viva |
@@ -287,22 +295,23 @@ ostrinc --native-type-report examples/viz_units.ostrin
 ostrinc --emit-c --target wasm32-wasi examples/viz_units.ostrin
 ```
 
-El informe de `viz_units` debe seguir indicando fallback mientras el diseño no
-esté implementado. La regresión que fija ese límite se puede retirar únicamente
-en el mismo PR que añada las pruebas de la fila completa y reduzca el contador
-de fallback con paridad.
+La fase 1 deja el informe de `viz_units` en fallback mientras faltan las filas
+de records, wrappers, `Phi` complejos y visualización genérica. La regresión que
+fija ese límite se puede retirar únicamente en el mismo PR que añada las
+pruebas de la fila completa y reduzca el contador de fallback con paridad.
 
 ## 8. Orden de implementación
 
-1. Añadir los helpers tipados a `qty_runtime.c` y pruebas unitarias del runtime
-   para literal, etiqueta dinámica, copia, movimiento y liberación.
-2. Cambiar productores de `Qty` en HIR/C e IR/C para declarar si devuelven
-   préstamo, referencia propia o transferencia. No habilitar aún el ratchet.
-3. Extender `retain_payload`, `release_payload`, listas, records y wrappers;
-   añadir `Ty::Quantity` a `requires_management` solo cuando el emisor de
-   `Retain`/`Release` esté listo.
-4. Activar primero el caso reducido de `max`/`index` y ejecutar native, WASI,
-   ASan, UBSan e intérprete diferencial.
+1. **Completado en fase 1:** añadir los helpers tipados a `qty_runtime.c`,
+   cambiar productores de `Qty` en IR/C, extender `retain_payload`/
+   `release_payload`, habilitar `Ty::Quantity` y conectar `Retain`/`Release`.
+2. **Completado en fase 1:** activar `max`/`min`/`mean`/`percentile`/`get`,
+   indexación escalar y operaciones aritméticas con etiquetas propias; ejecutar
+   native, WASI, leak-check e intérprete diferencial.
+3. **Pendiente:** cubrir con pruebas dedicadas parámetros que escapan, aliases
+   por `Phi`, records, `Option`/`Result` y wrappers antes de ampliar el ratchet.
+4. **Pendiente:** repetir native, WASI, ASan, UBSan e intérprete diferencial en
+   la matriz completa de la sección 7.
 5. Habilitar las instanciaciones genéricas de visualización y convertir la
    regresión de fallback en una aserción `ir=1, hir=0, ast=0` para el entry
    point, manteniendo un baseline explícito para `std.viz`.
@@ -316,8 +325,9 @@ de fallback con paridad.
   operación numérica y rompería más ABI de C/WASI del necesario.
 - No se introduce un interner global de unidades: puede reducir allocations,
   pero debe resolver lifetime, concurrencia y límites del catálogo primero.
-- No se considera suficiente retener solo en `Array_Float_max`: el mismo alias
-  aparece en indexación, listas, records, `Phi`, retornos y wrappers.
-- No se afirma que el problema esté resuelto mientras `Quantity` siga fuera de
-  `requires_management` y las copias de `Qty` puedan emitirse como asignación
-  C directa.
+- No se considera suficiente retener solo en `Array_Float_max`: la fase 1
+  también cubre indexación, reducciones y aritmética; records, `Phi` complejos,
+  retornos y wrappers permanecen sujetos a la matriz pendiente.
+- No se afirma que la migración completa esté resuelta mientras las rutas
+  genéricas de visualización sigan fuera del ratchet y existan productores de
+  `Qty` sin contrato probado.

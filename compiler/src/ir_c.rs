@@ -722,6 +722,7 @@ fn mangle_task_payload(ty: &Ty, records: &RecordFields) -> String {
 
 fn retain_payload(access: &str, ty: &Ty, records: &RecordFields) -> Option<String> {
     match ty {
+        Ty::Quantity(_) => Some(format!("ostrin_qty_retain({access})")),
         Ty::String | Ty::List(_) | Ty::Map(_, _) | Ty::Set(_) => {
             Some(format!("ostrin_retain((void*){access})"))
         }
@@ -2381,7 +2382,7 @@ fn emit_instruction(
                     let array_c_name = array_name(&Ty::Applied(name, args.clone())).ok_or(())?;
                     let code = if quantity(&args[0]) {
                         format!(
-                            "((Qty){{ {array_c_name}_index1({object_code}, {index_code}), {object_code}->unit }})"
+                            "ostrin_qty_from_borrowed({array_c_name}_index1({object_code}, {index_code}), {object_code}->unit)"
                         )
                     } else {
                         format!("{array_c_name}_index1({object_code}, {index_code})")
@@ -2664,7 +2665,7 @@ fn emit_instruction(
                             if quantity(&element) && codes.is_empty() && *ty == element =>
                         {
                             format!(
-                                "((Qty){{ Array_Float_{method}({receiver}), {receiver}->unit }})"
+                                "ostrin_qty_from_borrowed(Array_Float_{method}({receiver}), {receiver}->unit)"
                             )
                         }
                         "percentile"
@@ -2674,7 +2675,7 @@ fn emit_instruction(
                                 && *ty == element =>
                         {
                             format!(
-                                "((Qty){{ Array_Float_percentile({receiver}, {}), {receiver}->unit }})",
+                                "ostrin_qty_from_borrowed(Array_Float_percentile({receiver}, {}), {receiver}->unit)",
                                 codes[0]
                             )
                         }
@@ -2687,7 +2688,7 @@ fn emit_instruction(
                                 return Err(());
                             }
                             format!(
-                                "({{ double __ostrin_q_var_scale; (Qty){{ Array_Float_{method}({receiver}), ostrin_unit_combine({receiver}->unit, {receiver}->unit, 0, &__ostrin_q_var_scale) }}; }})"
+                                "({{ double __ostrin_q_var_scale; const char* __ostrin_q_unit = ostrin_unit_combine({receiver}->unit, {receiver}->unit, 0, &__ostrin_q_var_scale); Qty __ostrin_q_value = ostrin_qty_from_owned(Array_Float_{method}({receiver}), __ostrin_q_unit); if (__ostrin_q_var_scale != 1.0) __ostrin_q_value.v *= __ostrin_q_var_scale; __ostrin_q_value; }})"
                             )
                         }
                         "to_list"
@@ -2828,7 +2829,7 @@ fn emit_instruction(
                                 codes.len()
                             );
                             if quantity(&element) {
-                                format!("((Qty){{ {access}, {receiver}->unit }})")
+                                format!("ostrin_qty_from_borrowed({access}, {receiver}->unit)")
                             } else {
                                 access
                             }
@@ -4242,6 +4243,12 @@ fn emit_instruction(
         IrInstr::Retain { value } => {
             let ty = value_ty(values, *value)?;
             match ty {
+                Ty::Quantity(_) => {
+                    out.push_str(&format!(
+                        "    ostrin_qty_retain({});\n",
+                        value_code(values, *value)?
+                    ));
+                }
                 Ty::String | Ty::List(_) | Ty::Map(_, _) | Ty::Set(_) => {
                     out.push_str(&format!(
                         "    ostrin_retain((void*){});\n",
@@ -4338,6 +4345,12 @@ fn emit_instruction(
         IrInstr::Release { value } => {
             let ty = value_ty(values, *value)?;
             match ty {
+                Ty::Quantity(_) => {
+                    out.push_str(&format!(
+                        "    ostrin_qty_release({});\n",
+                        value_code(values, *value)?
+                    ));
+                }
                 Ty::String | Ty::List(_) | Ty::Map(_, _) | Ty::Set(_) => {
                     out.push_str(&format!(
                         "    ostrin_release((void*){});\n",
