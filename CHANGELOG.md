@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Native IR: Float32 collection coercions
+
+- Explicit `Float32` bindings and `List<Float32>`/`Set<Float32>` aggregates now
+  insert the checked `Float↔Float32` conversion in IR, preserving
+  single-precision output while removing the final AST fallback from
+  `float32.ostrin`.
+- The differential ratchet advances to **6,513 HIR/IR-generated functions
+  (6,499 IR + 14 HIR) / 38 AST** functions.
+
 ### Native IR: checker-resolved generic calls
 
 - Ordinary HIR functions now resolve checker-recorded generic call

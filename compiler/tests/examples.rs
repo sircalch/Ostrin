@@ -3288,6 +3288,13 @@ fn native_hir_handles_scalar_widths() {
             .find_map(|line| line.strip_prefix("ir-generated: ").and_then(|n| n.trim().parse::<usize>().ok()))
             .unwrap_or(0);
         assert!(hir_functions + ir_functions >= 1, "{file} did not generate any function from HIR/IR");
+        if file == "float32.ostrin" {
+            let ast_functions = report_text
+                .lines()
+                .find_map(|line| line.strip_prefix("ast-fallback: ").and_then(|n| n.trim().parse::<usize>().ok()))
+                .unwrap_or(0);
+            assert_eq!(ast_functions, 0, "Float32 scalar-width example regressed to AST fallback: {report_text}");
+        }
 
         let exe = temp_artifact(&format!("hir_{file}.exe"));
         let compile = run(&["--compile", "--out", &exe, &path]);

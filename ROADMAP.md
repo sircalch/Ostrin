@@ -6,7 +6,7 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
 ## Siguiente ciclo
 
 1. Reducir el fallback AST con el trinquete por archivo de `--native-type-report` (baseline actual:
-   6.512 funciones generadas por HIR/IR (6.498 IR + 14 HIR) y 39 AST). Las llamadas genéricas registradas por el checker se resuelven en HIR antes de construir la IR, por lo que `numeric_units.ostrin` ya no cae al emisor AST. `Quantity.to_string()` escalar y `Array<Float32>.to_string()` ya usan helpers nativos desde IR/C; el segundo elimina el fallback del punto de entrada de `arrays_3d`. Los patrones superficiales de records con campos escalares
+   6.513 funciones generadas por HIR/IR (6.499 IR + 14 HIR) y 38 AST). Las llamadas genéricas registradas por el checker se resuelven en HIR antes de construir la IR, por lo que `numeric_units.ostrin` ya no cae al emisor AST. `Quantity.to_string()` escalar y `Array<Float32>.to_string()` ya usan helpers nativos desde IR/C; el segundo elimina el fallback del punto de entrada de `arrays_3d`. Las coerciones `Float↔Float32` de bindings explícitos y agregados `List/Set<Float32>` también se insertan en IR y mantienen la precisión de `float32.ostrin`. Los patrones superficiales de records con campos escalares
    y los enums no genéricos con payloads escalares, incluidos los enteros de ancho fijo, variantes unitarias, patrones simples y
    patrones anidados de enums por valor y sus literales/rangos escalares ya comparten IR/C; quedan pendientes los payloads
    gestionados y enums genéricos.
