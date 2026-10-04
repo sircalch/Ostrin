@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Quantity visualization ownership status
+
+- Corrected the roadmap and HIR/IR design notes: generic `Figure.unit_line` and
+  `Figure.unit_scatter` remain on the verified HIR/AST fallback until scalar
+  quantity unit-label ownership is complete.
+
 ### GitHub Linguist sample provenance
 
 - Added a machine-readable inventory for representative `.ostrin` samples with
