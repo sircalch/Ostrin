@@ -261,6 +261,21 @@ export const PIPELINE = { file: "examples/lab_pipeline.ostrin", function: "kinet
 // The program shown in the homepage hero.
 export const HERO = "examples/lab_hero.ostrin";
 
+// Capability tags are derived from the source program and the recorded SVG. They are
+// discovery metadata, not maturity claims: the gallery remains the source-backed
+// evidence for every item shown on the public Viz page.
+function vizCapabilities(source, svg) {
+  const capabilities = [/\bviz\.scene3d\s*\(/.test(source) ? "3d" : "2d"];
+  if (svg.includes('data-ostrin-motion="true"')
+    || /\bviz\.animate\s*\(|\.morph\s*\(|\bmoving_point\s*\(|\brod\s*\(/.test(source)) {
+    capabilities.push("animation");
+  }
+  if (svg.includes('data-ostrin-table="true"') || /\bviz\.table\s*\(/.test(source)) capabilities.push("tables");
+  if (svg.includes("<ostrin-provenance")) capabilities.push("reproducibility");
+  if (/\bQuantity\b|\bunit_line\b|\bunit_scatter\b/.test(source)) capabilities.push("units");
+  return capabilities;
+}
+
 function readText(relativePath) {
   return readFileSync(path.join(repositoryRoot, relativePath), "utf8").replaceAll("\r\n", "\n");
 }
@@ -436,6 +451,7 @@ export async function buildLabData() {
       sourceUrl: `${repository}/blob/main/${figure.file}`,
       code: source,
       svg: svgPath,
+      capabilities: vizCapabilities(source, svg),
       provenance,
       printed: [...output.slice(0, start), ...output.slice(end + 1)],
     });

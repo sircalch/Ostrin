@@ -1586,6 +1586,7 @@ function card(figure) {
     el("summary", { text: `Source · ${figure.source}` }),
     el("pre", { className: "sl-code", tabindex: "0" }, [el("code", { text: figure.code })]),
   ]);
+  const capabilities = el("ul", { className: "viz-capability-tags", "aria-label": "Recorded capabilities" }, (figure.capabilities ?? []).map((capability) => el("li", { text: capabilityLabel(capability) })));
 
   run.addEventListener("click", async () => {
     run.disabled = true;
@@ -1619,7 +1620,8 @@ function card(figure) {
 
   return {
     id: figure.id,
-    searchText: [figure.id, figure.title, figure.blurb, figure.source].join(" ").toLocaleLowerCase(),
+    capabilities: figure.capabilities ?? [],
+    searchText: [figure.id, figure.title, figure.blurb, figure.source, ...(figure.capabilities ?? []).map(capabilityLabel)].join(" ").toLocaleLowerCase(),
     run,
     status,
     explore,
@@ -1628,6 +1630,7 @@ function card(figure) {
       el("div", { className: "viz-body" }, [
         el("h3", { text: figure.title }),
         el("p", { className: "muted", text: figure.blurb }),
+        capabilities,
         figure.printed.length ? printed : null,
         el("div", { className: "sl-actions" }, [run, explore, playground, bundle, status, el("a", { className: "text-link", href: figure.sourceUrl, text: "View source ↗" })]),
         provenance,
@@ -1635,6 +1638,20 @@ function card(figure) {
       ]),
     ]),
   };
+}
+
+const VIZ_CAPABILITY_DEFINITIONS = [
+  { id: "all", label: "All outputs", description: "Every recorded figure" },
+  { id: "2d", label: "2D plots", description: "Lines, fields and statistical views" },
+  { id: "3d", label: "3D scenes", description: "Surfaces, volumes and trajectories" },
+  { id: "animation", label: "Animation", description: "Motion or frame sequences" },
+  { id: "tables", label: "Tables", description: "Structured rows rendered as SVG" },
+  { id: "reproducibility", label: "Provenance", description: "Source and data metadata" },
+  { id: "units", label: "Units", description: "Quantity-aware source programs" },
+];
+
+function capabilityLabel(id) {
+  return VIZ_CAPABILITY_DEFINITIONS.find((definition) => definition.id === id)?.label ?? id;
 }
 
 const WORKFLOW_KIND_LABELS = {
@@ -1727,17 +1744,49 @@ function mountGallery(root) {
   const tools = document.querySelector("[data-viz-gallery-tools]");
   const search = tools?.querySelector("#viz-gallery-search");
   const status = tools?.querySelector("[data-viz-gallery-status]");
+  const capabilityPanel = document.querySelector("[data-viz-capabilities]");
+  const capabilityFilters = capabilityPanel?.querySelector("[data-viz-capability-filters]");
+  const capabilityStatus = capabilityPanel?.querySelector("[data-viz-capability-status]");
+  let selectedCapability = "all";
   const empty = el("p", { className: "viz-gallery-empty dim", hidden: true, text: "No figures match this search." });
+  const capabilityCounts = new Map(VIZ_CAPABILITY_DEFINITIONS.map(({ id }) => [id, id === "all"
+    ? cards.length
+    : cards.filter((item) => item.capabilities.includes(id)).length]));
+  const capabilityButtons = VIZ_CAPABILITY_DEFINITIONS.map((definition) => {
+    const button = el("button", {
+      type: "button",
+      className: "viz-capability-filter",
+      "data-viz-capability": definition.id,
+      "aria-pressed": definition.id === "all" ? "true" : "false",
+      title: definition.description,
+    }, [
+      el("strong", { text: String(capabilityCounts.get(definition.id)) }),
+      el("span", { text: definition.label }),
+    ]);
+    button.addEventListener("click", () => {
+      selectedCapability = definition.id;
+      for (const candidate of capabilityButtons) candidate.setAttribute("aria-pressed", String(candidate === button));
+      updateSearch();
+    });
+    return button;
+  });
+  capabilityFilters?.replaceChildren(...capabilityButtons);
+  if (capabilityPanel) capabilityPanel.hidden = false;
   const updateSearch = () => {
     const query = search?.value.trim().toLocaleLowerCase() ?? "";
     let visible = 0;
     for (const item of cards) {
-      const matches = !query || item.searchText.includes(query);
+      const matchesCapability = selectedCapability === "all" || item.capabilities.includes(selectedCapability);
+      const matches = matchesCapability && (!query || item.searchText.includes(query));
       item.node.hidden = !matches;
       if (matches) visible += 1;
     }
     empty.hidden = visible !== 0;
-    if (status) status.textContent = query ? `${visible} of ${cards.length} figures match` : `${cards.length} figures`;
+    if (status) status.textContent = query || selectedCapability !== "all" ? `${visible} of ${cards.length} figures match` : `${cards.length} figures`;
+    if (capabilityStatus) {
+      const active = VIZ_CAPABILITY_DEFINITIONS.find((definition) => definition.id === selectedCapability);
+      capabilityStatus.textContent = `${visible} ${active?.label.toLocaleLowerCase() ?? "outputs"} shown`;
+    }
   };
   if (tools && search) {
     tools.hidden = false;

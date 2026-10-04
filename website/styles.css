@@ -614,6 +614,21 @@ button.button-quiet, button.button { cursor: pointer; } button.button-quiet { ba
 .viz-gallery-tools input { flex: 1 1 260px; min-height: 36px; max-width: 30rem; padding: 7px 10px; color: var(--white); background: var(--night-2); border: 1px solid var(--line); border-radius: 3px; font: .78rem var(--mono); }
 .viz-gallery-tools input:focus { outline: 2px solid var(--violet); outline-offset: 1px; border-color: var(--violet); }
 .viz-gallery-tools output { color: var(--muted-2); font: .68rem var(--mono); }
+.viz-capability-panel { display: grid; grid-template-columns: minmax(12rem, .75fr) minmax(0, 2fr); gap: 16px 22px; align-items: center; margin: 12px 0 18px; padding: 16px 18px; background: var(--night-2); border: 1px solid var(--line); border-radius: 4px; }
+.viz-capability-panel[hidden] { display: none; }
+.viz-capability-copy { display: grid; gap: 6px; }
+.viz-capability-copy p { margin: 0; }
+.viz-capability-copy .small-label { color: var(--violet-2); font: .64rem var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+.viz-capability-copy .muted { font-size: .76rem; line-height: 1.45; }
+.viz-capability-filters { display: flex; flex-wrap: wrap; gap: 8px; }
+.viz-capability-filter { display: inline-flex; min-width: 6.6rem; flex-direction: column; gap: 2px; align-items: flex-start; padding: 8px 10px; color: var(--muted); background: transparent; border: 1px solid var(--line); border-radius: 3px; text-align: left; cursor: pointer; font: .67rem var(--mono); transition: border-color 160ms ease, color 160ms ease, background 160ms ease; }
+.viz-capability-filter strong { color: var(--white); font-size: .9rem; font-weight: 600; }
+.viz-capability-filter:hover, .viz-capability-filter:focus-visible { border-color: var(--violet-2); color: var(--white); }
+.viz-capability-filter[aria-pressed="true"] { color: var(--white); background: rgba(124, 58, 237, .16); border-color: var(--violet); }
+.viz-capability-filter:focus-visible { outline: 2px solid var(--violet-2); outline-offset: 2px; }
+.viz-capability-status { grid-column: 2; margin: -4px 0 0; color: var(--muted-2); font: .66rem var(--mono); }
+.viz-capability-tags { display: flex; flex-wrap: wrap; gap: 5px; margin: 0; padding: 0; list-style: none; }
+.viz-capability-tags li { padding: 3px 6px; color: var(--violet-2); border: 1px solid rgba(139, 92, 246, .34); border-radius: 2px; font: .6rem var(--mono); letter-spacing: .04em; text-transform: uppercase; }
 .viz-gallery { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
 .viz-gallery-empty { grid-column: 1 / -1; margin: 0; padding: 28px; border: 1px solid var(--line); background: var(--night-2); font: .78rem var(--mono); }
 .viz-card[hidden] { display: none; }
@@ -647,6 +662,8 @@ button.button-quiet, button.button { cursor: pointer; } button.button-quiet { ba
 .artifact-body .text-link { margin-top: auto; padding-top: 8px; }
 @media (max-width: 860px) {
   .viz-intro, .viz-workflow-grid, .viz-gallery, .viz-matrix, .home-viz, .artifact-grid { grid-template-columns: minmax(0, 1fr); }
+  .viz-capability-panel { grid-template-columns: minmax(0, 1fr); }
+  .viz-capability-status { grid-column: auto; }
 }
 
 .viz-dialog { width: min(1100px, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 0; background: var(--night-2); color: var(--white); border: 1px solid var(--line); border-radius: 6px; }
