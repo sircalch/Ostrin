@@ -197,6 +197,9 @@ if (lab) {
     check(read(figure.source).replaceAll("\r\n", "\n") === figure.code, `viz ${figure.id}: code drifted from ${figure.source}; run node scripts/lab-data.mjs --write`);
     const svg = read(`website/${figure.svg}`);
     check(svg.startsWith("<svg") && svg.includes('xmlns="http://www.w3.org/2000/svg"') && svg.trimEnd().endsWith("</svg>"), `viz ${figure.id}: ${figure.svg} is not a recorded SVG`);
+    const capabilities = new Set(figure.capabilities ?? []);
+    check(capabilities.has("2d") !== capabilities.has("3d"), `viz ${figure.id}: expected exactly one 2D or 3D capability tag`);
+    for (const capability of capabilities) check(["2d", "3d", "animation", "tables", "reproducibility", "units"].includes(capability), `viz ${figure.id}: unknown capability ${capability}`);
     if (figure.bundle) {
       const bundlePath = path.join(websiteRoot, figure.bundle);
       check(existsSync(bundlePath), `viz ${figure.id}: experiment bundle ${figure.bundle} is missing`);
@@ -242,6 +245,8 @@ if (lab) {
   check(read("website/viz.html").includes("data-viz-gallery"), "viz.html: missing gallery container");
   check(read("website/viz.html").includes("data-viz-gallery-tools")
     && read("website/viz.html").includes("viz-gallery-search"), "viz.html: missing gallery search controls");
+  check(read("website/viz.html").includes("data-viz-capabilities")
+    && read("website/viz.js").includes("data-viz-capability"), "viz gallery: missing capability filters");
   check(read("website/viz.html").includes("data-viz-workflows"), "viz.html: missing featured workflow container");
   check(read("website/viz.js").includes("Download experiment bundle"), "viz.js: missing experiment bundle download control");
   check(read("website/viz.js").includes("data-viz-playground")
