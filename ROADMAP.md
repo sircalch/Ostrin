@@ -16,8 +16,11 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    `zeros`/`ones`, `norm`, `abs` escalar y `sqrt` migró 348 funciones compartidas por la suite;
    LU ya está disponible con paridad publicada en el Lab; QR y Cholesky cruzan la IR y conservan esa
    paridad. El renderer de `std.viz` y sus superficies 2D/3D ya cruzan IR/C; las
-   instanciaciones genéricas de trazado con `Quantity` ya comparten esa ruta; quedan funciones
-   numéricas auxiliares y el ejemplo compuesto de selección enlazada, cuyos agregados y ownership siguen necesitando la migración gradual. La preparación numérica
+   las instanciaciones genéricas de trazado con `Quantity` siguen en fallback HIR/AST: un
+   experimento de `Figure.unit_line`/`unit_scatter` reveló que una etiqueta de unidad prestada
+   puede quedar viva después de liberar su array propietario. Quedan por cerrar ese contrato de
+   ownership antes de llevarlas a IR/C, además de funciones numéricas auxiliares y el ejemplo
+   compuesto de selección enlazada, cuyos agregados siguen necesitando la migración gradual. La preparación numérica
    de histogramas y violines ya cruza IR/C mediante `histogram`, `linspace`, `pow`, `norm_pdf` y
    `norm_cdf`, y los ids
    deterministas de `std.viz::uid` usan `hash(String)` en IR/C y el renderer usa un recorrido IR

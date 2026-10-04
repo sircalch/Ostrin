@@ -160,7 +160,10 @@ Sobre este IR se hacen los análisis que el texto C no permite:
    `linspace`, `pow`, `norm_pdf` y `norm_cdf`, `std.viz::uid` usa `hash(String)` en IR/C y `std.viz::render` recorre
    explícitamente sus series. HIR sustituye `Self` por el propietario concreto en las firmas de
    métodos de traits, por lo que los operadores de `Complex` también cruzan IR/C; las
-   instanciaciones genéricas de trazado con `Quantity` ya cruzan IR/C,
+   las instanciaciones genéricas de trazado con `Quantity` permanecen en fallback HIR/AST:
+   el intento de bajar `Figure.unit_line`/`unit_scatter` a IR/C expuso un alias prestado de la
+   etiqueta de unidad después de liberar el array propietario; se retomarán cuando el contrato de
+   ownership de `Quantity` escalar esté explícito,
    además de los agregados de LU, SVD, número de condición, autovectores y `ComplexVector`/`ComplexMatrix`,
    que quedan pendientes de migrar a IR, mientras los métodos de records recursivos conservan
    HIR/AST por seguridad, y solo permite reducirlo o justificar explícitamente
