@@ -4,6 +4,37 @@
  * but its unit is a runtime string, exactly like Value::Quantity. */
 typedef struct { double v; const char* u; } Qty;
 
+/* Scalar Quantity ownership contract.
+ *
+ * A Qty carries one reference to a dynamic unit label in `u`.  Static unit
+ * literals are intentionally harmless to retain/release because the runtime
+ * allocator only tracks labels returned by ostrin_alloc.  Producers that
+ * borrow an existing label must use `from_borrowed`; producers that receive a
+ * freshly allocated label from `ostrin_unit_combine` use `from_owned`.
+ */
+static void ostrin_qty_retain(Qty q) {
+    if (q.u) ostrin_retain((void*)q.u);
+}
+
+static void ostrin_qty_release(Qty q) {
+    if (q.u) ostrin_release((void*)q.u);
+}
+
+static Qty ostrin_qty_copy(Qty q) {
+    ostrin_qty_retain(q);
+    return q;
+}
+
+static Qty ostrin_qty_from_borrowed(double v, const char* u) {
+    Qty q = { v, u };
+    return ostrin_qty_copy(q);
+}
+
+static Qty ostrin_qty_from_owned(double v, const char* u) {
+    Qty q = { v, u };
+    return q;
+}
+
 /* Unit catalog: symbol, factor to the coherent SI unit and, for simple
  * atoms, their single base dimension (NULL for derived units such as J).
  * Mirrors types::unit_info. */
@@ -172,17 +203,19 @@ static const char* ostrin_unit_combine(const char* a, const char* b, int divide,
     return ostrin_unit_cat(buf, "", "");
 }
 
-static Qty ostrin_qty_add(Qty a, Qty b) { Qty r = { a.v + ostrin_convert(b.v, b.u, a.u), a.u }; return r; }
-static Qty ostrin_qty_sub(Qty a, Qty b) { Qty r = { a.v - ostrin_convert(b.v, b.u, a.u), a.u }; return r; }
+static Qty ostrin_qty_add(Qty a, Qty b) { return ostrin_qty_from_borrowed(a.v + ostrin_convert(b.v, b.u, a.u), a.u); }
+static Qty ostrin_qty_sub(Qty a, Qty b) { return ostrin_qty_from_borrowed(a.v - ostrin_convert(b.v, b.u, a.u), a.u); }
 static Qty ostrin_qty_mul(Qty a, Qty b) {
     double scale;
-    Qty r = { a.v * b.v, ostrin_unit_combine(a.u, b.u, 0, &scale) };
+    const char* u = ostrin_unit_combine(a.u, b.u, 0, &scale);
+    Qty r = ostrin_qty_from_owned(a.v * b.v, u);
     if (scale != 1.0) r.v *= scale;
     return r;
 }
 static Qty ostrin_qty_div(Qty a, Qty b) {
     double scale;
-    Qty r = { a.v / b.v, ostrin_unit_combine(a.u, b.u, 1, &scale) };
+    const char* u = ostrin_unit_combine(a.u, b.u, 1, &scale);
+    Qty r = ostrin_qty_from_owned(a.v / b.v, u);
     if (scale != 1.0) r.v *= scale;
     return r;
 }
@@ -190,15 +223,20 @@ static Qty ostrin_qty_div(Qty a, Qty b) {
  * into the value, as the interpreter does. */
 static Qty ostrin_qty_mul_pure(Qty a, Qty b) {
     Qty r = ostrin_qty_mul(a, b);
-    if (*r.u) { r.v *= ostrin_unit_expr_factor(r.u); r.u = ""; }
+    if (*r.u) {
+        r.v *= ostrin_unit_expr_factor(r.u);
+        ostrin_qty_release(r);
+        r.u = "";
+    }
     return r;
 }
 static double ostrin_qty_ratio(Qty a, Qty b) { return a.v / ostrin_convert(b.v, b.u, a.u); }
-static Qty ostrin_qty_scale_mul(Qty a, double s) { Qty r = { a.v * s, a.u }; return r; }
-static Qty ostrin_qty_scale_div(Qty a, double s) { Qty r = { a.v / s, a.u }; return r; }
+static Qty ostrin_qty_scale_mul(Qty a, double s) { return ostrin_qty_from_borrowed(a.v * s, a.u); }
+static Qty ostrin_qty_scale_div(Qty a, double s) { return ostrin_qty_from_borrowed(a.v / s, a.u); }
 static Qty ostrin_scalar_div_qty(double s, Qty a) {
     double scale;
-    Qty r = { s / a.v, ostrin_unit_combine("", a.u, 1, &scale) };
+    const char* u = ostrin_unit_combine("", a.u, 1, &scale);
+    Qty r = ostrin_qty_from_owned(s / a.v, u);
     if (scale != 1.0) r.v *= scale;
     return r;
 }

@@ -11,6 +11,8 @@ const requiredFiles = [
   "compiler/tests/examples.rs",
   "compiler/tests/differential.rs",
   "compiler/src/ownership.rs",
+  "compiler/src/ir_c.rs",
+  "compiler/src/qty_runtime.c",
   "ESTADO_Y_PLAN.md",
   "ROADMAP.md",
 ];
@@ -30,7 +32,7 @@ function update(root, relativePath, change) {
   writeFileSync(file, change(readFileSync(file, "utf8")), "utf8");
 }
 
-test("current Quantity ownership boundary passes", () => {
+test("current Quantity phase 1 ownership boundary passes", () => {
   assert.deepEqual(validateQuantityOwnership(repositoryRoot).errors, []);
 });
 
@@ -45,10 +47,10 @@ test("fails when the viz_units fallback baseline is removed", () => {
   }
 });
 
-test("fails when design 27 is marked as enabled before its ownership evidence", () => {
+test("fails when design 27 loses its phase 1 status", () => {
   const root = fixtureRoot();
   try {
-    update(root, "docs/design/27-ownership-de-quantity-escalar.md", (source) => source.replace("No habilita todavía", "Habilita"));
+    update(root, "docs/design/27-ownership-de-quantity-escalar.md", (source) => source.replace("fase 1 implementada y validada", "diseño técnico para revisión"));
     const { errors } = validateQuantityOwnership(root);
     assert.ok(errors.some((error) => error.includes("design 27")));
   } finally {
@@ -56,12 +58,12 @@ test("fails when design 27 is marked as enabled before its ownership evidence", 
   }
 });
 
-test("fails when Quantity enters managed ownership without the migration matrix", () => {
+test("fails when Quantity enters managed ownership without typed helpers", () => {
   const root = fixtureRoot();
   try {
-    update(root, "compiler/src/ownership.rs", (source) => source.replace(/Ty::Quantity\(_\)\s*\|\s*Ty::Int/, "Ty::Quantity(_) => true,\n        Ty::Int"));
+    update(root, "compiler/src/qty_runtime.c", (source) => source.replaceAll("ostrin_qty_retain", "removed_qty_retain"));
     const { errors } = validateQuantityOwnership(root);
-    assert.ok(errors.some((error) => error.includes("Ty::Quantity")));
+    assert.ok(errors.some((error) => error.includes("typed Quantity helper marker")));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

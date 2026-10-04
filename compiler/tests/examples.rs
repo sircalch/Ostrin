@@ -8769,6 +8769,82 @@ fn native_quantity_list_escape_retains_array_unit_labels() {
 }
 
 #[test]
+fn native_quantity_scalar_escape_retains_array_unit_labels() {
+    // A scalar reduction returns a Qty by value.  Its unit label must be
+    // retained before the source array is released, otherwise a dynamic unit
+    // such as m/s becomes dangling at the next scalar consumer.
+    let file = temp_source(
+        "native-quantity-scalar-escape.ostrin",
+        "fn id(q: Quantity<Length / Time>) -> Quantity<Length / Time> {\n    q\n}\nfn main() -> Void {\n    values = array([1 m, 2 m, 3 m]) / (1 s)\n    peak = values.max()\n    escaped = id(peak)\n    print(escaped)\n}\n",
+    );
+    let expected = "3 m/s\n";
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    if skip_if_no_c_compiler(&report) {
+        let _ = fs::remove_file(&file);
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ir-generated: 2"), "{report_text}");
+    assert!(report_text.contains("hir-generated: 0"), "{report_text}");
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "WASI C emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("ostrin_qty_from_borrowed")
+            && wasi_source.contains("ostrin_qty_retain")
+            && wasi_source.contains("ostrin_qty_release"),
+        "WASI C omitted scalar Quantity ownership helpers"
+    );
+
+    let exe = temp_artifact("native-quantity-scalar-escape.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run quantity scalar escape binary");
+    let _ = fs::remove_file(&exe);
+    let _ = fs::remove_file(&file);
+    assert!(
+        native.status.success(),
+        "native binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "scalar Quantity unit label leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn native_list_of_quantity_arrays_matches_interpreter_and_wasi() {
     let file = temp_source(
         "native-list-quantity-arrays.ostrin",

@@ -267,8 +267,23 @@ pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
                         instruction: index,
                     });
                 }
-                if let IrInstr::Opaque { op, .. } = instruction {
-                    if !(op.starts_with("as<") || op.starts_with("index_range<")) {
+                if let IrInstr::Opaque { op, inputs, .. } = instruction {
+                    // These Opaque forms only inspect scalar quantities and
+                    // never retain/capture their unit pointer.  Treating
+                    // them as barriers would make every quantity used in a
+                    // comparison ineligible for IR ownership lowering.
+                    let quantity_read_only = matches!(
+                        op.as_str(),
+                        "approximately" | "within<To>" | "within<Until>"
+                    ) && inputs.iter().all(|input| {
+                        definitions
+                            .get(input)
+                            .is_some_and(|(ty, _, _)| matches!(ty, Ty::Quantity(_)))
+                    });
+                    if !(op.starts_with("as<")
+                        || op.starts_with("index_range<")
+                        || quantity_read_only)
+                    {
                         for value in used_values(instruction) {
                             opaque_values.insert(value);
                         }
@@ -919,6 +934,14 @@ fn safe_release_site(instruction: &IrInstr) -> bool {
         IrInstr::Opaque { op, .. } if op.starts_with("as<") || op.starts_with("index_range<") => {
             true
         }
+        IrInstr::Opaque { op, .. }
+            if matches!(
+                op.as_str(),
+                "approximately" | "within<To>" | "within<Until>"
+            ) =>
+        {
+            true
+        }
         // Methods use the same borrowed argument contract as ordinary calls.
         // Native method emitters retain managed values they store or return,
         // so the last local reference can be released after any method call.
@@ -1283,15 +1306,20 @@ fn analyze_function(function: &crate::ir::IrFunction, report: &mut OwnershipRepo
 
 pub(crate) fn requires_management(ty: &Ty) -> bool {
     match ty {
-        Ty::String | Ty::List(_) | Ty::Map(_, _) | Ty::Set(_) | Ty::Dyn(_) | Ty::Fn(_, _) => true,
+        Ty::String
+        | Ty::List(_)
+        | Ty::Map(_, _)
+        | Ty::Set(_)
+        | Ty::Dyn(_)
+        | Ty::Fn(_, _)
+        | Ty::Quantity(_) => true,
         Ty::Applied(name, args)
             if name == "Option" && args.len() == 1 && option_value_payload(&args[0]) =>
         {
             false
         }
         Ty::Named(_) | Ty::Applied(_, _) => true,
-        Ty::Quantity(_)
-        | Ty::Int
+        Ty::Int
         | Ty::Float
         | Ty::Bool
         | Ty::Char
