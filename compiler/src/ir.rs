@@ -417,6 +417,43 @@ impl Builder {
         dst
     }
 
+    /// Lower a collection element with the element type already established
+    /// by the checked collection expression.  The checker keeps the source
+    /// literal's scalar type (`Float`) even when an explicitly typed
+    /// `List<Float32>` asks for the native single-precision representation;
+    /// the legacy emitter performs that numeric coercion while building the
+    /// C array literal. Preserve the same boundary in IR so the aggregate
+    /// remains type-correct without widening the general coercion rules.
+    fn coerce_numeric_value(&mut self, source: ValueId, source_ty: &Ty, expected: &Ty) -> ValueId {
+        if source_ty == expected {
+            return source;
+        }
+        let target = match expected {
+            Ty::Float => "Float",
+            Ty::Float32 => "Float32",
+            _ => return source,
+        };
+        if !matches!(
+            (source_ty, expected),
+            (Ty::Float, Ty::Float32) | (Ty::Float32, Ty::Float)
+        ) {
+            return source;
+        }
+        let dst = self.fresh();
+        self.emit(IrInstr::Opaque {
+            dst: Some(dst),
+            op: format!("as<{target}>"),
+            inputs: vec![source],
+            ty: expected.clone(),
+        });
+        dst
+    }
+
+    fn lower_collection_element(&mut self, value: &HirExpr, expected: &Ty) -> ValueId {
+        let source = self.lower_expr(value);
+        self.coerce_numeric_value(source, &value.ty, expected)
+    }
+
     fn unit(&mut self) -> ValueId {
         self.const_value("unit", Ty::Void)
     }
@@ -801,8 +838,19 @@ impl Builder {
 
     fn lower_stmt(&mut self, statement: &HirStmt) {
         match statement {
-            HirStmt::Let { name, value, .. } => {
-                let value = self.lower_expr(value);
+            HirStmt::Let {
+                name,
+                declared,
+                value,
+                ..
+            } => {
+                let value_id = self.lower_expr(value);
+                let value = declared
+                    .as_ref()
+                    .map(crate::typeck::resolve_type)
+                    .map_or(value_id, |expected| {
+                        self.coerce_numeric_value(value_id, &value.ty, &expected)
+                    });
                 self.emit(IrInstr::StoreLocal {
                     name: name.clone(),
                     value,
@@ -2435,7 +2483,14 @@ impl Builder {
             }
             HirKind::Lambda(params, body) => self.lower_lambda(expression, params, body),
             HirKind::List(values) | HirKind::Set(values) => {
-                let fields = values.iter().map(|value| self.lower_expr(value)).collect();
+                let element = match &expression.ty {
+                    Ty::List(element) | Ty::Set(element) => element.as_ref(),
+                    _ => unreachable!("list/set HIR expression must have a collection type"),
+                };
+                let fields = values
+                    .iter()
+                    .map(|value| self.lower_collection_element(value, element))
+                    .collect();
                 let dst = self.fresh();
                 self.emit(IrInstr::Aggregate {
                     dst,
