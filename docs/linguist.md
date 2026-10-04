@@ -13,7 +13,10 @@ se presenta como evidencia de adopción externa.
 La entrada que se llevaría a `lib/linguist/languages.yml` es:
 
 La versión machine-readable se conserva en [`docs/linguist-language.yml`](linguist-language.yml)
-y se valida con `node scripts/linguist-check.mjs`.
+y se valida con `node scripts/linguist-check.mjs`. El inventario source-backed de muestras,
+con su rol, licencia y URL canónica, se mantiene en
+[`docs/linguist-samples.yml`](linguist-samples.yml); el mismo gate comprueba que las rutas
+existan y que no se presente una muestra sin licencia u origen.
 
 ```yaml
 Ostrin:
@@ -46,7 +49,7 @@ aislado. El repositorio ya contiene ejemplos de:
 - concurrencia: `examples/native_concurrency.ostrin`, `examples/concurrency.ostrin`;
 - records, traits, módulos y paquetes: los ejemplos correspondientes bajo `examples/`.
 
-El inventario actual tiene **282 archivos `.ostrin` rastreados**, de los cuales **266** están
+El inventario actual tiene **284 archivos `.ostrin` rastreados**, de los cuales **266** están
 bajo `examples/`; todos pertenecen al repositorio de Ostrin. Eso demuestra variedad sintáctica,
 no el uso distribuido que Linguist exige para aceptar una extensión nueva.
 
@@ -62,8 +65,9 @@ Linguist no incluye lenguajes ausentes de `languages.yml` en sus estadísticas.
 
 ## Procedimiento cuando exista uso suficiente
 
-1. Preparar una copia de muestras representativas bajo `samples/Ostrin/` y
-   conservar sus licencias u origen.
+1. Copiar las muestras source-backed descritas en
+   [`docs/linguist-samples.yml`](linguist-samples.yml) bajo `samples/Ostrin/` y
+   conservar sus licencias y enlaces al origen.
 2. Añadir la entrada anterior y la gramática mediante las herramientas de
    `github/linguist`.
 3. Ejecutar `bundle exec rake test` y

@@ -62,15 +62,17 @@ Antes de abrir el PR se deben conservar en el informe:
 5. la licencia y el origen de cada muestra propuesta.
 
 La entrada local en [`docs/linguist-language.yml`](linguist-language.yml), la gramática
-TextMate y las muestras candidatas pasan el gate local:
+TextMate y el inventario source-backed de muestras en
+[`docs/linguist-samples.yml`](linguist-samples.yml) pasan el gate local:
 
 ```powershell
 node scripts/linguist-check.mjs
 node --test scripts/linguist-check.test.mjs
 ```
 
-Ese gate prueba la preparación del repositorio; no reemplaza la aceptación de
-Linguist ni la evidencia de uso externo.
+Ese gate comprueba la preparación reproducible del repositorio, incluidas las rutas,
+licencias y enlaces de origen de las muestras; no reemplaza la aceptación de Linguist
+ni la evidencia de uso externo.
 
 ## Validación contra un checkout real de `github-linguist`
 

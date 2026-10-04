@@ -1,0 +1,33 @@
+# Candidate samples for a future github/linguist pull request.
+# Every entry is source-backed and covered by the repository MIT license.
+schema: ostrin.linguist-samples/v1
+license: MIT
+samples:
+  - path: examples/physics.ostrin
+    role: quantities-and-conversions
+    source: https://github.com/sircalch/Ostrin/blob/main/examples/physics.ostrin
+    license: MIT
+  - path: examples/quantity_arrays.ostrin
+    role: arrays-of-quantities
+    source: https://github.com/sircalch/Ostrin/blob/main/examples/quantity_arrays.ostrin
+    license: MIT
+  - path: examples/arrays.ostrin
+    role: arrays-and-collections
+    source: https://github.com/sircalch/Ostrin/blob/main/examples/arrays.ostrin
+    license: MIT
+  - path: examples/numeric_methods.ostrin
+    role: numerical-methods
+    source: https://github.com/sircalch/Ostrin/blob/main/examples/numeric_methods.ostrin
+    license: MIT
+  - path: examples/native_concurrency.ostrin
+    role: native-concurrency
+    source: https://github.com/sircalch/Ostrin/blob/main/examples/native_concurrency.ostrin
+    license: MIT
+  - path: examples/concurrency.ostrin
+    role: deterministic-concurrency
+    source: https://github.com/sircalch/Ostrin/blob/main/examples/concurrency.ostrin
+    license: MIT
+  - path: examples/native_records.ostrin
+    role: records-and-methods
+    source: https://github.com/sircalch/Ostrin/blob/main/examples/native_records.ostrin
+    license: MIT

@@ -27,7 +27,8 @@ language bar cannot display it as a stable category yet. The roadmap now include
 the upstream submission: representative `.ostrin` samples, a language definition,
 local Linguist validation, and repository classification after acceptance. The
 draft entry and upstream checklist live in [`docs/linguist.md`](docs/linguist.md),
-with the machine-readable proposal in [`docs/linguist-language.yml`](docs/linguist-language.yml).
+with the machine-readable proposal in [`docs/linguist-language.yml`](docs/linguist-language.yml)
+and the source-backed sample inventory in [`docs/linguist-samples.yml`](docs/linguist-samples.yml).
 Run `node scripts/linguist-check.mjs` to validate the proposal, TextMate scope,
 license and representative samples before opening an upstream request.
 

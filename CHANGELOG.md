@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### GitHub Linguist sample provenance
+
+- Added a machine-readable inventory for representative `.ostrin` samples with
+  their role, MIT license and canonical source URL.
+- Extended the local Linguist gate and tests to validate every sample path,
+  origin and license before a future upstream proposal.
+
 ### Native IR: fixed-width integer `abs`
 
 - Scalar `abs` now lowers through IR/C for every fixed-width integer type while
