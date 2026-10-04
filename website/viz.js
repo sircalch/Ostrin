@@ -171,6 +171,19 @@ function readWorkflowState() {
   return (LAB?.workflows ?? []).find((workflow) => workflow.id === id) ?? null;
 }
 
+function readGalleryCapability() {
+  const id = new URL(window.location.href).searchParams.get("capability");
+  return VIZ_CAPABILITY_DEFINITIONS.some((definition) => definition.id === id) ? id : "all";
+}
+
+function writeGalleryCapability(capability, mode = "replace") {
+  const url = new URL(window.location.href);
+  url.searchParams.delete("capability");
+  if (capability !== "all") url.searchParams.set("capability", capability);
+  const method = mode === "push" ? "pushState" : "replaceState";
+  window.history[method]({ capability }, "", url.href);
+}
+
 function writeWorkflowState(workflowId, mode = "replace") {
   const url = new URL(window.location.href);
   url.searchParams.set("workflow", workflowId);
@@ -178,6 +191,7 @@ function writeWorkflowState(workflowId, mode = "replace") {
   for (const parameter of VIZ_PARAMETER_NAMES) url.searchParams.delete(parameter);
   url.searchParams.delete("azimuth");
   url.searchParams.delete("elevation");
+  url.searchParams.delete("capability");
   url.hash = `workflow-${workflowId}`;
   const method = mode === "push" ? "pushState" : "replaceState";
   window.history[method]({ workflow: workflowId }, "", url.href);
@@ -1748,7 +1762,7 @@ function mountGallery(root) {
   const capabilityPanel = document.querySelector("[data-viz-capabilities]");
   const capabilityFilters = capabilityPanel?.querySelector("[data-viz-capability-filters]");
   const capabilityStatus = capabilityPanel?.querySelector("[data-viz-capability-status]");
-  let selectedCapability = "all";
+  let selectedCapability = readGalleryCapability();
   const empty = el("p", { className: "viz-gallery-empty dim", hidden: true, text: "No figures match this search." });
   const capabilityCounts = new Map(VIZ_CAPABILITY_DEFINITIONS.map(({ id }) => [id, id === "all"
     ? cards.length
@@ -1758,6 +1772,7 @@ function mountGallery(root) {
       type: "button",
       className: "viz-capability-filter",
       "data-viz-capability": definition.id,
+      "aria-controls": "viz-gallery",
       "aria-pressed": definition.id === "all" ? "true" : "false",
       title: definition.description,
     }, [
@@ -1766,12 +1781,16 @@ function mountGallery(root) {
     ]);
     button.addEventListener("click", () => {
       selectedCapability = definition.id;
+      writeGalleryCapability(selectedCapability, "push");
       for (const candidate of capabilityButtons) candidate.setAttribute("aria-pressed", String(candidate === button));
       updateSearch();
     });
     return button;
   });
   capabilityFilters?.replaceChildren(...capabilityButtons);
+  for (const button of capabilityButtons) {
+    button.setAttribute("aria-pressed", String(button.dataset.vizCapability === selectedCapability));
+  }
   if (capabilityPanel) capabilityPanel.hidden = false;
   const updateSearch = () => {
     const query = search?.value.trim().toLocaleLowerCase() ?? "";

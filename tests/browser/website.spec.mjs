@@ -582,6 +582,20 @@ test("Viz gallery defers the compiler download until a live action", async ({ pa
   expect(wasmRequests).toEqual([]);
 });
 
+test("Viz capability filters are shareable and expose their gallery target", async ({ page }) => {
+  await page.goto("./viz.html?capability=3d", { waitUntil: "domcontentloaded" });
+  const gallery = page.locator("[data-viz-gallery]");
+  const activeCards = gallery.locator('.viz-card:not([hidden])');
+  const threeD = page.locator('[data-viz-capability="3d"]');
+  await expect(activeCards).toHaveCount(7);
+  await expect(threeD).toHaveAttribute("aria-pressed", "true");
+  await expect(threeD).toHaveAttribute("aria-controls", "viz-gallery");
+  await expect(page.locator("[data-viz-capability-status]")).toHaveText("7 3d scenes shown");
+  await page.locator('[data-viz-capability="all"]').click();
+  await expect(activeCards).toHaveCount(29);
+  await expect(page).toHaveURL(/viz\.html$/);
+});
+
 test("Viz exposes the recorded 3D surface experiment bundle", async ({ page }) => {
   await page.goto("./viz.html", { waitUntil: "domcontentloaded" });
   const bundleDownloadPromise = page.waitForEvent("download");

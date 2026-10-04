@@ -247,6 +247,10 @@ if (lab) {
     && read("website/viz.html").includes("viz-gallery-search"), "viz.html: missing gallery search controls");
   check(read("website/viz.html").includes("data-viz-capabilities")
     && read("website/viz.js").includes("data-viz-capability"), "viz gallery: missing capability filters");
+  check(read("website/viz.js").includes("readGalleryCapability")
+    && read("website/viz.js").includes("writeGalleryCapability")
+    && read("website/viz.js").includes('"aria-controls": "viz-gallery"'),
+  "viz gallery: capability filters must be shareable and tied to the gallery");
   check(read("website/viz.html").includes("Recorded SVGs load immediately")
     && !read("website/viz.js").includes("runtime().then(({ loadCompiler }) => loadCompiler())"),
   "viz gallery: compiler should load on demand after the initial page render");
