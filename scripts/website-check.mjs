@@ -240,8 +240,12 @@ if (lab) {
   }
   for (const kind of ["figure", "table", "animation", "provenance"]) check(workflowKinds.has(kind), `featured workflows: missing ${kind} step`);
   check(read("website/viz.html").includes("data-viz-gallery"), "viz.html: missing gallery container");
+  check(read("website/viz.html").includes("data-viz-gallery-tools")
+    && read("website/viz.html").includes("viz-gallery-search"), "viz.html: missing gallery search controls");
   check(read("website/viz.html").includes("data-viz-workflows"), "viz.html: missing featured workflow container");
   check(read("website/viz.js").includes("Download experiment bundle"), "viz.js: missing experiment bundle download control");
+  check(read("website/viz.js").includes("data-viz-playground")
+    && read("website/viz.js").includes("playgroundHref"), "viz.js: missing Playground source handoff");
 }
 
 const reference = read("website/reference.html");

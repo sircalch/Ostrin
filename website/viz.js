@@ -210,6 +210,12 @@ function downloadSvg(source, title) {
   downloadBlob(new Blob([source], { type: "image/svg+xml;charset=utf-8" }), `${fileStem(title)}.svg`);
 }
 
+function playgroundHref(source) {
+  const url = new URL("playground.html", window.location.href);
+  url.searchParams.set("code", source);
+  return url.href;
+}
+
 async function downloadExperimentBundle(url, title) {
   const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) throw new Error(`experiment bundle unavailable (HTTP ${response.status})`);
@@ -1535,6 +1541,13 @@ function card(figure) {
   const status = el("span", { className: "sl-status", text: "loading compiler…" });
   let liveSvg = null;
   const explore = el("button", { type: "button", className: "button-quiet", "data-viz-explore": figure.id, text: "Explore" });
+  const playground = el("a", {
+    className: "button-quiet",
+    href: playgroundHref(figure.code),
+    "data-viz-playground": figure.id,
+    "aria-label": `Open ${figure.title} in the Playground`,
+    text: "Open in Playground",
+  });
   const bundle = figure.bundle
     ? el("button", { type: "button", className: "button-quiet", "aria-label": "Download experiment bundle", "data-viz-bundle": figure.id, text: "Bundle" })
     : null;
@@ -1606,6 +1619,7 @@ function card(figure) {
 
   return {
     id: figure.id,
+    searchText: [figure.id, figure.title, figure.blurb, figure.source].join(" ").toLocaleLowerCase(),
     run,
     status,
     explore,
@@ -1615,7 +1629,7 @@ function card(figure) {
         el("h3", { text: figure.title }),
         el("p", { className: "muted", text: figure.blurb }),
         figure.printed.length ? printed : null,
-        el("div", { className: "sl-actions" }, [run, explore, bundle, status, el("a", { className: "text-link", href: figure.sourceUrl, text: "View source ↗" })]),
+        el("div", { className: "sl-actions" }, [run, explore, playground, bundle, status, el("a", { className: "text-link", href: figure.sourceUrl, text: "View source ↗" })]),
         provenance,
         code,
       ]),
@@ -1710,7 +1724,28 @@ function mountWorkflows(root) {
 
 function mountGallery(root) {
   const cards = LAB.gallery.map(card);
-  root.replaceChildren(...cards.map((item) => item.node));
+  const tools = document.querySelector("[data-viz-gallery-tools]");
+  const search = tools?.querySelector("#viz-gallery-search");
+  const status = tools?.querySelector("[data-viz-gallery-status]");
+  const empty = el("p", { className: "viz-gallery-empty dim", hidden: true, text: "No figures match this search." });
+  const updateSearch = () => {
+    const query = search?.value.trim().toLocaleLowerCase() ?? "";
+    let visible = 0;
+    for (const item of cards) {
+      const matches = !query || item.searchText.includes(query);
+      item.node.hidden = !matches;
+      if (matches) visible += 1;
+    }
+    empty.hidden = visible !== 0;
+    if (status) status.textContent = query ? `${visible} of ${cards.length} figures match` : `${cards.length} figures`;
+  };
+  if (tools && search) {
+    tools.hidden = false;
+    search.setAttribute("aria-controls", "viz-gallery");
+    search.addEventListener("input", updateSearch);
+  }
+  root.replaceChildren(empty, ...cards.map((item) => item.node));
+  updateSearch();
   const initial = readVizState();
   if (initial) {
     const target = cards.find((item) => item.id === initial.figureId);
