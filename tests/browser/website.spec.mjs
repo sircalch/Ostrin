@@ -582,6 +582,22 @@ test("Viz gallery defers the compiler download until a live action", async ({ pa
   expect(wasmRequests).toEqual([]);
 });
 
+test("Viz figure manifests preserve source and recorded provenance", async ({ page }) => {
+  await page.goto("./viz.html", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("[data-viz-gallery] .viz-card")).toHaveCount(29);
+  const manifestDownloadPromise = page.waitForEvent("download");
+  await page.locator('[data-viz-manifest="provenance"]').click();
+  const manifestDownload = await manifestDownloadPromise;
+  expect(manifestDownload.suggestedFilename()).toBe("reproducible-provenance.ostrin-figure.json");
+  const manifest = JSON.parse(await readFile(await manifestDownload.path(), "utf8"));
+  expect(manifest.schema).toBe("ostrin.figure/v0");
+  expect(manifest.id).toBe("provenance");
+  expect(manifest.source).toBe("examples/viz_provenance.ostrin");
+  expect(manifest.svg).toBe("assets/viz/provenance.svg");
+  expect(manifest.capabilities).toContain("reproducibility");
+  expect(manifest.provenance.source_hash).toMatch(/^sha256:/);
+});
+
 test("Viz capability filters are shareable and expose their gallery target", async ({ page }) => {
   await page.goto("./viz.html?capability=3d", { waitUntil: "domcontentloaded" });
   const gallery = page.locator("[data-viz-gallery]");

@@ -54,6 +54,40 @@ function provenanceText(metadata, prefix = "Provenance") {
   return `${prefix}: ${values.join(" · ")}.`;
 }
 
+function figureManifest(figure, source = null) {
+  const metadata = provenanceOf(source) ?? (figure.provenance && Object.keys(figure.provenance).length
+    ? {
+        sourceHash: figure.provenance["source-hash"] ?? "",
+        dataHash: figure.provenance["data-hash"] ?? "",
+        seed: figure.provenance.seed ?? "",
+        compiler: figure.provenance.compiler ?? "",
+      }
+    : null);
+  return {
+    schema: "ostrin.figure/v0",
+    id: figure.id,
+    title: figure.title,
+    source: figure.source,
+    source_url: figure.sourceUrl,
+    svg: figure.svg,
+    capabilities: [...(figure.capabilities ?? [])],
+    recorded_with: LAB.recordedWith,
+    provenance: metadata
+      ? {
+          source_hash: metadata.sourceHash || null,
+          data_hash: metadata.dataHash || null,
+          seed: metadata.seed || null,
+          compiler: metadata.compiler || null,
+        }
+      : null,
+  };
+}
+
+function downloadFigureManifest(figure, source = null) {
+  const manifest = JSON.stringify(figureManifest(figure, source), null, 2) + "\n";
+  downloadBlob(new Blob([manifest], { type: "application/json;charset=utf-8" }), `${fileStem(figure.title)}.ostrin-figure.json`);
+}
+
 const SVG_NUMBER = /-?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/g;
 
 function interpolateAnimatedValue(first, second, amount) {
@@ -1555,6 +1589,21 @@ function card(figure) {
   const status = el("span", { className: "sl-status", text: "" });
   let liveSvg = null;
   const explore = el("button", { type: "button", className: "button-quiet", "data-viz-explore": figure.id, text: "Explore" });
+  const manifest = el("button", {
+    type: "button",
+    className: "button-quiet",
+    "aria-label": `Download ${figure.title} figure manifest`,
+    "data-viz-manifest": figure.id,
+    text: "Manifest",
+  });
+  manifest.addEventListener("click", () => {
+    try {
+      downloadFigureManifest(figure, liveSvg);
+      status.textContent = "manifest downloaded";
+    } catch (error) {
+      status.textContent = error.message ?? String(error);
+    }
+  });
   const playground = el("a", {
     className: "button-quiet",
     href: playgroundHref(figure.code),
@@ -1647,7 +1696,7 @@ function card(figure) {
         el("p", { className: "muted", text: figure.blurb }),
         capabilities,
         figure.printed.length ? printed : null,
-        el("div", { className: "sl-actions" }, [run, explore, playground, bundle, status, el("a", { className: "text-link", href: figure.sourceUrl, text: "View source ↗" })]),
+        el("div", { className: "sl-actions" }, [run, explore, manifest, playground, bundle, status, el("a", { className: "text-link", href: figure.sourceUrl, text: "View source ↗" })]),
         provenance,
         code,
       ]),

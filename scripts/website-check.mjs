@@ -256,6 +256,10 @@ if (lab) {
   "viz gallery: compiler should load on demand after the initial page render");
   check(read("website/viz.html").includes("data-viz-workflows"), "viz.html: missing featured workflow container");
   check(read("website/viz.js").includes("Download experiment bundle"), "viz.js: missing experiment bundle download control");
+  check(read("website/viz.js").includes('"ostrin.figure/v0"')
+    && read("website/viz.js").includes('"data-viz-manifest"')
+    && read("website/viz.html").includes("ostrin.figure/v0"),
+  "viz gallery: missing downloadable figure manifest");
   check(read("website/viz.js").includes("data-viz-playground")
     && read("website/viz.js").includes("playgroundHref"), "viz.js: missing Playground source handoff");
 }
