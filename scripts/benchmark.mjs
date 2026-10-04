@@ -3,7 +3,8 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { performance } from "node:perf_hooks";
-import { existsSync, mkdirSync, rmSync } from "node:fs";
+import os from "node:os";
+import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -69,6 +70,92 @@ function normalizeOutput(output) {
   return output.replaceAll("\r\n", "\n").trim();
 }
 
+function statistic(values) {
+  const sorted = [...values].sort((a, b) => a - b);
+  const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+  const variance = values.reduce((sum, value) => sum + ((value - mean) ** 2), 0) / values.length;
+  const percentileRank = (sorted.length - 1) * 0.95;
+  const lower = Math.floor(percentileRank);
+  const upper = Math.ceil(percentileRank);
+  const p95 = lower === upper
+    ? sorted[lower]
+    : sorted[lower] + ((sorted[upper] - sorted[lower]) * (percentileRank - lower));
+  return {
+    samples: sorted.length,
+    minMs: Number(sorted[0].toFixed(3)),
+    maxMs: Number(sorted.at(-1).toFixed(3)),
+    meanMs: Number(mean.toFixed(3)),
+    medianMs: Number(median(values).toFixed(3)),
+    p95Ms: Number(p95.toFixed(3)),
+    stdevMs: Number(Math.sqrt(variance).toFixed(3)),
+  };
+}
+
+function compilerToolchain() {
+  const configured = process.env.OSTRIN_CC?.trim();
+  const candidates = configured ? [configured] : ["cc", "gcc", "clang"];
+  for (const command of candidates) {
+    const result = spawnSync(command, ["--version"], { cwd: repo, encoding: "utf8", timeout: 10000 });
+    if (!result.error && result.status === 0) {
+      const version = (result.stdout || result.stderr || "").trim().split(/\r?\n/, 1)[0] || "unknown";
+      return { command, version };
+    }
+  }
+  return { command: candidates[0] || "unknown", version: "unavailable" };
+}
+
+function gitSnapshot() {
+  let commit = process.env.GITHUB_SHA || "unknown";
+  let clean = false;
+  try {
+    commit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: repo, encoding: "utf8" }).trim() || commit;
+    const status = execFileSync("git", ["status", "--porcelain"], { cwd: repo, encoding: "utf8" });
+    clean = status.trim() === "";
+  } catch {
+    // The report still records the fallback commit and explicitly marks the
+    // checkout as unverified instead of hiding the missing Git context.
+  }
+  return { commit, clean };
+}
+
+function hostMetadata() {
+  const cpu = os.cpus()[0];
+  return {
+    platform: process.platform,
+    arch: process.arch,
+    os: {
+      type: os.type(),
+      release: os.release(),
+      version: typeof os.version === "function" ? os.version() : "unknown",
+    },
+    cpu: {
+      model: cpu?.model || "unknown",
+      logicalCores: os.cpus().length,
+    },
+    memoryBytes: os.totalmem(),
+  };
+}
+
+function nativeCompileMetadata() {
+  const flags = ["-O2"];
+  if (process.platform !== "win32") flags.push("-pthread", "-lm");
+  if (process.env.OSTRIN_CFLAGS?.trim()) flags.push(...process.env.OSTRIN_CFLAGS.trim().split(/\s+/));
+  flags.push("-ffp-contract=off");
+  return {
+    target: "native",
+    cCompiler: compilerToolchain(),
+    // These defaults are assembled by ostrinc itself in compiler/src/main.rs;
+    // the runner records them as source-defined defaults, not as an intercepted
+    // subprocess argv. OSTRIN_CFLAGS is recorded separately as an input.
+    compilerManagedDefaults: flags,
+    argvCapture: "not intercepted; see compiler/src/main.rs",
+    environment: {
+      OSTRIN_CC: process.env.OSTRIN_CC || null,
+      OSTRIN_CFLAGS: process.env.OSTRIN_CFLAGS || null,
+    },
+  };
+}
+
 function executableName(source) {
   const stem = source.replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "").toLowerCase();
   return join(outputDir, `${stem}${process.platform === "win32" ? ".exe" : ""}`);
@@ -77,6 +164,7 @@ function executableName(source) {
 function benchmarkWorkload(sourcePath, index) {
   const source = resolve(repo, sourcePath);
   if (!existsSync(source)) throw new Error(`workload not found: ${sourcePath}`);
+  const sourceBytes = readFileSync(source);
   const executable = executableName(sourcePath);
   rmSync(executable, { force: true });
   const compile = run(compiler, ["--compile", "--out", executable, source], `native compilation ${sourcePath}`);
@@ -110,33 +198,41 @@ function benchmarkWorkload(sourcePath, index) {
   return {
     index,
     workload: sourcePath.replaceAll("\\", "/"),
+    sourceBytes: sourceBytes.byteLength,
+    sourceSha256: outputHash(sourceBytes),
     outputBytes: Buffer.byteLength(expected),
     outputSha256: outputHash(expected),
     nativeCompileMs: Number(compile.elapsedMs.toFixed(3)),
     interpreterMs: interpreter.map((value) => Number(value.toFixed(3))),
     nativeMs: native.map((value) => Number(value.toFixed(3))),
+    statistics: {
+      interpreter: statistic(interpreter),
+      native: statistic(native),
+    },
     interpreterMedianMs: Number(interpreterMedianMs.toFixed(3)),
     nativeMedianMs: Number(nativeMedianMs.toFixed(3)),
     interpreterToNativeMedianRatio: Number((interpreterMedianMs / nativeMedianMs).toFixed(3)),
   };
 }
 
-const commit = (() => {
-  try {
-    return execFileSync("git", ["rev-parse", "HEAD"], { cwd: repo, encoding: "utf8" }).trim();
-  } catch {
-    return process.env.GITHUB_SHA || null;
-  }
-})();
+const git = gitSnapshot();
 const report = {
-  schema: 2,
+  schema: 3,
   workloads: workloadPaths.map((sourcePath, index) => benchmarkWorkload(sourcePath, index)),
-  commit,
+  commit: git.commit,
+  git,
   compiler: relative(repo, compiler).replaceAll("\\", "/"),
   compilerVersion: run(compiler, ["--version"], "compiler version").stdout.trim(),
   node: process.version,
+  host: hostMetadata(),
   platform: process.platform,
   arch: process.arch,
+  nativeCompile: nativeCompileMetadata(),
+  methodology: {
+    clock: "node:perf_hooks performance.now wall-clock process duration",
+    outputCheck: "normalized UTF-8 stdout must match interpreter and native output exactly",
+    memory: "not captured; peak child RSS and allocation counters are a planned metric",
+  },
   iterations,
   warmups,
 };

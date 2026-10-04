@@ -10,9 +10,13 @@ La batería predeterminada cubre [`benchmark_numeric.ostrin`](../examples/benchm
 (aritmética escalar), `arrays.ostrin`, `quantity_arrays.ostrin` y
 `numeric_methods.ostrin`. Cada ejecución comprueba que ambos caminos impriman
 exactamente el mismo resultado antes de guardar las mediciones. El informe JSON
-incluye commit, plataforma, versión del compilador, hash del resultado, mediciones
-individuales, mediana, tiempo de compilación nativa y la razón entre medianas para
-cada workload.
+schema 3 incluye el hash exacto de cada fuente, commit y estado del checkout,
+sistema operativo, CPU, compilador C, defaults administrados por el compilador e
+inputs de flags, además de cada muestra y
+estadísticas de dispersión (mínimo, máximo, media, mediana, p95 y desviación
+estándar). El gate [`benchmark-contract-check.mjs`](../scripts/benchmark-contract-check.mjs)
+rechaza informes incompletos o inconsistentes. La memoria pico del proceso hijo y
+los contadores de asignaciones aún se declaran como no medidos.
 
 El workflow [`benchmarks.yml`](../.github/workflows/benchmarks.yml) se ejecuta
 manualmente o cada lunes y conserva el informe por commit durante 14 días. Las
@@ -25,6 +29,7 @@ Para reproducirlo localmente:
 ```text
 cargo build --release --manifest-path compiler/Cargo.toml
 node scripts/benchmark.mjs --iterations 7 --warmups 1
+node scripts/benchmark-contract-check.mjs
 ```
 
 Puedes seleccionar una fuente concreta o una lista separada por comas con
