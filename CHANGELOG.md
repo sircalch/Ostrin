@@ -17,6 +17,13 @@
 - Corrected the differential-test comment that had incorrectly described generic
   Quantity plotting as already lowered through IR/C.
 
+### Scalar Quantity ownership gate
+
+- Added `scripts/quantity-ownership-check.mjs` and its tests to preserve the
+  design-27 boundary, the `viz_units.ostrin` native fallback regression, and
+  the unimplemented `Ty::Quantity` ownership classification until the complete
+  native/WASI/sanitizer matrix exists.
+
 ### GitHub Linguist sample provenance
 
 - Added a machine-readable inventory for representative `.ostrin` samples with
