@@ -1321,6 +1321,7 @@ fn wasm_program_matrix_emits_without_native_thread_dependencies() {
         "wasi_io_contract.ostrin",
         "native_ir_file_io.ostrin",
         "native_ir_managed_consumers.ostrin",
+        "numeric_complex.ostrin",
     ] {
         let wasm = run(&["--emit-c", "--target", "wasm32-wasi", &example_path(file)]);
         assert!(
@@ -11442,10 +11443,26 @@ fn std_numeric_solves_integrates_interpolates_and_transforms() {
 
 #[test]
 fn std_numeric_complex_matches_interpreter_and_native() {
-    let expected = "sum = 4 + 2i\nproduct = 11 + -2i\nquotient = -1 + 2i\nconjugate = 3 + -4i\nsquare = -7 + 24i\npolar = 1.0000000000000004 + 1.732050807568877i\nscalar left = 5 + 4i\nscaled = 6 + 8i\nmagnitude = 5\nmagnitude check = true\nEuler check = 0.0000000000000001224646799076922\n";
+    let expected = "sum = 4 + 2i\nproduct = 11 + -2i\nquotient = -1 + 2i\nconjugate = 3 + -4i\nsquare = -7 + 24i\npolar = 1.0000000000000004 + 1.732050807568877i\nscalar left = 5 + 4i\nscalar difference = -1 + -4i\nscaled = 6 + 8i\nscalar quotient = 0.24 + -0.32i\nmagnitude = 5\nmagnitude check = true\nEuler check = 0.0000000000000001224646799076922\n";
     assert_eq!(
         interpreter_and_native_agree("numeric_complex.ostrin"),
         expected
+    );
+
+    let report = run(&[
+        "--native-type-report",
+        &example_path("numeric_complex.ostrin"),
+    ]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    assert!(report.status.success(), "stderr: {}", stderr(&report));
+    assert!(
+        stdout(&report)
+            .lines()
+            .any(|line| line == "native-source: examples/numeric_complex.ostrin ir=3 hir=0 ast=0"),
+        "numeric_complex should be fully lowered through IR/C: {}",
+        stdout(&report)
     );
 
     let exe = temp_artifact("numeric_complex_leak.exe");
