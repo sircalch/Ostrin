@@ -1751,6 +1751,11 @@ struct Codegen<'a> {
     type_report: NativeTypeReport,
     /// Type key (record/enum/instance/quantity name) -> generic methods, instantiated per call.
     generic_methods: HashMap<String, HashMap<String, GenericMethod<'a>>>,
+    /// Synthetic method entries for generic instances that were resolved by
+    /// the checker/HIR prepass.  They are kept separate from `methods`: the
+    /// latter drives declaration-body emission, while these entries only make
+    /// an already queued C function visible to HIR/IR dispatch.
+    generic_method_instances: HashMap<(String, String), (Vec<CType>, CType)>,
     quantity_impls: Vec<&'a ImplDecl>,
     quantity_done: HashSet<String>,
     /// The type-parameter substitution of the function body being generated.
@@ -4416,12 +4421,23 @@ impl<'a> Codegen<'a> {
         method: &str,
         recorded: &crate::typeck::CallSubst,
     ) -> Option<String> {
+        // Dimension-parameter methods are intentionally left on the existing
+        // HIR/AST path.  In particular this keeps Figure.unit_line,
+        // Figure.unit_scatter and the list based quantity plots out of the
+        // IR prepass until their array/unit ownership contract is complete.
+        if !recorded.dims.is_empty() {
+            return None;
+        }
         let receiver = self.ty_to_ctype(recv_ty)?;
+        if !Self::generic_method_ir_type_safe(recv_ty) {
+            return None;
+        }
         let owner = match receiver {
             CType::Record(name) | CType::Enum(name) => name,
             _ => return None,
         };
         let gm = self.generic_methods.get(&owner)?.get(method)?.clone();
+        self.type_report.calls_from_checker += 1;
         let decl = gm.decl;
         let mut subst = HashMap::new();
         for generic in &decl.generics {
@@ -4429,6 +4445,9 @@ impl<'a> Codegen<'a> {
                 subst.insert(generic.name.clone(), CType::Quantity(dimension.clone()));
             } else {
                 let ty = recorded.types.get(&generic.name)?.clone();
+                if !Self::generic_method_ir_type_safe(&ty) {
+                    return None;
+                }
                 subst.insert(generic.name.clone(), self.ty_to_ctype(&ty)?);
             }
         }
@@ -4439,7 +4458,10 @@ impl<'a> Codegen<'a> {
             .collect::<Option<Vec<_>>>()?
             .join("_");
         let c_name = format!("{}__{}__{}", gm.key, decl.name, suffix);
-        if self.instantiations.contains_key(&c_name) {
+        if let Some((param_types, return_type)) = self.instantiations.get(&c_name).cloned() {
+            self.generic_method_instances
+                .entry((owner, c_name.clone()))
+                .or_insert((param_types, return_type));
             return Some(c_name);
         }
 
@@ -4459,6 +4481,10 @@ impl<'a> Codegen<'a> {
         self.flush_instances().ok()?;
         self.instantiations
             .insert(c_name.clone(), (param_types.clone(), return_type.clone()));
+        self.generic_method_instances.insert(
+            (owner, c_name.clone()),
+            (param_types.clone(), return_type.clone()),
+        );
         self.pending.push_back(PendingInstance {
             c_name: c_name.clone(),
             hir_name: gm.hir_name,
@@ -4469,6 +4495,27 @@ impl<'a> Codegen<'a> {
             return_type,
         });
         Some(c_name)
+    }
+
+    /// The first generic-method prepass slice is intentionally limited to
+    /// values whose ownership is already represented by the ordinary IR/C
+    /// emitter. A quantity anywhere in a receiver or method substitution
+    /// carries a runtime unit label and therefore remains on the established
+    /// method path until that ownership contract is proved at this boundary.
+    fn generic_method_ir_type_safe(ty: &Ty) -> bool {
+        match ty {
+            Ty::Quantity(_) | Ty::Unknown | Ty::Generic(_) | Ty::Dyn(_) => false,
+            Ty::List(inner) | Ty::Set(inner) => Self::generic_method_ir_type_safe(inner),
+            Ty::Map(key, value) => {
+                Self::generic_method_ir_type_safe(key) && Self::generic_method_ir_type_safe(value)
+            }
+            Ty::Applied(_, args) => args.iter().all(Self::generic_method_ir_type_safe),
+            Ty::Fn(params, ret) => {
+                params.iter().all(Self::generic_method_ir_type_safe)
+                    && Self::generic_method_ir_type_safe(ret)
+            }
+            _ => true,
+        }
     }
 
     fn ctype_agrees(&self, ty: &Ty, c: &CType) -> bool {
@@ -9078,6 +9125,7 @@ fn generate_impl(
         compare_enabled: false,
         type_report: NativeTypeReport::default(),
         generic_methods: HashMap::new(),
+        generic_method_instances: HashMap::new(),
         quantity_impls: impls
             .iter()
             .filter(|im| im.type_name == "Quantity")
@@ -9235,9 +9283,11 @@ fn generate_impl(
     // acquired a monomorphized C name.  The resolver uses the exact
     // substitutions recorded by the checker, queues each concrete instance,
     // and rewrites the HIR callee to that stable symbol before IR lowering.
-    // Generic method calls remain lazy in this first slice; their established
-    // HIR/AST path is unchanged until the method table can be updated in the
-    // same prepass.
+    // Generic methods whose concrete substitution is scalar/record safe can
+    // use the same prepass. Dimension/Quantity substitutions intentionally
+    // return None in ensure_hir_generic_method_instance, preserving the
+    // established fallback for unit-aware plotting and other ownership
+    // sensitive methods.
     if let Some(program) = hir.as_mut() {
         for function in &mut program.functions {
             if !non_generic_function_names.contains(&function.name) {
@@ -9247,7 +9297,11 @@ fn generate_impl(
                 crate::hir::GenericCall::Function { name, subst } => {
                     codegen.ensure_hir_generic_instance(name, subst)
                 }
-                crate::hir::GenericCall::Method { .. } => None,
+                crate::hir::GenericCall::Method {
+                    receiver,
+                    name,
+                    subst,
+                } => codegen.ensure_hir_generic_method_instance(receiver, name, subst),
             };
             crate::hir::resolve_generic_calls(function, &mut resolver);
         }
@@ -9399,6 +9453,20 @@ fn generate_impl(
             .function_c_names
             .insert(name.clone(), name.clone());
     }
+    // Generic method instances are stored separately from `methods` so they
+    // are not emitted twice as declaration methods.  Publish their direct
+    // C names to HIR nevertheless: a prepass-resolved call can still fall
+    // back from IR to HIR while retaining the same concrete callee.
+    for ((owner, method), (params, ret)) in &codegen.generic_method_instances {
+        hir_world.methods.insert(
+            (owner.clone(), method.clone()),
+            (
+                method.clone(),
+                params.iter().map(c_type_name).collect(),
+                c_type_name(ret),
+            ),
+        );
+    }
     if let Some(program) = &hir {
         codegen.register_hir_types(program);
         codegen.sync_hir_instances(&mut hir_world);
@@ -9436,7 +9504,7 @@ fn generate_impl(
             )
         })
         .collect();
-    let ir_methods: crate::ir_c::MethodNames = codegen
+    let mut ir_methods: crate::ir_c::MethodNames = codegen
         .methods
         .iter()
         .flat_map(|(record, methods)| {
@@ -9445,6 +9513,12 @@ fn generate_impl(
                 .map(move |(method, info)| ((record.clone(), method.clone()), info.c_name.clone()))
         })
         .collect();
+    for ((owner, method), _) in &codegen.generic_method_instances {
+        // The HIR resolver rewrites a generic method spelling to its concrete
+        // C symbol.  Register that symbol under the concrete receiver so the
+        // IR method dispatcher can prove and emit the same call.
+        ir_methods.insert((owner.clone(), method.clone()), method.clone());
+    }
     let recursive_records = recursive_record_names(&codegen.records);
     for f in &functions {
         if !f.generics.is_empty() {
