@@ -21,6 +21,10 @@ jobs:
         run: cargo build --release --manifest-path compiler/Cargo.toml
       - name: Run deterministic benchmark
         run: node scripts/benchmark.mjs --iterations 7 --warmups 1
+      - name: Validate reproducibility contract
+        run: |
+          node scripts/benchmark-contract-check.mjs
+          node --test scripts/benchmark-contract-check.test.mjs scripts/benchmark-page.test.mjs
       - name: Publish benchmark summary
         run: |
           node -e 'const r=require("./target/benchmarks/benchmark.json"); for (const w of r.workloads) console.log(`${w.workload}: interpreter ${w.interpreterMedianMs} ms, native ${w.nativeMedianMs} ms, ratio ${w.interpreterToNativeMedianRatio}x`);' >> "$GITHUB_STEP_SUMMARY"

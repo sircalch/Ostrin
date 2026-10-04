@@ -9,10 +9,17 @@ execution modes:
 2. `ostrinc --compile` followed by the generated native executable.
 
 Every workload must print deterministic output. The runner checks that the
-interpreter and native outputs match before recording timing samples. Each JSON
-report records the commit, compiler version, operating system, architecture,
-iteration count, warmups, output hash and per-workload medians. Results are
-machine-specific; a ratio is not a claim about another language or hardware.
+interpreter and native outputs match before recording timing samples. Schema 3
+also records the exact source hash for every workload, the full Git revision
+and checkout state, OS release, CPU model and logical core count, the C
+compiler, compiler-managed native defaults and environment flag inputs,
+warmups, per-sample timings and summary statistics (minimum, maximum, mean,
+median, p95 and standard deviation). The report labels those defaults as
+source-defined metadata; it does not pretend to intercept the compiler's
+internal subprocess argv.
+Results are machine-specific; a ratio is not a claim about another language or
+hardware. Peak child memory and allocation counters are still explicitly
+unmeasured and remain a future benchmark metric.
 
 ## Current workloads
 
@@ -32,6 +39,7 @@ Run a local report after building the release compiler:
 ```text
 cargo build --release --manifest-path compiler/Cargo.toml
 node scripts/benchmark.mjs --iterations 7 --warmups 1
+node scripts/benchmark-contract-check.mjs
 node scripts/benchmark-page.mjs --write
 ```
 
