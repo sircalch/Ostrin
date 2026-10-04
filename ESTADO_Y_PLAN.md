@@ -539,6 +539,9 @@ cd compiler
     cargo test                                   # 6 diferenciales + 270 de integración + 2 unitarias
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
+cd ..
+node scripts/project-plan-check.mjs              # ratchets y límites públicos del plan
+node --test scripts/project-plan-check.test.mjs
 ```
 
 Ejemplos nativos dedicados: `native_*.ostrin` (records, métodos, enums, genéricos,

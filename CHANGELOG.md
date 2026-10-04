@@ -8,6 +8,15 @@
   `Figure.unit_scatter` remain on the verified HIR/AST fallback until scalar
   quantity unit-label ownership is complete.
 
+### Project plan consistency gate
+
+- Added `scripts/project-plan-check.mjs` and its tests to compare the documented
+  HIR/IR/AST ratchet with `compiler/tests/differential.rs`, preserve explicit
+  `Available`/`Planned` Viz maturity labels, and keep Linguist and R0/R1
+  reproducibility evidence visible in the public plan.
+- Corrected the differential-test comment that had incorrectly described generic
+  Quantity plotting as already lowered through IR/C.
+
 ### GitHub Linguist sample provenance
 
 - Added a machine-readable inventory for representative `.ostrin` samples with

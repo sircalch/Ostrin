@@ -442,8 +442,10 @@ fn native_backend_types_agree_with_the_checker() {
     // whenever a backend family moves from AST to HIR/IR; a new example that
     // increases the total must update the limit only with an explicit reason.
     // The shared std.viz module is measured once for each importing example. Its
-    // deterministic String hash helper, renderer grid scan, dark-theme field
-    // stores and generic quantity plotting instantiations now lower through IR/C.
+    // deterministic String hash helper, renderer grid scan and dark-theme field
+    // stores now lower through IR/C. Generic quantity plotting instantiations
+    // remain on the verified HIR/AST fallback until scalar unit-label ownership
+    // is explicit; do not count them as migrated.
     // Histogram and violin data preparation now use the typed IR/C path: the
     // native emitter covers `histogram`, `linspace` and two-argument `pow`,
     // removing 65 measured fallbacks across the shared std.viz consumers.
@@ -477,7 +479,8 @@ fn native_backend_types_agree_with_the_checker() {
     // String hashing for deterministic SVG ids and the explicit renderer scan use
     // the same stable runtime helpers as the legacy emitter and remove 64 more
     // measured fallbacks in total. Field stores now transfer fresh managed strings
-    // safely, which lets the remaining visualization methods use IR/C. The
+    // safely, which lets compatible visualization methods use IR/C; generic
+    // quantity plotting remains on the verified fallback described above. The
     // standard-library `format_text` wrapper now lowers its `format` builtin
     // through the same IR/C path. HIR now
     // substitutes the concrete owner for `Self` in trait method signatures,
@@ -503,11 +506,13 @@ fn native_backend_types_agree_with_the_checker() {
     // dimension-specific trait methods dispatch through the IR method table
     // and no longer force their bodies through the AST emitter.
     // Method receivers and arguments now use the same borrowed-call contract
-    // as ordinary calls. This moves record builders (including std.viz
-    // Figure/Table/Scene3D chains) through the ownership-lowered IR without
-    // changing their interpreter/native output. Keep the new ratchet explicit
-    // until the next aggregate family moves with parity evidence; complex
-    // array promotion and non-linear aggregates remain pending.
+    // as ordinary calls. This moves compatible record builders (including
+    // std.viz Figure/Table/Scene3D chains) through the ownership-lowered IR
+    // without changing their interpreter/native output. Generic quantity
+    // plotting remains excluded until its scalar unit-label ownership has
+    // parity evidence. Keep the new ratchet explicit until the next aggregate
+    // family moves with parity evidence; complex array promotion and
+    // non-linear aggregates remain pending.
     // Normal-distribution PDF/CDF calls now share the numeric IR/C path for
     // scalar and Array<Float> inputs, removing the histogram example's last
     // entry-point fallback while retaining interpreter/native/WASI parity.

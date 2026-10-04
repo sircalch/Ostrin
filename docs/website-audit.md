@@ -1,6 +1,8 @@
 # Ostrin website audit
 
-*Cut: 2026-09-29 · source counts and public fallbacks are checked by `scripts/website-check.mjs`.*
+*Cut: 2026-10-04 · source counts and public fallbacks are checked by
+`scripts/website-check.mjs`; plan and maturity claims are checked by
+`scripts/project-plan-check.mjs`.*
 
 This is a current inventory, not a roadmap claim. Public statements should remain tied to code,
 tests or an explicitly labeled early-stage surface.
@@ -21,6 +23,7 @@ tests or an explicitly labeled early-stage surface.
 | Benchmarks | `website/benchmarks.html`, `website/benchmark-data.js`, `scripts/benchmark.mjs` | Eight deterministic workloads compare interpreter and native process medians; the page publishes commit, environment, sampling and output provenance without cross-language claims |
 | Provenance artifact | `website/provenance.html`, `website/provenance-data.js`, `website/provenance.js`, `scripts/provenance-page.mjs`, `compiler/src/provenance.rs` | Experimental machine-readable source hash, target and effect inventory with explicit replay limitations; regenerated and checked before Pages deployment |
 | Experiment bundle | `scripts/experiment-bundle.mjs`, `scripts/experiment-bundle.test.mjs`, `website/assets/experiments/*.ostrin-experiment.json`, `website/viz.js` | Parametrizable `ostrin.experiment/v0` source-backed download registry: the provenance and 3D surface fixtures are four-file R0 bundles (source, declared inputs, SVG and provenance) with calculated SHA-256/byte hashes, parameters/camera where declared and deterministic source revisions; R1 replay verification is labelled planned and R2/R3 are not claimed |
+| Plan and maturity gate | `scripts/project-plan-check.mjs`, `scripts/project-plan-check.test.mjs`, `ESTADO_Y_PLAN.md`, `ROADMAP.md`, `compiler/tests/differential.rs` | Compares the documented HIR/IR/AST baseline with the compiler ratchet, preserves the verified Quantity visualization ownership boundary, and requires explicit Available/Planned Viz labels plus Linguist and R0/R1 reproducibility evidence |
 | Community | `website/community.html`, `CONTRIBUTING.md`, issue templates | Contribution path and repository channels; no unverified chat, registry or external community is claimed |
 | Ecosystem and roadmap | `website/ecosystem.html`, `website/roadmap.html` | Current capabilities, early areas and future work are distinguished |
 | Deployment and editor | `.github/workflows/pages.yml`, `vscode-ostrin/`, LSP/DAP sources | Pages builds and checks the WASM artifact; editor support is implemented, Marketplace publication is not claimed |
