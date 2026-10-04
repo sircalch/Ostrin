@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-30 · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 268 de integración y 2 unitarias en verde.*
+*Corte: 2026-09-30 · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 269 de integración y 2 unitarias en verde.*
 
 Validación remota: Pages, CI, CodeQL, sanitizers y auditoría de seguridad pasaron para el
 ciclo actual en Windows, Linux, macOS y web. La compuerta oficial exige `cargo fmt --check`, Clippy con el lint `suspicious`, la suite del
@@ -162,8 +162,8 @@ por separado en `--native-type-report` como `ir-generated`; el mismo informe exp
 `hir-generated` y `ast-fallback` para que la retirada del backend legado tenga un contador
 visible. También publica líneas `native-source` agrupadas por archivo para localizar la deuda
 por módulo; la prueba diferencial comprueba que sus sumas coinciden con el total. En el corte
-actual, la suite de ejemplos suma 6 502 funciones IR, 14 HIR y 35 que aún caen al emisor
-AST; `native_backend_types_agree_with_the_checker` mantiene 35 como trinquete temporal. Las coerciones `Float↔Float32` de bindings explícitos y agregados `List/Set<Float32>` ahora se insertan en IR, conservando la precisión de `float32.ostrin`. Las llamadas genéricas registradas por el checker se resuelven ahora en HIR antes de construir la IR, de modo que `numeric_units.ostrin` ya no necesita fallback AST. Las operaciones escalares reflejadas de `Complex` (`Float +|−|×|÷ Complex`) llaman sus métodos `radd`/`rsub`/`rmul`/`rdiv` desde IR/C con el orden de operandos preservado; el formato escalar de `Bool` también usa la ruta tipada. `numeric_complex.ostrin` queda en `ir=3, hir=0, ast=0`, con paridad intérprete/nativo/WASI y leak-check. `Quantity.to_string()` escalar y `Array<Float32>.to_string()` ya llaman a helpers nativos desde IR/C; el segundo elimina el fallback del punto de entrada de `arrays_3d`. Los patrones
+actual, la suite de ejemplos suma 6 504 funciones IR, 14 HIR y 35 que aún caen al emisor
+AST; `native_backend_types_agree_with_the_checker` mantiene 35 como trinquete temporal. `atan2` escalar para `Float` y `Float32` usa ahora el runtime determinista desde IR/C, y `math_functions.ostrin` verifica ambas rutas con paridad nativa/WASI. Las coerciones `Float↔Float32` de bindings explícitos y agregados `List/Set<Float32>` ahora se insertan en IR, conservando la precisión de `float32.ostrin`. Las llamadas genéricas registradas por el checker se resuelven ahora en HIR antes de construir la IR, de modo que `numeric_units.ostrin` ya no necesita fallback AST. Las operaciones escalares reflejadas de `Complex` (`Float +|−|×|÷ Complex`) llaman sus métodos `radd`/`rsub`/`rmul`/`rdiv` desde IR/C con el orden de operandos preservado; el formato escalar de `Bool` también usa la ruta tipada. `numeric_complex.ostrin` queda en `ir=3, hir=0, ast=0`, con paridad intérprete/nativo/WASI y leak-check. `Quantity.to_string()` escalar y `Array<Float32>.to_string()` ya llaman a helpers nativos desde IR/C; el segundo elimina el fallback del punto de entrada de `arrays_3d`. Los patrones
 superficiales de records con campos escalares y los enums no genéricos con variantes unitarias,
 payloads escalares (incluidos enteros de ancho fijo), patrones simples y patrones anidados de enums por
 valor ya bajan por IR/C, incluidos records genéricos, con paridad intérprete/nativo/diferencial. Payloads
@@ -343,7 +343,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
 convendría dividirlos; el backend nativo no comparte el sistema de tipos del checker
-(ya consume los tipos del checker y compara cada nodo; el informe actual suma **6 502 funciones
+(ya consume los tipos del checker y compara cada nodo; el informe actual suma **6 504 funciones
 generadas desde IR, 14 desde HIR y 35 en fallback AST** en los ejemplos, con un trinquete
 que impide que el fallback aumente sin justificación; los métodos de records y enums concretos
 entran ahora en IR/C cuando sus campos y ownership son compatibles, mientras los records recursivos
@@ -534,7 +534,7 @@ sus evidencias y validación upstream.
 
 ```powershell
 cd compiler
-    cargo test                                   # 6 diferenciales + 268 de integración + 2 unitarias
+    cargo test                                   # 6 diferenciales + 269 de integración + 2 unitarias
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 ```

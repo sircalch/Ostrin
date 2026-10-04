@@ -2,13 +2,21 @@ fn clean(x: Float) -> Float {
     round(x * 1000000.0) / 1000000.0
 }
 
+fn angle(y: Float, x: Float) -> Float {
+    atan2(y, x)
+}
+
+fn angle32(y: Float32, x: Float32) -> Float32 {
+    atan2(y, x)
+}
+
 fn main() -> Void {
     print(sqrt(16.0))
     print(clean(sin(pi() / 6.0)))
     print(clean(cos(0.0)))
     print(clean(exp(1.0)))
     print(clean(ln(10.0)))
-    print(clean(atan2(1.0, 1.0) * 4.0))
+    print(clean(angle(1.0, 1.0) * 4.0))
     print(pow(2.0, 10.0))
     print(floor(-2.5))
     print(ceil(2.1))
@@ -25,5 +33,6 @@ fn main() -> Void {
 
     single = sqrt(2.0f32)
     print(single * single)
+    print(angle32(1.0f32, 1.0f32))
     print(abs(array([-1.5f32, 2.5f32])))
 }

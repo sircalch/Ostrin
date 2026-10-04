@@ -423,8 +423,8 @@ fn native_backend_types_agree_with_the_checker() {
     // explicit IR lowering (the migration of the native backend).
     let native_generated = hir_generated + ir_generated;
     assert!(
-        native_generated >= 6516,
-        "only {native_generated} functions were generated from HIR/IR (expected at least 6516)"
+        native_generated >= 6518,
+        "only {native_generated} functions were generated from HIR/IR (expected at least 6518)"
     );
     println!("functions generated from HIR/IR: {native_generated} (HIR {hir_generated}, IR {ir_generated})");
     println!("functions still using AST fallback: {ast_fallback}");
@@ -481,7 +481,7 @@ fn native_backend_types_agree_with_the_checker() {
     // through the same IR/C path. HIR now
     // substitutes the concrete owner for `Self` in trait method signatures,
     // allowing Complex arithmetic/equality to use IR/C. The verified baseline is
-    // 35 AST fallbacks (6,516 HIR/IR-generated: 6,502 IR and 14 HIR functions). Checker-recorded
+    // 35 AST fallbacks (6,518 HIR/IR-generated: 6,504 IR and 14 HIR functions). Checker-recorded
     // generic calls are resolved before IR lowering, so ordinary callers can reference their
     // monomorphized C symbols directly. Scalar quantity `to_string()` now calls the existing
     // quantity runtime helper from IR/C, and numeric

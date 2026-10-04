@@ -3517,6 +3517,20 @@ fn emit_instruction(
                 && *ty == Ty::Float
             {
                 format!("pow({}, {})", codes[0], codes[1])
+            } else if callee == "atan2"
+                && args.len() == 2
+                && value_ty(values, args[0])? == Ty::Float
+                && value_ty(values, args[1])? == Ty::Float
+                && *ty == Ty::Float
+            {
+                format!("ostrin_dm_atan2({}, {})", codes[0], codes[1])
+            } else if callee == "atan2"
+                && args.len() == 2
+                && value_ty(values, args[0])? == Ty::Float32
+                && value_ty(values, args[1])? == Ty::Float32
+                && *ty == Ty::Float32
+            {
+                format!("ostrin_dm_atan2f({}, {})", codes[0], codes[1])
             } else if callee == "eye"
                 && args.len() == 1
                 && value_ty(values, args[0])? == Ty::Int
