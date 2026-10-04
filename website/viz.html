@@ -512,7 +512,12 @@ fn main() -&gt; Void {
         </div>
       </section>
       <section class="section shell"><div class="section-header"><p class="eyebrow">Gallery</p><div><h2>Every figure is a program you can run.</h2><p class="lede">Each image below is the SVG its program printed when this site was built with <span class="mono">ostrinc.wasm</span>. Press <strong>Run live</strong> to recompute it in this page. Explore a figure and copy its URL to share the selected parameters or 3D camera. The provenance fixture also offers a versioned <span class="mono">ostrin.experiment/v0</span> download labelled R0, with an R1 replay-ready path documented as planned.</p></div></div>
-        <div class="viz-gallery" data-viz-gallery><noscript><p class="dim">The gallery needs JavaScript to list the figures; the programs are under <a class="text-link violet" href="https://github.com/sircalch/Ostrin/tree/main/examples">examples/viz_*.ostrin ↗</a>.</p></noscript></div>
+        <div class="viz-gallery-tools" data-viz-gallery-tools hidden>
+          <label for="viz-gallery-search">Find a figure</label>
+          <input id="viz-gallery-search" type="search" placeholder="Search plots, tables, animations…" autocomplete="off">
+          <output data-viz-gallery-status aria-live="polite"></output>
+        </div>
+        <div class="viz-gallery" id="viz-gallery" data-viz-gallery><noscript><p class="dim">The gallery needs JavaScript to list the figures; the programs are under <a class="text-link violet" href="https://github.com/sircalch/Ostrin/tree/main/examples">examples/viz_*.ostrin ↗</a>.</p></noscript></div>
       </section>
       <section class="section shell viz-status"><div class="section-header"><p class="eyebrow">Status</p><div><h2>What std.viz does today, and what is next.</h2></div></div>
         <div class="viz-matrix">

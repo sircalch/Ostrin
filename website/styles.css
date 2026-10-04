@@ -608,7 +608,15 @@ button.button-quiet, button.button { cursor: pointer; } button.button-quiet { ba
 .viz-workflow-fallback { grid-column: 1 / -1; padding: 18px 20px; background: var(--night-2); border: 1px solid var(--line); }
 .viz-workflow-fallback p { margin: 0 0 10px; }
 .viz-workflow-fallback ul { display: grid; gap: 6px; margin: 0; padding-left: 18px; color: var(--muted); font-size: .84rem; }
+.viz-gallery-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: 30px 0 18px; }
+.viz-gallery-tools[hidden] { display: none; }
+.viz-gallery-tools label { color: var(--muted); font: .72rem var(--mono); }
+.viz-gallery-tools input { flex: 1 1 260px; min-height: 36px; max-width: 30rem; padding: 7px 10px; color: var(--white); background: var(--night-2); border: 1px solid var(--line); border-radius: 3px; font: .78rem var(--mono); }
+.viz-gallery-tools input:focus { outline: 2px solid var(--violet); outline-offset: 1px; border-color: var(--violet); }
+.viz-gallery-tools output { color: var(--muted-2); font: .68rem var(--mono); }
 .viz-gallery { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
+.viz-gallery-empty { grid-column: 1 / -1; margin: 0; padding: 28px; border: 1px solid var(--line); background: var(--night-2); font: .78rem var(--mono); }
+.viz-card[hidden] { display: none; }
 .viz-card { display: flex; flex-direction: column; min-width: 0; background: var(--night-2); border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
 .viz-frame { display: block; background: #fff; border-bottom: 1px solid var(--line); }
 .viz-image { display: block; width: 100%; height: auto; }
