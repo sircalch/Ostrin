@@ -1537,8 +1537,8 @@ function card(figure) {
       }
     : null;
   const provenance = el("p", { className: "sl-provenance", text: provenanceText(recordedProvenance, `Recorded from ${figure.source}`) });
-  const run = el("button", { type: "button", className: "button", disabled: true, "data-viz-run": figure.id, text: "Run live" });
-  const status = el("span", { className: "sl-status", text: "loading compiler…" });
+  const run = el("button", { type: "button", className: "button", "data-viz-run": figure.id, text: "Run live" });
+  const status = el("span", { className: "sl-status", text: "" });
   let liveSvg = null;
   const explore = el("button", { type: "button", className: "button-quiet", "data-viz-explore": figure.id, text: "Explore" });
   const playground = el("a", {
@@ -1590,10 +1590,11 @@ function card(figure) {
 
   run.addEventListener("click", async () => {
     run.disabled = true;
-    status.textContent = "running…";
+    status.textContent = "loading compiler…";
     const started = performance.now();
     try {
       const { runOstrinc } = await runtime();
+      status.textContent = "running…";
       const { code: exit, lines } = await runOstrinc({ "main.ostrin": figure.code }, ["--run", "main.ostrin"]);
       const stdout = lines.filter(([kind]) => kind === "out").map(([, text]) => text);
       const { svg, printed: text } = svgOf(stdout);
@@ -1800,10 +1801,6 @@ function mountGallery(root) {
     const target = cards.find((item) => item.id === initial.figureId);
     if (target) queueMicrotask(() => target.explore.click());
   }
-  runtime().then(({ loadCompiler }) => loadCompiler()).then(
-    () => cards.forEach(({ run, status }) => { run.disabled = false; status.textContent = ""; }),
-    (error) => cards.forEach(({ status }) => { status.textContent = `compiler unavailable: ${error.message ?? error}`; }),
-  );
 }
 
 if (LAB?.workflows) document.querySelectorAll("[data-viz-workflows]").forEach(mountWorkflows);

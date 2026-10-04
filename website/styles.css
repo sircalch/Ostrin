@@ -614,6 +614,8 @@ button.button-quiet, button.button { cursor: pointer; } button.button-quiet { ba
 .viz-gallery-tools input { flex: 1 1 260px; min-height: 36px; max-width: 30rem; padding: 7px 10px; color: var(--white); background: var(--night-2); border: 1px solid var(--line); border-radius: 3px; font: .78rem var(--mono); }
 .viz-gallery-tools input:focus { outline: 2px solid var(--violet); outline-offset: 1px; border-color: var(--violet); }
 .viz-gallery-tools output { color: var(--muted-2); font: .68rem var(--mono); }
+.viz-runtime-note { margin: 24px 0 0; color: var(--muted-2); font: .7rem/1.5 var(--mono); }
+.viz-runtime-note strong { color: var(--green); font-weight: 500; }
 .viz-capability-panel { display: grid; grid-template-columns: minmax(12rem, .75fr) minmax(0, 2fr); gap: 16px 22px; align-items: center; margin: 12px 0 18px; padding: 16px 18px; background: var(--night-2); border: 1px solid var(--line); border-radius: 4px; }
 .viz-capability-panel[hidden] { display: none; }
 .viz-capability-copy { display: grid; gap: 6px; }

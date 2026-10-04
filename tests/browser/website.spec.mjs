@@ -571,6 +571,17 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   expect(runtimeErrors).toEqual([]);
 });
 
+test("Viz gallery defers the compiler download until a live action", async ({ page }) => {
+  const wasmRequests = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/ostrinc.wasm")) wasmRequests.push(request.url());
+  });
+  await page.goto("./viz.html", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("[data-viz-gallery] .viz-card")).toHaveCount(29);
+  await expect(page.locator(".viz-runtime-note")).toContainText("Recorded SVGs load immediately");
+  expect(wasmRequests).toEqual([]);
+});
+
 test("Viz exposes the recorded 3D surface experiment bundle", async ({ page }) => {
   await page.goto("./viz.html", { waitUntil: "domcontentloaded" });
   const bundleDownloadPromise = page.waitForEvent("download");
