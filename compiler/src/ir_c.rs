@@ -1969,11 +1969,35 @@ fn emit_instruction(
                 out.push_str(&format!("    {} = {code};\n", value_name(*dst)));
                 return Ok(());
             }
+            // Reflected scalar operators use the same concrete method symbols
+            // as the AST/HIR emitters. The receiver stays on the right and
+            // the scalar argument stays second, preserving the method ABI for
+            // expressions such as `2.0 - z` (`z.rsub(2.0)`).
+            if let Some(record) = record_name(&right_ty, records) {
+                let method = match op {
+                    BinOp::Add => Some("radd"),
+                    BinOp::Sub => Some("rsub"),
+                    BinOp::Mul => Some("rmul"),
+                    BinOp::Div => Some("rdiv"),
+                    _ => None,
+                };
+                if let Some(method) = method {
+                    if let Some(c_name) = methods.get(&(record, method.to_string())) {
+                        if left_ty == Ty::Float && *ty == right_ty {
+                            let call = format!(
+                                "{c_name}({}, {})",
+                                value_code(values, *right)?,
+                                value_code(values, *left)?
+                            );
+                            out.push_str(&format!("    {} = {call};\n", value_name(*dst)));
+                            return Ok(());
+                        }
+                    }
+                }
+            }
             // User-defined record operators use the same concrete method
             // symbols as the AST/HIR emitters. Keep the IR path in lockstep
-            // for closed record operands (for example `Complex * Complex`),
-            // while leaving reflected scalar operators and ordering traits on
-            // their established fallback until their ABI is explicit here.
+            // for closed record operands (for example `Complex * Complex`).
             if let (Some(record), Some(other_record)) = (
                 record_name(&left_ty, records),
                 record_name(&right_ty, records),
@@ -2418,6 +2442,12 @@ fn emit_instruction(
                 Ty::Float32 => match (method.as_str(), args.as_slice(), ty) {
                     ("to_string", [], Ty::String) => {
                         format!("ostrin_single_to_string({receiver})")
+                    }
+                    _ => return Err(()),
+                },
+                Ty::Bool => match (method.as_str(), args.as_slice(), ty) {
+                    ("to_string", [], Ty::String) => {
+                        format!("(({receiver}) ? \"true\" : \"false\")")
                     }
                     _ => return Err(()),
                 },

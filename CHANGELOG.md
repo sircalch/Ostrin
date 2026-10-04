@@ -11,6 +11,17 @@
 - The differential ratchet advances to **6,513 HIR/IR-generated functions
   (6,499 IR + 14 HIR) / 38 AST** functions.
 
+### Native IR: reflected Complex scalar operators
+
+- `Float + Complex`, `Float - Complex`, `Float * Complex` and `Float / Complex`
+  now dispatch to `Complex.radd`/`rsub`/`rmul`/`rdiv` through IR/C while
+  preserving receiver and argument order.
+- Boolean `to_string()` now uses the same typed IR/C path, allowing
+  `examples/numeric_complex.ostrin` to report `ir=3, hir=0, ast=0`.
+- Interpreter/native/WASI emission and leak checks remain covered; together
+  with the preceding Float32 coercion slice, the differential ratchet advances
+  to **6,516 HIR/IR-generated functions (6,502 IR + 14 HIR) / 35 AST**.
+
 ### Native IR: checker-resolved generic calls
 
 - Ordinary HIR functions now resolve checker-recorded generic call

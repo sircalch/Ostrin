@@ -18,7 +18,9 @@ fn main() -> Void {
     square = numeric.powi(z, 2)
     polar = numeric.polar(2.0, pi() / 3.0)
     scalar_left = 2.0 + z
+    scalar_difference = 2.0 - z
     scaled = 2.0 * z
+    scalar_quotient = 2.0 / z
     pair("sum", sum.re, sum.im)
     pair("product", product.re, product.im)
     pair("quotient", quotient.re, quotient.im)
@@ -26,7 +28,9 @@ fn main() -> Void {
     pair("square", square.re, square.im)
     pair("polar", polar.re, polar.im)
     pair("scalar left", scalar_left.re, scalar_left.im)
+    pair("scalar difference", scalar_difference.re, scalar_difference.im)
     pair("scaled", scaled.re, scaled.im)
+    pair("scalar quotient", scalar_quotient.re, scalar_quotient.im)
     print("magnitude = " + magnitude_of(z).to_string())
     print("magnitude check = " + (abs(magnitude_of(z) - 5.0) < 0.000000001).to_string())
     e = numeric.cis(pi())

@@ -129,9 +129,12 @@ Sobre este IR se hacen los análisis que el texto C no permite:
    `--native-type-report` publica también `ir-generated`, `hir-generated` y `ast-fallback`.
    El mismo informe agrupa esas cifras por archivo fuente con líneas `native-source`, y la
    prueba diferencial comprueba que la suma por módulo coincide con los totales globales.
-   La prueba diferencial conserva el baseline actual de fallback (38 funciones AST, con
-   6 513 funciones generadas por HIR/IR —6 499 IR y 14 HIR— sobre los ejemplos); las llamadas genéricas
-   registradas por el checker se resuelven en HIR antes de construir la IR, de modo que
+   La prueba diferencial conserva el baseline actual de fallback (35 funciones AST, con
+   6 516 funciones generadas por HIR/IR —6 502 IR y 14 HIR— sobre los ejemplos); las coerciones
+   `Float↔Float32` de bindings explícitos y agregados `List/Set<Float32>`, las operaciones escalares
+   reflejadas de `Complex` (`Float +|−|×|÷ Complex`) y `Bool.to_string()` ya usan IR/C, con paridad
+   intérprete/nativo/WASI y leak-check; las llamadas genéricas registradas por el checker se resuelven
+   en HIR antes de construir la IR, de modo que
    `numeric_units.ostrin` ya no cae al emisor AST. `Quantity.to_string()` escalar y
    `Array<Float32>.to_string()` usan helpers nativos desde IR/C y el ejemplo `arrays_3d` ya no cae al emisor AST. Las coerciones `Float↔Float32` de bindings explícitos y agregados `List/Set<Float32>` se insertan en IR con la misma precisión que el emisor legado. Los patrones superficiales de
    records con campos escalares y genéricos, junto con enums no genéricos por valor y sus patrones anidados,
