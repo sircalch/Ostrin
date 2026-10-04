@@ -4998,6 +4998,89 @@ fn native_ir_math_functions_lower_atan2() {
 }
 
 #[test]
+fn native_ir_detmath_lowers_pow_float32() {
+    let file = example_path("detmath.ostrin");
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "detmath interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    let expected = stdout(&interpreted).replace("\r\n", "\n");
+    let report = run(&["--native-type-report", &file]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "detmath report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text
+            .lines()
+            .any(|line| line == "native-source: examples/detmath.ostrin ir=3 hir=0 ast=0"),
+        "detmath did not use the IR path for pow: {report_text}"
+    );
+
+    let emitted = run(&["--emit-c", &file]);
+    assert!(
+        emitted.status.success(),
+        "detmath C emission failed: {}",
+        stderr(&emitted)
+    );
+    let source = stdout(&emitted);
+    assert!(
+        source.contains("double ostrin_fn_pow_scalar(double base, double exponent)")
+            && source.contains("__ir_v2 = ostrin_dm_pow(__ir_v0, __ir_v1);")
+            && source.contains("float ostrin_fn_pow_scalar32(float base, float exponent)")
+            && source.contains("__ir_v2 = ostrin_dm_powf(__ir_v0, __ir_v1);"),
+        "pow helpers did not use the native IR emitter: {source}"
+    );
+
+    let exe = temp_artifact("detmath-pow-float32.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    assert!(
+        compile.status.success(),
+        "detmath native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run detmath native binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "detmath native binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "detmath native ownership leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "detmath WASI C emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("ostrin_dm_pow(")
+            && wasi_source.contains("ostrin_dm_powf(")
+            && !wasi_source.contains("#define OSTRIN_NATIVE_THREADS"),
+        "detmath WASI C did not preserve deterministic pow lowering: {wasi_source}"
+    );
+}
+
+#[test]
 fn native_ir_float32_array_scalars_match_interpreter_native_and_wasi() {
     let file = fixture_path("native_ir_float32_array_scalar.ostrin");
     let interpreted = run(&["--run", &file]);

@@ -3516,7 +3516,14 @@ fn emit_instruction(
                 && value_ty(values, args[1])? == Ty::Float
                 && *ty == Ty::Float
             {
-                format!("pow({}, {})", codes[0], codes[1])
+                format!("ostrin_dm_pow({}, {})", codes[0], codes[1])
+            } else if callee == "pow"
+                && args.len() == 2
+                && value_ty(values, args[0])? == Ty::Float32
+                && value_ty(values, args[1])? == Ty::Float32
+                && *ty == Ty::Float32
+            {
+                format!("ostrin_dm_powf({}, {})", codes[0], codes[1])
             } else if callee == "atan2"
                 && args.len() == 2
                 && value_ty(values, args[0])? == Ty::Float

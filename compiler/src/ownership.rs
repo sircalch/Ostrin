@@ -9,7 +9,7 @@
 
 use std::collections::{HashMap, HashSet, VecDeque};
 
-use crate::ast::{Item, Type};
+use crate::ast::{Item, Type, UnaryOp};
 use crate::ir::{IrInstr, IrProgram, IrTerminator, ValueId};
 use crate::types::Ty;
 
@@ -884,6 +884,11 @@ fn safe_release_site(instruction: &IrInstr) -> bool {
     // aggregate/index operation whose native helper retains borrowed values, or
     // a field store that retains the incoming managed value before replacing it.
     match instruction {
+        // The native unary array kernels borrow their input and return a new
+        // array. Restrict this to the concrete array element types handled by
+        // IR/C so scalar or future non-native unary instructions stay
+        // conservative.
+        IrInstr::Unary { .. } if safe_unary_array(instruction) => true,
         IrInstr::StoreLocal { .. }
         | IrInstr::Spawn { .. }
         | IrInstr::ChannelSend { .. }
@@ -923,6 +928,23 @@ fn safe_release_site(instruction: &IrInstr) -> bool {
         IrInstr::MethodCall { .. } => true,
         _ => false,
     }
+}
+
+fn safe_unary_array(instruction: &IrInstr) -> bool {
+    let IrInstr::Unary { op, ty, .. } = instruction else {
+        return false;
+    };
+    matches!(*op, UnaryOp::Neg | UnaryOp::Not)
+        && matches!(
+            ty,
+            Ty::Applied(name, args)
+                if name == "Array"
+                    && args.len() == 1
+                    && matches!(
+                        args.first(),
+                        Some(Ty::Int | Ty::Float | Ty::Float32 | Ty::Bool | Ty::Quantity(_))
+                    )
+        )
 }
 
 /// `Option`/`Result` wrappers (`get(..).unwrap_or(..)`, `remove(..).unwrap()`) are consumed by

@@ -1,3 +1,11 @@
+fn pow_scalar(base: Float, exponent: Float) -> Float {
+    pow(base, exponent)
+}
+
+fn pow_scalar32(base: Float32, exponent: Float32) -> Float32 {
+    pow(base, exponent)
+}
+
 fn main() -> Void {
     xs = linspace(-3.0, 3.0, 13)
     print(sin(xs))
@@ -18,7 +26,7 @@ fn main() -> Void {
     print(asin(ratios))
     print(acos(ratios))
 
-    print(pow(2.0, 10.0))
+    print(pow_scalar(2.0, 10.0))
     print(pow(2.0, 0.5))
     print(pow(10.0, -3.0))
     print(pow(-2.0, 3.0))
@@ -36,5 +44,5 @@ fn main() -> Void {
     single = array([0.5f32, 1.0f32, 2.0f32])
     print(sin(single))
     print(exp(single))
-    print(pow(2.0f32, 0.5f32))
+    print(pow_scalar32(2.0f32, 0.5f32))
 }
