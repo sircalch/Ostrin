@@ -24,6 +24,12 @@ fn main() -> Void {
     print(abs(-7))
     print(abs(-2.5))
     print(abs(-128i8 + 1i8))
+    print(abs(-300i16))
+    print(abs(-70000i32))
+    print(abs(12u8))
+    print(abs(300u16))
+    print(abs(70000u32))
+    print(abs(9000000000000000000u64))
 
     x = linspace(0.0, 10.0, 6)
     y = sin(x) * exp(-x / 5.0)

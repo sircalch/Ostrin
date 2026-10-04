@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Native IR: fixed-width integer `abs`
+
+- Scalar `abs` now lowers through IR/C for every fixed-width integer type while
+  preserving the checked overflow error for the minimum signed value.
+  Public website inventory and generated site data now track the 270-test compiler suite.
+- `math_functions.ostrin` now reports `ir=4, hir=0, ast=0` and covers
+  interpreter/native parity, leak-check, WASI emission, and the minimum-value
+  error path. The differential ratchet advances to **6,522 HIR/IR-generated
+  functions (6,508 IR + 14 HIR) / 33 AST**.
+
 ### Native IR: deterministic `pow` for Float32
 
 - Scalar `pow` now lowers through IR/C for `Float` and `Float32`, using

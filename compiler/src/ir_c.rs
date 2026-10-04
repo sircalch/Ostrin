@@ -3453,13 +3453,22 @@ fn emit_instruction(
                     let array_c_name = array_name(&arg_ty).ok_or(())?;
                     format!("{array_c_name}_map({}, {function})", codes[0])
                 } else {
-                    let function = match arg_ty {
-                        Ty::Float if *ty == Ty::Float => "fabs",
-                        Ty::Float32 if *ty == Ty::Float32 => "fabsf",
-                        Ty::Int if *ty == Ty::Int => "ostrin_abs_i64",
+                    match arg_ty {
+                        Ty::Float if *ty == Ty::Float => format!("fabs({})", codes[0]),
+                        Ty::Float32 if *ty == Ty::Float32 => format!("fabsf({})", codes[0]),
+                        Ty::Int if *ty == Ty::Int => {
+                            format!("ostrin_abs_i64({})", codes[0])
+                        }
+                        Ty::Sized(kind) if *ty == Ty::Sized(kind) => {
+                            let c = kind.c_type();
+                            let min = c_int_literal(kind.min());
+                            format!(
+                                "({{ {c} __ostrin_ir_abs = {value}; if (__ostrin_ir_abs == ({c}){min}) {{ {OVERFLOW_ABORT} }} ({c})(__ostrin_ir_abs < 0 ? -__ostrin_ir_abs : __ostrin_ir_abs); }})",
+                                value = codes[0]
+                            )
+                        }
                         _ => return Err(()),
-                    };
-                    format!("{function}({})", codes[0])
+                    }
                 }
             } else if matches!(
                 callee.as_str(),
