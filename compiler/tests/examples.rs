@@ -8395,6 +8395,14 @@ fn native_ir_handles_generic_methods_with_ir_for_generic_records() {
         ir_functions >= 5,
         "generic method example generated only {ir_functions} IR functions: {report_text}"
     );
+    assert_eq!(
+        report_text.lines().find_map(|line| {
+            line.strip_prefix("ast-fallback: ")
+                .and_then(|n| n.trim().parse::<usize>().ok())
+        }),
+        Some(1),
+        "scalar concrete-receiver generic methods should use the checker/HIR prepass; the generic-receiver method path remains the single fallback: {report_text}"
+    );
 
     let c = run(&["--emit-c", &file]);
     assert!(c.status.success(), "C emission failed: {}", stderr(&c));
@@ -8436,6 +8444,26 @@ fn native_ir_handles_generic_methods_with_ir_for_generic_records() {
         String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
         "generic method binary leaked: {}",
         String::from_utf8_lossy(&native.stderr)
+    );
+
+    // The same prepass must remain valid for the cooperative WASI target.
+    // This checks the generated ABI and verifies that the target does not
+    // accidentally enable the native-thread runtime.
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "generic method WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("Wrapper__echo__Int")
+            && wasi_source.contains("Box__Int__swap_in__String"),
+        "WASI C omitted checker-resolved generic method symbols"
+    );
+    assert!(
+        !wasi_source.contains("#define OSTRIN_NATIVE_THREADS"),
+        "generic method WASI emission unexpectedly enabled native threads"
     );
 }
 

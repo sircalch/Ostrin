@@ -4278,10 +4278,20 @@ impl Checker {
                     );
                 }
                 for (generic, explicit_ty) in candidate.generics.iter().zip(explicit.iter()) {
-                    method_substitutions.insert(
-                        generic.name.clone(),
-                        self.resolve_type_in_context(explicit_ty),
-                    );
+                    if generic.bounds.iter().any(|bound| bound == "Dimension") {
+                        method_substitutions.insert(
+                            format!("#dim:{}", generic.name),
+                            Ty::Quantity(resolve_dimension_with_subst(
+                                explicit_ty,
+                                &HashMap::new(),
+                            )),
+                        );
+                    } else {
+                        method_substitutions.insert(
+                            generic.name.clone(),
+                            self.resolve_type_in_context(explicit_ty),
+                        );
+                    }
                 }
             }
         } else if !candidate.generics.is_empty() {
@@ -4330,7 +4340,7 @@ impl Checker {
         }
 
         let mut substitutions = candidate.impl_substitutions;
-        substitutions.extend(method_substitutions);
+        substitutions.extend(method_substitutions.clone());
         let expected_args: Vec<Ty> = candidate
             .params
             .iter()
@@ -4370,6 +4380,47 @@ impl Checker {
                     arg_types.len()
                 ),
             );
+        }
+
+        // Keep the concrete method arguments alongside ordinary generic-call
+        // substitutions.  HIR lowering uses the call node address for method
+        // calls whose expression has no source range of its own, while the
+        // source key covers the located form.  Dimension parameters are stored
+        // internally as `#dim:X -> Quantity<...>` during unification; expose
+        // them through CallSubst::dims so backend instantiation does not need
+        // to know about this checker-only marker.
+        //
+        // The enclosing impl substitutions deliberately stay out of this
+        // record.  The receiver type identifies that concrete impl, and the
+        // native backend combines its own impl bindings with these method
+        // bindings when it queues the instance.
+        if !candidate.generics.is_empty() {
+            let complete = candidate.generics.iter().all(|generic| {
+                method_substitutions.contains_key(&generic.name)
+                    || method_substitutions.contains_key(&format!("#dim:{}", generic.name))
+            });
+            if complete {
+                let mut recorded = CallSubst::default();
+                for generic in &candidate.generics {
+                    if let Some(dimension) = method_substitutions
+                        .get(&format!("#dim:{}", generic.name))
+                        .and_then(|ty| match ty {
+                            Ty::Quantity(dimension) => Some(dimension.clone()),
+                            _ => None,
+                        })
+                    {
+                        recorded.dims.insert(generic.name.clone(), dimension);
+                    } else if let Some(ty) = method_substitutions.get(&generic.name) {
+                        recorded.types.insert(generic.name.clone(), ty.clone());
+                    }
+                }
+                if let Some(key) = self.call_key_stack.last().cloned() {
+                    self.call_substs.insert(key, recorded.clone());
+                }
+                if let Some(node) = self.call_node_stack.last().copied() {
+                    self.call_substs_by_node.insert(node, recorded);
+                }
+            }
         }
 
         let mut return_type = candidate.return_type;

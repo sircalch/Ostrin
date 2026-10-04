@@ -413,11 +413,13 @@ fn native_backend_types_agree_with_the_checker() {
     // remaining generic-call entry-point bodies from the AST comparison. The
     // Float32 binding/list coercion slice, reflected Complex operators, scalar
     // boolean formatting and deterministic `pow` migration remove more entry-
-    // point bodies. The sized-integer `abs` migration leaves 2,038 comparable
-    // nodes; keep a tight lower bound with room for later slices.
+    // point bodies. The scalar concrete-method prepass removes one more
+    // entry-point body from this AST comparison; the remaining generic-
+    // receiver method path leaves 2,004 comparable nodes. Keep a tight lower
+    // bound with room for later slices.
     assert!(
-        node_agreed > 2030,
-        "only {node_agreed} AST nodes were compared with the checker's per-node types (ratchet 2030)"
+        node_agreed > 2000,
+        "only {node_agreed} AST nodes were compared with the checker's per-node types (ratchet 2000)"
     );
     // Ratchet: expressions the backend cannot compare (the checker has no type).
     // Ratchet: functions whose C is generated from the typed HIR or its
