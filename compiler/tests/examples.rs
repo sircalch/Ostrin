@@ -4962,6 +4962,42 @@ fn native_ir_emitter_handles_numeric_array_builtins() {
 }
 
 #[test]
+fn native_ir_math_functions_lower_atan2() {
+    let file = example_path("math_functions.ostrin");
+    let report = run(&["--native-type-report", &file]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "math functions report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text
+            .lines()
+            .any(|line| line == "native-source: examples/math_functions.ostrin ir=3 hir=0 ast=1"),
+        "atan2 helper did not use the IR path: {report_text}"
+    );
+
+    let emitted = run(&["--emit-c", &file]);
+    assert!(
+        emitted.status.success(),
+        "math functions C emission failed: {}",
+        stderr(&emitted)
+    );
+    let source = stdout(&emitted);
+    assert!(
+        source.contains("double ostrin_fn_angle(double y, double x)")
+            && source.contains("__ir_v2 = ostrin_dm_atan2(__ir_v0, __ir_v1);")
+            && source.contains("float ostrin_fn_angle32(float y, float x)")
+            && source.contains("__ir_v2 = ostrin_dm_atan2f(__ir_v0, __ir_v1);"),
+        "atan2 helper did not use the native IR emitter: {source}"
+    );
+}
+
+#[test]
 fn native_ir_float32_array_scalars_match_interpreter_native_and_wasi() {
     let file = fixture_path("native_ir_float32_array_scalar.ostrin");
     let interpreted = run(&["--run", &file]);

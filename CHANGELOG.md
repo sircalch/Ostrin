@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Native IR: deterministic `atan2`
+
+- Scalar `atan2` now lowers through IR/C for both `Float` and `Float32`, using
+  the existing deterministic runtime helpers `ostrin_dm_atan2` and
+  `ostrin_dm_atan2f`.
+- `math_functions.ostrin` verifies both precisions with interpreter/native
+  parity, leak-check, and WASI C emission. The differential ratchet advances
+  to **6,518 HIR/IR-generated functions (6,504 IR + 14 HIR) / 35 AST**.
+
 ### Native IR: Float32 collection coercions
 
 - Explicit `Float32` bindings and `List<Float32>`/`Set<Float32>` aggregates now
