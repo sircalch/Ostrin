@@ -11018,6 +11018,28 @@ fn viz_figures_label_axes_with_the_units_of_their_quantities() {
 }
 
 #[test]
+fn viz_units_keeps_scalar_quantity_plots_on_verified_fallback() {
+    // The generic unit_line/unit_scatter instantiations must remain on the
+    // verified fallback until scalar Quantity labels have an explicit IR
+    // retain/release contract. A future ownership implementation may remove
+    // this guard in the same change that adds the native/WASI lifetime tests.
+    let report = run(&["--native-type-report", &example_path("viz_units.ostrin")]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "viz_units type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("native-source: examples/viz_units.ostrin ir=0 hir=0 ast=1"),
+        "viz_units unexpectedly crossed the Quantity ownership boundary: {report_text}"
+    );
+}
+
+#[test]
 fn viz_layouts_keep_one_top_level_svg_element() {
     // The website extracts a figure from the first "<svg" line to the first
     // "</svg>" line, so nested panels must close inline.

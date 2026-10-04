@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-09-30 · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 270 de integración y 2 unitarias en verde.*
+*Corte: 2026-09-30 · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 271 de integración y 2 unitarias en verde.*
 
 Validación remota: Pages, CI, CodeQL, sanitizers y auditoría de seguridad pasaron para el
 ciclo actual en Windows, Linux, macOS y web. La compuerta oficial exige `cargo fmt --check`, Clippy con el lint `suspicious`, la suite del
@@ -9,7 +9,7 @@ CodeQL, sanitizers nativos y cobertura quedan registrados para el ciclo P5.
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
 Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–266); para el diseño
-del lenguaje, `docs/design/` (26 documentos). La auditoría del sitio vive en
+del lenguaje, `docs/design/` (27 documentos). La auditoría del sitio vive en
 `docs/website-audit.md`.
 
 ## 0. Estado de un vistazo
@@ -536,7 +536,7 @@ sus evidencias y validación upstream.
 
 ```powershell
 cd compiler
-    cargo test                                   # 6 diferenciales + 270 de integración + 2 unitarias
+    cargo test                                   # 6 diferenciales + 271 de integración + 2 unitarias
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 cd ..
