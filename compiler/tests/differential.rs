@@ -411,20 +411,21 @@ fn native_backend_types_agree_with_the_checker() {
     // entry point from this comparison. The generic-call HIR prepass now also
     // resolves checker-recorded instantiations before IR lowering, removing the
     // remaining generic-call entry-point bodies from the AST comparison. The
-    // Float32 binding/list coercion slice, reflected Complex operators and
-    // scalar boolean formatting remove more entry-point bodies; keep a lower
-    // bound with room for later slices.
+    // Float32 binding/list coercion slice, reflected Complex operators, scalar
+    // boolean formatting and deterministic `pow` migration remove more entry-
+    // point bodies. The pow migration leaves 2,145 comparable nodes; keep a
+    // tight lower bound with room for later slices.
     assert!(
-        node_agreed > 2200,
-        "only {node_agreed} AST nodes were compared with the checker's per-node types (ratchet 2200)"
+        node_agreed > 2140,
+        "only {node_agreed} AST nodes were compared with the checker's per-node types (ratchet 2140)"
     );
     // Ratchet: expressions the backend cannot compare (the checker has no type).
     // Ratchet: functions whose C is generated from the typed HIR or its
     // explicit IR lowering (the migration of the native backend).
     let native_generated = hir_generated + ir_generated;
     assert!(
-        native_generated >= 6518,
-        "only {native_generated} functions were generated from HIR/IR (expected at least 6518)"
+        native_generated >= 6521,
+        "only {native_generated} functions were generated from HIR/IR (expected at least 6521)"
     );
     println!("functions generated from HIR/IR: {native_generated} (HIR {hir_generated}, IR {ir_generated})");
     println!("functions still using AST fallback: {ast_fallback}");
@@ -481,7 +482,7 @@ fn native_backend_types_agree_with_the_checker() {
     // through the same IR/C path. HIR now
     // substitutes the concrete owner for `Self` in trait method signatures,
     // allowing Complex arithmetic/equality to use IR/C. The verified baseline is
-    // 35 AST fallbacks (6,518 HIR/IR-generated: 6,504 IR and 14 HIR functions). Checker-recorded
+    // 34 AST fallbacks (6,521 HIR/IR-generated: 6,507 IR and 14 HIR functions). Checker-recorded
     // generic calls are resolved before IR lowering, so ordinary callers can reference their
     // monomorphized C symbols directly. Scalar quantity `to_string()` now calls the existing
     // quantity runtime helper from IR/C, and numeric
@@ -524,7 +525,7 @@ fn native_backend_types_agree_with_the_checker() {
     // entry-point fallback while preserving the legacy C ABI conversion.
     // Explicit Float32 bindings and List/Set<Float32> aggregates, reflected
     // Complex scalar operators and Bool formatting now use typed IR/C.
-    const MAX_AST_FALLBACK_FUNCTIONS: usize = 35;
+    const MAX_AST_FALLBACK_FUNCTIONS: usize = 34;
     assert!(
         ast_fallback <= MAX_AST_FALLBACK_FUNCTIONS,
         "AST fallback grew to {ast_fallback} functions (ratchet limit {MAX_AST_FALLBACK_FUNCTIONS})"

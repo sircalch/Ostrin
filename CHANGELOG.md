@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Native IR: deterministic `pow` for Float32
+
+- Scalar `pow` now lowers through IR/C for `Float` and `Float32`, using
+  `ostrin_dm_pow` and `ostrin_dm_powf` so native code follows the deterministic
+  interpreter runtime.
+- `detmath.ostrin` now reaches `ir=3, hir=0, ast=0` and verifies both scalar
+  precisions with interpreter/native parity, leak-check, and WASI C emission.
+  The differential ratchet advances to **6,521 HIR/IR-generated functions
+  (6,507 IR + 14 HIR) / 34 AST**.
+
 ### Native IR: deterministic `atan2`
 
 - Scalar `atan2` now lowers through IR/C for both `Float` and `Float32`, using
