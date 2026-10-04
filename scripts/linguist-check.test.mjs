@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { repositoryRoot, validateLinguistPreparation } from "./linguist-check.mjs";
+import { parseSampleManifest, repositoryRoot, SAMPLE_MANIFEST, validateLinguistPreparation } from "./linguist-check.mjs";
 import { assertGhReady, buildUsageReport, parseArgs, QUERY, renderHuman } from "./linguist-usage-report.mjs";
 
 test("the repository has a complete Linguist preparation", () => {
@@ -11,6 +11,19 @@ test("the repository has a complete Linguist preparation", () => {
   assert.deepEqual(result.errors, []);
   assert.equal(result.grammarScope, "source.ostrin");
   assert.ok(result.examples >= result.sampleCandidates);
+});
+
+test("the sample manifest records source-backed MIT candidates", () => {
+  const text = readFileSync(path.join(repositoryRoot, SAMPLE_MANIFEST), "utf8");
+  const manifest = parseSampleManifest(text);
+  assert.equal(manifest.schema, "ostrin.linguist-samples/v1");
+  assert.equal(manifest.license, "MIT");
+  assert.ok(manifest.samples.length >= 1);
+  for (const sample of manifest.samples) {
+    assert.match(sample.path, /^examples\/.+\.ostrin$/);
+    assert.equal(sample.license, "MIT");
+    assert.match(sample.source, /^https:\/\/github\.com\/sircalch\/Ostrin\/blob\/main\//);
+  }
 });
 
 test("the readiness gate rejects a proposal without the extension", () => {
@@ -39,6 +52,53 @@ test("the readiness gate rejects a proposal without the extension", () => {
     }
     const result = validateLinguistPreparation(root);
     assert.ok(result.errors.some((error) => error.includes("missing .ostrin extension")));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("the readiness gate rejects a sample without provenance", () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "ostrin-linguist-"));
+  try {
+    mkdirSync(path.join(root, "docs"), { recursive: true });
+    mkdirSync(path.join(root, "vscode-ostrin", "syntaxes"), { recursive: true });
+    mkdirSync(path.join(root, "examples"), { recursive: true });
+    writeFileSync(
+      path.join(root, "docs", "linguist-language.yml"),
+      [
+        "Ostrin:",
+        "  type: programming",
+        '  color: "#5B3DF5"',
+        "  aliases:",
+        "    - ostrin",
+        "  extensions:",
+        '    - ".ostrin"',
+        "  interpreters:",
+        "    - ostrinc",
+        "  tm_scope: source.ostrin",
+        "  ace_mode: text",
+      ].join("\n"),
+    );
+    writeFileSync(path.join(root, "docs", "linguist.md"), "docs/linguist-language.yml docs/linguist-samples.yml");
+    writeFileSync(path.join(root, "LICENSE"), "MIT License\n");
+    writeFileSync(
+      path.join(root, "vscode-ostrin", "syntaxes", "ostrin.tmLanguage.json"),
+      JSON.stringify({ scopeName: "source.ostrin", fileTypes: ["ostrin"] }),
+    );
+    writeFileSync(path.join(root, "examples", "physics.ostrin"), "fn main() {}\n");
+    writeFileSync(
+      path.join(root, "docs", "linguist-samples.yml"),
+      [
+        "schema: ostrin.linguist-samples/v1",
+        "license: MIT",
+        "samples:",
+        "  - path: examples/physics.ostrin",
+        "    role: quantities",
+        "    license: MIT",
+      ].join("\n"),
+    );
+    const result = validateLinguistPreparation(root);
+    assert.ok(result.errors.some((error) => error.includes("needs its canonical source URL")));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
