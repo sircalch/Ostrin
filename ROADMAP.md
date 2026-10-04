@@ -20,7 +20,10 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    experimento de `Figure.unit_line`/`unit_scatter` reveló que una etiqueta de unidad prestada
    puede quedar viva después de liberar su array propietario. Quedan por cerrar ese contrato de
    ownership antes de llevarlas a IR/C, además de funciones numéricas auxiliares y el ejemplo
-   compuesto de selección enlazada, cuyos agregados siguen necesitando la migración gradual. La preparación numérica
+   compuesto de selección enlazada, cuyos agregados siguen necesitando la migración gradual. El
+   contrato está especificado en [`docs/design/27-ownership-de-quantity-escalar.md`](docs/design/27-ownership-de-quantity-escalar.md)
+   y `viz_units.ostrin` conserva un guard de fallback hasta completar native/WASI/sanitizers.
+   La preparación numérica
    de histogramas y violines ya cruza IR/C mediante `histogram`, `linspace`, `pow`, `norm_pdf` y
    `norm_cdf`, y los ids
    deterministas de `std.viz::uid` usan `hash(String)` en IR/C y el renderer usa un recorrido IR
