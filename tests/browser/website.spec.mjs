@@ -596,6 +596,14 @@ test("Viz figure manifests preserve source and recorded provenance", async ({ pa
   expect(manifest.svg).toBe("assets/viz/provenance.svg");
   expect(manifest.capabilities).toContain("reproducibility");
   expect(manifest.selected_state).toBeNull();
+  expect(manifest.citation).toMatchObject({
+    type: "software-figure",
+    author: "Ostrin project",
+    container: "Ostrin Viz",
+    title: "Reproducible provenance",
+    source: "examples/viz_provenance.ostrin",
+  });
+  expect(manifest.citation.url).toContain("viz.html?figure=provenance");
   expect(manifest.provenance.source_hash).toMatch(/^sha256:/);
 });
 
@@ -615,6 +623,20 @@ test("Viz figure manifests preserve the selected explorer state", async ({ page 
   expect(manifest.selected_state.camera).toEqual({ azimuth: 30, elevation: 36 });
   expect(manifest.selected_state.share_url).toContain("figure=surface");
   expect(manifest.selected_state.share_url).toContain("scale=1.6");
+});
+
+test("Viz exposes a citation handoff for the selected figure state", async ({ page }) => {
+  await page.goto("./viz.html?figure=surface&scale=1.6&azimuth=30&elevation=36#viz-surface", { waitUntil: "domcontentloaded" });
+  await expect(page.locator(".viz-dialog[open]")).toBeVisible();
+  await page.locator(".viz-dialog[open]").getByRole("button", { name: "Close" }).click();
+  await page.locator('[data-viz-citation="surface"]').click();
+
+  const citation = page.locator('.viz-citation-dialog[open]');
+  await expect(citation).toBeVisible();
+  await expect(citation).toContainText("@misc{ostrin_surface");
+  await expect(citation).toContainText("examples/viz_surface.ostrin");
+  await expect(citation).toContainText("scale=1.6");
+  await expect(citation).toContainText("azimuth=30");
 });
 
 test("Viz capability filters are shareable and expose their gallery target", async ({ page }) => {

@@ -505,8 +505,8 @@ sustituye la adopción independiente; por eso el plan mantiene un frente explíc
   sitio ejecuta ambos con `ostrinc.wasm` y compara el SVG byte a byte. El bundle 3D registra además
   sus parámetros y cámara. R1 queda reservado para replay de azar sembrado y R2/R3 no se reclaman.
   Los manifiestos de figura ya serializan el estado vivo seleccionado desde el explorador
-  (parámetros, cámara 3D opcional y URL compartible). Falta extender el contrato de bundle a todos
-  los experimentos;
+  (parámetros, cámara 3D opcional y URL compartible), y la galería ofrece una cita BibTeX con
+  metadatos de fuente y versión. Falta extender el contrato de bundle a todos los experimentos;
 - publicar benchmarks históricos por commit y métricas de adopción solo con una política de
   privacidad clara. Estas evidencias alimentan después el snapshot de Linguist y la propuesta
   upstream, pero no se presentan como adopción hasta que existan usuarios y proyectos externos.

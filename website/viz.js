@@ -55,6 +55,7 @@ function provenanceText(metadata, prefix = "Provenance") {
 }
 
 function figureManifest(figure, source = null) {
+  const selected = selectedFigureState(figure);
   const metadata = provenanceOf(source) ?? (figure.provenance && Object.keys(figure.provenance).length
     ? {
         sourceHash: figure.provenance["source-hash"] ?? "",
@@ -72,7 +73,8 @@ function figureManifest(figure, source = null) {
     svg: figure.svg,
     capabilities: [...(figure.capabilities ?? [])],
     recorded_with: LAB.recordedWith,
-    selected_state: selectedFigureState(figure),
+    selected_state: selected,
+    citation: citationData(figure, selected).metadata,
     provenance: metadata
       ? {
           source_hash: metadata.sourceHash || null,
@@ -87,6 +89,54 @@ function figureManifest(figure, source = null) {
 function downloadFigureManifest(figure, source = null) {
   const manifest = JSON.stringify(figureManifest(figure, source), null, 2) + "\n";
   downloadBlob(new Blob([manifest], { type: "application/json;charset=utf-8" }), `${fileStem(figure.title)}.ostrin-figure.json`);
+}
+
+let citation;
+function figureCitationDialog() {
+  if (citation) return citation;
+  const node = el("dialog", { className: "viz-dialog viz-citation-dialog", "aria-label": "Figure citation" });
+  const heading = el("h2", { className: "viz-dialog-title" });
+  const summary = el("p", { className: "viz-citation-summary" });
+  const text = el("pre", { className: "viz-citation-text", tabindex: "0" });
+  const status = el("span", { className: "viz-share-status", "aria-live": "polite", text: "" });
+  const action = (label, ariaLabel, handler) => {
+    const button = el("button", { type: "button", className: "button-quiet", "aria-label": ariaLabel, text: label });
+    button.addEventListener("click", handler);
+    return button;
+  };
+  const close = action("Close", "Close citation", () => node.close());
+  const copy = action("Copy BibTeX", "Copy BibTeX citation", async () => {
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("Clipboard API unavailable");
+      await navigator.clipboard.writeText(text.textContent);
+      status.textContent = "BibTeX copied.";
+    } catch {
+      status.textContent = "Select the citation text to copy it manually.";
+    }
+  });
+  const download = action("Download .bib", "Download BibTeX citation", () => {
+    downloadBlob(new Blob([text.textContent + "\n"], { type: "text/x-bibtex;charset=utf-8" }), `${fileStem(heading.textContent)}.bib`);
+    status.textContent = "BibTeX downloaded.";
+  });
+  node.append(
+    el("div", { className: "viz-dialog-bar" }, [heading, el("div", { className: "viz-dialog-tools" }, [copy, download, status, close])]),
+    summary,
+    text,
+  );
+  document.body.append(node);
+  citation = {
+    open(figure) {
+      const data = citationData(figure);
+      heading.textContent = `Cite ${figure.title}`;
+      summary.textContent = data.metadata.url === canonicalFigureUrl(figure)
+        ? `Stable figure URL · ${figure.source}`
+        : `Selected explorer state is encoded in this URL · ${figure.source}`;
+      text.textContent = data.bibtex;
+      status.textContent = "";
+      node.showModal();
+    },
+  };
+  return citation;
 }
 
 const SVG_NUMBER = /-?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/g;
@@ -210,6 +260,39 @@ function selectedFigureState(figure) {
     selected.camera = { azimuth: state.azimuth, elevation: state.elevation };
   }
   return selected;
+}
+
+function canonicalFigureUrl(figure, selected = null) {
+  if (selected?.share_url) return selected.share_url;
+  const url = new URL("viz.html", window.location.href);
+  url.search = `?figure=${encodeURIComponent(figure.id)}`;
+  url.hash = `viz-${encodeURIComponent(figure.id)}`;
+  return url.href;
+}
+
+function citationData(figure, selected = selectedFigureState(figure)) {
+  const url = canonicalFigureUrl(figure, selected);
+  const key = `ostrin_${figure.id.replace(/[^a-z0-9]+/gi, "_")}`;
+  const metadata = {
+    type: "software-figure",
+    author: "Ostrin project",
+    container: "Ostrin Viz",
+    version: LAB.compiler,
+    title: figure.title,
+    url,
+    source: figure.source,
+    source_url: figure.sourceUrl,
+  };
+  const bibtex = [
+    `@misc{${key},`,
+    "  author = {{Ostrin project}},",
+    `  title = {${figure.title.replace(/[{}]/g, "")}},`,
+    "  howpublished = {Ostrin Viz},",
+    `  note = {Version ${LAB.compiler}; source ${figure.source}},`,
+    `  url = {${url}}`,
+    "}",
+  ].join("\n");
+  return { metadata, bibtex };
 }
 
 function readWorkflowState() {
@@ -1616,6 +1699,14 @@ function card(figure) {
       status.textContent = error.message ?? String(error);
     }
   });
+  const cite = el("button", {
+    type: "button",
+    className: "button-quiet",
+    "aria-label": `Cite ${figure.title}`,
+    "data-viz-citation": figure.id,
+    text: "Cite",
+  });
+  cite.addEventListener("click", () => figureCitationDialog().open(figure));
   const playground = el("a", {
     className: "button-quiet",
     href: playgroundHref(figure.code),
@@ -1708,7 +1799,7 @@ function card(figure) {
         el("p", { className: "muted", text: figure.blurb }),
         capabilities,
         figure.printed.length ? printed : null,
-        el("div", { className: "sl-actions" }, [run, explore, manifest, playground, bundle, status, el("a", { className: "text-link", href: figure.sourceUrl, text: "View source ↗" })]),
+        el("div", { className: "sl-actions" }, [run, explore, manifest, cite, playground, bundle, status, el("a", { className: "text-link", href: figure.sourceUrl, text: "View source ↗" })]),
         provenance,
         code,
       ]),
