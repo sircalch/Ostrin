@@ -8,6 +8,10 @@
   including continuous and frame animations, tables, statistical plots and 3D scenes. Website CI
   now replays all registered fixtures byte-for-byte; seeded-randomness R1 remains planned.
 
+- Generalized the executable input replay contract to `surface` and `lines`: each declares the
+  consumed parameter path and an alternate sensitivity value, and website CI verifies both
+  against `ostrinc.wasm` without changing the R0 maturity label.
+
 ### Viz publication manifests
 
 - Figure manifests now preserve the selected explorer state: numeric parameters, an optional 3D

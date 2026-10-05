@@ -12,6 +12,10 @@
     "mode": "input-file",
     "input_file": "data.json",
     "consumes": ["parameters.scale"],
+    "sensitivity": {
+      "path": "parameters.scale",
+      "alternate": 1.5
+    },
     "command": "node scripts/experiment-replay.mjs --fixture surface",
     "target": "wasm32-wasip1",
     "wasi": "preview1",

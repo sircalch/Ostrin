@@ -503,10 +503,11 @@ sustituye la adopción independiente; por eso el plan mantiene un frente explíc
   comando de replay. Las 29 figuras source-backed de la galería ya publican `ostrin.experiment/v0`
   como artefactos R0 con cuatro archivos y hashes calculados; la CI del sitio ejecuta los 29 con
   `ostrinc.wasm` y compara el SVG byte a byte. Los bundles 3D registran además sus parámetros y
-  cámara, y los de azar conservan su semilla declarada. `surface` ya añade un corte ejecutable
-  input-driven: lee `data.json` en la fuente, y `scripts/experiment-replay.mjs` verifica el bundle
-  en WASI y demuestra que cambiar `parameters.scale` cambia la figura. Esto es evidencia de ejecución
-  de entradas, no una reclamación de R1 de azar sembrado; R2/R3 no se reclaman.
+  cámara, y los de azar conservan su semilla declarada. `surface` y `lines` ya añaden cortes
+  ejecutables input-driven: `surface` lee `data.json` y `lines` consume `parameters.samples`;
+  `scripts/experiment-replay.mjs` verifica ambos bundles en WASI y demuestra que cambiar el
+  parámetro declarado cambia la figura. Esto es evidencia de ejecución de entradas, no una
+  reclamación de R1 de azar sembrado; R2/R3 no se reclaman.
   Los manifiestos de figura ya serializan el estado vivo seleccionado desde el explorador
   (parámetros, cámara 3D opcional y URL compartible), y la galería ofrece una cita BibTeX con
   metadatos de fuente y versión. Falta extender el comando de replay al resto de entradas, cubrir

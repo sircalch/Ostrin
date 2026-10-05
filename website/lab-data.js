@@ -812,15 +812,15 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "bundle": "assets/experiments/lines.ostrin-experiment.json",
       "source": "examples/viz_lines.ostrin",
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_lines.ostrin",
-      "code": "// std.viz · lines: three damped oscillators, their envelope and a reference line.\nimport std.viz\n\nfn main() -> Void {\n    t = linspace(0.0, 12.0, 300)\n    envelope = exp(t * -0.2)\n    fig = viz.figure(\"Damped oscillators\")\n        .describe(\"x(t) = exp(-t/5) cos(ω t) for three frequencies\")\n        .labels(\"time t\", \"displacement x\")\n        .band(t, envelope * -1.0, envelope, label: \"envelope\")\n        .line(t, envelope * cos(t * 1.0), label: \"ω = 1\")\n        .line(t, envelope * cos(t * 2.0), label: \"ω = 2\")\n        .line(t, envelope * cos(t * 3.5), label: \"ω = 3.5\", dash: \"6 4\")\n        .hline(0.0)\n    print(fig.svg())\n}\n",
+      "code": "// std.viz · lines: three damped oscillators, their envelope and a reference line.\nimport std.viz\nimport std.json\n\nfn input_samples(fallback: Int) -> Int {\n    loaded = read_file(\"data.json\")\n    if loaded.is_err() {\n        return fallback\n    }\n    document = json.parse(loaded.unwrap())\n    if document.is_err() {\n        return fallback\n    }\n    parameters = json.object_get(document.unwrap(), \"parameters\")\n    if parameters.is_none() {\n        return fallback\n    }\n    value = json.object_get(parameters.unwrap(), \"samples\")\n    if value.is_none() {\n        return fallback\n    }\n    number = json.as_number(value.unwrap())\n    if number.is_none() {\n        return fallback\n    }\n    number.unwrap() as Int\n}\n\nfn main() -> Void {\n    samples = input_samples(300)\n    t = linspace(0.0, 12.0, samples)\n    envelope = exp(t * -0.2)\n    fig = viz.figure(\"Damped oscillators\")\n        .describe(\"x(t) = exp(-t/5) cos(ω t) for three frequencies\")\n        .labels(\"time t\", \"displacement x\")\n        .band(t, envelope * -1.0, envelope, label: \"envelope\")\n        .line(t, envelope * cos(t * 1.0), label: \"ω = 1\")\n        .line(t, envelope * cos(t * 2.0), label: \"ω = 2\")\n        .line(t, envelope * cos(t * 3.5), label: \"ω = 3.5\", dash: \"6 4\")\n        .hline(0.0)\n    print(fig.svg())\n}\n",
       "svg": "assets/viz/lines.svg",
       "capabilities": [
         "2d",
         "reproducibility"
       ],
       "provenance": {
-        "source-hash": "sha256:f125fc6117a1be6662e759730b0c4196d8dcd8a3b331ac1aa8e744ea3a31aace",
-        "data-hash": "sha256:85dbcfc4aeb5ccda5dac3238ff480e264942b48695c6e3dbcc84cd79830cf48e",
+        "source-hash": "sha256:88868b4a966ef6f9f6c8dafab41788247abee9494978e8f2e2462e61afcbcc11",
+        "data-hash": "sha256:a76a271cb34382391cf999ae97833b18fcab4660c02456a09811c1dd70b6d9dc",
         "seed": "seed=deterministic",
         "compiler": "ostrinc 0.1.0"
       },
@@ -853,7 +853,7 @@ globalThis.OSTRIN_LAB = Object.freeze({
       ],
       "provenance": {
         "source-hash": "sha256:d1c7a59124c39cd31943403f59e8c4feae64dba8cf23a9b6a95e7a4dd94e0b18",
-        "data-hash": "sha256:6a7b7cd46894ccbcbc8beaefafe30ef15e929aa17c4c15f2fc67adafcc40fd0c",
+        "data-hash": "sha256:ba396b72aaaacfed65c27e4a13ca9a0423dcd6a87263a653ee1a829a6a1ffeb0",
         "seed": "seed=deterministic",
         "compiler": "ostrinc 0.1.0"
       },
