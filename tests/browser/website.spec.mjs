@@ -670,7 +670,7 @@ test("Viz exposes the recorded 3D surface experiment bundle", async ({ page }) =
   }
 });
 
-test("Viz exposes the first input-driven seeded R1 experiment bundle", async ({ page }) => {
+test("Viz exposes the input-driven seeded R1 experiment bundles", async ({ page }) => {
   await page.goto("./viz.html", { waitUntil: "domcontentloaded" });
   await expect(page.locator('[data-viz-bundle="histogram"]')).toBeVisible();
   const bundleDownloadPromise = page.waitForEvent("download");
@@ -682,6 +682,16 @@ test("Viz exposes the first input-driven seeded R1 experiment bundle", async ({ 
   expect(bundle.provenance.execution.randomness.seed_path).toBe("seed");
   expect(bundle.provenance.randomness.seed_consumption).toBe("data.json:seed");
   expect(bundle.provenance.replay.level).toBe("R1");
+
+  const boxplotDownloadPromise = page.waitForEvent("download");
+  await page.locator('[data-viz-bundle="boxplot"]').click();
+  const boxplotDownload = await boxplotDownloadPromise;
+  expect(boxplotDownload.suggestedFilename()).toBe("grouped-boxplots.ostrin-experiment.json");
+  const boxplot = JSON.parse(await readFile(await boxplotDownload.path(), "utf8"));
+  expect(boxplot.reproducibility.level).toBe("R1");
+  expect(boxplot.provenance.execution.randomness.seed_path).toBe("seed");
+  expect(boxplot.provenance.randomness.seed_consumption).toBe("data.json:seed");
+  expect(boxplot.provenance.replay.level).toBe("R1");
 });
 
 test("Viz exposes recorded animation, table and volume experiment bundles", async ({ page }) => {

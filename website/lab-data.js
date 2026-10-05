@@ -1094,22 +1094,22 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "bundle": "assets/experiments/boxplot.ostrin-experiment.json",
       "source": "examples/viz_boxplot.ostrin",
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_boxplot.ostrin",
-      "code": "// std.viz · grouped boxplots: distribution summaries computed by Ostrin.\nimport std.viz\n\nfn main() -> Void {\n    r = rng(41)\n    control = r.randn([80]) * 0.55 + 4.2\n    treatment = r.randn([80]) * 0.8 + 5.3\n    follow_up = r.randn([80]) * 0.4 + 6.1\n    fig = viz.figure(\"Distribution summary\")\n        .describe(\"median, interquartile range, whiskers\")\n        .labels(\"cohort\", \"response\")\n        .boxplot(1.0, control, label: \"control\", color: \"#2563eb\")\n        .boxplot(2.0, treatment, label: \"treatment\", color: \"#db2777\")\n        .boxplot(3.0, follow_up, label: \"follow-up\", color: \"#059669\")\n    print(fig.svg())\n}\n",
+      "code": "// std.viz · grouped boxplots: distribution summaries computed by Ostrin.\nimport std.json\nimport std.viz\n\nfn input_int(key: String, fallback: Int) -> Int {\n    loaded = read_file(\"data.json\")\n    if loaded.is_err() {\n        return fallback\n    }\n    document = json.parse(loaded.unwrap())\n    if document.is_err() {\n        return fallback\n    }\n    value = json.object_get(document.unwrap(), key)\n    if value.is_none() {\n        return fallback\n    }\n    number = json.as_number(value.unwrap())\n    if number.is_none() {\n        return fallback\n    }\n    number.unwrap() as Int\n}\n\nfn input_parameter_int(key: String, fallback: Int) -> Int {\n    loaded = read_file(\"data.json\")\n    if loaded.is_err() {\n        return fallback\n    }\n    document = json.parse(loaded.unwrap())\n    if document.is_err() {\n        return fallback\n    }\n    parameters = json.object_get(document.unwrap(), \"parameters\")\n    if parameters.is_none() {\n        return fallback\n    }\n    value = json.object_get(parameters.unwrap(), key)\n    if value.is_none() {\n        return fallback\n    }\n    number = json.as_number(value.unwrap())\n    if number.is_none() {\n        return fallback\n    }\n    number.unwrap() as Int\n}\n\nfn main() -> Void {\n    seed = input_int(\"seed\", 41)\n    samples_per_group = input_parameter_int(\"samples_per_group\", 80)\n    r = rng(seed)\n    control = r.randn([samples_per_group]) * 0.55 + 4.2\n    treatment = r.randn([samples_per_group]) * 0.8 + 5.3\n    follow_up = r.randn([samples_per_group]) * 0.4 + 6.1\n    fig = viz.figure(\"Distribution summary\")\n        .describe(\"median, interquartile range, whiskers\")\n        .labels(\"cohort\", \"response\")\n        .boxplot(1.0, control, label: \"control\", color: \"#2563eb\")\n        .boxplot(2.0, treatment, label: \"treatment\", color: \"#db2777\")\n        .boxplot(3.0, follow_up, label: \"follow-up\", color: \"#059669\")\n    print(fig.svg())\n}\n",
       "svg": "assets/viz/boxplot.svg",
       "capabilities": [
         "2d",
         "reproducibility"
       ],
       "provenance": {
-        "source-hash": "sha256:f7f8424b58b47a74c9f2b3b614fb43c07819980d857e5103c0e463e207c74cb0",
-        "data-hash": "sha256:9f1e70d6c744911aa3caab0de7d4c89318cf51666862c75096d854d7a2caafd7",
+        "source-hash": "sha256:c8e3fde67e369bef08aebfd764765484e915c633ba7823f57f70de048687715c",
+        "data-hash": "sha256:270720dd40d7a02c80f5af42da5871cc6faa4951f13efb2d29d811bf66a8136d",
         "seed": "seed=41",
         "compiler": "ostrinc 0.1.0"
       },
       "reproducibility": {
-        "level": "R0",
-        "label": "R0 · exact replay verified",
-        "next": "R1 · seeded replay (planned verification)"
+        "level": "R1",
+        "label": "R1 · seeded replay verified",
+        "next": "R2 · external snapshots (planned verification)"
       },
       "printed": [
         ""
