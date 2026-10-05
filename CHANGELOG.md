@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Viz R0 experiment coverage
+
+- Added exact-replay `ostrin.experiment/v0` bundles for a continuous double pendulum, frame
+  animation, SVG table and 3D volume slices. Website CI now replays all six registered fixtures
+  byte-for-byte; seeded-randomness R1 remains planned.
+
 ### Viz publication manifests
 
 - Figure manifests now preserve the selected explorer state: numeric parameters, an optional 3D

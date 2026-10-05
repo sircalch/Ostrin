@@ -1,0 +1,9 @@
+{
+  "seed": "deterministic",
+  "parameters": {
+    "frames": 24,
+    "fps": 8.0,
+    "samples": 160
+  },
+  "description": "Deterministic wave-packet frame sequence and playback inputs for the animation figure."
+}

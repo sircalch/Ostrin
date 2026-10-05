@@ -53,7 +53,8 @@
 <line x1="66" y1="348" x2="620" y2="348" stroke="#9ca3af" stroke-width="1"/>
 <line x1="66" y1="62" x2="66" y2="348" stroke="#9ca3af" stroke-width="1"/>
 <text x="343" y="388" text-anchor="middle" font-size="12" fill="#1f2937">position x</text>
-<text x="16" y="205" text-anchor="middle" font-size="12" fill="#1f2937" transform="rotate(-90 16 205)">amplitude</text></svg></g>
+<text x="16" y="205" text-anchor="middle" font-size="12" fill="#1f2937" transform="rotate(-90 16 205)">amplitude</text>  <ostrin-provenance source-hash="sha256:d2e92f861d1dcd136df04d972ff42352298cafad1901f4b4859267bee8b0b3c4" data-hash="sha256:0d73b5090f7215c2202d1b296842283a67de86c1cf4db136d9f3215c09e4f30f" seed="seed=deterministic" compiler="ostrinc 0.1.0" />
+</svg></g>
 <g class="ostrin-frame" style="animation-delay:125ms"><svg width="640" height="400" viewBox="0 0 640 400" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
 <style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell,.contourf-cell,.quiver,.streamplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover,.contourf-cell:hover{fill-opacity:0.9}.quiver:hover>line{stroke-width:2.6px}.quiver:hover>polygon{filter:brightness(0.78)}.streamplot:hover{stroke-width:2.7px}</style>
 <rect width="640" height="400" fill="#ffffff"/>

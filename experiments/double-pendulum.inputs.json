@@ -1,0 +1,10 @@
+{
+  "seed": "deterministic",
+  "parameters": {
+    "seconds": 12.0,
+    "initial_theta_1": 2.2,
+    "initial_theta_2": 2.6,
+    "samples": 721
+  },
+  "description": "Deterministic rk45 trajectory and animation inputs for the double-pendulum figure."
+}

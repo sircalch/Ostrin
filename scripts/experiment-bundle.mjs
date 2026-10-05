@@ -41,6 +41,42 @@ export const experimentFixtures = Object.freeze({
     // can resolve the complete source/input/figure set deterministically.
     sourceRevision: "47e84fabcbfa144830e37a294a298698c267e21a",
   }),
+  "double-pendulum": Object.freeze({
+    id: "double-pendulum",
+    title: "Double pendulum (animated)",
+    sourcePath: "examples/viz_double_pendulum.ostrin",
+    inputPath: "experiments/double-pendulum.inputs.json",
+    figurePath: "website/assets/viz/double-pendulum.svg",
+    outputPath: "website/assets/experiments/double-pendulum.ostrin-experiment.json",
+    sourceRevision: "892f289731d9bf1568e9d7a669d68489f8598ec6",
+  }),
+  animation: Object.freeze({
+    id: "animation",
+    title: "Animation",
+    sourcePath: "examples/viz_animation.ostrin",
+    inputPath: "experiments/animation.inputs.json",
+    figurePath: "website/assets/viz/animation.svg",
+    outputPath: "website/assets/experiments/animation.ostrin-experiment.json",
+    sourceRevision: "892f289731d9bf1568e9d7a669d68489f8598ec6",
+  }),
+  table: Object.freeze({
+    id: "table",
+    title: "Data table",
+    sourcePath: "examples/viz_table.ostrin",
+    inputPath: "experiments/table.inputs.json",
+    figurePath: "website/assets/viz/table.svg",
+    outputPath: "website/assets/experiments/table.ostrin-experiment.json",
+    sourceRevision: "892f289731d9bf1568e9d7a669d68489f8598ec6",
+  }),
+  "volume-slices": Object.freeze({
+    id: "volume-slices",
+    title: "3D volume slices",
+    sourcePath: "examples/viz_volume_slices.ostrin",
+    inputPath: "experiments/volume-slices.inputs.json",
+    figurePath: "website/assets/viz/volume-slices.svg",
+    outputPath: "website/assets/experiments/volume-slices.ostrin-experiment.json",
+    sourceRevision: "892f289731d9bf1568e9d7a669d68489f8598ec6",
+  }),
 });
 
 // Short alias for callers that only need to enumerate the registry.

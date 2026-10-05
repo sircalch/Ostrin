@@ -670,6 +670,38 @@ test("Viz exposes the recorded 3D surface experiment bundle", async ({ page }) =
   }
 });
 
+test("Viz exposes recorded animation, table and volume experiment bundles", async ({ page }) => {
+  await page.goto("./viz.html", { waitUntil: "domcontentloaded" });
+
+  const animationDownloadPromise = page.waitForEvent("download");
+  await page.locator('[data-viz-bundle="animation"]').click();
+  const animationDownload = await animationDownloadPromise;
+  expect(animationDownload.suggestedFilename()).toBe("animation.ostrin-experiment.json");
+  const animationBundle = JSON.parse(await readFile(await animationDownload.path(), "utf8"));
+  expect(animationBundle.id).toBe("animation");
+  expect(animationBundle.provenance.parameters).toEqual({ frames: 24, fps: 8, samples: 160 });
+  expect(animationBundle.reproducibility.level).toBe("R0");
+
+  const tableDownloadPromise = page.waitForEvent("download");
+  await page.locator('[data-viz-bundle="table"]').click();
+  const tableDownload = await tableDownloadPromise;
+  expect(tableDownload.suggestedFilename()).toBe("data-table.ostrin-experiment.json");
+  const tableBundle = JSON.parse(await readFile(await tableDownload.path(), "utf8"));
+  expect(tableBundle.id).toBe("table");
+  expect(tableBundle.provenance.parameters).toEqual({ rows: 4, columns: 4 });
+  expect(tableBundle.reproducibility.level).toBe("R0");
+
+  const volumeDownloadPromise = page.waitForEvent("download");
+  await page.locator('[data-viz-bundle="volume-slices"]').click();
+  const volumeDownload = await volumeDownloadPromise;
+  expect(volumeDownload.suggestedFilename()).toBe("3d-volume-slices.ostrin-experiment.json");
+  const volumeBundle = JSON.parse(await readFile(await volumeDownload.path(), "utf8"));
+  expect(volumeBundle.id).toBe("volume-slices");
+  expect(volumeBundle.provenance.parameters).toEqual({ grid: 17, slice: 8 });
+  expect(volumeBundle.provenance.camera).toEqual({ azimuth: -48, elevation: 28 });
+  expect(volumeBundle.reproducibility.level).toBe("R0");
+});
+
 test("Viz publishes structured data for its scientific source", async ({ page }) => {
   await page.goto("./viz.html", { waitUntil: "domcontentloaded" });
   const structuredData = await page.locator('script[type="application/ld+json"]').evaluateAll((scripts) =>

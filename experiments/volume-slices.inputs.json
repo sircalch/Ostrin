@@ -1,0 +1,12 @@
+{
+  "seed": "deterministic",
+  "parameters": {
+    "grid": 17,
+    "slice": 8
+  },
+  "camera": {
+    "azimuth": -48.0,
+    "elevation": 28.0
+  },
+  "description": "Deterministic 17³ scalar volume, orthogonal slice and camera inputs."
+}
