@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Scalar Measurement contract gate
+
+- Added a source-backed website CI gate for the experimental scalar
+  `std.measurements` API, its interpreter/native parity evidence, and its
+  explicit boundary before `Array<Measurement<T>>`, Quantity integration,
+  covariance, and Monte Carlo support.
+
 ### Scalar generic method prepass
 
 - Concrete scalar and record receivers for generic methods now resolve through
