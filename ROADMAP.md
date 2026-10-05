@@ -116,8 +116,9 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    evidencia en intérprete, nativo y WASM.
    El primer artefacto web de alto retorno ya está implementado como un registro de dos fixtures
    source-backed (`provenance` y la superficie 3D `surface`): `ostrin.experiment/v0` descarga código,
-   entradas declaradas, SVG, manifest y `provenance.json` con hashes calculados y etiqueta R0; R1
-   queda como replay verificable planificado y no se reclaman R2/R3. El siguiente paso es extender
+   entradas declaradas, SVG, manifest y `provenance.json` con hashes calculados y etiqueta R0. La
+   CI del sitio reproduce ambos programas con `ostrinc.wasm` y compara el SVG byte a byte; R1 queda
+   reservado para evidencia de azar sembrado y no se reclaman R2/R3. El siguiente paso es extender
    el contrato al resto de experimentos de la galería, incluyendo parámetros y cámara seleccionados,
    para que la galería funcione como superficie de publicación científica además de demo.
    El Scientific Lab ya conserva la demo activa y sus parámetros en la URL para compartir y

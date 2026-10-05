@@ -1619,7 +1619,7 @@ function card(figure) {
     status.textContent = "preparing bundle…";
     try {
       await downloadExperimentBundle(figure.bundle, figure.title);
-      status.textContent = "bundle downloaded · R0";
+      status.textContent = "bundle downloaded · R0 replay verified";
     } catch (error) {
       status.textContent = error.message ?? String(error);
     } finally {

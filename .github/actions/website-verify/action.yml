@@ -37,7 +37,8 @@ runs:
         node scripts/quantity-ownership-check.mjs
         node --test scripts/quantity-ownership-check.test.mjs
         node scripts/website-metadata.mjs
-        node --no-warnings scripts/lab-data.mjs
+        node --no-warnings scripts/lab-data.mjs --verify-replays
+        node --test scripts/lab-data-replay.test.mjs
         node scripts/viz-jsonld.mjs
         node scripts/experiment-bundle.mjs
         node --test scripts/experiment-bundle.test.mjs

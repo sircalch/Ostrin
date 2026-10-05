@@ -1,8 +1,10 @@
 // Build and verify recorded Ostrin experiment contracts.
 //
-// The v0 bundles are deliberately R0 recorded artifacts: each one carries its
-// source, declared inputs, recorded figure and machine-readable provenance
-// with hashes. They do not claim server-side replay or R2/R3 guarantees.
+// The v0 bundles are R0 artifacts with an exact local replay gate: each one
+// carries its source, declared inputs, recorded figure and machine-readable
+// provenance with hashes. The website CI replays the source with the same
+// WASI compiler and compares the complete SVG byte-for-byte. They do not
+// claim seeded-randomness R1 or R2/R3 guarantees.
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -178,6 +180,15 @@ function provenanceFor(root, fixture, files, manifest) {
       kind: "figure",
       sha256: sha256(figure),
     }],
+    replay: {
+      level: "R0",
+      status: "verified",
+      backend: "ostrinc.wasm",
+      target: "wasm32-wasip1",
+      command: "node scripts/lab-data.mjs --verify-replays",
+      compares: "figure.svg",
+      note: "Website CI compares the replayed SVG byte-for-byte with this bundled figure; R1 requires seeded-randomness evidence.",
+    },
     figure_metadata: {
       policy: "The bundle generator normalizes the recorded SVG metadata to these calculated hashes; bundle manifest hashes are authoritative.",
       source_hash: metadata.sourceHash,
@@ -193,7 +204,7 @@ function provenanceFor(root, fixture, files, manifest) {
     ...(inputs.camera ? { camera: inputs.camera } : {}),
     seed: inputs.seed,
     manifest_schema: manifest.schema,
-    limits: "R0 recorded artifact. The bundle does not include external snapshots, lockfiles, runtime captures or an R2/R3 replay guarantee.",
+    limits: "R0 exact SVG replay is verified in website CI. The bundle does not include seeded-randomness evidence for R1, external snapshots, lockfiles, runtime captures or an R2/R3 replay guarantee.",
   };
 }
 
@@ -214,8 +225,8 @@ export function buildExperimentBundle(fixtureId = defaultFixtureId, root = repos
     title: fixture.title,
     reproducibility: {
       level: "R0",
-      label: "R0 · recorded artifact",
-      next: "R1 · replay-ready (planned verification)",
+      label: "R0 · exact replay verified",
+      next: "R1 · seeded replay (planned verification)",
     },
     experiment: {
       source: "source.ostrin",
@@ -260,7 +271,8 @@ export function verifyExperimentBundle(bundle, { expected, fixtureId } = {}) {
   if (bundle?.schema !== schema) errors.push(`schema must be ${schema}`);
   if (bundle?.id !== fixture.id) errors.push(`id must be ${fixture.id}`);
   if (bundle?.reproducibility?.level !== "R0") errors.push("bundle must be explicitly labelled R0");
-  if (bundle?.reproducibility?.next !== "R1 · replay-ready (planned verification)") errors.push("bundle must expose the planned R1 label");
+  if (bundle?.reproducibility?.label !== "R0 · exact replay verified") errors.push("bundle must expose the verified R0 replay label");
+  if (bundle?.reproducibility?.next !== "R1 · seeded replay (planned verification)") errors.push("bundle must expose the planned seeded R1 label");
   const files = bundle?.files;
   const entries = bundle?.manifest?.files;
   if (!files || typeof files !== "object") errors.push("files object is missing");
@@ -274,6 +286,12 @@ export function verifyExperimentBundle(bundle, { expected, fixtureId } = {}) {
   let provenanceFile;
   try { provenanceFile = JSON.parse(files?.["provenance.json"] ?? "null"); } catch { provenanceFile = null; }
   if (JSON.stringify(bundle?.provenance) !== JSON.stringify(provenanceFile)) errors.push("provenance.json is not the embedded provenance object");
+  const replay = bundle?.provenance?.replay;
+  if (replay?.level !== "R0" || replay?.status !== "verified" || replay?.backend !== "ostrinc.wasm"
+    || replay?.target !== "wasm32-wasip1" || replay?.command !== "node scripts/lab-data.mjs --verify-replays"
+    || replay?.compares !== "figure.svg" || !/R1 requires seeded-randomness evidence/.test(replay?.note ?? "")) {
+    errors.push("provenance replay contract is missing or overclaims R1");
+  }
   if (JSON.stringify(bundle?.experiment) !== JSON.stringify(expected?.experiment)) errors.push("experiment file map drifted");
   if (bundle?.provenance?.commit !== expected?.provenance?.commit) errors.push("provenance commit drifted from the source-backed fixture revision");
   const embedded = files?.["figure.svg"]?.match(/<ostrin-provenance\s+([^>]+?)\s*\/>/)?.[1] ?? "";
