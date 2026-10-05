@@ -400,7 +400,7 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   await pdfPopup.waitForLoadState("domcontentloaded");
   await expect(pdfPopup.locator("svg")).toBeVisible();
   await expect(pdfPopup.locator("h1")).toHaveText("Scatter and fit");
-  await expect(pdfPopup.locator("p")).toContainText("No reproducibility metadata recorded.");
+  await expect(pdfPopup.locator("p")).toContainText("Provenance: source sha256:");
   await expect(page.locator(".viz-export-status")).toHaveText(/PDF print view opened · \d+×\d+/);
   await pdfPopup.close();
   await page.getByRole("button", { name: "Zoom in" }).click();
