@@ -48,6 +48,18 @@ test("the boxplot bundle verifies a second input-driven seeded replay", async ()
   });
 });
 
+test("the scatter-fit bundle verifies a third input-driven seeded replay", async () => {
+  const result = await replay("scatter-fit");
+  assert.deepEqual(result, {
+    id: "scatter-fit",
+    input: "data.json",
+    consumed: ["seed", "parameters.samples"],
+    baseline: "match",
+    sensitivity: "changed-output",
+    seeded: "changed-output",
+  });
+});
+
 test("an executable replay rejects a bundle without its input contract", () => {
   const errors = bundleErrors({ schema: "ostrin.experiment/v0", id: "surface", files: {}, manifest: { files: [] } }, "surface");
   assert.ok(errors.some((error) => error.includes("input-file executable replay contract")));

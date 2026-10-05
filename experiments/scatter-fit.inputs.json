@@ -3,5 +3,30 @@
   "parameters": {
     "samples": 40
   },
-  "description": "Seeded 40-point calibration sample and least-squares fit."
+  "description": "Seeded 40-point calibration sample and least-squares fit.",
+  "reproducibility": {
+    "level": "R1",
+    "label": "R1 · seeded replay verified",
+    "next": "R2 · external snapshots (planned verification)"
+  },
+  "execution": {
+    "mode": "input-file",
+    "input_file": "data.json",
+    "consumes": ["seed", "parameters.samples"],
+    "sensitivity": {
+      "path": "seed",
+      "alternate": 2025
+    },
+    "randomness": {
+      "seed_path": "seed",
+      "algorithm": "xoshiro256**",
+      "version": "ostrin.rng/v1",
+      "partition": "single sequential stream",
+      "status": "verified-in-ci"
+    },
+    "command": "node scripts/experiment-replay.mjs --fixture scatter-fit",
+    "target": "wasm32-wasip1",
+    "wasi": "preview1",
+    "status": "verified-in-ci"
+  }
 }
