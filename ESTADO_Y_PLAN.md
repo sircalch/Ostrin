@@ -510,8 +510,12 @@ sustituye la adopción independiente; por eso el plan mantiene un frente explíc
   reclamación de R1 de azar sembrado; R2/R3 no se reclaman.
   Los manifiestos de figura ya serializan el estado vivo seleccionado desde el explorador
   (parámetros, cámara 3D opcional y URL compartible), y la galería ofrece una cita BibTeX con
-  metadatos de fuente y versión. Falta extender el comando de replay al resto de entradas, cubrir
-  azar sembrado con algoritmo/versionado explícitos y añadir lockfiles y snapshots de runtime;
+  metadatos de fuente y versión. Los bundles que invocan `rng(seed)` ya incluyen evidencia
+  source-backed del contrato `ostrin.rng/v1` (xoshiro256**, splitmix64, Marsaglia polar y
+  `detmath::ln`) con hashes de las implementaciones intérprete/nativa; se mantiene como evidencia
+  R0 y no como reclamación de replay R1. Falta extender el comando de replay al resto de entradas,
+  hacer que la semilla sea consumida desde `data.json`, verificar el replay de azar sembrado y
+  añadir lockfiles y snapshots de runtime;
 - publicar benchmarks históricos por commit y métricas de adopción solo con una política de
   privacidad clara. Estas evidencias alimentan después el snapshot de Linguist y la propuesta
   upstream, pero no se presentan como adopción hasta que existan usuarios y proyectos externos.

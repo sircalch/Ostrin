@@ -11,6 +11,10 @@
 - Generalized the executable input replay contract to `surface` and `lines`: each declares the
   consumed parameter path and an alternate sensitivity value, and website CI verifies both
   against `ostrinc.wasm` without changing the R0 maturity label.
+- Added source-backed `ostrin.rng/v1` evidence to RNG-consuming bundles: xoshiro256** with
+  splitmix64 seeding, Marsaglia polar normals, deterministic `detmath::ln`, interpreter/native
+  implementation hashes and explicit source-literal seed status. This documents the algorithm
+  without claiming input-driven seeded replay R1.
 
 ### Viz publication manifests
 

@@ -391,11 +391,37 @@ function manifestFor(files) {
   };
 }
 
+function seededRandomnessEvidence(root, source, inputs) {
+  if (typeof inputs.seed !== "number" || !Number.isFinite(inputs.seed) || !/\brng\s*\(/.test(source)) {
+    return undefined;
+  }
+  const implementationPaths = [
+    "compiler/src/interpreter/rng.rs",
+    "compiler/src/rng_runtime.c",
+  ];
+  return {
+    contract: "ostrin.rng/v1",
+    algorithm: "xoshiro256**",
+    seeding: "splitmix64",
+    normal: "Marsaglia polar",
+    deterministic_log: "detmath::ln",
+    implementations: implementationPaths.map((relativePath) => ({
+      path: relativePath,
+      sha256: sha256(normalizedText(root, relativePath)),
+    })),
+    parity: "interpreter-native",
+    seed_consumption: "source-literal",
+    status: "evidence-only-r0",
+  };
+}
+
 function provenanceFor(root, fixture, files, manifest) {
   const data = files["data.json"];
   const figure = files["figure.svg"];
+  const source = files["source.ostrin"];
   const inputs = JSON.parse(data);
   const metadata = metadataForFixture(fixture.id, root);
+  const randomness = seededRandomnessEvidence(root, source, inputs);
   return {
     schema: "ostrin.provenance/v0",
     level: "R0",
@@ -442,6 +468,7 @@ function provenanceFor(root, fixture, files, manifest) {
     parameters: inputs.parameters,
     ...(inputs.camera ? { camera: inputs.camera } : {}),
     seed: inputs.seed,
+    ...(randomness ? { randomness } : {}),
     ...(inputs.execution ? { execution: inputs.execution } : {}),
     manifest_schema: manifest.schema,
     limits: "R0 exact SVG replay is verified in website CI. The bundle does not include seeded-randomness evidence for R1, external snapshots, lockfiles, runtime captures or an R2/R3 replay guarantee.",

@@ -73,6 +73,30 @@ test("shared fixture metadata stays identical across normalized SVG and bundle",
     });
   }
 });
+
+test("seeded RNG bundles expose source-backed algorithm evidence without claiming R1", () => {
+  const histogram = buildExperimentBundle("histogram");
+  const randomness = histogram.provenance.randomness;
+  assert.equal(randomness.contract, "ostrin.rng/v1");
+  assert.equal(randomness.algorithm, "xoshiro256**");
+  assert.equal(randomness.seeding, "splitmix64");
+  assert.equal(randomness.normal, "Marsaglia polar");
+  assert.equal(randomness.deterministic_log, "detmath::ln");
+  assert.deepEqual(randomness.implementations.map(({ path }) => path), [
+    "compiler/src/interpreter/rng.rs",
+    "compiler/src/rng_runtime.c",
+  ]);
+  for (const implementation of randomness.implementations) assert.match(implementation.sha256, /^sha256:[0-9a-f]{64}$/);
+  assert.equal(randomness.parity, "interpreter-native");
+  assert.equal(randomness.seed_consumption, "source-literal");
+  assert.equal(randomness.status, "evidence-only-r0");
+  assert.equal(histogram.provenance.level, "R0");
+  assert.equal(histogram.reproducibility.next, "R1 · seeded replay (planned verification)");
+
+  const lines = buildExperimentBundle("lines");
+  assert.equal(lines.provenance.randomness, undefined);
+});
+
 test("the fixture registry stays source-backed and parameterizable", () => {
   const fixture = experimentFixtures.provenance;
   assert.ok(fixture);
