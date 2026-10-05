@@ -72,6 +72,7 @@ function figureManifest(figure, source = null) {
     svg: figure.svg,
     capabilities: [...(figure.capabilities ?? [])],
     recorded_with: LAB.recordedWith,
+    selected_state: selectedFigureState(figure),
     provenance: metadata
       ? {
           source_hash: metadata.sourceHash || null,
@@ -198,6 +199,17 @@ function readVizState() {
     return Number.isFinite(raw) ? Math.max(min, Math.min(max, raw)) : null;
   };
   return { figureId: figure.id, parameters, azimuth: readAngle("azimuth", -180, 180), elevation: readAngle("elevation", -80, 80) };
+}
+
+function selectedFigureState(figure) {
+  const state = readVizState();
+  if (!state || state.figureId !== figure.id) return null;
+  const parameters = Object.fromEntries(Object.entries(state.parameters).map(([name, value]) => [name, Number(value)]));
+  const selected = { parameters, share_url: window.location.href };
+  if (state.azimuth !== null || state.elevation !== null) {
+    selected.camera = { azimuth: state.azimuth, elevation: state.elevation };
+  }
+  return selected;
 }
 
 function readWorkflowState() {
