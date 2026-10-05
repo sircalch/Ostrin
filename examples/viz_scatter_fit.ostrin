@@ -1,10 +1,57 @@
 // std.viz · scatter: noisy calibration data, a least-squares fit and its ±2σ band.
 import std.viz
+import std.json
+
+fn input_int(key: String, fallback: Int) -> Int {
+    loaded = read_file("data.json")
+    if loaded.is_err() {
+        return fallback
+    }
+    document = json.parse(loaded.unwrap())
+    if document.is_err() {
+        return fallback
+    }
+    value = json.object_get(document.unwrap(), key)
+    if value.is_none() {
+        return fallback
+    }
+    number = json.as_number(value.unwrap())
+    if number.is_none() {
+        return fallback
+    }
+    number.unwrap() as Int
+}
+
+fn input_parameter_int(key: String, fallback: Int) -> Int {
+    loaded = read_file("data.json")
+    if loaded.is_err() {
+        return fallback
+    }
+    document = json.parse(loaded.unwrap())
+    if document.is_err() {
+        return fallback
+    }
+    parameters = json.object_get(document.unwrap(), "parameters")
+    if parameters.is_none() {
+        return fallback
+    }
+    value = json.object_get(parameters.unwrap(), key)
+    if value.is_none() {
+        return fallback
+    }
+    number = json.as_number(value.unwrap())
+    if number.is_none() {
+        return fallback
+    }
+    number.unwrap() as Int
+}
 
 fn main() -> Void {
-    r = rng(2024)
-    concentration = linspace(0.5, 10.0, 40)
-    signal = concentration * 1.8 + 2.0 + r.randn([40]) * 0.9
+    seed = input_int("seed", 2024)
+    samples = input_parameter_int("samples", 40)
+    r = rng(seed)
+    concentration = linspace(0.5, 10.0, samples)
+    signal = concentration * 1.8 + 2.0 + r.randn([samples]) * 0.9
     // linfit returns [slope, intercept, r²].
     fit = linfit(concentration, signal)
     predicted = concentration * fit[0] + fit[1]

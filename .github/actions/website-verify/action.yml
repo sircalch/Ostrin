@@ -43,6 +43,7 @@ runs:
         node scripts/experiment-replay.mjs --fixture surface
         node scripts/experiment-replay.mjs --fixture histogram
         node scripts/experiment-replay.mjs --fixture boxplot
+        node scripts/experiment-replay.mjs --fixture scatter-fit
         node --test scripts/experiment-replay.test.mjs
         node scripts/viz-jsonld.mjs
         node scripts/experiment-bundle.mjs

@@ -1297,22 +1297,22 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "bundle": "assets/experiments/scatter-fit.ostrin-experiment.json",
       "source": "examples/viz_scatter_fit.ostrin",
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_scatter_fit.ostrin",
-      "code": "// std.viz · scatter: noisy calibration data, a least-squares fit and its ±2σ band.\nimport std.viz\n\nfn main() -> Void {\n    r = rng(2024)\n    concentration = linspace(0.5, 10.0, 40)\n    signal = concentration * 1.8 + 2.0 + r.randn([40]) * 0.9\n    // linfit returns [slope, intercept, r²].\n    fit = linfit(concentration, signal)\n    predicted = concentration * fit[0] + fit[1]\n    residual = (signal - predicted).std()\n    print(\"slope \" + viz.num(fit[0]) + \", intercept \" + viz.num(fit[1]) + \", r2 \" + viz.num(fit[2]) + \", residual sd \" + viz.num(residual))\n    fig = viz.figure(\"Sensor calibration\")\n        .describe(\"least-squares fit with a ±2σ band\")\n        .labels(\"glucose [mmol/L]\", \"signal [mV]\")\n        .band(concentration, predicted - residual * 2.0, predicted + residual * 2.0, label: \"±2σ\")\n        .scatter(concentration, signal, label: \"measurements\")\n        .line(concentration, predicted, label: \"fit\")\n    print(fig.svg())\n}\n",
+      "code": "// std.viz · scatter: noisy calibration data, a least-squares fit and its ±2σ band.\nimport std.viz\nimport std.json\n\nfn input_int(key: String, fallback: Int) -> Int {\n    loaded = read_file(\"data.json\")\n    if loaded.is_err() {\n        return fallback\n    }\n    document = json.parse(loaded.unwrap())\n    if document.is_err() {\n        return fallback\n    }\n    value = json.object_get(document.unwrap(), key)\n    if value.is_none() {\n        return fallback\n    }\n    number = json.as_number(value.unwrap())\n    if number.is_none() {\n        return fallback\n    }\n    number.unwrap() as Int\n}\n\nfn input_parameter_int(key: String, fallback: Int) -> Int {\n    loaded = read_file(\"data.json\")\n    if loaded.is_err() {\n        return fallback\n    }\n    document = json.parse(loaded.unwrap())\n    if document.is_err() {\n        return fallback\n    }\n    parameters = json.object_get(document.unwrap(), \"parameters\")\n    if parameters.is_none() {\n        return fallback\n    }\n    value = json.object_get(parameters.unwrap(), key)\n    if value.is_none() {\n        return fallback\n    }\n    number = json.as_number(value.unwrap())\n    if number.is_none() {\n        return fallback\n    }\n    number.unwrap() as Int\n}\n\nfn main() -> Void {\n    seed = input_int(\"seed\", 2024)\n    samples = input_parameter_int(\"samples\", 40)\n    r = rng(seed)\n    concentration = linspace(0.5, 10.0, samples)\n    signal = concentration * 1.8 + 2.0 + r.randn([samples]) * 0.9\n    // linfit returns [slope, intercept, r²].\n    fit = linfit(concentration, signal)\n    predicted = concentration * fit[0] + fit[1]\n    residual = (signal - predicted).std()\n    print(\"slope \" + viz.num(fit[0]) + \", intercept \" + viz.num(fit[1]) + \", r2 \" + viz.num(fit[2]) + \", residual sd \" + viz.num(residual))\n    fig = viz.figure(\"Sensor calibration\")\n        .describe(\"least-squares fit with a ±2σ band\")\n        .labels(\"glucose [mmol/L]\", \"signal [mV]\")\n        .band(concentration, predicted - residual * 2.0, predicted + residual * 2.0, label: \"±2σ\")\n        .scatter(concentration, signal, label: \"measurements\")\n        .line(concentration, predicted, label: \"fit\")\n    print(fig.svg())\n}\n",
       "svg": "assets/viz/scatter-fit.svg",
       "capabilities": [
         "2d",
         "reproducibility"
       ],
       "provenance": {
-        "source-hash": "sha256:3e5ca808dce50157fd216df184cb8b172cf0612480115491524df243ffed8ec5",
-        "data-hash": "sha256:be5c39188e7fbb9201bd0b86fd06f0d3d172dd29021683867a24b6d32946cacb",
+        "source-hash": "sha256:751d3ec4af7bc7c91521b8393ec5ca8f84893662f5ec7c4de1b4a416474b6b7a",
+        "data-hash": "sha256:7efcad280005c7919f4d812038deec35acd3dae274029de741fd7782b75e9ab3",
         "seed": "seed=2024",
         "compiler": "ostrinc 0.1.0"
       },
       "reproducibility": {
-        "level": "R0",
-        "label": "R0 · exact replay verified",
-        "next": "R1 · seeded replay (planned verification)"
+        "level": "R1",
+        "label": "R1 · seeded replay verified",
+        "next": "R2 · external snapshots (planned verification)"
       },
       "printed": [
         "slope 1.8, intercept 2.19, r2 0.98, residual sd 0.8",

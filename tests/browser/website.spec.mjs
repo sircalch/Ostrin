@@ -692,6 +692,16 @@ test("Viz exposes the input-driven seeded R1 experiment bundles", async ({ page 
   expect(boxplot.provenance.execution.randomness.seed_path).toBe("seed");
   expect(boxplot.provenance.randomness.seed_consumption).toBe("data.json:seed");
   expect(boxplot.provenance.replay.level).toBe("R1");
+
+  const scatterFitDownloadPromise = page.waitForEvent("download");
+  await page.locator('[data-viz-bundle="scatter-fit"]').click();
+  const scatterFitDownload = await scatterFitDownloadPromise;
+  expect(scatterFitDownload.suggestedFilename()).toBe("scatter-and-fit.ostrin-experiment.json");
+  const scatterFit = JSON.parse(await readFile(await scatterFitDownload.path(), "utf8"));
+  expect(scatterFit.reproducibility.level).toBe("R1");
+  expect(scatterFit.provenance.execution.randomness.seed_path).toBe("seed");
+  expect(scatterFit.provenance.randomness.seed_consumption).toBe("data.json:seed");
+  expect(scatterFit.provenance.replay.level).toBe("R1");
 });
 
 test("Viz exposes recorded animation, table and volume experiment bundles", async ({ page }) => {
