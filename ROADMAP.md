@@ -6,7 +6,7 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
 ## Siguiente ciclo
 
 1. Reducir el fallback AST con el trinquete por archivo de `--native-type-report` (baseline actual:
-   6.523 funciones generadas por HIR/IR (6.509 IR + 14 HIR) y 32 AST). `atan2` escalar para `Float` y `Float32` ya usa el runtime determinista desde IR/C; `pow` escalar también usa `ostrin_dm_pow`/`ostrin_dm_powf`, y `detmath.ostrin` ya queda sin fallback AST. `math_functions.ostrin` verifica `atan2` y `abs` de enteros de ancho fijo con paridad nativa/WASI, leak-check y error del mínimo representable. Las coerciones `Float↔Float32` de bindings explícitos y agregados `List/Set<Float32>` se insertan en IR y mantienen la precisión de `float32.ostrin`. Las operaciones escalares reflejadas de `Complex` (`Float +|−|×|÷ Complex`) llaman `radd`/`rsub`/`rmul`/`rdiv` desde IR/C conservando el orden de operandos; `Bool.to_string()` también usa la ruta tipada y `numeric_complex.ostrin` queda en `ir=3, hir=0, ast=0` con paridad intérprete/nativo/WASI y leak-check. Las llamadas genéricas registradas por el checker se resuelven en HIR antes de construir la IR, por lo que `numeric_units.ostrin` ya no cae al emisor AST. `Quantity.to_string()` escalar y `Array<Float32>.to_string()` ya usan helpers nativos desde IR/C; el segundo elimina el fallback del punto de entrada de `arrays_3d`. Los patrones superficiales de records con campos escalares
+   6.559 funciones generadas por HIR/IR (6.542 IR + 17 HIR) y 33 AST). `atan2` escalar para `Float` y `Float32` ya usa el runtime determinista desde IR/C; `pow` escalar también usa `ostrin_dm_pow`/`ostrin_dm_powf`, y `detmath.ostrin` ya queda sin fallback AST. `math_functions.ostrin` verifica `atan2` y `abs` de enteros de ancho fijo con paridad nativa/WASI, leak-check y error del mínimo representable. Las coerciones `Float↔Float32` de bindings explícitos y agregados `List/Set<Float32>` se insertan en IR y mantienen la precisión de `float32.ostrin`. Las operaciones escalares reflejadas de `Complex` (`Float +|−|×|÷ Complex`) llaman `radd`/`rsub`/`rmul`/`rdiv` desde IR/C conservando el orden de operandos; `Bool.to_string()` también usa la ruta tipada y `numeric_complex.ostrin` queda en `ir=3, hir=0, ast=0` con paridad intérprete/nativo/WASI y leak-check. Las llamadas genéricas registradas por el checker se resuelven en HIR antes de construir la IR, por lo que `numeric_units.ostrin` ya no cae al emisor AST. `Quantity.to_string()` escalar y `Array<Float32>.to_string()` ya usan helpers nativos desde IR/C; el segundo elimina el fallback del punto de entrada de `arrays_3d`. Los patrones superficiales de records con campos escalares
    y los enums no genéricos con payloads escalares, incluidos los enteros de ancho fijo, variantes unitarias, patrones simples y
    patrones anidados de enums por valor y sus literales/rangos escalares ya comparten IR/C; quedan pendientes los payloads
    gestionados y enums genéricos.
@@ -120,9 +120,11 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    29 programas con `ostrinc.wasm` y compara el SVG byte a byte; R1 queda reservado para evidencia
    de azar sembrado y no se reclaman R2/R3. Los manifiestos de figura ya serializan el estado vivo
    seleccionado (parámetros, cámara 3D opcional y URL compartible), y la galería ofrece una cita
-   BibTeX con metadatos de fuente y versión. El siguiente paso es hacer los bundles R1 realmente
-   ejecutables con un comando que consuma sus entradas declaradas, lockfiles y snapshots de runtime,
-   sin perder la frontera verificable de R0.
+   BibTeX con metadatos de fuente y versión. Ya existe el primer corte ejecutable input-driven:
+   `surface` lee `data.json`, el comando `scripts/experiment-replay.mjs` verifica sus hashes en
+   WASI y una segunda ejecución demuestra sensibilidad a `parameters.scale`. El siguiente paso es
+   extender este contrato al resto de figuras, añadir replay de azar sembrado, lockfiles y snapshots
+   de runtime sin perder la frontera verificable de R0.
    El Scientific Lab ya conserva la demo activa y sus parámetros en la URL para compartir y
    restaurar experimentos reproducibles desde el navegador. La navegación compacta y el catálogo
    de ejemplos ya tienen estados ARIA, foco de teclado, Escape, pestañas con flechas/Home/End y

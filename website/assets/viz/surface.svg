@@ -46,5 +46,5 @@
 <line x1="582" y1="92.57" x2="586" y2="92.57" stroke="#9ca3af" stroke-width="1"/><text x="589" y="96.07" text-anchor="start" font-size="10" fill="#6b7280">8</text>
 <text x="620" y="286" text-anchor="middle" font-size="11" fill="#6b7280" transform="rotate(-90 620 286)">height</text>
 
-  <ostrin-provenance source-hash="sha256:7e2f944b0f350af40da94d82dd7c0c3383429eef8643208e55e2a32e39f6ad53" data-hash="sha256:2b7e55d539b9bdf1d4cd5a97609d169c165f886f416b5e06c8ef1aec440d0086" seed="seed=deterministic" compiler="ostrinc 0.1.0" />
+  <ostrin-provenance source-hash="sha256:d1c7a59124c39cd31943403f59e8c4feae64dba8cf23a9b6a95e7a4dd94e0b18" data-hash="sha256:6a7b7cd46894ccbcbc8beaefafe30ef15e929aa17c4c15f2fc67adafcc40fd0c" seed="seed=deterministic" compiler="ostrinc 0.1.0" />
 </svg>

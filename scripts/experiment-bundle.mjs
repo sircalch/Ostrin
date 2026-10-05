@@ -35,7 +35,7 @@ export const experimentFixtures = Object.freeze({
     inputPath: "experiments/surface.inputs.json",
     figurePath: "website/assets/viz/surface.svg",
     outputPath: "website/assets/experiments/surface.ostrin-experiment.json",
-    sourceRevision: "47e84fabcbfa144830e37a294a298698c267e21a",
+    sourceRevision: "ad03b4e4e3e67df1ec05dace27ef45d947cd1195",
   }),
   heatmap: Object.freeze({
     id: "heatmap",
@@ -442,6 +442,7 @@ function provenanceFor(root, fixture, files, manifest) {
     parameters: inputs.parameters,
     ...(inputs.camera ? { camera: inputs.camera } : {}),
     seed: inputs.seed,
+    ...(inputs.execution ? { execution: inputs.execution } : {}),
     manifest_schema: manifest.schema,
     limits: "R0 exact SVG replay is verified in website CI. The bundle does not include seeded-randomness evidence for R1, external snapshots, lockfiles, runtime captures or an R2/R3 replay guarantee.",
   };
