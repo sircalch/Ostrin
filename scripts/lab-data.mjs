@@ -423,6 +423,14 @@ export async function buildLabData() {
   for (const figure of GALLERY) {
     const source = readText(figure.file);
     const fixture = Object.values(experimentFixtures).find((candidate) => candidate.sourcePath === figure.file);
+    let reproducibility;
+    if (fixture) {
+      try {
+        reproducibility = JSON.parse(readFileSync(outputPathFor(fixture.id), "utf8")).reproducibility;
+      } catch (error) {
+        throw new Error(`${figure.file}: experiment bundle maturity is unavailable (${error.message})`);
+      }
+    }
     for (const param of figure.controls ?? []) {
       if (!sourceAssignmentPattern(param.name).test(source)) {
         throw new Error(`${figure.file}: Viz control ${param.name} needs a 'name = number' line`);
@@ -441,8 +449,8 @@ export async function buildLabData() {
     const svgPath = `assets/viz/${figure.id}.svg`;
     const rawSvg = `${output.slice(start, end + 1).join("\n")}\n`;
     // Experiment fixtures use the same calculated metadata as their downloadable bundle.
-    // R0 replay verification below removes drift between the live WASM output and
-    // the published surface without claiming seeded-randomness R1 evidence.
+    // Replay verification below removes drift between the live WASM output and
+    // the published surface while preserving the fixture's recorded R0/R1 maturity contract.
     const svg = fixture
       ? normalizeFigureMetadata(rawSvg, metadataForFixture(fixture.id))
       : rawSvg;
@@ -457,6 +465,7 @@ export async function buildLabData() {
       svg: svgPath,
       capabilities: vizCapabilities(source, svg),
       provenance,
+      reproducibility,
       printed: [...output.slice(0, start), ...output.slice(end + 1)],
     });
   }
@@ -493,9 +502,9 @@ export function compareReplayFigure(id, replayedSvg, bundle) {
     errors.push(`${id}: replayed SVG differs from the bundled figure`);
   }
   const replay = bundle?.provenance?.replay;
-  if (replay?.level !== "R0" || replay?.status !== "verified" || replay?.backend !== "ostrinc.wasm"
+  if (!['R0', 'R1'].includes(replay?.level) || replay?.status !== "verified" || replay?.backend !== "ostrinc.wasm"
     || replay?.target !== "wasm32-wasip1" || replay?.compares !== "figure.svg") {
-    errors.push(`${id}: bundle is missing the verified R0 replay contract`);
+    errors.push(`${id}: bundle is missing the verified R0/R1 replay contract`);
   }
   return errors;
 }
@@ -581,8 +590,8 @@ async function main() {
   const data = await buildLabData();
   if (process.argv.includes("--verify-replays")) {
     const replay = verifyFixtureReplays(data);
-    if (!replay.ok) throw new Error(`R0 experiment replay verification failed:\n${replay.errors.join("\n")}`);
-    console.log(`lab-data: ${Object.keys(experimentFixtures).length} R0 experiment replays match their bundled SVG figures`);
+    if (!replay.ok) throw new Error(`Experiment replay verification failed:\n${replay.errors.join("\n")}`);
+    console.log(`lab-data: ${Object.keys(experimentFixtures).length} experiment replays match their bundled SVG figures`);
   }
   const expected = renderLabData(data);
   const figureDir = path.join(repositoryRoot, "website", "assets", "viz");

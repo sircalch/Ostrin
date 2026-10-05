@@ -11,10 +11,13 @@
 - Generalized the executable input replay contract to `surface` and `lines`: each declares the
   consumed parameter path and an alternate sensitivity value, and website CI verifies both
   against `ostrinc.wasm` without changing the R0 maturity label.
-- Added source-backed `ostrin.rng/v1` evidence to RNG-consuming bundles: xoshiro256** with
+- Added source-backed `ostrin.rng/v1` evidence to source-literal RNG-consuming bundles: xoshiro256** with
   splitmix64 seeding, Marsaglia polar normals, deterministic `detmath::ln`, interpreter/native
   implementation hashes and explicit source-literal seed status. This documents the algorithm
-  without claiming input-driven seeded replay R1.
+  without changing their R0 maturity label.
+- Promoted `histogram` to the first input-driven R1 bundle: `seed`, sample count and bin count are
+  read from `data.json`, and the WASI replay changes the seed and requires a changed SVG. The
+  remaining random Viz fixtures stay at R0 until their seeds are migrated.
 
 ### Viz publication manifests
 
@@ -40,8 +43,8 @@
   the checker/HIR prepass and reuse the typed IR/C method dispatcher. Quantity
   and dimension-sensitive visualization methods remain on the verified fallback
   until their ownership contract is complete.
-- The differential ratchet advances to **6,595 HIR/IR-generated functions
-  (6,575 IR + 20 HIR) / 34 AST** after the generalized input-driven Viz replay slice.
+- The differential ratchet advances to **6,632 HIR/IR-generated functions
+  (6,609 IR + 23 HIR) / 35 AST** after the input-driven seeded `histogram` slice.
 
 ### Quantity visualization ownership status
 

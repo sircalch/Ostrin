@@ -1,15 +1,62 @@
 // std.viz · histogram: 20 000 normal samples and the scaled density on top.
 import std.viz
+import std.json
+
+fn input_int(key: String, fallback: Int) -> Int {
+    loaded = read_file("data.json")
+    if loaded.is_err() {
+        return fallback
+    }
+    document = json.parse(loaded.unwrap())
+    if document.is_err() {
+        return fallback
+    }
+    value = json.object_get(document.unwrap(), key)
+    if value.is_none() {
+        return fallback
+    }
+    number = json.as_number(value.unwrap())
+    if number.is_none() {
+        return fallback
+    }
+    number.unwrap() as Int
+}
+
+fn input_parameter_int(key: String, fallback: Int) -> Int {
+    loaded = read_file("data.json")
+    if loaded.is_err() {
+        return fallback
+    }
+    document = json.parse(loaded.unwrap())
+    if document.is_err() {
+        return fallback
+    }
+    parameters = json.object_get(document.unwrap(), "parameters")
+    if parameters.is_none() {
+        return fallback
+    }
+    value = json.object_get(parameters.unwrap(), key)
+    if value.is_none() {
+        return fallback
+    }
+    number = json.as_number(value.unwrap())
+    if number.is_none() {
+        return fallback
+    }
+    number.unwrap() as Int
+}
 
 fn main() -> Void {
-    samples = rng(7).randn([20000]) * 1.5 + 4.0
-    bins = 48
+    seed = input_int("seed", 7)
+    samples_count = input_parameter_int("samples", 20000)
+    bins = input_parameter_int("bins", 48)
+    samples = rng(seed).randn([samples_count]) * 1.5 + 4.0
     width = (samples.max() - samples.min()) / (bins as Float)
     x = linspace(samples.min(), samples.max(), 200)
-    density = norm_pdf(x, 4.0, 1.5) * (20000.0 * width)
+    density = norm_pdf(x, 4.0, 1.5) * ((samples_count as Float) * width)
     print("mean " + viz.num(samples.mean()) + ", sd " + viz.num(samples.std()) + ", p95 " + viz.num(samples.percentile(95.0)))
     fig = viz.figure("Normal samples")
-        .describe("20 000 draws from N(4, 1.5²), seed 7")
+        .describe(samples_count.to_string() + " draws from N(4, 1.5²), seed " + seed.to_string())
         .labels("value", "count")
         .histogram(samples, bins, label: "samples")
         .line(x, density, label: "N(4, 1.5²) density", color: "#111827", width: 1.8)

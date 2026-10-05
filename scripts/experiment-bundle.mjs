@@ -1,10 +1,10 @@
 // Build and verify recorded Ostrin experiment contracts.
 //
-// The v0 bundles are R0 artifacts with an exact local replay gate: each one
-// carries its source, declared inputs, recorded figure and machine-readable
-// provenance with hashes. The website CI replays the source with the same
-// WASI compiler and compares the complete SVG byte-for-byte. They do not
-// claim seeded-randomness R1 or R2/R3 guarantees.
+// The v0 bundles carry source, declared inputs, recorded figures and
+// machine-readable provenance with hashes. Website CI replays every source
+// with the same WASI compiler and compares the complete SVG byte-for-byte;
+// input-driven seeded bundles can additionally claim R1 after their seed
+// sensitivity contract is verified. No bundle claims R2/R3.
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -391,10 +391,29 @@ function manifestFor(files) {
   };
 }
 
+function reproducibilityFor(inputs) {
+  const declared = inputs.reproducibility;
+  if (!declared) {
+    return {
+      level: "R0",
+      label: "R0 · exact replay verified",
+      next: "R1 · seeded replay (planned verification)",
+    };
+  }
+  return {
+    level: declared.level,
+    label: declared.label,
+    next: declared.next,
+  };
+}
+
 function seededRandomnessEvidence(root, source, inputs) {
   if (typeof inputs.seed !== "number" || !Number.isFinite(inputs.seed) || !/\brng\s*\(/.test(source)) {
     return undefined;
   }
+  const inputDriven = inputs.execution?.randomness?.seed_path === "seed"
+    && inputs.execution?.consumes?.includes("seed")
+    && reproducibilityFor(inputs).level === "R1";
   const implementationPaths = [
     "compiler/src/interpreter/rng.rs",
     "compiler/src/rng_runtime.c",
@@ -402,16 +421,18 @@ function seededRandomnessEvidence(root, source, inputs) {
   return {
     contract: "ostrin.rng/v1",
     algorithm: "xoshiro256**",
+    version: "ostrin.rng/v1",
     seeding: "splitmix64",
     normal: "Marsaglia polar",
     deterministic_log: "detmath::ln",
+    partition: inputs.execution?.randomness?.partition ?? "single sequential stream",
     implementations: implementationPaths.map((relativePath) => ({
       path: relativePath,
       sha256: sha256(normalizedText(root, relativePath)),
     })),
     parity: "interpreter-native",
-    seed_consumption: "source-literal",
-    status: "evidence-only-r0",
+    seed_consumption: inputDriven ? "data.json:seed" : "source-literal",
+    status: inputDriven ? "input-driven-r1" : "evidence-only-r0",
   };
 }
 
@@ -421,13 +442,15 @@ function provenanceFor(root, fixture, files, manifest) {
   const source = files["source.ostrin"];
   const inputs = JSON.parse(data);
   const metadata = metadataForFixture(fixture.id, root);
+  const reproducibility = reproducibilityFor(inputs);
   const randomness = seededRandomnessEvidence(root, source, inputs);
   return {
     schema: "ostrin.provenance/v0",
-    level: "R0",
+    level: reproducibility.level,
+    reproducibility,
     levels: {
       R0: "Recorded source, inputs and outputs with calculated hashes.",
-      R1: "Replay-ready source, inputs, command and target; local replay must still be verified.",
+      R1: "Seeded replay with an input-driven seed, algorithm/version and stream partition; CI must verify seed sensitivity.",
     },
     program: {
       source: "source.ostrin",
@@ -446,13 +469,15 @@ function provenanceFor(root, fixture, files, manifest) {
       sha256: sha256(figure),
     }],
     replay: {
-      level: "R0",
+      level: reproducibility.level,
       status: "verified",
       backend: "ostrinc.wasm",
       target: "wasm32-wasip1",
       command: "node scripts/lab-data.mjs --verify-replays",
       compares: "figure.svg",
-      note: "Website CI compares the replayed SVG byte-for-byte with this bundled figure; R1 requires seeded-randomness evidence.",
+      note: reproducibility.level === "R1"
+        ? "Website CI compares the replayed SVG byte-for-byte and changes the declared data.json seed; the seeded xoshiro256** stream is verified for R1."
+        : "Website CI compares the replayed SVG byte-for-byte with this bundled figure; R1 requires seeded-randomness evidence.",
     },
     figure_metadata: {
       policy: "The bundle generator normalizes the recorded SVG metadata to these calculated hashes; bundle manifest hashes are authoritative.",
@@ -471,7 +496,9 @@ function provenanceFor(root, fixture, files, manifest) {
     ...(randomness ? { randomness } : {}),
     ...(inputs.execution ? { execution: inputs.execution } : {}),
     manifest_schema: manifest.schema,
-    limits: "R0 exact SVG replay is verified in website CI. The bundle does not include seeded-randomness evidence for R1, external snapshots, lockfiles, runtime captures or an R2/R3 replay guarantee.",
+    limits: reproducibility.level === "R1"
+      ? "R1 seeded replay is verified in website CI for the declared seed and algorithm contract. The bundle does not include external snapshots, lockfiles, runtime captures or an R2/R3 replay guarantee."
+      : "R0 exact SVG replay is verified in website CI. The bundle does not include seeded-randomness evidence for R1, external snapshots, lockfiles, runtime captures or an R2/R3 replay guarantee.",
   };
 }
 
@@ -483,6 +510,8 @@ export function buildExperimentBundle(fixtureId = defaultFixtureId, root = repos
   const files = bundleFiles(root, fixture);
   const manifest = manifestFor(files);
   const provenance = provenanceFor(root, fixture, files, manifest);
+  const inputData = JSON.parse(files["data.json"]);
+  const reproducibility = reproducibilityFor(inputData);
   const provenanceFile = canonicalJson(provenance);
   const allFiles = { ...files, "provenance.json": provenanceFile };
   const completeManifest = manifestFor(allFiles);
@@ -490,11 +519,7 @@ export function buildExperimentBundle(fixtureId = defaultFixtureId, root = repos
     schema,
     id: fixture.id,
     title: fixture.title,
-    reproducibility: {
-      level: "R0",
-      label: "R0 · exact replay verified",
-      next: "R1 · seeded replay (planned verification)",
-    },
+    reproducibility,
     experiment: {
       source: "source.ostrin",
       inputs: "data.json",
@@ -537,9 +562,9 @@ export function verifyExperimentBundle(bundle, { expected, fixtureId } = {}) {
   if (!bundle || typeof bundle !== "object") errors.push("bundle is not an object");
   if (bundle?.schema !== schema) errors.push(`schema must be ${schema}`);
   if (bundle?.id !== fixture.id) errors.push(`id must be ${fixture.id}`);
-  if (bundle?.reproducibility?.level !== "R0") errors.push("bundle must be explicitly labelled R0");
-  if (bundle?.reproducibility?.label !== "R0 · exact replay verified") errors.push("bundle must expose the verified R0 replay label");
-  if (bundle?.reproducibility?.next !== "R1 · seeded replay (planned verification)") errors.push("bundle must expose the planned seeded R1 label");
+  const maturity = expected?.reproducibility;
+  if (!maturity || !["R0", "R1"].includes(maturity.level)) errors.push("bundle reproducibility level must be R0 or R1");
+  if (JSON.stringify(bundle?.reproducibility) !== JSON.stringify(maturity)) errors.push("bundle reproducibility maturity drifted from the calculated fixture contract");
   const files = bundle?.files;
   const entries = bundle?.manifest?.files;
   if (!files || typeof files !== "object") errors.push("files object is missing");
@@ -554,10 +579,16 @@ export function verifyExperimentBundle(bundle, { expected, fixtureId } = {}) {
   try { provenanceFile = JSON.parse(files?.["provenance.json"] ?? "null"); } catch { provenanceFile = null; }
   if (JSON.stringify(bundle?.provenance) !== JSON.stringify(provenanceFile)) errors.push("provenance.json is not the embedded provenance object");
   const replay = bundle?.provenance?.replay;
-  if (replay?.level !== "R0" || replay?.status !== "verified" || replay?.backend !== "ostrinc.wasm"
+  const replayNote = maturity?.level === "R1"
+    ? /seeded xoshiro256\*\* stream is verified for R1/.test(replay?.note ?? "")
+    : /R1 requires seeded-randomness evidence/.test(replay?.note ?? "");
+  if (replay?.level !== maturity?.level || replay?.status !== "verified" || replay?.backend !== "ostrinc.wasm"
     || replay?.target !== "wasm32-wasip1" || replay?.command !== "node scripts/lab-data.mjs --verify-replays"
-    || replay?.compares !== "figure.svg" || !/R1 requires seeded-randomness evidence/.test(replay?.note ?? "")) {
-    errors.push("provenance replay contract is missing or overclaims R1");
+    || replay?.compares !== "figure.svg" || !replayNote) {
+    errors.push("provenance replay contract is missing or overclaims its reproducibility level");
+  }
+  if (bundle?.provenance?.level !== maturity?.level || JSON.stringify(bundle?.provenance?.reproducibility) !== JSON.stringify(maturity)) {
+    errors.push("provenance reproducibility maturity drifted from the bundle contract");
   }
   if (JSON.stringify(bundle?.experiment) !== JSON.stringify(expected?.experiment)) errors.push("experiment file map drifted");
   if (bundle?.provenance?.commit !== expected?.provenance?.commit) errors.push("provenance commit drifted from the source-backed fixture revision");
@@ -621,7 +652,8 @@ function main() {
     console.error(result.errors.map((error) => `experiment-bundle: ${error}`).join("\n"));
     process.exitCode = 1;
   } else {
-    console.log(`experiment-bundle: ok (${schema} · ${fixtureId} · R0)`);
+    const bundle = JSON.parse(readFileSync(target, "utf8"));
+    console.log(`experiment-bundle: ok (${schema} · ${fixtureId} · ${bundle.reproducibility.level})`);
   }
 }
 

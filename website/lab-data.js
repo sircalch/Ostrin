@@ -824,6 +824,11 @@ globalThis.OSTRIN_LAB = Object.freeze({
         "seed": "seed=deterministic",
         "compiler": "ostrinc 0.1.0"
       },
+      "reproducibility": {
+        "level": "R0",
+        "label": "R0 · exact replay verified",
+        "next": "R1 · seeded replay (planned verification)"
+      },
       "printed": [
         ""
       ]
@@ -857,6 +862,11 @@ globalThis.OSTRIN_LAB = Object.freeze({
         "seed": "seed=deterministic",
         "compiler": "ostrinc 0.1.0"
       },
+      "reproducibility": {
+        "level": "R0",
+        "label": "R0 · exact replay verified",
+        "next": "R1 · seeded replay (planned verification)"
+      },
       "printed": [
         ""
       ]
@@ -880,6 +890,11 @@ globalThis.OSTRIN_LAB = Object.freeze({
         "data-hash": "sha256:a7f1a1ff735be493361c8762acaa2a0ddd9570dedbb02bc42773bb6aa7a1f64a",
         "seed": "seed=deterministic",
         "compiler": "ostrinc 0.1.0"
+      },
+      "reproducibility": {
+        "level": "R0",
+        "label": "R0 · exact replay verified",
+        "next": "R1 · seeded replay (planned verification)"
       },
       "printed": [
         "min -6.52, max 8.08",
@@ -906,6 +921,11 @@ globalThis.OSTRIN_LAB = Object.freeze({
         "seed": "seed=deterministic",
         "compiler": "ostrinc 0.1.0"
       },
+      "reproducibility": {
+        "level": "R0",
+        "label": "R0 · exact replay verified",
+        "next": "R1 · seeded replay (planned verification)"
+      },
       "printed": [
         ""
       ]
@@ -929,6 +949,11 @@ globalThis.OSTRIN_LAB = Object.freeze({
         "data-hash": "sha256:75237920ca5df872ccf4b2ef556cb01b018b36a6104fafe9d2d84ead68e0921f",
         "seed": "seed=deterministic",
         "compiler": "ostrinc 0.1.0"
+      },
+      "reproducibility": {
+        "level": "R0",
+        "label": "R0 · exact replay verified",
+        "next": "R1 · seeded replay (planned verification)"
       },
       "printed": [
         ""
@@ -954,6 +979,11 @@ globalThis.OSTRIN_LAB = Object.freeze({
         "seed": "seed=deterministic",
         "compiler": "ostrinc 0.1.0"
       },
+      "reproducibility": {
+        "level": "R0",
+        "label": "R0 · exact replay verified",
+        "next": "R1 · seeded replay (planned verification)"
+      },
       "printed": [
         ""
       ]
@@ -977,6 +1007,11 @@ globalThis.OSTRIN_LAB = Object.freeze({
         "data-hash": "sha256:085cd36f9fd90d563529ca3aea965b826c2efed5938b6641e6bbb8f9cebc234e",
         "seed": "seed=42",
         "compiler": "ostrinc 0.1.0"
+      },
+      "reproducibility": {
+        "level": "R0",
+        "label": "R0 · exact replay verified",
+        "next": "R1 · seeded replay (planned verification)"
       },
       "printed": [
         ""
@@ -1011,6 +1046,11 @@ globalThis.OSTRIN_LAB = Object.freeze({
         "seed": "seed=deterministic",
         "compiler": "ostrinc 0.1.0"
       },
+      "reproducibility": {
+        "level": "R0",
+        "label": "R0 · exact replay verified",
+        "next": "R1 · seeded replay (planned verification)"
+      },
       "printed": [
         "final state 1.3 -0.01 21.92",
         ""
@@ -1024,17 +1064,22 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "bundle": "assets/experiments/histogram.ostrin-experiment.json",
       "source": "examples/viz_histogram.ostrin",
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_histogram.ostrin",
-      "code": "// std.viz · histogram: 20 000 normal samples and the scaled density on top.\nimport std.viz\n\nfn main() -> Void {\n    samples = rng(7).randn([20000]) * 1.5 + 4.0\n    bins = 48\n    width = (samples.max() - samples.min()) / (bins as Float)\n    x = linspace(samples.min(), samples.max(), 200)\n    density = norm_pdf(x, 4.0, 1.5) * (20000.0 * width)\n    print(\"mean \" + viz.num(samples.mean()) + \", sd \" + viz.num(samples.std()) + \", p95 \" + viz.num(samples.percentile(95.0)))\n    fig = viz.figure(\"Normal samples\")\n        .describe(\"20 000 draws from N(4, 1.5²), seed 7\")\n        .labels(\"value\", \"count\")\n        .histogram(samples, bins, label: \"samples\")\n        .line(x, density, label: \"N(4, 1.5²) density\", color: \"#111827\", width: 1.8)\n        .vline(4.0, color: \"#dc2626\")\n    print(fig.svg())\n}\n",
+      "code": "// std.viz · histogram: 20 000 normal samples and the scaled density on top.\nimport std.viz\nimport std.json\n\nfn input_int(key: String, fallback: Int) -> Int {\n    loaded = read_file(\"data.json\")\n    if loaded.is_err() {\n        return fallback\n    }\n    document = json.parse(loaded.unwrap())\n    if document.is_err() {\n        return fallback\n    }\n    value = json.object_get(document.unwrap(), key)\n    if value.is_none() {\n        return fallback\n    }\n    number = json.as_number(value.unwrap())\n    if number.is_none() {\n        return fallback\n    }\n    number.unwrap() as Int\n}\n\nfn input_parameter_int(key: String, fallback: Int) -> Int {\n    loaded = read_file(\"data.json\")\n    if loaded.is_err() {\n        return fallback\n    }\n    document = json.parse(loaded.unwrap())\n    if document.is_err() {\n        return fallback\n    }\n    parameters = json.object_get(document.unwrap(), \"parameters\")\n    if parameters.is_none() {\n        return fallback\n    }\n    value = json.object_get(parameters.unwrap(), key)\n    if value.is_none() {\n        return fallback\n    }\n    number = json.as_number(value.unwrap())\n    if number.is_none() {\n        return fallback\n    }\n    number.unwrap() as Int\n}\n\nfn main() -> Void {\n    seed = input_int(\"seed\", 7)\n    samples_count = input_parameter_int(\"samples\", 20000)\n    bins = input_parameter_int(\"bins\", 48)\n    samples = rng(seed).randn([samples_count]) * 1.5 + 4.0\n    width = (samples.max() - samples.min()) / (bins as Float)\n    x = linspace(samples.min(), samples.max(), 200)\n    density = norm_pdf(x, 4.0, 1.5) * ((samples_count as Float) * width)\n    print(\"mean \" + viz.num(samples.mean()) + \", sd \" + viz.num(samples.std()) + \", p95 \" + viz.num(samples.percentile(95.0)))\n    fig = viz.figure(\"Normal samples\")\n        .describe(samples_count.to_string() + \" draws from N(4, 1.5²), seed \" + seed.to_string())\n        .labels(\"value\", \"count\")\n        .histogram(samples, bins, label: \"samples\")\n        .line(x, density, label: \"N(4, 1.5²) density\", color: \"#111827\", width: 1.8)\n        .vline(4.0, color: \"#dc2626\")\n    print(fig.svg())\n}\n",
       "svg": "assets/viz/histogram.svg",
       "capabilities": [
         "2d",
         "reproducibility"
       ],
       "provenance": {
-        "source-hash": "sha256:45e31d23d660dc5d08faae515bd2cee12134dc56254b19d3ea99a0bd5fdfabbb",
-        "data-hash": "sha256:c5a26136b82d750658e2f446424e87e7fb21259d9b3043a411dc1e5c579fdb84",
+        "source-hash": "sha256:001a0b89c33606cdb2ab1412c56c0fcffe4e2a51d00d00aad8d43498e9acf27d",
+        "data-hash": "sha256:3c24ec43fb4766736faeb4640ba8eed153cc661365eac55c6410d125c3ecbae7",
         "seed": "seed=7",
         "compiler": "ostrinc 0.1.0"
+      },
+      "reproducibility": {
+        "level": "R1",
+        "label": "R1 · seeded replay verified",
+        "next": "R2 · external snapshots (planned verification)"
       },
       "printed": [
         "mean 3.97, sd 1.49, p95 6.42",
@@ -1061,6 +1106,11 @@ globalThis.OSTRIN_LAB = Object.freeze({
         "seed": "seed=41",
         "compiler": "ostrinc 0.1.0"
       },
+      "reproducibility": {
+        "level": "R0",
+        "label": "R0 · exact replay verified",
+        "next": "R1 · seeded replay (planned verification)"
+      },
       "printed": [
         ""
       ]
@@ -1084,6 +1134,11 @@ globalThis.OSTRIN_LAB = Object.freeze({
         "data-hash": "sha256:f67dd9ad8bc6cf21363bb044f2adaee99dcf34c3a4364fe8391cb5e7aa51ce79",
         "seed": "seed=73",
         "compiler": "ostrinc 0.1.0"
+      },
+      "reproducibility": {
+        "level": "R0",
+        "label": "R0 · exact replay verified",
+        "next": "R1 · seeded replay (planned verification)"
       },
       "printed": [
         ""
@@ -1109,6 +1164,11 @@ globalThis.OSTRIN_LAB = Object.freeze({
         "seed": "seed=91",
         "compiler": "ostrinc 0.1.0"
       },
+      "reproducibility": {
+        "level": "R0",
+        "label": "R0 · exact replay verified",
+        "next": "R1 · seeded replay (planned verification)"
+      },
       "printed": [
         ""
       ]
@@ -1132,6 +1192,11 @@ globalThis.OSTRIN_LAB = Object.freeze({
         "data-hash": "sha256:4dec90767996458296ce28c3eb2109e889ade921a4502bf2ac447f225109912e",
         "seed": "seed=5",
         "compiler": "ostrinc 0.1.0"
+      },
+      "reproducibility": {
+        "level": "R0",
+        "label": "R0 · exact replay verified",
+        "next": "R1 · seeded replay (planned verification)"
       },
       "printed": [
         ""
@@ -1157,6 +1222,11 @@ globalThis.OSTRIN_LAB = Object.freeze({
         "seed": "seed=deterministic",
         "compiler": "ostrinc 0.1.0"
       },
+      "reproducibility": {
+        "level": "R0",
+        "label": "R0 · exact replay verified",
+        "next": "R1 · seeded replay (planned verification)"
+      },
       "printed": [
         ""
       ]
@@ -1180,6 +1250,11 @@ globalThis.OSTRIN_LAB = Object.freeze({
         "data-hash": "sha256:90724f8fffebe725bf78be01ec938441d343c4604def84a48b56d5e182f04a38",
         "seed": "seed=deterministic",
         "compiler": "ostrinc 0.1.0"
+      },
+      "reproducibility": {
+        "level": "R0",
+        "label": "R0 · exact replay verified",
+        "next": "R1 · seeded replay (planned verification)"
       },
       "printed": [
         ""
@@ -1205,6 +1280,11 @@ globalThis.OSTRIN_LAB = Object.freeze({
         "seed": "seed=deterministic",
         "compiler": "ostrinc 0.1.0"
       },
+      "reproducibility": {
+        "level": "R0",
+        "label": "R0 · exact replay verified",
+        "next": "R1 · seeded replay (planned verification)"
+      },
       "printed": [
         ""
       ]
@@ -1228,6 +1308,11 @@ globalThis.OSTRIN_LAB = Object.freeze({
         "data-hash": "sha256:be5c39188e7fbb9201bd0b86fd06f0d3d172dd29021683867a24b6d32946cacb",
         "seed": "seed=2024",
         "compiler": "ostrinc 0.1.0"
+      },
+      "reproducibility": {
+        "level": "R0",
+        "label": "R0 · exact replay verified",
+        "next": "R1 · seeded replay (planned verification)"
       },
       "printed": [
         "slope 1.8, intercept 2.19, r2 0.98, residual sd 0.8",
@@ -1255,6 +1340,11 @@ globalThis.OSTRIN_LAB = Object.freeze({
         "seed": "seed=deterministic",
         "compiler": "ostrinc 0.1.0"
       },
+      "reproducibility": {
+        "level": "R0",
+        "label": "R0 · exact replay verified",
+        "next": "R1 · seeded replay (planned verification)"
+      },
       "printed": [
         "top speed 97.91999999999999 km/h, distance 0.764 km",
         ""
@@ -1280,6 +1370,11 @@ globalThis.OSTRIN_LAB = Object.freeze({
         "seed": "seed=11",
         "compiler": "ostrinc 0.1.0"
       },
+      "reproducibility": {
+        "level": "R0",
+        "label": "R0 · exact replay verified",
+        "next": "R1 · seeded replay (planned verification)"
+      },
       "printed": [
         ""
       ]
@@ -1303,6 +1398,11 @@ globalThis.OSTRIN_LAB = Object.freeze({
         "data-hash": "sha256:29199b105f940a4b4fc428135cefbf2d7d1fae058dd216b1f5d20834f2ac5c25",
         "seed": "seed=deterministic",
         "compiler": "ostrinc 0.1.0"
+      },
+      "reproducibility": {
+        "level": "R0",
+        "label": "R0 · exact replay verified",
+        "next": "R1 · seeded replay (planned verification)"
       },
       "printed": [
         "steps 643, evaluations 4655",
@@ -1329,6 +1429,11 @@ globalThis.OSTRIN_LAB = Object.freeze({
         "seed": "seed=42",
         "compiler": "ostrinc 0.1.0"
       },
+      "reproducibility": {
+        "level": "R0",
+        "label": "R0 · exact replay verified",
+        "next": "R1 · seeded replay (planned verification)"
+      },
       "printed": [
         "peak at 50 Hz: 1, at 120 Hz: 0.59",
         ""
@@ -1353,6 +1458,11 @@ globalThis.OSTRIN_LAB = Object.freeze({
         "data-hash": "sha256:e45b4048e1b184eb07952ac954786b839c75f9f5e64fc31d5e93b0ac8fc1c336",
         "seed": "seed=deterministic",
         "compiler": "ostrinc 0.1.0"
+      },
+      "reproducibility": {
+        "level": "R0",
+        "label": "R0 · exact replay verified",
+        "next": "R1 · seeded replay (planned verification)"
       },
       "printed": [
         "area under the spline 30.65",
@@ -1380,6 +1490,11 @@ globalThis.OSTRIN_LAB = Object.freeze({
         "seed": "seed=deterministic",
         "compiler": "ostrinc 0.1.0"
       },
+      "reproducibility": {
+        "level": "R0",
+        "label": "R0 · exact replay verified",
+        "next": "R1 · seeded replay (planned verification)"
+      },
       "printed": [
         "rk45 steps: 1708, energy drift below 1e-6: true",
         ""
@@ -1405,6 +1520,11 @@ globalThis.OSTRIN_LAB = Object.freeze({
         "data-hash": "sha256:d1693e76cecc476eac81dd7bd589c3cf8fd6f2acdb36ab1d41785fee4005cc63",
         "seed": "seed=deterministic",
         "compiler": "ostrinc 0.1.0"
+      },
+      "reproducibility": {
+        "level": "R0",
+        "label": "R0 · exact replay verified",
+        "next": "R1 · seeded replay (planned verification)"
       },
       "printed": [
         "comet: a = 1.8 AU, period 2.41 years",
@@ -1433,6 +1553,11 @@ globalThis.OSTRIN_LAB = Object.freeze({
         "seed": "seed=deterministic",
         "compiler": "ostrinc 0.1.0"
       },
+      "reproducibility": {
+        "level": "R0",
+        "label": "R0 · exact replay verified",
+        "next": "R1 · seeded replay (planned verification)"
+      },
       "printed": [
         "height at the pluck: 0.29, half a period later: -0.08",
         ""
@@ -1459,6 +1584,11 @@ globalThis.OSTRIN_LAB = Object.freeze({
         "seed": "seed=deterministic",
         "compiler": "ostrinc 0.1.0"
       },
+      "reproducibility": {
+        "level": "R0",
+        "label": "R0 · exact replay verified",
+        "next": "R1 · seeded replay (planned verification)"
+      },
       "printed": [
         ""
       ]
@@ -1483,6 +1613,11 @@ globalThis.OSTRIN_LAB = Object.freeze({
         "data-hash": "sha256:c1c126d97aa9c99b52e881cc4ee91b0a2a351e630d89b30e2e73ecd952561af2",
         "seed": "seed=deterministic",
         "compiler": "ostrinc 0.1.0"
+      },
+      "reproducibility": {
+        "level": "R0",
+        "label": "R0 · exact replay verified",
+        "next": "R1 · seeded replay (planned verification)"
       },
       "printed": [
         ""
@@ -1509,6 +1644,11 @@ globalThis.OSTRIN_LAB = Object.freeze({
         "seed": "seed=deterministic",
         "compiler": "ostrinc 0.1.0"
       },
+      "reproducibility": {
+        "level": "R0",
+        "label": "R0 · exact replay verified",
+        "next": "R1 · seeded replay (planned verification)"
+      },
       "printed": [
         ""
       ]
@@ -1532,6 +1672,11 @@ globalThis.OSTRIN_LAB = Object.freeze({
         "data-hash": "sha256:e301160280f21e939227ca4cf5329f2a4593aec961c11b1a5b13fbe84f3a7a39",
         "seed": "seed=3",
         "compiler": "ostrinc 0.1.0"
+      },
+      "reproducibility": {
+        "level": "R0",
+        "label": "R0 · exact replay verified",
+        "next": "R1 · seeded replay (planned verification)"
       },
       "printed": [
         ""

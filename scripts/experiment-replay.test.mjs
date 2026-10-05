@@ -24,6 +24,18 @@ test("the lines bundle executes from a generic declared sensitivity path", async
   });
 });
 
+test("the histogram bundle verifies input-driven seeded replay", async () => {
+  const result = await replay("histogram");
+  assert.deepEqual(result, {
+    id: "histogram",
+    input: "data.json",
+    consumed: ["seed", "parameters.samples", "parameters.bins"],
+    baseline: "match",
+    sensitivity: "changed-output",
+    seeded: "changed-output",
+  });
+});
+
 test("an executable replay rejects a bundle without its input contract", () => {
   const errors = bundleErrors({ schema: "ostrin.experiment/v0", id: "surface", files: {}, manifest: { files: [] } }, "surface");
   assert.ok(errors.some((error) => error.includes("input-file executable replay contract")));
