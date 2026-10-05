@@ -1,0 +1,13 @@
+{
+  "seed": "deterministic",
+  "parameters": {
+    "steps": 4000,
+    "dt": 0.01,
+    "rho": 28
+  },
+  "camera": {
+    "azimuth": -60,
+    "elevation": 20
+  },
+  "description": "Recorded 4000-step Lorenz trajectory and camera."
+}

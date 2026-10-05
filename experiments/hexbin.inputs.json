@@ -1,0 +1,9 @@
+{
+  "seed": 91,
+  "parameters": {
+    "samples": 1200,
+    "bins_x": 18,
+    "bins_y": 14
+  },
+  "description": "Seeded bivariate sample counted into hexagonal bins."
+}

@@ -1,0 +1,8 @@
+{
+  "seed": "deterministic",
+  "parameters": {
+    "seconds": 60,
+    "tolerance": 1e-9
+  },
+  "description": "Recorded adaptive RK45 pendulum integration over 60 seconds."
+}

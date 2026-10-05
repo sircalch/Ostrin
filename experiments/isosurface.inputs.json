@@ -1,0 +1,12 @@
+{
+  "seed": "deterministic",
+  "parameters": {
+    "grid": 17,
+    "level": 0.42
+  },
+  "camera": {
+    "azimuth": -52,
+    "elevation": 24
+  },
+  "description": "Recorded 17³ scalar volume, isosurface level and camera."
+}

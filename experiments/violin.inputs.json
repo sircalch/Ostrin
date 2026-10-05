@@ -1,0 +1,9 @@
+{
+  "seed": 73,
+  "parameters": {
+    "samples_per_group": 140,
+    "groups": 3,
+    "bandwidth_samples": 40
+  },
+  "description": "Seeded three-group Gaussian KDE violin comparison."
+}

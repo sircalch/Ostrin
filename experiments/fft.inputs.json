@@ -1,0 +1,9 @@
+{
+  "seed": 42,
+  "parameters": {
+    "samples": 512,
+    "duration_seconds": 1,
+    "noise_scale": 0.4
+  },
+  "description": "Seeded 512-sample two-tone signal and FFT spectrum."
+}

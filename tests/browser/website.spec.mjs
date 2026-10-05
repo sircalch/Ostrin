@@ -400,7 +400,7 @@ test("Viz gallery shows recorded figures and reruns them with the real compiler"
   await pdfPopup.waitForLoadState("domcontentloaded");
   await expect(pdfPopup.locator("svg")).toBeVisible();
   await expect(pdfPopup.locator("h1")).toHaveText("Scatter and fit");
-  await expect(pdfPopup.locator("p")).toContainText("No reproducibility metadata recorded.");
+  await expect(pdfPopup.locator("p")).toContainText("Provenance: source sha256:");
   await expect(page.locator(".viz-export-status")).toHaveText(/PDF print view opened · \d+×\d+/);
   await pdfPopup.close();
   await page.getByRole("button", { name: "Zoom in" }).click();
@@ -700,6 +700,14 @@ test("Viz exposes recorded animation, table and volume experiment bundles", asyn
   expect(volumeBundle.provenance.parameters).toEqual({ grid: 17, slice: 8 });
   expect(volumeBundle.provenance.camera).toEqual({ azimuth: -48, elevation: 28 });
   expect(volumeBundle.reproducibility.level).toBe("R0");
+});
+
+test("Viz exposes an experiment bundle action for every gallery figure", async ({ page }) => {
+  await page.goto("./viz.html", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("[data-viz-bundle]")).toHaveCount(29);
+  await expect(page.locator('[data-viz-bundle="dashboard"]')).toBeVisible();
+  await expect(page.locator('[data-viz-bundle="isosurface"]')).toBeVisible();
+  await expect(page.locator('[data-viz-bundle="linked-data"]')).toBeVisible();
 });
 
 test("Viz publishes structured data for its scientific source", async ({ page }) => {

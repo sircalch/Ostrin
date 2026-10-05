@@ -1,0 +1,8 @@
+{
+  "seed": "deterministic",
+  "parameters": {
+    "x_samples": 17,
+    "y_samples": 13
+  },
+  "description": "Recorded 17×13 deterministic 2D vector field."
+}

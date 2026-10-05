@@ -1,0 +1,8 @@
+{
+  "seed": 41,
+  "parameters": {
+    "samples_per_group": 80,
+    "groups": 3
+  },
+  "description": "Seeded three-group distribution summary."
+}

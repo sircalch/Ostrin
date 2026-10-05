@@ -1,0 +1,8 @@
+{
+  "seed": 7,
+  "parameters": {
+    "samples": 20000,
+    "bins": 48
+  },
+  "description": "Seeded normal sample histogram and analytic density overlay."
+}

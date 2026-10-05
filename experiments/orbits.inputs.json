@@ -1,0 +1,9 @@
+{
+  "seed": "deterministic",
+  "parameters": {
+    "years": 3,
+    "samples": 901,
+    "animation_seconds": 15
+  },
+  "description": "Recorded three Kepler trajectories over three years."
+}

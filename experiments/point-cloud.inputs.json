@@ -1,0 +1,12 @@
+{
+  "seed": 5,
+  "parameters": {
+    "clusters": 3,
+    "points_per_cluster": 120
+  },
+  "camera": {
+    "azimuth": -40,
+    "elevation": 22
+  },
+  "description": "Seeded three-cluster 3D point cloud and camera."
+}

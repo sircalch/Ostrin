@@ -1,0 +1,10 @@
+{
+  "seed": "deterministic",
+  "parameters": {
+    "modes": 25,
+    "samples": 81,
+    "frames": 91,
+    "animation_seconds": 4
+  },
+  "description": "Recorded 25-mode string shape and 91 morph frames."
+}

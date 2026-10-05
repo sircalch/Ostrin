@@ -1,0 +1,8 @@
+{
+  "seed": 3,
+  "parameters": {
+    "random_samples": 3000,
+    "grid": 28
+  },
+  "description": "Seeded four-panel dashboard inputs and 28×28 scalar grid."
+}
