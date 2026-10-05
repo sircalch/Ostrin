@@ -32,6 +32,8 @@ runs:
         node --test scripts/linguist-check.test.mjs
         node scripts/project-plan-check.mjs
         node --test scripts/project-plan-check.test.mjs
+        node scripts/measurement-contract-check.mjs
+        node --test scripts/measurement-contract-check.test.mjs
         node scripts/quantity-ownership-check.mjs
         node --test scripts/quantity-ownership-check.test.mjs
         node scripts/website-metadata.mjs
