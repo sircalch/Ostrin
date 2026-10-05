@@ -26,7 +26,7 @@ export const experimentFixtures = Object.freeze({
     inputPath: "experiments/lines.inputs.json",
     figurePath: "website/assets/viz/lines.svg",
     outputPath: "website/assets/experiments/lines.ostrin-experiment.json",
-    sourceRevision: "4ba378581b9c702850fc7c50cddd1ba4d824bacc",
+    sourceRevision: "a773387e2e7ade15a8baffa48e642f5f619b7a9b",
   }),
   surface: Object.freeze({
     id: "surface",
@@ -44,7 +44,7 @@ export const experimentFixtures = Object.freeze({
     inputPath: "experiments/heatmap.inputs.json",
     figurePath: "website/assets/viz/heatmap.svg",
     outputPath: "website/assets/experiments/heatmap.ostrin-experiment.json",
-    sourceRevision: "4ba378581b9c702850fc7c50cddd1ba4d824bacc",
+    sourceRevision: "a773387e2e7ade15a8baffa48e642f5f619b7a9b",
   }),
   contourf: Object.freeze({
     id: "contourf",
@@ -53,7 +53,7 @@ export const experimentFixtures = Object.freeze({
     inputPath: "experiments/contourf.inputs.json",
     figurePath: "website/assets/viz/contourf.svg",
     outputPath: "website/assets/experiments/contourf.ostrin-experiment.json",
-    sourceRevision: "4ba378581b9c702850fc7c50cddd1ba4d824bacc",
+    sourceRevision: "a773387e2e7ade15a8baffa48e642f5f619b7a9b",
   }),
   quiver: Object.freeze({
     id: "quiver",
@@ -62,7 +62,7 @@ export const experimentFixtures = Object.freeze({
     inputPath: "experiments/quiver.inputs.json",
     figurePath: "website/assets/viz/quiver.svg",
     outputPath: "website/assets/experiments/quiver.ostrin-experiment.json",
-    sourceRevision: "4ba378581b9c702850fc7c50cddd1ba4d824bacc",
+    sourceRevision: "a773387e2e7ade15a8baffa48e642f5f619b7a9b",
   }),
   streamplot: Object.freeze({
     id: "streamplot",
@@ -71,7 +71,7 @@ export const experimentFixtures = Object.freeze({
     inputPath: "experiments/streamplot.inputs.json",
     figurePath: "website/assets/viz/streamplot.svg",
     outputPath: "website/assets/experiments/streamplot.ostrin-experiment.json",
-    sourceRevision: "4ba378581b9c702850fc7c50cddd1ba4d824bacc",
+    sourceRevision: "a773387e2e7ade15a8baffa48e642f5f619b7a9b",
   }),
   provenance: Object.freeze({
     id: "provenance",
@@ -89,7 +89,7 @@ export const experimentFixtures = Object.freeze({
     inputPath: "experiments/lorenz.inputs.json",
     figurePath: "website/assets/viz/lorenz.svg",
     outputPath: "website/assets/experiments/lorenz.ostrin-experiment.json",
-    sourceRevision: "4ba378581b9c702850fc7c50cddd1ba4d824bacc",
+    sourceRevision: "a773387e2e7ade15a8baffa48e642f5f619b7a9b",
   }),
   histogram: Object.freeze({
     id: "histogram",
@@ -98,7 +98,7 @@ export const experimentFixtures = Object.freeze({
     inputPath: "experiments/histogram.inputs.json",
     figurePath: "website/assets/viz/histogram.svg",
     outputPath: "website/assets/experiments/histogram.ostrin-experiment.json",
-    sourceRevision: "4ba378581b9c702850fc7c50cddd1ba4d824bacc",
+    sourceRevision: "a773387e2e7ade15a8baffa48e642f5f619b7a9b",
   }),
   boxplot: Object.freeze({
     id: "boxplot",
@@ -107,7 +107,7 @@ export const experimentFixtures = Object.freeze({
     inputPath: "experiments/boxplot.inputs.json",
     figurePath: "website/assets/viz/boxplot.svg",
     outputPath: "website/assets/experiments/boxplot.ostrin-experiment.json",
-    sourceRevision: "4ba378581b9c702850fc7c50cddd1ba4d824bacc",
+    sourceRevision: "a773387e2e7ade15a8baffa48e642f5f619b7a9b",
   }),
   violin: Object.freeze({
     id: "violin",
@@ -116,7 +116,7 @@ export const experimentFixtures = Object.freeze({
     inputPath: "experiments/violin.inputs.json",
     figurePath: "website/assets/viz/violin.svg",
     outputPath: "website/assets/experiments/violin.ostrin-experiment.json",
-    sourceRevision: "4ba378581b9c702850fc7c50cddd1ba4d824bacc",
+    sourceRevision: "a773387e2e7ade15a8baffa48e642f5f619b7a9b",
   }),
   hexbin: Object.freeze({
     id: "hexbin",
@@ -125,7 +125,7 @@ export const experimentFixtures = Object.freeze({
     inputPath: "experiments/hexbin.inputs.json",
     figurePath: "website/assets/viz/hexbin.svg",
     outputPath: "website/assets/experiments/hexbin.ostrin-experiment.json",
-    sourceRevision: "4ba378581b9c702850fc7c50cddd1ba4d824bacc",
+    sourceRevision: "a773387e2e7ade15a8baffa48e642f5f619b7a9b",
   }),
   "point-cloud": Object.freeze({
     id: "point-cloud",
@@ -134,7 +134,7 @@ export const experimentFixtures = Object.freeze({
     inputPath: "experiments/point-cloud.inputs.json",
     figurePath: "website/assets/viz/point-cloud.svg",
     outputPath: "website/assets/experiments/point-cloud.ostrin-experiment.json",
-    sourceRevision: "4ba378581b9c702850fc7c50cddd1ba4d824bacc",
+    sourceRevision: "a773387e2e7ade15a8baffa48e642f5f619b7a9b",
   }),
   "vector-field": Object.freeze({
     id: "vector-field",
@@ -143,7 +143,7 @@ export const experimentFixtures = Object.freeze({
     inputPath: "experiments/vector-field.inputs.json",
     figurePath: "website/assets/viz/vector-field.svg",
     outputPath: "website/assets/experiments/vector-field.ostrin-experiment.json",
-    sourceRevision: "4ba378581b9c702850fc7c50cddd1ba4d824bacc",
+    sourceRevision: "a773387e2e7ade15a8baffa48e642f5f619b7a9b",
   }),
   "volume-slices": Object.freeze({
     id: "volume-slices",
@@ -152,7 +152,7 @@ export const experimentFixtures = Object.freeze({
     inputPath: "experiments/volume-slices.inputs.json",
     figurePath: "website/assets/viz/volume-slices.svg",
     outputPath: "website/assets/experiments/volume-slices.ostrin-experiment.json",
-    sourceRevision: "4ba378581b9c702850fc7c50cddd1ba4d824bacc",
+    sourceRevision: "a773387e2e7ade15a8baffa48e642f5f619b7a9b",
   }),
   isosurface: Object.freeze({
     id: "isosurface",
@@ -161,7 +161,7 @@ export const experimentFixtures = Object.freeze({
     inputPath: "experiments/isosurface.inputs.json",
     figurePath: "website/assets/viz/isosurface.svg",
     outputPath: "website/assets/experiments/isosurface.ostrin-experiment.json",
-    sourceRevision: "4ba378581b9c702850fc7c50cddd1ba4d824bacc",
+    sourceRevision: "a773387e2e7ade15a8baffa48e642f5f619b7a9b",
   }),
   "scatter-fit": Object.freeze({
     id: "scatter-fit",
@@ -170,7 +170,7 @@ export const experimentFixtures = Object.freeze({
     inputPath: "experiments/scatter-fit.inputs.json",
     figurePath: "website/assets/viz/scatter-fit.svg",
     outputPath: "website/assets/experiments/scatter-fit.ostrin-experiment.json",
-    sourceRevision: "4ba378581b9c702850fc7c50cddd1ba4d824bacc",
+    sourceRevision: "a773387e2e7ade15a8baffa48e642f5f619b7a9b",
   }),
   units: Object.freeze({
     id: "units",
@@ -179,7 +179,7 @@ export const experimentFixtures = Object.freeze({
     inputPath: "experiments/units.inputs.json",
     figurePath: "website/assets/viz/units.svg",
     outputPath: "website/assets/experiments/units.ostrin-experiment.json",
-    sourceRevision: "4ba378581b9c702850fc7c50cddd1ba4d824bacc",
+    sourceRevision: "a773387e2e7ade15a8baffa48e642f5f619b7a9b",
   }),
   bars: Object.freeze({
     id: "bars",
@@ -188,7 +188,7 @@ export const experimentFixtures = Object.freeze({
     inputPath: "experiments/bars.inputs.json",
     figurePath: "website/assets/viz/bars.svg",
     outputPath: "website/assets/experiments/bars.ostrin-experiment.json",
-    sourceRevision: "4ba378581b9c702850fc7c50cddd1ba4d824bacc",
+    sourceRevision: "a773387e2e7ade15a8baffa48e642f5f619b7a9b",
   }),
   ode: Object.freeze({
     id: "ode",
@@ -197,7 +197,7 @@ export const experimentFixtures = Object.freeze({
     inputPath: "experiments/ode.inputs.json",
     figurePath: "website/assets/viz/ode.svg",
     outputPath: "website/assets/experiments/ode.ostrin-experiment.json",
-    sourceRevision: "4ba378581b9c702850fc7c50cddd1ba4d824bacc",
+    sourceRevision: "a773387e2e7ade15a8baffa48e642f5f619b7a9b",
   }),
   fft: Object.freeze({
     id: "fft",
@@ -206,7 +206,7 @@ export const experimentFixtures = Object.freeze({
     inputPath: "experiments/fft.inputs.json",
     figurePath: "website/assets/viz/fft.svg",
     outputPath: "website/assets/experiments/fft.ostrin-experiment.json",
-    sourceRevision: "4ba378581b9c702850fc7c50cddd1ba4d824bacc",
+    sourceRevision: "a773387e2e7ade15a8baffa48e642f5f619b7a9b",
   }),
   spline: Object.freeze({
     id: "spline",
@@ -215,7 +215,7 @@ export const experimentFixtures = Object.freeze({
     inputPath: "experiments/spline.inputs.json",
     figurePath: "website/assets/viz/spline.svg",
     outputPath: "website/assets/experiments/spline.ostrin-experiment.json",
-    sourceRevision: "4ba378581b9c702850fc7c50cddd1ba4d824bacc",
+    sourceRevision: "a773387e2e7ade15a8baffa48e642f5f619b7a9b",
   }),
   "double-pendulum": Object.freeze({
     id: "double-pendulum",
@@ -224,7 +224,7 @@ export const experimentFixtures = Object.freeze({
     inputPath: "experiments/double-pendulum.inputs.json",
     figurePath: "website/assets/viz/double-pendulum.svg",
     outputPath: "website/assets/experiments/double-pendulum.ostrin-experiment.json",
-    sourceRevision: "4ba378581b9c702850fc7c50cddd1ba4d824bacc",
+    sourceRevision: "a773387e2e7ade15a8baffa48e642f5f619b7a9b",
   }),
   orbits: Object.freeze({
     id: "orbits",
@@ -233,7 +233,7 @@ export const experimentFixtures = Object.freeze({
     inputPath: "experiments/orbits.inputs.json",
     figurePath: "website/assets/viz/orbits.svg",
     outputPath: "website/assets/experiments/orbits.ostrin-experiment.json",
-    sourceRevision: "4ba378581b9c702850fc7c50cddd1ba4d824bacc",
+    sourceRevision: "a773387e2e7ade15a8baffa48e642f5f619b7a9b",
   }),
   string: Object.freeze({
     id: "string",
@@ -242,7 +242,7 @@ export const experimentFixtures = Object.freeze({
     inputPath: "experiments/string.inputs.json",
     figurePath: "website/assets/viz/string.svg",
     outputPath: "website/assets/experiments/string.ostrin-experiment.json",
-    sourceRevision: "4ba378581b9c702850fc7c50cddd1ba4d824bacc",
+    sourceRevision: "a773387e2e7ade15a8baffa48e642f5f619b7a9b",
   }),
   animation: Object.freeze({
     id: "animation",
@@ -251,7 +251,7 @@ export const experimentFixtures = Object.freeze({
     inputPath: "experiments/animation.inputs.json",
     figurePath: "website/assets/viz/animation.svg",
     outputPath: "website/assets/experiments/animation.ostrin-experiment.json",
-    sourceRevision: "4ba378581b9c702850fc7c50cddd1ba4d824bacc",
+    sourceRevision: "a773387e2e7ade15a8baffa48e642f5f619b7a9b",
   }),
   table: Object.freeze({
     id: "table",
@@ -260,7 +260,7 @@ export const experimentFixtures = Object.freeze({
     inputPath: "experiments/table.inputs.json",
     figurePath: "website/assets/viz/table.svg",
     outputPath: "website/assets/experiments/table.ostrin-experiment.json",
-    sourceRevision: "4ba378581b9c702850fc7c50cddd1ba4d824bacc",
+    sourceRevision: "a773387e2e7ade15a8baffa48e642f5f619b7a9b",
   }),
   "linked-data": Object.freeze({
     id: "linked-data",
@@ -269,7 +269,7 @@ export const experimentFixtures = Object.freeze({
     inputPath: "experiments/linked-data.inputs.json",
     figurePath: "website/assets/viz/linked-data.svg",
     outputPath: "website/assets/experiments/linked-data.ostrin-experiment.json",
-    sourceRevision: "4ba378581b9c702850fc7c50cddd1ba4d824bacc",
+    sourceRevision: "a773387e2e7ade15a8baffa48e642f5f619b7a9b",
   }),
   dashboard: Object.freeze({
     id: "dashboard",
@@ -278,7 +278,7 @@ export const experimentFixtures = Object.freeze({
     inputPath: "experiments/dashboard.inputs.json",
     figurePath: "website/assets/viz/dashboard.svg",
     outputPath: "website/assets/experiments/dashboard.ostrin-experiment.json",
-    sourceRevision: "4ba378581b9c702850fc7c50cddd1ba4d824bacc",
+    sourceRevision: "a773387e2e7ade15a8baffa48e642f5f619b7a9b",
   }),
 });
 
@@ -598,4 +598,5 @@ function main() {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) main();
+
 
