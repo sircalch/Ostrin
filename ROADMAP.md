@@ -120,9 +120,11 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    29 programas con `ostrinc.wasm` y compara el SVG byte a byte; R1 queda reservado para evidencia
    de azar sembrado y no se reclaman R2/R3. Los manifiestos de figura ya serializan el estado vivo
    seleccionado (parámetros, cámara 3D opcional y URL compartible), y la galería ofrece una cita
-   BibTeX con metadatos de fuente y versión. El siguiente paso es hacer los bundles R1 realmente
-   ejecutables con un comando que consuma sus entradas declaradas, lockfiles y snapshots de runtime,
-   sin perder la frontera verificable de R0.
+   BibTeX con metadatos de fuente y versión. Ya existe el primer corte ejecutable input-driven:
+   `surface` lee `data.json`, el comando `scripts/experiment-replay.mjs` verifica sus hashes en
+   WASI y una segunda ejecución demuestra sensibilidad a `parameters.scale`. El siguiente paso es
+   extender este contrato al resto de figuras, añadir replay de azar sembrado, lockfiles y snapshots
+   de runtime sin perder la frontera verificable de R0.
    El Scientific Lab ya conserva la demo activa y sus parámetros en la URL para compartir y
    restaurar experimentos reproducibles desde el navegador. La navegación compacta y el catálogo
    de ejemplos ya tienen estados ARIA, foco de teclado, Escape, pestañas con flechas/Home/End y

@@ -90,7 +90,7 @@ test("every registered fixture produces a verified recorded bundle", () => {
     const bundle = buildExperimentBundle(id);
     assert.equal(bundle.id, id);
     assert.equal(bundle.title, fixture.title);
-    assert.match(fixture.sourceRevision, /^[0-9a-f]{40}$/);
+    assert.match(bundle.provenance.commit, /^[0-9a-f]{40}$/);
     assert.deepEqual(verifyExperimentBundle(bundle, { fixtureId: id }).errors, []);
     if (id === "surface") {
       assert.deepEqual(bundle.provenance.parameters, { scale: 1 });

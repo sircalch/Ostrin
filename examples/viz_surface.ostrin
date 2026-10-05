@@ -1,5 +1,6 @@
 // std.viz · 3D: a shaded surface with a colorbar.
 import std.viz
+import std.json
 
 fn peaks(x: Float, y: Float) -> Float {
     3.0 * (1.0 - x) * (1.0 - x) * exp(-x * x - (y + 1.0) * (y + 1.0)) -
@@ -7,13 +8,38 @@ fn peaks(x: Float, y: Float) -> Float {
         exp(-(x + 1.0) * (x + 1.0) - y * y) / 3.0
 }
 
+fn input_scale(fallback: Float) -> Float {
+    loaded = read_file("data.json")
+    if loaded.is_err() {
+        return fallback
+    }
+    document = json.parse(loaded.unwrap())
+    if document.is_err() {
+        return fallback
+    }
+    parameters = json.object_get(document.unwrap(), "parameters")
+    if parameters.is_none() {
+        return fallback
+    }
+    value = json.object_get(parameters.unwrap(), "scale")
+    if value.is_none() {
+        return fallback
+    }
+    number = json.as_number(value.unwrap())
+    if number.is_none() {
+        return fallback
+    }
+    number.unwrap()
+}
+
 fn main() -> Void {
     scale = 1.0
+    rendered_scale = input_scale(scale)
     xs = linspace(-3.0, 3.0, 36)
     ys = linspace(-3.0, 3.0, 36)
     scene = viz.scene3d("peaks(x, y) as a surface")
-        .describe("36 × 36 grid, 2450 shaded triangles · scale = " + viz.num(scale))
+        .describe("36 × 36 grid, 2450 shaded triangles · scale = " + viz.num(rendered_scale))
         .labels("x", "y", "z")
-        .surface(xs, ys, viz.grid_of(xs, ys, fn(x, y) { peaks(x * scale, y * scale) }), label: "height")
+        .surface(xs, ys, viz.grid_of(xs, ys, fn(x, y) { peaks(x * rendered_scale, y * rendered_scale) }), label: "height")
     print(scene.svg())
 }

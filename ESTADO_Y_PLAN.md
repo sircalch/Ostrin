@@ -503,12 +503,14 @@ sustituye la adopción independiente; por eso el plan mantiene un frente explíc
   comando de replay. Las 29 figuras source-backed de la galería ya publican `ostrin.experiment/v0`
   como artefactos R0 con cuatro archivos y hashes calculados; la CI del sitio ejecuta los 29 con
   `ostrinc.wasm` y compara el SVG byte a byte. Los bundles 3D registran además sus parámetros y
-  cámara, y los de azar conservan su semilla declarada. R1 queda reservado para replay ejecutable
-  de azar sembrado y R2/R3 no se reclaman.
+  cámara, y los de azar conservan su semilla declarada. `surface` ya añade un corte ejecutable
+  input-driven: lee `data.json` en la fuente, y `scripts/experiment-replay.mjs` verifica el bundle
+  en WASI y demuestra que cambiar `parameters.scale` cambia la figura. Esto es evidencia de ejecución
+  de entradas, no una reclamación de R1 de azar sembrado; R2/R3 no se reclaman.
   Los manifiestos de figura ya serializan el estado vivo seleccionado desde el explorador
   (parámetros, cámara 3D opcional y URL compartible), y la galería ofrece una cita BibTeX con
-  metadatos de fuente y versión. Falta convertir las entradas declaradas en un comando de replay
-  ejecutable con lockfiles y snapshots de runtime;
+  metadatos de fuente y versión. Falta extender el comando de replay al resto de entradas, cubrir
+  azar sembrado con algoritmo/versionado explícitos y añadir lockfiles y snapshots de runtime;
 - publicar benchmarks históricos por commit y métricas de adopción solo con una política de
   privacidad clara. Estas evidencias alimentan después el snapshot de Linguist y la propuesta
   upstream, pero no se presentan como adopción hasta que existan usuarios y proyectos externos.

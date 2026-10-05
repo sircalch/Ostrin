@@ -845,15 +845,15 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "bundle": "assets/experiments/surface.ostrin-experiment.json",
       "source": "examples/viz_surface.ostrin",
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_surface.ostrin",
-      "code": "// std.viz · 3D: a shaded surface with a colorbar.\nimport std.viz\n\nfn peaks(x: Float, y: Float) -> Float {\n    3.0 * (1.0 - x) * (1.0 - x) * exp(-x * x - (y + 1.0) * (y + 1.0)) -\n        10.0 * (x / 5.0 - x * x * x - y * y * y * y * y) * exp(-x * x - y * y) -\n        exp(-(x + 1.0) * (x + 1.0) - y * y) / 3.0\n}\n\nfn main() -> Void {\n    scale = 1.0\n    xs = linspace(-3.0, 3.0, 36)\n    ys = linspace(-3.0, 3.0, 36)\n    scene = viz.scene3d(\"peaks(x, y) as a surface\")\n        .describe(\"36 × 36 grid, 2450 shaded triangles · scale = \" + viz.num(scale))\n        .labels(\"x\", \"y\", \"z\")\n        .surface(xs, ys, viz.grid_of(xs, ys, fn(x, y) { peaks(x * scale, y * scale) }), label: \"height\")\n    print(scene.svg())\n}\n",
+      "code": "// std.viz · 3D: a shaded surface with a colorbar.\nimport std.viz\nimport std.json\n\nfn peaks(x: Float, y: Float) -> Float {\n    3.0 * (1.0 - x) * (1.0 - x) * exp(-x * x - (y + 1.0) * (y + 1.0)) -\n        10.0 * (x / 5.0 - x * x * x - y * y * y * y * y) * exp(-x * x - y * y) -\n        exp(-(x + 1.0) * (x + 1.0) - y * y) / 3.0\n}\n\nfn input_scale(fallback: Float) -> Float {\n    loaded = read_file(\"data.json\")\n    if loaded.is_err() {\n        return fallback\n    }\n    document = json.parse(loaded.unwrap())\n    if document.is_err() {\n        return fallback\n    }\n    parameters = json.object_get(document.unwrap(), \"parameters\")\n    if parameters.is_none() {\n        return fallback\n    }\n    value = json.object_get(parameters.unwrap(), \"scale\")\n    if value.is_none() {\n        return fallback\n    }\n    number = json.as_number(value.unwrap())\n    if number.is_none() {\n        return fallback\n    }\n    number.unwrap()\n}\n\nfn main() -> Void {\n    scale = 1.0\n    rendered_scale = input_scale(scale)\n    xs = linspace(-3.0, 3.0, 36)\n    ys = linspace(-3.0, 3.0, 36)\n    scene = viz.scene3d(\"peaks(x, y) as a surface\")\n        .describe(\"36 × 36 grid, 2450 shaded triangles · scale = \" + viz.num(rendered_scale))\n        .labels(\"x\", \"y\", \"z\")\n        .surface(xs, ys, viz.grid_of(xs, ys, fn(x, y) { peaks(x * rendered_scale, y * rendered_scale) }), label: \"height\")\n    print(scene.svg())\n}\n",
       "svg": "assets/viz/surface.svg",
       "capabilities": [
         "3d",
         "reproducibility"
       ],
       "provenance": {
-        "source-hash": "sha256:7e2f944b0f350af40da94d82dd7c0c3383429eef8643208e55e2a32e39f6ad53",
-        "data-hash": "sha256:2b7e55d539b9bdf1d4cd5a97609d169c165f886f416b5e06c8ef1aec440d0086",
+        "source-hash": "sha256:d1c7a59124c39cd31943403f59e8c4feae64dba8cf23a9b6a95e7a4dd94e0b18",
+        "data-hash": "sha256:6a7b7cd46894ccbcbc8beaefafe30ef15e929aa17c4c15f2fc67adafcc40fd0c",
         "seed": "seed=deterministic",
         "compiler": "ostrinc 0.1.0"
       },

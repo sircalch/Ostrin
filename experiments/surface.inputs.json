@@ -7,5 +7,14 @@
     "azimuth": -55.0,
     "elevation": 28.0
   },
-  "description": "Default parameters and camera for the recorded 3D peaks surface fixture."
+  "description": "Default parameters and camera for the recorded 3D peaks surface fixture.",
+  "execution": {
+    "mode": "input-file",
+    "input_file": "data.json",
+    "consumes": ["parameters.scale"],
+    "command": "node scripts/experiment-replay.mjs --fixture surface",
+    "target": "wasm32-wasip1",
+    "wasi": "preview1",
+    "status": "verified-in-ci"
+  }
 }

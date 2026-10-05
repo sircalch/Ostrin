@@ -320,7 +320,7 @@ function sourceAssignmentPattern(name) {
 // Runs ostrinc.wasm on `files` in a child Node process and returns its stdout lines. Each run
 // gets a fresh process: WebAssembly memories of finished instances are not reliably released
 // within one process, and a few dozen heavy Viz programs used to crash Node.
-async function runWasm(module, files, args) {
+export async function runWasm(module, files, args) {
   const child = spawnSync(process.execPath, ["--no-warnings", fileURLToPath(import.meta.url), "--wasm-child"], {
     input: JSON.stringify({ files, args }),
     maxBuffer: 256 * 1024 * 1024,
@@ -422,6 +422,7 @@ export async function buildLabData() {
   const figures = {};
   for (const figure of GALLERY) {
     const source = readText(figure.file);
+    const fixture = Object.values(experimentFixtures).find((candidate) => candidate.sourcePath === figure.file);
     for (const param of figure.controls ?? []) {
       if (!sourceAssignmentPattern(param.name).test(source)) {
         throw new Error(`${figure.file}: Viz control ${param.name} needs a 'name = number' line`);
@@ -430,13 +431,15 @@ export async function buildLabData() {
         throw new Error(`${figure.file}: Viz control ${param.name} has invalid range metadata`);
       }
     }
-    const output = await runWasm(module, { "main.ostrin": source }, ["--run", "main.ostrin"]);
+    const output = await runWasm(module, {
+      "main.ostrin": source,
+      ...(fixture ? { "data.json": readText(fixture.inputPath) } : {}),
+    }, ["--run", "main.ostrin"]);
     const start = output.findIndex((line) => line.startsWith("<svg"));
     const end = output.findIndex((line, index) => index >= start && line === "</svg>");
     if (start < 0 || end < 0) throw new Error(`${figure.file}: expected one SVG figure in the output`);
     const svgPath = `assets/viz/${figure.id}.svg`;
     const rawSvg = `${output.slice(start, end + 1).join("\n")}\n`;
-    const fixture = Object.values(experimentFixtures).find((candidate) => candidate.sourcePath === figure.file);
     // Experiment fixtures use the same calculated metadata as their downloadable bundle.
     // R0 replay verification below removes drift between the live WASM output and
     // the published surface without claiming seeded-randomness R1 evidence.
