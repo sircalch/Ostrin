@@ -48,7 +48,7 @@ function bundleErrors(bundle, id) {
   if (!bundle || typeof bundle !== "object") return [`${id}: bundle is not an object`];
   if (bundle.schema !== schema) errors.push(`${id}: expected ${schema}`);
   if (bundle.id !== id) errors.push(`${id}: bundle id does not match the requested fixture`);
-  if (bundle.reproducibility?.level !== "R0") errors.push(`${id}: executable replay only accepts an explicit R0 bundle`);
+  if (!["R0", "R1"].includes(bundle.reproducibility?.level)) errors.push(`${id}: executable replay requires an explicit R0 or R1 bundle`);
   if (!bundle.files || typeof bundle.files !== "object") errors.push(`${id}: files object is missing`);
   if (!Array.isArray(bundle.manifest?.files) || bundle.manifest.files.length !== 4) errors.push(`${id}: manifest must contain four files`);
   for (const entry of bundle.manifest?.files ?? []) {
@@ -80,6 +80,25 @@ function bundleErrors(bundle, id) {
   if (!Number.isFinite(sensitivity?.alternate)) errors.push(`${id}: executable replay sensitivity must declare a finite alternate value`);
   if (Array.isArray(execution?.consumes) && typeof sensitivity?.path === "string" && !execution.consumes.includes(sensitivity.path)) {
     errors.push(`${id}: executable replay sensitivity path is not listed in consumed inputs`);
+  }
+  if (bundle.reproducibility?.level === "R1") {
+    const randomness = execution?.randomness;
+    const evidence = bundle.provenance?.randomness;
+    if (!randomness || randomness.seed_path !== sensitivity?.path) {
+      errors.push(`${id}: R1 replay must declare a randomness seed path equal to the sensitivity path`);
+    }
+    if (typeof randomness?.seed_path !== "string" || !execution?.consumes?.includes(randomness.seed_path)) {
+      errors.push(`${id}: R1 randomness seed path must be listed in consumed inputs`);
+    }
+    if (randomness?.algorithm !== evidence?.algorithm || randomness?.version !== evidence?.version) {
+      errors.push(`${id}: R1 randomness algorithm/version does not match provenance evidence`);
+    }
+    if (randomness?.partition !== evidence?.partition) {
+      errors.push(`${id}: R1 randomness partition does not match provenance evidence`);
+    }
+    if (evidence?.status !== "input-driven-r1" || evidence?.seed_consumption !== `data.json:${randomness?.seed_path}`) {
+      errors.push(`${id}: R1 provenance does not prove input-driven seed consumption`);
+    }
   }
   return errors;
 }
@@ -154,7 +173,14 @@ async function replay(id) {
   const changedSvg = normalizeFigureMetadata(extractSvg(changedOutput, id), metadata);
   if (changedSvg === rendered) throw new Error(`${id}: changing a declared input did not change the rendered figure`);
 
-  return { id, input: inputFile, consumed: bundle.provenance.execution.consumes, baseline: "match", sensitivity: "changed-output" };
+  return {
+    id,
+    input: inputFile,
+    consumed: bundle.provenance.execution.consumes,
+    baseline: "match",
+    sensitivity: "changed-output",
+    ...(bundle.reproducibility.level === "R1" ? { seeded: "changed-output" } : {}),
+  };
 }
 
 async function main() {

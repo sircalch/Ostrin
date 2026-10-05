@@ -3,7 +3,7 @@
 <rect width="640" height="400" fill="#ffffff"/>
 
 <text x="66" y="26" text-anchor="start" font-size="16" fill="#1f2937" font-weight="600">Normal samples</text>
-<text x="66" y="45" text-anchor="start" font-size="12" fill="#6b7280">20 000 draws from N(4, 1.5²), seed 7</text>
+<text x="66" y="45" text-anchor="start" font-size="12" fill="#6b7280">20000 draws from N(4, 1.5²), seed 7</text>
 <defs><clipPath id="clip9104607052447161200"><rect x="66" y="62" width="554" height="286"/></clipPath></defs>
 <line x1="150.43" y1="62" x2="150.43" y2="348" stroke="#e5e7eb" stroke-width="1"/>
 <line x1="150.43" y1="348" x2="150.43" y2="353" stroke="#9ca3af" stroke-width="1"/>
@@ -57,5 +57,5 @@
 <text x="343" y="388" text-anchor="middle" font-size="12" fill="#1f2937">value</text>
 <text x="16" y="205" text-anchor="middle" font-size="12" fill="#1f2937" transform="rotate(-90 16 205)">count</text>
 <g class="legend"><rect x="457.2" y="72" width="152.8" height="46" rx="6" fill="#ffffff" fill-opacity="0.88" stroke="#e5e7eb"/><g class="legend-item" data-viz-series-id="0"><rect x="465.2" y="81" width="14" height="10" fill="#2563eb" fill-opacity="0.7"/><text x="485.2" y="90" text-anchor="start" font-size="11" fill="#1f2937">samples</text></g><g class="legend-item" data-viz-series-id="1"><line x1="464.2" y1="104" x2="480.2" y2="104" stroke="#111827" stroke-width="2.5"/><text x="485.2" y="108" text-anchor="start" font-size="11" fill="#1f2937">N(4, 1.5²) density</text></g></g>
-  <ostrin-provenance source-hash="sha256:45e31d23d660dc5d08faae515bd2cee12134dc56254b19d3ea99a0bd5fdfabbb" data-hash="sha256:c5a26136b82d750658e2f446424e87e7fb21259d9b3043a411dc1e5c579fdb84" seed="seed=7" compiler="ostrinc 0.1.0" />
+  <ostrin-provenance source-hash="sha256:001a0b89c33606cdb2ab1412c56c0fcffe4e2a51d00d00aad8d43498e9acf27d" data-hash="sha256:3c24ec43fb4766736faeb4640ba8eed153cc661365eac55c6410d125c3ecbae7" seed="seed=7" compiler="ostrinc 0.1.0" />
 </svg>

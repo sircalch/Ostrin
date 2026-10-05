@@ -670,6 +670,20 @@ test("Viz exposes the recorded 3D surface experiment bundle", async ({ page }) =
   }
 });
 
+test("Viz exposes the first input-driven seeded R1 experiment bundle", async ({ page }) => {
+  await page.goto("./viz.html", { waitUntil: "domcontentloaded" });
+  await expect(page.locator('[data-viz-bundle="histogram"]')).toBeVisible();
+  const bundleDownloadPromise = page.waitForEvent("download");
+  await page.locator('[data-viz-bundle="histogram"]').click();
+  const bundleDownload = await bundleDownloadPromise;
+  expect(bundleDownload.suggestedFilename()).toBe("histogram-and-density.ostrin-experiment.json");
+  const bundle = JSON.parse(await readFile(await bundleDownload.path(), "utf8"));
+  expect(bundle.reproducibility.level).toBe("R1");
+  expect(bundle.provenance.execution.randomness.seed_path).toBe("seed");
+  expect(bundle.provenance.randomness.seed_consumption).toBe("data.json:seed");
+  expect(bundle.provenance.replay.level).toBe("R1");
+});
+
 test("Viz exposes recorded animation, table and volume experiment bundles", async ({ page }) => {
   await page.goto("./viz.html", { waitUntil: "domcontentloaded" });
 

@@ -11252,9 +11252,9 @@ fn viz_histograms_render_bins_and_use_numeric_ir() {
         stdout(&report)
     );
     assert!(
-        stdout(&report).contains("native-source: examples/viz_histogram.ostrin ir=1 hir=0 ast=0")
-            && stdout(&report).contains("ast-fallback: 0"),
-        "histogram entry point did not use the numeric IR path: {}",
+        stdout(&report).contains("native-source: examples/viz_histogram.ostrin ir=3 hir=0 ast=0")
+            && stdout(&report).contains("ast-fallback: 1"),
+        "histogram entry point did not use the numeric IR path with its JSON import boundary: {}",
         stdout(&report)
     );
 

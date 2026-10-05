@@ -1679,7 +1679,8 @@ function card(figure) {
         compiler: figure.provenance.compiler ?? "",
       }
     : null;
-  const provenance = el("p", { className: "sl-provenance", text: provenanceText(recordedProvenance, `Recorded from ${figure.source}`) });
+  const maturity = figure.reproducibility?.label ?? "R0 · exact replay verified";
+  const provenance = el("p", { className: "sl-provenance", text: `${provenanceText(recordedProvenance, `Recorded from ${figure.source}`)} · ${maturity}` });
   const run = el("button", { type: "button", className: "button", "data-viz-run": figure.id, text: "Run live" });
   const status = el("span", { className: "sl-status", text: "" });
   let liveSvg = null;
@@ -1722,7 +1723,7 @@ function card(figure) {
     status.textContent = "preparing bundle…";
     try {
       await downloadExperimentBundle(figure.bundle, figure.title);
-      status.textContent = "bundle downloaded · R0 replay verified";
+      status.textContent = `bundle downloaded · ${figure.reproducibility?.level ?? "R0"} replay verified`;
     } catch (error) {
       status.textContent = error.message ?? String(error);
     } finally {

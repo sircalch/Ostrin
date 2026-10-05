@@ -129,8 +129,8 @@ Sobre este IR se hacen los análisis que el texto C no permite:
    `--native-type-report` publica también `ir-generated`, `hir-generated` y `ast-fallback`.
    El mismo informe agrupa esas cifras por archivo fuente con líneas `native-source`, y la
    prueba diferencial comprueba que la suma por módulo coincide con los totales globales.
-   La prueba diferencial conserva el baseline actual de fallback (34 funciones AST, con
-   6 595 funciones generadas por HIR/IR —6 575 IR y 20 HIR— sobre los ejemplos); `atan2` escalar para
+   La prueba diferencial conserva el baseline actual de fallback (35 funciones AST, con
+   6 632 funciones generadas por HIR/IR —6 609 IR y 23 HIR— sobre los ejemplos); `atan2` escalar para
    `Float` y `Float32` usa el runtime determinista desde IR/C; `pow` para `Float` y
    `Float32` usa `ostrin_dm_pow` y `ostrin_dm_powf`; las coerciones
    `Float↔Float32` de bindings explícitos y agregados `List/Set<Float32>`, las operaciones escalares
