@@ -15,7 +15,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 import { collectSiteFacts, repositoryRoot } from "./site-facts.mjs";
-import { experimentFixtures, metadataForFixture, normalizeFigureMetadata } from "./experiment-bundle.mjs";
+import { experimentFixtures, metadataForFixture, normalizeFigureMetadata, outputPathFor } from "./experiment-bundle.mjs";
 
 const repository = "https://github.com/sircalch/Ostrin";
 const wasmPath = path.join(repositoryRoot, "website", "ostrinc.wasm");
@@ -438,7 +438,8 @@ export async function buildLabData() {
     const rawSvg = `${output.slice(start, end + 1).join("\n")}\n`;
     const fixture = Object.values(experimentFixtures).find((candidate) => candidate.sourcePath === figure.file);
     // Experiment fixtures use the same calculated metadata as their downloadable bundle.
-    // R0 remains a recorded artifact: this only removes drift between published surfaces.
+    // R0 replay verification below removes drift between the live WASM output and
+    // the published surface without claiming seeded-randomness R1 evidence.
     const svg = fixture
       ? normalizeFigureMetadata(rawSvg, metadataForFixture(fixture.id))
       : rawSvg;
@@ -471,6 +472,54 @@ export async function buildLabData() {
   }));
 
   return { compiler: collectSiteFacts().version, recordedWith: "ostrinc.wasm (wasm32-wasip1) under Node WASI", hero, demos, pipeline, gallery, workflows, figures };
+}
+
+/**
+ * Compare one live WASM replay with the figure stored in its source-backed
+ * experiment bundle. This is intentionally byte-for-byte: a renderer change
+ * must update the recorded artifact instead of being silently tolerated.
+ */
+export function compareReplayFigure(id, replayedSvg, bundle) {
+  const errors = [];
+  if (typeof replayedSvg !== "string" || replayedSvg.length === 0) {
+    errors.push(`${id}: replay did not produce an SVG`);
+  }
+  if (typeof bundle?.files?.["figure.svg"] !== "string") {
+    errors.push(`${id}: bundle has no figure.svg`);
+  } else if (bundle.files["figure.svg"] !== replayedSvg) {
+    errors.push(`${id}: replayed SVG differs from the bundled figure`);
+  }
+  const replay = bundle?.provenance?.replay;
+  if (replay?.level !== "R0" || replay?.status !== "verified" || replay?.backend !== "ostrinc.wasm"
+    || replay?.target !== "wasm32-wasip1" || replay?.compares !== "figure.svg") {
+    errors.push(`${id}: bundle is missing the verified R0 replay contract`);
+  }
+  return errors;
+}
+
+/**
+ * Verify every registered publication fixture against the freshly executed
+ * WASM figures returned by buildLabData().
+ */
+export function verifyFixtureReplays(data, root = repositoryRoot) {
+  const errors = [];
+  for (const id of Object.keys(experimentFixtures)) {
+    const figure = data?.figures?.[`assets/viz/${id}.svg`];
+    const file = outputPathFor(id, root);
+    if (!existsSync(file)) {
+      errors.push(`${id}: missing ${path.relative(root, file)}`);
+      continue;
+    }
+    let bundle;
+    try {
+      bundle = JSON.parse(readFileSync(file, "utf8"));
+    } catch (error) {
+      errors.push(`${id}: invalid bundle JSON (${error.message})`);
+      continue;
+    }
+    errors.push(...compareReplayFigure(id, figure, bundle));
+  }
+  return { ok: errors.length === 0, errors };
 }
 
 export function renderLabData(data) {
@@ -527,6 +576,11 @@ async function main() {
   const verified = await verifyOutputEvidence();
   console.log(`lab-data: ${verified} static page outputs match their Ostrin programs`);
   const data = await buildLabData();
+  if (process.argv.includes("--verify-replays")) {
+    const replay = verifyFixtureReplays(data);
+    if (!replay.ok) throw new Error(`R0 experiment replay verification failed:\n${replay.errors.join("\n")}`);
+    console.log(`lab-data: ${Object.keys(experimentFixtures).length} R0 experiment replays match their bundled SVG figures`);
+  }
   const expected = renderLabData(data);
   const figureDir = path.join(repositoryRoot, "website", "assets", "viz");
   if (process.argv.includes("--write")) {

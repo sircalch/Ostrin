@@ -16,13 +16,23 @@ import {
   verifyExperimentBundle,
 } from "./experiment-bundle.mjs";
 
-test("the v0 experiment bundle has calculated hashes and explicit R0/R1 labels", () => {
+test("the v0 experiment bundle has calculated hashes and an explicit R0/R1 boundary", () => {
   const result = verifyBundleFile(outputPath);
   assert.deepEqual(result.errors, []);
   const bundle = JSON.parse(readFileSync(outputPath, "utf8"));
   assert.equal(bundle.schema, "ostrin.experiment/v0");
   assert.equal(bundle.reproducibility.level, "R0");
-  assert.match(bundle.reproducibility.next, /^R1/);
+  assert.equal(bundle.reproducibility.label, "R0 · exact replay verified");
+  assert.equal(bundle.reproducibility.next, "R1 · seeded replay (planned verification)");
+  assert.deepEqual(bundle.provenance.replay, {
+    level: "R0",
+    status: "verified",
+    backend: "ostrinc.wasm",
+    target: "wasm32-wasip1",
+    command: "node scripts/lab-data.mjs --verify-replays",
+    compares: "figure.svg",
+    note: "Website CI compares the replayed SVG byte-for-byte with this bundled figure; R1 requires seeded-randomness evidence.",
+  });
   assert.equal(bundle.provenance.figure_metadata.policy,
     "The bundle generator normalizes the recorded SVG metadata to these calculated hashes; bundle manifest hashes are authoritative.");
   assert.match(bundle.provenance.commit, /^[0-9a-f]{40}$/);
