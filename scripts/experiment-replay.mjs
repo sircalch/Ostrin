@@ -3,9 +3,9 @@
 // Execute an input-file experiment bundle in an isolated WASI filesystem.
 //
 // R0 bundles remain the byte-for-byte publication contract. This command is a
-// first executable input-driven slice: the source reads data.json, the host
-// verifies the bundle hashes, and a sensitivity run proves that the declared
-// parameter changes the rendered figure. It deliberately does not claim the
+// executable input-driven slice: the source reads data.json, the host verifies
+// the bundle hashes, and a sensitivity run proves that a declared parameter
+// changes the rendered figure. It deliberately does not claim the
 // seeded-randomness R1 guarantee for fixtures that have not opted in.
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
@@ -73,7 +73,33 @@ function bundleErrors(bundle, id) {
   }
   if (execution?.status !== "verified-in-ci") errors.push(`${id}: executable replay contract is not CI-verified`);
   if (!Array.isArray(execution?.consumes) || execution.consumes.length === 0) errors.push(`${id}: executable replay does not declare consumed inputs`);
+  const sensitivity = execution?.sensitivity;
+  if (!sensitivity || typeof sensitivity.path !== "string" || sensitivity.path.length === 0) {
+    errors.push(`${id}: executable replay does not declare a sensitivity path`);
+  }
+  if (!Number.isFinite(sensitivity?.alternate)) errors.push(`${id}: executable replay sensitivity must declare a finite alternate value`);
+  if (Array.isArray(execution?.consumes) && typeof sensitivity?.path === "string" && !execution.consumes.includes(sensitivity.path)) {
+    errors.push(`${id}: executable replay sensitivity path is not listed in consumed inputs`);
+  }
   return errors;
+}
+
+function inputValue(input, dottedPath, id) {
+  const parts = dottedPath.split(".").filter(Boolean);
+  if (parts.length === 0) throw new Error(`${id}: sensitivity path is empty`);
+  let value = input;
+  for (const part of parts) {
+    if (!value || typeof value !== "object" || !(part in value)) {
+      throw new Error(`${id}: sensitivity path ${dottedPath} is missing from data.json`);
+    }
+    value = value[part];
+  }
+  return { parts, value };
+}
+
+function setInputValue(input, parts, value) {
+  const parent = parts.slice(0, -1).reduce((current, part) => current[part], input);
+  parent[parts.at(-1)] = value;
 }
 
 function alternateInput(bundle, id) {
@@ -83,14 +109,13 @@ function alternateInput(bundle, id) {
   } catch (error) {
     throw new Error(`${id}: data.json is invalid JSON (${error.message})`);
   }
-  const consumed = bundle.provenance.execution.consumes;
-  if (!consumed.includes("parameters.scale") || !Number.isFinite(input.parameters?.scale)) {
-    throw new Error(`${id}: this replay slice requires numeric parameters.scale sensitivity`);
-  }
+  const execution = bundle.provenance.execution;
+  const sensitivity = execution.sensitivity;
+  const { parts, value: original } = inputValue(input, sensitivity.path, id);
+  if (!Number.isFinite(original)) throw new Error(`${id}: sensitivity path ${sensitivity.path} must resolve to a finite number`);
   const alternate = structuredClone(input);
-  const original = alternate.parameters.scale;
-  alternate.parameters.scale = original >= 1 ? original - 0.25 : original + 0.25;
-  if (alternate.parameters.scale === original) throw new Error(`${id}: could not construct a distinct sensitivity input`);
+  setInputValue(alternate, parts, sensitivity.alternate);
+  if (sensitivity.alternate === original) throw new Error(`${id}: sensitivity alternate must differ from the recorded value`);
   return canonicalJson(alternate);
 }
 

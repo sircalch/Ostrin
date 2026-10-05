@@ -13,6 +13,17 @@ test("the surface bundle executes from its declared data.json input", async () =
   });
 });
 
+test("the lines bundle executes from a generic declared sensitivity path", async () => {
+  const result = await replay("lines");
+  assert.deepEqual(result, {
+    id: "lines",
+    input: "data.json",
+    consumed: ["parameters.samples"],
+    baseline: "match",
+    sensitivity: "changed-output",
+  });
+});
+
 test("an executable replay rejects a bundle without its input contract", () => {
   const errors = bundleErrors({ schema: "ostrin.experiment/v0", id: "surface", files: {}, manifest: { files: [] } }, "surface");
   assert.ok(errors.some((error) => error.includes("input-file executable replay contract")));

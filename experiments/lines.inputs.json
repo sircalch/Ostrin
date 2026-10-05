@@ -3,5 +3,20 @@
   "parameters": {
     "samples": 300
   },
-  "description": "Recorded 300-sample damped oscillator series and envelope."
+  "description": "Recorded 300-sample damped oscillator series and envelope.",
+  "execution": {
+    "mode": "input-file",
+    "input_file": "data.json",
+    "consumes": [
+      "parameters.samples"
+    ],
+    "sensitivity": {
+      "path": "parameters.samples",
+      "alternate": 256
+    },
+    "command": "node scripts/experiment-replay.mjs --fixture lines",
+    "target": "wasm32-wasip1",
+    "wasi": "preview1",
+    "status": "verified-in-ci"
+  }
 }

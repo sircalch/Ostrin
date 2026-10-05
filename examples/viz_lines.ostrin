@@ -1,8 +1,34 @@
 // std.viz · lines: three damped oscillators, their envelope and a reference line.
 import std.viz
+import std.json
+
+fn input_samples(fallback: Int) -> Int {
+    loaded = read_file("data.json")
+    if loaded.is_err() {
+        return fallback
+    }
+    document = json.parse(loaded.unwrap())
+    if document.is_err() {
+        return fallback
+    }
+    parameters = json.object_get(document.unwrap(), "parameters")
+    if parameters.is_none() {
+        return fallback
+    }
+    value = json.object_get(parameters.unwrap(), "samples")
+    if value.is_none() {
+        return fallback
+    }
+    number = json.as_number(value.unwrap())
+    if number.is_none() {
+        return fallback
+    }
+    number.unwrap() as Int
+}
 
 fn main() -> Void {
-    t = linspace(0.0, 12.0, 300)
+    samples = input_samples(300)
+    t = linspace(0.0, 12.0, samples)
     envelope = exp(t * -0.2)
     fig = viz.figure("Damped oscillators")
         .describe("x(t) = exp(-t/5) cos(ω t) for three frequencies")

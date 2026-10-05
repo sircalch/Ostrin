@@ -8,6 +8,10 @@
   including continuous and frame animations, tables, statistical plots and 3D scenes. Website CI
   now replays all registered fixtures byte-for-byte; seeded-randomness R1 remains planned.
 
+- Generalized the executable input replay contract to `surface` and `lines`: each declares the
+  consumed parameter path and an alternate sensitivity value, and website CI verifies both
+  against `ostrinc.wasm` without changing the R0 maturity label.
+
 ### Viz publication manifests
 
 - Figure manifests now preserve the selected explorer state: numeric parameters, an optional 3D
@@ -32,8 +36,8 @@
   the checker/HIR prepass and reuse the typed IR/C method dispatcher. Quantity
   and dimension-sensitive visualization methods remain on the verified fallback
   until their ownership contract is complete.
-- The differential ratchet advances to **6,559 HIR/IR-generated functions
-  (6,542 IR + 17 HIR) / 33 AST** after the input-driven Viz replay slice.
+- The differential ratchet advances to **6,595 HIR/IR-generated functions
+  (6,575 IR + 20 HIR) / 34 AST** after the generalized input-driven Viz replay slice.
 
 ### Quantity visualization ownership status
 
