@@ -78,8 +78,9 @@ test("seeded RNG bundles expose source-backed algorithm evidence and R1 replay m
   const histogram = buildExperimentBundle("histogram");
   const boxplot = buildExperimentBundle("boxplot");
   const scatterFit = buildExperimentBundle("scatter-fit");
+  const violin = buildExperimentBundle("violin");
   const randomness = histogram.provenance.randomness;
-  for (const bundle of [histogram, boxplot, scatterFit]) {
+  for (const bundle of [histogram, boxplot, scatterFit, violin]) {
     assert.equal(bundle.reproducibility.level, "R1");
     assert.equal(bundle.reproducibility.label, "R1 · seeded replay verified");
     assert.equal(bundle.provenance.level, "R1");

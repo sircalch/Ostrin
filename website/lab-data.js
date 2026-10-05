@@ -1123,22 +1123,22 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "bundle": "assets/experiments/violin.ostrin-experiment.json",
       "source": "examples/viz_violin.ostrin",
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_violin.ostrin",
-      "code": "// std.viz · kernel-density violins: full distributions with median markers.\nimport std.viz\n\nfn main() -> Void {\n    r = rng(73)\n    baseline = r.randn([140]) * 0.42 + 4.2\n    shifted = r.randn([140]) * 0.75 + 5.25\n    bimodal = zeros([140])\n    for i in 0 until 140 {\n        center = if i < 70 { 5.2 } else { 6.1 }\n        spread = if i < 70 { 0.28 } else { 0.18 }\n        bimodal.set(i, r.randn([1])[0] * spread + center)\n    }\n    fig = viz.figure(\"Distribution shapes\")\n        .describe(\"Gaussian KDE violins with medians computed in Ostrin\")\n        .labels(\"cohort\", \"response\")\n        .violin(1.0, baseline, 40, \"baseline\", \"#2563eb\")\n        .violin(2.0, shifted, 40, \"shifted\", \"#db2777\")\n        .violin(3.0, bimodal, 40, \"bimodal\", \"#059669\")\n    print(fig.svg())\n}\n",
+      "code": "// std.viz · kernel-density violins: full distributions with median markers.\nimport std.viz\nimport std.json\n\nfn input_int(key: String, fallback: Int) -> Int {\n    loaded = read_file(\"data.json\")\n    if loaded.is_err() {\n        return fallback\n    }\n    document = json.parse(loaded.unwrap())\n    if document.is_err() {\n        return fallback\n    }\n    value = json.object_get(document.unwrap(), key)\n    if value.is_none() {\n        return fallback\n    }\n    number = json.as_number(value.unwrap())\n    if number.is_none() {\n        return fallback\n    }\n    number.unwrap() as Int\n}\n\nfn input_parameter_int(key: String, fallback: Int) -> Int {\n    loaded = read_file(\"data.json\")\n    if loaded.is_err() {\n        return fallback\n    }\n    document = json.parse(loaded.unwrap())\n    if document.is_err() {\n        return fallback\n    }\n    parameters = json.object_get(document.unwrap(), \"parameters\")\n    if parameters.is_none() {\n        return fallback\n    }\n    value = json.object_get(parameters.unwrap(), key)\n    if value.is_none() {\n        return fallback\n    }\n    number = json.as_number(value.unwrap())\n    if number.is_none() {\n        return fallback\n    }\n    number.unwrap() as Int\n}\n\nfn main() -> Void {\n    seed = input_int(\"seed\", 73)\n    samples_per_group = input_parameter_int(\"samples_per_group\", 140)\n    bandwidth_samples = input_parameter_int(\"bandwidth_samples\", 40)\n    r = rng(seed)\n    baseline = r.randn([samples_per_group]) * 0.42 + 4.2\n    shifted = r.randn([samples_per_group]) * 0.75 + 5.25\n    bimodal = zeros([samples_per_group])\n    half = samples_per_group / 2\n    for i in 0 until samples_per_group {\n        center = if i < half { 5.2 } else { 6.1 }\n        spread = if i < half { 0.28 } else { 0.18 }\n        bimodal.set(i, r.randn([1])[0] * spread + center)\n    }\n    fig = viz.figure(\"Distribution shapes\")\n        .describe(\"Gaussian KDE violins with medians computed in Ostrin\")\n        .labels(\"cohort\", \"response\")\n        .violin(1.0, baseline, bandwidth_samples, \"baseline\", \"#2563eb\")\n        .violin(2.0, shifted, bandwidth_samples, \"shifted\", \"#db2777\")\n        .violin(3.0, bimodal, bandwidth_samples, \"bimodal\", \"#059669\")\n    print(fig.svg())\n}\n",
       "svg": "assets/viz/violin.svg",
       "capabilities": [
         "2d",
         "reproducibility"
       ],
       "provenance": {
-        "source-hash": "sha256:60a9adc5a536a3c3a770df9f53fbe6194bbda599fd89887017b83f6c39333b28",
-        "data-hash": "sha256:f67dd9ad8bc6cf21363bb044f2adaee99dcf34c3a4364fe8391cb5e7aa51ce79",
+        "source-hash": "sha256:f7ad796cfe48ab2249b01adc4a9563d8240234be03054753876e4c9f2b55d877",
+        "data-hash": "sha256:27832d0e2875f97710cab71e72918b37924692f842b6b4acc7f63fa2eb7fef4c",
         "seed": "seed=73",
         "compiler": "ostrinc 0.1.0"
       },
       "reproducibility": {
-        "level": "R0",
-        "label": "R0 · exact replay verified",
-        "next": "R1 · seeded replay (planned verification)"
+        "level": "R1",
+        "label": "R1 · seeded replay verified",
+        "next": "R2 · external snapshots (planned verification)"
       },
       "printed": [
         ""
