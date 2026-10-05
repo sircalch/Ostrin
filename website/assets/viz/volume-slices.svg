@@ -38,4 +38,5 @@
 <line x1="582" y1="103.42" x2="586" y2="103.42" stroke="#9ca3af" stroke-width="1"/><text x="589" y="106.92" text-anchor="start" font-size="10" fill="#6b7280">1.0</text>
 <text x="620" y="286" text-anchor="middle" font-size="11" fill="#6b7280" transform="rotate(-90 620 286)">scalar value</text>
 
+  <ostrin-provenance source-hash="sha256:b6e39bf3381f972b59ff4080654bccdcefc946acf514171fdb9ddd7d273ad3d8" data-hash="sha256:90724f8fffebe725bf78be01ec938441d343c4604def84a48b56d5e182f04a38" seed="seed=deterministic" compiler="ostrinc 0.1.0" />
 </svg>

@@ -1,0 +1,8 @@
+{
+  "seed": "deterministic",
+  "parameters": {
+    "rows": 4,
+    "columns": 4
+  },
+  "description": "Declared rows and columns for the deterministic ODE solver comparison table."
+}

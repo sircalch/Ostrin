@@ -1,0 +1,110 @@
+{
+  "schema": "ostrin.experiment/v0",
+  "id": "table",
+  "title": "Data table",
+  "reproducibility": {
+    "level": "R0",
+    "label": "R0 · exact replay verified",
+    "next": "R1 · seeded replay (planned verification)"
+  },
+  "experiment": {
+    "source": "source.ostrin",
+    "inputs": "data.json",
+    "figure": "figure.svg",
+    "provenance": "provenance.json"
+  },
+  "manifest": {
+    "schema": "ostrin.manifest/v0",
+    "files": [
+      {
+        "path": "data.json",
+        "kind": "input",
+        "media_type": "application/json",
+        "bytes": 182,
+        "sha256": "sha256:c1c126d97aa9c99b52e881cc4ee91b0a2a351e630d89b30e2e73ecd952561af2"
+      },
+      {
+        "path": "figure.svg",
+        "kind": "figure",
+        "media_type": "image/svg+xml",
+        "bytes": 7463,
+        "sha256": "sha256:3e6389b23fe426476b98209afc49ea3aa590e5f23f2ab01f8e4a6529dc3358cb"
+      },
+      {
+        "path": "provenance.json",
+        "kind": "provenance",
+        "media_type": "application/json",
+        "bytes": 2070,
+        "sha256": "sha256:2d87b0ef3f69aba318d15fe323293dced0f89e191de9b67a37ceee7782ad569d"
+      },
+      {
+        "path": "source.ostrin",
+        "kind": "source",
+        "media_type": "text/x-ostrin",
+        "bytes": 590,
+        "sha256": "sha256:52236864a96f98631a6b8f53e254a90f6fea74e461a220fed54e9f2b13456bbe"
+      }
+    ]
+  },
+  "provenance": {
+    "schema": "ostrin.provenance/v0",
+    "level": "R0",
+    "levels": {
+      "R0": "Recorded source, inputs and outputs with calculated hashes.",
+      "R1": "Replay-ready source, inputs, command and target; local replay must still be verified."
+    },
+    "program": {
+      "source": "source.ostrin",
+      "source_hash": "sha256:52236864a96f98631a6b8f53e254a90f6fea74e461a220fed54e9f2b13456bbe",
+      "entry": "main"
+    },
+    "inputs": [
+      {
+        "id": "data.json",
+        "kind": "parameters",
+        "sha256": "sha256:c1c126d97aa9c99b52e881cc4ee91b0a2a351e630d89b30e2e73ecd952561af2",
+        "seed": "deterministic"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "figure.svg",
+        "kind": "figure",
+        "sha256": "sha256:3e6389b23fe426476b98209afc49ea3aa590e5f23f2ab01f8e4a6529dc3358cb"
+      }
+    ],
+    "replay": {
+      "level": "R0",
+      "status": "verified",
+      "backend": "ostrinc.wasm",
+      "target": "wasm32-wasip1",
+      "command": "node scripts/lab-data.mjs --verify-replays",
+      "compares": "figure.svg",
+      "note": "Website CI compares the replayed SVG byte-for-byte with this bundled figure; R1 requires seeded-randomness evidence."
+    },
+    "figure_metadata": {
+      "policy": "The bundle generator normalizes the recorded SVG metadata to these calculated hashes; bundle manifest hashes are authoritative.",
+      "source_hash": "sha256:52236864a96f98631a6b8f53e254a90f6fea74e461a220fed54e9f2b13456bbe",
+      "data_hash": "sha256:c1c126d97aa9c99b52e881cc4ee91b0a2a351e630d89b30e2e73ecd952561af2",
+      "seed": "seed=deterministic",
+      "compiler": "ostrinc 0.1.0"
+    },
+    "compiler": "ostrinc 0.1.0",
+    "commit": "892f289731d9bf1568e9d7a669d68489f8598ec6",
+    "target": "wasm32-wasip1",
+    "command": "ostrinc --run --target wasm32-wasi source.ostrin",
+    "parameters": {
+      "rows": 4,
+      "columns": 4
+    },
+    "seed": "deterministic",
+    "manifest_schema": "ostrin.manifest/v0",
+    "limits": "R0 exact SVG replay is verified in website CI. The bundle does not include seeded-randomness evidence for R1, external snapshots, lockfiles, runtime captures or an R2/R3 replay guarantee."
+  },
+  "files": {
+    "source.ostrin": "// std.viz · a deterministic data table rendered by Ostrin as SVG.\n// Formatting stays in the program so units, significant digits and labels\n// are explicit before the table reaches the renderer.\nimport std.viz\n\nfn main() -> Void {\n    headers: List<String> = [\"solver\", \"steps\", \"error\", \"runtime\"]\n    rows: List<List<String>> = [\n        [\"RK4\", \"240\", \"2.4e-4\", \"18 ms\"],\n        [\"RK45\", \"96\", \"8.1e-7\", \"11 ms\"],\n        [\"BDF\", \"42\", \"1.7e-6\", \"14 ms\"],\n        [\"exact\", \"—\", \"0\", \"1 ms\"]\n    ]\n    print(viz.table(headers, rows, title: \"ODE solver comparison\").dark().svg())\n}\n",
+    "data.json": "{\n  \"seed\": \"deterministic\",\n  \"parameters\": {\n    \"rows\": 4,\n    \"columns\": 4\n  },\n  \"description\": \"Declared rows and columns for the deterministic ODE solver comparison table.\"\n}\n",
+    "figure.svg": "<svg role=\"table\" data-ostrin-table=\"true\" xmlns=\"http://www.w3.org/2000/svg\" width=\"760\" height=\"218\" viewBox=\"0 0 760 218\" font-family=\"Inter, Segoe UI, Helvetica, Arial, sans-serif\">\n<style>.pt:hover{stroke:#e2e8f0;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell,.contourf-cell,.quiver,.streamplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover,.contourf-cell:hover{fill-opacity:0.9}.quiver:hover>line{stroke-width:2.6px}.quiver:hover>polygon{filter:brightness(0.78)}.streamplot:hover{stroke-width:2.7px}</style>\n<rect width=\"760\" height=\"218\" fill=\"#0f172a\"/>\n\n<text x=\"16\" y=\"29\" text-anchor=\"start\" font-size=\"16\" fill=\"#e2e8f0\" font-weight=\"600\">ODE solver comparison</text>\n<rect class=\"table-header\" data-table-column=\"0\" x=\"10\" y=\"48\" width=\"104\" height=\"30\" fill=\"#e2e8f0\"/>\n<text class=\"table-heading\" data-table-column=\"0\" x=\"22\" y=\"67\" text-anchor=\"start\" font-size=\"11\" fill=\"#0f172a\" font-weight=\"600\">solver</text>\n<rect class=\"table-header\" data-table-column=\"1\" x=\"114\" y=\"48\" width=\"104\" height=\"30\" fill=\"#e2e8f0\"/>\n<text class=\"table-heading\" data-table-column=\"1\" x=\"126\" y=\"67\" text-anchor=\"start\" font-size=\"11\" fill=\"#0f172a\" font-weight=\"600\">steps</text>\n<rect class=\"table-header\" data-table-column=\"2\" x=\"218\" y=\"48\" width=\"104\" height=\"30\" fill=\"#e2e8f0\"/>\n<text class=\"table-heading\" data-table-column=\"2\" x=\"230\" y=\"67\" text-anchor=\"start\" font-size=\"11\" fill=\"#0f172a\" font-weight=\"600\">error</text>\n<rect class=\"table-header\" data-table-column=\"3\" x=\"322\" y=\"48\" width=\"104\" height=\"30\" fill=\"#e2e8f0\"/>\n<text class=\"table-heading\" data-table-column=\"3\" x=\"334\" y=\"67\" text-anchor=\"start\" font-size=\"11\" fill=\"#0f172a\" font-weight=\"600\">runtime</text>\n<g class=\"table-body\" role=\"rowgroup\">\n<g class=\"table-row\" role=\"row\" data-table-row=\"0\" data-viz-index=\"0\" data-table-y=\"78\">\n<rect class=\"table-cell\" role=\"cell\" data-table-column=\"0\" x=\"10\" y=\"78\" width=\"104\" height=\"30\" fill=\"#0f172a\" stroke=\"#1e293b\" stroke-width=\"0.6\"><title>RK4</title></rect>\n<text class=\"table-value\" data-table-column=\"0\" x=\"22\" y=\"97\" text-anchor=\"start\" font-size=\"11\" fill=\"#e2e8f0\">RK4</text>\n<rect class=\"table-cell\" role=\"cell\" data-table-column=\"1\" x=\"114\" y=\"78\" width=\"104\" height=\"30\" fill=\"#0f172a\" stroke=\"#1e293b\" stroke-width=\"0.6\"><title>240</title></rect>\n<text class=\"table-value\" data-table-column=\"1\" x=\"126\" y=\"97\" text-anchor=\"start\" font-size=\"11\" fill=\"#e2e8f0\">240</text>\n<rect class=\"table-cell\" role=\"cell\" data-table-column=\"2\" x=\"218\" y=\"78\" width=\"104\" height=\"30\" fill=\"#0f172a\" stroke=\"#1e293b\" stroke-width=\"0.6\"><title>2.4e-4</title></rect>\n<text class=\"table-value\" data-table-column=\"2\" x=\"230\" y=\"97\" text-anchor=\"start\" font-size=\"11\" fill=\"#e2e8f0\">2.4e-4</text>\n<rect class=\"table-cell\" role=\"cell\" data-table-column=\"3\" x=\"322\" y=\"78\" width=\"104\" height=\"30\" fill=\"#0f172a\" stroke=\"#1e293b\" stroke-width=\"0.6\"><title>18 ms</title></rect>\n<text class=\"table-value\" data-table-column=\"3\" x=\"334\" y=\"97\" text-anchor=\"start\" font-size=\"11\" fill=\"#e2e8f0\">18 ms</text>\n</g>\n<g class=\"table-row\" role=\"row\" data-table-row=\"1\" data-viz-index=\"1\" data-table-y=\"108\">\n<rect class=\"table-cell\" role=\"cell\" data-table-column=\"0\" x=\"10\" y=\"108\" width=\"104\" height=\"30\" fill=\"#1e293b\" stroke=\"#1e293b\" stroke-width=\"0.6\"><title>RK45</title></rect>\n<text class=\"table-value\" data-table-column=\"0\" x=\"22\" y=\"127\" text-anchor=\"start\" font-size=\"11\" fill=\"#e2e8f0\">RK45</text>\n<rect class=\"table-cell\" role=\"cell\" data-table-column=\"1\" x=\"114\" y=\"108\" width=\"104\" height=\"30\" fill=\"#1e293b\" stroke=\"#1e293b\" stroke-width=\"0.6\"><title>96</title></rect>\n<text class=\"table-value\" data-table-column=\"1\" x=\"126\" y=\"127\" text-anchor=\"start\" font-size=\"11\" fill=\"#e2e8f0\">96</text>\n<rect class=\"table-cell\" role=\"cell\" data-table-column=\"2\" x=\"218\" y=\"108\" width=\"104\" height=\"30\" fill=\"#1e293b\" stroke=\"#1e293b\" stroke-width=\"0.6\"><title>8.1e-7</title></rect>\n<text class=\"table-value\" data-table-column=\"2\" x=\"230\" y=\"127\" text-anchor=\"start\" font-size=\"11\" fill=\"#e2e8f0\">8.1e-7</text>\n<rect class=\"table-cell\" role=\"cell\" data-table-column=\"3\" x=\"322\" y=\"108\" width=\"104\" height=\"30\" fill=\"#1e293b\" stroke=\"#1e293b\" stroke-width=\"0.6\"><title>11 ms</title></rect>\n<text class=\"table-value\" data-table-column=\"3\" x=\"334\" y=\"127\" text-anchor=\"start\" font-size=\"11\" fill=\"#e2e8f0\">11 ms</text>\n</g>\n<g class=\"table-row\" role=\"row\" data-table-row=\"2\" data-viz-index=\"2\" data-table-y=\"138\">\n<rect class=\"table-cell\" role=\"cell\" data-table-column=\"0\" x=\"10\" y=\"138\" width=\"104\" height=\"30\" fill=\"#0f172a\" stroke=\"#1e293b\" stroke-width=\"0.6\"><title>BDF</title></rect>\n<text class=\"table-value\" data-table-column=\"0\" x=\"22\" y=\"157\" text-anchor=\"start\" font-size=\"11\" fill=\"#e2e8f0\">BDF</text>\n<rect class=\"table-cell\" role=\"cell\" data-table-column=\"1\" x=\"114\" y=\"138\" width=\"104\" height=\"30\" fill=\"#0f172a\" stroke=\"#1e293b\" stroke-width=\"0.6\"><title>42</title></rect>\n<text class=\"table-value\" data-table-column=\"1\" x=\"126\" y=\"157\" text-anchor=\"start\" font-size=\"11\" fill=\"#e2e8f0\">42</text>\n<rect class=\"table-cell\" role=\"cell\" data-table-column=\"2\" x=\"218\" y=\"138\" width=\"104\" height=\"30\" fill=\"#0f172a\" stroke=\"#1e293b\" stroke-width=\"0.6\"><title>1.7e-6</title></rect>\n<text class=\"table-value\" data-table-column=\"2\" x=\"230\" y=\"157\" text-anchor=\"start\" font-size=\"11\" fill=\"#e2e8f0\">1.7e-6</text>\n<rect class=\"table-cell\" role=\"cell\" data-table-column=\"3\" x=\"322\" y=\"138\" width=\"104\" height=\"30\" fill=\"#0f172a\" stroke=\"#1e293b\" stroke-width=\"0.6\"><title>14 ms</title></rect>\n<text class=\"table-value\" data-table-column=\"3\" x=\"334\" y=\"157\" text-anchor=\"start\" font-size=\"11\" fill=\"#e2e8f0\">14 ms</text>\n</g>\n<g class=\"table-row\" role=\"row\" data-table-row=\"3\" data-viz-index=\"3\" data-table-y=\"168\">\n<rect class=\"table-cell\" role=\"cell\" data-table-column=\"0\" x=\"10\" y=\"168\" width=\"104\" height=\"30\" fill=\"#1e293b\" stroke=\"#1e293b\" stroke-width=\"0.6\"><title>exact</title></rect>\n<text class=\"table-value\" data-table-column=\"0\" x=\"22\" y=\"187\" text-anchor=\"start\" font-size=\"11\" fill=\"#e2e8f0\">exact</text>\n<rect class=\"table-cell\" role=\"cell\" data-table-column=\"1\" x=\"114\" y=\"168\" width=\"104\" height=\"30\" fill=\"#1e293b\" stroke=\"#1e293b\" stroke-width=\"0.6\"><title>—</title></rect>\n<text class=\"table-value\" data-table-column=\"1\" x=\"126\" y=\"187\" text-anchor=\"start\" font-size=\"11\" fill=\"#e2e8f0\">—</text>\n<rect class=\"table-cell\" role=\"cell\" data-table-column=\"2\" x=\"218\" y=\"168\" width=\"104\" height=\"30\" fill=\"#1e293b\" stroke=\"#1e293b\" stroke-width=\"0.6\"><title>0</title></rect>\n<text class=\"table-value\" data-table-column=\"2\" x=\"230\" y=\"187\" text-anchor=\"start\" font-size=\"11\" fill=\"#e2e8f0\">0</text>\n<rect class=\"table-cell\" role=\"cell\" data-table-column=\"3\" x=\"322\" y=\"168\" width=\"104\" height=\"30\" fill=\"#1e293b\" stroke=\"#1e293b\" stroke-width=\"0.6\"><title>1 ms</title></rect>\n<text class=\"table-value\" data-table-column=\"3\" x=\"334\" y=\"187\" text-anchor=\"start\" font-size=\"11\" fill=\"#e2e8f0\">1 ms</text>\n</g>\n</g>\n<text class=\"table-footer\" data-table-footer=\"true\" x=\"16\" y=\"211\" text-anchor=\"start\" font-size=\"10\" fill=\"#94a3b8\">4 rows · 4 columns</text>\n  <ostrin-provenance source-hash=\"sha256:52236864a96f98631a6b8f53e254a90f6fea74e461a220fed54e9f2b13456bbe\" data-hash=\"sha256:c1c126d97aa9c99b52e881cc4ee91b0a2a351e630d89b30e2e73ecd952561af2\" seed=\"seed=deterministic\" compiler=\"ostrinc 0.1.0\" />\n</svg>\n",
+    "provenance.json": "{\n  \"schema\": \"ostrin.provenance/v0\",\n  \"level\": \"R0\",\n  \"levels\": {\n    \"R0\": \"Recorded source, inputs and outputs with calculated hashes.\",\n    \"R1\": \"Replay-ready source, inputs, command and target; local replay must still be verified.\"\n  },\n  \"program\": {\n    \"source\": \"source.ostrin\",\n    \"source_hash\": \"sha256:52236864a96f98631a6b8f53e254a90f6fea74e461a220fed54e9f2b13456bbe\",\n    \"entry\": \"main\"\n  },\n  \"inputs\": [\n    {\n      \"id\": \"data.json\",\n      \"kind\": \"parameters\",\n      \"sha256\": \"sha256:c1c126d97aa9c99b52e881cc4ee91b0a2a351e630d89b30e2e73ecd952561af2\",\n      \"seed\": \"deterministic\"\n    }\n  ],\n  \"outputs\": [\n    {\n      \"id\": \"figure.svg\",\n      \"kind\": \"figure\",\n      \"sha256\": \"sha256:3e6389b23fe426476b98209afc49ea3aa590e5f23f2ab01f8e4a6529dc3358cb\"\n    }\n  ],\n  \"replay\": {\n    \"level\": \"R0\",\n    \"status\": \"verified\",\n    \"backend\": \"ostrinc.wasm\",\n    \"target\": \"wasm32-wasip1\",\n    \"command\": \"node scripts/lab-data.mjs --verify-replays\",\n    \"compares\": \"figure.svg\",\n    \"note\": \"Website CI compares the replayed SVG byte-for-byte with this bundled figure; R1 requires seeded-randomness evidence.\"\n  },\n  \"figure_metadata\": {\n    \"policy\": \"The bundle generator normalizes the recorded SVG metadata to these calculated hashes; bundle manifest hashes are authoritative.\",\n    \"source_hash\": \"sha256:52236864a96f98631a6b8f53e254a90f6fea74e461a220fed54e9f2b13456bbe\",\n    \"data_hash\": \"sha256:c1c126d97aa9c99b52e881cc4ee91b0a2a351e630d89b30e2e73ecd952561af2\",\n    \"seed\": \"seed=deterministic\",\n    \"compiler\": \"ostrinc 0.1.0\"\n  },\n  \"compiler\": \"ostrinc 0.1.0\",\n  \"commit\": \"892f289731d9bf1568e9d7a669d68489f8598ec6\",\n  \"target\": \"wasm32-wasip1\",\n  \"command\": \"ostrinc --run --target wasm32-wasi source.ostrin\",\n  \"parameters\": {\n    \"rows\": 4,\n    \"columns\": 4\n  },\n  \"seed\": \"deterministic\",\n  \"manifest_schema\": \"ostrin.manifest/v0\",\n  \"limits\": \"R0 exact SVG replay is verified in website CI. The bundle does not include seeded-randomness evidence for R1, external snapshots, lockfiles, runtime captures or an R2/R3 replay guarantee.\"\n}\n"
+  }
+}

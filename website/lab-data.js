@@ -1082,14 +1082,21 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "title": "3D volume slices",
       "file": "examples/viz_volume_slices.ostrin",
       "blurb": "Three orthogonal scalar-field cuts, extracted from an Array<Float> volume and depth-sorted as interactive SVG cells.",
+      "bundle": "assets/experiments/volume-slices.ostrin-experiment.json",
       "source": "examples/viz_volume_slices.ostrin",
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_volume_slices.ostrin",
       "code": "import std.viz\n\nfn main() -> Void {\n    axes = linspace(-2.0, 2.0, 17)\n    volume = zeros([17, 17, 17])\n    for k in 0 until 17 {\n        for j in 0 until 17 {\n            for i in 0 until 17 {\n                x = axes[i]\n                y = axes[j]\n                z = axes[k]\n                r2 = x * x + y * y + z * z\n                bump = (x - 0.8) * (x - 0.8) + (y + 0.5) * (y + 0.5) + (z - 0.3) * (z - 0.3)\n                volume.set(k, j, i, exp(0.0 - r2 * 0.7) + 0.35 * exp(0.0 - bump * 2.5))\n            }\n        }\n    }\n    xy = viz.slice_xy(volume, 8)\n    xz = viz.slice_xz(volume, 8)\n    yz = viz.slice_yz(volume, 8)\n    scene = viz.scene3d(\"Volume slices\")\n        .describe(\"Three orthogonal cuts through a scalar field\")\n        .labels(\"x\", \"y\", \"z\")\n        .view(-48.0, 28.0)\n        .slice_xy(axes, axes, xy, axes[8], \"magma\", \"scalar value\")\n        .slice_xz(axes, axes, xz, axes[8], \"magma\", \"scalar value\")\n        .slice_yz(axes, axes, yz, axes[8], \"magma\", \"scalar value\")\n    print(scene.svg())\n}\n",
       "svg": "assets/viz/volume-slices.svg",
       "capabilities": [
-        "3d"
+        "3d",
+        "reproducibility"
       ],
-      "provenance": {},
+      "provenance": {
+        "source-hash": "sha256:b6e39bf3381f972b59ff4080654bccdcefc946acf514171fdb9ddd7d273ad3d8",
+        "data-hash": "sha256:90724f8fffebe725bf78be01ec938441d343c4604def84a48b56d5e182f04a38",
+        "seed": "seed=deterministic",
+        "compiler": "ostrinc 0.1.0"
+      },
       "printed": [
         ""
       ]
@@ -1224,15 +1231,22 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "title": "Double pendulum (animated)",
       "file": "examples/viz_double_pendulum.ostrin",
       "blurb": "Chaos in real time: rk45 integrates 12 s with energy conserved to 1e-6, and the rods and masses move smoothly with SVG <animate>.",
+      "bundle": "assets/experiments/double-pendulum.ostrin-experiment.json",
       "source": "examples/viz_double_pendulum.ostrin",
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_double_pendulum.ostrin",
       "code": "// A chaotic double pendulum, integrated by std.numeric.rk45 and animated by std.viz.\n// Every position is computed in Ostrin; the SVG only interpolates between them.\nimport std.numeric\nimport std.viz\n\nfn swing(t: Float, y: Array<Float>) -> Array<Float> {\n    // y = [θ1, θ2, ω1, ω2]; equal masses and rods (1 kg, 1 m), g = 9.81 m/s².\n    g = 9.81\n    d = y[0] - y[1]\n    den = 3.0 - cos(2.0 * d)\n    a1 = (0.0 - 3.0 * g * sin(y[0]) - g * sin(y[0] - 2.0 * y[1]) - 2.0 * sin(d) * (y[3] * y[3] + y[2] * y[2] * cos(d))) / den\n    a2 = 2.0 * sin(d) * (2.0 * y[2] * y[2] + 2.0 * g * cos(y[0]) + y[3] * y[3] * cos(d)) / den\n    array([y[2], y[3], a1, a2])\n}\n\n/// Energy per unit mass: kinetic + potential (it should stay constant).\nfn energy(y: Array<Float>) -> Float {\n    g = 9.81\n    y[2] * y[2] + 0.5 * y[3] * y[3] + y[2] * y[3] * cos(y[0] - y[1]) - 2.0 * g * cos(y[0]) - g * cos(y[1])\n}\n\nfn main() -> Void {\n    seconds = 12.0\n    sol = numeric.rk45(swing, array([2.2, 2.6, 0.0, 0.0]), 0.0, seconds, tol: 1e-10)\n    // Resample at 60 samples per second so the animation runs in real time.\n    t = linspace(0.0, seconds, 721)\n    th1 = numeric.interp_all(sol.t, sol.component(0), t)\n    th2 = numeric.interp_all(sol.t, sol.component(1), t)\n    x1 = sin(th1)\n    y1 = cos(th1) * -1.0\n    x2 = x1 + sin(th2)\n    y2 = y1 - cos(th2)\n    drift = abs(energy(sol.final_state()) - energy(array([2.2, 2.6, 0.0, 0.0])))\n    print(\"rk45 steps: \" + sol.length().to_string() + \", energy drift below 1e-6: \" + (drift < 0.000001).to_string())\n    fig = viz.figure(\"Double pendulum\").describe(\"θ1 = 2.2, θ2 = 2.6 rad at rest · rk45, tol 1e-10 · 12 s in real time\")\n        .size(560, 560).xlim(-2.2, 2.2).ylim(-2.2, 2.2).labels(\"x [m]\", \"y [m]\").no_legend()\n        .animate(seconds)\n        .rod(0.0, 0.0, x1, y1, color: \"#475569\")\n        .moving_segment(x1, y1, x2, y2, color: \"#475569\")\n        .moving_point(x1, y1, color: \"#2563eb\", size: 8.0, trail: false)\n        .moving_point(x2, y2, color: \"#dc2626\", size: 8.0)\n        .scatter(array([0.0]), array([0.0]), size: 4.0, color: \"#0f172a\")\n    print(fig.svg())\n}\n",
       "svg": "assets/viz/double-pendulum.svg",
       "capabilities": [
         "2d",
-        "animation"
+        "animation",
+        "reproducibility"
       ],
-      "provenance": {},
+      "provenance": {
+        "source-hash": "sha256:47046904a7c88535fcb26338bdc1dd96dd9e358c7dd27f3662a460abbf003db1",
+        "data-hash": "sha256:f5b8cfafe61ae0150a84b69bec14166cfd6cc890e72052ec31ab11450db6f2d7",
+        "seed": "seed=deterministic",
+        "compiler": "ostrinc 0.1.0"
+      },
       "printed": [
         "rk45 steps: 1708, energy drift below 1e-6: true",
         ""
@@ -1282,15 +1296,22 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "title": "Animation",
       "file": "examples/viz_animation.ostrin",
       "blurb": "24 frames of a spreading wave packet, combined by viz.animate into one SVG that loops with CSS alone.",
+      "bundle": "assets/experiments/animation.ostrin-experiment.json",
       "source": "examples/viz_animation.ostrin",
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_animation.ostrin",
       "code": "// std.viz animation: a dispersing wave packet, 24 frames played by CSS in one SVG.\n// Each frame is an ordinary figure; viz.animate loops them without scripts.\nimport std.viz\n\nfn packet(x: Array<Float>, t: Float) -> Array<Float> {\n    // Free-particle Gaussian packet: the envelope spreads as it travels.\n    width = sqrt(1.0 + t * t * 0.25)\n    center = 2.0 + 1.5 * t\n    envelope = exp((x - center) * (x - center) * (-0.5 / (width * width))) / sqrt(width)\n    envelope * cos(x * 4.0 - t * 8.0)\n}\n\nfn main() -> Void {\n    x = linspace(0.0, 12.0, 160)\n    mut frames: List<String> = []\n    for i in 0 until 24 {\n        t = (i as Float) * 0.25\n        y = packet(x, t)\n        env = exp((x - (2.0 + 1.5 * t)) * (x - (2.0 + 1.5 * t)) * (-0.5 / (1.0 + t * t * 0.25))) / sqrt(sqrt(1.0 + t * t * 0.25))\n        fig = viz.figure(\"Wave packet, t = \" + viz.num(t) + \" s\")\n            .describe(\"the envelope widens as √(1 + t²/4)\")\n            .labels(\"position x\", \"amplitude\")\n            .xlim(0.0, 12.0).ylim(-1.1, 1.1).no_legend()\n            .band(x, env * -1.0, env, color: \"#93c5fd\")\n            .line(x, y, color: \"#1d4ed8\", width: 2.0)\n        frames.push(fig.svg())\n    }\n    print(viz.animate(frames, fps: 8.0))\n}\n",
       "svg": "assets/viz/animation.svg",
       "capabilities": [
         "2d",
-        "animation"
+        "animation",
+        "reproducibility"
       ],
-      "provenance": {},
+      "provenance": {
+        "source-hash": "sha256:d2e92f861d1dcd136df04d972ff42352298cafad1901f4b4859267bee8b0b3c4",
+        "data-hash": "sha256:0d73b5090f7215c2202d1b296842283a67de86c1cf4db136d9f3215c09e4f30f",
+        "seed": "seed=deterministic",
+        "compiler": "ostrinc 0.1.0"
+      },
       "printed": [
         ""
       ]
@@ -1300,15 +1321,22 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "title": "Data table",
       "file": "examples/viz_table.ostrin",
       "blurb": "A formatted ODE solver comparison rendered as a tooltip-rich SVG table.",
+      "bundle": "assets/experiments/table.ostrin-experiment.json",
       "source": "examples/viz_table.ostrin",
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_table.ostrin",
       "code": "// std.viz · a deterministic data table rendered by Ostrin as SVG.\n// Formatting stays in the program so units, significant digits and labels\n// are explicit before the table reaches the renderer.\nimport std.viz\n\nfn main() -> Void {\n    headers: List<String> = [\"solver\", \"steps\", \"error\", \"runtime\"]\n    rows: List<List<String>> = [\n        [\"RK4\", \"240\", \"2.4e-4\", \"18 ms\"],\n        [\"RK45\", \"96\", \"8.1e-7\", \"11 ms\"],\n        [\"BDF\", \"42\", \"1.7e-6\", \"14 ms\"],\n        [\"exact\", \"—\", \"0\", \"1 ms\"]\n    ]\n    print(viz.table(headers, rows, title: \"ODE solver comparison\").dark().svg())\n}\n",
       "svg": "assets/viz/table.svg",
       "capabilities": [
         "2d",
-        "tables"
+        "tables",
+        "reproducibility"
       ],
-      "provenance": {},
+      "provenance": {
+        "source-hash": "sha256:52236864a96f98631a6b8f53e254a90f6fea74e461a220fed54e9f2b13456bbe",
+        "data-hash": "sha256:c1c126d97aa9c99b52e881cc4ee91b0a2a351e630d89b30e2e73ecd952561af2",
+        "seed": "seed=deterministic",
+        "compiler": "ostrinc 0.1.0"
+      },
       "printed": [
         ""
       ]

@@ -54,4 +54,5 @@
 </g>
 </g>
 <text class="table-footer" data-table-footer="true" x="16" y="211" text-anchor="start" font-size="10" fill="#94a3b8">4 rows · 4 columns</text>
+  <ostrin-provenance source-hash="sha256:52236864a96f98631a6b8f53e254a90f6fea74e461a220fed54e9f2b13456bbe" data-hash="sha256:c1c126d97aa9c99b52e881cc4ee91b0a2a351e630d89b30e2e73ecd952561af2" seed="seed=deterministic" compiler="ostrinc 0.1.0" />
 </svg>
