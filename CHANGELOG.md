@@ -7,6 +7,12 @@
 - Figure manifests now preserve the selected explorer state: numeric parameters, an optional 3D
   camera and the share URL, so exported evidence can be reopened with the same view.
 
+### Viz publication handoff
+
+- Added a citation action to every gallery figure. It presents BibTeX plus machine-readable
+  metadata for the source, version and exact selected explorer URL, including parameters and 3D
+  camera state when present.
+
 ### Scalar Measurement contract gate
 
 - Added a source-backed website CI gate for the experimental scalar

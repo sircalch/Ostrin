@@ -119,7 +119,8 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    entradas declaradas, SVG, manifest y `provenance.json` con hashes calculados y etiqueta R0. La
    CI del sitio reproduce ambos programas con `ostrinc.wasm` y compara el SVG byte a byte; R1 queda
    reservado para evidencia de azar sembrado y no se reclaman R2/R3. Los manifiestos de figura ya
-   serializan el estado vivo seleccionado (parámetros, cámara 3D opcional y URL compartible). El
+   serializan el estado vivo seleccionado (parámetros, cámara 3D opcional y URL compartible), y la
+   galería ofrece una cita BibTeX con metadatos de fuente y versión. El
    siguiente paso es extender el contrato de bundle al resto de experimentos de la galería para que
    la galería funcione como superficie de publicación científica además de demo.
    El Scientific Lab ya conserva la demo activa y sus parámetros en la URL para compartir y
