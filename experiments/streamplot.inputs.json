@@ -1,0 +1,9 @@
+{
+  "seed": "deterministic",
+  "parameters": {
+    "grid_x": 25,
+    "grid_y": 19,
+    "seeds": 63
+  },
+  "description": "Recorded sampled velocity grid and 63 streamline seeds."
+}

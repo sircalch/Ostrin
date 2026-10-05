@@ -1,7 +1,7 @@
 {
   "schema": "ostrin.experiment/v0",
   "id": "surface",
-  "title": "3D surface",
+  "title": "Shaded 3D surface",
   "reproducibility": {
     "level": "R0",
     "label": "R0 · exact replay verified",

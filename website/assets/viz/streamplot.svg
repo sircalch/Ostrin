@@ -123,4 +123,5 @@
 <text x="343" y="388" text-anchor="middle" font-size="12" fill="#1f2937">x</text>
 <text x="16" y="205" text-anchor="middle" font-size="12" fill="#1f2937" transform="rotate(-90 16 205)">y</text>
 <g class="legend"><rect x="549.6" y="310" width="60.4" height="28" rx="6" fill="#ffffff" fill-opacity="0.88" stroke="#e5e7eb"/><g class="legend-item" data-viz-series-id="0"><line x1="556.6" y1="324" x2="572.6" y2="324" stroke="#0f766e" stroke-width="2.5"/><text x="577.6" y="328" text-anchor="start" font-size="11" fill="#1f2937">flow</text></g></g>
+  <ostrin-provenance source-hash="sha256:0676175ae2c4e8d0280180f45659de9e72c419ae08358e18fd8bbf69a0d26dec" data-hash="sha256:1b5489f0725dfc0f0e97c04dca6a6582503e88ac3bfcac280dd6ac6e10fb14d0" seed="seed=deterministic" compiler="ostrinc 0.1.0" />
 </svg>

@@ -1,0 +1,7 @@
+{
+  "seed": 2024,
+  "parameters": {
+    "samples": 40
+  },
+  "description": "Seeded 40-point calibration sample and least-squares fit."
+}

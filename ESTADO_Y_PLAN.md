@@ -500,14 +500,15 @@ sustituye la adopción independiente; por eso el plan mantiene un frente explíc
   galería de proyectos externos verificables, sin fabricar repositorios ni contar forks;
 - convertir cada experimento de Viz en un bundle reproducible descargable con `source.ostrin`,
   datos, figuras, `provenance.json`, manifest, commit, hashes, semilla, parámetros, cámara y
-  comando de replay. Seis fixtures source-backed (`provenance`, `surface`, las animaciones
-  `double-pendulum` y `animation`, `table` y `volume-slices`) ya publican `ostrin.experiment/v0`
-  como artefactos R0 con cuatro archivos y hashes calculados; la CI del sitio ejecuta los seis con
+  comando de replay. Las 29 figuras source-backed de la galería ya publican `ostrin.experiment/v0`
+  como artefactos R0 con cuatro archivos y hashes calculados; la CI del sitio ejecuta los 29 con
   `ostrinc.wasm` y compara el SVG byte a byte. Los bundles 3D registran además sus parámetros y
-  cámara. R1 queda reservado para replay de azar sembrado y R2/R3 no se reclaman.
+  cámara, y los de azar conservan su semilla declarada. R1 queda reservado para replay ejecutable
+  de azar sembrado y R2/R3 no se reclaman.
   Los manifiestos de figura ya serializan el estado vivo seleccionado desde el explorador
   (parámetros, cámara 3D opcional y URL compartible), y la galería ofrece una cita BibTeX con
-  metadatos de fuente y versión. Falta extender el contrato de bundle a todos los experimentos;
+  metadatos de fuente y versión. Falta convertir las entradas declaradas en un comando de replay
+  ejecutable con lockfiles y snapshots de runtime;
 - publicar benchmarks históricos por commit y métricas de adopción solo con una política de
   privacidad clara. Estas evidencias alimentan después el snapshot de Linguist y la propuesta
   upstream, pero no se presentan como adopción hasta que existan usuarios y proyectos externos.

@@ -702,6 +702,14 @@ test("Viz exposes recorded animation, table and volume experiment bundles", asyn
   expect(volumeBundle.reproducibility.level).toBe("R0");
 });
 
+test("Viz exposes an experiment bundle action for every gallery figure", async ({ page }) => {
+  await page.goto("./viz.html", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("[data-viz-bundle]")).toHaveCount(29);
+  await expect(page.locator('[data-viz-bundle="dashboard"]')).toBeVisible();
+  await expect(page.locator('[data-viz-bundle="isosurface"]')).toBeVisible();
+  await expect(page.locator('[data-viz-bundle="linked-data"]')).toBeVisible();
+});
+
 test("Viz publishes structured data for its scientific source", async ({ page }) => {
   await page.goto("./viz.html", { waitUntil: "domcontentloaded" });
   const structuredData = await page.locator('script[type="application/ld+json"]').evaluateAll((scripts) =>

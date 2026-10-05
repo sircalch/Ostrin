@@ -1,0 +1,11 @@
+{
+  "seed": "deterministic",
+  "parameters": {
+    "samples": 25
+  },
+  "camera": {
+    "azimuth": -48,
+    "elevation": 28
+  },
+  "description": "Recorded 25-sample 3D vector field and camera."
+}

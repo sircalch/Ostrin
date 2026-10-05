@@ -1,0 +1,7 @@
+{
+  "seed": "deterministic",
+  "parameters": {
+    "samples": 300
+  },
+  "description": "Recorded 300-sample damped oscillator series and envelope."
+}

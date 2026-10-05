@@ -1,0 +1,7 @@
+{
+  "seed": "deterministic",
+  "parameters": {
+    "rows": 5
+  },
+  "description": "Recorded five linked calibration points and table rows."
+}

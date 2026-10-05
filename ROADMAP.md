@@ -114,16 +114,15 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    campos vectoriales, cámara, cortes ortogonales e isosuperficies de volúmenes), WebGPU y ampliar la procedencia reproducible ya disponible
    (hashes de fuente/datos, semilla y compilador) a informes y flujos de publicación con
    evidencia en intérprete, nativo y WASM.
-   El primer artefacto web de alto retorno ya está implementado como un registro de seis fixtures
-   source-backed (`provenance`, la superficie 3D `surface`, dos animaciones, `table` y
-   `volume-slices`): `ostrin.experiment/v0` descarga código, entradas declaradas, SVG, manifest y
-   `provenance.json` con hashes calculados y etiqueta R0. La CI del sitio reproduce los seis
-   programas con `ostrinc.wasm` y compara el SVG byte a byte; R1 queda reservado para evidencia de
-   azar sembrado y no se reclaman R2/R3. Los manifiestos de figura ya serializan el estado vivo
+   El primer artefacto web de alto retorno ya cubre las 29 figuras de la galería con bundles
+   source-backed `ostrin.experiment/v0`: cada descarga contiene código, entradas declaradas, SVG,
+   manifest y `provenance.json` con hashes calculados y etiqueta R0. La CI del sitio reproduce los
+   29 programas con `ostrinc.wasm` y compara el SVG byte a byte; R1 queda reservado para evidencia
+   de azar sembrado y no se reclaman R2/R3. Los manifiestos de figura ya serializan el estado vivo
    seleccionado (parámetros, cámara 3D opcional y URL compartible), y la galería ofrece una cita
-   BibTeX con metadatos de fuente y versión. El siguiente paso es extender el contrato de bundle
-   al resto de experimentos de la galería para que la galería funcione como superficie de
-   publicación científica además de demo.
+   BibTeX con metadatos de fuente y versión. El siguiente paso es hacer los bundles R1 realmente
+   ejecutables con un comando que consuma sus entradas declaradas, lockfiles y snapshots de runtime,
+   sin perder la frontera verificable de R0.
    El Scientific Lab ya conserva la demo activa y sus parámetros en la URL para compartir y
    restaurar experimentos reproducibles desde el navegador. La navegación compacta y el catálogo
    de ejemplos ya tienen estados ARIA, foco de teclado, Escape, pestañas con flechas/Home/End y

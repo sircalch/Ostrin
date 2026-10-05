@@ -1,0 +1,8 @@
+{
+  "seed": "deterministic",
+  "parameters": {
+    "grid": 48,
+    "contour_levels": 10
+  },
+  "description": "Recorded 48×48 scalar field and ten contour levels."
+}

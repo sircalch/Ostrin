@@ -1,0 +1,8 @@
+{
+  "seed": "deterministic",
+  "parameters": {
+    "knots": 9,
+    "samples": 300
+  },
+  "description": "Recorded nine knots, 300 interpolation samples and spline area."
+}
