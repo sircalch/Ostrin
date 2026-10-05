@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Viz publication manifests
+
+- Figure manifests now preserve the selected explorer state: numeric parameters, an optional 3D
+  camera and the share URL, so exported evidence can be reopened with the same view.
+
 ### Scalar Measurement contract gate
 
 - Added a source-backed website CI gate for the experimental scalar

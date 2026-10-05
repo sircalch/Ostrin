@@ -118,9 +118,10 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    source-backed (`provenance` y la superficie 3D `surface`): `ostrin.experiment/v0` descarga código,
    entradas declaradas, SVG, manifest y `provenance.json` con hashes calculados y etiqueta R0. La
    CI del sitio reproduce ambos programas con `ostrinc.wasm` y compara el SVG byte a byte; R1 queda
-   reservado para evidencia de azar sembrado y no se reclaman R2/R3. El siguiente paso es extender
-   el contrato al resto de experimentos de la galería, incluyendo parámetros y cámara seleccionados,
-   para que la galería funcione como superficie de publicación científica además de demo.
+   reservado para evidencia de azar sembrado y no se reclaman R2/R3. Los manifiestos de figura ya
+   serializan el estado vivo seleccionado (parámetros, cámara 3D opcional y URL compartible). El
+   siguiente paso es extender el contrato de bundle al resto de experimentos de la galería para que
+   la galería funcione como superficie de publicación científica además de demo.
    El Scientific Lab ya conserva la demo activa y sus parámetros en la URL para compartir y
    restaurar experimentos reproducibles desde el navegador. La navegación compacta y el catálogo
    de ejemplos ya tienen estados ARIA, foco de teclado, Escape, pestañas con flechas/Home/End y
