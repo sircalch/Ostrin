@@ -36,8 +36,8 @@
   the checker/HIR prepass and reuse the typed IR/C method dispatcher. Quantity
   and dimension-sensitive visualization methods remain on the verified fallback
   until their ownership contract is complete.
-- The differential ratchet advances to **6,559 HIR/IR-generated functions
-  (6,542 IR + 17 HIR) / 33 AST** after the input-driven Viz replay slice.
+- The differential ratchet advances to **6,595 HIR/IR-generated functions
+  (6,575 IR + 20 HIR) / 34 AST** after the generalized input-driven Viz replay slice.
 
 ### Quantity visualization ownership status
 
