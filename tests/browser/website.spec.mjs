@@ -702,6 +702,16 @@ test("Viz exposes the input-driven seeded R1 experiment bundles", async ({ page 
   expect(scatterFit.provenance.execution.randomness.seed_path).toBe("seed");
   expect(scatterFit.provenance.randomness.seed_consumption).toBe("data.json:seed");
   expect(scatterFit.provenance.replay.level).toBe("R1");
+
+  const violinDownloadPromise = page.waitForEvent("download");
+  await page.locator('[data-viz-bundle="violin"]').click();
+  const violinDownload = await violinDownloadPromise;
+  expect(violinDownload.suggestedFilename()).toBe("kernel-density-violins.ostrin-experiment.json");
+  const violin = JSON.parse(await readFile(await violinDownload.path(), "utf8"));
+  expect(violin.reproducibility.level).toBe("R1");
+  expect(violin.provenance.execution.randomness.seed_path).toBe("seed");
+  expect(violin.provenance.randomness.seed_consumption).toBe("data.json:seed");
+  expect(violin.provenance.replay.level).toBe("R1");
 });
 
 test("Viz exposes recorded animation, table and volume experiment bundles", async ({ page }) => {

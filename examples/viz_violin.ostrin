@@ -1,21 +1,70 @@
 // std.viz · kernel-density violins: full distributions with median markers.
 import std.viz
+import std.json
+
+fn input_int(key: String, fallback: Int) -> Int {
+    loaded = read_file("data.json")
+    if loaded.is_err() {
+        return fallback
+    }
+    document = json.parse(loaded.unwrap())
+    if document.is_err() {
+        return fallback
+    }
+    value = json.object_get(document.unwrap(), key)
+    if value.is_none() {
+        return fallback
+    }
+    number = json.as_number(value.unwrap())
+    if number.is_none() {
+        return fallback
+    }
+    number.unwrap() as Int
+}
+
+fn input_parameter_int(key: String, fallback: Int) -> Int {
+    loaded = read_file("data.json")
+    if loaded.is_err() {
+        return fallback
+    }
+    document = json.parse(loaded.unwrap())
+    if document.is_err() {
+        return fallback
+    }
+    parameters = json.object_get(document.unwrap(), "parameters")
+    if parameters.is_none() {
+        return fallback
+    }
+    value = json.object_get(parameters.unwrap(), key)
+    if value.is_none() {
+        return fallback
+    }
+    number = json.as_number(value.unwrap())
+    if number.is_none() {
+        return fallback
+    }
+    number.unwrap() as Int
+}
 
 fn main() -> Void {
-    r = rng(73)
-    baseline = r.randn([140]) * 0.42 + 4.2
-    shifted = r.randn([140]) * 0.75 + 5.25
-    bimodal = zeros([140])
-    for i in 0 until 140 {
-        center = if i < 70 { 5.2 } else { 6.1 }
-        spread = if i < 70 { 0.28 } else { 0.18 }
+    seed = input_int("seed", 73)
+    samples_per_group = input_parameter_int("samples_per_group", 140)
+    bandwidth_samples = input_parameter_int("bandwidth_samples", 40)
+    r = rng(seed)
+    baseline = r.randn([samples_per_group]) * 0.42 + 4.2
+    shifted = r.randn([samples_per_group]) * 0.75 + 5.25
+    bimodal = zeros([samples_per_group])
+    half = samples_per_group / 2
+    for i in 0 until samples_per_group {
+        center = if i < half { 5.2 } else { 6.1 }
+        spread = if i < half { 0.28 } else { 0.18 }
         bimodal.set(i, r.randn([1])[0] * spread + center)
     }
     fig = viz.figure("Distribution shapes")
         .describe("Gaussian KDE violins with medians computed in Ostrin")
         .labels("cohort", "response")
-        .violin(1.0, baseline, 40, "baseline", "#2563eb")
-        .violin(2.0, shifted, 40, "shifted", "#db2777")
-        .violin(3.0, bimodal, 40, "bimodal", "#059669")
+        .violin(1.0, baseline, bandwidth_samples, "baseline", "#2563eb")
+        .violin(2.0, shifted, bandwidth_samples, "shifted", "#db2777")
+        .violin(3.0, bimodal, bandwidth_samples, "bimodal", "#059669")
     print(fig.svg())
 }
