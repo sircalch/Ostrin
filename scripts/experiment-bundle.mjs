@@ -35,6 +35,7 @@ export const experimentFixtures = Object.freeze({
     inputPath: "experiments/surface.inputs.json",
     figurePath: "website/assets/viz/surface.svg",
     outputPath: "website/assets/experiments/surface.ostrin-experiment.json",
+    sourceRevision: "ad03b4e4e3e67df1ec05dace27ef45d947cd1195",
   }),
   heatmap: Object.freeze({
     id: "heatmap",
