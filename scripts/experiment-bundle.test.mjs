@@ -76,9 +76,17 @@ test("shared fixture metadata stays identical across normalized SVG and bundle",
 
 test("seeded RNG bundles expose source-backed algorithm evidence and R1 replay metadata", () => {
   const histogram = buildExperimentBundle("histogram");
+  const boxplot = buildExperimentBundle("boxplot");
   const randomness = histogram.provenance.randomness;
-  assert.equal(histogram.reproducibility.level, "R1");
-  assert.equal(histogram.reproducibility.label, "R1 · seeded replay verified");
+  for (const bundle of [histogram, boxplot]) {
+    assert.equal(bundle.reproducibility.level, "R1");
+    assert.equal(bundle.reproducibility.label, "R1 · seeded replay verified");
+    assert.equal(bundle.provenance.level, "R1");
+    assert.equal(bundle.provenance.replay.level, "R1");
+    assert.equal(bundle.reproducibility.next, "R2 · external snapshots (planned verification)");
+    assert.equal(bundle.provenance.randomness.seed_consumption, "data.json:seed");
+    assert.equal(bundle.provenance.randomness.status, "input-driven-r1");
+  }
   assert.equal(randomness.contract, "ostrin.rng/v1");
   assert.equal(randomness.algorithm, "xoshiro256**");
   assert.equal(randomness.version, "ostrin.rng/v1");
@@ -94,10 +102,6 @@ test("seeded RNG bundles expose source-backed algorithm evidence and R1 replay m
   assert.equal(randomness.parity, "interpreter-native");
   assert.equal(randomness.seed_consumption, "data.json:seed");
   assert.equal(randomness.status, "input-driven-r1");
-  assert.equal(histogram.provenance.level, "R1");
-  assert.equal(histogram.provenance.replay.level, "R1");
-  assert.equal(histogram.reproducibility.next, "R2 · external snapshots (planned verification)");
-
   const lines = buildExperimentBundle("lines");
   assert.equal(lines.provenance.randomness, undefined);
 });
