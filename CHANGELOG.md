@@ -10,6 +10,10 @@
   31 AST**. Recursive-record-returning methods such as `std.json::Parser.parse_number` now use
   the same typed IR/C path when their receiver and arguments have a supported ownership shape.
 
+- Added the structural ordering helper request to the IR/C emitter. Records with `derive(Eq, Ord)`
+  now compile their equality and ordering comparisons through the generated helpers; the ratchet
+  advances to **6,943 HIR/IR-generated functions (6,896 IR + 47 HIR) / 29 AST**.
+
 ### Viz experiment replay maturity
 
 - Added exact-replay `ostrin.experiment/v0` bundles for every one of the 29 Viz gallery figures,

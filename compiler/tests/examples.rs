@@ -9238,6 +9238,14 @@ fn derive_eq_and_ord_work_without_manual_impl() {
     let text = stdout(&out);
     let lines: Vec<&str> = text.lines().collect();
     assert_eq!(lines, ["true", "false", "true", "true", "true"]);
+    let report = run(&["--native-type-report", &example_path("derive.ostrin")]);
+    if !skip_if_no_c_compiler(&report) {
+        assert!(
+            stdout(&report).contains("native-source: examples/derive.ostrin ir=1 hir=0 ast=0"),
+            "derive Eq/Ord should use the structural IR helpers: {}",
+            stdout(&report)
+        );
+    }
 }
 
 #[test]

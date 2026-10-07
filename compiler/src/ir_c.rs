@@ -137,6 +137,7 @@ fn mangle_quantity_type(dimension: &std::collections::HashMap<String, i32>) -> S
 pub enum HelperRequest {
     Show,
     Equality,
+    Ordering,
 }
 
 type HelperGenerator<'a> = dyn FnMut(HelperRequest, &str, &str, &Ty) -> Option<String> + 'a;
@@ -1118,6 +1119,20 @@ fn binary_code(
             expression
         });
     }
+    if matches!(op, BinOp::Lt | BinOp::Gt | BinOp::LtEq | BinOp::GtEq)
+        && left_ty == right_ty
+        && !scalar(left_ty)
+    {
+        let expression = equality(HelperRequest::Ordering, left, right, left_ty).ok_or(())?;
+        let comparison = match op {
+            BinOp::Lt => "< 0",
+            BinOp::Gt => "> 0",
+            BinOp::LtEq => "<= 0",
+            BinOp::GtEq => ">= 0",
+            _ => unreachable!(),
+        };
+        return Ok(format!("({expression} {comparison})"));
+    }
     if (*left_ty == Ty::String || *right_ty == Ty::String)
         && matches!(
             op,
@@ -2042,9 +2057,14 @@ fn emit_instruction(
             let structural_equality = matches!(op, BinOp::Eq | BinOp::NotEq)
                 && left_ty == right_ty
                 && supported(&left_ty, records);
+            let structural_ordering =
+                matches!(op, BinOp::Lt | BinOp::Gt | BinOp::LtEq | BinOp::GtEq)
+                    && left_ty == right_ty
+                    && supported(&left_ty, records);
             if (!scalar(&left_ty) && !quantity(&left_ty)
                 || !scalar(&right_ty) && !quantity(&right_ty))
                 && !structural_equality
+                && !structural_ordering
             {
                 return Err(());
             }
@@ -5398,7 +5418,7 @@ pub fn generate(
 ) -> Option<String> {
     let mut helper = |request: HelperRequest, left: &str, _right: &str, ty: &Ty| match request {
         HelperRequest::Show => show(left, ty),
-        HelperRequest::Equality => None,
+        HelperRequest::Equality | HelperRequest::Ordering => None,
     };
     generate_with_helpers(
         function,

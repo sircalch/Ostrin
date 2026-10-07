@@ -9555,6 +9555,9 @@ fn generate_impl(
                                 crate::ir_c::HelperRequest::Equality => {
                                     codegen.eq_expr(left, right, &ctype).ok()
                                 }
+                                crate::ir_c::HelperRequest::Ordering => {
+                                    codegen.cmp_expr(left, right, &ctype).ok()
+                                }
                             }
                         },
                     )
@@ -9680,6 +9683,9 @@ fn generate_impl(
                                 }
                                 crate::ir_c::HelperRequest::Equality => {
                                     codegen.eq_expr(left, right, &ctype).ok()
+                                }
+                                crate::ir_c::HelperRequest::Ordering => {
+                                    codegen.cmp_expr(left, right, &ctype).ok()
                                 }
                             }
                         },
@@ -10456,6 +10462,9 @@ fn generate_impl(
                             }
                             crate::ir_c::HelperRequest::Equality => {
                                 codegen.eq_expr(left, right, &ctype).ok()
+                            }
+                            crate::ir_c::HelperRequest::Ordering => {
+                                codegen.cmp_expr(left, right, &ctype).ok()
                             }
                         }
                     },
