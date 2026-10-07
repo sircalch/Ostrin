@@ -8576,8 +8576,8 @@ fn native_backend_quantities_match_the_interpreter() {
     assert!(
         stdout(&shapes_report)
             .lines()
-            .any(|line| line == "native-source: examples/shapes.ostrin ir=2 hir=0 ast=1"),
-        "scalar quantity to_string did not use the IR path in Shape.describe: {}",
+            .any(|line| line == "native-source: examples/shapes.ostrin ir=3 hir=0 ast=0"),
+        "enum lists, scalar matching and quantity to_string did not use the IR path: {}",
         stdout(&shapes_report)
     );
 }

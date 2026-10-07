@@ -43,6 +43,7 @@ pub struct VariantInfo {
 pub type VariantFields = HashMap<(String, String), VariantInfo>;
 
 const ENUM_MARKER: &str = "__ostrin_enum__";
+pub const SCALAR_ENUM_MARKER: &str = "__ostrin_scalar_enum__";
 
 /// `RecordFields` is shared by the existing recursive ownership helpers.  A
 /// private marker entry lets those helpers recognize a by-value enum without
@@ -53,6 +54,15 @@ pub fn enum_marker(name: &str) -> String {
 
 fn is_plain_enum(ty: &Ty, records: &RecordFields) -> bool {
     matches!(ty, Ty::Named(name) if records.contains_key(&enum_marker(name)))
+}
+
+fn scalar_enum(ty: &Ty, records: &RecordFields) -> bool {
+    match ty {
+        Ty::Named(name) => records
+            .get(&enum_marker(name))
+            .is_some_and(|fields| fields.iter().any(|field| field == SCALAR_ENUM_MARKER)),
+        _ => false,
+    }
 }
 
 fn record_name(ty: &Ty, records: &RecordFields) -> Option<String> {
@@ -440,6 +450,36 @@ fn enum_scalar_pattern_code(
     Some(format!("({projected}) {condition}").replace("{value}", &format!("({projected})")))
 }
 
+fn direct_scalar_pattern_code(
+    subject_code: &str,
+    subject_ty: &Ty,
+    pattern: &IrScalarPattern,
+) -> Option<String> {
+    match pattern {
+        IrScalarPattern::Literal { path, value, ty } if path.is_empty() && ty == subject_ty => {
+            Some(format!(
+                "({subject_code}) == {}",
+                scalar_pattern_value_code(value)
+            ))
+        }
+        IrScalarPattern::Range {
+            path,
+            kind,
+            start,
+            end,
+            ty,
+        } if path.is_empty() && ty == subject_ty => {
+            let upper = if *kind == RangeKind::To { "<=" } else { "<" };
+            Some(format!(
+                "({subject_code}) >= {} && ({subject_code}) {upper} {}",
+                scalar_pattern_value_code(start),
+                scalar_pattern_value_code(end)
+            ))
+        }
+        _ => None,
+    }
+}
+
 /// Project an enum field path whose final value is itself a plain enum.  The
 /// type names in `VariantInfo` are C ABI names, so the marker table is enough
 /// to recover the next semantic enum type without widening the backend data
@@ -549,6 +589,7 @@ fn list_supported(ty: &Ty, records: &RecordFields) -> bool {
     list_element_supported(ty)
         || list_array_supported(ty)
         || record_name(ty, records).is_some()
+        || scalar_enum(ty, records)
         || matches!(ty, Ty::Applied(name, args) if name == "Channel" && args.len() == 1 && channel_supported(&args[0], records))
         || matches!(ty, Ty::List(element) if list_supported(element, records))
         // A list stores its element by value.  `Option<T>` is safe here when
@@ -662,6 +703,7 @@ fn mangle_option_payload(ty: &Ty, records: &RecordFields) -> String {
                 .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
                 .collect::<String>()
         ),
+        Ty::Named(name) if is_plain_enum(ty, records) => name.clone(),
         Ty::Named(name) if records.contains_key(name) => name.clone(),
         Ty::Applied(_, _) if record_name(ty, records).is_some() => {
             record_name(ty, records).unwrap_or_default()
@@ -2536,6 +2578,21 @@ fn emit_instruction(
                         _ => return Err(()),
                     }
                 }
+                Ty::Named(name) => {
+                    let c_name = methods.get(&(name.clone(), method.clone())).ok_or(())?;
+                    if !supported(ty, records) {
+                        return Err(());
+                    }
+                    let mut call_args = Vec::with_capacity(args.len() + 1);
+                    call_args.push(receiver.clone());
+                    for arg in args {
+                        if !supported(&value_ty(values, *arg)?, records) {
+                            return Err(());
+                        }
+                        call_args.push(value_code(values, *arg)?);
+                    }
+                    format!("{c_name}({})", call_args.join(", "))
+                }
                 Ty::String => {
                     let codes = args
                         .iter()
@@ -4036,6 +4093,19 @@ fn emit_instruction(
                     }
                 }
                 _ if pattern == "Wildcard" => "true".to_string(),
+                _ if matches!(
+                    subject_ty,
+                    Ty::Int | Ty::Float | Ty::Float32 | Ty::Sized(_) | Ty::Bool
+                ) && !scalar_tests.is_empty() =>
+                {
+                    scalar_tests
+                        .iter()
+                        .map(|test| {
+                            direct_scalar_pattern_code(&subject, &subject_ty, test).ok_or(())
+                        })
+                        .collect::<Result<Vec<_>, _>>()?
+                        .join(" && ")
+                }
                 _ if is_plain_enum(&subject_ty, records)
                     && plain_enum_value_supported(
                         &subject_ty,

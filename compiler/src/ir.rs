@@ -764,30 +764,26 @@ impl Builder {
                 }
             }
             crate::ast::Pattern::Literal(literal) => {
-                if !path.is_empty() {
-                    if let Some(value) = Self::scalar_pattern_value(literal, ty) {
-                        scalar_tests.push(IrScalarPattern::Literal {
-                            path,
-                            value,
-                            ty: ty.clone(),
-                        });
-                    }
+                if let Some(value) = Self::scalar_pattern_value(literal, ty) {
+                    scalar_tests.push(IrScalarPattern::Literal {
+                        path,
+                        value,
+                        ty: ty.clone(),
+                    });
                 }
             }
             crate::ast::Pattern::Range(start, kind, end) => {
-                if !path.is_empty() {
-                    if let (Some(start), Some(end)) = (
-                        Self::scalar_pattern_value(start, ty),
-                        Self::scalar_pattern_value(end, ty),
-                    ) {
-                        scalar_tests.push(IrScalarPattern::Range {
-                            path,
-                            kind: *kind,
-                            start,
-                            end,
-                            ty: ty.clone(),
-                        });
-                    }
+                if let (Some(start), Some(end)) = (
+                    Self::scalar_pattern_value(start, ty),
+                    Self::scalar_pattern_value(end, ty),
+                ) {
+                    scalar_tests.push(IrScalarPattern::Range {
+                        path,
+                        kind: *kind,
+                        start,
+                        end,
+                        ty: ty.clone(),
+                    });
                 }
             }
             crate::ast::Pattern::Wildcard => {}

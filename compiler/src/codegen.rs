@@ -9485,10 +9485,40 @@ fn generate_impl(
     // names alongside record metadata for the shared IR representation, but
     // keep variant details in a separate table so record ownership helpers
     // never mistake an enum for a heap record.
+    let mut scalar_enums: HashMap<String, bool> = HashMap::new();
     for variant in hir_world.variants.values() {
         ir_records
             .entry(crate::ir_c::enum_marker(&variant.enum_name))
             .or_default();
+        let scalar_payload = variant.fields.iter().all(|(_, field_ty)| {
+            matches!(
+                field_ty.as_str(),
+                "int64_t"
+                    | "double"
+                    | "float"
+                    | "bool"
+                    | "int8_t"
+                    | "int16_t"
+                    | "int32_t"
+                    | "uint8_t"
+                    | "uint16_t"
+                    | "uint32_t"
+                    | "uint64_t"
+                    | "Qty"
+            )
+        });
+        scalar_enums
+            .entry(variant.enum_name.clone())
+            .and_modify(|supported| *supported &= scalar_payload)
+            .or_insert(scalar_payload);
+    }
+    for (name, supported) in scalar_enums {
+        if supported {
+            ir_records
+                .entry(crate::ir_c::enum_marker(&name))
+                .or_default()
+                .push(crate::ir_c::SCALAR_ENUM_MARKER.to_string());
+        }
     }
     let ir_variants: crate::ir_c::VariantFields = hir_world
         .variants

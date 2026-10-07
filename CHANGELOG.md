@@ -31,6 +31,10 @@
   error contract. `native_builtins.ostrin` now uses the typed path, advancing the ratchet to
   **6,950 HIR/IR-generated functions (6,903 IR + 47 HIR) / 22 AST**.
 
+- Added scalar enum metadata for list lowering, generic concrete enum method dispatch, and direct
+  scalar literal/range pattern tests in IR/C. `shapes.ostrin` now compiles with `ir=3, hir=0, ast=0`,
+  and the ratchet advances to **6,951 HIR/IR-generated functions (6,905 IR + 46 HIR) / 21 AST**.
+
 ### Viz experiment replay maturity
 
 - Added exact-replay `ostrin.experiment/v0` bundles for every one of the 29 Viz gallery figures,
