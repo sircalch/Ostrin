@@ -732,6 +732,15 @@ test("Viz exposes the input-driven seeded R1 experiment bundles", async ({ page 
   expect(bars.provenance.execution.randomness.seed_path).toBe("seed");
   expect(bars.provenance.randomness.seed_consumption).toBe("data.json:seed");
   expect(bars.provenance.replay.level).toBe("R1");
+  const pointCloudDownloadPromise = page.waitForEvent("download");
+  await page.locator('[data-viz-bundle="point-cloud"]').click();
+  const pointCloudDownload = await pointCloudDownloadPromise;
+  expect(pointCloudDownload.suggestedFilename()).toBe("3d-point-cloud.ostrin-experiment.json");
+  const pointCloud = JSON.parse(await readFile(await pointCloudDownload.path(), "utf8"));
+  expect(pointCloud.reproducibility.level).toBe("R1");
+  expect(pointCloud.provenance.execution.randomness.seed_path).toBe("seed");
+  expect(pointCloud.provenance.randomness.seed_consumption).toBe("data.json:seed");
+  expect(pointCloud.provenance.replay.level).toBe("R1");
 });
 
 test("Viz exposes recorded animation, table and volume experiment bundles", async ({ page }) => {

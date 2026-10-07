@@ -162,8 +162,8 @@ por separado en `--native-type-report` como `ir-generated`; el mismo informe exp
 `hir-generated` y `ast-fallback` para que la retirada del backend legado tenga un contador
 visible. También publica líneas `native-source` agrupadas por archivo para localizar la deuda
 por módulo; la prueba diferencial comprueba que sus sumas coinciden con el total. En el corte
-actual, la suite de ejemplos suma 6 779 funciones IR, 38 HIR y 40 que aún caen al emisor
-AST; `native_backend_types_agree_with_the_checker` mantiene 40 como trinquete temporal. Los cortes R1 de `viz_histogram.ostrin`, `viz_boxplot.ostrin`, `viz_scatter_fit.ostrin`, `viz_violin.ostrin`, `viz_hexbin.ostrin` y `viz_bars.ostrin` importan `std.json` y conservan esa entrada en el camino tipado; `atan2` escalar para `Float` y `Float32` usa ahora el runtime determinista desde IR/C; `pow` escalar también usa `ostrin_dm_pow`/`ostrin_dm_powf`, y `detmath.ostrin` ya no conserva fallback AST. `math_functions.ostrin` verifica `atan2` y `abs` sobre enteros de ancho fijo con paridad nativa/WASI y leak-check; `abs` conserva el error del mínimo representable. Las coerciones `Float↔Float32` de bindings explícitos y agregados `List/Set<Float32>` ahora se insertan en IR, conservando la precisión de `float32.ostrin`. Las llamadas genéricas registradas por el checker se resuelven ahora en HIR antes de construir la IR, de modo que `numeric_units.ostrin` ya no necesita fallback AST. Las operaciones escalares reflejadas de `Complex` (`Float +|−|×|÷ Complex`) llaman sus métodos `radd`/`rsub`/`rmul`/`rdiv` desde IR/C con el orden de operandos preservado; el formato escalar de `Bool` también usa la ruta tipada. `numeric_complex.ostrin` queda en `ir=3, hir=0, ast=0`, con paridad intérprete/nativo/WASI y leak-check. `Quantity.to_string()` escalar y `Array<Float32>.to_string()` ya llaman a helpers nativos desde IR/C; el segundo elimina el fallback del punto de entrada de `arrays_3d`. Los patrones
+actual, la suite de ejemplos suma 6 813 funciones IR, 41 HIR y 41 que aún caen al emisor
+AST; `native_backend_types_agree_with_the_checker` mantiene 41 como trinquete temporal. Los cortes R1 de `viz_histogram.ostrin`, `viz_boxplot.ostrin`, `viz_scatter_fit.ostrin`, `viz_violin.ostrin`, `viz_hexbin.ostrin`, `viz_bars.ostrin` y `viz_point_cloud.ostrin` importan `std.json` y conservan esa entrada en el camino tipado; `atan2` escalar para `Float` y `Float32` usa ahora el runtime determinista desde IR/C; `pow` escalar también usa `ostrin_dm_pow`/`ostrin_dm_powf`, y `detmath.ostrin` ya no conserva fallback AST. `math_functions.ostrin` verifica `atan2` y `abs` sobre enteros de ancho fijo con paridad nativa/WASI y leak-check; `abs` conserva el error del mínimo representable. Las coerciones `Float↔Float32` de bindings explícitos y agregados `List/Set<Float32>` ahora se insertan en IR, conservando la precisión de `float32.ostrin`. Las llamadas genéricas registradas por el checker se resuelven ahora en HIR antes de construir la IR, de modo que `numeric_units.ostrin` ya no necesita fallback AST. Las operaciones escalares reflejadas de `Complex` (`Float +|−|×|÷ Complex`) llaman sus métodos `radd`/`rsub`/`rmul`/`rdiv` desde IR/C con el orden de operandos preservado; el formato escalar de `Bool` también usa la ruta tipada. `numeric_complex.ostrin` queda en `ir=3, hir=0, ast=0`, con paridad intérprete/nativo/WASI y leak-check. `Quantity.to_string()` escalar y `Array<Float32>.to_string()` ya llaman a helpers nativos desde IR/C; el segundo elimina el fallback del punto de entrada de `arrays_3d`. Los patrones
 superficiales de records con campos escalares y los enums no genéricos con variantes unitarias,
 payloads escalares (incluidos enteros de ancho fijo), patrones simples y patrones anidados de enums por
 valor ya bajan por IR/C, incluidos records genéricos, con paridad intérprete/nativo/diferencial. Payloads
@@ -345,8 +345,8 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
 convendría dividirlos; el backend nativo no comparte el sistema de tipos del checker
-(ya consume los tipos del checker y compara cada nodo; el informe actual suma **6 779 funciones
-generadas desde IR, 38 desde HIR y 40 en fallback AST** en los ejemplos, con un trinquete
+(ya consume los tipos del checker y compara cada nodo; el informe actual suma **6 813 funciones
+generadas desde IR, 41 desde HIR y 41 en fallback AST** en los ejemplos, con un trinquete
 que impide que el fallback aumente sin justificación; los métodos de records y enums concretos
 entran ahora en IR/C cuando sus campos y ownership son compatibles, mientras los records recursivos
 conservan el fallback verificado; las familias migradas incluyen escalares,
@@ -505,17 +505,17 @@ sustituye la adopción independiente; por eso el plan mantiene un frente explíc
   `ostrinc.wasm` y compara el SVG byte a byte. Los bundles 3D registran además sus parámetros y
   cámara, y los de azar conservan su semilla declarada. `surface` y `lines` ya añaden cortes
   ejecutables input-driven: `surface` lee `data.json` y `lines` consume `parameters.samples`;
-  `scripts/experiment-replay.mjs` verifica los ocho bundles en WASI y demuestra que cambiar el
+  `scripts/experiment-replay.mjs` verifica los nueve bundles en WASI y demuestra que cambiar el
   parámetro declarado cambia la figura. Esto es evidencia de ejecución de entradas, no una
   reclamación de R1 de azar sembrado; R2/R3 no se reclaman. `histogram` fue el primer corte
-  R1, `boxplot` el segundo, `scatter-fit` el tercero, `violin` el cuarto, `hexbin` el quinto y `bars` el sexto: los seis consumen `seed` desde `data.json`, registran
+  R1, `boxplot` el segundo, `scatter-fit` el tercero, `violin` el cuarto, `hexbin` el quinto, `bars` el sexto y `point-cloud` el séptimo: los siete consumen `seed` desde `data.json`, registran
   algoritmo/versión/partición y el replay cambia la semilla para exigir una figura distinta.
   Los manifiestos de figura ya serializan el estado vivo seleccionado desde el explorador
   (parámetros, cámara 3D opcional y URL compartible), y la galería ofrece una cita BibTeX con
   metadatos de fuente y versión. Los bundles que invocan `rng(seed)` ya incluyen evidencia
   source-backed del contrato `ostrin.rng/v1` (xoshiro256**, splitmix64, Marsaglia polar y
   `detmath::ln`) con hashes de las implementaciones intérprete/nativa; `histogram`, `boxplot`,
-  `scatter-fit`, `violin`, `hexbin` y `bars` ya elevan esa evidencia a R1 mediante sus contratos input-driven y la sensibilidad de semilla
+  `scatter-fit`, `violin`, `hexbin`, `bars` y `point-cloud` ya elevan esa evidencia a R1 mediante sus contratos input-driven y la sensibilidad de semilla
   verificada en CI.
   Falta extender el comando de replay al resto de entradas aleatorias, añadir lockfiles y
   snapshots de runtime, y conservar R2/R3 como pendientes;

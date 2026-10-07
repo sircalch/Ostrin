@@ -1177,26 +1177,26 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "id": "point-cloud",
       "title": "3D point cloud",
       "file": "examples/viz_point_cloud.ostrin",
-      "blurb": "Three Gaussian clusters, depth-sorted and colored by height.",
+      "blurb": "Three seeded Gaussian clusters, depth-sorted and colored by height.",
       "bundle": "assets/experiments/point-cloud.ostrin-experiment.json",
       "source": "examples/viz_point_cloud.ostrin",
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_point_cloud.ostrin",
-      "code": "// std.viz · 3D scatter: three Gaussian clusters drawn back to front.\nimport std.viz\n\nfn main() -> Void {\n    r = rng(5)\n    mut xs: List<Float> = []\n    mut ys: List<Float> = []\n    mut zs: List<Float> = []\n    centers = [0.0, 0.0, 0.0, 4.0, 1.0, 2.5, 1.5, 4.0, 5.0]\n    for c in 0 until 3 {\n        px = r.randn([120]) * 0.8 + centers[c * 3]\n        py = r.randn([120]) * 0.8 + centers[c * 3 + 1]\n        pz = r.randn([120]) * 0.8 + centers[c * 3 + 2]\n        for i in 0 until 120 {\n            xs.push(px[i])\n            ys.push(py[i])\n            zs.push(pz[i])\n        }\n    }\n    scene = viz.scene3d(\"Three clusters\")\n        .describe(\"360 points colored by height\")\n        .labels(\"x\", \"y\", \"z\")\n        .view(-40.0, 22.0)\n        .scatter(array(xs), array(ys), array(zs), colormap: \"coolwarm\", size: 3.2)\n    print(scene.svg())\n}\n",
+      "code": "// std.viz · 3D scatter: seeded Gaussian clusters drawn back to front.\nimport std.json\nimport std.viz\n\nfn input_int(key: String, fallback: Int) -> Int {\n    loaded = read_file(\"data.json\")\n    if loaded.is_err() {\n        return fallback\n    }\n    document = json.parse(loaded.unwrap())\n    if document.is_err() {\n        return fallback\n    }\n    value = json.object_get(document.unwrap(), key)\n    if value.is_none() {\n        return fallback\n    }\n    number = json.as_number(value.unwrap())\n    if number.is_none() {\n        return fallback\n    }\n    number.unwrap() as Int\n}\n\nfn input_parameter_int(key: String, fallback: Int) -> Int {\n    loaded = read_file(\"data.json\")\n    if loaded.is_err() {\n        return fallback\n    }\n    document = json.parse(loaded.unwrap())\n    if document.is_err() {\n        return fallback\n    }\n    parameters = json.object_get(document.unwrap(), \"parameters\")\n    if parameters.is_none() {\n        return fallback\n    }\n    value = json.object_get(parameters.unwrap(), key)\n    if value.is_none() {\n        return fallback\n    }\n    number = json.as_number(value.unwrap())\n    if number.is_none() {\n        return fallback\n    }\n    number.unwrap() as Int\n}\n\nfn main() -> Void {\n    seed = input_int(\"seed\", 5)\n    clusters = input_parameter_int(\"clusters\", 3)\n    points_per_cluster = input_parameter_int(\"points_per_cluster\", 120)\n    r = rng(seed)\n    mut xs: List<Float> = []\n    mut ys: List<Float> = []\n    mut zs: List<Float> = []\n    centers = [0.0, 0.0, 0.0, 4.0, 1.0, 2.5, 1.5, 4.0, 5.0]\n    for c in 0 until clusters {\n        px = r.randn([points_per_cluster]) * 0.8 + centers[c * 3]\n        py = r.randn([points_per_cluster]) * 0.8 + centers[c * 3 + 1]\n        pz = r.randn([points_per_cluster]) * 0.8 + centers[c * 3 + 2]\n        for i in 0 until points_per_cluster {\n            xs.push(px[i])\n            ys.push(py[i])\n            zs.push(pz[i])\n        }\n    }\n    scene = viz.scene3d(\"Three clusters\")\n        .describe((clusters * points_per_cluster).to_string() + \" points colored by height, seed \" + seed.to_string())\n        .labels(\"x\", \"y\", \"z\")\n        .view(-40.0, 22.0)\n        .scatter(array(xs), array(ys), array(zs), colormap: \"coolwarm\", size: 3.2)\n    print(scene.svg())\n}\n",
       "svg": "assets/viz/point-cloud.svg",
       "capabilities": [
         "3d",
         "reproducibility"
       ],
       "provenance": {
-        "source-hash": "sha256:ce492cb0ee37a62381dae63b7ad8ef100f128a7aac017eee0f06d5c915da337a",
-        "data-hash": "sha256:4dec90767996458296ce28c3eb2109e889ade921a4502bf2ac447f225109912e",
+        "source-hash": "sha256:13093744a1e49336e8a247733b8b2d7fc3b391fb91fb1090468bd70d3bc74538",
+        "data-hash": "sha256:02bcd5fef25524e0cdeb0f132eaf1a6fd7fc580c790529643ac40cd701b4ed28",
         "seed": "seed=5",
         "compiler": "ostrinc 0.1.0"
       },
       "reproducibility": {
-        "level": "R0",
-        "label": "R0 · exact replay verified",
-        "next": "R1 · seeded replay (planned verification)"
+        "level": "R1",
+        "label": "R1 · seeded replay verified",
+        "next": "R2 · external snapshots (planned verification)"
       },
       "printed": [
         ""
