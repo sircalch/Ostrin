@@ -27,6 +27,10 @@
   allowing `linear_algebra.ostrin` to use the typed matrix runtime. The ratchet advances to
   **6,949 HIR/IR-generated functions (6,902 IR + 47 HIR) / 23 AST**.
 
+- Added IR/C lowering for `sum(List<Int|Float|Quantity>)`, preserving the native empty-quantity
+  error contract. `native_builtins.ostrin` now uses the typed path, advancing the ratchet to
+  **6,950 HIR/IR-generated functions (6,903 IR + 47 HIR) / 22 AST**.
+
 ### Viz experiment replay maturity
 
 - Added exact-replay `ostrin.experiment/v0` bundles for every one of the 29 Viz gallery figures,

@@ -3399,6 +3399,27 @@ fn emit_instruction(
                     "({{ int64_t __ostrin_csv_row_count; int64_t* __ostrin_csv_col_counts; const char*** __ostrin_csv_rows = ostrin_s_csv({source}, &__ostrin_csv_row_count, &__ostrin_csv_col_counts); {inner_items_c} __ostrin_csv_lists = ({inner_items_c})ostrin_alloc(sizeof(*__ostrin_csv_lists) * (size_t)(__ostrin_csv_row_count + 1)); for (int64_t __ostrin_csv_row = 0; __ostrin_csv_row < __ostrin_csv_row_count; __ostrin_csv_row++) {{ __ostrin_csv_lists[__ostrin_csv_row] = {inner_name}_new_from_array(__ostrin_csv_rows[__ostrin_csv_row], __ostrin_csv_col_counts[__ostrin_csv_row]); for (int64_t __ostrin_csv_col = 0; __ostrin_csv_col < __ostrin_csv_col_counts[__ostrin_csv_row]; __ostrin_csv_col++) ostrin_release((void*)__ostrin_csv_rows[__ostrin_csv_row][__ostrin_csv_col]); ostrin_free((void*)__ostrin_csv_rows[__ostrin_csv_row]); }} {outer_c} __ostrin_csv_result = {outer_name}_new_from_array(__ostrin_csv_lists, __ostrin_csv_row_count); for (int64_t __ostrin_csv_row = 0; __ostrin_csv_row < __ostrin_csv_row_count; __ostrin_csv_row++) ostrin_release((void*)__ostrin_csv_lists[__ostrin_csv_row]); ostrin_free((void*)__ostrin_csv_lists); ostrin_free((void*)__ostrin_csv_rows); ostrin_free((void*)__ostrin_csv_col_counts); __ostrin_csv_result; }})",
                     source = codes[0]
                 )
+            } else if callee == "sum" && args.len() == 1 {
+                let Ty::List(element) = value_ty(values, args[0])? else {
+                    return Err(());
+                };
+                if *ty != *element {
+                    return Err(());
+                }
+                let list_name = format!("List_{}", mangle_option_payload(&element, records));
+                let list = format!("{list_name}* __ostrin_sum_list = {}", codes[0]);
+                match *element {
+                    Ty::Int => format!(
+                        "({{ {list}; int64_t __ostrin_sum_value = 0; for (int64_t __ostrin_sum_i = 0; __ostrin_sum_i < __ostrin_sum_list->length; __ostrin_sum_i++) __ostrin_sum_value += __ostrin_sum_list->items[__ostrin_sum_i]; __ostrin_sum_value; }})"
+                    ),
+                    Ty::Float => format!(
+                        "({{ {list}; double __ostrin_sum_value = 0.0; for (int64_t __ostrin_sum_i = 0; __ostrin_sum_i < __ostrin_sum_list->length; __ostrin_sum_i++) __ostrin_sum_value += __ostrin_sum_list->items[__ostrin_sum_i]; __ostrin_sum_value; }})"
+                    ),
+                    Ty::Quantity(_) => format!(
+                        "({{ {list}; if (__ostrin_sum_list->length == 0) {{ OSTRIN_FAIL(\"sum of an empty list of quantities\"); }} Qty __ostrin_sum_value = __ostrin_sum_list->items[0]; for (int64_t __ostrin_sum_i = 1; __ostrin_sum_i < __ostrin_sum_list->length; __ostrin_sum_i++) __ostrin_sum_value = ostrin_qty_add(__ostrin_sum_value, __ostrin_sum_list->items[__ostrin_sum_i]); __ostrin_sum_value; }})"
+                    ),
+                    _ => return Err(()),
+                }
             } else if callee == "parse_int"
                 && args.len() == 1
                 && value_ty(values, args[0])? == Ty::String
