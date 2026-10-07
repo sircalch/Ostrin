@@ -320,6 +320,54 @@ function compilerVersion(root) {
   return normalizedText(root, "compiler/Cargo.toml").match(/^version\s*=\s*"([^"]+)"/m)?.[1] ?? "unknown";
 }
 
+function ancestorProjectFile(root, sourcePath, fileName) {
+  const rootAbsolute = path.resolve(root);
+  let directory = path.dirname(path.resolve(root, sourcePath));
+  while (directory === rootAbsolute || directory.startsWith(`${rootAbsolute}${path.sep}`)) {
+    const candidate = path.join(directory, fileName);
+    if (existsSync(candidate)) return candidate;
+    if (directory === rootAbsolute) break;
+    directory = path.dirname(directory);
+  }
+  return null;
+}
+
+function runtimeFile(root, absolutePath) {
+  if (!absolutePath) return null;
+  const relativePath = path.relative(root, absolutePath).replaceAll("\\", "/");
+  return {
+    path: relativePath,
+    sha256: sha256(normalizedText(root, relativePath)),
+  };
+}
+
+export function runtimeSnapshotFor(root = repositoryRoot, sourcePath = "") {
+  const compilerLockfile = path.join(root, "compiler", "Cargo.lock");
+  const projectManifest = ancestorProjectFile(root, sourcePath, "ostrin.toml");
+  const projectLockfile = ancestorProjectFile(root, sourcePath, "ostrin.lock");
+  return {
+    schema: "ostrin.runtime/v1",
+    status: "partial",
+    target: "wasm32-wasip1",
+    wasi: "preview1",
+    runner: "WASI host",
+    compiler_lockfile: runtimeFile(root, compilerLockfile),
+    project: {
+      manifest: runtimeFile(root, projectManifest),
+      lockfile: runtimeFile(root, projectLockfile),
+    },
+    platform_policy: {
+      output: "target-specific; byte exact only when the replay gate verifies it",
+      numeric: "tolerances must be declared for cross-platform comparisons",
+    },
+    missing: [
+      "input snapshots",
+      "output hashes from this invocation",
+      "captured host and hardware metadata",
+    ],
+  };
+}
+
 function fixtureCommit(root, fixture) {
   if (fixture.sourceRevision) return fixture.sourceRevision;
   try {
@@ -444,6 +492,7 @@ function provenanceFor(root, fixture, files, manifest) {
   const metadata = metadataForFixture(fixture.id, root);
   const reproducibility = reproducibilityFor(inputs);
   const randomness = seededRandomnessEvidence(root, source, inputs);
+  const runtime = runtimeSnapshotFor(root, fixture.sourcePath);
   return {
     schema: "ostrin.provenance/v0",
     level: reproducibility.level,
@@ -487,6 +536,7 @@ function provenanceFor(root, fixture, files, manifest) {
       compiler: metadata.compiler,
     },
     compiler: metadata.compiler,
+    runtime,
     commit: fixtureCommit(root, fixture),
     target: "wasm32-wasip1",
     command: "ostrinc --run --target wasm32-wasi source.ostrin",
@@ -497,8 +547,8 @@ function provenanceFor(root, fixture, files, manifest) {
     ...(inputs.execution ? { execution: inputs.execution } : {}),
     manifest_schema: manifest.schema,
     limits: reproducibility.level === "R1"
-      ? "R1 seeded replay is verified in website CI for the declared seed and algorithm contract. The bundle does not include external snapshots, lockfiles, runtime captures or an R2/R3 replay guarantee."
-      : "R0 exact SVG replay is verified in website CI. The bundle does not include seeded-randomness evidence for R1, external snapshots, lockfiles, runtime captures or an R2/R3 replay guarantee.",
+      ? "R1 seeded replay is verified in website CI for the declared seed and algorithm contract. The bundle does not include external snapshots, lockfile contents, complete runtime captures or an R2/R3 replay guarantee."
+      : "R0 exact SVG replay is verified in website CI. The bundle does not include seeded-randomness evidence for R1, external snapshots, lockfile contents, complete runtime captures or an R2/R3 replay guarantee.",
   };
 }
 
@@ -589,6 +639,14 @@ export function verifyExperimentBundle(bundle, { expected, fixtureId } = {}) {
   }
   if (bundle?.provenance?.level !== maturity?.level || JSON.stringify(bundle?.provenance?.reproducibility) !== JSON.stringify(maturity)) {
     errors.push("provenance reproducibility maturity drifted from the bundle contract");
+  }
+  const runtime = bundle?.provenance?.runtime;
+  const expectedRuntime = expected?.provenance?.runtime;
+  if (JSON.stringify(runtime) !== JSON.stringify(expectedRuntime)) errors.push("runtime snapshot drifted from the source-backed contract");
+  if (runtime?.schema !== "ostrin.runtime/v1" || runtime?.status !== "partial"
+    || runtime?.target !== "wasm32-wasip1" || runtime?.wasi !== "preview1"
+    || runtime?.runner !== "WASI host") {
+    errors.push("runtime snapshot is missing the partial WASI contract");
   }
   if (JSON.stringify(bundle?.experiment) !== JSON.stringify(expected?.experiment)) errors.push("experiment file map drifted");
   if (bundle?.provenance?.commit !== expected?.provenance?.commit) errors.push("provenance commit drifted from the source-backed fixture revision");

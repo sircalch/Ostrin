@@ -29,6 +29,9 @@
   nearby project manifest/lockfile hashes when available, and the declared platform policy.
   The website provenance page renders that runtime status and keeps the missing input snapshots,
   invocation output hashes and host capture visible; it does not claim R2/R3.
+- All 29 downloadable Viz experiment bundles now carry the same partial runtime snapshot, and
+  the bundle verifier rejects missing or mismatched target/WASI/runtime evidence while preserving
+  their existing R0/R1 labels.
 
 ### Viz publication manifests
 

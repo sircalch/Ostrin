@@ -51,6 +51,12 @@ function bundleErrors(bundle, id) {
   if (!["R0", "R1"].includes(bundle.reproducibility?.level)) errors.push(`${id}: executable replay requires an explicit R0 or R1 bundle`);
   if (!bundle.files || typeof bundle.files !== "object") errors.push(`${id}: files object is missing`);
   if (!Array.isArray(bundle.manifest?.files) || bundle.manifest.files.length !== 4) errors.push(`${id}: manifest must contain four files`);
+  if (bundle.provenance?.runtime?.schema !== "ostrin.runtime/v1"
+    || bundle.provenance?.runtime?.status !== "partial"
+    || bundle.provenance?.runtime?.target !== "wasm32-wasip1"
+    || bundle.provenance?.runtime?.wasi !== "preview1") {
+    errors.push(`${id}: bundle is missing the partial ostrin.runtime/v1 snapshot`);
+  }
   for (const entry of bundle.manifest?.files ?? []) {
     const content = bundle.files?.[entry.path];
     if (typeof content !== "string") {

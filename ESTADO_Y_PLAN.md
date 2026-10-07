@@ -520,7 +520,8 @@ sustituye la adopción independiente; por eso el plan mantiene un frente explíc
   Los nueve experimentos de galería que consumen `rng(seed)` ya tienen el comando de replay y
   la sensibilidad de semilla verificados en R1. Los veinte bundles restantes conservan R0 por
   ser deterministas o no declarar todavía una sensibilidad de entradas compatible. Falta añadir
-  lockfiles, snapshots de runtime y tolerancias de plataforma para elevar la evidencia hacia R2,
+  snapshots de runtime completos, hashes de salida por invocación, metadatos capturados del host
+  y tolerancias de plataforma para elevar la evidencia hacia R2,
   y conservar R3 como pendiente;
 - publicar benchmarks históricos por commit y métricas de adopción solo con una política de
   privacidad clara. Estas evidencias alimentan después el snapshot de Linguist y la propuesta

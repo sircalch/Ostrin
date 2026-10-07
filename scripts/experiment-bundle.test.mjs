@@ -12,6 +12,7 @@ import {
   repositoryRoot,
   outputPathFor,
   renderExperimentBundle,
+  runtimeSnapshotFor,
   verifyBundleFile,
   verifyExperimentBundle,
 } from "./experiment-bundle.mjs";
@@ -24,6 +25,11 @@ test("the v0 experiment bundle has calculated hashes and an explicit R0/R1 bound
   assert.equal(bundle.reproducibility.level, "R0");
   assert.equal(bundle.reproducibility.label, "R0 · exact replay verified");
   assert.equal(bundle.reproducibility.next, "R1 · seeded replay (planned verification)");
+  assert.equal(bundle.provenance.runtime.schema, "ostrin.runtime/v1");
+  assert.equal(bundle.provenance.runtime.status, "partial");
+  assert.equal(bundle.provenance.runtime.target, "wasm32-wasip1");
+  assert.equal(bundle.provenance.runtime.wasi, "preview1");
+  assert.match(bundle.provenance.runtime.compiler_lockfile.sha256, /^sha256:[0-9a-f]{64}$/);
   assert.deepEqual(bundle.provenance.replay, {
     level: "R0",
     status: "verified",
@@ -123,6 +129,16 @@ test("the fixture registry stays source-backed and parameterizable", () => {
   assert.match(fixture.sourceRevision, /^[0-9a-f]{40}$/);
   assert.equal(bundle.provenance.commit, fixture.sourceRevision);
   assert.throws(() => buildExperimentBundle("missing"), /unknown experiment fixture/);
+});
+
+test("the runtime snapshot follows the source project boundary", () => {
+  const root = repositoryRoot;
+  const snapshot = runtimeSnapshotFor(root, "examples/data_project/app/main.ostrin");
+  assert.equal(snapshot.project.manifest.path, "examples/data_project/app/ostrin.toml");
+  assert.equal(snapshot.project.lockfile.path, "examples/data_project/app/ostrin.lock");
+  assert.match(snapshot.project.manifest.sha256, /^sha256:[0-9a-f]{64}$/);
+  assert.match(snapshot.project.lockfile.sha256, /^sha256:[0-9a-f]{64}$/);
+  assert.deepEqual(runtimeSnapshotFor(root, "examples/viz_histogram.ostrin").project.lockfile, null);
 });
 
 test("every registered fixture produces a verified recorded bundle", () => {
