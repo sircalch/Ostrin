@@ -128,9 +128,11 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    `surface` lee `data.json` y demuestra sensibilidad a `parameters.scale`; `lines` consume
    `parameters.samples` con el mismo contrato genérico de sensibilidad. `histogram`, `boxplot`,
    `scatter-fit`, `violin`, `hexbin`, `bars`, `point-cloud`, `fft` y `dashboard` consumen `seed` y parámetros declarados, y cambian su figura con una semilla alternativa. El comando
-   `scripts/experiment-replay.mjs` verifica los once en WASI y la CI los ejecuta. El siguiente paso
-   es extender el contrato R1 a los demás experimentos aleatorios, y añadir lockfiles y snapshots
-   de runtime sin perder la frontera verificable de R0.
+   `scripts/experiment-replay.mjs` verifica los once en WASI y la CI los ejecuta. Los nueve
+   experimentos de galería que consumen `rng(seed)` ya están en R1; los veinte restantes
+   conservan R0 porque son deterministas o todavía no declaran una sensibilidad de entradas
+   compatible. El siguiente paso es elevar la evidencia hacia R2 con lockfiles, snapshots de
+   runtime y tolerancias de plataforma sin perder la frontera verificable de R0.
    El Scientific Lab ya conserva la demo activa y sus parámetros en la URL para compartir y
    restaurar experimentos reproducibles desde el navegador. La navegación compacta y el catálogo
    de ejemplos ya tienen estados ARIA, foco de teclado, Escape, pestañas con flechas/Home/End y

@@ -18,8 +18,9 @@
   without changing their R0 maturity label.
 - Promoted `histogram` to the first, `boxplot` to the second, `scatter-fit` to the third, `violin` to the fourth, `hexbin` to the fifth, `bars` to the sixth, `point-cloud` to the seventh, `fft` to the eighth and `dashboard` to the ninth input-driven R1 bundle: their
   declared seeds and sample parameters are read from `data.json`, and the WASI replay changes
-  the seed and requires a changed SVG. The remaining random Viz fixtures stay at R0 until their
-  seeds are migrated.
+  the seed and requires a changed SVG. All gallery fixtures that consume `rng(seed)` are now
+  covered by this R1 contract; the remaining R0 fixtures are deterministic or lack a declared
+  input-sensitivity contract.
 
 ### Viz publication manifests
 

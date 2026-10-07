@@ -85,5 +85,4 @@ source reads `data.json`, the replay command checks the manifest and exact SVG, 
 parameter must change the output. The `lines` bundle now exercises the same generic sensitivity
 contract. RNG-consuming bundles record the xoshiro256**/splitmix64 implementation evidence and
 source hashes. `histogram` was the first input-driven seeded-randomness R1 bundle, `boxplot`
-the second, `scatter-fit` the third, `violin` the fourth, `hexbin` the fifth, `bars` the sixth, `point-cloud` the seventh, `fft` the eighth and `dashboard` the ninth; the remaining random fixtures still use source-literal seeds. Lockfiles and external runtime snapshots remain
-follow-up work, and the bundles do not claim R2/R3.
+the second, `scatter-fit` the third, `violin` the fourth, `hexbin` the fifth, `bars` the sixth, `point-cloud` the seventh, `fft` the eighth and `dashboard` the ninth; every gallery fixture that consumes `rng(seed)` is now covered by the R1 contract. The remaining R0 fixtures are deterministic or lack a declared input-sensitivity contract. Lockfiles and external runtime snapshots remain follow-up work, and the bundles do not claim R2/R3.
