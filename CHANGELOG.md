@@ -10,8 +10,11 @@
   input-driven seeded-randomness R1 sensitivity.
 
 - Generalized the executable input replay contract to `surface` and `lines`: each declares the
-  consumed parameter path and an alternate sensitivity value, and website CI verifies both
-  against `ostrinc.wasm` without changing the R0 maturity label.
+  consumed parameter path, an embedded `data.json` snapshot and a filesystem capability, and
+  website CI verifies the snapshot and alternate sensitivity value against `ostrinc.wasm`.
+- Promoted `surface` and `lines` to R2 external-input replay: their bundles now carry the snapshot
+  hash, declared parameters and capability contract, while complete runtime capture and R3 remain
+  pending.
 - Added source-backed `ostrin.rng/v1` evidence to source-literal RNG-consuming bundles: xoshiro256** with
   splitmix64 seeding, Marsaglia polar normals, deterministic `detmath::ln`, interpreter/native
   implementation hashes and explicit source-literal seed status. This documents the algorithm
@@ -31,7 +34,7 @@
   invocation output hashes and host capture visible; it does not claim R2/R3.
 - All 29 downloadable Viz experiment bundles now carry the same partial runtime snapshot, and
   the bundle verifier rejects missing or mismatched target/WASI/runtime evidence while preserving
-  their existing R0/R1 labels.
+  their explicit R0, R1 or R2 labels.
 
 ### Viz publication manifests
 
@@ -70,7 +73,7 @@
 
 - Added `scripts/project-plan-check.mjs` and its tests to compare the documented
   HIR/IR/AST ratchet with `compiler/tests/differential.rs`, preserve explicit
-  `Available`/`Planned` Viz maturity labels, and keep Linguist and R0/R1
+  `Available`/`Planned` Viz maturity labels, and keep Linguist and R0/R1/R2
   reproducibility evidence visible in the public plan.
 - Corrected the differential-test comment that had incorrectly described generic
   Quantity plotting as already lowered through IR/C.

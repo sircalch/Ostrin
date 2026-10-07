@@ -4,12 +4,23 @@
     "samples": 300
   },
   "description": "Recorded 300-sample damped oscillator series and envelope.",
+  "reproducibility": {
+    "level": "R2",
+    "label": "R2 · external snapshot replay verified",
+    "next": "R3 · auditable artifact (planned verification)"
+  },
   "execution": {
     "mode": "input-file",
     "input_file": "data.json",
     "consumes": [
       "parameters.samples"
     ],
+    "capabilities": ["filesystem.read:data.json"],
+    "snapshot": {
+      "path": "data.json",
+      "kind": "json",
+      "embedded": true
+    },
     "sensitivity": {
       "path": "parameters.samples",
       "alternate": 256

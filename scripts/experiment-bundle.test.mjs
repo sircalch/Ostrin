@@ -17,7 +17,7 @@ import {
   verifyExperimentBundle,
 } from "./experiment-bundle.mjs";
 
-test("the v0 experiment bundle has calculated hashes and an explicit R0/R1 boundary", () => {
+test("the v0 experiment bundle has calculated hashes and an explicit maturity boundary", () => {
   const result = verifyBundleFile(outputPath);
   assert.deepEqual(result.errors, []);
   const bundle = JSON.parse(readFileSync(outputPath, "utf8"));
@@ -117,6 +117,27 @@ test("seeded RNG bundles expose source-backed algorithm evidence and R1 replay m
   assert.equal(randomness.status, "input-driven-r1");
   const lines = buildExperimentBundle("lines");
   assert.equal(lines.provenance.randomness, undefined);
+});
+
+test("input-file bundles expose the R2 snapshot and capability contract", () => {
+  for (const id of ["surface", "lines"]) {
+    const bundle = buildExperimentBundle(id);
+    const execution = bundle.provenance.execution;
+    assert.equal(bundle.reproducibility.level, "R2");
+    assert.equal(bundle.reproducibility.label, "R2 · external snapshot replay verified");
+    assert.equal(bundle.provenance.level, "R2");
+    assert.equal(bundle.provenance.replay.level, "R2");
+    assert.equal(bundle.reproducibility.next, "R3 · auditable artifact (planned verification)");
+    assert.deepEqual(execution.capabilities, ["filesystem.read:data.json"]);
+    assert.deepEqual(execution.snapshot, { path: "data.json", kind: "json", embedded: true });
+    assert.deepEqual(bundle.provenance.runtime.input_snapshots, [{
+      path: "data.json",
+      kind: "json",
+      embedded: true,
+      sha256: bundle.manifest.files.find((entry) => entry.path === "data.json").sha256,
+    }]);
+    assert.equal(bundle.provenance.inputs[0].kind, "external-snapshot");
+  }
 });
 
 test("the fixture registry stays source-backed and parameterizable", () => {

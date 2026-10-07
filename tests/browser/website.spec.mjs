@@ -665,11 +665,21 @@ test("Viz exposes the recorded 3D surface experiment bundle", async ({ page }) =
   expect(bundle.id).toBe("surface");
   expect(bundle.provenance.parameters).toEqual({ scale: 1 });
   expect(bundle.provenance.camera).toEqual({ azimuth: -55, elevation: 28 });
-  expect(bundle.reproducibility.level).toBe("R0");
+  expect(bundle.reproducibility.level).toBe("R2");
+  expect(bundle.provenance.execution.capabilities).toEqual(["filesystem.read:data.json"]);
+  expect(bundle.provenance.runtime.input_snapshots[0].path).toBe("data.json");
   expect(bundle.files["figure.svg"]).toContain("<ostrin-provenance");
   for (const entry of bundle.manifest.files) {
     expect(entry.sha256).toBe(`sha256:${createHash("sha256").update(bundle.files[entry.path], "utf8").digest("hex")}`);
   }
+
+  const linesDownloadPromise = page.waitForEvent("download");
+  await page.locator('[data-viz-bundle="lines"]').click();
+  const linesDownload = await linesDownloadPromise;
+  const lines = JSON.parse(await readFile(await linesDownload.path(), "utf8"));
+  expect(lines.reproducibility.level).toBe("R2");
+  expect(lines.provenance.execution.capabilities).toEqual(["filesystem.read:data.json"]);
+  expect(lines.provenance.replay.level).toBe("R2");
 });
 
 test("Viz exposes the input-driven seeded R1 experiment bundles", async ({ page }) => {

@@ -302,7 +302,9 @@ en una consola de logs.
    perfil WASI, hashes de lockfiles/manifiestos disponibles y sitios de efecto, y marca explícitamente la
    salida como experimental/no verificada. El snapshot parcial ostrin.runtime/v1 ya expone la política de
    plataforma; aún faltan snapshots de entradas, hashes de salida de la invocación y metadatos capturados del
-   host para reclamar R2/R3.
+   host para reclamar R3 en el artefacto general. Los bundles `surface` y `lines` ya constituyen un
+   corte R2: embeben `data.json`, declaran la capacidad `filesystem.read:data.json`, conservan el
+   hash del snapshot y verifican la sensibilidad de sus parámetros en WASI.
 6. **Frontera WASM:** conectar la tabla con permisos del Scientific Lab; denegar red/E/S no declaradas y
    hacer visible la razón.
 7. **Visualización y notebook:** incrustar procedencia en figuras, tablas y estados compartibles; añadir

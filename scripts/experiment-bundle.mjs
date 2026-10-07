@@ -4,7 +4,8 @@
 // machine-readable provenance with hashes. Website CI replays every source
 // with the same WASI compiler and compares the complete SVG byte-for-byte;
 // input-driven seeded bundles can additionally claim R1 after their seed
-// sensitivity contract is verified. No bundle claims R2/R3.
+// sensitivity contract is verified; embedded external-input bundles can claim
+// R2 after their snapshot, capability and sensitivity contract is verified.
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -493,6 +494,13 @@ function provenanceFor(root, fixture, files, manifest) {
   const reproducibility = reproducibilityFor(inputs);
   const randomness = seededRandomnessEvidence(root, source, inputs);
   const runtime = runtimeSnapshotFor(root, fixture.sourcePath);
+  if (inputs.execution?.snapshot) {
+    runtime.input_snapshots = [{
+      ...inputs.execution.snapshot,
+      sha256: metadata.dataHash,
+    }];
+    runtime.missing = runtime.missing.filter((item) => item !== "input snapshots");
+  }
   return {
     schema: "ostrin.provenance/v0",
     level: reproducibility.level,
@@ -500,6 +508,7 @@ function provenanceFor(root, fixture, files, manifest) {
     levels: {
       R0: "Recorded source, inputs and outputs with calculated hashes.",
       R1: "Seeded replay with an input-driven seed, algorithm/version and stream partition; CI must verify seed sensitivity.",
+      R2: "Replay of an embedded external input snapshot with declared capabilities and parameters; CI must verify the snapshot and sensitivity contract.",
     },
     program: {
       source: "source.ostrin",
@@ -508,9 +517,10 @@ function provenanceFor(root, fixture, files, manifest) {
     },
     inputs: [{
       id: "data.json",
-      kind: "parameters",
+      kind: inputs.execution?.snapshot ? "external-snapshot" : "parameters",
       sha256: metadata.dataHash,
       seed: inputs.seed,
+      ...(inputs.execution?.snapshot ? { snapshot: inputs.execution.snapshot } : {}),
     }],
     outputs: [{
       id: "figure.svg",
@@ -524,7 +534,9 @@ function provenanceFor(root, fixture, files, manifest) {
       target: "wasm32-wasip1",
       command: "node scripts/lab-data.mjs --verify-replays",
       compares: "figure.svg",
-      note: reproducibility.level === "R1"
+      note: reproducibility.level === "R2"
+        ? "Website CI replays the embedded data.json snapshot under its declared filesystem capability and verifies that changing the declared parameter changes the figure."
+        : reproducibility.level === "R1"
         ? "Website CI compares the replayed SVG byte-for-byte and changes the declared data.json seed; the seeded xoshiro256** stream is verified for R1."
         : "Website CI compares the replayed SVG byte-for-byte with this bundled figure; R1 requires seeded-randomness evidence.",
     },
@@ -546,7 +558,9 @@ function provenanceFor(root, fixture, files, manifest) {
     ...(randomness ? { randomness } : {}),
     ...(inputs.execution ? { execution: inputs.execution } : {}),
     manifest_schema: manifest.schema,
-    limits: reproducibility.level === "R1"
+    limits: reproducibility.level === "R2"
+      ? "R2 external snapshot replay is verified in website CI for the embedded data.json, declared filesystem capability and parameter sensitivity. The bundle does not include complete runtime captures or an R3 auditable artifact guarantee."
+      : reproducibility.level === "R1"
       ? "R1 seeded replay is verified in website CI for the declared seed and algorithm contract. The bundle does not include external snapshots, lockfile contents, complete runtime captures or an R2/R3 replay guarantee."
       : "R0 exact SVG replay is verified in website CI. The bundle does not include seeded-randomness evidence for R1, external snapshots, lockfile contents, complete runtime captures or an R2/R3 replay guarantee.",
   };
@@ -613,7 +627,7 @@ export function verifyExperimentBundle(bundle, { expected, fixtureId } = {}) {
   if (bundle?.schema !== schema) errors.push(`schema must be ${schema}`);
   if (bundle?.id !== fixture.id) errors.push(`id must be ${fixture.id}`);
   const maturity = expected?.reproducibility;
-  if (!maturity || !["R0", "R1"].includes(maturity.level)) errors.push("bundle reproducibility level must be R0 or R1");
+  if (!maturity || !["R0", "R1", "R2"].includes(maturity.level)) errors.push("bundle reproducibility level must be R0, R1 or R2");
   if (JSON.stringify(bundle?.reproducibility) !== JSON.stringify(maturity)) errors.push("bundle reproducibility maturity drifted from the calculated fixture contract");
   const files = bundle?.files;
   const entries = bundle?.manifest?.files;
@@ -629,7 +643,9 @@ export function verifyExperimentBundle(bundle, { expected, fixtureId } = {}) {
   try { provenanceFile = JSON.parse(files?.["provenance.json"] ?? "null"); } catch { provenanceFile = null; }
   if (JSON.stringify(bundle?.provenance) !== JSON.stringify(provenanceFile)) errors.push("provenance.json is not the embedded provenance object");
   const replay = bundle?.provenance?.replay;
-  const replayNote = maturity?.level === "R1"
+  const replayNote = maturity?.level === "R2"
+    ? /embedded data\.json snapshot under its declared filesystem capability/.test(replay?.note ?? "")
+    : maturity?.level === "R1"
     ? /seeded xoshiro256\*\* stream is verified for R1/.test(replay?.note ?? "")
     : /R1 requires seeded-randomness evidence/.test(replay?.note ?? "");
   if (replay?.level !== maturity?.level || replay?.status !== "verified" || replay?.backend !== "ostrinc.wasm"
@@ -647,6 +663,25 @@ export function verifyExperimentBundle(bundle, { expected, fixtureId } = {}) {
     || runtime?.target !== "wasm32-wasip1" || runtime?.wasi !== "preview1"
     || runtime?.runner !== "WASI host") {
     errors.push("runtime snapshot is missing the partial WASI contract");
+  }
+  if (maturity?.level === "R2") {
+    const execution = bundle?.provenance?.execution;
+    const snapshot = execution?.snapshot;
+    if (!Array.isArray(execution?.capabilities)
+      || !execution.capabilities.includes(`filesystem.read:${execution?.input_file}`)) {
+      errors.push("R2 replay contract is missing the filesystem capability for its input snapshot");
+    }
+    if (!snapshot || snapshot.path !== execution?.input_file || snapshot.embedded !== true) {
+      errors.push("R2 replay contract is missing an embedded input snapshot");
+    }
+    const snapshotRecord = runtime?.input_snapshots?.find((entry) => entry.path === snapshot?.path);
+    const inputEntry = entries?.find((entry) => entry.path === execution?.input_file);
+    if (!snapshotRecord || snapshotRecord.sha256 !== inputEntry?.sha256) {
+      errors.push("R2 runtime snapshot hash does not match the bundled input");
+    }
+    if (!bundle?.provenance?.parameters || typeof bundle.provenance.parameters !== "object") {
+      errors.push("R2 replay contract is missing declared parameters");
+    }
   }
   if (JSON.stringify(bundle?.experiment) !== JSON.stringify(expected?.experiment)) errors.push("experiment file map drifted");
   if (bundle?.provenance?.commit !== expected?.provenance?.commit) errors.push("provenance commit drifted from the source-backed fixture revision");
