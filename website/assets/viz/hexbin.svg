@@ -3,7 +3,7 @@
 <rect width="640" height="400" fill="#ffffff"/>
 
 <text x="66" y="26" text-anchor="start" font-size="16" fill="#1f2937" font-weight="600">Bivariate density</text>
-<text x="66" y="45" text-anchor="start" font-size="12" fill="#6b7280">1 200 seeded observations counted into hexagonal bins</text>
+<text x="66" y="45" text-anchor="start" font-size="12" fill="#6b7280">1200 seeded observations counted into hexagonal bins, seed 91</text>
 <defs><clipPath id="clip692278225871859476"><rect x="66" y="62" width="488" height="286"/></clipPath></defs>
 <line x1="126.39" y1="348" x2="126.39" y2="353" stroke="#9ca3af" stroke-width="1"/>
 <text x="126.39" y="366" text-anchor="middle" font-size="11" fill="#6b7280">-1.5</text>
@@ -49,5 +49,5 @@
 <text x="618" y="205" text-anchor="middle" font-size="11" fill="#6b7280" transform="rotate(-90 618 205)">observations</text>
 
 
-  <ostrin-provenance source-hash="sha256:9a15a0118d3bc9b162e4acab29d53da3a21015b355101b50131878f618351882" data-hash="sha256:a71098a31125e571040bfffe38437f481b0cb438e3b9bc098d41e00e0c9b8d3f" seed="seed=91" compiler="ostrinc 0.1.0" />
+  <ostrin-provenance source-hash="sha256:0d671f7856e41a73a2a02283ae35d125c60478ad2f1647195c403ce9ed310db1" data-hash="sha256:4bc18dd027ea0f53e01e159a1b537070c58e4ae51e5fe348e51e754f72a1ce01" seed="seed=91" compiler="ostrinc 0.1.0" />
 </svg>

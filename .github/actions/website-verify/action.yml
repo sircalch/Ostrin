@@ -45,6 +45,7 @@ runs:
         node scripts/experiment-replay.mjs --fixture boxplot
         node scripts/experiment-replay.mjs --fixture scatter-fit
         node scripts/experiment-replay.mjs --fixture violin
+        node scripts/experiment-replay.mjs --fixture hexbin
         node --test scripts/experiment-replay.test.mjs
         node scripts/viz-jsonld.mjs
         node scripts/experiment-bundle.mjs

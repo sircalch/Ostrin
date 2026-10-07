@@ -1152,22 +1152,22 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "bundle": "assets/experiments/hexbin.ostrin-experiment.json",
       "source": "examples/viz_hexbin.ostrin",
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_hexbin.ostrin",
-      "code": "// std.viz · hexbin density: a bivariate sample counted in Ostrin.\nimport std.viz\n\nfn main() -> Void {\n    n = 1200\n    r = rng(91)\n    noise_x = r.randn([n])\n    noise_y = r.randn([n])\n    mut xs = zeros([n])\n    mut ys = zeros([n])\n    for i in 0 until n {\n        cluster = if i < 600 { 0.0 } else { 1.0 }\n        center_x = if cluster == 0.0 { -0.85 } else { 0.95 }\n        center_y = if cluster == 0.0 { -0.55 } else { 0.7 }\n        spread_x = if cluster == 0.0 { 0.38 } else { 0.26 }\n        spread_y = if cluster == 0.0 { 0.28 } else { 0.48 }\n        xs.set(i, noise_x[i] * spread_x + center_x)\n        ys.set(i, noise_y[i] * spread_y + center_y)\n    }\n    fig = viz.figure(\"Bivariate density\")\n        .describe(\"1 200 seeded observations counted into hexagonal bins\")\n        .labels(\"x\", \"y\")\n        .hexbin(xs, ys, 18, 14, \"magma\", \"observations\")\n    print(fig.svg())\n}\n",
+      "code": "// std.viz · hexbin density: a bivariate sample counted in Ostrin.\nimport std.viz\nimport std.json\n\nfn input_int(key: String, fallback: Int) -> Int {\n    loaded = read_file(\"data.json\")\n    if loaded.is_err() {\n        return fallback\n    }\n    document = json.parse(loaded.unwrap())\n    if document.is_err() {\n        return fallback\n    }\n    value = json.object_get(document.unwrap(), key)\n    if value.is_none() {\n        return fallback\n    }\n    number = json.as_number(value.unwrap())\n    if number.is_none() {\n        return fallback\n    }\n    number.unwrap() as Int\n}\n\nfn input_parameter_int(key: String, fallback: Int) -> Int {\n    loaded = read_file(\"data.json\")\n    if loaded.is_err() {\n        return fallback\n    }\n    document = json.parse(loaded.unwrap())\n    if document.is_err() {\n        return fallback\n    }\n    parameters = json.object_get(document.unwrap(), \"parameters\")\n    if parameters.is_none() {\n        return fallback\n    }\n    value = json.object_get(parameters.unwrap(), key)\n    if value.is_none() {\n        return fallback\n    }\n    number = json.as_number(value.unwrap())\n    if number.is_none() {\n        return fallback\n    }\n    number.unwrap() as Int\n}\n\nfn main() -> Void {\n    seed = input_int(\"seed\", 91)\n    n = input_parameter_int(\"samples\", 1200)\n    bins_x = input_parameter_int(\"bins_x\", 18)\n    bins_y = input_parameter_int(\"bins_y\", 14)\n    r = rng(seed)\n    noise_x = r.randn([n])\n    noise_y = r.randn([n])\n    mut xs = zeros([n])\n    mut ys = zeros([n])\n    half = n / 2\n    for i in 0 until n {\n        cluster = if i < half { 0.0 } else { 1.0 }\n        center_x = if cluster == 0.0 { -0.85 } else { 0.95 }\n        center_y = if cluster == 0.0 { -0.55 } else { 0.7 }\n        spread_x = if cluster == 0.0 { 0.38 } else { 0.26 }\n        spread_y = if cluster == 0.0 { 0.28 } else { 0.48 }\n        xs.set(i, noise_x[i] * spread_x + center_x)\n        ys.set(i, noise_y[i] * spread_y + center_y)\n    }\n    fig = viz.figure(\"Bivariate density\")\n        .describe(n.to_string() + \" seeded observations counted into hexagonal bins, seed \" + seed.to_string())\n        .labels(\"x\", \"y\")\n        .hexbin(xs, ys, bins_x, bins_y, \"magma\", \"observations\")\n    print(fig.svg())\n}\n",
       "svg": "assets/viz/hexbin.svg",
       "capabilities": [
         "2d",
         "reproducibility"
       ],
       "provenance": {
-        "source-hash": "sha256:9a15a0118d3bc9b162e4acab29d53da3a21015b355101b50131878f618351882",
-        "data-hash": "sha256:a71098a31125e571040bfffe38437f481b0cb438e3b9bc098d41e00e0c9b8d3f",
+        "source-hash": "sha256:0d671f7856e41a73a2a02283ae35d125c60478ad2f1647195c403ce9ed310db1",
+        "data-hash": "sha256:4bc18dd027ea0f53e01e159a1b537070c58e4ae51e5fe348e51e754f72a1ce01",
         "seed": "seed=91",
         "compiler": "ostrinc 0.1.0"
       },
       "reproducibility": {
-        "level": "R0",
-        "label": "R0 · exact replay verified",
-        "next": "R1 · seeded replay (planned verification)"
+        "level": "R1",
+        "label": "R1 · seeded replay verified",
+        "next": "R2 · external snapshots (planned verification)"
       },
       "printed": [
         ""
