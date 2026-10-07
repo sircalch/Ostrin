@@ -7,22 +7,23 @@
 - Added exact-replay `ostrin.experiment/v0` bundles for every one of the 29 Viz gallery figures,
   including continuous and frame animations, tables, statistical plots and 3D scenes. Website CI
   now replays all registered fixtures byte-for-byte; `histogram`, `boxplot`, `scatter-fit`, `violin`, `hexbin`, `bars`, `point-cloud`, `fft` and `dashboard` also verify
-  input-driven seeded-randomness R1 sensitivity.
+  input-driven seeded-randomness sensitivity; those nine seeded fixtures now retain their R1
+  algorithm evidence inside the R2 input-snapshot contract.
 
 - Generalized the executable input replay contract to `surface` and `lines`: each declares the
   consumed parameter path, an embedded `data.json` snapshot and a filesystem capability, and
   website CI verifies the snapshot and alternate sensitivity value against `ostrinc.wasm`.
-- Promoted `surface` and `lines` to R2 external-input replay: their bundles now carry the snapshot
-  hash, declared parameters and capability contract, while complete runtime capture and R3 remain
-  pending.
+- Promoted all eleven input-driven bundles to R2 external-input replay: their bundles now carry the
+  snapshot hash, declared parameters and capability contract; the nine seeded fixtures retain their
+  R1 algorithm/partition evidence, while complete runtime capture and R3 remain pending.
 - Added source-backed `ostrin.rng/v1` evidence to source-literal RNG-consuming bundles: xoshiro256** with
   splitmix64 seeding, Marsaglia polar normals, deterministic `detmath::ln`, interpreter/native
   implementation hashes and explicit source-literal seed status. This documents the algorithm
   without changing their R0 maturity label.
-- Promoted `histogram` to the first, `boxplot` to the second, `scatter-fit` to the third, `violin` to the fourth, `hexbin` to the fifth, `bars` to the sixth, `point-cloud` to the seventh, `fft` to the eighth and `dashboard` to the ninth input-driven R1 bundle: their
+- Promoted `histogram` to the first, `boxplot` to the second, `scatter-fit` to the third, `violin` to the fourth, `hexbin` to the fifth, `bars` to the sixth, `point-cloud` to the seventh, `fft` to the eighth and `dashboard` to the ninth seeded input-driven bundle; after adding the external snapshot contract, all eleven now claim R2 while retaining their
   declared seeds and sample parameters are read from `data.json`, and the WASI replay changes
   the seed and requires a changed SVG. All gallery fixtures that consume `rng(seed)` are now
-  covered by this R1 contract; the remaining R0 fixtures are deterministic or lack a declared
+  covered by this R1 prerequisite; the remaining R0 fixtures are deterministic or lack a declared
   input-sensitivity contract.
 
 ### Partial runtime provenance snapshot

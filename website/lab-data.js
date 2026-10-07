@@ -1072,14 +1072,14 @@ globalThis.OSTRIN_LAB = Object.freeze({
       ],
       "provenance": {
         "source-hash": "sha256:001a0b89c33606cdb2ab1412c56c0fcffe4e2a51d00d00aad8d43498e9acf27d",
-        "data-hash": "sha256:3c24ec43fb4766736faeb4640ba8eed153cc661365eac55c6410d125c3ecbae7",
+        "data-hash": "sha256:f2b27439549bf55bdedba159921cb8774c2d8d4a93e51535332590774608932b",
         "seed": "seed=7",
         "compiler": "ostrinc 0.1.0"
       },
       "reproducibility": {
-        "level": "R1",
-        "label": "R1 · seeded replay verified",
-        "next": "R2 · external snapshots (planned verification)"
+        "level": "R2",
+        "label": "R2 · external snapshot replay verified",
+        "next": "R3 · auditable artifact (planned verification)"
       },
       "printed": [
         "mean 3.97, sd 1.49, p95 6.42",
@@ -1102,14 +1102,14 @@ globalThis.OSTRIN_LAB = Object.freeze({
       ],
       "provenance": {
         "source-hash": "sha256:c8e3fde67e369bef08aebfd764765484e915c633ba7823f57f70de048687715c",
-        "data-hash": "sha256:270720dd40d7a02c80f5af42da5871cc6faa4951f13efb2d29d811bf66a8136d",
+        "data-hash": "sha256:26744d835070f73f65e196d328b05ad01e0a923e67437e1bd767344a4f8d8982",
         "seed": "seed=41",
         "compiler": "ostrinc 0.1.0"
       },
       "reproducibility": {
-        "level": "R1",
-        "label": "R1 · seeded replay verified",
-        "next": "R2 · external snapshots (planned verification)"
+        "level": "R2",
+        "label": "R2 · external snapshot replay verified",
+        "next": "R3 · auditable artifact (planned verification)"
       },
       "printed": [
         ""
@@ -1131,14 +1131,14 @@ globalThis.OSTRIN_LAB = Object.freeze({
       ],
       "provenance": {
         "source-hash": "sha256:f7ad796cfe48ab2249b01adc4a9563d8240234be03054753876e4c9f2b55d877",
-        "data-hash": "sha256:27832d0e2875f97710cab71e72918b37924692f842b6b4acc7f63fa2eb7fef4c",
+        "data-hash": "sha256:813876a2052d2f5b14332aba9a209814670b253982c5932ffb31b6e3dcb22c86",
         "seed": "seed=73",
         "compiler": "ostrinc 0.1.0"
       },
       "reproducibility": {
-        "level": "R1",
-        "label": "R1 · seeded replay verified",
-        "next": "R2 · external snapshots (planned verification)"
+        "level": "R2",
+        "label": "R2 · external snapshot replay verified",
+        "next": "R3 · auditable artifact (planned verification)"
       },
       "printed": [
         ""
@@ -1160,14 +1160,14 @@ globalThis.OSTRIN_LAB = Object.freeze({
       ],
       "provenance": {
         "source-hash": "sha256:0d671f7856e41a73a2a02283ae35d125c60478ad2f1647195c403ce9ed310db1",
-        "data-hash": "sha256:4bc18dd027ea0f53e01e159a1b537070c58e4ae51e5fe348e51e754f72a1ce01",
+        "data-hash": "sha256:036b628b6decc7c51f9f1b09144dbf5b9ca10ff1048801ff2fa0f0cc28306058",
         "seed": "seed=91",
         "compiler": "ostrinc 0.1.0"
       },
       "reproducibility": {
-        "level": "R1",
-        "label": "R1 · seeded replay verified",
-        "next": "R2 · external snapshots (planned verification)"
+        "level": "R2",
+        "label": "R2 · external snapshot replay verified",
+        "next": "R3 · auditable artifact (planned verification)"
       },
       "printed": [
         ""
@@ -1189,14 +1189,14 @@ globalThis.OSTRIN_LAB = Object.freeze({
       ],
       "provenance": {
         "source-hash": "sha256:13093744a1e49336e8a247733b8b2d7fc3b391fb91fb1090468bd70d3bc74538",
-        "data-hash": "sha256:02bcd5fef25524e0cdeb0f132eaf1a6fd7fc580c790529643ac40cd701b4ed28",
+        "data-hash": "sha256:eb4ed4dbf2105acb3eb05c4ab990e24b454a4f107512aaf51d2a0e77e55f70bf",
         "seed": "seed=5",
         "compiler": "ostrinc 0.1.0"
       },
       "reproducibility": {
-        "level": "R1",
-        "label": "R1 · seeded replay verified",
-        "next": "R2 · external snapshots (planned verification)"
+        "level": "R2",
+        "label": "R2 · external snapshot replay verified",
+        "next": "R3 · auditable artifact (planned verification)"
       },
       "printed": [
         ""
@@ -1305,14 +1305,14 @@ globalThis.OSTRIN_LAB = Object.freeze({
       ],
       "provenance": {
         "source-hash": "sha256:751d3ec4af7bc7c91521b8393ec5ca8f84893662f5ec7c4de1b4a416474b6b7a",
-        "data-hash": "sha256:7efcad280005c7919f4d812038deec35acd3dae274029de741fd7782b75e9ab3",
+        "data-hash": "sha256:c106c16c6e107ee2b9f12a04dc4ebd345b070a4abe1b9f49ec3ac5fe471c860a",
         "seed": "seed=2024",
         "compiler": "ostrinc 0.1.0"
       },
       "reproducibility": {
-        "level": "R1",
-        "label": "R1 · seeded replay verified",
-        "next": "R2 · external snapshots (planned verification)"
+        "level": "R2",
+        "label": "R2 · external snapshot replay verified",
+        "next": "R3 · auditable artifact (planned verification)"
       },
       "printed": [
         "slope 1.8, intercept 2.19, r2 0.98, residual sd 0.8",
@@ -1366,14 +1366,14 @@ globalThis.OSTRIN_LAB = Object.freeze({
       ],
       "provenance": {
         "source-hash": "sha256:cac0fae2f2c664c755b8d7f9819443acefad6e61ba8e3d1c77612dd89ea24394",
-        "data-hash": "sha256:65cdfc36cd8c4c0281c0a177c1a248462ed76359ba82fa1477886a269721faf1",
+        "data-hash": "sha256:8f9a389b20886a1d316527ffa6749158751a3196b86a96a97d63e1d9b52353dc",
         "seed": "seed=11",
         "compiler": "ostrinc 0.1.0"
       },
       "reproducibility": {
-        "level": "R1",
-        "label": "R1 · seeded replay verified",
-        "next": "R2 · external snapshots (planned verification)"
+        "level": "R2",
+        "label": "R2 · external snapshot replay verified",
+        "next": "R3 · auditable artifact (planned verification)"
       },
       "printed": [
         ""
@@ -1425,14 +1425,14 @@ globalThis.OSTRIN_LAB = Object.freeze({
       ],
       "provenance": {
         "source-hash": "sha256:c237e5d0c4af1e8e7b15e39443307b462809debf84b6513cc0b86ca710ed1728",
-        "data-hash": "sha256:df50c71965646b8cf1d4500eb5007f97c3f7a653dce4382a1b82992d02ded0b2",
+        "data-hash": "sha256:a95ef8bf2853a05f13825666ffd714b4cd5083308f4faa5c69d55543053047fc",
         "seed": "seed=42",
         "compiler": "ostrinc 0.1.0"
       },
       "reproducibility": {
-        "level": "R1",
-        "label": "R1 · seeded replay verified",
-        "next": "R2 · external snapshots (planned verification)"
+        "level": "R2",
+        "label": "R2 · external snapshot replay verified",
+        "next": "R3 · auditable artifact (planned verification)"
       },
       "printed": [
         "peak at 50 Hz: 1, at 120 Hz: 0.59",
@@ -1669,14 +1669,14 @@ globalThis.OSTRIN_LAB = Object.freeze({
       ],
       "provenance": {
         "source-hash": "sha256:ebcde66da78af85c35717f0e98a0f81a7a99a402c1401417f4a9d2213c714882",
-        "data-hash": "sha256:14835ac83832328c6b892a80607eb13502086e89c7c6b9595dae2cef737847b9",
+        "data-hash": "sha256:7553078b74342099848ae02c4db6d51d76b5ac53b96a61c5f3b53d2a1821ec18",
         "seed": "seed=3",
         "compiler": "ostrinc 0.1.0"
       },
       "reproducibility": {
-        "level": "R1",
-        "label": "R1 · seeded replay verified",
-        "next": "R2 · external snapshots (planned verification)"
+        "level": "R2",
+        "label": "R2 · external snapshot replay verified",
+        "next": "R3 · auditable artifact (planned verification)"
       },
       "printed": [
         ""

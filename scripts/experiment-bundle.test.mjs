@@ -87,7 +87,7 @@ test("shared fixture metadata stays identical across normalized SVG and bundle",
   }
 });
 
-test("seeded RNG bundles expose source-backed algorithm evidence and R1 replay metadata", () => {
+test("seeded RNG bundles expose source-backed algorithm evidence inside the R2 replay contract", () => {
   const histogram = buildExperimentBundle("histogram");
   const boxplot = buildExperimentBundle("boxplot");
   const scatterFit = buildExperimentBundle("scatter-fit");
@@ -99,11 +99,13 @@ test("seeded RNG bundles expose source-backed algorithm evidence and R1 replay m
   const dashboard = buildExperimentBundle("dashboard");
   const randomness = histogram.provenance.randomness;
   for (const bundle of [histogram, boxplot, scatterFit, violin, hexbin, bars, pointCloud, fft, dashboard]) {
-    assert.equal(bundle.reproducibility.level, "R1");
-    assert.equal(bundle.reproducibility.label, "R1 · seeded replay verified");
-    assert.equal(bundle.provenance.level, "R1");
-    assert.equal(bundle.provenance.replay.level, "R1");
-    assert.equal(bundle.reproducibility.next, "R2 · external snapshots (planned verification)");
+    assert.equal(bundle.reproducibility.level, "R2");
+    assert.equal(bundle.reproducibility.label, "R2 · external snapshot replay verified");
+    assert.equal(bundle.provenance.level, "R2");
+    assert.equal(bundle.provenance.replay.level, "R2");
+    assert.equal(bundle.reproducibility.next, "R3 · auditable artifact (planned verification)");
+    assert.deepEqual(bundle.provenance.execution.capabilities, ["filesystem.read:data.json"]);
+    assert.deepEqual(bundle.provenance.execution.snapshot, { path: "data.json", kind: "json", embedded: true });
     assert.equal(bundle.provenance.randomness.seed_consumption, "data.json:seed");
     assert.equal(bundle.provenance.randomness.status, "input-driven-r1");
   }
@@ -127,7 +129,7 @@ test("seeded RNG bundles expose source-backed algorithm evidence and R1 replay m
 });
 
 test("input-file bundles expose the R2 snapshot and capability contract", () => {
-  for (const id of ["surface", "lines"]) {
+  for (const id of ["surface", "lines", "histogram", "boxplot", "scatter-fit", "violin", "hexbin", "bars", "point-cloud", "fft", "dashboard"]) {
     const bundle = buildExperimentBundle(id);
     const execution = bundle.provenance.execution;
     assert.equal(bundle.reproducibility.level, "R2");

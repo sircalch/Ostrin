@@ -3,9 +3,9 @@
 // The v0 bundles carry source, declared inputs, recorded figures and
 // machine-readable provenance with hashes. Website CI replays every source
 // with the same WASI compiler and compares the complete SVG byte-for-byte;
-// input-driven seeded bundles can additionally claim R1 after their seed
-// sensitivity contract is verified; embedded external-input bundles can claim
-// R2 after their snapshot, capability and sensitivity contract is verified.
+// input-driven seeded bundles retain an R1 algorithm/partition prerequisite after
+// their seed sensitivity contract is verified; embedded external-input bundles can
+// claim R2 after their snapshot, capability and sensitivity contract is verified.
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -462,7 +462,7 @@ function seededRandomnessEvidence(root, source, inputs) {
   }
   const inputDriven = inputs.execution?.randomness?.seed_path === "seed"
     && inputs.execution?.consumes?.includes("seed")
-    && reproducibilityFor(inputs).level === "R1";
+    && ["R1", "R2"].includes(reproducibilityFor(inputs).level);
   const implementationPaths = [
     "compiler/src/interpreter/rng.rs",
     "compiler/src/rng_runtime.c",
@@ -544,7 +544,9 @@ function provenanceFor(root, fixture, files, manifest) {
       target: "wasm32-wasip1",
       command: "node scripts/lab-data.mjs --verify-replays",
       compares: "figure.svg",
-      note: reproducibility.level === "R2"
+      note: reproducibility.level === "R2" && randomness
+        ? "Website CI replays the embedded data.json snapshot under its declared filesystem capability, changes the declared seed and verifies the seeded xoshiro256** stream and changed SVG."
+        : reproducibility.level === "R2"
         ? "Website CI replays the embedded data.json snapshot under its declared filesystem capability and verifies that changing the declared parameter changes the figure."
         : reproducibility.level === "R1"
         ? "Website CI compares the replayed SVG byte-for-byte and changes the declared data.json seed; the seeded xoshiro256** stream is verified for R1."
@@ -568,7 +570,9 @@ function provenanceFor(root, fixture, files, manifest) {
     ...(randomness ? { randomness } : {}),
     ...(inputs.execution ? { execution: inputs.execution } : {}),
     manifest_schema: manifest.schema,
-    limits: reproducibility.level === "R2"
+    limits: reproducibility.level === "R2" && randomness
+      ? "R2 external snapshot replay and the seeded xoshiro256** sensitivity contract are verified in website CI. The bundle does not include complete runtime captures or an R3 auditable artifact guarantee."
+      : reproducibility.level === "R2"
       ? "R2 external snapshot replay is verified in website CI for the embedded data.json, declared filesystem capability and parameter sensitivity. The bundle does not include complete runtime captures or an R3 auditable artifact guarantee."
       : reproducibility.level === "R1"
       ? "R1 seeded replay is verified in website CI for the declared seed and algorithm contract. The bundle does not include external snapshots, lockfile contents, complete runtime captures or an R2/R3 replay guarantee."
@@ -665,6 +669,29 @@ export function verifyExperimentBundle(bundle, { expected, fixtureId } = {}) {
   }
   if (bundle?.provenance?.level !== maturity?.level || JSON.stringify(bundle?.provenance?.reproducibility) !== JSON.stringify(maturity)) {
     errors.push("provenance reproducibility maturity drifted from the bundle contract");
+  }
+  const seeded = maturity?.level === "R1" || (
+    maturity?.level === "R2" && bundle?.provenance?.randomness?.status === "input-driven-r1"
+  );
+  if (seeded) {
+    const execution = bundle?.provenance?.execution;
+    const randomness = execution?.randomness;
+    const evidence = bundle?.provenance?.randomness;
+    if (!randomness || randomness.seed_path !== execution?.sensitivity?.path) {
+      errors.push("seeded replay must declare a randomness seed path equal to the sensitivity path");
+    }
+    if (typeof randomness?.seed_path !== "string" || !execution?.consumes?.includes(randomness.seed_path)) {
+      errors.push("seeded randomness seed path must be listed in consumed inputs");
+    }
+    if (randomness?.algorithm !== evidence?.algorithm || randomness?.version !== evidence?.version) {
+      errors.push("seeded randomness algorithm/version does not match provenance evidence");
+    }
+    if (randomness?.partition !== evidence?.partition) {
+      errors.push("seeded randomness partition does not match provenance evidence");
+    }
+    if (evidence?.status !== "input-driven-r1" || evidence?.seed_consumption !== `data.json:${randomness?.seed_path}`) {
+      errors.push("provenance does not prove input-driven seed consumption");
+    }
   }
   const runtime = bundle?.provenance?.runtime;
   const expectedRuntime = expected?.provenance?.runtime;

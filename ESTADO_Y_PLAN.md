@@ -506,9 +506,9 @@ sustituye la adopción independiente; por eso el plan mantiene un frente explíc
   cámara, y los de azar conservan su semilla declarada. `surface` y `lines` ya añaden cortes
   ejecutables input-driven: `surface` lee `data.json` y `lines` consume `parameters.samples`;
   `scripts/experiment-replay.mjs` verifica los once bundles en WASI y demuestra que cambiar el
-  parámetro declarado cambia la figura. `surface` y `lines` ahora reclaman R2 porque sus snapshots
-  `data.json`, capacidades de filesystem y sensibilidad de parámetros están verificadas; los nueve
-  cortes de azar sembrado mantienen R1 y R3 sigue pendiente. `histogram` fue el primer corte
+  parámetro declarado cambia la figura. `surface` y `lines` fueron los primeros cortes R2 porque sus snapshots
+  `data.json`, capacidades de filesystem y sensibilidad de parámetros están verificadas; ahora los once
+  cortes input-driven reclaman R2, los nueve de azar sembrado conservan su evidencia R1 y R3 sigue pendiente. `histogram` fue el primer corte
   R1, `boxplot` el segundo, `scatter-fit` el tercero, `violin` el cuarto, `hexbin` el quinto, `bars` el sexto, `point-cloud` el séptimo, `fft` el octavo y `dashboard` el noveno: los nueve consumen `seed` desde `data.json`, registran
   algoritmo/versión/partición y el replay cambia la semilla para exigir una figura distinta.
   Los manifiestos de figura ya serializan el estado vivo seleccionado desde el explorador
@@ -516,13 +516,13 @@ sustituye la adopción independiente; por eso el plan mantiene un frente explíc
   metadatos de fuente y versión. Los bundles que invocan `rng(seed)` ya incluyen evidencia
   source-backed del contrato `ostrin.rng/v1` (xoshiro256**, splitmix64, Marsaglia polar y
   `detmath::ln`) con hashes de las implementaciones intérprete/nativa; `histogram`, `boxplot`,
-  `scatter-fit`, `violin`, `hexbin`, `bars`, `point-cloud`, `fft` y `dashboard` ya elevan esa evidencia a R1 mediante sus contratos input-driven y la sensibilidad de semilla
+  `scatter-fit`, `violin`, `hexbin`, `bars`, `point-cloud`, `fft` y `dashboard` ya conservan esa evidencia R1 dentro de sus contratos input-driven R2 y la sensibilidad de semilla
   verificada en CI.
   Los nueve experimentos de galería que consumen `rng(seed)` ya tienen el comando de replay y
-  la sensibilidad de semilla verificados en R1. Los dieciocho bundles restantes conservan R0 por
+  la sensibilidad de semilla verificados como evidencia R1 dentro de R2. Los dieciocho bundles restantes conservan R0 por
   ser deterministas o no declarar todavía una sensibilidad de entradas compatible. Falta añadir
-  capacidades y snapshots externos a más fixtures, metadatos capturados del host y tolerancias de
-  plataforma para completar R2 en más fixtures, y conservar R3 como pendiente;
+  metadatos capturados del host y tolerancias de plataforma, extender el contrato input-driven a más
+  fixtures y conservar R3 como pendiente;
 - publicar benchmarks históricos por commit y métricas de adopción solo con una política de
   privacidad clara. Estas evidencias alimentan después el snapshot de Linguist y la propuesta
   upstream, pero no se presentan como adopción hasta que existan usuarios y proyectos externos.

@@ -682,7 +682,7 @@ test("Viz exposes the recorded 3D surface experiment bundle", async ({ page }) =
   expect(lines.provenance.replay.level).toBe("R2");
 });
 
-test("Viz exposes the input-driven seeded R1 experiment bundles", async ({ page }) => {
+test("Viz exposes the input-driven seeded R2 experiment bundles", async ({ page }) => {
   await page.goto("./viz.html", { waitUntil: "domcontentloaded" });
   await expect(page.locator('[data-viz-bundle="histogram"]')).toBeVisible();
   const bundleDownloadPromise = page.waitForEvent("download");
@@ -690,89 +690,89 @@ test("Viz exposes the input-driven seeded R1 experiment bundles", async ({ page 
   const bundleDownload = await bundleDownloadPromise;
   expect(bundleDownload.suggestedFilename()).toBe("histogram-and-density.ostrin-experiment.json");
   const bundle = JSON.parse(await readFile(await bundleDownload.path(), "utf8"));
-  expect(bundle.reproducibility.level).toBe("R1");
+  expect(bundle.reproducibility.level).toBe("R2");
   expect(bundle.provenance.execution.randomness.seed_path).toBe("seed");
   expect(bundle.provenance.randomness.seed_consumption).toBe("data.json:seed");
-  expect(bundle.provenance.replay.level).toBe("R1");
+  expect(bundle.provenance.replay.level).toBe("R2");
 
   const boxplotDownloadPromise = page.waitForEvent("download");
   await page.locator('[data-viz-bundle="boxplot"]').click();
   const boxplotDownload = await boxplotDownloadPromise;
   expect(boxplotDownload.suggestedFilename()).toBe("grouped-boxplots.ostrin-experiment.json");
   const boxplot = JSON.parse(await readFile(await boxplotDownload.path(), "utf8"));
-  expect(boxplot.reproducibility.level).toBe("R1");
+  expect(boxplot.reproducibility.level).toBe("R2");
   expect(boxplot.provenance.execution.randomness.seed_path).toBe("seed");
   expect(boxplot.provenance.randomness.seed_consumption).toBe("data.json:seed");
-  expect(boxplot.provenance.replay.level).toBe("R1");
+  expect(boxplot.provenance.replay.level).toBe("R2");
 
   const scatterFitDownloadPromise = page.waitForEvent("download");
   await page.locator('[data-viz-bundle="scatter-fit"]').click();
   const scatterFitDownload = await scatterFitDownloadPromise;
   expect(scatterFitDownload.suggestedFilename()).toBe("scatter-and-fit.ostrin-experiment.json");
   const scatterFit = JSON.parse(await readFile(await scatterFitDownload.path(), "utf8"));
-  expect(scatterFit.reproducibility.level).toBe("R1");
+  expect(scatterFit.reproducibility.level).toBe("R2");
   expect(scatterFit.provenance.execution.randomness.seed_path).toBe("seed");
   expect(scatterFit.provenance.randomness.seed_consumption).toBe("data.json:seed");
-  expect(scatterFit.provenance.replay.level).toBe("R1");
+  expect(scatterFit.provenance.replay.level).toBe("R2");
 
   const violinDownloadPromise = page.waitForEvent("download");
   await page.locator('[data-viz-bundle="violin"]').click();
   const violinDownload = await violinDownloadPromise;
   expect(violinDownload.suggestedFilename()).toBe("kernel-density-violins.ostrin-experiment.json");
   const violin = JSON.parse(await readFile(await violinDownload.path(), "utf8"));
-  expect(violin.reproducibility.level).toBe("R1");
+  expect(violin.reproducibility.level).toBe("R2");
   expect(violin.provenance.execution.randomness.seed_path).toBe("seed");
   expect(violin.provenance.randomness.seed_consumption).toBe("data.json:seed");
-  expect(violin.provenance.replay.level).toBe("R1");
+  expect(violin.provenance.replay.level).toBe("R2");
 
   const hexbinDownloadPromise = page.waitForEvent("download");
   await page.locator('[data-viz-bundle="hexbin"]').click();
   const hexbinDownload = await hexbinDownloadPromise;
   expect(hexbinDownload.suggestedFilename()).toBe("hexbin-density.ostrin-experiment.json");
   const hexbin = JSON.parse(await readFile(await hexbinDownload.path(), "utf8"));
-  expect(hexbin.reproducibility.level).toBe("R1");
+  expect(hexbin.reproducibility.level).toBe("R2");
   expect(hexbin.provenance.execution.randomness.seed_path).toBe("seed");
   expect(hexbin.provenance.randomness.seed_consumption).toBe("data.json:seed");
-  expect(hexbin.provenance.replay.level).toBe("R1");
+  expect(hexbin.provenance.replay.level).toBe("R2");
 
   const barsDownloadPromise = page.waitForEvent("download");
   await page.locator('[data-viz-bundle="bars"]').click();
   const barsDownload = await barsDownloadPromise;
   expect(barsDownload.suggestedFilename()).toBe("bars-with-error-bars.ostrin-experiment.json");
   const bars = JSON.parse(await readFile(await barsDownload.path(), "utf8"));
-  expect(bars.reproducibility.level).toBe("R1");
+  expect(bars.reproducibility.level).toBe("R2");
   expect(bars.provenance.execution.randomness.seed_path).toBe("seed");
   expect(bars.provenance.randomness.seed_consumption).toBe("data.json:seed");
-  expect(bars.provenance.replay.level).toBe("R1");
+  expect(bars.provenance.replay.level).toBe("R2");
   const pointCloudDownloadPromise = page.waitForEvent("download");
   await page.locator('[data-viz-bundle="point-cloud"]').click();
   const pointCloudDownload = await pointCloudDownloadPromise;
   expect(pointCloudDownload.suggestedFilename()).toBe("3d-point-cloud.ostrin-experiment.json");
   const pointCloud = JSON.parse(await readFile(await pointCloudDownload.path(), "utf8"));
-  expect(pointCloud.reproducibility.level).toBe("R1");
+  expect(pointCloud.reproducibility.level).toBe("R2");
   expect(pointCloud.provenance.execution.randomness.seed_path).toBe("seed");
   expect(pointCloud.provenance.randomness.seed_consumption).toBe("data.json:seed");
-  expect(pointCloud.provenance.replay.level).toBe("R1");
+  expect(pointCloud.provenance.replay.level).toBe("R2");
 
   const fftDownloadPromise = page.waitForEvent("download");
   await page.locator('[data-viz-bundle="fft"]').click();
   const fftDownload = await fftDownloadPromise;
   expect(fftDownload.suggestedFilename()).toBe("spectrum-with-the-fft.ostrin-experiment.json");
   const fft = JSON.parse(await readFile(await fftDownload.path(), "utf8"));
-  expect(fft.reproducibility.level).toBe("R1");
+  expect(fft.reproducibility.level).toBe("R2");
   expect(fft.provenance.execution.randomness.seed_path).toBe("seed");
   expect(fft.provenance.randomness.seed_consumption).toBe("data.json:seed");
-  expect(fft.provenance.replay.level).toBe("R1");
+  expect(fft.provenance.replay.level).toBe("R2");
 
   const dashboardDownloadPromise = page.waitForEvent("download");
   await page.locator('[data-viz-bundle="dashboard"]').click();
   const dashboardDownload = await dashboardDownloadPromise;
   expect(dashboardDownload.suggestedFilename()).toBe("multi-panel-layout.ostrin-experiment.json");
   const dashboard = JSON.parse(await readFile(await dashboardDownload.path(), "utf8"));
-  expect(dashboard.reproducibility.level).toBe("R1");
+  expect(dashboard.reproducibility.level).toBe("R2");
   expect(dashboard.provenance.execution.randomness.seed_path).toBe("seed");
   expect(dashboard.provenance.randomness.seed_consumption).toBe("data.json:seed");
-  expect(dashboard.provenance.replay.level).toBe("R1");
+  expect(dashboard.provenance.replay.level).toBe("R2");
 });
 
 test("Viz exposes recorded animation, table and volume experiment bundles", async ({ page }) => {

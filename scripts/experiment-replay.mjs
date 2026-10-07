@@ -112,23 +112,25 @@ function bundleErrors(bundle, id) {
   if (Array.isArray(execution?.consumes) && typeof sensitivity?.path === "string" && !execution.consumes.includes(sensitivity.path)) {
     errors.push(`${id}: executable replay sensitivity path is not listed in consumed inputs`);
   }
-  if (bundle.reproducibility?.level === "R1") {
+  const seeded = bundle.reproducibility?.level === "R1"
+    || bundle.provenance?.randomness?.status === "input-driven-r1";
+  if (seeded) {
     const randomness = execution?.randomness;
     const evidence = bundle.provenance?.randomness;
     if (!randomness || randomness.seed_path !== sensitivity?.path) {
-      errors.push(`${id}: R1 replay must declare a randomness seed path equal to the sensitivity path`);
+      errors.push(`${id}: seeded replay must declare a randomness seed path equal to the sensitivity path`);
     }
     if (typeof randomness?.seed_path !== "string" || !execution?.consumes?.includes(randomness.seed_path)) {
-      errors.push(`${id}: R1 randomness seed path must be listed in consumed inputs`);
+      errors.push(`${id}: seeded randomness seed path must be listed in consumed inputs`);
     }
     if (randomness?.algorithm !== evidence?.algorithm || randomness?.version !== evidence?.version) {
-      errors.push(`${id}: R1 randomness algorithm/version does not match provenance evidence`);
+      errors.push(`${id}: seeded randomness algorithm/version does not match provenance evidence`);
     }
     if (randomness?.partition !== evidence?.partition) {
-      errors.push(`${id}: R1 randomness partition does not match provenance evidence`);
+      errors.push(`${id}: seeded randomness partition does not match provenance evidence`);
     }
     if (evidence?.status !== "input-driven-r1" || evidence?.seed_consumption !== `data.json:${randomness?.seed_path}`) {
-      errors.push(`${id}: R1 provenance does not prove input-driven seed consumption`);
+      errors.push(`${id}: provenance does not prove input-driven seed consumption`);
     }
   }
   return errors;
@@ -214,7 +216,7 @@ async function replay(id) {
     consumed: bundle.provenance.execution.consumes,
     baseline: "match",
     sensitivity: "changed-output",
-    ...(bundle.reproducibility.level === "R1" ? { seeded: "changed-output" } : {}),
+    ...(bundle.provenance?.randomness?.status === "input-driven-r1" ? { seeded: "changed-output" } : {}),
   };
 }
 

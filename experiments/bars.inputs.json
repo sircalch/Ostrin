@@ -6,14 +6,17 @@
   },
   "description": "Seeded five-group measurements with standard uncertainties.",
   "reproducibility": {
-    "level": "R1",
-    "label": "R1 · seeded replay verified",
-    "next": "R2 · external snapshots (planned verification)"
+    "level": "R2",
+    "label": "R2 · external snapshot replay verified",
+    "next": "R3 · auditable artifact (planned verification)"
   },
   "execution": {
     "mode": "input-file",
     "input_file": "data.json",
-    "consumes": ["seed", "parameters.samples_per_group"],
+    "consumes": [
+      "seed",
+      "parameters.samples_per_group"
+    ],
     "sensitivity": {
       "path": "seed",
       "alternate": 12
@@ -28,6 +31,14 @@
     "command": "node scripts/experiment-replay.mjs --fixture bars",
     "target": "wasm32-wasip1",
     "wasi": "preview1",
-    "status": "verified-in-ci"
+    "status": "verified-in-ci",
+    "capabilities": [
+      "filesystem.read:data.json"
+    ],
+    "snapshot": {
+      "path": "data.json",
+      "kind": "json",
+      "embedded": true
+    }
   }
 }
