@@ -3379,6 +3379,16 @@ fn emit_instruction(
                     "({{ int64_t __ostrin_csv_row_count; int64_t* __ostrin_csv_col_counts; const char*** __ostrin_csv_rows = ostrin_s_csv({source}, &__ostrin_csv_row_count, &__ostrin_csv_col_counts); {inner_items_c} __ostrin_csv_lists = ({inner_items_c})ostrin_alloc(sizeof(*__ostrin_csv_lists) * (size_t)(__ostrin_csv_row_count + 1)); for (int64_t __ostrin_csv_row = 0; __ostrin_csv_row < __ostrin_csv_row_count; __ostrin_csv_row++) {{ __ostrin_csv_lists[__ostrin_csv_row] = {inner_name}_new_from_array(__ostrin_csv_rows[__ostrin_csv_row], __ostrin_csv_col_counts[__ostrin_csv_row]); for (int64_t __ostrin_csv_col = 0; __ostrin_csv_col < __ostrin_csv_col_counts[__ostrin_csv_row]; __ostrin_csv_col++) ostrin_release((void*)__ostrin_csv_rows[__ostrin_csv_row][__ostrin_csv_col]); ostrin_free((void*)__ostrin_csv_rows[__ostrin_csv_row]); }} {outer_c} __ostrin_csv_result = {outer_name}_new_from_array(__ostrin_csv_lists, __ostrin_csv_row_count); for (int64_t __ostrin_csv_row = 0; __ostrin_csv_row < __ostrin_csv_row_count; __ostrin_csv_row++) ostrin_release((void*)__ostrin_csv_lists[__ostrin_csv_row]); ostrin_free((void*)__ostrin_csv_lists); ostrin_free((void*)__ostrin_csv_rows); ostrin_free((void*)__ostrin_csv_col_counts); __ostrin_csv_result; }})",
                     source = codes[0]
                 )
+            } else if callee == "parse_int"
+                && args.len() == 1
+                && value_ty(values, args[0])? == Ty::String
+                && *ty == Ty::Applied("Result".to_string(), vec![Ty::Int, Ty::String])
+            {
+                // The global parse_int builtin has the same checked result
+                // contract as String.to_int(). Keep both spellings on one
+                // native helper so file/CLI examples do not need the AST
+                // emitter merely to parse an integer.
+                parse_int_result_code(&codes[0])
             } else if (callee == "zeros" || callee == "ones")
                 && args.len() == 1
                 && value_ty(values, args[0])? == Ty::List(Box::new(Ty::Int))

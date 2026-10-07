@@ -391,6 +391,16 @@ fn standard_library_file_io_and_parsing_work() {
         stdout(&out).lines().collect::<Vec<_>>(),
         ["true", "42", "hello from Ostrin"]
     );
+    let report = run(&["--native-type-report", &example_path("stdlib_io.ostrin")]);
+    if !skip_if_no_c_compiler(&report) {
+        assert!(report.status.success(), "stdlib_io type report failed: {}", stderr(&report));
+        assert!(
+            stdout(&report).contains("native-source: examples/stdlib_io.ostrin ir=1 hir=0 ast=0")
+                && stdout(&report).contains("ast-fallback: 0"),
+            "stdlib_io still uses the AST fallback: {}",
+            stdout(&report)
+        );
+    }
 }
 
 #[test]

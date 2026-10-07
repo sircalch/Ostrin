@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Compiler fallback reduction
+
+- Moved the global `parse_int(String)` builtin through the same checked IR/C result helper
+  as `String.to_int()`. `stdlib_io.ostrin` now compiles with `ir=1, hir=0, ast=0`, and
+  the differential ratchet advances to **6,930 HIR/IR-generated functions (6,883 IR + 47 HIR) /
+  42 AST**.
+
 ### Viz experiment replay maturity
 
 - Added exact-replay `ostrin.experiment/v0` bundles for every one of the 29 Viz gallery figures,
