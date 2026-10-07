@@ -40,6 +40,10 @@
   preserving interpreter/native output and advancing the ratchet to **6,954 HIR/IR-generated
   functions (6,908 IR + 46 HIR) / 18 AST**.
 
+- Lowered relational operators for records with a concrete `impl Ord` through the native
+  `compare` method and its `Ordering` tag. `traits.ostrin` now compiles with `ir=5, hir=0, ast=0`,
+  advancing the ratchet to **6,955 HIR/IR-generated functions (6,909 IR + 46 HIR) / 17 AST**.
+
 ### Viz experiment replay maturity
 
 - Added exact-replay `ostrin.experiment/v0` bundles for every one of the 29 Viz gallery figures,

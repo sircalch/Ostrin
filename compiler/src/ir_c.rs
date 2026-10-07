@@ -2088,7 +2088,7 @@ fn emit_instruction(
                         _ => None,
                     };
                     if let Some(method) = method {
-                        if let Some(c_name) = methods.get(&(record, method.to_string())) {
+                        if let Some(c_name) = methods.get(&(record.clone(), method.to_string())) {
                             let result_is_bool = matches!(op, BinOp::Eq | BinOp::NotEq);
                             if (result_is_bool && *ty != Ty::Bool)
                                 || (!result_is_bool && *ty != left_ty)
@@ -2106,6 +2106,30 @@ fn emit_instruction(
                                 call
                             };
                             out.push_str(&format!("    {} = {code};\n", value_name(*dst)));
+                            return Ok(());
+                        }
+                    }
+                    if matches!(op, BinOp::Lt | BinOp::Gt | BinOp::LtEq | BinOp::GtEq) {
+                        if let Some(c_name) = methods.get(&(record, "compare".to_string())) {
+                            if *ty != Ty::Bool {
+                                return Err(());
+                            }
+                            let call = format!(
+                                "{c_name}({}, {})",
+                                value_code(values, *left)?,
+                                value_code(values, *right)?
+                            );
+                            let test = match op {
+                                BinOp::Lt => "== 0",
+                                BinOp::Gt => "== 2",
+                                BinOp::LtEq => "!= 2",
+                                BinOp::GtEq => "!= 0",
+                                _ => unreachable!(),
+                            };
+                            out.push_str(&format!(
+                                "    {} = (({call}).tag {test});\n",
+                                value_name(*dst)
+                            ));
                             return Ok(());
                         }
                     }
