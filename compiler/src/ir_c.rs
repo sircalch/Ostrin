@@ -3469,6 +3469,41 @@ fn emit_instruction(
                     "Array_Float_linspace({}, {}, {})",
                     codes[0], codes[1], codes[2]
                 )
+            } else if matches!(callee.as_str(), "linfit" | "solve")
+                && args.len() == 2
+                && value_ty(values, args[0])? == Ty::Applied("Array".to_string(), vec![Ty::Float])
+                && value_ty(values, args[1])? == Ty::Applied("Array".to_string(), vec![Ty::Float])
+                && *ty == Ty::Applied("Array".to_string(), vec![Ty::Float])
+            {
+                format!("Array_Float_{callee}({}, {})", codes[0], codes[1])
+            } else if callee == "polyfit"
+                && args.len() == 3
+                && value_ty(values, args[0])? == Ty::Applied("Array".to_string(), vec![Ty::Float])
+                && value_ty(values, args[1])? == Ty::Applied("Array".to_string(), vec![Ty::Float])
+                && value_ty(values, args[2])? == Ty::Int
+                && *ty == Ty::Applied("Array".to_string(), vec![Ty::Float])
+            {
+                format!(
+                    "Array_Float_polyfit({}, {}, {})",
+                    codes[0], codes[1], codes[2]
+                )
+            } else if callee == "polyval"
+                && args.len() == 2
+                && value_ty(values, args[0])? == Ty::Applied("Array".to_string(), vec![Ty::Float])
+            {
+                match value_ty(values, args[1])? {
+                    Ty::Float if *ty == Ty::Float => {
+                        format!("Array_Float_polyval({}, {})", codes[0], codes[1])
+                    }
+                    Ty::Applied(name, element)
+                        if name == "Array"
+                            && element.as_slice() == [Ty::Float]
+                            && *ty == Ty::Applied("Array".to_string(), vec![Ty::Float]) =>
+                    {
+                        format!("Array_Float_polyval_array({}, {})", codes[0], codes[1])
+                    }
+                    _ => return Err(()),
+                }
             } else if callee == "abs" && args.len() == 1 {
                 let arg_ty = value_ty(values, args[0])?;
                 if let Some(element) = array_element(&arg_ty) {

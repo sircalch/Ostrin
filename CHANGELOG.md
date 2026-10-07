@@ -19,6 +19,10 @@
   and native output identical, and the ratchet advances to **6,944 HIR/IR-generated functions
   (6,897 IR + 47 HIR) / 28 AST**.
 
+- Added IR/C lowering for the existing numeric runtimes `linfit`, `solve`, `polyfit` and `polyval`
+  over `Array<Float>`. `calibration.ostrin` now compiles through the typed path, advancing the
+  ratchet to **6,947 HIR/IR-generated functions (6,900 IR + 47 HIR) / 25 AST**.
+
 ### Viz experiment replay maturity
 
 - Added exact-replay `ostrin.experiment/v0` bundles for every one of the 29 Viz gallery figures,
