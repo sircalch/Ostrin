@@ -31,12 +31,12 @@ test("the current plan is aligned with compiler ratchets and public maturity lab
   const result = validateProjectPlan(repositoryRoot);
   assert.deepEqual(result.errors, []);
   assert.deepEqual(result.baseline, {
-    minimum: 6892,
-    maximumAst: 42,
-    total: 6892,
-    ast: 42,
-    ir: 6848,
-    hir: 44,
+    minimum: 6929,
+    maximumAst: 43,
+    total: 6929,
+    ast: 43,
+    ir: 6882,
+    hir: 47,
   });
 });
 

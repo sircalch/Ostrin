@@ -751,6 +751,16 @@ test("Viz exposes the input-driven seeded R1 experiment bundles", async ({ page 
   expect(fft.provenance.execution.randomness.seed_path).toBe("seed");
   expect(fft.provenance.randomness.seed_consumption).toBe("data.json:seed");
   expect(fft.provenance.replay.level).toBe("R1");
+
+  const dashboardDownloadPromise = page.waitForEvent("download");
+  await page.locator('[data-viz-bundle="dashboard"]').click();
+  const dashboardDownload = await dashboardDownloadPromise;
+  expect(dashboardDownload.suggestedFilename()).toBe("multi-panel-layout.ostrin-experiment.json");
+  const dashboard = JSON.parse(await readFile(await dashboardDownload.path(), "utf8"));
+  expect(dashboard.reproducibility.level).toBe("R1");
+  expect(dashboard.provenance.execution.randomness.seed_path).toBe("seed");
+  expect(dashboard.provenance.randomness.seed_consumption).toBe("data.json:seed");
+  expect(dashboard.provenance.replay.level).toBe("R1");
 });
 
 test("Viz exposes recorded animation, table and volume experiment bundles", async ({ page }) => {

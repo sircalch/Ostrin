@@ -120,6 +120,18 @@ test("the fft bundle verifies an eighth input-driven seeded replay", async () =>
   });
 });
 
+test("the dashboard bundle verifies a ninth input-driven seeded replay", async () => {
+  const result = await replay("dashboard");
+  assert.deepEqual(result, {
+    id: "dashboard",
+    input: "data.json",
+    consumed: ["seed", "parameters.random_samples", "parameters.grid"],
+    baseline: "match",
+    sensitivity: "changed-output",
+    seeded: "changed-output",
+  });
+});
+
 test("an executable replay rejects a bundle without its input contract", () => {
   const errors = bundleErrors({ schema: "ostrin.experiment/v0", id: "surface", files: {}, manifest: { files: [] } }, "surface");
   assert.ok(errors.some((error) => error.includes("input-file executable replay contract")));
