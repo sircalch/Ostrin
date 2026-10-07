@@ -1,15 +1,64 @@
 // std.viz · hexbin density: a bivariate sample counted in Ostrin.
 import std.viz
+import std.json
+
+fn input_int(key: String, fallback: Int) -> Int {
+    loaded = read_file("data.json")
+    if loaded.is_err() {
+        return fallback
+    }
+    document = json.parse(loaded.unwrap())
+    if document.is_err() {
+        return fallback
+    }
+    value = json.object_get(document.unwrap(), key)
+    if value.is_none() {
+        return fallback
+    }
+    number = json.as_number(value.unwrap())
+    if number.is_none() {
+        return fallback
+    }
+    number.unwrap() as Int
+}
+
+fn input_parameter_int(key: String, fallback: Int) -> Int {
+    loaded = read_file("data.json")
+    if loaded.is_err() {
+        return fallback
+    }
+    document = json.parse(loaded.unwrap())
+    if document.is_err() {
+        return fallback
+    }
+    parameters = json.object_get(document.unwrap(), "parameters")
+    if parameters.is_none() {
+        return fallback
+    }
+    value = json.object_get(parameters.unwrap(), key)
+    if value.is_none() {
+        return fallback
+    }
+    number = json.as_number(value.unwrap())
+    if number.is_none() {
+        return fallback
+    }
+    number.unwrap() as Int
+}
 
 fn main() -> Void {
-    n = 1200
-    r = rng(91)
+    seed = input_int("seed", 91)
+    n = input_parameter_int("samples", 1200)
+    bins_x = input_parameter_int("bins_x", 18)
+    bins_y = input_parameter_int("bins_y", 14)
+    r = rng(seed)
     noise_x = r.randn([n])
     noise_y = r.randn([n])
     mut xs = zeros([n])
     mut ys = zeros([n])
+    half = n / 2
     for i in 0 until n {
-        cluster = if i < 600 { 0.0 } else { 1.0 }
+        cluster = if i < half { 0.0 } else { 1.0 }
         center_x = if cluster == 0.0 { -0.85 } else { 0.95 }
         center_y = if cluster == 0.0 { -0.55 } else { 0.7 }
         spread_x = if cluster == 0.0 { 0.38 } else { 0.26 }
@@ -18,8 +67,8 @@ fn main() -> Void {
         ys.set(i, noise_y[i] * spread_y + center_y)
     }
     fig = viz.figure("Bivariate density")
-        .describe("1 200 seeded observations counted into hexagonal bins")
+        .describe(n.to_string() + " seeded observations counted into hexagonal bins, seed " + seed.to_string())
         .labels("x", "y")
-        .hexbin(xs, ys, 18, 14, "magma", "observations")
+        .hexbin(xs, ys, bins_x, bins_y, "magma", "observations")
     print(fig.svg())
 }

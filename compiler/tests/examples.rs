@@ -11485,8 +11485,8 @@ fn viz_hexbins_render_density_cells_and_colorbar() {
         );
         let report_text = stdout(&report);
         assert!(
-            report_text.contains("native-source: examples/viz_hexbin.ostrin ir=1 hir=0 ast=0")
-                && report_text.contains("ast-fallback: 0"),
+            report_text.contains("native-source: examples/viz_hexbin.ostrin ir=3 hir=0 ast=0")
+                && report_text.contains("ast-fallback: 1"),
             "hexbin entry point did not use the ownership-aware IR path: {report_text}"
         );
     }
