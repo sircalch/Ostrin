@@ -57,6 +57,15 @@ function bundleErrors(bundle, id) {
     || bundle.provenance?.runtime?.wasi !== "preview1") {
     errors.push(`${id}: bundle is missing the partial ostrin.runtime/v1 snapshot`);
   }
+  const invocation = bundle.provenance?.runtime?.invocation;
+  const invocationOutput = invocation?.outputs?.find((entry) => entry.path === "figure.svg");
+  const figureEntry = bundle.manifest?.files?.find((entry) => entry.path === "figure.svg");
+  if (invocation?.command !== "node scripts/lab-data.mjs --verify-replays"
+    || invocation?.status !== "verified-in-ci"
+    || invocationOutput?.bytes !== figureEntry?.bytes
+    || invocationOutput?.sha256 !== figureEntry?.sha256) {
+    errors.push(`${id}: runtime invocation output hash is missing or differs from the bundled figure`);
+  }
   if (bundle.reproducibility?.level === "R2") {
     const execution = bundle.provenance?.execution;
     const snapshot = execution?.snapshot;
@@ -189,6 +198,10 @@ async function replay(id) {
   };
   const rendered = normalizeFigureMetadata(extractSvg(output, id), metadata);
   if (rendered !== bundle.files["figure.svg"]) throw new Error(`${id}: input-driven replay SVG differs from the published bundle`);
+  const invocationOutput = bundle.provenance.runtime.invocation.outputs.find((entry) => entry.path === "figure.svg");
+  if (bytes(rendered) !== invocationOutput.bytes || sha256(rendered) !== invocationOutput.sha256) {
+    throw new Error(`${id}: input-driven replay output hash differs from the runtime invocation record`);
+  }
 
   const changedInput = alternateInput(bundle, id);
   const changedOutput = await runWasm(module, { "main.ostrin": source, [inputFile]: changedInput }, ["--run", "main.ostrin"]);

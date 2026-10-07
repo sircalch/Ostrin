@@ -30,6 +30,13 @@ test("the v0 experiment bundle has calculated hashes and an explicit maturity bo
   assert.equal(bundle.provenance.runtime.target, "wasm32-wasip1");
   assert.equal(bundle.provenance.runtime.wasi, "preview1");
   assert.match(bundle.provenance.runtime.compiler_lockfile.sha256, /^sha256:[0-9a-f]{64}$/);
+  assert.equal(bundle.provenance.runtime.invocation.command, "node scripts/lab-data.mjs --verify-replays");
+  assert.equal(bundle.provenance.runtime.invocation.status, "verified-in-ci");
+  assert.deepEqual(bundle.provenance.runtime.invocation.outputs, [{
+    path: "figure.svg",
+    bytes: bundle.manifest.files.find((entry) => entry.path === "figure.svg").bytes,
+    sha256: bundle.manifest.files.find((entry) => entry.path === "figure.svg").sha256,
+  }]);
   assert.deepEqual(bundle.provenance.replay, {
     level: "R0",
     status: "verified",
@@ -136,6 +143,7 @@ test("input-file bundles expose the R2 snapshot and capability contract", () => 
       embedded: true,
       sha256: bundle.manifest.files.find((entry) => entry.path === "data.json").sha256,
     }]);
+    assert.ok(!bundle.provenance.runtime.missing.includes("output hashes from this invocation"));
     assert.equal(bundle.provenance.inputs[0].kind, "external-snapshot");
   }
 });

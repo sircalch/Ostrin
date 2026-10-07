@@ -35,6 +35,8 @@
 - All 29 downloadable Viz experiment bundles now carry the same partial runtime snapshot, and
   the bundle verifier rejects missing or mismatched target/WASI/runtime evidence while preserving
   their explicit R0, R1 or R2 labels.
+- The runtime snapshot in every bundle now records the verified `figure.svg` invocation hash and
+  byte count; the executable replay gate checks that record before testing input sensitivity.
 
 ### Viz publication manifests
 

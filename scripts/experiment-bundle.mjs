@@ -501,6 +501,16 @@ function provenanceFor(root, fixture, files, manifest) {
     }];
     runtime.missing = runtime.missing.filter((item) => item !== "input snapshots");
   }
+  runtime.invocation = {
+    command: "node scripts/lab-data.mjs --verify-replays",
+    status: "verified-in-ci",
+    outputs: [{
+      path: "figure.svg",
+      bytes: bytes(figure),
+      sha256: sha256(figure),
+    }],
+  };
+  runtime.missing = runtime.missing.filter((item) => item !== "output hashes from this invocation");
   return {
     schema: "ostrin.provenance/v0",
     level: reproducibility.level,
@@ -663,6 +673,15 @@ export function verifyExperimentBundle(bundle, { expected, fixtureId } = {}) {
     || runtime?.target !== "wasm32-wasip1" || runtime?.wasi !== "preview1"
     || runtime?.runner !== "WASI host") {
     errors.push("runtime snapshot is missing the partial WASI contract");
+  }
+  const invocation = runtime?.invocation;
+  const invocationOutput = invocation?.outputs?.find((entry) => entry.path === "figure.svg");
+  const figureEntry = entries?.find((entry) => entry.path === "figure.svg");
+  if (invocation?.command !== "node scripts/lab-data.mjs --verify-replays"
+    || invocation?.status !== "verified-in-ci"
+    || invocationOutput?.bytes !== figureEntry?.bytes
+    || invocationOutput?.sha256 !== figureEntry?.sha256) {
+    errors.push("runtime invocation output hash is missing or differs from the bundled figure");
   }
   if (maturity?.level === "R2") {
     const execution = bundle?.provenance?.execution;

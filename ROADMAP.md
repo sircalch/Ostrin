@@ -117,8 +117,8 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    El primer artefacto web de alto retorno ya cubre las 29 figuras de la galería con bundles
    source-backed `ostrin.experiment/v0`: cada descarga contiene código, entradas declaradas, SVG,
    manifest y `provenance.json` con hashes calculados y etiqueta de madurez R0/R1/R2. Ahora cada bundle
-   también lleva un snapshot parcial `ostrin.runtime/v1` con target/WASI y los hashes de lockfiles
-   disponibles; esa instantánea parcial no sustituye el contrato R2/R3 completo. La CI del sitio reproduce los
+   también lleva un snapshot parcial `ostrin.runtime/v1` con target/WASI, hashes de lockfiles disponibles
+   y hashes de salida de la invocación verificada; esa instantánea parcial no sustituye el contrato R2/R3 completo. La CI del sitio reproduce los
    29 programas con `ostrinc.wasm` y compara el SVG byte a byte; `histogram`, `boxplot`, `scatter-fit`, `violin`, `hexbin`, `bars`, `point-cloud`, `fft` y `dashboard` son los nueve replays R1 de azar sembrado; `surface` y `lines` son los dos replays R2 de snapshot externo; los 18 restantes conservan R0. No se reclama R3. Los manifiestos de figura ya serializan el estado vivo
    seleccionado (parámetros, cámara 3D opcional y URL compartible), y la galería ofrece una cita
    BibTeX con metadatos de fuente y versión. Los bundles que usan `rng(seed)` ahora incluyen
@@ -133,8 +133,8 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    `scripts/experiment-replay.mjs` verifica los once en WASI y la CI los ejecuta. Los nueve
    experimentos de galería que consumen `rng(seed)` ya están en R1; los dieciocho restantes
    conservan R0 porque son deterministas o todavía no declaran una sensibilidad de entradas
-   compatible. El siguiente paso es completar la evidencia R2 con hashes de salida por invocación,
-   metadatos de host y tolerancias de plataforma, y después construir el artefacto auditable R3 sin
+   compatible. El siguiente paso es completar la evidencia R2 en más fixtures con capacidades y
+   snapshots externos, además de metadatos de host y tolerancias de plataforma, y después construir el artefacto auditable R3 sin
    perder la frontera verificable de R0.
    El Scientific Lab ya conserva la demo activa y sus parámetros en la URL para compartir y
    restaurar experimentos reproducibles desde el navegador. La navegación compacta y el catálogo
