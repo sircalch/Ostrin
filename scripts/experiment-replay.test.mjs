@@ -108,6 +108,18 @@ test("the point-cloud bundle verifies a seventh input-driven seeded replay", asy
   });
 });
 
+test("the fft bundle verifies an eighth input-driven seeded replay", async () => {
+  const result = await replay("fft");
+  assert.deepEqual(result, {
+    id: "fft",
+    input: "data.json",
+    consumed: ["seed", "parameters.samples", "parameters.duration_seconds", "parameters.noise_scale"],
+    baseline: "match",
+    sensitivity: "changed-output",
+    seeded: "changed-output",
+  });
+});
+
 test("an executable replay rejects a bundle without its input contract", () => {
   const errors = bundleErrors({ schema: "ostrin.experiment/v0", id: "surface", files: {}, manifest: { files: [] } }, "surface");
   assert.ok(errors.some((error) => error.includes("input-file executable replay contract")));

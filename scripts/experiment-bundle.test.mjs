@@ -82,8 +82,9 @@ test("seeded RNG bundles expose source-backed algorithm evidence and R1 replay m
   const hexbin = buildExperimentBundle("hexbin");
   const bars = buildExperimentBundle("bars");
   const pointCloud = buildExperimentBundle("point-cloud");
+  const fft = buildExperimentBundle("fft");
   const randomness = histogram.provenance.randomness;
-  for (const bundle of [histogram, boxplot, scatterFit, violin, hexbin, bars, pointCloud]) {
+  for (const bundle of [histogram, boxplot, scatterFit, violin, hexbin, bars, pointCloud, fft]) {
     assert.equal(bundle.reproducibility.level, "R1");
     assert.equal(bundle.reproducibility.label, "R1 · seeded replay verified");
     assert.equal(bundle.provenance.level, "R1");

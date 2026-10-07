@@ -5,5 +5,30 @@
     "duration_seconds": 1,
     "noise_scale": 0.4
   },
-  "description": "Seeded 512-sample two-tone signal and FFT spectrum."
+  "description": "Seeded 512-sample two-tone signal and FFT spectrum.",
+  "reproducibility": {
+    "level": "R1",
+    "label": "R1 · seeded replay verified",
+    "next": "R2 · external snapshots (planned verification)"
+  },
+  "execution": {
+    "mode": "input-file",
+    "input_file": "data.json",
+    "consumes": ["seed", "parameters.samples", "parameters.duration_seconds", "parameters.noise_scale"],
+    "sensitivity": {
+      "path": "seed",
+      "alternate": 43
+    },
+    "randomness": {
+      "seed_path": "seed",
+      "algorithm": "xoshiro256**",
+      "version": "ostrin.rng/v1",
+      "partition": "single sequential stream",
+      "status": "verified-in-ci"
+    },
+    "command": "node scripts/experiment-replay.mjs --fixture fft",
+    "target": "wasm32-wasip1",
+    "wasi": "preview1",
+    "status": "verified-in-ci"
+  }
 }

@@ -1,12 +1,84 @@
 // std.numeric + std.viz · a noisy two-tone signal and its spectrum.
 import std.numeric
 import std.viz
+import std.json
+
+fn input_int(key: String, fallback: Int) -> Int {
+    loaded = read_file("data.json")
+    if loaded.is_err() {
+        return fallback
+    }
+    document = json.parse(loaded.unwrap())
+    if document.is_err() {
+        return fallback
+    }
+    value = json.object_get(document.unwrap(), key)
+    if value.is_none() {
+        return fallback
+    }
+    number = json.as_number(value.unwrap())
+    if number.is_none() {
+        return fallback
+    }
+    number.unwrap() as Int
+}
+
+fn input_parameter_int(key: String, fallback: Int) -> Int {
+    loaded = read_file("data.json")
+    if loaded.is_err() {
+        return fallback
+    }
+    document = json.parse(loaded.unwrap())
+    if document.is_err() {
+        return fallback
+    }
+    parameters = json.object_get(document.unwrap(), "parameters")
+    if parameters.is_none() {
+        return fallback
+    }
+    value = json.object_get(parameters.unwrap(), key)
+    if value.is_none() {
+        return fallback
+    }
+    number = json.as_number(value.unwrap())
+    if number.is_none() {
+        return fallback
+    }
+    number.unwrap() as Int
+}
+
+fn input_parameter_float(key: String, fallback: Float) -> Float {
+    loaded = read_file("data.json")
+    if loaded.is_err() {
+        return fallback
+    }
+    document = json.parse(loaded.unwrap())
+    if document.is_err() {
+        return fallback
+    }
+    parameters = json.object_get(document.unwrap(), "parameters")
+    if parameters.is_none() {
+        return fallback
+    }
+    value = json.object_get(parameters.unwrap(), key)
+    if value.is_none() {
+        return fallback
+    }
+    number = json.as_number(value.unwrap())
+    if number.is_none() {
+        return fallback
+    }
+    number.unwrap()
+}
 
 fn main() -> Void {
-    n = 512
-    dt = 1.0 / 512.0
-    t = linspace(0.0, 1.0, n + 1)[0 until n]
-    noise = rng(42).randn([n]) * 0.4
+    seed = input_int("seed", 42)
+    n = input_parameter_int("samples", 512)
+    duration = input_parameter_float("duration_seconds", 1.0)
+    noise_scale = input_parameter_float("noise_scale", 0.4)
+    dt = duration / (n as Float)
+    t = linspace(0.0, duration, n + 1)[0 until n]
+    noise = rng(seed).randn([n]) * noise_scale
     signal = sin(t * (2.0 * pi() * 50.0)) + sin(t * (2.0 * pi() * 120.0)) * 0.6 + noise
     amp = numeric.amplitude(numeric.fft(signal))
     freqs = numeric.frequencies(n, dt)
@@ -15,5 +87,5 @@ fn main() -> Void {
         .line(t[0 until 128], signal[0 until 128], width: 1.2)
     b = viz.figure("Amplitude spectrum").size(480, 320).labels("f [Hz]", "|X(f)|").no_legend()
         .area(freqs, amp, color: "#059669")
-    print(viz.grid([a.svg(), b.svg()], 2, 480, 320, title: "FFT of 512 samples"))
+    print(viz.grid([a.svg(), b.svg()], 2, 480, 320, title: "FFT of " + n.to_string() + " samples, seed " + seed.to_string()))
 }
