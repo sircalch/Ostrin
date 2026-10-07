@@ -6,7 +6,7 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
 ## Siguiente ciclo
 
 1. Reducir el fallback AST con el trinquete por archivo de `--native-type-report` (baseline actual:
-   6.854 funciones generadas por HIR/IR (6.813 IR + 41 HIR) y 41 AST). `viz_histogram.ostrin`, `viz_boxplot.ostrin`, `viz_scatter_fit.ostrin`, `viz_violin.ostrin`, `viz_hexbin.ostrin`, `viz_bars.ostrin` y `viz_point_cloud.ostrin` ya importan `std.json` y conservan sus cortes input-driven de R1 en el camino tipado. `atan2` escalar para `Float` y `Float32` ya usa el runtime determinista desde IR/C; `pow` escalar también usa `ostrin_dm_pow`/`ostrin_dm_powf`, y `detmath.ostrin` ya queda sin fallback AST. `math_functions.ostrin` verifica `atan2` y `abs` de enteros de ancho fijo con paridad nativa/WASI, leak-check y error del mínimo representable. Las coerciones `Float↔Float32` de bindings explícitos y agregados `List/Set<Float32>` se insertan en IR y mantienen la precisión de `float32.ostrin`. Las operaciones escalares reflejadas de `Complex` (`Float +|−|×|÷ Complex`) llaman `radd`/`rsub`/`rmul`/`rdiv` desde IR/C conservando el orden de operandos; `Bool.to_string()` también usa la ruta tipada y `numeric_complex.ostrin` queda en `ir=3, hir=0, ast=0` con paridad intérprete/nativo/WASI y leak-check. Las llamadas genéricas registradas por el checker se resuelven en HIR antes de construir la IR, por lo que `numeric_units.ostrin` ya no cae al emisor AST. `Quantity.to_string()` escalar y `Array<Float32>.to_string()` ya usan helpers nativos desde IR/C; el segundo elimina el fallback del punto de entrada de `arrays_3d`. Los patrones superficiales de records con campos escalares
+   6.892 funciones generadas por HIR/IR (6.848 IR + 44 HIR) y 42 AST). `viz_histogram.ostrin`, `viz_boxplot.ostrin`, `viz_scatter_fit.ostrin`, `viz_violin.ostrin`, `viz_hexbin.ostrin`, `viz_bars.ostrin`, `viz_point_cloud.ostrin` y `viz_fft.ostrin` ya importan `std.json` y conservan sus cortes input-driven de R1 en el camino tipado. `atan2` escalar para `Float` y `Float32` ya usa el runtime determinista desde IR/C; `pow` escalar también usa `ostrin_dm_pow`/`ostrin_dm_powf`, y `detmath.ostrin` ya queda sin fallback AST. `math_functions.ostrin` verifica `atan2` y `abs` de enteros de ancho fijo con paridad nativa/WASI, leak-check y error del mínimo representable. Las coerciones `Float↔Float32` de bindings explícitos y agregados `List/Set<Float32>` se insertan en IR y mantienen la precisión de `float32.ostrin`. Las operaciones escalares reflejadas de `Complex` (`Float +|−|×|÷ Complex`) llaman `radd`/`rsub`/`rmul`/`rdiv` desde IR/C conservando el orden de operandos; `Bool.to_string()` también usa la ruta tipada y `numeric_complex.ostrin` queda en `ir=3, hir=0, ast=0` con paridad intérprete/nativo/WASI y leak-check. Las llamadas genéricas registradas por el checker se resuelven en HIR antes de construir la IR, por lo que `numeric_units.ostrin` ya no cae al emisor AST. `Quantity.to_string()` escalar y `Array<Float32>.to_string()` ya usan helpers nativos desde IR/C; el segundo elimina el fallback del punto de entrada de `arrays_3d`. Los patrones superficiales de records con campos escalares
    y los enums no genéricos con payloads escalares, incluidos los enteros de ancho fijo, variantes unitarias, patrones simples y
    patrones anidados de enums por valor y sus literales/rangos escalares ya comparten IR/C; quedan pendientes los payloads
    gestionados y enums genéricos.
@@ -117,18 +117,18 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    El primer artefacto web de alto retorno ya cubre las 29 figuras de la galería con bundles
    source-backed `ostrin.experiment/v0`: cada descarga contiene código, entradas declaradas, SVG,
    manifest y `provenance.json` con hashes calculados y etiqueta de madurez R0/R1. La CI del sitio reproduce los
-   29 programas con `ostrinc.wasm` y compara el SVG byte a byte; `histogram`, `boxplot`, `scatter-fit`, `violin`, `hexbin`, `bars` y `point-cloud` son ahora los siete replays R1 de azar sembrado y el resto conserva R0. No se reclaman R2/R3. Los manifiestos de figura ya serializan el estado vivo
+   29 programas con `ostrinc.wasm` y compara el SVG byte a byte; `histogram`, `boxplot`, `scatter-fit`, `violin`, `hexbin`, `bars`, `point-cloud` y `fft` son ahora los ocho replays R1 de azar sembrado y el resto conserva R0. No se reclaman R2/R3. Los manifiestos de figura ya serializan el estado vivo
    seleccionado (parámetros, cámara 3D opcional y URL compartible), y la galería ofrece una cita
    BibTeX con metadatos de fuente y versión. Los bundles que usan `rng(seed)` ahora incluyen
    evidencia source-backed del contrato `ostrin.rng/v1` (xoshiro256**, splitmix64, Marsaglia
    polar y `detmath::ln`) con hashes de las implementaciones intérprete/nativa. `histogram` consume
    `seed`, `parameters.samples` y `parameters.bins` desde `data.json`; la CI cambia la semilla y
-   exige una figura distinta, por lo que los siete bundles quedan en R1. Ya existen nueve cortes ejecutables
+   exige una figura distinta, por lo que los ocho bundles quedan en R1. Ya existen diez cortes ejecutables
    input-driven:
    `surface` lee `data.json` y demuestra sensibilidad a `parameters.scale`; `lines` consume
    `parameters.samples` con el mismo contrato genérico de sensibilidad. `histogram`, `boxplot`,
-   `scatter-fit`, `violin`, `hexbin`, `bars` y `point-cloud` consumen `seed` y parámetros declarados, y cambian su figura con una semilla alternativa. El comando
-   `scripts/experiment-replay.mjs` verifica los nueve en WASI y la CI los ejecuta. El siguiente paso
+   `scatter-fit`, `violin`, `hexbin`, `bars`, `point-cloud` y `fft` consumen `seed` y parámetros declarados, y cambian su figura con una semilla alternativa. El comando
+   `scripts/experiment-replay.mjs` verifica los diez en WASI y la CI los ejecuta. El siguiente paso
    es extender el contrato R1 a los demás experimentos aleatorios, y añadir lockfiles y snapshots
    de runtime sin perder la frontera verificable de R0.
    El Scientific Lab ya conserva la demo activa y sus parámetros en la URL para compartir y

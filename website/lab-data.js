@@ -1413,26 +1413,26 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "id": "fft",
       "title": "Spectrum with the FFT",
       "file": "examples/viz_fft.ostrin",
-      "blurb": "A noisy two-tone signal and its amplitude spectrum from std.numeric.fft: peaks at 50 Hz and 120 Hz.",
+      "blurb": "A seeded noisy two-tone signal and its amplitude spectrum from std.numeric.fft: peaks at 50 Hz and 120 Hz.",
       "bundle": "assets/experiments/fft.ostrin-experiment.json",
       "source": "examples/viz_fft.ostrin",
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_fft.ostrin",
-      "code": "// std.numeric + std.viz · a noisy two-tone signal and its spectrum.\nimport std.numeric\nimport std.viz\n\nfn main() -> Void {\n    n = 512\n    dt = 1.0 / 512.0\n    t = linspace(0.0, 1.0, n + 1)[0 until n]\n    noise = rng(42).randn([n]) * 0.4\n    signal = sin(t * (2.0 * pi() * 50.0)) + sin(t * (2.0 * pi() * 120.0)) * 0.6 + noise\n    amp = numeric.amplitude(numeric.fft(signal))\n    freqs = numeric.frequencies(n, dt)\n    print(\"peak at 50 Hz: \" + viz.num(amp[50]) + \", at 120 Hz: \" + viz.num(amp[120]))\n    a = viz.figure(\"Signal\").size(480, 320).labels(\"t [s]\", \"x\").no_legend()\n        .line(t[0 until 128], signal[0 until 128], width: 1.2)\n    b = viz.figure(\"Amplitude spectrum\").size(480, 320).labels(\"f [Hz]\", \"|X(f)|\").no_legend()\n        .area(freqs, amp, color: \"#059669\")\n    print(viz.grid([a.svg(), b.svg()], 2, 480, 320, title: \"FFT of 512 samples\"))\n}\n",
+      "code": "// std.numeric + std.viz · a noisy two-tone signal and its spectrum.\nimport std.numeric\nimport std.viz\nimport std.json\n\nfn input_int(key: String, fallback: Int) -> Int {\n    loaded = read_file(\"data.json\")\n    if loaded.is_err() {\n        return fallback\n    }\n    document = json.parse(loaded.unwrap())\n    if document.is_err() {\n        return fallback\n    }\n    value = json.object_get(document.unwrap(), key)\n    if value.is_none() {\n        return fallback\n    }\n    number = json.as_number(value.unwrap())\n    if number.is_none() {\n        return fallback\n    }\n    number.unwrap() as Int\n}\n\nfn input_parameter_int(key: String, fallback: Int) -> Int {\n    loaded = read_file(\"data.json\")\n    if loaded.is_err() {\n        return fallback\n    }\n    document = json.parse(loaded.unwrap())\n    if document.is_err() {\n        return fallback\n    }\n    parameters = json.object_get(document.unwrap(), \"parameters\")\n    if parameters.is_none() {\n        return fallback\n    }\n    value = json.object_get(parameters.unwrap(), key)\n    if value.is_none() {\n        return fallback\n    }\n    number = json.as_number(value.unwrap())\n    if number.is_none() {\n        return fallback\n    }\n    number.unwrap() as Int\n}\n\nfn input_parameter_float(key: String, fallback: Float) -> Float {\n    loaded = read_file(\"data.json\")\n    if loaded.is_err() {\n        return fallback\n    }\n    document = json.parse(loaded.unwrap())\n    if document.is_err() {\n        return fallback\n    }\n    parameters = json.object_get(document.unwrap(), \"parameters\")\n    if parameters.is_none() {\n        return fallback\n    }\n    value = json.object_get(parameters.unwrap(), key)\n    if value.is_none() {\n        return fallback\n    }\n    number = json.as_number(value.unwrap())\n    if number.is_none() {\n        return fallback\n    }\n    number.unwrap()\n}\n\nfn main() -> Void {\n    seed = input_int(\"seed\", 42)\n    n = input_parameter_int(\"samples\", 512)\n    duration = input_parameter_float(\"duration_seconds\", 1.0)\n    noise_scale = input_parameter_float(\"noise_scale\", 0.4)\n    dt = duration / (n as Float)\n    t = linspace(0.0, duration, n + 1)[0 until n]\n    noise = rng(seed).randn([n]) * noise_scale\n    signal = sin(t * (2.0 * pi() * 50.0)) + sin(t * (2.0 * pi() * 120.0)) * 0.6 + noise\n    amp = numeric.amplitude(numeric.fft(signal))\n    freqs = numeric.frequencies(n, dt)\n    print(\"peak at 50 Hz: \" + viz.num(amp[50]) + \", at 120 Hz: \" + viz.num(amp[120]))\n    a = viz.figure(\"Signal\").size(480, 320).labels(\"t [s]\", \"x\").no_legend()\n        .line(t[0 until 128], signal[0 until 128], width: 1.2)\n    b = viz.figure(\"Amplitude spectrum\").size(480, 320).labels(\"f [Hz]\", \"|X(f)|\").no_legend()\n        .area(freqs, amp, color: \"#059669\")\n    print(viz.grid([a.svg(), b.svg()], 2, 480, 320, title: \"FFT of \" + n.to_string() + \" samples, seed \" + seed.to_string()))\n}\n",
       "svg": "assets/viz/fft.svg",
       "capabilities": [
         "2d",
         "reproducibility"
       ],
       "provenance": {
-        "source-hash": "sha256:e3a636124d419b37cae394522023ae767ac85204633cc28f473116a49a469a6f",
-        "data-hash": "sha256:75b54988cdce2de2b17927e0837c69381ebb1b6366c0300cb6429ffc27316060",
+        "source-hash": "sha256:c237e5d0c4af1e8e7b15e39443307b462809debf84b6513cc0b86ca710ed1728",
+        "data-hash": "sha256:df50c71965646b8cf1d4500eb5007f97c3f7a653dce4382a1b82992d02ded0b2",
         "seed": "seed=42",
         "compiler": "ostrinc 0.1.0"
       },
       "reproducibility": {
-        "level": "R0",
-        "label": "R0 · exact replay verified",
-        "next": "R1 · seeded replay (planned verification)"
+        "level": "R1",
+        "label": "R1 · seeded replay verified",
+        "next": "R2 · external snapshots (planned verification)"
       },
       "printed": [
         "peak at 50 Hz: 1, at 120 Hz: 0.59",
