@@ -96,6 +96,18 @@ test("the bars bundle verifies a sixth input-driven seeded replay", async () => 
   });
 });
 
+test("the point-cloud bundle verifies a seventh input-driven seeded replay", async () => {
+  const result = await replay("point-cloud");
+  assert.deepEqual(result, {
+    id: "point-cloud",
+    input: "data.json",
+    consumed: ["seed", "parameters.clusters", "parameters.points_per_cluster"],
+    baseline: "match",
+    sensitivity: "changed-output",
+    seeded: "changed-output",
+  });
+});
+
 test("an executable replay rejects a bundle without its input contract", () => {
   const errors = bundleErrors({ schema: "ostrin.experiment/v0", id: "surface", files: {}, manifest: { files: [] } }, "surface");
   assert.ok(errors.some((error) => error.includes("input-file executable replay contract")));

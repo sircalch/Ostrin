@@ -47,6 +47,7 @@ runs:
         node scripts/experiment-replay.mjs --fixture violin
         node scripts/experiment-replay.mjs --fixture hexbin
         node scripts/experiment-replay.mjs --fixture bars
+        node scripts/experiment-replay.mjs --fixture point-cloud
         node --test scripts/experiment-replay.test.mjs
         node scripts/viz-jsonld.mjs
         node scripts/experiment-bundle.mjs

@@ -1,24 +1,72 @@
-// std.viz · 3D scatter: three Gaussian clusters drawn back to front.
+// std.viz · 3D scatter: seeded Gaussian clusters drawn back to front.
+import std.json
 import std.viz
 
+fn input_int(key: String, fallback: Int) -> Int {
+    loaded = read_file("data.json")
+    if loaded.is_err() {
+        return fallback
+    }
+    document = json.parse(loaded.unwrap())
+    if document.is_err() {
+        return fallback
+    }
+    value = json.object_get(document.unwrap(), key)
+    if value.is_none() {
+        return fallback
+    }
+    number = json.as_number(value.unwrap())
+    if number.is_none() {
+        return fallback
+    }
+    number.unwrap() as Int
+}
+
+fn input_parameter_int(key: String, fallback: Int) -> Int {
+    loaded = read_file("data.json")
+    if loaded.is_err() {
+        return fallback
+    }
+    document = json.parse(loaded.unwrap())
+    if document.is_err() {
+        return fallback
+    }
+    parameters = json.object_get(document.unwrap(), "parameters")
+    if parameters.is_none() {
+        return fallback
+    }
+    value = json.object_get(parameters.unwrap(), key)
+    if value.is_none() {
+        return fallback
+    }
+    number = json.as_number(value.unwrap())
+    if number.is_none() {
+        return fallback
+    }
+    number.unwrap() as Int
+}
+
 fn main() -> Void {
-    r = rng(5)
+    seed = input_int("seed", 5)
+    clusters = input_parameter_int("clusters", 3)
+    points_per_cluster = input_parameter_int("points_per_cluster", 120)
+    r = rng(seed)
     mut xs: List<Float> = []
     mut ys: List<Float> = []
     mut zs: List<Float> = []
     centers = [0.0, 0.0, 0.0, 4.0, 1.0, 2.5, 1.5, 4.0, 5.0]
-    for c in 0 until 3 {
-        px = r.randn([120]) * 0.8 + centers[c * 3]
-        py = r.randn([120]) * 0.8 + centers[c * 3 + 1]
-        pz = r.randn([120]) * 0.8 + centers[c * 3 + 2]
-        for i in 0 until 120 {
+    for c in 0 until clusters {
+        px = r.randn([points_per_cluster]) * 0.8 + centers[c * 3]
+        py = r.randn([points_per_cluster]) * 0.8 + centers[c * 3 + 1]
+        pz = r.randn([points_per_cluster]) * 0.8 + centers[c * 3 + 2]
+        for i in 0 until points_per_cluster {
             xs.push(px[i])
             ys.push(py[i])
             zs.push(pz[i])
         }
     }
     scene = viz.scene3d("Three clusters")
-        .describe("360 points colored by height")
+        .describe((clusters * points_per_cluster).to_string() + " points colored by height, seed " + seed.to_string())
         .labels("x", "y", "z")
         .view(-40.0, 22.0)
         .scatter(array(xs), array(ys), array(zs), colormap: "coolwarm", size: 3.2)
