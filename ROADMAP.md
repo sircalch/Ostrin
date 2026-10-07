@@ -150,8 +150,9 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    en un sistema de efectos interno con capacidades explícitas, niveles R0–R3 y un artefacto JSON
    reproducible antes de fijar sintaxis pública. El inventario experimental ya está disponible con
    `ostrinc --effect-report` y `--provenance-report`; el artefacto se publica en
-   [`website/provenance.html`](website/provenance.html) con hash de fuente, target y límites de replay.
-   Sigue siendo evidencia conservadora, no checking estático ni una garantía R2/R3.
+   [`website/provenance.html`](website/provenance.html) con hash de fuente, target, perfil WASI,
+   hashes de lockfiles/manifiestos disponibles y límites de replay. El snapshot ostrin.runtime/v1
+   es parcial: sigue siendo evidencia conservadora, no checking estático ni una garantía R2/R3.
 
 ## Horizonte posterior
 

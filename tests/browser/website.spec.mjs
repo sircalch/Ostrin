@@ -197,8 +197,10 @@ test("provenance page renders the generated reproducibility artifact", async ({ 
   await expect(page.locator("[data-provenance-schema]")).toHaveText("ostrin.provenance/v0");
   await expect(page.locator("[data-provenance-source]")).toContainText("sha256:");
   await expect(page.locator("[data-provenance-effects]")).toContainText("measurement");
+  await expect(page.locator("[data-provenance-runtime]")).toHaveText("wasm32-wasi · WASI preview1 · partial");
   await expect(page.locator("[data-provenance-level]")).toHaveText("unverified");
   await expect(page.locator("[data-provenance-json]")).toContainText('"source_hash"');
+  await expect(page.locator("[data-provenance-json]")).toContainText('"ostrin.runtime/v1"');
   await expectNoHorizontalOverflow(page, "provenance.html", 1280);
   expect(runtimeErrors).toEqual([]);
 });

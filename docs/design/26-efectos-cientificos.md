@@ -298,9 +298,11 @@ en una consola de logs.
    sin alterar la semántica estable del resto del lenguaje.
 5. **Artefacto de procedencia:** implementar JSON versionado, hashes de fuente/datos/salida y niveles R0–R3
    en una orden CLI experimental. La primera superficie ya existe como `ostrinc --provenance-report` y
-   [`website/provenance.html`](../../website/provenance.html): normaliza el hash de fuente, registra target
-   y sitios de efecto, y marca explícitamente la salida como experimental/no verificada. Aún faltan
-   snapshots de entradas, hashes de salida, lockfiles y metadatos de runtime para reclamar R2/R3.
+   [`website/provenance.html`](../../website/provenance.html): normaliza el hash de fuente, registra target,
+   perfil WASI, hashes de lockfiles/manifiestos disponibles y sitios de efecto, y marca explícitamente la
+   salida como experimental/no verificada. El snapshot parcial ostrin.runtime/v1 ya expone la política de
+   plataforma; aún faltan snapshots de entradas, hashes de salida de la invocación y metadatos capturados del
+   host para reclamar R2/R3.
 6. **Frontera WASM:** conectar la tabla con permisos del Scientific Lab; denegar red/E/S no declaradas y
    hacer visible la razón.
 7. **Visualización y notebook:** incrustar procedencia en figuras, tablas y estados compartibles; añadir

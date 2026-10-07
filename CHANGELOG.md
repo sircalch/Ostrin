@@ -22,6 +22,14 @@
   covered by this R1 contract; the remaining R0 fixtures are deterministic or lack a declared
   input-sensitivity contract.
 
+### Partial runtime provenance snapshot
+
+- The experimental `ostrinc --provenance-report --json` artifact now includes an
+  `ostrin.runtime/v1` snapshot with the selected target, WASI profile, compiler lockfile hash,
+  nearby project manifest/lockfile hashes when available, and the declared platform policy.
+  The website provenance page renders that runtime status and keeps the missing input snapshots,
+  invocation output hashes and host capture visible; it does not claim R2/R3.
+
 ### Viz publication manifests
 
 - Figure manifests now preserve the selected explorer state: numeric parameters, an optional 3D

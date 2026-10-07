@@ -522,7 +522,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
   "inputs": [],
   "limitations": [
     "This artifact is a conservative source inventory, not a static effect guarantee.",
-    "A future R2/R3 pipeline will add input snapshots, output hashes, lockfiles and runtime metadata."
+    "The runtime snapshot is partial; input snapshots, invocation output hashes and captured host metadata are still required for R2/R3."
   ],
   "outputs": [],
   "program": {
@@ -532,6 +532,33 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
   "reproducibility": {
     "level": "unverified",
     "reason": "input snapshots, output hashes, package locks and platform replay are not captured yet"
+  },
+  "runtime": {
+    "compiler_lockfile": {
+      "path": "compiler/Cargo.lock",
+      "sha256": "sha256:8845cd2f31666d04272d82c02c85a30d52d1c07753e96b30b1fafcd9c4ba8e34"
+    },
+    "missing": [
+      "input snapshots",
+      "output hashes from this invocation",
+      "captured host and hardware metadata"
+    ],
+    "platform_policy": {
+      "numeric": "tolerances must be declared for cross-platform comparisons",
+      "output": "target-specific; byte exact only when the replay gate verifies it"
+    },
+    "project": {
+      "lockfile": null,
+      "manifest": {
+        "path": "ostrin.toml",
+        "sha256": "sha256:3017456546ddea61d8e35e8cfb8e6ba5531e59f810652ae5884340426efcebd7"
+      }
+    },
+    "runner": "WASI host",
+    "schema": "ostrin.runtime/v1",
+    "status": "partial",
+    "target": "wasm32-wasi",
+    "wasi": "preview1"
   },
   "schema": "ostrin.provenance/v0",
   "verified": false

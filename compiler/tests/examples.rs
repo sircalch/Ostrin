@@ -9029,6 +9029,17 @@ fn experimental_provenance_report_contains_source_hash_and_effects() {
     assert_eq!(artifact["experimental"], true);
     assert_eq!(artifact["verified"], false);
     assert_eq!(artifact["compiler"]["target"], "wasm32-wasi");
+    assert_eq!(artifact["runtime"]["schema"], "ostrin.runtime/v1");
+    assert_eq!(artifact["runtime"]["status"], "partial");
+    assert_eq!(artifact["runtime"]["target"], "wasm32-wasi");
+    assert_eq!(artifact["runtime"]["wasi"], "preview1");
+    assert_eq!(artifact["runtime"]["runner"], "WASI host");
+    assert!(artifact["runtime"]["compiler_lockfile"]["sha256"]
+        .as_str()
+        .is_some_and(|hash| hash.starts_with("sha256:") && hash.len() == 71));
+    assert!(artifact["runtime"]["missing"]
+        .as_array()
+        .is_some_and(|missing| missing.iter().any(|item| item == "input snapshots")));
     assert!(artifact["program"]["source_hash"]
         .as_str()
         .is_some_and(|hash| hash.starts_with("sha256:") && hash.len() == 71));
@@ -9044,6 +9055,34 @@ fn experimental_provenance_report_contains_source_hash_and_effects() {
     assert!(text.status.success(), "stderr: {}", stderr(&text));
     assert!(stdout(&text).contains("provenance-report: experimental artifact"));
     assert!(stdout(&text).contains("source-hash: sha256:"));
+}
+
+#[test]
+fn provenance_report_hashes_nearby_project_manifest_and_lockfile() {
+    let out = run(&[
+        "--provenance-report",
+        "--json",
+        "--target",
+        "wasm32-wasi",
+        &example_path("data_project/app/main.ostrin"),
+    ]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let artifact: serde_json::Value =
+        serde_json::from_str(&stdout(&out)).expect("provenance report must be JSON");
+    assert_eq!(
+        artifact["runtime"]["project"]["manifest"]["path"],
+        "ostrin.toml"
+    );
+    assert!(artifact["runtime"]["project"]["manifest"]["sha256"]
+        .as_str()
+        .is_some_and(|hash| hash.starts_with("sha256:") && hash.len() == 71));
+    assert_eq!(
+        artifact["runtime"]["project"]["lockfile"]["path"],
+        "ostrin.lock"
+    );
+    assert!(artifact["runtime"]["project"]["lockfile"]["sha256"]
+        .as_str()
+        .is_some_and(|hash| hash.starts_with("sha256:") && hash.len() == 71));
 }
 
 #[test]
