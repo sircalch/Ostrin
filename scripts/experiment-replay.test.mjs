@@ -84,6 +84,18 @@ test("the hexbin bundle verifies a fifth input-driven seeded replay", async () =
   });
 });
 
+test("the bars bundle verifies a sixth input-driven seeded replay", async () => {
+  const result = await replay("bars");
+  assert.deepEqual(result, {
+    id: "bars",
+    input: "data.json",
+    consumed: ["seed", "parameters.samples_per_group"],
+    baseline: "match",
+    sensitivity: "changed-output",
+    seeded: "changed-output",
+  });
+});
+
 test("an executable replay rejects a bundle without its input contract", () => {
   const errors = bundleErrors({ schema: "ostrin.experiment/v0", id: "surface", files: {}, manifest: { files: [] } }, "surface");
   assert.ok(errors.some((error) => error.includes("input-file executable replay contract")));

@@ -3,7 +3,7 @@
 <rect width="640" height="400" fill="#ffffff"/>
 
 <text x="66" y="26" text-anchor="start" font-size="16" fill="#1f2937" font-weight="600">Dose response</text>
-<text x="66" y="45" text-anchor="start" font-size="12" fill="#6b7280">30 subjects per dose, standard uncertainty from Measurement&lt;Float&gt;</text>
+<text x="66" y="45" text-anchor="start" font-size="12" fill="#6b7280">30 subjects per dose, standard uncertainty from Measurement&lt;Float&gt;, seed 11</text>
 <defs><clipPath id="clip4143935244489001131"><rect x="66" y="62" width="554" height="286"/></clipPath></defs>
 <line x1="66" y1="62" x2="66" y2="348" stroke="#e5e7eb" stroke-width="1"/>
 <line x1="66" y1="348" x2="66" y2="353" stroke="#9ca3af" stroke-width="1"/>
@@ -62,5 +62,5 @@
 <text x="343" y="388" text-anchor="middle" font-size="12" fill="#1f2937">dose [mg]</text>
 <text x="16" y="205" text-anchor="middle" font-size="12" fill="#1f2937" transform="rotate(-90 16 205)">response</text>
 <g class="legend"><rect x="76" y="72" width="166" height="46" rx="6" fill="#ffffff" fill-opacity="0.88" stroke="#e5e7eb"/><g class="legend-item" data-viz-series-id="0"><rect x="84" y="81" width="14" height="10" fill="#93c5fd" fill-opacity="0.7"/><text x="104" y="90" text-anchor="start" font-size="11" fill="#1f2937">mean</text></g><g class="legend-item" data-viz-series-id="1"><circle cx="91" cy="104" r="4" fill="#1e3a8a"/><text x="104" y="108" text-anchor="start" font-size="11" fill="#1f2937">standard uncertainty</text></g></g>
-  <ostrin-provenance source-hash="sha256:84a04dd15da7866ae9865f6d9c7572554a65b54d1516eabf7663778c7c70e557" data-hash="sha256:6b9681ef356ac0284a8a55d306a9b79eb6d36f36717ef5847bc536a6201263f8" seed="seed=11" compiler="ostrinc 0.1.0" />
+  <ostrin-provenance source-hash="sha256:cac0fae2f2c664c755b8d7f9819443acefad6e61ba8e3d1c77612dd89ea24394" data-hash="sha256:65cdfc36cd8c4c0281c0a177c1a248462ed76359ba82fa1477886a269721faf1" seed="seed=11" compiler="ostrinc 0.1.0" />
 </svg>

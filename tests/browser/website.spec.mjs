@@ -722,6 +722,16 @@ test("Viz exposes the input-driven seeded R1 experiment bundles", async ({ page 
   expect(hexbin.provenance.execution.randomness.seed_path).toBe("seed");
   expect(hexbin.provenance.randomness.seed_consumption).toBe("data.json:seed");
   expect(hexbin.provenance.replay.level).toBe("R1");
+
+  const barsDownloadPromise = page.waitForEvent("download");
+  await page.locator('[data-viz-bundle="bars"]').click();
+  const barsDownload = await barsDownloadPromise;
+  expect(barsDownload.suggestedFilename()).toBe("bars-with-error-bars.ostrin-experiment.json");
+  const bars = JSON.parse(await readFile(await barsDownload.path(), "utf8"));
+  expect(bars.reproducibility.level).toBe("R1");
+  expect(bars.provenance.execution.randomness.seed_path).toBe("seed");
+  expect(bars.provenance.randomness.seed_consumption).toBe("data.json:seed");
+  expect(bars.provenance.replay.level).toBe("R1");
 });
 
 test("Viz exposes recorded animation, table and volume experiment bundles", async ({ page }) => {
