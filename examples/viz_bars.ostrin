@@ -3,14 +3,61 @@
 // renderer, so the uncertainty channel stays explicit and reproducible.
 import std.measurements
 import std.viz
+import std.json
+
+fn input_int(key: String, fallback: Int) -> Int {
+    loaded = read_file("data.json")
+    if loaded.is_err() {
+        return fallback
+    }
+    document = json.parse(loaded.unwrap())
+    if document.is_err() {
+        return fallback
+    }
+    value = json.object_get(document.unwrap(), key)
+    if value.is_none() {
+        return fallback
+    }
+    number = json.as_number(value.unwrap())
+    if number.is_none() {
+        return fallback
+    }
+    number.unwrap() as Int
+}
+
+fn input_parameter_int(key: String, fallback: Int) -> Int {
+    loaded = read_file("data.json")
+    if loaded.is_err() {
+        return fallback
+    }
+    document = json.parse(loaded.unwrap())
+    if document.is_err() {
+        return fallback
+    }
+    parameters = json.object_get(document.unwrap(), "parameters")
+    if parameters.is_none() {
+        return fallback
+    }
+    value = json.object_get(parameters.unwrap(), key)
+    if value.is_none() {
+        return fallback
+    }
+    number = json.as_number(value.unwrap())
+    if number.is_none() {
+        return fallback
+    }
+    number.unwrap() as Int
+}
 
 fn main() -> Void {
-    r = rng(11)
+    seed = input_int("seed", 11)
+    samples_per_group = input_parameter_int("samples_per_group", 30)
+    r = rng(seed)
     mut means: List<Float> = []
     mut sds: List<Float> = []
     effects = [0.0, 0.8, 1.9, 2.6, 2.9]
     for effect in effects {
-        group = r.randn([30]) * 0.7 + (5.0 + effect)
+        group = r.randn([samples_per_group]) * 0.7 + (5.0 + effect)
         means.push(group.mean())
         sds.push(group.std())
     }
@@ -27,7 +74,7 @@ fn main() -> Void {
             errors = array(measurements.uncertainties(observations).unwrap())
             doses = array([0.0, 1.0, 2.0, 3.0, 4.0])
             fig = viz.figure("Dose response")
-                .describe("30 subjects per dose, standard uncertainty from Measurement<Float>")
+                .describe(samples_per_group.to_string() + " subjects per dose, standard uncertainty from Measurement<Float>, seed " + seed.to_string())
                 .labels("dose [mg]", "response")
                 .bars(doses, measured, label: "mean", color: "#93c5fd")
                 .errorbars(doses, measured, errors, label: "standard uncertainty", color: "#1e3a8a")

@@ -6,7 +6,7 @@
 
 - Added exact-replay `ostrin.experiment/v0` bundles for every one of the 29 Viz gallery figures,
   including continuous and frame animations, tables, statistical plots and 3D scenes. Website CI
-  now replays all registered fixtures byte-for-byte; `histogram`, `boxplot`, `scatter-fit`, `violin` and `hexbin` also verify
+  now replays all registered fixtures byte-for-byte; `histogram`, `boxplot`, `scatter-fit`, `violin`, `hexbin` and `bars` also verify
   input-driven seeded-randomness R1 sensitivity.
 
 - Generalized the executable input replay contract to `surface` and `lines`: each declares the
@@ -16,7 +16,7 @@
   splitmix64 seeding, Marsaglia polar normals, deterministic `detmath::ln`, interpreter/native
   implementation hashes and explicit source-literal seed status. This documents the algorithm
   without changing their R0 maturity label.
-- Promoted `histogram` to the first, `boxplot` to the second, `scatter-fit` to the third, `violin` to the fourth and `hexbin` to the fifth input-driven R1 bundle: their
+- Promoted `histogram` to the first, `boxplot` to the second, `scatter-fit` to the third, `violin` to the fourth, `hexbin` to the fifth and `bars` to the sixth input-driven R1 bundle: their
   declared seeds and sample parameters are read from `data.json`, and the WASI replay changes
   the seed and requires a changed SVG. The remaining random Viz fixtures stay at R0 until their
   seeds are migrated.
@@ -46,7 +46,7 @@
   and dimension-sensitive visualization methods remain on the verified fallback
   until their ownership contract is complete.
 - The differential ratchet advances to **6,743 HIR/IR-generated functions
-  (6,745 IR + 35 HIR) / 39 AST** after the input-driven seeded `histogram`, `boxplot`, `scatter-fit`, `violin` and `hexbin` slices.
+  (6,779 IR + 38 HIR) / 40 AST** after the input-driven seeded `histogram`, `boxplot`, `scatter-fit`, `violin`, `hexbin` and `bars` slices.
 
 ### Quantity visualization ownership status
 
