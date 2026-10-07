@@ -138,6 +138,7 @@ pub enum HelperRequest {
     Show,
     Equality,
     Ordering,
+    Hash,
 }
 
 type HelperGenerator<'a> = dyn FnMut(HelperRequest, &str, &str, &Ty) -> Option<String> + 'a;
@@ -3196,10 +3197,9 @@ fn emit_instruction(
                     codes[0]
                 )
             } else if callee == "hash" && args.len() == 1 && *ty == Ty::Int {
-                // Keep scalar hash calls on the same stable runtime helpers as
-                // the legacy emitter.  `std.viz::uid` uses String hashing to
-                // derive deterministic SVG ids; lowering it here removes a
-                // shared visualization fallback without changing semantics.
+                // Keep hash calls on the same stable runtime helpers as the
+                // legacy emitter. Composite values reuse generated structural
+                // helpers for records, enums and collections.
                 let arg_ty = value_ty(values, args[0])?;
                 let hash = match arg_ty {
                     Ty::String => format!("ostrin_hash_string({})", codes[0]),
@@ -3208,7 +3208,7 @@ fn emit_instruction(
                     }
                     Ty::Float => format!("ostrin_hash_float((double)({}))", codes[0]),
                     Ty::Float32 => format!("ostrin_hash_float32((float)({}))", codes[0]),
-                    _ => return Err(()),
+                    _ => helper(HelperRequest::Hash, &codes[0], "", &arg_ty).ok_or(())?,
                 };
                 format!("(int64_t)({hash})")
             } else if matches!(callee.as_str(), "cov" | "corr") && args.len() == 2 {
@@ -5418,7 +5418,7 @@ pub fn generate(
 ) -> Option<String> {
     let mut helper = |request: HelperRequest, left: &str, _right: &str, ty: &Ty| match request {
         HelperRequest::Show => show(left, ty),
-        HelperRequest::Equality | HelperRequest::Ordering => None,
+        HelperRequest::Equality | HelperRequest::Ordering | HelperRequest::Hash => None,
     };
     generate_with_helpers(
         function,

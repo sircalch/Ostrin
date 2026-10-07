@@ -14,6 +14,11 @@
   now compile their equality and ordering comparisons through the generated helpers; the ratchet
   advances to **6,943 HIR/IR-generated functions (6,896 IR + 47 HIR) / 29 AST**.
 
+- Composite `hash(...)` calls now use the same generated structural hash helpers in IR/C for
+  records, enums, `Option`, `Result`, lists, maps and sets. `hash_builtin.ostrin` keeps interpreter
+  and native output identical, and the ratchet advances to **6,944 HIR/IR-generated functions
+  (6,897 IR + 47 HIR) / 28 AST**.
+
 ### Viz experiment replay maturity
 
 - Added exact-replay `ostrin.experiment/v0` bundles for every one of the 29 Viz gallery figures,

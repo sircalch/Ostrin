@@ -9558,6 +9558,7 @@ fn generate_impl(
                                 crate::ir_c::HelperRequest::Ordering => {
                                     codegen.cmp_expr(left, right, &ctype).ok()
                                 }
+                                crate::ir_c::HelperRequest::Hash => codegen.hash_expr(left, &ctype),
                             }
                         },
                     )
@@ -9687,6 +9688,7 @@ fn generate_impl(
                                 crate::ir_c::HelperRequest::Ordering => {
                                     codegen.cmp_expr(left, right, &ctype).ok()
                                 }
+                                crate::ir_c::HelperRequest::Hash => codegen.hash_expr(left, &ctype),
                             }
                         },
                     )
@@ -10466,6 +10468,7 @@ fn generate_impl(
                             crate::ir_c::HelperRequest::Ordering => {
                                 codegen.cmp_expr(left, right, &ctype).ok()
                             }
+                            crate::ir_c::HelperRequest::Hash => codegen.hash_expr(left, &ctype),
                         }
                     },
                 )
