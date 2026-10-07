@@ -212,7 +212,7 @@ export const GALLERY = [
   { id: "animation", title: "Animation", file: "examples/viz_animation.ostrin", blurb: "24 frames of a spreading wave packet, combined by viz.animate into one SVG that loops with CSS alone.", bundle: "assets/experiments/animation.ostrin-experiment.json" },
   { id: "table", title: "Data table", file: "examples/viz_table.ostrin", blurb: "A formatted ODE solver comparison rendered as a tooltip-rich SVG table.", bundle: "assets/experiments/table.ostrin-experiment.json" },
   { id: "linked-data", title: "Linked data selection", file: "examples/viz_linked_data.ostrin", blurb: "The same Ostrin samples feed a scatter plot and a table; click either side to select the matching row.", bundle: "assets/experiments/linked-data.ostrin-experiment.json" },
-  { id: "dashboard", title: "Multi-panel layout", file: "examples/viz_dashboard.ostrin", blurb: "Four figures, 2D and 3D, composed with viz.grid into one SVG.", bundle: "assets/experiments/dashboard.ostrin-experiment.json" },
+  { id: "dashboard", title: "Multi-panel layout", file: "examples/viz_dashboard.ostrin", blurb: "A seeded four-panel composition of 2D and 3D figures assembled with viz.grid into one SVG.", bundle: "assets/experiments/dashboard.ostrin-experiment.json" },
 ];
 
 // Curated paths through the gallery. These are discovery metadata only: every step points to

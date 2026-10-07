@@ -1657,26 +1657,26 @@ globalThis.OSTRIN_LAB = Object.freeze({
       "id": "dashboard",
       "title": "Multi-panel layout",
       "file": "examples/viz_dashboard.ostrin",
-      "blurb": "Four figures, 2D and 3D, composed with viz.grid into one SVG.",
+      "blurb": "A seeded four-panel composition of 2D and 3D figures assembled with viz.grid into one SVG.",
       "bundle": "assets/experiments/dashboard.ostrin-experiment.json",
       "source": "examples/viz_dashboard.ostrin",
       "sourceUrl": "https://github.com/sircalch/Ostrin/blob/main/examples/viz_dashboard.ostrin",
-      "code": "// std.viz · layout: four panels composed into one figure with viz.grid.\nimport std.viz\n\nfn wave(x: Float, y: Float) -> Float {\n    sin(x) * cos(y)\n}\n\nfn main() -> Void {\n    r = rng(3)\n    t = linspace(0.0, 6.28, 120)\n    samples = r.randn([3000])\n    grid = linspace(-3.14, 3.14, 28)\n    a = viz.figure(\"Signals\").size(480, 320).no_legend()\n        .line(t, sin(t)).line(t, cos(t))\n    b = viz.figure(\"Distribution\").size(480, 320).no_legend()\n        .histogram(samples, 30)\n    c = viz.figure(\"sin(x) cos(y)\").size(480, 320)\n        .heatmap(viz.grid_of(grid, grid, wave), -3.14, 3.14, -3.14, 3.14, colormap: \"coolwarm\")\n    d = viz.scene3d(\"sin(x) cos(y)\").size(480, 320)\n        .surface(grid, grid, viz.grid_of(grid, grid, wave), colormap: \"coolwarm\")\n    print(viz.grid([a.svg(), b.svg(), c.svg(), d.svg()], 2, 480, 320, title: \"Ostrin Viz dashboard\"))\n}\n",
+      "code": "// std.viz · layout: four panels composed into one figure with viz.grid.\nimport std.viz\nimport std.json\n\nfn input_int(key: String, fallback: Int) -> Int {\n    loaded = read_file(\"data.json\")\n    if loaded.is_err() {\n        return fallback\n    }\n    document = json.parse(loaded.unwrap())\n    if document.is_err() {\n        return fallback\n    }\n    value = json.object_get(document.unwrap(), key)\n    if value.is_none() {\n        return fallback\n    }\n    number = json.as_number(value.unwrap())\n    if number.is_none() {\n        return fallback\n    }\n    number.unwrap() as Int\n}\n\nfn input_parameter_int(key: String, fallback: Int) -> Int {\n    loaded = read_file(\"data.json\")\n    if loaded.is_err() {\n        return fallback\n    }\n    document = json.parse(loaded.unwrap())\n    if document.is_err() {\n        return fallback\n    }\n    parameters = json.object_get(document.unwrap(), \"parameters\")\n    if parameters.is_none() {\n        return fallback\n    }\n    value = json.object_get(parameters.unwrap(), key)\n    if value.is_none() {\n        return fallback\n    }\n    number = json.as_number(value.unwrap())\n    if number.is_none() {\n        return fallback\n    }\n    number.unwrap() as Int\n}\n\nfn wave(x: Float, y: Float) -> Float {\n    sin(x) * cos(y)\n}\n\nfn main() -> Void {\n    seed = input_int(\"seed\", 3)\n    random_samples = input_parameter_int(\"random_samples\", 3000)\n    grid_size = input_parameter_int(\"grid\", 28)\n    r = rng(seed)\n    t = linspace(0.0, 6.28, 120)\n    samples = r.randn([random_samples])\n    grid = linspace(-3.14, 3.14, grid_size)\n    a = viz.figure(\"Signals\").size(480, 320).no_legend()\n        .line(t, sin(t)).line(t, cos(t))\n    b = viz.figure(\"Distribution\").size(480, 320).no_legend()\n        .histogram(samples, 30)\n    c = viz.figure(\"sin(x) cos(y)\").size(480, 320)\n        .heatmap(viz.grid_of(grid, grid, wave), -3.14, 3.14, -3.14, 3.14, colormap: \"coolwarm\")\n    d = viz.scene3d(\"sin(x) cos(y)\").size(480, 320)\n        .surface(grid, grid, viz.grid_of(grid, grid, wave), colormap: \"coolwarm\")\n    print(viz.grid([a.svg(), b.svg(), c.svg(), d.svg()], 2, 480, 320, title: \"Ostrin Viz dashboard, seed \" + seed.to_string()))\n}\n",
       "svg": "assets/viz/dashboard.svg",
       "capabilities": [
         "3d",
         "reproducibility"
       ],
       "provenance": {
-        "source-hash": "sha256:4733bf36b09693a1557610cd3c7d48677669f5673cb7b87aa8028ce3825d779a",
-        "data-hash": "sha256:e301160280f21e939227ca4cf5329f2a4593aec961c11b1a5b13fbe84f3a7a39",
+        "source-hash": "sha256:ebcde66da78af85c35717f0e98a0f81a7a99a402c1401417f4a9d2213c714882",
+        "data-hash": "sha256:14835ac83832328c6b892a80607eb13502086e89c7c6b9595dae2cef737847b9",
         "seed": "seed=3",
         "compiler": "ostrinc 0.1.0"
       },
       "reproducibility": {
-        "level": "R0",
-        "label": "R0 · exact replay verified",
-        "next": "R1 · seeded replay (planned verification)"
+        "level": "R1",
+        "label": "R1 · seeded replay verified",
+        "next": "R2 · external snapshots (planned verification)"
       },
       "printed": [
         ""

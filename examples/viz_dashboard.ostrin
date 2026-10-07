@@ -1,15 +1,63 @@
 // std.viz · layout: four panels composed into one figure with viz.grid.
 import std.viz
+import std.json
+
+fn input_int(key: String, fallback: Int) -> Int {
+    loaded = read_file("data.json")
+    if loaded.is_err() {
+        return fallback
+    }
+    document = json.parse(loaded.unwrap())
+    if document.is_err() {
+        return fallback
+    }
+    value = json.object_get(document.unwrap(), key)
+    if value.is_none() {
+        return fallback
+    }
+    number = json.as_number(value.unwrap())
+    if number.is_none() {
+        return fallback
+    }
+    number.unwrap() as Int
+}
+
+fn input_parameter_int(key: String, fallback: Int) -> Int {
+    loaded = read_file("data.json")
+    if loaded.is_err() {
+        return fallback
+    }
+    document = json.parse(loaded.unwrap())
+    if document.is_err() {
+        return fallback
+    }
+    parameters = json.object_get(document.unwrap(), "parameters")
+    if parameters.is_none() {
+        return fallback
+    }
+    value = json.object_get(parameters.unwrap(), key)
+    if value.is_none() {
+        return fallback
+    }
+    number = json.as_number(value.unwrap())
+    if number.is_none() {
+        return fallback
+    }
+    number.unwrap() as Int
+}
 
 fn wave(x: Float, y: Float) -> Float {
     sin(x) * cos(y)
 }
 
 fn main() -> Void {
-    r = rng(3)
+    seed = input_int("seed", 3)
+    random_samples = input_parameter_int("random_samples", 3000)
+    grid_size = input_parameter_int("grid", 28)
+    r = rng(seed)
     t = linspace(0.0, 6.28, 120)
-    samples = r.randn([3000])
-    grid = linspace(-3.14, 3.14, 28)
+    samples = r.randn([random_samples])
+    grid = linspace(-3.14, 3.14, grid_size)
     a = viz.figure("Signals").size(480, 320).no_legend()
         .line(t, sin(t)).line(t, cos(t))
     b = viz.figure("Distribution").size(480, 320).no_legend()
@@ -18,5 +66,5 @@ fn main() -> Void {
         .heatmap(viz.grid_of(grid, grid, wave), -3.14, 3.14, -3.14, 3.14, colormap: "coolwarm")
     d = viz.scene3d("sin(x) cos(y)").size(480, 320)
         .surface(grid, grid, viz.grid_of(grid, grid, wave), colormap: "coolwarm")
-    print(viz.grid([a.svg(), b.svg(), c.svg(), d.svg()], 2, 480, 320, title: "Ostrin Viz dashboard"))
+    print(viz.grid([a.svg(), b.svg(), c.svg(), d.svg()], 2, 480, 320, title: "Ostrin Viz dashboard, seed " + seed.to_string()))
 }
