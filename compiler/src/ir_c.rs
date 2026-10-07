@@ -187,10 +187,16 @@ fn c_type(ty: &Ty, records: &RecordFields) -> Bail<String> {
         Ty::List(element) if list_supported(element, records) => {
             format!("List_{}*", mangle_option_payload(element, records))
         }
-        Ty::Map(key, value) if map_supported(key, value) => {
-            format!("Map_{}_{}*", mangle_scalar(key), mangle_scalar(value))
+        Ty::Map(key, value) if map_supported(key, value, records) => {
+            format!(
+                "Map_{}_{}*",
+                mangle_record_type(key, records),
+                mangle_record_type(value, records)
+            )
         }
-        Ty::Set(element) if set_supported(element) => format!("Set_{}*", mangle_scalar(element)),
+        Ty::Set(element) if set_supported(element, records) => {
+            format!("Set_{}*", mangle_record_type(element, records))
+        }
         Ty::Fn(_, _) => "OstrinClosure".to_string(),
         Ty::Named(name) if records.contains_key(name) => format!("{name}*"),
         Ty::Applied(_, _) if record_name(ty, records).is_some() => {
@@ -572,8 +578,8 @@ fn supported(ty: &Ty, records: &RecordFields) -> bool {
         || is_plain_enum(ty, records)
         || record_name(ty, records).is_some()
         || matches!(ty, Ty::List(element) if list_supported(element, records))
-        || matches!(ty, Ty::Map(key, value) if map_supported(key, value))
-        || matches!(ty, Ty::Set(element) if set_supported(element))
+        || matches!(ty, Ty::Map(key, value) if map_supported(key, value, records))
+        || matches!(ty, Ty::Set(element) if set_supported(element, records))
         || matches!(ty, Ty::Fn(_, _))
         || matches!(ty, Ty::Applied(name, args) if name == "Channel" && args.len() == 1 && channel_supported(&args[0], records))
         || matches!(ty, Ty::Applied(name, args) if name == "Task" && args.len() == 1 && task_supported(&args[0], records))
@@ -598,16 +604,23 @@ fn list_supported(ty: &Ty, records: &RecordFields) -> bool {
         // leaves scalar `None` entries untouched.
         || matches!(ty, Ty::Applied(name, args) if name == "Option" && args.len() == 1 && option_supported(&args[0], records))
         || matches!(ty, Ty::Applied(name, args) if name == "Result" && args.len() == 2 && result_supported(&args[0], &args[1], records))
-        || matches!(ty, Ty::Map(key, value) if map_supported(key, value))
-        || matches!(ty, Ty::Set(element) if set_supported(element))
+        || matches!(ty, Ty::Map(key, value) if map_supported(key, value, records))
+        || matches!(ty, Ty::Set(element) if set_supported(element, records))
 }
 
-fn map_supported(key: &Ty, value: &Ty) -> bool {
-    list_element_supported(key) && list_element_supported(value)
+fn map_supported(key: &Ty, value: &Ty, records: &RecordFields) -> bool {
+    (list_element_supported(key)
+        || record_name(key, records).is_some()
+        || matches!(key, Ty::List(inner) if list_supported(inner, records)))
+        && (list_element_supported(value)
+            || record_name(value, records).is_some()
+            || matches!(value, Ty::List(inner) if list_supported(inner, records)))
 }
 
-fn set_supported(element: &Ty) -> bool {
+fn set_supported(element: &Ty, records: &RecordFields) -> bool {
     list_element_supported(element)
+        || record_name(element, records).is_some()
+        || matches!(element, Ty::List(inner) if list_supported(inner, records))
 }
 
 fn channel_supported(element: &Ty, records: &RecordFields) -> bool {
@@ -624,8 +637,8 @@ fn option_supported(element: &Ty, records: &RecordFields) -> bool {
         Ty::Int | Ty::Float | Ty::Float32 | Ty::Sized(_) | Ty::Bool | Ty::String
     ) || array_supported(element)
         || matches!(element, Ty::List(inner) if list_supported(inner, records))
-        || matches!(element, Ty::Map(key, value) if map_supported(key, value))
-        || matches!(element, Ty::Set(inner) if set_supported(inner))
+        || matches!(element, Ty::Map(key, value) if map_supported(key, value, records))
+        || matches!(element, Ty::Set(inner) if set_supported(inner, records))
         || matches!(element, Ty::Applied(name, args) if name == "Option" && args.len() == 1 && option_supported(&args[0], records))
         || matches!(element, Ty::Applied(name, args) if name == "Result" && args.len() == 2 && result_supported(&args[0], &args[1], records))
         || record_name(element, records).is_some()
@@ -639,8 +652,8 @@ fn result_payload_supported(ty: &Ty, records: &RecordFields) -> bool {
     scalar(ty)
         || array_supported(ty)
         || matches!(ty, Ty::List(inner) if list_supported(inner, records))
-        || matches!(ty, Ty::Map(key, value) if map_supported(key, value))
-        || matches!(ty, Ty::Set(inner) if set_supported(inner))
+        || matches!(ty, Ty::Map(key, value) if map_supported(key, value, records))
+        || matches!(ty, Ty::Set(inner) if set_supported(inner, records))
         || matches!(ty, Ty::Applied(name, args) if name == "Option" && args.len() == 1 && option_supported(&args[0], records))
         || matches!(ty, Ty::Applied(name, args) if name == "Result" && args.len() == 2 && result_supported(&args[0], &args[1], records))
         || record_name(ty, records).is_some()
@@ -711,11 +724,15 @@ fn mangle_option_payload(ty: &Ty, records: &RecordFields) -> String {
         Ty::List(element) if list_supported(element, records) => {
             format!("List_{}", mangle_option_payload(element, records))
         }
-        Ty::Map(key, value) if map_supported(key, value) => {
-            format!("Map_{}_{}", mangle_scalar(key), mangle_scalar(value))
+        Ty::Map(key, value) if map_supported(key, value, records) => {
+            format!(
+                "Map_{}_{}",
+                mangle_record_type(key, records),
+                mangle_record_type(value, records)
+            )
         }
-        Ty::Set(element) if set_supported(element) => {
-            format!("Set_{}", mangle_scalar(element))
+        Ty::Set(element) if set_supported(element, records) => {
+            format!("Set_{}", mangle_record_type(element, records))
         }
         Ty::Applied(name, args) if name == "Array" && args.len() == 1 && array_supported(ty) => {
             match &args[0] {
@@ -2296,11 +2313,12 @@ fn emit_instruction(
                 ));
             }
             Ty::Set(element) => {
-                if !set_supported(element) || (kind != "collection" && !kind.starts_with("empty_"))
+                if !set_supported(element, records)
+                    || (kind != "collection" && !kind.starts_with("empty_"))
                 {
                     return Err(());
                 }
-                let set_name = format!("Set_{}", mangle_scalar(element));
+                let set_name = format!("Set_{}", mangle_record_type(element, records));
                 out.push_str(&format!("    {} = {set_name}_new();\n", value_name(*dst)));
                 for value in fields {
                     if value_ty(values, *value)? != **element {
@@ -2314,13 +2332,17 @@ fn emit_instruction(
                 }
             }
             Ty::Map(key, value) => {
-                if !map_supported(key, value)
+                if !map_supported(key, value, records)
                     || (kind != "map" && !kind.starts_with("empty_"))
                     || fields.len() % 2 != 0
                 {
                     return Err(());
                 }
-                let map_name = format!("Map_{}_{}", mangle_scalar(key), mangle_scalar(value));
+                let map_name = format!(
+                    "Map_{}_{}",
+                    mangle_record_type(key, records),
+                    mangle_record_type(value, records)
+                );
                 out.push_str(&format!("    {} = {map_name}_new();\n", value_name(*dst)));
                 for pair in fields.chunks_exact(2) {
                     if value_ty(values, pair[0])? != **key || value_ty(values, pair[1])? != **value
@@ -2948,8 +2970,12 @@ fn emit_instruction(
                         }
                     }
                 }
-                Ty::Map(key, value) if map_supported(&key, &value) => {
-                    let map_name = format!("Map_{}_{}", mangle_scalar(&key), mangle_scalar(&value));
+                Ty::Map(key, value) if map_supported(&key, &value, records) => {
+                    let map_name = format!(
+                        "Map_{}_{}",
+                        mangle_record_type(&key, records),
+                        mangle_record_type(&value, records)
+                    );
                     match method.as_str() {
                         "contains_key"
                             if args.len() == 1
@@ -3133,8 +3159,8 @@ fn emit_instruction(
                         _ => return Err(()),
                     }
                 }
-                Ty::Set(element) if set_supported(&element) => {
-                    let set_name = format!("Set_{}", mangle_scalar(&element));
+                Ty::Set(element) if set_supported(&element, records) => {
+                    let set_name = format!("Set_{}", mangle_record_type(&element, records));
                     match method.as_str() {
                         "contains"
                             if args.len() == 1

@@ -35,6 +35,11 @@
   scalar literal/range pattern tests in IR/C. `shapes.ostrin` now compiles with `ir=3, hir=0, ast=0`,
   and the ratchet advances to **6,951 HIR/IR-generated functions (6,905 IR + 46 HIR) / 21 AST**.
 
+- Extended IR/C collection lowering to composite `Map` and `Set` keys and values, including
+  `List<Int>` keys. `hash_map_composite.ostrin` now compiles with `ir=2, hir=0, ast=0`,
+  preserving interpreter/native output and advancing the ratchet to **6,954 HIR/IR-generated
+  functions (6,908 IR + 46 HIR) / 18 AST**.
+
 ### Viz experiment replay maturity
 
 - Added exact-replay `ostrin.experiment/v0` bundles for every one of the 29 Viz gallery figures,
