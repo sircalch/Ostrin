@@ -3613,6 +3613,18 @@ fn emit_instruction(
                 && *ty == Ty::Float32
             {
                 format!("ostrin_dm_atan2f({}, {})", codes[0], codes[1])
+            } else if matches!(callee.as_str(), "det" | "trace" | "norm")
+                && args.len() == 1
+                && value_ty(values, args[0])? == Ty::Applied("Array".to_string(), vec![Ty::Float])
+                && *ty == Ty::Float
+            {
+                format!("Array_Float_{callee}({})", codes[0])
+            } else if matches!(callee.as_str(), "inv" | "eigvals")
+                && args.len() == 1
+                && value_ty(values, args[0])? == Ty::Applied("Array".to_string(), vec![Ty::Float])
+                && *ty == Ty::Applied("Array".to_string(), vec![Ty::Float])
+            {
+                format!("Array_Float_{callee}({})", codes[0])
             } else if callee == "eye"
                 && args.len() == 1
                 && value_ty(values, args[0])? == Ty::Int

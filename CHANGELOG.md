@@ -23,6 +23,10 @@
   over `Array<Float>`. `calibration.ostrin` now compiles through the typed path, advancing the
   ratchet to **6,947 HIR/IR-generated functions (6,900 IR + 47 HIR) / 25 AST**.
 
+- Added IR/C lowering for `det`, `trace`, `inv`, `eigvals` and `eye` over `Array<Float>`,
+  allowing `linear_algebra.ostrin` to use the typed matrix runtime. The ratchet advances to
+  **6,949 HIR/IR-generated functions (6,902 IR + 47 HIR) / 23 AST**.
+
 ### Viz experiment replay maturity
 
 - Added exact-replay `ostrin.experiment/v0` bundles for every one of the 29 Viz gallery figures,
