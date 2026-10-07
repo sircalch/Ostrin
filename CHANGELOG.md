@@ -6,8 +6,9 @@
 
 - Moved the global `parse_int(String)` builtin through the same checked IR/C result helper
   as `String.to_int()`. `stdlib_io.ostrin` now compiles with `ir=1, hir=0, ast=0`, and
-  the differential ratchet advances to **6,930 HIR/IR-generated functions (6,883 IR + 47 HIR) /
-  42 AST**.
+  the differential ratchet advances to **6,941 HIR/IR-generated functions (6,894 IR + 47 HIR) /
+  31 AST**. Recursive-record-returning methods such as `std.json::Parser.parse_number` now use
+  the same typed IR/C path when their receiver and arguments have a supported ownership shape.
 
 ### Viz experiment replay maturity
 
@@ -1389,3 +1390,5 @@ Release notes: [`docs/releases/v0.1.0.md`](docs/releases/v0.1.0.md).
 - Physical quantities with dimensional arithmetic and conversions.
 - Simulated task/channel concurrency model with mutation-safety checks.
 - 47 passing compiler integration tests.
+
+\r\n

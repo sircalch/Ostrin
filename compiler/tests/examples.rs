@@ -393,7 +393,11 @@ fn standard_library_file_io_and_parsing_work() {
     );
     let report = run(&["--native-type-report", &example_path("stdlib_io.ostrin")]);
     if !skip_if_no_c_compiler(&report) {
-        assert!(report.status.success(), "stdlib_io type report failed: {}", stderr(&report));
+        assert!(
+            report.status.success(),
+            "stdlib_io type report failed: {}",
+            stderr(&report)
+        );
         assert!(
             stdout(&report).contains("native-source: examples/stdlib_io.ostrin ir=1 hir=0 ast=0")
                 && stdout(&report).contains("ast-fallback: 0"),
@@ -6935,8 +6939,8 @@ fn json_standard_library_matches_between_backends_and_is_leak_free() {
     assert!(
         stdout(&report)
             .lines()
-            .any(|line| line == "native-source: <ostrin-std>/json.ostrin ir=32 hir=3 ast=1"),
-        "JSON parser should lower string escapes through IR: {}",
+            .any(|line| line == "native-source: <ostrin-std>/json.ostrin ir=33 hir=3 ast=0"),
+        "JSON parser should lower string escapes and numeric parsing through IR: {}",
         stdout(&report)
     );
     let interpreted = run(&["--run", &path]);

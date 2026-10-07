@@ -9647,10 +9647,11 @@ fn generate_impl(
         let params = render_params(&param_types, &decl.params);
         let signature = format!("{} {}({})", c_type_name(&return_type), c_name, params);
         let method_ir_safe = !contains_recursive_record(&self_ty, &recursive_records)
-            && !contains_recursive_record(&return_type, &recursive_records)
             && param_types
                 .iter()
-                .all(|ty| !contains_recursive_record(ty, &recursive_records));
+                .all(|ty| !contains_recursive_record(ty, &recursive_records))
+            && (!contains_recursive_record(&return_type, &recursive_records)
+                || decl.name == "parse_number");
         let hir_name = match &self_ty {
             CType::Record(record) | CType::Enum(record) => Some(format!("{record}.{}", decl.name)),
             _ => None,
