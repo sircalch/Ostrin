@@ -13,6 +13,11 @@
   spawn body now produce a compiler diagnostic instead of an internal panic.
   The deterministic mutated-source suite exposed the crash; a focused regression
   covers both native report and C emission.
+- Fixed ownership liveness for managed loop `Phi` values whose only ordinary use
+  is the loop exit. Such values now release the outgoing reference on the
+  backedge before the next iteration overwrites it. A `Quantity` regression
+  verifies `if` and loop merges under native execution, WASI emission and
+  `--leak-check` (`live_allocations=0`).
 
 - Moved the global `parse_int(String)` builtin through the same checked IR/C result helper
   as `String.to_int()`. `stdlib_io.ostrin` now compiles with `ir=1, hir=0, ast=0`, and

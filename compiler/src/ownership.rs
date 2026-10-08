@@ -356,6 +356,11 @@ pub fn lower_linear(program: &IrProgram) -> (IrProgram, LoweringSummary) {
             let single_block = edges.is_empty()
                 && !value_uses.is_empty()
                 && blocks.len() == 1
+                // Same-block last-use cleanup is only valid when the value is
+                // defined in that block too. A loop Phi can otherwise be used
+                // only on its exit block while still needing a release on the
+                // backedge that overwrites it.
+                && blocks.contains(definition_block)
                 && !opaque_values.contains(value);
             if single_block {
                 let last = value_uses

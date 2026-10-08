@@ -8893,9 +8893,28 @@ fn native_quantity_phi_escape_retains_array_unit_labels() {
     // value must survive the branch merge and the arrays' last-use cleanup.
     let file = temp_source(
         "native-quantity-phi-escape.ostrin",
-        "fn choose(flag: Bool, left: Quantity<Length / Time>, right: Quantity<Length / Time>) -> Quantity<Length / Time> {\n    if flag { left } else { right }\n}\nfn main() -> Void {\n    slow = (array([1 m, 2 m, 3 m]) / (1 s)).max()\n    fast = (array([4 m, 5 m, 6 m]) / (1 s)).max()\n    print(choose(true, slow, fast))\n    print(choose(false, slow, fast))\n}\n",
+        r#"fn choose(flag: Bool, left: Quantity<Length / Time>, right: Quantity<Length / Time>) -> Quantity<Length / Time> {
+    if flag { left } else { right }
+}
+fn loop_choose(first: Quantity<Length / Time>, second: Quantity<Length / Time>) -> Quantity<Length / Time> {
+    mut selected = first
+    mut index = 0
+    while index < 2 {
+        selected = second
+        index = index + 1
+    }
+    selected
+}
+fn main() -> Void {
+    slow = (array([1 m, 2 m, 3 m]) / (1 s)).max()
+    fast = (array([4 m, 5 m, 6 m]) / (1 s)).max()
+    print(choose(true, slow, fast))
+    print(choose(false, slow, fast))
+    print(loop_choose(slow, fast))
+}
+"#,
     );
-    let expected = "3 m/s\n6 m/s\n";
+    let expected = "3 m/s\n6 m/s\n6 m/s\n";
 
     let interpreted = run(&["--run", &file]);
     assert!(
@@ -8916,7 +8935,7 @@ fn native_quantity_phi_escape_retains_array_unit_labels() {
         stderr(&report)
     );
     let report_text = stdout(&report);
-    assert!(report_text.contains("ir-generated: 2"), "{report_text}");
+    assert!(report_text.contains("ir-generated: 3"), "{report_text}");
     assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
 
     let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
