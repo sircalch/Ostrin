@@ -783,6 +783,11 @@ fn mangle_result_payload(ty: &Ty, records: &RecordFields) -> String {
 fn mangle_task_payload(ty: &Ty, records: &RecordFields) -> String {
     if *ty == Ty::Void {
         "Void".to_string()
+    } else if *ty == Ty::Unknown {
+        // Keep the placeholder ABI aligned with c_type(Ty::Unknown). This can
+        // arise when a checked spawn body ends in an unresolved call; native
+        // code generation must report/emit conservatively instead of panicking.
+        "Int".to_string()
     } else {
         mangle_option_payload(ty, records)
     }

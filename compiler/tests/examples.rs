@@ -2563,8 +2563,8 @@ fn native_backend_compiles_and_runs_enums_and_match() {
     // named argument), a positional-field variant (`Rectangle(Int, Int)`,
     // whose fields the pattern `Rectangle(width, height)` must resolve by
     // position, not name), a unit variant, and matches over a plain Int and
-    // scalar enum payloads. The plain Int match stays on HIR; enum
-    // literal/range predicates use the typed IR/C path.
+    // scalar enum payloads. All four functions now use the typed IR/C path,
+    // including the plain Int match and enum literal/range predicates.
     let exe = temp_artifact("enums.exe");
     let compile = run(&[
         "--compile",
@@ -2588,8 +2588,8 @@ fn native_backend_compiles_and_runs_enums_and_match() {
         stderr(&report)
     );
     assert!(
-        stdout(&report).contains("native-source: examples/native_enums.ostrin ir=3 hir=1 ast=0"),
-        "plain enum functions did not stay on IR/C while scalar literal/range matching was migrated: {}",
+        stdout(&report).contains("native-source: examples/native_enums.ostrin ir=4 hir=0 ast=0"),
+        "plain enum functions did not stay on the IR/C path: {}",
         stdout(&report)
     );
 
@@ -8888,6 +8888,109 @@ fn native_quantity_scalar_escape_retains_array_unit_labels() {
 }
 
 #[test]
+fn native_quantity_phi_escape_retains_array_unit_labels() {
+    // Both branches produce owned scalar quantities from arrays. The selected
+    // value must survive the branch merge and the arrays' last-use cleanup.
+    let file = temp_source(
+        "native-quantity-phi-escape.ostrin",
+        "fn choose(flag: Bool, left: Quantity<Length / Time>, right: Quantity<Length / Time>) -> Quantity<Length / Time> {\n    if flag { left } else { right }\n}\nfn main() -> Void {\n    slow = (array([1 m, 2 m, 3 m]) / (1 s)).max()\n    fast = (array([4 m, 5 m, 6 m]) / (1 s)).max()\n    print(choose(true, slow, fast))\n    print(choose(false, slow, fast))\n}\n",
+    );
+    let expected = "3 m/s\n6 m/s\n";
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    if skip_if_no_c_compiler(&report) {
+        let _ = fs::remove_file(&file);
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ir-generated: 2"), "{report_text}");
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "WASI C emission failed: {}",
+        stderr(&wasi)
+    );
+    assert!(
+        stdout(&wasi).contains("ostrin_qty_retain") && stdout(&wasi).contains("ostrin_qty_release"),
+        "WASI C omitted scalar Quantity ownership helpers"
+    );
+
+    let exe = temp_artifact("native-quantity-phi-escape.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run quantity Phi escape binary");
+    let _ = fs::remove_file(&exe);
+    let _ = fs::remove_file(&file);
+    assert!(
+        native.status.success(),
+        "native binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "scalar Quantity Phi ownership leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn native_codegen_rejects_unknown_spawn_result_without_panicking() {
+    // An unknown call at the end of a spawn body makes its result Unknown.
+    // The checker currently permits that incomplete type, so native lowering
+    // must return a diagnostic instead of panicking while naming Task<T>.
+    let file = temp_source(
+        "native-unknown-spawn-result.ostrin",
+        "fn main() -> Void {\n    task = spawn { rint(\"x\") }\n}\n",
+    );
+    let checked = run(&["--check", &file]);
+    assert!(
+        checked.status.success(),
+        "fixture should reach native lowering: {}",
+        stderr(&checked)
+    );
+
+    for mode in ["--native-type-report", "--emit-c"] {
+        let out = run(&[mode, &file]);
+        let diagnostic = stderr(&out);
+        assert!(!out.status.success(), "{mode} accepted an unresolved call");
+        assert!(
+            !diagnostic.contains("panicked"),
+            "{mode} panicked on an unknown task payload: {diagnostic}"
+        );
+        assert!(
+            diagnostic.contains("unknown function 'rint'"),
+            "{mode} omitted the native diagnostic: {diagnostic}"
+        );
+    }
+    let _ = fs::remove_file(file);
+}
+
+#[test]
 fn native_list_of_quantity_arrays_matches_interpreter_and_wasi() {
     let file = temp_source(
         "native-list-quantity-arrays.ostrin",
@@ -11315,8 +11418,8 @@ fn viz_histograms_render_bins_and_use_numeric_ir() {
     );
     assert!(
         stdout(&report).contains("native-source: examples/viz_histogram.ostrin ir=3 hir=0 ast=0")
-            && stdout(&report).contains("ast-fallback: 1"),
-        "histogram entry point did not use the numeric IR path with its JSON import boundary: {}",
+            && stdout(&report).contains("ast-fallback: 0"),
+        "histogram entry point did not use the numeric IR path through its JSON import boundary: {}",
         stdout(&report)
     );
 
@@ -11548,7 +11651,7 @@ fn viz_hexbins_render_density_cells_and_colorbar() {
         let report_text = stdout(&report);
         assert!(
             report_text.contains("native-source: examples/viz_hexbin.ostrin ir=3 hir=0 ast=0")
-                && report_text.contains("ast-fallback: 1"),
+                && report_text.contains("ast-fallback: 0"),
             "hexbin entry point did not use the ownership-aware IR path: {report_text}"
         );
     }

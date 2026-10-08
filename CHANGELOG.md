@@ -4,6 +4,16 @@
 
 ### Compiler fallback reduction
 
+- Added a native/WASI regression for dynamic `Quantity` unit labels that escape
+  through either branch of an `if`/`Phi`. Interpreter parity and native
+  `--leak-check` confirm both selected values remain valid after their source
+  arrays reach last use. Generic unit-aware plotting stays on the verified
+  fallback until its full ownership matrix is covered.
+- Hardened native task type mangling for `Task<Unknown>`: unsupported calls in a
+  spawn body now produce a compiler diagnostic instead of an internal panic.
+  The deterministic mutated-source suite exposed the crash; a focused regression
+  covers both native report and C emission.
+
 - Moved the global `parse_int(String)` builtin through the same checked IR/C result helper
   as `String.to_int()`. `stdlib_io.ostrin` now compiles with `ir=1, hir=0, ast=0`, and
   the differential ratchet advances to **6,941 HIR/IR-generated functions (6,894 IR + 47 HIR) /
