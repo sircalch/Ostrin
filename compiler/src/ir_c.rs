@@ -846,7 +846,37 @@ fn retain_payload(access: &str, ty: &Ty, records: &RecordFields) -> Option<Strin
 }
 
 fn release_payload(access: &str, ty: &Ty, records: &RecordFields) -> Option<String> {
-    retain_payload(access, ty, records).map(|body| body.replace("ostrin_retain", "ostrin_release"))
+    match ty {
+        Ty::Quantity(_) => Some(format!("ostrin_qty_release({access})")),
+        Ty::Applied(name, args)
+            if name == "Option"
+                && args.len() == 1
+                && option_supported(&args[0], records)
+                && option_managed_payload(&args[0], records) =>
+        {
+            release_payload(&format!("({access}).value"), &args[0], records)
+                .map(|body| format!("if (({access}).has) {{ {body}; }}"))
+        }
+        Ty::Applied(name, args)
+            if name == "Result"
+                && args.len() == 2
+                && result_supported(&args[0], &args[1], records)
+                && result_managed_payload(ty, records) =>
+        {
+            let ok = release_payload(&format!("({access}).value"), &args[0], records);
+            let err = release_payload(&format!("({access}).error"), &args[1], records);
+            match (ok, err) {
+                (Some(ok), Some(err)) => {
+                    Some(format!("if (({access}).ok) {{ {ok}; }} else {{ {err}; }}"))
+                }
+                (Some(ok), None) => Some(format!("if (({access}).ok) {{ {ok}; }}")),
+                (None, Some(err)) => Some(format!("if (!({access}).ok) {{ {err}; }}")),
+                (None, None) => None,
+            }
+        }
+        _ => retain_payload(access, ty, records)
+            .map(|body| body.replace("ostrin_retain", "ostrin_release")),
+    }
 }
 
 fn value_name(value: ValueId) -> String {

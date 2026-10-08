@@ -18,6 +18,10 @@
   backedge before the next iteration overwrites it. A `Quantity` regression
   verifies `if` and loop merges under native execution, WASI emission and
   `--leak-check` (`live_allocations=0`).
+- Completed typed ownership for non-recursive record fields containing scalar
+  `Quantity`: IR and legacy record destructors now release unit labels with
+  `ostrin_qty_release`. A native/WASI regression checks field extraction after
+  construction and zero live allocations.
 
 - Moved the global `parse_int(String)` builtin through the same checked IR/C result helper
   as `String.to_int()`. `stdlib_io.ostrin` now compiles with `ir=1, hir=0, ast=0`, and

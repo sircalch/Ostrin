@@ -1,8 +1,9 @@
 # 27. Ownership de `Quantity` escalar y etiquetas de unidad
 
 *Estado: fase 1 implementada y validada; el escape escalar por retorno, por
-`if`/`Phi` y por `Phi` de bucle tiene cobertura nativa/WASI/leak-check. No
-habilita todavía la bajada de `Figure.unit_line`/`unit_scatter` a IR/C.*
+`if`/`Phi`, por `Phi` de bucle y dentro de records no recursivos tiene cobertura
+nativa/WASI/leak-check. No habilita todavía la bajada de
+`Figure.unit_line`/`unit_scatter` a IR/C.*
 
 Depende de [01-variables-tipos-unidades.md](01-variables-tipos-unidades.md),
 [11-modelo-de-memoria.md](11-modelo-de-memoria.md),
@@ -282,7 +283,7 @@ positiva, salida diferencial y leak-check cuando aplique:
 | `index`, `mean`, `percentile` y `to_list` | sí | sí | ASan/UBSan | cada copia conserva su etiqueta |
 | parámetro `fn id(q) -> Quantity` y retorno del parámetro | sí | sí | ASan/UBSan | el caller recibe una copia viva |
 | alias por `Phi`, `if`, loop y `match` | sí | sí | ASan/UBSan | una liberación por referencia |
-| record con campo `Quantity` | sí | sí | ASan/UBSan | destructor recursivo correcto |
+| record no recursivo con campo `Quantity` | sí | sí | pendiente | destructor libera el campo y leak-check termina en cero |
 | `Option`/`Result` de `Quantity` | sí | sí | ASan/UBSan | solo se libera el payload activo |
 | `List<Quantity>` y `Array<Quantity>` | sí | sí | ASan/UBSan | no hay doble liberación |
 | `examples/viz_units.ostrin` | sí | sí | ASan/UBSan | desaparece el fallback solo con evidencia |
@@ -311,9 +312,10 @@ pruebas de la fila completa y reduzca el contador de fallback con paridad.
 2. **Completado en fase 1:** activar `max`/`min`/`mean`/`percentile`/`get`,
    indexación escalar y operaciones aritméticas con etiquetas propias; ejecutar
    native, WASI, leak-check e intérprete diferencial.
-3. **Parcial:** parámetros que escapan por retorno, aliases por `if`/`Phi` y un
-   `Phi` de bucle ya tienen pruebas nativas, WASI e intérprete; faltan aliases
-   por `match`, records, `Option`/`Result` y wrappers antes de ampliar el ratchet.
+3. **Parcial:** parámetros que escapan por retorno, aliases por `if`/`Phi`, un
+   `Phi` de bucle y records no recursivos con campos `Quantity` ya tienen
+   pruebas nativas, WASI e intérprete; faltan aliases por `match`, records
+   anidados, `Option`/`Result` y wrappers antes de ampliar el ratchet.
 4. **Pendiente:** repetir native, WASI, ASan, UBSan e intérprete diferencial en
    la matriz completa de la sección 7.
 5. Habilitar las instanciaciones genéricas de visualización y convertir la
@@ -330,8 +332,9 @@ pruebas de la fila completa y reduzca el contador de fallback con paridad.
 - No se introduce un interner global de unidades: puede reducir allocations,
   pero debe resolver lifetime, concurrencia y límites del catálogo primero.
 - No se considera suficiente retener solo en `Array_Float_max`: la fase 1
-  también cubre indexación, reducciones y aritmética; records, `Phi` de match,
-  retornos complejos y wrappers permanecen sujetos a la matriz pendiente.
+  también cubre indexación, reducciones y aritmética; records anidados,
+  `Phi` de match, retornos complejos y wrappers permanecen sujetos a la matriz
+  pendiente.
 - No se afirma que la migración completa esté resuelta mientras las rutas
   genéricas de visualización sigan fuera del ratchet y existan productores de
   `Qty` sin contrato probado.

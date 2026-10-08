@@ -175,6 +175,7 @@ fn is_reference_type(ty: &CType) -> bool {
 /// not emit any runtime calls.
 fn retain_managed_value(access: &str, ty: &CType) -> Option<String> {
     match ty {
+        CType::Quantity(_) => Some(format!("ostrin_qty_retain({access})")),
         CType::Option(inner) => retain_managed_value(&format!("({access}).value"), inner)
             .map(|body| format!("if (({access}).has) {{ {body}; }}")),
         CType::Result(ok, err) => {
@@ -199,24 +200,36 @@ fn retain_managed_value(access: &str, ty: &CType) -> Option<String> {
 /// Nested payloads use `ostrin_release`; the enclosing local/temporary is the
 /// only place that may need `ostrin_release_owned` for task-handle bookkeeping.
 fn release_managed_value(access: &str, ty: &CType) -> Option<String> {
-    retain_managed_value(access, ty).map(|body| body.replace("ostrin_retain", "ostrin_release"))
-}
-
-/// A `Quantity` is a by-value C struct, but its runtime unit expression may
-/// point at an owned string produced by `unit_combine`. Lists of quantities
-/// therefore need to retain/release the unit pointer for each element. The
-/// runtime retain ABI is a no-op for the string literals used by unit
-/// literals, so this also covers borrowed labels from quantity arrays without
-/// changing their representation.
-fn retain_list_item(access: &str, ty: &CType) -> Option<String> {
     match ty {
-        CType::Quantity(_) => Some(format!("ostrin_retain((void*)({access}).u)")),
-        _ => retain_managed_value(access, ty),
+        CType::Quantity(_) => Some(format!("ostrin_qty_release({access})")),
+        CType::Option(inner) => release_managed_value(&format!("({access}).value"), inner)
+            .map(|body| format!("if (({access}).has) {{ {body}; }}")),
+        CType::Result(ok, err) => {
+            let ok_body = release_managed_value(&format!("({access}).value"), ok);
+            let err_body = release_managed_value(&format!("({access}).error"), err);
+            match (ok_body, err_body) {
+                (Some(ok_body), Some(err_body)) => Some(format!(
+                    "if (({access}).ok) {{ {ok_body}; }} else {{ {err_body}; }}"
+                )),
+                (Some(ok_body), None) => Some(format!("if (({access}).ok) {{ {ok_body}; }}")),
+                (None, Some(err_body)) => Some(format!("if (!({access}).ok) {{ {err_body}; }}")),
+                (None, None) => None,
+            }
+        }
+        _ => retain_managed_value(access, ty)
+            .map(|body| body.replace("ostrin_retain", "ostrin_release")),
     }
 }
 
+/// List elements use the same typed retain contract as record and wrapper
+/// fields. `Quantity` stays by value while its helper manages a dynamic unit
+/// label without exposing the raw pointer to generic reference operations.
+fn retain_list_item(access: &str, ty: &CType) -> Option<String> {
+    retain_managed_value(access, ty)
+}
+
 fn release_list_item(access: &str, ty: &CType) -> Option<String> {
-    retain_list_item(access, ty).map(|body| body.replace("ostrin_retain", "ostrin_release"))
+    release_managed_value(access, ty)
 }
 
 /// Releases an owned value, preserving the task-handle bookkeeping used by
@@ -224,6 +237,7 @@ fn release_list_item(access: &str, ty: &CType) -> Option<String> {
 /// their active fields and therefore never cast a by-value wrapper to `void*`.
 fn release_owned_managed_value(access: &str, ty: &CType) -> Option<String> {
     match ty {
+        CType::Quantity(_) => Some(format!("ostrin_qty_release({access})")),
         CType::Option(inner) => release_managed_value(&format!("({access}).value"), inner)
             .map(|body| format!("if (({access}).has) {{ {body}; }}")),
         CType::Result(ok, err) => {
