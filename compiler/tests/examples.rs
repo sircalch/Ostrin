@@ -3245,6 +3245,7 @@ fn native_hir_handles_option_result_core() {
         ("native_result.ostrin", 6usize),
         ("native_result_catch.ostrin", 3usize),
         ("native_ir_result_combinators.ostrin", 9usize),
+        ("option_result.ostrin", 1usize),
         ("try_result.ostrin", 5usize),
     ] {
         let report = run(&["--native-type-report", &example_path(file)]);

@@ -4022,6 +4022,9 @@ impl<'a> Codegen<'a> {
     fn ty_to_ctype(&mut self, ty: &Ty) -> Option<CType> {
         Some(match ty {
             Ty::Int => CType::Int,
+            // The legacy C emitter uses an integer placeholder for an
+            // unconstrained Result error slot until a concrete Err fixes it.
+            Ty::Unknown => CType::Int,
             Ty::Float => CType::Float,
             Ty::Bool => CType::Bool,
             Ty::String => CType::Str,
@@ -9543,11 +9546,19 @@ fn generate_impl(
                 .map(move |(method, info)| ((record.clone(), method.clone()), info.c_name.clone()))
         })
         .collect();
-    for ((owner, method), _) in &codegen.generic_method_instances {
+    for ((owner, c_name), _) in &codegen.generic_method_instances {
         // The HIR resolver rewrites a generic method spelling to its concrete
         // C symbol.  Register that symbol under the concrete receiver so the
         // IR method dispatcher can prove and emit the same call.
-        ir_methods.insert((owner.clone(), method.clone()), method.clone());
+        ir_methods.insert((owner.clone(), c_name.clone()), c_name.clone());
+        if let Some(methods) = codegen.generic_methods.get(owner) {
+            for (source_name, generic) in methods {
+                let prefix = format!("{}__{}__", generic.key, generic.decl.name);
+                if c_name.starts_with(&prefix) {
+                    ir_methods.insert((owner.clone(), source_name.clone()), c_name.clone());
+                }
+            }
+        }
     }
     let recursive_records = recursive_record_names(&codegen.records);
     for f in &functions {

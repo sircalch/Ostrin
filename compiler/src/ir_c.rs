@@ -176,6 +176,9 @@ type ClosureHelpers = HashMap<usize, ClosureHelper>;
 fn c_type(ty: &Ty, records: &RecordFields) -> Bail<String> {
     Ok(match ty {
         Ty::Int => "int64_t".to_string(),
+        // An unconstrained `Result` error slot is represented as `Int` by
+        // the native AST backend until a concrete `Err` value constrains it.
+        Ty::Unknown => "int64_t".to_string(),
         Ty::Float => "double".to_string(),
         Ty::Float32 => "float".to_string(),
         Ty::Sized(kind) => kind.c_type().to_string(),
@@ -571,7 +574,8 @@ fn array_name(ty: &Ty) -> Option<String> {
 }
 
 fn supported(ty: &Ty, records: &RecordFields) -> bool {
-    scalar(ty)
+    *ty == Ty::Unknown
+        || scalar(ty)
         || quantity(ty)
         || array_supported(ty)
         || matches!(ty, Ty::Named(name) if name == "Rng")
@@ -649,7 +653,8 @@ fn option_managed_payload(element: &Ty, records: &RecordFields) -> bool {
 }
 
 fn result_payload_supported(ty: &Ty, records: &RecordFields) -> bool {
-    scalar(ty)
+    *ty == Ty::Unknown
+        || scalar(ty)
         || array_supported(ty)
         || matches!(ty, Ty::List(inner) if list_supported(inner, records))
         || matches!(ty, Ty::Map(key, value) if map_supported(key, value, records))
@@ -768,6 +773,8 @@ fn mangle_option_payload(ty: &Ty, records: &RecordFields) -> String {
 fn mangle_result_payload(ty: &Ty, records: &RecordFields) -> String {
     if *ty == Ty::Void {
         "Void".to_string()
+    } else if *ty == Ty::Unknown {
+        "Int".to_string()
     } else {
         mangle_option_payload(ty, records)
     }
