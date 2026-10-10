@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { repositoryRoot } from "./experiment-bundle.mjs";
@@ -16,13 +16,23 @@ function git(args) {
   return execFileSync("git", args, { cwd: repositoryRoot, encoding: "utf8" }).trim();
 }
 
+function filesUnder(directory) {
+  const root = path.join(repositoryRoot, directory);
+  const files = [];
+  function visit(current) {
+    for (const entry of readdirSync(current, { withFileTypes: true })) {
+      const fullPath = path.join(current, entry.name);
+      if (entry.isDirectory()) visit(fullPath);
+      else files.push(fullPath);
+    }
+  }
+  visit(root);
+  return files;
+}
+
 function countTests() {
-  const output = execFileSync("rg", ["-l", "^\\s*#\\[test\\]", "compiler/tests"], {
-    cwd: repositoryRoot,
-    encoding: "utf8",
-  });
-  return output.split(/\r?\n/).filter(Boolean).reduce((total, file) => {
-    const source = readFileSync(path.join(repositoryRoot, file), "utf8");
+  return filesUnder("compiler/tests").filter((file) => statSync(file).isFile()).reduce((total, file) => {
+    const source = readFileSync(file, "utf8");
     return total + (source.match(/^\s*#\[test\]/gm) ?? []).length;
   }, 0);
 }
