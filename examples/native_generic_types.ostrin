@@ -17,7 +17,7 @@ enum Maybe<T> {
 impl<T> Maybe<T> {
     fn is_just(self) -> Bool {
         match self {
-            Just(item) => true,
+            Just(_) => true,
             Nothing => false,
         }
     }
