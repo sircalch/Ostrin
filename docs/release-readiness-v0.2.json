@@ -1,0 +1,96 @@
+{
+  "release": "0.2.0",
+  "status": "NOT_READY",
+  "criteria": [
+    {
+      "id": "ast-fallback",
+      "status": "READY",
+      "acceptance": "The integration ratchet must be at 6 or fewer AST fallback functions (six fewer than the verified current baseline of 14), with interpreter/native parity preserved.",
+      "evidence": [{ "path": "compiler/tests/differential.rs", "claim": "Current fallback ratchet and differential suite" }]
+    },
+    {
+      "id": "numerical-validation",
+      "status": "OPEN",
+      "acceptance": "The analytic residual suite for LU, Cholesky, QR, SVD and symmetric eigenpairs passes for interpreter and native builds on the supported CI operating systems with per-case tolerances and no leaks.",
+      "requires_ci_run_url": true,
+      "evidence": [
+        { "path": "scripts/numeric-validation.mjs", "claim": "Independent numerical residual and reference validation" },
+        { "path": "validation/numeric/matrix_algorithms.json", "claim": "Analytical cases and explicit tolerances" },
+        { "path": "docs/design/24-metodos-numericos.md", "claim": "Numerical validation method and scope" }
+      ]
+    },
+    {
+      "id": "ownership",
+      "status": "OPEN",
+      "acceptance": "The ownership matrix has current evidence for every promoted cell; high-risk enum, wrapper, aggregate, escape, error, Phi, closure and task paths pass leak-check and applicable sanitizers/WASI.",
+      "evidence": [{ "path": "docs/ownership-matrix.md", "claim": "Ownership support, tested boundaries and limitations" }]
+    },
+    {
+      "id": "measurements",
+      "status": "OPEN",
+      "acceptance": "Measurement<Float> has reviewed semantics and analytical reference cases, parity, zero-allocation checks and ASan/UBSan/WASI evidence for the supported scalar contract.",
+      "evidence": [{ "path": "docs/design/25-mediciones-e-incertidumbre.md", "claim": "Measurement model and current limitations" }]
+    },
+    {
+      "id": "reproducibility-r1",
+      "status": "OPEN",
+      "acceptance": "R1 replay is generalized across the declared experiment set; recorded seeds and inputs reproduce outputs in CI, with platform/tolerance policy documented and a successful CI run linked.",
+      "requires_ci_run_url": true,
+      "evidence": [
+        { "path": "scripts/experiment-replay.mjs", "claim": "Executable R1/R2 replay gate discovers the registry" },
+        { "path": "docs/design/26-efectos-cientificos.md", "claim": "Defines exact replay scope and per-metric cross-platform tolerance requirements" }
+      ]
+    },
+    {
+      "id": "documentation",
+      "status": "OPEN",
+      "acceptance": "Status, roadmap, release notes and public maturity claims agree with source-backed inventories; documentation consistency checks pass.",
+      "evidence": [
+        { "path": "scripts/project-plan-check.mjs", "claim": "Machine-checked plan and public maturity consistency" },
+        { "path": "README-reproduce.md", "claim": "Reproduction commands, R0-R3 boundaries and CI evidence policy" }
+      ]
+    },
+    {
+      "id": "sanitizers",
+      "status": "OPEN",
+      "acceptance": "The complete release-candidate test scope passes ASan and UBSan on CI, with no unresolved critical memory or undefined-behavior findings and successful run links attached.",
+      "requires_ci_run_url": true,
+      "evidence": [{ "path": ".github/workflows/sanitizers.yml", "claim": "Required sanitizer workflows; attach successful v0.2 candidate run links before release" }]
+    },
+    {
+      "id": "benchmarks",
+      "status": "OPEN",
+      "acceptance": "A multi-commit benchmark history exists for the declared scientific workloads, reports include reproducibility metadata, and no unexplained regression remains.",
+      "evidence": [{ "path": "docs/benchmarks.md", "claim": "Benchmark protocol and interpretation limits" }]
+    },
+    {
+      "id": "website-audit",
+      "status": "OPEN",
+      "acceptance": "A dated visual, accessibility and responsive review covers the public site and playground; findings are resolved or explicitly accepted with evidence.",
+      "evidence": [{ "path": "docs/website-audit.md", "claim": "Website audit scope; attach dated visual review and disposition before release" }]
+    },
+    {
+      "id": "installation",
+      "status": "OPEN",
+      "acceptance": "Clean-runner install checks pass for supported operating systems and execute a real Ostrin program from the installed compiler; attach the candidate workflow run.",
+      "requires_ci_run_url": true,
+      "evidence": [{ "path": ".github/workflows/install-check.yml", "claim": "Cross-platform clean-runner installation workflow; attach v0.2 candidate run links before release" }]
+    },
+    {
+      "id": "changelog",
+      "status": "OPEN",
+      "acceptance": "The v0.2.0 changelog entry describes user-visible changes, compatibility and known limitations, and matches the published candidate.",
+      "evidence": [{ "path": "CHANGELOG.md", "claim": "Release history; add and review the v0.2.0 entry before release" }]
+    },
+    {
+      "id": "artifacts",
+      "status": "OPEN",
+      "acceptance": "Linux, macOS, Windows and WASI release artifacts are built from the tagged source, checksummed, extracted and smoke-tested; WASI runtime smoke matrix passes and candidate CI run links are attached.",
+      "requires_ci_run_url": true,
+      "evidence": [
+        { "path": ".github/workflows/release.yml", "claim": "Cross-platform release build, checksum, extraction and smoke test" },
+        { "path": ".github/workflows/wasi.yml", "claim": "Pinned WASI build, runtime smoke matrix and checksums" }
+      ]
+    }
+  ]
+}

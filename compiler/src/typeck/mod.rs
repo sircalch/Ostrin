@@ -1456,7 +1456,7 @@ impl Checker {
         result
     }
 
-    /// `sin`, `cos`, `sqrt`, …, `abs`, `pow`, `atan2`, `pi`.
+    /// `sin`, `cos`, `sqrt`, …, `abs`, `is_finite`, `pow`, `atan2`, `pi`.
     fn check_math_call(&mut self, name: &str, arg_types: &[Ty]) -> Option<Ty> {
         const UNARY: &[&str] = &[
             "sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh", "exp", "ln",
@@ -1465,7 +1465,7 @@ impl Checker {
         let arity = match name {
             "pi" => 0,
             "pow" | "atan2" => 2,
-            n if UNARY.contains(&n) || n == "abs" => 1,
+            n if UNARY.contains(&n) || matches!(n, "abs" | "is_finite") => 1,
             _ => return None,
         };
         if arg_types.len() != arity {
@@ -1480,6 +1480,17 @@ impl Checker {
         }
         match name {
             "pi" => Some(Ty::Float),
+            "is_finite" => match arg_types[0] {
+                Ty::Float | Ty::Float32 => Some(Ty::Bool),
+                Ty::Unknown => Some(Ty::Unknown),
+                ref other => {
+                    self.push(
+                        "E1041",
+                        format!("'is_finite' isn't defined for '{}'.", other.describe()),
+                    );
+                    Some(Ty::Unknown)
+                }
+            },
             "pow" | "atan2" => match (&arg_types[0], &arg_types[1]) {
                 (Ty::Float, Ty::Float) => Some(Ty::Float),
                 (Ty::Float32, Ty::Float32) => Some(Ty::Float32),
@@ -4192,6 +4203,35 @@ impl Checker {
                     arg_types.len()
                 ),
             );
+        }
+        // Preserve the method's concrete generic arguments for HIR consumers.
+        // Calls through a generic trait bound use this checker path rather
+        // than `check_concrete_method_call`, so without this record a later
+        // specialization cannot monomorphize the trait implementation call.
+        if !method_sig.generics.is_empty()
+            && method_sig.generics.iter().all(|generic| {
+                substitutions.contains_key(&generic.name)
+                    || substitutions.contains_key(&format!("#dim:{}", generic.name))
+            })
+        {
+            let mut recorded = CallSubst::default();
+            for generic in &method_sig.generics {
+                if let Some(Ty::Quantity(dimension)) =
+                    substitutions.get(&format!("#dim:{}", generic.name))
+                {
+                    recorded
+                        .dims
+                        .insert(generic.name.clone(), dimension.clone());
+                } else if let Some(ty) = substitutions.get(&generic.name) {
+                    recorded.types.insert(generic.name.clone(), ty.clone());
+                }
+            }
+            if let Some(key) = self.call_key_stack.last().cloned() {
+                self.call_substs.insert(key, recorded.clone());
+            }
+            if let Some(node) = self.call_node_stack.last().copied() {
+                self.call_substs_by_node.insert(node, recorded);
+            }
         }
         Some(resolve_type_with_type_subst(
             &method_sig.return_type,

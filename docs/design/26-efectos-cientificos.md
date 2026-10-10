@@ -1,8 +1,9 @@
 # 26 — Efectos científicos, determinismo y procedencia
 
 **Estado:** propuesta de diseño con inventario experimental; `ostrinc --effect-report` ya expone
-evidencia sintáctica conservadora, pero todavía no modifica la sintaxis estable ni añade filas de
-efectos al HIR.
+evidencia sintáctica conservadora, conserva etiquetas internas tipadas (`EffectKind`) y produce
+resúmenes por función con propagación conservadora a través de llamadas, ya transportados como
+filas internas de HIR/IR; todavía no modifica la sintaxis pública ni ofrece garantías de pureza.
 
 **Fecha:** 2026-09-29
 
@@ -190,6 +191,30 @@ R0–R3 describen evidencia disponible, no una escala de calidad científica. La
 plataformas deben añadir tolerancias numéricas, biblioteca matemática y arquitectura. “Bit a bit” solo se
 publica cuando una prueba lo verifica para ese target.
 
+### 7.1 Política de igualdad de replay y tolerancia entre plataformas
+
+Los bundles actuales separan dos afirmaciones:
+
+- **Igualdad de replay:** CI reproduce el SVG registrado byte por byte con el compilador WASI y la
+  configuración de replay de CI. Esto detecta cambios respecto al artefacto publicado; no demuestra
+  igualdad entre sistemas operativos, CPUs, versiones de runtimes ni backends distintos.
+- **Semilla R1:** el bundle registra la entrada de semilla, el algoritmo/versión y la partición del
+  flujo. Esta evidencia explica el flujo pseudoaleatorio; no demuestra por sí sola que el cálculo
+  posterior ni el SVG sean numéricamente equivalentes entre plataformas.
+
+El runtime snapshot vigente declara explícitamente que las comparaciones numéricas entre plataformas
+no se realizan ni se reclaman. No se compara el SVG renderizado entre sistemas ni se aplica una
+epsilon global. Antes de publicar una comparación entre plataformas, el experimento debe declarar por
+métrica: nombre y unidades, valor de referencia y método, error absoluto y relativo máximos, dominio
+de entrada y condiciones numéricas relevantes (por ejemplo, condicionamiento o región de estabilidad).
+El informe debe guardar el peor residuo medido y las plataformas/bibliotecas probadas. Si el contrato
+no existe o alguna plataforma queda fuera de la matriz, el resultado se marca **no evaluado** y no como
+equivalente.
+
+Por tanto, las figuras actuales conservan el gate de hash exacto dentro del replay CI; el soporte de
+tolerancias cruzadas sigue abierto y la captura de host/hardware ya está implementada en Pages CI,
+pero R3 y el gate de `v0.2` esperan una ejecución CI real que produzca el artefacto host-bound.
+
 ## 8. Inferencia y reglas del checker
 
 1. Cada builtin y función de módulo tendrá una fila conocida o una declaración de frontera `unsafe`.
@@ -301,8 +326,9 @@ en una consola de logs.
    [`website/provenance.html`](../../website/provenance.html): normaliza el hash de fuente, registra target,
    perfil WASI, hashes de lockfiles/manifiestos disponibles y sitios de efecto, y marca explícitamente la
    salida como experimental/no verificada. El snapshot parcial ostrin.runtime/v1 ya expone la política de
-   plataforma; aún faltan snapshots de entradas, hashes de salida de la invocación y metadatos capturados del
-   host para reclamar R3 en el artefacto general. Los once bundles input-driven ya constituyen cortes
+   plataforma; los bundles experimentales añaden snapshots de entradas cuando corresponden, hashes de salida,
+   resumen de efectos y, bajo `OSTRIN_CAPTURE_HOST=1`, metadatos públicos de host/hardware. La ejecución local
+   no reclama R3; Pages CI usa `--require-ready` para exigir el artefacto host-bound. Los once bundles input-driven ya constituyen cortes
    R2: embeben `data.json`, declaran la capacidad `filesystem.read:data.json`, conservan el hash del
    snapshot y verifican la sensibilidad de sus parámetros o semilla en WASI; los nueve casos seeded
    además conservan la evidencia algorítmica R1.

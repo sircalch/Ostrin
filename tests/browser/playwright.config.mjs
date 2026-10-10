@@ -6,7 +6,7 @@ const baseURL = "http://127.0.0.1:4173/Ostrin/";
 
 export default defineConfig({
   testDir: ".",
-  testMatch: "website.spec.mjs",
+  testMatch: ["website.spec.mjs", "visual.spec.mjs"],
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
@@ -22,7 +22,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testMatch: "website.spec.mjs",
+      testMatch: ["website.spec.mjs", "visual.spec.mjs"],
       use: { browserName: "chromium" },
     },
     {

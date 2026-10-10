@@ -40,6 +40,27 @@ test("the gate rejects an example that silently drops unknown uncertainty", () =
   }
 });
 
+test("the gate requires non-finite input guards and analytical propagation examples", () => {
+  const root = fixtureRoot();
+  try {
+    const stdFile = path.join(root, "compiler/std/measurements.ostrin");
+    const std = readFileSync(stdFile, "utf8").replaceAll("is_finite(value)", "finite_value(value)");
+    writeFileSync(stdFile, std);
+    const exampleFile = path.join(root, "examples/measurement_scalar.ostrin");
+    const example = readFileSync(exampleFile, "utf8").replace("x * x =", "x squared =");
+    writeFileSync(exampleFile, example);
+    const designFile = path.join(root, "docs/design/25-mediciones-e-incertidumbre.md");
+    const design = readFileSync(designFile, "utf8").replace("b·cₐ,s + a·c_b,s", "unsupported model");
+    writeFileSync(designFile, design);
+    const result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("typed is_finite guards")));
+    assert.ok(result.errors.some((error) => error.includes("x * x")));
+    assert.ok(result.errors.some((error) => error.includes("analytical propagation model")));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("the gate rejects documentation that enables arrays prematurely", () => {
   const root = fixtureRoot();
   try {

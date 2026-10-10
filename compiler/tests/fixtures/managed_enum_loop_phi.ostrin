@@ -1,0 +1,29 @@
+enum Message {
+    Text(String)
+    Empty
+}
+
+fn choose(flag: Bool) -> Message {
+    if flag {
+        Text("first" + " payload")
+    } else {
+        Text("second" + " payload")
+    }
+}
+
+fn show(message: Message) -> Void {
+    match message {
+        Text(text) => print(text),
+        Empty => print("empty"),
+    }
+}
+
+fn main() -> Void {
+    mut message = Text("initial payload")
+    mut index = 0
+    while index < 3 {
+        message = choose(index % 2 == 0)
+        index = index + 1
+    }
+    show(message)
+}

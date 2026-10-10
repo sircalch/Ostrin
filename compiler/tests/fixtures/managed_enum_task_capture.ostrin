@@ -1,0 +1,20 @@
+enum Message {
+    Text(String)
+    Empty
+}
+
+fn show(message: Message) -> Void {
+    match message {
+        Text(text) => print(text),
+        Empty => print("empty"),
+    }
+}
+
+fn main() -> Void {
+    message = Text("task payload")
+    worker = spawn {
+        message
+    }
+    received = worker.join()
+    show(received)
+}

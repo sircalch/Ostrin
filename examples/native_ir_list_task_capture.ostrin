@@ -1,0 +1,7 @@
+fn main() -> Void {
+    values = ["a", "b"]
+    task = spawn {
+        print(values.join(","))
+    }
+    task.join()
+}

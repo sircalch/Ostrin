@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-10-07 · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 276 de integración y 2 unitarias en verde.*
+*Corte: 2026-10-08 · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 302 de integración y 2 unitarias en verde.*
 
 Validación remota: Pages, CI, CodeQL, sanitizers y auditoría de seguridad pasaron para el
 ciclo actual en Windows, Linux, macOS y web. La compuerta oficial exige `cargo fmt --check`, Clippy con el lint `suspicious`, la suite del
@@ -11,6 +11,9 @@ Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede 
 Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–266); para el diseño
 del lenguaje, `docs/design/` (27 documentos). La auditoría del sitio vive en
 `docs/website-audit.md`.
+La arquitectura de implementación está en [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md),
+la visión de largo plazo en [`docs/VISION.md`](docs/VISION.md) y el trabajo futuro en
+[`ROADMAP.md`](ROADMAP.md); este archivo conserva el estado comprobado y el plan activo.
 
 ## 0. Estado de un vistazo
 
@@ -18,9 +21,10 @@ del lenguaje, `docs/design/` (27 documentos). La auditoría del sitio vive en
 |---|---|
 | **Implementado** | Compilador + intérprete (referencia semántica), checker con cantidades físicas, records/enums/traits/genéricos, `Option`/`Result`, colecciones, `Array<T>`, módulos y paquetes con lockfile, concurrencia cooperativa determinista, `--native-threads`, backend C con `--leak-check`, build WASI, playground WASM, LSP/DAP y extensión VS Code (VSIX local) |
 | **En fallback** | El backend nativo emite desde IR las familias cubiertas (§5); records/enums genéricos aplicados, iteradores indirectos, scopes anidados, handlers no lineales y agregados/escapes complejos caen de forma verificada a HIR y después al AST |
-| **Experimental** | Todo el lenguaje (versión 0.x, sin garantía de estabilidad); `--native-threads`; `std.viz` (visualización 2D/3D en SVG); `std.measurements` (mediciones escalares con fuentes de sensibilidad y estados `Exact`/`Standard`/`Unknown`); inventarios `--effect-report` y `--provenance-report` con artefacto público en `website/provenance.html`, target/WASI y snapshot parcial `ostrin.runtime/v1`; efectos científicos, determinismo y procedencia siguen en propuesta de diseño (`docs/design/26-efectos-cientificos.md`); paquetes científicos de ejemplo `tables`, `plot`, `autodiff` (modo directo); dependencias Git con `--fetch` |
-| **Pendiente** | Retirar el fallback AST, ownership completo, Quantity/arrays/covarianza/Monte Carlo de `Measurement<T>`, checking estático y niveles R2/R3 de efectos/procedencia, red, registry público, GPU, autodiff inverso, canales de distribución (Homebrew, winget, Scoop, Chocolatey, AUR), extensión en Marketplace y reconocimiento upstream de Ostrin en GitHub Linguist; el contrato pendiente de ownership de etiquetas de `Quantity` está especificado en [`docs/design/27-ownership-de-quantity-escalar.md`](docs/design/27-ownership-de-quantity-escalar.md) y `viz_units.ostrin` conserva un guard de fallback hasta completar la matriz native/WASI/sanitizers |
+| **Experimental** | Todo el lenguaje (versión 0.x, sin garantía de estabilidad); `--native-threads`; `std.viz` (visualización 2D/3D en SVG); `std.measurements` (mediciones escalares con fuentes de sensibilidad, estados `Exact`/`Standard`/`Unknown`, validación de valores no finitos y referencias analíticas para productos correlacionados/independientes; paridad intérprete/nativo, WASI destructor check y `live_allocations=0`; ASan/UBSan siguen pendientes de CI para esta rama); inventarios `--effect-report` y `--provenance-report` con artefacto público en `website/provenance.html`, target/WASI y snapshot parcial `ostrin.runtime/v1`; los efectos científicos ya tienen inventario experimental, propagación interna y bundles R0–R2; el checking estático completo y la reclamación R3 siguen en desarrollo (`docs/design/26-efectos-cientificos.md`); paquetes científicos de ejemplo `tables`, `plot`, `autodiff` (modo directo); dependencias Git con `--fetch` |
+| **Pendiente** | Retirar el fallback AST restante, completar ownership de agregados/escapes, Quantity/arrays/covarianza/Monte Carlo de `Measurement<T>`, checking estático y niveles R2/R3 de efectos/procedencia, red, registry público, GPU, autodiff inverso, canales de distribución (Homebrew, winget, Scoop, Chocolatey, AUR), extensión en Marketplace y reconocimiento upstream de Ostrin en GitHub Linguist; `Figure.unit_line`/`unit_scatter` ya usan IR/C con paridad nativa, emisión WASI y cero fugas, mientras ASan/UBSan quedan pendientes en CI para este ciclo y los trazados basados en listas conservan su frontera propia; contrato de ownership en [`docs/design/27-ownership-de-quantity-escalar.md`](docs/design/27-ownership-de-quantity-escalar.md) |
 | **Release** | [`v0.1.0`](https://github.com/sircalch/Ostrin/releases/tag/v0.1.0) publicada el 2026-09-24 con tres archivos (Linux x86_64, macOS ARM64, Windows x64) y sus `.sha256`; instaladores verificados contra ella en runners limpios (`install-check.yml`); workflows de CI, release y WASI en verde |
+| **Higiene del repositorio** | Auditoría del 2026-10-07: se retiraron 49 ramas remotas y 53 referencias locales ya integradas (24 sin worktree y 29 de worktrees limpios; estos checkouts quedaron en el mismo commit, detached y con sus archivos preservados). GitHub elimina ramas al fusionar. El auditor reproducible [`scripts/branch-hygiene-check.mjs`](scripts/branch-hygiene-check.mjs) confirma que `origin` solo conserva `main`, clasifica 4 ramas locales integradas y 7 con commits únicos; las integradas aún tienen worktrees con cambios locales, por lo que su eliminación queda pendiente hasta preservarlos. Política: [`CONTRIBUTING.md`](CONTRIBUTING.md) y [`docs/branch-hygiene.md`](docs/branch-hygiene.md) |
 
 ---
 
@@ -46,7 +50,7 @@ Implementación: compilador + intérprete + herramientas de editor, todo en Rust
 | Léxico / parser | `lexer/`, `parser/mod.rs` | Tokens, AST con rangos de origen |
 | Módulos y paquetes | `modules.rs`, `package.rs`, `ostrin.toml` | Imports, `--project`, grafo transitivo de dependencias y lockfile portable |
 | Verificador de tipos | `typeck/mod.rs` (~3 500 l.) | Tipos, dimensiones, traits, exhaustividad, genéricos |
-| HIR/IR | `hir.rs`, `hir_c.rs`, `ir.rs`, `ir_c.rs` | HIR verificado, CFG con temporales explícitos y emisor C para escalares, `String`, constructores de arrays 1D–3D, parámetros, indexación, selección booleana `a[mask]`, cortes `to`/`until`, `not` sobre `Array<Bool>`, `where(mask, a, b)` para `Int`/`Float`/`Float32`/`Bool`, aritmética/comparaciones elemento a elemento y métodos de `Array<T>` numérico escalar, `Array<Quantity<D>>` en parámetros, indexación, ownership, `unit()`/`values()` y conversión desde `List<Quantity<D>>` conservando la unidad, `Figure.unit_line`/`unit_scatter` genéricos todavía en fallback HIR/AST hasta cerrar el ownership de etiquetas de unidad prestadas, `Result<Int, String>`/`Result<Float, String>` con `try`, `try catch` inline, handlers globales, aliases locales y handlers locales capturados compatibles, wrappers `Option`/`Result` sobre `List`, `Map` y `Set` con payload gestionado, `Result<String, String>`/`Result<Void, String>` de E/S de archivos, records concretos y records genéricos monomorfizados, iteradores de records concretos (`next() -> Option<T>`), iteradores genéricos monomorfizados (`Cursor<Int>`), iteración de canales mediante `receive() -> Option<T>`, `spawn {}` con CFG y capturas inmutables, `spawn_scope {}` inline con grupos nativos, `Task.join()` y `Task.cancel()` tipados, `Option<Record>`, listas escalares y de cantidades, mapas/conjuntos escalares, enteros de ancho fijo y control de flujo, con fallback HIR/AST acotado |
+| HIR/IR | `hir.rs`, `hir_c.rs`, `ir.rs`, `ir_c.rs` | HIR verificado, CFG con temporales explícitos y emisor C para escalares, `String`, constructores de arrays 1D–3D, parámetros, indexación, selección booleana `a[mask]`, cortes `to`/`until`, `not` sobre `Array<Bool>`, `where(mask, a, b)` para `Int`/`Float`/`Float32`/`Bool`, aritmética/comparaciones elemento a elemento y métodos de `Array<T>` numérico escalar, `Array<Quantity<D>>` en parámetros, indexación, ownership, `unit()`/`values()` y conversión desde `List<Quantity<D>>` conservando la unidad, `Option<Quantity<D>>`, `Result<Quantity<D>, String>` y `Result<Option<Quantity<D>>, String>` con ownership nativo/WASI y `match`; el wrapper anidado también pasa leak-check al forzar el backend AST, `Figure.unit_line`/`unit_scatter` genéricos ya migrados a IR/C con salida diferencial idéntica, emisión WASI y leak-check nativo en cero, `Result<Int, String>`/`Result<Float, String>` con `try`, `try catch` inline, handlers globales, aliases locales y handlers locales capturados compatibles, wrappers `Option`/`Result` sobre `List`, `Map` y `Set` con payload gestionado, `Result<String, String>`/`Result<Void, String>` de E/S de archivos, records concretos y records genéricos monomorfizados, iteradores de records concretos (`next() -> Option<T>`), iteradores genéricos monomorfizados (`Cursor<Int>`), iteración de canales mediante `receive() -> Option<T>`, `spawn {}` con CFG y capturas inmutables, `spawn_scope {}` inline con grupos nativos, `Task.join()` y `Task.cancel()` tipados, paso de `Task<Void>` por argumento y retorno con paridad y cero fugas, `Option<Record>`, listas escalares en campos de records, con reemplazo por Phi de loop, y de cantidades, mapas/conjuntos escalares, incluidos mapas y sets en campos de records, enteros de ancho fijo y control de flujo, con fallback HIR/AST acotado |
 | Intérprete | `interpreter/mod.rs` | Ejecución tree‑walking y scheduler cooperativo; referencia semántica |
 | Servidor de lenguaje | `lsp.rs`, `symbols.rs`, `protocol.rs` | LSP sobre stdio |
 | Adaptador de depuración | `dap.rs` + hooks del intérprete | DAP sobre stdio |
@@ -161,13 +165,16 @@ salida numérica, emiten ramas, recursión, bucles con estado y `phi`, y se cuen
 por separado en `--native-type-report` como `ir-generated`; el mismo informe expone ahora
 `hir-generated` y `ast-fallback` para que la retirada del backend legado tenga un contador
 visible. También publica líneas `native-source` agrupadas por archivo para localizar la deuda
-por módulo; la prueba diferencial comprueba que sus sumas coinciden con el total. En el corte
-actual, la suite de ejemplos suma 6 910 funciones IR, 46 HIR y 16 que aún caen al emisor
-AST; `native_backend_types_agree_with_the_checker` mantiene 42 como trinquete temporal. La llamada global `parse_int(String)` ahora comparte el helper IR/C de `String.to_int()`, por lo que `stdlib_io.ostrin` ya no usa AST; los cortes R1 de `viz_histogram.ostrin`, `viz_boxplot.ostrin`, `viz_scatter_fit.ostrin`, `viz_violin.ostrin`, `viz_hexbin.ostrin`, `viz_bars.ostrin`, `viz_point_cloud.ostrin`, `viz_fft.ostrin` y `viz_dashboard.ostrin` importan `std.json` y conservan esa entrada en el camino tipado; `atan2` escalar para `Float` y `Float32` usa ahora el runtime determinista desde IR/C; `pow` escalar también usa `ostrin_dm_pow`/`ostrin_dm_powf`, y `detmath.ostrin` ya no conserva fallback AST. `math_functions.ostrin` verifica `atan2` y `abs` sobre enteros de ancho fijo con paridad nativa/WASI y leak-check; `abs` conserva el error del mínimo representable. Las coerciones `Float↔Float32` de bindings explícitos y agregados `List/Set<Float32>` ahora se insertan en IR, conservando la precisión de `float32.ostrin`. Las llamadas genéricas registradas por el checker se resuelven ahora en HIR antes de construir la IR, de modo que `numeric_units.ostrin` ya no necesita fallback AST. Las operaciones escalares reflejadas de `Complex` (`Float +|−|×|÷ Complex`) llaman sus métodos `radd`/`rsub`/`rmul`/`rdiv` desde IR/C con el orden de operandos preservado; el formato escalar de `Bool` también usa la ruta tipada. `numeric_complex.ostrin` queda en `ir=3, hir=0, ast=0`, con paridad intérprete/nativo/WASI y leak-check. `Quantity.to_string()` escalar y `Array<Float32>.to_string()` ya llaman a helpers nativos desde IR/C; el segundo elimina el fallback del punto de entrada de `arrays_3d`. Los patrones
+por módulo y `ast-fallback-function` con identificadores estables para cada cuerpo pendiente;
+la prueba diferencial comprueba que los nombres y las sumas por módulo coinciden con el total.
+En el corte
+actual, la suite de ejemplos suma 6 948 funciones IR, 38 HIR y 6 que aún caen al emisor
+AST; `native_backend_types_agree_with_the_checker` mantiene 40 expresiones y 50 nodos como trinquetes temporales. La llamada global `parse_int(String)` ahora comparte el helper IR/C de `String.to_int()`, por lo que `stdlib_io.ostrin` ya no usa AST; los cortes R1 de `viz_histogram.ostrin`, `viz_boxplot.ostrin`, `viz_scatter_fit.ostrin`, `viz_violin.ostrin`, `viz_hexbin.ostrin`, `viz_bars.ostrin`, `viz_point_cloud.ostrin`, `viz_fft.ostrin` y `viz_dashboard.ostrin` importan `std.json` y conservan esa entrada en el camino tipado; `atan2` escalar para `Float` y `Float32` usa ahora el runtime determinista desde IR/C; `pow` escalar también usa `ostrin_dm_pow`/`ostrin_dm_powf`, y `detmath.ostrin` ya no conserva fallback AST. `math_functions.ostrin` verifica `atan2` y `abs` sobre enteros de ancho fijo con paridad nativa/WASI y leak-check; `abs` conserva el error del mínimo representable. Las coerciones `Float↔Float32` de bindings explícitos y agregados `List/Set<Float32>` ahora se insertan en IR, conservando la precisión de `float32.ostrin`. Las llamadas genéricas registradas por el checker se resuelven ahora en HIR antes de construir la IR, de modo que `numeric_units.ostrin` ya no necesita fallback AST. Las operaciones escalares reflejadas de `Complex` (`Float +|−|×|÷ Complex`) llaman sus métodos `radd`/`rsub`/`rmul`/`rdiv` desde IR/C con el orden de operandos preservado; el formato escalar de `Bool` también usa la ruta tipada. `numeric_complex.ostrin` queda en `ir=3, hir=0, ast=0`, con paridad intérprete/nativo/WASI y leak-check. `Quantity.to_string()` escalar y `Array<Float32>.to_string()` ya llaman a helpers nativos desde IR/C; el segundo elimina el fallback del punto de entrada de `arrays_3d`. Los patrones
 superficiales de records con campos escalares y los enums no genéricos con variantes unitarias,
 payloads escalares (incluidos enteros de ancho fijo), patrones simples y patrones anidados de enums por
-valor ya bajan por IR/C, incluidos records genéricos, con paridad intérprete/nativo/diferencial. Payloads
-gestionados y enums genéricos siguen fuera de este slice; los literales/rangos escalares de payloads
+valor ya bajan por IR/C, incluidos records genéricos, y los constructores, patrones y métodos del
+ejemplo `shapes.ostrin` cruzan también payloads `Quantity` gestionados con paridad intérprete/nativo/WASI.
+Los enums genéricos siguen fuera de este slice; los literales/rangos escalares de payloads
 primitivos ya comparten IR/C. Los métodos
 de records y enums concretos comparten ahora IR/C cuando sus campos y ownership son compatibles; los
 records recursivos conservan HIR/AST hasta cerrar su contrato de ownership.
@@ -197,11 +204,12 @@ El ejemplo `dataframe.ostrin` ya cruza IR/C en sus recorridos de `List<List<Stri
 `Array<Quantity<D>>` ya cruza IR/C para aritmética elemento a elemento con conversión de unidades,
 comparaciones, negación, reducciones (`sum`/`min`/`max`/`mean`/`median`/`std`/`percentile`),
 varianza con unidad al cuadrado, cortes por rango, `as<unit>` y `to_list`; `quantity_arrays.ostrin`
-mantiene salida idéntica entre intérprete, nativo y WASI. El `--leak-check` de esta galería
-registra `live_allocations=4`: la representación de arrays consume ahora sus temporales de texto;
-`Array<Quantity<D>>.to_list()` retiene las etiquetas dinámicas por elemento y las libera con el
-destructor de la lista. Las asignaciones restantes pertenecen a expresiones escalares de unidades
-y a etiquetas que escapan a valores escalares, por lo que su ownership queda como deuda separada.
+mantiene salida idéntica entre intérprete, nativo y WASI. La representación de arrays consume
+sus temporales de texto; `Array<Quantity<D>>.to_list()` retiene las etiquetas dinámicas por
+elemento y las libera con el destructor de la lista. El `--leak-check` completo de
+`quantity_arrays.ostrin` termina ahora con
+`live_allocations=0`, incluidas expresiones escalares de unidades y etiquetas que escapan a valores
+escalares; la regresión exige cero, no un techo permisivo.
 El puente IR de `zeros`/`ones`, `norm`, `abs` escalar y `sqrt` redujo el fallback en 348 funciones;
 esta pasada añade conversiones escalares `as<Float/Float32>` y conversiones comprobadas a `Int`/enteros de ancho fijo,
 `abs` sobre arrays y funciones matemáticas
@@ -217,11 +225,10 @@ trait que usan `Self` ahora se sustituyen por `Complex` antes de bajar a IR/C. L
 `secant` y `newton` ya convierten sus límites enteros a texto desde IR/C, y `powi` despacha `Complex` mediante
 el operador `mul` registrado. Las cifras históricas de deuda por función de LU, SVD y álgebra compleja
 quedaron superadas por la migración de métodos; el informe actual deja como deuda verificable los
-recorridos y helpers que aún requieren agregados anidados y ownership no lineal. La deuda de
-`std.viz` conserva todavía las instanciaciones genéricas de trazado con `Quantity` en fallback
-HIR/AST: el experimento de llevar `Figure.unit_line`/`unit_scatter` a IR/C expuso que una
-cantidad escalar puede conservar una etiqueta de unidad prestada después de liberar su array
-propietario. Las superficies hexbin, contourf, quiver, streamplot, tablas, campos vectoriales y
+recorridos y helpers que aún requieren agregados anidados y ownership no lineal. Las
+instanciaciones genéricas `std.viz::Figure.unit_line`/`unit_scatter` ahora cruzan IR/C; la prueba
+`viz_units.ostrin` conserva la salida diferencial, emite C para WASI y termina con
+`live_allocations=0`. Las superficies hexbin, contourf, quiver, streamplot, tablas, campos vectoriales y
 el renderer SVG ya comparten IR/C. Las funciones numéricas auxiliares y los agregados no lineales forman la siguiente deuda
 verificable. Los marcadores de ownership de
 `String`, `List<T>`, los núcleos escalares de `Map<K,V>`/`Set<T>` y `Option<T>` con payload
@@ -328,9 +335,9 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Cierres en nativo | Captura **por valor** (una variable `mut` cambiada después no se ve dentro), incluidas capturas transitivas de closures anidadas; lambda sin contexto de tipos exige anotación |
 | Chequeo «movido tras enviar» (E1101) | Integrado por defecto en `--check`, `--run`, `--emit-c` y `--compile`; análisis de flujo sobre CFG alcanzable con punto fijo para loops y uso de operandos `Phi` en su arista; las guardas dinámicas siguen la vida del allocation, sin dejar direcciones reutilizadas marcadas; `--ownership-check` conserva el informe explícito |
 | Paralelismo nativo (`--native-threads`, canales bloqueantes, `select`) | Hilos del SO, mutexes/condiciones, canales bloqueantes y `select(List<Channel<T>>)` implementados de forma opt-in; `select` conserva prioridad determinista y cede el hilo nativo entre intentos; `Task.cancel()` cancela pendientes, propaga a grupos activos de `spawn_scope` o solicita cancelación a tareas `Running`, observada en checkpoints seguros; `receive()` vuelve periódicamente al runtime sin conservar el mutex durante el checkpoint. En tareas nativas, `read_file`/`write_file` delegan la libc a un worker desacoplado y esperan con condición temporizada, por lo que la cancelación libera la tarea y el worker limpia su solicitud; la libc no se aborta de forma forzada. El runtime cooperativo/WASI conserva E/S síncrona y observa la cancelación al regresar |
-| Memoria en nativo | Registro, destructores tipados para records/colecciones y entornos de tareas, `clone`/`drop`, cleanup automático de locales directos, bloques anidados, ramas, loops y cancelación de tareas en AST/HIR, y `--leak-check`; los destructores `Task_*` usan ahora la firma ABI `void (*)(void*)` que exige el registro del runtime, y la suite completa de ejemplos corre bajo UBSan con cancelación nativa incluida; `String`, `String.split/lines`, `List<String>.join`, `Result<Int, String>`, `Result<Float, String>`, records concretos, canales, `Option<Record>`, listas escalares/String, mapas/conjuntos escalares, wrappers sobre `List`/`Map`/`Set` y wrappers `Option`/`Result` anidados ya consumen ownership desde IR; `unwrap`, `unwrap_or`, `ok` y `ok_or` retienen el payload gestionado que escapa del wrapper; el generador diferencial de wrappers cubre ambas ramas y parámetros con cero fugas; el fallback AST ahora materializa y libera temporales gestionados de argumentos/`print` y campos de registros, pero consumidores complejos y escapes siguen pendientes |
-| IR de bloques | HIR→CFG disponible con `--ir`; el emisor C cubre ramas, bucles escalares con `phi`, rangos enteros direccionales (`to`/`until`, pasos y `break`/`continue`), `String` (incluidos `split/lines`, `char_at`, `slice` y `codepoint`), `List<String>.join`, igualdad estructural `==`/`!=` para `List`/`Map`/`Set` y wrappers `Option`/`Result` soportados, consumidores `unwrap`/`unwrap_or`/`ok`/`ok_or` con payload gestionado, `Result` escalar de parseo con `match`/consultas, `read_file`/`write_file` con resultados administrados y errores de archivo comprobados, `try`, `try catch` inline, handlers globales, aliases locales y handlers locales capturados compatibles, `map`/`map_err`/`then` de `Result`, `Option.map`/`then` escalar/String, records concretos con campos anidados, arrays numéricos escalares con constructores 1D–3D y `Array<Quantity<D>>` en parámetros, indexación, `unit()`/`values()`, aritmética elemento a elemento, comparaciones, reducciones, cortes por rango, conversiones y `to_list` con la etiqueta de unidad preservada; `Figure.unit_line`/`unit_scatter` sobre `Quantity` conservan por ahora el fallback HIR/AST, mientras las conversiones desde listas con unidad preservada ya están cubiertas, iteradores de records concretos cuyo elemento sea un payload soportado y cuyo `next` esté registrado, canales con `send`/`close`/`receive` y `for` sobre `Option<T>`, `select(List<Channel<T>>)` sobre payloads soportados, `spawn {}` con CFG soportado, capturas inmutables, closures capturados con entorno y destructor, `ClosureCall`, `Task.join()`, `Task.cancel()` y `yield()`, listas escalares/String/de cantidades, operaciones hash escalares, wrappers de una capa sobre `List`/`Map`/`Set`, wrappers `Option`/`Result` anidados con `match` y builtins portables de proceso/rutas (`args`, `env`, `cwd`, `path_join`, `file_exists`, `clone`, `drop`); los cambios de forma complejos y los agregados anidados siguen en HIR/AST, además de iteradores genéricos/indirectos, tareas anidadas o scopes, handlers locales no lineales y consumidores complejos que aún no reemplazan el backend C completo |
-| Ownership/último uso | `--ownership-report`, `--ownership-check` y `--ownership-ir`; la IR ya inserta y consume retain/release lineal para `String`, arrays numéricos escalares y sus métodos (incluidas las listas de forma de `reshape`/`sum_axis`), `Result` con payload `String` (incluido `Result<Void, String>`), records concretos, `Option<Record>`, listas escalares/String (incluida la lista fresca de `args()`), mapas/conjuntos escalares y `Option<String>` (incluido el valor fresco de `env()`), con transferencia en `Phi` simples y liberación de `Phi` de bucle en backedges probados; `clone`/`drop` tienen lowering explícito en IR, los entornos de tareas retienen también cada `Channel<T>` capturado, los buffers temporales de `split/lines` transfieren y liberan sus strings, `Result` libera condicionalmente `value`/`error`, y `unwrap`/`unwrap_or`/`ok`/`ok_or` retienen payloads extraídos o fallbacks antes de la liberación del wrapper; la ruta AST conserva la misma regla para temporales frescos en llamadas genéricas, `print` y acceso a campos; `Option` escalar es por valor, mientras llamadas transferentes no lineales, agregados complejos, scopes y escapes siguen conservadores |
+| Memoria en nativo | Registro, destructores tipados para records/colecciones y entornos de tareas, `clone`/`drop`, cleanup automático de locales directos, bloques anidados, ramas, loops y cancelación de tareas en AST/HIR, y `--leak-check`; los destructores `Task_*` usan ahora la firma ABI `void (*)(void*)` que exige el registro del runtime, y la suite completa de ejemplos corre bajo UBSan con cancelación nativa incluida; `String`, `String.split/lines`, `List<String>.join`, `Result<Int, String>`, `Result<Float, String>`, records concretos, canales, `Option<Record>`, listas escalares/String, mapas/conjuntos escalares, incluidos mapas y sets en campos de records, wrappers sobre `List`/`Map`/`Set` y wrappers `Option`/`Result` anidados ya consumen ownership desde IR; `Option<Quantity>`, `Result<Quantity,String>` y `Result<Option<Quantity>,String>` pasan leak-check nativo, incluida compilación AST forzada; el backend AST libera operandos temporales de arrays de cantidades y conserva la propiedad de etiquetas escapadas desde consultas escalares; `unwrap`, `unwrap_or`, `ok` y `ok_or` retienen el payload gestionado que escapa del wrapper; el generador diferencial de wrappers cubre ambas ramas y parámetros con cero fugas; consumidores complejos y escapes siguen pendientes |
+| IR de bloques | HIR→CFG disponible con `--ir`; el emisor C cubre ramas, bucles escalares con `phi`, rangos enteros direccionales (`to`/`until`, pasos y `break`/`continue`), `String` (incluidos `split/lines`, `char_at`, `slice` y `codepoint`), `List<String>.join`, igualdad estructural `==`/`!=` para `List`/`Map`/`Set` y wrappers `Option`/`Result` soportados, consumidores `unwrap`/`unwrap_or`/`ok`/`ok_or` con payload gestionado, `Result` escalar de parseo con `match`/consultas, `read_file`/`write_file` con resultados administrados y errores de archivo comprobados, `try`, `try catch` inline, handlers globales, aliases locales y handlers locales capturados compatibles, `map`/`map_err`/`then` de `Result`, `Option.map`/`then` escalar/String, records concretos con campos anidados, arrays numéricos escalares con constructores 1D–3D y `Array<Quantity<D>>` en parámetros, indexación, `unit()`/`values()`, aritmética elemento a elemento, comparaciones, reducciones, cortes por rango, conversiones y `to_list` con la etiqueta de unidad preservada; `Figure.unit_line`/`unit_scatter` sobre `Quantity` ya cruzan IR/C con paridad, emisión WASI y cero fugas nativas, mientras las conversiones desde listas con unidad preservada ya están cubiertas, iteradores de records concretos cuyo elemento sea un payload soportado y cuyo `next` esté registrado, canales con `send`/`close`/`receive` y `for` sobre `Option<T>`, `select(List<Channel<T>>)` sobre payloads soportados, `spawn {}` con CFG soportado, capturas inmutables, closures capturados con entorno y destructor, incluida la captura de `List<String>` por closure y tarea, `ClosureCall`, `Task.join()`, `Task.cancel()` y `yield()`, listas escalares/String/de cantidades, operaciones hash escalares, wrappers de una capa sobre `List`/`Map`/`Set`, wrappers `Option`/`Result` anidados con `match` y builtins portables de proceso/rutas (`args`, `env`, `cwd`, `path_join`, `file_exists`, `clone`, `drop`); los cambios de forma complejos y los agregados anidados siguen en HIR/AST, además de iteradores genéricos/indirectos, tareas anidadas o scopes, handlers locales no lineales y consumidores complejos que aún no reemplazan el backend C completo |
+| Ownership/último uso | `--ownership-report`, `--ownership-check` y `--ownership-ir`; la IR ya inserta y consume retain/release lineal para `String`, arrays numéricos escalares y sus métodos (incluidas las listas de forma de `reshape`/`sum_axis`), `Result` con payload `String` (incluido `Result<Void, String>`), records concretos, `Option<Record>`, listas escalares/String (incluida la lista fresca de `args()`), mapas/conjuntos escalares, incluidos mapas y sets en campos de records y `Option<String>` (incluido el valor fresco de `env()`), con transferencia en `Phi` simples y liberación de `Phi` de bucle en backedges probados; `clone`/`drop` tienen lowering explícito en IR, los entornos de tareas retienen también cada `Channel<T>` capturado, los buffers temporales de `split/lines` transfieren y liberan sus strings, `Result` libera condicionalmente `value`/`error`, y `unwrap`/`unwrap_or`/`ok`/`ok_or` retienen payloads extraídos o fallbacks antes de la liberación del wrapper; la ruta AST conserva la misma regla para temporales frescos en llamadas genéricas, `print` y acceso a campos; `Option` escalar es por valor, mientras llamadas transferentes no lineales, agregados complejos, scopes y escapes siguen conservadores |
 | Biblioteca estándar | Incluye `std.math`, `std.lists`, `std.strings` (incluidos `trim`, `split`, `lines`, `is_blank`, `format_text`, `format_float`, `char_at`, `slice` y `codepoint`), `std.time` (calendario gregoriano determinista, validación, ordinales, día de semana, ISO y `Result` de parseo), `std.json` (DOM, parser/serializer estricto y Unicode), `std.args`, `std.env`, `std.maps` (consultas genéricas de `Map<K,V>` con `Hash + Eq`), `std.viz`, `std.numeric` (raíces, cuadratura, interpolación, ODEs `rk4`/`rk45`, FFT, e integrales/derivadas/interpolación con unidades sobre `Array<Quantity<D>>`; documento 24) y el API experimental `std.measurements` (documento 25), que ya proyecta series `List<Measurement<Float>>` a valores e incertidumbres para `std.viz.errorbars`; red, métodos implícitos para sistemas rígidos, incertidumbre sobre `Quantity`/arrays y optimización multivariable siguen pendientes |
 | Mensajes de error de E/S | `strerror` ≠ texto de Rust (difieren entre backends) |
 | Unidades | `as` convierte a unidades compuestas (`v as km/h`) y comprueba la dimensión (E1026); `*`/`/` producen unidades canónicas (`kg*m^2/s^2`, `90 km/h * 30 min` → `45 km`); catálogo con N, J, W, Pa, Hz, V… y dimensiones con nombre (`Energy`, `Velocity`); `q.value()`/`q.unit()`. `Array<Quantity<D>>` (una unidad por array, aritmética elemento a elemento, reducciones con unidad, `as` sobre arrays, paridad nativa). `dimension`/`unit`/`define` declarados por el programa (registrados antes de analizar expresiones, con tabla nativa). Pendiente: unidades afines (°C) y unidades con prefijos automáticos |
@@ -345,8 +352,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
 convendría dividirlos; el backend nativo no comparte el sistema de tipos del checker
-(ya consume los tipos del checker y compara cada nodo; el informe actual suma **6 910 funciones
-generadas desde IR, 46 desde HIR y 16 en fallback AST** en los ejemplos, con un trinquete
+(ya consume los tipos del checker y compara cada nodo; el informe actual suma **6 948 funciones generadas desde IR, 38 desde HIR y 6 en fallback AST** en los ejemplos, con un trinquete
 que impide que el fallback aumente sin justificación; los métodos de records y enums concretos
 entran ahora en IR/C cuando sus campos y ownership son compatibles, mientras los records recursivos
 conservan el fallback verificado; las familias migradas incluyen escalares,
@@ -469,6 +475,10 @@ La demo Measurements muestra el API escalar experimental de `std.measurements`: 
 cancelación correlacionada y propagación determinista en intérprete, nativo y WASM. La figura de
 barras de error de la galería proyecta cinco mediciones a `std.viz.errorbars`; `Quantity<T>`,
 `Array<Measurement<T>>`, covarianza, Monte Carlo y cobertura permanecen en el plan.
+La regresión visual automatizada ya cubre seis superficies públicas en desktop/tablet/móvil y siete
+figuras representativas; sus baselines Chromium para Windows y Ubuntu 24.04 se comparan en Pages CI.
+Queda pendiente la auditoría completa con lector de pantalla y continuar mejorando la arquitectura
+de información según evidencia de uso.
 ### H. Distribución y reconocimiento en GitHub
 
 **Objetivo:** subir la definición de Ostrin al proyecto oficial
@@ -505,12 +515,13 @@ sustituye la adopción independiente; por eso el plan mantiene un frente explíc
   `ostrinc.wasm` y compara el SVG byte a byte. Los bundles 3D registran además sus parámetros y
   cámara, y los de azar conservan su semilla declarada. `surface` y `lines` ya añaden cortes
   ejecutables input-driven: `surface` lee `data.json` y `lines` consume `parameters.samples`;
-  `scripts/experiment-replay.mjs` verifica los once bundles en WASI y demuestra que cambiar el
-  parámetro declarado cambia la figura. `surface` y `lines` fueron los primeros cortes R2 porque sus snapshots
+  `scripts/experiment-replay.mjs --all` descubre en el registro source-backed y verifica los once
+  bundles R1/R2 en WASI, demostrando que repetir la misma entrada y semilla conserva el SVG y que cambiar la entrada declarada cambia la figura; CI ya no
+  mantiene una lista manual de IDs. `surface` y `lines` fueron los primeros cortes R2 porque sus snapshots
   `data.json`, capacidades de filesystem y sensibilidad de parámetros están verificadas; ahora los once
   cortes input-driven reclaman R2, los nueve de azar sembrado conservan su evidencia R1 y R3 sigue pendiente. `histogram` fue el primer corte
   R1, `boxplot` el segundo, `scatter-fit` el tercero, `violin` el cuarto, `hexbin` el quinto, `bars` el sexto, `point-cloud` el séptimo, `fft` el octavo y `dashboard` el noveno: los nueve consumen `seed` desde `data.json`, registran
-  algoritmo/versión/partición y el replay cambia la semilla para exigir una figura distinta.
+  algoritmo/versión/partición; el replay repite la misma semilla para exigir determinismo y después cambia la semilla para exigir una figura distinta.
   Los manifiestos de figura ya serializan el estado vivo seleccionado desde el explorador
   (parámetros, cámara 3D opcional y URL compartible), y la galería ofrece una cita BibTeX con
   metadatos de fuente y versión. Los bundles que invocan `rng(seed)` ya incluyen evidencia
@@ -520,9 +531,12 @@ sustituye la adopción independiente; por eso el plan mantiene un frente explíc
   verificada en CI.
   Los nueve experimentos de galería que consumen `rng(seed)` ya tienen el comando de replay y
   la sensibilidad de semilla verificados como evidencia R1 dentro de R2. Los dieciocho bundles restantes conservan R0 por
-  ser deterministas o no declarar todavía una sensibilidad de entradas compatible. Falta añadir
-  metadatos capturados del host y tolerancias de plataforma, extender el contrato input-driven a más
-  fixtures y conservar R3 como pendiente;
+  ser deterministas o no declarar todavía una sensibilidad de entradas compatible. El documento 26
+  define el alcance exacto del replay y exige tolerancias abs/rel por métrica antes de comparar plataformas;
+  los runtime snapshots declaran que esa comparación aún no se ejecuta. Los 29 bundles ya incluyen un
+  resumen normalizado del reporte experimental y conservador de efectos del compilador, con hashes del
+  analizador. Falta capturar metadatos del host, registrar tolerancias aplicadas en resultados comparativos,
+  extender el contrato input-driven a más fixtures y conservar R3 como pendiente;
 - publicar benchmarks históricos por commit y métricas de adopción solo con una política de
   privacidad clara. Estas evidencias alimentan después el snapshot de Linguist y la propuesta
   upstream, pero no se presentan como adopción hasta que existan usuarios y proyectos externos.
@@ -540,13 +554,48 @@ sustituye la adopción independiente; por eso el plan mantiene un frente explíc
 | **5** | E (WASM) + G (playground) | Difusión |
 | **6** | Definición upstream para GitHub Linguist, validación local y clasificación de `.ostrin` tras la aceptación | Ostrin visible como lenguaje en GitHub |
 
-Plan activo (2026-09-24): los bloques de release `v0.1.0`, homepage 3.0 y la compuerta inicial
-de calidad están cerrados en `main`. P5 añade auditoría de dependencias, CodeQL, sanitizers
-nativos y cobertura reproducible; después el siguiente ciclo vuelve al núcleo (retirada del
-fallback AST, ownership completo) con las brechas que expuso el Scientific Lab: `as` con
-unidades compuestas y simplificación de unidades derivadas en la salida (§6). GPU,
-autodiff inverso, registry público, red y la propuesta de Linguist siguen fuera hasta cerrar
-sus evidencias y validación upstream.
+Plan activo (2026-10-08): la fase actual es calidad, corrección científica, reproducibilidad y
+usabilidad externa. La auditoría de ramas está cerrada (§0): los refs remotos obsoletos y ramas
+locales limpias/fusionadas se retiraron; se preservaron los checkouts con cambios y los commits
+únicos aún no integrados. GitHub elimina nuevas ramas al fusionar. La matriz inicial de ownership
+por tipo y contexto está en [`docs/ownership-matrix.md`](docs/ownership-matrix.md). Se cerró una
+ruta HIR para enums gestionados dentro de `Result` y una primera ruta IR/C para `Message::Text(String)`
+seleccionado en un `Phi` de ramas. La regresión fuerza IR (`ir=3, hir=0, ast=0`), comprueba paridad,
+`live_allocations=0` y emite los dispatchers tipados para WASI. La captura de enum por closure
+también cruza IR con paridad, destructor del entorno, cero asignaciones vivas y emisión de C WASI;
+la captura diferida por tarea también cruza IR y pasa con scheduler cooperativo y `--native-threads`.
+Las pruebas focales de branch `Phi`, loop `Phi`, closure, captura y cancelación de tarea pasan bajo ASan y UBSan en WSL. El smoke
+matrix runtime de 20 programas compila y ejecuta con Node WASI y wasi-sdk 34, incluyendo las
+capturas y cancelación de tareas con payload gestionado. Para ello, el driver WASI enlaza `libsetjmp` de wasi-libc, que
+resuelve los símbolos generados por SJLJ. La suite completa de 302 pruebas de integración pasa en Windows. El
+corte anterior de 282 ejemplos pasó completo bajo ASan y UBSan; las
+cuatro regresiones de enums gestionados pasan focalmente bajo ASan y UBSan. La prueba
+`native_ir_nested_wrappers_preserve_recursive_ownership` ahora fuerza una lista de
+`Result<Option<Result<Option<String>,String>>,String>` por IR, la modifica en un loop con errores
+en capas distintas y comprueba paridad, `live_allocations=0` y el destructor recursivo emitido para
+WASI. Su ejecución en ASan/UBSan queda incluida en los jobs de sanitizer; falta obtener sus nuevos
+resultados de CI. El siguiente bloque técnico sigue siendo cerrar otros riesgos altos en agregados, escapes, `Phi`, closures y
+tareas. Después se
+reduce el fallback AST de forma segura, sin sacrificar semántica ni memoria. Siguen
+reproducción R1/R2, inferencia estática de efectos, `Measurement<T>` con cantidades/arreglos/
+covarianza, validación numérica, auditoría de accesibilidad/arquitectura web y preparación de `v0.2`. La
+validación analítica inicial de LU, Cholesky, QR, SVD y autovalores simétricos ya pasa localmente
+en intérprete y nativo con residuales independientes, tolerancias por caso y cero fugas; el criterio
+permanece abierto hasta obtener ejecución CI verde en todos los sistemas soportados y adjuntar su URL.
+El gate de publicación de [`v0.2.0`](docs/release-readiness-v0.2.json) tiene 12 criterios
+con evidencia y un límite inicial de ocho fallbacks AST; se mantiene **NOT_READY** hasta que
+todos estén validados. CI lo exige para la etiqueta `v0.2.x`.
+La clasificación de Ostrin por GitHub Linguist y el crecimiento del ecosistema dependen de
+evidencia de uso externo y validación upstream. GPU, autodiff inverso, registry público y red
+permanecen fuera de la etapa inmediata.
+El scorecard verificable de calidad se genera con [`scripts/quality-scorecard.mjs`](scripts/quality-scorecard.mjs)
+y queda en [`validation/quality-scorecard.json`](validation/quality-scorecard.json); reúne pruebas marcadas,
+la frontera HIR/IR/AST, ownership, niveles R0–R3, readiness y presencia de artefactos de validación.
+La página pública [`website/status.html`](website/status.html) presenta esas dimensiones por separado,
+con `status-data.js` generado desde el scorecard y sin convertirlas en una calificación agregada.
+El snapshot externo de Linguist queda en [`validation/linguist-usage.json`](validation/linguist-usage.json):
+la preparación local está lista, pero la consulta actual encuentra 0 archivos públicos `.ostrin` y
+mantiene pendiente cualquier PR upstream.
 
 ---
 
@@ -554,11 +603,14 @@ sus evidencias y validación upstream.
 
 ```powershell
 cd compiler
-    cargo test                                   # 6 diferenciales + 276 de integración + 2 unitarias
+    cargo test                                   # 6 diferenciales + 302 de integración + 2 unitarias
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 cd ..
 node scripts/project-plan-check.mjs              # ratchets y límites públicos del plan
+node scripts/quality-scorecard.mjs --write        # snapshot verificable de calidad y release readiness
+node scripts/status-page.mjs --write              # datos generados para el dashboard público
+node scripts/linguist-usage-report.mjs --json --output validation/linguist-usage.json
 node --test scripts/project-plan-check.test.mjs
 node scripts/quantity-ownership-check.mjs        # frontera de ownership de Quantity
 node --test scripts/quantity-ownership-check.test.mjs

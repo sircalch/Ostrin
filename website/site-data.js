@@ -5,9 +5,9 @@ globalThis.OSTRIN_SITE_FACTS = Object.freeze({
   "releaseDate": "2026-09-24",
   "releaseUrl": "https://github.com/sircalch/Ostrin/releases/tag/v0.1.0",
   "designDocs": "27",
-  "examples": "266",
+  "examples": "279",
   "experimentBundles": "29",
-  "integrationTests": "276",
+  "integrationTests": "302",
   "differentialTests": "6",
   "unitTests": "2"
 });

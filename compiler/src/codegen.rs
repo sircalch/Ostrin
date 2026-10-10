@@ -176,6 +176,7 @@ fn is_reference_type(ty: &CType) -> bool {
 fn retain_managed_value(access: &str, ty: &CType) -> Option<String> {
     match ty {
         CType::Quantity(_) => Some(format!("ostrin_qty_retain({access})")),
+        CType::Enum(name) => Some(format!("ostrin_retain_enum_{name}({access})")),
         CType::Option(inner) => retain_managed_value(&format!("({access}).value"), inner)
             .map(|body| format!("if (({access}).has) {{ {body}; }}")),
         CType::Result(ok, err) => {
@@ -202,6 +203,7 @@ fn retain_managed_value(access: &str, ty: &CType) -> Option<String> {
 fn release_managed_value(access: &str, ty: &CType) -> Option<String> {
     match ty {
         CType::Quantity(_) => Some(format!("ostrin_qty_release({access})")),
+        CType::Enum(name) => Some(format!("ostrin_drop_enum_{name}({access})")),
         CType::Option(inner) => release_managed_value(&format!("({access}).value"), inner)
             .map(|body| format!("if (({access}).has) {{ {body}; }}")),
         CType::Result(ok, err) => {
@@ -238,6 +240,7 @@ fn release_list_item(access: &str, ty: &CType) -> Option<String> {
 fn release_owned_managed_value(access: &str, ty: &CType) -> Option<String> {
     match ty {
         CType::Quantity(_) => Some(format!("ostrin_qty_release({access})")),
+        CType::Enum(name) => Some(format!("ostrin_drop_enum_{name}({access})")),
         CType::Option(inner) => release_managed_value(&format!("({access}).value"), inner)
             .map(|body| format!("if (({access}).has) {{ {body}; }}")),
         CType::Result(ok, err) => {
@@ -1442,6 +1445,8 @@ static void ostrin_expand_exp(const char* t_in, char* buf, size_t n) {\n\
 }\n\
 \n\
 static void ostrin_fmt_double(double v, char* buf, size_t n) {\n\
+    if (isnan(v)) { snprintf(buf, n, \"NaN\"); return; }\n\
+    if (isinf(v)) { snprintf(buf, n, \"%sinf\", signbit(v) ? \"-\" : \"\"); return; }\n\
     int prec;\n\
     for (prec = 1; prec <= 17; prec++) {\n\
         snprintf(buf, n, \"%.*g\", prec, v);\n\
@@ -1599,6 +1604,9 @@ pub struct NativeTypeReport {
     /// The same backend-generation counts grouped by stable source module.
     /// This avoids absolute checkout paths in compiler output.
     pub native_by_source: BTreeMap<String, NativeSourceReport>,
+    /// Stable source-qualified names of functions that still require the AST
+    /// emitter, so migration work can target concrete bodies instead of totals.
+    pub ast_fallback_functions: Vec<String>,
     /// The same comparison, but for *every* expression node (operands included), by node address.
     pub node_agreed: usize,
     pub node_unchecked: usize,
@@ -2023,7 +2031,7 @@ fn borrowed_reference_expr(expr: &Expr) -> bool {
 /// produced at the call site must be released by the caller afterwards. A
 /// local/field/index is already owned elsewhere and must stay borrowed.
 fn owned_call_argument(expr: &Expr, ty: &CType) -> bool {
-    if !is_reference_type(ty) {
+    if !is_reference_type(ty) && !contains_by_value_enum(ty) {
         return false;
     }
     // Every array operator allocates a new array.
@@ -2044,9 +2052,21 @@ fn owned_call_argument(expr: &Expr, ty: &CType) -> bool {
     )
 }
 
+/// Enums are C values, but a variant may own ref-counted values behind its
+/// tag. Treat them like owned arguments only at the by-value enum/wrapper
+/// boundary; pointer-backed values keep their existing path.
+fn contains_by_value_enum(ty: &CType) -> bool {
+    match ty {
+        CType::Enum(_) => true,
+        CType::Option(inner) => contains_by_value_enum(inner),
+        CType::Result(ok, err) => contains_by_value_enum(ok) || contains_by_value_enum(err),
+        _ => false,
+    }
+}
+
 struct OwnedCallArgs {
     codes: Vec<String>,
-    temporaries: Vec<(String, String, String)>,
+    temporaries: Vec<(String, String, String, CType)>,
 }
 
 impl<'a> Codegen<'a> {
@@ -3420,7 +3440,9 @@ impl<'a> Codegen<'a> {
                 if *return_type == CType::Void {
                     // An owned result is released in the same evaluation.
                     if owned_call_argument(e, &ty) {
-                        out.push_str(&format!("    ostrin_release_owned((void*)({code}));\n"));
+                        let release = release_owned_managed_value(&format!("({code})"), &ty)
+                            .expect("owned call argument has a release operation");
+                        out.push_str(&format!("    {release};\n"));
                     } else {
                         out.push_str(&format!("    {code};\n"));
                     }
@@ -3459,7 +3481,9 @@ impl<'a> Codegen<'a> {
         if let Some(e) = &block.tail {
             let (code, ty) = self.gen_expr(e)?;
             if owned_call_argument(e, &ty) {
-                out.push_str(&format!("    ostrin_release_owned((void*)({code}));\n"));
+                let release = release_owned_managed_value(&format!("({code})"), &ty)
+                    .expect("owned call argument has a release operation");
+                out.push_str(&format!("    {release};\n"));
             } else {
                 out.push_str(&format!("    {code};\n"));
             }
@@ -3739,7 +3763,9 @@ impl<'a> Codegen<'a> {
                     let (code, ty) = self.gen_expr(e)?;
                     // An owned result is released in the same evaluation.
                     if owned_call_argument(e, &ty) {
-                        out.push_str(&format!("    ostrin_release_owned((void*)({code}));\n"));
+                        let release = release_owned_managed_value(&format!("({code})"), &ty)
+                            .expect("owned call argument has a release operation");
+                        out.push_str(&format!("    {release};\n"));
                     } else {
                         out.push_str(&format!("    {code};\n"));
                     }
@@ -4438,13 +4464,6 @@ impl<'a> Codegen<'a> {
         method: &str,
         recorded: &crate::typeck::CallSubst,
     ) -> Option<String> {
-        // Dimension-parameter methods are intentionally left on the existing
-        // HIR/AST path.  In particular this keeps Figure.unit_line,
-        // Figure.unit_scatter and the list based quantity plots out of the
-        // IR prepass until their array/unit ownership contract is complete.
-        if !recorded.dims.is_empty() {
-            return None;
-        }
         let receiver = self.ty_to_ctype(recv_ty)?;
         if !Self::generic_method_ir_type_safe(recv_ty) {
             return None;
@@ -5165,8 +5184,9 @@ impl<'a> Codegen<'a> {
             let (value_code, value_ty) = self.gen_expr_hint(value_expr, Some(field_ty.clone()))?;
             let value_code = self.coerce(&value_code, &value_ty, &field_ty)?;
             body.push_str(&format!("{temp}->{field_name} = {value_code}; "));
-            if is_reference_type(&field_ty) {
-                body.push_str(&format!("ostrin_retain((void*){temp}->{field_name}); "));
+            if let Some(retain) = retain_managed_value(&format!("{temp}->{field_name}"), &field_ty)
+            {
+                body.push_str(&format!("{retain}; "));
             }
         }
         Ok((
@@ -5267,7 +5287,13 @@ impl<'a> Codegen<'a> {
             // reference names the pattern just bound (`n if n > 0 => ...`)
             // — folding it into `condition` would reference those C
             // variables before their own declaration even exists.
-            let commit = format!("{result_var} = {body_code}; {matched_var} = 1;");
+            let cleanup_scrutinee = if arm_owned.is_empty() && !borrowed_reference_expr(scrutinee) {
+                "@@OSTRIN_MATCH_SCRUTINEE_CLEANUP@@"
+            } else {
+                ""
+            };
+            let commit =
+                format!("{result_var} = {body_code}; {matched_var} = 1; {cleanup_scrutinee}");
             let guarded_commit = match guard_code {
                 Some(guard_code) => format!("if ({guard_code}) {{ {commit} }}"),
                 None => commit,
@@ -5284,6 +5310,17 @@ impl<'a> Codegen<'a> {
 
         // A match used for effect (every arm Void) has no value to store.
         let is_void = result_ty == CType::Void;
+        // A fresh wrapper used only to drive a statement match owns its
+        // active payload for the duration of the selected arm. Release it
+        // there unless the arm already cleans a directly bound reference.
+        let release_scrutinee = if is_void && !borrowed_reference_expr(scrutinee) {
+            release_owned_managed_value(&scrutinee_var, &scrutinee_ty)
+                .map(|release| format!("{release};"))
+                .unwrap_or_default()
+        } else {
+            String::new()
+        };
+        arm_blocks = arm_blocks.replace("@@OSTRIN_MATCH_SCRUTINEE_CLEANUP@@", &release_scrutinee);
         let (result_decl, arm_blocks, yielded) = if is_void {
             (
                 String::new(),
@@ -6105,6 +6142,8 @@ impl<'a> Codegen<'a> {
         lt: &CType,
         rc: &str,
         rt: &CType,
+        left_fresh: bool,
+        right_fresh: bool,
     ) -> Option<Result<(String, CType), String>> {
         let is_qarr = |t: &CType| matches!(t, CType::Array(e) if matches!(**e, CType::Quantity(_)));
         let is_arr = |t: &CType| matches!(t, CType::Array(_));
@@ -6115,7 +6154,7 @@ impl<'a> Codegen<'a> {
         if !involved {
             return None;
         }
-        Some(self.gen_quantity_array_binary_inner(op, lc, lt, rc, rt))
+        Some(self.gen_quantity_array_binary_inner(op, lc, lt, rc, rt, left_fresh, right_fresh))
     }
 
     fn gen_quantity_array_binary_inner(
@@ -6125,6 +6164,8 @@ impl<'a> Codegen<'a> {
         lt: &CType,
         rc: &str,
         rt: &CType,
+        left_fresh: bool,
+        right_fresh: bool,
     ) -> Result<(String, CType), String> {
         self.register_list_types(&CType::Array(Box::new(CType::Float)));
         self.uses_quantity_arrays = true;
@@ -6201,10 +6242,20 @@ impl<'a> Codegen<'a> {
             }
         };
         let wrap = |body: String, release: Option<String>| -> String {
-            match release {
-                Some(t) => format!("({{ {head}Array_Float* {t}; Array_Float* __qa = {body}; ostrin_release((void*){t}); __qa; }})"),
-                None => format!("({{ {head}{body}; }})"),
-            }
+            let release_converted = release
+                .map(|temp| format!("ostrin_release((void*){temp}); "))
+                .unwrap_or_default();
+            let release_left = if left_fresh {
+                format!("ostrin_release((void*){l}); ")
+            } else {
+                String::new()
+            };
+            let release_right = if right_fresh {
+                format!("ostrin_release((void*){r}); ")
+            } else {
+                String::new()
+            };
+            format!("({{ {head} Array_Float* __qa = {body}; {release_converted}{release_left}{release_right}__qa; }})")
         };
         let array_of = |t: CType| CType::Array(Box::new(t));
         match op {
@@ -6331,7 +6382,11 @@ impl<'a> Codegen<'a> {
                 return Ok((format!("{c_name}({rc}, {arg})"), return_type));
             }
         }
-        if let Some(result) = self.gen_quantity_array_binary(op, &lc, &lt, &rc, &rt) {
+        let left_fresh = matches!(lt, CType::Array(_)) && fresh_array_expr(l);
+        let right_fresh = matches!(rt, CType::Array(_)) && fresh_array_expr(r);
+        if let Some(result) =
+            self.gen_quantity_array_binary(op, &lc, &lt, &rc, &rt, left_fresh, right_fresh)
+        {
             return result;
         }
         if matches!(lt, CType::Quantity(_)) || matches!(rt, CType::Quantity(_)) {
@@ -6766,7 +6821,7 @@ impl<'a> Codegen<'a> {
             let temp = self.next_temp();
             owned
                 .temporaries
-                .push((c_type_name(ty), temp.clone(), code));
+                .push((c_type_name(ty), temp.clone(), code, ty.clone()));
             owned.codes[index] = temp;
         }
         owned
@@ -6785,7 +6840,7 @@ impl<'a> Codegen<'a> {
             return (call, return_type);
         }
         let mut body = String::new();
-        for (ctype, temp, code) in &owned.temporaries {
+        for (ctype, temp, code, _) in &owned.temporaries {
             body.push_str(&format!("{ctype} {temp} = {code}; "));
         }
         if return_type == CType::Void {
@@ -6796,14 +6851,18 @@ impl<'a> Codegen<'a> {
                 "{} {result} = {call}; ",
                 c_type_name(&return_type)
             ));
-            for (_, temp, _) in owned.temporaries.iter().rev() {
-                body.push_str(&format!("ostrin_release_owned((void*){temp}); "));
+            for (_, temp, _, ty) in owned.temporaries.iter().rev() {
+                let release = release_owned_managed_value(temp, ty)
+                    .expect("owned call temporary has a release operation");
+                body.push_str(&format!("{release}; "));
             }
             body.push_str(&format!("{result};"));
             return (format!("({{ {body} }})"), return_type);
         }
-        for (_, temp, _) in owned.temporaries.iter().rev() {
-            body.push_str(&format!("ostrin_release_owned((void*){temp}); "));
+        for (_, temp, _, ty) in owned.temporaries.iter().rev() {
+            let release = release_owned_managed_value(temp, ty)
+                .expect("owned call temporary has a release operation");
+            body.push_str(&format!("{release}; "));
         }
         body.push_str("(void)0;");
         (format!("({{ {body} }})"), return_type)
@@ -7520,7 +7579,10 @@ impl<'a> Codegen<'a> {
                 let mut owned = self.materialize_owned_call_args(args, &coerced, &arg_types);
                 let receiver = if owned_call_argument(obj, &obj_ty) {
                     let temp = self.next_temp();
-                    owned.temporaries.insert(0, (c_type_name(&obj_ty), temp.clone(), obj_code));
+                    owned.temporaries.insert(
+                        0,
+                        (c_type_name(&obj_ty), temp.clone(), obj_code, obj_ty.clone()),
+                    );
                     temp
                 } else {
                     obj_code
@@ -7682,11 +7744,11 @@ impl<'a> Codegen<'a> {
                     "unit" => Ok((format!("({{ {head} ostrin_unit_cat({a}->unit, \"\", \"\"); }})"), CType::Str)),
                     "values" => Ok((format!("({{ {head} ostrin_qa_tag(ostrin_qa_copy({a}), NULL); }})"), CType::Array(Box::new(CType::Float)))),
                     "sum" | "min" | "max" | "mean" | "median" | "std" | "sample_std" | "percentile" => Ok((
-                        format!("({{ {head} (Qty){{ Array_Float_{method_name}({a}{}), {a}->unit }}; }})", with_args(&codes)),
+                        format!("({{ {head} ostrin_qty_from_borrowed(Array_Float_{method_name}({a}{}), {a}->unit); }})", with_args(&codes)),
                         quantity,
                     )),
                     "get" => Ok((
-                        format!("({{ {head} (Qty){{ Array_Float_get({a}, (int64_t[]){{ {} }}, {}), {a}->unit }}; }})", codes.join(", "), codes.len()),
+                        format!("({{ {head} ostrin_qty_from_borrowed(Array_Float_get({a}, (int64_t[]){{ {} }}, {}), {a}->unit); }})", codes.join(", "), codes.len()),
                         quantity,
                     )),
                     "var" | "sample_var" => Ok((
@@ -7837,8 +7899,11 @@ impl<'a> Codegen<'a> {
                         let fresh = matches!(&args[0], Arg::Positional(e) if owned_call_argument(e, &elem_ty));
                         if fresh {
                             let t = self.next_temp();
+                            let release = release_owned_managed_value(&t, &elem_ty)
+                                .map(|release| format!("{release}; "))
+                                .unwrap_or_default();
                             return Ok((
-                                format!("({{ {} {t} = {coerced}; {struct_name}_push({obj_code}, {t}); ostrin_release_owned((void*){t}); }})", c_type_name(&elem_ty)),
+                                format!("({{ {} {t} = {coerced}; {struct_name}_push({obj_code}, {t}); {release}}})", c_type_name(&elem_ty)),
                                 CType::Void,
                             ));
                         }
@@ -8275,7 +8340,8 @@ impl<'a> Codegen<'a> {
             "format" | "format_float_value" => 2,
             "clone" | "drop" => 1,
             "norm" | "eigvals" | "det" | "inv" | "trace" | "eye" | "read_file" | "parse_int"
-            | "parse_csv" | "sum" | "panic" | "assert" | "array" | "zeros" | "ones" | "abs" => 1,
+            | "parse_csv" | "sum" | "panic" | "assert" | "array" | "zeros" | "ones" | "abs"
+            | "is_finite" => 1,
             n if [
                 "sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh", "exp", "ln",
                 "log10", "sqrt", "floor", "ceil", "round", "erf",
@@ -8563,6 +8629,10 @@ impl<'a> Codegen<'a> {
                 _ => Err(format!("'{name}' needs two arrays of the same float type")),
             },
             "pi" => Ok(Some(("3.141592653589793".to_string(), CType::Float))),
+            "is_finite" => match types[0] {
+                CType::Float | CType::Float32 => Ok(Some((format!("isfinite({})", codes[0]), CType::Bool))),
+                _ => Err("'is_finite' needs a Float or Float32 value".to_string()),
+            },
             "rng" => Ok(Some((format!("ostrin_rng_new({})", codes[0]), CType::Rng))),
             "pow" | "atan2" => match (&types[0], &types[1]) {
                 (CType::Float, CType::Float) => Ok(Some((format!("ostrin_dm_{name}({}, {})", codes[0], codes[1]), CType::Float))),
@@ -9502,42 +9572,16 @@ fn generate_impl(
     // names alongside record metadata for the shared IR representation, but
     // keep variant details in a separate table so record ownership helpers
     // never mistake an enum for a heap record.
-    let mut scalar_enums: HashMap<String, bool> = HashMap::new();
-    for variant in hir_world.variants.values() {
+    for variant in hir_world
+        .variants
+        .values()
+        .chain(hir_world.applied_variants.values())
+    {
         ir_records
             .entry(crate::ir_c::enum_marker(&variant.enum_name))
             .or_default();
-        let scalar_payload = variant.fields.iter().all(|(_, field_ty)| {
-            matches!(
-                field_ty.as_str(),
-                "int64_t"
-                    | "double"
-                    | "float"
-                    | "bool"
-                    | "int8_t"
-                    | "int16_t"
-                    | "int32_t"
-                    | "uint8_t"
-                    | "uint16_t"
-                    | "uint32_t"
-                    | "uint64_t"
-                    | "Qty"
-            )
-        });
-        scalar_enums
-            .entry(variant.enum_name.clone())
-            .and_modify(|supported| *supported &= scalar_payload)
-            .or_insert(scalar_payload);
     }
-    for (name, supported) in scalar_enums {
-        if supported {
-            ir_records
-                .entry(crate::ir_c::enum_marker(&name))
-                .or_default()
-                .push(crate::ir_c::SCALAR_ENUM_MARKER.to_string());
-        }
-    }
-    let ir_variants: crate::ir_c::VariantFields = hir_world
+    let mut ir_variants: crate::ir_c::VariantFields = hir_world
         .variants
         .iter()
         .map(|(name, variant)| {
@@ -9551,6 +9595,22 @@ fn generate_impl(
             )
         })
         .collect();
+    ir_variants.extend(
+        hir_world
+            .applied_variants
+            .iter()
+            .map(|((enum_name, name), variant)| {
+                (
+                    (enum_name.clone(), name.clone()),
+                    crate::ir_c::VariantInfo {
+                        name: name.clone(),
+                        tag: variant.tag,
+                        fields: variant.fields.clone(),
+                    },
+                )
+            }),
+    );
+    crate::ir_c::register_scalar_enum_markers(&mut ir_records, &ir_variants);
     let mut ir_methods: crate::ir_c::MethodNames = codegen
         .methods
         .iter()
@@ -9671,6 +9731,11 @@ fn generate_impl(
             }
             None => {
                 codegen.type_report.ast_fallback += 1;
+                codegen.type_report.ast_fallback_functions.push(format!(
+                    "{}::{}",
+                    native_source_key(f.source_file.as_deref()),
+                    f.name
+                ));
                 native_source_report(&mut codegen.type_report, f.source_file.as_deref())
                     .ast_fallback += 1;
                 codegen.gen_function_body(f, &return_type, &mut body)?;
@@ -9806,6 +9871,11 @@ fn generate_impl(
             }
             None => {
                 codegen.type_report.ast_fallback += 1;
+                codegen.type_report.ast_fallback_functions.push(format!(
+                    "{}::{}",
+                    native_source_key(decl.source_file.as_deref()),
+                    hir_name.as_deref().unwrap_or(&decl.name)
+                ));
                 native_source_report(&mut codegen.type_report, decl.source_file.as_deref())
                     .ast_fallback += 1;
                 codegen.gen_callable_body(
@@ -10434,13 +10504,20 @@ fn generate_impl(
                                 };
                                 let (params, ret) = codegen.instantiations.get(&target).cloned()?;
                                 hir_world.methods.insert(
-                                    (owner, target.clone()),
+                                    (owner.clone(), target.clone()),
                                     (
                                         target.clone(),
                                         params.iter().map(c_type_name).collect(),
                                         c_type_name(&ret),
                                     ),
                                 );
+                                // This instance may be discovered while
+                                // specializing the current generic caller,
+                                // after the initial IR method table was built.
+                                // The specialized HIR rewrites the call to
+                                // `target`, so register that exact symbol for
+                                // the IR emitter too.
+                                ir_methods.insert((owner, target.clone()), target.clone());
                                 Some(target)
                             }
                         };
@@ -10505,7 +10582,7 @@ fn generate_impl(
                         .map(|name| (name.clone(), name)),
                 );
                 known_functions.insert(job.c_name.clone(), job.c_name.clone());
-                crate::ir_c::generate_with_helpers(
+                let generated = crate::ir_c::generate_with_helpers(
                     &function,
                     &known_functions,
                     &ir_methods,
@@ -10526,8 +10603,8 @@ fn generate_impl(
                             crate::ir_c::HelperRequest::Hash => codegen.hash_expr(left, &ctype),
                         }
                     },
-                )
-                .map(|generated| {
+                );
+                generated.map(|generated| {
                     for declaration in generated.declarations {
                         ir_helper_prototypes.push(declaration);
                     }
@@ -10555,6 +10632,11 @@ fn generate_impl(
                 body = text;
             } else {
                 codegen.type_report.ast_fallback += 1;
+                codegen.type_report.ast_fallback_functions.push(format!(
+                    "{}::{}",
+                    native_source_key(job.decl.source_file.as_deref()),
+                    job.c_name
+                ));
                 native_source_report(&mut codegen.type_report, job.decl.source_file.as_deref())
                     .ast_fallback += 1;
                 codegen.gen_callable_body(
@@ -10769,6 +10851,64 @@ fn generate_impl(
     // by this point), a `List`'s element type is only known once the drain
     // loop above has finished discovering it from actual usage.
     out.push_str(&list_type_decls);
+
+    // Managed enum values are by-value tagged unions, so collection and
+    // record destructors need a type-specific dispatcher to release only the
+    // active variant's managed fields. Emit it for every concrete enum so
+    // nested enum payloads can call one another through forward prototypes.
+    let mut enum_drop_types = enums
+        .iter()
+        .map(|enum_decl| {
+            let variants = enum_decl
+                .variants
+                .iter()
+                .filter_map(|variant| codegen.variants.get(&variant.name).cloned())
+                .collect::<Vec<_>>();
+            (enum_decl.name.clone(), variants)
+        })
+        .collect::<Vec<_>>();
+    enum_drop_types.extend(
+        codegen
+            .instance_order
+            .iter()
+            .filter(|(is_enum, _)| *is_enum)
+            .filter_map(|(_, name)| {
+                codegen
+                    .instance_variants
+                    .get(name)
+                    .cloned()
+                    .map(|variants| (name.clone(), variants))
+            }),
+    );
+    enum_drop_types.sort_by(|left, right| left.0.cmp(&right.0));
+    enum_drop_types.dedup_by(|left, right| left.0 == right.0);
+    for (name, variants) in enum_drop_types {
+        let retain_signature = format!("static void ostrin_retain_enum_{name}({name} value)");
+        let drop_signature = format!("static void ostrin_drop_enum_{name}({name} value)");
+        let mut retain_body = String::from("    switch (value.tag) {\n");
+        let mut drop_body = String::from("    switch (value.tag) {\n");
+        for variant in variants {
+            retain_body.push_str(&format!("    case {}: {{\n", variant.tag));
+            drop_body.push_str(&format!("    case {}: {{\n", variant.tag));
+            for (field, ty) in &variant.fields {
+                let access = format!("value.data.{}.{}", variant.name, field);
+                if let Some(retain) = retain_managed_value(&access, ty) {
+                    retain_body.push_str(&format!("        {retain};\n"));
+                }
+                if let Some(release) = release_managed_value(&access, ty) {
+                    drop_body.push_str(&format!("        {release};\n"));
+                }
+            }
+            retain_body.push_str("        break;\n    }\n");
+            drop_body.push_str("        break;\n    }\n");
+        }
+        retain_body.push_str("    default: break;\n    }\n");
+        drop_body.push_str("    default: break;\n    }\n");
+        list_helper_prototypes.push(format!("{retain_signature};"));
+        list_helper_prototypes.push(format!("{drop_signature};"));
+        bodies.push((retain_signature, retain_body));
+        bodies.push((drop_signature, drop_body));
+    }
 
     // Record instances own any managed fields they contain, including
     // references nested inside by-value Option/Result wrappers. The callback

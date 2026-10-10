@@ -44,6 +44,7 @@ pub type VariantFields = HashMap<(String, String), VariantInfo>;
 
 const ENUM_MARKER: &str = "__ostrin_enum__";
 pub const SCALAR_ENUM_MARKER: &str = "__ostrin_scalar_enum__";
+const MANAGED_ENUM_MARKER: &str = "__ostrin_managed_enum__";
 
 /// `RecordFields` is shared by the existing recursive ownership helpers.  A
 /// private marker entry lets those helpers recognize a by-value enum without
@@ -53,16 +54,26 @@ pub fn enum_marker(name: &str) -> String {
 }
 
 fn is_plain_enum(ty: &Ty, records: &RecordFields) -> bool {
-    matches!(ty, Ty::Named(name) if records.contains_key(&enum_marker(name)))
+    enum_name(ty, records).is_some()
+}
+
+fn enum_name(ty: &Ty, records: &RecordFields) -> Option<String> {
+    match ty {
+        Ty::Named(name) if records.contains_key(&enum_marker(name)) => Some(name.clone()),
+        Ty::Applied(_, _) => {
+            let instance = mangle_record_type(ty, records);
+            records
+                .contains_key(&enum_marker(&instance))
+                .then_some(instance)
+        }
+        _ => None,
+    }
 }
 
 fn scalar_enum(ty: &Ty, records: &RecordFields) -> bool {
-    match ty {
-        Ty::Named(name) => records
-            .get(&enum_marker(name))
-            .is_some_and(|fields| fields.iter().any(|field| field == SCALAR_ENUM_MARKER)),
-        _ => false,
-    }
+    enum_name(ty, records)
+        .and_then(|name| records.get(&enum_marker(&name)))
+        .is_some_and(|fields| fields.iter().any(|field| field == SCALAR_ENUM_MARKER))
 }
 
 fn record_name(ty: &Ty, records: &RecordFields) -> Option<String> {
@@ -121,7 +132,15 @@ fn mangle_record_type(ty: &Ty, records: &RecordFields) -> String {
             mangle_record_type(value, records)
         ),
         Ty::Set(element) => format!("Set_{}", mangle_record_type(element, records)),
-        Ty::Fn(_, _) => "Fn".to_string(),
+        Ty::Fn(params, ret) => format!(
+            "Fn_{}_to_{}",
+            params
+                .iter()
+                .map(|param| mangle_record_type(param, records))
+                .collect::<Vec<_>>()
+                .join("_"),
+            mangle_record_type(ret, records)
+        ),
         Ty::Quantity(_) => "Quantity".to_string(),
         Ty::Dyn(name) => name.clone(),
         Ty::Generic(name) => name.clone(),
@@ -187,6 +206,7 @@ fn c_type(ty: &Ty, records: &RecordFields) -> Bail<String> {
         Ty::Quantity(_) => "Qty".to_string(),
         Ty::Named(name) if name == "Rng" => "OstrinRng*".to_string(),
         Ty::Named(name) if records.contains_key(&enum_marker(name)) => name.clone(),
+        Ty::Applied(_, _) if is_plain_enum(ty, records) => enum_name(ty, records).ok_or(())?,
         Ty::List(element) if list_supported(element, records) => {
             format!("List_{}*", mangle_option_payload(element, records))
         }
@@ -262,13 +282,13 @@ fn record_pattern_scalar(ty: &Ty) -> bool {
     )
 }
 
-/// The first enum slice includes fixed-width integer payloads because their
-/// checked arithmetic, casts and C ABI are already covered by the scalar path.
-/// Managed/generic payloads and nested patterns remain outside this slice.
+/// Scalar literal/range predicates on enum payloads remain limited to primitive
+/// values. Tag tests and direct bindings can also project managed payloads;
+/// their retain/release obligations are handled by the IR ownership pass.
 fn enum_pattern_scalar(ty: &Ty) -> bool {
     matches!(
         ty,
-        Ty::Int | Ty::Float | Ty::Float32 | Ty::Sized(_) | Ty::Bool | Ty::Quantity(_)
+        Ty::Int | Ty::Float | Ty::Float32 | Ty::Sized(_) | Ty::Bool
     )
 }
 
@@ -284,24 +304,24 @@ fn scalar_pattern_value_code(value: &IrScalarValue) -> String {
     }
 }
 
-fn plain_enum_value_supported(
+fn enum_value_supported(
     ty: &Ty,
     variants: &VariantFields,
     records: &RecordFields,
     visiting: &mut HashSet<String>,
 ) -> bool {
-    if enum_pattern_scalar(ty) {
+    if enum_pattern_scalar(ty) || *ty == Ty::String {
         return true;
     }
-    let Ty::Named(name) = ty else {
+    let Some(name) = enum_name(ty, records) else {
         return false;
     };
-    if !is_plain_enum(ty, records) || !visiting.insert(name.clone()) {
+    if !visiting.insert(name.clone()) {
         return false;
     }
     let supported = variants
         .iter()
-        .filter(|((enum_name, _), _)| enum_name == name)
+        .filter(|((enum_name, _), _)| enum_name == &name)
         .all(|(_, variant)| {
             variant.fields.iter().all(|(_, field_c_type)| {
                 matches!(
@@ -317,9 +337,9 @@ fn plain_enum_value_supported(
                         | "uint16_t"
                         | "uint32_t"
                         | "uint64_t"
-                        | "Qty"
+                        | "const char*"
                 ) || (records.contains_key(&enum_marker(field_c_type))
-                    && plain_enum_value_supported(
+                    && enum_value_supported(
                         &Ty::Named(field_c_type.clone()),
                         variants,
                         records,
@@ -327,8 +347,72 @@ fn plain_enum_value_supported(
                     ))
             })
         });
-    visiting.remove(name);
+    visiting.remove(&name);
     supported
+}
+
+/// Marks the enum types whose complete payload graph is unmanaged. This lets
+/// the general `supported` predicate stay conservative without needing variant
+/// metadata at every call site. Nested enums are accepted only when their
+/// complete payload graphs also pass this check.
+pub fn register_scalar_enum_markers(records: &mut RecordFields, variants: &VariantFields) {
+    let names = variants
+        .keys()
+        .map(|(name, _)| name.clone())
+        .collect::<HashSet<_>>();
+    for name in names {
+        let ty = Ty::Named(name.clone());
+        if enum_value_supported(&ty, variants, records, &mut HashSet::new()) {
+            let marker = records.entry(enum_marker(&name)).or_default();
+            if !marker.iter().any(|field| field == SCALAR_ENUM_MARKER) {
+                marker.push(SCALAR_ENUM_MARKER.to_string());
+            }
+        }
+    }
+
+    // Record which enum graphs own any references so the IR ownership pass
+    // can retain/drop managed values at Phi edges. Scalar-only enums keep
+    // their existing no-op ownership behavior. Iterate to a fixed point so
+    // an enum containing another managed enum is recognized regardless of
+    // declaration order.
+    loop {
+        let mut changed = false;
+        for ((name, _), variant) in variants {
+            let owns_managed_payload = variant.fields.iter().any(|(_, field_type)| {
+                let primitive = matches!(
+                    field_type.as_str(),
+                    "int64_t"
+                        | "double"
+                        | "float"
+                        | "bool"
+                        | "int8_t"
+                        | "int16_t"
+                        | "int32_t"
+                        | "uint8_t"
+                        | "uint16_t"
+                        | "uint32_t"
+                        | "uint64_t"
+                );
+                if primitive {
+                    return false;
+                }
+                if let Some(fields) = records.get(&enum_marker(field_type)) {
+                    return fields.iter().any(|field| field == MANAGED_ENUM_MARKER);
+                }
+                true
+            });
+            if owns_managed_payload {
+                let marker = records.entry(enum_marker(name)).or_default();
+                if !marker.iter().any(|field| field == MANAGED_ENUM_MARKER) {
+                    marker.push(MANAGED_ENUM_MARKER.to_string());
+                    changed = true;
+                }
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
 }
 
 /// Returns the source-level constructor name from the debug representation
@@ -370,6 +454,15 @@ fn is_simple_enum_pattern(pattern: &str) -> bool {
         && !pattern.contains("Ident(\"None\")")
 }
 
+fn pattern_constructor_name(pattern: &str) -> Option<&str> {
+    if let Some(rest) = pattern.strip_prefix("Variant(\"") {
+        return rest.split_once("\", ").map(|(name, _)| name);
+    }
+    pattern
+        .strip_prefix("Ident(\"")
+        .and_then(|rest| rest.strip_suffix("\")"))
+}
+
 fn enum_field_path(path: &[String]) -> Option<(&str, usize)> {
     let field = path.first()?.strip_prefix("__ostrin_enum_field__")?;
     let (variant, index) = field.rsplit_once("__")?;
@@ -377,10 +470,9 @@ fn enum_field_path(path: &[String]) -> Option<(&str, usize)> {
 }
 
 /// Projects a nested by-value enum path through the generated tagged-union
-/// layout.  Every segment carries its parent variant and positional index, so
-/// source binding names never affect the C member selected.  The helper is
-/// intentionally limited to plain enums; a managed payload would require the
-/// ownership protocol that still belongs to the HIR/AST fallback.
+/// layout. Every segment carries its parent variant and positional index, so
+/// source binding names never affect the C member selected. Ownership of the
+/// projected value is handled by the IR ownership pass for the binding type.
 fn nested_enum_field_code(
     subject_code: &str,
     subject_ty: &Ty,
@@ -523,13 +615,8 @@ fn enum_variant<'a>(
     variants: &'a VariantFields,
     records: &RecordFields,
 ) -> Option<&'a VariantInfo> {
-    let Ty::Named(enum_name) = subject_ty else {
-        return None;
-    };
-    if !is_plain_enum(subject_ty, records) {
-        return None;
-    }
-    variants.get(&(enum_name.clone(), name.to_string()))
+    let enum_name = enum_name(subject_ty, records)?;
+    variants.get(&(enum_name, name.to_string()))
 }
 
 fn array_element(ty: &Ty) -> Option<&Ty> {
@@ -579,24 +666,34 @@ fn supported(ty: &Ty, records: &RecordFields) -> bool {
         || quantity(ty)
         || array_supported(ty)
         || matches!(ty, Ty::Named(name) if name == "Rng")
+        // By-value enums are IR-safe only when every payload is genuinely
+        // unmanaged. Managed enums retain the verified HIR ownership path
+        // until enum retain/release is represented in IR itself.
         || is_plain_enum(ty, records)
         || record_name(ty, records).is_some()
         || matches!(ty, Ty::List(element) if list_supported(element, records))
         || matches!(ty, Ty::Map(key, value) if map_supported(key, value, records))
         || matches!(ty, Ty::Set(element) if set_supported(element, records))
-        || matches!(ty, Ty::Fn(_, _))
+        || matches!(ty, Ty::Fn(params, ret) if params.iter().all(|param| *param != Ty::Void && supported(param, records)) && supported(ret, records))
         || matches!(ty, Ty::Applied(name, args) if name == "Channel" && args.len() == 1 && channel_supported(&args[0], records))
         || matches!(ty, Ty::Applied(name, args) if name == "Task" && args.len() == 1 && task_supported(&args[0], records))
         || matches!(ty, Ty::Applied(name, args) if name == "Option" && args.len() == 1 && option_supported(&args[0], records))
         || matches!(ty, Ty::Applied(name, args) if name == "Result" && args.len() == 2 && result_supported(&args[0], &args[1], records))
 }
 
-fn list_element_supported(ty: &Ty) -> bool {
-    (scalar(ty) && *ty != Ty::Void) || quantity(ty)
+fn list_element_supported(ty: &Ty, records: &RecordFields) -> bool {
+    (scalar(ty) && *ty != Ty::Void)
+        || quantity(ty)
+        // Enum values are stored inline in the generated list.  The C
+        // list helpers already retain/drop managed enum payloads by active
+        // variant, so this is safe for both scalar and managed enums.
+        || is_plain_enum(ty, records)
+        || matches!(ty, Ty::Applied(name, args) if name == "Task" && args.len() == 1 && task_supported(&args[0], records))
+        || matches!(ty, Ty::Fn(params, ret) if params.iter().all(|param| *param != Ty::Void && supported(param, records)) && supported(ret, records))
 }
 
 fn list_supported(ty: &Ty, records: &RecordFields) -> bool {
-    list_element_supported(ty)
+    list_element_supported(ty, records)
         || list_array_supported(ty)
         || record_name(ty, records).is_some()
         || scalar_enum(ty, records)
@@ -613,16 +710,16 @@ fn list_supported(ty: &Ty, records: &RecordFields) -> bool {
 }
 
 fn map_supported(key: &Ty, value: &Ty, records: &RecordFields) -> bool {
-    (list_element_supported(key)
+    (list_element_supported(key, records)
         || record_name(key, records).is_some()
         || matches!(key, Ty::List(inner) if list_supported(inner, records)))
-        && (list_element_supported(value)
+        && (list_element_supported(value, records)
             || record_name(value, records).is_some()
             || matches!(value, Ty::List(inner) if list_supported(inner, records)))
 }
 
 fn set_supported(element: &Ty, records: &RecordFields) -> bool {
-    list_element_supported(element)
+    list_element_supported(element, records)
         || record_name(element, records).is_some()
         || matches!(element, Ty::List(inner) if list_supported(inner, records))
 }
@@ -639,7 +736,8 @@ fn option_supported(element: &Ty, records: &RecordFields) -> bool {
     matches!(
         element,
         Ty::Int | Ty::Float | Ty::Float32 | Ty::Sized(_) | Ty::Bool | Ty::String
-    ) || array_supported(element)
+    ) || quantity(element)
+        || array_supported(element)
         || matches!(element, Ty::List(inner) if list_supported(inner, records))
         || matches!(element, Ty::Map(key, value) if map_supported(key, value, records))
         || matches!(element, Ty::Set(inner) if set_supported(inner, records))
@@ -655,6 +753,7 @@ fn option_managed_payload(element: &Ty, records: &RecordFields) -> bool {
 fn result_payload_supported(ty: &Ty, records: &RecordFields) -> bool {
     *ty == Ty::Unknown
         || scalar(ty)
+        || quantity(ty)
         || array_supported(ty)
         || matches!(ty, Ty::List(inner) if list_supported(inner, records))
         || matches!(ty, Ty::Map(key, value) if map_supported(key, value, records))
@@ -674,9 +773,18 @@ fn result_managed_payload(ty: &Ty, records: &RecordFields) -> bool {
 
 fn managed_payload(ty: &Ty, records: &RecordFields) -> bool {
     match ty {
-        Ty::String | Ty::List(_) | Ty::Map(_, _) | Ty::Set(_) => true,
+        Ty::Quantity(_) | Ty::String | Ty::List(_) | Ty::Map(_, _) | Ty::Set(_) | Ty::Fn(_, _) => {
+            true
+        }
         Ty::Applied(name, args) if name == "Array" && args.len() == 1 => array_supported(ty),
         Ty::Named(name) if name == "Rng" => true,
+        Ty::Named(name)
+            if records
+                .get(&enum_marker(name))
+                .is_some_and(|fields| fields.iter().any(|field| field == MANAGED_ENUM_MARKER)) =>
+        {
+            true
+        }
         Ty::Named(name) => records.contains_key(name),
         Ty::Applied(_, _) if record_name(ty, records).is_some() => true,
         Ty::Applied(name, args) if name == "Channel" && args.len() == 1 => {
@@ -714,6 +822,7 @@ fn mangle_scalar(ty: &Ty) -> String {
 
 fn mangle_option_payload(ty: &Ty, records: &RecordFields) -> String {
     match ty {
+        Ty::Fn(_, _) => mangle_record_type(ty, records),
         Ty::Quantity(dimension) => format!(
             "Q_{}",
             crate::types::dim_to_string(dimension)
@@ -722,6 +831,9 @@ fn mangle_option_payload(ty: &Ty, records: &RecordFields) -> String {
                 .collect::<String>()
         ),
         Ty::Named(name) if is_plain_enum(ty, records) => name.clone(),
+        Ty::Applied(_, _) if is_plain_enum(ty, records) => {
+            enum_name(ty, records).unwrap_or_default()
+        }
         Ty::Named(name) if records.contains_key(name) => name.clone(),
         Ty::Applied(_, _) if record_name(ty, records).is_some() => {
             record_name(ty, records).unwrap_or_default()
@@ -766,6 +878,11 @@ fn mangle_option_payload(ty: &Ty, records: &RecordFields) -> String {
         {
             format!("Channel_{}", mangle_option_payload(&args[0], records))
         }
+        Ty::Applied(name, args)
+            if name == "Task" && args.len() == 1 && task_supported(&args[0], records) =>
+        {
+            format!("Task_{}", mangle_task_payload(&args[0], records))
+        }
         _ => mangle_scalar(ty),
     }
 }
@@ -803,6 +920,9 @@ fn retain_payload(access: &str, ty: &Ty, records: &RecordFields) -> Option<Strin
             Some(format!("ostrin_retain((void*){access})"))
         }
         Ty::Named(name) if name == "Rng" => Some(format!("ostrin_retain((void*){access})")),
+        Ty::Named(name) if is_plain_enum(ty, records) && managed_payload(ty, records) => {
+            Some(format!("ostrin_retain_enum_{name}({access})"))
+        }
         Ty::Named(name) if records.contains_key(name) => {
             Some(format!("ostrin_retain((void*){access})"))
         }
@@ -848,6 +968,9 @@ fn retain_payload(access: &str, ty: &Ty, records: &RecordFields) -> Option<Strin
 fn release_payload(access: &str, ty: &Ty, records: &RecordFields) -> Option<String> {
     match ty {
         Ty::Quantity(_) => Some(format!("ostrin_qty_release({access})")),
+        Ty::Named(name) if is_plain_enum(ty, records) && managed_payload(ty, records) => {
+            Some(format!("ostrin_drop_enum_{name}({access})"))
+        }
         Ty::Applied(name, args)
             if name == "Option"
                 && args.len() == 1
@@ -1857,15 +1980,11 @@ fn emit_instruction(
                     adapter
                 ));
             }
-            Ty::Named(_)
-                if enum_variant(ty, name, variants, records)
-                    .is_some_and(|variant| variant.fields.is_empty()) =>
+            _ if enum_variant(ty, name, variants, records)
+                .is_some_and(|variant| variant.fields.is_empty()) =>
             {
                 let variant = enum_variant(ty, name, variants, records).ok_or(())?;
-                let enum_name = match ty {
-                    Ty::Named(name) => name,
-                    _ => return Err(()),
-                };
+                let enum_name = enum_name(ty, records).ok_or(())?;
                 out.push_str(&format!(
                     "    {} = (({enum_name}){{ .tag = {} }});\n",
                     value_name(*dst),
@@ -3268,6 +3387,22 @@ fn emit_instruction(
                         _ => return Err(()),
                     }
                 }
+                receiver_ty if enum_name(&receiver_ty, records).is_some() => {
+                    let enum_name = enum_name(&receiver_ty, records).ok_or(())?;
+                    let c_name = methods.get(&(enum_name, method.clone())).ok_or(())?;
+                    if !supported(ty, records) {
+                        return Err(());
+                    }
+                    let mut call_args = Vec::with_capacity(args.len() + 1);
+                    call_args.push(receiver.clone());
+                    for arg in args {
+                        if !supported(&value_ty(values, *arg)?, records) {
+                            return Err(());
+                        }
+                        call_args.push(value_code(values, *arg)?);
+                    }
+                    format!("{c_name}({})", call_args.join(", "))
+                }
                 receiver_ty if record_name(&receiver_ty, records).is_some() => {
                     let record = record_name(&receiver_ty, records).ok_or(())?;
                     let c_name = methods.get(&(record, method.clone())).ok_or(())?;
@@ -3753,6 +3888,12 @@ fn emit_instruction(
                     };
                     format!("{function}({})", codes[0])
                 }
+            } else if callee == "is_finite"
+                && args.len() == 1
+                && matches!(value_ty(values, args[0])?, Ty::Float | Ty::Float32)
+                && *ty == Ty::Bool
+            {
+                format!("isfinite({})", codes[0])
             } else if callee == "pi" && args.is_empty() && *ty == Ty::Float {
                 "3.141592653589793".to_string()
             } else if callee == "pow"
@@ -3900,7 +4041,7 @@ fn emit_instruction(
                 let element_c = c_type(&channel_args[0], records)?;
                 let input = &codes[0];
                 format!(
-                    "({{ {list_name}* __ostrin_select_list = {input}; {result_name} __ostrin_select_result; memset(&__ostrin_select_result, 0, sizeof __ostrin_select_result); bool __ostrin_select_ready = false; if (!__ostrin_select_list || __ostrin_select_list->length == 0) OSTRIN_FAIL(\"select expects at least one channel\"); while (!__ostrin_select_ready) {{ if (ostrin_cancellation_requested()) {{ __ostrin_select_ready = true; }} else {{ for (int64_t __ostrin_select_index = 0; __ostrin_select_index < __ostrin_select_list->length; __ostrin_select_index++) {{ {element_c} __ostrin_select_value; int __ostrin_select_status = {channel_name}_try_receive(__ostrin_select_list->items[__ostrin_select_index], &__ostrin_select_value); if (__ostrin_select_status > 0) {{ __ostrin_select_result.has = true; __ostrin_select_result.value = __ostrin_select_value; __ostrin_select_ready = true; break; }} if (__ostrin_select_status < 0) {{ __ostrin_select_ready = true; break; }} }} if (!__ostrin_select_ready) {{\n#if defined(OSTRIN_NATIVE_THREADS)\n    ostrin_select_wait();\n#else\n    if (!ostrin_poll_all()) OSTRIN_FAIL(\"select would block: no runnable task remains\");\n#endif\n    }} }} }} ostrin_task_checkpoint(); __ostrin_select_result; }})"
+                    "({{ {list_name}* __ostrin_select_list = {input}; {result_name} __ostrin_select_result; memset(&__ostrin_select_result, 0, sizeof __ostrin_select_result); bool __ostrin_select_ready = false; if (!__ostrin_select_list || __ostrin_select_list->length == 0) OSTRIN_FAIL(\"select expects at least one channel\"); while (!__ostrin_select_ready) {{ if (ostrin_cancellation_requested()) {{ __ostrin_select_ready = true; }} else {{ for (int64_t __ostrin_select_index = 0; __ostrin_select_index < __ostrin_select_list->length; __ostrin_select_index++) {{ {element_c} __ostrin_select_value; int __ostrin_select_status = {channel_name}_try_receive(__ostrin_select_list->items[__ostrin_select_index], &__ostrin_select_value); if (__ostrin_select_status > 0) {{ __ostrin_select_result.has = true; __ostrin_select_result.value = __ostrin_select_value; __ostrin_select_ready = true; break; }} if (__ostrin_select_status < 0) {{ __ostrin_select_ready = true; break; }} }} if (!__ostrin_select_ready) {{\n#if defined(OSTRIN_NATIVE_THREADS)\n    ostrin_select_wait();\n#else\n    if (!ostrin_poll_all()) OSTRIN_FAIL(\"select would block: no runnable task remains\");\n#endif\n    }} }} }} __ostrin_select_result; }})"
                 )
             } else if callee == "Some" && args.len() == 1 {
                 let inner = value_ty(values, args[0])?;
@@ -4021,27 +4162,48 @@ fn emit_instruction(
                         let Ok(arg_ty) = value_ty(values, *value) else {
                             return false;
                         };
-                        plain_enum_value_supported(&arg_ty, variants, records, &mut HashSet::new())
+                        supported(&arg_ty, records)
                     })
                 {
                     return Err(());
                 }
-                let enum_name = match ty {
-                    Ty::Named(name) => name,
-                    _ => return Err(()),
-                };
-                let fields = variant
+                let enum_name = enum_name(ty, records).ok_or(())?;
+                let mut setup = Vec::new();
+                let mut fields = Vec::with_capacity(variant.fields.len());
+                for (index, (((field, field_c_type), code), value)) in variant
                     .fields
                     .iter()
                     .zip(codes.iter())
-                    .map(|((field, _), code)| format!(".{field} = {code}"))
-                    .collect::<Vec<_>>();
-                format!(
+                    .zip(args.iter())
+                    .enumerate()
+                {
+                    let arg_ty = value_ty(values, *value)?;
+                    let actual_c_type = c_type(&arg_ty, records)?;
+                    if actual_c_type != *field_c_type {
+                        return Err(());
+                    }
+                    if retain_payload(code, &arg_ty, records).is_some() {
+                        let temp = format!("__ostrin_enum_arg_{index}");
+                        setup.push(format!("{actual_c_type} {temp} = {code};"));
+                        if let Some(retain) = retain_payload(&temp, &arg_ty, records) {
+                            setup.push(format!("{retain};"));
+                        }
+                        fields.push(format!(".{field} = {temp}"));
+                    } else {
+                        fields.push(format!(".{field} = {code}"));
+                    }
+                }
+                let value = format!(
                     "(({enum_name}){{ .tag = {}, .data.{} = {{ {} }} }})",
                     variant.tag,
                     variant.name,
                     fields.join(", ")
-                )
+                );
+                if setup.is_empty() {
+                    value
+                } else {
+                    format!("({{ {} {value}; }})", setup.join(" "))
+                }
             } else {
                 let Some(c_function) = known_functions.get(callee) else {
                     return Err(());
@@ -4199,16 +4361,18 @@ fn emit_instruction(
                         .join(" && ")
                 }
                 _ if is_plain_enum(&subject_ty, records)
-                    && plain_enum_value_supported(
-                        &subject_ty,
-                        variants,
-                        records,
-                        &mut HashSet::new(),
-                    )
                     && (is_simple_enum_pattern(pattern) || !scalar_tests.is_empty())
-                    && (!enum_tests.is_empty() || !scalar_tests.is_empty()) =>
+                    && (pattern_constructor_name(pattern).is_some()
+                        || !enum_tests.is_empty()
+                        || !scalar_tests.is_empty()) =>
                 {
                     let mut conditions = Vec::with_capacity(enum_tests.len() + scalar_tests.len());
+                    if enum_tests.is_empty() && scalar_tests.is_empty() {
+                        let name = pattern_constructor_name(pattern).ok_or(())?;
+                        let variant =
+                            enum_variant(&subject_ty, name, variants, records).ok_or(())?;
+                        conditions.push(format!("({subject}).tag == {}", variant.tag));
+                    }
                     for (path, name) in enum_tests {
                         let (projected, projected_ty) = nested_enum_projection_code(
                             &subject,
@@ -4293,17 +4457,11 @@ fn emit_instruction(
                         )
                     }
                     _ if is_plain_enum(&subject_ty, records)
-                        && plain_enum_value_supported(
-                            &subject_ty,
-                            variants,
-                            records,
-                            &mut HashSet::new(),
-                        )
                         && path
                             .iter()
                             .all(|part| part.starts_with("__ostrin_enum_field__"))
                         && !path.is_empty()
-                        && enum_pattern_scalar(ty) =>
+                        && supported(ty, records) =>
                     {
                         let code = nested_enum_field_code(
                             &value_code(values, *subject)?,
@@ -4314,6 +4472,39 @@ fn emit_instruction(
                             records,
                         )
                         .ok_or(())?;
+                        (code, ty.clone())
+                    }
+                    _ if is_plain_enum(&subject_ty, records)
+                        && path.len() == 1
+                        && supported(ty, records) =>
+                    {
+                        let enum_name = enum_name(&subject_ty, records).ok_or(())?;
+                        let mut matches = variants
+                            .iter()
+                            .filter(|((name, _), variant)| {
+                                name == &enum_name
+                                    && variant.fields.iter().any(|(field, _)| field == &path[0])
+                            })
+                            .collect::<Vec<_>>();
+                        if matches.is_empty() {
+                            matches = variants
+                                .iter()
+                                .filter(|((name, _), variant)| {
+                                    name == &enum_name && variant.fields.len() == 1
+                                })
+                                .collect::<Vec<_>>();
+                        }
+                        if matches.len() != 1 {
+                            return Err(());
+                        }
+                        let variant = matches[0].1;
+                        let field = variant.fields.first().ok_or(())?;
+                        let code = format!(
+                            "({}).data.{}.{}",
+                            value_code(values, *subject)?,
+                            variant.name,
+                            field.0
+                        );
                         (code, ty.clone())
                     }
                     _ if path.len() == 1
@@ -4374,15 +4565,12 @@ fn emit_instruction(
             ));
         }
         IrInstr::Spawn {
-            dst,
-            region,
-            scoped,
-            ty,
+            dst, region, ty, ..
         } => {
             let Ty::Applied(name, args) = ty else {
                 return Err(());
             };
-            if name != "Task" || args.len() != 1 || *scoped || !task_supported(&args[0], records) {
+            if name != "Task" || args.len() != 1 || !task_supported(&args[0], records) {
                 return Err(());
             }
             let helper = spawn_helpers.get(region).ok_or(())?;
@@ -4586,12 +4774,16 @@ fn emit_instruction(
                     }
                 }
                 Ty::Named(_) if is_plain_enum(&ty, records) => {
-                    // Plain enum payloads in this slice are scalar, so the
-                    // by-value tagged union owns no native reference.  The
-                    // ownership pass still emits Retain around branch joins;
-                    // accepting it as a no-op keeps enum values in the same
-                    // linear path as their scalar fields.
-                    let _ = value_code(values, *value)?;
+                    if let Some(retain) = retain_payload(&value_code(values, *value)?, &ty, records)
+                    {
+                        out.push_str(&format!("    {retain};\n"));
+                    }
+                }
+                Ty::Applied(_, _) if is_plain_enum(&ty, records) => {
+                    if let Some(retain) = retain_payload(&value_code(values, *value)?, &ty, records)
+                    {
+                        out.push_str(&format!("    {retain};\n"));
+                    }
                 }
                 Ty::Fn(_, _) => {
                     out.push_str(&format!(
@@ -4612,10 +4804,11 @@ fn emit_instruction(
                     ));
                 }
                 Ty::String | Ty::List(_) | Ty::Map(_, _) | Ty::Set(_) => {
-                    out.push_str(&format!(
-                        "    ostrin_release((void*){});\n",
-                        value_code(values, *value)?
-                    ));
+                    let code = value_code(values, *value)?;
+                    out.push_str(&format!("    ostrin_release((void*){code});\n"));
+                    if matches!(ty, Ty::List(_)) {
+                        out.push_str("    ostrin_task_checkpoint();\n");
+                    }
                 }
                 Ty::Applied(name, args)
                     if name == "Array" && args.len() == 1 && array_supported(&ty) =>
@@ -4688,7 +4881,18 @@ fn emit_instruction(
                     }
                 }
                 Ty::Named(_) if is_plain_enum(&ty, records) => {
-                    let _ = value_code(values, *value)?;
+                    if let Some(release) =
+                        release_payload(&value_code(values, *value)?, &ty, records)
+                    {
+                        out.push_str(&format!("    {release};\n"));
+                    }
+                }
+                Ty::Applied(_, _) if is_plain_enum(&ty, records) => {
+                    if let Some(release) =
+                        release_payload(&value_code(values, *value)?, &ty, records)
+                    {
+                        out.push_str(&format!("    {release};\n"));
+                    }
                 }
                 Ty::Fn(_, _) => {
                     out.push_str(&format!(
@@ -5244,16 +5448,13 @@ fn build_spawn_helpers(
     let mut specs = Vec::new();
     for block in &function.blocks {
         for instruction in &block.instructions {
-            let IrInstr::Spawn {
-                region, scoped, ty, ..
-            } = instruction
-            else {
+            let IrInstr::Spawn { region, ty, .. } = instruction else {
                 continue;
             };
             let Ty::Applied(name, args) = ty else {
                 return Err(());
             };
-            if name != "Task" || args.len() != 1 || *scoped || !task_supported(&args[0], records) {
+            if name != "Task" || args.len() != 1 || !task_supported(&args[0], records) {
                 return Err(());
             }
             if spawn_helpers.contains_key(region) {
@@ -5289,10 +5490,6 @@ fn build_spawn_helpers(
             let block = function.blocks.get(*block_id).ok_or(())?;
             for instruction in &block.instructions {
                 if matches!(instruction, IrInstr::Param { .. }) {
-                    return Err(());
-                }
-                if matches!(instruction, IrInstr::Opaque { op, .. } if op.starts_with("scope_begin<") || op.starts_with("scope_end<"))
-                {
                     return Err(());
                 }
                 if let Some((value, ty)) = defined_value(instruction) {
@@ -5448,6 +5645,27 @@ fn build_spawn_helpers(
                 "    {} {};\n",
                 c_type(&ty, records)?,
                 value_name(value)
+            ));
+        }
+        let mut scopes = HashSet::new();
+        for block_id in &region_blocks {
+            let block = function.blocks.get(*block_id).ok_or(())?;
+            for instruction in &block.instructions {
+                if let IrInstr::Opaque { op, .. } = instruction {
+                    if let Some(scope) = op
+                        .strip_prefix("scope_begin<")
+                        .and_then(|value| value.strip_suffix('>'))
+                    {
+                        scopes.insert(scope.parse::<usize>().map_err(|_| ())?);
+                    }
+                }
+            }
+        }
+        let mut scopes: Vec<_> = scopes.into_iter().collect();
+        scopes.sort_unstable();
+        for scope in scopes {
+            body.push_str(&format!(
+                "    OstrinTaskGroup* __ostrin_ir_scope_{scope};\n"
             ));
         }
         body.push_str("    int __ostrin_ir_pred = -1;\n");
@@ -5687,7 +5905,10 @@ pub fn generate_with_helpers(
         return None;
     }
 
-    let values = collect_values(function, records).ok()?;
+    let values = match collect_values(function, records) {
+        Ok(values) => values,
+        Err(()) => return None,
+    };
     let mut spawn_helpers = SpawnHelpers::new();
     let mut helper_declarations = Vec::new();
     let (closure_helpers, closure_declarations, mut helpers) = build_closure_helpers(

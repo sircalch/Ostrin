@@ -11,7 +11,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { experimentFixtures, normalizeFigureMetadata, outputPathFor, repositoryRoot } from "./experiment-bundle.mjs";
+import { buildExperimentBundle, experimentFixtures, normalizeFigureMetadata, outputPathFor, repositoryRoot } from "./experiment-bundle.mjs";
 import { runWasm } from "./lab-data.mjs";
 
 const schema = "ostrin.experiment/v0";
@@ -34,6 +34,13 @@ function fixtureArgument(argv) {
   const index = argv.indexOf("--fixture");
   if (index >= 0 && argv[index + 1]) return argv[index + 1];
   return "";
+}
+
+export function listExecutableReplayIds() {
+  return Object.keys(experimentFixtures).filter((id) => {
+    const level = buildExperimentBundle(id).reproducibility.level;
+    return level === "R1" || level === "R2";
+  });
 }
 
 function extractSvg(lines, id) {
@@ -200,6 +207,15 @@ async function replay(id) {
   };
   const rendered = normalizeFigureMetadata(extractSvg(output, id), metadata);
   if (rendered !== bundle.files["figure.svg"]) throw new Error(`${id}: input-driven replay SVG differs from the published bundle`);
+  const seeded = bundle.reproducibility?.level === "R1"
+    || bundle.provenance?.randomness?.status === "input-driven-r1";
+  if (seeded) {
+    const repeatedOutput = await runWasm(module, files, ["--run", "main.ostrin"]);
+    const repeated = normalizeFigureMetadata(extractSvg(repeatedOutput, id), metadata);
+    if (repeated !== rendered) {
+      throw new Error(`${id}: same input and seed produced different SVG output on replay`);
+    }
+  }
   const invocationOutput = bundle.provenance.runtime.invocation.outputs.find((entry) => entry.path === "figure.svg");
   if (bytes(rendered) !== invocationOutput.bytes || sha256(rendered) !== invocationOutput.sha256) {
     throw new Error(`${id}: input-driven replay output hash differs from the runtime invocation record`);
@@ -216,15 +232,39 @@ async function replay(id) {
     consumed: bundle.provenance.execution.consumes,
     baseline: "match",
     sensitivity: "changed-output",
-    ...(bundle.provenance?.randomness?.status === "input-driven-r1" ? { seeded: "changed-output" } : {}),
+    ...(seeded ? { seeded: "same-seed-and-changed-output" } : {}),
   };
 }
 
+export async function replayAll() {
+  const ids = listExecutableReplayIds();
+  if (ids.length === 0) throw new Error("no R1/R2 experiment bundles are registered for executable replay");
+  const results = [];
+  for (const id of ids) results.push(await replay(id));
+  return results;
+}
+
 async function main() {
-  const id = fixtureArgument(process.argv.slice(2));
-  if (!id) throw new Error("usage: node scripts/experiment-replay.mjs --fixture <id>");
+  const args = process.argv.slice(2);
+  if (args.includes("--all")) {
+    if (args.some((argument) => argument === "--fixture" || argument.startsWith("--fixture="))) {
+      throw new Error("--all cannot be combined with --fixture");
+    }
+    const results = await replayAll();
+    for (const result of results) {
+      const seeded = result.seeded ? `; ${result.seeded}` : "";
+      console.log(`experiment-replay: verified ${result.id} (${result.input}; ${result.sensitivity}${seeded})`);
+    }
+    console.log(`experiment-replay: verified all ${results.length} R1/R2 bundles`);
+    return;
+  }
+  const id = fixtureArgument(args);
+  if (!args.includes("--fixture") && !args.some((argument) => argument.startsWith("--fixture="))) {
+    throw new Error("usage: node scripts/experiment-replay.mjs --fixture <id> | --all");
+  }
   const result = await replay(id);
-  console.log(`experiment-replay: verified ${result.id} (${result.input}; ${result.sensitivity})`);
+  const seeded = result.seeded ? `; ${result.seeded}` : "";
+  console.log(`experiment-replay: verified ${result.id} (${result.input}; ${result.sensitivity}${seeded})`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {

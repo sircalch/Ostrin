@@ -1,0 +1,11 @@
+record Holder {
+    task: Task<Void>
+}
+
+fn main() -> Void {
+    ready = channel<Int>()
+    holder = Holder { task: spawn { ready.send(9) } }
+    print(ready.receive().unwrap())
+    holder.task.join()
+    drop(holder)
+}

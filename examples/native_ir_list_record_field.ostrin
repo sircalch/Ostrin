@@ -1,0 +1,10 @@
+record Basket {
+    items: List<String>
+}
+
+fn main() -> Void {
+    basket = Basket { items: ["a", "b"] }
+    basket.items.push("c")
+    print(basket.items.join(","))
+    drop(basket)
+}

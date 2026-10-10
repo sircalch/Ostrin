@@ -1,0 +1,71 @@
+# Matriz de ownership del backend nativo
+
+*Corte: 2026-10-09 · inventario conservador; no es una promesa de soporte estable.*
+
+Esta matriz registra el contrato de valores gestionados en IR/C. El intérprete puede
+aceptar combinaciones que todavía usan el fallback HIR/AST en el backend nativo.
+Las celdas describen el cruce **tipo × contexto**; el estado de un contexto no
+implica automáticamente el de otro.
+
+## Estados
+
+| Código | Estado exacto | Criterio |
+|---|---|---|
+| `T` | `TESTED` | Hay una regresión explícita o una prueba de integración que cubre la interacción de ownership; verifica salida y, donde aplica, `--leak-check`. No significa que ASan/UBSan se hayan ejecutado. |
+| `S` | `SUPPORTED` | El emisor/runtime tiene la ruta, pero no hay una prueba focalizada para esta interacción concreta. |
+| `A` | `NOT APPLICABLE` | El contexto no tiene sentido para el tipo descrito. |
+| `K` | `KNOWN LIMITATION` | La interacción sigue en fallback, está restringida o aún no tiene contrato de ownership demostrado; no se debe contar como soporte IR/C. |
+
+`K` es deliberadamente conservador: significa que el proyecto no reclama soporte
+IR/C verificado para esa celda. No afirma por sí solo que el intérprete rechace el
+programa. Los estados `T` y `S` están limitados a las familias documentadas en la
+columna **Límite/evidencia**; no generalizan a todos los tipos de payload.
+
+## Matriz
+
+Las columnas corresponden a construcción, copia/alias, argumento, retorno,
+almacenamiento en campo, almacenamiento en colección, rama, loop, join `Phi`,
+error, captura por closure, captura por tarea, destrucción, backend nativo y WASI.
+
+| Tipo gestionado | Construcción | Copia/alias | Argumento | Retorno | Campo | Colección | Rama | Loop | Phi | Error | Captura closure | Captura tarea | Destrucción | Nativo | WASI | Límite/evidencia |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| `String` | T | T | T | T | S | T | T | S | S | T | T | S | T | T | T | `native_ownership_primitives_release_composite_allocations`, `native_ir_file_io_preserves_results_and_ownership`; los payloads recursivos permanecen limitados. |
+| `Record` concreto no recursivo | T | T | T | T | T | T | T | T | S | T | T | T | T | T | T | `native_backend_compiles_and_runs_records`, `native_ir_nested_record_option_payload_ownership` cubre `Record<Option<String>>` construido en ramas, devuelto dentro de `List<Record>` y recorrido en loop con paridad y `live_allocations=0`, más pruebas de alias/retorno; records recursivos se listan aparte. |
+| `Enum` con payload gestionado | T | T | T | T | T | T | T | T | T | T | T | T | T | T | T | `native_backend_quantities_match_the_interpreter` cubre `List<Shape>` con payload `Quantity`, constructores, patrones, métodos, paridad intérprete/nativo/WASI y `live_allocations=0`; `native_managed_enum_payload_fallback_preserves_ownership` y `native_managed_enum_result_error_and_early_return_preserve_payloads` cubren en HIR argumentos, alias, `List<Message>`, campos de record, loops y `Result<Message,String>` con paridad y `live_allocations=0`. `native_managed_enum_phi_owns_the_selected_payload` cubre `Message::Text(String)` en un `if`/`Phi`; `native_managed_enum_loop_phi_releases_replaced_payloads` comprueba el `Phi` de enum en el backedge y actualizaciones repetidas; `native_managed_enum_closure_capture_owns_payload` valida captura por valor, llamada y destrucción del entorno de closure; `native_managed_enum_task_capture_owns_payload` valida captura diferida, `join` y destrucción del entorno; `native_managed_enum_task_cancellation_drops_captured_payload` valida cancelación antes de ejecutar el closure y limpieza del entorno. Cooperativo y `--native-threads` terminan con cero asignaciones vivas; el resultado de la segunda llamada a `cancel()` puede variar bajo hilos porque la tarea puede empezar antes. Los cinco casos focales pasan con paridad y cero asignaciones vivas, y cada uno pasa ASan/UBSan individualmente; los fixtures de rama, bucle, closure, captura de tarea y cancelación de tarea verifican emisión y ejecución C bajo WASI. La matriz WASI de 20 programas pasa con wasi-sdk 34 y Node WASI, incluidos los valores de función guardados en listas y records. La suite completa actual de 288 pasó en Windows. El corte anterior de 282 pasó completo bajo ASan/UBSan. No se generaliza a payloads recursivos, cancelación en todos los estados ni a toda combinación de `Phi`. |
+| `List<T>` | T | T | T | T | T | T | T | T | T | T | T | T | T | T | T | `native_ir_list_record_field_preserves_ownership` cubre `List<String>` almacenada en un record, mutación del campo, `join` y destrucción con paridad intérprete/nativo y `live_allocations=0`; `native_ir_list_loop_phi_preserves_ownership` cubre un valor de lista transportado por `Phi` de loop, reemplazo repetido y releases del backedge; `native_ir_list_closure_capture_preserves_ownership` cubre captura de `List<String>` por closure, llamada y destrucción del entorno; `native_ir_list_task_capture_preserves_ownership` cubre captura diferida de `List<String>` por tarea cooperativa y con hilos nativos, `join` y destrucción; `native_ir_emitter_handles_lists_and_ownership_markers`, `native_ir_emitter_handles_nested_csv_lists_and_ownership`, `native_ir_nested_wrappers_preserve_recursive_ownership` (lista de `Result<Option<Result<Option<String>,String>>,String>` con inserciones en loop y errores interior/exterior); conversiones `List<Quantity>`; anidamiento/escapes más generales siguen acotados. |
+| `Map<K,V>` | T | T | T | T | T | T | S | T | T | T | T | T | T | T | T | `native_ir_map_record_field_preserves_ownership` cubre `Map<String,Int>` almacenado en un record, mutación del campo, consulta y destrucción con paridad intérprete/nativo y `live_allocations=0`; `native_ir_map_set_loop_phi_preserves_ownership` cubre reemplazo repetido en un loop-Phi con claves/valores gestionados, paridad y cero asignaciones vivas; `native_ir_map_set_closure_capture_preserves_ownership` cubre captura por closure, llamada y destrucción del entorno; `native_ir_map_set_task_capture_preserves_ownership` cubre captura diferida, `join`, scheduler cooperativo y `--native-threads`; `native_ir_emitter_handles_scalar_maps_and_sets`, `native_ir_compound_collections_preserve_payload_and_ownership`; payloads compuestos arbitrarios no se generalizan. |
+| `Set<T>` | T | T | T | T | T | T | S | T | T | T | T | T | T | T | T | `native_ir_set_record_field_preserves_ownership` cubre `Set<String>` almacenado en un record, mutación del campo, consulta y destrucción con paridad intérprete/nativo y `live_allocations=0`; `native_ir_map_set_loop_phi_preserves_ownership` cubre reemplazo repetido en un loop-Phi con elementos gestionados, paridad y cero asignaciones vivas; `native_ir_map_set_closure_capture_preserves_ownership` cubre captura por closure, llamada y destrucción del entorno; `native_ir_map_set_task_capture_preserves_ownership` cubre captura diferida, `join`, scheduler cooperativo y `--native-threads`; `native_ir_emitter_handles_scalar_maps_and_sets`, `native_ir_list_map_set_ownership`; agregados gestionados arbitrarios conservan límites. |
+| `Array<T>` | T | T | T | T | K | K | T | T | S | K | S | K | T | T | T | `native_ir_emitter_handles_scalar_array_parameters_and_indexing`, `native_ir_quantity_array_selection_preserves_unit_and_ownership`; arrays numéricos y `Array<Quantity<D>>` tienen kernels/ownership específicos, agregados dentro de arrays no están cubiertos generalmente. |
+| `Quantity<D>` con etiqueta dinámica | T | T | T | T | T | T | T | T | T | T | K | K | T | T | T | `native_quantity_scalar_escape_retains_array_unit_labels`, pruebas de `Phi`, wrappers y `viz_units`; ASan/UBSan en CI sigue pendiente para este ciclo. |
+| `Measurement<T>` | T | K | K | K | K | K | K | K | K | K | K | K | T | T | T | `std_measurements_scalar_matches_interpreter_and_native` comprueba destructores WASI recursivos y `live_allocations=0`; `std_measurements_series_feeds_reproducible_error_bars` mantiene la paridad SVG. ASan/UBSan están en `sanitizers.yml`, pendientes para este cambio; copy/alias y payloads compuestos siguen abiertos. |
+| `Option<T>` con payload gestionado | T | T | T | T | S | T | T | S | T | T | S | S | T | T | T | `native_ir_nested_record_option_payload_ownership` fuerza y verifica un `Phi` de `Option<String>` almacenado en `Record<Option<String>>`, luego lo retorna en `List<Record>` y lo consume en loop con paridad y `live_allocations=0`; `native_ir_nested_wrappers_preserve_recursive_ownership` añade tres niveles de wrappers en una lista con fallback por rama de error; otras combinaciones anidadas y escapes no lineales tienen límites. |
+| `Result<T,E>` con payload gestionado | T | T | T | T | S | T | T | S | T | T | S | S | T | T | T | `native_result_quantity_owns_dynamic_unit_label` verifica `Phi` entre `Ok(Quantity)`/`Err(String)`, `Result<Option<Quantity>>`, salida WASI, paridad IR/nativa, leak-check nativo y ruta AST; `native_ir_nested_wrappers_preserve_recursive_ownership` prueba una lista de resultados con tres niveles de wrappers y errores/fallback en ramas interior y exterior dentro de un loop; payloads recursivos/no soportados permanecen fuera de IR/C. |
+| Closure con entorno | T | T | T | T | T | T | S | S | S | K | T | T | T | T | T | `native_ir_owns_function_values_in_lists_and_record_fields` cubre closures con captura almacenadas en `List<fn>` de dos firmas y en un campo de record, con paridad, `live_allocations=0`, ASan, UBSan e interpretación WASI; `native_ir_handles_captured_closures_core` y `native_ir_try_captured_handler_preserves_closure_ownership` cubren captura/llamada. Scopes y escapes más generales siguen limitados. |
+| `Task<T>` | T | T | T | T | T | T | S | T | S | K | S | T | T | T | T | `native_ir_task_record_field_preserves_ownership` cubre almacenamiento de `Task<Void>` en un record, `join` y destrucción con paridad intérprete/nativo y `live_allocations=0`; `native_ir_task_argument_and_return_preserve_ownership` cubre paso por argumento y retorno; `native_ir_lab_concurrency_owns_task_list_elements` cubre `List<Task<Void>>`, inserción, recorrido y `join`; `native_ir_emitter_handles_task_cancel`, `native_ir_emitter_handles_yield_with_task_runtime`; `spawn`/cancelación tienen pruebas, pero otros payloads, ABI/fallback de tareas anidadas y escapes no lineales siguen acotados. |
+| `Channel<T>` | T | T | T | T | K | T | T | T | S | K | S | T | T | T | T | `native_ir_emitter_handles_select_over_channels`, `native_ir_emitter_handles_channel_iterator_protocol`, `native_threads_use_os_thread_and_blocking_channel_runtime`; no todos los payloads gestionados cruzan IR/C. |
+| Iterator con estado gestionado | T | K | T | T | K | K | T | T | K | K | K | K | K | S | S | `native_ir_emitter_handles_user_iterator_protocol`, `native_ir_emitter_handles_generic_iterator_protocol`, `native_ir_emitter_handles_generic_iterators_with_nested_managed_values`; iteradores indirectos y escapes siguen limitados. |
+| Agregado anidado (`List`/wrapper/record) | T | S | S | S | K | T | S | K | K | T | K | K | S | S | S | Algunas listas anidadas y wrappers pasan IR/C; escapes anidados, destructores recursivos y joins complejos son limitaciones explícitas. |
+| Record recursivo | K | K | K | K | K | K | K | K | K | K | K | K | K | K | K | Conserva fallback HIR/AST mientras no exista un contrato completo de destructor y ciclos para esta representación. |
+
+## Lectura del estado y trabajo pendiente
+
+- La cobertura de `String`, colecciones escalares, wrappers, records concretos,
+  closures, tareas y canales no debe extrapolarse a todo payload anidado. La
+  regresión `native_ir_nested_record_option_payload_ownership` verifica una ruta
+  concreta de record/wrapper/lista con ramas y loops; los enums gestionados añaden
+  un `Phi` de rama, uno de bucle, captura en closure, captura por tarea y
+  cancelación cooperativa antes de ejecutar el closure para `Message::Text(String)`,
+  sin cerrar escapes arbitrarios, cancelación en todos
+  los estados, otros `Phi` gestionados ni records recursivos.
+- `Quantity<D>` dispone de un contrato propio en
+  [`design/27-ownership-de-quantity-escalar.md`](design/27-ownership-de-quantity-escalar.md).
+  Su tabla de aceptación complementa esta matriz y mantiene sanitizers como gate
+  pendiente.
+- Las celdas `K` que afectan agregados recursivos, escapes, errores, `Phi`,
+  captures y destrucción son la lista de trabajo para cerrar primero los riesgos
+  altos. Se cambian a `S` o `T` solo con contrato en el emisor y evidencia de
+  paridad/leak-check; ASan/UBSan y WASI se exigen donde correspondan.
+- La matriz se actualiza junto con el código y las pruebas. El resumen ejecutivo
+  vive en [`../ESTADO_Y_PLAN.md`](../ESTADO_Y_PLAN.md); la arquitectura normativa
+  de memoria sigue en [`design/11-modelo-de-memoria.md`](design/11-modelo-de-memoria.md)
+  y [`design/18-modelo-de-memoria-nativo.md`](design/18-modelo-de-memoria-nativo.md).

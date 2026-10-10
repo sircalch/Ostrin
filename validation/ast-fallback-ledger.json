@@ -1,0 +1,68 @@
+{
+  "schema": "ostrin.ast-fallback-ledger/v1",
+  "status": "verified-in-differential-suite",
+  "count": 6,
+  "source": "compiler/tests/differential.rs",
+  "verifiedBaseline": {
+    "ir": 6948,
+    "hir": 38,
+    "ast": 6,
+    "total": 6986
+  },
+  "entries": [
+    {
+      "source": "examples/dyn_trait.ostrin",
+      "function": "main",
+      "reason": "dynamic-trait-dispatch",
+      "blockedBy": "dyn Shape values in a List and polymorphic method dispatch are not represented by the typed IR ABI",
+      "test": "native_backend_compiles_the_original_dyn_trait_example",
+      "risk": "high",
+      "plannedResolution": "design a stable trait-object representation and ownership contract before lowering dispatch to IR"
+    },
+    {
+      "source": "examples/dyn_trait.ostrin",
+      "function": "total_area",
+      "reason": "dynamic-trait-dispatch",
+      "blockedBy": "fold over List<dyn Shape> captures an indirect trait receiver and closure",
+      "test": "native_backend_compiles_the_original_dyn_trait_example",
+      "risk": "high",
+      "plannedResolution": "lower trait-object receivers and indirect iterator/closure calls together"
+    },
+    {
+      "source": "examples/native_dyn_trait.ostrin",
+      "function": "describe",
+      "reason": "dynamic-trait-dispatch",
+      "blockedBy": "dyn Shape parameter requires an erased receiver and vtable ownership ABI",
+      "test": "native_backend_compiles_and_runs_dyn_trait",
+      "risk": "high",
+      "plannedResolution": "specify trait-object layout, dispatch, drop behavior and WASI ABI before migration"
+    },
+    {
+      "source": "examples/native_dyn_trait.ostrin",
+      "function": "main",
+      "reason": "dynamic-trait-dispatch",
+      "blockedBy": "boxing concrete records as dyn Shape and invoking erased methods are outside the current IR lowering",
+      "test": "native_backend_compiles_and_runs_dyn_trait",
+      "risk": "high",
+      "plannedResolution": "migrate only after describe and boxed receiver ownership have a shared typed representation"
+    },
+    {
+      "source": "examples/native_trait_defaults.ostrin",
+      "function": "describe",
+      "reason": "dynamic-trait-default-method",
+      "blockedBy": "default trait methods invoked through dyn Named need erased receiver dispatch",
+      "test": "native_trait_defaults_are_lowered_to_ir",
+      "risk": "high",
+      "plannedResolution": "extend the trait-object ABI to default-method vtable entries with explicit receiver ownership"
+    },
+    {
+      "source": "examples/native_trait_defaults.ostrin",
+      "function": "main",
+      "reason": "dynamic-trait-default-method",
+      "blockedBy": "main constructs concrete and generic values consumed through dyn Named",
+      "test": "native_trait_defaults_are_lowered_to_ir",
+      "risk": "high",
+      "plannedResolution": "migrate after generic boxing, default dispatch and destructor paths are covered"
+    }
+  ]
+}

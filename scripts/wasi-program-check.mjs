@@ -56,6 +56,42 @@ const programs = [
     expected: "nested\ninner none\nok\nnested error\nnested\nouter fallback\nok\nok fallback\nnested\n",
   },
   {
+    name: "managed_enum_result_error",
+    source: "compiler/tests/fixtures/managed_enum_result_error.ostrin",
+    args: ["managed_enum_result_error.wasm"],
+    expected: "ok payload\nno payload\n",
+  },
+  {
+    name: "managed_enum_phi",
+    source: "compiler/tests/fixtures/managed_enum_phi.ostrin",
+    args: ["managed_enum_phi.wasm"],
+    expected: "first payload\nsecond payload\n",
+  },
+  {
+    name: "managed_enum_loop_phi",
+    source: "compiler/tests/fixtures/managed_enum_loop_phi.ostrin",
+    args: ["managed_enum_loop_phi.wasm"],
+    expected: "first payload\n",
+  },
+  {
+    name: "managed_enum_closure_capture",
+    source: "compiler/tests/fixtures/managed_enum_closure_capture.ostrin",
+    args: ["managed_enum_closure_capture.wasm"],
+    expected: "closure payload\n",
+  },
+  {
+    name: "managed_enum_task_capture",
+    source: "compiler/tests/fixtures/managed_enum_task_capture.ostrin",
+    args: ["managed_enum_task_capture.wasm"],
+    expected: "task payload\n",
+  },
+  {
+    name: "managed_enum_task_cancel",
+    source: "compiler/tests/fixtures/managed_enum_task_cancel.ostrin",
+    args: ["managed_enum_task_cancel.wasm"],
+    expected: "true\nfalse\n",
+  },
+  {
     name: "csv_parse",
     source: "examples/csv_parse.ostrin",
     args: ["csv_parse.wasm"],
@@ -78,6 +114,12 @@ const programs = [
     source: "examples/native_ir_function_values.ostrin",
     args: ["native_ir_function_values.wasm"],
     expected: "5\n10\n",
+  },
+  {
+    name: "native_function_values",
+    source: "examples/native_function_values.ostrin",
+    args: ["native_function_values.wasm"],
+    expected: "6\n15\n8\n49\n7\n16\n12\n23\n12\nhola mundo\naccion\n408\n2.5\nh1\n6\n",
   },
   {
     name: "native_ir_try_captured_handler",

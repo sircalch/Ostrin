@@ -1,0 +1,11 @@
+record Catalog {
+    tags: Set<String>
+}
+
+fn main() -> Void {
+    catalog = Catalog { tags: {"a", "b"} }
+    catalog.tags.add("c")
+    print(catalog.tags.contains("c"))
+    print(catalog.tags.count())
+    drop(catalog)
+}

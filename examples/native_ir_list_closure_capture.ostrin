@@ -1,0 +1,6 @@
+fn main() -> Void {
+    values = ["a", "b"]
+    reader = fn() { values.join(",") }
+    print(reader())
+    drop(reader)
+}

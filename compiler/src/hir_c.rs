@@ -292,8 +292,17 @@ impl Emitter<'_> {
             Ty::Named(name) if self.world.records.contains_key(name) => {
                 Some(format!("ostrin_retain((void*)({access}))"))
             }
+            Ty::Named(name) if self.world.enums.contains(name) => {
+                Some(format!("ostrin_retain_enum_{name}({access})"))
+            }
             Ty::Applied(..) if self.world.applied_records.contains_key(&ty.describe()) => {
                 Some(format!("ostrin_retain((void*)({access}))"))
+            }
+            Ty::Applied(..) if self.world.applied_enums.contains_key(&ty.describe()) => {
+                Some(format!(
+                    "ostrin_retain_enum_{}({access})",
+                    self.world.applied_enums[&ty.describe()]
+                ))
             }
             Ty::Applied(name, args) if name == "Option" && args.len() == 1 => self
                 .retain_managed_value(&format!("({access}).value"), &args[0])
@@ -315,8 +324,35 @@ impl Emitter<'_> {
     }
 
     fn release_managed_value(&self, access: &str, ty: &Ty) -> Option<String> {
-        self.retain_managed_value(access, ty)
-            .map(|body| body.replace("ostrin_retain", "ostrin_release"))
+        match ty {
+            Ty::Named(name) if self.world.enums.contains(name) => {
+                Some(format!("ostrin_drop_enum_{name}({access})"))
+            }
+            Ty::Applied(..) if self.world.applied_enums.contains_key(&ty.describe()) => {
+                Some(format!(
+                    "ostrin_drop_enum_{}({access})",
+                    self.world.applied_enums[&ty.describe()]
+                ))
+            }
+            Ty::Applied(name, args) if name == "Option" && args.len() == 1 => self
+                .release_managed_value(&format!("({access}).value"), &args[0])
+                .map(|body| format!("if (({access}).has) {{ {body}; }}")),
+            Ty::Applied(name, args) if name == "Result" && args.len() == 2 => {
+                let ok = self.release_managed_value(&format!("({access}).value"), &args[0]);
+                let err = self.release_managed_value(&format!("({access}).error"), &args[1]);
+                match (ok, err) {
+                    (Some(ok), Some(err)) => {
+                        Some(format!("if (({access}).ok) {{ {ok}; }} else {{ {err}; }}"))
+                    }
+                    (Some(ok), None) => Some(format!("if (({access}).ok) {{ {ok}; }}")),
+                    (None, Some(err)) => Some(format!("if (!({access}).ok) {{ {err}; }}")),
+                    (None, None) => None,
+                }
+            }
+            _ => self
+                .retain_managed_value(access, ty)
+                .map(|body| body.replace("ostrin_retain", "ostrin_release")),
+        }
     }
 
     fn borrowed_expr(expr: &HirExpr) -> bool {
@@ -324,6 +360,17 @@ impl Emitter<'_> {
             expr.kind,
             HirKind::Local(_) | HirKind::Field(..) | HirKind::Index(..)
         )
+    }
+
+    fn contains_enum(&self, ty: &Ty) -> bool {
+        match ty {
+            Ty::Named(name) => self.world.enums.contains(name),
+            Ty::Applied(..) if self.world.applied_enums.contains_key(&ty.describe()) => true,
+            Ty::Applied(name, args) if name == "Option" || name == "Result" => {
+                args.iter().any(|arg| self.contains_enum(arg))
+            }
+            _ => false,
+        }
     }
 
     fn owned_record_literal(expr: &HirExpr) -> bool {
@@ -1382,7 +1429,9 @@ impl Emitter<'_> {
                 let mut codes = Vec::with_capacity(args.len());
                 for arg in args {
                     let code = self.expr(&arg.value)?;
-                    if Self::owned_record_literal(&arg.value) {
+                    if (Self::owned_record_literal(&arg.value) || self.contains_enum(&arg.value.ty))
+                        && !Self::borrowed_expr(&arg.value)
+                    {
                         let temp = self.next_temp();
                         let cty = self.c_type(&arg.value.ty)?;
                         setup.push_str(&format!("{cty} {temp} = {code}; "));

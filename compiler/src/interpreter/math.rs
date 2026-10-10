@@ -1,6 +1,7 @@
 //! Elementary math functions on `Float`, `Float32` and (elementwise) `Array`s:
 //! `sin cos tan asin acos atan sinh cosh tanh exp ln log10 sqrt floor ceil
-//! round abs pow atan2 pi`. The result type always equals the argument type;
+//! round abs is_finite pow atan2 pi`. The result type always equals the argument type,
+//! except `is_finite`, which returns `Bool`;
 //! `Int` is never converted implicitly (the checker asks for `x as Float`).
 
 use super::{array, detmath, RuntimeError, Value};
@@ -9,7 +10,7 @@ use super::{array, detmath, RuntimeError, Value};
 pub fn is_math(name: &str, arity: usize) -> bool {
     match arity {
         0 => name == "pi",
-        1 => UNARY.contains(&name) || name == "abs",
+        1 => UNARY.contains(&name) || matches!(name, "abs" | "is_finite"),
         2 => matches!(name, "pow" | "atan2"),
         _ => false,
     }
@@ -59,6 +60,8 @@ fn unary(name: &str, value: &Value) -> Result<Value, RuntimeError> {
     match value {
         Value::Float(x) if name == "abs" => Ok(Value::Float(x.abs())),
         Value::F32(x) if name == "abs" => Ok(Value::F32(x.abs())),
+        Value::Float(x) if name == "is_finite" => Ok(Value::Bool(x.is_finite())),
+        Value::F32(x) if name == "is_finite" => Ok(Value::Bool(x.is_finite())),
         Value::Int(n) if name == "abs" => n.checked_abs().map(Value::Int).ok_or_else(|| {
             RuntimeError::Error("integer overflow: abs of the smallest Int".to_string())
         }),

@@ -46,3 +46,17 @@ jobs:
           # the default local smoke run, on every supported host.
           OSTRIN_FUZZ_SEEDS: "8"
         run: cargo test --manifest-path compiler/Cargo.toml --test examples generated_ -- --test-threads=1
+      - name: Set up Node.js for scientific validation tooling
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Validate numerical algorithms with residuals
+        run: node scripts/numeric-validation.mjs > numeric-validation-report.json
+      - name: Test numerical validation tolerances
+        run: node --test scripts/numeric-validation.test.mjs
+      - name: Upload numerical validation report
+        uses: actions/upload-artifact@v4
+        with:
+          name: numeric-validation-${{ matrix.os }}
+          path: numeric-validation-report.json
+          if-no-files-found: error

@@ -4,6 +4,59 @@
 
 ### Compiler fallback reduction
 
+- Lowered captured and named function values stored in `List<fn(...)>` and
+  function-valued record fields through IR/C. Function signatures now produce
+  distinct collection type names; the full example matches interpreter output
+  and passes native `--leak-check` with `live_allocations=0`. The measured AST
+  fallback ratchet drops from 17 to 16.
+- Added an analytic residual-validation harness for LU, Cholesky, QR, SVD and
+  symmetric eigenpairs. The independent checker computes reconstruction,
+  orthogonality, solve backward error and reference-solution error from the
+  full-precision factors printed by Ostrin; it runs against interpreter and native
+  outputs with per-case absolute/relative tolerances and a native zero-leak gate.
+
+- Generalized executable experiment replay with `experiment-replay.mjs --all`.
+  CI now discovers every registered R1/R2 bundle instead of keeping a hand-maintained
+  fixture list; all 11 current input-driven bundles replay and prove changed-input
+  sensitivity in WASI.
+- Made the reproducibility boundary explicit in every runtime snapshot: byte equality
+  applies only to the recorded CI replay configuration; cross-platform numeric equivalence
+  is neither performed nor claimed. The design specifies per-metric absolute/relative
+  tolerances, units, reference method and input domain before such comparisons can be made.
+
+- Fixed HIR ownership for fresh managed enums passed through function arguments,
+  including enums nested in `Option`/`Result`. The typed enum retain/drop
+  dispatch now releases the active payload after the call. A shared
+  `Result<Message, String>` regression covers `Ok`/`Err`, early return,
+  interpreter/native parity, `live_allocations=0` and actual WASI execution. The
+  286-example Windows suite passes. The full 282-example suite passed under ASan
+  and UBSan before this IR/Phi increment; the focused managed-enum Phi regression
+  passes under both sanitizers.
+- Added a typed IR/C path for managed enum values selected by a branch `Phi`.
+  The `Message::Text(String)` fixture proves all three functions use IR, preserves
+  interpreter/native parity, ends with `live_allocations=0`, and runs in the
+  18-program WASI smoke matrix. This slice does not generalize to recursive payloads,
+  other closure/task captures, or arbitrary managed enum joins.
+- Extended the tested enum ownership slice to a loop-carried `Phi` that replaces
+  the managed payload repeatedly. The regression forces IR for all three functions,
+  matches interpreter output, and reports zero live allocations; the fixture emits
+  tag-directed retain/drop helpers for WASI C. Focused ASan and UBSan runs pass.
+- Added by-value managed enum closure capture to the IR/C ownership path. The
+  regression verifies that the closure environment retains and drops the enum,
+  that the closure call matches the interpreter, and that native leak-check ends
+  at zero allocations. The WASI C emission test requires the typed enum ownership
+  helpers; focused ASan and UBSan runs pass.
+- Added managed enum capture to deferred tasks with `join`. The regression checks
+  task environment destruction, interpreter/native parity, zero native allocations,
+  cooperative scheduling, `--native-threads`, WASI C ownership helpers, ASan and
+  UBSan. All 18 WASI smoke programs now compile and execute, including this task case.
+- Linked wasi-libc's separate `libsetjmp` archive when building WASI targets. This
+  fixes SJLJ helper resolution for programs that compile cooperative task cancellation;
+  the pinned-SDK 19-program matrix passes.
+- Added an ownership regression for cancelling a task while its deferred environment
+  captures `Message::Text(String)`. Interpreter and cooperative native output agree;
+  cooperative and native-thread backends both finish with `live_allocations=0`, and
+  the fixture is included in the executable WASI matrix.
 - Added a native/WASI regression for dynamic `Quantity` unit labels that escape
   through either branch of an `if`/`Phi`. Interpreter parity and native
   `--leak-check` confirm both selected values remain valid after their source
@@ -22,6 +75,43 @@
   `Quantity`: IR and legacy record destructors now release unit labels with
   `ostrin_qty_release`. A native/WASI regression checks field extraction after
   construction and zero live allocations.
+- Lowered `Option<Quantity<D>>` through IR/C, including `Some`/`None` control flow
+  and `match` extraction. Interpreter/native output agrees, WASI C emits typed
+  quantity ownership, and native `--leak-check` reports `live_allocations=0`.
+- Lowered `Result<Quantity<D>, String>` through IR/C for both `Ok` and `Err`;
+  matching and error-string cleanup preserve interpreter parity and finish with
+  zero native live allocations. WASI C includes typed quantity ownership too.
+- Extended the wrapper matrix to `Result<Option<Quantity<D>>, String>`: the IR
+  path handles `Some`, `None` and `Err`, and a forced legacy AST build also
+  preserves interpreter output with `live_allocations=0`. Fixed AST ownership
+  for fresh quantity-array operands, scalar results borrowed from quantity
+  arrays, and statement-match scrutinees so cleanup does not leak or invalidate
+  escaping unit labels. This verifies native behavior and WASI C emission; it
+  does not claim execution under WASI or local sanitizer coverage.
+- Fixed a native leak when a collection owns an enum with a managed payload.
+  Generated tag-directed retain/drop dispatch now handles aliases and releases
+  only the active variant's managed fields. The HIR regression covers insertion,
+  removal, use after collection destruction, interpreter parity, and
+  `live_allocations=0`; WASI C emission includes both typed dispatchers. A second
+  regression covers enum field initialization, reassignment, and access after
+  record destruction. A third stress case builds 64 enum values in a loop,
+  traverses them after the loop and releases the collection. All three preserve
+  parity and report zero live allocations. General `Phi`, error, closure, task,
+  recursive-payload and IR ownership remain explicit matrix limitations.
+- Tightened `quantity_arrays.ostrin` from a permissive leak ceiling to an exact
+  zero-allocation requirement after its full native example; the current binary
+  reports `live_allocations=0`, including escaped scalar and list labels.
+- Enabled dimension-specialized IR/C instances for `Figure.unit_line` and
+  `Figure.unit_scatter`. `viz_units.ostrin` now reports `ir=1, hir=0, ast=0`,
+  preserves interpreter/native SVG parity, emits the calls and typed quantity
+  retain/release helpers for WASI C, and exits native `--leak-check` with
+  `live_allocations=0`. ASan/UBSan CI evidence and list-based quantity plots
+  remain open; the migration does not claim general plot ownership is complete.
+- After the typed Quantity plot migration, the enum ownership audit moves two
+  managed-payload functions back to the verified legacy path. The current
+  measured baseline is **6,955 HIR/IR-generated functions (6,909 IR + 46 HIR) / 17 AST**;
+  retaining those fallbacks keeps dynamic Quantity labels and managed enum
+  payloads out of scalar-only IR until ownership is represented there.
 
 - Moved the global `parse_int(String)` builtin through the same checked IR/C result helper
   as `String.to_int()`. `stdlib_io.ostrin` now compiles with `ir=1, hir=0, ast=0`, and
@@ -122,6 +212,10 @@
   `std.measurements` API, its interpreter/native parity evidence, and its
   explicit boundary before `Array<Measurement<T>>`, Quantity integration,
   covariance, and Monte Carlo support.
+- The scalar Measurement integration now asserts native `live_allocations=0`
+  and recursive WASI C destructors for `Measurement<Float>`, `Sensitivity`,
+  source lists and owned labels. The native sanitizer workflow runs this test;
+  its result for the current unpushed work remains pending.
 
 ### Scalar generic method prepass
 

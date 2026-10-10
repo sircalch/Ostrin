@@ -129,7 +129,46 @@ ningún caso especial en el runtime. Requieren al menos dos muestras.
   El tipo paramétrico `Array<Complex>`, las descomposiciones complejas y las matrices dispersas
   siguen pendientes.
 
-## 4. Hallazgos del compilador
+## 4. Validación numérica con residuales
+
+La regresión exacta de texto sigue siendo útil para diagnósticos y formatos. Para medir la calidad
+numérica se añade una compuerta separada en [`validation/numeric/matrix_algorithms.json`](../../validation/numeric/matrix_algorithms.json), ejecutada por
+[`scripts/numeric-validation.mjs`](../../scripts/numeric-validation.mjs). El fixture Ostrin entrega
+factores y soluciones a precisión completa; JavaScript calcula los residuales de forma independiente,
+sin ser una dependencia del compilador ni del runtime.
+
+La matriz inicial cubre cinco algoritmos en el intérprete y en C nativo:
+
+| Algoritmo | Referencia | Métricas independientes |
+| --- | --- | --- |
+| LU con pivoteo parcial | `A x = b` con solución analítica y filas permutadas | error de solución, residuo absoluto y relativo hacia atrás, `P A − L U`, estructura triangular |
+| Cholesky | `A x = b` para una matriz SPD y solución analítica | error de solución, residuo absoluto y relativo hacia atrás, `A − L Lᵀ`, pivotes positivos y estructura triangular |
+| QR fino | matriz rectangular de rango completo | `A − Q R`, `QᵀQ − I`, `R` triangular superior |
+| SVD fina | valores singulares analíticos de una matriz pequeña | `A − UΣVᵀ`, ortogonalidad de `U`/`V`, orden y valores singulares |
+| Autovalores simétricos | autovalores analíticos `1` y `3` | `A V − V Λ`, ortogonalidad y orden ascendente |
+
+Cada caso declara tolerancias absoluta y relativa; para los sistemas lineales se normaliza el residuo
+con `||A||F ||x||2 + ||b||2`, y para factorizaciones se usa la norma Frobenius relativa a `||A||F`.
+Las tolerancias están acotadas a estos casos pequeños y bien condicionados: no constituyen una
+garantía universal ni sustituyen pruebas de convergencia o análisis de condicionamiento para problemas
+grandes. Además de validar cada backend contra la referencia analítica, la compuerta compara las
+hojas numéricas de los informes de intérprete y nativo con una tolerancia explícita independiente;
+la ejecución actual compara 60 valores y obtiene diferencia máxima cero. La compuerta también exige
+`live_allocations=0` en el ejecutable nativo. CI la ejecuta en
+Linux, macOS y Windows, y conserva `numeric-validation-report.json` como artefacto por plataforma;
+los resultados por plataforma no deben compararse como bitwise. Cuando corre en GitHub Actions,
+el JSON añade `ci.run_url`, `ci.run_id`, commit y workflow para enlazar la evidencia exacta de la
+ejecución sin convertir un resultado local en evidencia CI.
+
+Para ejecutar localmente:
+
+```text
+cargo build --manifest-path compiler/Cargo.toml
+node scripts/numeric-validation.mjs
+node --test scripts/numeric-validation.test.mjs
+```
+
+## 5. Hallazgos del compilador
 
 - En C, los argumentos recién creados que se pasaban a clausuras (`f(t, array([...]))`) no se
   liberaban: 2 891 asignaciones vivas en `numeric_methods`. `gen_closure_call` usa ahora la misma ruta
@@ -144,7 +183,7 @@ retorno (y `f(t) as min` fallaba con E1026). El checker recorre ahora `Array`, `
 y tipos función para enlazar `X`, y una segunda aparición con otra dimensión es E1042
 (`examples/unit_generic_errors.ostrin`).
 
-## 5. Límites y siguientes pasos
+## 6. Límites y siguientes pasos
 
 | Pendiente | Nota |
 |---|---|

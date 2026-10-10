@@ -1,0 +1,15 @@
+enum Message {
+    Text(String)
+    Empty
+}
+
+fn main() -> Void {
+    spawn_scope {
+        message = Text("cancelled task payload")
+        worker = spawn {
+            message
+        }
+        print(worker.cancel())
+        print(worker.cancel())
+    }
+}

@@ -1,0 +1,30 @@
+enum Message {
+    Text(String)
+    Empty
+}
+
+fn build(flag: Bool) -> Result<Message, String> {
+    if flag {
+        return Ok(Text("ok" + " payload"))
+    }
+    Err("no" + " payload")
+}
+
+fn show(message: Message) -> Void {
+    match message {
+        Text(text) => print(text),
+        Empty => print("empty"),
+    }
+}
+
+fn show_result(result: Result<Message, String>) -> Void {
+    match result {
+        Ok(message) => show(message),
+        Err(error) => print(error),
+    }
+}
+
+fn main() -> Void {
+    show_result(build(true))
+    show_result(build(false))
+}

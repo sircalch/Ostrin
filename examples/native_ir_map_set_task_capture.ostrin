@@ -1,0 +1,8 @@
+fn main() -> Void {
+    scores: Map<String, Int> = ["a": 1, "b": 2]
+    tags: Set<String> = {"a", "b"}
+    task = spawn {
+        print(scores.count() + tags.count())
+    }
+    task.join()
+}

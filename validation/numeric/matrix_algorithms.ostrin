@@ -1,0 +1,99 @@
+import std.numeric
+
+fn emit_matrix(value: Array<Float>) -> Void {
+    rows = value.shape()[0]
+    columns = value.shape()[1]
+    for i in 0 until rows {
+        for j in 0 until columns {
+            print(value.get(i, j))
+        }
+    }
+}
+
+fn emit_vector(value: Array<Float>) -> Void {
+    for i in 0 until value.length() {
+        print(value[i])
+    }
+}
+
+fn emit_int_vector(value: Array<Int>) -> Void {
+    for i in 0 until value.length() {
+        print(value[i])
+    }
+}
+
+fn main() -> Void {
+    lu_a = array([
+        [0.3, 1.2, -0.7],
+        [1.1, -0.2, 0.4],
+        [0.5, 0.9, 1.3]
+    ])
+    lu_b = array([-1.925, 2.325, 2.55])
+    match numeric.lu(lu_a) {
+        Ok(factors) => {
+            emit_vector(factors.solve(lu_b))
+            emit_matrix(factors.l)
+            emit_matrix(factors.u)
+            emit_int_vector(factors.p)
+        },
+        Err(message) => print("lu_error=" + message),
+    }
+
+    chol_a = array([
+        [4.2, 1.1, 0.3],
+        [1.1, 3.7, 0.8],
+        [0.3, 0.8, 2.6]
+    ])
+    chol_b = array([2.5, -2.41, 4.14])
+    match numeric.cholesky(chol_a) {
+        Ok(factors) => {
+            emit_vector(factors.solve(chol_b))
+            emit_matrix(factors.l)
+        },
+        Err(message) => print("cholesky_error=" + message),
+    }
+
+    qr_a = array([
+        [1.2, -0.7],
+        [0.3, 2.1],
+        [1.1, 0.4]
+    ])
+    match numeric.qr(qr_a) {
+        Ok(factors) => {
+            emit_matrix(factors.q)
+            emit_matrix(factors.r)
+        },
+        Err(message) => print("qr_error=" + message),
+    }
+
+    svd_a = array([
+        [3.0, 1.0],
+        [0.0, 2.0],
+        [0.0, 0.0]
+    ])
+    match numeric.svd(svd_a) {
+        Ok(factors) => {
+            emit_matrix(factors.u)
+            emit_vector(factors.s)
+            emit_matrix(factors.vt)
+        },
+        Err(message) => print("svd_error=" + message),
+    }
+
+    eigen_a = array([[2.0, 1.0], [1.0, 2.0]])
+    match numeric.eigen(eigen_a) {
+        Ok(factors) => {
+            emit_vector(factors.values)
+            emit_matrix(factors.vectors)
+        },
+        Err(message) => print("eigen_error=" + message),
+    }
+
+    drop(lu_a)
+    drop(lu_b)
+    drop(chol_a)
+    drop(chol_b)
+    drop(qr_a)
+    drop(svd_a)
+    drop(eigen_a)
+}

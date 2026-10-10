@@ -9,6 +9,7 @@
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -346,20 +347,50 @@ export function runtimeSnapshotFor(root = repositoryRoot, sourcePath = "") {
   const compilerLockfile = path.join(root, "compiler", "Cargo.lock");
   const projectManifest = ancestorProjectFile(root, sourcePath, "ostrin.toml");
   const projectLockfile = ancestorProjectFile(root, sourcePath, "ostrin.lock");
-  return {
+  const host = process.env.OSTRIN_CAPTURE_HOST === "1" ? {
+    schema: "ostrin.host/v1",
+    source: "github-actions",
+    runner_os: process.env.RUNNER_OS ?? "unknown",
+    runner_arch: process.env.RUNNER_ARCH ?? "unknown",
+    runner_environment: process.env.RUNNER_ENVIRONMENT ?? "unknown",
+    image: {
+      os: process.env.ImageOS ?? "unknown",
+      version: process.env.ImageVersion ?? "unknown",
+    },
+    node: process.version,
+    hardware: {
+      arch: process.arch,
+      cpu_count: os.cpus().length,
+      endianness: os.endianness(),
+    },
+    wasi: "preview1",
+    captured: true,
+  } : undefined;
+  const snapshot = {
     schema: "ostrin.runtime/v1",
     status: "partial",
     target: "wasm32-wasip1",
     wasi: "preview1",
     runner: "WASI host",
     compiler_lockfile: runtimeFile(root, compilerLockfile),
+    dependencies: {
+      compiler_lockfile: runtimeFile(root, compilerLockfile),
+      project_manifest: runtimeFile(root, projectManifest),
+      project_lockfile: runtimeFile(root, projectLockfile),
+    },
+    scheduler: {
+      mode: "single-threaded-wasi-replay",
+      concurrency: "not used by gallery fixture",
+      status: "declared",
+    },
+    ...(host ? { host } : {}),
     project: {
       manifest: runtimeFile(root, projectManifest),
       lockfile: runtimeFile(root, projectLockfile),
     },
     platform_policy: {
-      output: "target-specific; byte exact only when the replay gate verifies it",
-      numeric: "tolerances must be declared for cross-platform comparisons",
+      output: "byte equality is verified only against the recorded figure in the CI replay configuration; this is not a cross-platform guarantee",
+      numeric: "cross-platform numerical comparison is not performed or claimed; before comparing, declare absolute and relative tolerances per metric with units, reference method, and applicable input domain; no universal epsilon is assumed",
     },
     missing: [
       "input snapshots",
@@ -367,6 +398,54 @@ export function runtimeSnapshotFor(root = repositoryRoot, sourcePath = "") {
       "captured host and hardware metadata",
     ],
   };
+  if (host) snapshot.missing = snapshot.missing.filter((item) => item !== "captured host and hardware metadata");
+  return snapshot;
+}
+
+const effectReports = new Map();
+
+function compilerEffectSummary(root, sourcePath) {
+  const key = `${root}:${sourcePath}`;
+  if (effectReports.has(key)) return effectReports.get(key);
+  const extension = process.platform === "win32" ? ".exe" : "";
+  let compiler = path.join(root, "compiler", "target", "release", `ostrinc${extension}`);
+  if (!existsSync(compiler)) {
+    execFileSync("cargo", ["build", "--release", "--manifest-path", path.join(root, "compiler", "Cargo.toml"), "--bin", "ostrinc"], {
+      cwd: root,
+      stdio: "pipe",
+      windowsHide: true,
+    });
+  }
+  if (!existsSync(compiler)) throw new Error("release compiler binary is missing after cargo build");
+  const raw = execFileSync(compiler, ["--effect-report", "--json", path.join(root, sourcePath)], {
+    cwd: root,
+    encoding: "utf8",
+    windowsHide: true,
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  const report = JSON.parse(raw.trim());
+  if (report.schema !== "ostrin.effect-report/v0" || !Array.isArray(report.effects)
+    || !report.function_effects || typeof report.function_effects !== "object") {
+    throw new Error(`unexpected compiler effect report for ${sourcePath}`);
+  }
+  const summary = {
+    schema: report.schema,
+    status: "captured",
+    source: "ostrinc --effect-report --json",
+    experimental: report.experimental === true,
+    conservative: report.conservative === true,
+    kinds: [...new Set(report.effects)].sort(),
+    entry: "main",
+    functions: Object.fromEntries(Object.entries(report.function_effects)
+      .sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)
+      .map(([name, kinds]) => [name, [...new Set(kinds)].sort()])),
+    analyzer: ["compiler/src/effects.rs", "compiler/src/main.rs"].map((relativePath) => ({
+      path: relativePath,
+      sha256: sha256(normalizedText(root, relativePath)),
+    })),
+  };
+  effectReports.set(key, summary);
+  return summary;
 }
 
 function fixtureCommit(root, fixture) {
@@ -493,10 +572,21 @@ function provenanceFor(root, fixture, files, manifest) {
   const metadata = metadataForFixture(fixture.id, root);
   const reproducibility = reproducibilityFor(inputs);
   const randomness = seededRandomnessEvidence(root, source, inputs);
+  const effects = compilerEffectSummary(root, fixture.sourcePath);
+  const execution = inputs.execution ?? {
+    mode: "recorded-parameters",
+    input_file: "data.json",
+    consumes: Object.keys(inputs.parameters ?? {}).map((key) => `parameters.${key}`),
+    capabilities: [],
+    command: "node scripts/lab-data.mjs --verify-replays",
+    target: "wasm32-wasip1",
+    wasi: "preview1",
+    status: "verified-in-ci",
+  };
   const runtime = runtimeSnapshotFor(root, fixture.sourcePath);
-  if (inputs.execution?.snapshot) {
+  if (execution.snapshot) {
     runtime.input_snapshots = [{
-      ...inputs.execution.snapshot,
+      ...execution.snapshot,
       sha256: metadata.dataHash,
     }];
     runtime.missing = runtime.missing.filter((item) => item !== "input snapshots");
@@ -527,10 +617,10 @@ function provenanceFor(root, fixture, files, manifest) {
     },
     inputs: [{
       id: "data.json",
-      kind: inputs.execution?.snapshot ? "external-snapshot" : "parameters",
+      kind: execution.snapshot ? "external-snapshot" : "parameters",
       sha256: metadata.dataHash,
       seed: inputs.seed,
-      ...(inputs.execution?.snapshot ? { snapshot: inputs.execution.snapshot } : {}),
+      ...(execution.snapshot ? { snapshot: execution.snapshot } : {}),
     }],
     outputs: [{
       id: "figure.svg",
@@ -568,15 +658,16 @@ function provenanceFor(root, fixture, files, manifest) {
     ...(inputs.camera ? { camera: inputs.camera } : {}),
     seed: inputs.seed,
     ...(randomness ? { randomness } : {}),
-    ...(inputs.execution ? { execution: inputs.execution } : {}),
+    execution,
+    effects,
     manifest_schema: manifest.schema,
     limits: reproducibility.level === "R2" && randomness
-      ? "R2 external snapshot replay and the seeded xoshiro256** sensitivity contract are verified in website CI. The bundle does not include complete runtime captures or an R3 auditable artifact guarantee."
+      ? "R2 external snapshot replay and the seeded xoshiro256** sensitivity contract are verified in website CI. Compiler effects are captured by the experimental conservative analyzer; host capture and a complete R3 auditable artifact guarantee remain pending."
       : reproducibility.level === "R2"
-      ? "R2 external snapshot replay is verified in website CI for the embedded data.json, declared filesystem capability and parameter sensitivity. The bundle does not include complete runtime captures or an R3 auditable artifact guarantee."
+      ? "R2 external snapshot replay is verified in website CI for the embedded data.json, declared filesystem capability and parameter sensitivity. Compiler effects are captured by the experimental conservative analyzer; host capture and a complete R3 auditable artifact guarantee remain pending."
       : reproducibility.level === "R1"
-      ? "R1 seeded replay is verified in website CI for the declared seed and algorithm contract. The bundle does not include external snapshots, lockfile contents, complete runtime captures or an R2/R3 replay guarantee."
-      : "R0 exact SVG replay is verified in website CI. The bundle does not include seeded-randomness evidence for R1, external snapshots, lockfile contents, complete runtime captures or an R2/R3 replay guarantee.",
+      ? "R1 seeded replay is verified in website CI for the declared seed and algorithm contract. Compiler effects are captured by the experimental conservative analyzer; host capture, external snapshots and complete R2/R3 guarantees remain pending."
+      : "R0 exact SVG replay is verified in website CI. Compiler effects are captured by the experimental conservative analyzer; host capture, seeded-randomness evidence for R1, external snapshots and complete R2/R3 guarantees remain pending.",
   };
 }
 
@@ -656,6 +747,11 @@ export function verifyExperimentBundle(bundle, { expected, fixtureId } = {}) {
   let provenanceFile;
   try { provenanceFile = JSON.parse(files?.["provenance.json"] ?? "null"); } catch { provenanceFile = null; }
   if (JSON.stringify(bundle?.provenance) !== JSON.stringify(provenanceFile)) errors.push("provenance.json is not the embedded provenance object");
+  const effects = bundle?.provenance?.effects;
+  if (effects?.schema !== "ostrin.effect-report/v0" || effects?.status !== "captured"
+    || !Array.isArray(effects?.kinds) || !effects?.functions || typeof effects.functions !== "object") {
+    errors.push("provenance effects capture is missing or malformed");
+  }
   const replay = bundle?.provenance?.replay;
   const replayNote = maturity?.level === "R2"
     ? /embedded data\.json snapshot under its declared filesystem capability/.test(replay?.note ?? "")
@@ -778,6 +874,15 @@ function fixtureArgument(argv) {
 }
 
 function main() {
+  if (process.argv.includes("--write-all")) {
+    for (const fixtureId of Object.keys(experimentFixtures)) {
+      const target = outputPathFor(fixtureId);
+      mkdirSync(path.dirname(target), { recursive: true });
+      writeFileSync(target, expectedText(fixtureId), "utf8");
+    }
+    console.log(`experiment-bundle: wrote ${Object.keys(experimentFixtures).length} fixtures`);
+    return;
+  }
   const fixtureId = fixtureArgument(process.argv.slice(2));
   const target = outputPathFor(fixtureId);
   if (process.argv.includes("--write")) {

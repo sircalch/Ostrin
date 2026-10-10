@@ -20,6 +20,7 @@ function requireText(text, marker, label) {
 
 const release = read(".github/workflows/release.yml");
 const wasi = read(".github/workflows/wasi.yml");
+const compiler = read("compiler/src/main.rs");
 for (const target of [
   "x86_64-unknown-linux-gnu",
   "aarch64-apple-darwin",
@@ -35,17 +36,17 @@ for (const marker of ["safe_ref=", "matrix.target", "archive=\"$name.tar.gz\"", 
 }
 for (const marker of [
   "scripts/wasi-program-check.mjs",
-  "wasi_io_contract.wasm",
-  "native_ir_file_io.wasm",
-  "native_ir_managed_consumers.wasm",
-  "native_ir_nested_wrappers.wasm",
-  "native_ir_function_values.wasm",
-  "sha256sum dist/ostrinc.wasm dist/hello.wasm dist/pkg_project.wasm dist/wasi_io_contract.wasm",
-  "dist/native_ir_managed_consumers.wasm dist/native_ir_nested_wrappers.wasm dist/native_ir_function_values.wasm > dist/SHA256SUMS",
-  "native_ir_managed_consumers.wasm native_ir_nested_wrappers.wasm native_ir_function_values.wasm SHA256SUMS README.txt",
+  "all 20 entries from scripts/wasi-program-check.mjs",
+  "sha256sum ./*.wasm > SHA256SUMS",
+  "tar -czf ../ostrinc-wasm32-wasip1.tar.gz ./*.wasm SHA256SUMS README.txt",
 ]) {
   requireText(wasi, marker, "WASI program matrix");
 }
+requireText(compiler, 'command.arg("-lsetjmp")', "WASI setjmp link support");
+requireText(release, "scripts/v0.2-readiness-check.mjs", "v0.2 release gate");
+requireText(release, "if: startsWith(github.ref, 'refs/tags/v0.2.')", "v0.2 release tag guard");
+read("docs/release-readiness-v0.2.json");
+read("scripts/v0.2-readiness-check.mjs");
 
 const shell = read("scripts/install.sh");
 for (const marker of [

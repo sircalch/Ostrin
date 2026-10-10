@@ -1,0 +1,11 @@
+fn main() -> Void {
+    scores: Map<String, Int> = ["a": 1, "b": 2]
+    tags: Set<String> = {"a", "b"}
+    reader = fn() {
+        scores.count() + tags.count()
+    }
+    print(reader())
+    drop(reader)
+    drop(scores)
+    drop(tags)
+}

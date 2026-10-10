@@ -4,9 +4,54 @@
 //! It records syntactic evidence so the compiler can expose a first inventory
 //! before effect rows become part of HIR and function signatures.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::ast::{Arg, Block, Expr, FunctionDecl, ImplDecl, Item, MatchArm, Pattern, Stmt};
+
+/// Typed internal effect labels. The public syntax remains intentionally unset;
+/// this enum gives later HIR/IR propagation a stable vocabulary.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum EffectKind {
+    Clock,
+    Concurrency,
+    Io,
+    Measurement,
+    Network,
+    Provenance,
+    RandomSeed,
+    Unsafe,
+    Unknown(String),
+}
+
+impl EffectKind {
+    pub fn parse(label: &str) -> Self {
+        match label {
+            "clock" => Self::Clock,
+            "concurrency" => Self::Concurrency,
+            "io" => Self::Io,
+            "measurement" => Self::Measurement,
+            "network" => Self::Network,
+            "provenance" => Self::Provenance,
+            "random(seed)" => Self::RandomSeed,
+            "unsafe" => Self::Unsafe,
+            other => Self::Unknown(other.to_string()),
+        }
+    }
+
+    pub fn label(&self) -> &str {
+        match self {
+            Self::Clock => "clock",
+            Self::Concurrency => "concurrency",
+            Self::Io => "io",
+            Self::Measurement => "measurement",
+            Self::Network => "network",
+            Self::Provenance => "provenance",
+            Self::RandomSeed => "random(seed)",
+            Self::Unsafe => "unsafe",
+            Self::Unknown(label) => label,
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EffectSite {
@@ -21,6 +66,11 @@ pub struct EffectSite {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct EffectReport {
     pub effects: BTreeSet<String>,
+    /// Typed labels retained for the future HIR/IR effect row.
+    pub kinds: BTreeSet<EffectKind>,
+    /// Direct per-function effect rows, kept separate from the global inventory.
+    pub function_kinds: BTreeMap<String, BTreeSet<EffectKind>>,
+    pub function_calls: BTreeMap<String, BTreeSet<String>>,
     pub sites: Vec<EffectSite>,
 }
 
@@ -47,6 +97,7 @@ pub fn analyze(items: &[Item]) -> EffectReport {
             _ => {}
         }
     }
+    propagate_function_effects(&mut report);
     report.sort_sites();
     report
 }
@@ -123,8 +174,13 @@ fn walk_expr(expr: &Expr, function: &str, file: Option<&str>, report: &mut Effec
         Expr::Located(inner, _) => walk_expr(inner, function, file, report),
         Expr::Call(callee, args) | Expr::GenericCall(callee, _, args) => {
             if let Some(operation) = expression_path(callee) {
+                report
+                    .function_calls
+                    .entry(function.to_string())
+                    .or_default()
+                    .insert(operation.clone());
                 if let Some(effect) = classify(&operation) {
-                    report.effects.insert(effect.to_string());
+                    add_effect(report, function, effect);
                     report.sites.push(EffectSite {
                         effect: effect.to_string(),
                         operation,
@@ -314,7 +370,7 @@ fn record(
     line: usize,
     col: usize,
 ) {
-    report.effects.insert(effect.to_string());
+    add_effect(report, function, effect);
     report.sites.push(EffectSite {
         effect: effect.to_string(),
         operation: operation.to_string(),
@@ -323,6 +379,44 @@ fn record(
         line,
         col,
     });
+}
+
+fn add_effect(report: &mut EffectReport, function: &str, effect: &str) {
+    let kind = EffectKind::parse(effect);
+    report.effects.insert(effect.to_string());
+    report.kinds.insert(kind.clone());
+    report
+        .function_kinds
+        .entry(function.to_string())
+        .or_default()
+        .insert(kind);
+}
+
+fn propagate_function_effects(report: &mut EffectReport) {
+    loop {
+        let mut changed = false;
+        let callers: Vec<(String, BTreeSet<String>)> = report
+            .function_calls
+            .iter()
+            .map(|(caller, callees)| (caller.clone(), callees.clone()))
+            .collect();
+        for (caller, callees) in callers {
+            let inherited: Vec<EffectKind> = callees
+                .iter()
+                .filter_map(|callee| report.function_kinds.get(callee))
+                .flat_map(|effects| effects.iter().cloned())
+                .collect();
+            let row = report.function_kinds.entry(caller).or_default();
+            for effect in inherited {
+                changed |= row.insert(effect.clone());
+                report.kinds.insert(effect.clone());
+                report.effects.insert(effect.label().to_string());
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
 }
 
 pub fn effect_description(effect: &str) -> &'static str {

@@ -456,7 +456,7 @@ function exportInteractiveHtml(source, title, fraction = 0) {
     '<button type="button" id="crosshair" aria-pressed="false">Enable crosshair</button>',
     '<span class="status" id="status" aria-live="polite">Drag to pan · scroll to zoom · hover a mark to inspect values.</span>',
     "</div>",
-    '<div class="viewport" id="viewport" tabindex="0" aria-label="Interactive figure viewport"><div class="art" id="art">',
+    '<div class="viewport" id="viewport" tabindex="0" aria-label="' + safeTitle + ' plot viewport"><div class="art" id="art">',
     staticSource,
     "</div></div>",
     "<script>",
@@ -777,8 +777,8 @@ async function exportAnimatedGif(source, duration, title, loops = 1, scale = 1) 
 let dialog;
 function explorer() {
   if (dialog) return dialog;
-  const frame = el("iframe", { className: "viz-frame-live", sandbox: "allow-same-origin", title: "Interactive figure" });
-  const heading = el("h2", { className: "viz-dialog-title" });
+  const frame = el("iframe", { className: "viz-frame-live", sandbox: "allow-same-origin", title: "Interactive figure plot" });
+  const heading = el("h2", { id: "viz-explorer-title", className: "viz-dialog-title" });
   const zoomLabel = el("output", { className: "viz-zoom", text: "100%" });
   const animationLabel = el("output", { className: "viz-animation-time", text: "0%" });
   const animationSlider = el("input", { type: "range", className: "viz-animation-slider", min: "0", max: "1000", value: "0", step: "1", "aria-label": "Animation position" });
@@ -1496,7 +1496,7 @@ function explorer() {
     parameterTools.hidden = parameters.length === 0;
     parameterStatus.textContent = parameters.length ? "Parameters are evaluated by Ostrin." : "";
   };
-  const node = el("dialog", { className: "viz-dialog", "aria-label": "Figure explorer" }, [
+  const node = el("dialog", { className: "viz-dialog", "aria-labelledby": "viz-explorer-title" }, [
     el("div", { className: "viz-dialog-bar" }, [
       heading,
       el("div", { className: "viz-dialog-tools" }, [
@@ -1623,6 +1623,7 @@ function explorer() {
   dialog = {
     open(title, text, camera = null) {
       heading.textContent = title;
+      frame.title = `${title} plot`;
       svg = text;
       zoom = 100;
       cameraSource = camera?.source ?? "";
@@ -1669,7 +1670,7 @@ function explorer() {
 }
 
 function card(figure) {
-  const image = el("img", { className: "viz-image", src: figure.svg, alt: `${figure.title}: SVG produced by the Ostrin program ${figure.source}`, loading: "lazy", decoding: "async" });
+  const image = el("img", { className: "viz-image", src: figure.svg, alt: `${figure.title}: ${figure.blurb} Source: ${figure.source}`, loading: "lazy", decoding: "async" });
   const printed = el("pre", { className: "viz-printed", text: figure.printed.join("\n") });
   const recordedProvenance = figure.provenance && Object.keys(figure.provenance).length
     ? {

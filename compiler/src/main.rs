@@ -291,6 +291,9 @@ fn real_main() -> ExitCode {
                 println!("ir-generated: {}", report.ir_generated);
                 println!("hir-generated: {}", report.hir_generated);
                 println!("ast-fallback: {}", report.ast_fallback);
+                for function in &report.ast_fallback_functions {
+                    println!("ast-fallback-function: {function}");
+                }
                 for (source, counts) in &report.native_by_source {
                     println!(
                         "native-source: {source} ir={} hir={} ast={}",
@@ -339,6 +342,11 @@ fn real_main() -> ExitCode {
                     "experimental": true,
                     "conservative": true,
                     "effects": report.effects,
+                    "effect_kinds": report.kinds.iter().map(|kind| kind.label()).collect::<Vec<_>>(),
+                    "function_effects": report.function_kinds.iter().map(|(function, kinds)| (
+                        function.clone(), kinds.iter().map(|kind| kind.label()).collect::<Vec<_>>()
+                    )).collect::<std::collections::BTreeMap<_, _>>(),
+                    "function_calls": report.function_calls,
                     "sites": sites,
                 })
             );
@@ -787,6 +795,11 @@ fn run_codegen(
         command.arg("--target=wasm32-wasip1");
         command.arg("-Werror=shift-count-overflow");
         command.args(["-mllvm", "-wasm-enable-sjlj"]);
+        // wasi-libc ships the WebAssembly setjmp/longjmp implementation in
+        // its own archive, separate from libc. SJLJ lowering emits references
+        // to these helpers, so WASI programs that use task cancellation must
+        // link it explicitly.
+        command.arg("-lsetjmp");
         if let Ok(sysroot) = env::var("OSTRIN_WASI_SYSROOT") {
             command.arg(format!("--sysroot={sysroot}"));
         }

@@ -18,6 +18,8 @@ const publicPages = [
   "./roadmap.html",
   "./showcase.html",
   "./viz.html",
+  "./workflow.html",
+  "./status.html",
 ];
 
 async function expectNoHorizontalOverflow(page, route, width) {
@@ -175,6 +177,42 @@ test("all public pages fit phone and tablet viewports", async ({ page }) => {
       await expectNoHorizontalOverflow(page, route, width);
     }
   }
+});
+
+test("public pages expose baseline accessible names", async ({ page }) => {
+  const issues = [];
+  for (const route of publicPages) {
+    await page.goto(route, { waitUntil: "networkidle" });
+    const pageIssues = await page.evaluate(() => {
+      const isVisible = (node) => {
+        if (!(node instanceof HTMLElement)) return true;
+        const style = window.getComputedStyle(node);
+        return !node.hidden && style.display !== "none" && style.visibility !== "hidden";
+      };
+      const labelledBy = (node) => (node.getAttribute("aria-labelledby") ?? "")
+        .split(/\s+/).filter(Boolean).map((id) => document.getElementById(id)?.textContent ?? "").join(" ");
+      const labelFor = (node) => node.id
+        ? [...document.querySelectorAll(`label[for="${CSS.escape(node.id)}"]`)].map((label) => label.textContent ?? "").join(" ")
+        : "";
+      const nameOf = (node) => [
+        node.getAttribute("aria-label"), labelledBy(node), node.getAttribute("title"), labelFor(node),
+        node.tagName === "IMG" ? node.getAttribute("alt") : null, node.textContent,
+      ].find((value) => value?.trim())?.trim() ?? "";
+      const missing = [];
+      for (const node of document.querySelectorAll("a[href], button, input, select, textarea, [role=button], [role=tab]")) {
+        if (isVisible(node) && !nameOf(node)) missing.push(`${node.tagName.toLowerCase()}#${node.id || "(no-id)"}`);
+      }
+      for (const node of document.querySelectorAll("img")) {
+        if (isVisible(node) && !node.hasAttribute("alt")) missing.push(`img#${node.id || "(no-id)"} missing alt`);
+      }
+      for (const node of document.querySelectorAll("iframe")) {
+        if (isVisible(node) && !nameOf(node)) missing.push(`iframe#${node.id || "(no-id)"} missing title`);
+      }
+      return missing;
+    });
+    for (const issue of pageIssues) issues.push(`${route}: ${issue}`);
+  }
+  expect(issues).toEqual([]);
 });
 
 test("benchmark page renders the recorded workload report", async ({ page }) => {
@@ -682,6 +720,58 @@ test("Viz exposes the recorded 3D surface experiment bundle", async ({ page }) =
   expect(lines.provenance.replay.level).toBe("R2");
 });
 
+test("Viz figures expose scientific summaries and named explorer controls", async ({ page }, testInfo) => {
+  const runtimeErrors = [];
+  page.on("pageerror", (error) => runtimeErrors.push(error.message));
+  page.on("console", (message) => {
+    const text = message.text();
+    const expectedSandboxBlock = /^Blocked script execution in 'about:(?:blank|srcdoc)' because the document's frame is sandboxed and the 'allow-scripts' permission is not set\.$/.test(text);
+    if (message.type() === "error" && !expectedSandboxBlock) runtimeErrors.push(text);
+  });
+  await page.goto("./viz.html", { waitUntil: "domcontentloaded" });
+  await expect(page).toHaveURL(/\/Ostrin\/viz\.html$/);
+  await expect(page).toHaveTitle(/Ostrin/);
+  await expect(page.getByRole("main")).toBeVisible();
+  await expect(page.locator("vite-error-overlay, .nextjs-portal, #webpack-dev-server-client-overlay")).toHaveCount(0);
+  const figures = page.locator(".viz-card");
+  await expect(figures).toHaveCount(29);
+
+  const missingSummaries = await figures.evaluateAll((cards) => cards.flatMap((card) => {
+    const title = card.querySelector("h3")?.textContent?.trim() ?? "";
+    const summary = card.querySelector(".muted")?.textContent?.trim() ?? "";
+    const image = card.querySelector("img.viz-image");
+    return !image?.alt.includes(title) || !image?.alt.includes(summary) ? [title || card.id] : [];
+  }));
+  expect(missingSummaries, "every plotted image should expose its scientific summary").toEqual([]);
+
+  const figure = page.locator("#viz-lines");
+  const title = (await figure.locator("h3").textContent()).trim();
+  await figure.getByRole("button", { name: "Explore" }).click();
+  const dialog = page.getByRole("dialog", { name: title });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator("iframe")).toHaveAttribute("title", `${title} plot`);
+  await page.screenshot({ path: testInfo.outputPath("viz-explorer-accessibility.png"), fullPage: false });
+
+  await dialog.getByRole("button", { name: "Close" }).click();
+  const surface = page.locator("#viz-surface");
+  const surfaceTitle = (await surface.locator("h3").textContent()).trim();
+  await surface.getByRole("button", { name: "Explore" }).click();
+  const surfaceDialog = page.getByRole("dialog", { name: surfaceTitle });
+  await expect(surfaceDialog.getByRole("slider", { name: "3D camera azimuth" })).toBeVisible();
+  await expect(surfaceDialog.getByRole("slider", { name: "3D camera elevation" })).toBeVisible();
+  await expect(surfaceDialog.locator(".viz-camera-status")).toHaveAttribute("aria-live", "polite");
+
+  await surfaceDialog.getByRole("button", { name: "Close" }).click();
+  const animation = page.locator("#viz-double-pendulum");
+  const animationTitle = (await animation.locator("h3").textContent()).trim();
+  await animation.getByRole("button", { name: "Explore" }).click();
+  const animationDialog = page.getByRole("dialog", { name: animationTitle });
+  await expect(animationDialog.getByRole("slider", { name: "Animation position" })).toBeVisible();
+  await expect(animationDialog.getByRole("button", { name: "Pause" })).toBeVisible();
+  await expect(animationDialog.locator(".viz-animation-status")).toHaveAttribute("aria-live", "polite");
+  expect(runtimeErrors).toEqual([]);
+});
+
 test("Viz exposes the input-driven seeded R2 experiment bundles", async ({ page }) => {
   await page.goto("./viz.html", { waitUntil: "domcontentloaded" });
   await expect(page.locator('[data-viz-bundle="histogram"]')).toBeVisible();
@@ -885,4 +975,32 @@ test("Featured Viz workflows select source-backed paths", async ({ page }) => {
   await expect(page.locator('[data-viz-workflow="simulate"]')).toHaveAttribute("data-active", "true");
   await expect(page.locator('[data-viz-workflow="analyze"]')).toHaveAttribute("data-active", "false");
   await expect(page.locator(".viz-workflow-selection")).toHaveText(/Simulate a system selected/);
+});
+
+test("flagship scientific workflow connects source, figure and evidence", async ({ page }) => {
+  await page.goto("./workflow.html", { waitUntil: "domcontentloaded" });
+  await expect(page).toHaveTitle(/Scientific Workflow/);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(/From equation/);
+  await expect(page.getByRole("link", { name: /Read the Ostrin source/ })).toHaveAttribute(
+    "href",
+    /github\.com\/sircalch\/Ostrin\/blob\/main\/examples\/viz_ode\.ostrin$/,
+  );
+  await expect(page.locator('img[alt^="Two-panel figure"]')).toBeVisible();
+  await expect(page.getByRole("link", { name: /Open the live ODE explorer/ })).toHaveAttribute(
+    "href",
+    "viz.html?figure=ode",
+  );
+  await expect(page.locator(".workflow-extension")).toHaveCount(3);
+});
+
+test("public status dashboard exposes separate evidence dimensions", async ({ page }) => {
+  await page.goto("./status.html", { waitUntil: "networkidle" });
+  await expect(page).toHaveTitle(/Status — Evidence Scorecard/);
+  await expect(page.locator("[data-status-backend] .status-metric")).toHaveCount(4);
+  await expect(page.locator("[data-status-backend] .status-metric-value").first()).toHaveText("6,948");
+  await expect(page.locator("[data-status-reproducibility] .status-metric-value").last()).toHaveText("0");
+  await expect(page.locator("[data-status-linguist] .status-metric-value").first()).toHaveText("0");
+  await expect(page.locator("[data-status-linguist] .status-metric-value").nth(2)).toHaveText("PENDING");
+  await expect(page.locator(".status-release strong")).toHaveText("NOT_READY");
+  await expect(page.locator(".status-criterion.open")).not.toHaveCount(0);
 });

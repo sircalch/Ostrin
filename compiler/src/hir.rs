@@ -8,7 +8,7 @@
 //! Fields no consumer reads yet are part of the contract, hence `dead_code` is allowed.
 #![allow(dead_code)]
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fmt::Write as _;
 
 use crate::ast::*;
@@ -51,6 +51,8 @@ pub struct HirFunction {
     pub ret: Ty,
     pub body: HirBlock,
     pub source_file: Option<String>,
+    /// Conservative effect row propagated from the source inventory.
+    pub effects: BTreeSet<String>,
 }
 
 /// Gives impl methods a collision-free HIR name when a generic record/enum
@@ -660,6 +662,7 @@ fn normalize_variant(fields: &[Option<String>], args: Vec<HirArg>) -> Vec<HirArg
 
 /// Builds the HIR of every function, method and trait default body.
 pub fn lower<'a>(items: &'a [Item], typed: &'a TypedProgram) -> HirProgram {
+    let effect_report = crate::effects::analyze(items);
     let mut signatures = Signatures {
         functions: Default::default(),
         methods: Default::default(),
@@ -753,6 +756,12 @@ pub fn lower<'a>(items: &'a [Item], typed: &'a TypedProgram) -> HirProgram {
             lowerer.local_types.insert(p.name.clone(), ty);
         }
         let body = lowerer.block(body);
+        let effects = effect_report
+            .function_kinds
+            .get(&name)
+            .into_iter()
+            .flat_map(|kinds| kinds.iter().map(|kind| kind.label().to_string()))
+            .collect();
         HirFunction {
             name,
             generics: generics.iter().map(|g| g.name.clone()).collect(),
@@ -772,6 +781,7 @@ pub fn lower<'a>(items: &'a [Item], typed: &'a TypedProgram) -> HirProgram {
             ret: resolve_declared_type(return_type, owner_type),
             body,
             source_file,
+            effects,
         }
     };
     for item in items {
@@ -949,6 +959,7 @@ pub fn specialize_function(function: &HirFunction, subst: &HashMap<String, Ty>) 
         ret: specialize_ty(&function.ret, subst),
         body: specialize_block(&function.body, subst),
         source_file: function.source_file.clone(),
+        effects: function.effects.clone(),
     }
 }
 
@@ -1641,6 +1652,13 @@ pub fn dump(program: &HirProgram) -> String {
             params.join(", "),
             f.ret.describe()
         );
+        if !f.effects.is_empty() {
+            let _ = writeln!(
+                out,
+                "  effects: {}",
+                f.effects.iter().cloned().collect::<Vec<_>>().join(", ")
+            );
+        }
         dump_block(&f.body, 1, &mut out);
         out.push('\n');
     }

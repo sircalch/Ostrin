@@ -63,6 +63,8 @@ pub struct IrFunction {
     /// stay attached to their owner so a closure's capture ValueIds keep the
     /// same SSA namespace as the `ClosureMake` instruction that creates it.
     pub closures: Vec<IrClosure>,
+    /// Effect row carried through the typed native boundary.
+    pub effects: std::collections::BTreeSet<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -348,6 +350,7 @@ impl Builder {
                 entry: 0,
                 blocks: vec![entry],
                 closures: Vec::new(),
+                effects: function.effects.clone(),
             },
             current: 0,
             next_value: 0,
@@ -539,6 +542,7 @@ impl Builder {
             ret: (**ret).clone(),
             body: body.clone(),
             source_file: Some(self.function.name.clone()),
+            effects: self.function.effects.clone(),
         };
         let body_ir = lower_function(
             &child,
@@ -3281,6 +3285,18 @@ pub fn dump(program: &IrProgram) -> String {
             function.name,
             function.ret.describe()
         );
+        if !function.effects.is_empty() {
+            let _ = writeln!(
+                out,
+                "  effects: {}",
+                function
+                    .effects
+                    .iter()
+                    .cloned()
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
+        }
         for block in &function.blocks {
             let _ = writeln!(out, "bb{}:", block.id);
             for instruction in &block.instructions {

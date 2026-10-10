@@ -52,6 +52,8 @@ export function validateProjectPlan(root = repositoryRoot) {
   const linguistUsage = read("docs/linguist-usage.md", root);
   const websiteAudit = read("docs/website-audit.md", root);
   const viz = read("website/viz.html", root);
+  const ownershipMatrix = read("docs/ownership-matrix.md", root);
+  const reproduction = read("README-reproduce.md", root);
 
   for (const [name, text] of [
     ["ESTADO_Y_PLAN.md", status],
@@ -59,7 +61,66 @@ export function validateProjectPlan(root = repositoryRoot) {
     ["docs/design/20-hir-y-ir.md", design],
     ["CHANGELOG.md", changelog],
     ["compiler/tests/differential.rs", differential],
+    ["docs/ownership-matrix.md", ownershipMatrix],
+    ["README-reproduce.md", reproduction],
   ]) check(errors, Boolean(text), `${name}: missing or empty`);
+
+  const ownershipTypes = [
+    "String",
+    "Record concreto no recursivo",
+    "Enum con payload gestionado",
+    "List<T>",
+    "Map<K,V>",
+    "Set<T>",
+    "Array<T>",
+    "Quantity<D> con etiqueta dinámica",
+    "Measurement<T>",
+    "Option<T> con payload gestionado",
+    "Result<T,E> con payload gestionado",
+    "Closure con entorno",
+    "Task<T>",
+    "Channel<T>",
+    "Iterator con estado gestionado",
+    "Agregado anidado (`List`/wrapper/record)",
+    "Record recursivo",
+  ];
+  const matrixRows = ownershipMatrix.split("\n")
+    .filter((line) => line.startsWith("|") && !line.includes("---"))
+    .map((line) => line.split("|").slice(1, -1).map((cell) => cell.trim()))
+    .filter((cells) => cells.length === 17 && cells[0] !== "Tipo gestionado");
+  const matrixHeader = ownershipMatrix.split("\n")
+    .find((line) => line.startsWith("| Tipo gestionado |"))
+    ?.split("|").slice(1, -1).map((cell) => cell.trim()) ?? [];
+  const expectedContexts = [
+    "Construcción", "Copia/alias", "Argumento", "Retorno", "Campo", "Colección",
+    "Rama", "Loop", "Phi", "Error", "Captura closure", "Captura tarea",
+    "Destrucción", "Nativo", "WASI",
+  ];
+  check(errors, matrixHeader.length === 17
+    && matrixHeader[0] === "Tipo gestionado"
+    && matrixHeader.slice(1, 16).every((context, index) => context === expectedContexts[index]),
+  "docs/ownership-matrix.md: the 15 ownership contexts must match the required matrix columns");
+  check(errors, /construction|construcción/i.test(ownershipMatrix)
+    && /KNOWN LIMITATION/.test(ownershipMatrix)
+    && /TESTED/.test(ownershipMatrix)
+    && /SUPPORTED/.test(ownershipMatrix)
+    && /NOT APPLICABLE/.test(ownershipMatrix),
+  "docs/ownership-matrix.md: status legend or ownership contexts are incomplete");
+  check(errors, matrixRows.length === ownershipTypes.length,
+    `docs/ownership-matrix.md: expected ${ownershipTypes.length} typed ownership rows, found ${matrixRows.length}`);
+  const rowNames = matrixRows.map((cells) => cells[0].replaceAll("`", ""));
+  for (const type of ownershipTypes) {
+    check(errors, rowNames.includes(type.replaceAll("`", "")),
+      `docs/ownership-matrix.md: missing ownership row ${type}`);
+  }
+  for (const cells of matrixRows) {
+    check(errors, cells.slice(1, 16).every((status) => ["T", "S", "A", "K"].includes(status)),
+      `docs/ownership-matrix.md: ${cells[0]} must assign one valid state to each of 15 contexts`);
+    check(errors, Boolean(cells[16]),
+      `docs/ownership-matrix.md: ${cells[0]} must include evidence or a known boundary`);
+  }
+  check(errors, status.includes("docs/ownership-matrix.md") && roadmap.includes("docs/ownership-matrix.md"),
+    "ESTADO_Y_PLAN.md and ROADMAP.md must link the ownership matrix");
 
   const baseline = sourceBaseline(differential);
   check(errors, baseline !== null,
@@ -82,22 +143,24 @@ export function validateProjectPlan(root = repositoryRoot) {
       "ROADMAP.md: native IR/HIR/AST inventory drifted from the ratchet source");
   }
 
-  const quantityFallback = (text) => text.includes("Figure.unit_line")
+  const quantityPlotIr = (text) => text.includes("Figure.unit_line")
     && text.includes("unit_scatter")
-    && /(?:fallback\s+HIR\/AST|HIR\/AST\s+fallback)/i.test(text)
-    && /ownership/i.test(text);
+    && /IR\/C/.test(text)
+    && /WASI/i.test(text)
+    && /(?:live_allocations=0|cero\s+(?:fugas|allocations vivas))/i.test(text)
+    && /paridad|parity|SVG diferencial|SVG differential/i.test(text);
   for (const [name, text] of [
     ["ESTADO_Y_PLAN.md", status],
     ["ROADMAP.md", roadmap],
     ["docs/design/20-hir-y-ir.md", design],
     ["CHANGELOG.md", changelog],
-  ]) check(errors, quantityFallback(text),
-    `${name}: must preserve the Quantity visualization ownership boundary`);
+  ]) check(errors, quantityPlotIr(text),
+    `${name}: must report evidence for IR Quantity visualization and ownership`);
 
-  check(errors, /generic quantity plotting instantiations[\s\S]{0,180}remain[\s\S]{0,180}fallback/i.test(differential),
-    "compiler/tests/differential.rs: missing explicit generic Quantity plotting fallback boundary");
-  check(errors, !/generic quantity plotting instantiations now lower through IR\/C/i.test(differential),
-    "compiler/tests/differential.rs: stale claim says generic Quantity plotting is already IR/C");
+  check(errors, /generic quantity plotting instantiations[\s\S]{0,220}now lower through IR\/C/i.test(differential),
+    "compiler/tests/differential.rs: must document the tested generic Quantity plot IR migration");
+  check(errors, !/generic quantity plotting instantiations[\s\S]{0,180}remain[\s\S]{0,180}fallback/i.test(differential),
+    "compiler/tests/differential.rs: stale claim keeps generic Quantity plotting on fallback");
 
   check(errors, /todavía no aparece como lenguaje oficial/i.test(linguist),
     "docs/linguist.md: must state that upstream Linguist recognition is not yet accepted");
@@ -112,6 +175,11 @@ export function validateProjectPlan(root = repositoryRoot) {
   }
   check(errors, /R0/.test(websiteAudit) && /R1/.test(websiteAudit) && /source-backed/i.test(websiteAudit),
     "docs/website-audit.md: reproducibility maturity and source-backed evidence are missing");
+  check(errors, /scripts\/numeric-validation\.mjs/.test(reproduction)
+    && /scripts\/experiment-replay\.mjs --all/.test(reproduction)
+    && /R0/.test(reproduction) && /R1/.test(reproduction) && /R2/.test(reproduction) && /R3/.test(reproduction)
+    && /OSTRIN_CAPTURE_HOST=1/.test(reproduction),
+  "README-reproduce.md: reproduction commands, R0-R3 levels and CI host contract are incomplete");
 
   return { errors, baseline };
 }

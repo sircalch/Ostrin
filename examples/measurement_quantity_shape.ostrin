@@ -1,0 +1,16 @@
+import std.measurements
+
+fn wrap<D: Dimension>(value: Quantity<D>) -> Measurement<Quantity<D>> {
+    Measurement {
+        value: value,
+        sources: [],
+        known: true,
+        reason: "",
+    }
+}
+
+fn main() -> Void {
+    measured = wrap(12.0 m)
+    print(measured.value)
+    print(measured.known)
+}

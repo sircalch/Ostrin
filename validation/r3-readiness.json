@@ -1,0 +1,430 @@
+{
+  "schema": "ostrin.r3-readiness/v1",
+  "status": "OPEN",
+  "requiredFields": [
+    "provenance.commit",
+    "provenance.compiler",
+    "provenance.target",
+    "provenance.runtime.schema",
+    "provenance.runtime.target",
+    "provenance.runtime.compiler_lockfile",
+    "provenance.inputs",
+    "provenance.outputs",
+    "provenance.parameters",
+    "provenance.execution",
+    "provenance.figure_metadata"
+  ],
+  "bundleCount": 29,
+  "baseReadyCount": 29,
+  "extensionReadyCount": 0,
+  "readyCount": 0,
+  "openCount": 29,
+  "entries": [
+    {
+      "file": "website/assets/experiments/animation.ostrin-experiment.json",
+      "id": "animation",
+      "currentLevel": "R0",
+      "status": "OPEN",
+      "requiredFields": {
+        "missing": []
+      },
+      "r3Extensions": {
+        "missing": [
+          "provenance.runtime.host"
+        ]
+      }
+    },
+    {
+      "file": "website/assets/experiments/bars.ostrin-experiment.json",
+      "id": "bars",
+      "currentLevel": "R2",
+      "status": "OPEN",
+      "requiredFields": {
+        "missing": []
+      },
+      "r3Extensions": {
+        "missing": [
+          "provenance.runtime.host"
+        ]
+      }
+    },
+    {
+      "file": "website/assets/experiments/boxplot.ostrin-experiment.json",
+      "id": "boxplot",
+      "currentLevel": "R2",
+      "status": "OPEN",
+      "requiredFields": {
+        "missing": []
+      },
+      "r3Extensions": {
+        "missing": [
+          "provenance.runtime.host"
+        ]
+      }
+    },
+    {
+      "file": "website/assets/experiments/contourf.ostrin-experiment.json",
+      "id": "contourf",
+      "currentLevel": "R0",
+      "status": "OPEN",
+      "requiredFields": {
+        "missing": []
+      },
+      "r3Extensions": {
+        "missing": [
+          "provenance.runtime.host"
+        ]
+      }
+    },
+    {
+      "file": "website/assets/experiments/dashboard.ostrin-experiment.json",
+      "id": "dashboard",
+      "currentLevel": "R2",
+      "status": "OPEN",
+      "requiredFields": {
+        "missing": []
+      },
+      "r3Extensions": {
+        "missing": [
+          "provenance.runtime.host"
+        ]
+      }
+    },
+    {
+      "file": "website/assets/experiments/double-pendulum.ostrin-experiment.json",
+      "id": "double-pendulum",
+      "currentLevel": "R0",
+      "status": "OPEN",
+      "requiredFields": {
+        "missing": []
+      },
+      "r3Extensions": {
+        "missing": [
+          "provenance.runtime.host"
+        ]
+      }
+    },
+    {
+      "file": "website/assets/experiments/fft.ostrin-experiment.json",
+      "id": "fft",
+      "currentLevel": "R2",
+      "status": "OPEN",
+      "requiredFields": {
+        "missing": []
+      },
+      "r3Extensions": {
+        "missing": [
+          "provenance.runtime.host"
+        ]
+      }
+    },
+    {
+      "file": "website/assets/experiments/heatmap.ostrin-experiment.json",
+      "id": "heatmap",
+      "currentLevel": "R0",
+      "status": "OPEN",
+      "requiredFields": {
+        "missing": []
+      },
+      "r3Extensions": {
+        "missing": [
+          "provenance.runtime.host"
+        ]
+      }
+    },
+    {
+      "file": "website/assets/experiments/hexbin.ostrin-experiment.json",
+      "id": "hexbin",
+      "currentLevel": "R2",
+      "status": "OPEN",
+      "requiredFields": {
+        "missing": []
+      },
+      "r3Extensions": {
+        "missing": [
+          "provenance.runtime.host"
+        ]
+      }
+    },
+    {
+      "file": "website/assets/experiments/histogram.ostrin-experiment.json",
+      "id": "histogram",
+      "currentLevel": "R2",
+      "status": "OPEN",
+      "requiredFields": {
+        "missing": []
+      },
+      "r3Extensions": {
+        "missing": [
+          "provenance.runtime.host"
+        ]
+      }
+    },
+    {
+      "file": "website/assets/experiments/isosurface.ostrin-experiment.json",
+      "id": "isosurface",
+      "currentLevel": "R0",
+      "status": "OPEN",
+      "requiredFields": {
+        "missing": []
+      },
+      "r3Extensions": {
+        "missing": [
+          "provenance.runtime.host"
+        ]
+      }
+    },
+    {
+      "file": "website/assets/experiments/lines.ostrin-experiment.json",
+      "id": "lines",
+      "currentLevel": "R2",
+      "status": "OPEN",
+      "requiredFields": {
+        "missing": []
+      },
+      "r3Extensions": {
+        "missing": [
+          "provenance.runtime.host"
+        ]
+      }
+    },
+    {
+      "file": "website/assets/experiments/linked-data.ostrin-experiment.json",
+      "id": "linked-data",
+      "currentLevel": "R0",
+      "status": "OPEN",
+      "requiredFields": {
+        "missing": []
+      },
+      "r3Extensions": {
+        "missing": [
+          "provenance.runtime.host"
+        ]
+      }
+    },
+    {
+      "file": "website/assets/experiments/lorenz.ostrin-experiment.json",
+      "id": "lorenz",
+      "currentLevel": "R0",
+      "status": "OPEN",
+      "requiredFields": {
+        "missing": []
+      },
+      "r3Extensions": {
+        "missing": [
+          "provenance.runtime.host"
+        ]
+      }
+    },
+    {
+      "file": "website/assets/experiments/ode.ostrin-experiment.json",
+      "id": "ode",
+      "currentLevel": "R0",
+      "status": "OPEN",
+      "requiredFields": {
+        "missing": []
+      },
+      "r3Extensions": {
+        "missing": [
+          "provenance.runtime.host"
+        ]
+      }
+    },
+    {
+      "file": "website/assets/experiments/orbits.ostrin-experiment.json",
+      "id": "orbits",
+      "currentLevel": "R0",
+      "status": "OPEN",
+      "requiredFields": {
+        "missing": []
+      },
+      "r3Extensions": {
+        "missing": [
+          "provenance.runtime.host"
+        ]
+      }
+    },
+    {
+      "file": "website/assets/experiments/point-cloud.ostrin-experiment.json",
+      "id": "point-cloud",
+      "currentLevel": "R2",
+      "status": "OPEN",
+      "requiredFields": {
+        "missing": []
+      },
+      "r3Extensions": {
+        "missing": [
+          "provenance.runtime.host"
+        ]
+      }
+    },
+    {
+      "file": "website/assets/experiments/provenance.ostrin-experiment.json",
+      "id": "provenance",
+      "currentLevel": "R0",
+      "status": "OPEN",
+      "requiredFields": {
+        "missing": []
+      },
+      "r3Extensions": {
+        "missing": [
+          "provenance.runtime.host"
+        ]
+      }
+    },
+    {
+      "file": "website/assets/experiments/quiver.ostrin-experiment.json",
+      "id": "quiver",
+      "currentLevel": "R0",
+      "status": "OPEN",
+      "requiredFields": {
+        "missing": []
+      },
+      "r3Extensions": {
+        "missing": [
+          "provenance.runtime.host"
+        ]
+      }
+    },
+    {
+      "file": "website/assets/experiments/scatter-fit.ostrin-experiment.json",
+      "id": "scatter-fit",
+      "currentLevel": "R2",
+      "status": "OPEN",
+      "requiredFields": {
+        "missing": []
+      },
+      "r3Extensions": {
+        "missing": [
+          "provenance.runtime.host"
+        ]
+      }
+    },
+    {
+      "file": "website/assets/experiments/spline.ostrin-experiment.json",
+      "id": "spline",
+      "currentLevel": "R0",
+      "status": "OPEN",
+      "requiredFields": {
+        "missing": []
+      },
+      "r3Extensions": {
+        "missing": [
+          "provenance.runtime.host"
+        ]
+      }
+    },
+    {
+      "file": "website/assets/experiments/streamplot.ostrin-experiment.json",
+      "id": "streamplot",
+      "currentLevel": "R0",
+      "status": "OPEN",
+      "requiredFields": {
+        "missing": []
+      },
+      "r3Extensions": {
+        "missing": [
+          "provenance.runtime.host"
+        ]
+      }
+    },
+    {
+      "file": "website/assets/experiments/string.ostrin-experiment.json",
+      "id": "string",
+      "currentLevel": "R0",
+      "status": "OPEN",
+      "requiredFields": {
+        "missing": []
+      },
+      "r3Extensions": {
+        "missing": [
+          "provenance.runtime.host"
+        ]
+      }
+    },
+    {
+      "file": "website/assets/experiments/surface.ostrin-experiment.json",
+      "id": "surface",
+      "currentLevel": "R2",
+      "status": "OPEN",
+      "requiredFields": {
+        "missing": []
+      },
+      "r3Extensions": {
+        "missing": [
+          "provenance.runtime.host"
+        ]
+      }
+    },
+    {
+      "file": "website/assets/experiments/table.ostrin-experiment.json",
+      "id": "table",
+      "currentLevel": "R0",
+      "status": "OPEN",
+      "requiredFields": {
+        "missing": []
+      },
+      "r3Extensions": {
+        "missing": [
+          "provenance.runtime.host"
+        ]
+      }
+    },
+    {
+      "file": "website/assets/experiments/units.ostrin-experiment.json",
+      "id": "units",
+      "currentLevel": "R0",
+      "status": "OPEN",
+      "requiredFields": {
+        "missing": []
+      },
+      "r3Extensions": {
+        "missing": [
+          "provenance.runtime.host"
+        ]
+      }
+    },
+    {
+      "file": "website/assets/experiments/vector-field.ostrin-experiment.json",
+      "id": "vector-field",
+      "currentLevel": "R0",
+      "status": "OPEN",
+      "requiredFields": {
+        "missing": []
+      },
+      "r3Extensions": {
+        "missing": [
+          "provenance.runtime.host"
+        ]
+      }
+    },
+    {
+      "file": "website/assets/experiments/violin.ostrin-experiment.json",
+      "id": "violin",
+      "currentLevel": "R2",
+      "status": "OPEN",
+      "requiredFields": {
+        "missing": []
+      },
+      "r3Extensions": {
+        "missing": [
+          "provenance.runtime.host"
+        ]
+      }
+    },
+    {
+      "file": "website/assets/experiments/volume-slices.ostrin-experiment.json",
+      "id": "volume-slices",
+      "currentLevel": "R0",
+      "status": "OPEN",
+      "requiredFields": {
+        "missing": []
+      },
+      "r3Extensions": {
+        "missing": [
+          "provenance.runtime.host"
+        ]
+      }
+    }
+  ]
+}

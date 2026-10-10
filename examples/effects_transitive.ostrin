@@ -1,0 +1,7 @@
+fn emit_marker() -> Void {
+    print("effect")
+}
+
+fn main() -> Void {
+    emit_marker()
+}

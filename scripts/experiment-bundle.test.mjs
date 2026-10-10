@@ -29,6 +29,10 @@ test("the v0 experiment bundle has calculated hashes and an explicit maturity bo
   assert.equal(bundle.provenance.runtime.status, "partial");
   assert.equal(bundle.provenance.runtime.target, "wasm32-wasip1");
   assert.equal(bundle.provenance.runtime.wasi, "preview1");
+  assert.deepEqual(bundle.provenance.runtime.platform_policy, {
+    output: "byte equality is verified only against the recorded figure in the CI replay configuration; this is not a cross-platform guarantee",
+    numeric: "cross-platform numerical comparison is not performed or claimed; before comparing, declare absolute and relative tolerances per metric with units, reference method, and applicable input domain; no universal epsilon is assumed",
+  });
   assert.match(bundle.provenance.runtime.compiler_lockfile.sha256, /^sha256:[0-9a-f]{64}$/);
   assert.equal(bundle.provenance.runtime.invocation.command, "node scripts/lab-data.mjs --verify-replays");
   assert.equal(bundle.provenance.runtime.invocation.status, "verified-in-ci");
@@ -169,7 +173,33 @@ test("the runtime snapshot follows the source project boundary", () => {
   assert.equal(snapshot.project.lockfile.path, "examples/data_project/app/ostrin.lock");
   assert.match(snapshot.project.manifest.sha256, /^sha256:[0-9a-f]{64}$/);
   assert.match(snapshot.project.lockfile.sha256, /^sha256:[0-9a-f]{64}$/);
-  assert.deepEqual(runtimeSnapshotFor(root, "examples/viz_histogram.ostrin").project.lockfile, null);
+  const rootLockfile = runtimeSnapshotFor(root, "examples/viz_histogram.ostrin").project.lockfile;
+  assert.equal(rootLockfile.path, "ostrin.lock");
+  assert.match(rootLockfile.sha256, /^sha256:[0-9a-f]{64}$/);
+});
+
+test("CI host capture is explicit and excludes private machine identity", () => {
+  const previous = process.env.OSTRIN_CAPTURE_HOST;
+  const previousOs = process.env.RUNNER_OS;
+  process.env.OSTRIN_CAPTURE_HOST = "1";
+  process.env.RUNNER_OS = "Linux";
+  try {
+    const host = buildExperimentBundle("provenance").provenance.runtime.host;
+    assert.equal(host.schema, "ostrin.host/v1");
+    assert.equal(host.source, "github-actions");
+    assert.equal(host.runner_os, "Linux");
+    assert.equal(host.captured, true);
+    assert.equal(host.hardware.arch, process.arch);
+    assert.ok(Number.isInteger(host.hardware.cpu_count) && host.hardware.cpu_count > 0);
+    assert.match(host.hardware.endianness, /^(LE|BE)$/);
+    assert.equal(Object.hasOwn(host, "hostname"), false);
+    assert.equal(Object.hasOwn(host, "username"), false);
+  } finally {
+    if (previous === undefined) delete process.env.OSTRIN_CAPTURE_HOST;
+    else process.env.OSTRIN_CAPTURE_HOST = previous;
+    if (previousOs === undefined) delete process.env.RUNNER_OS;
+    else process.env.RUNNER_OS = previousOs;
+  }
 });
 
 test("every registered fixture produces a verified recorded bundle", () => {
@@ -179,6 +209,14 @@ test("every registered fixture produces a verified recorded bundle", () => {
     assert.equal(bundle.title, fixture.title);
     assert.match(bundle.provenance.commit, /^[0-9a-f]{40}$/);
     assert.deepEqual(verifyExperimentBundle(bundle, { fixtureId: id }).errors, []);
+    assert.equal(bundle.provenance.effects.schema, "ostrin.effect-report/v0");
+    assert.equal(bundle.provenance.effects.status, "captured");
+    assert.equal(bundle.provenance.effects.source, "ostrinc --effect-report --json");
+    assert.ok(Array.isArray(bundle.provenance.effects.kinds));
+    assert.ok(Array.isArray(bundle.provenance.effects.functions.main));
+    for (const analyzer of bundle.provenance.effects.analyzer) {
+      assert.match(analyzer.sha256, /^sha256:[0-9a-f]{64}$/);
+    }
     if (id === "surface") {
       assert.deepEqual(bundle.provenance.parameters, { scale: 1 });
       assert.deepEqual(bundle.provenance.camera, { azimuth: -55, elevation: 28 });

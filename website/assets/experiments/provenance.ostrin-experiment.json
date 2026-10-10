@@ -34,8 +34,8 @@
         "path": "provenance.json",
         "kind": "provenance",
         "media_type": "application/json",
-        "bytes": 3568,
-        "sha256": "sha256:2ebe07a05c8d1f6350668298991d55271c6eae72e74725f1a8b71581db3a0517"
+        "bytes": 9336,
+        "sha256": "sha256:82fde911111b4bcec73b13ce4d999df509d3dd402f74e3e85ce0d339c6d8ad98"
       },
       {
         "path": "source.ostrin",
@@ -106,16 +106,38 @@
         "path": "compiler/Cargo.lock",
         "sha256": "sha256:8845cd2f31666d04272d82c02c85a30d52d1c07753e96b30b1fafcd9c4ba8e34"
       },
+      "dependencies": {
+        "compiler_lockfile": {
+          "path": "compiler/Cargo.lock",
+          "sha256": "sha256:8845cd2f31666d04272d82c02c85a30d52d1c07753e96b30b1fafcd9c4ba8e34"
+        },
+        "project_manifest": {
+          "path": "ostrin.toml",
+          "sha256": "sha256:3017456546ddea61d8e35e8cfb8e6ba5531e59f810652ae5884340426efcebd7"
+        },
+        "project_lockfile": {
+          "path": "ostrin.lock",
+          "sha256": "sha256:d7d80a3feae21b91fb4364ecdf32b9905505320593def1c09d68d579902dfa87"
+        }
+      },
+      "scheduler": {
+        "mode": "single-threaded-wasi-replay",
+        "concurrency": "not used by gallery fixture",
+        "status": "declared"
+      },
       "project": {
         "manifest": {
           "path": "ostrin.toml",
           "sha256": "sha256:3017456546ddea61d8e35e8cfb8e6ba5531e59f810652ae5884340426efcebd7"
         },
-        "lockfile": null
+        "lockfile": {
+          "path": "ostrin.lock",
+          "sha256": "sha256:d7d80a3feae21b91fb4364ecdf32b9905505320593def1c09d68d579902dfa87"
+        }
       },
       "platform_policy": {
-        "output": "target-specific; byte exact only when the replay gate verifies it",
-        "numeric": "tolerances must be declared for cross-platform comparisons"
+        "output": "byte equality is verified only against the recorded figure in the CI replay configuration; this is not a cross-platform guarantee",
+        "numeric": "cross-platform numerical comparison is not performed or claimed; before comparing, declare absolute and relative tolerances per metric with units, reference method, and applicable input domain; no universal epsilon is assumed"
       },
       "missing": [
         "input snapshots",
@@ -144,13 +166,208 @@
       "frequency": 2.4
     },
     "seed": 42,
+    "execution": {
+      "mode": "recorded-parameters",
+      "input_file": "data.json",
+      "consumes": [
+        "parameters.start",
+        "parameters.stop",
+        "parameters.samples",
+        "parameters.decay",
+        "parameters.frequency"
+      ],
+      "capabilities": [],
+      "command": "node scripts/lab-data.mjs --verify-replays",
+      "target": "wasm32-wasip1",
+      "wasi": "preview1",
+      "status": "verified-in-ci"
+    },
+    "effects": {
+      "schema": "ostrin.effect-report/v0",
+      "status": "captured",
+      "source": "ostrinc --effect-report --json",
+      "experimental": true,
+      "conservative": true,
+      "kinds": [
+        "concurrency",
+        "io"
+      ],
+      "entry": "main",
+      "functions": {
+        "add": [],
+        "area": [],
+        "band": [],
+        "bars": [],
+        "bind": [],
+        "boxplot": [],
+        "contour": [],
+        "contourf": [],
+        "dark": [],
+        "errorbars": [],
+        "heatmap": [],
+        "hexbin": [],
+        "histogram": [],
+        "hline": [],
+        "isosurface": [],
+        "line": [],
+        "main": [
+          "io"
+        ],
+        "morph": [],
+        "moving_point": [],
+        "moving_segment": [],
+        "quantity_line": [],
+        "quantity_scatter": [],
+        "quiver": [],
+        "rod": [],
+        "save": [
+          "concurrency",
+          "io"
+        ],
+        "scatter": [],
+        "slice_xy": [],
+        "slice_xz": [],
+        "slice_yz": [],
+        "stairs": [],
+        "std.viz::animate": [
+          "concurrency"
+        ],
+        "std.viz::animate_attr": [
+          "concurrency"
+        ],
+        "std.viz::argsort": [],
+        "std.viz::axes3d": [
+          "concurrency"
+        ],
+        "std.viz::binding_attr": [
+          "concurrency"
+        ],
+        "std.viz::center_gap": [],
+        "std.viz::colorbar": [],
+        "std.viz::colormap": [],
+        "std.viz::decimals": [],
+        "std.viz::depth": [],
+        "std.viz::draw_contour": [
+          "concurrency"
+        ],
+        "std.viz::draw_contourf": [
+          "concurrency"
+        ],
+        "std.viz::draw_heatmap": [
+          "concurrency"
+        ],
+        "std.viz::draw_hexbin": [
+          "concurrency"
+        ],
+        "std.viz::draw_mesh3": [
+          "concurrency"
+        ],
+        "std.viz::draw_motion": [
+          "concurrency"
+        ],
+        "std.viz::draw_quiver": [
+          "concurrency"
+        ],
+        "std.viz::draw_series": [
+          "concurrency"
+        ],
+        "std.viz::draw_slice": [
+          "concurrency"
+        ],
+        "std.viz::draw_surface": [
+          "concurrency"
+        ],
+        "std.viz::edge": [],
+        "std.viz::empty": [],
+        "std.viz::escape": [],
+        "std.viz::escape_attr": [],
+        "std.viz::figure": [],
+        "std.viz::gradient": [],
+        "std.viz::grid": [
+          "concurrency"
+        ],
+        "std.viz::grid_of": [],
+        "std.viz::header": [],
+        "std.viz::integrate_stream": [],
+        "std.viz::legend": [],
+        "std.viz::min_gap": [],
+        "std.viz::motion_series": [],
+        "std.viz::nice_step": [],
+        "std.viz::num": [],
+        "std.viz::path_of": [
+          "concurrency"
+        ],
+        "std.viz::pick": [],
+        "std.viz::project_x": [],
+        "std.viz::project_y": [],
+        "std.viz::provenance_metadata": [],
+        "std.viz::pt": [],
+        "std.viz::px": [],
+        "std.viz::render": [
+          "concurrency"
+        ],
+        "std.viz::render3d": [
+          "concurrency"
+        ],
+        "std.viz::render_table": [
+          "concurrency"
+        ],
+        "std.viz::rgb_part": [],
+        "std.viz::sample_stream": [],
+        "std.viz::scene3d": [],
+        "std.viz::screen_xs": [],
+        "std.viz::screen_ys": [],
+        "std.viz::seg": [],
+        "std.viz::series": [],
+        "std.viz::shade": [],
+        "std.viz::short": [],
+        "std.viz::slice_xy": [],
+        "std.viz::slice_xz": [],
+        "std.viz::slice_yz": [],
+        "std.viz::stream_inside": [],
+        "std.viz::stream_value": [],
+        "std.viz::svg_size": [],
+        "std.viz::table": [],
+        "std.viz::table_column_widths": [],
+        "std.viz::tetra_isoline": [],
+        "std.viz::text_at": [],
+        "std.viz::tick_label": [],
+        "std.viz::ticks": [],
+        "std.viz::tip": [],
+        "std.viz::uid": [],
+        "std.viz::unit_of": [],
+        "std.viz::values": [],
+        "streamplot": [],
+        "surface": [],
+        "svg": [
+          "concurrency"
+        ],
+        "text": [],
+        "unit_line": [],
+        "unit_scatter": [],
+        "vector_field": [],
+        "violin": [],
+        "vline": [],
+        "wireframe": []
+      },
+      "analyzer": [
+        {
+          "path": "compiler/src/effects.rs",
+          "sha256": "sha256:63aa777f045dc87ab756acf7311df8a0b1dd9488b8cf536576f01dfc52aa5ec1"
+        },
+        {
+          "path": "compiler/src/main.rs",
+          "sha256": "sha256:ccf7e1f6c0f92f57a6847e5bd383ea9700630d448d7a07415b1b77668c2d02f3"
+        }
+      ]
+    },
     "manifest_schema": "ostrin.manifest/v0",
-    "limits": "R0 exact SVG replay is verified in website CI. The bundle does not include seeded-randomness evidence for R1, external snapshots, lockfile contents, complete runtime captures or an R2/R3 replay guarantee."
+    "limits": "R0 exact SVG replay is verified in website CI. Compiler effects are captured by the experimental conservative analyzer; host capture, seeded-randomness evidence for R1, external snapshots and complete R2/R3 guarantees remain pending."
   },
   "files": {
     "source.ostrin": "// Reproducible publication metadata travels with the exported SVG.\n// The hashes are supplied by the experiment's build record; the browser and\n// native backends preserve them byte-for-byte.\nimport std.viz\n\nfn main() -> Void {\n    xs = linspace(0.0, 6.0, 25)\n    mut ys: List<Float> = []\n    for x in xs.to_list() {\n        ys.push(exp(0.0 - x / 4.0) * cos(2.4 * x))\n    }\n    fig = viz.figure(\"Reproducible damped signal\")\n        .describe(\"The SVG carries the source, data, seed and compiler record\")\n        .labels(\"time\", \"amplitude\")\n        .provenance(\n            \"sha256:6b96f1d1f4f1b955a7dff03d7bcf6af6e1f1ca5fbd1eea6fb3d7c2c7fb3c95d2\",\n            \"sha256:0a0e6b9b33e2b1bd3706d0b2d6e0f6e7a8e3e95d6b8a36b0c4c9d6af79c61d1a\",\n            \"2026-09-27T03:40Z / seed=42\",\n            \"ostrinc 0.1.0\"\n        )\n        .line(xs, array(ys), \"signal\", \"#2563eb\", 2.6, \"\")\n    print(fig.svg())\n}\n",
     "data.json": "{\n  \"seed\": 42,\n  \"parameters\": {\n    \"start\": 0,\n    \"stop\": 6,\n    \"samples\": 25,\n    \"decay\": 4,\n    \"frequency\": 2.4\n  },\n  \"description\": \"Inputs for the deterministic damped signal provenance fixture.\"\n}\n",
     "figure.svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"640\" height=\"400\" viewBox=\"0 0 640 400\" font-family=\"Inter, Segoe UI, Helvetica, Arial, sans-serif\">\n<style>.pt:hover{stroke:#1f2937;stroke-width:1.6px;stroke-opacity:1}.bar:hover{fill-opacity:1}.series:hover>path{stroke-width:3.5px}.pt,.bar,.boxplot,.violin,.hexbin-cell,.contourf-cell,.quiver,.streamplot{cursor:crosshair}.boxplot:hover{fill-opacity:0.42}.violin:hover,.hexbin-cell:hover,.contourf-cell:hover{fill-opacity:0.9}.quiver:hover>line{stroke-width:2.6px}.quiver:hover>polygon{filter:brightness(0.78)}.streamplot:hover{stroke-width:2.7px}</style>\n<rect width=\"640\" height=\"400\" fill=\"#ffffff\"/>\n\n<metadata><ostrin-provenance source-hash=\"sha256:ea9e89db161e9034fb2f9ab4b1013ffff1efe5a659671e6728395fc1e7646167\" data-hash=\"sha256:085cd36f9fd90d563529ca3aea965b826c2efed5938b6641e6bbb8f9cebc234e\" seed=\"seed=42\" compiler=\"ostrinc 0.1.0\"/></metadata>\n\n<text x=\"66\" y=\"26\" text-anchor=\"start\" font-size=\"16\" fill=\"#1f2937\" font-weight=\"600\">Reproducible damped signal</text>\n<text x=\"66\" y=\"45\" text-anchor=\"start\" font-size=\"12\" fill=\"#6b7280\">The SVG carries the source, data, seed and compiler record</text>\n<defs><clipPath id=\"clip4796110287609473969\"><rect x=\"66\" y=\"62\" width=\"554\" height=\"286\"/></clipPath></defs>\n<line x1=\"76.65\" y1=\"62\" x2=\"76.65\" y2=\"348\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>\n<line x1=\"76.65\" y1=\"348\" x2=\"76.65\" y2=\"353\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"76.65\" y=\"366\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6b7280\">0</text>\n<line x1=\"165.44\" y1=\"62\" x2=\"165.44\" y2=\"348\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>\n<line x1=\"165.44\" y1=\"348\" x2=\"165.44\" y2=\"353\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"165.44\" y=\"366\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6b7280\">1</text>\n<line x1=\"254.22\" y1=\"62\" x2=\"254.22\" y2=\"348\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>\n<line x1=\"254.22\" y1=\"348\" x2=\"254.22\" y2=\"353\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"254.22\" y=\"366\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6b7280\">2</text>\n<line x1=\"343\" y1=\"62\" x2=\"343\" y2=\"348\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>\n<line x1=\"343\" y1=\"348\" x2=\"343\" y2=\"353\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"343\" y=\"366\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6b7280\">3</text>\n<line x1=\"431.78\" y1=\"62\" x2=\"431.78\" y2=\"348\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>\n<line x1=\"431.78\" y1=\"348\" x2=\"431.78\" y2=\"353\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"431.78\" y=\"366\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6b7280\">4</text>\n<line x1=\"520.56\" y1=\"62\" x2=\"520.56\" y2=\"348\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>\n<line x1=\"520.56\" y1=\"348\" x2=\"520.56\" y2=\"353\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"520.56\" y=\"366\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6b7280\">5</text>\n<line x1=\"609.35\" y1=\"62\" x2=\"609.35\" y2=\"348\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>\n<line x1=\"609.35\" y1=\"348\" x2=\"609.35\" y2=\"353\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"609.35\" y=\"366\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6b7280\">6</text>\n<line x1=\"66\" y1=\"346.42\" x2=\"620\" y2=\"346.42\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>\n<line x1=\"61\" y1=\"346.42\" x2=\"66\" y2=\"346.42\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"58\" y=\"350.42\" text-anchor=\"end\" font-size=\"11\" fill=\"#6b7280\">-0.8</text>\n<line x1=\"66\" y1=\"316.26\" x2=\"620\" y2=\"316.26\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>\n<line x1=\"61\" y1=\"316.26\" x2=\"66\" y2=\"316.26\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"58\" y=\"320.26\" text-anchor=\"end\" font-size=\"11\" fill=\"#6b7280\">-0.6</text>\n<line x1=\"66\" y1=\"286.1\" x2=\"620\" y2=\"286.1\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>\n<line x1=\"61\" y1=\"286.1\" x2=\"66\" y2=\"286.1\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"58\" y=\"290.1\" text-anchor=\"end\" font-size=\"11\" fill=\"#6b7280\">-0.4</text>\n<line x1=\"66\" y1=\"255.94\" x2=\"620\" y2=\"255.94\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>\n<line x1=\"61\" y1=\"255.94\" x2=\"66\" y2=\"255.94\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"58\" y=\"259.94\" text-anchor=\"end\" font-size=\"11\" fill=\"#6b7280\">-0.2</text>\n<line x1=\"66\" y1=\"225.79\" x2=\"620\" y2=\"225.79\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>\n<line x1=\"61\" y1=\"225.79\" x2=\"66\" y2=\"225.79\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"58\" y=\"229.79\" text-anchor=\"end\" font-size=\"11\" fill=\"#6b7280\">0.0</text>\n<line x1=\"66\" y1=\"195.63\" x2=\"620\" y2=\"195.63\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>\n<line x1=\"61\" y1=\"195.63\" x2=\"66\" y2=\"195.63\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"58\" y=\"199.63\" text-anchor=\"end\" font-size=\"11\" fill=\"#6b7280\">0.2</text>\n<line x1=\"66\" y1=\"165.47\" x2=\"620\" y2=\"165.47\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>\n<line x1=\"61\" y1=\"165.47\" x2=\"66\" y2=\"165.47\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"58\" y=\"169.47\" text-anchor=\"end\" font-size=\"11\" fill=\"#6b7280\">0.4</text>\n<line x1=\"66\" y1=\"135.31\" x2=\"620\" y2=\"135.31\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>\n<line x1=\"61\" y1=\"135.31\" x2=\"66\" y2=\"135.31\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"58\" y=\"139.31\" text-anchor=\"end\" font-size=\"11\" fill=\"#6b7280\">0.6</text>\n<line x1=\"66\" y1=\"105.16\" x2=\"620\" y2=\"105.16\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>\n<line x1=\"61\" y1=\"105.16\" x2=\"66\" y2=\"105.16\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"58\" y=\"109.16\" text-anchor=\"end\" font-size=\"11\" fill=\"#6b7280\">0.8</text>\n<line x1=\"66\" y1=\"75\" x2=\"620\" y2=\"75\" stroke=\"#e5e7eb\" stroke-width=\"1\"/>\n<line x1=\"61\" y1=\"75\" x2=\"66\" y2=\"75\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"58\" y=\"79\" text-anchor=\"end\" font-size=\"11\" fill=\"#6b7280\">1.0</text>\n<g clip-path=\"url(#clip4796110287609473969)\">\n<g class=\"viz-series\" data-viz-series-id=\"0\"><g class=\"series\"><title>signal</title><path d=\"M76.65 75 L98.85 108.88 L121.04 177.57 L143.24 254.19 L165.44 312.38 L187.63 335 L209.83 318.72 L232.02 273.52 L254.22 217.78 L276.41 171.26 L298.61 148.29 L320.8 153.74 L343 182.46 L365.2 222.18 L387.39 258.43 L409.59 279.59 L431.78 280.41 L453.98 263.01 L476.17 235.3 L498.37 207.69 L520.56 189.33 L542.76 185.23 L564.96 195.06 L587.15 213.94 L609.35 234.53\" fill=\"none\" stroke=\"#2563eb\" stroke-width=\"2.6\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/></g></g>\n</g>\n<line x1=\"66\" y1=\"348\" x2=\"620\" y2=\"348\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<line x1=\"66\" y1=\"62\" x2=\"66\" y2=\"348\" stroke=\"#9ca3af\" stroke-width=\"1\"/>\n<text x=\"343\" y=\"388\" text-anchor=\"middle\" font-size=\"12\" fill=\"#1f2937\">time</text>\n<text x=\"16\" y=\"205\" text-anchor=\"middle\" font-size=\"12\" fill=\"#1f2937\" transform=\"rotate(-90 16 205)\">amplitude</text>\n<g class=\"legend\"><rect x=\"536.4\" y=\"72\" width=\"73.6\" height=\"28\" rx=\"6\" fill=\"#ffffff\" fill-opacity=\"0.88\" stroke=\"#e5e7eb\"/><g class=\"legend-item\" data-viz-series-id=\"0\"><line x1=\"543.4\" y1=\"86\" x2=\"559.4\" y2=\"86\" stroke=\"#2563eb\" stroke-width=\"2.5\"/><text x=\"564.4\" y=\"90\" text-anchor=\"start\" font-size=\"11\" fill=\"#1f2937\">signal</text></g></g>\n</svg>\n",
-    "provenance.json": "{\n  \"schema\": \"ostrin.provenance/v0\",\n  \"level\": \"R0\",\n  \"reproducibility\": {\n    \"level\": \"R0\",\n    \"label\": \"R0 · exact replay verified\",\n    \"next\": \"R1 · seeded replay (planned verification)\"\n  },\n  \"levels\": {\n    \"R0\": \"Recorded source, inputs and outputs with calculated hashes.\",\n    \"R1\": \"Seeded replay with an input-driven seed, algorithm/version and stream partition; CI must verify seed sensitivity.\",\n    \"R2\": \"Replay of an embedded external input snapshot with declared capabilities and parameters; CI must verify the snapshot and sensitivity contract.\"\n  },\n  \"program\": {\n    \"source\": \"source.ostrin\",\n    \"source_hash\": \"sha256:ea9e89db161e9034fb2f9ab4b1013ffff1efe5a659671e6728395fc1e7646167\",\n    \"entry\": \"main\"\n  },\n  \"inputs\": [\n    {\n      \"id\": \"data.json\",\n      \"kind\": \"parameters\",\n      \"sha256\": \"sha256:085cd36f9fd90d563529ca3aea965b826c2efed5938b6641e6bbb8f9cebc234e\",\n      \"seed\": 42\n    }\n  ],\n  \"outputs\": [\n    {\n      \"id\": \"figure.svg\",\n      \"kind\": \"figure\",\n      \"sha256\": \"sha256:7289316b34c29cac9801b41f1bdb586f5ee8ff25919ab9b77d1a00feefdb28bc\"\n    }\n  ],\n  \"replay\": {\n    \"level\": \"R0\",\n    \"status\": \"verified\",\n    \"backend\": \"ostrinc.wasm\",\n    \"target\": \"wasm32-wasip1\",\n    \"command\": \"node scripts/lab-data.mjs --verify-replays\",\n    \"compares\": \"figure.svg\",\n    \"note\": \"Website CI compares the replayed SVG byte-for-byte with this bundled figure; R1 requires seeded-randomness evidence.\"\n  },\n  \"figure_metadata\": {\n    \"policy\": \"The bundle generator normalizes the recorded SVG metadata to these calculated hashes; bundle manifest hashes are authoritative.\",\n    \"source_hash\": \"sha256:ea9e89db161e9034fb2f9ab4b1013ffff1efe5a659671e6728395fc1e7646167\",\n    \"data_hash\": \"sha256:085cd36f9fd90d563529ca3aea965b826c2efed5938b6641e6bbb8f9cebc234e\",\n    \"seed\": \"seed=42\",\n    \"compiler\": \"ostrinc 0.1.0\"\n  },\n  \"compiler\": \"ostrinc 0.1.0\",\n  \"runtime\": {\n    \"schema\": \"ostrin.runtime/v1\",\n    \"status\": \"partial\",\n    \"target\": \"wasm32-wasip1\",\n    \"wasi\": \"preview1\",\n    \"runner\": \"WASI host\",\n    \"compiler_lockfile\": {\n      \"path\": \"compiler/Cargo.lock\",\n      \"sha256\": \"sha256:8845cd2f31666d04272d82c02c85a30d52d1c07753e96b30b1fafcd9c4ba8e34\"\n    },\n    \"project\": {\n      \"manifest\": {\n        \"path\": \"ostrin.toml\",\n        \"sha256\": \"sha256:3017456546ddea61d8e35e8cfb8e6ba5531e59f810652ae5884340426efcebd7\"\n      },\n      \"lockfile\": null\n    },\n    \"platform_policy\": {\n      \"output\": \"target-specific; byte exact only when the replay gate verifies it\",\n      \"numeric\": \"tolerances must be declared for cross-platform comparisons\"\n    },\n    \"missing\": [\n      \"input snapshots\",\n      \"captured host and hardware metadata\"\n    ],\n    \"invocation\": {\n      \"command\": \"node scripts/lab-data.mjs --verify-replays\",\n      \"status\": \"verified-in-ci\",\n      \"outputs\": [\n        {\n          \"path\": \"figure.svg\",\n          \"bytes\": 6800,\n          \"sha256\": \"sha256:7289316b34c29cac9801b41f1bdb586f5ee8ff25919ab9b77d1a00feefdb28bc\"\n        }\n      ]\n    }\n  },\n  \"commit\": \"0ecc9c6e81d4a7000904db67446a4a377e9dd20d\",\n  \"target\": \"wasm32-wasip1\",\n  \"command\": \"ostrinc --run --target wasm32-wasi source.ostrin\",\n  \"parameters\": {\n    \"start\": 0,\n    \"stop\": 6,\n    \"samples\": 25,\n    \"decay\": 4,\n    \"frequency\": 2.4\n  },\n  \"seed\": 42,\n  \"manifest_schema\": \"ostrin.manifest/v0\",\n  \"limits\": \"R0 exact SVG replay is verified in website CI. The bundle does not include seeded-randomness evidence for R1, external snapshots, lockfile contents, complete runtime captures or an R2/R3 replay guarantee.\"\n}\n"
+    "provenance.json": "{\n  \"schema\": \"ostrin.provenance/v0\",\n  \"level\": \"R0\",\n  \"reproducibility\": {\n    \"level\": \"R0\",\n    \"label\": \"R0 · exact replay verified\",\n    \"next\": \"R1 · seeded replay (planned verification)\"\n  },\n  \"levels\": {\n    \"R0\": \"Recorded source, inputs and outputs with calculated hashes.\",\n    \"R1\": \"Seeded replay with an input-driven seed, algorithm/version and stream partition; CI must verify seed sensitivity.\",\n    \"R2\": \"Replay of an embedded external input snapshot with declared capabilities and parameters; CI must verify the snapshot and sensitivity contract.\"\n  },\n  \"program\": {\n    \"source\": \"source.ostrin\",\n    \"source_hash\": \"sha256:ea9e89db161e9034fb2f9ab4b1013ffff1efe5a659671e6728395fc1e7646167\",\n    \"entry\": \"main\"\n  },\n  \"inputs\": [\n    {\n      \"id\": \"data.json\",\n      \"kind\": \"parameters\",\n      \"sha256\": \"sha256:085cd36f9fd90d563529ca3aea965b826c2efed5938b6641e6bbb8f9cebc234e\",\n      \"seed\": 42\n    }\n  ],\n  \"outputs\": [\n    {\n      \"id\": \"figure.svg\",\n      \"kind\": \"figure\",\n      \"sha256\": \"sha256:7289316b34c29cac9801b41f1bdb586f5ee8ff25919ab9b77d1a00feefdb28bc\"\n    }\n  ],\n  \"replay\": {\n    \"level\": \"R0\",\n    \"status\": \"verified\",\n    \"backend\": \"ostrinc.wasm\",\n    \"target\": \"wasm32-wasip1\",\n    \"command\": \"node scripts/lab-data.mjs --verify-replays\",\n    \"compares\": \"figure.svg\",\n    \"note\": \"Website CI compares the replayed SVG byte-for-byte with this bundled figure; R1 requires seeded-randomness evidence.\"\n  },\n  \"figure_metadata\": {\n    \"policy\": \"The bundle generator normalizes the recorded SVG metadata to these calculated hashes; bundle manifest hashes are authoritative.\",\n    \"source_hash\": \"sha256:ea9e89db161e9034fb2f9ab4b1013ffff1efe5a659671e6728395fc1e7646167\",\n    \"data_hash\": \"sha256:085cd36f9fd90d563529ca3aea965b826c2efed5938b6641e6bbb8f9cebc234e\",\n    \"seed\": \"seed=42\",\n    \"compiler\": \"ostrinc 0.1.0\"\n  },\n  \"compiler\": \"ostrinc 0.1.0\",\n  \"runtime\": {\n    \"schema\": \"ostrin.runtime/v1\",\n    \"status\": \"partial\",\n    \"target\": \"wasm32-wasip1\",\n    \"wasi\": \"preview1\",\n    \"runner\": \"WASI host\",\n    \"compiler_lockfile\": {\n      \"path\": \"compiler/Cargo.lock\",\n      \"sha256\": \"sha256:8845cd2f31666d04272d82c02c85a30d52d1c07753e96b30b1fafcd9c4ba8e34\"\n    },\n    \"dependencies\": {\n      \"compiler_lockfile\": {\n        \"path\": \"compiler/Cargo.lock\",\n        \"sha256\": \"sha256:8845cd2f31666d04272d82c02c85a30d52d1c07753e96b30b1fafcd9c4ba8e34\"\n      },\n      \"project_manifest\": {\n        \"path\": \"ostrin.toml\",\n        \"sha256\": \"sha256:3017456546ddea61d8e35e8cfb8e6ba5531e59f810652ae5884340426efcebd7\"\n      },\n      \"project_lockfile\": {\n        \"path\": \"ostrin.lock\",\n        \"sha256\": \"sha256:d7d80a3feae21b91fb4364ecdf32b9905505320593def1c09d68d579902dfa87\"\n      }\n    },\n    \"scheduler\": {\n      \"mode\": \"single-threaded-wasi-replay\",\n      \"concurrency\": \"not used by gallery fixture\",\n      \"status\": \"declared\"\n    },\n    \"project\": {\n      \"manifest\": {\n        \"path\": \"ostrin.toml\",\n        \"sha256\": \"sha256:3017456546ddea61d8e35e8cfb8e6ba5531e59f810652ae5884340426efcebd7\"\n      },\n      \"lockfile\": {\n        \"path\": \"ostrin.lock\",\n        \"sha256\": \"sha256:d7d80a3feae21b91fb4364ecdf32b9905505320593def1c09d68d579902dfa87\"\n      }\n    },\n    \"platform_policy\": {\n      \"output\": \"byte equality is verified only against the recorded figure in the CI replay configuration; this is not a cross-platform guarantee\",\n      \"numeric\": \"cross-platform numerical comparison is not performed or claimed; before comparing, declare absolute and relative tolerances per metric with units, reference method, and applicable input domain; no universal epsilon is assumed\"\n    },\n    \"missing\": [\n      \"input snapshots\",\n      \"captured host and hardware metadata\"\n    ],\n    \"invocation\": {\n      \"command\": \"node scripts/lab-data.mjs --verify-replays\",\n      \"status\": \"verified-in-ci\",\n      \"outputs\": [\n        {\n          \"path\": \"figure.svg\",\n          \"bytes\": 6800,\n          \"sha256\": \"sha256:7289316b34c29cac9801b41f1bdb586f5ee8ff25919ab9b77d1a00feefdb28bc\"\n        }\n      ]\n    }\n  },\n  \"commit\": \"0ecc9c6e81d4a7000904db67446a4a377e9dd20d\",\n  \"target\": \"wasm32-wasip1\",\n  \"command\": \"ostrinc --run --target wasm32-wasi source.ostrin\",\n  \"parameters\": {\n    \"start\": 0,\n    \"stop\": 6,\n    \"samples\": 25,\n    \"decay\": 4,\n    \"frequency\": 2.4\n  },\n  \"seed\": 42,\n  \"execution\": {\n    \"mode\": \"recorded-parameters\",\n    \"input_file\": \"data.json\",\n    \"consumes\": [\n      \"parameters.start\",\n      \"parameters.stop\",\n      \"parameters.samples\",\n      \"parameters.decay\",\n      \"parameters.frequency\"\n    ],\n    \"capabilities\": [],\n    \"command\": \"node scripts/lab-data.mjs --verify-replays\",\n    \"target\": \"wasm32-wasip1\",\n    \"wasi\": \"preview1\",\n    \"status\": \"verified-in-ci\"\n  },\n  \"effects\": {\n    \"schema\": \"ostrin.effect-report/v0\",\n    \"status\": \"captured\",\n    \"source\": \"ostrinc --effect-report --json\",\n    \"experimental\": true,\n    \"conservative\": true,\n    \"kinds\": [\n      \"concurrency\",\n      \"io\"\n    ],\n    \"entry\": \"main\",\n    \"functions\": {\n      \"add\": [],\n      \"area\": [],\n      \"band\": [],\n      \"bars\": [],\n      \"bind\": [],\n      \"boxplot\": [],\n      \"contour\": [],\n      \"contourf\": [],\n      \"dark\": [],\n      \"errorbars\": [],\n      \"heatmap\": [],\n      \"hexbin\": [],\n      \"histogram\": [],\n      \"hline\": [],\n      \"isosurface\": [],\n      \"line\": [],\n      \"main\": [\n        \"io\"\n      ],\n      \"morph\": [],\n      \"moving_point\": [],\n      \"moving_segment\": [],\n      \"quantity_line\": [],\n      \"quantity_scatter\": [],\n      \"quiver\": [],\n      \"rod\": [],\n      \"save\": [\n        \"concurrency\",\n        \"io\"\n      ],\n      \"scatter\": [],\n      \"slice_xy\": [],\n      \"slice_xz\": [],\n      \"slice_yz\": [],\n      \"stairs\": [],\n      \"std.viz::animate\": [\n        \"concurrency\"\n      ],\n      \"std.viz::animate_attr\": [\n        \"concurrency\"\n      ],\n      \"std.viz::argsort\": [],\n      \"std.viz::axes3d\": [\n        \"concurrency\"\n      ],\n      \"std.viz::binding_attr\": [\n        \"concurrency\"\n      ],\n      \"std.viz::center_gap\": [],\n      \"std.viz::colorbar\": [],\n      \"std.viz::colormap\": [],\n      \"std.viz::decimals\": [],\n      \"std.viz::depth\": [],\n      \"std.viz::draw_contour\": [\n        \"concurrency\"\n      ],\n      \"std.viz::draw_contourf\": [\n        \"concurrency\"\n      ],\n      \"std.viz::draw_heatmap\": [\n        \"concurrency\"\n      ],\n      \"std.viz::draw_hexbin\": [\n        \"concurrency\"\n      ],\n      \"std.viz::draw_mesh3\": [\n        \"concurrency\"\n      ],\n      \"std.viz::draw_motion\": [\n        \"concurrency\"\n      ],\n      \"std.viz::draw_quiver\": [\n        \"concurrency\"\n      ],\n      \"std.viz::draw_series\": [\n        \"concurrency\"\n      ],\n      \"std.viz::draw_slice\": [\n        \"concurrency\"\n      ],\n      \"std.viz::draw_surface\": [\n        \"concurrency\"\n      ],\n      \"std.viz::edge\": [],\n      \"std.viz::empty\": [],\n      \"std.viz::escape\": [],\n      \"std.viz::escape_attr\": [],\n      \"std.viz::figure\": [],\n      \"std.viz::gradient\": [],\n      \"std.viz::grid\": [\n        \"concurrency\"\n      ],\n      \"std.viz::grid_of\": [],\n      \"std.viz::header\": [],\n      \"std.viz::integrate_stream\": [],\n      \"std.viz::legend\": [],\n      \"std.viz::min_gap\": [],\n      \"std.viz::motion_series\": [],\n      \"std.viz::nice_step\": [],\n      \"std.viz::num\": [],\n      \"std.viz::path_of\": [\n        \"concurrency\"\n      ],\n      \"std.viz::pick\": [],\n      \"std.viz::project_x\": [],\n      \"std.viz::project_y\": [],\n      \"std.viz::provenance_metadata\": [],\n      \"std.viz::pt\": [],\n      \"std.viz::px\": [],\n      \"std.viz::render\": [\n        \"concurrency\"\n      ],\n      \"std.viz::render3d\": [\n        \"concurrency\"\n      ],\n      \"std.viz::render_table\": [\n        \"concurrency\"\n      ],\n      \"std.viz::rgb_part\": [],\n      \"std.viz::sample_stream\": [],\n      \"std.viz::scene3d\": [],\n      \"std.viz::screen_xs\": [],\n      \"std.viz::screen_ys\": [],\n      \"std.viz::seg\": [],\n      \"std.viz::series\": [],\n      \"std.viz::shade\": [],\n      \"std.viz::short\": [],\n      \"std.viz::slice_xy\": [],\n      \"std.viz::slice_xz\": [],\n      \"std.viz::slice_yz\": [],\n      \"std.viz::stream_inside\": [],\n      \"std.viz::stream_value\": [],\n      \"std.viz::svg_size\": [],\n      \"std.viz::table\": [],\n      \"std.viz::table_column_widths\": [],\n      \"std.viz::tetra_isoline\": [],\n      \"std.viz::text_at\": [],\n      \"std.viz::tick_label\": [],\n      \"std.viz::ticks\": [],\n      \"std.viz::tip\": [],\n      \"std.viz::uid\": [],\n      \"std.viz::unit_of\": [],\n      \"std.viz::values\": [],\n      \"streamplot\": [],\n      \"surface\": [],\n      \"svg\": [\n        \"concurrency\"\n      ],\n      \"text\": [],\n      \"unit_line\": [],\n      \"unit_scatter\": [],\n      \"vector_field\": [],\n      \"violin\": [],\n      \"vline\": [],\n      \"wireframe\": []\n    },\n    \"analyzer\": [\n      {\n        \"path\": \"compiler/src/effects.rs\",\n        \"sha256\": \"sha256:63aa777f045dc87ab756acf7311df8a0b1dd9488b8cf536576f01dfc52aa5ec1\"\n      },\n      {\n        \"path\": \"compiler/src/main.rs\",\n        \"sha256\": \"sha256:ccf7e1f6c0f92f57a6847e5bd383ea9700630d448d7a07415b1b77668c2d02f3\"\n      }\n    ]\n  },\n  \"manifest_schema\": \"ostrin.manifest/v0\",\n  \"limits\": \"R0 exact SVG replay is verified in website CI. Compiler effects are captured by the experimental conservative analyzer; host capture, seeded-randomness evidence for R1, external snapshots and complete R2/R3 guarantees remain pending.\"\n}\n"
   }
 }
