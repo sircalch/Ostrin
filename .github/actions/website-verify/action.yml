@@ -30,6 +30,15 @@ runs:
       shell: bash
       working-directory: tests/browser
       run: npm test
+    - name: Upload browser failure artifacts
+      if: ${{ failure() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: ostrin-playwright-failures-${{ github.run_id }}
+        path: |
+          /tmp/ostrin-playwright-results
+          tests/browser/test-results
+        if-no-files-found: ignore
     - name: Capture CI host provenance and regenerate experiment bundles
       shell: bash
       env:
