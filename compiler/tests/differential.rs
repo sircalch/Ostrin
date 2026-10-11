@@ -41,6 +41,27 @@ fn text(bytes: &[u8]) -> String {
     String::from_utf8_lossy(bytes).replace("\r\n", "\n")
 }
 
+fn outputs_match(name: &str, interpreted: &str, native: &str) -> bool {
+    if name == "concurrency_cancel_after_drop.ostrin" {
+        // The cancellation contract forbids both child and parent continuation.
+        // Native scheduling may choose whether the controller prints `true`
+        // before the parent gets its first time slice, so compare the
+        // observable event set rather than imposing an OS-specific order.
+        let normalize = |output: &str| {
+            let mut lines: Vec<_> = output.lines().map(str::to_owned).collect();
+            lines.sort_unstable();
+            lines
+        };
+        return normalize(interpreted) == normalize(native)
+            && native.lines().count() == 2
+            && native.contains("parent-started\n")
+            && native.contains("true\n")
+            && !native.contains("child-must-not-run")
+            && !native.contains("parent-must-not-run");
+    }
+    interpreted == native
+}
+
 /// Examples the native backend deliberately does not reproduce, with the
 /// reason. Each entry must *fail* to compile natively — when a gap is closed
 /// the assertion below fires and the entry must be deleted.
@@ -129,7 +150,11 @@ fn every_example_agrees_between_interpreter_and_native() {
             continue;
         }
         compared += 1;
-        if text(&native.stdout) != text(&interpreted.stdout) {
+        if !outputs_match(
+            name.as_str(),
+            &text(&interpreted.stdout),
+            &text(&native.stdout),
+        ) {
             failures.push(format!(
                 "{name}: output differs between interpreter and native"
             ));

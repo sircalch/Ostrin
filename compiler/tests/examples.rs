@@ -1144,6 +1144,18 @@ fn skip_if_no_c_compiler(compile: &Output) -> bool {
     }
 }
 
+fn assert_cancel_output(output: &str, context: &str) {
+    let mut lines: Vec<_> = output.lines().collect();
+    lines.sort_unstable();
+    assert_eq!(
+        lines,
+        vec!["parent-started", "true"],
+        "{context}: cancellation events differed: {output:?}"
+    );
+    assert!(!output.contains("child-must-not-run"));
+    assert!(!output.contains("parent-must-not-run"));
+}
+
 #[test]
 fn native_backend_compiles_and_runs_fibonacci() {
     let report = run(&[
@@ -11538,9 +11550,9 @@ fn cancelled_tasks_do_not_release_dropped_child_handles_twice() {
         "cancel-after-drop binary failed: {}",
         String::from_utf8_lossy(&native.stderr)
     );
-    assert_eq!(
-        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
-        "parent-started\ntrue\n"
+    assert_cancel_output(
+        &String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        "native cancel-after-drop",
     );
     assert!(
         String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
@@ -11571,9 +11583,9 @@ fn cancelled_tasks_do_not_release_dropped_child_handles_twice() {
         "native-thread cancel-after-drop failed: {}",
         String::from_utf8_lossy(&threaded_native.stderr)
     );
-    assert_eq!(
-        String::from_utf8_lossy(&threaded_native.stdout).replace("\r\n", "\n"),
-        "parent-started\ntrue\n"
+    assert_cancel_output(
+        &String::from_utf8_lossy(&threaded_native.stdout).replace("\r\n", "\n"),
+        "native-thread cancel-after-drop",
     );
     assert!(
         String::from_utf8_lossy(&threaded_native.stderr).contains("live_allocations=0"),
