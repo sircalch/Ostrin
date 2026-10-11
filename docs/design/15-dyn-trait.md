@@ -87,9 +87,51 @@ shapes: List<dyn Shape + Printable> = [...]
 
 Cada valor de la lista debe implementar **ambos** traits — el compilador genera una tabla de métodos combinada por detrás; sigue sin ser visible ni configurable desde el código Ostrin.
 
+## 7. Frontera actual del backend y contrato para migrar a HIR/IR
+
+La representación no debe confundirse con soporte nativo completo. El emisor
+AST actual usa una pareja C equivalente a:
+
+```c
+typedef struct {
+    void *self;
+    const Trait_VTable *vtable;
+} Trait_Dyn;
+```
+
+La tabla contiene únicamente punteros a los métodos. Esa ruta sirve para la
+prueba de despacho dinámico, pero todavía no expresa la propiedad del receptor:
+el tipo `DynTrait` no entra en los helpers generales de `retain_managed_value` y
+`release_managed_value`, y HIR/IR no tiene aún una instrucción tipada para
+crear, copiar, fusionar o destruir un trait object. Por eso los seis cuerpos
+dinámicos del ledger de fallback siguen siendo una limitación de alto riesgo;
+no se deben contar como cobertura IR/C aunque el backend AST pueda ejecutarlos.
+
+La migración queda condicionada a un contrato único para AST, HIR, IR, WASI y
+el runtime:
+
+1. El valor tipado debe conservar `data`, `vtable` y el estado de ownership en
+   cada construcción, argumento, retorno, campo, colección, `Phi`, closure,
+   tarea, cancelación y `drop`.
+2. Cada vtable debe incluir operaciones de ciclo de vida (`retain` y
+   `release`, o una ABI equivalente demostrada) además de sus slots de método;
+   un receptor borrado no puede depender de una limpieza global al salir del
+   proceso.
+3. El lowering debe rechazar de forma determinista traits no object-safe,
+   llamadas indirectas no representables y combinaciones genéricas cuyo
+   ownership no esté probado. No se permite convertir esos casos en un cast
+   opaco.
+4. La aceptación mínima exige paridad intérprete/native, emisión y ejecución
+   WASI, `live_allocations=0`, ASan y UBSan para boxing, lista heterogénea,
+   argumento/retorno, método por defecto, `Phi`, closure, tarea y cancelación.
+
+Hasta que exista esa evidencia, `dyn Trait` permanece soportado por la ruta
+AST verificada y registrado explícitamente como fallback; esta frontera es
+intencional y forma parte del contrato de v0.2.
+
 ---
 
-## 7. Preguntas abiertas para la siguiente sesión de diseño
+## 8. Preguntas abiertas para la siguiente sesión de diseño
 
 1. **`match` sobre `dyn Trait`** — no tiene sentido igual que sobre un `enum` (no hay un conjunto cerrado de "variantes"); si hace falta recuperar el tipo concreto desde un `dyn Trait` (downcasting), sería un mecanismo aparte, no diseñado aquí.
 2. Pendientes previos siguen abiertos: `as D`, `select` sobre canales, cancelación de tareas, elisión de ARC, operadores bit a bit, ordenación general.
