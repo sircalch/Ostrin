@@ -11070,6 +11070,30 @@ fn measurement_quantity_boundary_is_explicitly_rejected_natively() {
 }
 
 #[test]
+fn direct_measurement_quantity_boundary_is_explicitly_rejected_natively() {
+    let file = example_path("measurement_quantity_direct_shape.ostrin");
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "direct Measurement<Quantity> interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), "12 m\n");
+
+    let native = run(&["--native-type-report", &file]);
+    assert!(
+        !native.status.success(),
+        "direct Measurement<Quantity> was enabled without a native ownership contract"
+    );
+    assert!(
+        stderr(&native)
+            .contains("type 'Measurement<Quantity<D>>' is not supported by the native backend yet"),
+        "direct Measurement<Quantity> boundary diagnostic changed: {}",
+        stderr(&native)
+    );
+}
+
+#[test]
 fn measurement_array_boundary_has_actionable_diagnostic() {
     let file = example_path("measurement_array_shape.ostrin");
     let interpreted = run(&["--run", &file]);
