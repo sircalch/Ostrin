@@ -28,6 +28,7 @@ function render() {
   const backend = document.querySelector("[data-status-backend]");
   const ownership = document.querySelector("[data-status-ownership]");
   const numeric = document.querySelector("[data-status-numeric]");
+  const effects = document.querySelector("[data-status-effects]");
   const reproducibility = document.querySelector("[data-status-reproducibility]");
   const linguist = document.querySelector("[data-status-linguist]");
   const readiness = document.querySelector("[data-status-readiness]");
@@ -50,6 +51,14 @@ function render() {
       valueCard("Parity", String(validation.comparedValues ?? 0), `max Δ ${validation.maximumAbsoluteDifference ?? "—"}`, validation.local === "verified" ? "ready" : "open"),
       valueCard("Leaks", validation.leakCheck, "native executable", validation.leakCheck === "live_allocations=0" ? "ready" : "open"),
       valueCard("CI run", validation.ci === "verified" ? "VERIFIED" : "PENDING", "platform evidence", validation.ci === "verified" ? "ready" : "open"),
+    );
+  }
+  if (effects && status.effectCoverage) {
+    const coverage = status.effectCoverage;
+    effects.replaceChildren(
+      valueCard("Known calls", String(coverage.knownCalls ?? 0), "classified or local calls", "ready"),
+      valueCard("Unresolved calls", String(coverage.unresolvedCalls ?? 0), "conservative boundary", coverage.unresolvedCalls === 0 ? "ready" : "open"),
+      valueCard("Inventory", coverage.complete ? "COMPLETE" : "PARTIAL", "not a purity proof", coverage.complete ? "ready" : "open"),
     );
   }
   reproducibility.replaceChildren(

@@ -122,6 +122,18 @@ function numericalValidationStatus() {
   };
 }
 
+function effectCoverageStatus() {
+  const source = text("website/provenance-data.js");
+  const block = source.match(/"effect_coverage":\s*\{([\s\S]*?)\n\s*\}/)?.[1] ?? "";
+  const number = (name) => Number(block.match(new RegExp(`"${name}":\\s*(\\d+)`))?.[1] ?? 0);
+  const complete = block.match(/"complete":\s*(true|false)/)?.[1] === "true";
+  return {
+    knownCalls: number("known_calls"),
+    unresolvedCalls: number("unresolved_calls"),
+    complete,
+  };
+}
+
 export async function buildScorecard() {
   const native = nativeCounts();
   const workingTreeDirty = git(["status", "--porcelain"]).length > 0;
@@ -140,6 +152,7 @@ export async function buildScorecard() {
     nativeBackend: native,
     ownership: ownershipCounts(),
     numericalValidation: numericalValidationStatus(),
+    effectCoverage: effectCoverageStatus(),
     reproducibility: await reproducibilityCounts(),
     r3: (() => {
       const report = buildR3Readiness();
