@@ -42,6 +42,8 @@ WASI y `live_allocations=0`; la prueba
 que el destructor del record libera la medición exactamente una vez.
 `examples/measurement_return.ostrin` cubre el paso como argumento y el retorno
 de `Measurement<Float>` con la misma paridad y comprobación de ownership.
+`examples/measurement_clone.ostrin` cubre la copia explícita mediante `clone`;
+los alias implícitos y los payloads compuestos continúan fuera del contrato.
 `examples/viz_bars.ostrin` añade una serie de
 cinco grupos y proyecta `values`/`uncertainties` hacia `std.viz.errorbars`, también con paridad
 intérprete/native y una figura SVG reproducible en la galería. El Scientific Lab ejecuta el

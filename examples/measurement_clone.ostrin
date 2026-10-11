@@ -1,0 +1,8 @@
+import std.measurements
+
+fn main() -> Void {
+    original = measurements.exact(2.0)
+    copied = clone(original)
+    print(measurements.summary(original))
+    print(measurements.summary(copied))
+}

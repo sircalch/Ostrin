@@ -14074,6 +14074,73 @@ fn std_numeric_cholesky_matches_interpreter_and_native() {
 }
 
 #[test]
+fn std_measurements_scalar_clone_preserves_ownership() {
+    let file = example_path("measurement_clone.ostrin");
+    let expected = "2 ± 0\n2 ± 0\n";
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "Measurement clone interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "Measurement clone type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("native-source: examples/measurement_clone.ostrin ir=1 hir=0 ast=0"),
+        "Measurement clone did not use IR: {report_text}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "Measurement clone WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("std_measurements__Measurement__Float")
+            && wasi_source.contains("ostrin_retain"),
+        "Measurement clone ownership markers missing: {wasi_source}"
+    );
+
+    let exe = temp_artifact("measurement-clone.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "Measurement clone compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run Measurement clone binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "Measurement clone native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "Measurement clone leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn std_measurements_scalar_argument_and_return_preserve_ownership() {
     let file = example_path("measurement_return.ostrin");
     let expected = "2 ± 0\n";
