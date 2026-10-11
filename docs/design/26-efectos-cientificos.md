@@ -323,6 +323,11 @@ en una consola de logs.
    `effect_coverage` resume esas cantidades (`known_calls`, `unresolved_calls` y `complete`);
    `complete` solo significa que el inventario resolvió todas las llamadas observadas, no que
    haya demostrado pureza.
+   La implementación también reconoce una whitelist pequeña y explícita de operaciones locales
+   deterministas —accesos y transformaciones de colecciones, cadenas, mediciones, resultados y
+   matemáticas elementales— para no contar como deuda llamadas como `length`, `push`, `value`,
+   `Ok` o `is_finite`. Esa whitelist mejora la cobertura del inventario, pero no autoriza
+   optimizaciones de pureza ni sustituye las filas de efectos del HIR/IR.
 2. **Representación interna:** definir nombres, argumentos y uniones de filas; publicar errores estables
    para llamadas puras incompatibles.
 3. **HIR/IR:** propagar `pure`, `random(seed)`, `io`, `network`, `concurrency`, `provenance` y
