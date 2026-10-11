@@ -1002,16 +1002,16 @@ fn release_payload(access: &str, ty: &Ty, records: &RecordFields) -> Option<Stri
     }
 }
 
-/// Release an explicitly dropped value while preserving task-handle
-/// bookkeeping. Automatic scope/temporary cleanup must use `release_payload`
-/// so it does not mark a handle as already released; the language-level
-/// `drop(...)` operation uses this variant.
+/// Consume an explicitly dropped value while preserving task-handle
+/// bookkeeping. Task handles are released by the ordinary last-use cleanup;
+/// this marker prevents the execution cleanup from releasing the same handle
+/// a second time.
 fn release_owned_payload(access: &str, ty: &Ty, records: &RecordFields) -> Option<String> {
     match ty {
         Ty::Applied(name, args)
             if name == "Task" && args.len() == 1 && task_supported(&args[0], records) =>
         {
-            Some(format!("ostrin_release_owned((void*){access})"))
+            Some(format!("ostrin_mark_task_handle_released((void*){access})"))
         }
         Ty::Applied(name, args)
             if name == "Option"
