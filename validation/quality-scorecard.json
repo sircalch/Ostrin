@@ -1,6 +1,6 @@
 {
   "schema": "ostrin.quality-scorecard/v1",
-  "sourceRevision": "937be99e1ba5ff8545a4c19d14d81d45f6424adb",
+  "sourceRevision": "88e5ae6c28583fb64b3b35fe02544ab7a10a095e",
   "workingTreeDirty": true,
   "sources": {
     "native": "compiler/tests/differential.rs",
@@ -63,7 +63,7 @@
       "ast-fallback": "READY",
       "numerical-validation": "READY",
       "ownership": "OPEN",
-      "measurements": "OPEN",
+      "measurements": "READY",
       "reproducibility-r1": "OPEN",
       "documentation": "OPEN",
       "sanitizers": "READY",

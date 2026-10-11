@@ -41,8 +41,8 @@ intérprete/native y una figura SVG reproducible en la galería. El Scientific L
 ejemplo escalar con `ostrinc.wasm`. La prueba `std_measurements_scalar_matches_interpreter_and_native`
 verifica además `live_allocations=0` en nativo y que el C emitido para WASI incluya la destrucción
 recursiva de `Measurement<Float>`, `Sensitivity`, las etiquetas y las listas de fuentes. ASan/UBSan
-se ejecutan para esta prueba mediante `sanitizers.yml` en CI; el resultado de esta rama aún está
-pendiente. Esta evidencia no habilita todavía `Array<Measurement<T>>`, integración nativa con `Quantity`,
+ejecutaron esta prueba mediante `sanitizers.yml` en CI y terminaron correctamente en el run
+`38101599953`. Esta evidencia no habilita todavía `Array<Measurement<T>>`, integración nativa con `Quantity`,
 intervalos de cobertura ni Monte Carlo.
 
 ## 2. Revisión de antecedentes

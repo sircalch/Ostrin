@@ -28,9 +28,12 @@
     },
     {
       "id": "measurements",
-      "status": "OPEN",
+      "status": "READY",
       "acceptance": "Measurement<Float> has reviewed semantics and analytical reference cases, parity, zero-allocation checks and ASan/UBSan/WASI evidence for the supported scalar contract.",
-      "evidence": [{ "path": "docs/design/25-mediciones-e-incertidumbre.md", "claim": "Measurement model and current limitations" }]
+      "evidence": [
+        { "path": "docs/design/25-mediciones-e-incertidumbre.md", "claim": "Measurement scalar model, analytical cases and explicit limitations" },
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38101599953", "claim": "Scalar Measurement lifecycle passes ASan and UBSan in CI" }
+      ]
     },
     {
       "id": "reproducibility-r1",
