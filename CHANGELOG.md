@@ -37,6 +37,10 @@
 
 ### Scientific effect inventory
 
+- Added the public status scorecard's Scientific effects dimension. It reports
+  known and unresolved call coverage separately and labels an incomplete
+  inventory as `PARTIAL`, keeping the conservative boundary visible in the web
+  experience as well as in the JSON provenance artifact.
 - `ostrinc --effect-report --json` now lists every visited function and adds
   `functions_without_known_effects` for rows where the conservative inventory
   found no known effect. The field is explicitly a candidate list, not a static
