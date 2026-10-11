@@ -53,6 +53,8 @@ export function validateProjectPlan(root = repositoryRoot) {
   const websiteAudit = read("docs/website-audit.md", root);
   const viz = read("website/viz.html", root);
   const ownershipMatrix = read("docs/ownership-matrix.md", root);
+  const dynTraitDesign = read("docs/design/15-dyn-trait.md", root);
+  const fallbackLedger = read("validation/ast-fallback-ledger.json", root);
   const reproduction = read("README-reproduce.md", root);
 
   for (const [name, text] of [
@@ -121,6 +123,14 @@ export function validateProjectPlan(root = repositoryRoot) {
   }
   check(errors, status.includes("docs/ownership-matrix.md") && roadmap.includes("docs/ownership-matrix.md"),
     "ESTADO_Y_PLAN.md and ROADMAP.md must link the ownership matrix");
+  check(errors, status.includes("docs/design/15-dyn-trait.md")
+    && /HIR\/IR/i.test(dynTraitDesign) && /ownership/i.test(dynTraitDesign)
+    && /retain/.test(dynTraitDesign) && /release/.test(dynTraitDesign)
+    && /live_allocations=0/.test(dynTraitDesign),
+  "dyn Trait: public status and design contract must expose the pending HIR/IR ownership boundary");
+  const dynamicTraitEntries = fallbackLedger.match(/"reason": "dynamic-trait-(?:dispatch|default-method)"/g) ?? [];
+  check(errors, dynamicTraitEntries.length === 6,
+    "validation/ast-fallback-ledger.json: the six dynamic-trait fallback bodies must remain enumerated");
 
   const baseline = sourceBaseline(differential);
   check(errors, baseline !== null,
