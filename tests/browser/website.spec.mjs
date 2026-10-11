@@ -221,7 +221,7 @@ test("benchmark page renders the recorded workload report", async ({ page }) => 
   await page.goto("./benchmarks.html", { waitUntil: "domcontentloaded" });
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Measure the work");
   await expect(page.locator("[data-benchmark-state]")).toContainText("Recorded benchmark");
-  await expect(page.locator("[data-benchmark-rows] tr")).toHaveCount(8);
+  await expect(page.locator("[data-benchmark-rows] tr")).toHaveCount(10);
   await expect(page.locator("[data-benchmark-commit]")).not.toHaveText("—");
   await expectNoHorizontalOverflow(page, "benchmarks.html", 1280);
   expect(runtimeErrors).toEqual([]);
