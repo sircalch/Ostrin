@@ -20,6 +20,9 @@
   arguments, returns, cloning, lists, branches, loops, `Phi` joins, closures
   and deferred tasks. The focused cases include leak checks and native-thread
   execution where tasks are involved.
+- Added `Result<Measurement<Float>, String>` ownership coverage for `Ok` and
+  `Err` branches, matching, native/WASI emission and a zero-allocation native
+  leak check.
 - Kept `Measurement<Quantity<D>>` and `Array<Measurement<T>>` behind explicit
   diagnostics until their source-identity, covariance, ownership and native ABI
   contracts are implemented. The interpreter and native boundary tests document

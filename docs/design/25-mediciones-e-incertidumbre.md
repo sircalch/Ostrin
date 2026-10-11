@@ -55,6 +55,8 @@ las dos ramas de una función, con la misma evidencia de paridad y ownership.
 loop y la liberación del valor final.
 `examples/measurement_phi.ostrin` cubre la selección de dos mediciones en un
 `Phi` explícito del backend nativo.
+`examples/measurement_result.ostrin` cubre `Result<Measurement<Float>, String>`
+en las ramas `Ok` y `Err`, con `match`, emisión WASI y `live_allocations=0`.
 `examples/measurement_task.ostrin` cubre captura diferida, `join` y destrucción
 del entorno de una tarea para `Measurement<Float>`.
 `examples/measurement_array_shape.ostrin` conserva la frontera explícita de

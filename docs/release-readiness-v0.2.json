@@ -36,6 +36,7 @@
         { "path": "examples/measurement_branch.ostrin", "claim": "Measurement<Float> branch selection has interpreter/native/WASI and leak-check coverage" },
         { "path": "examples/measurement_loop.ostrin", "claim": "Measurement<Float> loop replacement and destruction has interpreter/native/WASI and leak-check coverage" },
         { "path": "examples/measurement_phi.ostrin", "claim": "Measurement<Float> Phi selection has interpreter/native/WASI and leak-check coverage" },
+        { "path": "examples/measurement_result.ostrin", "claim": "Result<Measurement<Float>, String> Ok/Err paths have interpreter/native/WASI and leak-check coverage" },
         { "path": "examples/measurement_task.ostrin", "claim": "Measurement<Float> task capture, join and destruction has interpreter/native/WASI/native-threads and leak-check coverage" },
         { "path": "examples/measurement_array_shape.ostrin", "claim": "Array<Measurement<Float>> remains explicitly rejected with interpreter and actionable native diagnostics" },
         { "path": "examples/measurement_quantity_direct_shape.ostrin", "claim": "Direct Measurement<Quantity<Length>> remains explicitly rejected before unsafe native fallback" }
