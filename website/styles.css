@@ -342,6 +342,24 @@ h4 { font-size: .86rem; }
 .benchmark-table tbody td { color: var(--muted); }
 .benchmark-table tbody td:nth-child(3), .benchmark-table tbody td:nth-child(4) { color: var(--green); }
 .benchmark-table tr:last-child th, .benchmark-table tr:last-child td { border-bottom: 0; }
+.benchmark-pair { margin-top: 24px; padding: 22px; background: var(--night-2); border: 1px solid var(--line); }
+.benchmark-pair-header { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 24px; align-items: end; }
+.benchmark-pair-header h3 { margin: 0; font-size: 1.15rem; }
+.benchmark-pair-header p:not(.eyebrow) { margin: 0; color: var(--muted); font-size: .82rem; line-height: 1.55; }
+.benchmark-bars { display: grid; gap: 18px; margin-top: 25px; }
+.benchmark-bar-row { display: grid; grid-template-columns: 8.5rem minmax(0, 1fr); gap: 16px; align-items: center; }
+.benchmark-bar-row strong { color: var(--white); font: .72rem var(--mono); font-weight: 400; }
+.benchmark-bar-tracks { display: grid; gap: 5px; }
+.benchmark-bar-track { height: 25px; overflow: hidden; background: rgba(255,255,255,.05); border: 1px solid var(--line); }
+.benchmark-bar { display: flex; min-width: 4.8rem; height: 100%; align-items: center; padding: 0 8px; color: var(--night); font: .64rem var(--mono); white-space: nowrap; transition: width 240ms ease; }
+.benchmark-bar-native { background: var(--green); }
+.benchmark-bar-interpreter { background: var(--violet-2); }
+.benchmark-legend { display: flex; flex-wrap: wrap; gap: 16px; margin: 18px 0 0 8.5rem; color: var(--muted); font: .66rem var(--mono); }
+.benchmark-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.benchmark-swatch { width: 10px; height: 10px; display: inline-block; }
+.benchmark-swatch-native { background: var(--green); }
+.benchmark-swatch-interpreter { background: var(--violet-2); }
+.benchmark-pair-summary { margin: 18px 0 0; color: var(--muted); font: .72rem/1.55 var(--mono); }
 .benchmark-note { margin-top: 24px; }
 .benchmark-command { min-width: 0; margin: 27px 0 0; overflow-x: auto; }
 .community-card .tool-icon { display: block; }
@@ -698,6 +716,7 @@ button.button-quiet, button.button { cursor: pointer; } button.button-quiet { ba
 @media (max-width: 860px) {
   .viz-intro, .viz-workflow-grid, .viz-gallery, .viz-matrix, .home-viz, .artifact-grid, .workflow-step-grid, .workflow-extension-grid, .status-metric-grid { grid-template-columns: minmax(0, 1fr); }
   .status-criteria { grid-template-columns: minmax(0, 1fr); }
+  .benchmark-pair-header { grid-template-columns: minmax(0, 1fr); gap: 14px; }
   .viz-capability-panel { grid-template-columns: minmax(0, 1fr); }
   .viz-capability-status { grid-column: auto; }
 }
