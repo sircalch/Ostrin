@@ -95,12 +95,14 @@
     },
     {
       "id": "website-audit",
-      "status": "OPEN",
+      "status": "READY",
       "acceptance": "A dated visual, accessibility and responsive review covers the public site and playground; findings are resolved or explicitly accepted with evidence.",
       "evidence": [
-        { "path": "docs/website-audit.md", "claim": "Dated visual, responsive and accessibility review with explicit Firefox runner limitation" },
+        { "path": "docs/website-audit.md", "claim": "Dated visual, responsive and accessibility review with CI-backed Firefox coverage" },
         { "path": "tests/browser/visual.spec.mjs", "claim": "Chromium desktop/tablet/mobile visual regression and representative plot coverage" },
-        { "path": "tests/browser/cross-browser.spec.mjs", "claim": "Firefox/WebKit responsive and keyboard smoke coverage" }
+        { "path": "tests/browser/cross-browser.spec.mjs", "claim": "Firefox/WebKit responsive and keyboard smoke coverage" },
+        { "path": ".github/workflows/browser-audit.yml", "claim": "Non-deploying pinned Ubuntu 24.04 browser audit" },
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38111107188", "claim": "Chromium, Firefox, WebKit, WASM, static and accessibility website checks pass" }
       ]
     },
     {

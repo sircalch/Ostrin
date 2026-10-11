@@ -17,12 +17,11 @@ generated `ostrinc.wasm` artifact:
 | Chromium visual regression | PASS | `npm test -- --project=chromium visual.spec.mjs`: 2 tests passed; six public surfaces were checked at desktop (1440×960), tablet (768×1024) and mobile (390×844), plus seven representative plots. Existing snapshots remained within the configured pixel-diff threshold. |
 | Chromium functional/accessibility suite | PASS | `npm test -- --project=chromium website.spec.mjs`: 30 tests passed, including the benchmark report, keyboard navigation, accessible names, real WASM compiler flows, Viz/3D/animation/table/provenance controls and the public status dashboard. |
 | WebKit responsive smoke | PASS | `npm test -- --project=webkit-smoke cross-browser.spec.mjs`: public-page overflow and keyboard semantics passed. |
-| Firefox responsive smoke | ENVIRONMENT LIMITATION | Playwright Firefox could not launch on this Windows runner (`spawn UNKNOWN`) before a page was opened. The Firefox smoke remains required in the pinned CI/browser environment; no site failure is inferred from this local launch error. |
+| Firefox responsive smoke | PASS | Pinned Ubuntu 24.04 browser audit installed Firefox and passed the public-page overflow, keyboard and runtime-error suite in [CI run 38111107188](https://github.com/sircalch/Ostrin/actions/runs/38111107188). The Windows local `spawn UNKNOWN` limitation is a tooling note, not a site result. |
 | Static accessibility and metadata checks | PASS | `node scripts/website-check.mjs`: 17 public pages, heading hierarchy, social card, accessible status regions, generated facts and benchmark data passed. |
 
-The Firefox launch limitation remains an open release item until the corresponding CI job produces
-a successful run. The local Chromium/WebKit results are evidence for this checkout and do not replace
-the cross-browser CI gate.
+The cross-browser CI gate is green in the pinned Ubuntu 24.04 environment. The local Windows
+Firefox launch limitation remains documented as a tooling note and does not replace the CI result.
 
 ## Existing surfaces
 
