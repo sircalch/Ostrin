@@ -48,7 +48,16 @@ function nativeCounts() {
 
 function ownershipCounts() {
   const source = text("docs/ownership-matrix.md");
-  const rows = source.split(/\r?\n/).filter((line) => line.startsWith("| `") || line.startsWith("| Record") || line.startsWith("| Enum") || line.startsWith("| Closure"));
+  const rows = source
+    .split(/\r?\n/)
+    .filter((line) =>
+      line.startsWith("| `")
+      || line.startsWith("| Record")
+      || line.startsWith("| Enum")
+      || line.startsWith("| Closure")
+      || line.startsWith("| Iterator")
+      || line.startsWith("| Agregado")
+    );
   const counts = { tested: 0, supported: 0, notApplicable: 0, knownLimitation: 0 };
   for (const row of rows) {
     for (const cell of row.split("|").slice(2, 17)) {
