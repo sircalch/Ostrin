@@ -1,6 +1,6 @@
 # Ostrin website audit
 
-*Cut: 2026-10-10 · source counts and public fallbacks are checked by
+*Cut: 2026-10-11 · source counts and public fallbacks are checked by
 `scripts/website-check.mjs`; plan and maturity claims are checked by
 `scripts/project-plan-check.mjs` and `scripts/quantity-ownership-check.mjs`.*
 
@@ -9,12 +9,13 @@ tests or an explicitly labeled early-stage surface.
 
 ## Dated visual and responsive review
 
-Review performed on **2026-10-10** from the current checkout with the real static site and
+Review performed on **2026-10-11** from the current checkout with the real static site and
 generated `ostrinc.wasm` artifact:
 
 | Check | Result | Evidence and disposition |
 | --- | --- | --- |
 | Chromium visual regression | PASS | `npm test -- --project=chromium visual.spec.mjs`: 2 tests passed; six public surfaces were checked at desktop (1440×960), tablet (768×1024) and mobile (390×844), plus seven representative plots. Existing snapshots remained within the configured pixel-diff threshold. |
+| Chromium functional/accessibility suite | PASS | `npm test -- --project=chromium website.spec.mjs`: 30 tests passed, including the benchmark report, keyboard navigation, accessible names, real WASM compiler flows, Viz/3D/animation/table/provenance controls and the public status dashboard. |
 | WebKit responsive smoke | PASS | `npm test -- --project=webkit-smoke cross-browser.spec.mjs`: public-page overflow and keyboard semantics passed. |
 | Firefox responsive smoke | ENVIRONMENT LIMITATION | Playwright Firefox could not launch on this Windows runner (`spawn UNKNOWN`) before a page was opened. The Firefox smoke remains required in the pinned CI/browser environment; no site failure is inferred from this local launch error. |
 | Static accessibility and metadata checks | PASS | `node scripts/website-check.mjs`: 17 public pages, heading hierarchy, social card, accessible status regions, generated facts and benchmark data passed. |
