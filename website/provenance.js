@@ -17,6 +17,21 @@ if (artifact) {
     0,
   );
   setText("[data-provenance-unresolved-calls]", `${unresolvedCount} calls`);
+  const unresolvedList = document.querySelector("[data-provenance-unresolved-list]");
+  if (unresolvedList) {
+    unresolvedList.replaceChildren();
+    if (unresolvedCalls.length === 0) {
+      const item = document.createElement("li");
+      item.textContent = "No unresolved calls recorded.";
+      unresolvedList.append(item);
+    } else {
+      for (const entry of unresolvedCalls) {
+        const item = document.createElement("li");
+        item.textContent = `${entry.function}: ${(entry.calls ?? []).join(", ")}`;
+        unresolvedList.append(item);
+      }
+    }
+  }
   const runtime = artifact.runtime;
   const runtimeLabel = runtime?.target
     ? `${runtime.target}${runtime.wasi ? ` · WASI ${runtime.wasi}` : ""} · ${runtime.status ?? "unknown"}`
