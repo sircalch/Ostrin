@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.2.0 (candidate)
+
+### Scientific measurement ownership
+
+- Added native/WASI ownership coverage for `Measurement<Float>` across records,
+  arguments, returns, cloning, lists, branches, loops, `Phi` joins, closures
+  and deferred tasks. The focused cases include leak checks and native-thread
+  execution where tasks are involved.
+- Kept `Measurement<Quantity<D>>` and `Array<Measurement<T>>` behind explicit
+  diagnostics until their source-identity, covariance, ownership and native ABI
+  contracts are implemented. The interpreter and native boundary tests document
+  the supported behavior and the current limitation.
+- Re-synchronized public inventories and quality scorecard data with the
+  current 291-example, 315-integration-test repository state.
+
 ## Unreleased
 
 ### Compiler fallback reduction
