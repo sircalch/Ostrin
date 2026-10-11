@@ -11428,6 +11428,7 @@ fn experimental_effect_report_propagates_to_callers() {
         artifact["function_calls"]["main"],
         serde_json::json!(["emit_marker"])
     );
+    assert_eq!(artifact["unresolved_calls"], serde_json::json!({}));
 }
 #[test]
 fn experimental_provenance_report_contains_source_hash_and_effects() {

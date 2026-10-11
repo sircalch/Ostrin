@@ -41,6 +41,8 @@
   `functions_without_known_effects` for rows where the conservative inventory
   found no known effect. The field is explicitly a candidate list, not a static
   purity guarantee; unresolved calls remain outside the report.
+- The same report now exposes `unresolved_calls` per function, and the provenance
+  artifact carries that boundary in `activity.unresolved_calls`.
 - `ostrinc --provenance-report --json` carries the same candidate list inside
   `activity.functions_without_known_effects`, so reproducibility artifacts keep
   the effect evidence alongside their source hash and effect sites.

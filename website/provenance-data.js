@@ -673,6 +673,128 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "line": 46,
         "operation": "print"
       }
+    ],
+    "unresolved_calls": [
+      {
+        "calls": [
+          "sqrt"
+        ],
+        "function": "main"
+      },
+      {
+        "calls": [
+          "Err",
+          "Ok"
+        ],
+        "function": "std.measurements::add"
+      },
+      {
+        "calls": [
+          "Err",
+          "Ok"
+        ],
+        "function": "std.measurements::div"
+      },
+      {
+        "calls": [
+          "is_finite"
+        ],
+        "function": "std.measurements::exact"
+      },
+      {
+        "calls": [
+          "measurement.sources.length"
+        ],
+        "function": "std.measurements::is_exact"
+      },
+      {
+        "calls": [
+          "Err",
+          "Ok"
+        ],
+        "function": "std.measurements::mean"
+      },
+      {
+        "calls": [
+          "Err",
+          "Ok",
+          "merged.push"
+        ],
+        "function": "std.measurements::merge_scaled"
+      },
+      {
+        "calls": [
+          "Err",
+          "Ok"
+        ],
+        "function": "std.measurements::mul"
+      },
+      {
+        "calls": [
+          "measurement.sources.length"
+        ],
+        "function": "std.measurements::source_count"
+      },
+      {
+        "calls": [
+          "Err",
+          "Ok",
+          "is_finite",
+          "label.length"
+        ],
+        "function": "std.measurements::standard"
+      },
+      {
+        "calls": [
+          "Err",
+          "Ok"
+        ],
+        "function": "std.measurements::sub"
+      },
+      {
+        "calls": [
+          "Err",
+          "Ok"
+        ],
+        "function": "std.measurements::sum"
+      },
+      {
+        "calls": [
+          "measurement.value.to_string",
+          "sigma.to_string"
+        ],
+        "function": "std.measurements::summary"
+      },
+      {
+        "calls": [
+          "Err",
+          "Ok",
+          "output.push"
+        ],
+        "function": "std.measurements::uncertainties"
+      },
+      {
+        "calls": [
+          "Err",
+          "is_finite"
+        ],
+        "function": "std.measurements::uncertainty"
+      },
+      {
+        "calls": [
+          "output.push"
+        ],
+        "function": "std.measurements::values"
+      },
+      {
+        "calls": [
+          "Err",
+          "Ok",
+          "is_finite",
+          "sqrt"
+        ],
+        "function": "std.measurements::variance"
+      }
     ]
   },
   "compiler": {
@@ -685,6 +807,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
   "inputs": [],
   "limitations": [
     "This artifact is a conservative source inventory, not a static effect guarantee.",
+    "Unresolved calls are listed separately because an empty known-effect row does not imply purity.",
     "The runtime snapshot is partial; input snapshots, invocation output hashes and captured host metadata are still required for R2/R3."
   ],
   "outputs": [],

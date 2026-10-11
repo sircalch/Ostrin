@@ -356,6 +356,7 @@ fn real_main() -> ExitCode {
                         .cloned()
                         .collect::<Vec<_>>(),
                     "function_calls": report.function_calls,
+                    "unresolved_calls": report.unresolved_calls,
                     "sites": sites,
                 })
             );
@@ -391,6 +392,12 @@ fn real_main() -> ExitCode {
             println!(
                 "functions without known effects: {without_known_effects} (not a purity proof)"
             );
+            let unresolved_calls: usize = report
+                .unresolved_calls
+                .values()
+                .map(std::collections::BTreeSet::len)
+                .sum();
+            println!("unresolved calls: {unresolved_calls} (effect coverage is incomplete)");
             for site in &report.sites {
                 let file = site.file.as_deref().unwrap_or("<unknown>");
                 println!(

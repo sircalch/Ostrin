@@ -75,6 +75,10 @@ pub struct EffectReport {
     /// proof of purity because unresolved calls remain outside this report.
     pub function_names: BTreeSet<String>,
     pub function_calls: BTreeMap<String, BTreeSet<String>>,
+    /// Calls that could not be matched to a local function or a classified
+    /// host operation. These make the conservative boundary explicit: a
+    /// function with no known effect may still call one of these operations.
+    pub unresolved_calls: BTreeMap<String, BTreeSet<String>>,
     pub sites: Vec<EffectSite>,
 }
 
@@ -101,9 +105,32 @@ pub fn analyze(items: &[Item]) -> EffectReport {
             _ => {}
         }
     }
+    classify_unresolved_calls(&mut report);
     propagate_function_effects(&mut report);
     report.sort_sites();
     report
+}
+
+fn classify_unresolved_calls(report: &mut EffectReport) {
+    let known_functions = &report.function_names;
+    for (caller, calls) in &report.function_calls {
+        for operation in calls {
+            let leaf = operation
+                .rsplit(|character| character == '.' || character == ':')
+                .find(|segment| !segment.is_empty())
+                .unwrap_or(operation);
+            if classify(operation).is_none()
+                && !known_functions.contains(operation)
+                && !known_functions.contains(leaf)
+            {
+                report
+                    .unresolved_calls
+                    .entry(caller.clone())
+                    .or_default()
+                    .insert(operation.clone());
+            }
+        }
+    }
 }
 
 fn walk_impl(implementation: &ImplDecl, report: &mut EffectReport) {

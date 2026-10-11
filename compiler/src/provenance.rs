@@ -121,6 +121,16 @@ pub fn build_report(path: &Path, source: &[u8], target: &str, effects: &EffectRe
             })
         })
         .collect();
+    let unresolved_calls: Vec<Value> = effects
+        .unresolved_calls
+        .iter()
+        .map(|(function, calls)| {
+            json!({
+                "function": function,
+                "calls": calls.iter().collect::<Vec<_>>(),
+            })
+        })
+        .collect();
 
     let (level, reason) = if effect_names.is_empty() {
         (
@@ -152,6 +162,7 @@ pub fn build_report(path: &Path, source: &[u8], target: &str, effects: &EffectRe
         "activity": {
             "effects": effect_names,
             "functions_without_known_effects": functions_without_known_effects,
+            "unresolved_calls": unresolved_calls,
             "sites": sites,
         },
         "inputs": [],
@@ -162,6 +173,7 @@ pub fn build_report(path: &Path, source: &[u8], target: &str, effects: &EffectRe
         },
         "limitations": [
             "This artifact is a conservative source inventory, not a static effect guarantee.",
+            "Unresolved calls are listed separately because an empty known-effect row does not imply purity.",
             "The runtime snapshot is partial; input snapshots, invocation output hashes and captured host metadata are still required for R2/R3.",
         ],
     })

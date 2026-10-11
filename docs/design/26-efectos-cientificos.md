@@ -317,6 +317,9 @@ en una consola de logs.
    de que el resultado es conservador y no es una garantía estática. El JSON también publica
    `functions_without_known_effects`: son candidatos cuyo inventario no encontró una fila conocida,
    no funciones declaradas puras, porque una llamada no resuelta puede quedar fuera del análisis.
+   El JSON también expone `unresolved_calls` por función: llamadas que no se pudieron resolver
+   contra una función local ni contra una operación de host clasificada. Esta separación deja
+   visible la deuda de cobertura para la futura inferencia estática de efectos.
 2. **Representación interna:** definir nombres, argumentos y uniones de filas; publicar errores estables
    para llamadas puras incompatibles.
 3. **HIR/IR:** propagar `pure`, `random(seed)`, `io`, `network`, `concurrency`, `provenance` y
