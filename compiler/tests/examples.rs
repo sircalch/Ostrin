@@ -9071,6 +9071,73 @@ fn native_ir_nested_record_option_payload_ownership() {
 }
 
 #[test]
+fn native_ir_nested_aggregate_field_preserves_ownership() {
+    let file = example_path("native_ir_nested_aggregate_field.ostrin");
+    let expected = "nested\n";
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "nested aggregate field type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("ir-generated: 1")
+            && report_text.contains("hir-generated: 0")
+            && report_text.contains("ast-fallback: 0"),
+        "nested aggregate field regressed from IR: {report_text}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "nested aggregate field WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    assert!(
+        stdout(&wasi).contains("Option_Inner") && stdout(&wasi).contains("ostrin_release"),
+        "nested aggregate field WASI ownership helpers missing"
+    );
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "nested aggregate field interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let exe = temp_artifact("native-ir-nested-aggregate-field.exe");
+    let compiled = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compiled) {
+        return;
+    }
+    assert!(
+        compiled.status.success(),
+        "nested aggregate field compile failed: {}",
+        stderr(&compiled)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run nested aggregate field binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "nested aggregate field native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "nested aggregate field leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn native_ir_emitter_preserves_checked_fixed_width_arithmetic() {
     let file = example_path("native_ir_sized.ostrin");
     let expected = "120\n-4\n-7\n";

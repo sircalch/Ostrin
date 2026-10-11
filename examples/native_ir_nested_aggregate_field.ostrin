@@ -1,0 +1,16 @@
+record Inner {
+    text: String
+}
+
+record Outer {
+    item: Option<Inner>
+}
+
+fn main() -> Void {
+    mut outer = Outer { item: Some(Inner { text: "nested" }) }
+    match outer.item {
+        Some(inner) => print(inner.text),
+        None => print("none")
+    }
+    drop(outer)
+}
