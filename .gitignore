@@ -20,6 +20,9 @@ examples/plot_project/app/ostrin.lock
 examples/autodiff_project/app/ostrin.lock
 examples/*/*/ostrin.lock
 
+# The data-project lockfile is a checked-in, path-redacted provenance fixture.
+!examples/data_project/app/ostrin.lock
+
 # Explicit Git package fetch cache
 .ostrin/
 
