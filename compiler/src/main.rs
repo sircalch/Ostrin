@@ -346,6 +346,15 @@ fn real_main() -> ExitCode {
                     "function_effects": report.function_kinds.iter().map(|(function, kinds)| (
                         function.clone(), kinds.iter().map(|kind| kind.label()).collect::<Vec<_>>()
                     )).collect::<std::collections::BTreeMap<_, _>>(),
+                    "functions_without_known_effects": report.function_names.iter()
+                        .filter(|function| {
+                            report
+                                .function_kinds
+                                .get(*function)
+                                .is_none_or(std::collections::BTreeSet::is_empty)
+                        })
+                        .cloned()
+                        .collect::<Vec<_>>(),
                     "function_calls": report.function_calls,
                     "sites": sites,
                 })
@@ -369,6 +378,19 @@ fn real_main() -> ExitCode {
                 }
             }
             println!("sites: {}", report.sites.len());
+            let without_known_effects = report
+                .function_names
+                .iter()
+                .filter(|function| {
+                    report
+                        .function_kinds
+                        .get(*function)
+                        .is_none_or(std::collections::BTreeSet::is_empty)
+                })
+                .count();
+            println!(
+                "functions without known effects: {without_known_effects} (not a purity proof)"
+            );
             for site in &report.sites {
                 let file = site.file.as_deref().unwrap_or("<unknown>");
                 println!(

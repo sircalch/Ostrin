@@ -314,7 +314,9 @@ en una consola de logs.
 
 1. **Inventario (sin sintaxis nueva):** clasificar builtins, módulos, ejemplos y fronteras FFI por efecto;
    `ostrinc --effect-report` ya registra sitios conocidos en texto o JSON, con una advertencia explícita
-   de que el resultado es conservador y no es una garantía estática.
+   de que el resultado es conservador y no es una garantía estática. El JSON también publica
+   `functions_without_known_effects`: son candidatos cuyo inventario no encontró una fila conocida,
+   no funciones declaradas puras, porque una llamada no resuelta puede quedar fuera del análisis.
 2. **Representación interna:** definir nombres, argumentos y uniones de filas; publicar errores estables
    para llamadas puras incompatibles.
 3. **HIR/IR:** propagar `pure`, `random(seed)`, `io`, `network`, `concurrency`, `provenance` y

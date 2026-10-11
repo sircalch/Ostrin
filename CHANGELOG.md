@@ -29,11 +29,18 @@
   contracts are implemented. The interpreter and native boundary tests document
   the supported behavior and the current limitation.
 - Re-synchronized public inventories and quality scorecard data with the
-  current 296-example, 320-integration-test repository state.
+  current 298-example, 320-integration-test repository state.
 
 ## Unreleased
 
 ### Compiler fallback reduction
+
+### Scientific effect inventory
+
+- `ostrinc --effect-report --json` now lists every visited function and adds
+  `functions_without_known_effects` for rows where the conservative inventory
+  found no known effect. The field is explicitly a candidate list, not a static
+  purity guarantee; unresolved calls remain outside the report.
 
 - Lowered a nested `List<Outer>` aggregate containing `Option<Inner>` through
   IR/C. The typed `empty() -> Option<Inner>` constructor preserves the `None`

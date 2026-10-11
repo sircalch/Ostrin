@@ -70,6 +70,10 @@ pub struct EffectReport {
     pub kinds: BTreeSet<EffectKind>,
     /// Direct per-function effect rows, kept separate from the global inventory.
     pub function_kinds: BTreeMap<String, BTreeSet<EffectKind>>,
+    /// Every function visited by the inventory, including rows with no known
+    /// effect. An empty row is evidence for a candidate only; it is not a
+    /// proof of purity because unresolved calls remain outside this report.
+    pub function_names: BTreeSet<String>,
     pub function_calls: BTreeMap<String, BTreeSet<String>>,
     pub sites: Vec<EffectSite>,
 }
@@ -109,6 +113,7 @@ fn walk_impl(implementation: &ImplDecl, report: &mut EffectReport) {
 }
 
 fn walk_function(function: &FunctionDecl, report: &mut EffectReport) {
+    report.function_names.insert(function.name.clone());
     for parameter in &function.params {
         if let Some(default) = &parameter.default {
             walk_expr(
