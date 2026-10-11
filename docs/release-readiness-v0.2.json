@@ -102,7 +102,10 @@
       "status": "OPEN",
       "acceptance": "Clean-runner install checks pass for supported operating systems and execute a real Ostrin program from the installed compiler; attach the candidate workflow run.",
       "requires_ci_run_url": true,
-      "evidence": [{ "path": ".github/workflows/install-check.yml", "claim": "Cross-platform clean-runner installation workflow; attach v0.2 candidate run links before release" }]
+      "evidence": [
+        { "path": ".github/workflows/install-check.yml", "claim": "Cross-platform clean-runner installation workflow; attach v0.2 candidate run links before release" },
+        { "path": "validation/installation-local-2026-10-10.json", "claim": "Published 0.1.0 Windows installer checksum, version, check and hello smoke evidence" }
+      ]
     },
     {
       "id": "changelog",
