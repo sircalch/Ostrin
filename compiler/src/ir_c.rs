@@ -1002,6 +1002,47 @@ fn release_payload(access: &str, ty: &Ty, records: &RecordFields) -> Option<Stri
     }
 }
 
+/// Release an explicitly dropped value while preserving task-handle
+/// bookkeeping. Automatic scope/temporary cleanup must use `release_payload`
+/// so it does not mark a handle as already released; the language-level
+/// `drop(...)` operation uses this variant.
+fn release_owned_payload(access: &str, ty: &Ty, records: &RecordFields) -> Option<String> {
+    match ty {
+        Ty::Applied(name, args)
+            if name == "Task" && args.len() == 1 && task_supported(&args[0], records) =>
+        {
+            Some(format!("ostrin_release_owned((void*){access})"))
+        }
+        Ty::Applied(name, args)
+            if name == "Option"
+                && args.len() == 1
+                && option_supported(&args[0], records)
+                && option_managed_payload(&args[0], records) =>
+        {
+            release_owned_payload(&format!("({access}).value"), &args[0], records)
+                .map(|body| format!("if (({access}).has) {{ {body}; }}"))
+        }
+        Ty::Applied(name, args)
+            if name == "Result"
+                && args.len() == 2
+                && result_supported(&args[0], &args[1], records)
+                && result_managed_payload(ty, records) =>
+        {
+            let ok = release_owned_payload(&format!("({access}).value"), &args[0], records);
+            let err = release_owned_payload(&format!("({access}).error"), &args[1], records);
+            match (ok, err) {
+                (Some(ok), Some(err)) => {
+                    Some(format!("if (({access}).ok) {{ {ok}; }} else {{ {err}; }}"))
+                }
+                (Some(ok), None) => Some(format!("if (({access}).ok) {{ {ok}; }}")),
+                (None, Some(err)) => Some(format!("if (!({access}).ok) {{ {err}; }}")),
+                (None, None) => None,
+            }
+        }
+        _ => release_payload(access, ty, records),
+    }
+}
+
 fn value_name(value: ValueId) -> String {
     format!("__ir_v{value}")
 }
@@ -3466,7 +3507,7 @@ fn emit_instruction(
                 if !supported(&arg_ty, records) {
                     return Err(());
                 }
-                if let Some(release) = release_payload(&codes[0], &arg_ty, records) {
+                if let Some(release) = release_owned_payload(&codes[0], &arg_ty, records) {
                     format!("({{ {release}; (void)0; }})")
                 } else {
                     "(void)0".to_string()

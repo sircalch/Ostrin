@@ -932,6 +932,10 @@ fn safe_release_site(instruction: &IrInstr) -> bool {
         // local ownership after any direct call. `Some` is included here as
         // well because its constructor retains the payload before returning
         // the option value.
+        // `drop(value)` consumes the value itself. Its native lowering emits
+        // the release, so inserting the ordinary last-use release after the
+        // call would release the same task/heap handle twice.
+        IrInstr::Call { callee, .. } if callee == "drop" => false,
         IrInstr::Call { .. } | IrInstr::ClosureCall { .. } => true,
         // These opaque array operations borrow their source and return a fresh
         // allocation, so the source can be released immediately after the
