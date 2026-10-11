@@ -17,7 +17,7 @@
         { "path": "scripts/numeric-validation.mjs", "claim": "Independent numerical residual and reference validation" },
         { "path": "validation/numeric/matrix_algorithms.json", "claim": "Analytical cases and explicit tolerances" },
         { "path": "docs/design/24-metodos-numericos.md", "claim": "Numerical validation method and scope" },
-        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38172207563", "claim": "Ostrin CI numerical-validation artifacts pass on Windows, macOS and Ubuntu" }
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38173152874", "claim": "Ostrin CI numerical-validation artifacts pass on Windows, macOS and Ubuntu" }
       ]
     },
     {
@@ -55,7 +55,7 @@
       "acceptance": "Measurement<Float> has reviewed semantics and analytical reference cases, parity, zero-allocation checks and ASan/UBSan/WASI evidence for the supported scalar contract.",
       "evidence": [
         { "path": "docs/design/25-mediciones-e-incertidumbre.md", "claim": "Measurement scalar model, analytical cases and explicit limitations" },
-        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38172207387", "claim": "Scalar Measurement lifecycle passes ASan and UBSan in CI" }
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38173152897", "claim": "Scalar Measurement lifecycle passes ASan and UBSan in CI" }
       ]
     },
     {
@@ -66,7 +66,7 @@
       "evidence": [
         { "path": "scripts/experiment-replay.mjs", "claim": "Executable R1/R2 replay gate discovers the registry" },
         { "path": "docs/design/26-efectos-cientificos.md", "claim": "Defines exact replay scope and per-metric cross-platform tolerance requirements" },
-        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38172207563", "claim": "Ostrin CI replays all 11 declared R1/R2 bundles and verifies changed-input output" },
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38173152874", "claim": "Ostrin CI replays all 11 declared R1/R2 bundles and verifies changed-input output" },
         { "url": "https://github.com/sircalch/Ostrin/actions/runs/38162721694", "claim": "Website CI publishes the host-bound R3 evidence artifact; its report validates 29/29 bundles with openCount=0" }
       ]
     },
@@ -88,7 +88,7 @@
       "requires_ci_run_url": true,
       "evidence": [
         { "path": ".github/workflows/sanitizers.yml", "claim": "Required sanitizer workflows" },
-        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38172207387", "claim": "ASan and UBSan native suites pass" }
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38173152897", "claim": "ASan and UBSan native suites pass" }
       ]
     },
     {
@@ -110,7 +110,7 @@
         { "path": "tests/browser/visual.spec.mjs", "claim": "Chromium desktop/tablet/mobile visual regression and representative plot coverage" },
         { "path": "tests/browser/cross-browser.spec.mjs", "claim": "Firefox/WebKit responsive and keyboard smoke coverage" },
         { "path": ".github/workflows/browser-audit.yml", "claim": "Non-deploying pinned Ubuntu 24.04 browser audit" },
-        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38172207563", "claim": "Chromium, Firefox, WebKit, WASM, static and accessibility website checks pass" }
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38173152874", "claim": "Chromium, Firefox, WebKit, WASM, static and accessibility website checks pass" }
       ]
     },
     {

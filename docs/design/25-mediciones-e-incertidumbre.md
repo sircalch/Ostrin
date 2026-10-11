@@ -72,7 +72,7 @@ ejemplo escalar con `ostrinc.wasm`. La prueba `std_measurements_scalar_matches_i
 verifica además `live_allocations=0` en nativo y que el C emitido para WASI incluya la destrucción
 recursiva de `Measurement<Float>`, `Sensitivity`, las etiquetas y las listas de fuentes. ASan/UBSan
 ejecutaron esta prueba mediante `sanitizers.yml` en CI y terminaron correctamente en el run
-`38172207387`. Esta evidencia no habilita todavía `Array<Measurement<T>>`, integración nativa con `Quantity`,
+`38173152897`. Esta evidencia no habilita todavía `Array<Measurement<T>>`, integración nativa con `Quantity`,
 intervalos de cobertura ni Monte Carlo.
 
 ## 2. Revisión de antecedentes
