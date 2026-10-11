@@ -1,6 +1,6 @@
 {
   "schema": "ostrin.quality-scorecard/v1",
-  "sourceRevision": "e9f2792f019e818a12bca9cca25eefd48e349269",
+  "sourceRevision": "bd217966e0a724cb131bf4dfc2c6b0bc4618627b",
   "workingTreeDirty": true,
   "sources": {
     "native": "compiler/tests/differential.rs",
@@ -71,7 +71,7 @@
       "website-audit": "OPEN",
       "installation": "READY",
       "changelog": "OPEN",
-      "artifacts": "OPEN"
+      "artifacts": "READY"
     }
   },
   "artifacts": {
