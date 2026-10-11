@@ -26,7 +26,8 @@
       "acceptance": "The ownership matrix has current evidence for every promoted cell; high-risk enum, wrapper, aggregate, escape, error, Phi, closure and task paths pass leak-check and applicable sanitizers/WASI.",
       "evidence": [
         { "path": "docs/ownership-matrix.md", "claim": "Ownership support, tested boundaries and limitations" },
-        { "path": "compiler/tests/fixtures/native_ir_quantity_array_record_field.ostrin", "claim": "Array<Quantity<Length>> record-field replacement has interpreter/native/WASI and leak-check coverage" }
+        { "path": "compiler/tests/fixtures/native_ir_quantity_array_record_field.ostrin", "claim": "Array<Quantity<Length>> record-field replacement has interpreter/native/WASI and leak-check coverage" },
+        { "path": "examples/native_ir_map_set_branch.ostrin", "claim": "Map and Set branch selection has interpreter/native/WASI and leak-check coverage" }
       ]
     },
     {

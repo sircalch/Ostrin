@@ -5328,6 +5328,74 @@ fn native_ir_list_closure_capture_preserves_ownership() {
 }
 
 #[test]
+fn native_ir_map_set_branch_preserves_ownership() {
+    let file = example_path("native_ir_map_set_branch.ostrin");
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "map/set branch type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("ir-generated: 3")
+            && report_text.contains("hir-generated: 0")
+            && report_text.contains("ast-fallback: 0"),
+        "map/set branch regressed from IR: {report_text}"
+    );
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter map/set branch failed: {}",
+        stderr(&interpreted)
+    );
+    let expected = "1\n2\n1\ntrue\n";
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "WASI map/set branch emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("Map_String_Int") && wasi_source.contains("Set_String"),
+        "WASI C omitted map/set branch runtime: {wasi_source}"
+    );
+
+    let exe = temp_artifact("native-ir-map-set-branch.exe");
+    let compiled = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compiled) {
+        return;
+    }
+    assert!(
+        compiled.status.success(),
+        "native map/set branch compile failed: {}",
+        stderr(&compiled)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run native map/set branch binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "native map/set branch failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "native map/set branch leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn native_ir_map_set_closure_capture_preserves_ownership() {
     let file = example_path("native_ir_map_set_closure_capture.ostrin");
     let report = run(&["--native-type-report", &file]);
