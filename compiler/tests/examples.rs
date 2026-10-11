@@ -11434,6 +11434,28 @@ fn experimental_effect_report_propagates_to_callers() {
         serde_json::json!({"known_calls": 2, "unresolved_calls": 0, "complete": true})
     );
 }
+
+#[test]
+fn experimental_effect_report_keeps_unknown_calls_unresolved() {
+    let file = temp_source(
+        "effects-unknown.ostrin",
+        "fn main() -> Void {\n    mystery_host_operation()\n}\n",
+    );
+    let out = run(&["--effect-report", "--json", &file]);
+    let _ = fs::remove_file(&file);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let artifact: serde_json::Value =
+        serde_json::from_str(&stdout(&out)).expect("effect report must be JSON");
+    assert_eq!(
+        artifact["unresolved_calls"]["main"],
+        serde_json::json!(["mystery_host_operation"])
+    );
+    assert_eq!(
+        artifact["effect_coverage"],
+        serde_json::json!({"known_calls": 0, "unresolved_calls": 1, "complete": false})
+    );
+}
+
 #[test]
 fn experimental_provenance_report_contains_source_hash_and_effects() {
     let out = run(&[
