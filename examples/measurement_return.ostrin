@@ -1,0 +1,14 @@
+import std.measurements
+
+fn make() -> Measurement<Float> {
+    measurements.exact(2.0)
+}
+
+fn identity(value: Measurement<Float>) -> Measurement<Float> {
+    value
+}
+
+fn main() -> Void {
+    x = identity(make())
+    print(measurements.summary(x))
+}
