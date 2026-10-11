@@ -1,6 +1,6 @@
 {
   "schema": "ostrin.quality-scorecard/v1",
-  "sourceRevision": "344b690f0c681ec0bc5c51e2ad7306a5c0325e89",
+  "sourceRevision": "7e2cc6118774cbcd4577d5e637e300c798f6b38e",
   "workingTreeDirty": true,
   "sources": {
     "native": "compiler/tests/differential.rs",
@@ -10,7 +10,7 @@
     "tests": "compiler/tests"
   },
   "tests": {
-    "rustMarkedTests": 324
+    "rustMarkedTests": 325
   },
   "nativeBackend": {
     "ir": 6948,
