@@ -46,7 +46,7 @@ test("the current v0.2 gate remains closed after reaching the AST target", () =>
   const result = validateV02Readiness(repositoryRoot);
   assert.equal(result.ready, false);
   assert.ok(!result.errors.some((error) => error.includes("AST fallback ratchet")));
-  assert.ok(result.errors.some((error) => error.includes("sanitizers: status is OPEN")));
+  assert.ok(result.errors.some((error) => error.includes("ownership: status is OPEN")));
 });
 
 test("the gate rejects READY claims without evidence files", () => {

@@ -10,13 +10,14 @@
     },
     {
       "id": "numerical-validation",
-      "status": "OPEN",
+      "status": "READY",
       "acceptance": "The analytic residual suite for LU, Cholesky, QR, SVD and symmetric eigenpairs passes for interpreter and native builds on the supported CI operating systems with per-case tolerances and no leaks.",
       "requires_ci_run_url": true,
       "evidence": [
         { "path": "scripts/numeric-validation.mjs", "claim": "Independent numerical residual and reference validation" },
         { "path": "validation/numeric/matrix_algorithms.json", "claim": "Analytical cases and explicit tolerances" },
-        { "path": "docs/design/24-metodos-numericos.md", "claim": "Numerical validation method and scope" }
+        { "path": "docs/design/24-metodos-numericos.md", "claim": "Numerical validation method and scope" },
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38101599959", "claim": "Ostrin CI numerical-validation artifacts pass on Windows, macOS and Ubuntu" }
       ]
     },
     {
@@ -52,10 +53,13 @@
     },
     {
       "id": "sanitizers",
-      "status": "OPEN",
+      "status": "READY",
       "acceptance": "The complete release-candidate test scope passes ASan and UBSan on CI, with no unresolved critical memory or undefined-behavior findings and successful run links attached.",
       "requires_ci_run_url": true,
-      "evidence": [{ "path": ".github/workflows/sanitizers.yml", "claim": "Required sanitizer workflows; attach successful v0.2 candidate run links before release" }]
+      "evidence": [
+        { "path": ".github/workflows/sanitizers.yml", "claim": "Required sanitizer workflows" },
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38101599953", "claim": "ASan and UBSan native suites pass" }
+      ]
     },
     {
       "id": "benchmarks",
