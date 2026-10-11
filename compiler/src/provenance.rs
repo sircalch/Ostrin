@@ -131,6 +131,7 @@ pub fn build_report(path: &Path, source: &[u8], target: &str, effects: &EffectRe
             })
         })
         .collect();
+    let (known_calls, unresolved_call_count) = effects.call_coverage();
 
     let (level, reason) = if effect_names.is_empty() {
         (
@@ -163,6 +164,11 @@ pub fn build_report(path: &Path, source: &[u8], target: &str, effects: &EffectRe
             "effects": effect_names,
             "functions_without_known_effects": functions_without_known_effects,
             "unresolved_calls": unresolved_calls,
+            "effect_coverage": {
+                "known_calls": known_calls,
+                "unresolved_calls": unresolved_call_count,
+                "complete": unresolved_call_count == 0,
+            },
             "sites": sites,
         },
         "inputs": [],

@@ -17,6 +17,11 @@ if (artifact) {
     0,
   );
   setText("[data-provenance-unresolved-calls]", `${unresolvedCount} calls`);
+  const coverage = artifact.activity?.effect_coverage ?? {};
+  setText(
+    "[data-provenance-coverage]",
+    `${coverage.known_calls ?? 0} known · ${coverage.unresolved_calls ?? unresolvedCount} unresolved`,
+  );
   const unresolvedList = document.querySelector("[data-provenance-unresolved-list]");
   if (unresolvedList) {
     unresolvedList.replaceChildren();

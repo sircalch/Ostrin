@@ -335,6 +335,7 @@ fn real_main() -> ExitCode {
                     })
                 })
                 .collect();
+            let (known_calls, unresolved_call_count) = report.call_coverage();
             println!(
                 "{}",
                 serde_json::json!({
@@ -357,6 +358,11 @@ fn real_main() -> ExitCode {
                         .collect::<Vec<_>>(),
                     "function_calls": report.function_calls,
                     "unresolved_calls": report.unresolved_calls,
+                    "effect_coverage": {
+                        "known_calls": known_calls,
+                        "unresolved_calls": unresolved_call_count,
+                        "complete": unresolved_call_count == 0,
+                    },
                     "sites": sites,
                 })
             );
@@ -398,6 +404,8 @@ fn real_main() -> ExitCode {
                 .map(std::collections::BTreeSet::len)
                 .sum();
             println!("unresolved calls: {unresolved_calls} (effect coverage is incomplete)");
+            let (known_calls, _) = report.call_coverage();
+            println!("effect call coverage: {known_calls} known, {unresolved_calls} unresolved");
             for site in &report.sites {
                 let file = site.file.as_deref().unwrap_or("<unknown>");
                 println!(

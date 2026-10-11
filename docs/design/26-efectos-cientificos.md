@@ -320,6 +320,9 @@ en una consola de logs.
    El JSON también expone `unresolved_calls` por función: llamadas que no se pudieron resolver
    contra una función local ni contra una operación de host clasificada. Esta separación deja
    visible la deuda de cobertura para la futura inferencia estática de efectos.
+   `effect_coverage` resume esas cantidades (`known_calls`, `unresolved_calls` y `complete`);
+   `complete` solo significa que el inventario resolvió todas las llamadas observadas, no que
+   haya demostrado pureza.
 2. **Representación interna:** definir nombres, argumentos y uniones de filas; publicar errores estables
    para llamadas puras incompatibles.
 3. **HIR/IR:** propagar `pure`, `random(seed)`, `io`, `network`, `concurrency`, `provenance` y

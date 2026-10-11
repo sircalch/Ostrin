@@ -83,6 +83,20 @@ pub struct EffectReport {
 }
 
 impl EffectReport {
+    pub fn call_coverage(&self) -> (usize, usize) {
+        let total = self
+            .function_calls
+            .values()
+            .map(BTreeSet::len)
+            .sum::<usize>();
+        let unresolved = self
+            .unresolved_calls
+            .values()
+            .map(BTreeSet::len)
+            .sum::<usize>();
+        (total.saturating_sub(unresolved), unresolved)
+    }
+
     pub fn sort_sites(&mut self) {
         self.sites.sort_by(|left, right| {
             left.file

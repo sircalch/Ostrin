@@ -11429,6 +11429,10 @@ fn experimental_effect_report_propagates_to_callers() {
         serde_json::json!(["emit_marker"])
     );
     assert_eq!(artifact["unresolved_calls"], serde_json::json!({}));
+    assert_eq!(
+        artifact["effect_coverage"],
+        serde_json::json!({"known_calls": 2, "unresolved_calls": 0, "complete": true})
+    );
 }
 #[test]
 fn experimental_provenance_report_contains_source_hash_and_effects() {

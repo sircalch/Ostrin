@@ -236,6 +236,7 @@ test("provenance page renders the generated reproducibility artifact", async ({ 
   await expect(page.locator("[data-provenance-source]")).toContainText("sha256:");
   await expect(page.locator("[data-provenance-effects]")).toContainText("measurement");
   await expect(page.locator("[data-provenance-unresolved-calls]")).toContainText("calls");
+  await expect(page.locator("[data-provenance-coverage]")).toContainText("known");
   await expect(page.locator("[data-provenance-unresolved-list] li").first()).toBeVisible();
   await expect(page.locator("[data-provenance-runtime]")).toHaveText("wasm32-wasi · WASI preview1 · partial");
   await expect(page.locator("[data-provenance-level]")).toHaveText("unverified");
