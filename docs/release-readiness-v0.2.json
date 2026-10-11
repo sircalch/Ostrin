@@ -44,7 +44,9 @@
         { "path": "examples/native_generic_iterator_result.ostrin", "claim": "Generic Iterator<Result<String, String>> preserves the explicit Result payload type with interpreter/native parity and zero-leak coverage" },
         { "path": "examples/measurement_task.ostrin", "claim": "Measurement<Float> task capture, join and destruction has interpreter/native/WASI/native-threads and leak-check coverage" },
         { "path": "examples/measurement_array_shape.ostrin", "claim": "Array<Measurement<Float>> remains explicitly rejected with interpreter and actionable native diagnostics" },
-        { "path": "examples/measurement_quantity_direct_shape.ostrin", "claim": "Direct Measurement<Quantity<Length>> remains explicitly rejected before unsafe native fallback" }
+        { "path": "examples/measurement_quantity_direct_shape.ostrin", "claim": "Direct Measurement<Quantity<Length>> remains explicitly rejected before unsafe native fallback" },
+        { "path": "validation/ast-fallback-ledger.json", "claim": "Six dynamic-trait fallback bodies are enumerated with high-risk reasons, tests and planned resolutions" },
+        { "path": "docs/design/15-dyn-trait.md", "claim": "Trait-object ownership ABI, HIR/IR migration prerequisites and required WASI/sanitizer evidence are specified; the boundary remains open" }
       ]
     },
     {
