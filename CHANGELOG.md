@@ -10,8 +10,9 @@
   diagnostics, generated IR details and experimental APIs to change before a
   stable 1.0 contract.
 - The candidate is not a published release yet. The v0.2 readiness gate remains
-  closed until ownership, benchmark regression analysis, website audit and the
-  final release manifest have current evidence. No package or tag is implied by
+  closed until the ownership contract and final release manifest have current
+  evidence. Benchmark regression and website audit evidence are tracked separately
+  in the machine-readable readiness gate. No package or tag is implied by
   this changelog entry.
 
 ### Scientific measurement ownership
