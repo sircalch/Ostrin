@@ -293,7 +293,9 @@ wrappers anidados soportados ya tienen cobertura IR/C.
 - Escalares, strings, recursión, `if/while/for`, `match` (con guardas y patrones anidados).
 - Records (heap, por referencia) y enums (unión etiquetada por valor), ambos genéricos;
   métodos estáticos y genéricos; métodos por defecto de traits.
-- `dyn Trait` con vtable real (único punto de despacho en tiempo de ejecución).
+- `dyn Trait` con vtable real en la ruta AST verificada (único punto de despacho
+  en tiempo de ejecución); la representación HIR/IR y su ownership siguen
+  pendientes según [`docs/design/15-dyn-trait.md`](docs/design/15-dyn-trait.md).
 - `List/Map/Set/Option/Result`, combinadores con lambdas expandidas en línea, `try` y `try catch`
   inline para `Result` escalar con error `String`; `Option.map`/`then` para payloads
   escalares y `String` también usan IR. Wrappers de una capa sobre `List`, `Map` y `Set`
