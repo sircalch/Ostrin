@@ -17,7 +17,7 @@
         { "path": "scripts/numeric-validation.mjs", "claim": "Independent numerical residual and reference validation" },
         { "path": "validation/numeric/matrix_algorithms.json", "claim": "Analytical cases and explicit tolerances" },
         { "path": "docs/design/24-metodos-numericos.md", "claim": "Numerical validation method and scope" },
-        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38101599959", "claim": "Ostrin CI numerical-validation artifacts pass on Windows, macOS and Ubuntu" }
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38107386621", "claim": "Ostrin CI numerical-validation artifacts pass on Windows, macOS and Ubuntu" }
       ]
     },
     {
@@ -52,12 +52,13 @@
     },
     {
       "id": "reproducibility-r1",
-      "status": "OPEN",
+      "status": "READY",
       "acceptance": "R1 replay is generalized across the declared experiment set; recorded seeds and inputs reproduce outputs in CI, with platform/tolerance policy documented and a successful CI run linked.",
       "requires_ci_run_url": true,
       "evidence": [
         { "path": "scripts/experiment-replay.mjs", "claim": "Executable R1/R2 replay gate discovers the registry" },
-        { "path": "docs/design/26-efectos-cientificos.md", "claim": "Defines exact replay scope and per-metric cross-platform tolerance requirements" }
+        { "path": "docs/design/26-efectos-cientificos.md", "claim": "Defines exact replay scope and per-metric cross-platform tolerance requirements" },
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38107386621", "claim": "Ostrin CI replays all 11 declared R1/R2 bundles and verifies changed-input output" }
       ]
     },
     {
@@ -78,7 +79,7 @@
       "requires_ci_run_url": true,
       "evidence": [
         { "path": ".github/workflows/sanitizers.yml", "claim": "Required sanitizer workflows" },
-        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38101599953", "claim": "ASan and UBSan native suites pass" }
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38107386611", "claim": "ASan and UBSan native suites pass" }
       ]
     },
     {
