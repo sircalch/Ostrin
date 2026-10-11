@@ -47,11 +47,13 @@
     },
     {
       "id": "documentation",
-      "status": "OPEN",
+      "status": "READY",
       "acceptance": "Status, roadmap, release notes and public maturity claims agree with source-backed inventories; documentation consistency checks pass.",
       "evidence": [
         { "path": "scripts/project-plan-check.mjs", "claim": "Machine-checked plan and public maturity consistency" },
         { "path": "README-reproduce.md", "claim": "Reproduction commands, R0-R3 boundaries and CI evidence policy" }
+        ,{ "path": "ESTADO_Y_PLAN.md", "claim": "Current maturity and CI-backed sanitizer status" }
+        ,{ "path": "ROADMAP.md", "claim": "Roadmap status agrees with current CI evidence" }
       ]
     },
     {
