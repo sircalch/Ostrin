@@ -53,7 +53,7 @@ const programs = [
     name: "native_ir_nested_wrappers",
     source: "examples/native_ir_nested_wrappers.ostrin",
     args: ["native_ir_nested_wrappers.wasm"],
-    expected: "nested\ninner none\nok\nnested error\nnested\nouter fallback\nok\nok fallback\nnested\n",
+    expected: "nested\ninner none\nok\nnested error\nnested\nouter fallback\nok\nok fallback\nnested\ndeep payload\ndeep payload\ninner fallback\ndeep payload\ninner fallback\nouter fallback\n",
   },
   {
     name: "managed_enum_result_error",
