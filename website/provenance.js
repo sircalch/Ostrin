@@ -11,6 +11,12 @@ if (artifact) {
   setText("[data-provenance-effects]", (artifact.activity?.effects ?? []).join(", ") || "none known");
   const noKnownEffects = artifact.activity?.functions_without_known_effects ?? [];
   setText("[data-provenance-no-known-effects]", `${noKnownEffects.length} candidates`);
+  const unresolvedCalls = artifact.activity?.unresolved_calls ?? [];
+  const unresolvedCount = unresolvedCalls.reduce(
+    (total, entry) => total + (Array.isArray(entry.calls) ? entry.calls.length : 0),
+    0,
+  );
+  setText("[data-provenance-unresolved-calls]", `${unresolvedCount} calls`);
   const runtime = artifact.runtime;
   const runtimeLabel = runtime?.target
     ? `${runtime.target}${runtime.wasi ? ` · WASI ${runtime.wasi}` : ""} · ${runtime.status ?? "unknown"}`
