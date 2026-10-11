@@ -9210,6 +9210,61 @@ fn native_ir_nested_aggregate_field_preserves_ownership() {
 }
 
 #[test]
+fn native_nested_aggregate_loop_fallback_preserves_ownership() {
+    let file = example_path("native_ir_nested_aggregate_loop.ostrin");
+    let expected = "a\nnone\n";
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "nested aggregate loop type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("ir-generated: 1")
+            && report_text.contains("hir-generated: 0")
+            && report_text.contains("ast-fallback: 1"),
+        "nested aggregate loop changed its documented fallback boundary: {report_text}"
+    );
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "nested aggregate loop interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let exe = temp_artifact("native-nested-aggregate-loop.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "nested aggregate loop compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run nested aggregate loop binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "nested aggregate loop binary failed"
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "nested aggregate loop leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn native_ir_emitter_preserves_checked_fixed_width_arithmetic() {
     let file = example_path("native_ir_sized.ostrin");
     let expected = "120\n-4\n-7\n";

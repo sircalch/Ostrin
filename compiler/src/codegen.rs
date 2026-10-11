@@ -2039,7 +2039,10 @@ fn borrowed_reference_expr(expr: &Expr) -> bool {
 /// produced at the call site must be released by the caller afterwards. A
 /// local/field/index is already owned elsewhere and must stay borrowed.
 fn owned_call_argument(expr: &Expr, ty: &CType) -> bool {
-    if !is_reference_type(ty) && !contains_by_value_enum(ty) {
+    if !is_reference_type(ty)
+        && !contains_by_value_enum(ty)
+        && !matches!(ty, CType::Option(..) | CType::Result(..))
+    {
         return false;
     }
     // Every array operator allocates a new array.
@@ -2611,7 +2614,7 @@ impl<'a> Codegen<'a> {
         let decl: &'a RecordDecl = self.generic_records[base];
         let generics: Vec<String> = decl.generics.iter().map(|g| g.name.clone()).collect();
         let mut subst = self.seed_instance_subst(base, &generics, explicit, hint.as_ref())?;
-        let mut values: Vec<(String, String, CType)> = Vec::new();
+        let mut values: Vec<(String, String, CType, bool)> = Vec::new();
         for (field_name, expr) in fields {
             let Some(field) = decl.fields.iter().find(|f| &f.name == field_name) else {
                 return Err(format!("record '{base}' has no field '{field_name}'"));
@@ -2619,7 +2622,12 @@ impl<'a> Codegen<'a> {
             let field_hint = map_type_with_subst(&field.ty, &self.named_types(), &subst).ok();
             let (code, ty) = self.gen_expr_hint(expr, field_hint)?;
             self.bind_type(&field.ty, &ty, &generics, &mut subst, base)?;
-            values.push((field_name.clone(), code, ty));
+            values.push((
+                field_name.clone(),
+                code,
+                ty.clone(),
+                owned_call_argument(expr, &ty),
+            ));
         }
         if let Some(missing) = generics.iter().find(|g| !subst.contains_key(*g)) {
             return Err(format!("cannot infer type parameter '{missing}' of record '{base}' here; write '{base}<...> {{ ... }}'"));
@@ -2633,15 +2641,31 @@ impl<'a> Codegen<'a> {
             "{inst}* {temp} = ({inst}*)ostrin_calloc_with_drop(1, sizeof({inst}), (void (*)(void*))(ostrin_drop_{inst})); \
              if (!{temp}) {{ fprintf(stderr, \"ostrin: out of memory\\n\"); exit(1); }} "
         );
-        for (field_name, code, ty) in values {
+        for (field_name, code, ty, owned) in values {
             let field_ty = self
                 .field_type(&inst, &field_name)
                 .expect("field checked above");
             let code = self.coerce(&code, &ty, &field_ty)?;
-            body.push_str(&format!("{temp}->{field_name} = {code}; "));
+            let owned_temp = if owned {
+                let field_temp = self.next_temp();
+                body.push_str(&format!(
+                    "{} {field_temp} = {code}; ",
+                    c_type_name(&field_ty)
+                ));
+                body.push_str(&format!("{temp}->{field_name} = {field_temp}; "));
+                Some(field_temp)
+            } else {
+                body.push_str(&format!("{temp}->{field_name} = {code}; "));
+                None
+            };
             if let Some(retain) = retain_managed_value(&format!("{temp}->{field_name}"), &field_ty)
             {
                 body.push_str(&format!("{retain}; "));
+            }
+            if let Some(field_temp) = owned_temp {
+                if let Some(release) = release_managed_value(&field_temp, &field_ty) {
+                    body.push_str(&format!("{release}; "));
+                }
             }
         }
         Ok((format!("({{ {body} {temp}; }})"), CType::Record(inst)))
@@ -5133,6 +5157,7 @@ impl<'a> Codegen<'a> {
             return Err("empty list literals aren't supported by the native backend yet (the element type can't be inferred)".to_string());
         }
         let mut codes = Vec::with_capacity(items.len());
+        let mut owned_temporaries = Vec::new();
         let mut elem_ty: Option<CType> = expected.cloned();
         for item in items {
             let (mut code, mut ty) = self.gen_expr(item)?;
@@ -5149,7 +5174,12 @@ impl<'a> Codegen<'a> {
                     ));
                 }
                 Some(_) => {}
-                None => elem_ty = Some(ty),
+                None => elem_ty = Some(ty.clone()),
+            }
+            if owned_call_argument(item, &ty) {
+                let temp = self.next_temp();
+                owned_temporaries.push((temp.clone(), ty.clone(), code));
+                code = temp;
             }
             codes.push(code);
         }
@@ -5162,11 +5192,31 @@ impl<'a> Codegen<'a> {
             ));
         }
         let array_literal = format!("({}[]){{ {} }}", c_type_name(&elem_ty), codes.join(", "));
+        if owned_temporaries.is_empty() {
+            return Ok((
+                format!(
+                    "{struct_name}_new_from_array({array_literal}, {})",
+                    items.len()
+                ),
+                CType::List(Box::new(elem_ty)),
+            ));
+        }
+        let result = self.next_temp();
+        let mut body = String::new();
+        for (temp, ty, code) in &owned_temporaries {
+            body.push_str(&format!("{} {temp} = {code}; ", c_type_name(ty)));
+        }
+        body.push_str(&format!(
+            "{struct_name}* {result} = {struct_name}_new_from_array({array_literal}, {}); ",
+            items.len()
+        ));
+        for (temp, ty, _) in &owned_temporaries {
+            if let Some(release) = release_managed_value(temp, ty) {
+                body.push_str(&format!("{release}; "));
+            }
+        }
         Ok((
-            format!(
-                "{struct_name}_new_from_array({array_literal}, {})",
-                items.len()
-            ),
+            format!("({{ {body} {result}; }})"),
             CType::List(Box::new(elem_ty)),
         ))
     }
@@ -5191,10 +5241,26 @@ impl<'a> Codegen<'a> {
             let field_ty = self.field_type(name, field_name).expect("checked above");
             let (value_code, value_ty) = self.gen_expr_hint(value_expr, Some(field_ty.clone()))?;
             let value_code = self.coerce(&value_code, &value_ty, &field_ty)?;
-            body.push_str(&format!("{temp}->{field_name} = {value_code}; "));
+            let owned_temp = if owned_call_argument(value_expr, &field_ty) {
+                let value_temp = self.next_temp();
+                body.push_str(&format!(
+                    "{} {value_temp} = {value_code}; ",
+                    c_type_name(&field_ty)
+                ));
+                body.push_str(&format!("{temp}->{field_name} = {value_temp}; "));
+                Some(value_temp)
+            } else {
+                body.push_str(&format!("{temp}->{field_name} = {value_code}; "));
+                None
+            };
             if let Some(retain) = retain_managed_value(&format!("{temp}->{field_name}"), &field_ty)
             {
                 body.push_str(&format!("{retain}; "));
+            }
+            if let Some(value_temp) = owned_temp {
+                if let Some(release) = release_managed_value(&value_temp, &field_ty) {
+                    body.push_str(&format!("{release}; "));
+                }
             }
         }
         Ok((
@@ -6942,8 +7008,41 @@ impl<'a> Codegen<'a> {
             return self.gen_generic_variant(name, type_args, args, hint);
         }
         if let Some(variant) = self.variants.get(name).cloned() {
-            let arg_codes = self.gen_variant_args(&variant, args)?;
-            return self.gen_variant_construct(&variant, &arg_codes);
+            let mut arg_codes = self.gen_variant_args(&variant, args)?;
+            let mut owned_temporaries = Vec::new();
+            for (index, arg) in args.iter().enumerate() {
+                let Some((_, field_ty)) = variant.fields.get(index) else {
+                    continue;
+                };
+                let expr = match arg {
+                    Arg::Positional(expr) | Arg::Named(_, expr) => expr,
+                };
+                if owned_call_argument(expr, field_ty) {
+                    let temp = self.next_temp();
+                    owned_temporaries.push((
+                        temp.clone(),
+                        field_ty.clone(),
+                        arg_codes[index].clone(),
+                    ));
+                    arg_codes[index] = temp;
+                }
+            }
+            let (constructed, ty) = self.gen_variant_construct(&variant, &arg_codes)?;
+            if owned_temporaries.is_empty() {
+                return Ok((constructed, ty));
+            }
+            let result = self.next_temp();
+            let mut body = String::new();
+            for (temp, field_ty, code) in &owned_temporaries {
+                body.push_str(&format!("{} {temp} = {code}; ", c_type_name(field_ty)));
+            }
+            body.push_str(&format!("{} {result} = {constructed}; ", c_type_name(&ty)));
+            for (temp, field_ty, _) in &owned_temporaries {
+                if let Some(release) = release_managed_value(temp, field_ty) {
+                    body.push_str(&format!("{release}; "));
+                }
+            }
+            return Ok((format!("({{ {body} {result}; }})"), ty));
         }
         if (name == "Map" || name == "Set") && args.is_empty() {
             if let Some(types) = type_args {
