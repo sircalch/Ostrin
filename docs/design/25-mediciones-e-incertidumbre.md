@@ -46,6 +46,9 @@ de `Measurement<Float>` con la misma paridad y comprobación de ownership.
 los alias implícitos y los payloads compuestos continúan fuera del contrato.
 `examples/measurement_closure.ostrin` cubre la captura por closure y la
 destrucción del entorno sin perder la medición capturada.
+`examples/measurement_list.ostrin` cubre una colección de
+`Measurement<Float>` construida por el usuario, acceso indexado y destrucción,
+con paridad intérprete/native, emisión WASI y `live_allocations=0`.
 `examples/viz_bars.ostrin` añade una serie de
 cinco grupos y proyecta `values`/`uncertainties` hacia `std.viz.errorbars`, también con paridad
 intérprete/native y una figura SVG reproducible en la galería. El Scientific Lab ejecuta el
