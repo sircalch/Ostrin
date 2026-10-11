@@ -62,7 +62,7 @@ El bloque de backend nativo conserva este baseline: reducir el fallback AST con 
    paridad. El renderer de `std.viz` y sus superficies 2D/3D ya cruzan IR/C; las
    instanciaciones genéricas de `Figure.unit_line`/`unit_scatter` con `Quantity` también se
    especializan por dimensión en IR/C, conservan el SVG diferencial, emiten C para WASI y pasan
-   leak-check nativo con cero allocations vivas. ASan/UBSan pasan en CI (`38165890970`) para este
+   leak-check nativo con cero allocations vivas. ASan/UBSan pasan en CI (`38168709421`) para este
    ciclo; los trazados basados en listas aún requieren su propio contrato de ownership. Quedan
    además funciones numéricas auxiliares y el ejemplo compuesto de selección enlazada, cuyos
    agregados siguen necesitando la migración gradual. El contrato está especificado en

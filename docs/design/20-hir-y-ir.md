@@ -171,7 +171,7 @@ Sobre este IR se hacen los análisis que el texto C no permite:
    métodos de traits, por lo que los operadores de `Complex` también cruzan IR/C; las
    instanciaciones genéricas de `Figure.unit_line`/`unit_scatter` con `Quantity` ahora
    tienen especialización dimensionada en IR/C, SVG diferencial idéntico, emisión WASI y
-   `live_allocations=0` en nativo. ASan/UBSan pasan en CI (`38165890970`) y los trazados basados en
+   `live_allocations=0` en nativo. ASan/UBSan pasan en CI (`38168709421`) y los trazados basados en
    listas aún requieren su propio contrato de ownership. También quedan los agregados de LU,
    SVD, número de condición, autovectores y `ComplexVector`/`ComplexMatrix`,
    que quedan pendientes de migrar a IR, mientras los métodos de records recursivos conservan

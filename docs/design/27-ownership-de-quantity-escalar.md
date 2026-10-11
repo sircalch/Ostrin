@@ -5,7 +5,7 @@
 nativa/WASI/leak-check. La fase 2 habilita `Figure.unit_line` y
 `Figure.unit_scatter` por IR/C con especialización por dimensión, paridad,
 emisión WASI y `live_allocations=0`; las suites ASan/UBSan del ciclo pasan en
-CI (`38165890970`), aunque las filas de cobertura no generalizadas siguen
+CI (`38168709421`), aunque las filas de cobertura no generalizadas siguen
 abiertas.*
 
 La cobertura de ownership también incluye `Option<Quantity<D>>`,
@@ -258,7 +258,7 @@ Con este contrato, `viz_units` se valida de forma incremental: `distance.max()`
 y la conversión posterior conservan sus etiquetas; las instanciaciones genéricas
 de `unit_line` y `unit_scatter` tienen informe nativo IR, emisión C para WASI,
 paridad del SVG y leak-check nativo en cero. La ejecución bajo ASan/UBSan queda
-cubierta por la evidencia del ciclo (`38165890970`), sin convertirla en una
+cubierta por la evidencia del ciclo (`38168709421`), sin convertirla en una
 garantía para combinaciones que la matriz mantiene como limitación.
 
 ## 6. Native, WASI y browser
