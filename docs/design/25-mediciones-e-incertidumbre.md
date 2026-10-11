@@ -35,6 +35,11 @@ integración completa con `Quantity<T>`.
 `examples/measurement_scalar.ostrin` cubre construcciones `exact`, `standard` y `unknown`,
 validación de finitud, sigma y etiquetas, combinación de fuentes independientes, cancelación
 correlacionada (`x - x = 0 ± 0`), propagación analítica de `x*x` y `x*y`, y paridad intérprete/native.
+`examples/measurement_record.ostrin` añade almacenamiento y reemplazo de
+`Measurement<Float>` dentro de un record, con paridad intérprete/native, C para
+WASI y `live_allocations=0`; la prueba
+`std_measurements_scalar_record_field_preserves_ownership` verifica además
+que el destructor del record libera la medición exactamente una vez.
 `examples/viz_bars.ostrin` añade una serie de
 cinco grupos y proyecta `values`/`uncertainties` hacia `std.viz.errorbars`, también con paridad
 intérprete/native y una figura SVG reproducible en la galería. El Scientific Lab ejecuta el

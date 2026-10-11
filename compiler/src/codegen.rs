@@ -539,6 +539,14 @@ fn map_type_with_subst(
                 .iter()
                 .map(|a| map_type_with_subst(a, types, subst))
                 .collect::<Result<Vec<_>, _>>()?;
+            if (name == "Measurement" || name.ends_with("::Measurement"))
+                && concrete.iter().any(|arg| matches!(arg, CType::Quantity(_)))
+            {
+                return Err(
+                    "type 'Measurement<Quantity<D>>' is not supported by the native backend yet"
+                        .to_string(),
+                );
+            }
             let mangled = instance_name(name, &concrete);
             types.seen.borrow_mut().push((name.clone(), concrete));
             Ok(if is_enum {

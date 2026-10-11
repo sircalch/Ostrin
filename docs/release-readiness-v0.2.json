@@ -27,7 +27,8 @@
       "evidence": [
         { "path": "docs/ownership-matrix.md", "claim": "Ownership support, tested boundaries and limitations" },
         { "path": "compiler/tests/fixtures/native_ir_quantity_array_record_field.ostrin", "claim": "Array<Quantity<Length>> record-field replacement has interpreter/native/WASI and leak-check coverage" },
-        { "path": "examples/native_ir_map_set_branch.ostrin", "claim": "Map and Set branch selection has interpreter/native/WASI and leak-check coverage" }
+        { "path": "examples/native_ir_map_set_branch.ostrin", "claim": "Map and Set branch selection has interpreter/native/WASI and leak-check coverage" },
+        { "path": "examples/measurement_record.ostrin", "claim": "Measurement<Float> record-field replacement has interpreter/native/WASI and leak-check coverage" }
       ]
     },
     {

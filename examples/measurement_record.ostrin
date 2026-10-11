@@ -1,0 +1,12 @@
+import std.measurements
+
+record Sample {
+    mut measurement: Measurement<Float>
+}
+
+fn main() -> Void {
+    mut sample = Sample { measurement: measurements.exact(2.0) }
+    print(measurements.summary(sample.measurement))
+    sample.measurement = measurements.exact(3.0)
+    print(measurements.summary(sample.measurement))
+}
