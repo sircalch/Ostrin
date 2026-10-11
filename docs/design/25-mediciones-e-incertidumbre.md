@@ -49,6 +49,8 @@ destrucción del entorno sin perder la medición capturada.
 `examples/measurement_list.ostrin` cubre una colección de
 `Measurement<Float>` construida por el usuario, acceso indexado y destrucción,
 con paridad intérprete/native, emisión WASI y `live_allocations=0`.
+`examples/measurement_branch.ostrin` cubre la selección de una medición desde
+las dos ramas de una función, con la misma evidencia de paridad y ownership.
 `examples/viz_bars.ostrin` añade una serie de
 cinco grupos y proyecta `values`/`uncertainties` hacia `std.viz.errorbars`, también con paridad
 intérprete/native y una figura SVG reproducible en la galería. El Scientific Lab ejecuta el

@@ -1,0 +1,18 @@
+import std.measurements
+
+fn choose(flag: Bool) -> Measurement<Float> {
+    if flag {
+        measurements.exact(2.0)
+    } else {
+        measurements.exact(3.0)
+    }
+}
+
+fn main() -> Void {
+    first = choose(true)
+    second = choose(false)
+    print(measurements.summary(first))
+    print(measurements.summary(second))
+    drop(first)
+    drop(second)
+}

@@ -32,7 +32,8 @@
         { "path": "examples/measurement_return.ostrin", "claim": "Measurement<Float> argument and return ownership has interpreter/native/WASI and leak-check coverage" },
         { "path": "examples/measurement_clone.ostrin", "claim": "Measurement<Float> explicit clone ownership has interpreter/native/WASI and leak-check coverage" },
         { "path": "examples/measurement_closure.ostrin", "claim": "Measurement<Float> closure capture ownership has interpreter/native/WASI and leak-check coverage" },
-        { "path": "examples/measurement_list.ostrin", "claim": "List<Measurement<Float>> construction, indexing and destruction has interpreter/native/WASI and leak-check coverage" }
+        { "path": "examples/measurement_list.ostrin", "claim": "List<Measurement<Float>> construction, indexing and destruction has interpreter/native/WASI and leak-check coverage" },
+        { "path": "examples/measurement_branch.ostrin", "claim": "Measurement<Float> branch selection has interpreter/native/WASI and leak-check coverage" }
       ]
     },
     {
