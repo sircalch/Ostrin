@@ -4663,6 +4663,21 @@ fn native_ir_generic_iterator_preserves_explicit_result_payload_type() {
         "generic iterator Result payload left the verified IR path: {report_text}"
     );
 
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("Cursor__Result_String_String__next")
+            && wasi_source.contains("Option_Result_String_String")
+            && wasi_source.contains("ostrin_drop_Cursor__Result_String_String")
+            && !wasi_source.contains("#define OSTRIN_NATIVE_THREADS"),
+        "WASI C omitted generic iterator Result ownership helpers: {wasi_source}"
+    );
+
     let exe = temp_artifact("native_ir_generic_iterator_result.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
     if skip_if_no_c_compiler(&compile) {
