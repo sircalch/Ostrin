@@ -42,7 +42,7 @@ node --test scripts/experiment-bundle.test.mjs
 - **R0:** fuente, entrada y salida registradas; el replay exacto está limitado a la configuración de CI declarada.
 - **R1:** R0 más semilla, algoritmo y sensibilidad de azar verificadas.
 - **R2:** R0/R1 más snapshot de entrada embebido, capacidades declaradas y sensibilidad de parámetros verificada.
-- **R3:** artefacto auditable con host, dependencias, scheduler y efectos. El contrato y el gate están implementados; el checkout local permanece abierto hasta una ejecución CI que capture el host real.
+- **R3:** artefacto auditable con host, dependencias, scheduler y efectos. El checkout local permanece abierto porque no debe inventar host metadata; la ejecución CI `38162721694` produjo un artefacto host-bound verificable con 29/29 bundles listos.
 
 ```text
 node scripts/r3-readiness.mjs --write

@@ -16,9 +16,9 @@ El reporte queda en [`validation/r3-readiness.json`](../validation/r3-readiness.
 Un estado `OPEN` es deliberado: documenta el trabajo restante y no promociona
 un bundle R0/R1/R2 a R3.
 
-El estado actual tiene los **29/29 bundles con los campos base completos**, incluidos
-`execution`, dependencias y scheduler declarado. Los **0/29** están listos para R3 todavía:
-falta la captura auditable del host. Los 29 bundles ya incluyen un resumen normalizado del
+El checkout local tiene los **29/29 bundles con los campos base completos**, incluidos
+`execution`, dependencias y scheduler declarado. Los **0/29** locales están listos para R3
+porque no deben falsificar la captura del host. Los 29 bundles ya incluyen un resumen normalizado del
 reporte de efectos del compilador (`ostrin.effect-report/v0`), con hashes del analizador y
 la marca de que el análisis es experimental y conservador. El host sigue siendo un requisito
 explícito del auditor y no se rellena con valores sintéticos.
@@ -30,3 +30,7 @@ no se guardan hostname, usuario ni rutas privadas. La acción conserva además e
 R3, el scorecard, la página de estado y los bundles host-bound como el artefacto
 `ostrin-r3-host-evidence-<run_id>` durante 90 días. La verificación local mantiene el
 campo ausente para que un checkout de desarrollador no se presente como una ejecución CI.
+
+La ejecución CI `38162721694` produjo el artefacto host-bound y su reporte confirma
+`READY`, `29/29` bundles preparados y `openCount=0`. Esa evidencia permite auditar R3
+sin convertir el checkout local en un snapshot sintético.

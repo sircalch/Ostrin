@@ -519,7 +519,7 @@ sustituye la adopción independiente; por eso el plan mantiene un frente explíc
   bundles R1/R2 en WASI, demostrando que repetir la misma entrada y semilla conserva el SVG y que cambiar la entrada declarada cambia la figura; CI ya no
   mantiene una lista manual de IDs. `surface` y `lines` fueron los primeros cortes R2 porque sus snapshots
   `data.json`, capacidades de filesystem y sensibilidad de parámetros están verificadas; ahora los once
-  cortes input-driven reclaman R2, los nueve de azar sembrado conservan su evidencia R1 y R3 sigue pendiente. `histogram` fue el primer corte
+  cortes input-driven reclaman R2, los nueve de azar sembrado conservan su evidencia R1 y el checkout local mantiene R3 pendiente, aunque Website CI 38162721694 ya produjo evidencia host-bound 29/29. `histogram` fue el primer corte
   R1, `boxplot` el segundo, `scatter-fit` el tercero, `violin` el cuarto, `hexbin` el quinto, `bars` el sexto, `point-cloud` el séptimo, `fft` el octavo y `dashboard` el noveno: los nueve consumen `seed` desde `data.json`, registran
   algoritmo/versión/partición; el replay repite la misma semilla para exigir determinismo y después cambia la semilla para exigir una figura distinta.
   Los manifiestos de figura ya serializan el estado vivo seleccionado desde el explorador
