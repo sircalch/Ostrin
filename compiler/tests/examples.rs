@@ -7717,6 +7717,20 @@ fn native_ir_try_captured_handler_preserves_closure_ownership() {
         "{file} unexpectedly used a HIR fallback: {report_text}"
     );
 
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &path]);
+    assert!(
+        wasi.status.success(),
+        "WASI emission failed for {file}: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("ostrin_fn_make_recover")
+            && wasi_source.contains("ostrin_release")
+            && wasi_source.contains("Result_String_String"),
+        "{file} WASI output omitted captured-handler ownership helpers: {wasi_source}"
+    );
+
     let exe = temp_artifact("native_ir_try_captured_handler.exe");
     let compile = run(&["--compile", "--leak-check", "--out", &exe, &path]);
     assert!(

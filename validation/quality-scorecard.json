@@ -1,6 +1,6 @@
 {
   "schema": "ostrin.quality-scorecard/v1",
-  "sourceRevision": "ea820ff8484ba1a37b9e3e28d85892599f3e8165",
+  "sourceRevision": "7ad5f0888ab3a8b4b986f1787a09396546f791d9",
   "workingTreeDirty": true,
   "sources": {
     "native": "compiler/tests/differential.rs",
@@ -19,10 +19,10 @@
     "total": 6986
   },
   "ownership": {
-    "tested": 178,
+    "tested": 179,
     "supported": 23,
     "notApplicable": 0,
-    "knownLimitation": 24
+    "knownLimitation": 23
   },
   "numericalValidation": {
     "local": "verified",
