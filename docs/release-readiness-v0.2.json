@@ -38,6 +38,7 @@
         { "path": "examples/measurement_phi.ostrin", "claim": "Measurement<Float> Phi selection has interpreter/native/WASI and leak-check coverage" },
         { "path": "examples/measurement_result.ostrin", "claim": "Result<Measurement<Float>, String> Ok/Err paths have interpreter/native/WASI and leak-check coverage" },
         { "path": "examples/native_ir_try_captured_handler.ostrin", "claim": "Captured try/catch closure handler has interpreter/native/WASI and zero-leak ownership coverage" },
+        { "path": "examples/native_ir_task_result.ostrin", "claim": "Task<Result<String, String>> join covers Ok/Err ownership in cooperative and native-thread modes with WASI emission" },
         { "path": "examples/measurement_task.ostrin", "claim": "Measurement<Float> task capture, join and destruction has interpreter/native/WASI/native-threads and leak-check coverage" },
         { "path": "examples/measurement_array_shape.ostrin", "claim": "Array<Measurement<Float>> remains explicitly rejected with interpreter and actionable native diagnostics" },
         { "path": "examples/measurement_quantity_direct_shape.ostrin", "claim": "Direct Measurement<Quantity<Length>> remains explicitly rejected before unsafe native fallback" }

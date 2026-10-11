@@ -1,0 +1,24 @@
+fn worker(flag: Bool) -> Result<String, String> {
+    if flag {
+        Ok("value")
+    } else {
+        Err("failure")
+    }
+}
+
+fn main() -> Void {
+    ok_task = spawn { worker(true) }
+    err_task = spawn { worker(false) }
+    ok_result = ok_task.join()
+    err_result = err_task.join()
+    match ok_result {
+        Ok(value) => print(value),
+        Err(message) => print(message)
+    }
+    match err_result {
+        Ok(value) => print(value),
+        Err(message) => print(message)
+    }
+    drop(ok_result)
+    drop(err_result)
+}
