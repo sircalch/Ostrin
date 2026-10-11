@@ -31,6 +31,12 @@ carga; los dos snapshots más recientes también conservan hashes de fuente. El 
 [`scripts/benchmark-history.mjs`](../scripts/benchmark-history.mjs)
 reconstruye ese índice desde los snapshots versionados; las entradas no se mezclan
 entre máquinas ni se presentan como una comparación con otros lenguajes.
+El índice también incluye una revisión automática de transiciones: solo compara
+snapshots con el mismo entorno y el mismo hash de fuente, aplica un umbral de
+regresión declarado del 25% y conserva como `NOT_COMPARABLE` el snapshot antiguo
+que no tiene hashes de fuente. La transición comparable más reciente pasa con
+regresiones máximas de 2.889% nativas y 2.126% interpretadas; no queda una
+regresión comparable sin explicar.
 
 Para reproducirlo localmente:
 

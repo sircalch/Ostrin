@@ -85,12 +85,12 @@
     },
     {
       "id": "benchmarks",
-      "status": "OPEN",
+      "status": "READY",
       "acceptance": "A multi-commit benchmark history exists for the declared scientific workloads, reports include reproducibility metadata, and no unexplained regression remains.",
       "evidence": [
         { "path": "docs/benchmarks.md", "claim": "Benchmark protocol and interpretation limits" },
         { "path": "validation/benchmark-history.json", "claim": "Three provenance-backed benchmark commits with output hashes; source hashes are retained where the original snapshot provided them" },
-        { "path": "scripts/benchmark-history.mjs", "claim": "Rebuilds the historical index from versioned benchmark snapshots" }
+        { "path": "scripts/benchmark-history.mjs", "claim": "Rebuilds the historical index and performs environment/source-matched regression analysis" }
       ]
     },
     {

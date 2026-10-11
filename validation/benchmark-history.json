@@ -226,5 +226,77 @@
         }
       ]
     }
-  ]
+  ],
+  "analysis": {
+    "schema": "ostrin.benchmark-history-analysis/v1",
+    "policy": "Only adjacent snapshots with identical environment metadata and identical source hashes are compared; positive median deltas are regressions.",
+    "regressionThresholdPercent": 25,
+    "transitions": [
+      {
+        "from": "e7eb17c",
+        "to": "310ed6c",
+        "status": "NOT_COMPARABLE",
+        "reason": "source hashes are missing or differ"
+      },
+      {
+        "from": "310ed6c",
+        "to": "b3c997e",
+        "status": "PASS",
+        "thresholdPercent": 25,
+        "maxNativeRegressionPercent": 2.889,
+        "maxInterpreterRegressionPercent": 2.126,
+        "workloads": [
+          {
+            "workload": "examples/benchmark_numeric.ostrin",
+            "nativeMedianDeltaPercent": 2.066697980272436,
+            "interpreterMedianDeltaPercent": -1.234697418433306,
+            "ratioDeltaPercent": -3.2417667371025027
+          },
+          {
+            "workload": "examples/arrays.ostrin",
+            "nativeMedianDeltaPercent": -0.6658489574207116,
+            "interpreterMedianDeltaPercent": -1.0686647831961604,
+            "ratioDeltaPercent": -0.3506311360448766
+          },
+          {
+            "workload": "examples/quantity_arrays.ostrin",
+            "nativeMedianDeltaPercent": -0.5429250084832082,
+            "interpreterMedianDeltaPercent": -0.6450796863141872,
+            "ratioDeltaPercent": -0.07457121551079915
+          },
+          {
+            "workload": "examples/numeric_methods.ostrin",
+            "nativeMedianDeltaPercent": 2.8893014620561708,
+            "interpreterMedianDeltaPercent": 0.8270326150852325,
+            "ratioDeltaPercent": -1.991614255765195
+          },
+          {
+            "workload": "examples/numeric_lu.ostrin",
+            "nativeMedianDeltaPercent": 2.6428807400066034,
+            "interpreterMedianDeltaPercent": 2.126402835203778,
+            "ratioDeltaPercent": -0.5108556832694733
+          },
+          {
+            "workload": "examples/numeric_svd.ostrin",
+            "nativeMedianDeltaPercent": -1.1727416798732127,
+            "interpreterMedianDeltaPercent": 1.346389228886169,
+            "ratioDeltaPercent": 2.5746652935118464
+          },
+          {
+            "workload": "examples/numeric_complex_linear_algebra.ostrin",
+            "nativeMedianDeltaPercent": -1.381526104417663,
+            "interpreterMedianDeltaPercent": -1.4203072012766826,
+            "ratioDeltaPercent": -0.04966476285075405
+          },
+          {
+            "workload": "examples/viz_scatter_fit.ostrin",
+            "nativeMedianDeltaPercent": 1.9327943405760495,
+            "interpreterMedianDeltaPercent": -0.6764899211218256,
+            "ratioDeltaPercent": -2.5691056910569166
+          }
+        ]
+      }
+    ],
+    "status": "READY"
+  }
 }
