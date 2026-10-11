@@ -91,7 +91,11 @@
       "id": "website-audit",
       "status": "OPEN",
       "acceptance": "A dated visual, accessibility and responsive review covers the public site and playground; findings are resolved or explicitly accepted with evidence.",
-      "evidence": [{ "path": "docs/website-audit.md", "claim": "Website audit scope; attach dated visual review and disposition before release" }]
+      "evidence": [
+        { "path": "docs/website-audit.md", "claim": "Dated visual, responsive and accessibility review with explicit Firefox runner limitation" },
+        { "path": "tests/browser/visual.spec.mjs", "claim": "Chromium desktop/tablet/mobile visual regression and representative plot coverage" },
+        { "path": "tests/browser/cross-browser.spec.mjs", "claim": "Firefox/WebKit responsive and keyboard smoke coverage" }
+      ]
     },
     {
       "id": "installation",
