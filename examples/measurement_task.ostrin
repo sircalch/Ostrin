@@ -1,0 +1,11 @@
+import std.measurements
+
+fn main() -> Void {
+    measurement = measurements.exact(2.0)
+    worker = spawn {
+        measurement
+    }
+    received = worker.join()
+    print(measurements.summary(received))
+    drop(received)
+}

@@ -14616,6 +14616,81 @@ fn std_measurements_scalar_phi_preserves_ownership() {
 }
 
 #[test]
+fn std_measurements_scalar_task_capture_preserves_ownership() {
+    let file = example_path("measurement_task.ostrin");
+    let expected = "2 ± 0\n";
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "Measurement task interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "Measurement task type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("native-source: examples/measurement_task.ostrin ir=1 hir=0 ast=0"),
+        "Measurement task did not use IR: {report_text}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "Measurement task WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("Task_std_measurements__Measurement__Float")
+            && wasi_source.contains("OstrinIrTaskEnv_")
+            && wasi_source.contains("ostrin_ir_task_env_drop_"),
+        "Measurement task ownership markers missing: {wasi_source}"
+    );
+
+    for (target, flags) in [
+        ("measurement-task.exe", vec!["--compile"]),
+        (
+            "measurement-task-threads.exe",
+            vec!["--native-threads", "--compile"],
+        ),
+    ] {
+        let exe = temp_artifact(target);
+        let mut args = flags;
+        args.extend(["--leak-check", "--out", &exe, &file]);
+        let compile = run(&args);
+        assert!(
+            compile.status.success(),
+            "Measurement task compile for {target} failed: {}",
+            stderr(&compile)
+        );
+        let native = Command::new(&exe)
+            .output()
+            .unwrap_or_else(|error| panic!("run {target}: {error}"));
+        let _ = fs::remove_file(&exe);
+        assert!(
+            native.status.success(),
+            "Measurement task native run for {target} failed: {}",
+            String::from_utf8_lossy(&native.stderr)
+        );
+        assert_eq!(
+            String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+            expected
+        );
+        assert!(
+            String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+            "Measurement task leaked in {target}: {}",
+            String::from_utf8_lossy(&native.stderr)
+        );
+    }
+}
+
+#[test]
 fn std_measurements_scalar_matches_interpreter_and_native() {
     let file = example_path("measurement_scalar.ostrin");
     let expected = "x = 12.3 ± 0.02\nx + x = 24.6 ± 0.04\nx - x = 0 ± 0\nx + y = 13.8 ± 0.03605551275463989\n2x = 24.6 ± 0.04\nx * x = 151.29000000000002 ± 0.49200000000000005\nx * y = 18.450000000000003 ± 0.3702175036380641\nx / x = 1 ± 0\nunknown = unknown: scale received a measurement with unknown uncertainty\ninvalid sigma = measurement sigma must be non-negative\nempty source = measurement source label must not be empty\nnon-finite value = measurement value must be finite\nnon-finite sigma = measurement sigma must be finite\ninfinite sigma = measurement sigma must be finite\nnon-finite exact = unknown: exact measurement value must be finite\nunknown series = series offline\n";

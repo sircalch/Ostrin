@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-10-10 · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 312 de integración y 2 unitarias en verde.*
+*Corte: 2026-10-10 · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 313 de integración y 2 unitarias en verde.*
 
 Validación remota: Pages, CI, CodeQL, sanitizers y auditoría de seguridad pasaron para el
 ciclo actual en Windows, Linux, macOS y web. La compuerta oficial exige `cargo fmt --check`, Clippy con el lint `suspicious`, la suite del
@@ -567,7 +567,7 @@ la captura diferida por tarea también cruza IR y pasa con scheduler cooperativo
 Las pruebas focales de branch `Phi`, loop `Phi`, closure, captura y cancelación de tarea pasan bajo ASan y UBSan en WSL. El smoke
 matrix runtime de 20 programas compila y ejecuta con Node WASI y wasi-sdk 34, incluyendo las
 capturas y cancelación de tareas con payload gestionado. Para ello, el driver WASI enlaza `libsetjmp` de wasi-libc, que
-resuelve los símbolos generados por SJLJ. La suite completa de 312 pruebas de integración pasa en Windows. El
+resuelve los símbolos generados por SJLJ. La suite completa de 313 pruebas de integración pasa en Windows. El
 corte anterior de 282 ejemplos pasó completo bajo ASan y UBSan; las
 cuatro regresiones de enums gestionados pasan focalmente bajo ASan y UBSan. La prueba
 `native_ir_nested_wrappers_preserve_recursive_ownership` ahora fuerza una lista de
@@ -603,7 +603,7 @@ mantiene pendiente cualquier PR upstream.
 
 ```powershell
 cd compiler
-    cargo test                                   # 6 diferenciales + 312 de integración + 2 unitarias
+    cargo test                                   # 6 diferenciales + 313 de integración + 2 unitarias
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 cd ..

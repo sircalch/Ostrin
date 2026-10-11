@@ -55,6 +55,8 @@ las dos ramas de una función, con la misma evidencia de paridad y ownership.
 loop y la liberación del valor final.
 `examples/measurement_phi.ostrin` cubre la selección de dos mediciones en un
 `Phi` explícito del backend nativo.
+`examples/measurement_task.ostrin` cubre captura diferida, `join` y destrucción
+del entorno de una tarea para `Measurement<Float>`.
 `examples/viz_bars.ostrin` añade una serie de
 cinco grupos y proyecta `values`/`uncertainties` hacia `std.viz.errorbars`, también con paridad
 intérprete/native y una figura SVG reproducible en la galería. El Scientific Lab ejecuta el
