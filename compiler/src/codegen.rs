@@ -2045,6 +2045,12 @@ fn owned_call_argument(expr: &Expr, ty: &CType) -> bool {
     {
         return false;
     }
+    // A by-value wrapper around scalar payloads has no retain/release work.
+    // Keep it on the ordinary borrowed path so malformed-but-typechecked
+    // inputs cannot reach the release assertions below.
+    if release_owned_managed_value("", ty).is_none() {
+        return false;
+    }
     // Every array operator allocates a new array.
     if matches!(ty, CType::Array(_)) && fresh_array_expr(expr) {
         return true;
