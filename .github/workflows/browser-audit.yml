@@ -2,7 +2,7 @@ name: Browser audit
 
 on:
   push:
-    branches: [main, 'codex/**']
+    branches: [main]
     paths:
       - 'website/**'
       - 'compiler/**'
