@@ -57,6 +57,9 @@ loop y la liberación del valor final.
 `Phi` explícito del backend nativo.
 `examples/measurement_task.ostrin` cubre captura diferida, `join` y destrucción
 del entorno de una tarea para `Measurement<Float>`.
+`examples/measurement_array_shape.ostrin` conserva la frontera explícita de
+`Array<Measurement<Float>>`: el intérprete la rechaza por el contrato actual y
+el backend nativo da un diagnóstico específico que remite a `List`.
 `examples/viz_bars.ostrin` añade una serie de
 cinco grupos y proyecta `values`/`uncertainties` hacia `std.viz.errorbars`, también con paridad
 intérprete/native y una figura SVG reproducible en la galería. El Scientific Lab ejecuta el

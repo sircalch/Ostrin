@@ -11070,6 +11070,34 @@ fn measurement_quantity_boundary_is_explicitly_rejected_natively() {
 }
 
 #[test]
+fn measurement_array_boundary_has_actionable_diagnostic() {
+    let file = example_path("measurement_array_shape.ostrin");
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        !interpreted.status.success(),
+        "Array<Measurement<Float>> unexpectedly became interpreter-supported"
+    );
+    assert!(
+        stderr(&interpreted).contains("'array' expects a (nested) List of numbers or quantities"),
+        "interpreter array boundary diagnostic changed: {}",
+        stderr(&interpreted)
+    );
+
+    let native = run(&["--native-type-report", &file]);
+    assert!(
+        !native.status.success(),
+        "Array<Measurement<Float>> unexpectedly became native-supported"
+    );
+    assert!(
+        stderr(&native).contains(
+            "'array' of Measurement<T> is not supported by the native backend yet; use List<Measurement<T>>"
+        ),
+        "native array boundary diagnostic changed: {}",
+        stderr(&native)
+    );
+}
+
+#[test]
 fn experimental_effect_report_propagates_to_callers() {
     let out = run(&[
         "--effect-report",

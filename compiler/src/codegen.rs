@@ -8714,6 +8714,13 @@ impl<'a> Codegen<'a> {
                         array_ty,
                     )));
                 }
+                if depth == 1
+                    && matches!(ty, CType::Record(name) if name.contains("Measurement"))
+                {
+                    return Err(
+                        "'array' of Measurement<T> is not supported by the native backend yet; use List<Measurement<T>> until the array ownership and source-identity contract is implemented".to_string(),
+                    );
+                }
                 if !(1..=3).contains(&depth) || !matches!(ty, CType::Int | CType::Float | CType::Float32 | CType::Bool) {
                     return Err("'array' supports nested lists (up to 3 deep) of Int, Float, Float32 or Bool in the native backend".to_string());
                 }

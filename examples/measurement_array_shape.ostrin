@@ -1,0 +1,9 @@
+import std.measurements
+
+fn main() -> Void {
+    values: Array<Measurement<Float>> = array([
+        measurements.exact(2.0),
+        measurements.exact(3.0)
+    ])
+    print(measurements.summary(values[0]))
+}
