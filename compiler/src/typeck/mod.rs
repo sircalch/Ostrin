@@ -2588,22 +2588,38 @@ impl Checker {
         explicit_type_args: Option<&[Type]>,
         scope: &mut Scope,
     ) -> Ty {
+        // Resolve explicit record arguments before checking field expressions.
+        // This lets enum constructors such as `Err("message")` inherit the
+        // complete expected type from a field like `Result<String, String>`.
+        // Without it, an unconstrained constructor defaults its unknown `Ok`
+        // parameter to `Int`, producing an invalid native assignment later.
+        let explicit_type_subst: HashMap<String, Ty> = self
+            .record_generics
+            .get(name)
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+            .zip(explicit_type_args.unwrap_or_default().iter())
+            .map(|(generic, ty)| (generic.name.clone(), self.resolve_type_in_context(ty)))
+            .collect();
         let value_types: HashMap<String, Ty> = fields
             .iter()
             .map(|(field_name, value)| {
-                let declared_fn = self
+                let declared_type = self
                     .record_fields
                     .get(name)
                     .and_then(|fs| fs.iter().find(|(n, _)| n == field_name).map(|(_, t)| t.clone()))
-                    .map(|t| self.resolve_type_in_context(&t))
-                    .filter(|t| {
-                        // A lambda learns its parameter types, and an empty
-                        // `[]`/`{}` its element type, from the field.
-                        let empty = matches!(value.unlocated(), Expr::ListLiteral(items) | Expr::SetLiteral(items) if items.is_empty())
-                            || matches!(value.unlocated(), Expr::MapLiteral(pairs) if pairs.is_empty());
-                        matches!(t, Ty::Fn(..)) || (empty && !ty_mentions_generic(t))
-                    });
-                (field_name.clone(), self.infer_expr_with_expected(value, declared_fn.as_ref(), scope))
+                    .map(|t| resolve_type_with_type_subst(&t, &explicit_type_subst, &HashMap::new()));
+                let expected = declared_type.as_ref().filter(|t| {
+                    // A lambda learns its parameter types, and an empty
+                    // `[]`/`{}` its element type, from the field.
+                    let empty = matches!(value.unlocated(), Expr::ListLiteral(items) | Expr::SetLiteral(items) if items.is_empty())
+                        || matches!(value.unlocated(), Expr::MapLiteral(pairs) if pairs.is_empty());
+                    matches!(t, Ty::Fn(..))
+                        || (empty && !ty_mentions_generic(t))
+                        || explicit_type_args.is_some()
+                });
+                (field_name.clone(), self.infer_expr_with_expected(value, expected, scope))
             })
             .collect();
         // Untyped integer literals in a field whose declared type is a

@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-10-10 · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 318 de integración y 2 unitarias en verde.*
+*Corte: 2026-10-10 · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 319 de integración y 2 unitarias en verde.*
 
 Validación remota: Pages, CI, CodeQL, sanitizers y auditoría de seguridad pasaron para el
 ciclo actual en Windows, Linux, macOS y web. La compuerta oficial exige `cargo fmt --check`, Clippy con el lint `suspicious`, la suite del
@@ -50,7 +50,7 @@ Implementación: compilador + intérprete + herramientas de editor, todo en Rust
 | Léxico / parser | `lexer/`, `parser/mod.rs` | Tokens, AST con rangos de origen |
 | Módulos y paquetes | `modules.rs`, `package.rs`, `ostrin.toml` | Imports, `--project`, grafo transitivo de dependencias y lockfile portable |
 | Verificador de tipos | `typeck/mod.rs` (~3 500 l.) | Tipos, dimensiones, traits, exhaustividad, genéricos |
-| HIR/IR | `hir.rs`, `hir_c.rs`, `ir.rs`, `ir_c.rs` | HIR verificado, CFG con temporales explícitos y emisor C para escalares, `String`, constructores de arrays 1D–3D, parámetros, indexación, selección booleana `a[mask]`, cortes `to`/`until`, `not` sobre `Array<Bool>`, `where(mask, a, b)` para `Int`/`Float`/`Float32`/`Bool`, aritmética/comparaciones elemento a elemento y métodos de `Array<T>` numérico escalar, `Array<Quantity<D>>` en parámetros, indexación, ownership, `unit()`/`values()` y conversión desde `List<Quantity<D>>` conservando la unidad, `Option<Quantity<D>>`, `Result<Quantity<D>, String>` y `Result<Option<Quantity<D>>, String>` con ownership nativo/WASI y `match`; el wrapper anidado también pasa leak-check al forzar el backend AST, `Figure.unit_line`/`unit_scatter` genéricos ya migrados a IR/C con salida diferencial idéntica, emisión WASI y leak-check nativo en cero, `Result<Int, String>`/`Result<Float, String>` con `try`, `try catch` inline, handlers globales, aliases locales y handlers locales capturados compatibles, wrappers `Option`/`Result` sobre `List`, `Map` y `Set` con payload gestionado, `Result<String, String>`/`Result<Void, String>` de E/S de archivos, records concretos y records genéricos monomorfizados, iteradores de records concretos (`next() -> Option<T>`), iteradores genéricos monomorfizados (`Cursor<Int>`), iteración de canales mediante `receive() -> Option<T>`, `spawn {}` con CFG y capturas inmutables, `spawn_scope {}` inline con grupos nativos, `Task.join()` y `Task.cancel()` tipados, paso de `Task<Void>` por argumento y retorno con paridad y cero fugas, `Option<Record>`, listas escalares en campos de records, con reemplazo por Phi de loop, y de cantidades, mapas/conjuntos escalares, incluidos mapas y sets en campos de records, enteros de ancho fijo y control de flujo, con fallback HIR/AST acotado |
+| HIR/IR | `hir.rs`, `hir_c.rs`, `ir.rs`, `ir_c.rs` | HIR verificado, CFG con temporales explícitos y emisor C para escalares, `String`, constructores de arrays 1D–3D, parámetros, indexación, selección booleana `a[mask]`, cortes `to`/`until`, `not` sobre `Array<Bool>`, `where(mask, a, b)` para `Int`/`Float`/`Float32`/`Bool`, aritmética/comparaciones elemento a elemento y métodos de `Array<T>` numérico escalar, `Array<Quantity<D>>` en parámetros, indexación, ownership, `unit()`/`values()` y conversión desde `List<Quantity<D>>` conservando la unidad, `Option<Quantity<D>>`, `Result<Quantity<D>, String>` y `Result<Option<Quantity<D>>, String>` con ownership nativo/WASI y `match`; el wrapper anidado también pasa leak-check al forzar el backend AST, `Figure.unit_line`/`unit_scatter` genéricos ya migrados a IR/C con salida diferencial idéntica, emisión WASI y leak-check nativo en cero, `Result<Int, String>`/`Result<Float, String>` con `try`, `try catch` inline, handlers globales, aliases locales y handlers locales capturados compatibles, wrappers `Option`/`Result` sobre `List`, `Map` y `Set` con payload gestionado, `Result<String, String>`/`Result<Void, String>` de E/S de archivos, records concretos y records genéricos monomorfizados, iteradores de records concretos (`next() -> Option<T>`), iteradores genéricos monomorfizados (`Cursor<Int>`, `Cursor<List<String>>` y `Cursor<Result<String,String>>`), iteración de canales mediante `receive() -> Option<T>`, `spawn {}` con CFG y capturas inmutables, `spawn_scope {}` inline con grupos nativos, `Task.join()` y `Task.cancel()` tipados, paso de `Task<Void>` por argumento y retorno con paridad y cero fugas, `Option<Record>`, listas escalares en campos de records, con reemplazo por Phi de loop, y de cantidades, mapas/conjuntos escalares, incluidos mapas y sets en campos de records, enteros de ancho fijo y control de flujo, con fallback HIR/AST acotado |
 | Intérprete | `interpreter/mod.rs` | Ejecución tree‑walking y scheduler cooperativo; referencia semántica |
 | Servidor de lenguaje | `lsp.rs`, `symbols.rs`, `protocol.rs` | LSP sobre stdio |
 | Adaptador de depuración | `dap.rs` + hooks del intérprete | DAP sobre stdio |
@@ -239,7 +239,7 @@ positivos/negativos y paso cero conservan la semántica del intérprete, incluye
 Agregados complejos, iteradores propios indirectos, tareas anidadas dentro de `spawn`,
 `spawn_scope` y patrones distintos de `Some/None` y
 payloads gestionados que no sean `String` caen de forma verificable a HIR y después al AST. Los
-iteradores de records concretos y genéricos monomorfizados con `Iterator<T>` y `next() -> Option<T>` ya cruzan la IR, incluida
+iteradores de records concretos y genéricos monomorfizados con `Iterator<T>` y `next() -> Option<T>` ya cruzan la IR, incluidos payloads gestionados como `List<String>` y `Result<String,String>`, incluida
 la llamada de método nativa y la liberación del record iterador. Los canales sin spawn también cruzan
 la IR con `send`, `close`, `receive` y `for`, incluida la liberación del handle al último uso.
 Las instancias concretas de funciones y métodos genéricos pasan ahora por especialización,
@@ -567,7 +567,7 @@ la captura diferida por tarea también cruza IR y pasa con scheduler cooperativo
 Las pruebas focales de branch `Phi`, loop `Phi`, closure, captura y cancelación de tarea pasan bajo ASan y UBSan en WSL. El smoke
 matrix runtime de 20 programas compila y ejecuta con Node WASI y wasi-sdk 34, incluyendo las
 capturas y cancelación de tareas con payload gestionado. Para ello, el driver WASI enlaza `libsetjmp` de wasi-libc, que
-resuelve los símbolos generados por SJLJ. La suite completa de 318 pruebas de integración pasa en Windows. El
+resuelve los símbolos generados por SJLJ. La suite completa de 319 pruebas de integración pasa en Windows. El
 corte anterior de 282 ejemplos pasó completo bajo ASan y UBSan; las
 cuatro regresiones de enums gestionados pasan focalmente bajo ASan y UBSan. La prueba
 `native_ir_nested_wrappers_preserve_recursive_ownership` ahora fuerza una lista de
@@ -603,7 +603,7 @@ mantiene pendiente cualquier PR upstream.
 
 ```powershell
 cd compiler
-    cargo test                                   # 6 diferenciales + 318 de integración + 2 unitarias
+    cargo test                                   # 6 diferenciales + 319 de integración + 2 unitarias
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 cd ..
