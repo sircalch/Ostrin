@@ -26,5 +26,7 @@ explícito del auditor y no se rellena con valores sintéticos.
 Pages CI activa `OSTRIN_CAPTURE_HOST=1` después de preparar el compilador WASI y
 regenera los 29 bundles. En ese modo cada snapshot registra solo metadatos públicos
 del runner (`RUNNER_OS`, arquitectura, imagen, Node, WASI y hardware visible del proceso);
-no se guardan hostname, usuario ni rutas privadas. La verificación local mantiene el campo ausente para que
-un checkout de desarrollador no se presente como una ejecución CI.
+no se guardan hostname, usuario ni rutas privadas. La acción conserva además el reporte
+R3, el scorecard, la página de estado y los bundles host-bound como el artefacto
+`ostrin-r3-host-evidence-<run_id>` durante 90 días. La verificación local mantiene el
+campo ausente para que un checkout de desarrollador no se presente como una ejecución CI.

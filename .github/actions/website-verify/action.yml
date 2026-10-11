@@ -48,6 +48,18 @@ runs:
         node scripts/r3-readiness.mjs --write --require-ready
         node scripts/quality-scorecard.mjs --write
         node scripts/status-page.mjs --write
+    - name: Upload host-bound R3 evidence
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: ostrin-r3-host-evidence-${{ github.run_id }}
+        path: |
+          validation/r3-readiness.json
+          validation/quality-scorecard.json
+          website/status-data.js
+          website/assets/experiments/*.ostrin-experiment.json
+        if-no-files-found: error
+        retention-days: 90
     - name: Validate website, WASM and distribution contracts
       shell: bash
       env:
