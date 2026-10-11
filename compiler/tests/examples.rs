@@ -9210,7 +9210,7 @@ fn native_ir_nested_aggregate_field_preserves_ownership() {
 }
 
 #[test]
-fn native_nested_aggregate_loop_fallback_preserves_ownership() {
+fn native_nested_aggregate_loop_preserves_ownership() {
     let file = example_path("native_ir_nested_aggregate_loop.ostrin");
     let expected = "a\nnone\n";
     let report = run(&["--native-type-report", &file]);
@@ -9221,10 +9221,10 @@ fn native_nested_aggregate_loop_fallback_preserves_ownership() {
     );
     let report_text = stdout(&report);
     assert!(
-        report_text.contains("ir-generated: 1")
+        report_text.contains("ir-generated: 3")
             && report_text.contains("hir-generated: 0")
-            && report_text.contains("ast-fallback: 1"),
-        "nested aggregate loop changed its documented fallback boundary: {report_text}"
+            && report_text.contains("ast-fallback: 0"),
+        "nested aggregate loop did not stay fully on the typed backend: {report_text}"
     );
 
     let interpreted = run(&["--run", &file]);

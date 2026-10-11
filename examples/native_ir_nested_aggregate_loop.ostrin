@@ -6,8 +6,12 @@ record Outer {
     item: Option<Inner>
 }
 
+fn empty() -> Option<Inner> {
+    None
+}
+
 fn collect() -> List<Outer> {
-    [Outer { item: Some(Inner { text: "a" }) }, Outer { item: None }]
+    [Outer { item: Some(Inner { text: "a" }) }, Outer { item: empty() }]
 }
 
 fn main() -> Void {

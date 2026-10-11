@@ -4,10 +4,10 @@
   "count": 6,
   "source": "compiler/tests/differential.rs",
   "verifiedBaseline": {
-    "ir": 6948,
+    "ir": 7187,
     "hir": 38,
     "ast": 6,
-    "total": 6986
+    "total": 7225
   },
   "entries": [
     {

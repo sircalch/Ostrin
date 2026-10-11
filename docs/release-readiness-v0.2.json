@@ -40,7 +40,7 @@
         { "path": "examples/native_ir_try_captured_handler.ostrin", "claim": "Captured try/catch closure handler has interpreter/native/WASI and zero-leak ownership coverage" },
         { "path": "examples/native_ir_task_result.ostrin", "claim": "Task<Result<String, String>> join covers Ok/Err ownership in cooperative and native-thread modes with WASI emission" },
         { "path": "examples/native_ir_nested_aggregate_field.ostrin", "claim": "Nested Option<Inner> aggregate stored in a record field has interpreter/native/WASI and zero-leak coverage" },
-        { "path": "examples/native_ir_nested_aggregate_loop.ostrin", "claim": "Nested Option<Inner> aggregate iteration retains zero-leak coverage at the documented AST fallback boundary" },
+        { "path": "examples/native_ir_nested_aggregate_loop.ostrin", "claim": "Nested Option<Inner> aggregate iteration is lowered through IR/C with interpreter/native/WASI parity and zero-leak coverage" },
         { "path": "examples/native_generic_iterator_result.ostrin", "claim": "Generic Iterator<Result<String, String>> preserves the explicit Result payload type with interpreter/native parity and zero-leak coverage" },
         { "path": "examples/measurement_task.ostrin", "claim": "Measurement<Float> task capture, join and destruction has interpreter/native/WASI/native-threads and leak-check coverage" },
         { "path": "examples/measurement_array_shape.ostrin", "claim": "Array<Measurement<Float>> remains explicitly rejected with interpreter and actionable native diagnostics" },
