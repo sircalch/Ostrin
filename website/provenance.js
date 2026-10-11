@@ -9,6 +9,8 @@ if (artifact) {
   setText("[data-provenance-schema]", artifact.schema ?? "unknown");
   setText("[data-provenance-source]", artifact.program?.source_hash ?? "unknown");
   setText("[data-provenance-effects]", (artifact.activity?.effects ?? []).join(", ") || "none known");
+  const noKnownEffects = artifact.activity?.functions_without_known_effects ?? [];
+  setText("[data-provenance-no-known-effects]", `${noKnownEffects.length} candidates`);
   const runtime = artifact.runtime;
   const runtimeLabel = runtime?.target
     ? `${runtime.target}${runtime.wasi ? ` · WASI ${runtime.wasi}` : ""} · ${runtime.status ?? "unknown"}`

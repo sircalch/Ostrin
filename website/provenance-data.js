@@ -5,6 +5,17 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
       "io",
       "measurement"
     ],
+    "functions_without_known_effects": [
+      "std.measurements::is_exact",
+      "std.measurements::is_known",
+      "std.measurements::merge_scaled",
+      "std.measurements::source_count",
+      "std.measurements::standard",
+      "std.measurements::unknown",
+      "std.measurements::value",
+      "std.measurements::values",
+      "std.measurements::variance"
+    ],
     "sites": [
       {
         "col": 0,
