@@ -1,6 +1,6 @@
 {
   "schema": "ostrin.quality-scorecard/v1",
-  "sourceRevision": "5348991466f7a826dc75164428133f1273d5bd4e",
+  "sourceRevision": "584280fc7504eea7d14a10f14fac82fe51913d08",
   "workingTreeDirty": true,
   "sources": {
     "native": "compiler/tests/differential.rs",
@@ -34,9 +34,9 @@
     "ciRunUrl": "https://github.com/sircalch/Ostrin/actions/runs/38160056059"
   },
   "effectCoverage": {
-    "knownCalls": 33,
-    "unresolvedCalls": 35,
-    "complete": false
+    "knownCalls": 68,
+    "unresolvedCalls": 0,
+    "complete": true
   },
   "reproducibility": {
     "R0": 18,

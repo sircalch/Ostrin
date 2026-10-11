@@ -134,6 +134,7 @@ fn classify_unresolved_calls(report: &mut EffectReport) {
                 .find(|segment| !segment.is_empty())
                 .unwrap_or(operation);
             if classify(operation).is_none()
+                && !is_known_pure_operation(operation)
                 && !known_functions.contains(operation)
                 && !known_functions.contains(leaf)
             {
@@ -407,6 +408,49 @@ fn classify(operation: &str) -> Option<&'static str> {
     None
 }
 
+/// Operations in this list are local, deterministic transformations or
+/// collection accessors. They are known to the inventory without being
+/// effect rows: recognizing them only removes false `unresolved` markers and
+/// never proves that the surrounding function is pure.
+fn is_known_pure_operation(operation: &str) -> bool {
+    let leaf = operation
+        .rsplit(|character| character == '.' || character == ':')
+        .find(|segment| !segment.is_empty())
+        .unwrap_or(operation);
+    matches!(
+        leaf,
+        "abs"
+            | "at"
+            | "char_at"
+            | "codepoint"
+            | "contains"
+            | "first"
+            | "format_float"
+            | "format_text"
+            | "get"
+            | "is_blank"
+            | "is_empty"
+            | "is_exact"
+            | "is_finite"
+            | "is_known"
+            | "last"
+            | "length"
+            | "lines"
+            | "pop"
+            | "push"
+            | "reverse"
+            | "slice"
+            | "source_count"
+            | "sqrt"
+            | "to_string"
+            | "trim"
+            | "unit"
+            | "value"
+            | "Ok"
+            | "Err"
+    )
+}
+
 fn record(
     report: &mut EffectReport,
     effect: &str,
@@ -475,5 +519,18 @@ pub fn effect_description(effect: &str) -> &'static str {
         "provenance" => "registra metadatos de procedencia",
         "random(seed)" => "consume azar con un flujo explícito o detectable",
         _ => "efecto desconocido",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_known_pure_operation;
+
+    #[test]
+    fn pure_inventory_operations_are_known_without_becoming_effects() {
+        for operation in ["values.length", "std.strings::trim", "measurement.value"] {
+            assert!(is_known_pure_operation(operation), "{operation}");
+        }
+        assert!(!is_known_pure_operation("unknown_host_operation"));
     }
 }

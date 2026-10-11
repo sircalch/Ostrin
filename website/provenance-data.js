@@ -2,9 +2,9 @@
 globalThis.OSTRIN_PROVENANCE = Object.freeze({
   "activity": {
     "effect_coverage": {
-      "complete": false,
-      "known_calls": 33,
-      "unresolved_calls": 35
+      "complete": true,
+      "known_calls": 68,
+      "unresolved_calls": 0
     },
     "effects": [
       "io",
@@ -679,128 +679,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "operation": "print"
       }
     ],
-    "unresolved_calls": [
-      {
-        "calls": [
-          "sqrt"
-        ],
-        "function": "main"
-      },
-      {
-        "calls": [
-          "Err",
-          "Ok"
-        ],
-        "function": "std.measurements::add"
-      },
-      {
-        "calls": [
-          "Err",
-          "Ok"
-        ],
-        "function": "std.measurements::div"
-      },
-      {
-        "calls": [
-          "is_finite"
-        ],
-        "function": "std.measurements::exact"
-      },
-      {
-        "calls": [
-          "measurement.sources.length"
-        ],
-        "function": "std.measurements::is_exact"
-      },
-      {
-        "calls": [
-          "Err",
-          "Ok"
-        ],
-        "function": "std.measurements::mean"
-      },
-      {
-        "calls": [
-          "Err",
-          "Ok",
-          "merged.push"
-        ],
-        "function": "std.measurements::merge_scaled"
-      },
-      {
-        "calls": [
-          "Err",
-          "Ok"
-        ],
-        "function": "std.measurements::mul"
-      },
-      {
-        "calls": [
-          "measurement.sources.length"
-        ],
-        "function": "std.measurements::source_count"
-      },
-      {
-        "calls": [
-          "Err",
-          "Ok",
-          "is_finite",
-          "label.length"
-        ],
-        "function": "std.measurements::standard"
-      },
-      {
-        "calls": [
-          "Err",
-          "Ok"
-        ],
-        "function": "std.measurements::sub"
-      },
-      {
-        "calls": [
-          "Err",
-          "Ok"
-        ],
-        "function": "std.measurements::sum"
-      },
-      {
-        "calls": [
-          "measurement.value.to_string",
-          "sigma.to_string"
-        ],
-        "function": "std.measurements::summary"
-      },
-      {
-        "calls": [
-          "Err",
-          "Ok",
-          "output.push"
-        ],
-        "function": "std.measurements::uncertainties"
-      },
-      {
-        "calls": [
-          "Err",
-          "is_finite"
-        ],
-        "function": "std.measurements::uncertainty"
-      },
-      {
-        "calls": [
-          "output.push"
-        ],
-        "function": "std.measurements::values"
-      },
-      {
-        "calls": [
-          "Err",
-          "Ok",
-          "is_finite",
-          "sqrt"
-        ],
-        "function": "std.measurements::variance"
-      }
-    ]
+    "unresolved_calls": []
   },
   "compiler": {
     "commit": "unknown",

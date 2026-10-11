@@ -1002,8 +1002,8 @@ test("public status dashboard exposes separate evidence dimensions", async ({ pa
   await expect(page.locator("[data-status-backend] .status-metric")).toHaveCount(4);
   await expect(page.locator("[data-status-backend] .status-metric-value").first()).toHaveText("7,187");
   await expect(page.locator("[data-status-effects] .status-metric")).toHaveCount(3);
-  await expect(page.locator("[data-status-effects] .status-metric-value").first()).toHaveText("33");
-  await expect(page.locator("[data-status-effects] .status-metric-value").last()).toHaveText("PARTIAL");
+  await expect(page.locator("[data-status-effects] .status-metric-value").first()).toHaveText("68");
+  await expect(page.locator("[data-status-effects] .status-metric-value").last()).toHaveText("COMPLETE");
   await expect(page.locator("[data-status-reproducibility] .status-metric-value").last()).toHaveText("0");
   await expect(page.locator("[data-status-linguist] .status-metric-value").first()).toHaveText("0");
   await expect(page.locator("[data-status-linguist] .status-metric-value").nth(2)).toHaveText("PENDING");

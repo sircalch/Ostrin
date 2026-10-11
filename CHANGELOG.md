@@ -37,6 +37,10 @@
 
 ### Scientific effect inventory
 
+- Classified deterministic collection, string, measurement and result
+  operations as known local calls. The current provenance inventory now reports
+  `68` known and `0` unresolved calls while retaining its explicit
+  non-purity guarantee.
 - Added the public status scorecard's Scientific effects dimension. It reports
   known and unresolved call coverage separately and labels an incomplete
   inventory as `PARTIAL`, keeping the conservative boundary visible in the web
