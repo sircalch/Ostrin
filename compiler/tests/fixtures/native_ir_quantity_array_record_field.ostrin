@@ -1,0 +1,10 @@
+record Spectrum {
+    mut values: Array<Quantity<Length>>
+}
+
+fn main() -> Void {
+    mut spectrum = Spectrum { values: array([1 m, 2 m, 3 m]) }
+    print(spectrum.values)
+    spectrum.values = spectrum.values[1 until 3]
+    print(spectrum.values)
+}

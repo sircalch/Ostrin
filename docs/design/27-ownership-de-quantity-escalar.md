@@ -4,8 +4,9 @@
 `if`/`Phi`, por `Phi` de bucle y dentro de records no recursivos tiene cobertura
 nativa/WASI/leak-check. La fase 2 habilita `Figure.unit_line` y
 `Figure.unit_scatter` por IR/C con especialización por dimensión, paridad,
-emisión WASI y `live_allocations=0`; ASan/UBSan en CI sigue siendo evidencia
-pendiente para este ciclo.*
+emisión WASI y `live_allocations=0`; las suites ASan/UBSan del ciclo pasan en
+CI (`38101599953`), aunque las filas de cobertura no generalizadas siguen
+abiertas.*
 
 La cobertura de ownership también incluye `Option<Quantity<D>>`,
 `Result<Quantity<D>, String>` y `Result<Option<Quantity<D>>, String>`, con las
@@ -257,7 +258,8 @@ Con este contrato, `viz_units` se valida de forma incremental: `distance.max()`
 y la conversión posterior conservan sus etiquetas; las instanciaciones genéricas
 de `unit_line` y `unit_scatter` tienen informe nativo IR, emisión C para WASI,
 paridad del SVG y leak-check nativo en cero. La ejecución bajo ASan/UBSan queda
-pendiente de la CI Linux de este ciclo.
+cubierta por la evidencia del ciclo (`38101599953`), sin convertirla en una
+garantía para combinaciones que la matriz mantiene como limitación.
 
 ## 6. Native, WASI y browser
 
@@ -341,7 +343,7 @@ alcance y deben migrarse con evidencia propia.
 4. **Pendiente:** completar una matriz de ownership para todos los tipos
    gestionados; probar los riesgos altos que aún no tienen cobertura focalizada,
    incluidos records recursivos/anidados, escapes compuestos y capturas anidadas;
-   ejecutar ASan/UBSan en CI y completar las filas aplicables de la sección 7.
+   completar las filas aplicables de la sección 7 con evidencia específica.
 5. Las instanciaciones genéricas `unit_line`/`unit_scatter` ya no están en
    fallback: el guard verifica `ir=1, hir=0, ast=0` para el entry point y mantiene
    un baseline explícito para `std.viz`. Los trazados basados en listas conservan

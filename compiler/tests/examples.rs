@@ -10109,6 +10109,74 @@ fn native_ir_emitter_handles_scalar_quantities() {
 }
 
 #[test]
+fn native_quantity_array_record_field_preserves_unit_and_ownership() {
+    let file = fixture_path("native_ir_quantity_array_record_field.ostrin");
+    let expected = "[1, 2, 3] m\n[2, 3] m\n";
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "native report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ir-generated: 1"), "{report_text}");
+    assert!(report_text.contains("hir-generated: 0"), "{report_text}");
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "WASI C emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("struct Spectrum")
+            && wasi_source.contains("static void ostrin_drop_Spectrum")
+            && wasi_source.contains("ostrin_release((void*)(value->values))"),
+        "WASI C omitted Array record-field ownership: {wasi_source}"
+    );
+
+    let exe = temp_artifact("native-ir-quantity-array-record-field.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run quantity-array record-field binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "native binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "quantity-array record field leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn native_quantity_array_compound_units_release_owned_labels() {
     // Array<Quantity<D>> stores one shared unit label. A result such as
     // `m/s` comes from unit_combine and must be owned by the array, while a
