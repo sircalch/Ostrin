@@ -366,6 +366,9 @@ check(benchmarks.includes("data-benchmark-rows"), "benchmarks.html: missing benc
 const benchmarkData = read("website/benchmark-data.js");
 check(benchmarkData.includes("globalThis.OSTRIN_BENCHMARK") && benchmarkData.includes('"schema": 1'),
   "website/benchmark-data.js: missing generated benchmark record");
+const benchmarkHistory = read("validation/benchmark-history.json");
+check(benchmarkHistory.includes('"schema": "ostrin.benchmark-history/v1"'),
+  "validation/benchmark-history.json: missing benchmark history schema");
 check(read("benchmarks/README.md").includes("interpreter-versus-native"),
   "benchmarks/README.md: missing benchmark contract");
 

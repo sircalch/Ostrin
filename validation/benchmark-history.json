@@ -1,0 +1,230 @@
+{
+  "schema": "ostrin.benchmark-history/v1",
+  "generatedFrom": "checked-in website/benchmark-data.js snapshots",
+  "policy": "Historical entries preserve their original commit and environment; they are not cross-machine comparisons.",
+  "entries": [
+    {
+      "sourceCommit": "e7eb17c",
+      "benchmarkCommit": "ab8f09720583603454968379dcfb8d12a26c6578",
+      "compiler": "ostrinc 0.1.0",
+      "node": "v24.19.0",
+      "platform": "win32",
+      "arch": "x64",
+      "iterations": 7,
+      "warmups": 1,
+      "gitClean": null,
+      "workloads": [
+        {
+          "workload": "examples/benchmark_numeric.ostrin",
+          "outputSha256": "5eb06c147e97a87d816495ec13d06e74730a77040766c7118a11ce79debb426f",
+          "interpreterMedianMs": 284.213,
+          "nativeMedianMs": 18.238,
+          "interpreterToNativeMedianRatio": 15.583
+        },
+        {
+          "workload": "examples/arrays.ostrin",
+          "outputSha256": "30ded28c2b9d5e35ee00631c0656f85233cbfa6f5eb98ff9622cc27aea272fcd",
+          "interpreterMedianMs": 41.086,
+          "nativeMedianMs": 21.81,
+          "interpreterToNativeMedianRatio": 1.884
+        },
+        {
+          "workload": "examples/quantity_arrays.ostrin",
+          "outputSha256": "096611c76f3ce67238f18fad043e6c63875b931118ec64ddb3be7c316faf3a75",
+          "interpreterMedianMs": 48.52,
+          "nativeMedianMs": 17.418,
+          "interpreterToNativeMedianRatio": 2.786
+        },
+        {
+          "workload": "examples/numeric_methods.ostrin",
+          "outputSha256": "cc579fca9af4d7a9731c7bc2b1a215b36fc9a1ee20fe66728a00d695e58ebd58",
+          "interpreterMedianMs": 143.412,
+          "nativeMedianMs": 24.174,
+          "interpreterToNativeMedianRatio": 5.933
+        },
+        {
+          "workload": "examples/numeric_lu.ostrin",
+          "outputSha256": "5f5d980416766344175681432d58647a3364358c894e61dca5389173d6f17a88",
+          "interpreterMedianMs": 85.605,
+          "nativeMedianMs": 18.842,
+          "interpreterToNativeMedianRatio": 4.543
+        },
+        {
+          "workload": "examples/numeric_svd.ostrin",
+          "outputSha256": "8dc7f6a8375ccc906efd212bdcf5dd02cc692105b1304970a7c9c5550516a72c",
+          "interpreterMedianMs": 79.518,
+          "nativeMedianMs": 16.77,
+          "interpreterToNativeMedianRatio": 4.742
+        },
+        {
+          "workload": "examples/numeric_complex_linear_algebra.ostrin",
+          "outputSha256": "433ddb585475dbca9b9d1da223a522bf12bb4a1eebb331c9cd7b47931c17fd4f",
+          "interpreterMedianMs": 81.535,
+          "nativeMedianMs": 17.627,
+          "interpreterToNativeMedianRatio": 4.626
+        },
+        {
+          "workload": "examples/viz_scatter_fit.ostrin",
+          "outputSha256": "ecb2e338432f52a9f1bb91fcb792e6307cda4bd06b186a7959562241243c5608",
+          "interpreterMedianMs": 175.363,
+          "nativeMedianMs": 18.985,
+          "interpreterToNativeMedianRatio": 9.237
+        }
+      ]
+    },
+    {
+      "sourceCommit": "310ed6c",
+      "benchmarkCommit": "400a8426b62b8eae4b82a91997a7238a991f4d24",
+      "compiler": "ostrinc 0.1.0",
+      "node": "v24.19.0",
+      "platform": "win32",
+      "arch": "x64",
+      "iterations": 7,
+      "warmups": 1,
+      "gitClean": false,
+      "workloads": [
+        {
+          "workload": "examples/benchmark_numeric.ostrin",
+          "sourceSha256": "600c6d18abcd319eefbd5c869c301cfa1df5c5950e8b345458d9655012f6792d",
+          "outputSha256": "5eb06c147e97a87d816495ec13d06e74730a77040766c7118a11ce79debb426f",
+          "interpreterMedianMs": 123.917,
+          "nativeMedianMs": 6.387,
+          "interpreterToNativeMedianRatio": 19.403
+        },
+        {
+          "workload": "examples/arrays.ostrin",
+          "sourceSha256": "af2083471ba956c21067645fb984ce006519efac560afb571ec8c867b848ae86",
+          "outputSha256": "30ded28c2b9d5e35ee00631c0656f85233cbfa6f5eb98ff9622cc27aea272fcd",
+          "interpreterMedianMs": 8.141,
+          "nativeMedianMs": 5.707,
+          "interpreterToNativeMedianRatio": 1.426
+        },
+        {
+          "workload": "examples/quantity_arrays.ostrin",
+          "sourceSha256": "6165ecd6cbff6095a47a9b8e8cbc61f2aef27061dfb320e83ae7a8b72b557dd5",
+          "outputSha256": "096611c76f3ce67238f18fad043e6c63875b931118ec64ddb3be7c316faf3a75",
+          "interpreterMedianMs": 7.906,
+          "nativeMedianMs": 5.894,
+          "interpreterToNativeMedianRatio": 1.341
+        },
+        {
+          "workload": "examples/numeric_methods.ostrin",
+          "sourceSha256": "e021c50c1868560cff701e0de8cda97b07c472d85527f8c853ecdc1f0d237692",
+          "outputSha256": "cc579fca9af4d7a9731c7bc2b1a215b36fc9a1ee20fe66728a00d695e58ebd58",
+          "interpreterMedianMs": 49.333,
+          "nativeMedianMs": 8.618,
+          "interpreterToNativeMedianRatio": 5.724
+        },
+        {
+          "workload": "examples/numeric_lu.ostrin",
+          "sourceSha256": "f2bb4bb02bd9ab7bc681af1c29defe4d5cbdec0d76e50a3fea8f3989ae38bd90",
+          "outputSha256": "5f5d980416766344175681432d58647a3364358c894e61dca5389173d6f17a88",
+          "interpreterMedianMs": 23.702,
+          "nativeMedianMs": 6.054,
+          "interpreterToNativeMedianRatio": 3.915
+        },
+        {
+          "workload": "examples/numeric_svd.ostrin",
+          "sourceSha256": "867b8651ac16cd033434b40c5c7098d9eef51106db3e754e3f6284fc91230232",
+          "outputSha256": "8dc7f6a8375ccc906efd212bdcf5dd02cc692105b1304970a7c9c5550516a72c",
+          "interpreterMedianMs": 24.51,
+          "nativeMedianMs": 6.31,
+          "interpreterToNativeMedianRatio": 3.884
+        },
+        {
+          "workload": "examples/numeric_complex_linear_algebra.ostrin",
+          "sourceSha256": "5eaec3506ae800b3737747adee77461b22789e498f3a8155c625560d519d1cf2",
+          "outputSha256": "433ddb585475dbca9b9d1da223a522bf12bb4a1eebb331c9cd7b47931c17fd4f",
+          "interpreterMedianMs": 25.065,
+          "nativeMedianMs": 6.225,
+          "interpreterToNativeMedianRatio": 4.027
+        },
+        {
+          "workload": "examples/viz_scatter_fit.ostrin",
+          "sourceSha256": "356793bcde17891fe60df5753a283ee98ab857f0f6750d8c9a7b8b6a90fea699",
+          "outputSha256": "ecb2e338432f52a9f1bb91fcb792e6307cda4bd06b186a7959562241243c5608",
+          "interpreterMedianMs": 73.024,
+          "nativeMedianMs": 7.916,
+          "interpreterToNativeMedianRatio": 9.225
+        }
+      ]
+    },
+    {
+      "sourceCommit": "b3c997e",
+      "benchmarkCommit": "98a57f51ab1287d83db4552da955858e35f44127",
+      "compiler": "ostrinc 0.1.0",
+      "node": "v24.19.0",
+      "platform": "win32",
+      "arch": "x64",
+      "iterations": 7,
+      "warmups": 1,
+      "gitClean": false,
+      "workloads": [
+        {
+          "workload": "examples/benchmark_numeric.ostrin",
+          "sourceSha256": "600c6d18abcd319eefbd5c869c301cfa1df5c5950e8b345458d9655012f6792d",
+          "outputSha256": "5eb06c147e97a87d816495ec13d06e74730a77040766c7118a11ce79debb426f",
+          "interpreterMedianMs": 122.387,
+          "nativeMedianMs": 6.519,
+          "interpreterToNativeMedianRatio": 18.774
+        },
+        {
+          "workload": "examples/arrays.ostrin",
+          "sourceSha256": "af2083471ba956c21067645fb984ce006519efac560afb571ec8c867b848ae86",
+          "outputSha256": "30ded28c2b9d5e35ee00631c0656f85233cbfa6f5eb98ff9622cc27aea272fcd",
+          "interpreterMedianMs": 8.054,
+          "nativeMedianMs": 5.669,
+          "interpreterToNativeMedianRatio": 1.421
+        },
+        {
+          "workload": "examples/quantity_arrays.ostrin",
+          "sourceSha256": "6165ecd6cbff6095a47a9b8e8cbc61f2aef27061dfb320e83ae7a8b72b557dd5",
+          "outputSha256": "096611c76f3ce67238f18fad043e6c63875b931118ec64ddb3be7c316faf3a75",
+          "interpreterMedianMs": 7.855,
+          "nativeMedianMs": 5.862,
+          "interpreterToNativeMedianRatio": 1.34
+        },
+        {
+          "workload": "examples/numeric_methods.ostrin",
+          "sourceSha256": "e021c50c1868560cff701e0de8cda97b07c472d85527f8c853ecdc1f0d237692",
+          "outputSha256": "cc579fca9af4d7a9731c7bc2b1a215b36fc9a1ee20fe66728a00d695e58ebd58",
+          "interpreterMedianMs": 49.741,
+          "nativeMedianMs": 8.867,
+          "interpreterToNativeMedianRatio": 5.61
+        },
+        {
+          "workload": "examples/numeric_lu.ostrin",
+          "sourceSha256": "f2bb4bb02bd9ab7bc681af1c29defe4d5cbdec0d76e50a3fea8f3989ae38bd90",
+          "outputSha256": "5f5d980416766344175681432d58647a3364358c894e61dca5389173d6f17a88",
+          "interpreterMedianMs": 24.206,
+          "nativeMedianMs": 6.214,
+          "interpreterToNativeMedianRatio": 3.895
+        },
+        {
+          "workload": "examples/numeric_svd.ostrin",
+          "sourceSha256": "867b8651ac16cd033434b40c5c7098d9eef51106db3e754e3f6284fc91230232",
+          "outputSha256": "8dc7f6a8375ccc906efd212bdcf5dd02cc692105b1304970a7c9c5550516a72c",
+          "interpreterMedianMs": 24.84,
+          "nativeMedianMs": 6.236,
+          "interpreterToNativeMedianRatio": 3.984
+        },
+        {
+          "workload": "examples/numeric_complex_linear_algebra.ostrin",
+          "sourceSha256": "5eaec3506ae800b3737747adee77461b22789e498f3a8155c625560d519d1cf2",
+          "outputSha256": "433ddb585475dbca9b9d1da223a522bf12bb4a1eebb331c9cd7b47931c17fd4f",
+          "interpreterMedianMs": 24.709,
+          "nativeMedianMs": 6.139,
+          "interpreterToNativeMedianRatio": 4.025
+        },
+        {
+          "workload": "examples/viz_scatter_fit.ostrin",
+          "sourceSha256": "356793bcde17891fe60df5753a283ee98ab857f0f6750d8c9a7b8b6a90fea699",
+          "outputSha256": "ecb2e338432f52a9f1bb91fcb792e6307cda4bd06b186a7959562241243c5608",
+          "interpreterMedianMs": 72.53,
+          "nativeMedianMs": 8.069,
+          "interpreterToNativeMedianRatio": 8.988
+        }
+      ]
+    }
+  ]
+}
