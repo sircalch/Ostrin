@@ -2,6 +2,18 @@
 
 ## 0.2.0 (candidate)
 
+### Compatibility and release boundary
+
+- This entry describes the v0.2.0 release candidate on top of the existing
+  v0.1.0 compiler/runtime line. Existing Ostrin source remains source-compatible
+  within the tested examples, but the 0.x compatibility policy still permits
+  diagnostics, generated IR details and experimental APIs to change before a
+  stable 1.0 contract.
+- The candidate is not a published release yet. The v0.2 readiness gate remains
+  closed until ownership, benchmark regression analysis, website audit and the
+  final release manifest have current evidence. No package or tag is implied by
+  this changelog entry.
+
 ### Scientific measurement ownership
 
 - Added native/WASI ownership coverage for `Measurement<Float>` across records,
