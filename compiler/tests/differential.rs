@@ -68,13 +68,19 @@ fn outputs_match(name: &str, interpreted: &str, native: &str) -> bool {
 const KNOWN_NATIVE_GAPS: &[(&str, &str)] = &[(
     "measurement_quantity_shape.ostrin",
     "Measurement<Quantity<D>> remains interpreter-only while the native representation is designed",
+), (
+    "measurement_quantity_direct_shape.ostrin",
+    "direct Measurement<Quantity<D>> remains interpreter-only while the native representation is designed",
 )];
 
 // These examples intentionally exercise an experimental type boundary that is
 // not part of the typed-core ratchet yet. Keeping them out of the aggregate
 // counts prevents adding a documented frontier example from weakening the
 // ratchet for the stable core.
-const NON_CORE_TYPED_FIXTURES: &[&str] = &["measurement_quantity_shape.ostrin"];
+const NON_CORE_TYPED_FIXTURES: &[&str] = &[
+    "measurement_quantity_shape.ostrin",
+    "measurement_quantity_direct_shape.ostrin",
+];
 
 /// Examples that compile natively but whose output legitimately differs
 /// (operating-system error text comes from `strerror` vs Rust's `io::Error`).
