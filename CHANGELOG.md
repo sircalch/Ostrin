@@ -28,11 +28,20 @@
   contracts are implemented. The interpreter and native boundary tests document
   the supported behavior and the current limitation.
 - Re-synchronized public inventories and quality scorecard data with the
-  current 291-example, 315-integration-test repository state.
+  current 296-example, 320-integration-test repository state.
 
 ## Unreleased
 
 ### Compiler fallback reduction
+
+- Lowered a nested `List<Outer>` aggregate containing `Option<Inner>` through
+  IR/C. The typed `empty() -> Option<Inner>` constructor preserves the `None`
+  case, interpreter/native/WASI parity and native `--leak-check` at
+  `live_allocations=0`; the aggregate loop no longer adds an AST fallback.
+- Hardened native ownership cleanup for scalar-only `Option`/`Result` wrappers
+  and malformed-but-checkable inputs. Unsupported or incomplete native shapes
+  now produce diagnostics instead of reaching an internal `expect(...)` panic;
+  the deterministic mutated-source suite covers the boundary.
 
 - Lowered captured and named function values stored in `List<fn(...)>` and
   function-valued record fields through IR/C. Function signatures now produce
