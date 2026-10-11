@@ -96,6 +96,17 @@ pub fn build_report(path: &Path, source: &[u8], target: &str, effects: &EffectRe
     let normalized_source = String::from_utf8_lossy(source).replace("\r\n", "\n");
     let source_hash = sha256_bytes(normalized_source.as_bytes());
     let effect_names: Vec<String> = effects.effects.iter().cloned().collect();
+    let functions_without_known_effects: Vec<String> = effects
+        .function_names
+        .iter()
+        .filter(|function| {
+            effects
+                .function_kinds
+                .get(*function)
+                .is_none_or(std::collections::BTreeSet::is_empty)
+        })
+        .cloned()
+        .collect();
     let sites: Vec<Value> = effects
         .sites
         .iter()
@@ -140,6 +151,7 @@ pub fn build_report(path: &Path, source: &[u8], target: &str, effects: &EffectRe
         "runtime": runtime_snapshot(path, target),
         "activity": {
             "effects": effect_names,
+            "functions_without_known_effects": functions_without_known_effects,
             "sites": sites,
         },
         "inputs": [],
@@ -168,8 +180,12 @@ pub fn text_summary(report: &Value) -> String {
                 .join(", ")
         })
         .unwrap_or_default();
+    let no_known_effects = report["activity"]["functions_without_known_effects"]
+        .as_array()
+        .map(|values| values.len().to_string())
+        .unwrap_or_else(|| "0".to_string());
     format!(
-        "provenance-report: experimental artifact\nentry: {}\nsource-hash: {}\ncompiler: {} {} ({})\ntarget: {}\neffects: {}\nreproducibility: {}\nnote: {}",
+        "provenance-report: experimental artifact\nentry: {}\nsource-hash: {}\ncompiler: {} {} ({})\ntarget: {}\neffects: {}\nfunctions-without-known-effects: {}\nreproducibility: {}\nnote: {}",
         program["entry"].as_str().unwrap_or("<unknown>"),
         program["source_hash"].as_str().unwrap_or("<unknown>"),
         compiler["name"].as_str().unwrap_or("ostrinc"),
@@ -177,6 +193,7 @@ pub fn text_summary(report: &Value) -> String {
         compiler["commit"].as_str().unwrap_or("unknown"),
         compiler["target"].as_str().unwrap_or("native"),
         if effects.is_empty() { "none known" } else { &effects },
+        no_known_effects,
         report["reproducibility"]["level"].as_str().unwrap_or("unverified"),
         report["reproducibility"]["reason"].as_str().unwrap_or(""),
     )

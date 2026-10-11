@@ -41,6 +41,9 @@
   `functions_without_known_effects` for rows where the conservative inventory
   found no known effect. The field is explicitly a candidate list, not a static
   purity guarantee; unresolved calls remain outside the report.
+- `ostrinc --provenance-report --json` carries the same candidate list inside
+  `activity.functions_without_known_effects`, so reproducibility artifacts keep
+  the effect evidence alongside their source hash and effect sites.
 
 - Lowered a nested `List<Outer>` aggregate containing `Option<Inner>` through
   IR/C. The typed `empty() -> Option<Inner>` constructor preserves the `None`
