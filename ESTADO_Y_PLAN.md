@@ -573,8 +573,7 @@ cuatro regresiones de enums gestionados pasan focalmente bajo ASan y UBSan. La p
 `native_ir_nested_wrappers_preserve_recursive_ownership` ahora fuerza una lista de
 `Result<Option<Result<Option<String>,String>>,String>` por IR, la modifica en un loop con errores
 en capas distintas y comprueba paridad, `live_allocations=0` y el destructor recursivo emitido para
-WASI. Su ejecución en ASan/UBSan queda incluida en los jobs de sanitizer; falta obtener sus nuevos
-resultados de CI. El siguiente bloque técnico sigue siendo cerrar otros riesgos altos en agregados, escapes, `Phi`, closures y
+WASI. Su ejecución en ASan/UBSan queda incluida en los jobs de sanitizer; el run 38112752608 terminó correctamente. El siguiente bloque técnico sigue siendo cerrar otros riesgos altos en agregados, escapes, `Phi`, closures y
 tareas. Después se
 reduce el fallback AST de forma segura, sin sacrificar semántica ni memoria. Siguen
 reproducción R1/R2, inferencia estática de efectos, `Measurement<T>` con cantidades/arreglos/
