@@ -1,0 +1,8 @@
+import std.measurements
+
+fn main() -> Void {
+    measurement = measurements.exact(2.0)
+    callback: fn() -> String = fn() { measurements.summary(measurement) }
+    print(callback())
+    drop(callback)
+}
