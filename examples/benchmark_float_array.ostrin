@@ -1,0 +1,8 @@
+// Benchmark workload: unadorned Float array arithmetic and reductions.
+// Keep the shape and operation count aligned with benchmark_quantity_array.ostrin.
+fn main() -> Void {
+    values = linspace(0.0, 100.0, 1001)
+    transformed = (values * values + values) / 3.0
+    print(transformed.mean())
+    print(transformed.std())
+}

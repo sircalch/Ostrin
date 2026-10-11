@@ -1,0 +1,8 @@
+// Benchmark workload: the same array arithmetic with compile-time dimensions.
+// The physical meaning is retained while the runtime carries one shared unit.
+fn main() -> Void {
+    values = linspace(0.0, 100.0, 1001) as m
+    transformed = (values * values + values * (1 m)) / 3.0
+    print(transformed.mean() as m^2)
+    print(transformed.std() as m^2)
+}
