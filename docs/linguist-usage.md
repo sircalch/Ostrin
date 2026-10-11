@@ -7,7 +7,7 @@ reconozca `.ostrin` como lenguaje.
 
 ## Snapshot actual
 
-**Fecha del snapshot:** 2026-10-09
+**Fecha del snapshot:** 2026-10-11
 
 | Campo | Resultado |
 | --- | --- |
@@ -17,12 +17,12 @@ reconozca `.ostrin` como lenguaje.
 | Distribución entre repositorios y usuarios | Pendiente de revisión manual |
 | Propuesta upstream | **No lista para abrirse** |
 
-Los **284** archivos `.ostrin` rastreados en el repositorio propio (**266** bajo `examples/`)
+Los **317** archivos `.ostrin` rastreados en el repositorio propio (**291** bajo `examples/`)
 son muestras de sintaxis y capacidad del lenguaje. No se suman a esta evidencia de uso público. Mientras el
 contador sea 0 no se debe abrir un PR en Linguist ni presentar el mapa de lenguajes
 como si ya incluyera Ostrin.
 
-Este snapshot se verificó el 2026-10-09 con `node scripts/linguist-usage-report.mjs --json`:
+Este snapshot se verificó el 2026-10-11 con `node scripts/linguist-usage-report.mjs --json`:
 `indexedPublicFiles=0`, `incompleteResults=false`, umbral requerido `2000` y
 `readyForUpstreamPullRequest=false`. El resultado mantiene el estado
 `public-usage-pending`; no demuestra reconocimiento upstream.
