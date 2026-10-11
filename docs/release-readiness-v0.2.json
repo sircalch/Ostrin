@@ -34,7 +34,8 @@
         { "path": "examples/measurement_closure.ostrin", "claim": "Measurement<Float> closure capture ownership has interpreter/native/WASI and leak-check coverage" },
         { "path": "examples/measurement_list.ostrin", "claim": "List<Measurement<Float>> construction, indexing and destruction has interpreter/native/WASI and leak-check coverage" },
         { "path": "examples/measurement_branch.ostrin", "claim": "Measurement<Float> branch selection has interpreter/native/WASI and leak-check coverage" },
-        { "path": "examples/measurement_loop.ostrin", "claim": "Measurement<Float> loop replacement and destruction has interpreter/native/WASI and leak-check coverage" }
+        { "path": "examples/measurement_loop.ostrin", "claim": "Measurement<Float> loop replacement and destruction has interpreter/native/WASI and leak-check coverage" },
+        { "path": "examples/measurement_phi.ostrin", "claim": "Measurement<Float> Phi selection has interpreter/native/WASI and leak-check coverage" }
       ]
     },
     {

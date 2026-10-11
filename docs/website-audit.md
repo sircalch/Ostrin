@@ -34,10 +34,10 @@ tests or an explicitly labeled early-stage surface.
 
 ## Verified inventory
 
-- **287** `.ostrin` source files under `examples/`, including package-project sources and
+- **288** `.ostrin` source files under `examples/`, including package-project sources and
   intentional error cases.
 - **27** Markdown design documents under `docs/design/`.
-- Compiler suite: **311 integration**, **6 differential** and **2 unit** tests.
+- Compiler suite: **312 integration**, **6 differential** and **2 unit** tests.
 - WASI release smoke matrix: **20 program modules** passed in the latest full runtime run with
   wasi-sdk 34 and Node WASI. It covers hello, quantity arrays, a local-path package,
   arguments/environment, file I/O, managed ownership, nested `Option`/`Result`, managed enum

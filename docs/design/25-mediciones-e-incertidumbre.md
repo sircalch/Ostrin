@@ -53,6 +53,8 @@ con paridad intérprete/native, emisión WASI y `live_allocations=0`.
 las dos ramas de una función, con la misma evidencia de paridad y ownership.
 `examples/measurement_loop.ostrin` cubre reemplazos repetidos dentro de un
 loop y la liberación del valor final.
+`examples/measurement_phi.ostrin` cubre la selección de dos mediciones en un
+`Phi` explícito del backend nativo.
 `examples/viz_bars.ostrin` añade una serie de
 cinco grupos y proyecta `values`/`uncertainties` hacia `std.viz.errorbars`, también con paridad
 intérprete/native y una figura SVG reproducible en la galería. El Scientific Lab ejecuta el
