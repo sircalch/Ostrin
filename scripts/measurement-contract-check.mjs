@@ -27,12 +27,15 @@ export function validateMeasurementContract(root = repositoryRoot) {
   const tests = read("compiler/tests/examples.rs", root);
   const design = read("docs/design/25-mediciones-e-incertidumbre.md", root);
   const lab = read("scripts/lab-data.mjs", root);
+  const codegen = read("compiler/src/codegen.rs", root);
   const testsWithQuantityBoundary = tests.includes("measurement_quantity_boundary_is_explicitly_rejected_natively");
+  const testsWithDirectQuantityBoundary = tests.includes("direct_measurement_quantity_boundary_is_explicitly_rejected_natively");
 
   for (const [name, source] of [
     ["compiler/std/measurements.ostrin", std],
     ["examples/measurement_scalar.ostrin", example],
     ["compiler/tests/examples.rs", tests],
+    ["compiler/src/codegen.rs", codegen],
     ["docs/design/25-mediciones-e-incertidumbre.md", design],
     ["scripts/lab-data.mjs", lab],
   ]) check(errors, source.length > 0, `${name}: missing or empty`);
@@ -74,6 +77,10 @@ export function validateMeasurementContract(root = repositoryRoot) {
     "scripts/lab-data.mjs: experimental Measurement boundary is missing");
   check(errors, testsWithQuantityBoundary,
     "compiler/tests/examples.rs: Measurement<Quantity<D>> native boundary test is missing");
+  check(errors, testsWithDirectQuantityBoundary,
+    "compiler/tests/examples.rs: direct Measurement<Quantity<D>> native boundary test is missing");
+  check(errors, /type 'Measurement<Quantity<D>>' is not supported by the native backend yet/.test(codegen),
+    "compiler/src/codegen.rs: native Measurement<Quantity<D>> guard is missing");
 
   return { errors };
 }
