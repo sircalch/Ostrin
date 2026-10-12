@@ -3580,6 +3580,11 @@ fn native_backend_compiles_and_runs_dyn_trait() {
         "12\n9\n3\n4\n",
         "native binary should match the interpreter's output for the same program"
     );
+    assert!(
+        String::from_utf8_lossy(&run_output.stderr).contains("live_allocations=0"),
+        "dyn trait ownership leaked: {}",
+        String::from_utf8_lossy(&run_output.stderr)
+    );
 }
 
 #[test]
