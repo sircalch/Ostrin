@@ -153,8 +153,15 @@ fn community_starter_project_runs_from_manifest() {
         env!("CARGO_MANIFEST_DIR")
     );
     let out = run(&["--run", "--project", &project]);
-    assert!(out.status.success(), "starter project failed: {}", stderr(&out));
-    assert_eq!(stdout(&out).replace("\r\n", "\n"), "Hello from a public Ostrin project\n");
+    assert!(
+        out.status.success(),
+        "starter project failed: {}",
+        stderr(&out)
+    );
+    assert_eq!(
+        stdout(&out).replace("\r\n", "\n"),
+        "Hello from a public Ostrin project\n"
+    );
 }
 
 #[test]
