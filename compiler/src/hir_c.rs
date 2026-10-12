@@ -340,6 +340,9 @@ impl Emitter<'_> {
 
     fn release_managed_value(&self, access: &str, ty: &Ty) -> Option<String> {
         match ty {
+            Ty::Dyn(_) => Some(format!(
+                "if (({access}).vtable && ({access}).vtable->release) {{ ({access}).vtable->release(({access}).self); }}"
+            )),
             Ty::Named(name) if self.world.enums.contains(name) => {
                 Some(format!("ostrin_drop_enum_{name}({access})"))
             }

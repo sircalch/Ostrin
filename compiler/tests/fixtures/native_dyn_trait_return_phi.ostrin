@@ -1,0 +1,38 @@
+trait Shape {
+    fn area(self) -> Float
+}
+
+record Circle {
+    radius: Float
+}
+
+record Square {
+    side: Float
+}
+
+impl Shape for Circle {
+    fn area(self) -> Float { 3.0 * self.radius * self.radius }
+}
+
+impl Shape for Square {
+    fn area(self) -> Float { self.side * self.side }
+}
+
+fn pass(shape: dyn Shape) -> dyn Shape {
+    shape
+}
+
+fn choose(flag: Bool, first: dyn Shape, second: dyn Shape) -> dyn Shape {
+    mut selected: dyn Shape = first
+    if flag { selected = first } else { selected = second }
+    selected
+}
+
+fn main() -> Void {
+    boxed: dyn Shape = Circle { radius: 2.0 }
+    other: dyn Shape = Square { side: 3.0 }
+    first: dyn Shape = pass(boxed)
+    second: dyn Shape = choose(true, first, other)
+    print(first.area())
+    print(second.area())
+}
