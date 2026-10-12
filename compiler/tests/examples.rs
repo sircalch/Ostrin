@@ -3553,6 +3553,7 @@ fn native_backend_compiles_and_runs_dyn_trait() {
     let exe = temp_artifact("dyn_trait.exe");
     let compile = run(&[
         "--compile",
+        "--leak-check",
         "--out",
         &exe,
         &example_path("native_dyn_trait.ostrin"),
