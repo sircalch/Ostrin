@@ -63,6 +63,13 @@ abrir ahora una propuesta upstream tendría alta probabilidad de rechazo. El
 repositorio no debe añadir un `.gitattributes` que simule reconocimiento oficial:
 Linguist no incluye lenguajes ausentes de `languages.yml` en sus estadísticas.
 
+Para facilitar adopción independiente, el repositorio publica un
+[starter project reproducible](../templates/ostrin-community-starter/) y una
+[plantilla de showcase](../.github/ISSUE_TEMPLATE/showcase.md). Ambos ayudan a
+crear proyectos públicos con manifiesto, lockfile, comando de ejecución, licencia
+y evidencia reproducible; sus archivos cuentan como ejemplos propios hasta que
+proyectos externos los publiquen en repositorios independientes.
+
 ## Procedimiento cuando exista uso suficiente
 
 1. Copiar las muestras source-backed descritas en
