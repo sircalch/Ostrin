@@ -3600,6 +3600,13 @@ fn native_backend_dedups_vtables_across_repeated_boxing() {
         1,
         "Square's vtable should be emitted once: {source}"
     );
+    assert!(
+        source.contains(".retain = Shape__Circle__retain")
+            && source.contains(".release = Shape__Circle__release")
+            && source.contains(".retain = Shape__Square__retain")
+            && source.contains(".release = Shape__Square__release"),
+        "dyn Shape vtables must carry lifecycle hooks: {source}"
+    );
 }
 
 #[test]

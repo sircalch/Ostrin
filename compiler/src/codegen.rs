@@ -10777,6 +10777,20 @@ fn generate_impl(
             progressed = true;
             let trait_method_sigs = codegen.trait_methods[&trait_name].clone();
             let mut entries = Vec::new();
+            let retain_name = format!("{trait_name}__{record_name}__retain");
+            let release_name = format!("{trait_name}__{record_name}__release");
+            thunk_prototypes.push(format!("static void {retain_name}(void* self);"));
+            thunk_prototypes.push(format!("static void {release_name}(void* self);"));
+            bodies.push((
+                format!("static void {retain_name}(void* self)"),
+                "    ostrin_retain(self);\n".to_string(),
+            ));
+            bodies.push((
+                format!("static void {release_name}(void* self)"),
+                "    ostrin_release(self);\n".to_string(),
+            ));
+            entries.push(format!(".retain = {retain_name}"));
+            entries.push(format!(".release = {release_name}"));
             for (method_name, (param_types, return_type)) in &trait_method_sigs {
                 let record_method_c_name =
                     codegen.methods[&record_name][method_name].c_name.clone();
@@ -10949,6 +10963,8 @@ fn generate_impl(
     // are lazy — see `PendingVTable` and the drain loop above.
     for (trait_name, methods) in &codegen.trait_methods {
         out.push_str("typedef struct {\n");
+        out.push_str("    void (*retain)(void*);\n");
+        out.push_str("    void (*release)(void*);\n");
         for (method_name, (param_types, return_type)) in methods {
             let params = std::iter::once("void*".to_string())
                 .chain(param_types.iter().map(c_type_name))
