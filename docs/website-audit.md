@@ -53,7 +53,7 @@ Firefox launch limitation remains documented as a tooling note and does not repl
 - **298** `.ostrin` source files under `examples/`, including package-project sources and
   intentional error cases.
 - **27** Markdown design documents under `docs/design/`.
-- Compiler suite: **323 integration**, **6 differential** and **2 unit** tests.
+- Compiler suite: **324 integration**, **6 differential** and **2 unit** tests.
 - WASI release smoke matrix: **20 program modules** passed in the latest full runtime run with
   wasi-sdk 34 and Node WASI. It covers hello, quantity arrays, a local-path package,
   arguments/environment, file I/O, managed ownership, nested `Option`/`Result`, managed enum
@@ -114,3 +114,4 @@ parameter must change the output. The `lines` bundle now exercises the same gene
 contract. RNG-consuming bundles record the xoshiro256**/splitmix64 implementation evidence and
 source hashes. `histogram` was the first input-driven seeded-randomness bundle, `boxplot`
 the second, `scatter-fit` the third, `violin` the fourth, `hexbin` the fifth, `bars` the sixth, `point-cloud` the seventh, `fft` the eighth and `dashboard` the ninth; every gallery fixture that consumes `rng(seed)` retains the R1 algorithm contract inside its R2 bundle. All eleven input-driven fixtures now claim R2 because their embedded `data.json` snapshots, filesystem capabilities and sensitivity are verified. The remaining 18 R0 fixtures are deterministic or lack a declared input-sensitivity contract. The R3 host/effects gate is implemented; Website CI run 38162721694 produced the host-bound artifact and validated 29/29 bundles, while the checkout intentionally keeps host metadata absent.
+

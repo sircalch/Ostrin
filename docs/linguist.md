@@ -49,7 +49,7 @@ aislado. El repositorio ya contiene ejemplos de:
 - concurrencia: `examples/native_concurrency.ostrin`, `examples/concurrency.ostrin`;
 - records, traits, módulos y paquetes: los ejemplos correspondientes bajo `examples/`.
 
-El inventario actual tiene **326 archivos `.ostrin` rastreados**, de los cuales **298** están
+El inventario actual tiene **327 archivos `.ostrin` rastreados**, de los cuales **298** están
 bajo `examples/`; todos pertenecen al repositorio de Ostrin. Eso demuestra variedad sintáctica,
 no el uso distribuido que Linguist exige para aceptar una extensión nueva.
 
@@ -86,3 +86,4 @@ proyectos externos los publiquen en repositorios independientes.
 
 La referencia normativa es la guía de contribución de
 [`github/linguist`](https://github.com/github-linguist/linguist/blob/main/CONTRIBUTING.md).
+
