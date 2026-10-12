@@ -165,6 +165,7 @@ fn is_reference_type(ty: &CType) -> bool {
             | CType::Task(_)
             | CType::Array(_)
             | CType::Rng
+            | CType::DynTrait(_)
     )
 }
 
@@ -175,6 +176,9 @@ fn is_reference_type(ty: &CType) -> bool {
 /// not emit any runtime calls.
 fn retain_managed_value(access: &str, ty: &CType) -> Option<String> {
     match ty {
+        CType::DynTrait(_) => Some(format!(
+            "if (({access}).vtable && ({access}).vtable->retain) {{ ({access}).vtable->retain(({access}).self); }}"
+        )),
         CType::Quantity(_) => Some(format!("ostrin_qty_retain({access})")),
         CType::Enum(name) => Some(format!("ostrin_retain_enum_{name}({access})")),
         CType::Option(inner) => retain_managed_value(&format!("({access}).value"), inner)
@@ -202,6 +206,9 @@ fn retain_managed_value(access: &str, ty: &CType) -> Option<String> {
 /// only place that may need `ostrin_release_owned` for task-handle bookkeeping.
 fn release_managed_value(access: &str, ty: &CType) -> Option<String> {
     match ty {
+        CType::DynTrait(_) => Some(format!(
+            "if (({access}).vtable && ({access}).vtable->release) {{ ({access}).vtable->release(({access}).self); }}"
+        )),
         CType::Quantity(_) => Some(format!("ostrin_qty_release({access})")),
         CType::Enum(name) => Some(format!("ostrin_drop_enum_{name}({access})")),
         CType::Option(inner) => release_managed_value(&format!("({access}).value"), inner)
@@ -239,6 +246,9 @@ fn release_list_item(access: &str, ty: &CType) -> Option<String> {
 /// their active fields and therefore never cast a by-value wrapper to `void*`.
 fn release_owned_managed_value(access: &str, ty: &CType) -> Option<String> {
     match ty {
+        CType::DynTrait(_) => Some(format!(
+            "if (({access}).vtable && ({access}).vtable->release) {{ ({access}).vtable->release(({access}).self); }}"
+        )),
         CType::Quantity(_) => Some(format!("ostrin_qty_release({access})")),
         CType::Enum(name) => Some(format!("ostrin_drop_enum_{name}({access})")),
         CType::Option(inner) => release_managed_value(&format!("({access}).value"), inner)
