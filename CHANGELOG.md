@@ -33,6 +33,20 @@
 
 ## Unreleased
 
+### Public adoption path
+
+- Added a copyable `templates/ostrin-community-starter` project with a
+  reproducible command for public Ostrin experiments.
+- Added a showcase issue template and links from the Community and Showcase
+  pages. External usage remains counted separately from the repository's own
+  examples for the GitHub Linguist path.
+
+### Scientific boundary guards
+
+- Strengthened the measurement contract gate so both generic and direct
+  `Measurement<Quantity<D>>` native boundary tests, plus the explicit backend
+  guard, must remain present until typed IR ownership support exists.
+
 ### Compiler fallback reduction
 
 ### Scientific effect inventory
