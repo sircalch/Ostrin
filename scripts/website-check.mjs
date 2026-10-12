@@ -81,6 +81,9 @@ const projectStatus = read("ESTADO_Y_PLAN.md");
 check(projectStatus.includes(`· ${facts.differentialTests} pruebas diferenciales, ${facts.integrationTests} de integración y ${facts.unitTests} unitarias en verde.`)
   && projectStatus.includes(`# ${facts.differentialTests} diferenciales + ${facts.integrationTests} de integración + ${facts.unitTests} unitarias`),
   "ESTADO_Y_PLAN.md: compiler test counts drifted from source");
+const changelog = read("CHANGELOG.md");
+check(changelog.includes(`${facts.integrationTests}-integration-test repository state`),
+  "CHANGELOG.md: v0.2 candidate test count drifted from source");
 
 // Every registered experiment must have a checked, source-backed download.
 for (const [fixtureId, fixture] of Object.entries(experimentFixtures)) {
