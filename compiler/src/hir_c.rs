@@ -35,6 +35,7 @@ pub struct World {
     pub applied_enums: HashMap<String, String>,
     /// Methods of records: (record, method) -> (C name, C parameter types with `self` first, C return type).
     pub methods: HashMap<(String, String), (String, Vec<String>, String)>,
+    pub trait_methods: HashMap<String, HashMap<String, (Vec<String>, String)>>,
     pub c_name: fn(&str) -> String,
     /// Non-generic enums (tagged unions passed by value) and their variants by name.
     pub enums: HashSet<String>,
@@ -71,6 +72,17 @@ fn c_compatible(arg: &str, param: &str) -> bool {
             && matches!(param, "int64_t" | "double" | "bool"))
 }
 
+fn contains_dyn(ty: &Ty) -> bool {
+    match ty {
+        Ty::Dyn(_) => true,
+        Ty::List(elem) | Ty::Set(elem) => contains_dyn(elem),
+        Ty::Map(key, value) => contains_dyn(key) || contains_dyn(value),
+        Ty::Applied(_, args) => args.iter().any(contains_dyn),
+        Ty::Fn(args, ret) => args.iter().any(contains_dyn) || contains_dyn(ret),
+        _ => false,
+    }
+}
+
 struct Emitter<'a> {
     world: &'a World,
     scopes: Vec<HashSet<String>>,
@@ -95,6 +107,7 @@ impl Emitter<'_> {
             Ty::Sized(kind) => Ok(kind.c_type().to_string()),
             Ty::Bool => Ok("bool".to_string()),
             Ty::String => Ok("const char*".to_string()),
+            Ty::Dyn(name) => Ok(format!("{name}_Dyn")),
             Ty::Named(n) if self.world.records.contains_key(n) => Ok(format!("{n}*")),
             Ty::Named(n) if self.world.enums.contains(n) => Ok(n.clone()),
             Ty::Applied(..) if self.world.applied_records.contains_key(&ty.describe()) => {
@@ -103,13 +116,15 @@ impl Emitter<'_> {
             Ty::Applied(..) if self.world.applied_enums.contains_key(&ty.describe()) => {
                 Ok(self.world.applied_enums[&ty.describe()].clone())
             }
-            Ty::List(elem) => Ok(format!("List_{}*", self.mangle_type(elem)?)),
-            Ty::Map(key, value) => Ok(format!(
+            Ty::List(elem) if !contains_dyn(elem) => {
+                Ok(format!("List_{}*", self.mangle_type(elem)?))
+            }
+            Ty::Map(key, value) if !contains_dyn(key) && !contains_dyn(value) => Ok(format!(
                 "Map_{}_{}*",
                 self.mangle_type(key)?,
                 self.mangle_type(value)?
             )),
-            Ty::Set(elem) => Ok(format!("Set_{}*", self.mangle_type(elem)?)),
+            Ty::Set(elem) if !contains_dyn(elem) => Ok(format!("Set_{}*", self.mangle_type(elem)?)),
             Ty::Fn(..) => Ok("OstrinClosure".to_string()),
             Ty::Applied(name, args) if name == "Option" && args.len() == 1 => {
                 Ok(format!("Option_{}", self.mangle_type(&args[0])?))
@@ -123,10 +138,6 @@ impl Emitter<'_> {
         }
     }
 
-    fn managed_c_type(ty: &str) -> bool {
-        ty == "const char*" || ty.ends_with('*')
-    }
-
     fn mangle_type(&self, ty: &Ty) -> Bail<String> {
         Ok(match ty {
             Ty::Int => "Int".to_string(),
@@ -137,13 +148,14 @@ impl Emitter<'_> {
             Ty::String => "String".to_string(),
             Ty::Void => "Void".to_string(),
             Ty::Named(n) => n.clone(),
-            Ty::List(elem) => format!("List_{}", self.mangle_type(elem)?),
-            Ty::Map(key, value) => format!(
+            Ty::Dyn(n) => format!("{n}_Dyn"),
+            Ty::List(elem) if !contains_dyn(elem) => format!("List_{}", self.mangle_type(elem)?),
+            Ty::Map(key, value) if !contains_dyn(key) && !contains_dyn(value) => format!(
                 "Map_{}_{}",
                 self.mangle_type(key)?,
                 self.mangle_type(value)?
             ),
-            Ty::Set(elem) => format!("Set_{}", self.mangle_type(elem)?),
+            Ty::Set(elem) if !contains_dyn(elem) => format!("Set_{}", self.mangle_type(elem)?),
             Ty::Fn(params, ret) => format!(
                 "Fn_{}_to_{}",
                 params
@@ -286,6 +298,9 @@ impl Emitter<'_> {
     /// so they must never be cast to `void*` directly.
     fn retain_managed_value(&self, access: &str, ty: &Ty) -> Option<String> {
         match ty {
+            Ty::Dyn(_) => Some(format!(
+                "if (({access}).vtable && ({access}).vtable->retain) {{ ({access}).vtable->retain(({access}).self); }}"
+            )),
             Ty::String | Ty::List(_) | Ty::Map(_, _) | Ty::Set(_) => {
                 Some(format!("ostrin_retain((void*)({access}))"))
             }
@@ -1163,8 +1178,11 @@ impl Emitter<'_> {
                     }
                     let code = self.expr(value)?;
                     body.push_str(&format!("{temp}->{field} = {code}; "));
-                    if Self::managed_c_type(&want) {
-                        body.push_str(&format!("ostrin_retain((void*){temp}->{field}); "));
+                    if let Some(retain) =
+                        self.retain_managed_value(&format!("{temp}->{field}"), &value.ty)
+                    {
+                        body.push_str(&retain);
+                        body.push_str("; ");
                     }
                 }
                 Ok(format!("({{ {body} {temp}; }})"))
@@ -1206,6 +1224,38 @@ impl Emitter<'_> {
                 }
                 if is_set(&recv.ty) {
                     return self.set_method(e, recv, method, args);
+                }
+                if let Ty::Dyn(trait_name) = &recv.ty {
+                    let (params, ret) = self
+                        .world
+                        .trait_methods
+                        .get(trait_name)
+                        .and_then(|methods| methods.get(method))
+                        .cloned()
+                        .ok_or(())?;
+                    if params.len() != args.len() || args.iter().any(|a| a.name.is_some()) {
+                        return Err(());
+                    }
+                    if e.ty == Ty::Void {
+                        if ret != "void" {
+                            return Err(());
+                        }
+                    } else if ret != self.c_type(&e.ty)? {
+                        return Err(());
+                    }
+                    let recv_code = self.expr(recv)?;
+                    let temp = self.next_temp();
+                    let mut call_args = vec![format!("{temp}.self")];
+                    for (arg, want) in args.iter().zip(&params) {
+                        if !c_compatible(&self.c_type(&arg.value.ty)?, want) {
+                            return Err(());
+                        }
+                        call_args.push(self.expr(&arg.value)?);
+                    }
+                    let call = format!("{temp}.vtable->{method}({})", call_args.join(", "));
+                    return Ok(format!(
+                        "({{ {trait_name}_Dyn {temp} = {recv_code}; {call}; }})"
+                    ));
                 }
                 if args.is_empty() && e.ty == Ty::String {
                     let recv_code = self.expr(recv)?;

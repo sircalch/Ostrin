@@ -461,9 +461,9 @@ fn native_backend_types_agree_with_the_checker() {
     // and leak contract is covered by a dedicated integration regression.
     // Scoped spawn cancellation now lowers both concurrency cancellation
     // entry points through IR as well. That removes their AST expression
-    // population from this comparison; 43 expressions remain in the
+    // population from this comparison; 38 expressions remain in the
     // checker/native comparison set.
-    assert!(agreed >= 40, "only {agreed} AST expressions were compared");
+    assert!(agreed >= 38, "only {agreed} AST expressions were compared");
     // The same comparison over *every* AST node (operands included), by node address.
     // The Float32 array `to_string()` migration removed the entire `arrays_3d`
     // entry point from this comparison. The generic-call HIR prepass now also

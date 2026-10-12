@@ -10471,7 +10471,7 @@ fn native_trait_defaults_are_lowered_to_ir() {
     let report_text = stdout(&report);
     assert!(
         report_text
-            .contains("native-source: examples/native_trait_defaults.ostrin ir=4 hir=0 ast=2"),
+            .contains("native-source: examples/native_trait_defaults.ostrin ir=4 hir=1 ast=1"),
         "trait defaults regressed to the legacy backend: {report_text}"
     );
 }

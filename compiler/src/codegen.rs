@@ -9624,6 +9624,24 @@ fn generate_impl(
                 })
             })
             .collect(),
+        trait_methods: codegen
+            .trait_methods
+            .iter()
+            .map(|(trait_name, methods)| {
+                (
+                    trait_name.clone(),
+                    methods
+                        .iter()
+                        .map(|(name, (params, ret))| {
+                            (
+                                name.clone(),
+                                (params.iter().map(c_type_name).collect(), c_type_name(ret)),
+                            )
+                        })
+                        .collect(),
+                )
+            })
+            .collect(),
         c_name: c_function_name,
         enums: codegen
             .enum_names
