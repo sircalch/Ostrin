@@ -85,6 +85,7 @@ export function validateProjectPlan(root = repositoryRoot) {
     "Iterator con estado gestionado",
     "Agregado anidado (`List`/wrapper/record)",
     "Record recursivo",
+    "dyn Trait",
   ];
   const matrixRows = ownershipMatrix.split("\n")
     .filter((line) => line.startsWith("|") && !line.includes("---"))
