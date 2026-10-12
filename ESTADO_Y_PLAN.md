@@ -407,8 +407,9 @@ backends. El bloque JSON, `std.maps` y `std.strings.format_float` están verific
 red y paquetes con registro (con consentimiento explícito del usuario para la red).
 
 ### D. Experiencia de desarrollador
-Formateador oficial (`ostrinc fmt`), `ostrinc test`, documentación generada, acciones de
-código en LSP (quick fixes), inlay hints, publicación de la extensión en el Marketplace,
+El formateador oficial (`ostrinc --fmt`) y el runner de pruebas (`ostrinc --test`) ya están
+implementados y cubiertos por pruebas de integración. Quedan documentación generada, acciones
+de código en LSP (quick fixes), inlay hints, publicación de la extensión en el Marketplace y
 canales de distribución adicionales (la release `v0.1.0`, la CI con matriz y los instaladores ya existen).
 
 ### E. Backends adicionales
