@@ -36,6 +36,7 @@ pub struct World {
     /// Methods of records: (record, method) -> (C name, C parameter types with `self` first, C return type).
     pub methods: HashMap<(String, String), (String, Vec<String>, String)>,
     pub trait_methods: HashMap<String, HashMap<String, (Vec<String>, String)>>,
+    pub dyn_impls: HashSet<(String, String)>,
     pub c_name: fn(&str) -> String,
     /// Non-generic enums (tagged unions passed by value) and their variants by name.
     pub enums: HashSet<String>,
@@ -96,6 +97,24 @@ struct Emitter<'a> {
 }
 
 impl Emitter<'_> {
+    fn coerce_dyn(&self, code: String, from: &Ty, to: &Ty) -> Bail<String> {
+        let Ty::Dyn(trait_name) = to else {
+            return Ok(code);
+        };
+        let Ty::Named(record_name) = from else {
+            return Err(());
+        };
+        if !self
+            .world
+            .dyn_impls
+            .contains(&(trait_name.clone(), record_name.clone()))
+        {
+            return Err(());
+        }
+        Ok(format!(
+            "(({trait_name}_Dyn){{ .self = (void*)({code}), .vtable = &{trait_name}__{record_name}__vtable }})"
+        ))
+    }
     /// The C type of a value the emitter handles: scalars, records, the
     /// monomorphized built-in wrappers and the collection structs emitted by
     /// codegen.
@@ -590,16 +609,23 @@ impl Emitter<'_> {
                 value,
                 ..
             } => {
-                let ty = self.c_type(&value.ty)?;
+                let declared_ty = declared
+                    .as_ref()
+                    .map(crate::typeck::resolve_type)
+                    .unwrap_or_else(|| value.ty.clone());
+                let ty = self.c_type(&declared_ty)?;
                 if let Some(declared) = declared {
                     let declared = crate::typeck::resolve_type(declared);
-                    if declared != value.ty || self.c_type(&declared)? != ty {
+                    if declared != value.ty
+                        && !(matches!(declared, Ty::Dyn(_)) && matches!(value.ty, Ty::Named(_)))
+                    {
                         return Err(());
                     }
                 }
-                let code = self.expr(value)?;
+                let value_code = self.expr(value)?;
+                let code = self.coerce_dyn(value_code, &value.ty, &declared_ty)?;
                 out.push_str(&format!("    {ty} {name} = {code};\n"));
-                self.track_owned_local(name, &value.ty, Self::borrowed_expr(value), out);
+                self.track_owned_local(name, &declared_ty, Self::borrowed_expr(value), out);
                 self.scopes.last_mut().expect("scope").insert(name.clone());
             }
             HirStmt::Assign { name, value } => {
@@ -1460,7 +1486,10 @@ impl Emitter<'_> {
                     return Err(());
                 }
                 for (arg, want) in args.iter().zip(&params) {
-                    if !c_compatible(&self.c_type(&arg.value.ty)?, want) {
+                    let actual = self.c_type(&arg.value.ty)?;
+                    if !c_compatible(&actual, want)
+                        && !(matches!(arg.value.ty, Ty::Named(_)) && want.ends_with("_Dyn"))
+                    {
                         return Err(());
                     }
                 }
@@ -1480,9 +1509,30 @@ impl Emitter<'_> {
                 let mut setup = String::new();
                 let mut cleanup = String::new();
                 let mut codes = Vec::with_capacity(args.len());
-                for arg in args {
-                    let code = self.expr(&arg.value)?;
-                    if (Self::owned_record_literal(&arg.value) || self.contains_enum(&arg.value.ty))
+                for (arg, want) in args.iter().zip(&params) {
+                    let boxed = matches!(arg.value.ty, Ty::Named(_)) && want.ends_with("_Dyn");
+                    let code = if boxed {
+                        let target = Ty::Dyn(want.trim_end_matches("_Dyn").to_string());
+                        let value_code = self.expr(&arg.value)?;
+                        self.coerce_dyn(value_code, &arg.value.ty, &target)?
+                    } else {
+                        self.expr(&arg.value)?
+                    };
+                    if boxed {
+                        let temp = self.next_temp();
+                        let cty =
+                            self.c_type(&Ty::Dyn(want.trim_end_matches("_Dyn").to_string()))?;
+                        setup.push_str(&format!("{cty} {temp} = {code}; "));
+                        let release = self
+                            .release_managed_value(
+                                &temp,
+                                &Ty::Dyn(want.trim_end_matches("_Dyn").to_string()),
+                            )
+                            .ok_or(())?;
+                        cleanup.push_str(&format!("{release}; "));
+                        codes.push(temp);
+                    } else if (Self::owned_record_literal(&arg.value)
+                        || self.contains_enum(&arg.value.ty))
                         && !Self::borrowed_expr(&arg.value)
                     {
                         let temp = self.next_temp();

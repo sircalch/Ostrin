@@ -9493,6 +9493,29 @@ fn generate_impl(
         codegen.register_impl_methods(im, &im.type_name, &self_ty, &self_subst, false);
     }
 
+    // Queue every concrete object-safe trait/record pair before HIR emission.
+    // HIR boxing sites can then refer to the same immutable vtable symbols as
+    // the legacy coercion path without discovering ABI declarations midway
+    // through C generation.
+    for (trait_name, trait_methods) in &codegen.trait_methods {
+        for record_name in codegen.records.keys() {
+            if trait_methods.keys().all(|method| {
+                codegen
+                    .methods
+                    .get(record_name)
+                    .is_some_and(|methods| methods.contains_key(method))
+            }) {
+                let key = (trait_name.clone(), record_name.clone());
+                if codegen.vtables_emitted.insert(key.clone()) {
+                    codegen.pending_vtables.push_back(PendingVTable {
+                        trait_name: key.0,
+                        record_name: key.1,
+                    });
+                }
+            }
+        }
+    }
+
     // Resolve checker-recorded generic calls in ordinary HIR functions before
     // lowering the program to explicit IR.  The legacy ordering discovered
     // generic instances only while emitting AST/HIR bodies, which meant an
@@ -9642,6 +9665,7 @@ fn generate_impl(
                 )
             })
             .collect(),
+        dyn_impls: HashSet::new(),
         c_name: c_function_name,
         enums: codegen
             .enum_names
@@ -9679,6 +9703,20 @@ fn generate_impl(
         closure_bodies: std::cell::RefCell::new(Vec::new()),
         closure_counter: std::cell::Cell::new(0),
     };
+    for (trait_name, trait_methods) in &codegen.trait_methods {
+        for record_name in codegen.records.keys() {
+            if trait_methods.keys().all(|method| {
+                codegen
+                    .methods
+                    .get(record_name)
+                    .is_some_and(|methods| methods.contains_key(method))
+            }) {
+                hir_world
+                    .dyn_impls
+                    .insert((trait_name.clone(), record_name.clone()));
+            }
+        }
+    }
     for (name, (params, ret)) in &codegen.instantiations {
         hir_world.functions.insert(
             name.clone(),
