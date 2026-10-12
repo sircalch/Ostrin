@@ -25,6 +25,11 @@ fn pass(shape: dyn Shape) -> dyn Shape {
 fn choose(flag: Bool, first: dyn Shape, second: dyn Shape) -> dyn Shape {
     mut selected: dyn Shape = first
     if flag { selected = first } else { selected = second }
+    mut iteration = 0
+    while iteration < 4 {
+        if iteration % 2 == 0 { selected = second } else { selected = first }
+        iteration = iteration + 1
+    }
     selected
 }
 
@@ -32,7 +37,8 @@ fn main() -> Void {
     boxed: dyn Shape = Circle { radius: 2.0 }
     other: dyn Shape = Square { side: 3.0 }
     first: dyn Shape = pass(boxed)
-    second: dyn Shape = choose(true, first, other)
+    second: dyn Shape = choose(false, first, other)
     print(first.area())
     print(second.area())
 }
+
