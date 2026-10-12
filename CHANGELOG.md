@@ -29,7 +29,7 @@
   contracts are implemented. The interpreter and native boundary tests document
   the supported behavior and the current limitation.
 - Re-synchronized public inventories and quality scorecard data with the
-  current 298-example, 322-integration-test repository state.
+  current 298-example, 323-integration-test repository state.
 
 ## Unreleased
 

@@ -3588,6 +3588,47 @@ fn native_backend_compiles_and_runs_dyn_trait() {
 }
 
 #[test]
+fn native_dyn_trait_alias_keeps_both_receivers_alive() {
+    let file = fixture_path("native_dyn_trait_alias.ostrin");
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), "12\n12\n");
+
+    let exe = temp_artifact("dyn-trait-alias.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run dyn trait alias binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "native failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        stdout(&interpreted).replace("\r\n", "\n")
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "dyn trait alias leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn native_backend_dedups_vtables_across_repeated_boxing() {
     // `Circle` is boxed into `dyn Shape` twice in native_dyn_trait.ostrin
     // (once via describe(), once via the explicit `boxed: dyn Shape =`

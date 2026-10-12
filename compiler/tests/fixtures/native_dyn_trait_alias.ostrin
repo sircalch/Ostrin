@@ -1,0 +1,20 @@
+trait Shape {
+    fn area(self) -> Float
+}
+
+record Circle {
+    radius: Float
+}
+
+impl Shape for Circle {
+    fn area(self) -> Float {
+        3.0 * self.radius * self.radius
+    }
+}
+
+fn main() -> Void {
+    first: dyn Shape = Circle { radius: 2.0 }
+    second: dyn Shape = first
+    print(first.area())
+    print(second.area())
+}
