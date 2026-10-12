@@ -147,6 +147,17 @@ fn hello_type_checks_ok() {
 }
 
 #[test]
+fn community_starter_project_runs_from_manifest() {
+    let project = format!(
+        "{}/../templates/ostrin-community-starter",
+        env!("CARGO_MANIFEST_DIR")
+    );
+    let out = run(&["--run", "--project", &project]);
+    assert!(out.status.success(), "starter project failed: {}", stderr(&out));
+    assert_eq!(stdout(&out).replace("\r\n", "\n"), "Hello from a public Ostrin project\n");
+}
+
+#[test]
 fn record_fields_are_checked_and_generic_fields_are_substituted() {
     let out = run(&["--run", &example_path("field_access.ostrin")]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
