@@ -125,6 +125,34 @@ el runtime:
    WASI, `live_allocations=0`, ASan y UBSan para boxing, lista heterogénea,
    argumento/retorno, método por defecto, `Phi`, closure, tarea y cancelación.
 
+### 7.1 Estado de ownership y transiciones obligatorias
+
+El ABI propuesto trata al trait object como un valor gestionado con dos partes
+indivisibles. `data` apunta al payload y `vtable` describe tanto los métodos
+como el destructor del payload; nunca se permite conservar uno sin el otro.
+Cada operación debe respetar estas transiciones:
+
+| Operación | Precondición | Acción requerida | Postcondición |
+|---|---|---|---|
+| `box` | payload concreto válido | asignar payload y seleccionar vtable | una referencia propietaria al par `data/vtable` |
+| copia/argumento/campo | par no nulo | llamar `retain(data, vtable)` | dos referencias válidas al mismo par |
+| retorno/colección | referencia válida | transferir o retener según el modo de paso | el receptor tiene exactamente una referencia nueva |
+| `Phi`/reemplazo | ambas ramas pueden poseer | retener la rama elegida y liberar la descartada | una sola referencia al valor seleccionado |
+| `drop`/cancelación | referencia válida | llamar `release(data, vtable)` una vez | el payload queda destruido cuando llega a cero |
+
+El contador, si existe, pertenece al bloque de `data` y no a la vtable. La
+vtable es inmutable, compartible y no se libera por cada instancia. Una vtable
+mal formada, un `data == NULL` inesperado o una combinación de tipos que no
+pueda conservar estas invariantes debe producir un diagnóstico de lowering;
+no puede degradarse a un cast opaco ni a una liberación global al finalizar el
+proceso.
+
+La primera implementación de HIR/IR debe introducir una representación única
+para este par y una operación de `drop` explícita. La migración de cada uno de
+los seis fallbacks se acepta solo cuando su prueba nativa demuestra las cuatro
+transiciones anteriores además de la matriz de paridad, WASI y sanitizers de la
+sección 7.
+
 Hasta que exista esa evidencia, `dyn Trait` permanece soportado por la ruta
 AST verificada y registrado explícitamente como fallback; esta frontera es
 intencional y forma parte del contrato de v0.2.
