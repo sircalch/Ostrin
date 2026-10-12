@@ -136,6 +136,19 @@ cargo test
 cargo run -- --run ..\examples\physics.ostrin
 ```
 
+### Format and test an Ostrin program
+
+The compiler includes a deterministic formatter and a small test runner for functions named
+`test_*`:
+
+```powershell
+cargo run -- --fmt --check ..\examples\testing.ostrin
+cargo run -- --test ..\examples\testing.ostrin
+```
+
+Use `--fmt --write` to rewrite a file in place. The same commands are available in the browser
+playground and in the VS Code extension; see the [public workflow guide](https://sircalch.github.io/Ostrin/guides.html#testing).
+
 ### Install a published release
 
 Release archives are built for Linux x86_64, macOS arm64 and Windows x64 by
