@@ -44,7 +44,8 @@
   `live_allocations=0` pass; WASI passes the 26-program local matrix. ASan/UBSan
   checks for this revision are running in CI, so the v0.2 ownership gate remains
   open pending those results and the remaining matrix audit.
-- Added dyn Trait task capture and pre-run cancellation regressions. Both verify
+- Added dyn Trait task capture and pre-run cancellation regressions with a
+  `String`-owning payload. Capture also keeps a parent alias alive. Both verify
   the retained data/vtable pair, dynamic dispatch or cancellation cleanup,
   cooperative and native-thread execution, and `live_allocations=0`; both are
   included in the 26-program WASI matrix. ASan/UBSan checks for this revision

@@ -101,7 +101,7 @@ const programs = [
     name: "native_dyn_trait_task_capture",
     source: "compiler/tests/fixtures/native_dyn_trait_task_capture.ostrin",
     args: ["native_dyn_trait_task_capture.wasm"],
-    expected: "12\n",
+    expected: "task payload\ntask payload\n",
   },
   {
     name: "native_dyn_trait_task_cancel",

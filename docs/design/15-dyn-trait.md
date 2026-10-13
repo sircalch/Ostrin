@@ -112,12 +112,13 @@ Los campos de records no genéricos y el entorno HIR de closures ahora preservan
 la pareja `data/vtable`: `native_dyn_trait_record_field_replacement_preserves_pair_ownership`
 prueba reemplazo, alias y autoasignación; `native_dyn_trait_closure_capture_outlives_the_source_scope`
 prueba que el payload sobrevive al scope que lo creó y se libera al destruir la
-closure. Ambos tienen paridad intérprete/native y `live_allocations=0`. La matriz
-WASI pasó localmente sus 26 programas, incluidos los fixtures de campos,
-closures y dispatch default genérico. Se añadieron pruebas de captura por tarea
-y cancelación antes de ejecución; ambas preservan el par y terminan con
-`live_allocations=0` en scheduler cooperativo y `--native-threads`. WASI pasó
-ahora sus 26 programas. ASan/UBSan de esta revisión siguen pendientes porque el
+closure. Ambos tienen paridad intérprete/native y `live_allocations=0`. Se
+añadieron pruebas de captura por tarea y cancelación antes de ejecución con un
+payload `String` gestionado; la captura también mantiene un alias vivo en el
+padre. Ambas preservan el par y terminan con `live_allocations=0` en scheduler
+cooperativo y `--native-threads`. WASI pasó localmente sus 26 programas,
+incluidos los fixtures de campo, closure, tareas y default genérico. ASan/UBSan
+de esta revisión siguen pendientes porque el
 GCC MinGW local no dispone de `libasan`; deben confirmarse en el workflow Clang
 de Linux. Campos genéricos siguen fuera del ABI dyn HIR/C verificado.
 

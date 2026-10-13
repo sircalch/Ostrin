@@ -1,18 +1,18 @@
-trait Shape {
-    fn area(self) -> Float
+trait Message {
+    fn text(self) -> String
 }
 
-record Circle { radius: Float }
+record Speaker { text: String }
 
-impl Shape for Circle {
-    fn area(self) -> Float { 3.0 * self.radius * self.radius }
+impl Message for Speaker {
+    fn text(self) -> String { self.text }
 }
 
 fn main() -> Void {
     spawn_scope {
-        shape: dyn Shape = Circle { radius: 2.0 }
+        shape: dyn Message = Speaker { text: "cancelled payload" }
         worker = spawn {
-            shape.area()
+            shape.text()
         }
         print(worker.cancel())
         print(worker.cancel())

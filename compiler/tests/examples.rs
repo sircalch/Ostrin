@@ -3798,7 +3798,7 @@ fn native_dyn_trait_closure_capture_outlives_the_source_scope() {
 #[test]
 fn native_dyn_trait_task_capture_preserves_pair_ownership() {
     let file = fixture_path("native_dyn_trait_task_capture.ostrin");
-    let expected = "12\n";
+    let expected = "task payload\ntask payload\n";
 
     let interpreted = run(&["--run", &file]);
     assert!(
@@ -3828,8 +3828,8 @@ fn native_dyn_trait_task_capture_preserves_pair_ownership() {
     );
     let wasi_source = stdout(&wasi);
     assert!(
-        wasi_source.contains("Shape__Circle__retain")
-            && wasi_source.contains("Shape__Circle__release")
+        wasi_source.contains("Message__Speaker__retain")
+            && wasi_source.contains("Message__Speaker__release")
             && wasi_source.contains("ostrin_ir_task_env_drop_"),
         "WASI C omitted the dyn payload task ownership hooks"
     );
@@ -3891,7 +3891,7 @@ fn native_dyn_trait_task_cancellation_releases_captured_pair() {
     );
     let wasi_source = stdout(&wasi);
     assert!(
-        wasi_source.contains("Shape__Circle__release")
+        wasi_source.contains("Message__Speaker__release")
             && wasi_source.contains("ostrin_ir_task_env_drop_"),
         "WASI C omitted dyn cancellation cleanup hooks"
     );
