@@ -115,6 +115,66 @@ impl Emitter<'_> {
             "(({trait_name}_Dyn){{ .self = (void*)({code}), .vtable = &{trait_name}__{record_name}__vtable }})"
         ))
     }
+
+    fn coerce_dyn_list(
+        &mut self,
+        code: String,
+        from: &Ty,
+        to: &Ty,
+        borrowed: bool,
+    ) -> Bail<String> {
+        let (Ty::List(from_elem), Ty::List(to_elem)) = (from, to) else {
+            return Err(());
+        };
+        let (Ty::Named(record), Ty::Dyn(trait_name)) = (from_elem.as_ref(), to_elem.as_ref())
+        else {
+            return Err(());
+        };
+        if !self
+            .world
+            .dyn_impls
+            .contains(&(trait_name.clone(), record.clone()))
+        {
+            return Err(());
+        }
+        let source_ty = self.c_type(from)?;
+        let target_name = self.mangle_type(to)?;
+        let target_c = self.c_type(to)?;
+        let source = self.next_temp();
+        let target = self.next_temp();
+        let index = self.next_temp();
+        let cleanup = if borrowed {
+            String::new()
+        } else {
+            format!(" ostrin_release((void*){source});")
+        };
+        Ok(format!(
+            "({{ {source_ty} {source} = {code}; {target_c} {target} = {target_name}_new_from_array(NULL, 0); for (int64_t {index} = 0; {index} < {source}->length; {index}++) {{ {trait_name}_Dyn __hir_dyn = ({trait_name}_Dyn){{ .self = (void*){source}->items[{index}], .vtable = &{trait_name}__{record}__vtable }}; {target_name}_push({target}, __hir_dyn); }}{cleanup} {target}; }})"
+        ))
+    }
+
+    fn dyn_list_literal(&mut self, values: &[HirExpr], trait_name: &str) -> Bail<String> {
+        let elem = Ty::Dyn(trait_name.to_string());
+        let elem_c = self.c_type(&elem)?;
+        let list_ty = Ty::List(Box::new(elem.clone()));
+        let list_name = self.mangle_type(&list_ty)?;
+        let list = self.next_temp();
+        let mut body = format!("{list_name}* {list} = {list_name}_new_from_array(NULL, 0); ");
+        for value in values {
+            let concrete = self.expr(value)?;
+            let boxed = self.coerce_dyn(concrete, &value.ty, &elem)?;
+            if Self::borrowed_expr(value) {
+                body.push_str(&format!("{list_name}_push({list}, {boxed}); "));
+            } else {
+                let item = self.next_temp();
+                let release = self.release_managed_value(&item, &elem).ok_or(())?;
+                body.push_str(&format!(
+                    "{elem_c} {item} = {boxed}; {list_name}_push({list}, {item}); {release}; "
+                ));
+            }
+        }
+        Ok(format!("({{ {body} {list}; }})"))
+    }
     /// The C type of a value the emitter handles: scalars, records, the
     /// monomorphized built-in wrappers and the collection structs emitted by
     /// codegen.
@@ -134,6 +194,15 @@ impl Emitter<'_> {
             }
             Ty::Applied(..) if self.world.applied_enums.contains_key(&ty.describe()) => {
                 Ok(self.world.applied_enums[&ty.describe()].clone())
+            }
+            // A flat List<dyn Trait> is a supported ownership shape: the
+            // list runtime retains/releases each fat value through its
+            // vtable hooks. Keep nested/heterogeneous dyn aggregates gated.
+            Ty::List(elem) if matches!(elem.as_ref(), Ty::Dyn(_)) => {
+                let Ty::Dyn(name) = elem.as_ref() else {
+                    unreachable!()
+                };
+                Ok(format!("List_{name}*"))
             }
             Ty::List(elem) if !contains_dyn(elem) => {
                 Ok(format!("List_{}*", self.mangle_type(elem)?))
@@ -168,6 +237,14 @@ impl Emitter<'_> {
             Ty::Void => "Void".to_string(),
             Ty::Named(n) => n.clone(),
             Ty::Dyn(n) => format!("{n}_Dyn"),
+            // The legacy CType registry mangles DynTrait by its trait name,
+            // so use that same spelling for the shared list helper symbols.
+            Ty::List(elem) if matches!(elem.as_ref(), Ty::Dyn(_)) => {
+                let Ty::Dyn(name) = elem.as_ref() else {
+                    unreachable!()
+                };
+                format!("List_{name}")
+            }
             Ty::List(elem) if !contains_dyn(elem) => format!("List_{}", self.mangle_type(elem)?),
             Ty::Map(key, value) if !contains_dyn(key) && !contains_dyn(value) => format!(
                 "Map_{}_{}",
@@ -618,14 +695,47 @@ impl Emitter<'_> {
                     let declared = crate::typeck::resolve_type(declared);
                     if declared != value.ty
                         && !(matches!(declared, Ty::Dyn(_)) && matches!(value.ty, Ty::Named(_)))
+                        && !matches!((&declared, &value.ty), (Ty::List(to), Ty::List(from)) if matches!(to.as_ref(), Ty::Dyn(_)) && matches!(from.as_ref(), Ty::Named(_)))
                     {
                         return Err(());
                     }
                 }
-                let value_code = self.expr(value)?;
-                let code = self.coerce_dyn(value_code, &value.ty, &declared_ty)?;
+                let dyn_list = match (&declared_ty, &value.kind) {
+                    (Ty::List(to), HirKind::List(values)) if declared_ty != value.ty => {
+                        match to.as_ref() {
+                            Ty::Dyn(trait_name) => Some((values, trait_name.as_str())),
+                            _ => None,
+                        }
+                    }
+                    _ => None,
+                };
+                let (code, owns_code) = if let Some((values, trait_name)) = dyn_list {
+                    (self.dyn_list_literal(values, trait_name)?, false)
+                } else {
+                    let value_code = self.expr(value)?;
+                    let converted_list = declared_ty != value.ty
+                        && matches!((&declared_ty, &value.ty), (Ty::List(to), Ty::List(from)) if matches!(to.as_ref(), Ty::Dyn(_)) && matches!(from.as_ref(), Ty::Named(_)));
+                    let code = if converted_list {
+                        self.coerce_dyn_list(
+                            value_code,
+                            &value.ty,
+                            &declared_ty,
+                            Self::borrowed_expr(value),
+                        )?
+                    } else {
+                        self.coerce_dyn(value_code, &value.ty, &declared_ty)?
+                    };
+                    (
+                        code,
+                        if converted_list {
+                            false
+                        } else {
+                            Self::borrowed_expr(value)
+                        },
+                    )
+                };
                 out.push_str(&format!("    {ty} {name} = {code};\n"));
-                self.track_owned_local(name, &declared_ty, Self::borrowed_expr(value), out);
+                self.track_owned_local(name, &declared_ty, owns_code, out);
                 self.scopes.last_mut().expect("scope").insert(name.clone());
             }
             HirStmt::Assign { name, value } => {
@@ -1905,10 +2015,17 @@ impl Emitter<'_> {
         let temp = self.next_temp();
         let mut body = format!("{name}* {temp} = {name}_new_from_array(NULL, 0); ");
         for value in values {
-            if !c_compatible(&self.c_type(&value.ty)?, &elem_c) {
-                return Err(());
-            }
-            let code = self.expr(value)?;
+            let value_c = self.c_type(&value.ty)?;
+            let code = if c_compatible(&value_c, &elem_c) {
+                self.expr(value)?
+            } else {
+                // A heterogeneous literal such as
+                // `[Circle { .. }, Square { .. }]` is typed as
+                // `List<dyn Shape>` by the checker. Preserve the fat value
+                // and let the list's typed hooks retain its payload.
+                let concrete = self.expr(value)?;
+                self.coerce_dyn(concrete, &value.ty, elem)?
+            };
             if self.managed(elem) && !Self::borrowed_expr(value) {
                 let item = self.next_temp();
                 let release = self.release_managed_value(&item, elem).ok_or(())?;

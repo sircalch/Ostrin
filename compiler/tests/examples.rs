@@ -3670,6 +3670,48 @@ fn native_dyn_trait_hir_return_and_phi_preserve_ownership() {
 }
 
 #[test]
+fn native_dyn_trait_list_owns_elements_across_argument_return_and_drop() {
+    let file = fixture_path("native_dyn_trait_list.ostrin");
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    let expected = "12\n9\n3\n48\n48\n";
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let exe = temp_artifact("dyn-trait-list.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run dyn trait list binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "native failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "dyn trait list leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn native_backend_dedups_vtables_across_repeated_boxing() {
     // `Circle` is boxed into `dyn Shape` twice in native_dyn_trait.ostrin
     // (once via describe(), once via the explicit `boxed: dyn Shape =`
@@ -3936,6 +3978,7 @@ fn native_backend_compiles_the_original_dyn_trait_example() {
     let exe = temp_artifact("dyn_trait_original.exe");
     let compile = run(&[
         "--compile",
+        "--leak-check",
         "--out",
         &exe,
         &example_path("dyn_trait.ostrin"),
@@ -3953,6 +3996,11 @@ fn native_backend_compiles_the_original_dyn_trait_example() {
     assert_eq!(
         String::from_utf8_lossy(&run_output.stdout).replace("\r\n", "\n"),
         "12.56636\n9\n3.14159\n24.70795\n"
+    );
+    assert!(
+        String::from_utf8_lossy(&run_output.stderr).contains("live_allocations=0"),
+        "original dyn trait example leaked: {}",
+        String::from_utf8_lossy(&run_output.stderr)
     );
 }
 

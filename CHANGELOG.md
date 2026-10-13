@@ -29,9 +29,19 @@
   contracts are implemented. The interpreter and native boundary tests document
   the supported behavior and the current limitation.
 - Re-synchronized public inventories and quality scorecard data with the
-  current 298-example, 324-integration-test repository state.
+  current 298-example, 325-integration-test repository state.
 
 ## Unreleased
+
+### Native dynamic traits
+
+- Lowered heterogeneous `List<dyn Trait>` construction, elementwise boxing,
+  iteration and indirect `fold` dispatch through HIR/C. Vtable hooks preserve
+  payload ownership across list insertion, argument/return forwarding and drop;
+  focused parity and `live_allocations=0` regressions cover concrete, borrowed
+  and forwarded values. The v0.2 ownership gate remains open for persistent
+  fields, generic default-method boxing, closure/task/cancellation, WASI and
+  sanitizer evidence.
 
 ### Public adoption path
 

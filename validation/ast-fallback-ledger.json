@@ -1,33 +1,15 @@
 {
   "schema": "ostrin.ast-fallback-ledger/v1",
   "status": "verified-in-differential-suite",
-  "count": 3,
+  "count": 1,
   "source": "compiler/tests/differential.rs",
   "verifiedBaseline": {
     "ir": 7189,
-    "hir": 41,
-    "ast": 3,
-    "total": 7230
+    "hir": 43,
+    "ast": 1,
+    "total": 7232
   },
   "entries": [
-    {
-      "source": "examples/dyn_trait.ostrin",
-      "function": "main",
-      "reason": "dynamic-trait-dispatch",
-      "blockedBy": "dyn Shape values in a List and polymorphic method dispatch are not represented by the typed IR ABI",
-      "test": "native_backend_compiles_the_original_dyn_trait_example",
-      "risk": "high",
-      "plannedResolution": "implement the typed trait-object and ownership contract in docs/design/15-dyn-trait.md §7 before lowering dispatch to IR"
-    },
-    {
-      "source": "examples/dyn_trait.ostrin",
-      "function": "total_area",
-      "reason": "dynamic-trait-dispatch",
-      "blockedBy": "fold over List<dyn Shape> captures an indirect trait receiver and closure",
-      "test": "native_backend_compiles_the_original_dyn_trait_example",
-      "risk": "high",
-      "plannedResolution": "lower trait-object receivers and indirect iterator/closure calls together after the §7 ABI contract is tested"
-    },
     {
       "source": "examples/native_trait_defaults.ostrin",
       "function": "main",

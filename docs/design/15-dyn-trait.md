@@ -102,11 +102,13 @@ typedef struct {
 Las vtables son inmutables y contienen slots de métodos y hooks de lifecycle
 para el payload. HIR/C ya representa `Ty::Dyn` como el struct completo, hace
 boxing concreto→dyn para records registrados, despacha llamadas por la vtable y
-usa sus hooks al copiar, reemplazar, retornar y destruir. Las pruebas directas
-cubren alias, argumentos, retornos, Phi y loop-Phi con `live_allocations=0`.
-IR todavía no tiene nodos dedicados `DynBox`/`DynCall`; los tres cuerpos
-restantes del ledger son `List<dyn Trait>`/closure indirecta (`dyn_trait.ostrin`)
-y boxing de record genérico/default method (`native_trait_defaults.ostrin::main`).
+usa sus hooks al copiar, reemplazar, retornar, destruir y almacenar valores en
+`List<dyn Trait>`. `dyn_trait.ostrin` (incluidos `main` y el `fold` indirecto)
+ahora genera HIR/C; las pruebas cubren lista heterogénea, argumento/retorno,
+iteración, alias, Phi y loop-Phi con `live_allocations=0` en los casos focales.
+IR todavía no tiene nodos dedicados `DynBox`/`DynCall`; el único cuerpo dyn
+restante del ledger es el boxing de record genérico con método default
+(`native_trait_defaults.ostrin::main`).
 Los campos persistentes, closures/tareas/cancelación y la evidencia WASI,
 ASan y UBSan permanecen abiertos.
 

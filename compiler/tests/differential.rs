@@ -461,9 +461,9 @@ fn native_backend_types_agree_with_the_checker() {
     // and leak contract is covered by a dedicated integration regression.
     // Scoped spawn cancellation now lowers both concurrency cancellation
     // entry points through IR as well. That removes their AST expression
-    // population from this comparison; 26 expressions remain in the
+    // population from this comparison; 11 expressions remain in the
     // checker/native comparison set.
-    assert!(agreed >= 26, "only {agreed} AST expressions were compared");
+    assert!(agreed >= 11, "only {agreed} AST expressions were compared");
     // The same comparison over *every* AST node (operands included), by node address.
     // The Float32 array `to_string()` migration removed the entire `arrays_3d`
     // entry point from this comparison. The generic-call HIR prepass now also
@@ -479,17 +479,18 @@ fn native_backend_types_agree_with_the_checker() {
     // whole entry point removes its AST nodes from this comparison by design.
     // Quantity plot bodies now use checked IR, and viz_units has a dedicated
     // native/WASI/leak regression for the migrated path.
+    println!("checker AST comparisons: {agreed} expressions, {node_agreed} nodes");
     assert!(
-        node_agreed >= 32,
-        "only {node_agreed} AST nodes were compared with the checker's per-node types (ratchet 32)"
+        node_agreed >= 12,
+        "only {node_agreed} AST nodes were compared with the checker's per-node types (ratchet 12)"
     );
     // Ratchet: expressions the backend cannot compare (the checker has no type).
     // Ratchet: functions whose C is generated from the typed HIR or its
     // explicit IR lowering (the migration of the native backend).
     let native_generated = hir_generated + ir_generated;
     assert!(
-        native_generated >= 7230,
-        "only {native_generated} functions were generated from HIR/IR (expected at least 7230)"
+        native_generated >= 7232,
+        "only {native_generated} functions were generated from HIR/IR (expected at least 7232)"
     );
     println!("functions generated from HIR/IR: {native_generated} (HIR {hir_generated}, IR {ir_generated})");
     println!("functions still using AST fallback: {ast_fallback}");
@@ -566,11 +567,12 @@ fn native_backend_types_agree_with_the_checker() {
     // standard-library `format_text` wrapper now lowers its `format` builtin
     // through the same IR/C path. HIR now
     // substitutes the concrete owner for `Self` in trait method signatures,
-    // allowing Complex arithmetic/equality to use IR/C. The verified baseline is
-    // 3 AST fallbacks (7,230 HIR/IR-generated: 7,189 IR and 41 HIR functions).
+    // allowing Complex arithmetic/equality to use IR/C. Typed dyn lists and
+    // indirect fold/dispatch now use HIR/C. The verified baseline is 1 AST
+    // fallback (7,232 HIR/IR-generated: 7,189 IR and 43 HIR functions).
     // Function values stored in signature-specific lists and record fields now
     // use the IR ownership path. Remaining AST bodies include managed enum
-    // payload, dynamic trait, generic dispatch and concurrency boundaries.
+    // payload, generic dispatch and concurrency boundaries.
     // Checker-recorded
     // generic calls are resolved before IR lowering, so ordinary callers can reference their
     // monomorphized C symbols directly. Scalar quantity `to_string()` now calls the existing
@@ -617,7 +619,7 @@ fn native_backend_types_agree_with_the_checker() {
     // entry-point fallback while preserving the legacy C ABI conversion.
     // Explicit Float32 bindings and List/Set<Float32> aggregates, reflected
     // Complex scalar operators and Bool formatting now use typed IR/C.
-    const MAX_AST_FALLBACK_FUNCTIONS: usize = 3;
+    const MAX_AST_FALLBACK_FUNCTIONS: usize = 1;
     assert!(
         ast_fallback <= MAX_AST_FALLBACK_FUNCTIONS,
         "AST fallback grew to {ast_fallback} functions (ratchet limit {MAX_AST_FALLBACK_FUNCTIONS})"

@@ -25,7 +25,7 @@ function sourceBaseline(source) {
   const minimum = sourceCode.match(/native_generated\s*>=\s*(\d+)/)?.[1];
   const maximumAst = sourceCode.match(/MAX_AST_FALLBACK_FUNCTIONS:\s*usize\s*=\s*(\d+)/)?.[1];
   const detail = sourceCode.match(
-    /The verified baseline is\s+(\d[\d,]*)\s+AST fallbacks\s+\((\d[\d,]*)\s+HIR\/IR-generated:\s*(\d[\d,]*)\s+IR and\s+(\d[\d,]*)\s+HIR functions\)/,
+    /The verified baseline is\s+(\d[\d,]*)\s+AST\s+fallbacks?\s+\((\d[\d,]*)\s+HIR\/IR-generated:\s*(\d[\d,]*)\s+IR and\s+(\d[\d,]*)\s+HIR functions\)/,
   );
   if (!minimum || !maximumAst || !detail) return null;
   const [ast, total, ir, hir] = detail.slice(1).map(parseNumber);
@@ -130,8 +130,8 @@ export function validateProjectPlan(root = repositoryRoot) {
     && /live_allocations=0/.test(dynTraitDesign),
   "dyn Trait: public status and design contract must expose the pending HIR/IR ownership boundary");
   const dynamicTraitEntries = fallbackLedger.match(/"reason": "dynamic-trait-(?:dispatch|default-method)"/g) ?? [];
-  check(errors, dynamicTraitEntries.length === 3,
-    "validation/ast-fallback-ledger.json: the three remaining dynamic-trait fallback bodies must remain enumerated");
+  check(errors, dynamicTraitEntries.length === 1,
+    "validation/ast-fallback-ledger.json: the remaining generic default-method fallback must remain enumerated");
 
   const baseline = sourceBaseline(differential);
   check(errors, baseline !== null,

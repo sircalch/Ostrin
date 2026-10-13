@@ -51,7 +51,7 @@ traits, pattern matching, quantities and two concurrency modes: deterministic
 cooperative scheduling by default, plus opt-in native threads for compiled
 programs.
 
-The compiler suite currently passes **324 integration tests, 2 unit tests and 6 differential
+The compiler suite currently passes **325 integration tests, 2 unit tests and 6 differential
 interpreter↔native tests**. Reproduction commands and evidence boundaries are documented in
 [`README-reproduce.md`](README-reproduce.md). Function calls
 support named/default arguments, scalar and `String` collection lookups preserve `Option<T>`
@@ -78,8 +78,9 @@ reference, to match the interpreter's identity semantics) with their
 non-generic `impl` methods (resolved statically at compile time), plain
 non-generic enums with `match` (compiled to a tagged union and a sequence of
 `if`s), direct `dyn Trait` values (typed `data + vtable` HIR lowering with
-retain/release hooks and runtime vtable dispatch; `List<dyn Trait>`, generic
-record boxing and closure/task captures still use explicit AST fallbacks), and
+retain/release hooks and runtime vtable dispatch; heterogeneous `List<dyn Trait>`
+and indirect `fold` now use HIR, while generic record boxing and closure/task
+captures still use explicit AST fallbacks), and
 `List<T>` (heap-allocated, by reference, monomorphized per element type the
 same way a generic function is — `length`/`push`/`remove_at`, indexing and
 `for x in list`) — over `Int`/`Float`/`Bool`/`String`, recursion,
