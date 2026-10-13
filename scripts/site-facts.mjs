@@ -19,7 +19,8 @@ function filesUnder(relativePath) {
 }
 
 function countRustTests(relativePath) {
-  return [...readRepositoryFile(relativePath).replaceAll("\r\n", "\n").matchAll(/^\s*#\[test\]\s*$/gm)].length;
+  const sourceFiles = relativePath.endsWith(".rs") ? [relativePath] : filesUnder(relativePath).filter((file) => file.endsWith(".rs"));
+  return sourceFiles.reduce((total, file) => total + [...readRepositoryFile(file).replaceAll("\r\n", "\n").matchAll(/^\s*#\[test\]\s*$/gm)].length, 0);
 }
 
 export function collectSiteFacts() {
@@ -43,7 +44,7 @@ export function collectSiteFacts() {
     experimentBundles: String(filesUnder("website/assets/experiments").filter((file) => file.endsWith(".ostrin-experiment.json")).length),
     integrationTests: String(countRustTests("compiler/tests/examples.rs")),
     differentialTests: String(countRustTests("compiler/tests/differential.rs")),
-    unitTests: String(countRustTests("compiler/src/fmt.rs")),
+    unitTests: String(countRustTests("compiler/src")),
   };
 }
 

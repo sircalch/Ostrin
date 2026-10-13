@@ -10964,6 +10964,18 @@ fn generate_impl(
     }
     out.push_str(&list_typedefs);
     out.push('\n');
+    // A dyn object is embedded by value in wrappers and records. Declare its
+    // fixed-size pair before those bodies; the vtable body still follows the
+    // concrete payload definitions needed by its method slots.
+    for trait_name in codegen.trait_methods.keys() {
+        out.push_str(&format!(
+            "typedef struct {trait_name}_VTable {trait_name}_VTable;\n"
+        ));
+        out.push_str(&format!(
+            "typedef struct {{ void* self; const {trait_name}_VTable* vtable; }} {trait_name}_Dyn;\n"
+        ));
+    }
+    out.push('\n');
     let emit_enum = |out: &mut String, name: &str, variants: &[VariantInfo]| {
         out.push_str(&format!("struct {name} {{\n    int tag;\n"));
         if variants.iter().any(|variant| !variant.fields.is_empty()) {
@@ -11049,18 +11061,6 @@ fn generate_impl(
         }
         emitted_wrappers.insert(name);
     }
-    // A dyn object is embedded by value in records and wrappers. Declare its
-    // fixed-size pair before those bodies, while leaving the vtable definition
-    // until record/enum payload types are complete for method slot signatures.
-    for trait_name in codegen.trait_methods.keys() {
-        out.push_str(&format!(
-            "typedef struct {trait_name}_VTable {trait_name}_VTable;\n"
-        ));
-        out.push_str(&format!(
-            "typedef struct {{ void* self; const {trait_name}_VTable* vtable; }} {trait_name}_Dyn;\n"
-        ));
-    }
-    out.push('\n');
     let emit_record = |out: &mut String, name: &str, fields: &[(String, CType)]| {
         out.push_str(&format!("struct {name} {{\n"));
         for (field_name, field_ty) in fields {

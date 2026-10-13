@@ -162,6 +162,16 @@ test("generic dyn Trait ownership example is visible in the public catalogue", a
   );
 });
 
+test("dyn Trait Option and Result example is visible in the public catalogue", async ({ page }) => {
+  await page.goto("./examples.html", { waitUntil: "domcontentloaded" });
+  const card = page.locator("#dynamic-trait-wrappers");
+  await expect(card).toBeVisible();
+  await expect(card.getByRole("link", { name: "View source ↗" })).toHaveAttribute(
+    "href",
+    "https://github.com/sircalch/Ostrin/blob/main/examples/native_dyn_trait_wrappers.ostrin",
+  );
+});
+
 test("header switches at its tablet breakpoint without overflow", async ({ page }) => {
   for (const [width, collapsed] of [[1000, true], [1001, false]]) {
     await page.setViewportSize({ width, height: 844 });

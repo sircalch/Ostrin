@@ -1,0 +1,56 @@
+trait Speaker {
+    fn speak(self) -> String
+}
+
+record First {
+    text: String
+}
+
+record Second {
+    text: String
+}
+
+impl Speaker for First {
+    fn speak(self) -> String { self.text }
+}
+
+impl Speaker for Second {
+    fn speak(self) -> String { self.text }
+}
+
+fn maybe_speaker(flag: Bool) -> Option<dyn Speaker> {
+    if flag {
+        speaker: dyn Speaker = First { text: "optional" }
+        Some(speaker)
+    } else {
+        None
+    }
+}
+
+fn result_speaker(flag: Bool) -> Result<dyn Speaker, String> {
+    if flag {
+        speaker: dyn Speaker = Second { text: "result" }
+        Ok(speaker)
+    } else {
+        Err("failure")
+    }
+}
+
+fn main() -> Void {
+    match maybe_speaker(true) {
+        Some(speaker) => print(speaker.speak()),
+        None => print("empty"),
+    }
+    match maybe_speaker(false) {
+        Some(speaker) => print(speaker.speak()),
+        None => print("empty"),
+    }
+    match result_speaker(true) {
+        Ok(speaker) => print(speaker.speak()),
+        Err(message) => print(message),
+    }
+    match result_speaker(false) {
+        Ok(speaker) => print(speaker.speak()),
+        Err(message) => print(message),
+    }
+}

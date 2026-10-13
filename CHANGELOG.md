@@ -29,7 +29,7 @@
   contracts are implemented. The interpreter and native boundary tests document
   the supported behavior and the current limitation.
 - Re-synchronized public inventories and quality scorecard data with the
-  current 301-example, 331-integration-test repository state.
+  current 302-example, 332-integration-test repository state.
 
 ## Unreleased
 
@@ -40,7 +40,7 @@
   the specialized vtable. `native_trait_defaults.ostrin` now reports six IR
   functions and zero AST fallbacks; interpreter/native parity and
   `live_allocations=0` pass. The repository inventory advances to 7,198 IR +
-  41 HIR functions and zero AST fallbacks. WASI passes the 27-program local
+  41 HIR functions and zero AST fallbacks. WASI passes the 28-program local
   matrix. ASan/UBSan pass for head `b3bce84` in
   [CI](https://github.com/sircalch/Ostrin/actions/runs/38364183520); the v0.2
   ownership gate remains open for the remaining unverified matrix boundaries.
@@ -48,11 +48,15 @@
   instantiation. Replacement keeps a copied alias valid; the focused test has
   interpreter/native parity, zero AST fallback, a zero-allocation native check
   and WASI execution. Nested generic wrappers remain unverified.
+- Added `Option<dyn Speaker>` and `Result<dyn Speaker, String>` wrapper coverage
+  for `Some`/`None` and `Ok`/`Err`. Explicitly boxed values preserve dynamic
+  dispatch through interpreter, native and WASI paths, and the native
+  leak-check ends at zero. The example is listed in the public website catalogue.
 - Added dyn Trait task capture and pre-run cancellation regressions with a
   `String`-owning payload. Capture also keeps a parent alias alive. Both verify
   the retained data/vtable pair, dynamic dispatch or cancellation cleanup,
   cooperative and native-thread execution, and `live_allocations=0`; both are
-  included in the 27-program WASI matrix. ASan/UBSan pass for head `b3bce84` in
+  included in the 28-program WASI matrix. ASan/UBSan pass for head `b3bce84` in
   the linked Linux/Clang workflow above.
 - Lowered heterogeneous `List<dyn Trait>` construction, elementwise boxing,
   iteration and indirect `fold` dispatch through HIR/C. Vtable hooks preserve

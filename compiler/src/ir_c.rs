@@ -742,7 +742,8 @@ fn option_supported(element: &Ty, records: &RecordFields) -> bool {
     matches!(
         element,
         Ty::Int | Ty::Float | Ty::Float32 | Ty::Sized(_) | Ty::Bool | Ty::String
-    ) || quantity(element)
+    ) || matches!(element, Ty::Dyn(_))
+        || quantity(element)
         || array_supported(element)
         || matches!(element, Ty::List(inner) if list_supported(inner, records))
         || matches!(element, Ty::Map(key, value) if map_supported(key, value, records))
@@ -759,6 +760,7 @@ fn option_managed_payload(element: &Ty, records: &RecordFields) -> bool {
 fn result_payload_supported(ty: &Ty, records: &RecordFields) -> bool {
     *ty == Ty::Unknown
         || scalar(ty)
+        || matches!(ty, Ty::Dyn(_))
         || quantity(ty)
         || array_supported(ty)
         || matches!(ty, Ty::List(inner) if list_supported(inner, records))
@@ -779,9 +781,13 @@ fn result_managed_payload(ty: &Ty, records: &RecordFields) -> bool {
 
 fn managed_payload(ty: &Ty, records: &RecordFields) -> bool {
     match ty {
-        Ty::Quantity(_) | Ty::String | Ty::List(_) | Ty::Map(_, _) | Ty::Set(_) | Ty::Fn(_, _) => {
-            true
-        }
+        Ty::Dyn(_)
+        | Ty::Quantity(_)
+        | Ty::String
+        | Ty::List(_)
+        | Ty::Map(_, _)
+        | Ty::Set(_)
+        | Ty::Fn(_, _) => true,
         Ty::Applied(name, args) if name == "Array" && args.len() == 1 => array_supported(ty),
         Ty::Named(name) if name == "Rng" => true,
         Ty::Named(name)
@@ -828,6 +834,9 @@ fn mangle_scalar(ty: &Ty) -> String {
 
 fn mangle_option_payload(ty: &Ty, records: &RecordFields) -> String {
     match ty {
+        // C wrapper identifiers use the trait name, while the stored value's
+        // field type remains the explicit `Trait_Dyn` pair.
+        Ty::Dyn(name) => name.clone(),
         Ty::Fn(_, _) => mangle_record_type(ty, records),
         Ty::Quantity(dimension) => format!(
             "Q_{}",

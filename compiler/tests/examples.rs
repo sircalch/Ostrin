@@ -3824,6 +3824,84 @@ fn native_dyn_trait_generic_record_field_preserves_pair_ownership() {
 }
 
 #[test]
+fn native_dyn_trait_option_and_result_wrappers_preserve_pair_ownership() {
+    let file = example_path("native_dyn_trait_wrappers.ostrin");
+    let expected = "optional\nempty\nresult\nfailure\n";
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ir-generated: 5"), "{report_text}");
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+    assert!(report_text.contains("divergences: 0"), "{report_text}");
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_c = stdout(&wasi);
+    assert!(
+        wasi_c.contains("Speaker_Dyn"),
+        "dyn pair missing from WASI C"
+    );
+    assert!(
+        wasi_c.contains("Option_Speaker"),
+        "Option wrapper missing from WASI C"
+    );
+    assert!(
+        wasi_c.contains("Result_Speaker_String"),
+        "Result wrapper missing from WASI C"
+    );
+    assert!(
+        wasi_c.contains("vtable->release"),
+        "dyn release hook missing from WASI C"
+    );
+
+    let exe = temp_artifact("dyn-trait-option-result.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run dyn Trait wrapper binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "dyn Trait wrapper leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn native_dyn_trait_closure_capture_outlives_the_source_scope() {
     let file = example_path("native_dyn_trait_closure_capture.ostrin");
     let interpreted = run(&["--run", &file]);

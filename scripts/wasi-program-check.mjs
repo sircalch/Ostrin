@@ -98,6 +98,12 @@ const programs = [
     expected: "first\nfirst\nsecond\n",
   },
   {
+    name: "native_dyn_trait_wrappers",
+    source: "examples/native_dyn_trait_wrappers.ostrin",
+    args: ["native_dyn_trait_wrappers.wasm"],
+    expected: "optional\nempty\nresult\nfailure\n",
+  },
+  {
     name: "native_dyn_trait_closure_capture",
     source: "examples/native_dyn_trait_closure_capture.ostrin",
     args: ["native_dyn_trait_closure_capture.wasm"],
