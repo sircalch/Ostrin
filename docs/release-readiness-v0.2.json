@@ -45,6 +45,8 @@
         { "path": "examples/measurement_task.ostrin", "claim": "Measurement<Float> task capture, join and destruction has interpreter/native/WASI/native-threads and leak-check coverage" },
         { "path": "examples/measurement_array_shape.ostrin", "claim": "Array<Measurement<Float>> remains explicitly rejected with interpreter and actionable native diagnostics" },
         { "path": "examples/measurement_quantity_direct_shape.ostrin", "claim": "Direct Measurement<Quantity<Length>> remains explicitly rejected before unsafe native fallback" },
+        { "path": "examples/native_dyn_trait_record_field.ostrin", "claim": "Non-generic record fields preserve dyn Trait data/vtable pairing across construction, replacement, aliases and self-assignment with interpreter/native parity and zero live allocations" },
+        { "path": "examples/native_dyn_trait_closure_capture.ostrin", "claim": "A returned closure keeps a dyn Trait payload alive after its source scope and releases it after invocation with interpreter/native parity and zero live allocations" },
         { "path": "validation/ast-fallback-ledger.json", "claim": "The remaining generic default-method fallback is enumerated with high-risk reason, test and planned resolution" },
         { "path": "docs/design/15-dyn-trait.md", "claim": "Trait-object ownership ABI, HIR/IR migration prerequisites and required WASI/sanitizer evidence are specified; the boundary remains open" }
       ]

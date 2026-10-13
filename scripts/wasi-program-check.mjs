@@ -80,6 +80,18 @@ const programs = [
     expected: "12\n9\n3\n48\n48\n",
   },
   {
+    name: "native_dyn_trait_record_field",
+    source: "examples/native_dyn_trait_record_field.ostrin",
+    args: ["native_dyn_trait_record_field.wasm"],
+    expected: "12\n12\n9\n9\n",
+  },
+  {
+    name: "native_dyn_trait_closure_capture",
+    source: "examples/native_dyn_trait_closure_capture.ostrin",
+    args: ["native_dyn_trait_closure_capture.wasm"],
+    expected: "12\n",
+  },
+  {
     name: "managed_enum_closure_capture",
     source: "compiler/tests/fixtures/managed_enum_closure_capture.ostrin",
     args: ["managed_enum_closure_capture.wasm"],

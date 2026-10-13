@@ -1,0 +1,19 @@
+trait Shape {
+    fn area(self) -> Float
+}
+
+record Circle { radius: Float }
+
+impl Shape for Circle {
+    fn area(self) -> Float { 3.0 * self.radius * self.radius }
+}
+
+fn make_callback() -> fn() -> Float {
+    shape: dyn Shape = Circle { radius: 2.0 }
+    fn() { shape.area() }
+}
+
+fn main() -> Void {
+    callback = make_callback()
+    print(callback())
+}

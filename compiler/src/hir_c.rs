@@ -29,6 +29,10 @@ pub struct World {
     /// Non-generic records: name -> [(field, C type)] in declaration order. Empty when reads of
     /// records must be tracked (E1101), which only the AST path knows how to do.
     pub records: HashMap<String, Vec<(String, String)>>,
+    /// Source types for record fields, kept alongside C spellings so value
+    /// coercions (notably concrete record -> `dyn Trait`) retain their typed
+    /// ownership contract during record construction and replacement.
+    pub record_field_types: HashMap<String, Vec<(String, Ty)>>,
     /// Applied generic records/enums are keyed by their HIR spelling
     /// (`Box<Int>`) and point at the concrete C instance (`Box__Int`).
     pub applied_records: HashMap<String, String>,
@@ -98,6 +102,9 @@ struct Emitter<'a> {
 
 impl Emitter<'_> {
     fn coerce_dyn(&self, code: String, from: &Ty, to: &Ty) -> Bail<String> {
+        if from == to {
+            return Ok(code);
+        }
         let Ty::Dyn(trait_name) = to else {
             return Ok(code);
         };
@@ -291,6 +298,16 @@ impl Emitter<'_> {
             .ok_or(())
     }
 
+    fn field_type(&self, record: &Ty, field: &str) -> Bail<Ty> {
+        let name = self.record_name(record)?;
+        self.world
+            .record_field_types
+            .get(&name)
+            .and_then(|fields| fields.iter().find(|(candidate, _)| candidate == field))
+            .map(|(_, ty)| ty.clone())
+            .ok_or(())
+    }
+
     fn record_name(&self, ty: &Ty) -> Bail<String> {
         match ty {
             Ty::Named(name) if self.world.records.contains_key(name) => Ok(name.clone()),
@@ -400,6 +417,7 @@ impl Emitter<'_> {
             Ty::String | Ty::List(_) | Ty::Map(_, _) | Ty::Set(_) => {
                 Some(format!("ostrin_retain((void*)({access}))"))
             }
+            Ty::Fn(_, _) => Some(format!("ostrin_retain((void*)({access}).env)")),
             Ty::Named(name) if self.world.records.contains_key(name) => {
                 Some(format!("ostrin_retain((void*)({access}))"))
             }
@@ -767,24 +785,39 @@ impl Emitter<'_> {
                     return Err(());
                 };
                 let field_ty = self.field(&obj.ty, field)?;
-                if !c_compatible(&self.c_type(&value.ty)?, &field_ty)
-                    && self.c_type(&value.ty)? != field_ty
-                {
+                let target_ty = self.field_type(&obj.ty, field)?;
+                if target_ty != target.ty {
                     return Err(());
                 }
-                let (o, v) = (self.expr(obj)?, self.expr(value)?);
-                if self.managed(&value.ty) {
+                let (o, value_code) = (self.expr(obj)?, self.expr(value)?);
+                let v = self.coerce_dyn(value_code, &value.ty, &target_ty)?;
+                let value_c = self.c_type(&target_ty)?;
+                if value_c != field_ty {
+                    return Err(());
+                }
+                if self.managed(&target_ty) {
                     // Same ownership as the AST path: the field keeps its own
-                    // reference to the new value and drops the old one.
+                    // reference to a borrowed value, transfers a fresh value,
+                    // and drops the old value. Evaluate before releasing so
+                    // self-assignment through an alias remains valid.
                     let temp = self.next_temp();
-                    let retain = self.retain_managed_value(&temp, &value.ty).ok_or(())?;
+                    let mut transition = String::new();
+                    if Self::borrowed_expr(value) {
+                        let retain = self.retain_managed_value(&temp, &target_ty).ok_or(())?;
+                        transition.push_str(&format!("{retain}; "));
+                    }
                     let release = self
-                        .release_managed_value(&format!("({o})->{field}"), &value.ty)
+                        .release_managed_value(&format!("({o})->{field}"), &target_ty)
                         .ok_or(())?;
                     out.push_str(&format!(
-                        "    {field_ty} {temp} = {v}; {retain}; {release}; ({o})->{field} = {temp};\n"
+                        "    {field_ty} {temp} = {v}; {transition}{release}; ({o})->{field} = {temp};\n"
                     ));
                 } else {
+                    if !c_compatible(&self.c_type(&value.ty)?, &field_ty)
+                        && self.c_type(&value.ty)? != field_ty
+                    {
+                        return Err(());
+                    }
                     out.push_str(&format!("    {o}->{field} = {v};\n"));
                 }
             }
@@ -1311,17 +1344,31 @@ impl Emitter<'_> {
                         .find(|(f, _)| f == field)
                         .map(|(_, t)| t.clone())
                         .ok_or(())?;
-                    let have = self.c_type(&value.ty)?;
-                    if !c_compatible(&have, &want) {
+                    let target_ty = self
+                        .world
+                        .record_field_types
+                        .get(&record)
+                        .and_then(|fields| {
+                            fields
+                                .iter()
+                                .find(|(candidate, _)| candidate == field)
+                                .map(|(_, ty)| ty.clone())
+                        })
+                        .ok_or(())?;
+                    let have = self.c_type(&target_ty)?;
+                    if have != want {
                         return Err(());
                     }
-                    let code = self.expr(value)?;
+                    let value_code = self.expr(value)?;
+                    let code = self.coerce_dyn(value_code, &value.ty, &target_ty)?;
                     body.push_str(&format!("{temp}->{field} = {code}; "));
-                    if let Some(retain) =
-                        self.retain_managed_value(&format!("{temp}->{field}"), &value.ty)
-                    {
-                        body.push_str(&retain);
-                        body.push_str("; ");
+                    if Self::borrowed_expr(value) {
+                        if let Some(retain) =
+                            self.retain_managed_value(&format!("{temp}->{field}"), &target_ty)
+                        {
+                            body.push_str(&retain);
+                            body.push_str("; ");
+                        }
                     }
                 }
                 Ok(format!("({{ {body} {temp}; }})"))
@@ -1844,6 +1891,18 @@ impl Emitter<'_> {
                 "typedef struct {{ {} }} {env_name};",
                 env_fields.join("")
             ));
+            let drop_name = format!("ostrin_hir_lambda_env_drop_{id}");
+            prototype.push(format!("static void {drop_name}(void* __env);"));
+            let mut drop_body = format!("    {env_name}* __e = __env;\n");
+            for (name, ty) in &captures {
+                if let Some(release) = self.release_managed_value(&format!("__e->{name}"), ty) {
+                    drop_body.push_str(&format!("    {release};\n"));
+                }
+            }
+            self.world
+                .closure_bodies
+                .borrow_mut()
+                .push((format!("static void {drop_name}(void* __env)"), drop_body));
         }
         let signature = format!("static {ret_c} {fn_name}(void* __env{params_c})");
         if !captures.is_empty() {
@@ -1869,12 +1928,19 @@ impl Emitter<'_> {
         let env = if captures.is_empty() {
             "NULL".to_string()
         } else {
+            let drop_name = format!("ostrin_hir_lambda_env_drop_{id}");
             let assignments = captures
                 .iter()
-                .map(|(name, _)| format!("__ce->{name} = {name}; "))
+                .map(|(name, ty)| {
+                    let retain = self
+                        .retain_managed_value(&format!("__ce->{name}"), ty)
+                        .map(|body| format!("{body}; "))
+                        .unwrap_or_default();
+                    format!("__ce->{name} = {name}; {retain}")
+                })
                 .collect::<String>();
             format!(
-                "({{ {env_name}* __ce = malloc(sizeof *__ce); if (!__ce) OSTRIN_OOM(); {assignments} (void*)__ce; }})"
+                "({{ {env_name}* __ce = ({env_name}*)ostrin_calloc_with_drop(1, sizeof *__ce, (void (*)(void*)){drop_name}); if (!__ce) OSTRIN_OOM(); {assignments} (void*)__ce; }})"
             )
         };
         Ok(format!("((OstrinClosure){{ (void*){fn_name}, {env} }})"))

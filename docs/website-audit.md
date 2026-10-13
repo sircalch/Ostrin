@@ -50,10 +50,10 @@ Firefox launch limitation remains documented as a tooling note and does not repl
 
 ## Verified inventory
 
-- **298** `.ostrin` source files under `examples/`, including package-project sources and
+- **300** `.ostrin` source files under `examples/`, including package-project sources and
   intentional error cases.
 - **27** Markdown design documents under `docs/design/`.
-- Compiler suite: **325 integration**, **6 differential** and **2 unit** tests.
+- Compiler suite: **327 integration**, **6 differential** and **2 unit** tests.
 - WASI release smoke matrix: **21 program modules** passed in run `38344348208` with
   wasi-sdk 34 and Node WASI. It covers hello, quantity arrays, a local-path package,
   arguments/environment, file I/O, managed ownership, nested `Option`/`Result`, managed enum

@@ -9629,6 +9629,10 @@ fn generate_impl(
                 })
                 .collect()
         },
+        record_field_types: hir
+            .as_ref()
+            .map(|program| program.record_fields.clone())
+            .unwrap_or_default(),
         applied_records: HashMap::new(),
         applied_enums: HashMap::new(),
         methods: codegen
@@ -11007,6 +11011,18 @@ fn generate_impl(
         }
         emitted_wrappers.insert(name);
     }
+    // A dyn object is embedded by value in records and wrappers. Declare its
+    // fixed-size pair before those bodies, while leaving the vtable definition
+    // until record/enum payload types are complete for method slot signatures.
+    for trait_name in codegen.trait_methods.keys() {
+        out.push_str(&format!(
+            "typedef struct {trait_name}_VTable {trait_name}_VTable;\n"
+        ));
+        out.push_str(&format!(
+            "typedef struct {{ void* self; const {trait_name}_VTable* vtable; }} {trait_name}_Dyn;\n"
+        ));
+    }
+    out.push('\n');
     let emit_record = |out: &mut String, name: &str, fields: &[(String, CType)]| {
         out.push_str(&format!("struct {name} {{\n"));
         for (field_name, field_ty) in fields {
@@ -11023,12 +11039,10 @@ fn generate_impl(
         }
     }
 
-    // Every trait's vtable and fat-pointer types are declared eagerly (they
-    // are cheap, and needed to even *state* a `dyn Trait` parameter's type);
-    // only the actual vtable *instances* for a given (trait, record) pair
-    // are lazy — see `PendingVTable` and the drain loop above.
+    // Vtable instances for a given (trait, record) pair are lazy; the fat
+    // pointer typedef was emitted before records so it can be a field type.
     for (trait_name, methods) in &codegen.trait_methods {
-        out.push_str("typedef struct {\n");
+        out.push_str(&format!("struct {trait_name}_VTable {{\n"));
         out.push_str("    void (*retain)(void*);\n");
         out.push_str("    void (*release)(void*);\n");
         for (method_name, (param_types, return_type)) in methods {
@@ -11043,8 +11057,7 @@ fn generate_impl(
                 params
             ));
         }
-        out.push_str(&format!("}} {trait_name}_VTable;\n\n"));
-        out.push_str(&format!("typedef struct {{ void* self; const {trait_name}_VTable* vtable; }} {trait_name}_Dyn;\n\n"));
+        out.push_str("};\n\n");
     }
 
     // Every `List` struct is declared here, right before the prototype

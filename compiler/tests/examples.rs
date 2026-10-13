@@ -3712,6 +3712,90 @@ fn native_dyn_trait_list_owns_elements_across_argument_return_and_drop() {
 }
 
 #[test]
+fn native_dyn_trait_record_field_replacement_preserves_pair_ownership() {
+    let file = example_path("native_dyn_trait_record_field.ostrin");
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    let expected = "12\n12\n9\n9\n";
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let exe = temp_artifact("dyn-trait-record-field.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run dyn trait record-field binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "native failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "dyn trait record-field replacement leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn native_dyn_trait_closure_capture_outlives_the_source_scope() {
+    let file = example_path("native_dyn_trait_closure_capture.ostrin");
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    let expected = "12\n";
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let exe = temp_artifact("dyn-trait-closure-capture.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run dyn trait closure-capture binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "native failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "dyn trait closure capture leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn native_backend_dedups_vtables_across_repeated_boxing() {
     // `Circle` is boxed into `dyn Shape` twice in native_dyn_trait.ostrin
     // (once via describe(), once via the explicit `boxed: dyn Shape =`
