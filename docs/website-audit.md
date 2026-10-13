@@ -1,6 +1,6 @@
 # Ostrin website audit
 
-*Cut: 2026-10-11 · source counts and public fallbacks are checked by
+*Cut: 2026-10-13 · source counts and public fallbacks are checked by
 `scripts/website-check.mjs`; plan and maturity claims are checked by
 `scripts/project-plan-check.mjs` and `scripts/quantity-ownership-check.mjs`.*
 

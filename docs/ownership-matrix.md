@@ -1,6 +1,6 @@
 # Matriz de ownership del backend nativo
 
-*Corte: 2026-10-12 · inventario conservador; no es una promesa de soporte estable.*
+*Corte: 2026-10-13 · inventario conservador; no es una promesa de soporte estable.*
 
 Esta matriz registra el contrato de valores gestionados en IR/C. El intérprete puede
 aceptar combinaciones que todavía usan el fallback HIR/AST en el backend nativo.
@@ -70,8 +70,8 @@ payloads arbitrarios. Los sanitizers se ejecutan en CI sobre el head actual.
 | Colección `List<dyn Trait>` | `T` | `native_dyn_trait_list_owns_elements_across_argument_return_and_drop`; boxing elemento a elemento, iteración, forwarding y drop. |
 | Destrucción (`drop`) | `T` | Pruebas de lista, campo, closure y tarea; hooks de vtable liberan payloads, leak-check termina en cero. |
 | Cancelación | `T` | `native_dyn_trait_task_cancellation_releases_captured_pair`; cancelación antes de ejecución con payload `String`, schedulers cooperativo y nativo con hilos. Otros estados de cancelación no se generalizan. |
-| WASI | `T` | `node scripts/wasi-program-check.mjs`; los 28 programas compilan y ejecutan, incluidos campo genérico directo, default, closure, tarea y cancelación dyn. |
-| ASan / UBSan | `T` | [Workflows Clang en `b3bce84`](https://github.com/sircalch/Ostrin/actions/runs/38364183520): suite nativa ASan, corpus diferencial y fuzz del frontend pasan; UBSan pasa la suite nativa. |
+| WASI | `T` | `node scripts/wasi-program-check.mjs`; los 28 programas compilan y ejecutan, incluidos campo genérico directo, wrappers, default, closure, tarea y cancelación dyn. |
+| ASan / UBSan | `T` | [Workflows Clang en `52e902a`](https://github.com/sircalch/Ostrin/actions/runs/38429889992): suite nativa ASan, corpus diferencial y fuzz del frontend pasan; UBSan pasa la suite nativa. |
 
 ## Lectura del estado y trabajo pendiente
 

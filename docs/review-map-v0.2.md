@@ -17,20 +17,21 @@ head's CI or a release approval.
 
 ## Current revision evidence
 
-- Implementation revision audited: `b3bce84` (`Format generic dyn trait ownership test`),
-  including the generic `Holder<dyn Speaker>` field implementation and its public example.
-- At this head, [Ostrin CI](https://github.com/sircalch/Ostrin/actions/runs/38364183481)
+- Implementation revision audited: `52e902a` (`Support dyn trait values in Option and Result`),
+  including `Option<dyn Speaker>` and `Result<dyn Speaker, String>` wrappers, the generic
+  `Holder<dyn Speaker>` field and the public examples catalogue.
+- At this head, [Ostrin CI](https://github.com/sircalch/Ostrin/actions/runs/38429889889)
   passed on Ubuntu, macOS and Windows, including the generated differential
   corpus, numerical validation and Website/browser checks;
-  [ASan and UBSan](https://github.com/sircalch/Ostrin/actions/runs/38364183520),
-  [CodeQL](https://github.com/sircalch/Ostrin/actions/runs/38364183357),
-  [dependency audit](https://github.com/sircalch/Ostrin/actions/runs/38364183491)
-  and [Browser audit](https://github.com/sircalch/Ostrin/actions/runs/38364183365)
+  [ASan and UBSan](https://github.com/sircalch/Ostrin/actions/runs/38429889992),
+  [CodeQL](https://github.com/sircalch/Ostrin/actions/runs/38429890224),
+  [dependency audit](https://github.com/sircalch/Ostrin/actions/runs/38429890227)
+  and [Browser audit](https://github.com/sircalch/Ostrin/actions/runs/38429890260)
   also passed.
-- Local evidence for the latest web changes: all 31 Chromium website tests,
+- Local evidence for the latest web changes: all 32 Chromium website tests,
   `website-check --wasm`, `linguist-check` and its 8 unit tests passed.
 - Local WASI program matrix: 28 programs passed, including generic
-  `dyn Trait` field case. The repository reports 7,198 IR + 41 HIR functions,
+  `dyn Trait` field and `Option`/`Result` wrapper cases. The repository reports 7,198 IR + 41 HIR functions,
   zero AST fallbacks and 334 tracked `.ostrin` files (302 examples). Sanitizer
   CI for the new fixture passed on this revision.
 - The release gate remains `NOT_READY`: ownership and changelog are still open.
