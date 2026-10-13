@@ -1,6 +1,6 @@
 # Matriz de ownership del backend nativo
 
-*Corte: 2026-10-10 · inventario conservador; no es una promesa de soporte estable.*
+*Corte: 2026-10-12 · inventario conservador; no es una promesa de soporte estable.*
 
 Esta matriz registra el contrato de valores gestionados en IR/C. El intérprete puede
 aceptar combinaciones que todavía usan el fallback HIR/AST en el backend nativo.
@@ -48,6 +48,29 @@ error, captura por closure, captura por tarea, destrucción, backend nativo y WA
 | Record recursivo | K | K | K | K | K | K | K | K | K | K | K | K | K | K | K | Conserva fallback HIR/AST mientras no exista un contrato completo de destructor y ciclos para esta representación. |
 
 | `dyn Trait` | T | T | T | T | T | T | T | T | T | K | T | T | T | T | T | `native_dyn_trait_list_owns_elements_across_argument_return_and_drop` y `native_backend_compiles_the_original_dyn_trait_example` verifican lista heterogénea, conversión elemento a elemento con vtable correcta, argumento/retorno, iteración/fold, boxing, dispatch, alias, Phi, loop-Phi, hooks y `live_allocations=0` en HIR/C. `native_dyn_trait_record_field_replacement_preserves_pair_ownership` cubre construcción, lectura, reemplazo concreto, alias que sobrevive al reemplazo y autoasignación. `native_dyn_trait_closure_capture_outlives_the_source_scope` cubre captura por closure tras destruir el scope. `native_dyn_trait_task_capture_preserves_pair_ownership` captura un `Speaker` propietario de `String`, mantiene un alias en el padre, hace dispatch y `join` en scheduler cooperativo y `--native-threads`; `native_dyn_trait_task_cancellation_releases_captured_pair` libera el `String` gestionado al cancelar antes de ejecución en ambos schedulers. Los dos terminan con `live_allocations=0`. `native_trait_defaults_are_lowered_to_ir` confirma seis funciones IR/cero AST, vtable genérica con método default, paridad y leak-check. La matriz WASI pasó localmente sus 26 programas, incluidos lista, campos, closure, tareas y default genérico. ASan/UBSan de esta revisión quedan pendientes de CI Linux/Clang. Campos genéricos conservan la limitación conocida; el gate global de ownership permanece abierto. El ledger AST ya no registra un fallback de dyn. |
+
+### Evidencia de operaciones `dyn Trait`
+
+Esta submatriz desglosa las transiciones específicas exigidas por el ABI
+`data + vtable`; `T` sigue limitado al caso nombrado y no implica soporte para
+payloads arbitrarios. Los sanitizers se ejecutan en CI sobre el head actual.
+
+| Operación | Estado | Evidencia o límite explícito |
+|---|---|---|
+| Boxing y selección de vtable | `T` | `native_trait_defaults_are_lowered_to_ir`; comprueba `DynBox` para records concretos y `Box<Int>`, dispatch default y `live_allocations=0`. |
+| Copia / alias | `T` | `native_dyn_trait_alias_keeps_both_receivers_alive`; ambos aliases siguen despachando tras liberar el scope propietario. |
+| Argumento y llamada anidada | `T` | `native_dyn_trait_list_owns_elements_across_argument_return_and_drop`; forwarding y llamadas por vtable con payload concreto y gestionado. |
+| Retorno | `T` | `native_dyn_trait_hir_return_and_phi_preserve_ownership`; retorno desde `pass` sobrevive a la destrucción del scope del callee. |
+| Campo y reemplazo | `T` | `native_dyn_trait_record_field_replacement_preserves_pair_ownership`; construcción, reemplazo, alias y autoasignación. Campos genéricos: `K`. |
+| `Phi` | `T` | `native_dyn_trait_hir_return_and_phi_preserve_ownership`; selección retiene el par elegido y libera la rama descartada. |
+| Loop-Phi | `T` | `native_dyn_trait_hir_return_and_phi_preserve_ownership`; cuatro reemplazos mantienen el receptor/vtable emparejados y liberan el anterior. |
+| Captura por closure | `T` | `native_dyn_trait_closure_capture_outlives_the_source_scope`; dispatch después del scope de origen, cero asignaciones vivas. |
+| Captura por tarea | `T` | `native_dyn_trait_task_capture_preserves_pair_ownership`; `Speaker { text: String }`, alias del padre, `join`, scheduler cooperativo y nativo con hilos. |
+| Colección `List<dyn Trait>` | `T` | `native_dyn_trait_list_owns_elements_across_argument_return_and_drop`; boxing elemento a elemento, iteración, forwarding y drop. |
+| Destrucción (`drop`) | `T` | Pruebas de lista, campo, closure y tarea; hooks de vtable liberan payloads, leak-check termina en cero. |
+| Cancelación | `T` | `native_dyn_trait_task_cancellation_releases_captured_pair`; cancelación antes de ejecución con payload `String`, schedulers cooperativo y nativo con hilos. Otros estados de cancelación no se generalizan. |
+| WASI | `T` | `node scripts/wasi-program-check.mjs`; los 26 programas compilan y ejecutan, incluidos default, closure, tarea y cancelación dyn. |
+| ASan / UBSan | `PENDIENTE` | Workflows Clang para el head `1b05a08`; no se declara terminado hasta que ambos jobs reporten éxito. |
 
 ## Lectura del estado y trabajo pendiente
 
