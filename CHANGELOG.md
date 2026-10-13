@@ -40,23 +40,23 @@
   the specialized vtable. `native_trait_defaults.ostrin` now reports six IR
   functions and zero AST fallbacks; interpreter/native parity and
   `live_allocations=0` pass. The repository inventory advances to 7,198 IR +
-  41 HIR functions and zero AST fallbacks. Interpreter/native parity and
-  `live_allocations=0` pass; WASI passes the 26-program local matrix. ASan/UBSan
-  checks for this revision are running in CI, so the v0.2 ownership gate remains
-  open pending those results and the remaining matrix audit.
+  41 HIR functions and zero AST fallbacks. WASI passes the 26-program local
+  matrix. ASan/UBSan pass for head `bae4c0e` in
+  [CI](https://github.com/sircalch/Ostrin/actions/runs/38356736980); the v0.2
+  ownership gate remains open for the remaining unverified matrix boundaries.
 - Added dyn Trait task capture and pre-run cancellation regressions with a
   `String`-owning payload. Capture also keeps a parent alias alive. Both verify
   the retained data/vtable pair, dynamic dispatch or cancellation cleanup,
   cooperative and native-thread execution, and `live_allocations=0`; both are
-  included in the 26-program WASI matrix. ASan/UBSan checks for this revision
-  are running in the Linux/Clang workflow.
+  included in the 26-program WASI matrix. ASan/UBSan pass for head `bae4c0e` in
+  the linked Linux/Clang workflow above.
 - Lowered heterogeneous `List<dyn Trait>` construction, elementwise boxing,
   iteration and indirect `fold` dispatch through HIR/C. Vtable hooks preserve
   payload ownership across list insertion, argument/return forwarding and drop;
   focused parity and `live_allocations=0` regressions cover concrete, borrowed,
   forwarded, field replacement and closure/task captures. The v0.2 ownership
-  gate remains open for generic dyn fields, sanitizer results on this revision,
-  and any ownership combinations not represented by the tests.
+  gate remains open for generic dyn fields and ownership combinations not
+  represented by the tests.
 
 ### Public adoption path
 

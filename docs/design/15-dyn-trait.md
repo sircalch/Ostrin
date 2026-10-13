@@ -117,13 +117,14 @@ añadieron pruebas de captura por tarea y cancelación antes de ejecución con u
 payload `String` gestionado; la captura también mantiene un alias vivo en el
 padre. Ambas preservan el par y terminan con `live_allocations=0` en scheduler
 cooperativo y `--native-threads`. WASI pasó localmente sus 26 programas,
-incluidos los fixtures de campo, closure, tareas y default genérico. ASan/UBSan
-de esta revisión siguen pendientes porque el
-GCC MinGW local no dispone de `libasan`; deben confirmarse en el workflow Clang
-de Linux. Campos genéricos siguen fuera del ABI dyn HIR/C verificado.
+incluidos los fixtures de campo, closure, tareas y default genérico. En el head
+`bae4c0e`, ASan pasó la suite nativa, el corpus diferencial generado y el fuzz
+del frontend; UBSan también pasó en CI con Clang. Véanse los
+[resultados de sanitizers](https://github.com/sircalch/Ostrin/actions/runs/38356736980).
+Campos genéricos siguen fuera del ABI dyn HIR/C verificado.
 
-La migración queda condicionada a un contrato único para AST, HIR, IR, WASI y
-el runtime:
+El contrato de implementación se aplica de forma coherente a AST, HIR, IR, WASI
+y el runtime:
 
 1. El valor tipado debe conservar `data`, `vtable` y el estado de ownership en
    cada construcción, argumento, retorno, campo, colección, `Phi`, closure,
@@ -162,33 +163,32 @@ pueda conservar estas invariantes debe producir un diagnóstico de lowering;
 no puede degradarse a un cast opaco ni a una liberación global al finalizar el
 proceso.
 
-Estado implementado y trabajo restante para cerrar el contrato de ownership:
+Estado implementado y límites restantes del contrato de ownership:
 
-1. **Completado parcialmente:** el typechecker transmite el tipo esperado a
+1. **Implementado para los casos cubiertos:** el typechecker transmite el tipo esperado a
    coerciones de argumentos; HIR conserva `DynCoerce` y la IR conserva
    `DynBox`/`DynCall`. El verificador comprueba que el origen de boxing coincide
    con la definición y que el destino es `dyn Trait`. La prueba
    `hir_ir_preserve_checker_approved_dyn_argument_coercions` verifica los
    records concretos, el dispatch dinámico y `ir violations: 0`.
-2. **Completado localmente:** IR/C emite `DynBox`/`DynCall`, mantiene unido el
+2. **Implementado y validado:** IR/C emite `DynBox`/`DynCall`, mantiene unido el
    par y registra vtables genéricas/default; retain/release cubre boxing,
    llamadas, argumentos, retornos, alias, campos, reemplazos, `Phi`, loop-Phi y
    drop en los casos probados.
-3. Ejecutar matriz WASI y ASan/UBSan con esta revisión, y cubrir payload
-   gestionado en el default genérico si la auditoría de pruebas detecta un hueco.
-4. Mantener fallbacks explícitos para campos genéricos y otras ABI que todavía
-   no estén probadas.
-5. Completar evidencia de paridad intérprete/native, `live_allocations=0`,
-   WASI, ASan y UBSan para las transiciones de la sección 7. No modificar el
-   gate de release manualmente.
+3. La matriz WASI local pasó 26 programas. En `bae4c0e`, ASan y UBSan pasaron
+   en CI; ASan también ejecutó el corpus diferencial y el fuzz del frontend.
+4. Los campos genéricos y otras combinaciones fuera de la matriz probada siguen
+   fuera del soporte verificado; no se generaliza la evidencia de los casos
+   cubiertos a esas ABI.
+5. Las transiciones de la sección 7 tienen paridad, `live_allocations=0`, WASI
+   donde aplica, ASan y UBSan para los casos enumerados en la matriz. El gate
+   global permanece `OPEN` por los límites no cubiertos y no debe modificarse
+   manualmente.
 
-La migración de cada fallback restante se acepta solo cuando su prueba nativa demuestra las cuatro
-transiciones anteriores además de la matriz de paridad, WASI y sanitizers de la
-sección 7.
-
-Hasta que exista esa evidencia, los casos fuera de la cobertura HIR/C permanecen
-en los fallbacks AST enumerados; la frontera es intencional y forma parte del
-contrato de v0.2.
+El ledger actual registra cero fallbacks AST para la población medida. Este
+recuento no equivale a soporte universal: cualquier combinación fuera de la
+cobertura HIR/C verificada sigue siendo una limitación y no debe degradarse a un
+cast opaco ni recibir una afirmación de soporte sin evidencia propia.
 
 ---
 

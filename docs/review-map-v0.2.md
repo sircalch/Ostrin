@@ -11,15 +11,30 @@ head's CI or a release approval.
 | Trait-object semantics | `docs/design/15-dyn-trait.md`, `examples/native_trait_defaults.ostrin`, `compiler/tests/fixtures/native_dyn_trait_task_*.ostrin` | Vtable is shared/immutable; payload lifecycle is driven through typed hooks | Interpreter/native parity, task modes, cancellation, WASI matrix | Current task cancellation test covers cancellation before execution; arbitrary cancellation states remain outside the claim |
 | Scientific measurements/numerics | `examples/measurement_*.ostrin`, `examples/std_numeric_*.ostrin`, `scripts/numeric-validation.mjs`, `validation/numeric/` | Scalar Measurement ownership and numerical algorithms have explicit parity, residual and reproducibility evidence | CI numerical validation, native leak checks, WASI; linked readiness evidence | `Measurement<Quantity<D>>`, covariance and array measurement remain guarded boundaries |
 | Effects/provenance/reproducibility | `compiler/src/effects.rs`, `compiler/src/provenance.rs`, `scripts/experiment-replay.mjs`, `docs/design/26-efectos-cientificos.md` | Inventory reports known and unresolved calls without treating completeness as purity; replay scope is explicit | Effect/provenance reports, replay bundles and WASI checks | Static effect semantics and R3 user-facing artifact maturity remain future work |
-| Website/browser | `website/`, `tests/browser/`, `scripts/website-check.mjs`, `docs/website-audit.md` | Public counts/status derive from repository facts and browser checks exercise key flows | `website-check --wasm`, Browser audit, cross-browser/accessibility checks | Keep maturity labels aligned; do not imply production readiness or upstream Linguist adoption |
+| Website/browser | `website/`, `tests/browser/`, `scripts/website-check.mjs`, `docs/website-audit.md`, `docs/linguist.md`, `docs/linguist-usage.md` | Public counts/status derive from repository facts; the dashboard test reads the loaded scorecard, and the Linguist inventory states 332 tracked `.ostrin` files (300 examples) | Local Chromium suite (30 tests), `website-check --wasm`, Linguist gate and unit tests, PR Browser audit and Website checks | Regenerate public facts when inventories or evidence change; upstream Linguist recognition still has 0 external files against a 2,000-file threshold |
 | Validation/manifests/scorecard | `validation/ast-fallback-ledger.json`, `validation/quality-scorecard.json`, `docs/release-readiness-v0.2.json`, `scripts/project-plan-check.mjs` | Ledger and scorecard reflect measured baselines; release gate is derived and ownership stays open | fallback-ledger, Linguist, project-plan and readiness scripts | Generated artifacts must be regenerated after source changes; never hand-set ownership READY |
 | Packaging and CI | `.github/workflows/`, `compiler/Cargo.toml`, `README.md`, `CHANGELOG.md` | Supported host/WASI builds and package workflows are reproducible; release notes separate candidate from published releases | CI matrix, sanitizers, CodeQL, dependency audit, Browser audit, WASI and install checks | PR is a large draft integration; all relevant checks must pass on the final head; do not merge without approval |
 
 ## Current revision evidence
 
-- Local head: `886627e` (`feat: lower dyn trait ownership through IR`).
-- Full local compiler suite: 3 unit tests, 6 differential tests and 330 integration tests passed.
-- Local WASI program matrix: 26 programs passed.
-- Website, Linguist, fallback-ledger and project-plan checks passed.
-- Fresh PR #185 CI, ASan, UBSan, CodeQL, security and Browser audit checks are
-  running for this revision; this document does not mark those checks passed.
+- Implementation revision audited: `bae4c0e` (`docs: refresh Ostrin Linguist
+  inventory`), on top of the data-driven public status dashboard assertion.
+- At this head, [Ostrin CI](https://github.com/sircalch/Ostrin/actions/runs/38356737026)
+  passed on Ubuntu, macOS and Windows, including the generated differential
+  corpus, numerical validation and Website/browser checks;
+  [ASan and UBSan](https://github.com/sircalch/Ostrin/actions/runs/38356736980),
+  [CodeQL](https://github.com/sircalch/Ostrin/actions/runs/38356737050),
+  [dependency audit](https://github.com/sircalch/Ostrin/actions/runs/38356736953)
+  and [Browser audit](https://github.com/sircalch/Ostrin/actions/runs/38356736968)
+  also passed.
+- Local evidence for the latest web changes: all 30 Chromium website tests,
+  `website-check --wasm`, `linguist-check` and its 8 unit tests passed.
+- Local WASI program matrix: 26 programs passed. The repository reports 7,198
+  IR + 41 HIR functions, zero AST fallbacks and 332 tracked `.ostrin` files
+  (300 examples).
+- The release gate remains `NOT_READY`: ownership and changelog are still open.
+  Generic dyn fields, broader aggregate combinations and cancellation states
+  beyond the focused pre-run case remain outside the ownership claim. This map
+  records implementation evidence for `bae4c0e`; the accompanying follow-up
+  only synchronizes documentation to that evidence. Any later code revision
+  requires fresh workflows.
