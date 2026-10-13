@@ -1000,7 +1000,7 @@ test("public status dashboard exposes separate evidence dimensions", async ({ pa
   await page.goto("./status.html", { waitUntil: "networkidle" });
   await expect(page).toHaveTitle(/Status — Evidence Scorecard/);
   await expect(page.locator("[data-status-backend] .status-metric")).toHaveCount(4);
-  await expect(page.locator("[data-status-backend] .status-metric-value").first()).toHaveText("7,187");
+  await expect(page.locator("[data-status-backend] .status-metric-value").first()).toHaveText("7,189");
   await expect(page.locator("[data-status-effects] .status-metric")).toHaveCount(3);
   await expect(page.locator("[data-status-effects] .status-metric-value").first()).toHaveText("68");
   await expect(page.locator("[data-status-effects] .status-metric-value").last()).toHaveText("COMPLETE");

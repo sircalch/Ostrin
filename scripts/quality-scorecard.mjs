@@ -39,7 +39,7 @@ function countTests() {
 
 function nativeCounts() {
   const source = text("compiler/tests/differential.rs");
-  const detail = source.match(/(\d[\d,]*)\s+AST fallbacks\s+\((\d[\d,]*)\s+HIR\/IR-generated:\s*(\d[\d,]*)\s+IR and\s+(\d[\d,]*)\s+HIR functions\)/);
+  const detail = source.match(/(\d[\d,]*)\s+AST\s+fallbacks?\s+\((\d[\d,]*)\s+HIR\/IR-generated:\s*(\d[\d,]*)\s+IR and\s+(\d[\d,]*)\s+HIR functions\)/);
   const ir = Number((detail?.[3] ?? "0").replaceAll(",", ""));
   const hir = Number((detail?.[4] ?? "0").replaceAll(",", ""));
   const ast = Number(source.match(/const MAX_AST_FALLBACK_FUNCTIONS: usize = (\d+)/)?.[1] ?? 0);

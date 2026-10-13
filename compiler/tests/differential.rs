@@ -568,8 +568,7 @@ fn native_backend_types_agree_with_the_checker() {
     // through the same IR/C path. HIR now
     // substitutes the concrete owner for `Self` in trait method signatures,
     // allowing Complex arithmetic/equality to use IR/C. Typed dyn lists and
-    // indirect fold/dispatch now use HIR/C. The verified baseline is 1 AST
-    // fallback (7,232 HIR/IR-generated: 7,189 IR and 43 HIR functions).
+    // indirect fold/dispatch now use HIR/C. The verified baseline is 1 AST fallback (7,232 HIR/IR-generated: 7,189 IR and 43 HIR functions).
     // Function values stored in signature-specific lists and record fields now
     // use the IR ownership path. Remaining AST bodies include managed enum
     // payload, generic dispatch and concurrency boundaries.
