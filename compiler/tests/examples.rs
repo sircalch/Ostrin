@@ -3796,6 +3796,150 @@ fn native_dyn_trait_closure_capture_outlives_the_source_scope() {
 }
 
 #[test]
+fn native_dyn_trait_task_capture_preserves_pair_ownership() {
+    let file = fixture_path("native_dyn_trait_task_capture.ostrin");
+    let expected = "12\n";
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "native report failed: {}",
+        stderr(&report)
+    );
+    assert!(
+        stdout(&report).contains("ir-generated: 2") && stdout(&report).contains("ast-fallback: 0"),
+        "dyn task capture did not lower through IR: {}",
+        stdout(&report)
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("Shape__Circle__retain")
+            && wasi_source.contains("Shape__Circle__release")
+            && wasi_source.contains("ostrin_ir_task_env_drop_"),
+        "WASI C omitted the dyn payload task ownership hooks"
+    );
+
+    for (target, flags) in [
+        ("native-dyn-trait-task.exe", vec!["--compile"]),
+        (
+            "native-dyn-trait-task-threads.exe",
+            vec!["--native-threads", "--compile"],
+        ),
+    ] {
+        let exe = temp_artifact(target);
+        let mut args = flags;
+        args.extend(["--leak-check", "--out", &exe, &file]);
+        let compile = run(&args);
+        assert!(
+            compile.status.success(),
+            "native compile for {target} failed: {}",
+            stderr(&compile)
+        );
+        let native = Command::new(&exe)
+            .output()
+            .unwrap_or_else(|error| panic!("run {target}: {error}"));
+        let _ = fs::remove_file(&exe);
+        assert!(
+            native.status.success(),
+            "native binary {target} failed: {}",
+            String::from_utf8_lossy(&native.stderr)
+        );
+        assert_eq!(
+            String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+            expected
+        );
+        assert!(
+            String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+            "dyn task capture leaked in {target}: {}",
+            String::from_utf8_lossy(&native.stderr)
+        );
+    }
+}
+
+#[test]
+fn native_dyn_trait_task_cancellation_releases_captured_pair() {
+    let file = fixture_path("native_dyn_trait_task_cancel.ostrin");
+    let expected = "true\nfalse\n";
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("Shape__Circle__release")
+            && wasi_source.contains("ostrin_ir_task_env_drop_"),
+        "WASI C omitted dyn cancellation cleanup hooks"
+    );
+
+    for (target, flags) in [
+        ("native-dyn-trait-cancel.exe", vec!["--compile"]),
+        (
+            "native-dyn-trait-cancel-threads.exe",
+            vec!["--native-threads", "--compile"],
+        ),
+    ] {
+        let exe = temp_artifact(target);
+        let mut args = flags;
+        args.extend(["--leak-check", "--out", &exe, &file]);
+        let compile = run(&args);
+        assert!(
+            compile.status.success(),
+            "native compile for {target} failed: {}",
+            stderr(&compile)
+        );
+        let native = Command::new(&exe)
+            .output()
+            .unwrap_or_else(|error| panic!("run {target}: {error}"));
+        let _ = fs::remove_file(&exe);
+        assert!(
+            native.status.success(),
+            "native binary {target} failed: {}",
+            String::from_utf8_lossy(&native.stderr)
+        );
+        let actual = String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n");
+        if target.contains("threads") {
+            assert!(
+                actual.lines().count() == 2
+                    && actual.lines().all(|line| matches!(line, "true" | "false")),
+                "native-thread cancellation returned invalid results: {actual}"
+            );
+        } else {
+            assert_eq!(actual, expected);
+        }
+        assert!(
+            String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+            "dyn payload leaked after cancellation in {target}: {}",
+            String::from_utf8_lossy(&native.stderr)
+        );
+    }
+}
+
+#[test]
 fn native_backend_dedups_vtables_across_repeated_boxing() {
     // `Circle` is boxed into `dyn Shape` twice in native_dyn_trait.ostrin
     // (once via describe(), once via the explicit `boxed: dyn Shape =`
@@ -10644,8 +10788,87 @@ fn native_trait_defaults_are_lowered_to_ir() {
     let report_text = stdout(&report);
     assert!(
         report_text
-            .contains("native-source: examples/native_trait_defaults.ostrin ir=4 hir=1 ast=1"),
+            .contains("native-source: examples/native_trait_defaults.ostrin ir=6 hir=0 ast=0"),
         "trait defaults regressed to the legacy backend: {report_text}"
+    );
+    let emitted = run(&["--emit-c", &example_path("native_trait_defaults.ostrin")]);
+    assert!(
+        emitted.status.success(),
+        "C emission failed: {}",
+        stderr(&emitted)
+    );
+    assert!(
+        stdout(&emitted).contains(".vtable->greeting(")
+            && stdout(&emitted).contains(".vtable->shout("),
+        "dyn dispatch was not emitted from the typed IR: {}",
+        stdout(&emitted)
+    );
+
+    let file = example_path("native_trait_defaults.ostrin");
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    let exe = temp_artifact("native_trait_defaults_dyn_ir.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .unwrap_or_else(|error| panic!("failed to run compiled binary '{exe}': {error}"));
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native binary failed");
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        stdout(&interpreted).replace("\r\n", "\n"),
+        "native dyn dispatch should match the interpreter"
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "dyn dispatch leaked a payload: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn hir_ir_preserve_checker_approved_dyn_argument_coercions() {
+    let hir = run(&["--hir", &example_path("native_trait_defaults.ostrin")]);
+    assert!(hir.status.success(), "HIR failed: {}", stderr(&hir));
+    let hir_text = stdout(&hir);
+    assert!(
+        hir_text.contains("dyn<dyn Named>(Dog {"),
+        "HIR did not preserve the Dog-to-dyn argument coercion: {hir_text}"
+    );
+    assert!(
+        hir_text.contains("dyn<dyn Named>(Cat {"),
+        "HIR did not preserve the Cat-to-dyn argument coercion: {hir_text}"
+    );
+
+    let ir = run(&["--ir", &example_path("native_trait_defaults.ostrin")]);
+    assert!(ir.status.success(), "IR failed: {}", stderr(&ir));
+    let ir_text = stdout(&ir);
+    assert!(ir_text.contains("dyn_box %1:Dog -> dyn Named"), "{ir_text}");
+    assert!(ir_text.contains("dyn_box %6:Cat -> dyn Named"), "{ir_text}");
+    assert!(
+        ir_text.contains("dyn_box %11:Box<Int> -> dyn Named"),
+        "generic record boxing was not preserved as a typed IR operation: {ir_text}"
+    );
+    assert!(
+        ir_text.contains("dyn_call Named %0.greeting()")
+            && ir_text.contains("dyn_call Named %0.shout()"),
+        "dynamic trait method calls were not preserved as typed IR operations: {ir_text}"
+    );
+    assert!(
+        ir_text.contains("ir violations: 0"),
+        "IR verifier rejected the typed dyn boxing operation: {ir_text}"
     );
 }
 

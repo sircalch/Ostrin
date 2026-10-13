@@ -1318,6 +1318,10 @@ impl Emitter<'_> {
                 }
                 Ok(format!("{}->{field}", self.expr(obj)?))
             }
+            HirKind::DynCoerce(value) => {
+                let code = self.expr(value)?;
+                self.coerce_dyn(code, &value.ty, &e.ty)
+            }
             HirKind::Record { fields, .. } => {
                 let record = match &e.ty {
                     Ty::Named(name) if self.world.records.contains_key(name) => name.clone(),
@@ -2508,6 +2512,7 @@ fn hir_expr_contains_lambda(expr: &HirExpr) -> bool {
         | HirKind::Unary(_, value)
         | HirKind::Field(value, _)
         | HirKind::As(value, _)
+        | HirKind::DynCoerce(value)
         | HirKind::Try(value, None) => hir_expr_contains_lambda(value),
         HirKind::Try(value, Some(handler)) => {
             hir_expr_contains_lambda(value) || hir_expr_contains_lambda(handler)
@@ -2624,6 +2629,7 @@ fn collect_hir_locals_expr(
         | HirKind::Unary(_, value)
         | HirKind::Field(value, _)
         | HirKind::As(value, _)
+        | HirKind::DynCoerce(value)
         | HirKind::Try(value, None) => collect_hir_locals_expr(value, used, bound),
         HirKind::Try(value, Some(handler)) => {
             collect_hir_locals_expr(value, used, bound);

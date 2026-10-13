@@ -29,12 +29,24 @@
   contracts are implemented. The interpreter and native boundary tests document
   the supported behavior and the current limitation.
 - Re-synchronized public inventories and quality scorecard data with the
-  current 300-example, 327-integration-test repository state.
+  current 300-example, 330-integration-test repository state.
 
 ## Unreleased
 
 ### Native dynamic traits
 
+- Lowered the generic `Box<Int>` default-method case through typed IR/C:
+  `DynBox` and `DynCall` preserve the `data + vtable` pair and dispatch through
+  the specialized vtable. `native_trait_defaults.ostrin` now reports six IR
+  functions and zero AST fallbacks; interpreter/native parity and
+  `live_allocations=0` pass. The repository inventory advances to 7,198 IR +
+  41 HIR functions and zero AST fallbacks. WASI and ASan/UBSan for this revision
+  are still pending, so the v0.2 ownership gate remains open.
+- Added dyn Trait task capture and pre-run cancellation regressions. Both verify
+  the retained data/vtable pair, dynamic dispatch or cancellation cleanup,
+  cooperative and native-thread execution, and `live_allocations=0`; both are
+  included in the 26-program WASI matrix. ASan/UBSan for this working revision
+  still require the Linux/Clang workflow.
 - Lowered heterogeneous `List<dyn Trait>` construction, elementwise boxing,
   iteration and indirect `fold` dispatch through HIR/C. Vtable hooks preserve
   payload ownership across list insertion, argument/return forwarding and drop;

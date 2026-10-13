@@ -62,6 +62,14 @@ el helper real del runtime; `spawn_scope {}` abre y drena el grupo estructurado 
 IR cuando sus hijos usan la ABI soportada; las tareas anidadas con capturas propagadas ya comparten
 esa ABI, mientras los scopes anidados y escapes complejos siguen en fallback.*
 
+La ruta de trait objects conserva `DynBox`/`DynCall` en IR y emite el par
+`data + vtable` en `ir_c.rs`, incluidos records genéricos y métodos default
+especializados. `native_trait_defaults.ostrin` genera 6 funciones IR, 0 HIR y
+0 AST, con dispatch por vtable, paridad intérprete/nativo y `live_allocations=0`.
+La migración no cierra el gate general de ownership: la matriz WASI y ASan/UBSan
+de esta revisión aún deben ejecutarse; tareas/cancelación y campos genéricos dyn
+siguen como límites explícitos.
+
 ## 1. Qué existe ya (comprobado en el código)
 
 | Pieza | Dónde | Papel en la migración |

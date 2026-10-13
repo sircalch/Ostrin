@@ -1,23 +1,13 @@
 {
   "schema": "ostrin.ast-fallback-ledger/v1",
   "status": "verified-in-differential-suite",
-  "count": 1,
+  "count": 0,
   "source": "compiler/tests/differential.rs",
   "verifiedBaseline": {
-    "ir": 7194,
-    "hir": 44,
-    "ast": 1,
-    "total": 7238
+    "ir": 7198,
+    "hir": 41,
+    "ast": 0,
+    "total": 7239
   },
-  "entries": [
-    {
-      "source": "examples/native_trait_defaults.ostrin",
-      "function": "main",
-      "reason": "dynamic-trait-default-method",
-      "blockedBy": "generic Box<Int> value invokes its default trait method; generic record boxing/vtable ownership is outside the current HIR ABI",
-      "test": "native_trait_defaults_are_lowered_to_ir",
-      "risk": "high",
-      "plannedResolution": "implement object-safe default-method entries and generic-record vtable registration with payload ownership tests"
-    }
-  ]
+  "entries": []
 }

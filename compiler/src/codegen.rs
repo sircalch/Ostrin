@@ -4289,7 +4289,8 @@ impl<'a> Codegen<'a> {
             crate::hir::HirKind::Unit(value, _)
             | crate::hir::HirKind::Unary(_, value)
             | crate::hir::HirKind::Field(value, _)
-            | crate::hir::HirKind::As(value, _) => self.register_hir_expr_types(value),
+            | crate::hir::HirKind::As(value, _)
+            | crate::hir::HirKind::DynCoerce(value) => self.register_hir_expr_types(value),
             crate::hir::HirKind::Binary(_, left, right)
             | crate::hir::HirKind::Index(left, right)
             | crate::hir::HirKind::Within(left, right) => {
@@ -9559,11 +9560,6 @@ fn generate_impl(
                     .filter(|function| {
                         non_generic_function_names.contains(&function.name)
                             && !ir_unresolved.contains(&function.name)
-                            && !function
-                                .params
-                                .iter()
-                                .any(|(_, ty)| matches!(ty, Ty::Dyn(_)))
-                            && !matches!(function.ret, Ty::Dyn(_))
                     })
                     .map(|function| (function.name.clone(), c_function_name(&function.name)))
             })
@@ -9748,6 +9744,28 @@ fn generate_impl(
         codegen.register_hir_types(program);
         codegen.sync_hir_instances(&mut hir_world);
     }
+    // HIR type registration materializes concrete generic records and their
+    // applicable impl/default methods. Queue their vtables only after that
+    // specialization exists, so IR boxing and the legacy emitter share the
+    // same checked method registry.
+    for (trait_name, trait_methods) in &codegen.trait_methods {
+        for record_name in codegen.records.keys() {
+            if trait_methods.keys().all(|method| {
+                codegen
+                    .methods
+                    .get(record_name)
+                    .is_some_and(|methods| methods.contains_key(method))
+            }) {
+                let key = (trait_name.clone(), record_name.clone());
+                if codegen.vtables_emitted.insert(key.clone()) {
+                    codegen.pending_vtables.push_back(PendingVTable {
+                        trait_name: key.0,
+                        record_name: key.1,
+                    });
+                }
+            }
+        }
+    }
     let mut ir_records: crate::ir_c::RecordFields = codegen
         .records
         .iter()
@@ -9825,6 +9843,20 @@ fn generate_impl(
         }
     }
     let recursive_records = recursive_record_names(&codegen.records);
+    let ir_dyn_methods: crate::ir_c::DynTraitMethods = codegen
+        .trait_methods
+        .iter()
+        .flat_map(|(trait_name, methods)| {
+            methods.iter().map(move |(method, (params, ret))| {
+                (
+                    (trait_name.clone(), method.clone()),
+                    (params.iter().map(c_type_name).collect(), c_type_name(ret)),
+                )
+            })
+        })
+        .collect();
+    let ir_dyn_implementations: crate::ir_c::DynImplementations =
+        codegen.vtables_emitted.iter().cloned().collect();
     for f in &functions {
         if !f.generics.is_empty() {
             continue;
@@ -9845,12 +9877,14 @@ fn generate_impl(
                 .iter()
                 .find(|function| function.name == f.name && !ir_unresolved.contains(&function.name))
                 .and_then(|function| {
-                    crate::ir_c::generate_with_helpers(
+                    crate::ir_c::generate_with_dyn_metadata(
                         function,
                         &ir_functions,
                         &ir_methods,
                         &ir_records,
                         &ir_variants,
+                        &ir_dyn_methods,
+                        &ir_dyn_implementations,
                         &mut |request, left, right, ty| {
                             let ctype = codegen.ty_to_ctype(ty)?;
                             match request {
@@ -9980,12 +10014,14 @@ fn generate_impl(
                 .iter()
                 .find(|function| function.name == wanted && !ir_unresolved.contains(&function.name))
                 .and_then(|function| {
-                    crate::ir_c::generate_with_helpers(
+                    crate::ir_c::generate_with_dyn_metadata(
                         function,
                         &ir_functions,
                         &ir_methods,
                         &ir_records,
                         &ir_variants,
+                        &ir_dyn_methods,
+                        &ir_dyn_implementations,
                         &mut |request, left, right, ty| {
                             let ctype = codegen.ty_to_ctype(ty)?;
                             match request {
@@ -10772,12 +10808,14 @@ fn generate_impl(
                         .map(|name| (name.clone(), name)),
                 );
                 known_functions.insert(job.c_name.clone(), job.c_name.clone());
-                let generated = crate::ir_c::generate_with_helpers(
+                let generated = crate::ir_c::generate_with_dyn_metadata(
                     &function,
                     &known_functions,
                     &ir_methods,
                     &ir_records,
                     &ir_variants,
+                    &ir_dyn_methods,
+                    &ir_dyn_implementations,
                     &mut |request, left, right, ty| {
                         let ctype = codegen.ty_to_ctype(ty)?;
                         match request {

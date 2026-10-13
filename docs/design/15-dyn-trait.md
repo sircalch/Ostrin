@@ -100,25 +100,26 @@ typedef struct {
 ```
 
 Las vtables son inmutables y contienen slots de métodos y hooks de lifecycle
-para el payload. HIR/C ya representa `Ty::Dyn` como el struct completo, hace
-boxing concreto→dyn para records registrados, despacha llamadas por la vtable y
-usa sus hooks al copiar, reemplazar, retornar, destruir y almacenar valores en
-`List<dyn Trait>`. `dyn_trait.ostrin` (incluidos `main` y el `fold` indirecto)
-ahora genera HIR/C; las pruebas cubren lista heterogénea, argumento/retorno,
-iteración, alias, Phi y loop-Phi con `live_allocations=0` en los casos focales.
-IR todavía no tiene nodos dedicados `DynBox`/`DynCall`; el único cuerpo dyn
-restante del ledger es el boxing de record genérico con método default
-(`native_trait_defaults.ostrin::main`).
+para el payload. HIR/C representa `Ty::Dyn` como el struct completo, hace
+boxing concreto→dyn, despacha llamadas por la vtable y usa sus hooks para
+argumentos, retornos, campos, reemplazos, listas, closures y destrucción. La IR
+conserva `DynBox` y `DynCall`, e `ir_c.rs` emite el ABI `data + vtable` con
+registro de vtables de records genéricos, incluidos métodos default
+especializados. `native_trait_defaults.ostrin` genera seis funciones IR y cero
+fallbacks AST; su prueba exige dispatch por vtable, paridad con el intérprete y
+`live_allocations=0`.
 Los campos de records no genéricos y el entorno HIR de closures ahora preservan
 la pareja `data/vtable`: `native_dyn_trait_record_field_replacement_preserves_pair_ownership`
 prueba reemplazo, alias y autoasignación; `native_dyn_trait_closure_capture_outlives_the_source_scope`
 prueba que el payload sobrevive al scope que lo creó y se libera al destruir la
 closure. Ambos tienen paridad intérprete/native y `live_allocations=0`. La matriz
-y el run [WASI 38347835544](https://github.com/sircalch/Ostrin/actions/runs/38347835544)
-cubre los 23 módulos de la matriz, incluidos los dos fixtures nuevos. ASan y UBSan
-pasaron la suite nativa completa en el [run 38347772788](https://github.com/sircalch/Ostrin/actions/runs/38347772788).
-Captura por tarea, cancelación, campos genéricos
-y default dispatch en `Box<Int>` siguen fuera del ABI HIR/C verificado.
+WASI pasó localmente sus 26 programas, incluidos los fixtures de campos,
+closures y dispatch default genérico. Se añadieron pruebas de captura por tarea
+y cancelación antes de ejecución; ambas preservan el par y terminan con
+`live_allocations=0` en scheduler cooperativo y `--native-threads`. WASI pasó
+ahora sus 26 programas. ASan/UBSan de esta revisión siguen pendientes porque el
+GCC MinGW local no dispone de `libasan`; deben confirmarse en el workflow Clang
+de Linux. Campos genéricos siguen fuera del ABI dyn HIR/C verificado.
 
 La migración queda condicionada a un contrato único para AST, HIR, IR, WASI y
 el runtime:
@@ -160,8 +161,26 @@ pueda conservar estas invariantes debe producir un diagnóstico de lowering;
 no puede degradarse a un cast opaco ni a una liberación global al finalizar el
 proceso.
 
-La siguiente etapa debe propagar la representación única a IR y a campos,
-colecciones y entornos de ejecución, con `drop` explícito donde corresponda.
+Estado implementado y trabajo restante para cerrar el contrato de ownership:
+
+1. **Completado parcialmente:** el typechecker transmite el tipo esperado a
+   coerciones de argumentos; HIR conserva `DynCoerce` y la IR conserva
+   `DynBox`/`DynCall`. El verificador comprueba que el origen de boxing coincide
+   con la definición y que el destino es `dyn Trait`. La prueba
+   `hir_ir_preserve_checker_approved_dyn_argument_coercions` verifica los
+   records concretos, el dispatch dinámico y `ir violations: 0`.
+2. **Completado localmente:** IR/C emite `DynBox`/`DynCall`, mantiene unido el
+   par y registra vtables genéricas/default; retain/release cubre boxing,
+   llamadas, argumentos, retornos, alias, campos, reemplazos, `Phi`, loop-Phi y
+   drop en los casos probados.
+3. Ejecutar matriz WASI y ASan/UBSan con esta revisión, y cubrir payload
+   gestionado en el default genérico si la auditoría de pruebas detecta un hueco.
+4. Mantener fallbacks explícitos para campos genéricos y otras ABI que todavía
+   no estén probadas.
+5. Completar evidencia de paridad intérprete/native, `live_allocations=0`,
+   WASI, ASan y UBSan para las transiciones de la sección 7. No modificar el
+   gate de release manualmente.
+
 La migración de cada fallback restante se acepta solo cuando su prueba nativa demuestra las cuatro
 transiciones anteriores además de la matriz de paridad, WASI y sanitizers de la
 sección 7.

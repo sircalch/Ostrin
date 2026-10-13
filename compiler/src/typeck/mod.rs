@@ -68,6 +68,10 @@ pub struct TypedProgram {
     /// Resolved generic arguments of a call, keyed by the call node's address (works for
     /// calls with no source range of their own, e.g. a receiver `wrap(5).is_just()`).
     pub call_substs_by_node: HashMap<usize, CallSubst>,
+    /// Expected parameter types for each source argument expression. This is
+    /// semantic input to HIR lowering (for example, concrete-to-dyn boxing),
+    /// not a backend guess based on C spellings.
+    pub expected_types_by_node: HashMap<usize, Ty>,
 }
 
 #[derive(Clone)]
@@ -115,6 +119,7 @@ pub struct Checker {
     literal_kinds: HashMap<ExprKey, LitKind>,
     node_types: HashMap<usize, Ty>,
     call_substs_by_node: HashMap<usize, CallSubst>,
+    expected_types_by_node: HashMap<usize, Ty>,
     call_node_stack: Vec<usize>,
     /// Copies of declarations checked in place of the original (impl methods
     /// with `Self` substituted, trait default bodies). `node_types` is keyed by
@@ -226,6 +231,7 @@ impl Checker {
             literal_kinds: HashMap::new(),
             node_types: HashMap::new(),
             call_substs_by_node: HashMap::new(),
+            expected_types_by_node: HashMap::new(),
             call_node_stack: Vec::new(),
             checked_copies: Vec::new(),
             call_key_stack: Vec::new(),
@@ -250,14 +256,23 @@ impl Checker {
         self,
         items: &[Item],
     ) -> (Vec<TypeError>, Vec<EditorBinding>, Vec<EditorExpression>) {
-        let (errors, bindings, expressions, _, _, _, _, _) = self.check_all(items);
+        let (errors, bindings, expressions, _, _, _, _, _, _) = self.check_all(items);
         (errors, bindings, expressions)
     }
 
     /// Like `check_program`, but also returns the type of every expression.
     pub fn check_program_typed(self, items: &[Item]) -> TypedProgram {
-        let (errors, _, _, expr_types, call_substs, literal_kinds, node_types, call_substs_by_node) =
-            self.check_all(items);
+        let (
+            errors,
+            _,
+            _,
+            expr_types,
+            call_substs,
+            literal_kinds,
+            node_types,
+            call_substs_by_node,
+            expected_types_by_node,
+        ) = self.check_all(items);
         TypedProgram {
             errors,
             expr_types,
@@ -265,6 +280,7 @@ impl Checker {
             literal_kinds,
             node_types,
             call_substs_by_node,
+            expected_types_by_node,
         }
     }
 
@@ -280,6 +296,7 @@ impl Checker {
         HashMap<ExprKey, LitKind>,
         HashMap<usize, Ty>,
         HashMap<usize, CallSubst>,
+        HashMap<usize, Ty>,
     ) {
         for item in items {
             match item {
@@ -448,6 +465,7 @@ impl Checker {
             self.literal_kinds,
             self.node_types,
             self.call_substs_by_node,
+            self.expected_types_by_node,
         )
     }
 
@@ -2616,9 +2634,14 @@ impl Checker {
                     let empty = matches!(value.unlocated(), Expr::ListLiteral(items) | Expr::SetLiteral(items) if items.is_empty())
                         || matches!(value.unlocated(), Expr::MapLiteral(pairs) if pairs.is_empty());
                     matches!(t, Ty::Fn(..))
+                        || matches!(t, Ty::Dyn(_))
                         || (empty && !ty_mentions_generic(t))
                         || explicit_type_args.is_some()
                 });
+                if let Some(expected @ Ty::Dyn(_)) = expected {
+                    self.expected_types_by_node
+                        .insert(value as *const Expr as usize, expected.clone());
+                }
                 (field_name.clone(), self.infer_expr_with_expected(value, expected, scope))
             })
             .collect();
@@ -3992,6 +4015,10 @@ impl Checker {
                 let expected = resolve_type_with_subst(&param.ty, &dim_subst);
                 if let Some(expr) = arg_expr_for_param(sig, args, index) {
                     self.note_expected(expr, &expected);
+                    if matches!(expected, Ty::Dyn(_)) {
+                        self.expected_types_by_node
+                            .insert(expr as *const Expr as usize, expected.clone());
+                    }
                 }
                 let adapted = match arg_expr_for_param(sig, args, index) {
                     Some(expr) => self.adapt_literals(expr, &expected, arg_ty),
@@ -4057,6 +4084,10 @@ impl Checker {
             let expected = resolve_type_with_type_subst(&param.ty, &type_subst, &dim_subst);
             if let Some(expr) = arg_expr_for_param(sig, args, index) {
                 self.note_expected(expr, &expected);
+                if matches!(expected, Ty::Dyn(_)) {
+                    self.expected_types_by_node
+                        .insert(expr as *const Expr as usize, expected.clone());
+                }
             }
         }
 

@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-10-12 · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 327 de integración y 2 unitarias en verde.*
+*Corte: 2026-10-12 · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 330 de integración y 2 unitarias en verde.*
 
 Validación remota: Pages, CI, CodeQL, sanitizers y auditoría de seguridad pasaron para el
 ciclo `4671b28` en Windows, Linux, macOS y web (Ostrin CI `38182030324`, Browser audit
@@ -170,8 +170,7 @@ visible. También publica líneas `native-source` agrupadas por archivo para loc
 por módulo y `ast-fallback-function` con identificadores estables para cada cuerpo pendiente;
 la prueba diferencial comprueba que los nombres y las sumas por módulo coinciden con el total.
 En el corte
-actual, la suite de ejemplos suma 7 194 funciones IR, 44 HIR y 1 que aún cae al emisor
-AST; `native_backend_types_agree_with_the_checker` mantiene un mínimo de 11 expresiones AST comparadas. La llamada global `parse_int(String)` ahora comparte el helper IR/C de `String.to_int()`, por lo que `stdlib_io.ostrin` ya no usa AST; los cortes R1 de `viz_histogram.ostrin`, `viz_boxplot.ostrin`, `viz_scatter_fit.ostrin`, `viz_violin.ostrin`, `viz_hexbin.ostrin`, `viz_bars.ostrin`, `viz_point_cloud.ostrin`, `viz_fft.ostrin` y `viz_dashboard.ostrin` importan `std.json` y conservan esa entrada en el camino tipado; `atan2` escalar para `Float` y `Float32` usa ahora el runtime determinista desde IR/C; `pow` escalar también usa `ostrin_dm_pow`/`ostrin_dm_powf`, y `detmath.ostrin` ya no conserva fallback AST. `math_functions.ostrin` verifica `atan2` y `abs` sobre enteros de ancho fijo con paridad nativa/WASI y leak-check; `abs` conserva el error del mínimo representable. Las coerciones `Float↔Float32` de bindings explícitos y agregados `List/Set<Float32>` ahora se insertan en IR, conservando la precisión de `float32.ostrin`. Las llamadas genéricas registradas por el checker se resuelven ahora en HIR antes de construir la IR, de modo que `numeric_units.ostrin` ya no necesita fallback AST. Las operaciones escalares reflejadas de `Complex` (`Float +|−|×|÷ Complex`) llaman sus métodos `radd`/`rsub`/`rmul`/`rdiv` desde IR/C con el orden de operandos preservado; el formato escalar de `Bool` también usa la ruta tipada. `numeric_complex.ostrin` queda en `ir=3, hir=0, ast=0`, con paridad intérprete/nativo/WASI y leak-check. `Quantity.to_string()` escalar y `Array<Float32>.to_string()` ya llaman a helpers nativos desde IR/C; el segundo elimina el fallback del punto de entrada de `arrays_3d`. Los patrones
+actual, la suite de ejemplos suma 7 198 funciones IR, 41 HIR y 0 fallbacks AST; `native_backend_types_agree_with_the_checker` confirma 0 divergencias y una población AST vacía. La llamada global `parse_int(String)` ahora comparte el helper IR/C de `String.to_int()`, por lo que `stdlib_io.ostrin` ya no usa AST; los cortes R1 de `viz_histogram.ostrin`, `viz_boxplot.ostrin`, `viz_scatter_fit.ostrin`, `viz_violin.ostrin`, `viz_hexbin.ostrin`, `viz_bars.ostrin`, `viz_point_cloud.ostrin`, `viz_fft.ostrin` y `viz_dashboard.ostrin` importan `std.json` y conservan esa entrada en el camino tipado; `atan2` escalar para `Float` y `Float32` usa ahora el runtime determinista desde IR/C; `pow` escalar también usa `ostrin_dm_pow`/`ostrin_dm_powf`, y `detmath.ostrin` ya no conserva fallback AST. `math_functions.ostrin` verifica `atan2` y `abs` sobre enteros de ancho fijo con paridad nativa/WASI y leak-check; `abs` conserva el error del mínimo representable. Las coerciones `Float↔Float32` de bindings explícitos y agregados `List/Set<Float32>` ahora se insertan en IR, conservando la precisión de `float32.ostrin`. Las llamadas genéricas registradas por el checker se resuelven ahora en HIR antes de construir la IR, de modo que `numeric_units.ostrin` ya no necesita fallback AST. Las operaciones escalares reflejadas de `Complex` (`Float +|−|×|÷ Complex`) llaman sus métodos `radd`/`rsub`/`rmul`/`rdiv` desde IR/C con el orden de operandos preservado; el formato escalar de `Bool` también usa la ruta tipada. `numeric_complex.ostrin` queda en `ir=3, hir=0, ast=0`, con paridad intérprete/nativo/WASI y leak-check. `Quantity.to_string()` escalar y `Array<Float32>.to_string()` ya llaman a helpers nativos desde IR/C; el segundo elimina el fallback del punto de entrada de `arrays_3d`. Los patrones
 superficiales de records con campos escalares y los enums no genéricos con variantes unitarias,
 payloads escalares (incluidos enteros de ancho fijo), patrones simples y patrones anidados de enums por
 valor ya bajan por IR/C, incluidos records genéricos, y los constructores, patrones y métodos del
@@ -361,8 +360,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 | Distribución | Workflow WASI reproducible para `ostrinc.wasm`, `hello.wasm`, `pkg_project.wasm`, un contrato de `args`/`env`, E/S de archivos y ownership gestionado, con toolchain fijado, ejecución bajo Node WASI y SHA-256; playground de navegador sobre el compilador WASM; workflow de release `v0.1.0` para Linux x86_64, macOS arm64 y Windows x64 que valida versión, checksums, archivos extraídos, `hello.ostrin` y un proyecto con dependencia `path`, y publica `docs/releases/v0.1.0.md` como notas; `v0.1.0` está publicada y `install-check.yml` instala la release con los instaladores Unix/PowerShell en Linux, macOS y Windows limpios y ejecuta `hello.ostrin`; canales externos y registry público siguen pendientes |
 
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
-convendría dividirlos; el backend nativo no comparte el sistema de tipos del checker
-(ya consume los tipos del checker y compara cada nodo; el informe actual suma **7 194 funciones generadas desde IR, 44 desde HIR y 1 en fallback AST** en los ejemplos, con un trinquete
+convendría dividirlos; el backend nativo ya consume los tipos del checker y los ejemplos medidos suman **7 198 funciones generadas desde IR, 41 desde HIR y 0 en fallback AST**, con un trinquete
 que impide que el fallback aumente sin justificación; los métodos de records y enums concretos
 entran ahora en IR/C cuando sus campos y ownership son compatibles, mientras los records recursivos
 conservan el fallback verificado; las familias migradas incluyen escalares,
@@ -614,7 +612,7 @@ mantiene pendiente cualquier PR upstream.
 
 ```powershell
 cd compiler
-    cargo test                                   # 6 diferenciales + 327 de integración + 2 unitarias
+    cargo test                                   # 6 diferenciales + 330 de integración + 2 unitarias
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 cd ..

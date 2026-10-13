@@ -28,6 +28,10 @@ type Values = HashMap<ValueId, (String, Ty)>;
 pub type RecordFields = HashMap<String, Vec<String>>;
 pub type MethodNames = HashMap<(String, String), String>;
 pub type FunctionNames = HashMap<String, String>;
+/// C ABI signatures for object-safe methods and the concrete record/vtable
+/// pairs already registered by the native backend.
+pub type DynTraitMethods = HashMap<(String, String), (Vec<String>, String)>;
+pub type DynImplementations = HashSet<(String, String)>;
 
 /// Metadata for the plain, non-generic enum ABI emitted by `codegen.rs`.
 /// Field types are already validated by the checker and the IR builder; the
@@ -221,6 +225,7 @@ fn c_type(ty: &Ty, records: &RecordFields) -> Bail<String> {
             format!("Set_{}*", mangle_record_type(element, records))
         }
         Ty::Fn(_, _) => "OstrinClosure".to_string(),
+        Ty::Dyn(name) => format!("{name}_Dyn"),
         Ty::Named(name) if records.contains_key(name) => format!("{name}*"),
         Ty::Applied(_, _) if record_name(ty, records).is_some() => {
             format!("{}*", record_name(ty, records).ok_or(())?)
@@ -675,6 +680,7 @@ fn supported(ty: &Ty, records: &RecordFields) -> bool {
         || matches!(ty, Ty::Map(key, value) if map_supported(key, value, records))
         || matches!(ty, Ty::Set(element) if set_supported(element, records))
         || matches!(ty, Ty::Fn(params, ret) if params.iter().all(|param| *param != Ty::Void && supported(param, records)) && supported(ret, records))
+        || matches!(ty, Ty::Dyn(_))
         || matches!(ty, Ty::Applied(name, args) if name == "Channel" && args.len() == 1 && channel_supported(&args[0], records))
         || matches!(ty, Ty::Applied(name, args) if name == "Task" && args.len() == 1 && task_supported(&args[0], records))
         || matches!(ty, Ty::Applied(name, args) if name == "Option" && args.len() == 1 && option_supported(&args[0], records))
@@ -912,6 +918,9 @@ fn mangle_task_payload(ty: &Ty, records: &RecordFields) -> String {
 
 fn retain_payload(access: &str, ty: &Ty, records: &RecordFields) -> Option<String> {
     match ty {
+        Ty::Dyn(_) => Some(format!(
+            "if (({access}).vtable && ({access}).vtable->retain) {{ ({access}).vtable->retain(({access}).self); }}"
+        )),
         Ty::Quantity(_) => Some(format!("ostrin_qty_retain({access})")),
         Ty::String | Ty::List(_) | Ty::Map(_, _) | Ty::Set(_) => {
             Some(format!("ostrin_retain((void*){access})"))
@@ -967,6 +976,9 @@ fn retain_payload(access: &str, ty: &Ty, records: &RecordFields) -> Option<Strin
 
 fn release_payload(access: &str, ty: &Ty, records: &RecordFields) -> Option<String> {
     match ty {
+        Ty::Dyn(_) => Some(format!(
+            "if (({access}).vtable && ({access}).vtable->release) {{ ({access}).vtable->release(({access}).self); }}"
+        )),
         Ty::Quantity(_) => Some(format!("ostrin_qty_release({access})")),
         Ty::Named(name) if is_plain_enum(ty, records) && managed_payload(ty, records) => {
             Some(format!("ostrin_drop_enum_{name}({access})"))
@@ -1082,6 +1094,7 @@ fn defined_value(instruction: &IrInstr) -> Option<(ValueId, Ty)> {
         | IrInstr::Const { dst, ty, .. }
         | IrInstr::Global { dst, ty, .. }
         | IrInstr::Move { dst, ty, .. }
+        | IrInstr::DynBox { dst, ty, .. }
         | IrInstr::Unary { dst, ty, .. }
         | IrInstr::Binary { dst, ty, .. }
         | IrInstr::Field { dst, ty, .. }
@@ -1111,6 +1124,9 @@ fn defined_value(instruction: &IrInstr) -> Option<(ValueId, Ty)> {
         | IrInstr::MethodCall {
             dst: Some(dst), ty, ..
         }
+        | IrInstr::DynCall {
+            dst: Some(dst), ty, ..
+        }
         | IrInstr::Opaque {
             dst: Some(dst), ty, ..
         } => Some((*dst, ty.clone())),
@@ -1119,6 +1135,7 @@ fn defined_value(instruction: &IrInstr) -> Option<(ValueId, Ty)> {
         | IrInstr::Call { dst: None, .. }
         | IrInstr::ClosureCall { dst: None, .. }
         | IrInstr::MethodCall { dst: None, .. }
+        | IrInstr::DynCall { dst: None, .. }
         | IrInstr::Opaque { dst: None, .. }
         | IrInstr::ChannelSend { .. }
         | IrInstr::ChannelClose { .. }
@@ -1988,6 +2005,8 @@ fn emit_instruction(
     methods: &MethodNames,
     records: &RecordFields,
     variants: &VariantFields,
+    dyn_methods: &DynTraitMethods,
+    dyn_implementations: &DynImplementations,
     spawn_helpers: &SpawnHelpers,
     closure_helpers: &ClosureHelpers,
     helper: &mut HelperGenerator<'_>,
@@ -2054,6 +2073,30 @@ fn emit_instruction(
                 "    {} = {};\n",
                 value_name(*dst),
                 value_code(values, *source)?
+            ));
+        }
+        IrInstr::DynBox {
+            dst,
+            source,
+            source_ty,
+            ty,
+        } => {
+            let Ty::Dyn(trait_name) = ty else {
+                return Err(());
+            };
+            let record = record_name(source_ty, records).ok_or(())?;
+            if value_ty(values, *source)? != *source_ty
+                || !dyn_implementations.contains(&(trait_name.clone(), record.clone()))
+            {
+                return Err(());
+            }
+            let source = value_code(values, *source)?;
+            // The fat pointer owns an independent payload reference. Keep
+            // data/vtable paired in one compound value and retain before the
+            // source SSA value can be released by the ownership pass.
+            out.push_str(&format!(
+                "    ostrin_retain((void*){source}); {} = (({trait_name}_Dyn){{ .self = (void*){source}, .vtable = &{trait_name}__{record}__vtable }});\n",
+                value_name(*dst)
             ));
         }
         IrInstr::StoreLocal { .. } => {}
@@ -2701,6 +2744,47 @@ fn emit_instruction(
                     out.push_str(&format!("    {} = {code};\n", value_name(*dst),));
                 }
                 _ => return Err(()),
+            }
+        }
+        IrInstr::DynCall {
+            dst,
+            trait_name,
+            method,
+            receiver,
+            args,
+            ty,
+        } => {
+            let expected_receiver = Ty::Dyn(trait_name.clone());
+            if value_ty(values, *receiver)? != expected_receiver {
+                return Err(());
+            }
+            let (param_types, return_type) = dyn_methods
+                .get(&(trait_name.clone(), method.clone()))
+                .ok_or(())?;
+            if *ty == Ty::Void && dst.is_some()
+                || *ty != Ty::Void && dst.is_none()
+                || args.len() != param_types.len()
+                || c_type(ty, records)? != *return_type
+            {
+                return Err(());
+            }
+            let mut call_args = vec![format!("{}.self", value_code(values, *receiver)?)];
+            for (arg, param_ty) in args.iter().zip(param_types) {
+                let arg_ty = value_ty(values, *arg)?;
+                if c_type(&arg_ty, records)? != *param_ty {
+                    return Err(());
+                }
+                call_args.push(value_code(values, *arg)?);
+            }
+            let call = format!(
+                "({}).vtable->{method}({})",
+                value_code(values, *receiver)?,
+                call_args.join(", ")
+            );
+            if let Some(dst) = dst {
+                out.push_str(&format!("    {} = {call};\n", value_name(*dst)));
+            } else {
+                out.push_str(&format!("    {call};\n"));
             }
         }
         IrInstr::MethodCall {
@@ -4732,6 +4816,12 @@ fn emit_instruction(
         IrInstr::Retain { value } => {
             let ty = value_ty(values, *value)?;
             match ty {
+                Ty::Dyn(_) => {
+                    let code = value_code(values, *value)?;
+                    out.push_str(&format!(
+                        "    if (({code}).vtable && ({code}).vtable->retain) {{ ({code}).vtable->retain(({code}).self); }}\n"
+                    ));
+                }
                 Ty::Quantity(_) => {
                     out.push_str(&format!(
                         "    ostrin_qty_retain({});\n",
@@ -4838,6 +4928,12 @@ fn emit_instruction(
         IrInstr::Release { value } => {
             let ty = value_ty(values, *value)?;
             match ty {
+                Ty::Dyn(_) => {
+                    let code = value_code(values, *value)?;
+                    out.push_str(&format!(
+                        "    if (({code}).vtable && ({code}).vtable->release) {{ ({code}).vtable->release(({code}).self); }}\n"
+                    ));
+                }
                 Ty::Quantity(_) => {
                     out.push_str(&format!(
                         "    ostrin_qty_release({});\n",
@@ -5326,7 +5422,7 @@ fn emit_region_terminator(
 
 fn used_values(instruction: &IrInstr) -> Vec<ValueId> {
     match instruction {
-        IrInstr::Move { source, .. } => vec![*source],
+        IrInstr::Move { source, .. } | IrInstr::DynBox { source, .. } => vec![*source],
         IrInstr::StoreLocal { value, .. } => vec![*value],
         IrInstr::Unary { operand, .. } => vec![*operand],
         IrInstr::Binary { left, right, .. } => vec![*left, *right],
@@ -5335,9 +5431,11 @@ fn used_values(instruction: &IrInstr) -> Vec<ValueId> {
             .chain(args.iter().copied())
             .collect(),
         IrInstr::ClosureMake { captures, .. } => captures.clone(),
-        IrInstr::MethodCall { receiver, args, .. } => std::iter::once(*receiver)
-            .chain(args.iter().copied())
-            .collect(),
+        IrInstr::MethodCall { receiver, args, .. } | IrInstr::DynCall { receiver, args, .. } => {
+            std::iter::once(*receiver)
+                .chain(args.iter().copied())
+                .collect()
+        }
         IrInstr::Field { object, .. } => vec![*object],
         IrInstr::FieldStore { object, value, .. } => vec![*object, *value],
         IrInstr::Index { object, index, .. } => vec![*object, *index],
@@ -5482,6 +5580,8 @@ fn build_spawn_helpers(
     methods: &MethodNames,
     records: &RecordFields,
     variants: &VariantFields,
+    dyn_methods: &DynTraitMethods,
+    dyn_implementations: &DynImplementations,
     spawn_helpers: &mut SpawnHelpers,
     closure_helpers: &ClosureHelpers,
     helper: &mut HelperGenerator<'_>,
@@ -5723,6 +5823,8 @@ fn build_spawn_helpers(
                     methods,
                     records,
                     variants,
+                    dyn_methods,
+                    dyn_implementations,
                     spawn_helpers,
                     closure_helpers,
                     helper,
@@ -5928,6 +6030,28 @@ pub fn generate_with_helpers(
     variants: &VariantFields,
     helper: &mut HelperGenerator<'_>,
 ) -> Option<Generated> {
+    generate_with_dyn_metadata(
+        function,
+        known_functions,
+        methods,
+        records,
+        variants,
+        &DynTraitMethods::new(),
+        &DynImplementations::new(),
+        helper,
+    )
+}
+
+pub fn generate_with_dyn_metadata(
+    function: &IrFunction,
+    known_functions: &FunctionNames,
+    methods: &MethodNames,
+    records: &RecordFields,
+    variants: &VariantFields,
+    dyn_methods: &DynTraitMethods,
+    dyn_implementations: &DynImplementations,
+    helper: &mut HelperGenerator<'_>,
+) -> Option<Generated> {
     if function.entry >= function.blocks.len()
         || function
             .params
@@ -5970,6 +6094,8 @@ pub fn generate_with_helpers(
         methods,
         records,
         variants,
+        dyn_methods,
+        dyn_implementations,
         &mut spawn_helpers,
         &closure_helpers,
         helper,
@@ -6045,6 +6171,8 @@ pub fn generate_with_helpers(
                 methods,
                 records,
                 variants,
+                dyn_methods,
+                dyn_implementations,
                 &spawn_helpers,
                 &closure_helpers,
                 helper,

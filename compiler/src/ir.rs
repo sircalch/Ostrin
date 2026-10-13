@@ -109,6 +109,15 @@ pub enum IrInstr {
         source: ValueId,
         ty: Ty,
     },
+    /// A typed concrete-to-trait-object conversion. The output remains one
+    /// `Ty::Dyn` value; the C emitter may reject it until the selected vtable
+    /// and lifecycle ABI are available.
+    DynBox {
+        dst: ValueId,
+        source: ValueId,
+        source_ty: Ty,
+        ty: Ty,
+    },
     StoreLocal {
         name: String,
         value: ValueId,
@@ -152,6 +161,15 @@ pub enum IrInstr {
     },
     MethodCall {
         dst: Option<ValueId>,
+        method: String,
+        receiver: ValueId,
+        args: Vec<ValueId>,
+        ty: Ty,
+    },
+    /// Dispatches through a method slot on one `dyn Trait` value.
+    DynCall {
+        dst: Option<ValueId>,
+        trait_name: String,
         method: String,
         receiver: ValueId,
         args: Vec<ValueId>,
@@ -2423,13 +2441,24 @@ impl Builder {
                         } else {
                             Some(self.fresh())
                         };
-                        self.emit(IrInstr::MethodCall {
-                            dst,
-                            method: method.clone(),
-                            receiver,
-                            args,
-                            ty: expression.ty.clone(),
-                        });
+                        if let Ty::Dyn(trait_name) = &recv.ty {
+                            self.emit(IrInstr::DynCall {
+                                dst,
+                                trait_name: trait_name.clone(),
+                                method: method.clone(),
+                                receiver,
+                                args,
+                                ty: expression.ty.clone(),
+                            });
+                        } else {
+                            self.emit(IrInstr::MethodCall {
+                                dst,
+                                method: method.clone(),
+                                receiver,
+                                args,
+                                ty: expression.ty.clone(),
+                            });
+                        }
                         dst.unwrap_or_else(|| self.unit())
                     }
                 }
@@ -2570,6 +2599,17 @@ impl Builder {
                     dst: Some(dst),
                     op: format!("as<{target}>"),
                     inputs: vec![value],
+                    ty: expression.ty.clone(),
+                });
+                dst
+            }
+            HirKind::DynCoerce(value) => {
+                let source = self.lower_expr(value);
+                let dst = self.fresh();
+                self.emit(IrInstr::DynBox {
+                    dst,
+                    source,
+                    source_ty: value.ty.clone(),
                     ty: expression.ty.clone(),
                 });
                 dst
@@ -2798,6 +2838,7 @@ fn defined_value_type(instruction: &IrInstr) -> Option<(ValueId, Ty)> {
         | IrInstr::Const { dst, ty, .. }
         | IrInstr::Global { dst, ty, .. }
         | IrInstr::Move { dst, ty, .. }
+        | IrInstr::DynBox { dst, ty, .. }
         | IrInstr::Unary { dst, ty, .. }
         | IrInstr::Binary { dst, ty, .. }
         | IrInstr::Field { dst, ty, .. }
@@ -2827,6 +2868,9 @@ fn defined_value_type(instruction: &IrInstr) -> Option<(ValueId, Ty)> {
         | IrInstr::MethodCall {
             dst: Some(dst), ty, ..
         }
+        | IrInstr::DynCall {
+            dst: Some(dst), ty, ..
+        }
         | IrInstr::Opaque {
             dst: Some(dst), ty, ..
         } => Some((*dst, ty.clone())),
@@ -2835,6 +2879,7 @@ fn defined_value_type(instruction: &IrInstr) -> Option<(ValueId, Ty)> {
         | IrInstr::Call { dst: None, .. }
         | IrInstr::ClosureCall { dst: None, .. }
         | IrInstr::MethodCall { dst: None, .. }
+        | IrInstr::DynCall { dst: None, .. }
         | IrInstr::Opaque { dst: None, .. }
         | IrInstr::ChannelSend { .. }
         | IrInstr::ChannelClose { .. }
@@ -3069,7 +3114,8 @@ fn collect_lambda_locals_expr(
         HirKind::Unit(value, _)
         | HirKind::Unary(_, value)
         | HirKind::Field(value, _)
-        | HirKind::As(value, _) => collect_lambda_locals_expr(value, bound, used),
+        | HirKind::As(value, _)
+        | HirKind::DynCoerce(value) => collect_lambda_locals_expr(value, bound, used),
         HirKind::Binary(_, left, right)
         | HirKind::Index(left, right)
         | HirKind::Within(left, right) => {
@@ -3199,6 +3245,36 @@ pub fn verify(program: &IrProgram) -> VerifyReport {
                 if matches!(instruction, IrInstr::Opaque { .. }) {
                     report.opaque += 1;
                 }
+                if let IrInstr::DynBox {
+                    source,
+                    source_ty,
+                    ty,
+                    ..
+                } = instruction
+                {
+                    let actual = function
+                        .blocks
+                        .iter()
+                        .flat_map(|candidate| candidate.instructions.iter())
+                        .find_map(|candidate| {
+                            defined_value_type(candidate)
+                                .filter(|(value, _)| value == source)
+                                .map(|(_, actual)| actual)
+                        });
+                    let source_is_concrete = matches!(source_ty, Ty::Named(_) | Ty::Applied(..));
+                    if actual.as_ref() != Some(source_ty)
+                        || !source_is_concrete
+                        || !matches!(ty, Ty::Dyn(_))
+                    {
+                        report.violations.push(format!(
+                            "{}: bb{} has invalid dyn boxing types (source {}, destination {})",
+                            function.name,
+                            block.id,
+                            source_ty.describe(),
+                            ty.describe()
+                        ));
+                    }
+                }
             }
             if let Some(terminator) = &block.terminator {
                 let targets = match terminator {
@@ -3322,6 +3398,16 @@ fn display_instruction(instruction: &IrInstr) -> String {
         IrInstr::Const { dst, value, ty } => format!("%{dst} = const {value}: {}", ty.describe()),
         IrInstr::Global { dst, name, ty } => format!("%{dst} = global @{name}: {}", ty.describe()),
         IrInstr::Move { dst, source, .. } => format!("%{dst} = move %{source}"),
+        IrInstr::DynBox {
+            dst,
+            source,
+            source_ty,
+            ty,
+        } => format!(
+            "%{dst} = dyn_box %{source}:{} -> {}",
+            source_ty.describe(),
+            ty.describe()
+        ),
         IrInstr::StoreLocal { name, value } => format!("store {name} <- %{value}"),
         IrInstr::Unary {
             dst, op, operand, ..
@@ -3359,6 +3445,19 @@ fn display_instruction(instruction: &IrInstr) -> String {
             "{}method %{receiver}.{method}({})",
             result_prefix(*dst),
             value_list(args)
+        ),
+        IrInstr::DynCall {
+            dst,
+            trait_name,
+            method,
+            receiver,
+            args,
+            ty,
+        } => format!(
+            "{}dyn_call {trait_name} %{receiver}.{method}({}):{}",
+            result_prefix(*dst),
+            value_list(args),
+            ty.describe()
         ),
         IrInstr::Field {
             dst, object, field, ..

@@ -211,6 +211,9 @@ pub enum HirKind {
     Within(Box<HirExpr>, Box<HirExpr>),
     Approximately(Box<HirExpr>, Box<HirExpr>, Box<HirExpr>),
     As(Box<HirExpr>, String),
+    /// A checker-approved concrete-to-dyn conversion. Keeping the target
+    /// trait explicit prevents native backends from guessing coercions.
+    DynCoerce(Box<HirExpr>),
     Loop(HirBlock),
     Record {
         name: String,
@@ -250,6 +253,34 @@ impl<'a> Lowerer<'a> {
             .unwrap_or(Ty::Unknown)
     }
 
+    fn argument_expr(&mut self, expr: &Expr) -> HirExpr {
+        let value = self.expr(expr);
+        let expected = std::iter::successors(Some(expr), |node| match node {
+            Expr::Located(inner, _) => Some(inner.as_ref()),
+            _ => None,
+        })
+        .find_map(|node| {
+            self.typed
+                .expected_types_by_node
+                .get(&(node as *const Expr as usize))
+        });
+        match expected {
+            Some(target @ Ty::Dyn(_)) => Self::coerce_dyn(value, target.clone()),
+            _ => value,
+        }
+    }
+
+    fn coerce_dyn(value: HirExpr, target: Ty) -> HirExpr {
+        if value.ty == target {
+            value
+        } else {
+            HirExpr {
+                ty: target,
+                kind: HirKind::DynCoerce(Box::new(value)),
+            }
+        }
+    }
+
     fn declare(&mut self, name: &str) {
         self.scopes
             .last_mut()
@@ -284,6 +315,17 @@ impl<'a> Lowerer<'a> {
                     None => value.ty.clone(),
                 };
                 self.local_types.insert(name.clone(), bound);
+                let value = match ty {
+                    Some(declared) => {
+                        let expected = crate::typeck::resolve_type(declared);
+                        if matches!(expected, Ty::Dyn(_)) {
+                            Self::coerce_dyn(value, expected)
+                        } else {
+                            value
+                        }
+                    }
+                    None => value,
+                };
                 HirStmt::Let {
                     name: name.clone(),
                     mutable: *mut_,
@@ -303,10 +345,16 @@ impl<'a> Lowerer<'a> {
                     value,
                 }
             }
-            Stmt::FieldAssign { target, value } => HirStmt::FieldAssign {
-                target: self.expr(target),
-                value: self.expr(value),
-            },
+            Stmt::FieldAssign { target, value } => {
+                let target = self.expr(target);
+                let value = self.expr(value);
+                let value = if matches!(target.ty, Ty::Dyn(_)) {
+                    Self::coerce_dyn(value, target.ty.clone())
+                } else {
+                    value
+                };
+                HirStmt::FieldAssign { target, value }
+            }
             Stmt::Return(value) => HirStmt::Return(value.as_ref().map(|e| self.expr(e))),
             Stmt::Break(value) => HirStmt::Break(value.as_ref().map(|e| self.expr(e))),
             Stmt::Continue => HirStmt::Continue,
@@ -339,11 +387,11 @@ impl<'a> Lowerer<'a> {
             .map(|a| match a {
                 Arg::Positional(e) => HirArg {
                     name: None,
-                    value: self.expr(e),
+                    value: self.argument_expr(e),
                 },
                 Arg::Named(n, e) => HirArg {
                     name: Some(n.clone()),
-                    value: self.expr(e),
+                    value: self.argument_expr(e),
                 },
             })
             .collect()
@@ -480,7 +528,7 @@ impl<'a> Lowerer<'a> {
                 type_args: Vec::new(),
                 fields: fields
                     .iter()
-                    .map(|(n, e)| (n.clone(), self.expr(e)))
+                    .map(|(n, e)| (n.clone(), self.argument_expr(e)))
                     .collect(),
             },
             Expr::GenericRecordLiteral(name, type_args, fields) => HirKind::Record {
@@ -488,7 +536,7 @@ impl<'a> Lowerer<'a> {
                 type_args: type_args.clone(),
                 fields: fields
                     .iter()
-                    .map(|(n, e)| (n.clone(), self.expr(e)))
+                    .map(|(n, e)| (n.clone(), self.argument_expr(e)))
                     .collect(),
             },
             Expr::Match(scrutinee, arms) => {
@@ -1203,6 +1251,7 @@ fn specialize_expr(expr: &HirExpr, subst: &HashMap<String, Ty>) -> HirExpr {
         HirKind::As(value, target) => {
             HirKind::As(Box::new(specialize_expr(value, subst)), target.clone())
         }
+        HirKind::DynCoerce(value) => HirKind::DynCoerce(Box::new(specialize_expr(value, subst))),
         HirKind::Loop(block) => HirKind::Loop(specialize_block(block, subst)),
         HirKind::Record {
             name,
@@ -1308,7 +1357,8 @@ where
         HirKind::Unit(value, _)
         | HirKind::Unary(_, value)
         | HirKind::Field(value, _)
-        | HirKind::As(value, _) => resolve_expr_calls(value, resolver),
+        | HirKind::As(value, _)
+        | HirKind::DynCoerce(value) => resolve_expr_calls(value, resolver),
         HirKind::Binary(_, left, right)
         | HirKind::Index(left, right)
         | HirKind::Within(left, right) => {
@@ -1505,9 +1555,11 @@ fn verify_expr(e: &HirExpr, generics: &HashSet<String>, ctx: &mut Ctx) {
     }
     let go = |x: &HirExpr, ctx: &mut Ctx| verify_expr(x, generics, ctx);
     match &e.kind {
-        HirKind::Unit(a, _) | HirKind::Unary(_, a) | HirKind::Field(a, _) | HirKind::As(a, _) => {
-            go(a, ctx)
-        }
+        HirKind::Unit(a, _)
+        | HirKind::Unary(_, a)
+        | HirKind::Field(a, _)
+        | HirKind::As(a, _)
+        | HirKind::DynCoerce(a) => go(a, ctx),
         HirKind::Binary(_, a, b) | HirKind::Index(a, b) | HirKind::Within(a, b) => {
             go(a, ctx);
             go(b, ctx);
@@ -1806,6 +1858,7 @@ fn one_line(e: &HirExpr) -> String {
             format!("({} ≈ {} ± {})", one_line(a), one_line(b), one_line(t))
         }
         HirKind::As(a, t) => format!("({} as {t})", one_line(a)),
+        HirKind::DynCoerce(value) => format!("dyn<{}>({})", e.ty.describe(), one_line(value)),
         HirKind::Loop(_) => "loop {…}".to_string(),
         HirKind::Record { name, fields, .. } => {
             format!(

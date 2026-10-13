@@ -80,6 +80,12 @@ const programs = [
     expected: "12\n9\n3\n48\n48\n",
   },
   {
+    name: "native_trait_defaults_ir",
+    source: "examples/native_trait_defaults.ostrin",
+    args: ["native_trait_defaults_ir.wasm"],
+    expected: "hello rex/HEY\nhello tom/meow\nhello int box/HEY\n",
+  },
+  {
     name: "native_dyn_trait_record_field",
     source: "examples/native_dyn_trait_record_field.ostrin",
     args: ["native_dyn_trait_record_field.wasm"],
@@ -90,6 +96,18 @@ const programs = [
     source: "examples/native_dyn_trait_closure_capture.ostrin",
     args: ["native_dyn_trait_closure_capture.wasm"],
     expected: "12\n",
+  },
+  {
+    name: "native_dyn_trait_task_capture",
+    source: "compiler/tests/fixtures/native_dyn_trait_task_capture.ostrin",
+    args: ["native_dyn_trait_task_capture.wasm"],
+    expected: "12\n",
+  },
+  {
+    name: "native_dyn_trait_task_cancel",
+    source: "compiler/tests/fixtures/native_dyn_trait_task_cancel.ostrin",
+    args: ["native_dyn_trait_task_cancel.wasm"],
+    expected: "true\nfalse\n",
   },
   {
     name: "managed_enum_closure_capture",

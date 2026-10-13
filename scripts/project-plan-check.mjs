@@ -130,8 +130,8 @@ export function validateProjectPlan(root = repositoryRoot) {
     && /live_allocations=0/.test(dynTraitDesign),
   "dyn Trait: public status and design contract must expose the pending HIR/IR ownership boundary");
   const dynamicTraitEntries = fallbackLedger.match(/"reason": "dynamic-trait-(?:dispatch|default-method)"/g) ?? [];
-  check(errors, dynamicTraitEntries.length === 1,
-    "validation/ast-fallback-ledger.json: the remaining generic default-method fallback must remain enumerated");
+  check(errors, dynamicTraitEntries.length === 0,
+    "validation/ast-fallback-ledger.json: dyn Trait default dispatch has migrated; stale dyn fallback entries must be removed");
 
   const baseline = sourceBaseline(differential);
   check(errors, baseline !== null,

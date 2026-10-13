@@ -48,5 +48,5 @@ fn describe(n: dyn Named) -> String {
 fn main() -> Void {
     print(describe(Dog { label: "rex" }))
     print(describe(Cat { label: "tom" }))
-    print(Box<Int> { item: 1 }.greeting())
+    print(describe(Box<Int> { item: 1 }))
 }

@@ -932,7 +932,10 @@ fn safe_release_site(instruction: &IrInstr) -> bool {
         // local ownership after any direct call. `Some` is included here as
         // well because its constructor retains the payload before returning
         // the option value.
-        IrInstr::Call { .. } | IrInstr::ClosureCall { .. } => true,
+        IrInstr::Call { .. }
+        | IrInstr::ClosureCall { .. }
+        | IrInstr::DynBox { .. }
+        | IrInstr::DynCall { .. } => true,
         // These opaque array operations borrow their source and return a fresh
         // allocation, so the source can be released immediately after the
         // operation when it has no later uses.
@@ -1349,6 +1352,7 @@ fn defined_value(instruction: &IrInstr) -> Option<(ValueId, Ty)> {
         | IrInstr::Const { dst, ty, .. }
         | IrInstr::Global { dst, ty, .. }
         | IrInstr::Move { dst, ty, .. }
+        | IrInstr::DynBox { dst, ty, .. }
         | IrInstr::Unary { dst, ty, .. }
         | IrInstr::Binary { dst, ty, .. }
         | IrInstr::Field { dst, ty, .. }
@@ -1378,6 +1382,9 @@ fn defined_value(instruction: &IrInstr) -> Option<(ValueId, Ty)> {
         | IrInstr::MethodCall {
             dst: Some(dst), ty, ..
         }
+        | IrInstr::DynCall {
+            dst: Some(dst), ty, ..
+        }
         | IrInstr::Opaque {
             dst: Some(dst), ty, ..
         } => Some((*dst, ty.clone())),
@@ -1386,6 +1393,7 @@ fn defined_value(instruction: &IrInstr) -> Option<(ValueId, Ty)> {
         | IrInstr::Call { dst: None, .. }
         | IrInstr::ClosureCall { dst: None, .. }
         | IrInstr::MethodCall { dst: None, .. }
+        | IrInstr::DynCall { dst: None, .. }
         | IrInstr::Opaque { dst: None, .. }
         | IrInstr::ChannelSend { .. }
         | IrInstr::ChannelClose { .. }
@@ -1396,7 +1404,7 @@ fn defined_value(instruction: &IrInstr) -> Option<(ValueId, Ty)> {
 
 fn used_values(instruction: &IrInstr) -> Vec<ValueId> {
     match instruction {
-        IrInstr::Move { source, .. } => vec![*source],
+        IrInstr::Move { source, .. } | IrInstr::DynBox { source, .. } => vec![*source],
         IrInstr::StoreLocal { value, .. } => vec![*value],
         IrInstr::Unary { operand, .. } => vec![*operand],
         IrInstr::Binary { left, right, .. } => vec![*left, *right],
@@ -1405,9 +1413,11 @@ fn used_values(instruction: &IrInstr) -> Vec<ValueId> {
             .chain(args.iter().copied())
             .collect(),
         IrInstr::ClosureMake { captures, .. } => captures.clone(),
-        IrInstr::MethodCall { receiver, args, .. } => std::iter::once(*receiver)
-            .chain(args.iter().copied())
-            .collect(),
+        IrInstr::MethodCall { receiver, args, .. } | IrInstr::DynCall { receiver, args, .. } => {
+            std::iter::once(*receiver)
+                .chain(args.iter().copied())
+                .collect()
+        }
         IrInstr::Field { object, .. } => vec![*object],
         IrInstr::FieldStore { object, value, .. } => vec![*object, *value],
         IrInstr::Index { object, index, .. } => vec![*object, *index],

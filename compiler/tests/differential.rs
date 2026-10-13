@@ -459,11 +459,14 @@ fn native_backend_types_agree_with_the_checker() {
     // closures gained list/record storage ownership, removing AST nodes
     // from this checker-comparison population. Its full output
     // and leak contract is covered by a dedicated integration regression.
-    // Scoped spawn cancellation now lowers both concurrency cancellation
-    // entry points through IR as well. That removes their AST expression
-    // population from this comparison; 11 expressions remain in the
-    // checker/native comparison set.
-    assert!(agreed >= 11, "only {agreed} AST expressions were compared");
+    // Scoped spawn cancellation and dyn Trait default dispatch now lower
+    // through IR as well. A zero AST comparison population is valid once all
+    // remaining source entry points are typed; the generated-function and
+    // fallback ratchets below independently verify migration progress.
+    assert!(
+        agreed <= 11,
+        "unexpectedly large AST comparison population: {agreed}"
+    );
     // The same comparison over *every* AST node (operands included), by node address.
     // The Float32 array `to_string()` migration removed the entire `arrays_3d`
     // entry point from this comparison. The generic-call HIR prepass now also
@@ -475,22 +478,22 @@ fn native_backend_types_agree_with_the_checker() {
     // entry-point body from this AST comparison. Composite map/set lowering
     // removes the `hash_map_composite` entry point from the AST comparison too.
     // The scalar Option/Result lowering removes `option_result` from it as well.
-    // Keep a lower bound with room for later typed backend slices; migrating a
-    // whole entry point removes its AST nodes from this comparison by design.
+    // Migrating a whole entry point removes its AST nodes from this comparison
+    // by design; zero is the expected current population.
     // Quantity plot bodies now use checked IR, and viz_units has a dedicated
     // native/WASI/leak regression for the migrated path.
     println!("checker AST comparisons: {agreed} expressions, {node_agreed} nodes");
     assert!(
-        node_agreed >= 12,
-        "only {node_agreed} AST nodes were compared with the checker's per-node types (ratchet 12)"
+        node_agreed <= 12,
+        "unexpectedly large AST node comparison population: {node_agreed}"
     );
     // Ratchet: expressions the backend cannot compare (the checker has no type).
     // Ratchet: functions whose C is generated from the typed HIR or its
     // explicit IR lowering (the migration of the native backend).
     let native_generated = hir_generated + ir_generated;
     assert!(
-        native_generated >= 7238,
-        "only {native_generated} functions were generated from HIR/IR (expected at least 7238)"
+        native_generated >= 7239,
+        "only {native_generated} functions were generated from HIR/IR (expected at least 7239)"
     );
     println!("functions generated from HIR/IR: {native_generated} (HIR {hir_generated}, IR {ir_generated})");
     println!("functions still using AST fallback: {ast_fallback}");
@@ -569,7 +572,7 @@ fn native_backend_types_agree_with_the_checker() {
     // substitutes the concrete owner for `Self` in trait method signatures,
     // allowing Complex arithmetic/equality to use IR/C. Typed dyn lists and
     // indirect fold/dispatch and persistent dyn fields now use HIR/C. The verified baseline is
-    // 1 AST fallback (7,238 HIR/IR-generated: 7,194 IR and 44 HIR functions).
+    // 0 AST fallbacks (7,239 HIR/IR-generated: 7,198 IR and 41 HIR functions).
     // Function values stored in signature-specific lists and record fields now
     // use the IR ownership path. Remaining AST bodies include managed enum
     // payload, generic dispatch and concurrency boundaries.
@@ -619,7 +622,7 @@ fn native_backend_types_agree_with_the_checker() {
     // entry-point fallback while preserving the legacy C ABI conversion.
     // Explicit Float32 bindings and List/Set<Float32> aggregates, reflected
     // Complex scalar operators and Bool formatting now use typed IR/C.
-    const MAX_AST_FALLBACK_FUNCTIONS: usize = 1;
+    const MAX_AST_FALLBACK_FUNCTIONS: usize = 0;
     assert!(
         ast_fallback <= MAX_AST_FALLBACK_FUNCTIONS,
         "AST fallback grew to {ast_fallback} functions (ratchet limit {MAX_AST_FALLBACK_FUNCTIONS})"

@@ -1,0 +1,20 @@
+trait Shape {
+    fn area(self) -> Float
+}
+
+record Circle { radius: Float }
+
+impl Shape for Circle {
+    fn area(self) -> Float { 3.0 * self.radius * self.radius }
+}
+
+fn main() -> Void {
+    spawn_scope {
+        shape: dyn Shape = Circle { radius: 2.0 }
+        worker = spawn {
+            shape.area()
+        }
+        print(worker.cancel())
+        print(worker.cancel())
+    }
+}
