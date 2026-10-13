@@ -11,4 +11,3 @@ globalThis.OSTRIN_SITE_FACTS = Object.freeze({
   "differentialTests": "6",
   "unitTests": "2"
 });
-
