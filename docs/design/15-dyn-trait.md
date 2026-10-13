@@ -116,12 +116,18 @@ closure. Ambos tienen paridad intérprete/native y `live_allocations=0`. Se
 añadieron pruebas de captura por tarea y cancelación antes de ejecución con un
 payload `String` gestionado; la captura también mantiene un alias vivo en el
 padre. Ambas preservan el par y terminan con `live_allocations=0` en scheduler
-cooperativo y `--native-threads`. WASI pasó localmente sus 26 programas,
-incluidos los fixtures de campo, closure, tareas y default genérico. En el head
+cooperativo y `--native-threads`. Un campo `T` de `Holder<T>` instanciado
+directamente como `dyn Speaker` también pasa reemplazo, alias, paridad, IR sin
+fallback, emisión WASI y cero allocations vivas en
+`native_dyn_trait_generic_record_field_preserves_pair_ownership`; esto no se
+generaliza a wrappers o agregados genéricos anidados. WASI pasó localmente sus
+27 programas, incluidos los casos de campo genérico, closure, tareas y default.
+En el head
 `bae4c0e`, ASan pasó la suite nativa, el corpus diferencial generado y el fuzz
 del frontend; UBSan también pasó en CI con Clang. Véanse los
 [resultados de sanitizers](https://github.com/sircalch/Ostrin/actions/runs/38356736980).
-Campos genéricos siguen fuera del ABI dyn HIR/C verificado.
+Campos genéricos anidados y otras combinaciones fuera de la matriz siguen fuera
+del ABI dyn HIR/C verificado.
 
 El contrato de implementación se aplica de forma coherente a AST, HIR, IR, WASI
 y el runtime:
@@ -175,10 +181,11 @@ Estado implementado y límites restantes del contrato de ownership:
    par y registra vtables genéricas/default; retain/release cubre boxing,
    llamadas, argumentos, retornos, alias, campos, reemplazos, `Phi`, loop-Phi y
    drop en los casos probados.
-3. La matriz WASI local pasó 26 programas. En `bae4c0e`, ASan y UBSan pasaron
+3. La matriz WASI local pasó 27 programas. En `bae4c0e`, ASan y UBSan pasaron
    en CI; ASan también ejecutó el corpus diferencial y el fuzz del frontend.
-4. Los campos genéricos y otras combinaciones fuera de la matriz probada siguen
-   fuera del soporte verificado; no se generaliza la evidencia de los casos
+4. Se probó `Holder<dyn Speaker>` como un campo genérico directo; wrappers
+   genéricos anidados y otras combinaciones fuera de la matriz probada siguen
+   fuera del soporte verificado. No se generaliza la evidencia de los casos
    cubiertos a esas ABI.
 5. Las transiciones de la sección 7 tienen paridad, `live_allocations=0`, WASI
    donde aplica, ASan y UBSan para los casos enumerados en la matriz. El gate

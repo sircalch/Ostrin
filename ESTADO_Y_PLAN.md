@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-10-12 · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 330 de integración y 2 unitarias en verde.*
+*Corte: 2026-10-13 · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 331 de integración y 2 unitarias en verde.*
 
 Validación remota: Pages, CI, CodeQL, sanitizers y auditoría de seguridad pasaron para el
 ciclo `4671b28` en Windows, Linux, macOS y web (Ostrin CI `38182030324`, Browser audit
@@ -615,7 +615,7 @@ mantiene pendiente cualquier PR upstream.
 
 ```powershell
 cd compiler
-    cargo test                                   # 6 diferenciales + 330 de integración + 2 unitarias
+    cargo test                                   # 6 diferenciales + 331 de integración + 2 unitarias
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 cd ..

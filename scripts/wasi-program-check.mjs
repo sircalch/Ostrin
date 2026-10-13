@@ -92,6 +92,12 @@ const programs = [
     expected: "12\n12\n9\n9\n",
   },
   {
+    name: "native_dyn_trait_generic_field",
+    source: "examples/native_dyn_trait_generic_field.ostrin",
+    args: ["native_dyn_trait_generic_field.wasm"],
+    expected: "first\nfirst\nsecond\n",
+  },
+  {
     name: "native_dyn_trait_closure_capture",
     source: "examples/native_dyn_trait_closure_capture.ostrin",
     args: ["native_dyn_trait_closure_capture.wasm"],

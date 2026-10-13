@@ -3754,6 +3754,77 @@ fn native_dyn_trait_record_field_replacement_preserves_pair_ownership() {
 }
 
 #[test]
+fn native_dyn_trait_generic_record_field_preserves_pair_ownership() {
+    let file = example_path("native_dyn_trait_generic_field.ostrin");
+    let expected = "first\nfirst\nsecond\n";
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
+    assert!(
+        stdout(&report).contains("ir-generated: 3")
+            && stdout(&report).contains("ast-fallback: 0"),
+        "generic dyn field did not lower completely through IR: {}",
+        stdout(&report)
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_c = stdout(&wasi);
+    assert!(
+        wasi_c.contains("Speaker__First__vtable")
+            && wasi_c.contains("Speaker__Second__vtable")
+            && wasi_c.contains("ostrin_drop_Holder__Speaker")
+            && wasi_c.contains(".vtable->release"),
+        "WASI C omitted generic dyn field dispatch or pair cleanup"
+    );
+
+    let exe = temp_artifact("dyn-trait-generic-field.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run dyn trait generic record-field binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "native failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "generic dyn record field leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn native_dyn_trait_closure_capture_outlives_the_source_scope() {
     let file = example_path("native_dyn_trait_closure_capture.ostrin");
     let interpreted = run(&["--run", &file]);

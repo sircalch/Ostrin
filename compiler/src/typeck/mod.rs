@@ -2018,7 +2018,12 @@ impl Checker {
                     if let Some(field_ty) = index.and_then(|i| field_types.get(i)) {
                         let field_ty =
                             resolve_type_with_type_subst(field_ty, &subst, &HashMap::new());
-                        self.note_expected(value, &field_ty);
+                        if let Ty::Dyn(_) = field_ty {
+                            self.expected_types_by_node
+                                .insert(value as *const Expr as usize, field_ty.clone());
+                        } else {
+                            self.note_expected(value, &field_ty);
+                        }
                     }
                 }
             }
@@ -3448,22 +3453,27 @@ impl Checker {
         };
         let refined = refine_expected_type(&inferred, expected);
         if refined != inferred {
-            self.set_node_type_layers(expr, &refined);
-            let mut layer = expr;
-            loop {
-                if let Expr::Located(_, range) = layer {
-                    let key = ExprKey {
-                        file: self.current_source_file.clone(),
-                        start: range.start,
-                        end: range.end,
-                    };
-                    self.expr_types.insert(key, refined.clone());
-                    if let Expr::Located(inner, _) = layer {
-                        layer = inner;
-                        continue;
+            if matches!(expected, Ty::Dyn(_)) {
+                self.expected_types_by_node
+                    .insert(expr as *const Expr as usize, expected.clone());
+            } else {
+                self.set_node_type_layers(expr, &refined);
+                let mut layer = expr;
+                loop {
+                    if let Expr::Located(_, range) = layer {
+                        let key = ExprKey {
+                            file: self.current_source_file.clone(),
+                            start: range.start,
+                            end: range.end,
+                        };
+                        self.expr_types.insert(key, refined.clone());
+                        if let Expr::Located(inner, _) = layer {
+                            layer = inner;
+                            continue;
+                        }
                     }
+                    break;
                 }
-                break;
             }
         }
         refined
@@ -6527,6 +6537,7 @@ fn refine_expected_type(actual: &Ty, expected: &Ty) -> Ty {
         return actual.clone();
     }
     match (actual, expected) {
+        (_, Ty::Dyn(_)) => expected.clone(),
         (Ty::Unknown, expected) => expected.clone(),
         (Ty::List(actual), Ty::List(expected)) => {
             Ty::List(Box::new(refine_expected_type(actual, expected)))

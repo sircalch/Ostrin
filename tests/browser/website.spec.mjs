@@ -152,6 +152,16 @@ test("example filters expose the active state", async ({ page }) => {
   await expect(filterToolbar.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "false");
 });
 
+test("generic dyn Trait ownership example is visible in the public catalogue", async ({ page }) => {
+  await page.goto("./examples.html", { waitUntil: "domcontentloaded" });
+  const card = page.locator("#dynamic-traits");
+  await expect(card).toBeVisible();
+  await expect(card.getByRole("link", { name: "View source ↗" })).toHaveAttribute(
+    "href",
+    "https://github.com/sircalch/Ostrin/blob/main/examples/native_dyn_trait_generic_field.ostrin",
+  );
+});
+
 test("header switches at its tablet breakpoint without overflow", async ({ page }) => {
   for (const [width, collapsed] of [[1000, true], [1001, false]]) {
     await page.setViewportSize({ width, height: 844 });
