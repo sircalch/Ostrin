@@ -576,7 +576,8 @@ seleccionado en un `Phi` de ramas. La regresión fuerza IR (`ir=3, hir=0, ast=0`
 también cruza IR con paridad, destructor del entorno, cero asignaciones vivas y emisión de C WASI;
 la captura diferida por tarea también cruza IR y pasa con scheduler cooperativo y `--native-threads`.
 Las pruebas focales de branch `Phi`, loop `Phi`, closure, captura y cancelación de tarea pasan bajo ASan y UBSan en WSL. El smoke
-matrix runtime de 21 programas compila y ejecuta con Node WASI y wasi-sdk 34, incluyendo las
+matrix runtime de 23 programas compila y ejecuta con Node WASI y wasi-sdk 34 (run
+[38347316359](https://github.com/sircalch/Ostrin/actions/runs/38347316359)), incluyendo las
 capturas y cancelación de tareas con payload gestionado. Para ello, el driver WASI enlaza `libsetjmp` de wasi-libc, que
 resuelve los símbolos generados por SJLJ. La suite completa de 327 pruebas de integración pasa en Windows. El
 corte anterior de 282 ejemplos pasó completo bajo ASan y UBSan; las

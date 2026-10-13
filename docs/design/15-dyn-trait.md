@@ -114,8 +114,9 @@ la pareja `data/vtable`: `native_dyn_trait_record_field_replacement_preserves_pa
 prueba reemplazo, alias y autoasignación; `native_dyn_trait_closure_capture_outlives_the_source_scope`
 prueba que el payload sobrevive al scope que lo creó y se libera al destruir la
 closure. Ambos tienen paridad intérprete/native y `live_allocations=0`. La matriz
-WASI previa cubre la lista heterogénea; WASI y ASan/UBSan para los dos casos
-nuevos se esperan del CI actual. Captura por tarea, cancelación, campos genéricos
+y el run WASI 38347316359 cubre los 23 módulos de la matriz, incluidos los dos
+fixtures nuevos de campo y closure. ASan/UBSan para esos dos casos se espera del
+CI actual. Captura por tarea, cancelación, campos genéricos
 y default dispatch en `Box<Int>` siguen fuera del ABI HIR/C verificado.
 
 La migración queda condicionada a un contrato único para AST, HIR, IR, WASI y
