@@ -152,6 +152,9 @@ El bloque de backend nativo conserva este baseline: reducir el fallback AST con 
    reunir casos de estudio y proyectos externos verificables; y mantener una página de releases,
    búsqueda de documentación y benchmarks históricos sin inflar métricas con forks.
 6. **Continuar el frente profesional de visualización y web**: ampliar `std.viz` con
+   una regla transversal: cuando una capacidad del lenguaje cambie lo que Ostrin puede
+   ejecutar, explorar o publicar, actualizar en el mismo ciclo la web, la galería y la
+   documentación afectadas, con ejemplos y evidencia verificables; además de
    campos vectoriales 2D (`quiver` y `streamplot`), gráficas estadísticas (incluidos violines KDE y hexbin), bandas de contorno rellenas y consolidar la selección enlazada, mantener tablas reproducibles con filtro y
    ordenamiento en el explorador, conservar ejemplos verificables en la galería, ampliar animaciones,
    vídeo, controles temporales, calidad 1×/2×, interruptores de series desde la leyenda, crosshair de inspección y parámetros conducidos por Ostrin, consolidar la exportación SVG/PNG/HTML/WebM/GIF, mantener el flujo PDF vectorial y ofrecer MP4 cuando el navegador exponga un códec compatible, exploración 3D (ya incluye superficies,
