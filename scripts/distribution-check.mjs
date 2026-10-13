@@ -36,7 +36,7 @@ for (const marker of ["safe_ref=", "matrix.target", "archive=\"$name.tar.gz\"", 
 }
 for (const marker of [
   "scripts/wasi-program-check.mjs",
-  "all 20 entries from scripts/wasi-program-check.mjs",
+  "all 21 entries from scripts/wasi-program-check.mjs",
   "sha256sum ./*.wasm > SHA256SUMS",
   "tar -czf ../ostrinc-wasm32-wasip1.tar.gz ./*.wasm SHA256SUMS README.txt",
 ]) {

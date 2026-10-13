@@ -74,6 +74,12 @@ const programs = [
     expected: "first payload\n",
   },
   {
+    name: "native_dyn_trait_list",
+    source: "compiler/tests/fixtures/native_dyn_trait_list.ostrin",
+    args: ["native_dyn_trait_list.wasm"],
+    expected: "12\n9\n3\n48\n48\n",
+  },
+  {
     name: "managed_enum_closure_capture",
     source: "compiler/tests/fixtures/managed_enum_closure_capture.ostrin",
     args: ["managed_enum_closure_capture.wasm"],
