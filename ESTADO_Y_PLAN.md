@@ -16,6 +16,9 @@ del lenguaje, `docs/design/` (27 documentos). La auditoría del sitio vive en
 La arquitectura de implementación está en [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md),
 la visión de largo plazo en [`docs/VISION.md`](docs/VISION.md) y el trabajo futuro en
 [`ROADMAP.md`](ROADMAP.md); este archivo conserva el estado comprobado y el plan activo.
+La revisión del bloque de confianza por subsistema está organizada en
+[`docs/review-map-v0.2.md`](docs/review-map-v0.2.md); el mapa no sustituye los
+checks del head final ni cierra gates por sí mismo.
 
 ## 0. Estado de un vistazo
 

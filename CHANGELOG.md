@@ -40,20 +40,22 @@
   the specialized vtable. `native_trait_defaults.ostrin` now reports six IR
   functions and zero AST fallbacks; interpreter/native parity and
   `live_allocations=0` pass. The repository inventory advances to 7,198 IR +
-  41 HIR functions and zero AST fallbacks. WASI and ASan/UBSan for this revision
-  are still pending, so the v0.2 ownership gate remains open.
+  41 HIR functions and zero AST fallbacks. Interpreter/native parity and
+  `live_allocations=0` pass; WASI passes the 26-program local matrix. ASan/UBSan
+  checks for this revision are running in CI, so the v0.2 ownership gate remains
+  open pending those results and the remaining matrix audit.
 - Added dyn Trait task capture and pre-run cancellation regressions. Both verify
   the retained data/vtable pair, dynamic dispatch or cancellation cleanup,
   cooperative and native-thread execution, and `live_allocations=0`; both are
-  included in the 26-program WASI matrix. ASan/UBSan for this working revision
-  still require the Linux/Clang workflow.
+  included in the 26-program WASI matrix. ASan/UBSan checks for this revision
+  are running in the Linux/Clang workflow.
 - Lowered heterogeneous `List<dyn Trait>` construction, elementwise boxing,
   iteration and indirect `fold` dispatch through HIR/C. Vtable hooks preserve
   payload ownership across list insertion, argument/return forwarding and drop;
-  focused parity and `live_allocations=0` regressions cover concrete, borrowed
-  and forwarded values. The v0.2 ownership gate remains open for persistent
-  fields, generic default-method boxing, closure/task/cancellation, WASI and
-  sanitizer evidence.
+  focused parity and `live_allocations=0` regressions cover concrete, borrowed,
+  forwarded, field replacement and closure/task captures. The v0.2 ownership
+  gate remains open for generic dyn fields, sanitizer results on this revision,
+  and any ownership combinations not represented by the tests.
 
 ### Public adoption path
 
