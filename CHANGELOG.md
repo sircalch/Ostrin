@@ -51,7 +51,9 @@
 - Added `Option<dyn Speaker>` and `Result<dyn Speaker, String>` wrapper coverage
   for `Some`/`None` and `Ok`/`Err`. Explicitly boxed values preserve dynamic
   dispatch through interpreter, native and WASI paths, and the native
-  leak-check ends at zero. The example is listed in the public website catalogue.
+  leak-check ends at zero. `List<Option<dyn Speaker>>` also preserves dispatch
+  and releases the empty/present elements correctly. The example is listed in
+  the public website catalogue.
 - Added dyn Trait task capture and pre-run cancellation regressions with a
   `String`-owning payload. Capture also keeps a parent alias alive. Both verify
   the retained data/vtable pair, dynamic dispatch or cancellation cleanup,

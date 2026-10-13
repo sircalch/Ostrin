@@ -186,7 +186,9 @@ Estado implementado y límites restantes del contrato de ownership:
    drop en los casos probados.
 3. La matriz WASI local pasó 28 programas. La prueba de wrappers añade
 `Option`/`Result` alrededor de un `dyn Trait` ya convertido explícitamente; no
-implica conversión contextual general de payloads dentro de wrappers. En `52e902a`, ASan y UBSan pasaron
+implica conversión contextual general de payloads dentro de wrappers. La misma
+prueba también cubre `List<Option<dyn Speaker>>` con dispatch sobre el elemento
+presente y destrucción del ausente. En `52e902a`, ASan y UBSan pasaron
    en CI; ASan también ejecutó el corpus diferencial y el fuzz del frontend.
 4. Se probó `Holder<dyn Speaker>` como un campo genérico directo; wrappers
    genéricos anidados y otras combinaciones fuera de la matriz probada siguen

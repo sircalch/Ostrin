@@ -36,6 +36,11 @@ fn result_speaker(flag: Bool) -> Result<dyn Speaker, String> {
     }
 }
 
+fn optional_speakers() -> List<Option<dyn Speaker>> {
+    speaker: dyn Speaker = First { text: "nested" }
+    [Some(speaker), None]
+}
+
 fn main() -> Void {
     match maybe_speaker(true) {
         Some(speaker) => print(speaker.speak()),
@@ -52,5 +57,11 @@ fn main() -> Void {
     match result_speaker(false) {
         Ok(speaker) => print(speaker.speak()),
         Err(message) => print(message),
+    }
+    for maybe in optional_speakers() {
+        match maybe {
+            Some(speaker) => print(speaker.speak()),
+            None => print("empty"),
+        }
     }
 }

@@ -3826,7 +3826,7 @@ fn native_dyn_trait_generic_record_field_preserves_pair_ownership() {
 #[test]
 fn native_dyn_trait_option_and_result_wrappers_preserve_pair_ownership() {
     let file = example_path("native_dyn_trait_wrappers.ostrin");
-    let expected = "optional\nempty\nresult\nfailure\n";
+    let expected = "optional\nempty\nresult\nfailure\nnested\nempty\n";
 
     let interpreted = run(&["--run", &file]);
     assert!(
@@ -3843,7 +3843,7 @@ fn native_dyn_trait_option_and_result_wrappers_preserve_pair_ownership() {
         stderr(&report)
     );
     let report_text = stdout(&report);
-    assert!(report_text.contains("ir-generated: 5"), "{report_text}");
+    assert!(report_text.contains("ir-generated: 6"), "{report_text}");
     assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
     assert!(report_text.contains("divergences: 0"), "{report_text}");
 
