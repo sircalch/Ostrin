@@ -123,9 +123,9 @@ fallback, emisión WASI y cero allocations vivas en
 generaliza a wrappers o agregados genéricos anidados. WASI pasó localmente sus
 27 programas, incluidos los casos de campo genérico, closure, tareas y default.
 En el head
-`bae4c0e`, ASan pasó la suite nativa, el corpus diferencial generado y el fuzz
+`b3bce84`, ASan pasó la suite nativa, el corpus diferencial generado y el fuzz
 del frontend; UBSan también pasó en CI con Clang. Véanse los
-[resultados de sanitizers](https://github.com/sircalch/Ostrin/actions/runs/38356736980).
+[resultados de sanitizers](https://github.com/sircalch/Ostrin/actions/runs/38364183520).
 Campos genéricos anidados y otras combinaciones fuera de la matriz siguen fuera
 del ABI dyn HIR/C verificado.
 
@@ -181,7 +181,7 @@ Estado implementado y límites restantes del contrato de ownership:
    par y registra vtables genéricas/default; retain/release cubre boxing,
    llamadas, argumentos, retornos, alias, campos, reemplazos, `Phi`, loop-Phi y
    drop en los casos probados.
-3. La matriz WASI local pasó 27 programas. En `bae4c0e`, ASan y UBSan pasaron
+3. La matriz WASI local pasó 27 programas. En `b3bce84`, ASan y UBSan pasaron
    en CI; ASan también ejecutó el corpus diferencial y el fuzz del frontend.
 4. Se probó `Holder<dyn Speaker>` como un campo genérico directo; wrappers
    genéricos anidados y otras combinaciones fuera de la matriz probada siguen

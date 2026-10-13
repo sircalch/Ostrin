@@ -17,25 +17,24 @@ head's CI or a release approval.
 
 ## Current revision evidence
 
-- Implementation revision audited: `bae4c0e` (`docs: refresh Ostrin Linguist
-  inventory`), on top of the data-driven public status dashboard assertion.
-- At this head, [Ostrin CI](https://github.com/sircalch/Ostrin/actions/runs/38356737026)
+- Implementation revision audited: `b3bce84` (`Format generic dyn trait ownership test`),
+  including the generic `Holder<dyn Speaker>` field implementation and its public example.
+- At this head, [Ostrin CI](https://github.com/sircalch/Ostrin/actions/runs/38364183481)
   passed on Ubuntu, macOS and Windows, including the generated differential
   corpus, numerical validation and Website/browser checks;
-  [ASan and UBSan](https://github.com/sircalch/Ostrin/actions/runs/38356736980),
-  [CodeQL](https://github.com/sircalch/Ostrin/actions/runs/38356737050),
-  [dependency audit](https://github.com/sircalch/Ostrin/actions/runs/38356736953)
-  and [Browser audit](https://github.com/sircalch/Ostrin/actions/runs/38356736968)
+  [ASan and UBSan](https://github.com/sircalch/Ostrin/actions/runs/38364183520),
+  [CodeQL](https://github.com/sircalch/Ostrin/actions/runs/38364183357),
+  [dependency audit](https://github.com/sircalch/Ostrin/actions/runs/38364183491)
+  and [Browser audit](https://github.com/sircalch/Ostrin/actions/runs/38364183365)
   also passed.
 - Local evidence for the latest web changes: all 31 Chromium website tests,
   `website-check --wasm`, `linguist-check` and its 8 unit tests passed.
-- Local WASI program matrix: 27 programs passed, including a new generic
+- Local WASI program matrix: 27 programs passed, including the generic
   `dyn Trait` field case. The repository reports 7,198 IR + 41 HIR functions,
   zero AST fallbacks and 333 tracked `.ostrin` files (301 examples). Sanitizer
-  CI for the new fixture is pending on the current revision.
+  CI for the new fixture passed on this revision.
 - The release gate remains `NOT_READY`: ownership and changelog are still open.
   Nested generic wrappers, broader aggregate combinations and cancellation
   states beyond the focused pre-run case remain outside the ownership claim. This map
-  records implementation evidence for `bae4c0e`; the accompanying follow-up
-  only synchronizes documentation to that evidence. Any later code revision
+  records implementation evidence for `b3bce84`; any later code revision
   requires fresh workflows.
