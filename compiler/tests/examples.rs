@@ -3773,8 +3773,7 @@ fn native_dyn_trait_generic_record_field_preserves_pair_ownership() {
         stderr(&report)
     );
     assert!(
-        stdout(&report).contains("ir-generated: 3")
-            && stdout(&report).contains("ast-fallback: 0"),
+        stdout(&report).contains("ir-generated: 3") && stdout(&report).contains("ast-fallback: 0"),
         "generic dyn field did not lower completely through IR: {}",
         stdout(&report)
     );
