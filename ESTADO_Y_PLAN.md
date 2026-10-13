@@ -170,8 +170,8 @@ visible. También publica líneas `native-source` agrupadas por archivo para loc
 por módulo y `ast-fallback-function` con identificadores estables para cada cuerpo pendiente;
 la prueba diferencial comprueba que los nombres y las sumas por módulo coinciden con el total.
 En el corte
-actual, la suite de ejemplos suma 7 187 funciones IR, 38 HIR y 6 que aún caen al emisor
-AST; `native_backend_types_agree_with_the_checker` mantiene 40 expresiones y 50 nodos como trinquetes temporales. La llamada global `parse_int(String)` ahora comparte el helper IR/C de `String.to_int()`, por lo que `stdlib_io.ostrin` ya no usa AST; los cortes R1 de `viz_histogram.ostrin`, `viz_boxplot.ostrin`, `viz_scatter_fit.ostrin`, `viz_violin.ostrin`, `viz_hexbin.ostrin`, `viz_bars.ostrin`, `viz_point_cloud.ostrin`, `viz_fft.ostrin` y `viz_dashboard.ostrin` importan `std.json` y conservan esa entrada en el camino tipado; `atan2` escalar para `Float` y `Float32` usa ahora el runtime determinista desde IR/C; `pow` escalar también usa `ostrin_dm_pow`/`ostrin_dm_powf`, y `detmath.ostrin` ya no conserva fallback AST. `math_functions.ostrin` verifica `atan2` y `abs` sobre enteros de ancho fijo con paridad nativa/WASI y leak-check; `abs` conserva el error del mínimo representable. Las coerciones `Float↔Float32` de bindings explícitos y agregados `List/Set<Float32>` ahora se insertan en IR, conservando la precisión de `float32.ostrin`. Las llamadas genéricas registradas por el checker se resuelven ahora en HIR antes de construir la IR, de modo que `numeric_units.ostrin` ya no necesita fallback AST. Las operaciones escalares reflejadas de `Complex` (`Float +|−|×|÷ Complex`) llaman sus métodos `radd`/`rsub`/`rmul`/`rdiv` desde IR/C con el orden de operandos preservado; el formato escalar de `Bool` también usa la ruta tipada. `numeric_complex.ostrin` queda en `ir=3, hir=0, ast=0`, con paridad intérprete/nativo/WASI y leak-check. `Quantity.to_string()` escalar y `Array<Float32>.to_string()` ya llaman a helpers nativos desde IR/C; el segundo elimina el fallback del punto de entrada de `arrays_3d`. Los patrones
+actual, la suite de ejemplos suma 7 189 funciones IR, 41 HIR y 3 que aún caen al emisor
+AST; `native_backend_types_agree_with_the_checker` mantiene 26 expresiones y 32 nodos como trinquetes temporales. La llamada global `parse_int(String)` ahora comparte el helper IR/C de `String.to_int()`, por lo que `stdlib_io.ostrin` ya no usa AST; los cortes R1 de `viz_histogram.ostrin`, `viz_boxplot.ostrin`, `viz_scatter_fit.ostrin`, `viz_violin.ostrin`, `viz_hexbin.ostrin`, `viz_bars.ostrin`, `viz_point_cloud.ostrin`, `viz_fft.ostrin` y `viz_dashboard.ostrin` importan `std.json` y conservan esa entrada en el camino tipado; `atan2` escalar para `Float` y `Float32` usa ahora el runtime determinista desde IR/C; `pow` escalar también usa `ostrin_dm_pow`/`ostrin_dm_powf`, y `detmath.ostrin` ya no conserva fallback AST. `math_functions.ostrin` verifica `atan2` y `abs` sobre enteros de ancho fijo con paridad nativa/WASI y leak-check; `abs` conserva el error del mínimo representable. Las coerciones `Float↔Float32` de bindings explícitos y agregados `List/Set<Float32>` ahora se insertan en IR, conservando la precisión de `float32.ostrin`. Las llamadas genéricas registradas por el checker se resuelven ahora en HIR antes de construir la IR, de modo que `numeric_units.ostrin` ya no necesita fallback AST. Las operaciones escalares reflejadas de `Complex` (`Float +|−|×|÷ Complex`) llaman sus métodos `radd`/`rsub`/`rmul`/`rdiv` desde IR/C con el orden de operandos preservado; el formato escalar de `Bool` también usa la ruta tipada. `numeric_complex.ostrin` queda en `ir=3, hir=0, ast=0`, con paridad intérprete/nativo/WASI y leak-check. `Quantity.to_string()` escalar y `Array<Float32>.to_string()` ya llaman a helpers nativos desde IR/C; el segundo elimina el fallback del punto de entrada de `arrays_3d`. Los patrones
 superficiales de records con campos escalares y los enums no genéricos con variantes unitarias,
 payloads escalares (incluidos enteros de ancho fijo), patrones simples y patrones anidados de enums por
 valor ya bajan por IR/C, incluidos records genéricos, y los constructores, patrones y métodos del
@@ -295,9 +295,12 @@ wrappers anidados soportados ya tienen cobertura IR/C.
 - Escalares, strings, recursión, `if/while/for`, `match` (con guardas y patrones anidados).
 - Records (heap, por referencia) y enums (unión etiquetada por valor), ambos genéricos;
   métodos estáticos y genéricos; métodos por defecto de traits.
-- `dyn Trait` con vtable real en la ruta AST verificada (único punto de despacho
-  en tiempo de ejecución); la representación HIR/IR y su ownership siguen
-  pendientes según [`docs/design/15-dyn-trait.md`](docs/design/15-dyn-trait.md).
+- `dyn Trait` directo con par tipado `data + vtable` en HIR/C, boxing de records
+  no genéricos, dispatch por vtable y hooks de retain/release; alias, argumento,
+  retorno, reemplazo local, Phi y loop-Phi tienen prueba de paridad y leak-check.
+  `List<dyn Trait>`, boxing de records genéricos, campos persistentes, closures,
+  tareas, cancelación, WASI y sanitizers siguen pendientes según
+  [`docs/design/15-dyn-trait.md`](docs/design/15-dyn-trait.md).
 - `List/Map/Set/Option/Result`, combinadores con lambdas expandidas en línea, `try` y `try catch`
   inline para `Result` escalar con error `String`; `Option.map`/`then` para payloads
   escalares y `String` también usan IR. Wrappers de una capa sobre `List`, `Map` y `Set`
@@ -356,7 +359,7 @@ función genérica como valor, `Array` de tipos que no sean Int/Float/Float32/Bo
 
 Deuda técnica notable: `codegen.rs` y `typeck/mod.rs` son archivos muy grandes y
 convendría dividirlos; el backend nativo no comparte el sistema de tipos del checker
-(ya consume los tipos del checker y compara cada nodo; el informe actual suma **7 187 funciones generadas desde IR, 38 desde HIR y 6 en fallback AST** en los ejemplos, con un trinquete
+(ya consume los tipos del checker y compara cada nodo; el informe actual suma **7 189 funciones generadas desde IR, 41 desde HIR y 3 en fallback AST** en los ejemplos, con un trinquete
 que impide que el fallback aumente sin justificación; los métodos de records y enums concretos
 entran ahora en IR/C cuando sus campos y ownership son compatibles, mientras los records recursivos
 conservan el fallback verificado; las familias migradas incluyen escalares,
@@ -625,4 +628,3 @@ dyn, listas, closures, option, result, unidades, display, derive, args nombrados
 colecciones, trait defaults, métodos genéricos, builtins, concurrencia).
 
 \r\n
-

@@ -77,9 +77,9 @@ called and reused after that — plain records (heap-allocated, always by
 reference, to match the interpreter's identity semantics) with their
 non-generic `impl` methods (resolved statically at compile time), plain
 non-generic enums with `match` (compiled to a tagged union and a sequence of
-`if`s), `dyn Trait` values (a real vtable on the verified AST fallback; its
-HIR/IR ownership migration remains pending, and it is the one place in this
-backend anything is resolved at runtime rather than compile time), and
+`if`s), direct `dyn Trait` values (typed `data + vtable` HIR lowering with
+retain/release hooks and runtime vtable dispatch; `List<dyn Trait>`, generic
+record boxing and closure/task captures still use explicit AST fallbacks), and
 `List<T>` (heap-allocated, by reference, monomorphized per element type the
 same way a generic function is — `length`/`push`/`remove_at`, indexing and
 `for x in list`) — over `Int`/`Float`/`Bool`/`String`, recursion,

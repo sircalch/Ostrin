@@ -89,8 +89,8 @@ Cada valor de la lista debe implementar **ambos** traits — el compilador gener
 
 ## 7. Frontera actual del backend y contrato para migrar a HIR/IR
 
-La representación no debe confundirse con soporte nativo completo. El emisor
-AST actual usa una pareja C equivalente a:
+La representación no debe confundirse con soporte nativo completo. El ABI C
+usa una pareja tipada equivalente a:
 
 ```c
 typedef struct {
@@ -99,13 +99,16 @@ typedef struct {
 } Trait_Dyn;
 ```
 
-La tabla contiene únicamente punteros a los métodos. Esa ruta sirve para la
-prueba de despacho dinámico, pero todavía no expresa la propiedad del receptor:
-el tipo `DynTrait` no entra en los helpers generales de `retain_managed_value` y
-`release_managed_value`, y HIR/IR no tiene aún una instrucción tipada para
-crear, copiar, fusionar o destruir un trait object. Por eso los seis cuerpos
-dinámicos del ledger de fallback siguen siendo una limitación de alto riesgo;
-no se deben contar como cobertura IR/C aunque el backend AST pueda ejecutarlos.
+Las vtables son inmutables y contienen slots de métodos y hooks de lifecycle
+para el payload. HIR/C ya representa `Ty::Dyn` como el struct completo, hace
+boxing concreto→dyn para records registrados, despacha llamadas por la vtable y
+usa sus hooks al copiar, reemplazar, retornar y destruir. Las pruebas directas
+cubren alias, argumentos, retornos, Phi y loop-Phi con `live_allocations=0`.
+IR todavía no tiene nodos dedicados `DynBox`/`DynCall`; los tres cuerpos
+restantes del ledger son `List<dyn Trait>`/closure indirecta (`dyn_trait.ostrin`)
+y boxing de record genérico/default method (`native_trait_defaults.ostrin::main`).
+Los campos persistentes, closures/tareas/cancelación y la evidencia WASI,
+ASan y UBSan permanecen abiertos.
 
 La migración queda condicionada a un contrato único para AST, HIR, IR, WASI y
 el runtime:
@@ -147,15 +150,15 @@ pueda conservar estas invariantes debe producir un diagnóstico de lowering;
 no puede degradarse a un cast opaco ni a una liberación global al finalizar el
 proceso.
 
-La primera implementación de HIR/IR debe introducir una representación única
-para este par y una operación de `drop` explícita. La migración de cada uno de
-los seis fallbacks se acepta solo cuando su prueba nativa demuestra las cuatro
+La siguiente etapa debe propagar la representación única a IR y a campos,
+colecciones y entornos de ejecución, con `drop` explícito donde corresponda.
+La migración de cada fallback restante se acepta solo cuando su prueba nativa demuestra las cuatro
 transiciones anteriores además de la matriz de paridad, WASI y sanitizers de la
 sección 7.
 
-Hasta que exista esa evidencia, `dyn Trait` permanece soportado por la ruta
-AST verificada y registrado explícitamente como fallback; esta frontera es
-intencional y forma parte del contrato de v0.2.
+Hasta que exista esa evidencia, los casos fuera de la cobertura HIR/C permanecen
+en los fallbacks AST enumerados; la frontera es intencional y forma parte del
+contrato de v0.2.
 
 ---
 

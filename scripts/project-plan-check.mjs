@@ -130,8 +130,8 @@ export function validateProjectPlan(root = repositoryRoot) {
     && /live_allocations=0/.test(dynTraitDesign),
   "dyn Trait: public status and design contract must expose the pending HIR/IR ownership boundary");
   const dynamicTraitEntries = fallbackLedger.match(/"reason": "dynamic-trait-(?:dispatch|default-method)"/g) ?? [];
-  check(errors, dynamicTraitEntries.length === 6,
-    "validation/ast-fallback-ledger.json: the six dynamic-trait fallback bodies must remain enumerated");
+  check(errors, dynamicTraitEntries.length === 3,
+    "validation/ast-fallback-ledger.json: the three remaining dynamic-trait fallback bodies must remain enumerated");
 
   const baseline = sourceBaseline(differential);
   check(errors, baseline !== null,

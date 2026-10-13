@@ -1,13 +1,13 @@
 {
   "schema": "ostrin.ast-fallback-ledger/v1",
   "status": "verified-in-differential-suite",
-  "count": 6,
+  "count": 3,
   "source": "compiler/tests/differential.rs",
   "verifiedBaseline": {
-    "ir": 7187,
-    "hir": 38,
-    "ast": 6,
-    "total": 7225
+    "ir": 7189,
+    "hir": 41,
+    "ast": 3,
+    "total": 7230
   },
   "entries": [
     {
@@ -29,40 +29,13 @@
       "plannedResolution": "lower trait-object receivers and indirect iterator/closure calls together after the §7 ABI contract is tested"
     },
     {
-      "source": "examples/native_dyn_trait.ostrin",
-      "function": "describe",
-      "reason": "dynamic-trait-dispatch",
-      "blockedBy": "dyn Shape parameter requires an erased receiver and vtable ownership ABI",
-      "test": "native_backend_compiles_and_runs_dyn_trait",
-      "risk": "high",
-      "plannedResolution": "specify and test trait-object layout, dispatch, retain/release, drop behavior and WASI ABI per docs/design/15-dyn-trait.md §7"
-    },
-    {
-      "source": "examples/native_dyn_trait.ostrin",
-      "function": "main",
-      "reason": "dynamic-trait-dispatch",
-      "blockedBy": "boxing concrete records as dyn Shape and invoking erased methods are outside the current IR lowering",
-      "test": "native_backend_compiles_and_runs_dyn_trait",
-      "risk": "high",
-      "plannedResolution": "migrate only after describe and boxed receiver ownership share the typed §7 representation"
-    },
-    {
-      "source": "examples/native_trait_defaults.ostrin",
-      "function": "describe",
-      "reason": "dynamic-trait-default-method",
-      "blockedBy": "default trait methods invoked through dyn Named need erased receiver dispatch",
-      "test": "native_trait_defaults_are_lowered_to_ir",
-      "risk": "high",
-      "plannedResolution": "extend the typed §7 trait-object ABI to default-method vtable entries with explicit receiver ownership"
-    },
-    {
       "source": "examples/native_trait_defaults.ostrin",
       "function": "main",
       "reason": "dynamic-trait-default-method",
-      "blockedBy": "main constructs concrete and generic values consumed through dyn Named",
+      "blockedBy": "generic Box<Int> value invokes its default trait method; generic record boxing/vtable ownership is outside the current HIR ABI",
       "test": "native_trait_defaults_are_lowered_to_ir",
       "risk": "high",
-      "plannedResolution": "migrate after generic boxing, default dispatch and destructor paths satisfy the §7 evidence matrix"
+      "plannedResolution": "implement object-safe default-method entries and generic-record vtable registration with payload ownership tests"
     }
   ]
 }
