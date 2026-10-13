@@ -300,9 +300,9 @@ wrappers anidados soportados ya tienen cobertura IR/C.
   retorno, reemplazo local, Phi, loop-Phi y `List<dyn Trait>` heterogénea con
   iteración/fold tienen pruebas de paridad y leak-check en los casos focales.
   Los campos de records no genéricos y la captura por closure ahora tienen
-  pruebas nativas con paridad y cero fugas. Boxing de records genéricos, captura
-  por tarea, cancelación, WASI y sanitizers para estas transiciones siguen
-  pendientes según
+  pruebas nativas con paridad y cero fugas. Los dos fixtures nuevos también pasan
+  WASI (run 38347835544), ASan y UBSan (run 38347772788). Boxing de records
+  genéricos, captura por tarea y cancelación siguen pendientes según
   [`docs/design/15-dyn-trait.md`](docs/design/15-dyn-trait.md).
 - `List/Map/Set/Option/Result`, combinadores con lambdas expandidas en línea, `try` y `try catch`
   inline para `Result` escalar con error `String`; `Option.map`/`then` para payloads
