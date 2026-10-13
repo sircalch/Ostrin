@@ -109,8 +109,10 @@ iteración, alias, Phi y loop-Phi con `live_allocations=0` en los casos focales.
 IR todavía no tiene nodos dedicados `DynBox`/`DynCall`; el único cuerpo dyn
 restante del ledger es el boxing de record genérico con método default
 (`native_trait_defaults.ostrin::main`).
-Los campos persistentes, closures/tareas/cancelación y la evidencia WASI,
-ASan y UBSan permanecen abiertos.
+Los campos persistentes, closures/tareas/cancelación y la evidencia ASan/UBSan
+permanecen abiertos. La matriz WASI ya compila y ejecuta el fixture de lista
+heterogénea con salida esperada; esa ruta todavía no tiene comprobación de
+`live_allocations=0` bajo WASI ni cubre las demás transiciones.
 
 La migración queda condicionada a un contrato único para AST, HIR, IR, WASI y
 el runtime:
