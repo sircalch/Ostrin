@@ -89,10 +89,18 @@ function validateWorkload(errors, workload, index, report, root) {
   }
   check(errors, closeEnough(workload.interpreterMedianMs, workload.statistics?.interpreter?.medianMs), `${label}: interpreter median is not linked to statistics`);
   check(errors, closeEnough(workload.nativeMedianMs, workload.statistics?.native?.medianMs), `${label}: native median is not linked to statistics`);
-  check(errors, closeEnough(
-    workload.interpreterToNativeMedianRatio,
-    workload.nativeMedianMs > 0 ? workload.interpreterMedianMs / workload.nativeMedianMs : NaN,
-  ), `${label}: interpreter/native ratio is not linked to medians`);
+  const expectedRatio = workload.nativeMedianMs > 0
+    ? workload.interpreterMedianMs / workload.nativeMedianMs
+    : NaN;
+  const numeratorFloor = Math.max(workload.interpreterMedianMs - 0.0005, Number.EPSILON);
+  const denominatorFloor = Math.max(workload.nativeMedianMs - 0.0005, Number.EPSILON);
+  const ratioRoundingTolerance = Math.max(
+    0.01,
+    0.001 + Math.abs(expectedRatio) * (0.0005 / numeratorFloor + 0.0005 / denominatorFloor),
+  );
+  check(errors, finite(workload.interpreterToNativeMedianRatio)
+    && Math.abs(workload.interpreterToNativeMedianRatio - expectedRatio) <= ratioRoundingTolerance,
+  `${label}: interpreter/native ratio is not linked to medians`);
 }
 
 /**

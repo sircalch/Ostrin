@@ -95,3 +95,18 @@ test("the contract rejects reports without dispersion statistics", () => {
   const errors = validateBenchmarkReport(report);
   assert.ok(errors.some((error) => error.includes("native: statistics are missing")));
 });
+
+test("the ratio contract accounts for rounding amplified by a small native median", () => {
+  const report = fixture();
+  const workload = report.workloads[0];
+  workload.interpreterMs = [114.696, 114.697, 114.698];
+  workload.nativeMs = [2.115, 2.116, 2.117];
+  workload.statistics = { interpreter: stats(workload.interpreterMs), native: stats(workload.nativeMs) };
+  workload.interpreterMedianMs = 114.697;
+  workload.nativeMedianMs = 2.116;
+  workload.interpreterToNativeMedianRatio = 54.217;
+
+  assert.deepEqual(validateBenchmarkReport(report), []);
+  workload.interpreterToNativeMedianRatio = 100;
+  assert.ok(validateBenchmarkReport(report).some((error) => error.includes("ratio is not linked to medians")));
+});
