@@ -123,7 +123,9 @@ fallback, emisión WASI y cero allocations vivas en
 `native_dyn_trait_option_and_result_wrappers_preserve_pair_ownership` cubre
 `Option<dyn Speaker>` (`Some`/`None`) y `Result<dyn Speaker, String>` (`Ok`/`Err`)
 con paridad, IR sin fallback, ejecución nativa con cero allocations vivas y
-emisión WASI. No se generaliza a otros wrappers o agregados genéricos anidados.
+emisión WASI. También almacena `Option<dyn Speaker>` en el campo mutable de un
+record, lee el valor, lo reemplaza por `None` y vuelve a leerlo. No se generaliza
+a otros wrappers o agregados genéricos anidados.
 WASI pasó localmente sus 28 programas, incluidos estos wrappers, el campo
 genérico, closure, tareas y default.
 En el head `fafaaf6`, ASan pasó la suite nativa, el corpus diferencial generado y el fuzz

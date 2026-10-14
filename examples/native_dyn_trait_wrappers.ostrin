@@ -10,6 +10,10 @@ record Second {
     text: String
 }
 
+record SpeakerSlot {
+    mut item: Option<dyn Speaker>
+}
+
 impl Speaker for First {
     fn speak(self) -> String { self.text }
 }
@@ -41,6 +45,10 @@ fn optional_speakers() -> List<Option<dyn Speaker>> {
     [Some(speaker), None]
 }
 
+fn speaker_slot() -> SpeakerSlot {
+    SpeakerSlot { item: maybe_speaker(true) }
+}
+
 fn main() -> Void {
     match maybe_speaker(true) {
         Some(speaker) => print(speaker.speak()),
@@ -63,5 +71,15 @@ fn main() -> Void {
             Some(speaker) => print(speaker.speak()),
             None => print("empty"),
         }
+    }
+    mut slot: SpeakerSlot = speaker_slot()
+    match slot.item {
+        Some(speaker) => print(speaker.speak()),
+        None => print("empty"),
+    }
+    slot.item = maybe_speaker(false)
+    match slot.item {
+        Some(speaker) => print(speaker.speak()),
+        None => print("empty"),
     }
 }
