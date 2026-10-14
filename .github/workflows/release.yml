@@ -59,7 +59,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          safe_ref="${GITHUB_REF_NAME//[^A-Za-z0-9._-]/-}"
+          version="$(cargo metadata --no-deps --format-version 1 --manifest-path compiler/Cargo.toml | node -e 'let input=""; process.stdin.on("data", chunk => input += chunk).on("end", () => console.log(JSON.parse(input).packages.find(pkg => pkg.name === "ostrinc").version));')"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            package_ref="$GITHUB_REF_NAME"
+          else
+            package_ref="v${version}-rc.${GITHUB_SHA:0:7}"
+          fi
+          safe_ref="${package_ref//[^A-Za-z0-9._-]/-}"
           name="ostrinc-${safe_ref}-${{ matrix.target }}"
           mkdir "$name"
           cp "compiler/target/${{ matrix.target }}/release/${{ matrix.exe }}" "$name/"
