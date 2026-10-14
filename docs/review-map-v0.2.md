@@ -17,23 +17,25 @@ head's CI or a release approval.
 
 ## Current revision evidence
 
-- Implementation revision audited: `e06f85a` (`test: cover dyn trait wrapper fields`).
+Documentation and the public status site are synchronized with this revision. The website/browser checks passed on this head (17 pages, 302 examples, 333 integration tests); the public Linguist inventory reports 302 examples and tracks upstream adoption separately.
+
+- Implementation revision audited: `54123b76` (`fix: validate R3 readiness in local and CI bundles`).
   It includes `Option<dyn Speaker>` stored and replaced in a mutable record,
   `Result<dyn Speaker, String>`, `List<Option<dyn Speaker>>`, the direct generic
   `Holder<dyn Speaker>` field, and the matching public catalogue description.
-- [Ostrin CI](https://github.com/sircalch/Ostrin/actions/runs/38503780024) passed
+- [Ostrin CI](https://github.com/sircalch/Ostrin/actions/runs/38508656204) passed
   on Ubuntu, Windows and macOS, including the differential corpus, numerical
-  validation and website checks. [ASan and UBSan](https://github.com/sircalch/Ostrin/actions/runs/38503780052),
-  [CodeQL](https://github.com/sircalch/Ostrin/actions/runs/38503780032),
-  [Security audit](https://github.com/sircalch/Ostrin/actions/runs/38503780021)
-  and [Browser audit](https://github.com/sircalch/Ostrin/actions/runs/38503780019)
+  validation and website checks. [Sanitizers](https://github.com/sircalch/Ostrin/actions/runs/38508656243),
+  [CodeQL](https://github.com/sircalch/Ostrin/actions/runs/38508656238),
+  [Security audit](https://github.com/sircalch/Ostrin/actions/runs/38508656197)
+  and [Browser audit](https://github.com/sircalch/Ostrin/actions/runs/38508656214)
   passed on this head.
-- The [WASI build and runtime matrix](https://github.com/sircalch/Ostrin/actions/runs/38504413644)
+- The [WASI build and runtime matrix](https://github.com/sircalch/Ostrin/actions/runs/38508663521)
   passed all 28 programs and packaged/checksummed the compiler artifact. Local
   `website-check`, Linguist, project-plan, fallback-ledger and distribution
   checks also pass; the repository reports 7,198 IR + 41 HIR functions, zero
   AST fallbacks and 334 tracked `.ostrin` files (302 examples).
-- The [release workflow dispatch](https://github.com/sircalch/Ostrin/actions/runs/38504426790)
+- The [release workflow dispatch](https://github.com/sircalch/Ostrin/actions/runs/38508665475)
   passed package tests, builds, smoke checks and archive verification on macOS
   ARM64, Linux x86_64 and Windows x86_64. It does not publish a release; the
   v0.2 version bump and tag are a post-merge release step.

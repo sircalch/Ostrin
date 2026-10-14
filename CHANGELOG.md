@@ -70,8 +70,8 @@
   functions and zero AST fallbacks; interpreter/native parity and
   `live_allocations=0` pass. The repository inventory advances to 7,198 IR +
   41 HIR functions and zero AST fallbacks. WASI passes the 28-program local
-  matrix. ASan/UBSan pass on head `e06f85a` in
-  [CI](https://github.com/sircalch/Ostrin/actions/runs/38503780052). Unlisted
+  matrix. ASan/UBSan pass on head `54123b76` in
+  [CI](https://github.com/sircalch/Ostrin/actions/runs/38508656243). Unlisted
   matrix combinations remain outside the tested support claim.
 - Added generic record-field ownership for a direct `Holder<dyn Speaker>`
   instantiation. Replacement keeps a copied alias valid; the focused test has
@@ -88,7 +88,7 @@
   `String`-owning payload. Capture also keeps a parent alias alive. Both verify
   the retained data/vtable pair, dynamic dispatch or cancellation cleanup,
   cooperative and native-thread execution, and `live_allocations=0`; both are
-  included in the 28-program WASI matrix. ASan/UBSan pass for head `e06f85a` in
+  included in the 28-program WASI matrix. ASan/UBSan pass for head `54123b76` in
   the linked Linux/Clang workflow above.
 - Lowered heterogeneous `List<dyn Trait>` construction, elementwise boxing,
   iteration and indirect `fold` dispatch through HIR/C. Vtable hooks preserve

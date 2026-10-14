@@ -127,11 +127,11 @@ emisión WASI. También almacena `Option<dyn Speaker>` en el campo mutable de un
 record, lee el valor, lo reemplaza por `None` y vuelve a leerlo. No se generaliza
 a otros wrappers o agregados genéricos anidados.
 Los 28 programas WASI también pasaron en el workflow de GitHub para el head
-`e06f85a`, incluidos wrappers, campos, closure, tareas y default.
+`54123b76`, incluidos wrappers, campos, closure, tareas y default.
 En ese mismo head, ASan pasó la suite nativa, el corpus diferencial generado y
 el fuzz del frontend; UBSan pasó la suite nativa. Véanse los
-[resultados de sanitizers](https://github.com/sircalch/Ostrin/actions/runs/38503780052)
-y el [workflow WASI](https://github.com/sircalch/Ostrin/actions/runs/38504413644).
+[resultados de sanitizers](https://github.com/sircalch/Ostrin/actions/runs/38508656243)
+y el [workflow WASI](https://github.com/sircalch/Ostrin/actions/runs/38508663521).
 Campos genéricos anidados y otras combinaciones fuera de la matriz siguen fuera
 del ABI dyn HIR/C verificado.
 
@@ -191,7 +191,7 @@ Estado implementado y límites restantes del contrato de ownership:
 `Option`/`Result` alrededor de un `dyn Trait` ya convertido explícitamente; no
 implica conversión contextual general de payloads dentro de wrappers. La misma
 prueba también cubre `List<Option<dyn Speaker>>` con dispatch sobre el elemento
-presente y destrucción del ausente. En `e06f85a`, ASan y UBSan pasaron
+presente y destrucción del ausente. En `54123b76`, ASan y UBSan pasaron
    en CI; ASan también ejecutó el corpus diferencial y el fuzz del frontend.
 4. Se probó `Holder<dyn Speaker>` como un campo genérico directo; wrappers
    genéricos anidados y otras combinaciones fuera de la matriz probada siguen

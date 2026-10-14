@@ -30,9 +30,9 @@
       "requires_ci_run_url": true,
       "evidence": [
         { "path": "docs/ownership-matrix.md", "claim": "Ownership support, tested boundaries and limitations" },
-        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38503780024", "claim": "Current-head interpreter/native, differential, numerical and website CI passes on Ubuntu, Windows and macOS" },
-        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38503780052", "claim": "Current-head ASan native suite, generated differential corpus, frontend fuzz and UBSan suite pass" },
-        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38504413644", "claim": "Current-head WASI compiler build, 28-program runtime matrix and artifact checksum pass" },
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38508656204", "claim": "Current-head interpreter/native, differential, numerical and website CI passes on Ubuntu, Windows and macOS" },
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38508656243", "claim": "Current-head ASan native suite, generated differential corpus, frontend fuzz and UBSan suite pass" },
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38508663521", "claim": "Current-head WASI compiler build, 28-program runtime matrix and artifact checksum pass" },
         { "path": "compiler/tests/fixtures/native_ir_quantity_array_record_field.ostrin", "claim": "Array<Quantity<Length>> record-field replacement has interpreter/native/WASI and leak-check coverage" },
         { "path": "examples/native_ir_map_set_branch.ostrin", "claim": "Map and Set branch selection has interpreter/native/WASI and leak-check coverage" },
         { "path": "examples/measurement_record.ostrin", "claim": "Measurement<Float> record-field replacement has interpreter/native/WASI and leak-check coverage" },
