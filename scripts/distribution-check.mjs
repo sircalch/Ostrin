@@ -31,7 +31,7 @@ for (const target of [
 for (const marker of ["sha256sum", "shasum", "ARCHIVE=", "gh release create", "--notes-file", "--verify-tag"]) {
   requireText(release, marker, "release workflow");
 }
-for (const marker of ["safe_ref=", "matrix.target", "archive=\"$name.tar.gz\"", "archive=\"$name.zip\""]) {
+for (const marker of ["safe_ref=", 'package_ref="v${version}-rc.${GITHUB_SHA:0:7}"', "matrix.target", "archive=\"$name.tar.gz\"", "archive=\"$name.zip\""]) {
   requireText(release, marker, "release archive naming");
 }
 for (const marker of [
@@ -79,8 +79,13 @@ const cargo = read("compiler/Cargo.toml");
 const version = (cargo.match(/^version\s*=\s*"([^"]+)"/m) || [])[1];
 if (!version) failures.push("compiler/Cargo.toml: missing package version");
 
+const changelog = read("CHANGELOG.md");
+const latestPublishedVersion = [...changelog.matchAll(/^## (\d+\.\d+\.\d+) .*\((\d{4}-\d{2}-\d{2})\)\s*$/gm)]
+  .map(([, releaseVersion, date]) => ({ version: releaseVersion, date }))
+  .filter((release) => existsSync(path.join(root, "docs", "releases", `v${release.version}.md`)))
+  .sort((a, b) => b.date.localeCompare(a.date))[0]?.version || version;
 const readme = read("README.md");
-for (const marker of ["scripts/install.sh", "scripts/install.ps1", "checksum", "--version " + version, "Invoke-WebRequest -UseBasicParsing"]) {
+for (const marker of ["scripts/install.sh", "scripts/install.ps1", "checksum", "--version " + latestPublishedVersion, "Invoke-WebRequest -UseBasicParsing"]) {
   requireText(readme, marker, "README installation documentation");
 }
 
@@ -94,15 +99,15 @@ for (const marker of [
   "## Examples",
   "## Reporting problems",
   "experimental",
-  "ostrinc-v" + version + "-x86_64-unknown-linux-gnu.tar.gz",
-  "ostrinc-v" + version + "-aarch64-apple-darwin.tar.gz",
-  "ostrinc-v" + version + "-x86_64-pc-windows-msvc.zip",
-  "--version " + version,
-  "Invoke-WebRequest -UseBasicParsing",
+  "ostrinc-v" + version + "-rc.",
+  "x86_64-unknown-linux-gnu.tar.gz",
+  "aarch64-apple-darwin.tar.gz",
+  "x86_64-pc-windows-msvc.zip",
+  "gh run download",
+  "ostrinc " + version,
 ]) {
   requireText(notes, marker, notesPath);
 }
-const changelog = read("CHANGELOG.md");
 requireText(changelog, "## " + version + " ", "CHANGELOG.md");
 
 if (failures.length) {
