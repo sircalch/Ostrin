@@ -148,7 +148,7 @@
     },
     {
       "id": "artifacts",
-      "status": "READY",
+      "status": "OPEN",
       "acceptance": "Linux, macOS, Windows and WASI release artifacts are built from the tagged source, checksummed, extracted and smoke-tested; WASI runtime smoke matrix passes and candidate CI run links are attached.",
       "requires_ci_run_url": true,
       "evidence": [
