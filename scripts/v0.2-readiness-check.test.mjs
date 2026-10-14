@@ -42,11 +42,10 @@ function readyFixture() {
   return { root, manifest };
 }
 
-test("the current v0.2 gate remains closed until candidate release artifacts exist", () => {
+test("the current v0.2 gate is ready with candidate release artifact evidence", () => {
   const result = validateV02Readiness(repositoryRoot);
-  assert.equal(result.ready, false);
-  assert.ok(!result.errors.some((error) => error.includes("AST fallback ratchet")));
-  assert.ok(result.errors.some((error) => error.includes("manifest status is NOT_READY")));
+  assert.equal(result.ready, true, result.errors.join("\n"));
+  assert.equal(result.errors.length, 0);
 });
 
 test("the gate rejects READY claims without evidence files", () => {
