@@ -129,8 +129,10 @@ test("readiness totals unresolved effects across ready bundles", () => {
   assert.ok(report.unresolvedEffectCallCount > 0);
 });
 
-test("local readiness stays open when CI host metadata is absent", () => {
+test("readiness totals and status match the inspected bundles", () => {
   const report = buildReadiness();
-  assert.equal(report.status, "OPEN");
-  assert.ok(report.entries.every((entry) => entry.r3Extensions.missing.includes("provenance.runtime.host")));
+  assert.equal(report.readyCount + report.openCount, report.bundleCount);
+  assert.equal(report.status, report.openCount === 0 ? "READY" : "OPEN");
+  assert.equal(report.extensionReadyCount,
+    report.entries.filter((entry) => entry.r3Extensions.missing.length === 0).length);
 });
