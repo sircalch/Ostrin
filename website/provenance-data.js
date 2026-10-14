@@ -685,7 +685,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
     "commit": "unknown",
     "name": "ostrinc",
     "target": "wasm32-wasi",
-    "version": "0.1.0"
+    "version": "0.2.0"
   },
   "experimental": true,
   "inputs": [],
@@ -706,7 +706,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
   "runtime": {
     "compiler_lockfile": {
       "path": "compiler/Cargo.lock",
-      "sha256": "sha256:8845cd2f31666d04272d82c02c85a30d52d1c07753e96b30b1fafcd9c4ba8e34"
+      "sha256": "sha256:957a647603df96e4dc3f63cf2a1c3628877c39a9e5e1277fc9e73254673ed311"
     },
     "missing": [
       "input snapshots",

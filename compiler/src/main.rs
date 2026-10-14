@@ -985,7 +985,10 @@ fn test_greet() -> Void {
 }
 
 fn print_help() {
-    println!("ostrinc {} — compiler and interpreter for Ostrin", env!("CARGO_PKG_VERSION"));
+    println!(
+        "ostrinc {} — compiler and interpreter for Ostrin",
+        env!("CARGO_PKG_VERSION")
+    );
     println!();
     println!("Usage:\n  ostrinc [OPTIONS] [entry_file.ostrin]");
     println!();
