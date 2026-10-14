@@ -126,11 +126,12 @@ con paridad, IR sin fallback, ejecución nativa con cero allocations vivas y
 emisión WASI. También almacena `Option<dyn Speaker>` en el campo mutable de un
 record, lee el valor, lo reemplaza por `None` y vuelve a leerlo. No se generaliza
 a otros wrappers o agregados genéricos anidados.
-WASI pasó localmente sus 28 programas, incluidos estos wrappers, el campo
-genérico, closure, tareas y default.
-En el head `fafaaf6`, ASan pasó la suite nativa, el corpus diferencial generado y el fuzz
-del frontend; UBSan también pasó en CI con Clang. Véanse los
-[resultados de sanitizers](https://github.com/sircalch/Ostrin/actions/runs/38457383426).
+Los 28 programas WASI también pasaron en el workflow de GitHub para el head
+`e06f85a`, incluidos wrappers, campos, closure, tareas y default.
+En ese mismo head, ASan pasó la suite nativa, el corpus diferencial generado y
+el fuzz del frontend; UBSan pasó la suite nativa. Véanse los
+[resultados de sanitizers](https://github.com/sircalch/Ostrin/actions/runs/38503780052)
+y el [workflow WASI](https://github.com/sircalch/Ostrin/actions/runs/38504413644).
 Campos genéricos anidados y otras combinaciones fuera de la matriz siguen fuera
 del ABI dyn HIR/C verificado.
 
@@ -190,16 +191,18 @@ Estado implementado y límites restantes del contrato de ownership:
 `Option`/`Result` alrededor de un `dyn Trait` ya convertido explícitamente; no
 implica conversión contextual general de payloads dentro de wrappers. La misma
 prueba también cubre `List<Option<dyn Speaker>>` con dispatch sobre el elemento
-presente y destrucción del ausente. En `fafaaf6`, ASan y UBSan pasaron
+presente y destrucción del ausente. En `e06f85a`, ASan y UBSan pasaron
    en CI; ASan también ejecutó el corpus diferencial y el fuzz del frontend.
 4. Se probó `Holder<dyn Speaker>` como un campo genérico directo; wrappers
    genéricos anidados y otras combinaciones fuera de la matriz probada siguen
    fuera del soporte verificado. No se generaliza la evidencia de los casos
    cubiertos a esas ABI.
 5. Las transiciones de la sección 7 tienen paridad, `live_allocations=0`, WASI
-   donde aplica, ASan y UBSan para los casos enumerados en la matriz. El gate
-   global permanece `OPEN` por los límites no cubiertos y no debe modificarse
-   manualmente.
+   donde aplica, ASan y UBSan para los casos enumerados en la matriz. El
+   criterio v0.2 de ownership queda `READY` para las celdas promovidas con
+   evidencia; las combinaciones fuera de la matriz siguen siendo limitaciones
+   explícitas y no se generaliza la promesa. El estado debe reflejar evidencia
+   actual, no editarse manualmente sin ella.
 
 El ledger actual registra cero fallbacks AST para la población medida. Este
 recuento no equivale a soporte universal: cualquier combinación fuera de la

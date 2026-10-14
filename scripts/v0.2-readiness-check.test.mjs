@@ -42,11 +42,11 @@ function readyFixture() {
   return { root, manifest };
 }
 
-test("the current v0.2 gate remains closed after reaching the AST target", () => {
+test("the current v0.2 gate remains closed until candidate release artifacts exist", () => {
   const result = validateV02Readiness(repositoryRoot);
   assert.equal(result.ready, false);
   assert.ok(!result.errors.some((error) => error.includes("AST fallback ratchet")));
-  assert.ok(result.errors.some((error) => error.includes("ownership: status is OPEN")));
+  assert.ok(result.errors.some((error) => error.includes("manifest status is NOT_READY")));
 });
 
 test("the gate rejects READY claims without evidence files", () => {
@@ -75,7 +75,7 @@ test("the gate requires real repository Actions run links for CI-backed criteria
   }
 });
 
-test("the gate accepts a complete evidenced manifest after the fallback ratchet reaches six", () => {
+test("the gate accepts a complete evidenced manifest with the zero-fallback ratchet", () => {
   const { root } = readyFixture();
   try {
     const result = validateV02Readiness(root);

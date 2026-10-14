@@ -2,18 +2,47 @@
 
 ## 0.2.0 (candidate)
 
-### Compatibility and release boundary
+### Release summary
 
-- This entry describes the v0.2.0 release candidate on top of the existing
-  v0.1.0 compiler/runtime line. Existing Ostrin source remains source-compatible
-  within the tested examples, but the 0.x compatibility policy still permits
-  diagnostics, generated IR details and experimental APIs to change before a
-  stable 1.0 contract.
-- The candidate is not a published release yet. The v0.2 readiness gate remains
-  closed until the ownership contract and final release manifest have current
-  evidence. Benchmark regression and website audit evidence are tracked separately
-  in the machine-readable readiness gate. No package or tag is implied by
-  this changelog entry.
+- Expanded typed HIR/IR and native lowering for supported managed values,
+  including dynamic trait objects, managed enums, records, collections and
+  function values. The measured compiler inventory is 7,198 IR + 41 HIR bodies
+  with zero AST fallbacks. This describes the measured core, not universal IR
+  support for every valid program shape.
+- Added scalar `Measurement<Float>` ownership through records, calls, clones,
+  collections, branches, loops, closures, results and deferred tasks. Numerical
+  validation checks LU, Cholesky, QR, SVD and symmetric eigenpairs against
+  independent residuals and declared tolerances.
+- Expanded scientific visualization with plots, tables, 3D scenes, animation
+  and reproducible figure bundles. The browser gallery and playground expose
+  those capabilities with responsive and cross-browser checks.
+- Improved reproducibility artifacts with source, input, dependency, effect
+  and runtime evidence. R1 replay is verified for the registered input-driven
+  experiments; runtime provenance remains partial and does not claim general
+  cross-platform numerical equivalence.
+- Added a conservative effects inventory that distinguishes known effects from
+  unresolved calls. It is not a static purity guarantee.
+- Added WASI compiler/runtime coverage, a public community starter and clearer
+  website maturity/status information. GitHub Linguist recognition still
+  depends on external public `.ostrin` adoption and has not been accepted
+  upstream.
+
+### Compatibility and known limitations
+
+- This candidate builds on the experimental v0.1.0 compiler/runtime line. The
+  0.x compatibility policy permits diagnostics, generated IR details and
+  experimental APIs to change before a stable 1.0 contract.
+- Dynamic trait ownership is verified only for the combinations listed in
+  `docs/ownership-matrix.md`; unsupported nested shapes and cancellation states
+  are not implied to work through IR/C. `Measurement<Quantity<D>>` and
+  `Array<Measurement<T>>` remain explicitly guarded. Static effect semantics,
+  complete R3 provenance and cross-platform numerical equivalence are not
+  delivered by this candidate.
+- This is a release candidate description, not a published release. The v0.2
+  ownership and changelog criteria are ready against the proposed source, but
+  the overall readiness manifest remains `NOT_READY` until a post-merge v0.2
+  version/tag and final release artifacts exist. No package or tag is implied
+  by this entry.
 
 ### Scientific measurement ownership
 
@@ -41,9 +70,9 @@
   functions and zero AST fallbacks; interpreter/native parity and
   `live_allocations=0` pass. The repository inventory advances to 7,198 IR +
   41 HIR functions and zero AST fallbacks. WASI passes the 28-program local
-  matrix. ASan/UBSan pass for head `b3bce84` in
-  [CI](https://github.com/sircalch/Ostrin/actions/runs/38364183520); the v0.2
-  ownership gate remains open for the remaining unverified matrix boundaries.
+  matrix. ASan/UBSan pass on head `e06f85a` in
+  [CI](https://github.com/sircalch/Ostrin/actions/runs/38503780052). Unlisted
+  matrix combinations remain outside the tested support claim.
 - Added generic record-field ownership for a direct `Holder<dyn Speaker>`
   instantiation. Replacement keeps a copied alias valid; the focused test has
   interpreter/native parity, zero AST fallback, a zero-allocation native check
@@ -52,21 +81,24 @@
   for `Some`/`None` and `Ok`/`Err`. Explicitly boxed values preserve dynamic
   dispatch through interpreter, native and WASI paths, and the native
   leak-check ends at zero. `List<Option<dyn Speaker>>` also preserves dispatch
-  and releases the empty/present elements correctly. The example is listed in
-  the public website catalogue.
+  and releases the empty/present elements correctly. The same example stores
+  `Option<dyn Speaker>` in a mutable record field and replaces `Some` with
+  `None`. The example is listed in the public website catalogue.
 - Added dyn Trait task capture and pre-run cancellation regressions with a
   `String`-owning payload. Capture also keeps a parent alias alive. Both verify
   the retained data/vtable pair, dynamic dispatch or cancellation cleanup,
   cooperative and native-thread execution, and `live_allocations=0`; both are
-  included in the 28-program WASI matrix. ASan/UBSan pass for head `b3bce84` in
+  included in the 28-program WASI matrix. ASan/UBSan pass for head `e06f85a` in
   the linked Linux/Clang workflow above.
 - Lowered heterogeneous `List<dyn Trait>` construction, elementwise boxing,
   iteration and indirect `fold` dispatch through HIR/C. Vtable hooks preserve
   payload ownership across list insertion, argument/return forwarding and drop;
   focused parity and `live_allocations=0` regressions cover concrete, borrowed,
-  forwarded, field replacement and closure/task captures. The v0.2 ownership
-  gate remains open for generic dyn fields and ownership combinations not
-  represented by the tests.
+  forwarded, field replacement and closure/task captures. Direct generic fields
+  and the listed `Option`/`Result` wrappers are covered; nested generic wrappers
+  and other combinations not listed in the ownership matrix remain outside the
+  claim. The v0.2 ownership gate is bounded by the evidence and limitations in
+  the ownership matrix.
 
 ### Public adoption path
 
