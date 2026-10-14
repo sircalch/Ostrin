@@ -77,7 +77,7 @@ fn real_main() -> ExitCode {
         return ExitCode::SUCCESS;
     }
     if version {
-        println!("ostrinc 0.1.0");
+        println!("ostrinc {}", env!("CARGO_PKG_VERSION"));
         return ExitCode::SUCCESS;
     }
 
@@ -985,7 +985,7 @@ fn test_greet() -> Void {
 }
 
 fn print_help() {
-    println!("ostrinc 0.1.0 — compiler and interpreter for Ostrin");
+    println!("ostrinc {} — compiler and interpreter for Ostrin", env!("CARGO_PKG_VERSION"));
     println!();
     println!("Usage:\n  ostrinc [OPTIONS] [entry_file.ostrin]");
     println!();

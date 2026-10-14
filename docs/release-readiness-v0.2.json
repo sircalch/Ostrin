@@ -149,13 +149,13 @@
     {
       "id": "artifacts",
       "status": "OPEN",
-      "acceptance": "Linux, macOS, Windows and WASI release artifacts are built from the tagged source, checksummed, extracted and smoke-tested; WASI runtime smoke matrix passes and candidate CI run links are attached.",
+      "acceptance": "Linux, macOS, Windows and WASI v0.2.0 candidate artifacts are built from the frozen candidate source commit on main, checksummed, extracted and smoke-tested; the WASI runtime smoke matrix passes and candidate CI run links are attached. A final release tag and publication are intentionally deferred for explicit owner authorization.",
       "requires_ci_run_url": true,
       "evidence": [
         { "path": ".github/workflows/release.yml", "claim": "Cross-platform release build, checksum, extraction and smoke test" },
         { "path": ".github/workflows/wasi.yml", "claim": "Pinned WASI build, runtime smoke matrix and checksums" },
-        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38109715203", "claim": "Linux, macOS and Windows release artifacts build, package, checksum, extract and smoke-test successfully" },
-        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38109546060", "claim": "WASI compiler artifact and 20-program runtime matrix pass on the corrected commit" }
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38109715203", "claim": "Historical Linux, macOS and Windows release smoke; replace with the v0.2.0 candidate run after verification" },
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38109546060", "claim": "Historical WASI compiler artifact smoke; replace with the v0.2.0 candidate run after verification" }
       ]
     }
   ]

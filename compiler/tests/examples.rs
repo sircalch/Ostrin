@@ -11901,7 +11901,7 @@ fn native_backend_monomorphizes_one_list_struct_per_element_type() {
 fn cli_exposes_help_and_version() {
     let version = run(&["--version"]);
     assert!(version.status.success());
-    assert!(stdout(&version).contains("ostrinc 0.1.0"));
+    assert!(stdout(&version).contains("ostrinc 0.2.0"));
 
     let help = run(&["--help"]);
     assert!(help.status.success());
@@ -14781,7 +14781,7 @@ fn viz_exports_reproducibility_metadata_for_figures() {
         "data-hash=\"sha256:0a0e6b9b33e2b1bd3706d0b2d6e0f6e7a8e3e95d6b8a36b0c4c9d6af79c61d1a\""
     ));
     assert!(out.contains("seed=\"2026-09-27T03:40Z / seed=42\""));
-    assert!(out.contains("compiler=\"ostrinc 0.1.0\""));
+    assert!(out.contains("compiler=\"ostrinc 0.2.0\""));
 }
 
 #[test]

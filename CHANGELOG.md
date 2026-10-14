@@ -39,10 +39,9 @@
   complete R3 provenance and cross-platform numerical equivalence are not
   delivered by this candidate.
 - This is a release candidate description, not a published release. The v0.2
-  ownership and changelog criteria are ready against the proposed source, but
-  the overall readiness manifest remains `NOT_READY` until a post-merge v0.2
-  version/tag and final release artifacts exist. No package or tag is implied
-  by this entry.
+  candidate is versioned `0.2.0`; readiness depends on its checksummed,
+  extracted and smoke-tested platform artifacts. The final release tag and
+  publication remain deferred for explicit owner authorization.
 
 ### Scientific measurement ownership
 
