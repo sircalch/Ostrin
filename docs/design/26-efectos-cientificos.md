@@ -328,6 +328,9 @@ en una consola de logs.
    matemáticas elementales— para no contar como deuda llamadas como `length`, `push`, `value`,
    `Ok` o `is_finite`. Esa whitelist mejora la cobertura del inventario, pero no autoriza
    optimizaciones de pureza ni sustituye las filas de efectos del HIR/IR.
+   Las llamadas a métodos locales se propagan usando la clave del método que comparte el inventario;
+   si no se puede asociar una llamada calificada con una función local, permanece en
+   `unresolved_calls` en lugar de presentar una cobertura completa.
 2. **Representación interna:** definir nombres, argumentos y uniones de filas; publicar errores estables
    para llamadas puras incompatibles.
 3. **HIR/IR:** propagar `pure`, `random(seed)`, `io`, `network`, `concurrency`, `provenance` y

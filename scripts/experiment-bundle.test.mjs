@@ -13,6 +13,7 @@ import {
   outputPathFor,
   renderExperimentBundle,
   runtimeSnapshotFor,
+  validateEffectCapture,
   verifyBundleFile,
   verifyExperimentBundle,
 } from "./experiment-bundle.mjs";
@@ -214,6 +215,10 @@ test("every registered fixture produces a verified recorded bundle", () => {
     assert.equal(bundle.provenance.effects.source, "ostrinc --effect-report --json");
     assert.ok(Array.isArray(bundle.provenance.effects.kinds));
     assert.ok(Array.isArray(bundle.provenance.effects.functions.main));
+    assert.ok(bundle.provenance.effects.function_calls);
+    assert.ok(bundle.provenance.effects.unresolved_calls);
+    assert.ok(bundle.provenance.effects.effect_coverage);
+    assert.deepEqual(validateEffectCapture(bundle.provenance.effects), []);
     for (const analyzer of bundle.provenance.effects.analyzer) {
       assert.match(analyzer.sha256, /^sha256:[0-9a-f]{64}$/);
     }
@@ -224,6 +229,39 @@ test("every registered fixture produces a verified recorded bundle", () => {
     const fileResult = verifyBundleFile(outputPathFor(id), id);
     assert.deepEqual(fileResult.errors, [], `${id}: ${fileResult.errors.join("; ")}`);
   }
+});
+
+test("effect evidence preserves unresolved calls and validates coverage consistency", () => {
+  const complete = {
+    schema: "ostrin.effect-report/v0",
+    status: "captured",
+    experimental: true,
+    conservative: true,
+    kinds: [],
+    functions: { main: [] },
+    function_calls: { main: ["known_call"] },
+    unresolved_calls: {},
+    effect_coverage: { known_calls: 1, unresolved_calls: 0, complete: true },
+  };
+  assert.deepEqual(validateEffectCapture(complete), []);
+
+  const incomplete = {
+    ...complete,
+    function_calls: { main: ["mystery_operation"] },
+    unresolved_calls: { main: ["mystery_operation"] },
+    effect_coverage: { known_calls: 0, unresolved_calls: 1, complete: false },
+  };
+  assert.deepEqual(validateEffectCapture(incomplete), []);
+
+  const hiddenBoundary = { ...incomplete };
+  delete hiddenBoundary.unresolved_calls;
+  assert.ok(validateEffectCapture(hiddenBoundary).some((error) => error.includes("unresolved_calls")));
+
+  const overstated = {
+    ...incomplete,
+    effect_coverage: { known_calls: 1, unresolved_calls: 0, complete: true },
+  };
+  assert.ok(validateEffectCapture(overstated).some((error) => error.includes("does not match")));
 });
 
 test("tampering with bundled content is rejected by the hash gate", () => {

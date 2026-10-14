@@ -310,6 +310,60 @@ function sha256(value) {
   return `sha256:${createHash("sha256").update(Buffer.from(value, "utf8")).digest("hex")}`;
 }
 
+function isStringArrayMap(value) {
+  return value != null
+    && typeof value === "object"
+    && !Array.isArray(value)
+    && Object.values(value).every((items) =>
+      Array.isArray(items) && items.every((item) => typeof item === "string"));
+}
+
+export function validateEffectCapture(effects) {
+  const errors = [];
+  if (!effects || typeof effects !== "object" || Array.isArray(effects)) {
+    return ["effects capture must be an object"];
+  }
+  if (effects.schema !== "ostrin.effect-report/v0" || effects.status !== "captured") {
+    errors.push("effects capture schema/status is missing or unsupported");
+  }
+  if (typeof effects.experimental !== "boolean" || typeof effects.conservative !== "boolean") {
+    errors.push("effects capture must preserve experimental/conservative flags");
+  }
+  if (!Array.isArray(effects.kinds) || !effects.kinds.every((kind) => typeof kind === "string")) {
+    errors.push("effects capture kinds must be an array of strings");
+  }
+  if (!isStringArrayMap(effects.functions)) errors.push("effects capture functions must map names to effect arrays");
+  if (!isStringArrayMap(effects.function_calls)) errors.push("effects capture function_calls must map names to call arrays");
+  if (!isStringArrayMap(effects.unresolved_calls)) errors.push("effects capture unresolved_calls must map names to call arrays");
+
+  const coverage = effects.effect_coverage;
+  if (!coverage || typeof coverage !== "object" || Array.isArray(coverage)
+    || !Number.isInteger(coverage.known_calls) || coverage.known_calls < 0
+    || !Number.isInteger(coverage.unresolved_calls) || coverage.unresolved_calls < 0
+    || typeof coverage.complete !== "boolean") {
+    errors.push("effects capture effect_coverage is missing or malformed");
+    return errors;
+  }
+  if (!isStringArrayMap(effects.function_calls) || !isStringArrayMap(effects.unresolved_calls)) return errors;
+
+  const callCount = Object.values(effects.function_calls).reduce((total, calls) => total + calls.length, 0);
+  let unresolvedCount = 0;
+  for (const [caller, calls] of Object.entries(effects.unresolved_calls)) {
+    const recordedCalls = new Set(effects.function_calls[caller] ?? []);
+    for (const call of calls) {
+      unresolvedCount++;
+      if (!recordedCalls.has(call)) errors.push(`unresolved call ${caller}.${call} is absent from function_calls`);
+    }
+  }
+  if (unresolvedCount > callCount
+    || coverage.known_calls !== callCount - unresolvedCount
+    || coverage.unresolved_calls !== unresolvedCount
+    || coverage.complete !== (unresolvedCount === 0)) {
+    errors.push("effects capture effect_coverage does not match function_calls/unresolved_calls");
+  }
+  return errors;
+}
+
 function bytes(value) {
   return Buffer.byteLength(value, "utf8");
 }
@@ -439,11 +493,18 @@ function compilerEffectSummary(root, sourcePath) {
     functions: Object.fromEntries(Object.entries(report.function_effects)
       .sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)
       .map(([name, kinds]) => [name, [...new Set(kinds)].sort()])),
+    function_calls: report.function_calls,
+    unresolved_calls: report.unresolved_calls,
+    effect_coverage: report.effect_coverage,
     analyzer: ["compiler/src/effects.rs", "compiler/src/main.rs"].map((relativePath) => ({
       path: relativePath,
       sha256: sha256(normalizedText(root, relativePath)),
     })),
   };
+  const effectErrors = validateEffectCapture(summary);
+  if (effectErrors.length > 0) {
+    throw new Error(`invalid compiler effect report for ${sourcePath}: ${effectErrors.join("; ")}`);
+  }
   effectReports.set(key, summary);
   return summary;
 }
@@ -748,10 +809,7 @@ export function verifyExperimentBundle(bundle, { expected, fixtureId } = {}) {
   try { provenanceFile = JSON.parse(files?.["provenance.json"] ?? "null"); } catch { provenanceFile = null; }
   if (JSON.stringify(bundle?.provenance) !== JSON.stringify(provenanceFile)) errors.push("provenance.json is not the embedded provenance object");
   const effects = bundle?.provenance?.effects;
-  if (effects?.schema !== "ostrin.effect-report/v0" || effects?.status !== "captured"
-    || !Array.isArray(effects?.kinds) || !effects?.functions || typeof effects.functions !== "object") {
-    errors.push("provenance effects capture is missing or malformed");
-  }
+  for (const error of validateEffectCapture(effects)) errors.push(`provenance ${error}`);
   const replay = bundle?.provenance?.replay;
   const replayNote = maturity?.level === "R2"
     ? /embedded data\.json snapshot under its declared filesystem capability/.test(replay?.note ?? "")

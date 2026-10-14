@@ -74,6 +74,11 @@ pub struct EffectReport {
     /// effect. An empty row is evidence for a candidate only; it is not a
     /// proof of purity because unresolved calls remain outside this report.
     pub function_names: BTreeSet<String>,
+    /// Top-level functions have exact call names. Impl methods are indexed by
+    /// their method name because the syntactic inventory does not type-check
+    /// the receiver expression.
+    pub free_function_names: BTreeSet<String>,
+    pub impl_method_names: BTreeSet<String>,
     pub function_calls: BTreeMap<String, BTreeSet<String>>,
     /// Calls that could not be matched to a local function or a classified
     /// host operation. These make the conservative boundary explicit: a
@@ -114,7 +119,10 @@ pub fn analyze(items: &[Item]) -> EffectReport {
     let mut report = EffectReport::default();
     for item in items {
         match item {
-            Item::Function(function) => walk_function(function, &mut report),
+            Item::Function(function) => {
+                report.free_function_names.insert(function.name.clone());
+                walk_function(function, &mut report);
+            }
             Item::Impl(implementation) => walk_impl(implementation, &mut report),
             _ => {}
         }
@@ -126,17 +134,16 @@ pub fn analyze(items: &[Item]) -> EffectReport {
 }
 
 fn classify_unresolved_calls(report: &mut EffectReport) {
-    let known_functions = &report.function_names;
     for (caller, calls) in &report.function_calls {
         for operation in calls {
-            let leaf = operation
-                .rsplit(|character| character == '.' || character == ':')
-                .find(|segment| !segment.is_empty())
-                .unwrap_or(operation);
             if classify(operation).is_none()
                 && !is_known_pure_operation(operation)
-                && !known_functions.contains(operation)
-                && !known_functions.contains(leaf)
+                && local_callee_key(
+                    operation,
+                    &report.free_function_names,
+                    &report.impl_method_names,
+                )
+                .is_none()
             {
                 report
                     .unresolved_calls
@@ -150,8 +157,21 @@ fn classify_unresolved_calls(report: &mut EffectReport) {
 
 fn walk_impl(implementation: &ImplDecl, report: &mut EffectReport) {
     for method in &implementation.methods {
+        report.impl_method_names.insert(method.name.clone());
         walk_function(method, report);
     }
+}
+
+fn local_callee_key<'a>(
+    operation: &'a str,
+    free_functions: &BTreeSet<String>,
+    impl_methods: &BTreeSet<String>,
+) -> Option<&'a str> {
+    if free_functions.contains(operation) {
+        return Some(operation);
+    }
+    let (_, method) = operation.rsplit_once('.')?;
+    impl_methods.contains(method).then_some(method)
 }
 
 fn walk_function(function: &FunctionDecl, report: &mut EffectReport) {
@@ -493,6 +513,13 @@ fn propagate_function_effects(report: &mut EffectReport) {
         for (caller, callees) in callers {
             let inherited: Vec<EffectKind> = callees
                 .iter()
+                .filter_map(|callee| {
+                    local_callee_key(
+                        callee,
+                        &report.free_function_names,
+                        &report.impl_method_names,
+                    )
+                })
                 .filter_map(|callee| report.function_kinds.get(callee))
                 .flat_map(|effects| effects.iter().cloned())
                 .collect();

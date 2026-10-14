@@ -12052,6 +12052,44 @@ fn experimental_effect_report_propagates_to_callers() {
 }
 
 #[test]
+fn experimental_effect_report_propagates_through_qualified_impl_methods() {
+    let file = temp_source(
+        "effects-qualified-method.ostrin",
+        "trait Output {\n    fn emit(self) -> Void\n}\n\
+         record Console { marker: Int }\n\
+         impl Output for Console {\n    fn emit(self) -> Void {\n        print(\"effect\")\n    }\n}\n\
+         fn forward(console: Console) -> Void {\n    console.emit()\n}\n\
+         fn main() -> Void {\n    forward(Console { marker: 0 })\n}\n",
+    );
+    let out = run(&["--effect-report", "--json", &file]);
+    let _ = fs::remove_file(&file);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let report: serde_json::Value =
+        serde_json::from_str(&stdout(&out)).expect("effect report must be JSON");
+    assert_eq!(
+        report["function_effects"]["emit"],
+        serde_json::json!(["io"])
+    );
+    assert_eq!(
+        report["function_calls"]["forward"],
+        serde_json::json!(["console.emit"])
+    );
+    assert_eq!(
+        report["function_effects"]["forward"],
+        serde_json::json!(["io"])
+    );
+    assert_eq!(
+        report["function_effects"]["main"],
+        serde_json::json!(["io"])
+    );
+    assert_eq!(report["unresolved_calls"], serde_json::json!({}));
+    assert_eq!(
+        report["effect_coverage"],
+        serde_json::json!({"known_calls": 3, "unresolved_calls": 0, "complete": true})
+    );
+}
+
+#[test]
 fn experimental_effect_report_keeps_unknown_calls_unresolved() {
     let file = temp_source(
         "effects-unknown.ostrin",

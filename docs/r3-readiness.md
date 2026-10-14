@@ -10,7 +10,8 @@ node scripts/r3-readiness.mjs --write
 ```
 
 Pages CI usa además `node scripts/r3-readiness.mjs --require-ready`; ese modo
-termina con error si cualquier bundle no tiene todos los campos R3.
+termina con error si cualquier bundle no tiene todos los campos R3 o una captura
+de efectos estructuralmente válida.
 
 El reporte queda en [`validation/r3-readiness.json`](../validation/r3-readiness.json).
 Un estado `OPEN` es deliberado: documenta el trabajo restante y no promociona
@@ -20,8 +21,12 @@ El checkout local tiene los **29/29 bundles con los campos base completos**, inc
 `execution`, dependencias y scheduler declarado. Los **0/29** locales están listos para R3
 porque no deben falsificar la captura del host. Los 29 bundles ya incluyen un resumen normalizado del
 reporte de efectos del compilador (`ostrin.effect-report/v0`), con hashes del analizador y
-la marca de que el análisis es experimental y conservador. El host sigue siendo un requisito
-explícito del auditor y no se rellena con valores sintéticos.
+la marca de que el análisis es experimental y conservador. El resumen conserva las llamadas locales,
+las llamadas no resueltas y el conteo de cobertura; el auditor valida su consistencia y reporta por
+separado cuántos bundles tienen inventario parcial y cuántas llamadas siguen sin clasificar. Una captura
+coherente puede estar lista para auditoría R3 aunque su inventario sea parcial; `complete` significa que
+no quedan llamadas sin clasificar, no que el programa sea puro. Una captura ausente o inconsistente
+mantiene R3 `OPEN`. El host sigue siendo un requisito explícito del auditor y no se rellena con valores sintéticos.
 
 Pages CI activa `OSTRIN_CAPTURE_HOST=1` después de preparar el compilador WASI y
 regenera los 29 bundles. En ese modo cada snapshot registra solo metadatos públicos

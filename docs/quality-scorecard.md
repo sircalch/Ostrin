@@ -20,6 +20,7 @@ publica:
 - celdas `TESTED`, `SUPPORTED` y `KNOWN LIMITATION` de la matriz de ownership;
 - distribución R0/R1/R2/R3 del registro de experimentos;
 - estado de auditoría R3 para los 29 bundles publicados;
+- bundles R3 con inventario de efectos parcial y total de llamadas sin clasificar;
 - estado de cada criterio de readiness de v0.2;
 - presencia de validación numérica, auditoría web, Linguist y auditoría de ramas.
 
@@ -34,3 +35,8 @@ de CI exigido por el gate de release.
 El archivo incluye el commit fuente para que un informe histórico pueda
 reproducirse. No presenta como verdes los criterios que siguen abiertos en el
 manifiesto de release.
+
+`workingTreeDirty` detecta cambios de fuente y otros archivos locales, pero ignora
+los bundles de experimento, el reporte R3, el scorecard y los datos de estado que
+la verificación de Pages regenera como evidencia de host. Así, esos artefactos CI
+no convierten por sí mismos un checkout limpio en una fuente marcada como sucia.

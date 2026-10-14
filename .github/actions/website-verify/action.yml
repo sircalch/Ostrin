@@ -71,6 +71,7 @@ runs:
         node scripts/fallback-ledger-check.mjs
         node scripts/r3-readiness.mjs --require-ready
         node --test scripts/r3-readiness.test.mjs
+        node --test scripts/quality-scorecard.test.mjs
         node --test scripts/project-plan-check.test.mjs
         node --test scripts/v0.2-readiness-check.test.mjs
         node scripts/measurement-contract-check.mjs

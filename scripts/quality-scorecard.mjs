@@ -16,6 +16,24 @@ function git(args) {
   return execFileSync("git", args, { cwd: repositoryRoot, encoding: "utf8" }).trim();
 }
 
+const generatedEvidencePath = (filePath) => {
+  const normalized = filePath.replaceAll("\\", "/");
+  return normalized === "validation/r3-readiness.json"
+    || normalized === "validation/quality-scorecard.json"
+    || normalized === "website/status-data.js"
+    || (normalized.startsWith("website/assets/experiments/") && normalized.endsWith(".ostrin-experiment.json"));
+};
+
+export function hasDirtySourceChanges(changedPaths) {
+  return changedPaths.some((filePath) => !generatedEvidencePath(filePath));
+}
+
+function workingTreeSourcePaths() {
+  const tracked = git(["diff", "--name-only", "HEAD"]).split(/\r?\n/).filter(Boolean);
+  const untracked = git(["ls-files", "--others", "--exclude-standard"]).split(/\r?\n/).filter(Boolean);
+  return [...tracked, ...untracked];
+}
+
 function filesUnder(directory) {
   const root = path.join(repositoryRoot, directory);
   const files = [];
@@ -136,7 +154,10 @@ function effectCoverageStatus() {
 
 export async function buildScorecard() {
   const native = nativeCounts();
-  const workingTreeDirty = git(["status", "--porcelain"]).length > 0;
+  // Website CI intentionally rewrites these evidence outputs before publishing
+  // host-bound R3 data. They are not source edits and must not make the public
+  // source-integrity indicator permanently dirty.
+  const workingTreeDirty = hasDirtySourceChanges(workingTreeSourcePaths());
   return {
     schema: "ostrin.quality-scorecard/v1",
     sourceRevision: git(["rev-parse", "HEAD"]),
@@ -163,6 +184,8 @@ export async function buildScorecard() {
         extensionReadyCount: report.extensionReadyCount,
         readyCount: report.readyCount,
         openCount: report.openCount,
+        incompleteEffectBundleCount: report.incompleteEffectBundleCount,
+        unresolvedEffectCallCount: report.unresolvedEffectCallCount,
       };
     })(),
     linguist: linguistStatus(),

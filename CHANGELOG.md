@@ -58,7 +58,7 @@
   contracts are implemented. The interpreter and native boundary tests document
   the supported behavior and the current limitation.
 - Re-synchronized public inventories and quality scorecard data with the
-  current 302-example, 332-integration-test repository state.
+  current 302-example, 333-integration-test repository state.
 
 ## Unreleased
 
