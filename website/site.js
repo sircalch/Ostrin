@@ -18,7 +18,7 @@
       link.textContent = 'release notes ↗';
       text.append(link);
     } else {
-      text.textContent = 'Version ' + SITE_FACTS.version + ' is in development; no release has been published yet.';
+      text.textContent = 'Version ' + SITE_FACTS.version + ' is in candidate preparation; the latest published release is v' + SITE_FACTS.publishedVersion + '.';
     }
   });
 

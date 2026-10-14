@@ -33,12 +33,18 @@ export function collectSiteFacts() {
     .find((line) => line.startsWith(`## ${version} `));
   const releaseDate = heading?.match(/\((\d{4}-\d{2}-\d{2})\)\s*$/)?.[1];
   const released = Boolean(releaseDate) && existsSync(path.join(repositoryRoot, "docs", "releases", `v${version}.md`));
+  const published = [...readRepositoryFile("CHANGELOG.md").replaceAll("\r\n", "\n").matchAll(/^## (\d+\.\d+\.\d+) .*\((\d{4}-\d{2}-\d{2})\)\s*$/gm)]
+    .map(([, publishedVersion, date]) => ({ version: publishedVersion, date }))
+    .filter((release) => existsSync(path.join(repositoryRoot, "docs", "releases", `v${release.version}.md`)))
+    .sort((a, b) => b.date.localeCompare(a.date))[0] ?? null;
 
   return {
     version,
     releaseStatus: released ? "published" : "unreleased",
     releaseDate: released ? releaseDate : "",
     releaseUrl: released ? `https://github.com/sircalch/Ostrin/releases/tag/v${version}` : "",
+    publishedVersion: released ? version : published?.version ?? "",
+    publishedReleaseUrl: released ? `https://github.com/sircalch/Ostrin/releases/tag/v${version}` : published ? `https://github.com/sircalch/Ostrin/releases/tag/v${published.version}` : "",
     designDocs: String(filesUnder("docs/design").filter((file) => file.endsWith(".md")).length),
     examples: String(filesUnder("examples").filter((file) => file.endsWith(".ostrin")).length),
     experimentBundles: String(filesUnder("website/assets/experiments").filter((file) => file.endsWith(".ostrin-experiment.json")).length),

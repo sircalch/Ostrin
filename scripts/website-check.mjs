@@ -165,18 +165,17 @@ for (const page of publicPages) {
 
 // Release claims must match what CHANGELOG.md and docs/releases/ record (see site-facts.mjs).
 const released = facts.releaseStatus === "published";
+const installVersion = facts.publishedVersion || facts.version;
 for (const page of [...publicPages.map((name) => `website/${name}`), "README.md"]) {
   const text = read(page);
   for (const [, tag] of text.matchAll(/releases\/tag\/(v[0-9][^"'\s)<]*)/g)) {
-    check(released && tag === `v${facts.version}`, `${page}: links to release ${tag}, but ${released ? `the current release is v${facts.version}` : "no release is recorded"}`);
+    check(tag === `v${installVersion}`, `${page}: links to release ${tag}, but the latest published release is v${installVersion || "not recorded"}`);
   }
   for (const [, version] of text.matchAll(/--version (\d+\.\d+\.\d+)/g)) {
-    check(version === facts.version, `${page}: install command uses ${version}, compiler is ${facts.version}`);
+    check(version === installVersion, `${page}: install command uses ${version}, latest published compiler is ${installVersion}`);
   }
   if (released) {
     check(!/not (?:yet )?published|not published yet|prepared, not yet/i.test(text), `${page}: says the release is unpublished, but v${facts.version} is recorded as published`);
-  } else {
-    check(!text.includes(`v${facts.version}`) || page === "README.md", `${page}: mentions v${facts.version}, which has no recorded release`);
   }
 }
 

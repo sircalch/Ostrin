@@ -4,6 +4,8 @@ globalThis.OSTRIN_SITE_FACTS = Object.freeze({
   "releaseStatus": "unreleased",
   "releaseDate": "",
   "releaseUrl": "",
+  "publishedVersion": "0.1.0",
+  "publishedReleaseUrl": "https://github.com/sircalch/Ostrin/releases/tag/v0.1.0",
   "designDocs": "27",
   "examples": "302",
   "experimentBundles": "29",
