@@ -1,0 +1,28 @@
+trait Shape {
+    fn area(self) -> Float
+}
+
+record Circle { radius: Float }
+record Square { side: Float }
+
+impl Shape for Circle {
+    fn area(self) -> Float { 3.0 * self.radius * self.radius }
+}
+impl Shape for Square {
+    fn area(self) -> Float { self.side * self.side }
+}
+
+fn pass_all(shapes: List<dyn Shape>) -> List<dyn Shape> { shapes }
+
+fn main() -> Void {
+    shapes: List<dyn Shape> = [Circle { radius: 2.0 }, Square { side: 3.0 }]
+    forwarded: List<dyn Shape> = pass_all(shapes)
+    for shape in forwarded { print(shape.area()) }
+    circles: List<Circle> = [Circle { radius: 1.0 }]
+    boxed_circles: List<dyn Shape> = circles
+    for shape in boxed_circles { print(shape.area()) }
+    borrowed: Circle = Circle { radius: 4.0 }
+    aliases: List<dyn Shape> = [borrowed]
+    print(aliases[0].area())
+    print(borrowed.area())
+}

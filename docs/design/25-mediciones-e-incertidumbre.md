@@ -25,17 +25,54 @@ componible:
 Este documento fija interfaces y contratos para una implementación gradual. La primera fase
 ejecutable vive en `compiler/std/measurements.ostrin`: conserva fuentes de sensibilidad explícitas
 para `Measurement<Float>`, propaga suma/resta/producto/cociente y representa incertidumbre
-desconocida sin convertirla en cero. La superficie sigue siendo experimental y funcional; todavía
-no declara semántica de operadores ni integración completa con `Quantity<T>`.
+desconocida sin convertirla en cero. `exact` y `standard` rechazan valores nominales y sigmas no
+finitos mediante el builtin tipado `is_finite` para `Float`/`Float32`; las sensibilidades y la varianza también se validan al consultar la incertidumbre. La
+superficie sigue siendo experimental y funcional; todavía no declara semántica de operadores ni
+integración completa con `Quantity<T>`.
 
 ### 1.1 Evidencia de la fase escalar
 
 `examples/measurement_scalar.ostrin` cubre construcciones `exact`, `standard` y `unknown`,
-validación de sigma y etiquetas, combinación de fuentes independientes, cancelación correlacionada
-(`x - x = 0 ± 0`) y paridad intérprete/native. `examples/viz_bars.ostrin` añade una serie de
+validación de finitud, sigma y etiquetas, combinación de fuentes independientes, cancelación
+correlacionada (`x - x = 0 ± 0`), propagación analítica de `x*x` y `x*y`, y paridad intérprete/native.
+`examples/measurement_record.ostrin` añade almacenamiento y reemplazo de
+`Measurement<Float>` dentro de un record, con paridad intérprete/native, C para
+WASI y `live_allocations=0`; la prueba
+`std_measurements_scalar_record_field_preserves_ownership` verifica además
+que el destructor del record libera la medición exactamente una vez.
+`examples/measurement_return.ostrin` cubre el paso como argumento y el retorno
+de `Measurement<Float>` con la misma paridad y comprobación de ownership.
+`examples/measurement_clone.ostrin` cubre la copia explícita mediante `clone`;
+los alias implícitos y los payloads compuestos continúan fuera del contrato.
+`examples/measurement_closure.ostrin` cubre la captura por closure y la
+destrucción del entorno sin perder la medición capturada.
+`examples/measurement_list.ostrin` cubre una colección de
+`Measurement<Float>` construida por el usuario, acceso indexado y destrucción,
+con paridad intérprete/native, emisión WASI y `live_allocations=0`.
+`examples/measurement_branch.ostrin` cubre la selección de una medición desde
+las dos ramas de una función, con la misma evidencia de paridad y ownership.
+`examples/measurement_loop.ostrin` cubre reemplazos repetidos dentro de un
+loop y la liberación del valor final.
+`examples/measurement_phi.ostrin` cubre la selección de dos mediciones en un
+`Phi` explícito del backend nativo.
+`examples/measurement_result.ostrin` cubre `Result<Measurement<Float>, String>`
+en las ramas `Ok` y `Err`, con `match`, emisión WASI y `live_allocations=0`.
+`examples/measurement_task.ostrin` cubre captura diferida, `join` y destrucción
+del entorno de una tarea para `Measurement<Float>`.
+`examples/measurement_array_shape.ostrin` conserva la frontera explícita de
+`Array<Measurement<Float>>`: el intérprete la rechaza por el contrato actual y
+el backend nativo da un diagnóstico específico que remite a `List`.
+`examples/measurement_quantity_direct_shape.ostrin` cubre también la forma
+concreta `Measurement<Quantity<Length>>`; el backend la rechaza antes de entrar
+en el fallback AST que todavía no demuestra ownership de sus campos gestionados.
+`examples/viz_bars.ostrin` añade una serie de
 cinco grupos y proyecta `values`/`uncertainties` hacia `std.viz.errorbars`, también con paridad
 intérprete/native y una figura SVG reproducible en la galería. El Scientific Lab ejecuta el
-ejemplo escalar con `ostrinc.wasm`. Esta evidencia no habilita todavía `Array<Measurement<T>>`,
+ejemplo escalar con `ostrinc.wasm`. La prueba `std_measurements_scalar_matches_interpreter_and_native`
+verifica además `live_allocations=0` en nativo y que el C emitido para WASI incluya la destrucción
+recursiva de `Measurement<Float>`, `Sensitivity`, las etiquetas y las listas de fuentes. ASan/UBSan
+ejecutaron esta prueba mediante `sanitizers.yml` en CI y terminaron correctamente en el run
+`38173152897`. Esta evidencia no habilita todavía `Array<Measurement<T>>`, integración nativa con `Quantity`,
 intervalos de cobertura ni Monte Carlo.
 
 ## 2. Revisión de antecedentes
@@ -218,6 +255,8 @@ runtime:
   indicar que descarta la incertidumbre.
 
 Este contrato no habilita todavía `Array<Measurement<T>>`, covarianza ni `Measurement<Quantity<D>>`.
+El intérprete acepta la forma de representación, mientras el backend nativo la rechaza
+explícitamente hasta definir ownership, dimensión de incertidumbre y ABI.
 Antes de implementar cualquiera de ellas se requieren pruebas de alias explícito, independencia de
 etiquetas repetidas, reducciones con fuentes compartidas, validación de covarianza, conversiones de
 unidades y paridad intérprete/native/WASM. También se necesitan leak-check, ASan y UBSan para los
@@ -230,6 +269,28 @@ buffers o grafos gestionados.
 La primera implementación debe cubrir suma, resta, producto, cociente, potencias enteras y las
 conversiones de unidades ya soportadas. Para funciones diferenciables, el camino linealizado
 usa las derivadas disponibles y conserva las dependencias de fuente.
+
+El contrato escalar actual usa la ley de propagación de incertidumbre de primer orden: si una
+salida `y = f(x)` depende de fuentes con sensibilidades `cᵢ` y desviaciones estándar `σᵢ`, su
+varianza es `Σᵢ (cᵢ σᵢ)²`. La fórmula general añade términos de covarianza; esta fase aún no acepta
+una matriz de covarianza. Una etiqueta de fuente identifica provisionalmente una misma variable:
+las contribuciones con esa etiqueta se combinan antes de elevar al cuadrado, mientras que etiquetas
+distintas se tratan como fuentes independientes. La etiqueta como identidad es una limitación
+experimental, no el contrato final de identidad opaca de §5.5.
+
+| Operación | Valor nominal | Sensibilidad de cada fuente `s` | Supuesto y límite |
+| --- | --- | --- | --- |
+| `exact(x)` | `x` | Ninguna; varianza cero | `x` debe ser finito. |
+| `standard(x, σ, label)` | `x` | `c_label = 1` | `x` y `σ` deben ser finitos; `σ ≥ 0`; cada etiqueta conserva un único `σ`. |
+| `scale(a, k)` | `k·a` | `k·cₐ,s` | Lineal y exacta respecto a `k`; el valor desconocido sigue siendo desconocido. |
+| `add(a,b)` / `sub(a,b)` | `a ± b` | `cₐ,s ± c_b,s` | Fuentes de igual etiqueta son correlacionadas y se combinan con signo antes de calcular varianza. |
+| `mul(a,b)` | `a·b` | `b·cₐ,s + a·c_b,s` | Aproximación de Taylor de primer orden alrededor de los valores nominales; se omiten términos de orden superior. |
+| `div(a,b)` | `a/b` | `cₐ,s/b − a·c_b,s/b²` | Igual aproximación local; `b ≠ 0`; no cubre denominadores cercanos a cero ni distribuciones fuertemente no lineales. |
+
+Las pruebas analíticas actuales comprueban que para `x=12.30±0.02`, `x*x` produce incertidumbre
+`2·12.30·0.02 = 0.492` (la misma fuente aparece en ambos operandos), y que para una fuente
+independiente `y=1.50±0.03`, `u(x*y) = √((y·0.02)² + (x·0.03)²)`. La validación se compara con
+estas derivadas y la ley de propagación documentada por [NIST TN 1297, Appendix A](https://www.nist.gov/pml/nist-technical-note-1297/nist-tn-1297-appendix-law-propagation-uncertainty); no sustituye una validación de segundo orden ni Monte Carlo.
 
 Las funciones trascendentes requieren un argumento adimensional según las reglas de `Quantity`.
 El resultado conserva la unidad y la sensibilidad correctas cuando la operación es válida.

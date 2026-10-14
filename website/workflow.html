@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#080a10">
+    <meta name="description" content="A source-backed Ostrin scientific workflow from an adaptive ODE to an animated figure and reproducible provenance.">
+    <link rel="canonical" href="https://sircalch.github.io/Ostrin/workflow.html">
+    <meta property="og:site_name" content="Ostrin">
+    <meta property="og:title" content="Ostrin Scientific Workflow — From Source to Evidence">
+    <meta property="og:description" content="A source-backed Ostrin scientific workflow from an adaptive ODE to an animated figure and reproducible provenance.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://sircalch.github.io/Ostrin/workflow.html">
+    <meta property="og:image" content="https://sircalch.github.io/Ostrin/assets/ostrin-social.png">
+    <meta property="og:image:type" content="image/png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Ostrin programming language: scientific-first, general-purpose, native C and WASI.">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Ostrin Scientific Workflow — From Source to Evidence">
+    <meta name="twitter:description" content="A source-backed Ostrin scientific workflow from an adaptive ODE to an animated figure and reproducible provenance.">
+    <meta name="twitter:image" content="https://sircalch.github.io/Ostrin/assets/ostrin-social.png">
+    <meta name="twitter:image:alt" content="Ostrin programming language: scientific-first, general-purpose, native C and WASI.">
+    <link rel="icon" href="assets/ostrin-logo.png">
+    <link rel="stylesheet" href="styles.css">
+    <script src="site-data.js" defer></script>
+    <script src="site.js" defer></script>
+    <title>Ostrin Scientific Workflow — From Source to Evidence</title>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    <header class="site-header"><a class="brand" href="index.html"><img src="assets/ostrin-logo.png" alt="" width="36" height="36"><span>OSTRIN</span></a><div class="header-right"><span class="version"></span><button class="menu-toggle" aria-label="Open navigation" aria-expanded="false"><span></span><span></span></button><nav class="site-nav" aria-label="Main navigation"><a href="docs.html">Learn</a><a href="reference.html">Reference</a><a href="guides.html">Guides</a><a href="examples.html">Examples</a><a href="cookbook.html">Cookbook</a><a href="viz.html">Viz</a><a href="playground.html">Playground</a><a href="https://github.com/sircalch/Ostrin">GitHub <span aria-hidden="true">↗</span></a></nav></div></header>
+    <main id="main-content" tabindex="-1">
+      <section class="page-hero shell"><p class="eyebrow">Flagship workflow · source-backed</p><h1>From equation<br><em>to evidence.</em></h1><p class="lede">One small scientific question follows the same path a larger Ostrin project should follow: write the model, run it with the real compiler, inspect the figure, then keep the provenance beside the result.</p><div class="page-meta"><span>adaptive RK45</span><span>native SVG</span><span>WASI replay</span><span>R0 verified</span></div></section>
+      <section class="section shell" aria-labelledby="workflow-question">
+        <div class="section-header"><p class="eyebrow">The question</p><div><h2 id="workflow-question">How does a driven pendulum settle?</h2><p class="lede">The example integrates a damped, periodically driven pendulum for 60 seconds. The state is angle and angular velocity; the result is both a time series and a phase portrait.</p></div></div>
+        <div class="workflow-step-grid">
+          <article class="workflow-step-card"><span class="workflow-step-number">01 / SOURCE</span><h3>State the model</h3><p><span class="mono">examples/viz_ode.ostrin</span> defines the derivative and calls <span class="mono">numeric.rk45</span> with an explicit tolerance.</p><a class="text-link violet" data-evidence="examples/viz_ode.ostrin" href="https://github.com/sircalch/Ostrin/blob/main/examples/viz_ode.ostrin">Read the Ostrin source ↗</a></article>
+          <article class="workflow-step-card"><span class="workflow-step-number">02 / EXECUTE</span><h3>Run the same program</h3><p>The recorded figure was produced by <span class="mono">ostrinc.wasm</span> for <span class="mono">wasm32-wasip1</span>. Open the live explorer to rerun the program in the browser.</p><a class="text-link violet" href="viz.html?figure=ode">Open the live ODE explorer ↗</a></article>
+          <article class="workflow-step-card"><span class="workflow-step-number">03 / INSPECT</span><h3>Read two views</h3><p>Angle over time shows the response; the phase portrait shows the trajectory through state space. The SVG remains standalone and searchable.</p><a class="text-link violet" href="viz.html?workflow=simulate&amp;figure=ode">Inspect the recorded figure ↗</a></article>
+          <article class="workflow-step-card"><span class="workflow-step-number">04 / PRESERVE</span><h3>Keep the evidence</h3><p>The experiment bundle stores source, input, figure and provenance hashes. Its current contract is R0: exact replay in the recorded CI configuration.</p><a class="text-link violet" href="provenance.html">Read the provenance boundary ↗</a></article>
+        </div>
+      </section>
+      <section class="section shell workflow-feature" aria-labelledby="workflow-figure-title">
+        <div class="section-header"><p class="eyebrow">Recorded output</p><div><h2 id="workflow-figure-title">The result stays inspectable.</h2><p class="lede">This is the SVG generated from the source above. It can be opened directly, downloaded from the gallery or recomputed through the live explorer.</p></div></div>
+        <figure class="workflow-figure"><img src="assets/viz/ode.svg" alt="Two-panel figure showing driven pendulum angle over time and its phase portrait" width="960" height="320"><figcaption><span>Adaptive ODE solver · tolerance 1e-9</span><a class="text-link violet" href="assets/viz/ode.svg">Open SVG ↗</a></figcaption></figure>
+      </section>
+      <section class="dark-band"><div class="section shell" aria-labelledby="workflow-extensions-title"><div class="section-header"><p class="eyebrow">Extend the question</p><div><h2 id="workflow-extensions-title">Simulation becomes communication.</h2><p class="lede">The same visualization surface supports motion, tables and provenance artifacts. These companion programs show the next steps without hiding which source produced each result.</p></div></div><div class="workflow-extension-grid">
+        <a class="workflow-extension" href="viz.html?figure=double-pendulum"><img src="assets/viz/double-pendulum.svg" alt="Animated double pendulum figure preview"><span class="workflow-step-number">ANIMATION</span><h3>Watch dynamics</h3><p>Scrub an SVG animation and export a selected frame or video when the browser supports it.</p></a>
+        <a class="workflow-extension" href="viz.html?figure=table"><img src="assets/viz/table.svg" alt="Formatted ODE solver comparison table preview"><span class="workflow-step-number">TABLE</span><h3>Compare methods</h3><p>Filter and sort a source-backed table while keeping row values and provenance visible.</p></a>
+        <a class="workflow-extension" href="viz.html?figure=provenance"><img src="assets/viz/provenance.svg" alt="Provenance artifact figure preview"><span class="workflow-step-number">PROVENANCE</span><h3>Trace the artifact</h3><p>Follow source, data, seed and compiler identity from the figure back to the repository.</p></a>
+      </div></div></section>
+      <section class="section shell workflow-limit" aria-labelledby="workflow-limits-title"><div class="split-callout"><div><p class="eyebrow">Evidence boundary</p><h2 id="workflow-limits-title">Useful evidence, stated precisely.</h2><p>This workflow verifies exact SVG replay in the recorded browser configuration. It does not claim cross-platform numerical equivalence or a complete R3 host capture. Those remain explicit next steps.</p><a class="button" href="viz.html?workflow=simulate">Open the full simulation path <span>→</span></a></div><ul class="mini-list"><li>Source hash and figure hash are recorded</li><li>Compiler and WASI target are visible</li><li>R0 replay is verified in Website CI</li><li>Cross-platform tolerances remain unclaimed</li></ul></div></section>
+    </main>
+    <footer class="site-footer shell"><a class="brand" href="index.html"><img src="assets/ostrin-logo.png" alt="" width="30" height="30"><span>OSTRIN</span></a><span>Open development · MIT License</span><div class="footer-links"><a href="language.html">Language</a><a href="ecosystem.html">Ecosystem</a><a href="showcase.html">Showcase</a><a href="community.html">Community</a><a href="roadmap.html">Roadmap</a><a href="benchmarks.html">Benchmarks</a><a href="https://github.com/sircalch/Ostrin">GitHub ↗</a></div></footer>
+  </body>
+</html>

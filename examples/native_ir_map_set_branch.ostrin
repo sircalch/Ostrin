@@ -1,0 +1,32 @@
+fn choose_scores(flag: Bool) -> Map<String, Int> {
+    if flag {
+        mut values: Map<String, Int> = Map<String, Int>()
+        values.set("left", 1)
+        values
+    } else {
+        mut values: Map<String, Int> = Map<String, Int>()
+        values.set("right", 2)
+        values
+    }
+}
+
+fn choose_tags(flag: Bool) -> Set<String> {
+    if flag {
+        mut values: Set<String> = Set<String>()
+        values.add("left")
+        values
+    } else {
+        mut values: Set<String> = Set<String>()
+        values.add("right")
+        values
+    }
+}
+
+fn main() -> Void {
+    scores = choose_scores(false)
+    tags = choose_tags(true)
+    print(scores.count())
+    print(scores.get("right").unwrap())
+    print(tags.count())
+    print(tags.contains("left"))
+}

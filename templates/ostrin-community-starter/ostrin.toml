@@ -1,0 +1,4 @@
+[package]
+name = "ostrin-community-starter"
+version = "0.1.0"
+entry = "hello.ostrin"

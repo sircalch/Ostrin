@@ -62,6 +62,14 @@ el helper real del runtime; `spawn_scope {}` abre y drena el grupo estructurado 
 IR cuando sus hijos usan la ABI soportada; las tareas anidadas con capturas propagadas ya comparten
 esa ABI, mientras los scopes anidados y escapes complejos siguen en fallback.*
 
+La ruta de trait objects conserva `DynBox`/`DynCall` en IR y emite el par
+`data + vtable` en `ir_c.rs`, incluidos records genéricos y métodos default
+especializados. `native_trait_defaults.ostrin` genera 6 funciones IR, 0 HIR y
+0 AST, con dispatch por vtable, paridad intérprete/nativo y `live_allocations=0`.
+La migración no cierra el gate general de ownership: la matriz WASI y ASan/UBSan
+de esta revisión aún deben ejecutarse; tareas/cancelación y campos genéricos dyn
+siguen como límites explícitos.
+
 ## 1. Qué existe ya (comprobado en el código)
 
 | Pieza | Dónde | Papel en la migración |
@@ -140,8 +148,17 @@ Sobre este IR se hacen los análisis que el texto C no permite:
    `numeric_units.ostrin` ya no cae al emisor AST. `Quantity.to_string()` escalar y
    `Array<Float32>.to_string()` usan helpers nativos desde IR/C y el ejemplo `arrays_3d` ya no cae al emisor AST. Las coerciones `Float↔Float32` de bindings explícitos y agregados `List/Set<Float32>` se insertan en IR con la misma precisión que el emisor legado. Los patrones superficiales de
    records con campos escalares y genéricos, junto con enums no genéricos por valor y sus patrones anidados,
-   ya usan IR/C con paridad intérprete/nativo/WASI; los payloads gestionados y enums genéricos siguen fuera
-   del slice.
+   ya usan IR/C con paridad intérprete/nativo/WASI; un `Message::Text(String)` seleccionado por un `if`/
+   `Phi` también usa IR/C con retain/drop por tag, paridad, leak-check nativo, ASan/UBSan focalizados y
+   runtime WASI. Otros payloads gestionados y enums genéricos siguen fuera del slice. El fallback HIR genera
+   destructores por tag para enums que guardan payloads gestionados
+   en colecciones; `List<Message>` con `Message::Text(String)` y un campo `Envelope.message`
+   prueban retain/drop por tag, alias, inserción/extracción/reasignación y destrucción con
+   paridad y leak-check nativo; WASI emite ambos dispatchers tipados. Las enums con payload
+   gestionado siguen fuera de IR salvo el caso acotado `Message::Text(String)` en un `Phi` de rama.
+   Un estrés acotado crea 64 enums en un `while`, los recorre después del loop y termina sin fugas bajo
+   HIR; esto no generaliza a `Phi` de bucle, errores, closures, tareas ni payloads recursivos.
+   Los payloads `Quantity` quedan fuera del subconjunto escalar por su etiqueta dinámica.
    El incremento acotado incluye
    también `Rng` (constructor, métodos escalares, muestreo de arrays y permutación), con
    liberación gestionada y paridad intérprete/nativo. Los combinadores de listas (`map`, `filter`,
@@ -160,11 +177,11 @@ Sobre este IR se hacen los análisis que el texto C no permite:
    `linspace`, `pow`, `norm_pdf` y `norm_cdf`, `std.viz::uid` usa `hash(String)` en IR/C y `std.viz::render` recorre
    explícitamente sus series. HIR sustituye `Self` por el propietario concreto en las firmas de
    métodos de traits, por lo que los operadores de `Complex` también cruzan IR/C; las
-   las instanciaciones genéricas de trazado con `Quantity` permanecen en fallback HIR/AST:
-   el intento de bajar `Figure.unit_line`/`unit_scatter` a IR/C expuso un alias prestado de la
-   etiqueta de unidad después de liberar el array propietario; se retomarán cuando el contrato de
-   ownership de `Quantity` escalar esté explícito,
-   además de los agregados de LU, SVD, número de condición, autovectores y `ComplexVector`/`ComplexMatrix`,
+   instanciaciones genéricas de `Figure.unit_line`/`unit_scatter` con `Quantity` ahora
+   tienen especialización dimensionada en IR/C, SVG diferencial idéntico, emisión WASI y
+   `live_allocations=0` en nativo. ASan/UBSan pasan en CI (`38173152897`) y los trazados basados en
+   listas aún requieren su propio contrato de ownership. También quedan los agregados de LU,
+   SVD, número de condición, autovectores y `ComplexVector`/`ComplexMatrix`,
    que quedan pendientes de migrar a IR, mientras los métodos de records recursivos conservan
    HIR/AST por seguridad, y solo permite reducirlo o justificar explícitamente
    otro aumento.

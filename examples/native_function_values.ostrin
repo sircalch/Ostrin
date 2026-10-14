@@ -19,6 +19,10 @@ fn double(x: Int) -> Int {
     x * 2
 }
 
+fn add_half(x: Float) -> Float {
+    x + 0.5
+}
+
 fn greet(name: String) -> String {
     "hola " + name
 }
@@ -66,6 +70,11 @@ fn main() -> Void {
         total = total + f(100)
     }
     print(total)
+
+    float_functions: List<fn(Float) -> Float> = [add_half]
+    for f in float_functions {
+        print(f(2.0))
+    }
 
     h = Handler { name: "h1", on_value: fn(v) { v + k } }
     print(h.name)

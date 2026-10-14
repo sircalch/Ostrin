@@ -1,0 +1,255 @@
+{
+  "schema": "ostrin.numeric-validation/v1",
+  "reference": {
+    "kind": "analytic",
+    "method": "independent JavaScript residual calculations over values emitted at full Float precision",
+    "runtime_dependency": "none"
+  },
+  "fixture": "validation/numeric/matrix_algorithms.ostrin",
+  "environment": {
+    "platform": "win32",
+    "architecture": "x64",
+    "node": "v24.21.0"
+  },
+  "leakCheck": "live_allocations=0",
+  "nativeCompileDiagnostics": "",
+  "parity": {
+    "comparedValues": 60,
+    "maximumAbsoluteDifference": 0,
+    "absolute": 1e-13,
+    "relative": 1e-12
+  },
+  "runs": {
+    "interpreter": {
+      "lu": {
+        "solution": [
+          1.25,
+          -0.7500000000000001,
+          2
+        ],
+        "absoluteResidual": {
+          "value": 0,
+          "limit": 1.0203862334963085e-11,
+          "scale": 10.103862334963086
+        },
+        "relativeBackwardError": {
+          "value": 0,
+          "limit": 1e-12,
+          "scale": 1
+        },
+        "maximumForwardError": 1.1102230246251565e-16,
+        "relativeFactorizationResidual": {
+          "value": 9.98621689453575e-17,
+          "limit": 1.1e-12,
+          "scale": 1
+        },
+        "triangularStructureResidual": {
+          "value": 0,
+          "limit": 1.1e-12,
+          "scale": 1
+        }
+      },
+      "cholesky": {
+        "solution": [
+          0.7999999999999998,
+          -1.3,
+          1.9
+        ],
+        "absoluteResidual": {
+          "value": 9.930136612989092e-16,
+          "limit": 2.1292783454284722e-11,
+          "scale": 21.192783454284722
+        },
+        "relativeBackwardError": {
+          "value": 4.6856217043926966e-17,
+          "limit": 1e-12,
+          "scale": 1
+        },
+        "maximumForwardError": 2.220446049250313e-16,
+        "relativeFactorizationResidual": {
+          "value": 1.5328008716382516e-16,
+          "limit": 1.1e-12,
+          "scale": 1
+        },
+        "triangularStructureResidual": {
+          "value": 0,
+          "limit": 1.1e-12,
+          "scale": 1
+        }
+      },
+      "qr": {
+        "relativeReconstructionResidual": {
+          "value": 0,
+          "limit": 1.1e-12,
+          "scale": 1
+        },
+        "orthogonalityResidual": {
+          "value": 2.220446049250313e-16,
+          "limit": 1.1e-12,
+          "scale": 1
+        },
+        "triangularStructureResidual": {
+          "value": 0,
+          "limit": 1.1e-12,
+          "scale": 1
+        }
+      },
+      "svd": {
+        "relativeReconstructionResidual": {
+          "value": 2.719479911021037e-16,
+          "limit": 2e-12,
+          "scale": 1
+        },
+        "uOrthogonalityResidual": {
+          "value": 2.220446049250313e-16,
+          "limit": 2e-12,
+          "scale": 1
+        },
+        "vOrthogonalityResidual": {
+          "value": 3.1401849173675503e-16,
+          "limit": 2e-12,
+          "scale": 1
+        },
+        "singularValues": [
+          3.2566165379829393,
+          1.8424029756098446
+        ]
+      },
+      "eigen": {
+        "relativeEigenResidual": {
+          "value": 1.447553722489536e-16,
+          "limit": 1.1e-12,
+          "scale": 1
+        },
+        "orthogonalityResidual": {
+          "value": 3.1401849173675503e-16,
+          "limit": 1.1e-12,
+          "scale": 1
+        },
+        "eigenvalues": [
+          0.9999999999999998,
+          2.9999999999999996
+        ]
+      }
+    },
+    "native": {
+      "lu": {
+        "solution": [
+          1.25,
+          -0.7500000000000001,
+          2
+        ],
+        "absoluteResidual": {
+          "value": 0,
+          "limit": 1.0203862334963085e-11,
+          "scale": 10.103862334963086
+        },
+        "relativeBackwardError": {
+          "value": 0,
+          "limit": 1e-12,
+          "scale": 1
+        },
+        "maximumForwardError": 1.1102230246251565e-16,
+        "relativeFactorizationResidual": {
+          "value": 9.98621689453575e-17,
+          "limit": 1.1e-12,
+          "scale": 1
+        },
+        "triangularStructureResidual": {
+          "value": 0,
+          "limit": 1.1e-12,
+          "scale": 1
+        }
+      },
+      "cholesky": {
+        "solution": [
+          0.7999999999999998,
+          -1.3,
+          1.9
+        ],
+        "absoluteResidual": {
+          "value": 9.930136612989092e-16,
+          "limit": 2.1292783454284722e-11,
+          "scale": 21.192783454284722
+        },
+        "relativeBackwardError": {
+          "value": 4.6856217043926966e-17,
+          "limit": 1e-12,
+          "scale": 1
+        },
+        "maximumForwardError": 2.220446049250313e-16,
+        "relativeFactorizationResidual": {
+          "value": 1.5328008716382516e-16,
+          "limit": 1.1e-12,
+          "scale": 1
+        },
+        "triangularStructureResidual": {
+          "value": 0,
+          "limit": 1.1e-12,
+          "scale": 1
+        }
+      },
+      "qr": {
+        "relativeReconstructionResidual": {
+          "value": 0,
+          "limit": 1.1e-12,
+          "scale": 1
+        },
+        "orthogonalityResidual": {
+          "value": 2.220446049250313e-16,
+          "limit": 1.1e-12,
+          "scale": 1
+        },
+        "triangularStructureResidual": {
+          "value": 0,
+          "limit": 1.1e-12,
+          "scale": 1
+        }
+      },
+      "svd": {
+        "relativeReconstructionResidual": {
+          "value": 2.719479911021037e-16,
+          "limit": 2e-12,
+          "scale": 1
+        },
+        "uOrthogonalityResidual": {
+          "value": 2.220446049250313e-16,
+          "limit": 2e-12,
+          "scale": 1
+        },
+        "vOrthogonalityResidual": {
+          "value": 3.1401849173675503e-16,
+          "limit": 2e-12,
+          "scale": 1
+        },
+        "singularValues": [
+          3.2566165379829393,
+          1.8424029756098446
+        ]
+      },
+      "eigen": {
+        "relativeEigenResidual": {
+          "value": 1.447553722489536e-16,
+          "limit": 1.1e-12,
+          "scale": 1
+        },
+        "orthogonalityResidual": {
+          "value": 3.1401849173675503e-16,
+          "limit": 1.1e-12,
+          "scale": 1
+        },
+        "eigenvalues": [
+          0.9999999999999998,
+          2.9999999999999996
+        ]
+      }
+    }
+  },
+  "ci": {
+    "provider": "github-actions",
+    "run_id": "38160056059",
+    "run_url": "https://github.com/sircalch/Ostrin/actions/runs/38160056059",
+    "commit": "175dca42b27767cc4c85a165bc0fc758bff5491a",
+    "workflow": "Ostrin CI"
+  }
+}

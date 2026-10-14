@@ -10,7 +10,7 @@
 //!   fuzzing of the lexer/parser/checker and native lowering: bad input may
 //!   produce errors but must never panic.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::PathBuf;
 use std::process::{Command, Output};
@@ -41,10 +41,46 @@ fn text(bytes: &[u8]) -> String {
     String::from_utf8_lossy(bytes).replace("\r\n", "\n")
 }
 
+fn outputs_match(name: &str, interpreted: &str, native: &str) -> bool {
+    if name == "concurrency_cancel_after_drop.ostrin" {
+        // The cancellation contract forbids both child and parent continuation.
+        // Native scheduling may choose whether the controller prints `true`
+        // before the parent gets its first time slice, so compare the
+        // observable event set rather than imposing an OS-specific order.
+        let normalize = |output: &str| {
+            let mut lines: Vec<_> = output.lines().map(str::to_owned).collect();
+            lines.sort_unstable();
+            lines
+        };
+        return normalize(interpreted) == normalize(native)
+            && native.lines().count() == 2
+            && native.contains("parent-started\n")
+            && native.contains("true\n")
+            && !native.contains("child-must-not-run")
+            && !native.contains("parent-must-not-run");
+    }
+    interpreted == native
+}
+
 /// Examples the native backend deliberately does not reproduce, with the
 /// reason. Each entry must *fail* to compile natively — when a gap is closed
 /// the assertion below fires and the entry must be deleted.
-const KNOWN_NATIVE_GAPS: &[(&str, &str)] = &[];
+const KNOWN_NATIVE_GAPS: &[(&str, &str)] = &[(
+    "measurement_quantity_shape.ostrin",
+    "Measurement<Quantity<D>> remains interpreter-only while the native representation is designed",
+), (
+    "measurement_quantity_direct_shape.ostrin",
+    "direct Measurement<Quantity<D>> remains interpreter-only while the native representation is designed",
+)];
+
+// These examples intentionally exercise an experimental type boundary that is
+// not part of the typed-core ratchet yet. Keeping them out of the aggregate
+// counts prevents adding a documented frontier example from weakening the
+// ratchet for the stable core.
+const NON_CORE_TYPED_FIXTURES: &[&str] = &[
+    "measurement_quantity_shape.ostrin",
+    "measurement_quantity_direct_shape.ostrin",
+];
 
 /// Examples that compile natively but whose output legitimately differs
 /// (operating-system error text comes from `strerror` vs Rust's `io::Error`).
@@ -120,7 +156,11 @@ fn every_example_agrees_between_interpreter_and_native() {
             continue;
         }
         compared += 1;
-        if text(&native.stdout) != text(&interpreted.stdout) {
+        if !outputs_match(
+            name.as_str(),
+            &text(&interpreted.stdout),
+            &text(&native.stdout),
+        ) {
             failures.push(format!(
                 "{name}: output differs between interpreter and native"
             ));
@@ -316,7 +356,9 @@ fn typed_expression_table_does_not_regress() {
     const MAX_UNKNOWN_EXPRESSIONS: usize = 8;
     let (mut total, mut unknown) = (0usize, 0usize);
     for path in examples() {
-        if STANDARD_LIBRARY_FIXTURES.contains(&name_of(&path).as_str()) {
+        if STANDARD_LIBRARY_FIXTURES.contains(&name_of(&path).as_str())
+            || NON_CORE_TYPED_FIXTURES.contains(&name_of(&path).as_str())
+        {
             continue;
         }
         let file = path.to_string_lossy().to_string();
@@ -352,10 +394,13 @@ fn native_backend_types_agree_with_the_checker() {
     let mut ir_generated = 0usize;
     let mut ast_fallback = 0usize;
     let mut native_sources: BTreeMap<String, (usize, usize, usize)> = BTreeMap::new();
+    let mut fallback_functions = BTreeSet::new();
     let (mut agreed, mut partial, mut completed, mut unchecked, mut node_agreed, mut divergences) =
         (0usize, 0usize, 0usize, 0usize, 0usize, Vec::<String>::new());
     for path in examples() {
-        if STANDARD_LIBRARY_FIXTURES.contains(&name_of(&path).as_str()) {
+        if STANDARD_LIBRARY_FIXTURES.contains(&name_of(&path).as_str())
+            || NON_CORE_TYPED_FIXTURES.contains(&name_of(&path).as_str())
+        {
             continue;
         }
         let file = path.to_string_lossy().to_string();
@@ -379,6 +424,8 @@ fn native_backend_types_agree_with_the_checker() {
                 ir_generated += n.trim().parse::<usize>().unwrap();
             } else if let Some(n) = line.strip_prefix("ast-fallback: ") {
                 ast_fallback += n.trim().parse::<usize>().unwrap();
+            } else if let Some(function) = line.strip_prefix("ast-fallback-function: ") {
+                fallback_functions.insert(function.to_string());
             } else if let Some(rest) = line.strip_prefix("native-source: ") {
                 let mut fields = rest.split_whitespace();
                 let source = fields.next().unwrap_or("<unknown>").to_string();
@@ -405,7 +452,21 @@ fn native_backend_types_agree_with_the_checker() {
             }
         }
     }
-    assert!(agreed > 1300, "only {agreed} expressions were compared");
+    // Migrating std.viz's generic Quantity line/scatter instances moves their
+    // bodies out of the AST-only type-comparison path; the dedicated
+    // viz_units regression checks their IR/native/WASI semantics directly.
+    // `native_function_values::main` moved from AST to IR after function
+    // closures gained list/record storage ownership, removing AST nodes
+    // from this checker-comparison population. Its full output
+    // and leak contract is covered by a dedicated integration regression.
+    // Scoped spawn cancellation and dyn Trait default dispatch now lower
+    // through IR as well. A zero AST comparison population is valid once all
+    // remaining source entry points are typed; the generated-function and
+    // fallback ratchets below independently verify migration progress.
+    assert!(
+        agreed <= 11,
+        "unexpectedly large AST comparison population: {agreed}"
+    );
     // The same comparison over *every* AST node (operands included), by node address.
     // The Float32 array `to_string()` migration removed the entire `arrays_3d`
     // entry point from this comparison. The generic-call HIR prepass now also
@@ -414,20 +475,25 @@ fn native_backend_types_agree_with_the_checker() {
     // Float32 binding/list coercion slice, reflected Complex operators, scalar
     // boolean formatting and deterministic `pow` migration remove more entry-
     // point bodies. The scalar concrete-method prepass removes one more
-    // entry-point body from this AST comparison; the remaining generic-
-    // receiver method path leaves 2,004 comparable nodes. Keep a tight lower
-    // bound with room for later slices.
+    // entry-point body from this AST comparison. Composite map/set lowering
+    // removes the `hash_map_composite` entry point from the AST comparison too.
+    // The scalar Option/Result lowering removes `option_result` from it as well.
+    // Migrating a whole entry point removes its AST nodes from this comparison
+    // by design; zero is the expected current population.
+    // Quantity plot bodies now use checked IR, and viz_units has a dedicated
+    // native/WASI/leak regression for the migrated path.
+    println!("checker AST comparisons: {agreed} expressions, {node_agreed} nodes");
     assert!(
-        node_agreed > 2000,
-        "only {node_agreed} AST nodes were compared with the checker's per-node types (ratchet 2000)"
+        node_agreed <= 12,
+        "unexpectedly large AST node comparison population: {node_agreed}"
     );
     // Ratchet: expressions the backend cannot compare (the checker has no type).
     // Ratchet: functions whose C is generated from the typed HIR or its
     // explicit IR lowering (the migration of the native backend).
     let native_generated = hir_generated + ir_generated;
     assert!(
-        native_generated >= 6929,
-        "only {native_generated} functions were generated from HIR/IR (expected at least 6929)"
+        native_generated >= 7239,
+        "only {native_generated} functions were generated from HIR/IR (expected at least 7239)"
     );
     println!("functions generated from HIR/IR: {native_generated} (HIR {hir_generated}, IR {ir_generated})");
     println!("functions still using AST fallback: {ast_fallback}");
@@ -439,15 +505,33 @@ fn native_backend_types_agree_with_the_checker() {
         (ir_generated, hir_generated, ast_fallback),
         "per-source native metrics do not add up to the global report"
     );
+    assert_eq!(
+        fallback_functions.len(),
+        ast_fallback,
+        "every AST fallback must have a stable source-qualified function identifier"
+    );
     println!("native source modules measured: {}", native_sources.len());
+    for (source, (ir, hir, ast)) in &native_sources {
+        if *ast > 0 {
+            println!("native source AST fallback: {source} ir={ir} hir={hir} ast={ast}");
+        }
+    }
+    println!(
+        "AST fallback function identifiers: {}",
+        fallback_functions.len()
+    );
+    for function in &fallback_functions {
+        println!("ast-fallback-function: {function}");
+    }
     // This is intentionally the current repository-wide baseline. Lower it
     // whenever a backend family moves from AST to HIR/IR; a new example that
     // increases the total must update the limit only with an explicit reason.
     // The shared std.viz module is measured once for each importing example. Its
     // deterministic String hash helper, renderer grid scan and dark-theme field
     // stores now lower through IR/C. Generic quantity plotting instantiations
-    // remain on the verified HIR/AST fallback until scalar unit-label ownership
-    // is explicit; do not count them as migrated.
+    // now lower through IR/C, with native/WASI emission and a zero-live-
+    // allocation regression; list-based Quantity plots remain a
+    // separate migration boundary.
     // Histogram and violin data preparation now use the typed IR/C path: the
     // native emitter covers `histogram`, `linspace` and two-argument `pow`,
     // removing 65 measured fallbacks across the shared std.viz consumers.
@@ -482,20 +566,26 @@ fn native_backend_types_agree_with_the_checker() {
     // the same stable runtime helpers as the legacy emitter and remove 64 more
     // measured fallbacks in total. Field stores now transfer fresh managed strings
     // safely, which lets compatible visualization methods use IR/C; generic
-    // quantity plotting remains on the verified fallback described above. The
+    // Quantity unit_line/unit_scatter now use the same ownership-lowered path. The
     // standard-library `format_text` wrapper now lowers its `format` builtin
     // through the same IR/C path. HIR now
     // substitutes the concrete owner for `Self` in trait method signatures,
-    // allowing Complex arithmetic/equality to use IR/C. The verified baseline is
-    // 43 AST fallbacks (6,929 HIR/IR-generated: 6,882 IR and 47 HIR functions). Checker-recorded
+    // allowing Complex arithmetic/equality to use IR/C. Typed dyn lists and
+    // indirect fold/dispatch and persistent dyn fields now use HIR/C. The verified baseline is
+    // 0 AST fallbacks (7,239 HIR/IR-generated: 7,198 IR and 41 HIR functions).
+    // Function values stored in signature-specific lists and record fields now
+    // use the IR ownership path. Remaining AST bodies include managed enum
+    // payload, generic dispatch and concurrency boundaries.
+    // Checker-recorded
     // generic calls are resolved before IR lowering, so ordinary callers can reference their
     // monomorphized C symbols directly. Scalar quantity `to_string()` now calls the existing
-    // quantity runtime helper from IR/C, and numeric
-    // arrays can use the generated show helper for `to_string()`, so enum methods with quantity
-    // payloads and the `arrays_3d` entry point no longer need the AST emitter. Plain non-generic enum
+    // quantity runtime helper from IR/C, and numeric arrays can use the generated show helper
+    // for `to_string()`. Enum methods with Quantity payloads remain outside IR because those
+    // payloads carry managed unit labels; `arrays_3d` no longer needs the AST emitter. Plain
+    // non-generic enum
     // constructors, fixed-width scalar payload bindings, unit variants, simple match tests, nested
-    // by-value enum patterns and scalar literal/range predicates now use IR/C; managed payloads and
-    // generic enums remain outside this slice. Shallow record patterns
+    // by-value enum patterns and scalar literal/range predicates now use IR/C; generic enums
+    // remain outside this slice. Shallow record patterns
     // with scalar fields now lower through the typed IR/C path. Numeric array selection
     // (`a[mask]`, `where`, `not`) now follows the same typed IR/C path. Trait default methods
     // now lower once per concrete impl through the same typed IR path, while
@@ -510,9 +600,9 @@ fn native_backend_types_agree_with_the_checker() {
     // Method receivers and arguments now use the same borrowed-call contract
     // as ordinary calls. This moves compatible record builders (including
     // std.viz Figure/Table/Scene3D chains) through the ownership-lowered IR
-    // without changing their interpreter/native output. Generic quantity
-    // plotting remains excluded until its scalar unit-label ownership has
-    // parity evidence. Keep the new ratchet explicit until the next aggregate
+    // without changing their interpreter/native output. Generic Quantity plot
+    // methods now have dimension-specialized IR instances, WASI emission and
+    // zero-leak native parity evidence. Keep the new ratchet explicit until the next aggregate
     // family moves with parity evidence; complex array promotion and
     // non-linear aggregates remain pending.
     // Normal-distribution PDF/CDF calls now share the numeric IR/C path for
@@ -532,7 +622,7 @@ fn native_backend_types_agree_with_the_checker() {
     // entry-point fallback while preserving the legacy C ABI conversion.
     // Explicit Float32 bindings and List/Set<Float32> aggregates, reflected
     // Complex scalar operators and Bool formatting now use typed IR/C.
-    const MAX_AST_FALLBACK_FUNCTIONS: usize = 43;
+    const MAX_AST_FALLBACK_FUNCTIONS: usize = 0;
     assert!(
         ast_fallback <= MAX_AST_FALLBACK_FUNCTIONS,
         "AST fallback grew to {ast_fallback} functions (ratchet limit {MAX_AST_FALLBACK_FUNCTIONS})"
@@ -565,7 +655,9 @@ fn hir_covers_the_examples_with_known_types() {
     const MAX_VIOLATIONS: usize = 0;
     let (mut nodes, mut unknown, mut violations) = (0usize, 0usize, Vec::<String>::new());
     for path in examples() {
-        if STANDARD_LIBRARY_FIXTURES.contains(&name_of(&path).as_str()) {
+        if STANDARD_LIBRARY_FIXTURES.contains(&name_of(&path).as_str())
+            || NON_CORE_TYPED_FIXTURES.contains(&name_of(&path).as_str())
+        {
             continue;
         }
         let file = path.to_string_lossy().to_string();

@@ -1,0 +1,23 @@
+{
+  "schema": "ostrin.linguist-usage/v1",
+  "generatedAt": "2026-10-11T19:35:50.280Z",
+  "extension": ".ostrin",
+  "query": "NOT is:fork extension:ostrin -repo:sircalch/Ostrin",
+  "queryUrl": "https://github.com/search?q=NOT%20is%3Afork%20extension%3Aostrin%20-repo%3Asircalch%2FOstrin&type=code",
+  "indexedPublicFiles": 0,
+  "incompleteResults": false,
+  "internalRepositoryExcluded": true,
+  "threshold": {
+    "requiredFiles": 2000,
+    "countReady": false,
+    "status": "below-threshold"
+  },
+  "distribution": {
+    "status": "manual-review-required",
+    "uniqueRepositories": null,
+    "uniqueUsers": null,
+    "note": "GitHub Linguist requiere distribución entre repositorios y usuarios; este contador no la infiere del repositorio de Ostrin."
+  },
+  "readyForUpstreamPullRequest": false,
+  "status": "public-usage-pending"
+}

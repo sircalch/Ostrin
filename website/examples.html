@@ -42,6 +42,8 @@
           <article class="example-card" data-category="language"><span class="example-tag">language / basics</span><h3>hello.ostrin</h3><p>The smallest useful starting point for learning the file and function shape.</p><a class="example-link" href="https://github.com/sircalch/Ostrin/blob/main/examples/hello.ostrin">View source ↗</a></article>
           <article class="example-card" data-category="language"><span class="example-tag">language / collections</span><h3>collections.ostrin</h3><p>Collection literals, iteration and the operations currently covered by the core.</p><a class="example-link" href="https://github.com/sircalch/Ostrin/blob/main/examples/collections.ostrin">View source ↗</a></article>
           <article class="example-card" data-category="language"><span class="example-tag">language / traits</span><h3>traits.ostrin</h3><p>Traits and implementations as the basis for reusable behavior.</p><a class="example-link" href="https://github.com/sircalch/Ostrin/blob/main/examples/traits.ostrin">View source ↗</a></article>
+          <article class="example-card" data-category="language" id="dynamic-traits"><span class="example-tag">language / dynamic traits</span><h3>native_dyn_trait_generic_field.ostrin</h3><p>A generic record stores a dynamically dispatched trait value, replaces it safely and keeps an alias alive through the change.</p><a class="example-link" href="https://github.com/sircalch/Ostrin/blob/main/examples/native_dyn_trait_generic_field.ostrin">View source ↗</a></article>
+          <article class="example-card" data-category="language" id="dynamic-trait-wrappers"><span class="example-tag">language / dynamic traits</span><h3>native_dyn_trait_wrappers.ostrin</h3><p>Optional, fallible, list-nested and record-stored dynamic trait values keep their data and vtable together through replacement, ownership and dispatch.</p><a class="example-link" href="https://github.com/sircalch/Ostrin/blob/main/examples/native_dyn_trait_wrappers.ostrin">View source ↗</a></article>
           <article class="example-card" data-category="errors"><span class="example-tag">checker / failures</span><h3>errors.ostrin</h3><p>Intentional mistakes used to exercise dimensional, mutation and type errors.</p><a class="example-link" href="https://github.com/sircalch/Ostrin/blob/main/examples/errors.ostrin">View source ↗</a></article>
           <article class="example-card" data-category="language"><span class="example-tag">language / matching</span><h3>match_nested.ostrin</h3><p>Nested patterns and the shape of exhaustive control flow.</p><a class="example-link" href="https://github.com/sircalch/Ostrin/blob/main/examples/match_nested.ostrin">View source ↗</a></article>
           <article class="example-card" data-category="types"><span class="example-tag">scientific / complex algebra</span><h3>numeric_complex_linear_algebra.ostrin</h3><p>Dense complex matrices, adjoints, matrix products and pivoted solves with residual checks.</p><a class="example-link" href="https://github.com/sircalch/Ostrin/blob/main/examples/numeric_complex_linear_algebra.ostrin">View source ↗</a></article>
@@ -93,7 +95,7 @@
 <span class="line"><span class="number">02</span>b = <span class="fn">2</span> m</span>
 <span class="line"><span class="number">03</span>total = a + b</span>
 <span class="line"><span class="number">04</span>v = velocity(<span class="fn">10</span> m, <span class="fn">2</span> s)</span>
-<span class="line"><span class="number">05</span>print(v)</span></code></pre></div><div class="output-panel"><h4>compiler output</h4><pre><span class="ok">✓ type check passed</span>
+<span class="line"><span class="number">05</span>print(v)</span></code></pre></div><div class="output-panel"><h3>compiler output</h3><pre><span class="ok">✓ type check passed</span>
 
 total: <span class="ok">2.000005 m</span>
 velocity: <span class="ok">5 m/s</span></pre></div></div></div>
@@ -102,14 +104,14 @@ velocity: <span class="ok">5 m/s</span></pre></div></div></div>
 <span class="line"><span class="number">03</span>    ch.send(<span class="fn">1</span>)</span>
 <span class="line"><span class="number">04</span>    ch.close()</span>
 <span class="line"><span class="number">05</span>}</span>
-<span class="line"><span class="number">06</span><span class="kw">for</span> value <span class="kw">in</span> ch { print(value) }</span></code></pre></div><div class="output-panel"><h4>interpreter output</h4><pre><span class="ok">✓ model accepted</span>
+<span class="line"><span class="number">06</span><span class="kw">for</span> value <span class="kw">in</span> ch { print(value) }</span></code></pre></div><div class="output-panel"><h3>interpreter output</h3><pre><span class="ok">✓ model accepted</span>
 
 1
 <span class="ok">channel closed</span>
 <span class="muted">runtime: interpreter + native C</span></pre></div></div></div>
           <div id="errors-tab" class="tab-panel" role="tabpanel"><div class="lab-grid"><div class="code-window"><div class="window-bar"><span class="window-dots"><i></i><i></i><i></i></span><span>errors.ostrin</span><button class="copy-button" data-copy="errors-code">copy</button></div><pre class="code" id="errors-code"><code><span class="line"><span class="number">01</span>a = <span class="fn">5</span> nm</span>
 <span class="line"><span class="number">02</span>b = <span class="fn">10</span> s</span>
-<span class="line"><span class="number">03</span>c = a + b</span></code></pre></div><div class="output-panel"><h4>checker output</h4><pre><span class="ok">× rejected before run</span>
+<span class="line"><span class="number">03</span>c = a + b</span></code></pre></div><div class="output-panel"><h3>checker output</h3><pre><span class="ok">× rejected before run</span>
 
 line 03: incompatible dimensions
 found: <span class="ok">Length + Time</span>

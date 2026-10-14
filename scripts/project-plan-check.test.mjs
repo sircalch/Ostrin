@@ -14,6 +14,7 @@ const trackedFiles = [
   "docs/linguist.md",
   "docs/linguist-usage.md",
   "docs/website-audit.md",
+  "docs/ownership-matrix.md",
   "website/viz.html",
 ];
 
@@ -31,26 +32,27 @@ test("the current plan is aligned with compiler ratchets and public maturity lab
   const result = validateProjectPlan(repositoryRoot);
   assert.deepEqual(result.errors, []);
   assert.deepEqual(result.baseline, {
-    minimum: 6929,
-    maximumAst: 43,
-    total: 6929,
-    ast: 43,
-    ir: 6882,
-    hir: 47,
+    minimum: 7239,
+    maximumAst: 0,
+    total: 7239,
+    ast: 0,
+    ir: 7198,
+    hir: 41,
   });
 });
 
-test("the plan gate rejects the stale claim that Quantity plotting is already IR/C", () => {
+test("the plan gate rejects a stale Quantity plotting fallback claim", () => {
   const root = fixtureRoot();
   try {
     const file = path.join(root, "compiler/tests/differential.rs");
     const source = readFileSync(file, "utf8");
     writeFileSync(file, source.replace(
-      "Generic quantity plotting instantiations",
-      "Generic quantity plotting instantiations now lower through IR/C.\n    //",
+      "Generic quantity plotting instantiations\n    // now lower through IR/C",
+      "Generic quantity plotting instantiations remain on the verified HIR/AST fallback",
     ));
     const result = validateProjectPlan(root);
-    assert.ok(result.errors.some((error) => error.includes("stale claim")));
+    assert.ok(result.errors.some((error) => error.includes("stale claim"))
+      || result.errors.some((error) => error.includes("IR migration")));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -77,6 +79,45 @@ test("the plan gate requires a reproducibility maturity trail", () => {
     writeFileSync(file, source);
     const result = validateProjectPlan(root);
     assert.ok(result.errors.some((error) => error.includes("reproducibility maturity")));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("the plan gate requires every ownership type and context in the matrix", () => {
+  const root = fixtureRoot();
+  try {
+    const file = path.join(root, "docs/ownership-matrix.md");
+    const source = readFileSync(file, "utf8").replace("| `String` | T |", "| `String` | INVALID | ");
+    writeFileSync(file, source);
+    const result = validateProjectPlan(root);
+    assert.ok(result.errors.some((error) => error.includes("15 contexts")));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("the plan gate rejects a missing ownership row", () => {
+  const root = fixtureRoot();
+  try {
+    const file = path.join(root, "docs/ownership-matrix.md");
+    const source = readFileSync(file, "utf8").replace(/^\| `String` \|.*\r?\n/m, "");
+    writeFileSync(file, source);
+    const result = validateProjectPlan(root);
+    assert.ok(result.errors.some((error) => error.includes("missing ownership row String")));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("the plan gate rejects a renamed ownership context", () => {
+  const root = fixtureRoot();
+  try {
+    const file = path.join(root, "docs/ownership-matrix.md");
+    const source = readFileSync(file, "utf8").replace("| Copia/alias |", "| Compartir | ");
+    writeFileSync(file, source);
+    const result = validateProjectPlan(root);
+    assert.ok(result.errors.some((error) => error.includes("15 ownership contexts")));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

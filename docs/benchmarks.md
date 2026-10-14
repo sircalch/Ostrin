@@ -7,8 +7,13 @@ por dos caminos:
 2. `ostrinc --compile`, seguido de la ejecución del binario nativo generado.
 
 La batería predeterminada cubre [`benchmark_numeric.ostrin`](../examples/benchmark_numeric.ostrin)
-(aritmética escalar), `arrays.ostrin`, `quantity_arrays.ostrin` y
-`numeric_methods.ostrin`. Cada ejecución comprueba que ambos caminos impriman
+(aritmética escalar), `arrays.ostrin`, `quantity_arrays.ostrin`, el par alineado
+[`benchmark_float_array.ostrin`](../examples/benchmark_float_array.ostrin) /
+[`benchmark_quantity_array.ostrin`](../examples/benchmark_quantity_array.ostrin),
+`numeric_methods.ostrin` y cargas de álgebra lineal y visualización. El par
+Float/Quantity conserva la misma forma y operaciones para observar el coste
+semántico de las unidades; no es una comparación con otros lenguajes. Cada
+ejecución comprueba que ambos caminos impriman
 exactamente el mismo resultado antes de guardar las mediciones. El informe JSON
 schema 3 incluye el hash exacto de cada fuente, commit y estado del checkout,
 sistema operativo, CPU, compilador C, defaults administrados por el compilador e
@@ -23,6 +28,20 @@ manualmente o cada lunes y conserva el informe por commit durante 14 días. Las
 mediciones son evidencia de una carga concreta; no representan por sí solas el
 rendimiento de todo el lenguaje. La ampliación prevista cubre arrays, cantidades,
 métodos numéricos y cargas científicas antes de establecer umbrales.
+
+El historial local [`validation/benchmark-history.json`](../validation/benchmark-history.json)
+conserva tres ejecuciones reales de commits anteriores. Cada entrada mantiene el
+commit del benchmark, entorno, número de muestras, hashes de salida y medianas por
+carga; los dos snapshots más recientes también conservan hashes de fuente. El script
+[`scripts/benchmark-history.mjs`](../scripts/benchmark-history.mjs)
+reconstruye ese índice desde los snapshots versionados; las entradas no se mezclan
+entre máquinas ni se presentan como una comparación con otros lenguajes.
+El índice también incluye una revisión automática de transiciones: solo compara
+snapshots con el mismo entorno y el mismo hash de fuente, aplica un umbral de
+regresión declarado del 25% y conserva como `NOT_COMPARABLE` el snapshot antiguo
+que no tiene hashes de fuente. La transición comparable más reciente pasa con
+regresiones máximas de 2.889% nativas y 2.126% interpretadas; no queda una
+regresión comparable sin explicar.
 
 Para reproducirlo localmente:
 

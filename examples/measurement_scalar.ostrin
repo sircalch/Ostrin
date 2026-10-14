@@ -10,6 +10,8 @@ fn main() -> Void {
                 print("x - x = " + measurements.summary(measurements.sub(x, x).unwrap()))
                 print("x + y = " + measurements.summary(measurements.add(x, y).unwrap()))
                 print("2x = " + measurements.summary(measurements.mul(x, measurements.exact(2.0)).unwrap()))
+                print("x * x = " + measurements.summary(measurements.mul(x, x).unwrap()))
+                print("x * y = " + measurements.summary(measurements.mul(x, y).unwrap()))
                 print("x / x = " + measurements.summary(measurements.div(x, x).unwrap()))
                 print("unknown = " + measurements.summary(measurements.scale(measurements.unknown(4.0, "sensor offline"), 2.0)))
             },
@@ -26,6 +28,19 @@ fn main() -> Void {
         Ok(_) => print("empty source accepted"),
         Err(message) => print("empty source = " + message),
     }
+    match measurements.standard(sqrt(-1.0), 0.1, "nan value") {
+        Ok(_) => print("non-finite value accepted"),
+        Err(message) => print("non-finite value = " + message),
+    }
+    match measurements.standard(1.0, sqrt(-1.0), "nan sigma") {
+        Ok(_) => print("non-finite sigma accepted"),
+        Err(message) => print("non-finite sigma = " + message),
+    }
+    match measurements.standard(1.0, 1.0 / 0.0, "infinite sigma") {
+        Ok(_) => print("infinite sigma accepted"),
+        Err(message) => print("infinite sigma = " + message),
+    }
+    print("non-finite exact = " + measurements.summary(measurements.exact(sqrt(-1.0))))
     match measurements.uncertainties([measurements.unknown(4.0, "series offline")]) {
         Ok(_) => print("unknown series accepted"),
         Err(message) => print("unknown series = " + message),

@@ -20,6 +20,9 @@ pub record Measurement<T> {
 }
 
 pub fn exact(value: Float) -> Measurement<Float> {
+    if not is_finite(value) {
+        return unknown(value, "exact measurement value must be finite")
+    }
     Measurement {
         value: value,
         sources: [],
@@ -29,6 +32,12 @@ pub fn exact(value: Float) -> Measurement<Float> {
 }
 
 pub fn standard(value: Float, sigma: Float, label: String) -> Result<Measurement<Float>, String> {
+    if not is_finite(value) {
+        return Err("measurement value must be finite")
+    }
+    if not is_finite(sigma) {
+        return Err("measurement sigma must be finite")
+    }
     if sigma < 0.0 {
         return Err("measurement sigma must be non-negative")
     }
@@ -125,6 +134,9 @@ pub fn uncertainty(measurement: Measurement<Float>) -> Result<Float, String> {
     if not measurement.known {
         return Err(measurement.reason)
     }
+    if not is_finite(measurement.value) {
+        return Err("measurement value must be finite")
+    }
     variance(measurement.sources)
 }
 
@@ -141,10 +153,27 @@ pub fn summary(measurement: Measurement<Float>) -> String {
 fn variance(sources: List<Sensitivity>) -> Result<Float, String> {
     mut total = 0.0
     for source in sources {
+        if not is_finite(source.coefficient) {
+            return Err("measurement sensitivity coefficient must be finite")
+        }
+        if not is_finite(source.sigma) {
+            return Err("measurement source sigma must be finite")
+        }
         if source.sigma < 0.0 {
             return Err("measurement source sigma must be non-negative")
         }
-        total = total + source.coefficient * source.coefficient * source.sigma * source.sigma
+        weighted = source.coefficient * source.sigma
+        if not is_finite(weighted) {
+            return Err("measurement uncertainty overflowed")
+        }
+        contribution = weighted * weighted
+        if not is_finite(contribution) {
+            return Err("measurement uncertainty overflowed")
+        }
+        total = total + contribution
+        if not is_finite(total) {
+            return Err("measurement uncertainty overflowed")
+        }
     }
     Ok(sqrt(total))
 }

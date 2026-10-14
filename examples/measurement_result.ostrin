@@ -1,0 +1,24 @@
+import std.measurements
+
+fn choose(flag: Bool) -> Result<Measurement<Float>, String> {
+    if flag {
+        Ok(measurements.exact(2.0))
+    } else {
+        Err("bad")
+    }
+}
+
+fn main() -> Void {
+    first = choose(true)
+    second = choose(false)
+    match first {
+        Ok(value) => print(measurements.summary(value)),
+        Err(message) => print(message)
+    }
+    match second {
+        Ok(value) => print(measurements.summary(value)),
+        Err(message) => print(message)
+    }
+    drop(first)
+    drop(second)
+}

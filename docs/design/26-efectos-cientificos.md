@@ -1,8 +1,9 @@
 # 26 — Efectos científicos, determinismo y procedencia
 
 **Estado:** propuesta de diseño con inventario experimental; `ostrinc --effect-report` ya expone
-evidencia sintáctica conservadora, pero todavía no modifica la sintaxis estable ni añade filas de
-efectos al HIR.
+evidencia sintáctica conservadora, conserva etiquetas internas tipadas (`EffectKind`) y produce
+resúmenes por función con propagación conservadora a través de llamadas, ya transportados como
+filas internas de HIR/IR; todavía no modifica la sintaxis pública ni ofrece garantías de pureza.
 
 **Fecha:** 2026-09-29
 
@@ -190,6 +191,30 @@ R0–R3 describen evidencia disponible, no una escala de calidad científica. La
 plataformas deben añadir tolerancias numéricas, biblioteca matemática y arquitectura. “Bit a bit” solo se
 publica cuando una prueba lo verifica para ese target.
 
+### 7.1 Política de igualdad de replay y tolerancia entre plataformas
+
+Los bundles actuales separan dos afirmaciones:
+
+- **Igualdad de replay:** CI reproduce el SVG registrado byte por byte con el compilador WASI y la
+  configuración de replay de CI. Esto detecta cambios respecto al artefacto publicado; no demuestra
+  igualdad entre sistemas operativos, CPUs, versiones de runtimes ni backends distintos.
+- **Semilla R1:** el bundle registra la entrada de semilla, el algoritmo/versión y la partición del
+  flujo. Esta evidencia explica el flujo pseudoaleatorio; no demuestra por sí sola que el cálculo
+  posterior ni el SVG sean numéricamente equivalentes entre plataformas.
+
+El runtime snapshot vigente declara explícitamente que las comparaciones numéricas entre plataformas
+no se realizan ni se reclaman. No se compara el SVG renderizado entre sistemas ni se aplica una
+epsilon global. Antes de publicar una comparación entre plataformas, el experimento debe declarar por
+métrica: nombre y unidades, valor de referencia y método, error absoluto y relativo máximos, dominio
+de entrada y condiciones numéricas relevantes (por ejemplo, condicionamiento o región de estabilidad).
+El informe debe guardar el peor residuo medido y las plataformas/bibliotecas probadas. Si el contrato
+no existe o alguna plataforma queda fuera de la matriz, el resultado se marca **no evaluado** y no como
+equivalente.
+
+Por tanto, las figuras actuales conservan el gate de hash exacto dentro del replay CI; el soporte de
+tolerancias cruzadas sigue abierto y la captura de host/hardware ya está implementada en Pages CI,
+pero R3 y el gate de `v0.2` esperan una ejecución CI real que produzca el artefacto host-bound.
+
 ## 8. Inferencia y reglas del checker
 
 1. Cada builtin y función de módulo tendrá una fila conocida o una declaración de frontera `unsafe`.
@@ -289,7 +314,23 @@ en una consola de logs.
 
 1. **Inventario (sin sintaxis nueva):** clasificar builtins, módulos, ejemplos y fronteras FFI por efecto;
    `ostrinc --effect-report` ya registra sitios conocidos en texto o JSON, con una advertencia explícita
-   de que el resultado es conservador y no es una garantía estática.
+   de que el resultado es conservador y no es una garantía estática. El JSON también publica
+   `functions_without_known_effects`: son candidatos cuyo inventario no encontró una fila conocida,
+   no funciones declaradas puras, porque una llamada no resuelta puede quedar fuera del análisis.
+   El JSON también expone `unresolved_calls` por función: llamadas que no se pudieron resolver
+   contra una función local ni contra una operación de host clasificada. Esta separación deja
+   visible la deuda de cobertura para la futura inferencia estática de efectos.
+   `effect_coverage` resume esas cantidades (`known_calls`, `unresolved_calls` y `complete`);
+   `complete` solo significa que el inventario resolvió todas las llamadas observadas, no que
+   haya demostrado pureza.
+   La implementación también reconoce una whitelist pequeña y explícita de operaciones locales
+   deterministas —accesos y transformaciones de colecciones, cadenas, mediciones, resultados y
+   matemáticas elementales— para no contar como deuda llamadas como `length`, `push`, `value`,
+   `Ok` o `is_finite`. Esa whitelist mejora la cobertura del inventario, pero no autoriza
+   optimizaciones de pureza ni sustituye las filas de efectos del HIR/IR.
+   Las llamadas a métodos locales se propagan usando la clave del método que comparte el inventario;
+   si no se puede asociar una llamada calificada con una función local, permanece en
+   `unresolved_calls` en lugar de presentar una cobertura completa.
 2. **Representación interna:** definir nombres, argumentos y uniones de filas; publicar errores estables
    para llamadas puras incompatibles.
 3. **HIR/IR:** propagar `pure`, `random(seed)`, `io`, `network`, `concurrency`, `provenance` y
@@ -298,9 +339,15 @@ en una consola de logs.
    sin alterar la semántica estable del resto del lenguaje.
 5. **Artefacto de procedencia:** implementar JSON versionado, hashes de fuente/datos/salida y niveles R0–R3
    en una orden CLI experimental. La primera superficie ya existe como `ostrinc --provenance-report` y
-   [`website/provenance.html`](../../website/provenance.html): normaliza el hash de fuente, registra target
-   y sitios de efecto, y marca explícitamente la salida como experimental/no verificada. Aún faltan
-   snapshots de entradas, hashes de salida, lockfiles y metadatos de runtime para reclamar R2/R3.
+   [`website/provenance.html`](../../website/provenance.html): normaliza el hash de fuente, registra target,
+   perfil WASI, hashes de lockfiles/manifiestos disponibles y sitios de efecto, y marca explícitamente la
+   salida como experimental/no verificada. El snapshot parcial ostrin.runtime/v1 ya expone la política de
+   plataforma; los bundles experimentales añaden snapshots de entradas cuando corresponden, hashes de salida,
+   resumen de efectos y, bajo `OSTRIN_CAPTURE_HOST=1`, metadatos públicos de host/hardware. La ejecución local
+   no reclama R3; Pages CI usa `--require-ready` para exigir el artefacto host-bound. Los once bundles input-driven ya constituyen cortes
+   R2: embeben `data.json`, declaran la capacidad `filesystem.read:data.json`, conservan el hash del
+   snapshot y verifican la sensibilidad de sus parámetros o semilla en WASI; los nueve casos seeded
+   además conservan la evidencia algorítmica R1.
 6. **Frontera WASM:** conectar la tabla con permisos del Scientific Lab; denegar red/E/S no declaradas y
    hacer visible la razón.
 7. **Visualización y notebook:** incrustar procedencia en figuras, tablas y estados compartibles; añadir

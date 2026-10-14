@@ -4,9 +4,54 @@
 //! It records syntactic evidence so the compiler can expose a first inventory
 //! before effect rows become part of HIR and function signatures.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::ast::{Arg, Block, Expr, FunctionDecl, ImplDecl, Item, MatchArm, Pattern, Stmt};
+
+/// Typed internal effect labels. The public syntax remains intentionally unset;
+/// this enum gives later HIR/IR propagation a stable vocabulary.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum EffectKind {
+    Clock,
+    Concurrency,
+    Io,
+    Measurement,
+    Network,
+    Provenance,
+    RandomSeed,
+    Unsafe,
+    Unknown(String),
+}
+
+impl EffectKind {
+    pub fn parse(label: &str) -> Self {
+        match label {
+            "clock" => Self::Clock,
+            "concurrency" => Self::Concurrency,
+            "io" => Self::Io,
+            "measurement" => Self::Measurement,
+            "network" => Self::Network,
+            "provenance" => Self::Provenance,
+            "random(seed)" => Self::RandomSeed,
+            "unsafe" => Self::Unsafe,
+            other => Self::Unknown(other.to_string()),
+        }
+    }
+
+    pub fn label(&self) -> &str {
+        match self {
+            Self::Clock => "clock",
+            Self::Concurrency => "concurrency",
+            Self::Io => "io",
+            Self::Measurement => "measurement",
+            Self::Network => "network",
+            Self::Provenance => "provenance",
+            Self::RandomSeed => "random(seed)",
+            Self::Unsafe => "unsafe",
+            Self::Unknown(label) => label,
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EffectSite {
@@ -21,10 +66,42 @@ pub struct EffectSite {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct EffectReport {
     pub effects: BTreeSet<String>,
+    /// Typed labels retained for the future HIR/IR effect row.
+    pub kinds: BTreeSet<EffectKind>,
+    /// Direct per-function effect rows, kept separate from the global inventory.
+    pub function_kinds: BTreeMap<String, BTreeSet<EffectKind>>,
+    /// Every function visited by the inventory, including rows with no known
+    /// effect. An empty row is evidence for a candidate only; it is not a
+    /// proof of purity because unresolved calls remain outside this report.
+    pub function_names: BTreeSet<String>,
+    /// Top-level functions have exact call names. Impl methods are indexed by
+    /// their method name because the syntactic inventory does not type-check
+    /// the receiver expression.
+    pub free_function_names: BTreeSet<String>,
+    pub impl_method_names: BTreeSet<String>,
+    pub function_calls: BTreeMap<String, BTreeSet<String>>,
+    /// Calls that could not be matched to a local function or a classified
+    /// host operation. These make the conservative boundary explicit: a
+    /// function with no known effect may still call one of these operations.
+    pub unresolved_calls: BTreeMap<String, BTreeSet<String>>,
     pub sites: Vec<EffectSite>,
 }
 
 impl EffectReport {
+    pub fn call_coverage(&self) -> (usize, usize) {
+        let total = self
+            .function_calls
+            .values()
+            .map(BTreeSet::len)
+            .sum::<usize>();
+        let unresolved = self
+            .unresolved_calls
+            .values()
+            .map(BTreeSet::len)
+            .sum::<usize>();
+        (total.saturating_sub(unresolved), unresolved)
+    }
+
     pub fn sort_sites(&mut self) {
         self.sites.sort_by(|left, right| {
             left.file
@@ -42,22 +119,63 @@ pub fn analyze(items: &[Item]) -> EffectReport {
     let mut report = EffectReport::default();
     for item in items {
         match item {
-            Item::Function(function) => walk_function(function, &mut report),
+            Item::Function(function) => {
+                report.free_function_names.insert(function.name.clone());
+                walk_function(function, &mut report);
+            }
             Item::Impl(implementation) => walk_impl(implementation, &mut report),
             _ => {}
         }
     }
+    classify_unresolved_calls(&mut report);
+    propagate_function_effects(&mut report);
     report.sort_sites();
     report
 }
 
+fn classify_unresolved_calls(report: &mut EffectReport) {
+    for (caller, calls) in &report.function_calls {
+        for operation in calls {
+            if classify(operation).is_none()
+                && !is_known_pure_operation(operation)
+                && local_callee_key(
+                    operation,
+                    &report.free_function_names,
+                    &report.impl_method_names,
+                )
+                .is_none()
+            {
+                report
+                    .unresolved_calls
+                    .entry(caller.clone())
+                    .or_default()
+                    .insert(operation.clone());
+            }
+        }
+    }
+}
+
 fn walk_impl(implementation: &ImplDecl, report: &mut EffectReport) {
     for method in &implementation.methods {
+        report.impl_method_names.insert(method.name.clone());
         walk_function(method, report);
     }
 }
 
+fn local_callee_key<'a>(
+    operation: &'a str,
+    free_functions: &BTreeSet<String>,
+    impl_methods: &BTreeSet<String>,
+) -> Option<&'a str> {
+    if free_functions.contains(operation) {
+        return Some(operation);
+    }
+    let (_, method) = operation.rsplit_once('.')?;
+    impl_methods.contains(method).then_some(method)
+}
+
 fn walk_function(function: &FunctionDecl, report: &mut EffectReport) {
+    report.function_names.insert(function.name.clone());
     for parameter in &function.params {
         if let Some(default) = &parameter.default {
             walk_expr(
@@ -123,8 +241,13 @@ fn walk_expr(expr: &Expr, function: &str, file: Option<&str>, report: &mut Effec
         Expr::Located(inner, _) => walk_expr(inner, function, file, report),
         Expr::Call(callee, args) | Expr::GenericCall(callee, _, args) => {
             if let Some(operation) = expression_path(callee) {
+                report
+                    .function_calls
+                    .entry(function.to_string())
+                    .or_default()
+                    .insert(operation.clone());
                 if let Some(effect) = classify(&operation) {
-                    report.effects.insert(effect.to_string());
+                    add_effect(report, function, effect);
                     report.sites.push(EffectSite {
                         effect: effect.to_string(),
                         operation,
@@ -305,6 +428,49 @@ fn classify(operation: &str) -> Option<&'static str> {
     None
 }
 
+/// Operations in this list are local, deterministic transformations or
+/// collection accessors. They are known to the inventory without being
+/// effect rows: recognizing them only removes false `unresolved` markers and
+/// never proves that the surrounding function is pure.
+fn is_known_pure_operation(operation: &str) -> bool {
+    let leaf = operation
+        .rsplit(|character| character == '.' || character == ':')
+        .find(|segment| !segment.is_empty())
+        .unwrap_or(operation);
+    matches!(
+        leaf,
+        "abs"
+            | "at"
+            | "char_at"
+            | "codepoint"
+            | "contains"
+            | "first"
+            | "format_float"
+            | "format_text"
+            | "get"
+            | "is_blank"
+            | "is_empty"
+            | "is_exact"
+            | "is_finite"
+            | "is_known"
+            | "last"
+            | "length"
+            | "lines"
+            | "pop"
+            | "push"
+            | "reverse"
+            | "slice"
+            | "source_count"
+            | "sqrt"
+            | "to_string"
+            | "trim"
+            | "unit"
+            | "value"
+            | "Ok"
+            | "Err"
+    )
+}
+
 fn record(
     report: &mut EffectReport,
     effect: &str,
@@ -314,7 +480,7 @@ fn record(
     line: usize,
     col: usize,
 ) {
-    report.effects.insert(effect.to_string());
+    add_effect(report, function, effect);
     report.sites.push(EffectSite {
         effect: effect.to_string(),
         operation: operation.to_string(),
@@ -323,6 +489,51 @@ fn record(
         line,
         col,
     });
+}
+
+fn add_effect(report: &mut EffectReport, function: &str, effect: &str) {
+    let kind = EffectKind::parse(effect);
+    report.effects.insert(effect.to_string());
+    report.kinds.insert(kind.clone());
+    report
+        .function_kinds
+        .entry(function.to_string())
+        .or_default()
+        .insert(kind);
+}
+
+fn propagate_function_effects(report: &mut EffectReport) {
+    loop {
+        let mut changed = false;
+        let callers: Vec<(String, BTreeSet<String>)> = report
+            .function_calls
+            .iter()
+            .map(|(caller, callees)| (caller.clone(), callees.clone()))
+            .collect();
+        for (caller, callees) in callers {
+            let inherited: Vec<EffectKind> = callees
+                .iter()
+                .filter_map(|callee| {
+                    local_callee_key(
+                        callee,
+                        &report.free_function_names,
+                        &report.impl_method_names,
+                    )
+                })
+                .filter_map(|callee| report.function_kinds.get(callee))
+                .flat_map(|effects| effects.iter().cloned())
+                .collect();
+            let row = report.function_kinds.entry(caller).or_default();
+            for effect in inherited {
+                changed |= row.insert(effect.clone());
+                report.kinds.insert(effect.clone());
+                report.effects.insert(effect.label().to_string());
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
 }
 
 pub fn effect_description(effect: &str) -> &'static str {
@@ -335,5 +546,18 @@ pub fn effect_description(effect: &str) -> &'static str {
         "provenance" => "registra metadatos de procedencia",
         "random(seed)" => "consume azar con un flujo explícito o detectable",
         _ => "efecto desconocido",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_known_pure_operation;
+
+    #[test]
+    fn pure_inventory_operations_are_known_without_becoming_effects() {
+        for operation in ["values.length", "std.strings::trim", "measurement.value"] {
+            assert!(is_known_pure_operation(operation), "{operation}");
+        }
+        assert!(!is_known_pure_operation("unknown_host_operation"));
     }
 }

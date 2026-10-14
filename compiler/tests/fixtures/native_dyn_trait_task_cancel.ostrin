@@ -1,0 +1,20 @@
+trait Message {
+    fn text(self) -> String
+}
+
+record Speaker { text: String }
+
+impl Message for Speaker {
+    fn text(self) -> String { self.text }
+}
+
+fn main() -> Void {
+    spawn_scope {
+        shape: dyn Message = Speaker { text: "cancelled payload" }
+        worker = spawn {
+            shape.text()
+        }
+        print(worker.cancel())
+        print(worker.cancel())
+    }
+}

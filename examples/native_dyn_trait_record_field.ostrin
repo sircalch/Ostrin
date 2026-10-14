@@ -1,0 +1,28 @@
+trait Shape {
+    fn area(self) -> Float
+}
+
+record Circle { radius: Float }
+record Square { side: Float }
+record Holder { mut shape: dyn Shape }
+
+impl Shape for Circle {
+    fn area(self) -> Float { 3.0 * self.radius * self.radius }
+}
+impl Shape for Square {
+    fn area(self) -> Float { self.side * self.side }
+}
+
+fn main() -> Void {
+    mut initial: dyn Shape = Circle { radius: 2.0 }
+    mut holder: Holder = Holder { shape: initial }
+    alias: dyn Shape = holder.shape
+    print(alias.area())
+
+    holder.shape = Square { side: 3.0 }
+    print(alias.area())
+    print(holder.shape.area())
+
+    holder.shape = holder.shape
+    print(holder.shape.area())
+}

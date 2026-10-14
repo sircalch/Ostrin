@@ -7,14 +7,19 @@
   },
   "description": "Seeded bivariate sample counted into hexagonal bins.",
   "reproducibility": {
-    "level": "R1",
-    "label": "R1 · seeded replay verified",
-    "next": "R2 · external snapshots (planned verification)"
+    "level": "R2",
+    "label": "R2 · external snapshot replay verified",
+    "next": "R3 · auditable artifact (planned verification)"
   },
   "execution": {
     "mode": "input-file",
     "input_file": "data.json",
-    "consumes": ["seed", "parameters.samples", "parameters.bins_x", "parameters.bins_y"],
+    "consumes": [
+      "seed",
+      "parameters.samples",
+      "parameters.bins_x",
+      "parameters.bins_y"
+    ],
     "sensitivity": {
       "path": "seed",
       "alternate": 92
@@ -29,6 +34,14 @@
     "command": "node scripts/experiment-replay.mjs --fixture hexbin",
     "target": "wasm32-wasip1",
     "wasi": "preview1",
-    "status": "verified-in-ci"
+    "status": "verified-in-ci",
+    "capabilities": [
+      "filesystem.read:data.json"
+    ],
+    "snapshot": {
+      "path": "data.json",
+      "kind": "json",
+      "embedded": true
+    }
   }
 }

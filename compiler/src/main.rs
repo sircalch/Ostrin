@@ -291,6 +291,9 @@ fn real_main() -> ExitCode {
                 println!("ir-generated: {}", report.ir_generated);
                 println!("hir-generated: {}", report.hir_generated);
                 println!("ast-fallback: {}", report.ast_fallback);
+                for function in &report.ast_fallback_functions {
+                    println!("ast-fallback-function: {function}");
+                }
                 for (source, counts) in &report.native_by_source {
                     println!(
                         "native-source: {source} ir={} hir={} ast={}",
@@ -332,6 +335,7 @@ fn real_main() -> ExitCode {
                     })
                 })
                 .collect();
+            let (known_calls, unresolved_call_count) = report.call_coverage();
             println!(
                 "{}",
                 serde_json::json!({
@@ -339,6 +343,26 @@ fn real_main() -> ExitCode {
                     "experimental": true,
                     "conservative": true,
                     "effects": report.effects,
+                    "effect_kinds": report.kinds.iter().map(|kind| kind.label()).collect::<Vec<_>>(),
+                    "function_effects": report.function_kinds.iter().map(|(function, kinds)| (
+                        function.clone(), kinds.iter().map(|kind| kind.label()).collect::<Vec<_>>()
+                    )).collect::<std::collections::BTreeMap<_, _>>(),
+                    "functions_without_known_effects": report.function_names.iter()
+                        .filter(|function| {
+                            report
+                                .function_kinds
+                                .get(*function)
+                                .is_none_or(std::collections::BTreeSet::is_empty)
+                        })
+                        .cloned()
+                        .collect::<Vec<_>>(),
+                    "function_calls": report.function_calls,
+                    "unresolved_calls": report.unresolved_calls,
+                    "effect_coverage": {
+                        "known_calls": known_calls,
+                        "unresolved_calls": unresolved_call_count,
+                        "complete": unresolved_call_count == 0,
+                    },
                     "sites": sites,
                 })
             );
@@ -361,6 +385,27 @@ fn real_main() -> ExitCode {
                 }
             }
             println!("sites: {}", report.sites.len());
+            let without_known_effects = report
+                .function_names
+                .iter()
+                .filter(|function| {
+                    report
+                        .function_kinds
+                        .get(*function)
+                        .is_none_or(std::collections::BTreeSet::is_empty)
+                })
+                .count();
+            println!(
+                "functions without known effects: {without_known_effects} (not a purity proof)"
+            );
+            let unresolved_calls: usize = report
+                .unresolved_calls
+                .values()
+                .map(std::collections::BTreeSet::len)
+                .sum();
+            println!("unresolved calls: {unresolved_calls} (effect coverage is incomplete)");
+            let (known_calls, _) = report.call_coverage();
+            println!("effect call coverage: {known_calls} known, {unresolved_calls} unresolved");
             for site in &report.sites {
                 let file = site.file.as_deref().unwrap_or("<unknown>");
                 println!(
@@ -787,6 +832,11 @@ fn run_codegen(
         command.arg("--target=wasm32-wasip1");
         command.arg("-Werror=shift-count-overflow");
         command.args(["-mllvm", "-wasm-enable-sjlj"]);
+        // wasi-libc ships the WebAssembly setjmp/longjmp implementation in
+        // its own archive, separate from libc. SJLJ lowering emits references
+        // to these helpers, so WASI programs that use task cancellation must
+        // link it explicitly.
+        command.arg("-lsetjmp");
         if let Ok(sysroot) = env::var("OSTRIN_WASI_SYSROOT") {
             command.arg(format!("--sysroot={sysroot}"));
         }

@@ -16,6 +16,8 @@ const publicPages = [
   "./roadmap.html",
   "./showcase.html",
   "./viz.html",
+  "./workflow.html",
+  "./status.html",
 ];
 
 async function expectNoHorizontalOverflow(page, route, width) {

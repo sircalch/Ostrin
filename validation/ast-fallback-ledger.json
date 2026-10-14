@@ -1,0 +1,13 @@
+{
+  "schema": "ostrin.ast-fallback-ledger/v1",
+  "status": "verified-in-differential-suite",
+  "count": 0,
+  "source": "compiler/tests/differential.rs",
+  "verifiedBaseline": {
+    "ir": 7198,
+    "hir": 41,
+    "ast": 0,
+    "total": 7239
+  },
+  "entries": []
+}

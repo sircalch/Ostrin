@@ -93,15 +93,15 @@ Esto también dejó ver que el ejemplo de `Fibonacci` implementaba `Iterator<Int
 
 ### 5.3 Qué queda genuinamente pendiente tras esta pasada
 
-Con el barrido hecho, la lista real de pendientes se reduce a: `as D` (conversión genérica de escalar a cantidad, documento 02 §3.3), `dyn Trait` (polimorfismo dinámico, documento 03 §7), `select` sobre canales y cancelación de tareas (documento 09 §5), elisión de ARC como optimización (documento 11 §7), operadores bit a bit y ordenación general (documento 13 §6), y — del documento 14 — índice de descubrimiento opcional, verificación de integridad, y workspaces.
+Con el barrido hecho, la lista real de pendientes de diseño se reduce a: `as D` (conversión genérica de escalar a cantidad, documento 02 §3.3), `select` sobre canales y cancelación de tareas (documento 09 §5), elisión de ARC como optimización (documento 11 §7), operadores bit a bit y ordenación general (documento 13 §6), y — del documento 14 — índice de descubrimiento opcional, verificación de integridad, y workspaces. `dyn Trait` tiene el diseño de lenguaje cerrado en el documento 15, pero su contrato de ownership y migración HIR/IR siguen abiertos según §7 de ese documento.
 
-*(Actualización: `dyn Trait` se cerró en el documento 15, y `as D` en el documento 16 — resultó no necesitar ningún mecanismo nuevo, ver §6 más abajo.)*
+*(Actualización: el diseño de `dyn Trait` se cerró en el documento 15, y `as D` en el documento 16 — resultó no necesitar ningún mecanismo nuevo, ver §6 más abajo. La implementación HIR/IR de `dyn Trait` no se considera cerrada hasta satisfacer su contrato de ownership.)*
 
 ---
 
 ## 6. Tercera pasada de revisión (tras los documentos 15–16, cierre del núcleo del lenguaje)
 
-Con `dyn Trait` y `as D` cerrados, los 16 documentos cubren el núcleo completo planteado al inicio de esta sesión: variables, tipos, unidades, funciones, traits, errores, enums, iteradores, módulos, lógica, concurrencia, memoria, `derive`, colecciones, paquetes y polimorfismo dinámico. Esta pasada final se concentró en dos clases de error que ya habían aparecido antes y que solo se detectan mirando el conjunto completo, no un documento a la vez.
+Con el diseño de `dyn Trait` y `as D` cerrados, los 16 documentos cubren el núcleo del lenguaje planteado al inicio de esta sesión: variables, tipos, unidades, funciones, traits, errores, enums, iteradores, módulos, lógica, concurrencia, memoria, `derive`, colecciones, paquetes y polimorfismo dinámico. La implementación nativa de `dyn Trait` conserva una frontera pendiente explícita; esta pasada final se concentró en dos clases de error que solo se detectan mirando el conjunto completo, no un documento a la vez.
 
 ### 6.1 Colisión de palabra reservada `unit`
 

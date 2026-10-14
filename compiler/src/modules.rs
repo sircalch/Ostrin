@@ -423,6 +423,29 @@ fn build_resolution_maps(
                         .clone()
                         .unwrap_or_else(|| imp.path.last().cloned().unwrap());
                     alias_map.insert(alias, imp.path.clone());
+
+                    // The checker makes public type declarations from a module
+                    // available in signatures even when the module is imported
+                    // through a value namespace (for example,
+                    // `import std.measurements` followed by
+                    // `Measurement<Float>`). Keep the merged AST consistent
+                    // with that rule. Functions remain behind the module alias;
+                    // only exported records, enums, and traits enter the type
+                    // resolution map.
+                    if let Some(target) = cache.get(&imp.path) {
+                        for name in &target.exported {
+                            let is_type = target.items.iter().any(|item| match item {
+                                Item::Record(record) => record.name == *name,
+                                Item::Enum(enum_decl) => enum_decl.name == *name,
+                                Item::Trait(trait_decl) => trait_decl.name == *name,
+                                _ => false,
+                            });
+                            if is_type && !resolve_map.contains_key(name) {
+                                resolve_map
+                                    .insert(name.clone(), resolve_export(&imp.path, name, cache)?);
+                            }
+                        }
+                    }
                 }
             }
             Item::Impl(_) => {}

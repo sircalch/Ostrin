@@ -1,0 +1,28 @@
+fn add_score(table: Map<String, Int>, key: String, value: Int) -> Map<String, Int> {
+    mut next = clone(table)
+    next.set(key, value)
+    next
+}
+
+fn add_tag(tags: Set<String>, key: String) -> Set<String> {
+    mut next = clone(tags)
+    next.add(key)
+    next
+}
+
+fn main() -> Void {
+    mut scores: Map<String, Int> = Map<String, Int>()
+    mut tags: Set<String> = Set<String>()
+    mut i = 0
+    while i < 3 {
+        scores = add_score(scores, i.to_string(), i)
+        tags = add_tag(tags, i.to_string())
+        i = i + 1
+    }
+    print(scores.count())
+    print(scores.get("2").unwrap())
+    print(tags.count())
+    print(tags.contains("1"))
+    drop(scores)
+    drop(tags)
+}

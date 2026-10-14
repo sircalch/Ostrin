@@ -95,7 +95,7 @@ El RC sobre el generador actual (texto C con expresiones‑sentencia) exigiría 
 
 ## 6. Plan de implementación
 
-1. HIR → IR con valores temporales explícitos (Etapas 2–4 de `docs/ARQUITECTURA_Y_VISION.md`).
+1. HIR → IR con valores temporales explícitos, según la migración descrita en [`20-hir-y-ir.md`](20-hir-y-ir.md) y el estado actual en [`../ARCHITECTURE.md`](../ARCHITECTURE.md).
 2. Runtime C: registro de objeto con contador; `ostrin_retain`/`ostrin_release`; destructores por tipo.
    Esta base ya cubre records, listas, mapas, sets, canales y entornos de tareas generados.
 3. Inserción de retain/release + optimización de último uso. Ya existe una primera pasada

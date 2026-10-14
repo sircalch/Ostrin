@@ -7,6 +7,12 @@ on:
       - 'website/**'
       - 'compiler/**'
       - 'scripts/provenance-page.mjs'
+      - 'scripts/quality-scorecard.mjs'
+      - 'scripts/status-page.mjs'
+      - 'scripts/experiment-bundle.mjs'
+      - 'scripts/r3-readiness.mjs'
+      - 'docs/r3-readiness.md'
+      - 'validation/**'
       - 'scripts/website-check.mjs'
       - 'tests/browser/**'
       - '.github/actions/website-verify/**'
@@ -27,7 +33,7 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out repository
         uses: actions/checkout@v5

@@ -1,0 +1,24 @@
+record Inner {
+    text: String
+}
+
+record Outer {
+    item: Option<Inner>
+}
+
+fn empty() -> Option<Inner> {
+    None
+}
+
+fn collect() -> List<Outer> {
+    [Outer { item: Some(Inner { text: "a" }) }, Outer { item: empty() }]
+}
+
+fn main() -> Void {
+    for row in collect() {
+        match row.item {
+            Some(inner) => print(inner.text),
+            None => print("none")
+        }
+    }
+}

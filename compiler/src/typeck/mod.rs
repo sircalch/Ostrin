@@ -68,6 +68,10 @@ pub struct TypedProgram {
     /// Resolved generic arguments of a call, keyed by the call node's address (works for
     /// calls with no source range of their own, e.g. a receiver `wrap(5).is_just()`).
     pub call_substs_by_node: HashMap<usize, CallSubst>,
+    /// Expected parameter types for each source argument expression. This is
+    /// semantic input to HIR lowering (for example, concrete-to-dyn boxing),
+    /// not a backend guess based on C spellings.
+    pub expected_types_by_node: HashMap<usize, Ty>,
 }
 
 #[derive(Clone)]
@@ -115,6 +119,7 @@ pub struct Checker {
     literal_kinds: HashMap<ExprKey, LitKind>,
     node_types: HashMap<usize, Ty>,
     call_substs_by_node: HashMap<usize, CallSubst>,
+    expected_types_by_node: HashMap<usize, Ty>,
     call_node_stack: Vec<usize>,
     /// Copies of declarations checked in place of the original (impl methods
     /// with `Self` substituted, trait default bodies). `node_types` is keyed by
@@ -226,6 +231,7 @@ impl Checker {
             literal_kinds: HashMap::new(),
             node_types: HashMap::new(),
             call_substs_by_node: HashMap::new(),
+            expected_types_by_node: HashMap::new(),
             call_node_stack: Vec::new(),
             checked_copies: Vec::new(),
             call_key_stack: Vec::new(),
@@ -250,14 +256,23 @@ impl Checker {
         self,
         items: &[Item],
     ) -> (Vec<TypeError>, Vec<EditorBinding>, Vec<EditorExpression>) {
-        let (errors, bindings, expressions, _, _, _, _, _) = self.check_all(items);
+        let (errors, bindings, expressions, _, _, _, _, _, _) = self.check_all(items);
         (errors, bindings, expressions)
     }
 
     /// Like `check_program`, but also returns the type of every expression.
     pub fn check_program_typed(self, items: &[Item]) -> TypedProgram {
-        let (errors, _, _, expr_types, call_substs, literal_kinds, node_types, call_substs_by_node) =
-            self.check_all(items);
+        let (
+            errors,
+            _,
+            _,
+            expr_types,
+            call_substs,
+            literal_kinds,
+            node_types,
+            call_substs_by_node,
+            expected_types_by_node,
+        ) = self.check_all(items);
         TypedProgram {
             errors,
             expr_types,
@@ -265,6 +280,7 @@ impl Checker {
             literal_kinds,
             node_types,
             call_substs_by_node,
+            expected_types_by_node,
         }
     }
 
@@ -280,6 +296,7 @@ impl Checker {
         HashMap<ExprKey, LitKind>,
         HashMap<usize, Ty>,
         HashMap<usize, CallSubst>,
+        HashMap<usize, Ty>,
     ) {
         for item in items {
             match item {
@@ -448,6 +465,7 @@ impl Checker {
             self.literal_kinds,
             self.node_types,
             self.call_substs_by_node,
+            self.expected_types_by_node,
         )
     }
 
@@ -1456,7 +1474,7 @@ impl Checker {
         result
     }
 
-    /// `sin`, `cos`, `sqrt`, …, `abs`, `pow`, `atan2`, `pi`.
+    /// `sin`, `cos`, `sqrt`, …, `abs`, `is_finite`, `pow`, `atan2`, `pi`.
     fn check_math_call(&mut self, name: &str, arg_types: &[Ty]) -> Option<Ty> {
         const UNARY: &[&str] = &[
             "sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh", "exp", "ln",
@@ -1465,7 +1483,7 @@ impl Checker {
         let arity = match name {
             "pi" => 0,
             "pow" | "atan2" => 2,
-            n if UNARY.contains(&n) || n == "abs" => 1,
+            n if UNARY.contains(&n) || matches!(n, "abs" | "is_finite") => 1,
             _ => return None,
         };
         if arg_types.len() != arity {
@@ -1480,6 +1498,17 @@ impl Checker {
         }
         match name {
             "pi" => Some(Ty::Float),
+            "is_finite" => match arg_types[0] {
+                Ty::Float | Ty::Float32 => Some(Ty::Bool),
+                Ty::Unknown => Some(Ty::Unknown),
+                ref other => {
+                    self.push(
+                        "E1041",
+                        format!("'is_finite' isn't defined for '{}'.", other.describe()),
+                    );
+                    Some(Ty::Unknown)
+                }
+            },
             "pow" | "atan2" => match (&arg_types[0], &arg_types[1]) {
                 (Ty::Float, Ty::Float) => Some(Ty::Float),
                 (Ty::Float32, Ty::Float32) => Some(Ty::Float32),
@@ -1989,7 +2018,12 @@ impl Checker {
                     if let Some(field_ty) = index.and_then(|i| field_types.get(i)) {
                         let field_ty =
                             resolve_type_with_type_subst(field_ty, &subst, &HashMap::new());
-                        self.note_expected(value, &field_ty);
+                        if let Ty::Dyn(_) = field_ty {
+                            self.expected_types_by_node
+                                .insert(value as *const Expr as usize, field_ty.clone());
+                        } else {
+                            self.note_expected(value, &field_ty);
+                        }
                     }
                 }
             }
@@ -2577,22 +2611,43 @@ impl Checker {
         explicit_type_args: Option<&[Type]>,
         scope: &mut Scope,
     ) -> Ty {
+        // Resolve explicit record arguments before checking field expressions.
+        // This lets enum constructors such as `Err("message")` inherit the
+        // complete expected type from a field like `Result<String, String>`.
+        // Without it, an unconstrained constructor defaults its unknown `Ok`
+        // parameter to `Int`, producing an invalid native assignment later.
+        let explicit_type_subst: HashMap<String, Ty> = self
+            .record_generics
+            .get(name)
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+            .zip(explicit_type_args.unwrap_or_default().iter())
+            .map(|(generic, ty)| (generic.name.clone(), self.resolve_type_in_context(ty)))
+            .collect();
         let value_types: HashMap<String, Ty> = fields
             .iter()
             .map(|(field_name, value)| {
-                let declared_fn = self
+                let declared_type = self
                     .record_fields
                     .get(name)
                     .and_then(|fs| fs.iter().find(|(n, _)| n == field_name).map(|(_, t)| t.clone()))
-                    .map(|t| self.resolve_type_in_context(&t))
-                    .filter(|t| {
-                        // A lambda learns its parameter types, and an empty
-                        // `[]`/`{}` its element type, from the field.
-                        let empty = matches!(value.unlocated(), Expr::ListLiteral(items) | Expr::SetLiteral(items) if items.is_empty())
-                            || matches!(value.unlocated(), Expr::MapLiteral(pairs) if pairs.is_empty());
-                        matches!(t, Ty::Fn(..)) || (empty && !ty_mentions_generic(t))
-                    });
-                (field_name.clone(), self.infer_expr_with_expected(value, declared_fn.as_ref(), scope))
+                    .map(|t| resolve_type_with_type_subst(&t, &explicit_type_subst, &HashMap::new()));
+                let expected = declared_type.as_ref().filter(|t| {
+                    // A lambda learns its parameter types, and an empty
+                    // `[]`/`{}` its element type, from the field.
+                    let empty = matches!(value.unlocated(), Expr::ListLiteral(items) | Expr::SetLiteral(items) if items.is_empty())
+                        || matches!(value.unlocated(), Expr::MapLiteral(pairs) if pairs.is_empty());
+                    matches!(t, Ty::Fn(..))
+                        || matches!(t, Ty::Dyn(_))
+                        || (empty && !ty_mentions_generic(t))
+                        || explicit_type_args.is_some()
+                });
+                if let Some(expected @ Ty::Dyn(_)) = expected {
+                    self.expected_types_by_node
+                        .insert(value as *const Expr as usize, expected.clone());
+                }
+                (field_name.clone(), self.infer_expr_with_expected(value, expected, scope))
             })
             .collect();
         // Untyped integer literals in a field whose declared type is a
@@ -3398,22 +3453,27 @@ impl Checker {
         };
         let refined = refine_expected_type(&inferred, expected);
         if refined != inferred {
-            self.set_node_type_layers(expr, &refined);
-            let mut layer = expr;
-            loop {
-                if let Expr::Located(_, range) = layer {
-                    let key = ExprKey {
-                        file: self.current_source_file.clone(),
-                        start: range.start,
-                        end: range.end,
-                    };
-                    self.expr_types.insert(key, refined.clone());
-                    if let Expr::Located(inner, _) = layer {
-                        layer = inner;
-                        continue;
+            if matches!(expected, Ty::Dyn(_)) {
+                self.expected_types_by_node
+                    .insert(expr as *const Expr as usize, expected.clone());
+            } else {
+                self.set_node_type_layers(expr, &refined);
+                let mut layer = expr;
+                loop {
+                    if let Expr::Located(_, range) = layer {
+                        let key = ExprKey {
+                            file: self.current_source_file.clone(),
+                            start: range.start,
+                            end: range.end,
+                        };
+                        self.expr_types.insert(key, refined.clone());
+                        if let Expr::Located(inner, _) = layer {
+                            layer = inner;
+                            continue;
+                        }
                     }
+                    break;
                 }
-                break;
             }
         }
         refined
@@ -3965,6 +4025,10 @@ impl Checker {
                 let expected = resolve_type_with_subst(&param.ty, &dim_subst);
                 if let Some(expr) = arg_expr_for_param(sig, args, index) {
                     self.note_expected(expr, &expected);
+                    if matches!(expected, Ty::Dyn(_)) {
+                        self.expected_types_by_node
+                            .insert(expr as *const Expr as usize, expected.clone());
+                    }
                 }
                 let adapted = match arg_expr_for_param(sig, args, index) {
                     Some(expr) => self.adapt_literals(expr, &expected, arg_ty),
@@ -4030,6 +4094,10 @@ impl Checker {
             let expected = resolve_type_with_type_subst(&param.ty, &type_subst, &dim_subst);
             if let Some(expr) = arg_expr_for_param(sig, args, index) {
                 self.note_expected(expr, &expected);
+                if matches!(expected, Ty::Dyn(_)) {
+                    self.expected_types_by_node
+                        .insert(expr as *const Expr as usize, expected.clone());
+                }
             }
         }
 
@@ -4192,6 +4260,35 @@ impl Checker {
                     arg_types.len()
                 ),
             );
+        }
+        // Preserve the method's concrete generic arguments for HIR consumers.
+        // Calls through a generic trait bound use this checker path rather
+        // than `check_concrete_method_call`, so without this record a later
+        // specialization cannot monomorphize the trait implementation call.
+        if !method_sig.generics.is_empty()
+            && method_sig.generics.iter().all(|generic| {
+                substitutions.contains_key(&generic.name)
+                    || substitutions.contains_key(&format!("#dim:{}", generic.name))
+            })
+        {
+            let mut recorded = CallSubst::default();
+            for generic in &method_sig.generics {
+                if let Some(Ty::Quantity(dimension)) =
+                    substitutions.get(&format!("#dim:{}", generic.name))
+                {
+                    recorded
+                        .dims
+                        .insert(generic.name.clone(), dimension.clone());
+                } else if let Some(ty) = substitutions.get(&generic.name) {
+                    recorded.types.insert(generic.name.clone(), ty.clone());
+                }
+            }
+            if let Some(key) = self.call_key_stack.last().cloned() {
+                self.call_substs.insert(key, recorded.clone());
+            }
+            if let Some(node) = self.call_node_stack.last().copied() {
+                self.call_substs_by_node.insert(node, recorded);
+            }
         }
         Some(resolve_type_with_type_subst(
             &method_sig.return_type,
@@ -6440,6 +6537,7 @@ fn refine_expected_type(actual: &Ty, expected: &Ty) -> Ty {
         return actual.clone();
     }
     match (actual, expected) {
+        (_, Ty::Dyn(_)) => expected.clone(),
         (Ty::Unknown, expected) => expected.clone(),
         (Ty::List(actual), Ty::List(expected)) => {
             Ty::List(Box::new(refine_expected_type(actual, expected)))

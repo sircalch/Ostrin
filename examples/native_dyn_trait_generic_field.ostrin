@@ -1,0 +1,32 @@
+trait Speaker {
+    fn speak(self) -> String
+}
+
+record First {
+    text: String
+}
+
+record Second {
+    text: String
+}
+
+impl Speaker for First {
+    fn speak(self) -> String { self.text }
+}
+
+impl Speaker for Second {
+    fn speak(self) -> String { self.text }
+}
+
+record Holder<T> {
+    mut value: T
+}
+
+fn main() -> Void {
+    mut holder: Holder<dyn Speaker> = Holder<dyn Speaker> { value: First { text: "first" } }
+    previous = holder.value
+    print(holder.value.speak())
+    holder.value = Second { text: "second" }
+    print(previous.speak())
+    print(holder.value.speak())
+}

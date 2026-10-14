@@ -38,6 +38,33 @@ fn option_ok_or_nested() -> String {
     some_nested().ok_or("outer error").unwrap().unwrap()
 }
 
+fn deep_nested(flag: Bool) -> Result<Option<Result<Option<String>, String>>, String> {
+    if flag {
+        Ok(Some(Ok(Some("deep" + " payload"))))
+    } else {
+        Ok(Some(Err("inner error" + " payload")))
+    }
+}
+
+fn deep_outer_error() -> Result<Option<Result<Option<String>, String>>, String> {
+    Err("outer error" + " payload")
+}
+
+fn deep_fallback() -> Result<Option<String>, String> {
+    Ok(Some("outer fallback"))
+}
+
+fn collect_deep_nested() -> List<Result<Option<Result<Option<String>, String>>, String>> {
+    mut values = [deep_nested(true)]
+    mut i = 0
+    while i < 4 {
+        values.push(deep_nested(i % 2 == 0))
+        i = i + 1
+    }
+    values.push(deep_outer_error())
+    values
+}
+
 fn main() -> Void {
     match some_nested() {
         Some(inner) => match inner {
@@ -69,4 +96,10 @@ fn main() -> Void {
     print(result_unwrap_nested())
     print(result_ok_nested_fallback())
     print(option_ok_or_nested())
+    for value in collect_deep_nested() {
+        print(value.unwrap_or(Some(deep_fallback()))
+            .unwrap()
+            .unwrap_or(Some("inner fallback"))
+            .unwrap_or("leaf fallback"))
+    }
 }

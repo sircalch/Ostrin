@@ -1,0 +1,162 @@
+{
+  "release": "0.2.0",
+  "status": "NOT_READY",
+  "criteria": [
+    {
+      "id": "ast-fallback",
+      "status": "READY",
+      "acceptance": "The current measured differential baseline has zero AST fallback functions (7,198 IR + 41 HIR = 7,239 HIR/IR bodies), with interpreter/native parity preserved.",
+      "evidence": [
+        { "path": "compiler/tests/differential.rs", "claim": "Measured HIR/IR ratchet, zero AST fallback ceiling and interpreter/native differential suite" },
+        { "path": "validation/ast-fallback-ledger.json", "claim": "Verified zero-fallback ledger at 7,198 IR + 41 HIR bodies" }
+      ]
+    },
+    {
+      "id": "numerical-validation",
+      "status": "READY",
+      "acceptance": "The analytic residual suite for LU, Cholesky, QR, SVD and symmetric eigenpairs passes for interpreter and native builds on the supported CI operating systems with per-case tolerances and no leaks.",
+      "requires_ci_run_url": true,
+      "evidence": [
+        { "path": "scripts/numeric-validation.mjs", "claim": "Independent numerical residual and reference validation" },
+        { "path": "validation/numeric/matrix_algorithms.json", "claim": "Analytical cases and explicit tolerances" },
+        { "path": "docs/design/24-metodos-numericos.md", "claim": "Numerical validation method and scope" },
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38182030324", "claim": "Ostrin CI numerical-validation artifacts pass on Windows, macOS and Ubuntu" }
+      ]
+    },
+    {
+      "id": "ownership",
+      "status": "READY",
+      "acceptance": "The ownership matrix has current evidence for every promoted cell; high-risk enum, wrapper, aggregate, escape, error, Phi, closure and task paths pass leak-check and applicable sanitizers/WASI.",
+      "requires_ci_run_url": true,
+      "evidence": [
+        { "path": "docs/ownership-matrix.md", "claim": "Ownership support, tested boundaries and limitations" },
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38508656204", "claim": "Current-head interpreter/native, differential, numerical and website CI passes on Ubuntu, Windows and macOS" },
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38508656243", "claim": "Current-head ASan native suite, generated differential corpus, frontend fuzz and UBSan suite pass" },
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38508663521", "claim": "Current-head WASI compiler build, 28-program runtime matrix and artifact checksum pass" },
+        { "path": "compiler/tests/fixtures/native_ir_quantity_array_record_field.ostrin", "claim": "Array<Quantity<Length>> record-field replacement has interpreter/native/WASI and leak-check coverage" },
+        { "path": "examples/native_ir_map_set_branch.ostrin", "claim": "Map and Set branch selection has interpreter/native/WASI and leak-check coverage" },
+        { "path": "examples/measurement_record.ostrin", "claim": "Measurement<Float> record-field replacement has interpreter/native/WASI and leak-check coverage" },
+        { "path": "examples/measurement_return.ostrin", "claim": "Measurement<Float> argument and return ownership has interpreter/native/WASI and leak-check coverage" },
+        { "path": "examples/measurement_clone.ostrin", "claim": "Measurement<Float> explicit clone ownership has interpreter/native/WASI and leak-check coverage" },
+        { "path": "examples/measurement_closure.ostrin", "claim": "Measurement<Float> closure capture ownership has interpreter/native/WASI and leak-check coverage" },
+        { "path": "examples/measurement_list.ostrin", "claim": "List<Measurement<Float>> construction, indexing and destruction has interpreter/native/WASI and leak-check coverage" },
+        { "path": "examples/measurement_branch.ostrin", "claim": "Measurement<Float> branch selection has interpreter/native/WASI and leak-check coverage" },
+        { "path": "examples/measurement_loop.ostrin", "claim": "Measurement<Float> loop replacement and destruction has interpreter/native/WASI and leak-check coverage" },
+        { "path": "examples/measurement_phi.ostrin", "claim": "Measurement<Float> Phi selection has interpreter/native/WASI and leak-check coverage" },
+        { "path": "examples/measurement_result.ostrin", "claim": "Result<Measurement<Float>, String> Ok/Err paths have interpreter/native/WASI and leak-check coverage" },
+        { "path": "examples/native_ir_try_captured_handler.ostrin", "claim": "Captured try/catch closure handler has interpreter/native/WASI and zero-leak ownership coverage" },
+        { "path": "examples/native_ir_task_result.ostrin", "claim": "Task<Result<String, String>> join covers Ok/Err ownership in cooperative and native-thread modes with WASI emission" },
+        { "path": "examples/native_ir_nested_aggregate_field.ostrin", "claim": "Nested Option<Inner> aggregate stored in a record field has interpreter/native/WASI and zero-leak coverage" },
+        { "path": "examples/native_ir_nested_aggregate_loop.ostrin", "claim": "Nested Option<Inner> aggregate iteration is lowered through IR/C with interpreter/native/WASI parity and zero-leak coverage" },
+        { "path": "examples/native_generic_iterator_result.ostrin", "claim": "Generic Iterator<Result<String, String>> preserves the explicit Result payload type with interpreter/native parity and zero-leak coverage" },
+        { "path": "examples/measurement_task.ostrin", "claim": "Measurement<Float> task capture, join and destruction has interpreter/native/WASI/native-threads and leak-check coverage" },
+        { "path": "examples/measurement_array_shape.ostrin", "claim": "Array<Measurement<Float>> remains explicitly rejected with interpreter and actionable native diagnostics" },
+        { "path": "examples/measurement_quantity_direct_shape.ostrin", "claim": "Direct Measurement<Quantity<Length>> remains explicitly rejected before unsafe native fallback" },
+        { "path": "examples/native_dyn_trait_record_field.ostrin", "claim": "Non-generic record fields preserve dyn Trait data/vtable pairing across construction, replacement, aliases and self-assignment with interpreter/native parity and zero live allocations" },
+        { "path": "examples/native_dyn_trait_generic_field.ostrin", "claim": "Holder<T> instantiated as Holder<dyn Speaker> preserves the field's data/vtable pair across aliasing and replacement with interpreter/native parity, WASI execution and zero live allocations" },
+        { "path": "examples/native_dyn_trait_wrappers.ostrin", "claim": "Option<dyn Speaker> Some/None (including storage in a mutable record field and replacement by None), Result<dyn Speaker, String> Ok/Err and List<Option<dyn Speaker>> preserve dispatch and ownership with interpreter/native parity, WASI emission and zero live allocations" },
+        { "path": "examples/native_dyn_trait_closure_capture.ostrin", "claim": "A returned closure keeps a dyn Trait payload alive after its source scope and releases it after invocation with interpreter/native parity and zero live allocations" },
+        { "path": "compiler/tests/fixtures/native_dyn_trait_task_capture.ostrin", "claim": "A scheduled task captures and dynamically dispatches a dyn Trait value with interpreter/native-thread parity and zero live allocations" },
+        { "path": "compiler/tests/fixtures/native_dyn_trait_task_cancel.ostrin", "claim": "A cancelled scheduled task releases its captured dyn Trait payload exactly once in cooperative and native-thread modes, with WASI emission and zero live allocations" },
+        { "path": "validation/ast-fallback-ledger.json", "claim": "Current differential suite reports zero AST fallbacks; dyn default-method migration is removed from the ledger with a verified baseline" },
+        { "path": "docs/design/15-dyn-trait.md", "claim": "Trait-object ownership ABI, HIR/IR migration prerequisites and required WASI/sanitizer evidence are specified; the boundary remains open" }
+      ]
+    },
+    {
+      "id": "measurements",
+      "status": "READY",
+      "acceptance": "Measurement<Float> has reviewed semantics and analytical reference cases, parity, zero-allocation checks and ASan/UBSan/WASI evidence for the supported scalar contract.",
+      "evidence": [
+        { "path": "docs/design/25-mediciones-e-incertidumbre.md", "claim": "Measurement scalar model, analytical cases and explicit limitations" },
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38182030421", "claim": "Scalar Measurement lifecycle passes ASan and UBSan in CI" }
+      ]
+    },
+    {
+      "id": "reproducibility-r1",
+      "status": "READY",
+      "acceptance": "R1 replay is generalized across the declared experiment set; recorded seeds and inputs reproduce outputs in CI, with platform/tolerance policy documented and a successful CI run linked.",
+      "requires_ci_run_url": true,
+      "evidence": [
+        { "path": "scripts/experiment-replay.mjs", "claim": "Executable R1/R2 replay gate discovers the registry" },
+        { "path": "docs/design/26-efectos-cientificos.md", "claim": "Defines exact replay scope and per-metric cross-platform tolerance requirements" },
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38182030324", "claim": "Ostrin CI replays all 11 declared R1/R2 bundles and verifies changed-input output" },
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38162721694", "claim": "Website CI publishes the host-bound R3 evidence artifact; its report validates 29/29 bundles with openCount=0" }
+      ]
+    },
+    {
+      "id": "documentation",
+      "status": "READY",
+      "acceptance": "Status, roadmap, release notes and public maturity claims agree with source-backed inventories; documentation consistency checks pass.",
+      "evidence": [
+        { "path": "scripts/project-plan-check.mjs", "claim": "Machine-checked plan and public maturity consistency" },
+        { "path": "README-reproduce.md", "claim": "Reproduction commands, R0-R3 boundaries and CI evidence policy" }
+        ,{ "path": "ESTADO_Y_PLAN.md", "claim": "Current maturity and CI-backed sanitizer status" }
+        ,{ "path": "ROADMAP.md", "claim": "Roadmap status agrees with current CI evidence" }
+      ]
+    },
+    {
+      "id": "sanitizers",
+      "status": "READY",
+      "acceptance": "The complete release-candidate test scope passes ASan and UBSan on CI, with no unresolved critical memory or undefined-behavior findings and successful run links attached.",
+      "requires_ci_run_url": true,
+      "evidence": [
+        { "path": ".github/workflows/sanitizers.yml", "claim": "Required sanitizer workflows" },
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38182030421", "claim": "ASan and UBSan native suites pass" }
+      ]
+    },
+    {
+      "id": "benchmarks",
+      "status": "READY",
+      "acceptance": "A multi-commit benchmark history exists for the declared scientific workloads, reports include reproducibility metadata, and no unexplained regression remains.",
+      "evidence": [
+        { "path": "docs/benchmarks.md", "claim": "Benchmark protocol and interpretation limits" },
+        { "path": "validation/benchmark-history.json", "claim": "Three provenance-backed benchmark commits with output hashes; source hashes are retained where the original snapshot provided them" },
+        { "path": "scripts/benchmark-history.mjs", "claim": "Rebuilds the historical index and performs environment/source-matched regression analysis" }
+      ]
+    },
+    {
+      "id": "website-audit",
+      "status": "READY",
+      "acceptance": "A dated visual, accessibility and responsive review covers the public site and playground; findings are resolved or explicitly accepted with evidence.",
+      "evidence": [
+        { "path": "docs/website-audit.md", "claim": "Dated visual, responsive and accessibility review with CI-backed Firefox coverage" },
+        { "path": "tests/browser/visual.spec.mjs", "claim": "Chromium desktop/tablet/mobile visual regression and representative plot coverage" },
+        { "path": "tests/browser/cross-browser.spec.mjs", "claim": "Firefox/WebKit responsive and keyboard smoke coverage" },
+        { "path": ".github/workflows/browser-audit.yml", "claim": "Non-deploying pinned Ubuntu 24.04 browser audit" },
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38182030431", "claim": "Chromium, Firefox, WebKit, WASM, static and accessibility website checks pass" }
+      ]
+    },
+    {
+      "id": "installation",
+      "status": "READY",
+      "acceptance": "Clean-runner install checks pass for supported operating systems and execute a real Ostrin program from the installed compiler; attach the candidate workflow run.",
+      "requires_ci_run_url": true,
+      "evidence": [
+        { "path": ".github/workflows/install-check.yml", "claim": "Cross-platform clean-runner installation workflow; attach v0.2 candidate run links before release" },
+        { "path": "validation/installation-local-2026-10-10.json", "claim": "Published 0.1.0 Windows installer checksum, version, check and hello smoke evidence" },
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38109043146", "claim": "Clean-runner install and hello smoke pass on Ubuntu, macOS and Windows" }
+      ]
+    },
+    {
+      "id": "changelog",
+      "status": "READY",
+      "acceptance": "The v0.2.0 candidate changelog and release notes describe source-backed user-visible changes, compatibility and known limitations, and agree with the proposed source state.",
+      "evidence": [
+        { "path": "CHANGELOG.md", "claim": "Detailed release history and v0.2.0 candidate summary" },
+        { "path": "docs/releases/v0.2.0.md", "claim": "Prepared candidate release notes with source-backed scope and known limitations" }
+      ]
+    },
+    {
+      "id": "artifacts",
+      "status": "OPEN",
+      "acceptance": "Linux, macOS, Windows and WASI release artifacts are built from the tagged source, checksummed, extracted and smoke-tested; WASI runtime smoke matrix passes and candidate CI run links are attached.",
+      "requires_ci_run_url": true,
+      "evidence": [
+        { "path": ".github/workflows/release.yml", "claim": "Cross-platform release build, checksum, extraction and smoke test" },
+        { "path": ".github/workflows/wasi.yml", "claim": "Pinned WASI build, runtime smoke matrix and checksums" },
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38109715203", "claim": "Linux, macOS and Windows release artifacts build, package, checksum, extract and smoke-test successfully" },
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38109546060", "claim": "WASI compiler artifact and 20-program runtime matrix pass on the corrected commit" }
+      ]
+    }
+  ]
+}

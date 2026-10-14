@@ -3,11 +3,13 @@
 // The v0 bundles carry source, declared inputs, recorded figures and
 // machine-readable provenance with hashes. Website CI replays every source
 // with the same WASI compiler and compares the complete SVG byte-for-byte;
-// input-driven seeded bundles can additionally claim R1 after their seed
-// sensitivity contract is verified. No bundle claims R2/R3.
+// input-driven seeded bundles retain an R1 algorithm/partition prerequisite after
+// their seed sensitivity contract is verified; embedded external-input bundles can
+// claim R2 after their snapshot, capability and sensitivity contract is verified.
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -308,6 +310,60 @@ function sha256(value) {
   return `sha256:${createHash("sha256").update(Buffer.from(value, "utf8")).digest("hex")}`;
 }
 
+function isStringArrayMap(value) {
+  return value != null
+    && typeof value === "object"
+    && !Array.isArray(value)
+    && Object.values(value).every((items) =>
+      Array.isArray(items) && items.every((item) => typeof item === "string"));
+}
+
+export function validateEffectCapture(effects) {
+  const errors = [];
+  if (!effects || typeof effects !== "object" || Array.isArray(effects)) {
+    return ["effects capture must be an object"];
+  }
+  if (effects.schema !== "ostrin.effect-report/v0" || effects.status !== "captured") {
+    errors.push("effects capture schema/status is missing or unsupported");
+  }
+  if (typeof effects.experimental !== "boolean" || typeof effects.conservative !== "boolean") {
+    errors.push("effects capture must preserve experimental/conservative flags");
+  }
+  if (!Array.isArray(effects.kinds) || !effects.kinds.every((kind) => typeof kind === "string")) {
+    errors.push("effects capture kinds must be an array of strings");
+  }
+  if (!isStringArrayMap(effects.functions)) errors.push("effects capture functions must map names to effect arrays");
+  if (!isStringArrayMap(effects.function_calls)) errors.push("effects capture function_calls must map names to call arrays");
+  if (!isStringArrayMap(effects.unresolved_calls)) errors.push("effects capture unresolved_calls must map names to call arrays");
+
+  const coverage = effects.effect_coverage;
+  if (!coverage || typeof coverage !== "object" || Array.isArray(coverage)
+    || !Number.isInteger(coverage.known_calls) || coverage.known_calls < 0
+    || !Number.isInteger(coverage.unresolved_calls) || coverage.unresolved_calls < 0
+    || typeof coverage.complete !== "boolean") {
+    errors.push("effects capture effect_coverage is missing or malformed");
+    return errors;
+  }
+  if (!isStringArrayMap(effects.function_calls) || !isStringArrayMap(effects.unresolved_calls)) return errors;
+
+  const callCount = Object.values(effects.function_calls).reduce((total, calls) => total + calls.length, 0);
+  let unresolvedCount = 0;
+  for (const [caller, calls] of Object.entries(effects.unresolved_calls)) {
+    const recordedCalls = new Set(effects.function_calls[caller] ?? []);
+    for (const call of calls) {
+      unresolvedCount++;
+      if (!recordedCalls.has(call)) errors.push(`unresolved call ${caller}.${call} is absent from function_calls`);
+    }
+  }
+  if (unresolvedCount > callCount
+    || coverage.known_calls !== callCount - unresolvedCount
+    || coverage.unresolved_calls !== unresolvedCount
+    || coverage.complete !== (unresolvedCount === 0)) {
+    errors.push("effects capture effect_coverage does not match function_calls/unresolved_calls");
+  }
+  return errors;
+}
+
 function bytes(value) {
   return Buffer.byteLength(value, "utf8");
 }
@@ -318,6 +374,139 @@ function canonicalJson(value) {
 
 function compilerVersion(root) {
   return normalizedText(root, "compiler/Cargo.toml").match(/^version\s*=\s*"([^"]+)"/m)?.[1] ?? "unknown";
+}
+
+function ancestorProjectFile(root, sourcePath, fileName) {
+  const rootAbsolute = path.resolve(root);
+  let directory = path.dirname(path.resolve(root, sourcePath));
+  while (directory === rootAbsolute || directory.startsWith(`${rootAbsolute}${path.sep}`)) {
+    const candidate = path.join(directory, fileName);
+    if (existsSync(candidate)) return candidate;
+    if (directory === rootAbsolute) break;
+    directory = path.dirname(directory);
+  }
+  return null;
+}
+
+function runtimeFile(root, absolutePath) {
+  if (!absolutePath) return null;
+  const relativePath = path.relative(root, absolutePath).replaceAll("\\", "/");
+  return {
+    path: relativePath,
+    sha256: sha256(normalizedText(root, relativePath)),
+  };
+}
+
+export function runtimeSnapshotFor(root = repositoryRoot, sourcePath = "") {
+  const compilerLockfile = path.join(root, "compiler", "Cargo.lock");
+  const projectManifest = ancestorProjectFile(root, sourcePath, "ostrin.toml");
+  const projectLockfile = ancestorProjectFile(root, sourcePath, "ostrin.lock");
+  const host = process.env.OSTRIN_CAPTURE_HOST === "1" ? {
+    schema: "ostrin.host/v1",
+    source: "github-actions",
+    runner_os: process.env.RUNNER_OS ?? "unknown",
+    runner_arch: process.env.RUNNER_ARCH ?? "unknown",
+    runner_environment: process.env.RUNNER_ENVIRONMENT ?? "unknown",
+    image: {
+      os: process.env.ImageOS ?? "unknown",
+      version: process.env.ImageVersion ?? "unknown",
+    },
+    node: process.version,
+    hardware: {
+      arch: process.arch,
+      cpu_count: os.cpus().length,
+      endianness: os.endianness(),
+    },
+    wasi: "preview1",
+    captured: true,
+  } : undefined;
+  const snapshot = {
+    schema: "ostrin.runtime/v1",
+    status: "partial",
+    target: "wasm32-wasip1",
+    wasi: "preview1",
+    runner: "WASI host",
+    compiler_lockfile: runtimeFile(root, compilerLockfile),
+    dependencies: {
+      compiler_lockfile: runtimeFile(root, compilerLockfile),
+      project_manifest: runtimeFile(root, projectManifest),
+      project_lockfile: runtimeFile(root, projectLockfile),
+    },
+    scheduler: {
+      mode: "single-threaded-wasi-replay",
+      concurrency: "not used by gallery fixture",
+      status: "declared",
+    },
+    ...(host ? { host } : {}),
+    project: {
+      manifest: runtimeFile(root, projectManifest),
+      lockfile: runtimeFile(root, projectLockfile),
+    },
+    platform_policy: {
+      output: "byte equality is verified only against the recorded figure in the CI replay configuration; this is not a cross-platform guarantee",
+      numeric: "cross-platform numerical comparison is not performed or claimed; before comparing, declare absolute and relative tolerances per metric with units, reference method, and applicable input domain; no universal epsilon is assumed",
+    },
+    missing: [
+      "input snapshots",
+      "output hashes from this invocation",
+      "captured host and hardware metadata",
+    ],
+  };
+  if (host) snapshot.missing = snapshot.missing.filter((item) => item !== "captured host and hardware metadata");
+  return snapshot;
+}
+
+const effectReports = new Map();
+
+function compilerEffectSummary(root, sourcePath) {
+  const key = `${root}:${sourcePath}`;
+  if (effectReports.has(key)) return effectReports.get(key);
+  const extension = process.platform === "win32" ? ".exe" : "";
+  let compiler = path.join(root, "compiler", "target", "release", `ostrinc${extension}`);
+  if (!existsSync(compiler)) {
+    execFileSync("cargo", ["build", "--release", "--manifest-path", path.join(root, "compiler", "Cargo.toml"), "--bin", "ostrinc"], {
+      cwd: root,
+      stdio: "pipe",
+      windowsHide: true,
+    });
+  }
+  if (!existsSync(compiler)) throw new Error("release compiler binary is missing after cargo build");
+  const raw = execFileSync(compiler, ["--effect-report", "--json", path.join(root, sourcePath)], {
+    cwd: root,
+    encoding: "utf8",
+    windowsHide: true,
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  const report = JSON.parse(raw.trim());
+  if (report.schema !== "ostrin.effect-report/v0" || !Array.isArray(report.effects)
+    || !report.function_effects || typeof report.function_effects !== "object") {
+    throw new Error(`unexpected compiler effect report for ${sourcePath}`);
+  }
+  const summary = {
+    schema: report.schema,
+    status: "captured",
+    source: "ostrinc --effect-report --json",
+    experimental: report.experimental === true,
+    conservative: report.conservative === true,
+    kinds: [...new Set(report.effects)].sort(),
+    entry: "main",
+    functions: Object.fromEntries(Object.entries(report.function_effects)
+      .sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)
+      .map(([name, kinds]) => [name, [...new Set(kinds)].sort()])),
+    function_calls: report.function_calls,
+    unresolved_calls: report.unresolved_calls,
+    effect_coverage: report.effect_coverage,
+    analyzer: ["compiler/src/effects.rs", "compiler/src/main.rs"].map((relativePath) => ({
+      path: relativePath,
+      sha256: sha256(normalizedText(root, relativePath)),
+    })),
+  };
+  const effectErrors = validateEffectCapture(summary);
+  if (effectErrors.length > 0) {
+    throw new Error(`invalid compiler effect report for ${sourcePath}: ${effectErrors.join("; ")}`);
+  }
+  effectReports.set(key, summary);
+  return summary;
 }
 
 function fixtureCommit(root, fixture) {
@@ -413,7 +602,7 @@ function seededRandomnessEvidence(root, source, inputs) {
   }
   const inputDriven = inputs.execution?.randomness?.seed_path === "seed"
     && inputs.execution?.consumes?.includes("seed")
-    && reproducibilityFor(inputs).level === "R1";
+    && ["R1", "R2"].includes(reproducibilityFor(inputs).level);
   const implementationPaths = [
     "compiler/src/interpreter/rng.rs",
     "compiler/src/rng_runtime.c",
@@ -444,6 +633,35 @@ function provenanceFor(root, fixture, files, manifest) {
   const metadata = metadataForFixture(fixture.id, root);
   const reproducibility = reproducibilityFor(inputs);
   const randomness = seededRandomnessEvidence(root, source, inputs);
+  const effects = compilerEffectSummary(root, fixture.sourcePath);
+  const execution = inputs.execution ?? {
+    mode: "recorded-parameters",
+    input_file: "data.json",
+    consumes: Object.keys(inputs.parameters ?? {}).map((key) => `parameters.${key}`),
+    capabilities: [],
+    command: "node scripts/lab-data.mjs --verify-replays",
+    target: "wasm32-wasip1",
+    wasi: "preview1",
+    status: "verified-in-ci",
+  };
+  const runtime = runtimeSnapshotFor(root, fixture.sourcePath);
+  if (execution.snapshot) {
+    runtime.input_snapshots = [{
+      ...execution.snapshot,
+      sha256: metadata.dataHash,
+    }];
+    runtime.missing = runtime.missing.filter((item) => item !== "input snapshots");
+  }
+  runtime.invocation = {
+    command: "node scripts/lab-data.mjs --verify-replays",
+    status: "verified-in-ci",
+    outputs: [{
+      path: "figure.svg",
+      bytes: bytes(figure),
+      sha256: sha256(figure),
+    }],
+  };
+  runtime.missing = runtime.missing.filter((item) => item !== "output hashes from this invocation");
   return {
     schema: "ostrin.provenance/v0",
     level: reproducibility.level,
@@ -451,6 +669,7 @@ function provenanceFor(root, fixture, files, manifest) {
     levels: {
       R0: "Recorded source, inputs and outputs with calculated hashes.",
       R1: "Seeded replay with an input-driven seed, algorithm/version and stream partition; CI must verify seed sensitivity.",
+      R2: "Replay of an embedded external input snapshot with declared capabilities and parameters; CI must verify the snapshot and sensitivity contract.",
     },
     program: {
       source: "source.ostrin",
@@ -459,9 +678,10 @@ function provenanceFor(root, fixture, files, manifest) {
     },
     inputs: [{
       id: "data.json",
-      kind: "parameters",
+      kind: execution.snapshot ? "external-snapshot" : "parameters",
       sha256: metadata.dataHash,
       seed: inputs.seed,
+      ...(execution.snapshot ? { snapshot: execution.snapshot } : {}),
     }],
     outputs: [{
       id: "figure.svg",
@@ -475,7 +695,11 @@ function provenanceFor(root, fixture, files, manifest) {
       target: "wasm32-wasip1",
       command: "node scripts/lab-data.mjs --verify-replays",
       compares: "figure.svg",
-      note: reproducibility.level === "R1"
+      note: reproducibility.level === "R2" && randomness
+        ? "Website CI replays the embedded data.json snapshot under its declared filesystem capability, changes the declared seed and verifies the seeded xoshiro256** stream and changed SVG."
+        : reproducibility.level === "R2"
+        ? "Website CI replays the embedded data.json snapshot under its declared filesystem capability and verifies that changing the declared parameter changes the figure."
+        : reproducibility.level === "R1"
         ? "Website CI compares the replayed SVG byte-for-byte and changes the declared data.json seed; the seeded xoshiro256** stream is verified for R1."
         : "Website CI compares the replayed SVG byte-for-byte with this bundled figure; R1 requires seeded-randomness evidence.",
     },
@@ -487,6 +711,7 @@ function provenanceFor(root, fixture, files, manifest) {
       compiler: metadata.compiler,
     },
     compiler: metadata.compiler,
+    runtime,
     commit: fixtureCommit(root, fixture),
     target: "wasm32-wasip1",
     command: "ostrinc --run --target wasm32-wasi source.ostrin",
@@ -494,11 +719,16 @@ function provenanceFor(root, fixture, files, manifest) {
     ...(inputs.camera ? { camera: inputs.camera } : {}),
     seed: inputs.seed,
     ...(randomness ? { randomness } : {}),
-    ...(inputs.execution ? { execution: inputs.execution } : {}),
+    execution,
+    effects,
     manifest_schema: manifest.schema,
-    limits: reproducibility.level === "R1"
-      ? "R1 seeded replay is verified in website CI for the declared seed and algorithm contract. The bundle does not include external snapshots, lockfiles, runtime captures or an R2/R3 replay guarantee."
-      : "R0 exact SVG replay is verified in website CI. The bundle does not include seeded-randomness evidence for R1, external snapshots, lockfiles, runtime captures or an R2/R3 replay guarantee.",
+    limits: reproducibility.level === "R2" && randomness
+      ? "R2 external snapshot replay and the seeded xoshiro256** sensitivity contract are verified in website CI. Compiler effects are captured by the experimental conservative analyzer; host capture and a complete R3 auditable artifact guarantee remain pending."
+      : reproducibility.level === "R2"
+      ? "R2 external snapshot replay is verified in website CI for the embedded data.json, declared filesystem capability and parameter sensitivity. Compiler effects are captured by the experimental conservative analyzer; host capture and a complete R3 auditable artifact guarantee remain pending."
+      : reproducibility.level === "R1"
+      ? "R1 seeded replay is verified in website CI for the declared seed and algorithm contract. Compiler effects are captured by the experimental conservative analyzer; host capture, external snapshots and complete R2/R3 guarantees remain pending."
+      : "R0 exact SVG replay is verified in website CI. Compiler effects are captured by the experimental conservative analyzer; host capture, seeded-randomness evidence for R1, external snapshots and complete R2/R3 guarantees remain pending.",
   };
 }
 
@@ -563,7 +793,7 @@ export function verifyExperimentBundle(bundle, { expected, fixtureId } = {}) {
   if (bundle?.schema !== schema) errors.push(`schema must be ${schema}`);
   if (bundle?.id !== fixture.id) errors.push(`id must be ${fixture.id}`);
   const maturity = expected?.reproducibility;
-  if (!maturity || !["R0", "R1"].includes(maturity.level)) errors.push("bundle reproducibility level must be R0 or R1");
+  if (!maturity || !["R0", "R1", "R2"].includes(maturity.level)) errors.push("bundle reproducibility level must be R0, R1 or R2");
   if (JSON.stringify(bundle?.reproducibility) !== JSON.stringify(maturity)) errors.push("bundle reproducibility maturity drifted from the calculated fixture contract");
   const files = bundle?.files;
   const entries = bundle?.manifest?.files;
@@ -578,8 +808,12 @@ export function verifyExperimentBundle(bundle, { expected, fixtureId } = {}) {
   let provenanceFile;
   try { provenanceFile = JSON.parse(files?.["provenance.json"] ?? "null"); } catch { provenanceFile = null; }
   if (JSON.stringify(bundle?.provenance) !== JSON.stringify(provenanceFile)) errors.push("provenance.json is not the embedded provenance object");
+  const effects = bundle?.provenance?.effects;
+  for (const error of validateEffectCapture(effects)) errors.push(`provenance ${error}`);
   const replay = bundle?.provenance?.replay;
-  const replayNote = maturity?.level === "R1"
+  const replayNote = maturity?.level === "R2"
+    ? /embedded data\.json snapshot under its declared filesystem capability/.test(replay?.note ?? "")
+    : maturity?.level === "R1"
     ? /seeded xoshiro256\*\* stream is verified for R1/.test(replay?.note ?? "")
     : /R1 requires seeded-randomness evidence/.test(replay?.note ?? "");
   if (replay?.level !== maturity?.level || replay?.status !== "verified" || replay?.backend !== "ostrinc.wasm"
@@ -589,6 +823,65 @@ export function verifyExperimentBundle(bundle, { expected, fixtureId } = {}) {
   }
   if (bundle?.provenance?.level !== maturity?.level || JSON.stringify(bundle?.provenance?.reproducibility) !== JSON.stringify(maturity)) {
     errors.push("provenance reproducibility maturity drifted from the bundle contract");
+  }
+  const seeded = maturity?.level === "R1" || (
+    maturity?.level === "R2" && bundle?.provenance?.randomness?.status === "input-driven-r1"
+  );
+  if (seeded) {
+    const execution = bundle?.provenance?.execution;
+    const randomness = execution?.randomness;
+    const evidence = bundle?.provenance?.randomness;
+    if (!randomness || randomness.seed_path !== execution?.sensitivity?.path) {
+      errors.push("seeded replay must declare a randomness seed path equal to the sensitivity path");
+    }
+    if (typeof randomness?.seed_path !== "string" || !execution?.consumes?.includes(randomness.seed_path)) {
+      errors.push("seeded randomness seed path must be listed in consumed inputs");
+    }
+    if (randomness?.algorithm !== evidence?.algorithm || randomness?.version !== evidence?.version) {
+      errors.push("seeded randomness algorithm/version does not match provenance evidence");
+    }
+    if (randomness?.partition !== evidence?.partition) {
+      errors.push("seeded randomness partition does not match provenance evidence");
+    }
+    if (evidence?.status !== "input-driven-r1" || evidence?.seed_consumption !== `data.json:${randomness?.seed_path}`) {
+      errors.push("provenance does not prove input-driven seed consumption");
+    }
+  }
+  const runtime = bundle?.provenance?.runtime;
+  const expectedRuntime = expected?.provenance?.runtime;
+  if (JSON.stringify(runtime) !== JSON.stringify(expectedRuntime)) errors.push("runtime snapshot drifted from the source-backed contract");
+  if (runtime?.schema !== "ostrin.runtime/v1" || runtime?.status !== "partial"
+    || runtime?.target !== "wasm32-wasip1" || runtime?.wasi !== "preview1"
+    || runtime?.runner !== "WASI host") {
+    errors.push("runtime snapshot is missing the partial WASI contract");
+  }
+  const invocation = runtime?.invocation;
+  const invocationOutput = invocation?.outputs?.find((entry) => entry.path === "figure.svg");
+  const figureEntry = entries?.find((entry) => entry.path === "figure.svg");
+  if (invocation?.command !== "node scripts/lab-data.mjs --verify-replays"
+    || invocation?.status !== "verified-in-ci"
+    || invocationOutput?.bytes !== figureEntry?.bytes
+    || invocationOutput?.sha256 !== figureEntry?.sha256) {
+    errors.push("runtime invocation output hash is missing or differs from the bundled figure");
+  }
+  if (maturity?.level === "R2") {
+    const execution = bundle?.provenance?.execution;
+    const snapshot = execution?.snapshot;
+    if (!Array.isArray(execution?.capabilities)
+      || !execution.capabilities.includes(`filesystem.read:${execution?.input_file}`)) {
+      errors.push("R2 replay contract is missing the filesystem capability for its input snapshot");
+    }
+    if (!snapshot || snapshot.path !== execution?.input_file || snapshot.embedded !== true) {
+      errors.push("R2 replay contract is missing an embedded input snapshot");
+    }
+    const snapshotRecord = runtime?.input_snapshots?.find((entry) => entry.path === snapshot?.path);
+    const inputEntry = entries?.find((entry) => entry.path === execution?.input_file);
+    if (!snapshotRecord || snapshotRecord.sha256 !== inputEntry?.sha256) {
+      errors.push("R2 runtime snapshot hash does not match the bundled input");
+    }
+    if (!bundle?.provenance?.parameters || typeof bundle.provenance.parameters !== "object") {
+      errors.push("R2 replay contract is missing declared parameters");
+    }
   }
   if (JSON.stringify(bundle?.experiment) !== JSON.stringify(expected?.experiment)) errors.push("experiment file map drifted");
   if (bundle?.provenance?.commit !== expected?.provenance?.commit) errors.push("provenance commit drifted from the source-backed fixture revision");
@@ -639,6 +932,15 @@ function fixtureArgument(argv) {
 }
 
 function main() {
+  if (process.argv.includes("--write-all")) {
+    for (const fixtureId of Object.keys(experimentFixtures)) {
+      const target = outputPathFor(fixtureId);
+      mkdirSync(path.dirname(target), { recursive: true });
+      writeFileSync(target, expectedText(fixtureId), "utf8");
+    }
+    console.log(`experiment-bundle: wrote ${Object.keys(experimentFixtures).length} fixtures`);
+    return;
+  }
   const fixtureId = fixtureArgument(process.argv.slice(2));
   const target = outputPathFor(fixtureId);
   if (process.argv.includes("--write")) {

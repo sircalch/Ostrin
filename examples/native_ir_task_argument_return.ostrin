@@ -1,0 +1,10 @@
+fn forward(task: Task<Void>) -> Task<Void> {
+    task
+}
+
+fn main() -> Void {
+    ready = channel<Int>()
+    task = forward(spawn { ready.send(7) })
+    print(ready.receive().unwrap())
+    task.join()
+}

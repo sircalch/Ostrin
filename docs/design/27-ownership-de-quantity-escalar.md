@@ -1,7 +1,22 @@
 # 27. Ownership de `Quantity` escalar y etiquetas de unidad
 
-*Estado: fase 1 implementada y validada. No habilita todavía la bajada de
-`Figure.unit_line`/`unit_scatter` a IR/C.*
+*Estado: fase 1 implementada y validada; el escape escalar por retorno, por
+`if`/`Phi`, por `Phi` de bucle y dentro de records no recursivos tiene cobertura
+nativa/WASI/leak-check. La fase 2 habilita `Figure.unit_line` y
+`Figure.unit_scatter` por IR/C con especialización por dimensión, paridad,
+emisión WASI y `live_allocations=0`; las suites ASan/UBSan del ciclo pasan en
+CI (`38173152897`), aunque las filas de cobertura no generalizadas siguen
+abiertas.*
+
+La cobertura de ownership también incluye `Option<Quantity<D>>`,
+`Result<Quantity<D>, String>` y `Result<Option<Quantity<D>>, String>`, con las
+rutas `Some`/`None`/`Ok`/`Err`, extracción mediante `match`, emisión C para
+WASI y leak-check nativo. La última forma se valida tanto por IR como con el
+backend AST forzado; este último también libera operandos temporales de arrays
+de cantidades y conserva las etiquetas que escapan de consultas escalares.
+Las instancias genéricas de `Figure.unit_line`/`unit_scatter` también cruzan IR/C:
+`viz_units.ostrin` conserva la salida y termina con cero allocations vivas en
+el backend nativo.
 
 Depende de [01-variables-tipos-unidades.md](01-variables-tipos-unidades.md),
 [11-modelo-de-memoria.md](11-modelo-de-memoria.md),
@@ -9,6 +24,10 @@ Depende de [01-variables-tipos-unidades.md](01-variables-tipos-unidades.md),
 [19-jerarquia-numerica-y-arrays.md](19-jerarquia-numerica-y-arrays.md),
 [20-hir-y-ir.md](20-hir-y-ir.md) y
 [21-distribucion-y-wasm.md](21-distribucion-y-wasm.md).
+
+La cobertura por tipo y contexto en el backend nativo se resume en la
+[matriz de ownership](../ownership-matrix.md); este documento conserva el
+contrato detallado de etiquetas escalares `Quantity`.
 
 Este documento resuelve una pregunta concreta que quedó abierta al intentar
 llevar las instanciaciones genéricas de visualización con cantidades al emisor
@@ -54,16 +73,19 @@ queda colgando.
 El experimento conservado como artefacto local fuera del repositorio durante
 esta auditoría hizo visible la secuencia con `examples/viz_units.ostrin`: después de
 `distance.max()` se liberó el array y el uso posterior de la unidad produjo
-`runtime error: unknown unit` con bytes ya liberados. El parche experimental no
-se integró. La fase 1 implementa ahora el contrato para el emisor IR/C y deja
-`examples/viz_units.ostrin` en fallback verificado hasta completar los
-productores genéricos de visualización.
+`runtime error: unknown unit` con bytes ya liberados. La fase 1 implementó el
+contrato de etiqueta escalar; con las pruebas de wrappers y escapes de arrays
+en cero fugas, la fase 2 habilitó la especialización dimensionada de los dos
+métodos de trazado y cerró el mismo caso en IR/C.
 
 La regresión `native_quantity_scalar_escape_retains_array_unit_labels` reproduce
 el caso mínimo con una etiqueta dinámica: `array([1 m, 2 m, 3 m]) / (1 s)`,
 `peak = values.max()` y `print(peak)` después del último uso del array. La
 salida esperada es `3 m/s`; la prueba comprueba intérprete, IR/C nativo,
 emisión WASI y `--leak-check` (`live_allocations=0`).
+La galería completa `examples/quantity_arrays.ostrin` también termina ahora con
+`live_allocations=0`; su integración exige el contador exacto para cubrir
+conversiones, reducciones, etiquetas que escapan a escalares y `to_list`.
 
 ## 2. Invariantes que debe preservar la solución
 
@@ -232,11 +254,12 @@ print(peak)
 después de `max`. La misma regla cubre `values[0]`, `percentile`, `mean` y
 `to_list`.
 
-Con este contrato, el experimento de `viz_units` podrá habilitarse de forma
-incremental: primero se valida `distance.max()` y la conversión posterior;
-después se habilitan las instanciaciones genéricas de `unit_line` y
-`unit_scatter`; finalmente se retira el fallback solo cuando el informe nativo,
-WASI, sanitizers y la prueba diferencial sean verdes.
+Con este contrato, `viz_units` se valida de forma incremental: `distance.max()`
+y la conversión posterior conservan sus etiquetas; las instanciaciones genéricas
+de `unit_line` y `unit_scatter` tienen informe nativo IR, emisión C para WASI,
+paridad del SVG y leak-check nativo en cero. La ejecución bajo ASan/UBSan queda
+cubierta por la evidencia del ciclo (`38173152897`), sin convertirla en una
+garantía para combinaciones que la matriz mantiene como limitación.
 
 ## 6. Native, WASI y browser
 
@@ -275,14 +298,16 @@ positiva, salida diferencial y leak-check cuando aplique:
 | Caso | Native | WASI | Sanitizers | Criterio |
 |---|---:|---:|---:|---|
 | `array([1 m, 2 m, 3 m]) / (1 s)` y `.max()` después del último uso del array | sí | sí | ASan/UBSan | sin UAF, `3 m/s`, cero fugas |
+| Dos reducciones con etiquetas dinámicas unidas por `if`/`Phi`, con ambas ramas elegidas | sí | sí | leak-check | `3 m/s` y `6 m/s`, cero fugas |
+| `Quantity` de un `Phi` de bucle, reemplazado en el backedge y devuelto al salir | sí | sí | leak-check | `6 m/s`, cero fugas |
 | producto dinámico `m * m` y conversión posterior | sí | sí | ASan/UBSan | `m^2` correcto, cero fugas |
 | `index`, `mean`, `percentile` y `to_list` | sí | sí | ASan/UBSan | cada copia conserva su etiqueta |
 | parámetro `fn id(q) -> Quantity` y retorno del parámetro | sí | sí | ASan/UBSan | el caller recibe una copia viva |
 | alias por `Phi`, `if`, loop y `match` | sí | sí | ASan/UBSan | una liberación por referencia |
-| record con campo `Quantity` | sí | sí | ASan/UBSan | destructor recursivo correcto |
+| record no recursivo con campo `Quantity` | sí | sí | pendiente | destructor libera el campo y leak-check termina en cero |
 | `Option`/`Result` de `Quantity` | sí | sí | ASan/UBSan | solo se libera el payload activo |
 | `List<Quantity>` y `Array<Quantity>` | sí | sí | ASan/UBSan | no hay doble liberación |
-| `examples/viz_units.ostrin` | sí | sí | ASan/UBSan | desaparece el fallback solo con evidencia |
+| `examples/viz_units.ostrin` | sí, IR + leak-check | sí, C emitido | pendiente CI | IR=1/HIR=0/AST=0, SVG diferencial idéntico y cero allocations nativas |
 | literales estáticos (`m`, `s`, `km/h`) | sí | sí | ASan/UBSan | `retain/release` no intenta liberar literales |
 
 Además, la suite debe verificar:
@@ -295,10 +320,10 @@ ostrinc --native-type-report examples/viz_units.ostrin
 ostrinc --emit-c --target wasm32-wasi examples/viz_units.ostrin
 ```
 
-La fase 1 deja el informe de `viz_units` en fallback mientras faltan las filas
-de records, wrappers, `Phi` complejos y visualización genérica. La regresión que
-fija ese límite se puede retirar únicamente en el mismo PR que añada las
-pruebas de la fila completa y reduzca el contador de fallback con paridad.
+La fase 2 ya retiró el fallback de `viz_units`; los sanitizers en CI y las filas
+de records/escapes todavía abiertas siguen siendo gates de ownership. Las
+instancias de trazado genéricas basadas en listas permanecen fuera de este
+alcance y deben migrarse con evidencia propia.
 
 ## 8. Orden de implementación
 
@@ -308,13 +333,21 @@ pruebas de la fila completa y reduzca el contador de fallback con paridad.
 2. **Completado en fase 1:** activar `max`/`min`/`mean`/`percentile`/`get`,
    indexación escalar y operaciones aritméticas con etiquetas propias; ejecutar
    native, WASI, leak-check e intérprete diferencial.
-3. **Pendiente:** cubrir con pruebas dedicadas parámetros que escapan, aliases
-   por `Phi`, records, `Option`/`Result` y wrappers antes de ampliar el ratchet.
-4. **Pendiente:** repetir native, WASI, ASan, UBSan e intérprete diferencial en
-   la matriz completa de la sección 7.
-5. Habilitar las instanciaciones genéricas de visualización y convertir la
-   regresión de fallback en una aserción `ir=1, hir=0, ast=0` para el entry
-   point, manteniendo un baseline explícito para `std.viz`.
+3. **Implementado con cobertura focalizada:** parámetros que escapan por
+   retorno, aliases por `if`/`Phi`, un `Phi` de bucle, records no recursivos con
+   campos `Quantity`, `Option`/`Result` (incluidos wrappers anidados) y
+   conversiones entre `Array<Quantity>` y listas ya tienen rutas IR/C y/o AST
+   verificadas con intérprete, WASI y leak-check según la prueba correspondiente.
+   `Figure.unit_line`/`unit_scatter` también cruzan IR/C con especialización por
+   dimensión; `viz_units.ostrin` conserva paridad y termina con cero allocations.
+4. **Pendiente:** completar una matriz de ownership para todos los tipos
+   gestionados; probar los riesgos altos que aún no tienen cobertura focalizada,
+   incluidos records recursivos/anidados, escapes compuestos y capturas anidadas;
+   completar las filas aplicables de la sección 7 con evidencia específica.
+5. Las instanciaciones genéricas `unit_line`/`unit_scatter` ya no están en
+   fallback: el guard verifica `ir=1, hir=0, ast=0` para el entry point y mantiene
+   un baseline explícito para `std.viz`. Los trazados basados en listas conservan
+   su propia frontera de ownership.
 6. Medir el coste de las copias de etiquetas antes de introducir interning o
    una representación `UnitLabel` opaca. La optimización no debe preceder a la
    prueba de ownership.
@@ -326,8 +359,9 @@ pruebas de la fila completa y reduzca el contador de fallback con paridad.
 - No se introduce un interner global de unidades: puede reducir allocations,
   pero debe resolver lifetime, concurrencia y límites del catálogo primero.
 - No se considera suficiente retener solo en `Array_Float_max`: la fase 1
-  también cubre indexación, reducciones y aritmética; records, `Phi` complejos,
-  retornos y wrappers permanecen sujetos a la matriz pendiente.
+  también cubre indexación, reducciones y aritmética; records anidados,
+  `Phi` de match, retornos complejos y wrappers permanecen sujetos a la matriz
+  pendiente.
 - No se afirma que la migración completa esté resuelta mientras las rutas
   genéricas de visualización sigan fuera del ratchet y existan productores de
   `Qty` sin contrato probado.

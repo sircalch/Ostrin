@@ -147,6 +147,24 @@ fn hello_type_checks_ok() {
 }
 
 #[test]
+fn community_starter_project_runs_from_manifest() {
+    let project = format!(
+        "{}/../templates/ostrin-community-starter",
+        env!("CARGO_MANIFEST_DIR")
+    );
+    let out = run(&["--run", "--project", &project]);
+    assert!(
+        out.status.success(),
+        "starter project failed: {}",
+        stderr(&out)
+    );
+    assert_eq!(
+        stdout(&out).replace("\r\n", "\n"),
+        "Hello from a public Ostrin project\n"
+    );
+}
+
+#[test]
 fn record_fields_are_checked_and_generic_fields_are_substituted() {
     let out = run(&["--run", &example_path("field_access.ostrin")]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
@@ -391,6 +409,20 @@ fn standard_library_file_io_and_parsing_work() {
         stdout(&out).lines().collect::<Vec<_>>(),
         ["true", "42", "hello from Ostrin"]
     );
+    let report = run(&["--native-type-report", &example_path("stdlib_io.ostrin")]);
+    if !skip_if_no_c_compiler(&report) {
+        assert!(
+            report.status.success(),
+            "stdlib_io type report failed: {}",
+            stderr(&report)
+        );
+        assert!(
+            stdout(&report).contains("native-source: examples/stdlib_io.ostrin ir=1 hir=0 ast=0")
+                && stdout(&report).contains("ast-fallback: 0"),
+            "stdlib_io still uses the AST fallback: {}",
+            stdout(&report)
+        );
+    }
 }
 
 #[test]
@@ -1128,6 +1160,18 @@ fn skip_if_no_c_compiler(compile: &Output) -> bool {
     } else {
         false
     }
+}
+
+fn assert_cancel_output(output: &str, context: &str) {
+    let mut lines: Vec<_> = output.lines().collect();
+    lines.sort_unstable();
+    assert_eq!(
+        lines,
+        vec!["parent-started", "true"],
+        "{context}: cancellation events differed: {output:?}"
+    );
+    assert!(!output.contains("child-must-not-run"));
+    assert!(!output.contains("parent-must-not-run"));
 }
 
 #[test]
@@ -2549,8 +2593,8 @@ fn native_backend_compiles_and_runs_enums_and_match() {
     // named argument), a positional-field variant (`Rectangle(Int, Int)`,
     // whose fields the pattern `Rectangle(width, height)` must resolve by
     // position, not name), a unit variant, and matches over a plain Int and
-    // scalar enum payloads. The plain Int match stays on HIR; enum
-    // literal/range predicates use the typed IR/C path.
+    // scalar enum payloads. All four functions now use the typed IR/C path,
+    // including the plain Int match and enum literal/range predicates.
     let exe = temp_artifact("enums.exe");
     let compile = run(&[
         "--compile",
@@ -2574,8 +2618,8 @@ fn native_backend_compiles_and_runs_enums_and_match() {
         stderr(&report)
     );
     assert!(
-        stdout(&report).contains("native-source: examples/native_enums.ostrin ir=3 hir=1 ast=0"),
-        "plain enum functions did not stay on IR/C while scalar literal/range matching was migrated: {}",
+        stdout(&report).contains("native-source: examples/native_enums.ostrin ir=4 hir=0 ast=0"),
+        "plain enum functions did not stay on the IR/C path: {}",
         stdout(&report)
     );
 
@@ -2766,6 +2810,677 @@ fn native_ir_enum_fixed_width_payloads_preserve_parity() {
 }
 
 #[test]
+fn native_managed_enum_payload_fallback_preserves_ownership() {
+    // Managed enum payload ownership is type-directed by the active tag. This
+    // graph now uses IR for enum construction, aliases, list storage/removal,
+    // matching, and destruction.
+    let file = temp_source(
+        "native-managed-enum-payload.ostrin",
+        "enum Message {\n    Text(String)\n    Empty\n}\n\nfn make(flag: Bool) -> Message {\n    if flag { Text(\"first\" + \" message\") } else { Text(\"second\" + \" message\") }\n}\n\nfn show(message: Message) -> Void {\n    match message {\n        Text(text) => print(text),\n        Empty => print(\"empty\"),\n    }\n}\n\nfn main() -> Void {\n    alias = make(true)\n    show(make(false))\n    mut messages: List<Message> = []\n    messages.push(alias)\n    messages.push(alias)\n    messages.push(make(false))\n    removed = messages.remove_at(0)\n    drop(messages)\n    replacement = \"other\" + \" message\"\n    show(removed)\n    show(alias)\n    print(replacement)\n}\n",
+    );
+    let expected = "second message\nfirst message\nfirst message\nother message\n";
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    if skip_if_no_c_compiler(&report) {
+        let _ = fs::remove_file(&file);
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.lines().any(|line| line == "ir-generated: 3")
+            && report_text.lines().any(|line| line == "hir-generated: 0")
+            && report_text.lines().any(|line| line == "ast-fallback: 0")
+            && report_text.contains("divergences: 0"),
+        "managed enum ownership graph should lower through IR without divergence: {report_text}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "WASI fallback emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("ostrin_retain_enum_Message(Message value)")
+            && wasi_source.contains("ostrin_retain_enum_Message(value)")
+            && wasi_source.contains("ostrin_drop_enum_Message(Message value)")
+            && wasi_source.contains("ostrin_release((void*)(value.data.Text.f0))"),
+        "WASI output omitted managed enum retain/release dispatch"
+    );
+
+    let exe = temp_artifact("native-managed-enum-payload.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    assert!(
+        compile.status.success(),
+        "native fallback compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run managed enum fallback binary");
+    let _ = fs::remove_file(&exe);
+    let _ = fs::remove_file(&file);
+    assert!(
+        native.status.success(),
+        "native fallback failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "managed enum fallback leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn native_managed_enum_record_field_retains_payload() {
+    let file = temp_source(
+        "native-managed-enum-record-field.ostrin",
+        "enum Message {\n    Text(String)\n    Empty\n}\nrecord Envelope {\n    mut message: Message\n}\nfn make(flag: Bool) -> Message {\n    if flag { Text(\"field\" + \" payload\") } else { Text(\"replacement\" + \" payload\") }\n}\nfn inspect(message: Message) -> Void {\n    match message {\n        Text(text) => print(text),\n        Empty => print(\"empty\"),\n    }\n}\nfn main() -> Void {\n    original = make(true)\n    replacement = make(false)\n    mut envelope = Envelope { message: original }\n    envelope.message = replacement\n    inspect(envelope.message)\n    drop(envelope)\n    inspect(original)\n    inspect(replacement)\n}\n",
+    );
+    let expected = "replacement payload\nfield payload\nreplacement payload\n";
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    if skip_if_no_c_compiler(&report) {
+        let _ = fs::remove_file(&file);
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "native report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("ir-generated: 0") && report_text.contains("divergences: 0"),
+        "managed enum field crossed the IR ownership boundary or diverged: {report_text}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("ostrin_retain_enum_Message")
+            && wasi_source.contains("ostrin_drop_enum_Message")
+            && wasi_source.contains("ostrin_drop_Envelope"),
+        "WASI C omitted enum field ownership helpers"
+    );
+
+    let exe = temp_artifact("native-managed-enum-record-field.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run managed enum record field binary");
+    let _ = fs::remove_file(&exe);
+    let _ = fs::remove_file(&file);
+    assert!(
+        native.status.success(),
+        "native binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "managed enum field leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn native_managed_enum_loop_escapes_preserve_payloads() {
+    let file = temp_source(
+        "native-managed-enum-loop.ostrin",
+        "enum Message {\n    Text(String)\n    Empty\n}\nfn make(flag: Bool) -> Message {\n    if flag { Text(\"first\" + \" message\") } else { Text(\"second\" + \" message\") }\n}\nfn show(message: Message) -> Void {\n    match message {\n        Text(text) => print(text),\n        Empty => print(\"empty\"),\n    }\n}\nfn main() -> Void {\n    mut messages: List<Message> = []\n    mut i = 0\n    while i < 64 {\n        messages.push(make(i < 32))\n        i = i + 1\n    }\n    for message in messages {\n        show(message)\n    }\n    drop(messages)\n}\n",
+    );
+    let expected = format!(
+        "{}{}",
+        "first message\n".repeat(32),
+        "second message\n".repeat(32)
+    );
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    if skip_if_no_c_compiler(&report) {
+        let _ = fs::remove_file(&file);
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "native report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("ir-generated: 0") && report_text.contains("divergences: 0"),
+        "managed enum loop escaped the verified HIR boundary or diverged: {report_text}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("ostrin_retain_enum_Message")
+            && wasi_source.contains("ostrin_drop_enum_Message"),
+        "WASI output omitted enum ownership dispatch for loop storage"
+    );
+
+    let exe = temp_artifact("native-managed-enum-loop.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run managed enum loop binary");
+    let _ = fs::remove_file(&exe);
+    let _ = fs::remove_file(&file);
+    assert!(
+        native.status.success(),
+        "native binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "managed enum loop leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn native_managed_enum_result_error_and_early_return_preserve_payloads() {
+    let file = temp_source(
+        "native-managed-enum-result-error.ostrin",
+        include_str!("fixtures/managed_enum_result_error.ostrin"),
+    );
+    let expected = "ok payload\nno payload\n";
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    if skip_if_no_c_compiler(&report) {
+        let _ = fs::remove_file(&file);
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "native report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.lines().any(|line| line == "ir-generated: 1")
+            && report_text.lines().any(|line| line == "hir-generated: 3")
+            && report_text.lines().any(|line| line == "ast-fallback: 0")
+            && report_text.contains("divergences: 0"),
+        "managed enum Result should preserve mixed IR/HIR ownership without divergence: {report_text}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("ostrin_retain_enum_Message")
+            && wasi_source.contains("ostrin_drop_enum_Message"),
+        "WASI output omitted enum ownership dispatch for Result branches"
+    );
+
+    let exe = temp_artifact("native-managed-enum-result-error.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run managed enum Result binary");
+    let _ = fs::remove_file(&exe);
+    let _ = fs::remove_file(&file);
+    assert!(
+        native.status.success(),
+        "native binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "managed enum Result leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn native_managed_enum_phi_owns_the_selected_payload() {
+    let file = temp_source(
+        "native-managed-enum-phi.ostrin",
+        include_str!("fixtures/managed_enum_phi.ostrin"),
+    );
+    let expected = "first payload\nsecond payload\n";
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let ir = run(&["--ir", &file]);
+    assert!(ir.status.success(), "IR lowering failed: {}", stderr(&ir));
+    assert!(
+        stdout(&ir).contains("phi"),
+        "managed enum branch join did not produce an IR Phi: {}",
+        stdout(&ir)
+    );
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "native report failed: {}",
+        stderr(&report)
+    );
+    assert!(
+        stdout(&report)
+            .lines()
+            .any(|line| line == "ir-generated: 3")
+            && stdout(&report).contains("divergences: 0"),
+        "managed enum Phi should use the IR path without divergence: {}",
+        stdout(&report)
+    );
+
+    let exe = temp_artifact("native-managed-enum-phi.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run managed enum Phi binary");
+    let _ = fs::remove_file(&exe);
+    let _ = fs::remove_file(&file);
+    assert!(
+        native.status.success(),
+        "native binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "managed enum Phi leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn native_managed_enum_loop_phi_releases_replaced_payloads() {
+    let file = temp_source(
+        "native-managed-enum-loop-phi.ostrin",
+        include_str!("fixtures/managed_enum_loop_phi.ostrin"),
+    );
+    let expected = "first payload\n";
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let ir = run(&["--ir", &file]);
+    assert!(ir.status.success(), "IR lowering failed: {}", stderr(&ir));
+    let ir_text = stdout(&ir);
+    assert!(
+        ir_text.contains("%4 = phi [bb0, %1] [bb2, %11]"),
+        "managed enum loop did not produce a loop-carried Phi: {ir_text}"
+    );
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "native report failed: {}",
+        stderr(&report)
+    );
+    assert!(
+        stdout(&report)
+            .lines()
+            .any(|line| line == "ir-generated: 3")
+            && stdout(&report).contains("divergences: 0"),
+        "managed enum loop Phi should use IR without divergence: {}",
+        stdout(&report)
+    );
+
+    let exe = temp_artifact("native-managed-enum-loop-phi.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run managed enum loop Phi binary");
+    let _ = fs::remove_file(&exe);
+    let _ = fs::remove_file(&file);
+    assert!(
+        native.status.success(),
+        "native binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "managed enum loop Phi leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn native_managed_enum_closure_capture_owns_payload() {
+    let file = temp_source(
+        "native-managed-enum-closure-capture.ostrin",
+        include_str!("fixtures/managed_enum_closure_capture.ostrin"),
+    );
+    let expected = "closure payload\n";
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "native report failed: {}",
+        stderr(&report)
+    );
+    assert!(
+        stdout(&report)
+            .lines()
+            .any(|line| line == "ir-generated: 2")
+            && stdout(&report).contains("divergences: 0"),
+        "managed enum closure capture should use IR without divergence: {}",
+        stdout(&report)
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("ostrin_retain_enum_Message")
+            && wasi_source.contains("ostrin_drop_enum_Message"),
+        "WASI C omitted ownership helpers for the closure environment"
+    );
+
+    let exe = temp_artifact("native-managed-enum-closure-capture.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run managed enum closure capture binary");
+    let _ = fs::remove_file(&exe);
+    let _ = fs::remove_file(&file);
+    assert!(
+        native.status.success(),
+        "native binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "managed enum closure capture leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn native_managed_enum_task_capture_owns_payload() {
+    let file = temp_source(
+        "native-managed-enum-task-capture.ostrin",
+        include_str!("fixtures/managed_enum_task_capture.ostrin"),
+    );
+    let expected = "task payload\n";
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "native report failed: {}",
+        stderr(&report)
+    );
+    assert!(
+        stdout(&report)
+            .lines()
+            .any(|line| line == "ir-generated: 2")
+            && stdout(&report).contains("divergences: 0"),
+        "managed enum task capture should use IR without divergence: {}",
+        stdout(&report)
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("ostrin_retain_enum_Message")
+            && wasi_source.contains("ostrin_drop_enum_Message")
+            && wasi_source.contains("ostrin_ir_task_env_drop_"),
+        "WASI C omitted task environment ownership helpers"
+    );
+
+    for (target, flags) in [
+        ("native-managed-enum-task.exe", vec!["--compile"]),
+        (
+            "native-managed-enum-task-threads.exe",
+            vec!["--native-threads", "--compile"],
+        ),
+    ] {
+        let exe = temp_artifact(target);
+        let mut args = flags;
+        args.extend(["--leak-check", "--out", &exe, &file]);
+        let compile = run(&args);
+        assert!(
+            compile.status.success(),
+            "native compile for {target} failed: {}",
+            stderr(&compile)
+        );
+        let native = Command::new(&exe)
+            .output()
+            .unwrap_or_else(|error| panic!("run {target}: {error}"));
+        let _ = fs::remove_file(&exe);
+        assert!(
+            native.status.success(),
+            "native binary {target} failed: {}",
+            String::from_utf8_lossy(&native.stderr)
+        );
+        assert_eq!(
+            String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+            expected
+        );
+        assert!(
+            String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+            "managed enum task capture leaked in {target}: {}",
+            String::from_utf8_lossy(&native.stderr)
+        );
+    }
+    let _ = fs::remove_file(&file);
+}
+
+#[test]
+fn native_managed_enum_task_cancellation_drops_captured_payload() {
+    let file = temp_source(
+        "native-managed-enum-task-cancel.ostrin",
+        include_str!("fixtures/managed_enum_task_cancel.ostrin"),
+    );
+    let expected = "true\nfalse\n";
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("ostrin_retain_enum_Message")
+            && wasi_source.contains("ostrin_drop_enum_Message")
+            && wasi_source.contains("ostrin_ir_task_env_drop_"),
+        "WASI C omitted cancelled task environment ownership helpers"
+    );
+
+    for (target, flags) in [
+        ("native-managed-enum-task-cancel.exe", vec!["--compile"]),
+        (
+            "native-managed-enum-task-cancel-threads.exe",
+            vec!["--native-threads", "--compile"],
+        ),
+    ] {
+        let exe = temp_artifact(target);
+        let mut args = flags;
+        args.extend(["--leak-check", "--out", &exe, &file]);
+        let compile = run(&args);
+        assert!(
+            compile.status.success(),
+            "native compile for {target} failed: {}",
+            stderr(&compile)
+        );
+        let native = Command::new(&exe)
+            .output()
+            .unwrap_or_else(|error| panic!("run {target}: {error}"));
+        let _ = fs::remove_file(&exe);
+        assert!(
+            native.status.success(),
+            "native binary {target} failed: {}",
+            String::from_utf8_lossy(&native.stderr)
+        );
+        let actual = String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n");
+        if target.contains("threads") {
+            assert!(
+                actual.lines().count() == 2
+                    && actual.lines().all(|line| matches!(line, "true" | "false")),
+                "native-thread cancellation returned an invalid result sequence: {actual}"
+            );
+        } else {
+            assert_eq!(actual, expected);
+        }
+        assert!(
+            String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+            "cancelled managed enum task leaked in {target}: {}",
+            String::from_utf8_lossy(&native.stderr)
+        );
+    }
+    let _ = fs::remove_file(&file);
+}
+
+#[test]
 fn native_backend_compiles_and_runs_generic_functions() {
     // Monomorphization: `identity<T>` is called with Int, String and a
     // record (Pair), so it must be emitted three times — once per concrete
@@ -2838,6 +3553,7 @@ fn native_backend_compiles_and_runs_dyn_trait() {
     let exe = temp_artifact("dyn_trait.exe");
     let compile = run(&[
         "--compile",
+        "--leak-check",
         "--out",
         &exe,
         &example_path("native_dyn_trait.ostrin"),
@@ -2864,6 +3580,511 @@ fn native_backend_compiles_and_runs_dyn_trait() {
         "12\n9\n3\n4\n",
         "native binary should match the interpreter's output for the same program"
     );
+    assert!(
+        String::from_utf8_lossy(&run_output.stderr).contains("live_allocations=0"),
+        "dyn trait ownership leaked: {}",
+        String::from_utf8_lossy(&run_output.stderr)
+    );
+}
+
+#[test]
+fn native_dyn_trait_alias_keeps_both_receivers_alive() {
+    let file = fixture_path("native_dyn_trait_alias.ostrin");
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), "12\n12\n");
+
+    let exe = temp_artifact("dyn-trait-alias.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run dyn trait alias binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "native failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        stdout(&interpreted).replace("\r\n", "\n")
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "dyn trait alias leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn native_dyn_trait_hir_return_and_phi_preserve_ownership() {
+    let file = fixture_path("native_dyn_trait_return_phi.ostrin");
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), "12\n12\n");
+
+    let exe = temp_artifact("dyn-trait-return-phi.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run dyn trait return/phi binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "native failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        "12\n12\n"
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "dyn trait return/phi leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn native_dyn_trait_list_owns_elements_across_argument_return_and_drop() {
+    let file = fixture_path("native_dyn_trait_list.ostrin");
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    let expected = "12\n9\n3\n48\n48\n";
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let exe = temp_artifact("dyn-trait-list.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run dyn trait list binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "native failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "dyn trait list leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn native_dyn_trait_record_field_replacement_preserves_pair_ownership() {
+    let file = example_path("native_dyn_trait_record_field.ostrin");
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    let expected = "12\n12\n9\n9\n";
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let exe = temp_artifact("dyn-trait-record-field.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run dyn trait record-field binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "native failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "dyn trait record-field replacement leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn native_dyn_trait_generic_record_field_preserves_pair_ownership() {
+    let file = example_path("native_dyn_trait_generic_field.ostrin");
+    let expected = "first\nfirst\nsecond\n";
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
+    assert!(
+        stdout(&report).contains("ir-generated: 3") && stdout(&report).contains("ast-fallback: 0"),
+        "generic dyn field did not lower completely through IR: {}",
+        stdout(&report)
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_c = stdout(&wasi);
+    assert!(
+        wasi_c.contains("Speaker__First__vtable")
+            && wasi_c.contains("Speaker__Second__vtable")
+            && wasi_c.contains("ostrin_drop_Holder__Speaker")
+            && wasi_c.contains(".vtable->release"),
+        "WASI C omitted generic dyn field dispatch or pair cleanup"
+    );
+
+    let exe = temp_artifact("dyn-trait-generic-field.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run dyn trait generic record-field binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "native failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "generic dyn record field leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn native_dyn_trait_option_and_result_wrappers_preserve_pair_ownership() {
+    let file = example_path("native_dyn_trait_wrappers.ostrin");
+    let expected = "optional\nempty\nresult\nfailure\nnested\nempty\noptional\nempty\n";
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ir-generated: 7"), "{report_text}");
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+    assert!(report_text.contains("divergences: 0"), "{report_text}");
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_c = stdout(&wasi);
+    assert!(
+        wasi_c.contains("Speaker_Dyn"),
+        "dyn pair missing from WASI C"
+    );
+    assert!(
+        wasi_c.contains("Option_Speaker"),
+        "Option wrapper missing from WASI C"
+    );
+    assert!(
+        wasi_c.contains("Result_Speaker_String"),
+        "Result wrapper missing from WASI C"
+    );
+    assert!(
+        wasi_c.contains("vtable->release"),
+        "dyn release hook missing from WASI C"
+    );
+
+    let exe = temp_artifact("dyn-trait-option-result.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run dyn Trait wrapper binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "dyn Trait wrapper leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn native_dyn_trait_closure_capture_outlives_the_source_scope() {
+    let file = example_path("native_dyn_trait_closure_capture.ostrin");
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    let expected = "12\n";
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let exe = temp_artifact("dyn-trait-closure-capture.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run dyn trait closure-capture binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "native failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "dyn trait closure capture leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn native_dyn_trait_task_capture_preserves_pair_ownership() {
+    let file = fixture_path("native_dyn_trait_task_capture.ostrin");
+    let expected = "task payload\ntask payload\n";
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "native report failed: {}",
+        stderr(&report)
+    );
+    assert!(
+        stdout(&report).contains("ir-generated: 2") && stdout(&report).contains("ast-fallback: 0"),
+        "dyn task capture did not lower through IR: {}",
+        stdout(&report)
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("Message__Speaker__retain")
+            && wasi_source.contains("Message__Speaker__release")
+            && wasi_source.contains("ostrin_ir_task_env_drop_"),
+        "WASI C omitted the dyn payload task ownership hooks"
+    );
+
+    for (target, flags) in [
+        ("native-dyn-trait-task.exe", vec!["--compile"]),
+        (
+            "native-dyn-trait-task-threads.exe",
+            vec!["--native-threads", "--compile"],
+        ),
+    ] {
+        let exe = temp_artifact(target);
+        let mut args = flags;
+        args.extend(["--leak-check", "--out", &exe, &file]);
+        let compile = run(&args);
+        assert!(
+            compile.status.success(),
+            "native compile for {target} failed: {}",
+            stderr(&compile)
+        );
+        let native = Command::new(&exe)
+            .output()
+            .unwrap_or_else(|error| panic!("run {target}: {error}"));
+        let _ = fs::remove_file(&exe);
+        assert!(
+            native.status.success(),
+            "native binary {target} failed: {}",
+            String::from_utf8_lossy(&native.stderr)
+        );
+        assert_eq!(
+            String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+            expected
+        );
+        assert!(
+            String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+            "dyn task capture leaked in {target}: {}",
+            String::from_utf8_lossy(&native.stderr)
+        );
+    }
+}
+
+#[test]
+fn native_dyn_trait_task_cancellation_releases_captured_pair() {
+    let file = fixture_path("native_dyn_trait_task_cancel.ostrin");
+    let expected = "true\nfalse\n";
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("Message__Speaker__release")
+            && wasi_source.contains("ostrin_ir_task_env_drop_"),
+        "WASI C omitted dyn cancellation cleanup hooks"
+    );
+
+    for (target, flags) in [
+        ("native-dyn-trait-cancel.exe", vec!["--compile"]),
+        (
+            "native-dyn-trait-cancel-threads.exe",
+            vec!["--native-threads", "--compile"],
+        ),
+    ] {
+        let exe = temp_artifact(target);
+        let mut args = flags;
+        args.extend(["--leak-check", "--out", &exe, &file]);
+        let compile = run(&args);
+        assert!(
+            compile.status.success(),
+            "native compile for {target} failed: {}",
+            stderr(&compile)
+        );
+        let native = Command::new(&exe)
+            .output()
+            .unwrap_or_else(|error| panic!("run {target}: {error}"));
+        let _ = fs::remove_file(&exe);
+        assert!(
+            native.status.success(),
+            "native binary {target} failed: {}",
+            String::from_utf8_lossy(&native.stderr)
+        );
+        let actual = String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n");
+        if target.contains("threads") {
+            assert!(
+                actual.lines().count() == 2
+                    && actual.lines().all(|line| matches!(line, "true" | "false")),
+                "native-thread cancellation returned invalid results: {actual}"
+            );
+        } else {
+            assert_eq!(actual, expected);
+        }
+        assert!(
+            String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+            "dyn payload leaked after cancellation in {target}: {}",
+            String::from_utf8_lossy(&native.stderr)
+        );
+    }
 }
 
 #[test]
@@ -2884,6 +4105,13 @@ fn native_backend_dedups_vtables_across_repeated_boxing() {
         source.matches("Shape__Square__vtable = {").count(),
         1,
         "Square's vtable should be emitted once: {source}"
+    );
+    assert!(
+        source.contains(".retain = Shape__Circle__retain")
+            && source.contains(".release = Shape__Circle__release")
+            && source.contains(".retain = Shape__Square__retain")
+            && source.contains(".release = Shape__Square__release"),
+        "dyn Shape vtables must carry lifecycle hooks: {source}"
     );
 }
 
@@ -3126,6 +4354,7 @@ fn native_backend_compiles_the_original_dyn_trait_example() {
     let exe = temp_artifact("dyn_trait_original.exe");
     let compile = run(&[
         "--compile",
+        "--leak-check",
         "--out",
         &exe,
         &example_path("dyn_trait.ostrin"),
@@ -3143,6 +4372,11 @@ fn native_backend_compiles_the_original_dyn_trait_example() {
     assert_eq!(
         String::from_utf8_lossy(&run_output.stdout).replace("\r\n", "\n"),
         "12.56636\n9\n3.14159\n24.70795\n"
+    );
+    assert!(
+        String::from_utf8_lossy(&run_output.stderr).contains("live_allocations=0"),
+        "original dyn trait example leaked: {}",
+        String::from_utf8_lossy(&run_output.stderr)
     );
 }
 
@@ -3231,6 +4465,7 @@ fn native_hir_handles_option_result_core() {
         ("native_result.ostrin", 6usize),
         ("native_result_catch.ostrin", 3usize),
         ("native_ir_result_combinators.ostrin", 9usize),
+        ("option_result.ostrin", 1usize),
         ("try_result.ostrin", 5usize),
     ] {
         let report = run(&["--native-type-report", &example_path(file)]);
@@ -3939,6 +5174,78 @@ fn native_ir_emitter_handles_generic_iterators_with_nested_managed_values() {
 }
 
 #[test]
+fn native_ir_generic_iterator_preserves_explicit_result_payload_type() {
+    let file = example_path("native_generic_iterator_result.ostrin");
+    let expected = "failure\n";
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("ir-generated: 2")
+            && report_text.contains("hir-generated: 0")
+            && report_text.contains("ast-fallback: 0")
+            && report_text.contains("divergences: 0"),
+        "generic iterator Result payload left the verified IR path: {report_text}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("Cursor__Result_String_String__next")
+            && wasi_source.contains("Option_Result_String_String")
+            && wasi_source.contains("ostrin_drop_Cursor__Result_String_String")
+            && !wasi_source.contains("#define OSTRIN_NATIVE_THREADS"),
+        "WASI C omitted generic iterator Result ownership helpers: {wasi_source}"
+    );
+
+    let exe = temp_artifact("native_ir_generic_iterator_result.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run generic iterator Result binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "generic iterator Result leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn native_ir_emitter_handles_channel_iterator_protocol() {
     let file = example_path("native_ir_channel_iterator.ostrin");
     let expected = "3\ntrue\n";
@@ -4301,6 +5608,762 @@ fn native_ir_emitter_handles_task_cancel() {
     assert!(
         stdout(&emitted).contains("Task_Int_cancel"),
         "native C did not call the typed cancel helper"
+    );
+}
+
+#[test]
+fn native_ir_task_argument_and_return_preserve_ownership() {
+    let file = example_path("native_ir_task_argument_return.ostrin");
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "task argument/return type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("ir-generated: 2")
+            && report_text.contains("hir-generated: 0")
+            && report_text.contains("ast-fallback: 0"),
+        "task argument/return regressed from IR: {report_text}"
+    );
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter task argument/return failed: {}",
+        stderr(&interpreted)
+    );
+    let expected = "7\n";
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let exe = temp_artifact("native-ir-task-argument-return.exe");
+    let compiled = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compiled) {
+        return;
+    }
+    assert!(
+        compiled.status.success(),
+        "native task argument/return compile failed: {}",
+        stderr(&compiled)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run native task argument/return binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "native task argument/return failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "native task argument/return leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+
+    let threaded_exe = temp_artifact("native-ir-task-argument-return-threads.exe");
+    let threaded_compile = run(&[
+        "--compile",
+        "--native-threads",
+        "--leak-check",
+        "--out",
+        &threaded_exe,
+        &file,
+    ]);
+    assert!(
+        threaded_compile.status.success(),
+        "native-thread task argument/return compile failed: {}",
+        stderr(&threaded_compile)
+    );
+    let threaded = Command::new(&threaded_exe)
+        .output()
+        .expect("run native-thread task argument/return binary");
+    let _ = fs::remove_file(&threaded_exe);
+    assert!(
+        threaded.status.success(),
+        "native-thread task argument/return failed: {}",
+        String::from_utf8_lossy(&threaded.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&threaded.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&threaded.stderr).contains("live_allocations=0"),
+        "native-thread task argument/return leaked: {}",
+        String::from_utf8_lossy(&threaded.stderr)
+    );
+}
+
+#[test]
+fn native_ir_task_result_error_preserves_ownership() {
+    let file = example_path("native_ir_task_result.ostrin");
+    let expected = "value\nfailure\n";
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "task Result type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("ir-generated: 2")
+            && report_text.contains("hir-generated: 0")
+            && report_text.contains("ast-fallback: 0"),
+        "task Result regressed from IR: {report_text}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "task Result WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    assert!(
+        stdout(&wasi).contains("Task_Result_String_String")
+            && stdout(&wasi).contains("Result_String_String")
+            && stdout(&wasi).contains("ostrin_release"),
+        "task Result WASI ownership helpers missing"
+    );
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter task Result failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    for (suffix, extra) in [
+        ("", Vec::<&str>::new()),
+        ("-threads", vec!["--native-threads"]),
+    ] {
+        let exe = temp_artifact(&format!("native-ir-task-result{suffix}.exe"));
+        let mut args = vec!["--compile", "--leak-check", "--out", exe.as_str()];
+        args.extend(extra);
+        args.push(&file);
+        let compiled = run(&args);
+        if skip_if_no_c_compiler(&compiled) {
+            return;
+        }
+        assert!(
+            compiled.status.success(),
+            "task Result compile failed ({suffix}): {}",
+            stderr(&compiled)
+        );
+        let native = Command::new(&exe)
+            .output()
+            .expect("run native task Result binary");
+        let _ = fs::remove_file(&exe);
+        assert!(
+            native.status.success(),
+            "task Result native run failed ({suffix}): {}",
+            String::from_utf8_lossy(&native.stderr)
+        );
+        assert_eq!(
+            String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+            expected
+        );
+        assert!(
+            String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+            "task Result leaked ({suffix}): {}",
+            String::from_utf8_lossy(&native.stderr)
+        );
+    }
+}
+
+#[test]
+fn native_ir_task_record_field_preserves_ownership() {
+    let file = example_path("native_ir_task_record_field.ostrin");
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "task record-field type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("ir-generated: 1")
+            && report_text.contains("hir-generated: 0")
+            && report_text.contains("ast-fallback: 0"),
+        "task record field regressed from IR: {report_text}"
+    );
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter task record field failed: {}",
+        stderr(&interpreted)
+    );
+    let expected = "9\n";
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let exe = temp_artifact("native-ir-task-record-field.exe");
+    let compiled = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compiled) {
+        return;
+    }
+    assert!(
+        compiled.status.success(),
+        "native task record-field compile failed: {}",
+        stderr(&compiled)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run native task record-field binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "native task record field failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "native task record field leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn native_ir_list_record_field_preserves_ownership() {
+    let file = example_path("native_ir_list_record_field.ostrin");
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "list record-field type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("ir-generated: 1")
+            && report_text.contains("hir-generated: 0")
+            && report_text.contains("ast-fallback: 0"),
+        "list record field regressed from IR: {report_text}"
+    );
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter list record field failed: {}",
+        stderr(&interpreted)
+    );
+    let expected = "a,b,c\n";
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let exe = temp_artifact("native-ir-list-record-field.exe");
+    let compiled = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compiled) {
+        return;
+    }
+    assert!(
+        compiled.status.success(),
+        "native list record-field compile failed: {}",
+        stderr(&compiled)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run native list record-field binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "native list record field failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "native list record field leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn native_ir_list_loop_phi_preserves_ownership() {
+    let file = example_path("native_ir_list_loop_phi.ostrin");
+    let ownership = run(&["--ownership-ir", &file]);
+    assert!(
+        ownership.status.success(),
+        "list loop Phi ownership lowering failed: {}",
+        stderr(&ownership)
+    );
+    let ownership_source = stdout(&ownership);
+    assert!(
+        ownership_source.contains("phi") && ownership_source.contains("release %4"),
+        "list loop did not expose the carried value and its release: {ownership_source}"
+    );
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "list loop Phi type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("ir-generated: 2")
+            && report_text.contains("hir-generated: 0")
+            && report_text.contains("ast-fallback: 0"),
+        "list loop Phi regressed from IR: {report_text}"
+    );
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter list loop Phi failed: {}",
+        stderr(&interpreted)
+    );
+    let expected = "a,0,1,2\n";
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let exe = temp_artifact("native-ir-list-loop-phi.exe");
+    let compiled = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compiled) {
+        return;
+    }
+    assert!(
+        compiled.status.success(),
+        "native list loop Phi compile failed: {}",
+        stderr(&compiled)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run native list loop Phi binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "native list loop Phi failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "native list loop Phi leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn native_ir_list_closure_capture_preserves_ownership() {
+    let file = example_path("native_ir_list_closure_capture.ostrin");
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "list closure-capture type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("ir-generated: 1")
+            && report_text.contains("hir-generated: 0")
+            && report_text.contains("ast-fallback: 0"),
+        "list closure capture regressed from IR: {report_text}"
+    );
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter list closure capture failed: {}",
+        stderr(&interpreted)
+    );
+    let expected = "a,b\n";
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let exe = temp_artifact("native-ir-list-closure-capture.exe");
+    let compiled = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compiled) {
+        return;
+    }
+    assert!(
+        compiled.status.success(),
+        "native list closure-capture compile failed: {}",
+        stderr(&compiled)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run native list closure-capture binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "native list closure capture failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "native list closure capture leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn native_ir_map_set_branch_preserves_ownership() {
+    let file = example_path("native_ir_map_set_branch.ostrin");
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "map/set branch type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("ir-generated: 3")
+            && report_text.contains("hir-generated: 0")
+            && report_text.contains("ast-fallback: 0"),
+        "map/set branch regressed from IR: {report_text}"
+    );
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter map/set branch failed: {}",
+        stderr(&interpreted)
+    );
+    let expected = "1\n2\n1\ntrue\n";
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "WASI map/set branch emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("Map_String_Int") && wasi_source.contains("Set_String"),
+        "WASI C omitted map/set branch runtime: {wasi_source}"
+    );
+
+    let exe = temp_artifact("native-ir-map-set-branch.exe");
+    let compiled = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compiled) {
+        return;
+    }
+    assert!(
+        compiled.status.success(),
+        "native map/set branch compile failed: {}",
+        stderr(&compiled)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run native map/set branch binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "native map/set branch failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "native map/set branch leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn native_ir_map_set_closure_capture_preserves_ownership() {
+    let file = example_path("native_ir_map_set_closure_capture.ostrin");
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "map/set closure type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("ir-generated: 1")
+            && report_text.contains("hir-generated: 0")
+            && report_text.contains("ast-fallback: 0"),
+        "map/set closure capture regressed from IR: {report_text}"
+    );
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter map/set closure capture failed: {}",
+        stderr(&interpreted)
+    );
+    let expected = "4\n";
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+    let exe = temp_artifact("native-ir-map-set-closure-capture.exe");
+    let compiled = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compiled) {
+        return;
+    }
+    assert!(
+        compiled.status.success(),
+        "native map/set closure compile failed: {}",
+        stderr(&compiled)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run native map/set closure binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "native map/set closure failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "native map/set closure leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+#[test]
+fn native_ir_list_task_capture_preserves_ownership() {
+    let file = example_path("native_ir_list_task_capture.ostrin");
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "list task-capture type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("ir-generated: 1")
+            && report_text.contains("hir-generated: 0")
+            && report_text.contains("ast-fallback: 0"),
+        "list task capture regressed from IR: {report_text}"
+    );
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter list task capture failed: {}",
+        stderr(&interpreted)
+    );
+    let expected = "a,b\n";
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    for (suffix, extra) in [("", Vec::new()), ("-threads", vec!["--native-threads"])] {
+        let exe = temp_artifact(&format!("native-ir-list-task-capture{suffix}.exe"));
+        let mut args = vec!["--compile", "--leak-check", "--out", &exe, &file];
+        if !extra.is_empty() {
+            args.insert(1, "--native-threads");
+        }
+        let compiled = run(&args);
+        if skip_if_no_c_compiler(&compiled) {
+            return;
+        }
+        assert!(
+            compiled.status.success(),
+            "native list task-capture compile failed: {}",
+            stderr(&compiled)
+        );
+        let native = Command::new(&exe)
+            .output()
+            .expect("run native list task-capture binary");
+        let _ = fs::remove_file(&exe);
+        assert!(
+            native.status.success(),
+            "native list task capture failed: {}",
+            String::from_utf8_lossy(&native.stderr)
+        );
+        assert_eq!(
+            String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+            expected
+        );
+        assert!(
+            String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+            "native list task capture leaked: {}",
+            String::from_utf8_lossy(&native.stderr)
+        );
+    }
+}
+
+#[test]
+fn native_ir_map_set_task_capture_preserves_ownership() {
+    let file = example_path("native_ir_map_set_task_capture.ostrin");
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "map/set task type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("ir-generated: 1")
+            && report_text.contains("hir-generated: 0")
+            && report_text.contains("ast-fallback: 0"),
+        "map/set task capture regressed from IR: {report_text}"
+    );
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter map/set task capture failed: {}",
+        stderr(&interpreted)
+    );
+    let expected = "4\n";
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+    for (suffix, extra) in [("", Vec::new()), ("-threads", vec!["--native-threads"])] {
+        let exe = temp_artifact(&format!("native-ir-map-set-task-capture{suffix}.exe"));
+        let mut args = vec!["--compile", "--leak-check", "--out", &exe, &file];
+        if !extra.is_empty() {
+            args.insert(1, "--native-threads");
+        }
+        let compiled = run(&args);
+        if skip_if_no_c_compiler(&compiled) {
+            return;
+        }
+        assert!(
+            compiled.status.success(),
+            "native map/set task compile failed: {}",
+            stderr(&compiled)
+        );
+        let native = Command::new(&exe)
+            .output()
+            .expect("run native map/set task binary");
+        let _ = fs::remove_file(&exe);
+        assert!(
+            native.status.success(),
+            "native map/set task failed: {}",
+            String::from_utf8_lossy(&native.stderr)
+        );
+        assert_eq!(
+            String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+            expected
+        );
+        assert!(
+            String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+            "native map/set task leaked: {}",
+            String::from_utf8_lossy(&native.stderr)
+        );
+    }
+}
+#[test]
+fn native_ir_map_record_field_preserves_ownership() {
+    let file = example_path("native_ir_map_record_field.ostrin");
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "map record-field type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("ir-generated: 1")
+            && report_text.contains("hir-generated: 0")
+            && report_text.contains("ast-fallback: 0"),
+        "map record field regressed from IR: {report_text}"
+    );
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter map record field failed: {}",
+        stderr(&interpreted)
+    );
+    let expected = "5\n2\n";
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let exe = temp_artifact("native-ir-map-record-field.exe");
+    let compiled = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compiled) {
+        return;
+    }
+    assert!(
+        compiled.status.success(),
+        "native map record-field compile failed: {}",
+        stderr(&compiled)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run native map record-field binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "native map record field failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "native map record field leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn native_ir_set_record_field_preserves_ownership() {
+    let file = example_path("native_ir_set_record_field.ostrin");
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "set record-field type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("ir-generated: 1")
+            && report_text.contains("hir-generated: 0")
+            && report_text.contains("ast-fallback: 0"),
+        "set record field regressed from IR: {report_text}"
+    );
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter set record field failed: {}",
+        stderr(&interpreted)
+    );
+    let expected = "true\n3\n";
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let exe = temp_artifact("native-ir-set-record-field.exe");
+    let compiled = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compiled) {
+        return;
+    }
+    assert!(
+        compiled.status.success(),
+        "native set record-field compile failed: {}",
+        stderr(&compiled)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run native set record-field binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "native set record field failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "native set record field leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
     );
 }
 
@@ -6107,7 +8170,8 @@ fn native_ir_nested_wrappers_preserve_recursive_ownership() {
     let file = "native_ir_nested_wrappers.ostrin";
     let path = example_path(file);
     let expected =
-        "nested\ninner none\nok\nnested error\nnested\nouter fallback\nok\nok fallback\nnested\n";
+        "nested\ninner none\nok\nnested error\nnested\nouter fallback\nok\nok fallback\nnested\n\
+deep payload\ndeep payload\ninner fallback\ndeep payload\ninner fallback\nouter fallback\n";
     let interpreted = run(&["--run", &path]);
     assert!(
         interpreted.status.success(),
@@ -6141,6 +8205,20 @@ fn native_ir_nested_wrappers_preserve_recursive_ownership() {
         stdout(&report).contains("hir-generated: 0"),
         "{file} unexpectedly used a HIR fallback: {}",
         stdout(&report)
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &path]);
+    assert!(
+        wasi.status.success(),
+        "WASI emission failed for {file}: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains(
+            "static void List_Result_Option_Result_Option_String_String_String_drop(void* raw)"
+        ) && wasi_source.contains("list->items[i]).value).value).error"),
+        "WASI output omitted recursive list-wrapper destruction for {file}"
     );
 
     let exe = temp_artifact("native_ir_nested_wrappers.exe");
@@ -6323,6 +8401,20 @@ fn native_ir_try_captured_handler_preserves_closure_ownership() {
     assert!(
         report_text.contains("hir-generated: 0"),
         "{file} unexpectedly used a HIR fallback: {report_text}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &path]);
+    assert!(
+        wasi.status.success(),
+        "WASI emission failed for {file}: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("ostrin_fn_make_recover")
+            && wasi_source.contains("ostrin_release")
+            && wasi_source.contains("Result_String_String"),
+        "{file} WASI output omitted captured-handler ownership helpers: {wasi_source}"
     );
 
     let exe = temp_artifact("native_ir_try_captured_handler.exe");
@@ -6925,8 +9017,8 @@ fn json_standard_library_matches_between_backends_and_is_leak_free() {
     assert!(
         stdout(&report)
             .lines()
-            .any(|line| line == "native-source: <ostrin-std>/json.ostrin ir=32 hir=3 ast=1"),
-        "JSON parser should lower string escapes through IR: {}",
+            .any(|line| line == "native-source: <ostrin-std>/json.ostrin ir=33 hir=3 ast=0"),
+        "JSON parser should lower string escapes and numeric parsing through IR: {}",
         stdout(&report)
     );
     let interpreted = run(&["--run", &path]);
@@ -7528,9 +9620,9 @@ fn native_ir_emitter_handles_records_and_option_record_ownership() {
 fn native_ir_nested_record_option_payload_ownership() {
     let file = temp_source(
         "native-ir-nested-record-option.ostrin",
-        "record Boxed {\n    value: Option<String>\n}\n\nfn main() -> Void {\n    item = Boxed { value: Some(\"le\" + \"ak\") }\n    print(item.value.unwrap())\n}\n",
+        "record Boxed {\n    value: Option<String>\n}\n\nfn choose(flag: Bool) -> Boxed {\n    value = if flag { Some(\"left\" + \" branch\") } else { Some(\"right\" + \" branch\") }\n    Boxed { value: value }\n}\n\nfn collect(flag: Bool) -> List<Boxed> {\n    mut items = [choose(flag)]\n    mut i = 0\n    while i < 3 {\n        items.push(choose(i < 2))\n        i = i + 1\n    }\n    items\n}\n\nfn main() -> Void {\n    for item in collect(true) {\n        print(item.value.unwrap())\n    }\n}\n",
     );
-    let expected = "leak\n";
+    let expected = "left branch\nleft branch\nleft branch\nright branch\n";
 
     let interpreted = run(&["--run", &file]);
     assert!(
@@ -7539,6 +9631,14 @@ fn native_ir_nested_record_option_payload_ownership() {
         stderr(&interpreted)
     );
     assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let ir = run(&["--ir", &file]);
+    assert!(ir.status.success(), "IR lowering failed: {}", stderr(&ir));
+    let ir_text = stdout(&ir);
+    assert!(
+        ir_text.to_ascii_lowercase().contains("phi"),
+        "nested managed branch did not produce a Phi in IR: {ir_text}"
+    );
 
     let report = run(&["--native-type-report", &file]);
     if skip_if_no_c_compiler(&report) {
@@ -7551,7 +9651,7 @@ fn native_ir_nested_record_option_payload_ownership() {
         stderr(&report)
     );
     let report_text = stdout(&report);
-    assert!(report_text.contains("ir-generated: 1"), "{report_text}");
+    assert!(report_text.contains("ir-generated: 3"), "{report_text}");
     assert!(report_text.contains("hir-generated: 0"), "{report_text}");
     assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
 
@@ -7575,6 +9675,128 @@ fn native_ir_nested_record_option_payload_ownership() {
     assert!(
         String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
         "nested record option payload leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn native_ir_nested_aggregate_field_preserves_ownership() {
+    let file = example_path("native_ir_nested_aggregate_field.ostrin");
+    let expected = "nested\n";
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "nested aggregate field type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("ir-generated: 1")
+            && report_text.contains("hir-generated: 0")
+            && report_text.contains("ast-fallback: 0"),
+        "nested aggregate field regressed from IR: {report_text}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "nested aggregate field WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    assert!(
+        stdout(&wasi).contains("Option_Inner") && stdout(&wasi).contains("ostrin_release"),
+        "nested aggregate field WASI ownership helpers missing"
+    );
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "nested aggregate field interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let exe = temp_artifact("native-ir-nested-aggregate-field.exe");
+    let compiled = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compiled) {
+        return;
+    }
+    assert!(
+        compiled.status.success(),
+        "nested aggregate field compile failed: {}",
+        stderr(&compiled)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run nested aggregate field binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "nested aggregate field native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "nested aggregate field leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn native_nested_aggregate_loop_preserves_ownership() {
+    let file = example_path("native_ir_nested_aggregate_loop.ostrin");
+    let expected = "a\nnone\n";
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "nested aggregate loop type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("ir-generated: 3")
+            && report_text.contains("hir-generated: 0")
+            && report_text.contains("ast-fallback: 0"),
+        "nested aggregate loop did not stay fully on the typed backend: {report_text}"
+    );
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "nested aggregate loop interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let exe = temp_artifact("native-nested-aggregate-loop.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "nested aggregate loop compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run nested aggregate loop binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "nested aggregate loop binary failed"
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "nested aggregate loop leaked: {}",
         String::from_utf8_lossy(&native.stderr)
     );
 }
@@ -7954,6 +10176,60 @@ fn main() -> Void {
 }
 
 #[test]
+fn native_ir_map_set_loop_phi_preserves_ownership() {
+    let file = example_path("native_ir_map_set_loop_phi.ostrin");
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "map/set loop-Phi type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("ir-generated: 3")
+            && report_text.contains("hir-generated: 0")
+            && report_text.contains("ast-fallback: 0"),
+        "map/set loop-Phi regressed from IR: {report_text}"
+    );
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter map/set loop-Phi failed: {}",
+        stderr(&interpreted)
+    );
+    let expected = "3\n2\n3\ntrue\n";
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+    let exe = temp_artifact("native-ir-map-set-loop-phi.exe");
+    let compiled = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compiled) {
+        return;
+    }
+    assert!(
+        compiled.status.success(),
+        "native map/set loop-Phi compile failed: {}",
+        stderr(&compiled)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run native map/set loop-Phi binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "native map/set loop-Phi failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "native map/set loop-Phi leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn native_ir_list_map_set_ownership() {
     let file = temp_source(
         "native-ir-list-map-set.ostrin",
@@ -8221,6 +10497,61 @@ fn native_ir_handles_named_function_values_and_indirect_calls() {
 }
 
 #[test]
+fn native_ir_owns_function_values_in_lists_and_record_fields() {
+    // This example combines captured functions in List<fn> with a closure in a
+    // record field. Both must retain and release their environments in IR/C.
+    let file = example_path("native_function_values.ostrin");
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    let expected = stdout(&interpreted).replace("\r\n", "\n");
+    let report = run(&["--native-type-report", &file]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text
+            .contains("native-source: examples/native_function_values.ostrin ir=10 hir=0 ast=0")
+            && report_text.contains("ast-fallback: 0"),
+        "function values should lower fully through IR: {report_text}"
+    );
+
+    let exe = temp_artifact("native_function_values_ownership.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run native function-values example");
+    assert!(
+        native.status.success(),
+        "native execution failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "function values stored in aggregates leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
 fn native_ir_handles_concrete_generic_instances() {
     // The generic declaration is lowered once, then specialized into concrete
     // IR for each call: scalar identity, List indexing, recursive calls and
@@ -8314,7 +10645,8 @@ fn native_hir_handles_generic_records_and_enums() {
         "native type report failed: {}",
         stderr(&report)
     );
-    let hir_functions = stdout(&report)
+    let report_text = stdout(&report);
+    let hir_functions = report_text
         .lines()
         .find_map(|line| {
             line.strip_prefix("hir-generated: ")
@@ -8322,8 +10654,30 @@ fn native_hir_handles_generic_records_and_enums() {
         })
         .unwrap_or(0);
     assert!(
-        hir_functions >= 8,
+        hir_functions >= 3,
         "generic record/enum example generated only {hir_functions} HIR functions"
+    );
+    let ir_functions = report_text
+        .lines()
+        .find_map(|line| {
+            line.strip_prefix("ir-generated: ")
+                .and_then(|n| n.trim().parse::<usize>().ok())
+        })
+        .unwrap_or(0);
+    let ast_functions = report_text
+        .lines()
+        .find_map(|line| {
+            line.strip_prefix("ast-fallback: ")
+                .and_then(|n| n.trim().parse::<usize>().ok())
+        })
+        .unwrap_or(0);
+    assert!(
+        ir_functions >= 9,
+        "generic record/enum example generated only {ir_functions} IR functions"
+    );
+    assert_eq!(
+        ast_functions, 0,
+        "generic record/enum example still uses AST fallback: {report_text}"
     );
 
     let c = run(&["--emit-c", &file]);
@@ -8400,8 +10754,8 @@ fn native_ir_handles_generic_methods_with_ir_for_generic_records() {
             line.strip_prefix("ast-fallback: ")
                 .and_then(|n| n.trim().parse::<usize>().ok())
         }),
-        Some(1),
-        "scalar concrete-receiver generic methods should use the checker/HIR prepass; the generic-receiver method path remains the single fallback: {report_text}"
+        Some(0),
+        "generic-receiver trait method calls should be specialized from checker substitutions and generated through IR: {report_text}"
     );
 
     let c = run(&["--emit-c", &file]);
@@ -8562,8 +10916,8 @@ fn native_backend_quantities_match_the_interpreter() {
     assert!(
         stdout(&shapes_report)
             .lines()
-            .any(|line| line == "native-source: examples/shapes.ostrin ir=2 hir=0 ast=1"),
-        "scalar quantity to_string did not use the IR path in Shape.describe: {}",
+            .any(|line| line == "native-source: examples/shapes.ostrin ir=3 hir=0 ast=0"),
+        "managed Quantity enum payloads did not cross the IR ownership boundary: {}",
         stdout(&shapes_report)
     );
 }
@@ -8582,8 +10936,87 @@ fn native_trait_defaults_are_lowered_to_ir() {
     let report_text = stdout(&report);
     assert!(
         report_text
-            .contains("native-source: examples/native_trait_defaults.ostrin ir=4 hir=0 ast=2"),
+            .contains("native-source: examples/native_trait_defaults.ostrin ir=6 hir=0 ast=0"),
         "trait defaults regressed to the legacy backend: {report_text}"
+    );
+    let emitted = run(&["--emit-c", &example_path("native_trait_defaults.ostrin")]);
+    assert!(
+        emitted.status.success(),
+        "C emission failed: {}",
+        stderr(&emitted)
+    );
+    assert!(
+        stdout(&emitted).contains(".vtable->greeting(")
+            && stdout(&emitted).contains(".vtable->shout("),
+        "dyn dispatch was not emitted from the typed IR: {}",
+        stdout(&emitted)
+    );
+
+    let file = example_path("native_trait_defaults.ostrin");
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    let exe = temp_artifact("native_trait_defaults_dyn_ir.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .unwrap_or_else(|error| panic!("failed to run compiled binary '{exe}': {error}"));
+    let _ = fs::remove_file(&exe);
+    assert!(native.status.success(), "native binary failed");
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        stdout(&interpreted).replace("\r\n", "\n"),
+        "native dyn dispatch should match the interpreter"
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "dyn dispatch leaked a payload: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn hir_ir_preserve_checker_approved_dyn_argument_coercions() {
+    let hir = run(&["--hir", &example_path("native_trait_defaults.ostrin")]);
+    assert!(hir.status.success(), "HIR failed: {}", stderr(&hir));
+    let hir_text = stdout(&hir);
+    assert!(
+        hir_text.contains("dyn<dyn Named>(Dog {"),
+        "HIR did not preserve the Dog-to-dyn argument coercion: {hir_text}"
+    );
+    assert!(
+        hir_text.contains("dyn<dyn Named>(Cat {"),
+        "HIR did not preserve the Cat-to-dyn argument coercion: {hir_text}"
+    );
+
+    let ir = run(&["--ir", &example_path("native_trait_defaults.ostrin")]);
+    assert!(ir.status.success(), "IR failed: {}", stderr(&ir));
+    let ir_text = stdout(&ir);
+    assert!(ir_text.contains("dyn_box %1:Dog -> dyn Named"), "{ir_text}");
+    assert!(ir_text.contains("dyn_box %6:Cat -> dyn Named"), "{ir_text}");
+    assert!(
+        ir_text.contains("dyn_box %11:Box<Int> -> dyn Named"),
+        "generic record boxing was not preserved as a typed IR operation: {ir_text}"
+    );
+    assert!(
+        ir_text.contains("dyn_call Named %0.greeting()")
+            && ir_text.contains("dyn_call Named %0.shout()"),
+        "dynamic trait method calls were not preserved as typed IR operations: {ir_text}"
+    );
+    assert!(
+        ir_text.contains("ir violations: 0"),
+        "IR verifier rejected the typed dyn boxing operation: {ir_text}"
     );
 }
 
@@ -8640,6 +11073,74 @@ fn native_ir_emitter_handles_scalar_quantities() {
     assert!(
         String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
         "quantity IR path leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn native_quantity_array_record_field_preserves_unit_and_ownership() {
+    let file = fixture_path("native_ir_quantity_array_record_field.ostrin");
+    let expected = "[1, 2, 3] m\n[2, 3] m\n";
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    if skip_if_no_c_compiler(&report) {
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "native report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ir-generated: 1"), "{report_text}");
+    assert!(report_text.contains("hir-generated: 0"), "{report_text}");
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "WASI C emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("struct Spectrum")
+            && wasi_source.contains("static void ostrin_drop_Spectrum")
+            && wasi_source.contains("ostrin_release((void*)(value->values))"),
+        "WASI C omitted Array record-field ownership: {wasi_source}"
+    );
+
+    let exe = temp_artifact("native-ir-quantity-array-record-field.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run quantity-array record-field binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "native binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "quantity-array record field leaked: {}",
         String::from_utf8_lossy(&native.stderr)
     );
 }
@@ -8764,7 +11265,8 @@ fn native_quantity_list_escape_retains_array_unit_labels() {
     let wasi_source = stdout(&wasi);
     assert!(
         wasi_source.contains("List_Q_Length_drop")
-            && wasi_source.contains("ostrin_retain((void*)(list->items[i]).u)"),
+            && wasi_source.contains("ostrin_qty_retain(list->items[i])")
+            && wasi_source.contains("ostrin_qty_release(list->items[i])"),
         "WASI source omitted quantity-list label ownership"
     );
 
@@ -8870,6 +11372,436 @@ fn native_quantity_scalar_escape_retains_array_unit_labels() {
         "scalar Quantity unit label leaked: {}",
         String::from_utf8_lossy(&native.stderr)
     );
+}
+
+#[test]
+fn native_quantity_phi_escape_retains_array_unit_labels() {
+    // Both branches produce owned scalar quantities from arrays. The selected
+    // value must survive the branch merge and the arrays' last-use cleanup.
+    let file = temp_source(
+        "native-quantity-phi-escape.ostrin",
+        r#"fn choose(flag: Bool, left: Quantity<Length / Time>, right: Quantity<Length / Time>) -> Quantity<Length / Time> {
+    if flag { left } else { right }
+}
+fn loop_choose(first: Quantity<Length / Time>, second: Quantity<Length / Time>) -> Quantity<Length / Time> {
+    mut selected = first
+    mut index = 0
+    while index < 2 {
+        selected = second
+        index = index + 1
+    }
+    selected
+}
+fn main() -> Void {
+    slow = (array([1 m, 2 m, 3 m]) / (1 s)).max()
+    fast = (array([4 m, 5 m, 6 m]) / (1 s)).max()
+    print(choose(true, slow, fast))
+    print(choose(false, slow, fast))
+    print(loop_choose(slow, fast))
+}
+"#,
+    );
+    let expected = "3 m/s\n6 m/s\n6 m/s\n";
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    if skip_if_no_c_compiler(&report) {
+        let _ = fs::remove_file(&file);
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ir-generated: 3"), "{report_text}");
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "WASI C emission failed: {}",
+        stderr(&wasi)
+    );
+    assert!(
+        stdout(&wasi).contains("ostrin_qty_retain") && stdout(&wasi).contains("ostrin_qty_release"),
+        "WASI C omitted scalar Quantity ownership helpers"
+    );
+
+    let exe = temp_artifact("native-quantity-phi-escape.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run quantity Phi escape binary");
+    let _ = fs::remove_file(&exe);
+    let _ = fs::remove_file(&file);
+    assert!(
+        native.status.success(),
+        "native binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "scalar Quantity Phi ownership leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn native_quantity_record_field_owns_dynamic_unit_label() {
+    let file = temp_source(
+        "native-quantity-record-field.ostrin",
+        r#"record Peak {
+    value: Quantity<Length / Time>
+}
+fn main() -> Void {
+    speed = (array([1 m, 2 m, 3 m]) / (1 s)).max()
+    peak = Peak { value: speed }
+    print(peak.value)
+}
+"#,
+    );
+    let expected = "3 m/s\n";
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    if skip_if_no_c_compiler(&report) {
+        let _ = fs::remove_file(&file);
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ir-generated: 1"), "{report_text}");
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "WASI C emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("ostrin_qty_retain")
+            && wasi_source.contains("ostrin_qty_release(value->value);"),
+        "WASI C omitted typed Quantity ownership in the record destructor"
+    );
+
+    let exe = temp_artifact("native-quantity-record-field.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run Quantity record ownership binary");
+    let _ = fs::remove_file(&exe);
+    let _ = fs::remove_file(&file);
+    assert!(
+        native.status.success(),
+        "native binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "Quantity record ownership leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn native_option_quantity_owns_dynamic_unit_label() {
+    let file = temp_source(
+        "native-option-quantity.ostrin",
+        r#"fn maybe(flag: Bool) -> Option<Quantity<Length / Time>> {
+    if flag {
+        Some((array([1 m, 2 m, 3 m]) / (1 s)).max())
+    } else {
+        None
+    }
+}
+fn main() -> Void {
+    match maybe(true) {
+        Some(value) => print(value),
+        None => print("none"),
+    }
+    match maybe(false) {
+        Some(value) => print(value),
+        None => print("none"),
+    }
+}
+"#,
+    );
+    let expected = "3 m/s\nnone\n";
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    if skip_if_no_c_compiler(&report) {
+        let _ = fs::remove_file(&file);
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ir-generated: 2"), "{report_text}");
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "WASI C emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("ostrin_qty_retain") && wasi_source.contains("ostrin_qty_release"),
+        "WASI C omitted typed Quantity ownership for Option payloads"
+    );
+
+    let exe = temp_artifact("native-option-quantity.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run Option<Quantity> ownership binary");
+    let _ = fs::remove_file(&exe);
+    let _ = fs::remove_file(&file);
+    assert!(
+        native.status.success(),
+        "native binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "Option<Quantity> ownership leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn native_result_quantity_owns_dynamic_unit_label() {
+    let file = temp_source(
+        "native-result-quantity.ostrin",
+        r#"fn maybe(flag: Bool) -> Result<Quantity<Length / Time>, String> {
+    if flag {
+        Ok((array([1 m, 2 m, 3 m]) / (1 s)).max())
+    } else {
+        Err("unavailable")
+    }
+}
+fn maybe_nested(flag: Bool) -> Result<Option<Quantity<Length / Time>>, String> {
+    if flag {
+        Ok(Some((array([1 m, 2 m, 3 m]) / (1 s)).max()))
+    } else {
+        Err("unavailable")
+    }
+}
+fn empty_nested() -> Result<Option<Quantity<Length / Time>>, String> {
+    Ok(None)
+}
+fn main() -> Void {
+    match maybe(true) {
+        Ok(value) => print(value),
+        Err(error) => print(error),
+    }
+    match maybe(false) {
+        Ok(value) => print(value),
+        Err(error) => print(error),
+    }
+    nested_some = maybe_nested(true)
+    nested_error = maybe_nested(false)
+    nested_none = empty_nested()
+    print("nested results returned")
+}
+"#,
+    );
+    let expected = "3 m/s\nunavailable\nnested results returned\n";
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let ir = run(&["--ir", &file]);
+    assert!(ir.status.success(), "IR lowering failed: {}", stderr(&ir));
+    let ir_text = stdout(&ir);
+    assert!(
+        ir_text.to_ascii_lowercase().contains("phi"),
+        "managed Result error branch did not produce a Phi in IR: {ir_text}"
+    );
+
+    let report = run(&["--native-type-report", &file]);
+    if skip_if_no_c_compiler(&report) {
+        let _ = fs::remove_file(&file);
+        return;
+    }
+    assert!(
+        report.status.success(),
+        "native type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(report_text.contains("ir-generated: 4"), "{report_text}");
+    assert!(report_text.contains("ast-fallback: 0"), "{report_text}");
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "WASI C emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("ostrin_qty_retain") && wasi_source.contains("ostrin_qty_release"),
+        "WASI C omitted typed Quantity ownership for Result payloads"
+    );
+
+    let exe = temp_artifact("native-result-quantity.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    assert!(
+        compile.status.success(),
+        "native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run Result<Quantity> ownership binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "native binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "Result<Quantity> ownership leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+
+    let ast_exe = temp_artifact("native-result-quantity-ast.exe");
+    let ast_compile = Command::new(env!("CARGO_BIN_EXE_ostrinc"))
+        .args(["--compile", "--leak-check", "--out"])
+        .arg(&ast_exe)
+        .arg(&file)
+        .env("OSTRIN_NO_IR_CODEGEN", "1")
+        .env("OSTRIN_NO_HIR_CODEGEN", "1")
+        .output()
+        .expect("compile Result<Quantity> through the legacy AST backend");
+    assert!(
+        ast_compile.status.success(),
+        "legacy AST compile failed: {}",
+        String::from_utf8_lossy(&ast_compile.stderr)
+    );
+    let ast_native = Command::new(&ast_exe)
+        .output()
+        .expect("run legacy AST Result<Quantity> binary");
+    let _ = fs::remove_file(&ast_exe);
+    let _ = fs::remove_file(&file);
+    assert!(
+        ast_native.status.success(),
+        "legacy AST binary failed: {}",
+        String::from_utf8_lossy(&ast_native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&ast_native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&ast_native.stderr).contains("live_allocations=0"),
+        "legacy AST Result<Quantity> ownership leaked: {}",
+        String::from_utf8_lossy(&ast_native.stderr)
+    );
+}
+
+#[test]
+fn native_codegen_rejects_unknown_spawn_result_without_panicking() {
+    // An unknown call at the end of a spawn body makes its result Unknown.
+    // The checker currently permits that incomplete type, so native lowering
+    // must return a diagnostic instead of panicking while naming Task<T>.
+    let file = temp_source(
+        "native-unknown-spawn-result.ostrin",
+        "fn main() -> Void {\n    task = spawn { rint(\"x\") }\n}\n",
+    );
+    let checked = run(&["--check", &file]);
+    assert!(
+        checked.status.success(),
+        "fixture should reach native lowering: {}",
+        stderr(&checked)
+    );
+
+    for mode in ["--native-type-report", "--emit-c"] {
+        let out = run(&[mode, &file]);
+        let diagnostic = stderr(&out);
+        assert!(!out.status.success(), "{mode} accepted an unresolved call");
+        assert!(
+            !diagnostic.contains("panicked"),
+            "{mode} panicked on an unknown task payload: {diagnostic}"
+        );
+        assert!(
+            diagnostic.contains("unknown function 'rint'"),
+            "{mode} omitted the native diagnostic: {diagnostic}"
+        );
+    }
+    let _ = fs::remove_file(file);
 }
 
 #[test]
@@ -9010,7 +11942,172 @@ fn experimental_effect_report_exposes_measurement_and_io_sites() {
     let json_text = stdout(&json);
     assert!(json_text.contains("\"schema\":\"ostrin.effect-report/v0\""));
     assert!(json_text.contains("\"conservative\":true"));
+    assert!(json_text.contains("\"effect_kinds\":["));
+    assert!(json_text.contains("\"function_effects\":{") && json_text.contains("\"main\":["));
     assert!(json_text.contains("\"effect\":\"measurement\""));
+}
+
+#[test]
+fn measurement_quantity_boundary_is_explicitly_rejected_natively() {
+    let file = example_path("measurement_quantity_shape.ostrin");
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "Measurement<Quantity> interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), "12 m\ntrue\n");
+    let native = run(&["--native-type-report", &file]);
+    assert!(
+        !native.status.success(),
+        "Measurement<Quantity> was enabled without a native ownership contract"
+    );
+    assert!(
+        stderr(&native)
+            .contains("type 'Measurement<Quantity<D>>' is not supported by the native backend yet"),
+        "native boundary diagnostic changed: {}",
+        stderr(&native)
+    );
+}
+
+#[test]
+fn direct_measurement_quantity_boundary_is_explicitly_rejected_natively() {
+    let file = example_path("measurement_quantity_direct_shape.ostrin");
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "direct Measurement<Quantity> interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), "12 m\n");
+
+    let native = run(&["--native-type-report", &file]);
+    assert!(
+        !native.status.success(),
+        "direct Measurement<Quantity> was enabled without a native ownership contract"
+    );
+    assert!(
+        stderr(&native)
+            .contains("type 'Measurement<Quantity<D>>' is not supported by the native backend yet"),
+        "direct Measurement<Quantity> boundary diagnostic changed: {}",
+        stderr(&native)
+    );
+}
+
+#[test]
+fn measurement_array_boundary_has_actionable_diagnostic() {
+    let file = example_path("measurement_array_shape.ostrin");
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        !interpreted.status.success(),
+        "Array<Measurement<Float>> unexpectedly became interpreter-supported"
+    );
+    assert!(
+        stderr(&interpreted).contains("'array' expects a (nested) List of numbers or quantities"),
+        "interpreter array boundary diagnostic changed: {}",
+        stderr(&interpreted)
+    );
+
+    let native = run(&["--native-type-report", &file]);
+    assert!(
+        !native.status.success(),
+        "Array<Measurement<Float>> unexpectedly became native-supported"
+    );
+    assert!(
+        stderr(&native).contains(
+            "'array' of Measurement<T> is not supported by the native backend yet; use List<Measurement<T>>"
+        ),
+        "native array boundary diagnostic changed: {}",
+        stderr(&native)
+    );
+}
+
+#[test]
+fn experimental_effect_report_propagates_to_callers() {
+    let out = run(&[
+        "--effect-report",
+        "--json",
+        &example_path("effects_transitive.ostrin"),
+    ]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let artifact: serde_json::Value =
+        serde_json::from_str(&stdout(&out)).expect("effect report must be JSON");
+    assert_eq!(
+        artifact["function_effects"]["emit_marker"],
+        serde_json::json!(["io"])
+    );
+    assert_eq!(
+        artifact["function_effects"]["main"],
+        serde_json::json!(["io"])
+    );
+    assert_eq!(
+        artifact["function_calls"]["main"],
+        serde_json::json!(["emit_marker"])
+    );
+    assert_eq!(artifact["unresolved_calls"], serde_json::json!({}));
+    assert_eq!(
+        artifact["effect_coverage"],
+        serde_json::json!({"known_calls": 2, "unresolved_calls": 0, "complete": true})
+    );
+}
+
+#[test]
+fn experimental_effect_report_propagates_through_qualified_impl_methods() {
+    let file = temp_source(
+        "effects-qualified-method.ostrin",
+        "trait Output {\n    fn emit(self) -> Void\n}\n\
+         record Console { marker: Int }\n\
+         impl Output for Console {\n    fn emit(self) -> Void {\n        print(\"effect\")\n    }\n}\n\
+         fn forward(console: Console) -> Void {\n    console.emit()\n}\n\
+         fn main() -> Void {\n    forward(Console { marker: 0 })\n}\n",
+    );
+    let out = run(&["--effect-report", "--json", &file]);
+    let _ = fs::remove_file(&file);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let report: serde_json::Value =
+        serde_json::from_str(&stdout(&out)).expect("effect report must be JSON");
+    assert_eq!(
+        report["function_effects"]["emit"],
+        serde_json::json!(["io"])
+    );
+    assert_eq!(
+        report["function_calls"]["forward"],
+        serde_json::json!(["console.emit"])
+    );
+    assert_eq!(
+        report["function_effects"]["forward"],
+        serde_json::json!(["io"])
+    );
+    assert_eq!(
+        report["function_effects"]["main"],
+        serde_json::json!(["io"])
+    );
+    assert_eq!(report["unresolved_calls"], serde_json::json!({}));
+    assert_eq!(
+        report["effect_coverage"],
+        serde_json::json!({"known_calls": 3, "unresolved_calls": 0, "complete": true})
+    );
+}
+
+#[test]
+fn experimental_effect_report_keeps_unknown_calls_unresolved() {
+    let file = temp_source(
+        "effects-unknown.ostrin",
+        "fn main() -> Void {\n    mystery_host_operation()\n}\n",
+    );
+    let out = run(&["--effect-report", "--json", &file]);
+    let _ = fs::remove_file(&file);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let artifact: serde_json::Value =
+        serde_json::from_str(&stdout(&out)).expect("effect report must be JSON");
+    assert_eq!(
+        artifact["unresolved_calls"]["main"],
+        serde_json::json!(["mystery_host_operation"])
+    );
+    assert_eq!(
+        artifact["effect_coverage"],
+        serde_json::json!({"known_calls": 0, "unresolved_calls": 1, "complete": false})
+    );
 }
 
 #[test]
@@ -9029,6 +12126,17 @@ fn experimental_provenance_report_contains_source_hash_and_effects() {
     assert_eq!(artifact["experimental"], true);
     assert_eq!(artifact["verified"], false);
     assert_eq!(artifact["compiler"]["target"], "wasm32-wasi");
+    assert_eq!(artifact["runtime"]["schema"], "ostrin.runtime/v1");
+    assert_eq!(artifact["runtime"]["status"], "partial");
+    assert_eq!(artifact["runtime"]["target"], "wasm32-wasi");
+    assert_eq!(artifact["runtime"]["wasi"], "preview1");
+    assert_eq!(artifact["runtime"]["runner"], "WASI host");
+    assert!(artifact["runtime"]["compiler_lockfile"]["sha256"]
+        .as_str()
+        .is_some_and(|hash| hash.starts_with("sha256:") && hash.len() == 71));
+    assert!(artifact["runtime"]["missing"]
+        .as_array()
+        .is_some_and(|missing| missing.iter().any(|item| item == "input snapshots")));
     assert!(artifact["program"]["source_hash"]
         .as_str()
         .is_some_and(|hash| hash.starts_with("sha256:") && hash.len() == 71));
@@ -9044,6 +12152,34 @@ fn experimental_provenance_report_contains_source_hash_and_effects() {
     assert!(text.status.success(), "stderr: {}", stderr(&text));
     assert!(stdout(&text).contains("provenance-report: experimental artifact"));
     assert!(stdout(&text).contains("source-hash: sha256:"));
+}
+
+#[test]
+fn provenance_report_hashes_nearby_project_manifest_and_lockfile() {
+    let out = run(&[
+        "--provenance-report",
+        "--json",
+        "--target",
+        "wasm32-wasi",
+        &example_path("data_project/app/main.ostrin"),
+    ]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let artifact: serde_json::Value =
+        serde_json::from_str(&stdout(&out)).expect("provenance report must be JSON");
+    assert_eq!(
+        artifact["runtime"]["project"]["manifest"]["path"],
+        "ostrin.toml"
+    );
+    assert!(artifact["runtime"]["project"]["manifest"]["sha256"]
+        .as_str()
+        .is_some_and(|hash| hash.starts_with("sha256:") && hash.len() == 71));
+    assert_eq!(
+        artifact["runtime"]["project"]["lockfile"]["path"],
+        "ostrin.lock"
+    );
+    assert!(artifact["runtime"]["project"]["lockfile"]["sha256"]
+        .as_str()
+        .is_some_and(|hash| hash.starts_with("sha256:") && hash.len() == 71));
 }
 
 #[test]
@@ -9185,6 +12321,14 @@ fn derive_eq_and_ord_work_without_manual_impl() {
     let text = stdout(&out);
     let lines: Vec<&str> = text.lines().collect();
     assert_eq!(lines, ["true", "false", "true", "true", "true"]);
+    let report = run(&["--native-type-report", &example_path("derive.ostrin")]);
+    if !skip_if_no_c_compiler(&report) {
+        assert!(
+            stdout(&report).contains("native-source: examples/derive.ostrin ir=1 hir=0 ast=0"),
+            "derive Eq/Ord should use the structural IR helpers: {}",
+            stdout(&report)
+        );
+    }
 }
 
 #[test]
@@ -9560,9 +12704,9 @@ fn cancelled_tasks_do_not_release_dropped_child_handles_twice() {
         "cancel-after-drop binary failed: {}",
         String::from_utf8_lossy(&native.stderr)
     );
-    assert_eq!(
-        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
-        "parent-started\ntrue\n"
+    assert_cancel_output(
+        &String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        "native cancel-after-drop",
     );
     assert!(
         String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
@@ -9593,9 +12737,9 @@ fn cancelled_tasks_do_not_release_dropped_child_handles_twice() {
         "native-thread cancel-after-drop failed: {}",
         String::from_utf8_lossy(&threaded_native.stderr)
     );
-    assert_eq!(
-        String::from_utf8_lossy(&threaded_native.stdout).replace("\r\n", "\n"),
-        "parent-started\ntrue\n"
+    assert_cancel_output(
+        &String::from_utf8_lossy(&threaded_native.stdout).replace("\r\n", "\n"),
+        "native-thread cancel-after-drop",
     );
     assert!(
         String::from_utf8_lossy(&threaded_native.stderr).contains("live_allocations=0"),
@@ -9668,6 +12812,60 @@ fn yield_advances_the_cooperative_scheduler_and_compiles_with_threads() {
         stderr(&threaded_compile)
     );
     let _ = fs::remove_file(&threaded_exe);
+}
+
+#[test]
+fn native_ir_lab_concurrency_owns_task_list_elements() {
+    let file = example_path("lab_concurrency.ostrin");
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "lab report failed: {}",
+        stderr(&report)
+    );
+    assert!(
+        stdout(&report)
+            .lines()
+            .any(|line| line == "native-source: examples/lab_concurrency.ostrin ir=2 hir=0 ast=0"),
+        "lab concurrency retained an AST fallback: {}",
+        stdout(&report)
+    );
+
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "lab interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    let exe = temp_artifact("lab-concurrency-ir.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "lab native compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run lab concurrency binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "lab native execution failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        stdout(&interpreted),
+        "lab concurrency diverged between interpreter and native backend"
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "lab concurrency leaked task-list ownership: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
 }
 
 #[test]
@@ -9893,7 +13091,7 @@ fn native_ir_record_patterns_match_interpreter_native_and_wasi() {
         ),
         (
             "generic_nested_patterns.ostrin",
-            "native-source: examples/generic_nested_patterns.ostrin ir=1 hir=3 ast=0",
+            "native-source: examples/generic_nested_patterns.ostrin ir=2 hir=2 ast=0",
             "(__ir_v0)->first",
         ),
     ] {
@@ -11122,11 +14320,7 @@ fn viz_figures_label_axes_with_the_units_of_their_quantities() {
 }
 
 #[test]
-fn viz_units_keeps_scalar_quantity_plots_on_verified_fallback() {
-    // The generic unit_line/unit_scatter instantiations must remain on the
-    // verified fallback until scalar Quantity labels have an explicit IR
-    // retain/release contract. A future ownership implementation may remove
-    // this guard in the same change that adds the native/WASI lifetime tests.
+fn viz_units_quantity_plots_lower_to_ir_and_preserve_ownership() {
     let report = run(&["--native-type-report", &example_path("viz_units.ostrin")]);
     if skip_if_no_c_compiler(&report) {
         return;
@@ -11138,8 +14332,62 @@ fn viz_units_keeps_scalar_quantity_plots_on_verified_fallback() {
     );
     let report_text = stdout(&report);
     assert!(
-        report_text.contains("native-source: examples/viz_units.ostrin ir=0 hir=0 ast=1"),
-        "viz_units unexpectedly crossed the Quantity ownership boundary: {report_text}"
+        report_text.contains("native-source: examples/viz_units.ostrin ir=1 hir=0 ast=0")
+            && report_text.contains("ast-fallback: 0"),
+        "viz_units quantity plots did not stay on the IR path: {report_text}"
+    );
+
+    let wasi = run(&[
+        "--emit-c",
+        "--target",
+        "wasm32-wasi",
+        &example_path("viz_units.ostrin"),
+    ]);
+    assert!(
+        wasi.status.success(),
+        "WASI C emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("Figure__unit_line__Q_Time")
+            && wasi_source.contains("Figure__unit_scatter__Q_Time")
+            && wasi_source.contains("ostrin_qty_retain")
+            && wasi_source.contains("ostrin_qty_release"),
+        "WASI C omitted typed quantity plot calls or ownership helpers"
+    );
+
+    let expected = interpreter_and_native_agree("viz_units.ostrin");
+    let exe = temp_artifact("viz-units-quantity-ownership.exe");
+    let compile = run(&[
+        "--compile",
+        "--leak-check",
+        "--out",
+        &exe,
+        &example_path("viz_units.ostrin"),
+    ]);
+    assert!(
+        compile.status.success(),
+        "native leak-check compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run IR-generated Quantity plot binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "native Quantity plot binary failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "IR-generated Quantity plots leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
     );
 }
 
@@ -11253,8 +14501,8 @@ fn viz_histograms_render_bins_and_use_numeric_ir() {
     );
     assert!(
         stdout(&report).contains("native-source: examples/viz_histogram.ostrin ir=3 hir=0 ast=0")
-            && stdout(&report).contains("ast-fallback: 1"),
-        "histogram entry point did not use the numeric IR path with its JSON import boundary: {}",
+            && stdout(&report).contains("ast-fallback: 0"),
+        "histogram entry point did not use the numeric IR path through its JSON import boundary: {}",
         stdout(&report)
     );
 
@@ -11486,7 +14734,7 @@ fn viz_hexbins_render_density_cells_and_colorbar() {
         let report_text = stdout(&report);
         assert!(
             report_text.contains("native-source: examples/viz_hexbin.ostrin ir=3 hir=0 ast=0")
-                && report_text.contains("ast-fallback: 1"),
+                && report_text.contains("ast-fallback: 0"),
             "hexbin entry point did not use the ownership-aware IR path: {report_text}"
         );
     }
@@ -11592,11 +14840,8 @@ fn arrays_of_quantities_keep_one_unit_and_check_dimensions() {
         ]
     );
 
-    // Array rendering must not retain the temporary strings created for each
-    // element. Quantity unit expressions (including array tags that can
-    // escape into scalar/list values) still have a separate ownership
-    // backlog, so keep this as a non-regression ceiling rather than requiring
-    // zero for the whole gallery.
+    // The whole Quantity array gallery owns and releases its unit labels,
+    // including labels that escape through scalar and list values.
     let exe = temp_artifact("quantity_arrays_leaks.exe");
     let compile = run(&[
         "--compile",
@@ -11628,8 +14873,8 @@ fn arrays_of_quantities_keep_one_unit_and_check_dimensions() {
             .and_then(|value| value.parse::<usize>().ok())
             .expect("quantity-array leak-check did not report live allocations");
         assert!(
-            live <= 14,
-            "array rendering ownership regressed: live_allocations={live}; report: {report}"
+            live == 0,
+            "quantity-array gallery leaked allocations: live_allocations={live}; report: {report}"
         );
     }
     let errors = run(&["--check", &example_path("quantity_arrays_errors.ostrin")]);
@@ -11847,16 +15092,700 @@ fn std_numeric_cholesky_matches_interpreter_and_native() {
 }
 
 #[test]
-fn std_measurements_scalar_matches_interpreter_and_native() {
-    assert_eq!(
-        interpreter_and_native_agree("measurement_scalar.ostrin"),
-        "x = 12.3 ± 0.02\nx + x = 24.6 ± 0.04\nx - x = 0 ± 0\nx + y = 13.8 ± 0.03605551275463989\n2x = 24.6 ± 0.04\nx / x = 1 ± 0\nunknown = unknown: scale received a measurement with unknown uncertainty\ninvalid sigma = measurement sigma must be non-negative\nempty source = measurement source label must not be empty\nunknown series = series offline\n"
+fn std_measurements_scalar_closure_capture_preserves_ownership() {
+    let file = example_path("measurement_closure.ostrin");
+    let expected = "2 ± 0\n";
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "Measurement closure interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "Measurement closure type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("native-source: examples/measurement_closure.ostrin ir=1 hir=0 ast=0"),
+        "Measurement closure did not use IR: {report_text}"
     );
 
-    let report = run(&[
-        "--native-type-report",
-        &example_path("measurement_scalar.ostrin"),
-    ]);
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "Measurement closure WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("OstrinIrClosureEnv_")
+            && wasi_source.contains("std_measurements__Measurement__Float"),
+        "Measurement closure ownership markers missing: {wasi_source}"
+    );
+
+    let exe = temp_artifact("measurement-closure.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "Measurement closure compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run Measurement closure binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "Measurement closure native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "Measurement closure leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn std_measurements_scalar_clone_preserves_ownership() {
+    let file = example_path("measurement_clone.ostrin");
+    let expected = "2 ± 0\n2 ± 0\n";
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "Measurement clone interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "Measurement clone type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("native-source: examples/measurement_clone.ostrin ir=1 hir=0 ast=0"),
+        "Measurement clone did not use IR: {report_text}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "Measurement clone WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("std_measurements__Measurement__Float")
+            && wasi_source.contains("ostrin_retain"),
+        "Measurement clone ownership markers missing: {wasi_source}"
+    );
+
+    let exe = temp_artifact("measurement-clone.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "Measurement clone compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run Measurement clone binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "Measurement clone native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "Measurement clone leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn std_measurements_scalar_argument_and_return_preserve_ownership() {
+    let file = example_path("measurement_return.ostrin");
+    let expected = "2 ± 0\n";
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "Measurement return interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "Measurement return type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("native-source: examples/measurement_return.ostrin ir=3 hir=0 ast=0"),
+        "Measurement argument/return did not use IR: {report_text}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "Measurement return WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("ostrin_fn_make")
+            && wasi_source.contains("ostrin_fn_identity")
+            && wasi_source.contains("ostrin_retain((void*)__ir_v"),
+        "Measurement argument/return ownership markers missing: {wasi_source}"
+    );
+
+    let exe = temp_artifact("measurement-return.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "Measurement return compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run Measurement return binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "Measurement return native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "Measurement argument/return leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn std_measurements_scalar_record_field_preserves_ownership() {
+    let file = example_path("measurement_record.ostrin");
+    let expected = "2 ± 0\n3 ± 0\n";
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "Measurement record interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "Measurement record type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("native-source: examples/measurement_record.ostrin ir=1 hir=0 ast=0"),
+        "Measurement record did not use IR: {report_text}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "Measurement record WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("struct Sample")
+            && wasi_source.contains("static void ostrin_drop_Sample")
+            && wasi_source.contains("ostrin_release((void*)(value->measurement))"),
+        "Measurement record WASI ownership marker missing: {wasi_source}"
+    );
+
+    let exe = temp_artifact("measurement-record-field.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "Measurement record compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run Measurement record binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "Measurement record native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "Measurement record leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn std_measurements_scalar_list_preserves_ownership() {
+    let file = example_path("measurement_list.ostrin");
+    let expected = "2 ± 0\n3 ± 0\n";
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "Measurement list interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "Measurement list type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("native-source: examples/measurement_list.ostrin ir=1 hir=0 ast=0"),
+        "Measurement list did not use IR: {report_text}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "Measurement list WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("List_std_measurements__Measurement__Float")
+            && wasi_source.contains("std_measurements__Measurement__Float")
+            && wasi_source.contains("ostrin_retain"),
+        "Measurement list ownership markers missing: {wasi_source}"
+    );
+
+    let exe = temp_artifact("measurement-list.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "Measurement list compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run Measurement list binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "Measurement list native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "Measurement list leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn std_measurements_scalar_branch_preserves_ownership() {
+    let file = example_path("measurement_branch.ostrin");
+    let expected = "2 ± 0\n3 ± 0\n";
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "Measurement branch interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "Measurement branch type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("native-source: examples/measurement_branch.ostrin ir=2 hir=0 ast=0"),
+        "Measurement branch did not use IR: {report_text}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "Measurement branch WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("ostrin_fn_choose")
+            && wasi_source.contains("std_measurements__Measurement__Float")
+            && wasi_source.contains("ostrin_release"),
+        "Measurement branch ownership markers missing: {wasi_source}"
+    );
+
+    let exe = temp_artifact("measurement-branch.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "Measurement branch compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run Measurement branch binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "Measurement branch native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "Measurement branch leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn std_measurements_scalar_result_error_preserves_ownership() {
+    let file = example_path("measurement_result.ostrin");
+    let expected = "2 ± 0\nbad\n";
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "Measurement Result interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "Measurement Result type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("native-source: examples/measurement_result.ostrin ir=2 hir=0 ast=0"),
+        "Measurement Result did not use IR: {report_text}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "Measurement Result WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("Result_std_measurements__Measurement__Float_String")
+            && wasi_source.contains("std_measurements__Measurement__Float")
+            && wasi_source.contains("ostrin_release"),
+        "Measurement Result ownership markers missing: {wasi_source}"
+    );
+
+    let exe = temp_artifact("measurement-result.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "Measurement Result compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run Measurement Result binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "Measurement Result native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "Measurement Result leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn std_measurements_scalar_loop_preserves_ownership() {
+    let file = example_path("measurement_loop.ostrin");
+    let expected = "2 ± 0\n";
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "Measurement loop interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "Measurement loop type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("native-source: examples/measurement_loop.ostrin ir=2 hir=0 ast=0"),
+        "Measurement loop did not use IR: {report_text}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "Measurement loop WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("ostrin_fn_choose")
+            && wasi_source.contains("std_measurements__Measurement__Float")
+            && wasi_source.contains("ostrin_release"),
+        "Measurement loop ownership markers missing: {wasi_source}"
+    );
+
+    let exe = temp_artifact("measurement-loop.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "Measurement loop compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run Measurement loop binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "Measurement loop native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "Measurement loop leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn std_measurements_scalar_phi_preserves_ownership() {
+    let file = example_path("measurement_phi.ostrin");
+    let expected = "2 ± 0\n3 ± 0\n";
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "Measurement Phi interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "Measurement Phi type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("native-source: examples/measurement_phi.ostrin ir=2 hir=0 ast=0"),
+        "Measurement Phi did not use IR: {report_text}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "Measurement Phi WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("ostrin_fn_choose")
+            && wasi_source.contains("if (__ostrin_ir_pred == 1)")
+            && wasi_source.contains("std_measurements__Measurement__Float"),
+        "Measurement Phi ownership markers missing: {wasi_source}"
+    );
+
+    let exe = temp_artifact("measurement-phi.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "Measurement Phi compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run Measurement Phi binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "Measurement Phi native run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "Measurement Phi leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+}
+
+#[test]
+fn std_measurements_scalar_task_capture_preserves_ownership() {
+    let file = example_path("measurement_task.ostrin");
+    let expected = "2 ± 0\n";
+    let interpreted = run(&["--run", &file]);
+    assert!(
+        interpreted.status.success(),
+        "Measurement task interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(stdout(&interpreted).replace("\r\n", "\n"), expected);
+
+    let report = run(&["--native-type-report", &file]);
+    assert!(
+        report.status.success(),
+        "Measurement task type report failed: {}",
+        stderr(&report)
+    );
+    let report_text = stdout(&report);
+    assert!(
+        report_text.contains("native-source: examples/measurement_task.ostrin ir=1 hir=0 ast=0"),
+        "Measurement task did not use IR: {report_text}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "Measurement task WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    assert!(
+        wasi_source.contains("Task_std_measurements__Measurement__Float")
+            && wasi_source.contains("OstrinIrTaskEnv_")
+            && wasi_source.contains("ostrin_ir_task_env_drop_"),
+        "Measurement task ownership markers missing: {wasi_source}"
+    );
+
+    for (target, flags) in [
+        ("measurement-task.exe", vec!["--compile"]),
+        (
+            "measurement-task-threads.exe",
+            vec!["--native-threads", "--compile"],
+        ),
+    ] {
+        let exe = temp_artifact(target);
+        let mut args = flags;
+        args.extend(["--leak-check", "--out", &exe, &file]);
+        let compile = run(&args);
+        assert!(
+            compile.status.success(),
+            "Measurement task compile for {target} failed: {}",
+            stderr(&compile)
+        );
+        let native = Command::new(&exe)
+            .output()
+            .unwrap_or_else(|error| panic!("run {target}: {error}"));
+        let _ = fs::remove_file(&exe);
+        assert!(
+            native.status.success(),
+            "Measurement task native run for {target} failed: {}",
+            String::from_utf8_lossy(&native.stderr)
+        );
+        assert_eq!(
+            String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+            expected
+        );
+        assert!(
+            String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+            "Measurement task leaked in {target}: {}",
+            String::from_utf8_lossy(&native.stderr)
+        );
+    }
+}
+
+#[test]
+fn std_measurements_scalar_matches_interpreter_and_native() {
+    let file = example_path("measurement_scalar.ostrin");
+    let expected = "x = 12.3 ± 0.02\nx + x = 24.6 ± 0.04\nx - x = 0 ± 0\nx + y = 13.8 ± 0.03605551275463989\n2x = 24.6 ± 0.04\nx * x = 151.29000000000002 ± 0.49200000000000005\nx * y = 18.450000000000003 ± 0.3702175036380641\nx / x = 1 ± 0\nunknown = unknown: scale received a measurement with unknown uncertainty\ninvalid sigma = measurement sigma must be non-negative\nempty source = measurement source label must not be empty\nnon-finite value = measurement value must be finite\nnon-finite sigma = measurement sigma must be finite\ninfinite sigma = measurement sigma must be finite\nnon-finite exact = unknown: exact measurement value must be finite\nunknown series = series offline\n";
+    assert_eq!(
+        interpreter_and_native_agree("measurement_scalar.ostrin"),
+        expected
+    );
+
+    let report = run(&["--native-type-report", &file]);
     assert!(
         report.status.success(),
         "measurement type report failed: {}",
@@ -11872,6 +15801,57 @@ fn std_measurements_scalar_matches_interpreter_and_native() {
             && measurement_source.contains("hir=0")
             && measurement_source.contains("ast=0"),
         "measurement lowering regressed: {measurement_source}"
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "Measurement WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    for marker in [
+        "ostrin_drop_std_measurements__Measurement__Float",
+        "ostrin_drop_std_measurements__Sensitivity",
+        "List_std_measurements__Sensitivity_drop",
+        "for (int64_t i = 0; i < list->length; i++)",
+        "ostrin_release((void*)(value->sources))",
+        "ostrin_release((void*)(value->reason))",
+        "ostrin_release((void*)(value->label))",
+    ] {
+        assert!(
+            wasi_source.contains(marker),
+            "Measurement WASI output is missing recursive ownership marker {marker}"
+        );
+    }
+
+    let exe = temp_artifact("measurement-scalar-ownership.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "Measurement ownership compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run Measurement ownership binary");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "Measurement ownership run failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "Measurement scalar lifecycle leaked: {}",
+        String::from_utf8_lossy(&native.stderr)
     );
 }
 

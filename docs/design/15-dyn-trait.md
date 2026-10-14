@@ -87,9 +87,131 @@ shapes: List<dyn Shape + Printable> = [...]
 
 Cada valor de la lista debe implementar **ambos** traits — el compilador genera una tabla de métodos combinada por detrás; sigue sin ser visible ni configurable desde el código Ostrin.
 
+## 7. Frontera actual del backend y contrato para migrar a HIR/IR
+
+La representación no debe confundirse con soporte nativo completo. El ABI C
+usa una pareja tipada equivalente a:
+
+```c
+typedef struct {
+    void *self;
+    const Trait_VTable *vtable;
+} Trait_Dyn;
+```
+
+Las vtables son inmutables y contienen slots de métodos y hooks de lifecycle
+para el payload. HIR/C representa `Ty::Dyn` como el struct completo, hace
+boxing concreto→dyn, despacha llamadas por la vtable y usa sus hooks para
+argumentos, retornos, campos, reemplazos, listas, closures y destrucción. La IR
+conserva `DynBox` y `DynCall`, e `ir_c.rs` emite el ABI `data + vtable` con
+registro de vtables de records genéricos, incluidos métodos default
+especializados. `native_trait_defaults.ostrin` genera seis funciones IR y cero
+fallbacks AST; su prueba exige dispatch por vtable, paridad con el intérprete y
+`live_allocations=0`.
+Los campos de records no genéricos y el entorno HIR de closures ahora preservan
+la pareja `data/vtable`: `native_dyn_trait_record_field_replacement_preserves_pair_ownership`
+prueba reemplazo, alias y autoasignación; `native_dyn_trait_closure_capture_outlives_the_source_scope`
+prueba que el payload sobrevive al scope que lo creó y se libera al destruir la
+closure. Ambos tienen paridad intérprete/native y `live_allocations=0`. Se
+añadieron pruebas de captura por tarea y cancelación antes de ejecución con un
+payload `String` gestionado; la captura también mantiene un alias vivo en el
+padre. Ambas preservan el par y terminan con `live_allocations=0` en scheduler
+cooperativo y `--native-threads`. Un campo `T` de `Holder<T>` instanciado
+directamente como `dyn Speaker` también pasa reemplazo, alias, paridad, IR sin
+fallback, emisión WASI y cero allocations vivas en
+`native_dyn_trait_generic_record_field_preserves_pair_ownership`. La prueba
+`native_dyn_trait_option_and_result_wrappers_preserve_pair_ownership` cubre
+`Option<dyn Speaker>` (`Some`/`None`) y `Result<dyn Speaker, String>` (`Ok`/`Err`)
+con paridad, IR sin fallback, ejecución nativa con cero allocations vivas y
+emisión WASI. También almacena `Option<dyn Speaker>` en el campo mutable de un
+record, lee el valor, lo reemplaza por `None` y vuelve a leerlo. No se generaliza
+a otros wrappers o agregados genéricos anidados.
+Los 28 programas WASI también pasaron en el workflow de GitHub para el head
+`54123b76`, incluidos wrappers, campos, closure, tareas y default.
+En ese mismo head, ASan pasó la suite nativa, el corpus diferencial generado y
+el fuzz del frontend; UBSan pasó la suite nativa. Véanse los
+[resultados de sanitizers](https://github.com/sircalch/Ostrin/actions/runs/38508656243)
+y el [workflow WASI](https://github.com/sircalch/Ostrin/actions/runs/38508663521).
+Campos genéricos anidados y otras combinaciones fuera de la matriz siguen fuera
+del ABI dyn HIR/C verificado.
+
+El contrato de implementación se aplica de forma coherente a AST, HIR, IR, WASI
+y el runtime:
+
+1. El valor tipado debe conservar `data`, `vtable` y el estado de ownership en
+   cada construcción, argumento, retorno, campo, colección, `Phi`, closure,
+   tarea, cancelación y `drop`.
+2. Cada vtable debe incluir operaciones de ciclo de vida (`retain` y
+   `release`, o una ABI equivalente demostrada) además de sus slots de método;
+   un receptor borrado no puede depender de una limpieza global al salir del
+   proceso.
+3. El lowering debe rechazar de forma determinista traits no object-safe,
+   llamadas indirectas no representables y combinaciones genéricas cuyo
+   ownership no esté probado. No se permite convertir esos casos en un cast
+   opaco.
+4. La aceptación mínima exige paridad intérprete/native, emisión y ejecución
+   WASI, `live_allocations=0`, ASan y UBSan para boxing, lista heterogénea,
+   argumento/retorno, método por defecto, `Phi`, closure, tarea y cancelación.
+
+### 7.1 Estado de ownership y transiciones obligatorias
+
+El ABI propuesto trata al trait object como un valor gestionado con dos partes
+indivisibles. `data` apunta al payload y `vtable` describe tanto los métodos
+como el destructor del payload; nunca se permite conservar uno sin el otro.
+Cada operación debe respetar estas transiciones:
+
+| Operación | Precondición | Acción requerida | Postcondición |
+|---|---|---|---|
+| `box` | payload concreto válido | asignar payload y seleccionar vtable | una referencia propietaria al par `data/vtable` |
+| copia/argumento/campo | par no nulo | llamar `retain(data, vtable)` | dos referencias válidas al mismo par |
+| retorno/colección | referencia válida | transferir o retener según el modo de paso | el receptor tiene exactamente una referencia nueva |
+| `Phi`/reemplazo | ambas ramas pueden poseer | retener la rama elegida y liberar la descartada | una sola referencia al valor seleccionado |
+| `drop`/cancelación | referencia válida | llamar `release(data, vtable)` una vez | el payload queda destruido cuando llega a cero |
+
+El contador, si existe, pertenece al bloque de `data` y no a la vtable. La
+vtable es inmutable, compartible y no se libera por cada instancia. Una vtable
+mal formada, un `data == NULL` inesperado o una combinación de tipos que no
+pueda conservar estas invariantes debe producir un diagnóstico de lowering;
+no puede degradarse a un cast opaco ni a una liberación global al finalizar el
+proceso.
+
+Estado implementado y límites restantes del contrato de ownership:
+
+1. **Implementado para los casos cubiertos:** el typechecker transmite el tipo esperado a
+   coerciones de argumentos; HIR conserva `DynCoerce` y la IR conserva
+   `DynBox`/`DynCall`. El verificador comprueba que el origen de boxing coincide
+   con la definición y que el destino es `dyn Trait`. La prueba
+   `hir_ir_preserve_checker_approved_dyn_argument_coercions` verifica los
+   records concretos, el dispatch dinámico y `ir violations: 0`.
+2. **Implementado y validado:** IR/C emite `DynBox`/`DynCall`, mantiene unido el
+   par y registra vtables genéricas/default; retain/release cubre boxing,
+   llamadas, argumentos, retornos, alias, campos, reemplazos, `Phi`, loop-Phi y
+   drop en los casos probados.
+3. La matriz WASI local pasó 28 programas. La prueba de wrappers añade
+`Option`/`Result` alrededor de un `dyn Trait` ya convertido explícitamente; no
+implica conversión contextual general de payloads dentro de wrappers. La misma
+prueba también cubre `List<Option<dyn Speaker>>` con dispatch sobre el elemento
+presente y destrucción del ausente. En `54123b76`, ASan y UBSan pasaron
+   en CI; ASan también ejecutó el corpus diferencial y el fuzz del frontend.
+4. Se probó `Holder<dyn Speaker>` como un campo genérico directo; wrappers
+   genéricos anidados y otras combinaciones fuera de la matriz probada siguen
+   fuera del soporte verificado. No se generaliza la evidencia de los casos
+   cubiertos a esas ABI.
+5. Las transiciones de la sección 7 tienen paridad, `live_allocations=0`, WASI
+   donde aplica, ASan y UBSan para los casos enumerados en la matriz. El
+   criterio v0.2 de ownership queda `READY` para las celdas promovidas con
+   evidencia; las combinaciones fuera de la matriz siguen siendo limitaciones
+   explícitas y no se generaliza la promesa. El estado debe reflejar evidencia
+   actual, no editarse manualmente sin ella.
+
+El ledger actual registra cero fallbacks AST para la población medida. Este
+recuento no equivale a soporte universal: cualquier combinación fuera de la
+cobertura HIR/C verificada sigue siendo una limitación y no debe degradarse a un
+cast opaco ni recibir una afirmación de soporte sin evidencia propia.
+
 ---
 
-## 7. Preguntas abiertas para la siguiente sesión de diseño
+## 8. Preguntas abiertas para la siguiente sesión de diseño
 
 1. **`match` sobre `dyn Trait`** — no tiene sentido igual que sobre un `enum` (no hay un conjunto cerrado de "variantes"); si hace falta recuperar el tipo concreto desde un `dyn Trait` (downcasting), sería un mecanismo aparte, no diseñado aquí.
 2. Pendientes previos siguen abiertos: `as D`, `select` sobre canales, cancelación de tareas, elisión de ARC, operadores bit a bit, ordenación general.

@@ -8,10 +8,21 @@
     "elevation": 28.0
   },
   "description": "Default parameters and camera for the recorded 3D peaks surface fixture.",
+  "reproducibility": {
+    "level": "R2",
+    "label": "R2 · external snapshot replay verified",
+    "next": "R3 · auditable artifact (planned verification)"
+  },
   "execution": {
     "mode": "input-file",
     "input_file": "data.json",
     "consumes": ["parameters.scale"],
+    "capabilities": ["filesystem.read:data.json"],
+    "snapshot": {
+      "path": "data.json",
+      "kind": "json",
+      "embedded": true
+    },
     "sensitivity": {
       "path": "parameters.scale",
       "alternate": 1.5

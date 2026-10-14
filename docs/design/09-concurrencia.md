@@ -36,6 +36,7 @@ result = task.join()
 - `spawn { cuerpo }` lanza el bloque como una tarea concurrente y devuelve inmediatamente un `Task<T>`, donde `T` es el tipo del valor que produce el bloque (igual que un bloque `{ }` normal, la última expresión es el valor).
 - `task.join()` bloquea la tarea actual hasta que `task` termine, y devuelve su resultado. Si el cuerpo de la tarea hace panic, `.join()` propaga ese panic en quien lo llama (un panic nunca desaparece en silencio, ver documento 04, §3).
 - Si el cuerpo de la tarea devuelve `Result<T, E>`, `task.join()` simplemente devuelve ese `Result<T, E>` — no hay un mecanismo especial de "captura de errores concurrentes"; el manejo de errores es el mismo `Result` de siempre (documento 04), solo que el valor llegó desde otra tarea.
+- `examples/native_ir_task_result.ostrin` verifica esta regla con ramas `Ok`/`Err`, `join`, emisión WASI y leak-check en los modos cooperativo y `--native-threads`.
 
 ### 1.1 Qué puede capturar un `spawn`
 

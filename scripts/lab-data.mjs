@@ -450,7 +450,7 @@ export async function buildLabData() {
     const rawSvg = `${output.slice(start, end + 1).join("\n")}\n`;
     // Experiment fixtures use the same calculated metadata as their downloadable bundle.
     // Replay verification below removes drift between the live WASM output and
-    // the published surface while preserving the fixture's recorded R0/R1 maturity contract.
+    // the published surface while preserving the fixture's recorded R0/R1/R2 maturity contract.
     const svg = fixture
       ? normalizeFigureMetadata(rawSvg, metadataForFixture(fixture.id))
       : rawSvg;
@@ -502,9 +502,9 @@ export function compareReplayFigure(id, replayedSvg, bundle) {
     errors.push(`${id}: replayed SVG differs from the bundled figure`);
   }
   const replay = bundle?.provenance?.replay;
-  if (!['R0', 'R1'].includes(replay?.level) || replay?.status !== "verified" || replay?.backend !== "ostrinc.wasm"
+  if (!['R0', 'R1', 'R2'].includes(replay?.level) || replay?.status !== "verified" || replay?.backend !== "ostrinc.wasm"
     || replay?.target !== "wasm32-wasip1" || replay?.compares !== "figure.svg") {
-    errors.push(`${id}: bundle is missing the verified R0/R1 replay contract`);
+    errors.push(`${id}: bundle is missing the verified R0/R1/R2 replay contract`);
   }
   return errors;
 }

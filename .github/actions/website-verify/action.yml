@@ -21,17 +21,59 @@ runs:
       shell: bash
       working-directory: tests/browser
       run: npx playwright install --with-deps chromium firefox webkit
+    - name: Generate public evidence dashboard
+      shell: bash
+      run: |
+        node scripts/quality-scorecard.mjs --write
+        node scripts/status-page.mjs --write
     - name: Build compiler WASM and run browser regressions
       shell: bash
       working-directory: tests/browser
       run: npm test
+    - name: Upload browser failure artifacts
+      if: ${{ failure() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: ostrin-playwright-failures-${{ github.run_id }}
+        path: |
+          /tmp/ostrin-playwright-results
+          tests/browser/test-results
+        if-no-files-found: ignore
+    - name: Capture CI host provenance and regenerate experiment bundles
+      shell: bash
+      env:
+        OSTRIN_CAPTURE_HOST: "1"
+      run: |
+        node scripts/experiment-bundle.mjs --write-all
+        node scripts/r3-readiness.mjs --write --require-ready
+        node scripts/quality-scorecard.mjs --write
+        node scripts/status-page.mjs --write
+    - name: Upload host-bound R3 evidence
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: ostrin-r3-host-evidence-${{ github.run_id }}
+        path: |
+          validation/r3-readiness.json
+          validation/quality-scorecard.json
+          website/status-data.js
+          website/assets/experiments/*.ostrin-experiment.json
+        if-no-files-found: error
+        retention-days: 90
     - name: Validate website, WASM and distribution contracts
       shell: bash
+      env:
+        OSTRIN_CAPTURE_HOST: "1"
       run: |
         node scripts/linguist-check.mjs
         node --test scripts/linguist-check.test.mjs
         node scripts/project-plan-check.mjs
+        node scripts/fallback-ledger-check.mjs
+        node scripts/r3-readiness.mjs --require-ready
+        node --test scripts/r3-readiness.test.mjs
+        node --test scripts/quality-scorecard.test.mjs
         node --test scripts/project-plan-check.test.mjs
+        node --test scripts/v0.2-readiness-check.test.mjs
         node scripts/measurement-contract-check.mjs
         node --test scripts/measurement-contract-check.test.mjs
         node scripts/quantity-ownership-check.mjs
@@ -39,15 +81,7 @@ runs:
         node scripts/website-metadata.mjs
         node --no-warnings scripts/lab-data.mjs --verify-replays
         node --test scripts/lab-data-replay.test.mjs
-        node scripts/experiment-replay.mjs --fixture lines
-        node scripts/experiment-replay.mjs --fixture surface
-        node scripts/experiment-replay.mjs --fixture histogram
-        node scripts/experiment-replay.mjs --fixture boxplot
-        node scripts/experiment-replay.mjs --fixture scatter-fit
-        node scripts/experiment-replay.mjs --fixture violin
-        node scripts/experiment-replay.mjs --fixture hexbin
-        node scripts/experiment-replay.mjs --fixture bars
-        node scripts/experiment-replay.mjs --fixture point-cloud
+        node scripts/experiment-replay.mjs --all
         node --test scripts/experiment-replay.test.mjs
         node scripts/viz-jsonld.mjs
         node scripts/experiment-bundle.mjs

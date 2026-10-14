@@ -51,8 +51,9 @@ traits, pattern matching, quantities and two concurrency modes: deterministic
 cooperative scheduling by default, plus opt-in native threads for compiled
 programs.
 
-The compiler suite currently passes **272 integration tests, 2 unit tests and 6 differential
-interpreter↔native tests**. Function calls
+The compiler suite currently passes **333 integration tests, 3 unit tests and 6 differential
+interpreter↔native tests**. Reproduction commands and evidence boundaries are documented in
+[`README-reproduce.md`](README-reproduce.md). Function calls
 support named/default arguments, scalar and `String` collection lookups preserve `Option<T>`
 through the native IR path; concrete records and simple `Option<Record>` values
 now use the same IR path with ownership markers, and record fields are checked
@@ -76,8 +77,10 @@ called and reused after that — plain records (heap-allocated, always by
 reference, to match the interpreter's identity semantics) with their
 non-generic `impl` methods (resolved statically at compile time), plain
 non-generic enums with `match` (compiled to a tagged union and a sequence of
-`if`s), `dyn Trait` values (a real vtable, the one place in this backend
-anything is actually resolved at runtime rather than compile time), and
+`if`s), direct `dyn Trait` values (typed `data + vtable` HIR lowering with
+retain/release hooks and runtime vtable dispatch; heterogeneous `List<dyn Trait>`
+and indirect `fold` now use HIR, while generic record boxing and closure/task
+captures still use explicit AST fallbacks), and
 `List<T>` (heap-allocated, by reference, monomorphized per element type the
 same way a generic function is — `length`/`push`/`remove_at`, indexing and
 `for x in list`) — over `Int`/`Float`/`Bool`/`String`, recursion,
@@ -133,6 +136,19 @@ cd compiler
 cargo test
 cargo run -- --run ..\examples\physics.ostrin
 ```
+
+### Format and test an Ostrin program
+
+The compiler includes a deterministic formatter and a small test runner for functions named
+`test_*`:
+
+```powershell
+cargo run -- --fmt --check ..\examples\testing.ostrin
+cargo run -- --test ..\examples\testing.ostrin
+```
+
+Use `--fmt --write` to rewrite a file in place. The same commands are available in the browser
+playground and in the VS Code extension; see the [public workflow guide](https://sircalch.github.io/Ostrin/guides.html#testing).
 
 ### Install a published release
 
@@ -261,3 +277,4 @@ history and current implementation notes.
 ## License
 
 Ostrin is released under the [MIT License](LICENSE).
+

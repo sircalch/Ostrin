@@ -1,0 +1,11 @@
+record Index {
+    scores: Map<String, Int>
+}
+
+fn main() -> Void {
+    index = Index { scores: ["ann": 3] }
+    index.scores.set("bob", 5)
+    print(index.scores.get("bob").unwrap())
+    print(index.scores.count())
+    drop(index)
+}

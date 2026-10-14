@@ -1,16 +1,10 @@
-# Ostrin — arquitectura
+# Architecture index
 
-Este archivo es el índice canónico de la arquitectura actual y objetivo de Ostrin.
+The canonical overview of the current implementation is
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Long-term direction is in
+[`docs/VISION.md`](docs/VISION.md); verified status and the active plan are in
+[`ESTADO_Y_PLAN.md`](ESTADO_Y_PLAN.md); future work is in [`ROADMAP.md`](ROADMAP.md).
 
-- [Visión y arquitectura del lenguaje](docs/ARQUITECTURA_Y_VISION.md)
-- [Pipeline HIR/IR y migración del backend](docs/design/20-hir-y-ir.md)
-- [Estado verificado y plan activo](ESTADO_Y_PLAN.md)
-- [Contexto histórico de decisiones](CONTEXTO_PROYECTO.md)
-
-El pipeline del compilador es:
-
-`source → lexer → parser → AST → resolución → type checker → HIR tipado → monomorfización → Ostrin IR → ownership → backends`
-
-El intérprete sigue siendo la referencia semántica. El backend nativo transpila a C y el backend
-WASI produce el compilador WASM; ambos se validan con pruebas diferenciales y los gates de
-seguridad descritos en [SECURITY.md](SECURITY.md).
+Detailed compiler and memory decisions live in [`docs/design/`](docs/design/).
+The previous combined architecture/vision audit is retained as a short
+redirect at [`docs/ARQUITECTURA_Y_VISION.md`](docs/ARQUITECTURA_Y_VISION.md).

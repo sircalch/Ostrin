@@ -1,0 +1,12 @@
+import std.measurements
+
+fn main() -> Void {
+    mut x: Measurement<Quantity<Length>> = Measurement {
+        value: 12 m,
+        sources: [],
+        known: true,
+        reason: ""
+    }
+    print(x.value)
+    drop(x)
+}

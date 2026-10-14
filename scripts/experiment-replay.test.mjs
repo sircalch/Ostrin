@@ -1,6 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { bundleErrors, extractSvg, replay } from "./experiment-replay.mjs";
+import { bundleErrors, extractSvg, listExecutableReplayIds, replay } from "./experiment-replay.mjs";
+import { buildExperimentBundle, experimentFixtures } from "./experiment-bundle.mjs";
+
+test("the executable replay registry includes every source-backed R1/R2 bundle", () => {
+  const expected = Object.keys(experimentFixtures).filter((id) => {
+    const level = buildExperimentBundle(id).reproducibility.level;
+    return level === "R1" || level === "R2";
+  });
+  assert.deepEqual(listExecutableReplayIds(), expected);
+  assert.equal(expected.length, 11);
+});
 
 test("the surface bundle executes from its declared data.json input", async () => {
   const result = await replay("surface");
@@ -32,7 +42,7 @@ test("the histogram bundle verifies input-driven seeded replay", async () => {
     consumed: ["seed", "parameters.samples", "parameters.bins"],
     baseline: "match",
     sensitivity: "changed-output",
-    seeded: "changed-output",
+    seeded: "same-seed-and-changed-output",
   });
 });
 
@@ -44,7 +54,7 @@ test("the boxplot bundle verifies a second input-driven seeded replay", async ()
     consumed: ["seed", "parameters.samples_per_group"],
     baseline: "match",
     sensitivity: "changed-output",
-    seeded: "changed-output",
+    seeded: "same-seed-and-changed-output",
   });
 });
 
@@ -56,7 +66,7 @@ test("the scatter-fit bundle verifies a third input-driven seeded replay", async
     consumed: ["seed", "parameters.samples"],
     baseline: "match",
     sensitivity: "changed-output",
-    seeded: "changed-output",
+    seeded: "same-seed-and-changed-output",
   });
 });
 
@@ -68,7 +78,7 @@ test("the violin bundle verifies a fourth input-driven seeded replay", async () 
     consumed: ["seed", "parameters.samples_per_group", "parameters.bandwidth_samples"],
     baseline: "match",
     sensitivity: "changed-output",
-    seeded: "changed-output",
+    seeded: "same-seed-and-changed-output",
   });
 });
 
@@ -80,7 +90,7 @@ test("the hexbin bundle verifies a fifth input-driven seeded replay", async () =
     consumed: ["seed", "parameters.samples", "parameters.bins_x", "parameters.bins_y"],
     baseline: "match",
     sensitivity: "changed-output",
-    seeded: "changed-output",
+    seeded: "same-seed-and-changed-output",
   });
 });
 
@@ -92,7 +102,7 @@ test("the bars bundle verifies a sixth input-driven seeded replay", async () => 
     consumed: ["seed", "parameters.samples_per_group"],
     baseline: "match",
     sensitivity: "changed-output",
-    seeded: "changed-output",
+    seeded: "same-seed-and-changed-output",
   });
 });
 
@@ -104,7 +114,7 @@ test("the point-cloud bundle verifies a seventh input-driven seeded replay", asy
     consumed: ["seed", "parameters.clusters", "parameters.points_per_cluster"],
     baseline: "match",
     sensitivity: "changed-output",
-    seeded: "changed-output",
+    seeded: "same-seed-and-changed-output",
   });
 });
 
@@ -116,7 +126,7 @@ test("the fft bundle verifies an eighth input-driven seeded replay", async () =>
     consumed: ["seed", "parameters.samples", "parameters.duration_seconds", "parameters.noise_scale"],
     baseline: "match",
     sensitivity: "changed-output",
-    seeded: "changed-output",
+    seeded: "same-seed-and-changed-output",
   });
 });
 
@@ -128,7 +138,7 @@ test("the dashboard bundle verifies a ninth input-driven seeded replay", async (
     consumed: ["seed", "parameters.random_samples", "parameters.grid"],
     baseline: "match",
     sensitivity: "changed-output",
-    seeded: "changed-output",
+    seeded: "same-seed-and-changed-output",
   });
 });
 

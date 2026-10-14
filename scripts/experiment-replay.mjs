@@ -11,7 +11,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { experimentFixtures, normalizeFigureMetadata, outputPathFor, repositoryRoot } from "./experiment-bundle.mjs";
+import { buildExperimentBundle, experimentFixtures, normalizeFigureMetadata, outputPathFor, repositoryRoot } from "./experiment-bundle.mjs";
 import { runWasm } from "./lab-data.mjs";
 
 const schema = "ostrin.experiment/v0";
@@ -36,6 +36,13 @@ function fixtureArgument(argv) {
   return "";
 }
 
+export function listExecutableReplayIds() {
+  return Object.keys(experimentFixtures).filter((id) => {
+    const level = buildExperimentBundle(id).reproducibility.level;
+    return level === "R1" || level === "R2";
+  });
+}
+
 function extractSvg(lines, id) {
   const start = lines.findIndex((line) => line.startsWith("<svg"));
   const end = lines.findIndex((line, index) => index >= start && line === "</svg>");
@@ -48,9 +55,40 @@ function bundleErrors(bundle, id) {
   if (!bundle || typeof bundle !== "object") return [`${id}: bundle is not an object`];
   if (bundle.schema !== schema) errors.push(`${id}: expected ${schema}`);
   if (bundle.id !== id) errors.push(`${id}: bundle id does not match the requested fixture`);
-  if (!["R0", "R1"].includes(bundle.reproducibility?.level)) errors.push(`${id}: executable replay requires an explicit R0 or R1 bundle`);
+  if (!["R0", "R1", "R2"].includes(bundle.reproducibility?.level)) errors.push(`${id}: executable replay requires an explicit R0, R1 or R2 bundle`);
   if (!bundle.files || typeof bundle.files !== "object") errors.push(`${id}: files object is missing`);
   if (!Array.isArray(bundle.manifest?.files) || bundle.manifest.files.length !== 4) errors.push(`${id}: manifest must contain four files`);
+  if (bundle.provenance?.runtime?.schema !== "ostrin.runtime/v1"
+    || bundle.provenance?.runtime?.status !== "partial"
+    || bundle.provenance?.runtime?.target !== "wasm32-wasip1"
+    || bundle.provenance?.runtime?.wasi !== "preview1") {
+    errors.push(`${id}: bundle is missing the partial ostrin.runtime/v1 snapshot`);
+  }
+  const invocation = bundle.provenance?.runtime?.invocation;
+  const invocationOutput = invocation?.outputs?.find((entry) => entry.path === "figure.svg");
+  const figureEntry = bundle.manifest?.files?.find((entry) => entry.path === "figure.svg");
+  if (invocation?.command !== "node scripts/lab-data.mjs --verify-replays"
+    || invocation?.status !== "verified-in-ci"
+    || invocationOutput?.bytes !== figureEntry?.bytes
+    || invocationOutput?.sha256 !== figureEntry?.sha256) {
+    errors.push(`${id}: runtime invocation output hash is missing or differs from the bundled figure`);
+  }
+  if (bundle.reproducibility?.level === "R2") {
+    const execution = bundle.provenance?.execution;
+    const snapshot = execution?.snapshot;
+    if (!Array.isArray(execution?.capabilities)
+      || !execution.capabilities.includes(`filesystem.read:${execution?.input_file}`)) {
+      errors.push(`${id}: R2 bundle is missing the filesystem capability for its input snapshot`);
+    }
+    if (!snapshot || snapshot.path !== execution?.input_file || snapshot.embedded !== true) {
+      errors.push(`${id}: R2 bundle is missing an embedded input snapshot`);
+    }
+    const runtimeSnapshot = bundle.provenance?.runtime?.input_snapshots?.find((entry) => entry.path === snapshot?.path);
+    const inputEntry = bundle.manifest?.files?.find((entry) => entry.path === execution?.input_file);
+    if (!runtimeSnapshot || runtimeSnapshot.sha256 !== inputEntry?.sha256) {
+      errors.push(`${id}: R2 input snapshot hash does not match the bundled data`);
+    }
+  }
   for (const entry of bundle.manifest?.files ?? []) {
     const content = bundle.files?.[entry.path];
     if (typeof content !== "string") {
@@ -81,23 +119,25 @@ function bundleErrors(bundle, id) {
   if (Array.isArray(execution?.consumes) && typeof sensitivity?.path === "string" && !execution.consumes.includes(sensitivity.path)) {
     errors.push(`${id}: executable replay sensitivity path is not listed in consumed inputs`);
   }
-  if (bundle.reproducibility?.level === "R1") {
+  const seeded = bundle.reproducibility?.level === "R1"
+    || bundle.provenance?.randomness?.status === "input-driven-r1";
+  if (seeded) {
     const randomness = execution?.randomness;
     const evidence = bundle.provenance?.randomness;
     if (!randomness || randomness.seed_path !== sensitivity?.path) {
-      errors.push(`${id}: R1 replay must declare a randomness seed path equal to the sensitivity path`);
+      errors.push(`${id}: seeded replay must declare a randomness seed path equal to the sensitivity path`);
     }
     if (typeof randomness?.seed_path !== "string" || !execution?.consumes?.includes(randomness.seed_path)) {
-      errors.push(`${id}: R1 randomness seed path must be listed in consumed inputs`);
+      errors.push(`${id}: seeded randomness seed path must be listed in consumed inputs`);
     }
     if (randomness?.algorithm !== evidence?.algorithm || randomness?.version !== evidence?.version) {
-      errors.push(`${id}: R1 randomness algorithm/version does not match provenance evidence`);
+      errors.push(`${id}: seeded randomness algorithm/version does not match provenance evidence`);
     }
     if (randomness?.partition !== evidence?.partition) {
-      errors.push(`${id}: R1 randomness partition does not match provenance evidence`);
+      errors.push(`${id}: seeded randomness partition does not match provenance evidence`);
     }
     if (evidence?.status !== "input-driven-r1" || evidence?.seed_consumption !== `data.json:${randomness?.seed_path}`) {
-      errors.push(`${id}: R1 provenance does not prove input-driven seed consumption`);
+      errors.push(`${id}: provenance does not prove input-driven seed consumption`);
     }
   }
   return errors;
@@ -167,6 +207,19 @@ async function replay(id) {
   };
   const rendered = normalizeFigureMetadata(extractSvg(output, id), metadata);
   if (rendered !== bundle.files["figure.svg"]) throw new Error(`${id}: input-driven replay SVG differs from the published bundle`);
+  const seeded = bundle.reproducibility?.level === "R1"
+    || bundle.provenance?.randomness?.status === "input-driven-r1";
+  if (seeded) {
+    const repeatedOutput = await runWasm(module, files, ["--run", "main.ostrin"]);
+    const repeated = normalizeFigureMetadata(extractSvg(repeatedOutput, id), metadata);
+    if (repeated !== rendered) {
+      throw new Error(`${id}: same input and seed produced different SVG output on replay`);
+    }
+  }
+  const invocationOutput = bundle.provenance.runtime.invocation.outputs.find((entry) => entry.path === "figure.svg");
+  if (bytes(rendered) !== invocationOutput.bytes || sha256(rendered) !== invocationOutput.sha256) {
+    throw new Error(`${id}: input-driven replay output hash differs from the runtime invocation record`);
+  }
 
   const changedInput = alternateInput(bundle, id);
   const changedOutput = await runWasm(module, { "main.ostrin": source, [inputFile]: changedInput }, ["--run", "main.ostrin"]);
@@ -179,15 +232,39 @@ async function replay(id) {
     consumed: bundle.provenance.execution.consumes,
     baseline: "match",
     sensitivity: "changed-output",
-    ...(bundle.reproducibility.level === "R1" ? { seeded: "changed-output" } : {}),
+    ...(seeded ? { seeded: "same-seed-and-changed-output" } : {}),
   };
 }
 
+export async function replayAll() {
+  const ids = listExecutableReplayIds();
+  if (ids.length === 0) throw new Error("no R1/R2 experiment bundles are registered for executable replay");
+  const results = [];
+  for (const id of ids) results.push(await replay(id));
+  return results;
+}
+
 async function main() {
-  const id = fixtureArgument(process.argv.slice(2));
-  if (!id) throw new Error("usage: node scripts/experiment-replay.mjs --fixture <id>");
+  const args = process.argv.slice(2);
+  if (args.includes("--all")) {
+    if (args.some((argument) => argument === "--fixture" || argument.startsWith("--fixture="))) {
+      throw new Error("--all cannot be combined with --fixture");
+    }
+    const results = await replayAll();
+    for (const result of results) {
+      const seeded = result.seeded ? `; ${result.seeded}` : "";
+      console.log(`experiment-replay: verified ${result.id} (${result.input}; ${result.sensitivity}${seeded})`);
+    }
+    console.log(`experiment-replay: verified all ${results.length} R1/R2 bundles`);
+    return;
+  }
+  const id = fixtureArgument(args);
+  if (!args.includes("--fixture") && !args.some((argument) => argument.startsWith("--fixture="))) {
+    throw new Error("usage: node scripts/experiment-replay.mjs --fixture <id> | --all");
+  }
   const result = await replay(id);
-  console.log(`experiment-replay: verified ${result.id} (${result.input}; ${result.sensitivity})`);
+  const seeded = result.seeded ? `; ${result.seeded}` : "";
+  console.log(`experiment-replay: verified ${result.id} (${result.input}; ${result.sensitivity}${seeded})`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {

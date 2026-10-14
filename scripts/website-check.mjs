@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { collectSiteFacts } from "./site-facts.mjs";
 import { experimentFixtures, verifyBundleFile } from "./experiment-bundle.mjs";
 import { checkVizStructuredData } from "./viz-jsonld.mjs";
+import { buildStatusData, renderStatusData } from "./status-page.mjs";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const websiteRoot = path.join(repositoryRoot, "website");
@@ -66,6 +67,8 @@ for (const [key, expected] of Object.entries(facts)) {
 const readme = read("README.md");
 check(readme.includes(`**${facts.integrationTests} integration tests, ${facts.unitTests} unit tests and ${facts.differentialTests} differential`),
   "README.md: compiler test counts drifted from source");
+check(readme.includes("README-reproduce.md") && read("README-reproduce.md").includes("scripts/experiment-replay.mjs --all"),
+  "README.md: reproduction guide link or command is missing");
 const roadmap = read("website/roadmap.html");
 check(roadmap.includes(`${facts.integrationTests} integration + ${facts.differentialTests} differential tests`),
   "roadmap.html: test counts drifted from source");
@@ -78,6 +81,9 @@ const projectStatus = read("ESTADO_Y_PLAN.md");
 check(projectStatus.includes(`· ${facts.differentialTests} pruebas diferenciales, ${facts.integrationTests} de integración y ${facts.unitTests} unitarias en verde.`)
   && projectStatus.includes(`# ${facts.differentialTests} diferenciales + ${facts.integrationTests} de integración + ${facts.unitTests} unitarias`),
   "ESTADO_Y_PLAN.md: compiler test counts drifted from source");
+const changelog = read("CHANGELOG.md");
+check(changelog.includes(`${facts.integrationTests}-integration-test repository state`),
+  "CHANGELOG.md: v0.2 candidate test count drifted from source");
 
 // Every registered experiment must have a checked, source-backed download.
 for (const [fixtureId, fixture] of Object.entries(experimentFixtures)) {
@@ -91,6 +97,13 @@ for (const [fixtureId, fixture] of Object.entries(experimentFixtures)) {
 
 for (const page of publicPages) {
   const html = read(`website/${page}`);
+  const headingLevels = [...html.matchAll(/<h([1-6])\b[^>]*>[\s\S]*?<\/h\1>/gi)].map((match) => Number(match[1]));
+  check(headingLevels.filter((level) => level === 1).length === 1,
+    `${page}: expected exactly one h1 heading`);
+  for (let index = 1; index < headingLevels.length; index += 1) {
+    check(headingLevels[index] <= headingLevels[index - 1] + 1,
+      `${page}: heading level jumps from h${headingLevels[index - 1]} to h${headingLevels[index]}`);
+  }
   check(html.includes('<script src="site-data.js" defer></script>'), `${page}: missing generated site data script`);
   check(html.includes('<a class="skip-link" href="#main-content">Skip to content</a>'), `${page}: missing keyboard skip link`);
   check(html.includes('<main id="main-content" tabindex="-1">'), `${page}: main content is not a keyboard skip target`);
@@ -280,10 +293,33 @@ check(homepage.includes('id="visual-artifacts"')
   && homepage.includes('href="viz.html?figure=table"')
   && homepage.includes('href="viz.html?figure=provenance"'),
 "index.html: visual artifact entry points are missing");
+check(homepage.includes('href="workflow.html"'), "index.html: missing flagship workflow entry point");
 check(homepage.includes('type="module" src="playground.js"'), "index.html: missing real playground module");
 check(homepage.includes('data-site-value="examples"'), "index.html: missing centralized project facts");
 check(homepage.includes('id="source-status" class="source-status"'), "index.html: source location status is missing");
 check(homepage.includes('id="output" class="output" role="status"'), "index.html: output is missing accessible status semantics");
+
+const workflowPage = read("website/workflow.html");
+for (const marker of [
+  "From equation",
+  "examples/viz_ode.ostrin",
+  "assets/viz/ode.svg",
+  "viz.html?figure=double-pendulum",
+  "viz.html?figure=table",
+  "viz.html?figure=provenance",
+  "R0 verified",
+]) check(workflowPage.includes(marker), `workflow.html: missing ${marker}`);
+
+const statusPage = read("website/status.html");
+for (const marker of ["data-status-backend", "data-status-ownership", "data-status-reproducibility", "data-status-linguist", "data-status-readiness", "status-data.js", "status.js"]) {
+  check(statusPage.includes(marker), `status.html: missing ${marker}`);
+}
+try {
+  check(read("website/status-data.js").replaceAll("\r\n", "\n") === renderStatusData(buildStatusData()).replaceAll("\r\n", "\n"),
+    "website/status-data.js: generated scorecard is stale; run node scripts/status-page.mjs --write");
+} catch (error) {
+  check(false, `website/status-data.js: unable to validate generated scorecard (${error.message})`);
+}
 
 const docs = read("website/docs.html");
 check(docs.includes('id="learn"'), "docs.html: missing guided learning path");
@@ -333,6 +369,9 @@ check(benchmarks.includes("data-benchmark-rows"), "benchmarks.html: missing benc
 const benchmarkData = read("website/benchmark-data.js");
 check(benchmarkData.includes("globalThis.OSTRIN_BENCHMARK") && benchmarkData.includes('"schema": 1'),
   "website/benchmark-data.js: missing generated benchmark record");
+const benchmarkHistory = read("validation/benchmark-history.json");
+check(benchmarkHistory.includes('"schema": "ostrin.benchmark-history/v1"'),
+  "validation/benchmark-history.json: missing benchmark history schema");
 check(read("benchmarks/README.md").includes("interpreter-versus-native"),
   "benchmarks/README.md: missing benchmark contract");
 

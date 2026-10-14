@@ -44,3 +44,17 @@ agree about the current behavior.
 
 Please include a concise description, the relevant design decision, tests or
 examples, documentation updates and known limitations.
+
+## Branch lifecycle
+
+Use a temporary branch for each focused change and open a pull request against
+`main`. GitHub is configured to delete the remote branch after merge. Keep local
+branches that contain work not covered by `main` or a merged pull request. Before
+removing a local branch, verify its commits are integrated and that no linked
+worktree still uses it. A clean merged worktree can be detached at its current
+commit before removing the branch; preserve the checkout and its ignored files.
+Do not detach or remove branches from worktrees with uncommitted changes or unique
+commits. Periodically prune stale remote-tracking refs with `git fetch --prune`.
+
+The current project state and dated repository-hygiene audit are recorded in
+[`ESTADO_Y_PLAN.md`](ESTADO_Y_PLAN.md).

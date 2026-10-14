@@ -1,4 +1,5 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -17,6 +18,18 @@ function filesUnder(relativePath, root = repositoryRoot) {
     const child = path.join(relativePath, entry.name);
     return entry.isDirectory() ? filesUnder(child, root) : [child];
   });
+}
+
+function trackedOstrinFiles(root = repositoryRoot) {
+  if (!existsSync(path.join(root, ".git"))) return null;
+  try {
+    return execFileSync("git", ["ls-files", "*.ostrin"], { cwd: root, encoding: "utf8" })
+      .split(/\r?\n/)
+      .map((file) => file.trim())
+      .filter(Boolean);
+  } catch {
+    return null;
+  }
 }
 
 function hasYamlValue(yaml, key, value) {
@@ -63,6 +76,7 @@ export function validateLinguistPreparation(root = repositoryRoot) {
   const documentation = read("docs/linguist.md", root);
   const sampleManifestText = read(SAMPLE_MANIFEST, root);
   const license = read("LICENSE", root);
+  const linguistUsage = read("docs/linguist-usage.md", root);
   let grammar;
   const sampleManifest = parseSampleManifest(sampleManifestText);
 
@@ -160,6 +174,20 @@ export function validateLinguistPreparation(root = repositoryRoot) {
     }
   }
   const examples = filesUnder("examples", root).filter((file) => file.endsWith(".ostrin"));
+  const tracked = trackedOstrinFiles(root);
+  if (tracked) {
+    const trackedExamples = tracked.filter((file) => /^examples[\\/]/.test(file));
+    const inventoryPattern = /inventario actual tiene \*\*(\d+) archivos `\.ostrin` rastreados\*\*, de los cuales \*\*(\d+)\*\*/i;
+    const usagePattern = /Los \*\*(\d+)\*\* archivos[\s\S]*?\(\*\*(\d+)\*\* bajo `examples\/`\)/i;
+    const inventory = documentation.match(inventoryPattern);
+    const usage = linguistUsage.match(usagePattern);
+    if (!inventory || Number(inventory[1]) !== tracked.length || Number(inventory[2]) !== trackedExamples.length) {
+      errors.push(`docs/linguist.md: tracked Ostrin inventory must be ${tracked.length} files and ${trackedExamples.length} examples`);
+    }
+    if (!usage || Number(usage[1]) !== tracked.length || Number(usage[2]) !== trackedExamples.length) {
+      errors.push(`docs/linguist-usage.md: tracked Ostrin inventory must be ${tracked.length} files and ${trackedExamples.length} examples`);
+    }
+  }
 
   return {
     errors,

@@ -3,26 +3,70 @@
 La fuente de verdad del roadmap activo es [ESTADO_Y_PLAN.md](ESTADO_Y_PLAN.md), sección 8 y sus
 listas de pendientes. Este índice separa el futuro del estado comprobado.
 
-## Siguiente ciclo
+## Orden de prioridades
 
-1. Reducir el fallback AST con el trinquete por archivo de `--native-type-report` (baseline actual:
-   6.929 funciones generadas por HIR/IR (6.882 IR + 47 HIR) y 43 AST). `viz_histogram.ostrin`, `viz_boxplot.ostrin`, `viz_scatter_fit.ostrin`, `viz_violin.ostrin`, `viz_hexbin.ostrin`, `viz_bars.ostrin`, `viz_point_cloud.ostrin`, `viz_fft.ostrin` y `viz_dashboard.ostrin` ya importan `std.json` y conservan sus cortes input-driven de R1 en el camino tipado. `atan2` escalar para `Float` y `Float32` ya usa el runtime determinista desde IR/C; `pow` escalar también usa `ostrin_dm_pow`/`ostrin_dm_powf`, y `detmath.ostrin` ya queda sin fallback AST. `math_functions.ostrin` verifica `atan2` y `abs` de enteros de ancho fijo con paridad nativa/WASI, leak-check y error del mínimo representable. Las coerciones `Float↔Float32` de bindings explícitos y agregados `List/Set<Float32>` se insertan en IR y mantienen la precisión de `float32.ostrin`. Las operaciones escalares reflejadas de `Complex` (`Float +|−|×|÷ Complex`) llaman `radd`/`rsub`/`rmul`/`rdiv` desde IR/C conservando el orden de operandos; `Bool.to_string()` también usa la ruta tipada y `numeric_complex.ostrin` queda en `ir=3, hir=0, ast=0` con paridad intérprete/nativo/WASI y leak-check. Las llamadas genéricas registradas por el checker se resuelven en HIR antes de construir la IR, por lo que `numeric_units.ostrin` ya no cae al emisor AST. `Quantity.to_string()` escalar y `Array<Float32>.to_string()` ya usan helpers nativos desde IR/C; el segundo elimina el fallback del punto de entrada de `arrays_3d`. Los patrones superficiales de records con campos escalares
+La publicación de `v0.2.0` está bloqueada hasta satisfacer el gate explícito de
+[`docs/release-readiness-v0.2.json`](docs/release-readiness-v0.2.json). El validador
+[`scripts/v0.2-readiness-check.mjs`](scripts/v0.2-readiness-check.mjs) se ejecuta en CI al
+publicar esa etiqueta; hoy el hito sigue **NOT_READY**.
+
+0. **Higiene del repositorio — auditoría automatizada y limpieza parcial:** se auditaron todas
+   las referencias contra `main` y los heads de PR fusionados; se eliminaron
+   49 ramas remotas y 53 referencias locales limpias e integradas. De las
+   referencias locales, 29 estaban en worktrees limpios: esos checkouts quedaron
+   en el mismo commit detached, con archivos ignorados y demás contenido
+   preservados. Permanecen 11 ramas locales además de `main`: seis checkouts con
+   cambios sin confirmar (incluido el principal) y cinco con commits únicos no
+   cubiertos por `main` o PR fusionados. Se activó `delete_branch_on_merge`.
+   La política queda en
+   [`CONTRIBUTING.md`](CONTRIBUTING.md); el auditor actual está en
+   [`scripts/branch-hygiene-check.mjs`](scripts/branch-hygiene-check.mjs) y el detalle está en
+   [`ESTADO_Y_PLAN.md`](ESTADO_Y_PLAN.md).
+
+   **Fuentes documentales — sincronizadas:** la auditoría arquitectónica antigua
+   quedó reemplazada por [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) y
+   [`docs/VISION.md`](docs/VISION.md). `ESTADO_Y_PLAN.md` conserva el estado
+   comprobado y `ROADMAP.md` el trabajo futuro; el archivo anterior es ahora una
+   redirección para no conservar afirmaciones históricas como actuales.
+
+1. **Ownership — matriz inicial creada:** consultar
+   [`docs/ownership-matrix.md`](docs/ownership-matrix.md). El siguiente trabajo
+   cierra celdas de alto riesgo para agregados anidados/recursivos, escapes,
+   errores y `Phi`, con paridad y evidencia de memoria antes de ampliar el
+   lowering.
+
+La auditoría del bloque 0 está documentada; la eliminación de referencias integradas queda
+pendiente de retirar sus worktrees con cambios. El siguiente trabajo técnico sigue este orden rector,
+según el programa de madurez: (1) matriz de soporte de ownership y cierre de riesgos altos,
+(2) retirada segura del fallback AST, (3) generalizar replay y cerrar R1, (4) implementar R2,
+(5) inferencia estática de efectos, (6) `Measurement<T>` para cantidades/arreglos/covarianza,
+(7) validación numérica y regresión histórica de rendimiento, (8) auditoría de accesibilidad y
+arquitectura de información web (las capturas visuales automatizadas ya están en CI), y (9)
+preparación del hito `v0.2` y usuarios externos.
+Solo después se reevalúan FFI, química, autodiff inverso, computación simbólica, GPU y notebook.
+
+### Detalle de frentes y evidencia actual
+
+El bloque de backend nativo conserva este baseline: reducir el fallback AST con el trinquete por archivo de `--native-type-report` (baseline actual:
+   7.239 funciones generadas por HIR/IR (7.198 IR + 41 HIR) y 0 AST). `native_trait_defaults.ostrin` ahora baja el boxing genérico y el método default por `DynBox`/`DynCall` tipados, con paridad, `live_allocations=0` y WASI incorporado a la matriz; [ASan y UBSan pasan en CI para `bae4c0e`](https://github.com/sircalch/Ostrin/actions/runs/38356736980). Captura por tarea/cancelación y campos genéricos siguen abiertos. Los mapas y conjuntos con claves compuestas, incluido `List<Int>`, ya usan IR/C; los operadores relacionales de records con `impl Ord` llaman `compare` y consultan el tag de `Ordering` desde la ruta tipada; `option_result.ostrin` también usa IR/C y conserva la convención nativa `Int` para el error todavía no concretado de un `Result` creado con `Ok`. La llamada global `parse_int(String)` ahora comparte el helper IR/C de `String.to_int()`, por lo que `stdlib_io.ostrin` ya no usa AST. `std.json::Parser.parse_number` también cruza IR/C; los métodos JSON con retorno recursivo más complejo conservan HIR hasta tener evidencia de ownership. Los comparadores estructurales de records con `derive(Eq, Ord)` ahora reutilizan los helpers IR/C generados para igualdad y orden. El builtin `hash(...)` reutiliza esos helpers para records, enums, `Option`, `Result`, listas, mapas y sets, manteniendo hashes estructurales estables. `linfit`, `solve`, `polyfit` y `polyval` sobre `Array<Float>` ahora comparten sus runtimes numéricos con IR/C, y `calibration.ostrin` queda sin fallback. `det`, `trace`, `inv`, `eigvals` y `eye` sobre `Array<Float>` también usan sus runtimes matriciales desde IR/C, y `linear_algebra.ostrin` queda sin fallback. `sum(List<Int|Float|Quantity>)` ahora usa el mismo runtime IR/C que el emisor nativo, y `native_builtins.ostrin` queda sin fallback. `viz_histogram.ostrin`, `viz_boxplot.ostrin`, `viz_scatter_fit.ostrin`, `viz_violin.ostrin`, `viz_hexbin.ostrin`, `viz_bars.ostrin`, `viz_point_cloud.ostrin`, `viz_fft.ostrin` y `viz_dashboard.ostrin` ya importan `std.json` y conservan el camino tipado que alimenta sus contratos input-driven R2 con evidencia seeded R1. `atan2` escalar para `Float` y `Float32` ya usa el runtime determinista desde IR/C; `pow` escalar también usa `ostrin_dm_pow`/`ostrin_dm_powf`, y `detmath.ostrin` ya queda sin fallback AST. `math_functions.ostrin` verifica `atan2` y `abs` de enteros de ancho fijo con paridad nativa/WASI, leak-check y error del mínimo representable. Las coerciones `Float↔Float32` de bindings explícitos y agregados `List/Set<Float32>` se insertan en IR y mantienen la precisión de `float32.ostrin`. Las operaciones escalares reflejadas de `Complex` (`Float +|−|×|÷ Complex`) llaman `radd`/`rsub`/`rmul`/`rdiv` desde IR/C conservando el orden de operandos; `Bool.to_string()` también usa la ruta tipada y `numeric_complex.ostrin` queda en `ir=3, hir=0, ast=0` con paridad intérprete/nativo/WASI y leak-check. El checker ahora registra las sustituciones de llamadas genéricas en métodos de traits, lo que permite generar por IR `native_generic_methods.ostrin::apply__Wrapper_Int`. Las llamadas genéricas registradas por el checker se resuelven en HIR antes de construir la IR, por lo que `numeric_units.ostrin` ya no cae al emisor AST. `Quantity.to_string()` escalar y `Array<Float32>.to_string()` ya usan helpers nativos desde IR/C; el segundo elimina el fallback del punto de entrada de `arrays_3d`. Los patrones superficiales de records con campos escalares
    y los enums no genéricos con payloads escalares, incluidos los enteros de ancho fijo, variantes unitarias, patrones simples y
-   patrones anidados de enums por valor y sus literales/rangos escalares ya comparten IR/C; quedan pendientes los payloads
-   gestionados y enums genéricos.
+   patrones anidados de enums por valor y sus literales/rangos escalares ya comparten IR/C. `shapes.ostrin` añade
+   constructores, patrones y métodos con payloads `Quantity` gestionados, con paridad intérprete/nativo/WASI;
+   quedan pendientes otros agregados gestionados y los enums genéricos.
    Los métodos de records y enums concretos ya comparten
-   la ruta IR/C cuando sus campos y ownership son compatibles; los records recursivos permanecen
-   deliberadamente en HIR/AST hasta cerrar ese contrato. El puente IR para los constructores numéricos
+   la ruta IR/C cuando sus campos, argumentos y ownership son compatibles, incluso cuando el retorno
+   contiene un record recursivo; los métodos con payloads gestionados todavía requieren evidencia
+   específica. El puente IR para los constructores numéricos
    `zeros`/`ones`, `norm`, `abs` escalar y `sqrt` migró 348 funciones compartidas por la suite;
    LU ya está disponible con paridad publicada en el Lab; QR y Cholesky cruzan la IR y conservan esa
    paridad. El renderer de `std.viz` y sus superficies 2D/3D ya cruzan IR/C; las
-   las instanciaciones genéricas de trazado con `Quantity` siguen en fallback HIR/AST: un
-   experimento de `Figure.unit_line`/`unit_scatter` reveló que una etiqueta de unidad prestada
-   puede quedar viva después de liberar su array propietario. Quedan por cerrar ese contrato de
-   ownership antes de llevarlas a IR/C, además de funciones numéricas auxiliares y el ejemplo
-   compuesto de selección enlazada, cuyos agregados siguen necesitando la migración gradual. El
-   contrato está especificado en [`docs/design/27-ownership-de-quantity-escalar.md`](docs/design/27-ownership-de-quantity-escalar.md)
-   y `viz_units.ostrin` conserva un guard de fallback hasta completar native/WASI/sanitizers.
+   instanciaciones genéricas de `Figure.unit_line`/`unit_scatter` con `Quantity` también se
+   especializan por dimensión en IR/C, conservan el SVG diferencial, emiten C para WASI y pasan
+   leak-check nativo con cero allocations vivas. ASan/UBSan pasan en CI (`38173152897`) para este
+   ciclo; los trazados basados en listas aún requieren su propio contrato de ownership. Quedan
+   además funciones numéricas auxiliares y el ejemplo compuesto de selección enlazada, cuyos
+   agregados siguen necesitando la migración gradual. El contrato está especificado en
+   [`docs/design/27-ownership-de-quantity-escalar.md`](docs/design/27-ownership-de-quantity-escalar.md).
    La preparación numérica
    de histogramas y violines ya cruza IR/C mediante `histogram`, `linspace`, `pow`, `norm_pdf` y
    `norm_cdf`, y los ids
@@ -108,6 +152,9 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    reunir casos de estudio y proyectos externos verificables; y mantener una página de releases,
    búsqueda de documentación y benchmarks históricos sin inflar métricas con forks.
 6. **Continuar el frente profesional de visualización y web**: ampliar `std.viz` con
+   una regla transversal: cuando una capacidad del lenguaje cambie lo que Ostrin puede
+   ejecutar, explorar o publicar, actualizar en el mismo ciclo la web, la galería y la
+   documentación afectadas, con ejemplos y evidencia verificables; además de
    campos vectoriales 2D (`quiver` y `streamplot`), gráficas estadísticas (incluidos violines KDE y hexbin), bandas de contorno rellenas y consolidar la selección enlazada, mantener tablas reproducibles con filtro y
    ordenamiento en el explorador, conservar ejemplos verificables en la galería, ampliar animaciones,
    vídeo, controles temporales, calidad 1×/2×, interruptores de series desde la leyenda, crosshair de inspección y parámetros conducidos por Ostrin, consolidar la exportación SVG/PNG/HTML/WebM/GIF, mantener el flujo PDF vectorial y ofrecer MP4 cuando el navegador exponga un códec compatible, exploración 3D (ya incluye superficies,
@@ -116,40 +163,55 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
    evidencia en intérprete, nativo y WASM.
    El primer artefacto web de alto retorno ya cubre las 29 figuras de la galería con bundles
    source-backed `ostrin.experiment/v0`: cada descarga contiene código, entradas declaradas, SVG,
-   manifest y `provenance.json` con hashes calculados y etiqueta de madurez R0/R1. La CI del sitio reproduce los
-   29 programas con `ostrinc.wasm` y compara el SVG byte a byte; `histogram`, `boxplot`, `scatter-fit`, `violin`, `hexbin`, `bars`, `point-cloud`, `fft` y `dashboard` son ahora los nueve replays R1 de azar sembrado y el resto conserva R0. No se reclaman R2/R3. Los manifiestos de figura ya serializan el estado vivo
+   manifest y `provenance.json` con hashes calculados y etiqueta de madurez R0/R1/R2. Ahora cada bundle
+   también lleva un snapshot parcial `ostrin.runtime/v1` con target/WASI, hashes de lockfiles disponibles
+   y hashes de salida de la invocación verificada; los 29 bundles ya registran además el contrato base de ejecución, dependencias y scheduler declarado, pero esa instantánea parcial no sustituye el contrato R2/R3 completo. La CI del sitio reproduce los
+   29 programas con `ostrinc.wasm` y compara el SVG byte a byte; los once bundles input-driven (`surface`, `lines` y los nueve cortes de azar sembrado) son replays R2 de snapshot externo; los nueve de azar conservan además su evidencia de semilla R1; los 18 restantes conservan R0. No se reclama R3. Los manifiestos de figura ya serializan el estado vivo
    seleccionado (parámetros, cámara 3D opcional y URL compartible), y la galería ofrece una cita
    BibTeX con metadatos de fuente y versión. Los bundles que usan `rng(seed)` ahora incluyen
    evidencia source-backed del contrato `ostrin.rng/v1` (xoshiro256**, splitmix64, Marsaglia
    polar y `detmath::ln`) con hashes de las implementaciones intérprete/nativa. `histogram` consume
-   `seed`, `parameters.samples` y `parameters.bins` desde `data.json`; la CI cambia la semilla y
-   exige una figura distinta, por lo que los nueve bundles quedan en R1. Ya existen once cortes ejecutables
+   `seed`, `parameters.samples` y `parameters.bins` desde `data.json`; la CI repite la misma entrada y semilla para exigir el mismo SVG, cambia la semilla y
+   exige una figura distinta; con el snapshot y la capacidad declarados, los nueve bundles de azar quedan incluidos en R2 y conservan la evidencia R1. Ya existen once cortes ejecutables
    input-driven:
    `surface` lee `data.json` y demuestra sensibilidad a `parameters.scale`; `lines` consume
    `parameters.samples` con el mismo contrato genérico de sensibilidad. `histogram`, `boxplot`,
    `scatter-fit`, `violin`, `hexbin`, `bars`, `point-cloud`, `fft` y `dashboard` consumen `seed` y parámetros declarados, y cambian su figura con una semilla alternativa. El comando
-   `scripts/experiment-replay.mjs` verifica los once en WASI y la CI los ejecuta. El siguiente paso
-   es extender el contrato R1 a los demás experimentos aleatorios, y añadir lockfiles y snapshots
-   de runtime sin perder la frontera verificable de R0.
+   `scripts/experiment-replay.mjs --all` descubre los once replays R1/R2 desde el registro source-backed
+   y CI ejecuta esa selección sin una lista manual. Los nueve
+   experimentos de galería que consumen `rng(seed)` ya están incluidos en R2 con evidencia R1; los dieciocho restantes
+   conservan R0 porque son deterministas o todavía no declaran una sensibilidad de entradas
+   compatible. El documento 26 define que el replay exacto solo vale dentro de la configuración de CI;
+   comparaciones numéricas entre plataformas quedan no evaluadas hasta registrar tolerancias abs/rel por métrica.
+   El siguiente paso es capturar metadatos de host y guardar tolerancias aplicadas junto con los resultados,
+   extender contratos input-driven a nuevas fixtures y después construir el artefacto auditable R3 sin
+   perder la frontera verificable de R0.
    El Scientific Lab ya conserva la demo activa y sus parámetros en la URL para compartir y
    restaurar experimentos reproducibles desde el navegador. La navegación compacta y el catálogo
    de ejemplos ya tienen estados ARIA, foco de teclado, Escape, pestañas con flechas/Home/End y
    filtros anunciados; Chromium cubre los flujos completos y Firefox/WebKit ya recorren las catorce
-   páginas públicas con una matriz de humo; la galería añade ahora tres recorridos source-backed
+   diecisiete páginas públicas con una matriz de humo; la galería añade ahora tres recorridos source-backed
    (`simulate`, `analyze` y `explore-3d`) que agrupan figuras, tablas, animaciones y procedencia
-   mediante `?workflow=...`, con etiquetas `available`/`experimental`; quedan auditorías más amplias
-   con lectores de pantalla y baselines visuales.
-7. **Extender el núcleo científico de mediciones**: validar el API escalar experimental de
-   `std.measurements`; la proyección de series `List<Measurement<Float>>` a valores e
-   incertidumbres ya alimenta `std.viz.errorbars` con paridad intérprete/native/WASM. El siguiente
-   bloque es integrar `Quantity<T>`, `Array<Measurement<T>>` y covarianza antes de añadir Monte
-   Carlo, intervalos de cobertura o semántica de operadores.
+   mediante `?workflow=...`, con etiquetas `available`/`experimental`; la página de workflow insignia
+   conecta una ecuación, ejecución WASM, SVG y provenance, y `status.html` publica el scorecard
+   separado de backend, ownership, reproducibilidad y readiness; quedan auditorías más amplias con
+   nombres accesibles de controles, imágenes e iframes ya están automatizados; queda la auditoría
+   manual completa con lectores de pantalla y baselines visuales.
+7. **Extender el núcleo científico de mediciones**: el API escalar experimental de
+   `std.measurements` ya tiene paridad intérprete/native, `live_allocations=0` y una comprobación
+   de destructores recursivos en C para WASI; `sanitizers.yml` incluye esta prueba, pendiente de
+   resultado para esta rama. La proyección de series `List<Measurement<Float>>` alimenta
+   `std.viz.errorbars`. El siguiente bloque es integrar `Quantity<T>`,
+   `Array<Measurement<T>>` y covarianza antes de añadir Monte Carlo, intervalos de cobertura o
+   semántica de operadores.
 8. **Diseñar efectos científicos y procedencia**: convertir la propuesta de [documento 26](docs/design/26-efectos-cientificos.md)
    en un sistema de efectos interno con capacidades explícitas, niveles R0–R3 y un artefacto JSON
    reproducible antes de fijar sintaxis pública. El inventario experimental ya está disponible con
    `ostrinc --effect-report` y `--provenance-report`; el artefacto se publica en
-   [`website/provenance.html`](website/provenance.html) con hash de fuente, target y límites de replay.
-   Sigue siendo evidencia conservadora, no checking estático ni una garantía R2/R3.
+   [`website/provenance.html`](website/provenance.html) con hash de fuente, target, perfil WASI,
+   hashes de lockfiles/manifiestos disponibles y límites de replay. El snapshot ostrin.runtime/v1
+   es parcial: los once bundles input-driven ya usan su extensión de snapshot de entrada para R2,
+   y los nueve casos sembrados conservan evidencia R1; esto aún no equivale al artefacto auditable R3 ni a checking estático.
 
 ## Horizonte posterior
 
@@ -163,3 +225,5 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
 
 Las capacidades implementadas no se anuncian aquí hasta que tengan evidencia en el estado actual,
 las pruebas o los workflows correspondientes.
+
+\r\n

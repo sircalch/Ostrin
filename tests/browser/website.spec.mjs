@@ -18,6 +18,8 @@ const publicPages = [
   "./roadmap.html",
   "./showcase.html",
   "./viz.html",
+  "./workflow.html",
+  "./status.html",
 ];
 
 async function expectNoHorizontalOverflow(page, route, width) {
@@ -150,6 +152,26 @@ test("example filters expose the active state", async ({ page }) => {
   await expect(filterToolbar.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "false");
 });
 
+test("generic dyn Trait ownership example is visible in the public catalogue", async ({ page }) => {
+  await page.goto("./examples.html", { waitUntil: "domcontentloaded" });
+  const card = page.locator("#dynamic-traits");
+  await expect(card).toBeVisible();
+  await expect(card.getByRole("link", { name: "View source ↗" })).toHaveAttribute(
+    "href",
+    "https://github.com/sircalch/Ostrin/blob/main/examples/native_dyn_trait_generic_field.ostrin",
+  );
+});
+
+test("dyn Trait Option and Result example is visible in the public catalogue", async ({ page }) => {
+  await page.goto("./examples.html", { waitUntil: "domcontentloaded" });
+  const card = page.locator("#dynamic-trait-wrappers");
+  await expect(card).toBeVisible();
+  await expect(card.getByRole("link", { name: "View source ↗" })).toHaveAttribute(
+    "href",
+    "https://github.com/sircalch/Ostrin/blob/main/examples/native_dyn_trait_wrappers.ostrin",
+  );
+});
+
 test("header switches at its tablet breakpoint without overflow", async ({ page }) => {
   for (const [width, collapsed] of [[1000, true], [1001, false]]) {
     await page.setViewportSize({ width, height: 844 });
@@ -177,13 +199,49 @@ test("all public pages fit phone and tablet viewports", async ({ page }) => {
   }
 });
 
+test("public pages expose baseline accessible names", async ({ page }) => {
+  const issues = [];
+  for (const route of publicPages) {
+    await page.goto(route, { waitUntil: "networkidle" });
+    const pageIssues = await page.evaluate(() => {
+      const isVisible = (node) => {
+        if (!(node instanceof HTMLElement)) return true;
+        const style = window.getComputedStyle(node);
+        return !node.hidden && style.display !== "none" && style.visibility !== "hidden";
+      };
+      const labelledBy = (node) => (node.getAttribute("aria-labelledby") ?? "")
+        .split(/\s+/).filter(Boolean).map((id) => document.getElementById(id)?.textContent ?? "").join(" ");
+      const labelFor = (node) => node.id
+        ? [...document.querySelectorAll(`label[for="${CSS.escape(node.id)}"]`)].map((label) => label.textContent ?? "").join(" ")
+        : "";
+      const nameOf = (node) => [
+        node.getAttribute("aria-label"), labelledBy(node), node.getAttribute("title"), labelFor(node),
+        node.tagName === "IMG" ? node.getAttribute("alt") : null, node.textContent,
+      ].find((value) => value?.trim())?.trim() ?? "";
+      const missing = [];
+      for (const node of document.querySelectorAll("a[href], button, input, select, textarea, [role=button], [role=tab]")) {
+        if (isVisible(node) && !nameOf(node)) missing.push(`${node.tagName.toLowerCase()}#${node.id || "(no-id)"}`);
+      }
+      for (const node of document.querySelectorAll("img")) {
+        if (isVisible(node) && !node.hasAttribute("alt")) missing.push(`img#${node.id || "(no-id)"} missing alt`);
+      }
+      for (const node of document.querySelectorAll("iframe")) {
+        if (isVisible(node) && !nameOf(node)) missing.push(`iframe#${node.id || "(no-id)"} missing title`);
+      }
+      return missing;
+    });
+    for (const issue of pageIssues) issues.push(`${route}: ${issue}`);
+  }
+  expect(issues).toEqual([]);
+});
+
 test("benchmark page renders the recorded workload report", async ({ page }) => {
   const runtimeErrors = [];
   page.on("pageerror", (error) => runtimeErrors.push(error.message));
   await page.goto("./benchmarks.html", { waitUntil: "domcontentloaded" });
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Measure the work");
   await expect(page.locator("[data-benchmark-state]")).toContainText("Recorded benchmark");
-  await expect(page.locator("[data-benchmark-rows] tr")).toHaveCount(8);
+  await expect(page.locator("[data-benchmark-rows] tr")).toHaveCount(10);
   await expect(page.locator("[data-benchmark-commit]")).not.toHaveText("—");
   await expectNoHorizontalOverflow(page, "benchmarks.html", 1280);
   expect(runtimeErrors).toEqual([]);
@@ -197,8 +255,13 @@ test("provenance page renders the generated reproducibility artifact", async ({ 
   await expect(page.locator("[data-provenance-schema]")).toHaveText("ostrin.provenance/v0");
   await expect(page.locator("[data-provenance-source]")).toContainText("sha256:");
   await expect(page.locator("[data-provenance-effects]")).toContainText("measurement");
+  await expect(page.locator("[data-provenance-unresolved-calls]")).toContainText("calls");
+  await expect(page.locator("[data-provenance-coverage]")).toContainText("known");
+  await expect(page.locator("[data-provenance-unresolved-list] li").first()).toBeVisible();
+  await expect(page.locator("[data-provenance-runtime]")).toHaveText("wasm32-wasi · WASI preview1 · partial");
   await expect(page.locator("[data-provenance-level]")).toHaveText("unverified");
   await expect(page.locator("[data-provenance-json]")).toContainText('"source_hash"');
+  await expect(page.locator("[data-provenance-json]")).toContainText('"ostrin.runtime/v1"');
   await expectNoHorizontalOverflow(page, "provenance.html", 1280);
   expect(runtimeErrors).toEqual([]);
 });
@@ -663,14 +726,76 @@ test("Viz exposes the recorded 3D surface experiment bundle", async ({ page }) =
   expect(bundle.id).toBe("surface");
   expect(bundle.provenance.parameters).toEqual({ scale: 1 });
   expect(bundle.provenance.camera).toEqual({ azimuth: -55, elevation: 28 });
-  expect(bundle.reproducibility.level).toBe("R0");
+  expect(bundle.reproducibility.level).toBe("R2");
+  expect(bundle.provenance.execution.capabilities).toEqual(["filesystem.read:data.json"]);
+  expect(bundle.provenance.runtime.input_snapshots[0].path).toBe("data.json");
   expect(bundle.files["figure.svg"]).toContain("<ostrin-provenance");
   for (const entry of bundle.manifest.files) {
     expect(entry.sha256).toBe(`sha256:${createHash("sha256").update(bundle.files[entry.path], "utf8").digest("hex")}`);
   }
+
+  const linesDownloadPromise = page.waitForEvent("download");
+  await page.locator('[data-viz-bundle="lines"]').click();
+  const linesDownload = await linesDownloadPromise;
+  const lines = JSON.parse(await readFile(await linesDownload.path(), "utf8"));
+  expect(lines.reproducibility.level).toBe("R2");
+  expect(lines.provenance.execution.capabilities).toEqual(["filesystem.read:data.json"]);
+  expect(lines.provenance.replay.level).toBe("R2");
 });
 
-test("Viz exposes the input-driven seeded R1 experiment bundles", async ({ page }) => {
+test("Viz figures expose scientific summaries and named explorer controls", async ({ page }, testInfo) => {
+  const runtimeErrors = [];
+  page.on("pageerror", (error) => runtimeErrors.push(error.message));
+  page.on("console", (message) => {
+    const text = message.text();
+    const expectedSandboxBlock = /^Blocked script execution in 'about:(?:blank|srcdoc)' because the document's frame is sandboxed and the 'allow-scripts' permission is not set\.$/.test(text);
+    if (message.type() === "error" && !expectedSandboxBlock) runtimeErrors.push(text);
+  });
+  await page.goto("./viz.html", { waitUntil: "domcontentloaded" });
+  await expect(page).toHaveURL(/\/Ostrin\/viz\.html$/);
+  await expect(page).toHaveTitle(/Ostrin/);
+  await expect(page.getByRole("main")).toBeVisible();
+  await expect(page.locator("vite-error-overlay, .nextjs-portal, #webpack-dev-server-client-overlay")).toHaveCount(0);
+  const figures = page.locator(".viz-card");
+  await expect(figures).toHaveCount(29);
+
+  const missingSummaries = await figures.evaluateAll((cards) => cards.flatMap((card) => {
+    const title = card.querySelector("h3")?.textContent?.trim() ?? "";
+    const summary = card.querySelector(".muted")?.textContent?.trim() ?? "";
+    const image = card.querySelector("img.viz-image");
+    return !image?.alt.includes(title) || !image?.alt.includes(summary) ? [title || card.id] : [];
+  }));
+  expect(missingSummaries, "every plotted image should expose its scientific summary").toEqual([]);
+
+  const figure = page.locator("#viz-lines");
+  const title = (await figure.locator("h3").textContent()).trim();
+  await figure.getByRole("button", { name: "Explore" }).click();
+  const dialog = page.getByRole("dialog", { name: title });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator("iframe")).toHaveAttribute("title", `${title} plot`);
+  await page.screenshot({ path: testInfo.outputPath("viz-explorer-accessibility.png"), fullPage: false });
+
+  await dialog.getByRole("button", { name: "Close" }).click();
+  const surface = page.locator("#viz-surface");
+  const surfaceTitle = (await surface.locator("h3").textContent()).trim();
+  await surface.getByRole("button", { name: "Explore" }).click();
+  const surfaceDialog = page.getByRole("dialog", { name: surfaceTitle });
+  await expect(surfaceDialog.getByRole("slider", { name: "3D camera azimuth" })).toBeVisible();
+  await expect(surfaceDialog.getByRole("slider", { name: "3D camera elevation" })).toBeVisible();
+  await expect(surfaceDialog.locator(".viz-camera-status")).toHaveAttribute("aria-live", "polite");
+
+  await surfaceDialog.getByRole("button", { name: "Close" }).click();
+  const animation = page.locator("#viz-double-pendulum");
+  const animationTitle = (await animation.locator("h3").textContent()).trim();
+  await animation.getByRole("button", { name: "Explore" }).click();
+  const animationDialog = page.getByRole("dialog", { name: animationTitle });
+  await expect(animationDialog.getByRole("slider", { name: "Animation position" })).toBeVisible();
+  await expect(animationDialog.getByRole("button", { name: "Pause" })).toBeVisible();
+  await expect(animationDialog.locator(".viz-animation-status")).toHaveAttribute("aria-live", "polite");
+  expect(runtimeErrors).toEqual([]);
+});
+
+test("Viz exposes the input-driven seeded R2 experiment bundles", async ({ page }) => {
   await page.goto("./viz.html", { waitUntil: "domcontentloaded" });
   await expect(page.locator('[data-viz-bundle="histogram"]')).toBeVisible();
   const bundleDownloadPromise = page.waitForEvent("download");
@@ -678,89 +803,89 @@ test("Viz exposes the input-driven seeded R1 experiment bundles", async ({ page 
   const bundleDownload = await bundleDownloadPromise;
   expect(bundleDownload.suggestedFilename()).toBe("histogram-and-density.ostrin-experiment.json");
   const bundle = JSON.parse(await readFile(await bundleDownload.path(), "utf8"));
-  expect(bundle.reproducibility.level).toBe("R1");
+  expect(bundle.reproducibility.level).toBe("R2");
   expect(bundle.provenance.execution.randomness.seed_path).toBe("seed");
   expect(bundle.provenance.randomness.seed_consumption).toBe("data.json:seed");
-  expect(bundle.provenance.replay.level).toBe("R1");
+  expect(bundle.provenance.replay.level).toBe("R2");
 
   const boxplotDownloadPromise = page.waitForEvent("download");
   await page.locator('[data-viz-bundle="boxplot"]').click();
   const boxplotDownload = await boxplotDownloadPromise;
   expect(boxplotDownload.suggestedFilename()).toBe("grouped-boxplots.ostrin-experiment.json");
   const boxplot = JSON.parse(await readFile(await boxplotDownload.path(), "utf8"));
-  expect(boxplot.reproducibility.level).toBe("R1");
+  expect(boxplot.reproducibility.level).toBe("R2");
   expect(boxplot.provenance.execution.randomness.seed_path).toBe("seed");
   expect(boxplot.provenance.randomness.seed_consumption).toBe("data.json:seed");
-  expect(boxplot.provenance.replay.level).toBe("R1");
+  expect(boxplot.provenance.replay.level).toBe("R2");
 
   const scatterFitDownloadPromise = page.waitForEvent("download");
   await page.locator('[data-viz-bundle="scatter-fit"]').click();
   const scatterFitDownload = await scatterFitDownloadPromise;
   expect(scatterFitDownload.suggestedFilename()).toBe("scatter-and-fit.ostrin-experiment.json");
   const scatterFit = JSON.parse(await readFile(await scatterFitDownload.path(), "utf8"));
-  expect(scatterFit.reproducibility.level).toBe("R1");
+  expect(scatterFit.reproducibility.level).toBe("R2");
   expect(scatterFit.provenance.execution.randomness.seed_path).toBe("seed");
   expect(scatterFit.provenance.randomness.seed_consumption).toBe("data.json:seed");
-  expect(scatterFit.provenance.replay.level).toBe("R1");
+  expect(scatterFit.provenance.replay.level).toBe("R2");
 
   const violinDownloadPromise = page.waitForEvent("download");
   await page.locator('[data-viz-bundle="violin"]').click();
   const violinDownload = await violinDownloadPromise;
   expect(violinDownload.suggestedFilename()).toBe("kernel-density-violins.ostrin-experiment.json");
   const violin = JSON.parse(await readFile(await violinDownload.path(), "utf8"));
-  expect(violin.reproducibility.level).toBe("R1");
+  expect(violin.reproducibility.level).toBe("R2");
   expect(violin.provenance.execution.randomness.seed_path).toBe("seed");
   expect(violin.provenance.randomness.seed_consumption).toBe("data.json:seed");
-  expect(violin.provenance.replay.level).toBe("R1");
+  expect(violin.provenance.replay.level).toBe("R2");
 
   const hexbinDownloadPromise = page.waitForEvent("download");
   await page.locator('[data-viz-bundle="hexbin"]').click();
   const hexbinDownload = await hexbinDownloadPromise;
   expect(hexbinDownload.suggestedFilename()).toBe("hexbin-density.ostrin-experiment.json");
   const hexbin = JSON.parse(await readFile(await hexbinDownload.path(), "utf8"));
-  expect(hexbin.reproducibility.level).toBe("R1");
+  expect(hexbin.reproducibility.level).toBe("R2");
   expect(hexbin.provenance.execution.randomness.seed_path).toBe("seed");
   expect(hexbin.provenance.randomness.seed_consumption).toBe("data.json:seed");
-  expect(hexbin.provenance.replay.level).toBe("R1");
+  expect(hexbin.provenance.replay.level).toBe("R2");
 
   const barsDownloadPromise = page.waitForEvent("download");
   await page.locator('[data-viz-bundle="bars"]').click();
   const barsDownload = await barsDownloadPromise;
   expect(barsDownload.suggestedFilename()).toBe("bars-with-error-bars.ostrin-experiment.json");
   const bars = JSON.parse(await readFile(await barsDownload.path(), "utf8"));
-  expect(bars.reproducibility.level).toBe("R1");
+  expect(bars.reproducibility.level).toBe("R2");
   expect(bars.provenance.execution.randomness.seed_path).toBe("seed");
   expect(bars.provenance.randomness.seed_consumption).toBe("data.json:seed");
-  expect(bars.provenance.replay.level).toBe("R1");
+  expect(bars.provenance.replay.level).toBe("R2");
   const pointCloudDownloadPromise = page.waitForEvent("download");
   await page.locator('[data-viz-bundle="point-cloud"]').click();
   const pointCloudDownload = await pointCloudDownloadPromise;
   expect(pointCloudDownload.suggestedFilename()).toBe("3d-point-cloud.ostrin-experiment.json");
   const pointCloud = JSON.parse(await readFile(await pointCloudDownload.path(), "utf8"));
-  expect(pointCloud.reproducibility.level).toBe("R1");
+  expect(pointCloud.reproducibility.level).toBe("R2");
   expect(pointCloud.provenance.execution.randomness.seed_path).toBe("seed");
   expect(pointCloud.provenance.randomness.seed_consumption).toBe("data.json:seed");
-  expect(pointCloud.provenance.replay.level).toBe("R1");
+  expect(pointCloud.provenance.replay.level).toBe("R2");
 
   const fftDownloadPromise = page.waitForEvent("download");
   await page.locator('[data-viz-bundle="fft"]').click();
   const fftDownload = await fftDownloadPromise;
   expect(fftDownload.suggestedFilename()).toBe("spectrum-with-the-fft.ostrin-experiment.json");
   const fft = JSON.parse(await readFile(await fftDownload.path(), "utf8"));
-  expect(fft.reproducibility.level).toBe("R1");
+  expect(fft.reproducibility.level).toBe("R2");
   expect(fft.provenance.execution.randomness.seed_path).toBe("seed");
   expect(fft.provenance.randomness.seed_consumption).toBe("data.json:seed");
-  expect(fft.provenance.replay.level).toBe("R1");
+  expect(fft.provenance.replay.level).toBe("R2");
 
   const dashboardDownloadPromise = page.waitForEvent("download");
   await page.locator('[data-viz-bundle="dashboard"]').click();
   const dashboardDownload = await dashboardDownloadPromise;
   expect(dashboardDownload.suggestedFilename()).toBe("multi-panel-layout.ostrin-experiment.json");
   const dashboard = JSON.parse(await readFile(await dashboardDownload.path(), "utf8"));
-  expect(dashboard.reproducibility.level).toBe("R1");
+  expect(dashboard.reproducibility.level).toBe("R2");
   expect(dashboard.provenance.execution.randomness.seed_path).toBe("seed");
   expect(dashboard.provenance.randomness.seed_consumption).toBe("data.json:seed");
-  expect(dashboard.provenance.replay.level).toBe("R1");
+  expect(dashboard.provenance.replay.level).toBe("R2");
 });
 
 test("Viz exposes recorded animation, table and volume experiment bundles", async ({ page }) => {
@@ -873,4 +998,36 @@ test("Featured Viz workflows select source-backed paths", async ({ page }) => {
   await expect(page.locator('[data-viz-workflow="simulate"]')).toHaveAttribute("data-active", "true");
   await expect(page.locator('[data-viz-workflow="analyze"]')).toHaveAttribute("data-active", "false");
   await expect(page.locator(".viz-workflow-selection")).toHaveText(/Simulate a system selected/);
+});
+
+test("flagship scientific workflow connects source, figure and evidence", async ({ page }) => {
+  await page.goto("./workflow.html", { waitUntil: "domcontentloaded" });
+  await expect(page).toHaveTitle(/Scientific Workflow/);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(/From equation/);
+  await expect(page.getByRole("link", { name: /Read the Ostrin source/ })).toHaveAttribute(
+    "href",
+    /github\.com\/sircalch\/Ostrin\/blob\/main\/examples\/viz_ode\.ostrin$/,
+  );
+  await expect(page.locator('img[alt^="Two-panel figure"]')).toBeVisible();
+  await expect(page.getByRole("link", { name: /Open the live ODE explorer/ })).toHaveAttribute(
+    "href",
+    "viz.html?figure=ode",
+  );
+  await expect(page.locator(".workflow-extension")).toHaveCount(3);
+});
+
+test("public status dashboard exposes separate evidence dimensions", async ({ page }) => {
+  await page.goto("./status.html", { waitUntil: "networkidle" });
+  await expect(page).toHaveTitle(/Status — Evidence Scorecard/);
+  await expect(page.locator("[data-status-backend] .status-metric")).toHaveCount(4);
+  const backendIrCount = await page.evaluate(() => globalThis.OSTRIN_STATUS.nativeBackend.ir.toLocaleString());
+  await expect(page.locator("[data-status-backend] .status-metric-value").first()).toHaveText(backendIrCount);
+  await expect(page.locator("[data-status-effects] .status-metric")).toHaveCount(3);
+  await expect(page.locator("[data-status-effects] .status-metric-value").first()).toHaveText("68");
+  await expect(page.locator("[data-status-effects] .status-metric-value").last()).toHaveText("COMPLETE");
+  await expect(page.locator("[data-status-reproducibility] .status-metric-value").last()).toHaveText("0");
+  await expect(page.locator("[data-status-linguist] .status-metric-value").first()).toHaveText("0");
+  await expect(page.locator("[data-status-linguist] .status-metric-value").nth(2)).toHaveText("PENDING");
+  await expect(page.locator(".status-release strong")).toHaveText("NOT_READY");
+  await expect(page.locator(".status-criterion.open")).not.toHaveCount(0);
 });

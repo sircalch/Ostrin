@@ -125,4 +125,4 @@ Como no existe un registro central donde "reservar" un nombre, la identidad real
    archivos `.ostrin`; las compilaciones normales y `--locked` rechazan el contenido modificado
    y piden regenerar el lockfile.
 3. **Workspaces** (varios paquetes Ostrin relacionados en un mismo repositorio, compartiendo un `ostrin.lock`) — útil para proyectos grandes, no cubierto en este documento.
-4. Pendientes previos siguen abiertos: `dyn Trait`, elisión de ARC, operadores bit a bit y ordenación general.
+4. Pendientes previos siguen abiertos: la migración HIR/IR y ownership de `dyn Trait` (el diseño del lenguaje está en [15-dyn-trait.md](15-dyn-trait.md)), elisión de ARC, operadores bit a bit y ordenación general.

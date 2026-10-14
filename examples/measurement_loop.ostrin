@@ -1,0 +1,20 @@
+import std.measurements
+
+fn choose(flag: Bool) -> Measurement<Float> {
+    if flag {
+        measurements.exact(2.0)
+    } else {
+        measurements.exact(3.0)
+    }
+}
+
+fn main() -> Void {
+    mut selected: Measurement<Float> = measurements.exact(1.0)
+    mut index = 0
+    while index < 3 {
+        selected = choose(index % 2 == 0)
+        index = index + 1
+    }
+    print(measurements.summary(selected))
+    drop(selected)
+}

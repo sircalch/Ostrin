@@ -29,12 +29,18 @@ pub struct World {
     /// Non-generic records: name -> [(field, C type)] in declaration order. Empty when reads of
     /// records must be tracked (E1101), which only the AST path knows how to do.
     pub records: HashMap<String, Vec<(String, String)>>,
+    /// Source types for record fields, kept alongside C spellings so value
+    /// coercions (notably concrete record -> `dyn Trait`) retain their typed
+    /// ownership contract during record construction and replacement.
+    pub record_field_types: HashMap<String, Vec<(String, Ty)>>,
     /// Applied generic records/enums are keyed by their HIR spelling
     /// (`Box<Int>`) and point at the concrete C instance (`Box__Int`).
     pub applied_records: HashMap<String, String>,
     pub applied_enums: HashMap<String, String>,
     /// Methods of records: (record, method) -> (C name, C parameter types with `self` first, C return type).
     pub methods: HashMap<(String, String), (String, Vec<String>, String)>,
+    pub trait_methods: HashMap<String, HashMap<String, (Vec<String>, String)>>,
+    pub dyn_impls: HashSet<(String, String)>,
     pub c_name: fn(&str) -> String,
     /// Non-generic enums (tagged unions passed by value) and their variants by name.
     pub enums: HashSet<String>,
@@ -71,6 +77,17 @@ fn c_compatible(arg: &str, param: &str) -> bool {
             && matches!(param, "int64_t" | "double" | "bool"))
 }
 
+fn contains_dyn(ty: &Ty) -> bool {
+    match ty {
+        Ty::Dyn(_) => true,
+        Ty::List(elem) | Ty::Set(elem) => contains_dyn(elem),
+        Ty::Map(key, value) => contains_dyn(key) || contains_dyn(value),
+        Ty::Applied(_, args) => args.iter().any(contains_dyn),
+        Ty::Fn(args, ret) => args.iter().any(contains_dyn) || contains_dyn(ret),
+        _ => false,
+    }
+}
+
 struct Emitter<'a> {
     world: &'a World,
     scopes: Vec<HashSet<String>>,
@@ -84,6 +101,87 @@ struct Emitter<'a> {
 }
 
 impl Emitter<'_> {
+    fn coerce_dyn(&self, code: String, from: &Ty, to: &Ty) -> Bail<String> {
+        if from == to {
+            return Ok(code);
+        }
+        let Ty::Dyn(trait_name) = to else {
+            return Ok(code);
+        };
+        let Ty::Named(record_name) = from else {
+            return Err(());
+        };
+        if !self
+            .world
+            .dyn_impls
+            .contains(&(trait_name.clone(), record_name.clone()))
+        {
+            return Err(());
+        }
+        Ok(format!(
+            "(({trait_name}_Dyn){{ .self = (void*)({code}), .vtable = &{trait_name}__{record_name}__vtable }})"
+        ))
+    }
+
+    fn coerce_dyn_list(
+        &mut self,
+        code: String,
+        from: &Ty,
+        to: &Ty,
+        borrowed: bool,
+    ) -> Bail<String> {
+        let (Ty::List(from_elem), Ty::List(to_elem)) = (from, to) else {
+            return Err(());
+        };
+        let (Ty::Named(record), Ty::Dyn(trait_name)) = (from_elem.as_ref(), to_elem.as_ref())
+        else {
+            return Err(());
+        };
+        if !self
+            .world
+            .dyn_impls
+            .contains(&(trait_name.clone(), record.clone()))
+        {
+            return Err(());
+        }
+        let source_ty = self.c_type(from)?;
+        let target_name = self.mangle_type(to)?;
+        let target_c = self.c_type(to)?;
+        let source = self.next_temp();
+        let target = self.next_temp();
+        let index = self.next_temp();
+        let cleanup = if borrowed {
+            String::new()
+        } else {
+            format!(" ostrin_release((void*){source});")
+        };
+        Ok(format!(
+            "({{ {source_ty} {source} = {code}; {target_c} {target} = {target_name}_new_from_array(NULL, 0); for (int64_t {index} = 0; {index} < {source}->length; {index}++) {{ {trait_name}_Dyn __hir_dyn = ({trait_name}_Dyn){{ .self = (void*){source}->items[{index}], .vtable = &{trait_name}__{record}__vtable }}; {target_name}_push({target}, __hir_dyn); }}{cleanup} {target}; }})"
+        ))
+    }
+
+    fn dyn_list_literal(&mut self, values: &[HirExpr], trait_name: &str) -> Bail<String> {
+        let elem = Ty::Dyn(trait_name.to_string());
+        let elem_c = self.c_type(&elem)?;
+        let list_ty = Ty::List(Box::new(elem.clone()));
+        let list_name = self.mangle_type(&list_ty)?;
+        let list = self.next_temp();
+        let mut body = format!("{list_name}* {list} = {list_name}_new_from_array(NULL, 0); ");
+        for value in values {
+            let concrete = self.expr(value)?;
+            let boxed = self.coerce_dyn(concrete, &value.ty, &elem)?;
+            if Self::borrowed_expr(value) {
+                body.push_str(&format!("{list_name}_push({list}, {boxed}); "));
+            } else {
+                let item = self.next_temp();
+                let release = self.release_managed_value(&item, &elem).ok_or(())?;
+                body.push_str(&format!(
+                    "{elem_c} {item} = {boxed}; {list_name}_push({list}, {item}); {release}; "
+                ));
+            }
+        }
+        Ok(format!("({{ {body} {list}; }})"))
+    }
     /// The C type of a value the emitter handles: scalars, records, the
     /// monomorphized built-in wrappers and the collection structs emitted by
     /// codegen.
@@ -95,6 +193,7 @@ impl Emitter<'_> {
             Ty::Sized(kind) => Ok(kind.c_type().to_string()),
             Ty::Bool => Ok("bool".to_string()),
             Ty::String => Ok("const char*".to_string()),
+            Ty::Dyn(name) => Ok(format!("{name}_Dyn")),
             Ty::Named(n) if self.world.records.contains_key(n) => Ok(format!("{n}*")),
             Ty::Named(n) if self.world.enums.contains(n) => Ok(n.clone()),
             Ty::Applied(..) if self.world.applied_records.contains_key(&ty.describe()) => {
@@ -103,13 +202,24 @@ impl Emitter<'_> {
             Ty::Applied(..) if self.world.applied_enums.contains_key(&ty.describe()) => {
                 Ok(self.world.applied_enums[&ty.describe()].clone())
             }
-            Ty::List(elem) => Ok(format!("List_{}*", self.mangle_type(elem)?)),
-            Ty::Map(key, value) => Ok(format!(
+            // A flat List<dyn Trait> is a supported ownership shape: the
+            // list runtime retains/releases each fat value through its
+            // vtable hooks. Keep nested/heterogeneous dyn aggregates gated.
+            Ty::List(elem) if matches!(elem.as_ref(), Ty::Dyn(_)) => {
+                let Ty::Dyn(name) = elem.as_ref() else {
+                    unreachable!()
+                };
+                Ok(format!("List_{name}*"))
+            }
+            Ty::List(elem) if !contains_dyn(elem) => {
+                Ok(format!("List_{}*", self.mangle_type(elem)?))
+            }
+            Ty::Map(key, value) if !contains_dyn(key) && !contains_dyn(value) => Ok(format!(
                 "Map_{}_{}*",
                 self.mangle_type(key)?,
                 self.mangle_type(value)?
             )),
-            Ty::Set(elem) => Ok(format!("Set_{}*", self.mangle_type(elem)?)),
+            Ty::Set(elem) if !contains_dyn(elem) => Ok(format!("Set_{}*", self.mangle_type(elem)?)),
             Ty::Fn(..) => Ok("OstrinClosure".to_string()),
             Ty::Applied(name, args) if name == "Option" && args.len() == 1 => {
                 Ok(format!("Option_{}", self.mangle_type(&args[0])?))
@@ -123,10 +233,6 @@ impl Emitter<'_> {
         }
     }
 
-    fn managed_c_type(ty: &str) -> bool {
-        ty == "const char*" || ty.ends_with('*')
-    }
-
     fn mangle_type(&self, ty: &Ty) -> Bail<String> {
         Ok(match ty {
             Ty::Int => "Int".to_string(),
@@ -137,13 +243,22 @@ impl Emitter<'_> {
             Ty::String => "String".to_string(),
             Ty::Void => "Void".to_string(),
             Ty::Named(n) => n.clone(),
-            Ty::List(elem) => format!("List_{}", self.mangle_type(elem)?),
-            Ty::Map(key, value) => format!(
+            Ty::Dyn(n) => format!("{n}_Dyn"),
+            // The legacy CType registry mangles DynTrait by its trait name,
+            // so use that same spelling for the shared list helper symbols.
+            Ty::List(elem) if matches!(elem.as_ref(), Ty::Dyn(_)) => {
+                let Ty::Dyn(name) = elem.as_ref() else {
+                    unreachable!()
+                };
+                format!("List_{name}")
+            }
+            Ty::List(elem) if !contains_dyn(elem) => format!("List_{}", self.mangle_type(elem)?),
+            Ty::Map(key, value) if !contains_dyn(key) && !contains_dyn(value) => format!(
                 "Map_{}_{}",
                 self.mangle_type(key)?,
                 self.mangle_type(value)?
             ),
-            Ty::Set(elem) => format!("Set_{}", self.mangle_type(elem)?),
+            Ty::Set(elem) if !contains_dyn(elem) => format!("Set_{}", self.mangle_type(elem)?),
             Ty::Fn(params, ret) => format!(
                 "Fn_{}_to_{}",
                 params
@@ -180,6 +295,16 @@ impl Emitter<'_> {
             .get(&name)
             .and_then(|fs| fs.iter().find(|(f, _)| f == field))
             .map(|(_, t)| t.clone())
+            .ok_or(())
+    }
+
+    fn field_type(&self, record: &Ty, field: &str) -> Bail<Ty> {
+        let name = self.record_name(record)?;
+        self.world
+            .record_field_types
+            .get(&name)
+            .and_then(|fields| fields.iter().find(|(candidate, _)| candidate == field))
+            .map(|(_, ty)| ty.clone())
             .ok_or(())
     }
 
@@ -286,14 +411,27 @@ impl Emitter<'_> {
     /// so they must never be cast to `void*` directly.
     fn retain_managed_value(&self, access: &str, ty: &Ty) -> Option<String> {
         match ty {
+            Ty::Dyn(_) => Some(format!(
+                "if (({access}).vtable && ({access}).vtable->retain) {{ ({access}).vtable->retain(({access}).self); }}"
+            )),
             Ty::String | Ty::List(_) | Ty::Map(_, _) | Ty::Set(_) => {
                 Some(format!("ostrin_retain((void*)({access}))"))
             }
+            Ty::Fn(_, _) => Some(format!("ostrin_retain((void*)({access}).env)")),
             Ty::Named(name) if self.world.records.contains_key(name) => {
                 Some(format!("ostrin_retain((void*)({access}))"))
             }
+            Ty::Named(name) if self.world.enums.contains(name) => {
+                Some(format!("ostrin_retain_enum_{name}({access})"))
+            }
             Ty::Applied(..) if self.world.applied_records.contains_key(&ty.describe()) => {
                 Some(format!("ostrin_retain((void*)({access}))"))
+            }
+            Ty::Applied(..) if self.world.applied_enums.contains_key(&ty.describe()) => {
+                Some(format!(
+                    "ostrin_retain_enum_{}({access})",
+                    self.world.applied_enums[&ty.describe()]
+                ))
             }
             Ty::Applied(name, args) if name == "Option" && args.len() == 1 => self
                 .retain_managed_value(&format!("({access}).value"), &args[0])
@@ -315,8 +453,38 @@ impl Emitter<'_> {
     }
 
     fn release_managed_value(&self, access: &str, ty: &Ty) -> Option<String> {
-        self.retain_managed_value(access, ty)
-            .map(|body| body.replace("ostrin_retain", "ostrin_release"))
+        match ty {
+            Ty::Dyn(_) => Some(format!(
+                "if (({access}).vtable && ({access}).vtable->release) {{ ({access}).vtable->release(({access}).self); }}"
+            )),
+            Ty::Named(name) if self.world.enums.contains(name) => {
+                Some(format!("ostrin_drop_enum_{name}({access})"))
+            }
+            Ty::Applied(..) if self.world.applied_enums.contains_key(&ty.describe()) => {
+                Some(format!(
+                    "ostrin_drop_enum_{}({access})",
+                    self.world.applied_enums[&ty.describe()]
+                ))
+            }
+            Ty::Applied(name, args) if name == "Option" && args.len() == 1 => self
+                .release_managed_value(&format!("({access}).value"), &args[0])
+                .map(|body| format!("if (({access}).has) {{ {body}; }}")),
+            Ty::Applied(name, args) if name == "Result" && args.len() == 2 => {
+                let ok = self.release_managed_value(&format!("({access}).value"), &args[0]);
+                let err = self.release_managed_value(&format!("({access}).error"), &args[1]);
+                match (ok, err) {
+                    (Some(ok), Some(err)) => {
+                        Some(format!("if (({access}).ok) {{ {ok}; }} else {{ {err}; }}"))
+                    }
+                    (Some(ok), None) => Some(format!("if (({access}).ok) {{ {ok}; }}")),
+                    (None, Some(err)) => Some(format!("if (!({access}).ok) {{ {err}; }}")),
+                    (None, None) => None,
+                }
+            }
+            _ => self
+                .retain_managed_value(access, ty)
+                .map(|body| body.replace("ostrin_retain", "ostrin_release")),
+        }
     }
 
     fn borrowed_expr(expr: &HirExpr) -> bool {
@@ -324,6 +492,17 @@ impl Emitter<'_> {
             expr.kind,
             HirKind::Local(_) | HirKind::Field(..) | HirKind::Index(..)
         )
+    }
+
+    fn contains_enum(&self, ty: &Ty) -> bool {
+        match ty {
+            Ty::Named(name) => self.world.enums.contains(name),
+            Ty::Applied(..) if self.world.applied_enums.contains_key(&ty.describe()) => true,
+            Ty::Applied(name, args) if name == "Option" || name == "Result" => {
+                args.iter().any(|arg| self.contains_enum(arg))
+            }
+            _ => false,
+        }
     }
 
     fn owned_record_literal(expr: &HirExpr) -> bool {
@@ -525,16 +704,56 @@ impl Emitter<'_> {
                 value,
                 ..
             } => {
-                let ty = self.c_type(&value.ty)?;
+                let declared_ty = declared
+                    .as_ref()
+                    .map(crate::typeck::resolve_type)
+                    .unwrap_or_else(|| value.ty.clone());
+                let ty = self.c_type(&declared_ty)?;
                 if let Some(declared) = declared {
                     let declared = crate::typeck::resolve_type(declared);
-                    if declared != value.ty || self.c_type(&declared)? != ty {
+                    if declared != value.ty
+                        && !(matches!(declared, Ty::Dyn(_)) && matches!(value.ty, Ty::Named(_)))
+                        && !matches!((&declared, &value.ty), (Ty::List(to), Ty::List(from)) if matches!(to.as_ref(), Ty::Dyn(_)) && matches!(from.as_ref(), Ty::Named(_)))
+                    {
                         return Err(());
                     }
                 }
-                let code = self.expr(value)?;
+                let dyn_list = match (&declared_ty, &value.kind) {
+                    (Ty::List(to), HirKind::List(values)) if declared_ty != value.ty => {
+                        match to.as_ref() {
+                            Ty::Dyn(trait_name) => Some((values, trait_name.as_str())),
+                            _ => None,
+                        }
+                    }
+                    _ => None,
+                };
+                let (code, owns_code) = if let Some((values, trait_name)) = dyn_list {
+                    (self.dyn_list_literal(values, trait_name)?, false)
+                } else {
+                    let value_code = self.expr(value)?;
+                    let converted_list = declared_ty != value.ty
+                        && matches!((&declared_ty, &value.ty), (Ty::List(to), Ty::List(from)) if matches!(to.as_ref(), Ty::Dyn(_)) && matches!(from.as_ref(), Ty::Named(_)));
+                    let code = if converted_list {
+                        self.coerce_dyn_list(
+                            value_code,
+                            &value.ty,
+                            &declared_ty,
+                            Self::borrowed_expr(value),
+                        )?
+                    } else {
+                        self.coerce_dyn(value_code, &value.ty, &declared_ty)?
+                    };
+                    (
+                        code,
+                        if converted_list {
+                            false
+                        } else {
+                            Self::borrowed_expr(value)
+                        },
+                    )
+                };
                 out.push_str(&format!("    {ty} {name} = {code};\n"));
-                self.track_owned_local(name, &value.ty, Self::borrowed_expr(value), out);
+                self.track_owned_local(name, &declared_ty, owns_code, out);
                 self.scopes.last_mut().expect("scope").insert(name.clone());
             }
             HirStmt::Assign { name, value } => {
@@ -566,24 +785,39 @@ impl Emitter<'_> {
                     return Err(());
                 };
                 let field_ty = self.field(&obj.ty, field)?;
-                if !c_compatible(&self.c_type(&value.ty)?, &field_ty)
-                    && self.c_type(&value.ty)? != field_ty
-                {
+                let target_ty = self.field_type(&obj.ty, field)?;
+                if target_ty != target.ty {
                     return Err(());
                 }
-                let (o, v) = (self.expr(obj)?, self.expr(value)?);
-                if self.managed(&value.ty) {
+                let (o, value_code) = (self.expr(obj)?, self.expr(value)?);
+                let v = self.coerce_dyn(value_code, &value.ty, &target_ty)?;
+                let value_c = self.c_type(&target_ty)?;
+                if value_c != field_ty {
+                    return Err(());
+                }
+                if self.managed(&target_ty) {
                     // Same ownership as the AST path: the field keeps its own
-                    // reference to the new value and drops the old one.
+                    // reference to a borrowed value, transfers a fresh value,
+                    // and drops the old value. Evaluate before releasing so
+                    // self-assignment through an alias remains valid.
                     let temp = self.next_temp();
-                    let retain = self.retain_managed_value(&temp, &value.ty).ok_or(())?;
+                    let mut transition = String::new();
+                    if Self::borrowed_expr(value) {
+                        let retain = self.retain_managed_value(&temp, &target_ty).ok_or(())?;
+                        transition.push_str(&format!("{retain}; "));
+                    }
                     let release = self
-                        .release_managed_value(&format!("({o})->{field}"), &value.ty)
+                        .release_managed_value(&format!("({o})->{field}"), &target_ty)
                         .ok_or(())?;
                     out.push_str(&format!(
-                        "    {field_ty} {temp} = {v}; {retain}; {release}; ({o})->{field} = {temp};\n"
+                        "    {field_ty} {temp} = {v}; {transition}{release}; ({o})->{field} = {temp};\n"
                     ));
                 } else {
+                    if !c_compatible(&self.c_type(&value.ty)?, &field_ty)
+                        && self.c_type(&value.ty)? != field_ty
+                    {
+                        return Err(());
+                    }
                     out.push_str(&format!("    {o}->{field} = {v};\n"));
                 }
             }
@@ -1084,6 +1318,10 @@ impl Emitter<'_> {
                 }
                 Ok(format!("{}->{field}", self.expr(obj)?))
             }
+            HirKind::DynCoerce(value) => {
+                let code = self.expr(value)?;
+                self.coerce_dyn(code, &value.ty, &e.ty)
+            }
             HirKind::Record { fields, .. } => {
                 let record = match &e.ty {
                     Ty::Named(name) if self.world.records.contains_key(name) => name.clone(),
@@ -1110,14 +1348,31 @@ impl Emitter<'_> {
                         .find(|(f, _)| f == field)
                         .map(|(_, t)| t.clone())
                         .ok_or(())?;
-                    let have = self.c_type(&value.ty)?;
-                    if !c_compatible(&have, &want) {
+                    let target_ty = self
+                        .world
+                        .record_field_types
+                        .get(&record)
+                        .and_then(|fields| {
+                            fields
+                                .iter()
+                                .find(|(candidate, _)| candidate == field)
+                                .map(|(_, ty)| ty.clone())
+                        })
+                        .ok_or(())?;
+                    let have = self.c_type(&target_ty)?;
+                    if have != want {
                         return Err(());
                     }
-                    let code = self.expr(value)?;
+                    let value_code = self.expr(value)?;
+                    let code = self.coerce_dyn(value_code, &value.ty, &target_ty)?;
                     body.push_str(&format!("{temp}->{field} = {code}; "));
-                    if Self::managed_c_type(&want) {
-                        body.push_str(&format!("ostrin_retain((void*){temp}->{field}); "));
+                    if Self::borrowed_expr(value) {
+                        if let Some(retain) =
+                            self.retain_managed_value(&format!("{temp}->{field}"), &target_ty)
+                        {
+                            body.push_str(&retain);
+                            body.push_str("; ");
+                        }
                     }
                 }
                 Ok(format!("({{ {body} {temp}; }})"))
@@ -1159,6 +1414,38 @@ impl Emitter<'_> {
                 }
                 if is_set(&recv.ty) {
                     return self.set_method(e, recv, method, args);
+                }
+                if let Ty::Dyn(trait_name) = &recv.ty {
+                    let (params, ret) = self
+                        .world
+                        .trait_methods
+                        .get(trait_name)
+                        .and_then(|methods| methods.get(method))
+                        .cloned()
+                        .ok_or(())?;
+                    if params.len() != args.len() || args.iter().any(|a| a.name.is_some()) {
+                        return Err(());
+                    }
+                    if e.ty == Ty::Void {
+                        if ret != "void" {
+                            return Err(());
+                        }
+                    } else if ret != self.c_type(&e.ty)? {
+                        return Err(());
+                    }
+                    let recv_code = self.expr(recv)?;
+                    let temp = self.next_temp();
+                    let mut call_args = vec![format!("{temp}.self")];
+                    for (arg, want) in args.iter().zip(&params) {
+                        if !c_compatible(&self.c_type(&arg.value.ty)?, want) {
+                            return Err(());
+                        }
+                        call_args.push(self.expr(&arg.value)?);
+                    }
+                    let call = format!("{temp}.vtable->{method}({})", call_args.join(", "));
+                    return Ok(format!(
+                        "({{ {trait_name}_Dyn {temp} = {recv_code}; {call}; }})"
+                    ));
                 }
                 if args.is_empty() && e.ty == Ty::String {
                     let recv_code = self.expr(recv)?;
@@ -1360,7 +1647,10 @@ impl Emitter<'_> {
                     return Err(());
                 }
                 for (arg, want) in args.iter().zip(&params) {
-                    if !c_compatible(&self.c_type(&arg.value.ty)?, want) {
+                    let actual = self.c_type(&arg.value.ty)?;
+                    if !c_compatible(&actual, want)
+                        && !(matches!(arg.value.ty, Ty::Named(_)) && want.ends_with("_Dyn"))
+                    {
                         return Err(());
                     }
                 }
@@ -1380,9 +1670,32 @@ impl Emitter<'_> {
                 let mut setup = String::new();
                 let mut cleanup = String::new();
                 let mut codes = Vec::with_capacity(args.len());
-                for arg in args {
-                    let code = self.expr(&arg.value)?;
-                    if Self::owned_record_literal(&arg.value) {
+                for (arg, want) in args.iter().zip(&params) {
+                    let boxed = matches!(arg.value.ty, Ty::Named(_)) && want.ends_with("_Dyn");
+                    let code = if boxed {
+                        let target = Ty::Dyn(want.trim_end_matches("_Dyn").to_string());
+                        let value_code = self.expr(&arg.value)?;
+                        self.coerce_dyn(value_code, &arg.value.ty, &target)?
+                    } else {
+                        self.expr(&arg.value)?
+                    };
+                    if boxed {
+                        let temp = self.next_temp();
+                        let cty =
+                            self.c_type(&Ty::Dyn(want.trim_end_matches("_Dyn").to_string()))?;
+                        setup.push_str(&format!("{cty} {temp} = {code}; "));
+                        let release = self
+                            .release_managed_value(
+                                &temp,
+                                &Ty::Dyn(want.trim_end_matches("_Dyn").to_string()),
+                            )
+                            .ok_or(())?;
+                        cleanup.push_str(&format!("{release}; "));
+                        codes.push(temp);
+                    } else if (Self::owned_record_literal(&arg.value)
+                        || self.contains_enum(&arg.value.ty))
+                        && !Self::borrowed_expr(&arg.value)
+                    {
                         let temp = self.next_temp();
                         let cty = self.c_type(&arg.value.ty)?;
                         setup.push_str(&format!("{cty} {temp} = {code}; "));
@@ -1582,6 +1895,18 @@ impl Emitter<'_> {
                 "typedef struct {{ {} }} {env_name};",
                 env_fields.join("")
             ));
+            let drop_name = format!("ostrin_hir_lambda_env_drop_{id}");
+            prototype.push(format!("static void {drop_name}(void* __env);"));
+            let mut drop_body = format!("    {env_name}* __e = __env;\n");
+            for (name, ty) in &captures {
+                if let Some(release) = self.release_managed_value(&format!("__e->{name}"), ty) {
+                    drop_body.push_str(&format!("    {release};\n"));
+                }
+            }
+            self.world
+                .closure_bodies
+                .borrow_mut()
+                .push((format!("static void {drop_name}(void* __env)"), drop_body));
         }
         let signature = format!("static {ret_c} {fn_name}(void* __env{params_c})");
         if !captures.is_empty() {
@@ -1607,12 +1932,19 @@ impl Emitter<'_> {
         let env = if captures.is_empty() {
             "NULL".to_string()
         } else {
+            let drop_name = format!("ostrin_hir_lambda_env_drop_{id}");
             let assignments = captures
                 .iter()
-                .map(|(name, _)| format!("__ce->{name} = {name}; "))
+                .map(|(name, ty)| {
+                    let retain = self
+                        .retain_managed_value(&format!("__ce->{name}"), ty)
+                        .map(|body| format!("{body}; "))
+                        .unwrap_or_default();
+                    format!("__ce->{name} = {name}; {retain}")
+                })
                 .collect::<String>();
             format!(
-                "({{ {env_name}* __ce = malloc(sizeof *__ce); if (!__ce) OSTRIN_OOM(); {assignments} (void*)__ce; }})"
+                "({{ {env_name}* __ce = ({env_name}*)ostrin_calloc_with_drop(1, sizeof *__ce, (void (*)(void*)){drop_name}); if (!__ce) OSTRIN_OOM(); {assignments} (void*)__ce; }})"
             )
         };
         Ok(format!("((OstrinClosure){{ (void*){fn_name}, {env} }})"))
@@ -1753,10 +2085,17 @@ impl Emitter<'_> {
         let temp = self.next_temp();
         let mut body = format!("{name}* {temp} = {name}_new_from_array(NULL, 0); ");
         for value in values {
-            if !c_compatible(&self.c_type(&value.ty)?, &elem_c) {
-                return Err(());
-            }
-            let code = self.expr(value)?;
+            let value_c = self.c_type(&value.ty)?;
+            let code = if c_compatible(&value_c, &elem_c) {
+                self.expr(value)?
+            } else {
+                // A heterogeneous literal such as
+                // `[Circle { .. }, Square { .. }]` is typed as
+                // `List<dyn Shape>` by the checker. Preserve the fat value
+                // and let the list's typed hooks retain its payload.
+                let concrete = self.expr(value)?;
+                self.coerce_dyn(concrete, &value.ty, elem)?
+            };
             if self.managed(elem) && !Self::borrowed_expr(value) {
                 let item = self.next_temp();
                 let release = self.release_managed_value(&item, elem).ok_or(())?;
@@ -2173,6 +2512,7 @@ fn hir_expr_contains_lambda(expr: &HirExpr) -> bool {
         | HirKind::Unary(_, value)
         | HirKind::Field(value, _)
         | HirKind::As(value, _)
+        | HirKind::DynCoerce(value)
         | HirKind::Try(value, None) => hir_expr_contains_lambda(value),
         HirKind::Try(value, Some(handler)) => {
             hir_expr_contains_lambda(value) || hir_expr_contains_lambda(handler)
@@ -2289,6 +2629,7 @@ fn collect_hir_locals_expr(
         | HirKind::Unary(_, value)
         | HirKind::Field(value, _)
         | HirKind::As(value, _)
+        | HirKind::DynCoerce(value)
         | HirKind::Try(value, None) => collect_hir_locals_expr(value, used, bound),
         HirKind::Try(value, Some(handler)) => {
             collect_hir_locals_expr(value, used, bound);

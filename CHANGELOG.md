@@ -1,25 +1,342 @@
 # Changelog
 
+## 0.2.0 (candidate)
+
+### Release summary
+
+- Expanded typed HIR/IR and native lowering for supported managed values,
+  including dynamic trait objects, managed enums, records, collections and
+  function values. The measured compiler inventory is 7,198 IR + 41 HIR bodies
+  with zero AST fallbacks. This describes the measured core, not universal IR
+  support for every valid program shape.
+- Added scalar `Measurement<Float>` ownership through records, calls, clones,
+  collections, branches, loops, closures, results and deferred tasks. Numerical
+  validation checks LU, Cholesky, QR, SVD and symmetric eigenpairs against
+  independent residuals and declared tolerances.
+- Expanded scientific visualization with plots, tables, 3D scenes, animation
+  and reproducible figure bundles. The browser gallery and playground expose
+  those capabilities with responsive and cross-browser checks.
+- Improved reproducibility artifacts with source, input, dependency, effect
+  and runtime evidence. R1 replay is verified for the registered input-driven
+  experiments; runtime provenance remains partial and does not claim general
+  cross-platform numerical equivalence.
+- Added a conservative effects inventory that distinguishes known effects from
+  unresolved calls. It is not a static purity guarantee.
+- Added WASI compiler/runtime coverage, a public community starter and clearer
+  website maturity/status information. GitHub Linguist recognition still
+  depends on external public `.ostrin` adoption and has not been accepted
+  upstream.
+
+### Compatibility and known limitations
+
+- This candidate builds on the experimental v0.1.0 compiler/runtime line. The
+  0.x compatibility policy permits diagnostics, generated IR details and
+  experimental APIs to change before a stable 1.0 contract.
+- Dynamic trait ownership is verified only for the combinations listed in
+  `docs/ownership-matrix.md`; unsupported nested shapes and cancellation states
+  are not implied to work through IR/C. `Measurement<Quantity<D>>` and
+  `Array<Measurement<T>>` remain explicitly guarded. Static effect semantics,
+  complete R3 provenance and cross-platform numerical equivalence are not
+  delivered by this candidate.
+- This is a release candidate description, not a published release. The v0.2
+  ownership and changelog criteria are ready against the proposed source, but
+  the overall readiness manifest remains `NOT_READY` until a post-merge v0.2
+  version/tag and final release artifacts exist. No package or tag is implied
+  by this entry.
+
+### Scientific measurement ownership
+
+- Added native/WASI ownership coverage for `Measurement<Float>` across records,
+  arguments, returns, cloning, lists, branches, loops, `Phi` joins, closures
+  and deferred tasks. The focused cases include leak checks and native-thread
+  execution where tasks are involved.
+- Added `Result<Measurement<Float>, String>` ownership coverage for `Ok` and
+  `Err` branches, matching, native/WASI emission and a zero-allocation native
+  leak check.
+- Kept `Measurement<Quantity<D>>` and `Array<Measurement<T>>` behind explicit
+  diagnostics until their source-identity, covariance, ownership and native ABI
+  contracts are implemented. The interpreter and native boundary tests document
+  the supported behavior and the current limitation.
+- Re-synchronized public inventories and quality scorecard data with the
+  current 302-example, 333-integration-test repository state.
+
 ## Unreleased
+
+### Native dynamic traits
+
+- Lowered the generic `Box<Int>` default-method case through typed IR/C:
+  `DynBox` and `DynCall` preserve the `data + vtable` pair and dispatch through
+  the specialized vtable. `native_trait_defaults.ostrin` now reports six IR
+  functions and zero AST fallbacks; interpreter/native parity and
+  `live_allocations=0` pass. The repository inventory advances to 7,198 IR +
+  41 HIR functions and zero AST fallbacks. WASI passes the 28-program local
+  matrix. ASan/UBSan pass on head `54123b76` in
+  [CI](https://github.com/sircalch/Ostrin/actions/runs/38508656243). Unlisted
+  matrix combinations remain outside the tested support claim.
+- Added generic record-field ownership for a direct `Holder<dyn Speaker>`
+  instantiation. Replacement keeps a copied alias valid; the focused test has
+  interpreter/native parity, zero AST fallback, a zero-allocation native check
+  and WASI execution. Nested generic wrappers remain unverified.
+- Added `Option<dyn Speaker>` and `Result<dyn Speaker, String>` wrapper coverage
+  for `Some`/`None` and `Ok`/`Err`. Explicitly boxed values preserve dynamic
+  dispatch through interpreter, native and WASI paths, and the native
+  leak-check ends at zero. `List<Option<dyn Speaker>>` also preserves dispatch
+  and releases the empty/present elements correctly. The same example stores
+  `Option<dyn Speaker>` in a mutable record field and replaces `Some` with
+  `None`. The example is listed in the public website catalogue.
+- Added dyn Trait task capture and pre-run cancellation regressions with a
+  `String`-owning payload. Capture also keeps a parent alias alive. Both verify
+  the retained data/vtable pair, dynamic dispatch or cancellation cleanup,
+  cooperative and native-thread execution, and `live_allocations=0`; both are
+  included in the 28-program WASI matrix. ASan/UBSan pass for head `54123b76` in
+  the linked Linux/Clang workflow above.
+- Lowered heterogeneous `List<dyn Trait>` construction, elementwise boxing,
+  iteration and indirect `fold` dispatch through HIR/C. Vtable hooks preserve
+  payload ownership across list insertion, argument/return forwarding and drop;
+  focused parity and `live_allocations=0` regressions cover concrete, borrowed,
+  forwarded, field replacement and closure/task captures. Direct generic fields
+  and the listed `Option`/`Result` wrappers are covered; nested generic wrappers
+  and other combinations not listed in the ownership matrix remain outside the
+  claim. The v0.2 ownership gate is bounded by the evidence and limitations in
+  the ownership matrix.
+
+### Public adoption path
+
+- Added a copyable `templates/ostrin-community-starter` project with a
+  reproducible command for public Ostrin experiments.
+- Added a showcase issue template and links from the Community and Showcase
+  pages. External usage remains counted separately from the repository's own
+  examples for the GitHub Linguist path.
+
+### Scientific boundary guards
+
+- Strengthened the measurement contract gate so both generic and direct
+  `Measurement<Quantity<D>>` native boundary tests, plus the explicit backend
+  guard, must remain present until typed IR ownership support exists.
+
+### Compiler fallback reduction
+
+### Scientific effect inventory
+
+- Classified deterministic collection, string, measurement and result
+  operations as known local calls. The current provenance inventory now reports
+  `68` known and `0` unresolved calls while retaining its explicit
+  non-purity guarantee.
+- Added the public status scorecard's Scientific effects dimension. It reports
+  known and unresolved call coverage separately and labels an incomplete
+  inventory as `PARTIAL`, keeping the conservative boundary visible in the web
+  experience as well as in the JSON provenance artifact.
+- `ostrinc --effect-report --json` now lists every visited function and adds
+  `functions_without_known_effects` for rows where the conservative inventory
+  found no known effect. The field is explicitly a candidate list, not a static
+  purity guarantee; unresolved calls remain outside the report.
+- The same report now exposes `unresolved_calls` per function, and the provenance
+  artifact carries that boundary in `activity.unresolved_calls`.
+- Both reports now include `effect_coverage` with known and unresolved call counts;
+  `complete` describes inventory coverage only and is not a purity claim.
+- `ostrinc --provenance-report --json` carries the same candidate list inside
+  `activity.functions_without_known_effects`, so reproducibility artifacts keep
+  the effect evidence alongside their source hash and effect sites.
+
+- Lowered a nested `List<Outer>` aggregate containing `Option<Inner>` through
+  IR/C. The typed `empty() -> Option<Inner>` constructor preserves the `None`
+  case, interpreter/native/WASI parity and native `--leak-check` at
+  `live_allocations=0`; the aggregate loop no longer adds an AST fallback.
+- Hardened native ownership cleanup for scalar-only `Option`/`Result` wrappers
+  and malformed-but-checkable inputs. Unsupported or incomplete native shapes
+  now produce diagnostics instead of reaching an internal `expect(...)` panic;
+  the deterministic mutated-source suite covers the boundary.
+
+- Lowered captured and named function values stored in `List<fn(...)>` and
+  function-valued record fields through IR/C. Function signatures now produce
+  distinct collection type names; the full example matches interpreter output
+  and passes native `--leak-check` with `live_allocations=0`. The measured AST
+  fallback ratchet drops from 17 to 16.
+- Added an analytic residual-validation harness for LU, Cholesky, QR, SVD and
+  symmetric eigenpairs. The independent checker computes reconstruction,
+  orthogonality, solve backward error and reference-solution error from the
+  full-precision factors printed by Ostrin; it runs against interpreter and native
+  outputs with per-case absolute/relative tolerances and a native zero-leak gate.
+
+- Generalized executable experiment replay with `experiment-replay.mjs --all`.
+  CI now discovers every registered R1/R2 bundle instead of keeping a hand-maintained
+  fixture list; all 11 current input-driven bundles replay and prove changed-input
+  sensitivity in WASI.
+- Made the reproducibility boundary explicit in every runtime snapshot: byte equality
+  applies only to the recorded CI replay configuration; cross-platform numeric equivalence
+  is neither performed nor claimed. The design specifies per-metric absolute/relative
+  tolerances, units, reference method and input domain before such comparisons can be made.
+
+- Fixed HIR ownership for fresh managed enums passed through function arguments,
+  including enums nested in `Option`/`Result`. The typed enum retain/drop
+  dispatch now releases the active payload after the call. A shared
+  `Result<Message, String>` regression covers `Ok`/`Err`, early return,
+  interpreter/native parity, `live_allocations=0` and actual WASI execution. The
+  286-example Windows suite passes. The full 282-example suite passed under ASan
+  and UBSan before this IR/Phi increment; the focused managed-enum Phi regression
+  passes under both sanitizers.
+- Added a typed IR/C path for managed enum values selected by a branch `Phi`.
+  The `Message::Text(String)` fixture proves all three functions use IR, preserves
+  interpreter/native parity, ends with `live_allocations=0`, and runs in the
+  18-program WASI smoke matrix. This slice does not generalize to recursive payloads,
+  other closure/task captures, or arbitrary managed enum joins.
+- Extended the tested enum ownership slice to a loop-carried `Phi` that replaces
+  the managed payload repeatedly. The regression forces IR for all three functions,
+  matches interpreter output, and reports zero live allocations; the fixture emits
+  tag-directed retain/drop helpers for WASI C. Focused ASan and UBSan runs pass.
+- Added by-value managed enum closure capture to the IR/C ownership path. The
+  regression verifies that the closure environment retains and drops the enum,
+  that the closure call matches the interpreter, and that native leak-check ends
+  at zero allocations. The WASI C emission test requires the typed enum ownership
+  helpers; focused ASan and UBSan runs pass.
+- Added managed enum capture to deferred tasks with `join`. The regression checks
+  task environment destruction, interpreter/native parity, zero native allocations,
+  cooperative scheduling, `--native-threads`, WASI C ownership helpers, ASan and
+  UBSan. All 18 WASI smoke programs now compile and execute, including this task case.
+- Linked wasi-libc's separate `libsetjmp` archive when building WASI targets. This
+  fixes SJLJ helper resolution for programs that compile cooperative task cancellation;
+  the pinned-SDK 19-program matrix passes.
+- Added an ownership regression for cancelling a task while its deferred environment
+  captures `Message::Text(String)`. Interpreter and cooperative native output agree;
+  cooperative and native-thread backends both finish with `live_allocations=0`, and
+  the fixture is included in the executable WASI matrix.
+- Added a native/WASI regression for dynamic `Quantity` unit labels that escape
+  through either branch of an `if`/`Phi`. Interpreter parity and native
+  `--leak-check` confirm both selected values remain valid after their source
+  arrays reach last use. Generic unit-aware plotting stays on the verified
+  fallback until its full ownership matrix is covered.
+- Hardened native task type mangling for `Task<Unknown>`: unsupported calls in a
+  spawn body now produce a compiler diagnostic instead of an internal panic.
+  The deterministic mutated-source suite exposed the crash; a focused regression
+  covers both native report and C emission.
+- Fixed ownership liveness for managed loop `Phi` values whose only ordinary use
+  is the loop exit. Such values now release the outgoing reference on the
+  backedge before the next iteration overwrites it. A `Quantity` regression
+  verifies `if` and loop merges under native execution, WASI emission and
+  `--leak-check` (`live_allocations=0`).
+- Completed typed ownership for non-recursive record fields containing scalar
+  `Quantity`: IR and legacy record destructors now release unit labels with
+  `ostrin_qty_release`. A native/WASI regression checks field extraction after
+  construction and zero live allocations.
+- Lowered `Option<Quantity<D>>` through IR/C, including `Some`/`None` control flow
+  and `match` extraction. Interpreter/native output agrees, WASI C emits typed
+  quantity ownership, and native `--leak-check` reports `live_allocations=0`.
+- Lowered `Result<Quantity<D>, String>` through IR/C for both `Ok` and `Err`;
+  matching and error-string cleanup preserve interpreter parity and finish with
+  zero native live allocations. WASI C includes typed quantity ownership too.
+- Extended the wrapper matrix to `Result<Option<Quantity<D>>, String>`: the IR
+  path handles `Some`, `None` and `Err`, and a forced legacy AST build also
+  preserves interpreter output with `live_allocations=0`. Fixed AST ownership
+  for fresh quantity-array operands, scalar results borrowed from quantity
+  arrays, and statement-match scrutinees so cleanup does not leak or invalidate
+  escaping unit labels. This verifies native behavior and WASI C emission; it
+  does not claim execution under WASI or local sanitizer coverage.
+- Fixed a native leak when a collection owns an enum with a managed payload.
+  Generated tag-directed retain/drop dispatch now handles aliases and releases
+  only the active variant's managed fields. The HIR regression covers insertion,
+  removal, use after collection destruction, interpreter parity, and
+  `live_allocations=0`; WASI C emission includes both typed dispatchers. A second
+  regression covers enum field initialization, reassignment, and access after
+  record destruction. A third stress case builds 64 enum values in a loop,
+  traverses them after the loop and releases the collection. All three preserve
+  parity and report zero live allocations. General `Phi`, error, closure, task,
+  recursive-payload and IR ownership remain explicit matrix limitations.
+- Tightened `quantity_arrays.ostrin` from a permissive leak ceiling to an exact
+  zero-allocation requirement after its full native example; the current binary
+  reports `live_allocations=0`, including escaped scalar and list labels.
+- Enabled dimension-specialized IR/C instances for `Figure.unit_line` and
+  `Figure.unit_scatter`. `viz_units.ostrin` now reports `ir=1, hir=0, ast=0`,
+  preserves interpreter/native SVG parity, emits the calls and typed quantity
+  retain/release helpers for WASI C, and exits native `--leak-check` with
+  `live_allocations=0`. ASan/UBSan CI evidence and list-based quantity plots
+  remain open; the migration does not claim general plot ownership is complete.
+- After the typed Quantity plot migration, the enum ownership audit moves two
+  managed-payload functions back to the verified legacy path. The current
+  measured baseline is **6,955 HIR/IR-generated functions (6,909 IR + 46 HIR) / 17 AST**;
+  retaining those fallbacks keeps dynamic Quantity labels and managed enum
+  payloads out of scalar-only IR until ownership is represented there.
+
+- Moved the global `parse_int(String)` builtin through the same checked IR/C result helper
+  as `String.to_int()`. `stdlib_io.ostrin` now compiles with `ir=1, hir=0, ast=0`, and
+  the differential ratchet advances to **6,941 HIR/IR-generated functions (6,894 IR + 47 HIR) /
+  31 AST**. Recursive-record-returning methods such as `std.json::Parser.parse_number` now use
+  the same typed IR/C path when their receiver and arguments have a supported ownership shape.
+
+- Added the structural ordering helper request to the IR/C emitter. Records with `derive(Eq, Ord)`
+  now compile their equality and ordering comparisons through the generated helpers; the ratchet
+  advances to **6,943 HIR/IR-generated functions (6,896 IR + 47 HIR) / 29 AST**.
+
+- Composite `hash(...)` calls now use the same generated structural hash helpers in IR/C for
+  records, enums, `Option`, `Result`, lists, maps and sets. `hash_builtin.ostrin` keeps interpreter
+  and native output identical, and the ratchet advances to **6,944 HIR/IR-generated functions
+  (6,897 IR + 47 HIR) / 28 AST**.
+
+- Added IR/C lowering for the existing numeric runtimes `linfit`, `solve`, `polyfit` and `polyval`
+  over `Array<Float>`. `calibration.ostrin` now compiles through the typed path, advancing the
+  ratchet to **6,947 HIR/IR-generated functions (6,900 IR + 47 HIR) / 25 AST**.
+
+- Added IR/C lowering for `det`, `trace`, `inv`, `eigvals` and `eye` over `Array<Float>`,
+  allowing `linear_algebra.ostrin` to use the typed matrix runtime. The ratchet advances to
+  **6,949 HIR/IR-generated functions (6,902 IR + 47 HIR) / 23 AST**.
+
+- Added IR/C lowering for `sum(List<Int|Float|Quantity>)`, preserving the native empty-quantity
+  error contract. `native_builtins.ostrin` now uses the typed path, advancing the ratchet to
+  **6,950 HIR/IR-generated functions (6,903 IR + 47 HIR) / 22 AST**.
+
+- Added scalar enum metadata for list lowering, generic concrete enum method dispatch, and direct
+  scalar literal/range pattern tests in IR/C. `shapes.ostrin` now compiles with `ir=3, hir=0, ast=0`,
+  and the ratchet advances to **6,951 HIR/IR-generated functions (6,905 IR + 46 HIR) / 21 AST**.
+
+- Extended IR/C collection lowering to composite `Map` and `Set` keys and values, including
+  `List<Int>` keys. `hash_map_composite.ostrin` now compiles with `ir=2, hir=0, ast=0`,
+  preserving interpreter/native output and advancing the ratchet to **6,954 HIR/IR-generated
+  functions (6,908 IR + 46 HIR) / 18 AST**.
+
+- Lowered relational operators for records with a concrete `impl Ord` through the native
+  `compare` method and its `Ordering` tag. `traits.ostrin` now compiles with `ir=5, hir=0, ast=0`,
+  advancing the ratchet to **6,955 HIR/IR-generated functions (6,909 IR + 46 HIR) / 17 AST**.
+
+- Lowered `option_result.ostrin` through IR/C. An unconstrained `Result` error payload follows the
+  native backend's existing `Int` placeholder convention until an `Err` value constrains it;
+  interpreter/native output remains identical. The ratchet advances to **6,956 HIR/IR-generated
+  functions (6,910 IR + 46 HIR) / 16 AST**.
 
 ### Viz experiment replay maturity
 
 - Added exact-replay `ostrin.experiment/v0` bundles for every one of the 29 Viz gallery figures,
   including continuous and frame animations, tables, statistical plots and 3D scenes. Website CI
   now replays all registered fixtures byte-for-byte; `histogram`, `boxplot`, `scatter-fit`, `violin`, `hexbin`, `bars`, `point-cloud`, `fft` and `dashboard` also verify
-  input-driven seeded-randomness R1 sensitivity.
+  input-driven seeded-randomness sensitivity; those nine seeded fixtures now retain their R1
+  algorithm evidence inside the R2 input-snapshot contract.
 
 - Generalized the executable input replay contract to `surface` and `lines`: each declares the
-  consumed parameter path and an alternate sensitivity value, and website CI verifies both
-  against `ostrinc.wasm` without changing the R0 maturity label.
+  consumed parameter path, an embedded `data.json` snapshot and a filesystem capability, and
+  website CI verifies the snapshot and alternate sensitivity value against `ostrinc.wasm`.
+- Promoted all eleven input-driven bundles to R2 external-input replay: their bundles now carry the
+  snapshot hash, declared parameters and capability contract; the nine seeded fixtures retain their
+  R1 algorithm/partition evidence, while complete runtime capture and R3 remain pending.
 - Added source-backed `ostrin.rng/v1` evidence to source-literal RNG-consuming bundles: xoshiro256** with
   splitmix64 seeding, Marsaglia polar normals, deterministic `detmath::ln`, interpreter/native
   implementation hashes and explicit source-literal seed status. This documents the algorithm
   without changing their R0 maturity label.
-- Promoted `histogram` to the first, `boxplot` to the second, `scatter-fit` to the third, `violin` to the fourth, `hexbin` to the fifth, `bars` to the sixth, `point-cloud` to the seventh, `fft` to the eighth and `dashboard` to the ninth input-driven R1 bundle: their
+- Promoted `histogram` to the first, `boxplot` to the second, `scatter-fit` to the third, `violin` to the fourth, `hexbin` to the fifth, `bars` to the sixth, `point-cloud` to the seventh, `fft` to the eighth and `dashboard` to the ninth seeded input-driven bundle; after adding the external snapshot contract, all eleven now claim R2 while retaining their
   declared seeds and sample parameters are read from `data.json`, and the WASI replay changes
-  the seed and requires a changed SVG. The remaining random Viz fixtures stay at R0 until their
-  seeds are migrated.
+  the seed and requires a changed SVG. All gallery fixtures that consume `rng(seed)` are now
+  covered by this R1 prerequisite; the remaining R0 fixtures are deterministic or lack a declared
+  input-sensitivity contract.
+
+### Partial runtime provenance snapshot
+
+- The experimental `ostrinc --provenance-report --json` artifact now includes an
+  `ostrin.runtime/v1` snapshot with the selected target, WASI profile, compiler lockfile hash,
+  nearby project manifest/lockfile hashes when available, and the declared platform policy.
+  The website provenance page renders that runtime status and keeps the missing input snapshots,
+  invocation output hashes and host capture visible; it does not claim R2/R3.
+- All 29 downloadable Viz experiment bundles now carry the same partial runtime snapshot, and
+  the bundle verifier rejects missing or mismatched target/WASI/runtime evidence while preserving
+  their explicit R0, R1 or R2 labels.
+- The runtime snapshot in every bundle now records the verified `figure.svg` invocation hash and
+  byte count; the executable replay gate checks that record before testing input sensitivity.
 
 ### Viz publication manifests
 
@@ -38,6 +355,10 @@
   `std.measurements` API, its interpreter/native parity evidence, and its
   explicit boundary before `Array<Measurement<T>>`, Quantity integration,
   covariance, and Monte Carlo support.
+- The scalar Measurement integration now asserts native `live_allocations=0`
+  and recursive WASI C destructors for `Measurement<Float>`, `Sensitivity`,
+  source lists and owned labels. The native sanitizer workflow runs this test;
+  its result for the current unpushed work remains pending.
 
 ### Scalar generic method prepass
 
@@ -58,7 +379,7 @@
 
 - Added `scripts/project-plan-check.mjs` and its tests to compare the documented
   HIR/IR/AST ratchet with `compiler/tests/differential.rs`, preserve explicit
-  `Available`/`Planned` Viz maturity labels, and keep Linguist and R0/R1
+  `Available`/`Planned` Viz maturity labels, and keep Linguist and R0/R1/R2
   reproducibility evidence visible in the public plan.
 - Corrected the differential-test comment that had incorrectly described generic
   Quantity plotting as already lowered through IR/C.
@@ -1364,3 +1685,6 @@ Release notes: [`docs/releases/v0.1.0.md`](docs/releases/v0.1.0.md).
 - Physical quantities with dimensional arithmetic and conversions.
 - Simulated task/channel concurrency model with mutation-safety checks.
 - 47 passing compiler integration tests.
+
+\r\n
+

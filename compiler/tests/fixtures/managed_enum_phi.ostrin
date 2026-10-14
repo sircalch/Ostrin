@@ -1,0 +1,26 @@
+enum Message {
+    Text(String)
+    Empty
+}
+
+fn choose(flag: Bool) -> Message {
+    if flag {
+        Text("first" + " payload")
+    } else {
+        Text("second" + " payload")
+    }
+}
+
+fn show(message: Message) -> Void {
+    match message {
+        Text(text) => print(text),
+        Empty => print("empty"),
+    }
+}
+
+fn main() -> Void {
+    first = choose(true)
+    second = choose(false)
+    show(first)
+    show(second)
+}

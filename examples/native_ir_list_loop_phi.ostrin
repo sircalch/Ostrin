@@ -1,0 +1,16 @@
+fn append_value(values: List<String>, x: String) -> List<String> {
+    mut result = clone(values)
+    result.push(x)
+    result
+}
+
+fn main() -> Void {
+    mut values: List<String> = ["a"]
+    mut i = 0
+    while i < 3 {
+        values = append_value(values, i.to_string())
+        i = i + 1
+    }
+    print(values.join(","))
+    drop(values)
+}

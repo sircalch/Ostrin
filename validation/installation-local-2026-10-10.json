@@ -1,0 +1,16 @@
+{
+  "schema": "ostrin.installation-check/v1",
+  "status": "verified-local",
+  "release": "0.1.0",
+  "date": "2026-10-10",
+  "platform": "win32-x64",
+  "installer": "scripts/install.ps1",
+  "installDir": "temporary directory outside the repository",
+  "checksum": "verified by installer",
+  "versionOutput": "ostrinc 0.1.0",
+  "checkCommand": "ostrinc --check examples/hello.ostrin",
+  "checkResult": "OK — no se encontraron errores de tipo (2 elemento(s)).",
+  "runCommand": "ostrinc --run examples/hello.ostrin",
+  "runOutputIncludes": "hola desde Ostrin",
+  "scope": "Local Windows evidence only; Ubuntu and macOS clean-runner evidence still requires install-check.yml."
+}

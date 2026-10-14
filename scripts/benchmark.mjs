@@ -16,6 +16,8 @@ const defaultWorkloads = [
   "examples/benchmark_numeric.ostrin",
   "examples/arrays.ostrin",
   "examples/quantity_arrays.ostrin",
+  "examples/benchmark_float_array.ostrin",
+  "examples/benchmark_quantity_array.ostrin",
   "examples/numeric_methods.ostrin",
   "examples/numeric_lu.ostrin",
   "examples/numeric_svd.ostrin",

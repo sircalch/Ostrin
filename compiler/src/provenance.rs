@@ -2,22 +2,111 @@
 //!
 //! The report records what the compiler can prove from the current source and
 //! effect inventory. It deliberately does not claim replay or purity: input
-//! snapshots, generated outputs, package locks and platform guarantees still
-//! need to be supplied by a future reproducibility pipeline.
+//! snapshots, generated outputs, complete package locks and captured platform
+//! metadata still need to be supplied by a future reproducibility pipeline.
 
-use std::path::Path;
+use std::fs;
+use std::path::{Path, PathBuf};
 
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
 use crate::effects::EffectReport;
 
+fn sha256_bytes(bytes: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    format!("sha256:{:x}", hasher.finalize())
+}
+
+fn normalized_file_hash(path: &Path) -> Option<String> {
+    let bytes = fs::read(path).ok()?;
+    let normalized = String::from_utf8_lossy(&bytes).replace("\r\n", "\n");
+    Some(sha256_bytes(normalized.as_bytes()))
+}
+
+fn ancestor_file(start: &Path, file_name: &str) -> Option<PathBuf> {
+    let mut directory = if start.is_dir() {
+        start.to_path_buf()
+    } else {
+        start.parent()?.to_path_buf()
+    };
+    loop {
+        let candidate = directory.join(file_name);
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+        if !directory.pop() {
+            return None;
+        }
+    }
+}
+
+fn project_file(path: &Path, file_name: &str) -> Option<Value> {
+    let file = ancestor_file(path, file_name)?;
+    Some(json!({
+        "path": file_name,
+        "sha256": normalized_file_hash(&file)?,
+    }))
+}
+
+fn runtime_snapshot(path: &Path, target: &str) -> Value {
+    // The compiler lockfile is part of the source tree used to build this
+    // executable. Keep only a repository-relative label in the artifact so a
+    // report never leaks the absolute checkout path.
+    let compiler_lockfile = Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.lock");
+    let compiler_lock = normalized_file_hash(&compiler_lockfile).map(|sha256| {
+        json!({
+            "path": "compiler/Cargo.lock",
+            "sha256": sha256,
+        })
+    });
+    let project_manifest = project_file(path, "ostrin.toml");
+    let project_lockfile = project_file(path, "ostrin.lock");
+    let wasi = if target.contains("wasi") {
+        Some("preview1")
+    } else {
+        None
+    };
+
+    json!({
+        "schema": "ostrin.runtime/v1",
+        "status": "partial",
+        "target": target,
+        "wasi": wasi,
+        "runner": if wasi.is_some() { "WASI host" } else { "native process" },
+        "compiler_lockfile": compiler_lock,
+        "project": {
+            "manifest": project_manifest,
+            "lockfile": project_lockfile,
+        },
+        "platform_policy": {
+            "output": "target-specific; byte exact only when the replay gate verifies it",
+            "numeric": "tolerances must be declared for cross-platform comparisons",
+        },
+        "missing": [
+            "input snapshots",
+            "output hashes from this invocation",
+            "captured host and hardware metadata",
+        ],
+    })
+}
+
 pub fn build_report(path: &Path, source: &[u8], target: &str, effects: &EffectReport) -> Value {
     let normalized_source = String::from_utf8_lossy(source).replace("\r\n", "\n");
-    let mut hasher = Sha256::new();
-    hasher.update(normalized_source.as_bytes());
-    let source_hash = format!("sha256:{:x}", hasher.finalize());
+    let source_hash = sha256_bytes(normalized_source.as_bytes());
     let effect_names: Vec<String> = effects.effects.iter().cloned().collect();
+    let functions_without_known_effects: Vec<String> = effects
+        .function_names
+        .iter()
+        .filter(|function| {
+            effects
+                .function_kinds
+                .get(*function)
+                .is_none_or(std::collections::BTreeSet::is_empty)
+        })
+        .cloned()
+        .collect();
     let sites: Vec<Value> = effects
         .sites
         .iter()
@@ -32,6 +121,17 @@ pub fn build_report(path: &Path, source: &[u8], target: &str, effects: &EffectRe
             })
         })
         .collect();
+    let unresolved_calls: Vec<Value> = effects
+        .unresolved_calls
+        .iter()
+        .map(|(function, calls)| {
+            json!({
+                "function": function,
+                "calls": calls.iter().collect::<Vec<_>>(),
+            })
+        })
+        .collect();
+    let (known_calls, unresolved_call_count) = effects.call_coverage();
 
     let (level, reason) = if effect_names.is_empty() {
         (
@@ -59,8 +159,16 @@ pub fn build_report(path: &Path, source: &[u8], target: &str, effects: &EffectRe
             "commit": option_env!("OSTRIN_COMMIT").unwrap_or("unknown"),
             "target": target,
         },
+        "runtime": runtime_snapshot(path, target),
         "activity": {
             "effects": effect_names,
+            "functions_without_known_effects": functions_without_known_effects,
+            "unresolved_calls": unresolved_calls,
+            "effect_coverage": {
+                "known_calls": known_calls,
+                "unresolved_calls": unresolved_call_count,
+                "complete": unresolved_call_count == 0,
+            },
             "sites": sites,
         },
         "inputs": [],
@@ -71,7 +179,8 @@ pub fn build_report(path: &Path, source: &[u8], target: &str, effects: &EffectRe
         },
         "limitations": [
             "This artifact is a conservative source inventory, not a static effect guarantee.",
-            "A future R2/R3 pipeline will add input snapshots, output hashes, lockfiles and runtime metadata.",
+            "Unresolved calls are listed separately because an empty known-effect row does not imply purity.",
+            "The runtime snapshot is partial; input snapshots, invocation output hashes and captured host metadata are still required for R2/R3.",
         ],
     })
 }
@@ -89,8 +198,12 @@ pub fn text_summary(report: &Value) -> String {
                 .join(", ")
         })
         .unwrap_or_default();
+    let no_known_effects = report["activity"]["functions_without_known_effects"]
+        .as_array()
+        .map(|values| values.len().to_string())
+        .unwrap_or_else(|| "0".to_string());
     format!(
-        "provenance-report: experimental artifact\nentry: {}\nsource-hash: {}\ncompiler: {} {} ({})\ntarget: {}\neffects: {}\nreproducibility: {}\nnote: {}",
+        "provenance-report: experimental artifact\nentry: {}\nsource-hash: {}\ncompiler: {} {} ({})\ntarget: {}\neffects: {}\nfunctions-without-known-effects: {}\nreproducibility: {}\nnote: {}",
         program["entry"].as_str().unwrap_or("<unknown>"),
         program["source_hash"].as_str().unwrap_or("<unknown>"),
         compiler["name"].as_str().unwrap_or("ostrinc"),
@@ -98,6 +211,7 @@ pub fn text_summary(report: &Value) -> String {
         compiler["commit"].as_str().unwrap_or("unknown"),
         compiler["target"].as_str().unwrap_or("native"),
         if effects.is_empty() { "none known" } else { &effects },
+        no_known_effects,
         report["reproducibility"]["level"].as_str().unwrap_or("unverified"),
         report["reproducibility"]["reason"].as_str().unwrap_or(""),
     )

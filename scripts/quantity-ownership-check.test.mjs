@@ -32,16 +32,19 @@ function update(root, relativePath, change) {
   writeFileSync(file, change(readFileSync(file, "utf8")), "utf8");
 }
 
-test("current Quantity phase 1 ownership boundary passes", () => {
+test("current Quantity phase 1 and plot phase 2 evidence passes", () => {
   assert.deepEqual(validateQuantityOwnership(repositoryRoot).errors, []);
 });
 
-test("fails when the viz_units fallback baseline is removed", () => {
+test("fails when the viz_units IR ownership baseline regresses", () => {
   const root = fixtureRoot();
   try {
-    update(root, "compiler/tests/examples.rs", (source) => source.replace("ir=0 hir=0 ast=1", "ir=1 hir=0 ast=0"));
+    update(root, "compiler/tests/examples.rs", (source) => source.replace(
+      "native-source: examples/viz_units.ostrin ir=1 hir=0 ast=0",
+      "native-source: examples/viz_units.ostrin ir=0 hir=0 ast=1",
+    ));
     const { errors } = validateQuantityOwnership(root);
-    assert.ok(errors.some((error) => error.includes("fallback regression")));
+    assert.ok(errors.length > 0, "the gate accepted the AST fallback regression");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
