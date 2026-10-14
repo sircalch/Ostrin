@@ -126,9 +126,9 @@ con paridad, IR sin fallback, ejecución nativa con cero allocations vivas y
 emisión WASI. No se generaliza a otros wrappers o agregados genéricos anidados.
 WASI pasó localmente sus 28 programas, incluidos estos wrappers, el campo
 genérico, closure, tareas y default.
-En el head `52e902a`, ASan pasó la suite nativa, el corpus diferencial generado y el fuzz
+En el head `fafaaf6`, ASan pasó la suite nativa, el corpus diferencial generado y el fuzz
 del frontend; UBSan también pasó en CI con Clang. Véanse los
-[resultados de sanitizers](https://github.com/sircalch/Ostrin/actions/runs/38429889992).
+[resultados de sanitizers](https://github.com/sircalch/Ostrin/actions/runs/38457383426).
 Campos genéricos anidados y otras combinaciones fuera de la matriz siguen fuera
 del ABI dyn HIR/C verificado.
 
@@ -188,7 +188,7 @@ Estado implementado y límites restantes del contrato de ownership:
 `Option`/`Result` alrededor de un `dyn Trait` ya convertido explícitamente; no
 implica conversión contextual general de payloads dentro de wrappers. La misma
 prueba también cubre `List<Option<dyn Speaker>>` con dispatch sobre el elemento
-presente y destrucción del ausente. En `52e902a`, ASan y UBSan pasaron
+presente y destrucción del ausente. En `fafaaf6`, ASan y UBSan pasaron
    en CI; ASan también ejecutó el corpus diferencial y el fuzz del frontend.
 4. Se probó `Holder<dyn Speaker>` como un campo genérico directo; wrappers
    genéricos anidados y otras combinaciones fuera de la matriz probada siguen
