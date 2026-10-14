@@ -1,7 +1,7 @@
 {
   "schema": "ostrin.quality-scorecard/v1",
-  "sourceRevision": "850793d8050256c4a776cf52b82937c88ba959db",
-  "workingTreeDirty": false,
+  "sourceRevision": "70ea4a393d39070fb5426231314e09b1f2f9a018",
+  "workingTreeDirty": true,
   "sources": {
     "native": "compiler/tests/differential.rs",
     "ownership": "docs/ownership-matrix.md",
