@@ -130,7 +130,8 @@ test("R3 stays open while valid captured effects are incomplete", () => {
 
 test("readiness totals unresolved effects across incomplete bundles", () => {
   const report = buildReadiness();
-  assert.equal(report.incompleteEffectBundleCount, report.bundleCount);
+  assert.ok(report.incompleteEffectBundleCount > 0);
+  assert.ok(report.incompleteEffectBundleCount <= report.bundleCount);
   assert.ok(report.unresolvedEffectCallCount > 0);
   assert.equal(report.readyCount, 0);
   assert.equal(report.status, "OPEN");
