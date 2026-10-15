@@ -1,6 +1,6 @@
 {
   "schema": "ostrin.quality-scorecard/v1",
-  "sourceRevision": "e2d610ba662794cba2d8619f29ea2cbead136dd1",
+  "sourceRevision": "f3b088a336099cce03c02d8a113d62197f065e16",
   "workingTreeDirty": false,
   "sources": {
     "native": "compiler/tests/differential.rs",
@@ -31,7 +31,7 @@
     "maximumAbsoluteDifference": 0,
     "leakCheck": "live_allocations=0",
     "ci": "verified",
-    "ciRunUrl": "https://github.com/sircalch/Ostrin/actions/runs/38160056059"
+    "ciRunUrl": "https://github.com/sircalch/Ostrin/actions/runs/38520134678"
   },
   "effectCoverage": {
     "knownCalls": 68,
