@@ -12162,6 +12162,26 @@ fn experimental_provenance_report_contains_source_hash_and_effects() {
     assert!(text.status.success(), "stderr: {}", stderr(&text));
     assert!(stdout(&text).contains("provenance-report: experimental artifact"));
     assert!(stdout(&text).contains("source-hash: sha256:"));
+
+    let file = temp_source(
+        "effects-provenance-path.ostrin",
+        "fn main() -> Void {\n    mystery_host_operation()\n}\n",
+    );
+    let out = run(&["--provenance-report", "--json", &file]);
+    let _ = fs::remove_file(&file);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let artifact: serde_json::Value =
+        serde_json::from_str(&stdout(&out)).expect("provenance report must be JSON");
+    let call_sites = artifact["activity"]["unresolved_call_sites"]
+        .as_array()
+        .expect("provenance must retain unresolved call occurrences");
+    let call = call_sites
+        .iter()
+        .find(|site| site["operation"] == "mystery_host_operation")
+        .expect("the unknown call must remain visible");
+    assert!(call["file"].is_null());
+    assert_eq!(call["line"], 2);
+    assert_eq!(call["col"], 5);
 }
 
 #[test]

@@ -115,7 +115,9 @@ pub fn build_report(path: &Path, source: &[u8], target: &str, effects: &EffectRe
                 "effect": site.effect,
                 "operation": site.operation,
                 "function": site.function,
-                "file": site.file.as_deref().map(|file| file.replace('\\', "/")),
+                "file": site.file.as_deref()
+                    .filter(|file| !Path::new(file).is_absolute())
+                    .map(|file| file.replace('\\', "/")),
                 "line": site.line,
                 "col": site.col,
             })
@@ -138,7 +140,9 @@ pub fn build_report(path: &Path, source: &[u8], target: &str, effects: &EffectRe
             json!({
                 "operation": site.operation,
                 "function": site.function,
-                "file": site.file.as_deref().map(|file| file.replace('\\', "/")),
+                "file": site.file.as_deref()
+                    .filter(|file| !Path::new(file).is_absolute())
+                    .map(|file| file.replace('\\', "/")),
                 "line": site.line,
                 "col": site.col,
             })

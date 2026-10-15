@@ -323,7 +323,8 @@ en una consola de logs.
    añade las ocurrencias fuente con función, operación y posición para poder auditarlas una por una;
    puede contener varias ocurrencias aunque `unresolved_calls` deduplique un mismo nombre dentro de
    una función. Son candidatas no clasificadas por este inventario sintáctico, no diagnósticos del
-   resolvedor tipado.
+   resolvedor tipado. La posición `0:0` indica que el parser no conservó un rango para una operación
+   sintética; las rutas absolutas se omiten al persistir un reporte de procedencia.
    `effect_coverage` resume esas cantidades (`known_calls`, `unresolved_calls` y `complete`);
    `complete` solo significa que el inventario resolvió todas las llamadas observadas, no que
    haya demostrado pureza.
