@@ -3,8 +3,8 @@ globalThis.OSTRIN_STATUS = Object.freeze({
   "schema": "ostrin.quality-scorecard/v1",
   "sourceRevision": "d0abbad0f674317c95c389b953507365f3fd1a59",
   "evidenceRevision": "aaa9f16d7cc64fb4ab4b55edc5373d1c9ef1dde0",
-  "releaseTag": null,
-  "finalReleaseSourceRevision": null,
+  "releaseTag": "v0.2.0",
+  "finalReleaseSourceRevision": "29c24c0bd607822dbc2609a54bfcce545ca563f6",
   "workingTreeDirty": false,
   "sources": {
     "native": "compiler/tests/differential.rs",
@@ -55,8 +55,8 @@ globalThis.OSTRIN_STATUS = Object.freeze({
     "extensionReadyCount": 0,
     "readyCount": 0,
     "openCount": 29,
-    "captureReadyCount": 29,
-    "captureOpenCount": 0,
+    "captureReadyCount": 0,
+    "captureOpenCount": 29,
     "incompleteEffectBundleCount": 29,
     "unresolvedEffectCallCount": 4266
   },
