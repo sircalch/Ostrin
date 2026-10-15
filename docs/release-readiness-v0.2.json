@@ -4,9 +4,9 @@
   "candidateProvenance": {
     "sourceRevision": "d0abbad0f674317c95c389b953507365f3fd1a59",
     "evidenceRevision": "aaa9f16d7cc64fb4ab4b55edc5373d1c9ef1dde0",
-    "releaseTag": null,
-    "finalReleaseSourceRevision": null,
-    "meaning": "sourceRevision is the code used for the recorded RC binaries; evidenceRevision is the fixed post-merge evidence base; releaseTag is unset until separately authorized. Post-merge rehearsal artifacts have separate hashes, and final release artifacts must be newly built from the exact authorized tag."
+    "releaseTag": "v0.2.0",
+    "finalReleaseSourceRevision": "29c24c0bd607822dbc2609a54bfcce545ca563f6",
+    "meaning": "sourceRevision is the code used for RC binaries; evidenceRevision is the fixed pre-publication evidence base; releaseTag is the published tag; finalReleaseSourceRevision is the exact tagged commit used to build final assets. Post-tag workflow evidence is recorded separately to avoid self-reference."
   },
   "criteria": [
     {
@@ -155,14 +155,14 @@
     {
       "id": "artifacts",
       "status": "READY",
-      "acceptance": "The recorded Linux, macOS, Windows and WASI RC artifacts were built from candidateProvenance.sourceRevision, checksummed, extracted and smoke-tested; the WASI runtime smoke matrix passes and candidate CI run links are attached. These hashes identify only those RC artifacts. A final release tag and publication are intentionally deferred; final-release artifacts must be rebuilt from the exact authorized tag.",
+      "acceptance": "The Linux, macOS, Windows and WASI release artifacts were built from the exact published tag, checksummed, extracted and smoke-tested; the WASI runtime smoke matrix passes and final checksums and workflow evidence are recorded separately from RC hashes.",
       "requires_ci_run_url": true,
       "evidence": [
         { "path": ".github/workflows/release.yml", "claim": "Cross-platform release build, checksum, extraction and smoke test" },
         { "path": ".github/workflows/wasi.yml", "claim": "Pinned WASI build, runtime smoke matrix and checksums" },
         { "url": "https://github.com/sircalch/Ostrin/actions/runs/38681320600", "claim": "Ostrin v0.2.0-rc.d0abbad Linux x86_64, macOS ARM64 and Windows x64 archives pass tests, compiler smoke, checksum verification, extraction and packaged-project smoke on their native runners; publish job skipped because this is an untagged main-branch candidate" },
         { "url": "https://github.com/sircalch/Ostrin/actions/runs/38681318079", "claim": "Ostrin WASI compiler artifact for d0abbad passes Node WASI smoke and its 28-program runtime matrix; internal SHA256SUMS covers the compiler plus 28 program modules and was independently verified locally" },
-        { "path": "validation/release-candidate-v0.2.0.json", "claim": "RC source revision d0abbad, source-scoped archive names and SHA-256 hashes, workflow run evidence, downloaded checksum/extraction and smoke outcomes, and explicit unset final tag/source state" }
+        { "path": "validation/release-candidate-v0.2.0.json", "claim": "RC source revision d0abbad and its checksums remain distinct from the published tag build; final source revision, fresh archive checksums, downloaded sidecar verification, extraction and smoke outcomes are recorded from workflow 38815035506" }
       ]
     }
   ]

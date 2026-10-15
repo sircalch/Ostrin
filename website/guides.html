@@ -33,13 +33,13 @@
     <main id="main-content" tabindex="-1">
       <section class="page-hero shell"><p class="eyebrow">Guides</p><h1>Workflows,<br><em>step by step.</em></h1><p class="lede">Task-oriented guides for the current compiler. Every command here exists in <span class="mono">ostrinc --help</span>; anything not available yet says so.</p></section>
       <section class="page-grid shell"><aside class="side-nav"><p class="eyebrow">On this page</p><a href="#install">Install the compiler</a><a href="#projects">Create a project with dependencies</a><a href="#effects">Inspect effects and provenance</a><a href="#testing">Test and format</a><a href="#native">Compile to native code</a><a href="#wasi">Build WebAssembly (WASI)</a><a href="#editor">Use Visual Studio Code</a><a href="#site-evidence">How this site proves its results</a></aside><div class="guide-list">
-        <article class="guide" id="install"><h2>Install the compiler</h2><p>The <span data-site-value="version"></span> compiler is a release candidate in preparation. The latest published experimental release is <span data-site-value="publishedVersion"></span>; its installers download the matching archive, verify its SHA-256 checksum and check <span class="mono">ostrinc --version</span>.</p><pre class="code guide-code"><code># Linux x86_64 or macOS ARM64
+        <article class="guide" id="install"><h2>Install the compiler</h2><p>The latest experimental release is v<span data-site-value="publishedVersion"></span>. Its installers download the matching archive, verify its SHA-256 checksum and check <span class="mono">ostrinc --version</span>.</p><pre class="code guide-code"><code># Linux x86_64 or macOS ARM64
 curl --fail --location https://raw.githubusercontent.com/sircalch/Ostrin/main/scripts/install.sh \
   --output /tmp/ostrinc-install.sh
-sh /tmp/ostrinc-install.sh --version 0.1.0</code></pre><pre class="code guide-code"><code># Windows PowerShell
+sh /tmp/ostrinc-install.sh --version 0.2.0</code></pre><pre class="code guide-code"><code># Windows PowerShell
 $installer = Join-Path $env:TEMP 'ostrinc-install.ps1'
 Invoke-WebRequest -UseBasicParsing https://raw.githubusercontent.com/sircalch/Ostrin/main/scripts/install.ps1 -OutFile $installer
-powershell -ExecutionPolicy Bypass -File $installer -Version 0.1.0 -AddToPath</code></pre><pre class="code guide-code"><code>ostrinc --version
+powershell -ExecutionPolicy Bypass -File $installer -Version 0.2.0 -AddToPath</code></pre><pre class="code guide-code"><code>ostrinc --version
 ostrinc --run examples/hello.ostrin</code></pre><p class="muted">To build from source instead: <span class="mono">cargo build --release --manifest-path compiler/Cargo.toml</span>. Package-manager channels (Homebrew, winget, Scoop, Chocolatey, AUR) are not available yet.</p></article>
         <article class="guide" id="projects"><h2>Create a project with dependencies</h2><p><span class="mono">--new</span> creates a manifest and a <span class="mono">main.ostrin</span> with a test. Dependencies are local paths or Git repositories; builds write a deterministic <span class="mono">ostrin.lock</span>.</p><pre class="code guide-code"><code>ostrinc --new my_project
 ostrinc --run --project my_project
