@@ -3,8 +3,8 @@
   "release": "0.2.0",
   "sourceRevision": "d0abbad0f674317c95c389b953507365f3fd1a59",
   "candidateIdentifier": "v0.2.0-rc.d0abbad",
-  "evidenceRevision": "08f11168a515ca20a1975d026d8dca661fb2dc3a",
-  "evidenceRevisionMeaning": "Fixed input commit containing the reviewed release evidence, honest R3 status semantics with strict structural capture validation, release workflow, notes and publication procedure; generated evidence derivatives point here and are committed afterward, avoiding self-reference.",
+  "evidenceRevision": "aaa9f16d7cc64fb4ab4b55edc5373d1c9ef1dde0",
+  "evidenceRevisionMeaning": "Fixed post-merge evidence base: this main commit contains the reviewed publication procedure, release notes, release workflow and structural R3 capture validation. The RC binaries remain sourced only from sourceRevision. Generated candidate metadata records this evidence revision afterward, avoiding self-reference.",
   "releaseTag": null,
   "finalReleaseSourceRevision": null,
   "releaseProvenancePolicy": "The RC artifacts below were built from sourceRevision only. A final release must be rebuilt from the exact authorized v0.2.0 tag; its artifacts and SHA-256 values must be recorded from that tag workflow and must not reuse these RC hashes.",
@@ -50,6 +50,34 @@
       { "target": "wasm32-wasip1", "archive": "ostrinc-v0.2.0-rc.119d4b2-wasm32-wasip1.tar.gz", "sha256": "67603c4b190026be5e1ec3a5dd31fe918585cd3b93ed117bc04a618f25d074b1", "sidecarVerifiedLocally": true, "internalManifestVerification": "all 29 modules verified locally; 28-program matrix and compiler Node WASI smoke passed on runner" }
     ],
     "finalReleasePolicy": "These are branch rehearsal hashes from sourceRevision 119d4b2, not final release hashes. Rebuild every artifact from the exact authorized v0.2.0 tag and record its new hashes."
+  },
+  "postMergeMainRehearsal": {
+    "sourceRevision": "aaa9f16d7cc64fb4ab4b55edc5373d1c9ef1dde0",
+    "event": "workflow_dispatch on main; no tag created",
+    "releaseWorkflowRun": {
+      "runId": 38798562375,
+      "url": "https://github.com/sircalch/Ostrin/actions/runs/38798562375",
+      "conclusion": "success",
+      "publishJob": "skipped: main is untagged",
+      "allFourTargetBuilds": "passed",
+      "nativeRunnerTestsExtractionAndSmoke": "passed on Linux x86_64, macOS ARM64 and Windows x64"
+    },
+    "artifacts": [
+      { "target": "x86_64-unknown-linux-gnu", "archive": "ostrinc-v0.2.0-rc.aaa9f16-x86_64-unknown-linux-gnu.tar.gz", "sha256": "0485382090224959c9972e895761c2f8054875b0226ec58501814a3c9f604827", "sidecarVerifiedAfterDownload": true, "runnerExtractionAndSmoke": "passed" },
+      { "target": "aarch64-apple-darwin", "archive": "ostrinc-v0.2.0-rc.aaa9f16-aarch64-apple-darwin.tar.gz", "sha256": "0fcf60785db8a2af943d79b8c6ef6cece265fa5544c163a1db40c33bab2bcb2b", "sidecarVerifiedAfterDownload": true, "runnerExtractionAndSmoke": "passed" },
+      { "target": "x86_64-pc-windows-msvc", "archive": "ostrinc-v0.2.0-rc.aaa9f16-x86_64-pc-windows-msvc.zip", "sha256": "14b2d41da8e49f114958ac2fee3fa764cca5841f24aeba0c147dfad23524cf08", "sidecarVerifiedAfterDownload": true, "runnerExtractionAndSmoke": "passed", "localDownloadedExecutableVersionHelloAndPackagedProjectSmoke": "passed: ostrinc 0.2.0; hello and packaged project outputs verified" },
+      { "target": "wasm32-wasip1", "archive": "ostrinc-v0.2.0-rc.aaa9f16-wasm32-wasip1.tar.gz", "sha256": "8844bdf76af5739793b554519316db49e1ea3ff563963e40e6040d5a790e9d62", "sidecarVerifiedAfterDownload": true, "internalManifestVerification": "all 29 WASM files verified locally; Node WASI compiler smoke and 28-program matrix passed on runner" }
+    ],
+    "otherPostMergeChecks": {
+      "ciRun": "https://github.com/sircalch/Ostrin/actions/runs/38797639201",
+      "securityAuditRun": "https://github.com/sircalch/Ostrin/actions/runs/38797639082",
+      "codeqlRun": "https://github.com/sircalch/Ostrin/actions/runs/38797639241",
+      "browserAuditRun": "https://github.com/sircalch/Ostrin/actions/runs/38797639015",
+      "websiteDeployRun": "https://github.com/sircalch/Ostrin/actions/runs/38797639023",
+      "sanitizersRun": "https://github.com/sircalch/Ostrin/actions/runs/38798343561",
+      "wasiRun": "https://github.com/sircalch/Ostrin/actions/runs/38798347392"
+    },
+    "finalReleasePolicy": "These are post-merge rehearsal hashes for sourceRevision aaa9f16, not v0.2.0 release hashes. The public tag workflow must rebuild from the exact authorized tag and record fresh final-release checksums; never reuse any RC or rehearsal hash as a final-release hash."
   },
   "relatedChecks": {
     "ciRun": "https://github.com/sircalch/Ostrin/actions/runs/38681256328",
