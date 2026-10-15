@@ -2,7 +2,7 @@
 globalThis.OSTRIN_STATUS = Object.freeze({
   "schema": "ostrin.quality-scorecard/v1",
   "sourceRevision": "d0abbad0f674317c95c389b953507365f3fd1a59",
-  "evidenceRevision": "08f11168a515ca20a1975d026d8dca661fb2dc3a",
+  "evidenceRevision": "aaa9f16d7cc64fb4ab4b55edc5373d1c9ef1dde0",
   "releaseTag": null,
   "finalReleaseSourceRevision": null,
   "workingTreeDirty": false,
@@ -55,8 +55,8 @@ globalThis.OSTRIN_STATUS = Object.freeze({
     "extensionReadyCount": 0,
     "readyCount": 0,
     "openCount": 29,
-    "captureReadyCount": 0,
-    "captureOpenCount": 29,
+    "captureReadyCount": 29,
+    "captureOpenCount": 0,
     "incompleteEffectBundleCount": 29,
     "unresolvedEffectCallCount": 4266
   },
