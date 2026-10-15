@@ -1,10 +1,12 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-10-15 · `v0.1.0` sigue siendo la última release pública; candidato `v0.2.0` congelado en `cb9a524` · 6 pruebas diferenciales, 333 de integración y 3 unitarias en verde.*
+*Corte: 2026-10-15 · `v0.1.0` sigue siendo la última release pública; RC `v0.2.0` construido desde `d0abbad0f674317c95c389b953507365f3fd1a59`; la evidencia y el commit propuesto para un futuro tag son revisiones distintas · 6 pruebas diferenciales, 333 de integración y 3 unitarias en verde.*
 
-Validación remota del candidato `cb9a524`: CI `38520134678`, Browser audit `38520134566`,
-CodeQL `38520134640`, Security audit `38520134613`, Native sanitizers `38520142898`,
-WASI `38520140712`, release artifacts `38520144819` y benchmarks `38609662881` pasaron.
+Validación remota del RC construido desde `d0abbad`: CI `38681256328`, Browser audit
+`38681256349`, CodeQL `38681256503`, Security audit `38681256363`, Native sanitizers
+`38681322946`, WASI `38681318079`, release artifacts `38681320600` y benchmarks
+`38609662881` pasaron. Estos artefactos y hashes pertenecen a `d0abbad`, no a commits
+documentales posteriores.
 La compuerta oficial exige `cargo fmt --check`, Clippy con el lint `suspicious`, la suite del
 compilador y las comprobaciones del sitio; los workflows de auditoría de dependencias,
 CodeQL, sanitizers nativos y cobertura quedan registrados para el ciclo P5.
@@ -595,10 +597,15 @@ validación analítica inicial de LU, Cholesky, QR, SVD y autovalores simétrico
 en intérprete y nativo con residuales independientes, tolerancias por caso y cero fugas; el criterio
 permanece abierto hasta obtener ejecución CI verde en todos los sistemas soportados y adjuntar su URL.
 El gate de publicación de [`v0.2.0`](docs/release-readiness-v0.2.json) contiene 12 criterios
-marcados `READY` y la ratchet medida es 7.198 IR + 41 HIR, con cero fallbacks AST. El candidato
-está congelado en `cb9a524`; antes de solicitar aprobación final deben quedar sincronizados los
-documentos y scorecard con la evidencia de ese head y regenerarse los artifacts desde el head
-final de `main`. No se ha creado tag ni release `v0.2.0`; CI exige el gate para esa etiqueta.
+marcados `READY` y la ratchet medida es 7.198 IR + 41 HIR, con cero fallbacks AST. El manifiesto de candidato distingue la revisión fuente (commit usado para los binarios RC),
+la revisión de evidencia (commit fijo con las entradas documentales, al que apuntan los
+metadatos derivados) y el tag de release (ref exacta, aún inexistente). El commit de `main`
+resultante de fusionar la documentación no cambia retroactivamente el origen de los binarios
+RC. Si se autoriza publicar, se deberá construir y verificar un juego nuevo de artefactos y
+hashes desde el tag exacto; no se reutilizarán los del RC. No se ha creado tag ni release
+`v0.2.0`; la etiqueta activa el workflow que publica, por lo que requiere autorización final.
+El procedimiento previo, instalación, compatibilidad, limitaciones, integridad y rollback
+está en [`docs/releases/v0.2.0-publication.md`](docs/releases/v0.2.0-publication.md).
 La clasificación de Ostrin por GitHub Linguist y el crecimiento del ecosistema dependen de
 evidencia de uso externo y validación upstream. GPU, autodiff inverso, registry público y red
 permanecen fuera de la etapa inmediata.

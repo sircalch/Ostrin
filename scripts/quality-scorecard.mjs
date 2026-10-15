@@ -21,6 +21,10 @@ const generatedEvidencePath = (filePath) => {
   return normalized === "validation/r3-readiness.json"
     || normalized === "validation/quality-scorecard.json"
     || normalized === "website/status-data.js"
+    || normalized === "validation/release-candidate-v0.2.0.json"
+    || normalized === "docs/release-readiness-v0.2.json"
+    || normalized === "docs/review-map-v0.2.md"
+    || normalized === "validation/numeric/windows-local.json"
     || (normalized.startsWith("website/assets/experiments/") && normalized.endsWith(".ostrin-experiment.json"));
 };
 
@@ -154,13 +158,17 @@ function effectCoverageStatus() {
 
 export async function buildScorecard() {
   const native = nativeCounts();
+  const candidateEvidence = JSON.parse(text("validation/release-candidate-v0.2.0.json"));
   // Website CI intentionally rewrites these evidence outputs before publishing
   // host-bound R3 data. They are not source edits and must not make the public
   // source-integrity indicator permanently dirty.
   const workingTreeDirty = hasDirtySourceChanges(workingTreeSourcePaths());
   return {
     schema: "ostrin.quality-scorecard/v1",
-    sourceRevision: git(["rev-parse", "HEAD"]),
+    sourceRevision: candidateEvidence.sourceRevision,
+    evidenceRevision: candidateEvidence.evidenceRevision,
+    releaseTag: candidateEvidence.releaseTag,
+    finalReleaseSourceRevision: candidateEvidence.finalReleaseSourceRevision,
     workingTreeDirty,
     sources: {
       native: "compiler/tests/differential.rs",
