@@ -164,8 +164,11 @@ jobs:
         run: |
           set -euo pipefail
           version="$(cargo metadata --no-deps --format-version 1 --manifest-path compiler/Cargo.toml | node -e 'let input=""; process.stdin.on("data", chunk => input += chunk).on("end", () => console.log(JSON.parse(input).packages.find(pkg => pkg.name === "ostrinc").version));')"
-          test "$version" = "${GITHUB_REF_NAME#v}" || test "$GITHUB_REF" != refs/tags/v*
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            test "${GITHUB_REF_NAME#v}" = "$version" || {
+              echo "release tag $GITHUB_REF_NAME does not match compiler version $version" >&2
+              exit 1
+            }
             package_ref="$GITHUB_REF_NAME"
           else
             package_ref="v${version}-rc.${GITHUB_SHA:0:7}"
