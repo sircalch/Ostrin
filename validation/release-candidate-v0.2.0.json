@@ -79,6 +79,32 @@
     },
     "finalReleasePolicy": "These are post-merge rehearsal hashes for sourceRevision aaa9f16, not v0.2.0 release hashes. The public tag workflow must rebuild from the exact authorized tag and record fresh final-release checksums; never reuse any RC or rehearsal hash as a final-release hash."
   },
+  "currentMainRehearsal": {
+    "sourceRevision": "4728c1bba063140c223f1a9e223015aabe28bf94",
+    "event": "workflow_dispatch on main; no tag created",
+    "releaseWorkflowRun": {
+      "runId": 38808673942,
+      "url": "https://github.com/sircalch/Ostrin/actions/runs/38808673942",
+      "conclusion": "success",
+      "publishJob": "skipped: main is untagged",
+      "allFourTargetBuilds": "passed",
+      "nativeRunnerTestsExtractionAndSmoke": "passed on Linux x86_64, macOS ARM64 and Windows x64"
+    },
+    "artifacts": [
+      { "target": "x86_64-unknown-linux-gnu", "archive": "ostrinc-v0.2.0-rc.4728c1b-x86_64-unknown-linux-gnu.tar.gz", "sha256": "3bb0deb76a4c098e43794c1e4312d016f7dfb75155a59c000d7082e7f2691b6c", "sidecarVerifiedAfterDownload": true, "runnerExtractionAndSmoke": "passed" },
+      { "target": "aarch64-apple-darwin", "archive": "ostrinc-v0.2.0-rc.4728c1b-aarch64-apple-darwin.tar.gz", "sha256": "e9c44b45f4e4956c5aef6b4da3680bef18a2f8d6d5408b3c022199f9df4ca775", "sidecarVerifiedAfterDownload": true, "runnerExtractionAndSmoke": "passed" },
+      { "target": "x86_64-pc-windows-msvc", "archive": "ostrinc-v0.2.0-rc.4728c1b-x86_64-pc-windows-msvc.zip", "sha256": "30c160c59a5d65fa4b0420164ed0936a33a3ad20ebe5a3d662ca6e0c9bc4b6f7", "sidecarVerifiedAfterDownload": true, "runnerExtractionAndSmoke": "passed", "localDownloadedExecutableVersionHelloAndPackagedProjectSmoke": "passed: ostrinc 0.2.0; hello and packaged project outputs verified" },
+      { "target": "wasm32-wasip1", "archive": "ostrinc-v0.2.0-rc.4728c1b-wasm32-wasip1.tar.gz", "sha256": "89e61232ab1b8caef8126009c4a1dc1bfea0d58efdce1e018daf8df57ef70efb", "sidecarVerifiedAfterDownload": true, "internalManifestVerification": "all 29 WASM files verified locally; Node WASI compiler smoke and 28-program matrix passed on runner" }
+    ],
+    "otherPostMergeChecks": {
+      "ciRun": "https://github.com/sircalch/Ostrin/actions/runs/38807591339",
+      "securityAuditRun": "https://github.com/sircalch/Ostrin/actions/runs/38807591291",
+      "codeqlRun": "https://github.com/sircalch/Ostrin/actions/runs/38807591228",
+      "browserAuditRun": "https://github.com/sircalch/Ostrin/actions/runs/38807592034",
+      "websiteDeployRun": "https://github.com/sircalch/Ostrin/actions/runs/38807591505"
+    },
+    "finalReleasePolicy": "These are untagged rehearsal hashes for sourceRevision 4728c1b, not v0.2.0 release hashes. The public tag workflow must rebuild from the exact authorized v0.2.0 tag and record fresh final-release checksums; never reuse any RC or rehearsal hash as a final-release hash."
+  },
   "relatedChecks": {
     "ciRun": "https://github.com/sircalch/Ostrin/actions/runs/38681256328",
     "sanitizersRun": "https://github.com/sircalch/Ostrin/actions/runs/38681322946",
