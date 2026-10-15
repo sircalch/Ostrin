@@ -1,41 +1,36 @@
 # R3 readiness
 
-R3 requiere un artefacto auditable: procedencia, hashes, lockfile, entorno,
-dependencias, efectos, scheduler, inputs, parámetros y outputs. El auditor
-recorre los bundles publicados y separa los campos ya presentes de las
-extensiones que todavía faltan.
+R3 requiere una captura auditable de procedencia, hashes, lockfile, entorno,
+dependencias, efectos, scheduler, entradas, parámetros y outputs. El auditor
+separa los campos base, las extensiones de captura ausentes y las capturas de
+efectos cuyo inventario todavía no puede cerrarse.
 
 ```text
 node scripts/r3-readiness.mjs --write
 ```
 
-Pages CI usa además `node scripts/r3-readiness.mjs --require-ready`; ese modo
-termina con error si cualquier bundle no tiene todos los campos R3 o una captura
-de efectos estructuralmente válida.
+Pages CI captura metadatos del host y valida el contrato estructural con
+`node scripts/r3-readiness.mjs --require-capture`. Ese gate permite conservar una
+captura incompleta para diagnóstico; **no equivale** a `--require-ready`. R3 solo
+queda `READY` cuando el reporte vigente marca todos los bundles listos.
 
 El reporte queda en [`validation/r3-readiness.json`](../validation/r3-readiness.json).
-Un estado `OPEN` es deliberado: documenta el trabajo restante y no promociona
-un bundle R0/R1/R2 a R3.
+Un estado `OPEN` es deliberado y no promociona un bundle R0/R1/R2 a R3.
 
-El checkout local tiene los **29/29 bundles con los campos base completos**, incluidos
-`execution`, dependencias y scheduler declarado. Los **0/29** locales están listos para R3
-porque no deben falsificar la captura del host. Los 29 bundles ya incluyen un resumen normalizado del
-reporte de efectos del compilador (`ostrin.effect-report/v0`), con hashes del analizador y
-la marca de que el análisis es experimental y conservador. El resumen conserva las llamadas locales,
-las llamadas no resueltas y el conteo de cobertura; el auditor valida su consistencia y reporta por
-separado cuántos bundles tienen inventario parcial y cuántas llamadas siguen sin clasificar. Una captura
-coherente puede estar lista para auditoría R3 aunque su inventario sea parcial; `complete` significa que
-no quedan llamadas sin clasificar, no que el programa sea puro. Una captura ausente o inconsistente
-mantiene R3 `OPEN`. El host sigue siendo un requisito explícito del auditor y no se rellena con valores sintéticos.
+## Diagnóstico del snapshot actual
 
-Pages CI activa `OSTRIN_CAPTURE_HOST=1` después de preparar el compilador WASI y
-regenera los 29 bundles. En ese modo cada snapshot registra solo metadatos públicos
-del runner (`RUNNER_OS`, arquitectura, imagen, Node, WASI y hardware visible del proceso);
-no se guardan hostname, usuario ni rutas privadas. La acción conserva además el reporte
-R3, el scorecard, la página de estado y los bundles host-bound como el artefacto
-`ostrin-r3-host-evidence-<run_id>` durante 90 días. La verificación local mantiene el
-campo ausente para que un checkout de desarrollador no se presente como una ejecución CI.
+En el snapshot de código `29c24c0bd607822dbc2609a54bfcce545ca563f6`:
 
-La ejecución CI `38162721694` produjo el artefacto host-bound y su reporte confirma
-`READY`, `29/29` bundles preparados y `openCount=0`. Esa evidencia permite auditar R3
-sin convertir el checkout local en un snapshot sintético.
+- Los 29 bundles tienen completos sus campos base.
+- Ninguno está listo para R3: los 29 carecen de `provenance.runtime.host` y los 29 tienen captura de efectos incompleta.
+- El inventario registra 4,266 referencias `caller-operation` sin clasificar y 130 nombres distintos. Su forma sintáctica se divide en 2,003 identificadores y 2,263 rutas de miembro.
+
+Son referencias registradas por el inventario, no invocaciones dinámicas del programa. Una ruta como `f` puede ser un builtin, función local o callback; `data.max` puede ser un método, campo o API del host. El agrupamiento no determina resolución tipada ni demuestra pureza. `gapDiagnostics` existe para orientar el trabajo de inferencia; no cambia el gate de readiness.
+
+Este reporte tampoco determina si las entradas externas están capturadas de forma completa y segura ni si las tolerancias numéricas están justificadas científicamente. Esos contratos requieren validación independiente.
+
+## Captura del host en CI
+
+La acción de Pages activa `OSTRIN_CAPTURE_HOST=1` al regenerar los bundles. Conserva metadatos públicos del runner (sistema, arquitectura, imagen, Node, WASI y hardware visible al proceso), sin hostname, usuario ni rutas privadas. El artefacto `ostrin-r3-host-evidence-<run_id>` se conserva 90 días.
+
+El artefacto de la ejecución `38162721694` no cierra el estado actual. GitHub informa que esa ejecución fue cancelada; además, su reporte anterior marcaba `READY`, pero los bundles archivados no contenían `effect_coverage` ni `unresolved_calls`. La implementación vigente exige una captura estructuralmente válida y que el inventario de efectos esté completo. Por eso no se usa ese artefacto antiguo para promover los 29 bundles.

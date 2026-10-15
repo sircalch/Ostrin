@@ -23,6 +23,175 @@
   "captureOpenCount": 29,
   "incompleteEffectBundleCount": 29,
   "unresolvedEffectCallCount": 4266,
+  "gapDiagnostics": {
+    "captureGaps": {
+      "missingExtensionFields": [
+        {
+          "field": "provenance.runtime.host",
+          "bundleCount": 29,
+          "bundles": [
+            "animation",
+            "bars",
+            "boxplot",
+            "contourf",
+            "dashboard",
+            "double-pendulum",
+            "fft",
+            "heatmap",
+            "hexbin",
+            "histogram",
+            "isosurface",
+            "lines",
+            "linked-data",
+            "lorenz",
+            "ode",
+            "orbits",
+            "point-cloud",
+            "provenance",
+            "quiver",
+            "scatter-fit",
+            "spline",
+            "streamplot",
+            "string",
+            "surface",
+            "table",
+            "units",
+            "vector-field",
+            "violin",
+            "volume-slices"
+          ]
+        }
+      ],
+      "incompleteExtensionFields": [
+        {
+          "field": "provenance.effects.effect_coverage",
+          "bundleCount": 29,
+          "bundles": [
+            "animation",
+            "bars",
+            "boxplot",
+            "contourf",
+            "dashboard",
+            "double-pendulum",
+            "fft",
+            "heatmap",
+            "hexbin",
+            "histogram",
+            "isosurface",
+            "lines",
+            "linked-data",
+            "lorenz",
+            "ode",
+            "orbits",
+            "point-cloud",
+            "provenance",
+            "quiver",
+            "scatter-fit",
+            "spline",
+            "streamplot",
+            "string",
+            "surface",
+            "table",
+            "units",
+            "vector-field",
+            "violin",
+            "volume-slices"
+          ]
+        }
+      ]
+    },
+    "effectInventory": {
+      "countUnit": "recorded function-operation references in unresolved_calls; not source invocation count",
+      "operationReferences": 4266,
+      "uniqueOperationNames": 130,
+      "bySyntax": {
+        "identifier": 2003,
+        "memberPath": 2263,
+        "qualifiedPath": 0,
+        "other": 0
+      },
+      "topOperations": [
+        {
+          "operation": "array",
+          "syntax": "identifier",
+          "references": 721,
+          "bundleCount": 29
+        },
+        {
+          "operation": "zeros",
+          "syntax": "identifier",
+          "references": 233,
+          "bundleCount": 29
+        },
+        {
+          "operation": "floor",
+          "syntax": "identifier",
+          "references": 203,
+          "bundleCount": 29
+        },
+        {
+          "operation": "s.grid.shape",
+          "syntax": "memberPath",
+          "references": 203,
+          "bundleCount": 29
+        },
+        {
+          "operation": "round",
+          "syntax": "identifier",
+          "references": 116,
+          "bundleCount": 29
+        },
+        {
+          "operation": "volume.shape",
+          "syntax": "memberPath",
+          "references": 116,
+          "bundleCount": 29
+        },
+        {
+          "operation": "data.max",
+          "syntax": "memberPath",
+          "references": 87,
+          "bundleCount": 29
+        },
+        {
+          "operation": "data.min",
+          "syntax": "memberPath",
+          "references": 87,
+          "bundleCount": 29
+        },
+        {
+          "operation": "log10",
+          "syntax": "identifier",
+          "references": 87,
+          "bundleCount": 29
+        },
+        {
+          "operation": "plane.set",
+          "syntax": "memberPath",
+          "references": 87,
+          "bundleCount": 29
+        },
+        {
+          "operation": "s.grid.max",
+          "syntax": "memberPath",
+          "references": 87,
+          "bundleCount": 29
+        },
+        {
+          "operation": "s.grid.min",
+          "syntax": "memberPath",
+          "references": 87,
+          "bundleCount": 29
+        }
+      ],
+      "interpretation": "Syntax groups are descriptive only. An identifier may be a builtin, local function or callback; a member path may be a method, field or host API. This report does not determine type resolution or prove purity."
+    },
+    "notAssessed": [
+      "Whether an operation resolves to a typed function or intrinsic",
+      "Whether external inputs are fully captured and privacy-safe",
+      "Whether numerical tolerances are scientifically justified"
+    ]
+  },
   "entries": [
     {
       "file": "website/assets/experiments/animation.ostrin-experiment.json",

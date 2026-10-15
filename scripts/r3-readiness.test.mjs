@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { after } from "node:test";
 import { runtimeSnapshotFor } from "./experiment-bundle.mjs";
-import { buildReadiness, inspectBundle, requiredCaptureErrors } from "./r3-readiness.mjs";
+import { buildReadiness, diagnoseEffectCalls, inspectBundle, requiredCaptureErrors } from "./r3-readiness.mjs";
 
 const originalCaptureHost = process.env.OSTRIN_CAPTURE_HOST;
 delete process.env.OSTRIN_CAPTURE_HOST;
@@ -232,4 +232,40 @@ test("readiness totals and status match the inspected bundles", () => {
   assert.equal(report.extensionReadyCount,
     report.entries.filter((entry) =>
       entry.r3Extensions.missing.length === 0 && entry.r3Extensions.incomplete.length === 0).length);
+});
+
+test("effect-gap diagnostics group operation syntax without inferring resolution or purity", () => {
+  const diagnostics = diagnoseEffectCalls({
+    unresolved_calls: {
+      main: ["array", "data.max", "std::math::exp", "host?"],
+      wrapper: ["array", "callback"],
+    },
+  });
+
+  assert.equal(diagnostics.referenceCount, 6);
+  assert.equal(diagnostics.uniqueOperationNames, 5);
+  assert.deepEqual(diagnostics.bySyntax, {
+    identifier: 3,
+    memberPath: 1,
+    qualifiedPath: 1,
+    other: 1,
+  });
+  assert.equal(diagnostics.operations.get("array"), 2);
+});
+
+test("R3 gap summary reconciles with per-bundle missing fields and effect coverage", () => {
+  const report = buildReadiness();
+  const { captureGaps, effectInventory, notAssessed } = report.gapDiagnostics;
+  const hostGap = captureGaps.missingExtensionFields.find(({ field }) => field === "provenance.runtime.host");
+  const effectGap = captureGaps.incompleteExtensionFields.find(({ field }) => field === "provenance.effects.effect_coverage");
+
+  assert.equal(hostGap?.bundleCount, report.captureOpenCount);
+  assert.equal(effectGap?.bundleCount, report.incompleteEffectBundleCount);
+  assert.equal(effectInventory.operationReferences, report.unresolvedEffectCallCount);
+  assert.equal(Object.values(effectInventory.bySyntax).reduce((sum, count) => sum + count, 0),
+    effectInventory.operationReferences);
+  assert.ok(effectInventory.uniqueOperationNames > 0);
+  assert.ok(effectInventory.topOperations.length > 0);
+  assert.match(effectInventory.interpretation, /does not determine type resolution or prove purity/i);
+  assert.ok(notAssessed.includes("Whether numerical tolerances are scientifically justified"));
 });

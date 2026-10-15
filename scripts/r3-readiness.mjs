@@ -117,13 +117,110 @@ export function inspectBundle(bundle, file) {
   };
 }
 
+function effectOperationSyntax(operation) {
+  if (operation.includes("::")) return "qualifiedPath";
+  if (operation.includes(".")) return "memberPath";
+  if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(operation)) return "identifier";
+  return "other";
+}
+
+export function diagnoseEffectCalls(effects) {
+  const bySyntax = { identifier: 0, memberPath: 0, qualifiedPath: 0, other: 0 };
+  const operationReferences = new Map();
+  const unresolved = isObject(effects?.unresolved_calls) ? effects.unresolved_calls : {};
+  let referenceCount = 0;
+  for (const calls of Object.values(unresolved)) {
+    if (!Array.isArray(calls)) continue;
+    for (const operation of calls) {
+      if (typeof operation !== "string") continue;
+      referenceCount++;
+      bySyntax[effectOperationSyntax(operation)]++;
+      operationReferences.set(operation, (operationReferences.get(operation) ?? 0) + 1);
+    }
+  }
+  return {
+    referenceCount,
+    uniqueOperationNames: operationReferences.size,
+    bySyntax,
+    operations: operationReferences,
+  };
+}
+
+function buildGapDiagnostics(records) {
+  const missingFields = new Map();
+  const incompleteFields = new Map();
+  const effectOperationReferences = new Map();
+  const effectSyntaxCounts = { identifier: 0, memberPath: 0, qualifiedPath: 0, other: 0 };
+  let effectOperationReferenceCount = 0;
+
+  for (const { entry, effectCalls } of records) {
+    const bundle = entry.id ?? entry.file;
+    for (const field of entry.r3Extensions.missing) {
+      if (!missingFields.has(field)) missingFields.set(field, new Set());
+      missingFields.get(field).add(bundle);
+    }
+    for (const field of entry.r3Extensions.incomplete) {
+      if (!incompleteFields.has(field)) incompleteFields.set(field, new Set());
+      incompleteFields.get(field).add(bundle);
+    }
+    effectOperationReferenceCount += effectCalls.referenceCount;
+    for (const [syntax, count] of Object.entries(effectCalls.bySyntax)) {
+      effectSyntaxCounts[syntax] += count;
+    }
+    for (const [operation, count] of effectCalls.operations) {
+      if (!effectOperationReferences.has(operation)) {
+        effectOperationReferences.set(operation, { references: 0, bundles: new Set() });
+      }
+      const current = effectOperationReferences.get(operation);
+      current.references += count;
+      current.bundles.add(bundle);
+    }
+  }
+
+  const summarize = (fields) => [...fields]
+    .map(([field, bundles]) => ({ field, bundleCount: bundles.size, bundles: [...bundles].sort() }))
+    .sort((left, right) => left.field.localeCompare(right.field));
+  const topOperations = [...effectOperationReferences]
+    .map(([operation, counts]) => ({
+      operation,
+      syntax: effectOperationSyntax(operation),
+      references: counts.references,
+      bundleCount: counts.bundles.size,
+    }))
+    .sort((left, right) => right.references - left.references || left.operation.localeCompare(right.operation))
+    .slice(0, 12);
+
+  return {
+    captureGaps: {
+      missingExtensionFields: summarize(missingFields),
+      incompleteExtensionFields: summarize(incompleteFields),
+    },
+    effectInventory: {
+      countUnit: "recorded function-operation references in unresolved_calls; not source invocation count",
+      operationReferences: effectOperationReferenceCount,
+      uniqueOperationNames: effectOperationReferences.size,
+      bySyntax: effectSyntaxCounts,
+      topOperations,
+      interpretation: "Syntax groups are descriptive only. An identifier may be a builtin, local function or callback; a member path may be a method, field or host API. This report does not determine type resolution or prove purity.",
+    },
+    notAssessed: [
+      "Whether an operation resolves to a typed function or intrinsic",
+      "Whether external inputs are fully captured and privacy-safe",
+      "Whether numerical tolerances are scientifically justified",
+    ],
+  };
+}
+
 export function buildReadiness(root = repositoryRoot) {
   const directory = path.join(root, "website/assets/experiments");
   const files = readdirSync(directory).filter((file) => file.endsWith(".ostrin-experiment.json")).sort();
-  const entries = files.map((file) => {
+  const records = files.map((file) => {
     const absolute = path.join(directory, file);
-    return inspectBundle(JSON.parse(readFileSync(absolute, "utf8")), path.relative(root, absolute).replaceAll("\\", "/"));
+    const bundle = JSON.parse(readFileSync(absolute, "utf8"));
+    const entry = inspectBundle(bundle, path.relative(root, absolute).replaceAll("\\", "/"));
+    return { entry, effectCalls: diagnoseEffectCalls(bundle?.provenance?.effects) };
   });
+  const entries = records.map(({ entry }) => entry);
   return {
     schema: "ostrin.r3-readiness/v1",
     status: entries.every((entry) => entry.status === "READY") ? "READY" : "OPEN",
@@ -140,6 +237,7 @@ export function buildReadiness(root = repositoryRoot) {
       entry.requiredFields.missing.length > 0 || entry.r3Extensions.missing.length > 0).length,
     incompleteEffectBundleCount: entries.filter((entry) => entry.r3Extensions.incomplete.includes("provenance.effects.effect_coverage")).length,
     unresolvedEffectCallCount: entries.reduce((total, entry) => total + (entry.effectCoverage?.unresolved_calls ?? 0), 0),
+    gapDiagnostics: buildGapDiagnostics(records),
     entries,
   };
 }
