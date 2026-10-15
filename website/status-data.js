@@ -2,10 +2,10 @@
 globalThis.OSTRIN_STATUS = Object.freeze({
   "schema": "ostrin.quality-scorecard/v1",
   "sourceRevision": "d0abbad0f674317c95c389b953507365f3fd1a59",
-  "evidenceRevision": "8e3606d35282c9a8943db588edd6f21a4aa5a317",
+  "evidenceRevision": "e8575726fa03f51a5c28d6728c4b5648f6f72162",
   "releaseTag": null,
   "finalReleaseSourceRevision": null,
-  "workingTreeDirty": true,
+  "workingTreeDirty": false,
   "sources": {
     "native": "compiler/tests/differential.rs",
     "ownership": "docs/ownership-matrix.md",
