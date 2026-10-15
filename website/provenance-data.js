@@ -3,6 +3,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
   "activity": {
     "effect_coverage": {
       "complete": true,
+      "count_unit": "distinct_function_operation_edges",
       "known_calls": 68,
       "symbolic_calls": 0,
       "unresolved_calls": 0

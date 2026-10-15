@@ -1,7 +1,7 @@
 {
   "schema": "ostrin.quality-scorecard/v1",
-  "sourceRevision": "f90128443d88d644497b5049aa16fa912e9d9f6a",
-  "workingTreeDirty": false,
+  "sourceRevision": "dffe31bba7d9909ec34ab12ca474daffd7e52ea0",
+  "workingTreeDirty": true,
   "sources": {
     "native": "compiler/tests/differential.rs",
     "ownership": "docs/ownership-matrix.md",
@@ -10,7 +10,7 @@
     "tests": "compiler/tests"
   },
   "tests": {
-    "rustMarkedTests": 357
+    "rustMarkedTests": 358
   },
   "nativeBackend": {
     "ir": 7198,
@@ -34,6 +34,7 @@
     "ciRunUrl": "https://github.com/sircalch/Ostrin/actions/runs/38160056059"
   },
   "effectCoverage": {
+    "countUnit": "distinct_function_operation_edges",
     "knownCalls": 20589,
     "symbolicCalls": 74,
     "unresolvedCalls": 0,

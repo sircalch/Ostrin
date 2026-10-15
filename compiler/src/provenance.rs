@@ -280,6 +280,7 @@ pub fn build_report(path: &Path, source: &[u8], target: &str, effects: &EffectRe
             "indirect_calls": indirect_calls,
             "open_effect_calls": open_effect_calls,
             "effect_coverage": {
+                "count_unit": "distinct_function_operation_edges",
                 "known_calls": known_calls,
                 "symbolic_calls": symbolic_call_count,
                 "unresolved_calls": unresolved_call_count,

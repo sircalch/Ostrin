@@ -40,7 +40,7 @@ test("R3 readiness requires host, dependencies, scheduler and effects", () => {
         unresolved_calls: {},
         function_effect_variables: {},
         symbolic_effect_calls: {},
-        effect_coverage: { known_calls: 1, symbolic_calls: 0, unresolved_calls: 0, complete: true },
+        effect_coverage: { count_unit: "distinct_function_operation_edges", known_calls: 1, symbolic_calls: 0, unresolved_calls: 0, complete: true },
       },
       level: "R0",
     },
@@ -62,7 +62,7 @@ test("R3 readiness uses the explicit CI host capture contract", () => {
     unresolved_calls: {},
     function_effect_variables: {},
     symbolic_effect_calls: {},
-    effect_coverage: { known_calls: 0, symbolic_calls: 0, unresolved_calls: 0, complete: true },
+    effect_coverage: { count_unit: "distinct_function_operation_edges", known_calls: 0, symbolic_calls: 0, unresolved_calls: 0, complete: true },
   };
   const bundle = {
     provenance: {
@@ -94,7 +94,7 @@ test("R3 preserves valid incomplete effects as a visible limitation", () => {
     unresolved_calls: { main: ["mystery_operation"] },
     function_effect_variables: {},
     symbolic_effect_calls: {},
-    effect_coverage: { known_calls: 0, symbolic_calls: 0, unresolved_calls: 1, complete: false },
+    effect_coverage: { count_unit: "distinct_function_operation_edges", known_calls: 0, symbolic_calls: 0, unresolved_calls: 1, complete: false },
   };
   const bundle = {
     provenance: {

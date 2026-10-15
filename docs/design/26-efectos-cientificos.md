@@ -320,7 +320,10 @@ en una consola de logs.
    El JSON también expone `unresolved_calls` por función: llamadas que no se pudieron resolver
    contra una función local ni contra una operación de host clasificada. Esta separación deja
    visible la deuda de cobertura para la futura inferencia estática de efectos.
-   `effect_coverage` resume esas cantidades (`known_calls`, `unresolved_calls` y `complete`);
+   `effect_coverage` resume esas cantidades (`known_calls`, `unresolved_calls` y `complete`). El
+   campo `count_unit` usa `distinct_function_operation_edges`: cuenta pares únicos
+   función-operación, por lo que llamadas repetidas a la misma operación dentro de una función
+   cuentan una sola vez. No representa el total de sitios de llamada del código fuente;
    `complete` solo significa que el inventario resolvió todas las llamadas observadas, no que
    haya demostrado pureza.
    La implementación también reconoce una whitelist pequeña y explícita de operaciones locales

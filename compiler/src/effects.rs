@@ -187,9 +187,11 @@ enum DropEffect {
 }
 
 impl EffectReport {
-    /// Return (concrete, symbolic, unresolved) callsite counts. A symbolic
-    /// callback invocation is accounted for by its effect-row variable; it
-    /// is not concrete/pure, but it is no longer an unmodeled call.
+    /// Return (concrete, symbolic, unresolved) distinct function-operation
+    /// edge counts. The report stores operation names in sets, so repeated
+    /// calls with the same spelling in one function count once. A symbolic
+    /// callback edge is accounted for by its effect-row variable; it is not
+    /// concrete/pure, but it is no longer an unmodeled edge.
     pub fn call_coverage(&self) -> (usize, usize, usize) {
         let total = self
             .function_calls

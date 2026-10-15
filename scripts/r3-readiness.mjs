@@ -87,6 +87,7 @@ export function buildReadiness(root = repositoryRoot) {
     knownEffectCallCount: entries.reduce((total, entry) => total + (entry.effectCoverage?.known_calls ?? 0), 0),
     symbolicEffectCallCount: entries.reduce((total, entry) => total + (entry.effectCoverage?.symbolic_calls ?? 0), 0),
     unresolvedEffectCallCount: entries.reduce((total, entry) => total + (entry.effectCoverage?.unresolved_calls ?? 0), 0),
+    effectCoverageCountUnit: "distinct_function_operation_edges",
     entries,
   };
 }

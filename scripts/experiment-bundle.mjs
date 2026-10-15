@@ -339,6 +339,10 @@ export function validateEffectCapture(effects) {
   if (!isStringArrayMap(effects.symbolic_effect_calls)) errors.push("effects capture symbolic_effect_calls must map names to callback arrays");
 
   const coverage = effects.effect_coverage;
+  if (coverage?.count_unit !== "distinct_function_operation_edges") {
+    errors.push("effects capture effect_coverage.count_unit must be distinct_function_operation_edges");
+    return errors;
+  }
   if (!coverage || typeof coverage !== "object" || Array.isArray(coverage)
     || !Number.isInteger(coverage.known_calls) || coverage.known_calls < 0
     || !Number.isInteger(coverage.symbolic_calls) || coverage.symbolic_calls < 0

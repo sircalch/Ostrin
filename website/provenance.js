@@ -30,7 +30,7 @@ if (artifact) {
   const coverage = artifact.activity?.effect_coverage ?? {};
   setText(
     "[data-provenance-coverage]",
-    `${coverage.known_calls ?? 0} concrete · ${coverage.symbolic_calls ?? 0} callback-symbolic · ${coverage.unresolved_calls ?? unresolvedCount} unresolved`,
+    `${coverage.known_calls ?? 0} concrete edges · ${coverage.symbolic_calls ?? 0} callback-symbolic edges · ${coverage.unresolved_calls ?? unresolvedCount} unresolved edges`,
   );
   const unresolvedList = document.querySelector("[data-provenance-unresolved-list]");
   if (unresolvedList) {

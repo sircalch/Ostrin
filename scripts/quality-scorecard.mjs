@@ -142,6 +142,7 @@ function numericalValidationStatus() {
 
 function effectCoverageStatus(report) {
   return {
+    countUnit: report.effectCoverageCountUnit,
     knownCalls: report.knownEffectCallCount,
     symbolicCalls: report.symbolicEffectCallCount,
     unresolvedCalls: report.unresolvedEffectCallCount,

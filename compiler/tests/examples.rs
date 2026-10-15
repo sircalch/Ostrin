@@ -12093,8 +12093,31 @@ fn experimental_effect_report_propagates_to_callers() {
     assert_eq!(artifact["unresolved_calls"], serde_json::json!({}));
     assert_eq!(
         artifact["effect_coverage"],
-        serde_json::json!({"known_calls": 2, "symbolic_calls": 0, "unresolved_calls": 0, "complete": true})
+        serde_json::json!({"count_unit": "distinct_function_operation_edges", "known_calls": 2, "symbolic_calls": 0, "unresolved_calls": 0, "complete": true})
     );
+}
+
+#[test]
+fn effect_coverage_counts_distinct_function_operation_edges() {
+    let file = temp_source(
+        "effects-duplicate-operation-edges.ostrin",
+        "fn main() -> Void {\n    print(\"first\")\n    print(\"second\")\n}\n",
+    );
+    let out = run(&["--effect-report", "--json", &file]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let report: serde_json::Value =
+        serde_json::from_str(&stdout(&out)).expect("effect report must be JSON");
+    assert_eq!(
+        report["function_calls"]["main"],
+        serde_json::json!(["print"])
+    );
+    assert_eq!(
+        report["effect_coverage"]["count_unit"],
+        "distinct_function_operation_edges"
+    );
+    assert_eq!(report["effect_coverage"]["known_calls"], 1);
+    assert_eq!(report["effect_coverage"]["unresolved_calls"], 0);
+    let _ = fs::remove_file(&file);
 }
 
 #[test]
@@ -12154,7 +12177,7 @@ fn experimental_effect_report_propagates_through_qualified_impl_methods() {
     assert_eq!(report["unresolved_calls"], serde_json::json!({}));
     assert_eq!(
         report["effect_coverage"],
-        serde_json::json!({"known_calls": 3, "symbolic_calls": 0, "unresolved_calls": 0, "complete": true})
+        serde_json::json!({"count_unit": "distinct_function_operation_edges", "known_calls": 3, "symbolic_calls": 0, "unresolved_calls": 0, "complete": true})
     );
 }
 
@@ -12197,7 +12220,7 @@ fn experimental_effect_report_resolves_homonymous_methods_by_receiver_type() {
     );
     assert_eq!(
         report["effect_coverage"],
-        serde_json::json!({"known_calls": 4, "symbolic_calls": 0, "unresolved_calls": 1, "complete": false})
+        serde_json::json!({"count_unit": "distinct_function_operation_edges", "known_calls": 4, "symbolic_calls": 0, "unresolved_calls": 1, "complete": false})
     );
 
     let hir = run(&["--hir", &file]);
@@ -12363,7 +12386,7 @@ fn experimental_effect_report_tracks_trait_defaults_and_excludes_overrides() {
         .any(|site| { site["function"] == "Console.overridden" && site["operation"] == "print" }));
     assert_eq!(
         report["effect_coverage"],
-        serde_json::json!({"known_calls": 4, "symbolic_calls": 0, "unresolved_calls": 0, "complete": true})
+        serde_json::json!({"count_unit": "distinct_function_operation_edges", "known_calls": 4, "symbolic_calls": 0, "unresolved_calls": 0, "complete": true})
     );
 
     let hir = run(&["--hir", &file]);
@@ -12401,7 +12424,7 @@ fn experimental_effect_report_keeps_unknown_calls_unresolved() {
     );
     assert_eq!(
         artifact["effect_coverage"],
-        serde_json::json!({"known_calls": 0, "symbolic_calls": 0, "unresolved_calls": 1, "complete": false})
+        serde_json::json!({"count_unit": "distinct_function_operation_edges", "known_calls": 0, "symbolic_calls": 0, "unresolved_calls": 1, "complete": false})
     );
 }
 

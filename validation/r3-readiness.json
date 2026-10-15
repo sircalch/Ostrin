@@ -23,6 +23,7 @@
   "knownEffectCallCount": 20589,
   "symbolicEffectCallCount": 74,
   "unresolvedEffectCallCount": 0,
+  "effectCoverageCountUnit": "distinct_function_operation_edges",
   "entries": [
     {
       "file": "website/assets/experiments/animation.ostrin-experiment.json",
@@ -40,6 +41,7 @@
       },
       "effectCoverage": {
         "complete": true,
+        "count_unit": "distinct_function_operation_edges",
         "known_calls": 614,
         "symbolic_calls": 1,
         "unresolved_calls": 0
@@ -61,6 +63,7 @@
       },
       "effectCoverage": {
         "complete": true,
+        "count_unit": "distinct_function_operation_edges",
         "known_calls": 810,
         "symbolic_calls": 1,
         "unresolved_calls": 0
@@ -82,6 +85,7 @@
       },
       "effectCoverage": {
         "complete": true,
+        "count_unit": "distinct_function_operation_edges",
         "known_calls": 740,
         "symbolic_calls": 1,
         "unresolved_calls": 0
@@ -103,6 +107,7 @@
       },
       "effectCoverage": {
         "complete": true,
+        "count_unit": "distinct_function_operation_edges",
         "known_calls": 607,
         "symbolic_calls": 1,
         "unresolved_calls": 0
@@ -124,6 +129,7 @@
       },
       "effectCoverage": {
         "complete": true,
+        "count_unit": "distinct_function_operation_edges",
         "known_calls": 752,
         "symbolic_calls": 1,
         "unresolved_calls": 0
@@ -145,6 +151,7 @@
       },
       "effectCoverage": {
         "complete": true,
+        "count_unit": "distinct_function_operation_edges",
         "known_calls": 886,
         "symbolic_calls": 10,
         "unresolved_calls": 0
@@ -166,6 +173,7 @@
       },
       "effectCoverage": {
         "complete": true,
+        "count_unit": "distinct_function_operation_edges",
         "known_calls": 1032,
         "symbolic_calls": 10,
         "unresolved_calls": 0
@@ -187,6 +195,7 @@
       },
       "effectCoverage": {
         "complete": true,
+        "count_unit": "distinct_function_operation_edges",
         "known_calls": 610,
         "symbolic_calls": 1,
         "unresolved_calls": 0
@@ -208,6 +217,7 @@
       },
       "effectCoverage": {
         "complete": true,
+        "count_unit": "distinct_function_operation_edges",
         "known_calls": 745,
         "symbolic_calls": 1,
         "unresolved_calls": 0
@@ -229,6 +239,7 @@
       },
       "effectCoverage": {
         "complete": true,
+        "count_unit": "distinct_function_operation_edges",
         "known_calls": 749,
         "symbolic_calls": 1,
         "unresolved_calls": 0
@@ -250,6 +261,7 @@
       },
       "effectCoverage": {
         "complete": true,
+        "count_unit": "distinct_function_operation_edges",
         "known_calls": 609,
         "symbolic_calls": 1,
         "unresolved_calls": 0
@@ -271,6 +283,7 @@
       },
       "effectCoverage": {
         "complete": true,
+        "count_unit": "distinct_function_operation_edges",
         "known_calls": 728,
         "symbolic_calls": 1,
         "unresolved_calls": 0
@@ -292,6 +305,7 @@
       },
       "effectCoverage": {
         "complete": true,
+        "count_unit": "distinct_function_operation_edges",
         "known_calls": 608,
         "symbolic_calls": 1,
         "unresolved_calls": 0
@@ -313,6 +327,7 @@
       },
       "effectCoverage": {
         "complete": true,
+        "count_unit": "distinct_function_operation_edges",
         "known_calls": 609,
         "symbolic_calls": 1,
         "unresolved_calls": 0
@@ -334,6 +349,7 @@
       },
       "effectCoverage": {
         "complete": true,
+        "count_unit": "distinct_function_operation_edges",
         "known_calls": 881,
         "symbolic_calls": 10,
         "unresolved_calls": 0
@@ -355,6 +371,7 @@
       },
       "effectCoverage": {
         "complete": true,
+        "count_unit": "distinct_function_operation_edges",
         "known_calls": 887,
         "symbolic_calls": 10,
         "unresolved_calls": 0
@@ -376,6 +393,7 @@
       },
       "effectCoverage": {
         "complete": true,
+        "count_unit": "distinct_function_operation_edges",
         "known_calls": 745,
         "symbolic_calls": 1,
         "unresolved_calls": 0
@@ -397,6 +415,7 @@
       },
       "effectCoverage": {
         "complete": true,
+        "count_unit": "distinct_function_operation_edges",
         "known_calls": 610,
         "symbolic_calls": 1,
         "unresolved_calls": 0
@@ -418,6 +437,7 @@
       },
       "effectCoverage": {
         "complete": true,
+        "count_unit": "distinct_function_operation_edges",
         "known_calls": 613,
         "symbolic_calls": 1,
         "unresolved_calls": 0
@@ -439,6 +459,7 @@
       },
       "effectCoverage": {
         "complete": true,
+        "count_unit": "distinct_function_operation_edges",
         "known_calls": 743,
         "symbolic_calls": 1,
         "unresolved_calls": 0
@@ -460,6 +481,7 @@
       },
       "effectCoverage": {
         "complete": true,
+        "count_unit": "distinct_function_operation_edges",
         "known_calls": 877,
         "symbolic_calls": 10,
         "unresolved_calls": 0
@@ -481,6 +503,7 @@
       },
       "effectCoverage": {
         "complete": true,
+        "count_unit": "distinct_function_operation_edges",
         "known_calls": 616,
         "symbolic_calls": 1,
         "unresolved_calls": 0
@@ -502,6 +525,7 @@
       },
       "effectCoverage": {
         "complete": true,
+        "count_unit": "distinct_function_operation_edges",
         "known_calls": 613,
         "symbolic_calls": 1,
         "unresolved_calls": 0
@@ -523,6 +547,7 @@
       },
       "effectCoverage": {
         "complete": true,
+        "count_unit": "distinct_function_operation_edges",
         "known_calls": 730,
         "symbolic_calls": 1,
         "unresolved_calls": 0
@@ -544,6 +569,7 @@
       },
       "effectCoverage": {
         "complete": true,
+        "count_unit": "distinct_function_operation_edges",
         "known_calls": 603,
         "symbolic_calls": 1,
         "unresolved_calls": 0
@@ -565,6 +591,7 @@
       },
       "effectCoverage": {
         "complete": true,
+        "count_unit": "distinct_function_operation_edges",
         "known_calls": 608,
         "symbolic_calls": 1,
         "unresolved_calls": 0
@@ -586,6 +613,7 @@
       },
       "effectCoverage": {
         "complete": true,
+        "count_unit": "distinct_function_operation_edges",
         "known_calls": 611,
         "symbolic_calls": 1,
         "unresolved_calls": 0
@@ -607,6 +635,7 @@
       },
       "effectCoverage": {
         "complete": true,
+        "count_unit": "distinct_function_operation_edges",
         "known_calls": 742,
         "symbolic_calls": 1,
         "unresolved_calls": 0
@@ -628,6 +657,7 @@
       },
       "effectCoverage": {
         "complete": true,
+        "count_unit": "distinct_function_operation_edges",
         "known_calls": 611,
         "symbolic_calls": 1,
         "unresolved_calls": 0

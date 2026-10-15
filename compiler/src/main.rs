@@ -384,6 +384,7 @@ fn real_main() -> ExitCode {
                     "indirect_calls": report.indirect_calls,
                     "open_effect_calls": report.open_effect_calls,
                     "effect_coverage": {
+                        "count_unit": "distinct_function_operation_edges",
                         "known_calls": known_calls,
                         "symbolic_calls": symbolic_call_count,
                         "unresolved_calls": unresolved_call_count,
@@ -429,7 +430,9 @@ fn real_main() -> ExitCode {
                 .values()
                 .map(std::collections::BTreeSet::len)
                 .sum();
-            println!("unresolved calls: {unresolved_calls} (effect coverage is incomplete)");
+            println!(
+                "unresolved operation edges: {unresolved_calls} (effect coverage is incomplete)"
+            );
             let indirect_calls: usize = report
                 .indirect_calls
                 .values()
@@ -443,7 +446,7 @@ fn real_main() -> ExitCode {
                 .sum();
             println!("open effect-call references (direct + inherited): {open_effect_calls}");
             let (known_calls, symbolic_calls, _) = report.call_coverage();
-            println!("effect call coverage: {known_calls} concrete, {symbolic_calls} callback-symbolic, {unresolved_calls} unresolved");
+            println!("effect operation-edge coverage: {known_calls} concrete, {symbolic_calls} callback-symbolic, {unresolved_calls} unresolved (distinct edges; repeated callsites are counted once per function)");
             for site in &report.sites {
                 let file = site.file.as_deref().unwrap_or("<unknown>");
                 println!(
