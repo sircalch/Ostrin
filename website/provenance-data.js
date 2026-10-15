@@ -679,6 +679,7 @@ globalThis.OSTRIN_PROVENANCE = Object.freeze({
         "operation": "print"
       }
     ],
+    "unresolved_call_sites": [],
     "unresolved_calls": []
   },
   "compiler": {
