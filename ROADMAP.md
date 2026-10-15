@@ -5,10 +5,11 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
 
 ## Orden de prioridades
 
-La publicación de `v0.2.0` está bloqueada hasta satisfacer el gate explícito de
-[`docs/release-readiness-v0.2.json`](docs/release-readiness-v0.2.json). El validador
-[`scripts/v0.2-readiness-check.mjs`](scripts/v0.2-readiness-check.mjs) se ejecuta en CI al
-publicar esa etiqueta; hoy el hito sigue **NOT_READY**.
+El candidato `v0.2.0` está congelado en `cb9a52480f0d016921e4d0bccb195ad0faac958b`.
+El manifest [`docs/release-readiness-v0.2.json`](docs/release-readiness-v0.2.json) marca sus
+12 criterios como `READY`; la verificación de frontera todavía exige sincronizar toda la
+metadata/documentación y reconstruir los artifacts desde el head final que llegue a `main`.
+No existe tag ni release `v0.2.0`; la publicación requiere autorización explícita del propietario.
 
 0. **Higiene del repositorio — auditoría automatizada y limpieza parcial:** se auditaron todas
    las referencias contra `main` y los heads de PR fusionados; se eliminaron

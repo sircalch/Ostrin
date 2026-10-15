@@ -12,35 +12,31 @@ head's CI or a release approval.
 | Scientific measurements/numerics | `examples/measurement_*.ostrin`, `examples/std_numeric_*.ostrin`, `scripts/numeric-validation.mjs`, `validation/numeric/` | Scalar Measurement ownership and numerical algorithms have explicit parity, residual and reproducibility evidence | CI numerical validation, native leak checks, WASI; linked readiness evidence | `Measurement<Quantity<D>>`, covariance and array measurement remain guarded boundaries |
 | Effects/provenance/reproducibility | `compiler/src/effects.rs`, `compiler/src/provenance.rs`, `scripts/experiment-replay.mjs`, `docs/design/26-efectos-cientificos.md` | Inventory reports known and unresolved calls without treating completeness as purity; replay scope is explicit | Effect/provenance reports, replay bundles and WASI checks | Static effect semantics and R3 user-facing artifact maturity remain future work |
 | Website/browser | `website/`, `tests/browser/`, `scripts/website-check.mjs`, `docs/website-audit.md`, `docs/linguist.md`, `docs/linguist-usage.md` | Public counts/status derive from repository facts; source-backed catalogue cards cover direct generic fields and `Option`/`Result` wrappers, the dashboard test reads the loaded scorecard, and the Linguist inventory states 334 tracked `.ostrin` files (302 examples) | Local Chromium suite (32 tests), `website-check --wasm`, Linguist gate and unit tests, PR Browser audit and Website checks | Regenerate public facts when inventories or evidence change; upstream Linguist recognition still has 0 external files against a 2,000-file threshold |
-| Validation/manifests/scorecard | `validation/ast-fallback-ledger.json`, `validation/quality-scorecard.json`, `docs/release-readiness-v0.2.json`, `scripts/project-plan-check.mjs` | Ledger reports the current 7,198 IR + 41 HIR and zero AST fallbacks; readiness remains evidence-derived | fallback-ledger, Linguist, project-plan and readiness scripts | Regenerate public facts after source changes; overall v0.2 release stays `NOT_READY` until its post-merge candidate/version/tag and final artifacts exist |
-| Packaging and CI | `.github/workflows/`, `compiler/Cargo.toml`, `README.md`, `CHANGELOG.md`, `docs/releases/v0.2.0.md` | Host/WASI packaging and candidate smoke paths are reviewable; notes distinguish candidate scope from a published release | CI matrix, sanitizers, CodeQL, dependency audit, Browser audit, WASI and release workflow dispatch | The release workflow dispatch on a branch builds and smoke-tests packages but does not publish; compiler version/tag remains 0.1.0 until the post-merge v0.2 release step |
+| Validation/manifests/scorecard | `validation/ast-fallback-ledger.json`, `validation/quality-scorecard.json`, `docs/release-readiness-v0.2.json`, `scripts/project-plan-check.mjs` | Frozen source `cb9a524` measures 7,198 IR + 41 HIR and zero AST fallbacks; the manifest records 12 READY criteria | fallback-ledger, Linguist, project-plan and readiness scripts | Candidate evidence and generated scorecard must be synchronized to the final main commit; the public tag/release remains uncreated pending owner approval |
+| Packaging and CI | `.github/workflows/`, `compiler/Cargo.toml`, `README.md`, `CHANGELOG.md`, `docs/releases/v0.2.0.md` | Host/WASI packages for frozen source `cb9a524` have checksums, extraction and smoke evidence; notes distinguish candidate scope from a published release | CI matrix, sanitizers, CodeQL, dependency audit, Browser audit, WASI and release workflow | A later docs/metadata commit changes the candidate head and requires a fresh artifact build; dispatch does not publish, and publication requires explicit owner approval |
 
 ## Current revision evidence
 
-Documentation and the public status site are synchronized with this revision. The website/browser checks passed on this head (17 pages, 302 examples, 333 integration tests); the public Linguist inventory reports 302 examples and tracks upstream adoption separately.
+This review records the frozen source revision `cb9a52480f0d016921e4d0bccb195ad0faac958b`. CI reports 333 integration tests, 6 differential tests and 3 unit tests; `website-check` reports 17 pages and 302 examples. The public Linguist inventory reports 302 examples and tracks upstream adoption separately.
 
-- Implementation revision audited: `54123b76` (`fix: validate R3 readiness in local and CI bundles`).
-  It includes `Option<dyn Speaker>` stored and replaced in a mutable record,
-  `Result<dyn Speaker, String>`, `List<Option<dyn Speaker>>`, the direct generic
-  `Holder<dyn Speaker>` field, and the matching public catalogue description.
-- [Ostrin CI](https://github.com/sircalch/Ostrin/actions/runs/38508656204) passed
-  on Ubuntu, Windows and macOS, including the differential corpus, numerical
-  validation and website checks. [Sanitizers](https://github.com/sircalch/Ostrin/actions/runs/38508656243),
-  [CodeQL](https://github.com/sircalch/Ostrin/actions/runs/38508656238),
-  [Security audit](https://github.com/sircalch/Ostrin/actions/runs/38508656197)
-  and [Browser audit](https://github.com/sircalch/Ostrin/actions/runs/38508656214)
-  passed on this head.
-- The [WASI build and runtime matrix](https://github.com/sircalch/Ostrin/actions/runs/38508663521)
-  passed all 28 programs and packaged/checksummed the compiler artifact. Local
-  `website-check`, Linguist, project-plan, fallback-ledger and distribution
-  checks also pass; the repository reports 7,198 IR + 41 HIR functions, zero
-  AST fallbacks and 334 tracked `.ostrin` files (302 examples).
-- The [release workflow dispatch](https://github.com/sircalch/Ostrin/actions/runs/38508665475)
-  passed package tests, builds, smoke checks and archive verification on macOS
-  ARM64, Linux x86_64 and Windows x86_64. It does not publish a release; the
-  v0.2 version bump and tag are a post-merge release step.
-- The readiness manifest remains `NOT_READY` until the v0.2 candidate is
-  versioned and its final release artifacts are produced. Nested generic
-  wrappers, broader aggregate combinations and cancellation states beyond the
-  focused pre-run case remain outside the ownership claim. Later code changes
-  require fresh workflows.
+- [Ostrin CI](https://github.com/sircalch/Ostrin/actions/runs/38520134678) passed
+  on Ubuntu, Windows and macOS, including tests and numerical validation.
+  [Sanitizers](https://github.com/sircalch/Ostrin/actions/runs/38520142898),
+  [CodeQL](https://github.com/sircalch/Ostrin/actions/runs/38520134640),
+  [Security audit](https://github.com/sircalch/Ostrin/actions/runs/38520134613)
+  and [Browser audit](https://github.com/sircalch/Ostrin/actions/runs/38520134566)
+  passed for the same frozen source.
+- The [WASI build and runtime matrix](https://github.com/sircalch/Ostrin/actions/runs/38520140712)
+  passed all 28 programs. The [release workflow](https://github.com/sircalch/Ostrin/actions/runs/38520144819)
+  passed archive build, checksum, extraction and packaged smoke tests on macOS
+  ARM64, Linux x86_64 and Windows x86_64; its publish job was skipped because
+  the ref was untagged. [Benchmarks](https://github.com/sircalch/Ostrin/actions/runs/38609662881)
+  and [website deployment](https://github.com/sircalch/Ostrin/actions/runs/38520134760)
+  also passed.
+- The readiness manifest marks all 12 criteria `READY`; the candidate remains
+  unpublished and untagged pending explicit owner authorization. The local
+  approval audit found stale status/scorecard references on `main`; this branch
+  updates those docs but does not change the frozen compiler source. A final
+  main commit requires a new artifact build before publication approval.
+- Nested generic wrappers, broader aggregate combinations, and cancellation
+  states beyond the focused pre-run case remain outside the ownership claim.
