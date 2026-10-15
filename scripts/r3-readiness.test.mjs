@@ -259,13 +259,13 @@ test("R3 gap summary reconciles with per-bundle missing fields and effect covera
   const hostGap = captureGaps.missingExtensionFields.find(({ field }) => field === "provenance.runtime.host");
   const effectGap = captureGaps.incompleteExtensionFields.find(({ field }) => field === "provenance.effects.effect_coverage");
 
-  assert.equal(hostGap?.bundleCount, report.captureOpenCount);
-  assert.equal(effectGap?.bundleCount, report.incompleteEffectBundleCount);
+  assert.equal(hostGap?.bundleCount ?? 0, report.captureOpenCount);
+  assert.equal(effectGap?.bundleCount ?? 0, report.incompleteEffectBundleCount);
   assert.equal(effectInventory.operationReferences, report.unresolvedEffectCallCount);
   assert.equal(Object.values(effectInventory.bySyntax).reduce((sum, count) => sum + count, 0),
     effectInventory.operationReferences);
-  assert.ok(effectInventory.uniqueOperationNames > 0);
-  assert.ok(effectInventory.topOperations.length > 0);
+  assert.equal(effectInventory.uniqueOperationNames > 0, report.unresolvedEffectCallCount > 0);
+  assert.equal(effectInventory.topOperations.length > 0, report.unresolvedEffectCallCount > 0);
   assert.match(effectInventory.interpretation, /does not determine type resolution or prove purity/i);
   assert.ok(notAssessed.includes("Whether numerical tolerances are scientifically justified"));
 });
