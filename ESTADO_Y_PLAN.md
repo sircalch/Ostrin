@@ -1,6 +1,6 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-10-14 · baseline integrado `main`/`cb9a524` · release candidate v0.2.0 sin publicar · 6 pruebas diferenciales, 352 de integración y 11 unitarias en verde.*
+*Corte: 2026-10-15 · base integrada PR #185 (`ddd8d21`) · release candidate v0.2.0 sin publicar · 6 pruebas diferenciales, 353 de integración y 11 unitarias en verde.*
 
 Baseline remoto integrado: `main` en `cb9a52480f0d016921e4d0bccb195ad0faac958b` pasó CI
 ([38520134678](https://github.com/sircalch/Ostrin/actions/runs/38520134678)), Browser audit
@@ -11,7 +11,7 @@ Baseline remoto integrado: `main` en `cb9a52480f0d016921e4d0bccb195ad0faac958b` 
 ([38520140712](https://github.com/sircalch/Ostrin/actions/runs/38520140712)), empaquetado de release
 ([38520144819](https://github.com/sircalch/Ostrin/actions/runs/38520144819)), auditoría web y despliegue.
 La matriz de ownership vigente está en [`docs/ownership-matrix.md`](docs/ownership-matrix.md). La rama local `codex/static-effect-row-verification` añade inferencia tipada experimental sin
-validación CI remota todavía. Su suite local pasó: 11 pruebas unitarias, 6 diferenciales y 352 de integración
+validación CI remota todavía. Su suite local pasó: 11 pruebas unitarias, 6 diferenciales y 353 de integración
 y 77 tests Node; también pasan fmt, el Clippy configurado por CI, `project-plan-check` y
 `website-check`.
 
@@ -66,7 +66,7 @@ Implementación: compilador + intérprete + herramientas de editor, todo en Rust
 | Servidor de lenguaje | `lsp.rs`, `symbols.rs`, `protocol.rs` | LSP sobre stdio |
 | Adaptador de depuración | `dap.rs` + hooks del intérprete | DAP sobre stdio |
 | **Backend nativo** | `codegen.rs`, `hir_c.rs` y runtimes C | Transpila a C y compila con gcc/clang/cc |
-| CLI | `main.rs` | `--check --run --ast --tokens --json --lsp --dap --emit-c --compile --native-threads --effect-report --provenance-report` (inventarios experimentales conservadores) |
+| CLI | `main.rs` | `--check --run --ast --tokens --json --lsp --dap --emit-c --compile --native-threads --effect-report --require-closed-effects --provenance-report` (análisis experimental conservador) |
 | Editor | `vscode-ostrin/` (v0.4.0) | Resaltado, LSP, DAP, comandos, VSIX |
 
 Regla de oro del proyecto: **el intérprete es la referencia**. Cada capacidad del
@@ -595,7 +595,7 @@ plan, después de revisar e integrar efectos, es `Measurement<Quantity<D>>` seg�
 
 ```powershell
 cd compiler
-    cargo test                                   # 6 diferenciales + 352 de integración + 11 unitarias
+    cargo test                                   # 6 diferenciales + 353 de integración + 11 unitarias
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 cd ..

@@ -55,6 +55,7 @@ fn real_main() -> ExitCode {
     let typed_report = args.iter().any(|a| a == "--typed-report");
     let native_type_report = args.iter().any(|a| a == "--native-type-report");
     let effect_report = args.iter().any(|a| a == "--effect-report");
+    let require_closed_effects = args.iter().any(|a| a == "--require-closed-effects");
     let provenance_report = args.iter().any(|a| a == "--provenance-report");
     let hir_mode = args.iter().any(|a| a == "--hir");
     let ir_mode = args.iter().any(|a| a == "--ir");
@@ -318,9 +319,29 @@ fn real_main() -> ExitCode {
         };
     }
 
-    if effect_report {
+    if effect_report || require_closed_effects {
         let typed = typeck::Checker::new().check_program_typed(&items);
         let report = effects::analyze_with_types(&items, &typed);
+        let (known_calls, symbolic_call_count, unresolved_call_count) = report.call_coverage();
+        let open_call_count: usize = report
+            .open_effect_calls
+            .values()
+            .map(std::collections::BTreeSet::len)
+            .sum();
+        let indirect_call_count: usize = report
+            .indirect_calls
+            .values()
+            .map(std::collections::BTreeSet::len)
+            .sum();
+        let symbolic_variable_count: usize = report
+            .function_effect_variables
+            .values()
+            .map(std::collections::BTreeSet::len)
+            .sum();
+        let effects_closed = unresolved_call_count == 0
+            && open_call_count == 0
+            && indirect_call_count == 0
+            && symbolic_variable_count == 0;
         if json {
             let sites: Vec<_> = report
                 .sites
@@ -336,7 +357,6 @@ fn real_main() -> ExitCode {
                     })
                 })
                 .collect();
-            let (known_calls, symbolic_call_count, unresolved_call_count) = report.call_coverage();
             println!(
                 "{}",
                 serde_json::json!({
@@ -389,6 +409,13 @@ fn real_main() -> ExitCode {
                         "symbolic_calls": symbolic_call_count,
                         "unresolved_calls": unresolved_call_count,
                         "complete": unresolved_call_count == 0,
+                    },
+                    "effect_closure": {
+                        "status": if effects_closed { "closed" } else { "open" },
+                        "required": require_closed_effects,
+                        "open_calls": open_call_count,
+                        "indirect_calls": indirect_call_count,
+                        "symbolic_variables": symbolic_variable_count,
                     },
                     "sites": sites,
                 })
@@ -455,8 +482,22 @@ fn real_main() -> ExitCode {
                 );
             }
             println!("note: this report is evidence for future effect checking; it is not a static guarantee");
+            println!(
+                "effect closure: {} ({} open calls, {} indirect calls, {} symbolic variables)",
+                if effects_closed { "closed" } else { "open" },
+                open_call_count,
+                indirect_call_count,
+                symbolic_variable_count
+            );
         }
-        return ExitCode::SUCCESS;
+        return if require_closed_effects && !effects_closed {
+            eprintln!(
+                "error: --require-closed-effects found unresolved or symbolic effect boundaries"
+            );
+            ExitCode::FAILURE
+        } else {
+            ExitCode::SUCCESS
+        };
     }
 
     if provenance_report {
@@ -1067,6 +1108,7 @@ fn print_help() {
     println!("  --hir         Print the typed, verified HIR");
     println!("  --ir          Lower HIR to explicit basic blocks and temporaries");
     println!("  --effect-report  Infer conservative scientific effect rows (experimental)");
+    println!("  --require-closed-effects  Fail if any operation or effect row remains open");
     println!("  --provenance-report  Emit an experimental reproducibility artifact");
     println!("  --ownership-report  Report conservative managed values and last-use candidates");
     println!("  --ownership-ir      Insert proof-guided linear release markers into a cloned IR");

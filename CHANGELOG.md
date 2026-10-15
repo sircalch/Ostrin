@@ -64,7 +64,8 @@
 ### Experimental typed effect inference
 
 - Compose inferred effects through local calls, recursive call cycles and typed collection callbacks. Preserve symbolic callback effect variables through HIR and IR, and leave unknown calls open. Coverage counts distinct function-operation edges (`count_unit: distinct_function_operation_edges`), not source callsites. This remains an experimental inventory: a closed row is not a purity guarantee, and effect rows are not yet public function-type contracts.
-- The current working branch has a 302-example, 352-integration-test repository state; this count is not the frozen v0.2.0 candidate baseline.
+- Added opt-in `--require-closed-effects` so automated checks fail when calls or effect rows remain unresolved, indirect or symbolic. A closed report allows known effects and does not assert purity.
+- The current working branch has a 302-example, 353-integration-test repository state; this count is not the frozen v0.2.0 candidate baseline.
 
 ### Native dynamic traits
 

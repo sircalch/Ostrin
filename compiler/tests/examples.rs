@@ -11911,6 +11911,7 @@ fn cli_exposes_help_and_version() {
     assert!(stdout(&help).contains("--members"));
     assert!(stdout(&help).contains("--types"));
     assert!(stdout(&help).contains("--effect-report"));
+    assert!(stdout(&help).contains("--require-closed-effects"));
     assert!(stdout(&help).contains("--provenance-report"));
     assert!(stdout(&help).contains("--project"));
     assert!(stdout(&help).contains("--native-threads"));
@@ -12118,6 +12119,49 @@ fn effect_coverage_counts_distinct_function_operation_edges() {
     assert_eq!(report["effect_coverage"]["known_calls"], 1);
     assert_eq!(report["effect_coverage"]["unresolved_calls"], 0);
     let _ = fs::remove_file(&file);
+}
+
+#[test]
+fn require_closed_effects_accepts_resolved_rows_and_rejects_open_boundaries() {
+    let resolved = temp_source(
+        "effects-closed-gate.ostrin",
+        "fn emit() -> Void { print(\"known io\") }\nfn main() -> Void { emit() }\n",
+    );
+    let out = run(&["--require-closed-effects", "--json", &resolved]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let report: serde_json::Value = serde_json::from_str(&stdout(&out)).unwrap();
+    assert_eq!(report["effect_closure"]["status"], "closed");
+    assert_eq!(report["effect_closure"]["required"], true);
+
+    let open = temp_source(
+        "effects-open-gate.ostrin",
+        "fn main() -> Void { unknown_host_call() }\n",
+    );
+    let out = run(&["--require-closed-effects", "--json", &open]);
+    assert!(
+        !out.status.success(),
+        "open effect boundary passed the gate"
+    );
+    let report: serde_json::Value = serde_json::from_str(&stdout(&out)).unwrap();
+    assert_eq!(report["effect_closure"]["status"], "open");
+    assert_eq!(report["effect_closure"]["open_calls"], 1);
+    assert!(stderr(&out).contains("--require-closed-effects"));
+
+    let symbolic = temp_source(
+        "effects-symbolic-gate.ostrin",
+        "fn invoke(callback: fn() -> Void) -> Void { callback() }\n",
+    );
+    let out = run(&["--require-closed-effects", "--json", &symbolic]);
+    assert!(
+        !out.status.success(),
+        "symbolic effect row passed the closed gate"
+    );
+    let report: serde_json::Value = serde_json::from_str(&stdout(&out)).unwrap();
+    assert_eq!(report["effect_closure"]["status"], "open");
+    assert_eq!(report["effect_closure"]["symbolic_variables"], 1);
+    let _ = fs::remove_file(resolved);
+    let _ = fs::remove_file(open);
+    let _ = fs::remove_file(symbolic);
 }
 
 #[test]
