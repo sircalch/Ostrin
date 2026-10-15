@@ -247,9 +247,9 @@
   },
   "ci": {
     "provider": "github-actions",
-    "run_id": "38520134678",
-    "run_url": "https://github.com/sircalch/Ostrin/actions/runs/38520134678",
-    "commit": "cb9a52480f0d016921e4d0bccb195ad0faac958b",
+    "run_id": "38681256328",
+    "run_url": "https://github.com/sircalch/Ostrin/actions/runs/38681256328",
+    "commit": "d0abbad0f674317c95c389b953507365f3fd1a59",
     "workflow": "Ostrin CI"
   }
 }

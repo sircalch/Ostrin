@@ -17,26 +17,26 @@ head's CI or a release approval.
 
 ## Current revision evidence
 
-This review records the frozen source revision `cb9a52480f0d016921e4d0bccb195ad0faac958b`. CI reports 333 integration tests, 6 differential tests and 3 unit tests; `website-check` reports 17 pages and 302 examples. The public Linguist inventory reports 302 examples and tracks upstream adoption separately.
+This review records compiler source revision `d0abbad0f674317c95c389b953507365f3fd1a59`, which was `main` when the RC artifacts were built. CI reports 339 Rust-marked tests; `website-check` reports 17 pages, 302 examples and 333 integration tests. The public Linguist inventory reports 302 examples and tracks upstream adoption separately.
 
-- [Ostrin CI](https://github.com/sircalch/Ostrin/actions/runs/38520134678) passed
+- [Ostrin CI](https://github.com/sircalch/Ostrin/actions/runs/38681256328) passed
   on Ubuntu, Windows and macOS, including tests and numerical validation.
-  [Sanitizers](https://github.com/sircalch/Ostrin/actions/runs/38520142898),
-  [CodeQL](https://github.com/sircalch/Ostrin/actions/runs/38520134640),
-  [Security audit](https://github.com/sircalch/Ostrin/actions/runs/38520134613)
-  and [Browser audit](https://github.com/sircalch/Ostrin/actions/runs/38520134566)
+  [Sanitizers](https://github.com/sircalch/Ostrin/actions/runs/38681322946),
+  [CodeQL](https://github.com/sircalch/Ostrin/actions/runs/38681256503),
+  [Security audit](https://github.com/sircalch/Ostrin/actions/runs/38681256363)
+  and [Browser audit](https://github.com/sircalch/Ostrin/actions/runs/38681256349)
   passed for the same frozen source.
-- The [WASI build and runtime matrix](https://github.com/sircalch/Ostrin/actions/runs/38520140712)
-  passed all 28 programs. The [release workflow](https://github.com/sircalch/Ostrin/actions/runs/38520144819)
+- The [WASI build and runtime matrix](https://github.com/sircalch/Ostrin/actions/runs/38681318079)
+  passed all 28 programs. The [release workflow](https://github.com/sircalch/Ostrin/actions/runs/38681320600)
   passed archive build, checksum, extraction and packaged smoke tests on macOS
   ARM64, Linux x86_64 and Windows x86_64; its publish job was skipped because
   the ref was untagged. [Benchmarks](https://github.com/sircalch/Ostrin/actions/runs/38609662881)
-  and [website deployment](https://github.com/sircalch/Ostrin/actions/runs/38520134760)
+  and [website deployment](https://github.com/sircalch/Ostrin/actions/runs/38681256306)
   also passed.
 - The readiness manifest marks all 12 criteria `READY`; the candidate remains
-  unpublished and untagged pending explicit owner authorization. The local
-  approval audit found stale status/scorecard references on `main`; this branch
-  updates those docs but does not change the frozen compiler source. A final
-  main commit requires a new artifact build before publication approval.
+  unpublished and untagged pending explicit owner authorization. The RC
+  evidence manifest and readiness links now point to source revision `d0abbad`
+  and its verified artifact runs. Later evidence-only metadata commits do not
+  change that compiler source revision.
 - Nested generic wrappers, broader aggregate combinations, and cancellation
   states beyond the focused pre-run case remain outside the ownership claim.

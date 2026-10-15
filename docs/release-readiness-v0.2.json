@@ -20,7 +20,7 @@
         { "path": "scripts/numeric-validation.mjs", "claim": "Independent numerical residual and reference validation" },
         { "path": "validation/numeric/matrix_algorithms.json", "claim": "Analytical cases and explicit tolerances" },
         { "path": "docs/design/24-metodos-numericos.md", "claim": "Numerical validation method and scope" },
-        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38520134678", "claim": "Candidate-head Ostrin CI numerical validation passes on Windows, macOS and Ubuntu; the Windows report compares 60 values with maximum absolute difference 0 and live_allocations=0" }
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38681256328", "claim": "Post-merge main Ostrin CI numerical validation passes on Windows, macOS and Ubuntu; the Windows report compares 60 values with maximum absolute difference 0 and live_allocations=0" }
       ]
     },
     {
@@ -30,9 +30,9 @@
       "requires_ci_run_url": true,
       "evidence": [
         { "path": "docs/ownership-matrix.md", "claim": "Ownership support, tested boundaries and limitations" },
-        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38520134678", "claim": "Frozen-candidate interpreter/native, differential and numerical CI passes on Ubuntu, Windows and macOS" },
-        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38520142898", "claim": "Frozen-candidate ASan native suite, generated differential corpus, frontend fuzz and UBSan suite pass" },
-        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38520140712", "claim": "Frozen-candidate WASI compiler build, 28-program runtime matrix and artifact checksum pass" },
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38681256328", "claim": "Post-merge main interpreter/native, differential and numerical CI passes on Ubuntu, Windows and macOS" },
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38681322946", "claim": "Post-merge main ASan native suite, generated differential corpus, frontend fuzz and UBSan suite pass" },
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38681318079", "claim": "Post-merge main WASI compiler build, 28-program runtime matrix and artifact checksum pass" },
         { "path": "compiler/tests/fixtures/native_ir_quantity_array_record_field.ostrin", "claim": "Array<Quantity<Length>> record-field replacement has interpreter/native/WASI and leak-check coverage" },
         { "path": "examples/native_ir_map_set_branch.ostrin", "claim": "Map and Set branch selection has interpreter/native/WASI and leak-check coverage" },
         { "path": "examples/measurement_record.ostrin", "claim": "Measurement<Float> record-field replacement has interpreter/native/WASI and leak-check coverage" },
@@ -68,7 +68,7 @@
       "acceptance": "Measurement<Float> has reviewed semantics and analytical reference cases, parity, zero-allocation checks and ASan/UBSan/WASI evidence for the supported scalar contract.",
       "evidence": [
         { "path": "docs/design/25-mediciones-e-incertidumbre.md", "claim": "Measurement scalar model, analytical cases and explicit limitations" },
-        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38520142898", "claim": "Frozen-candidate scalar Measurement lifecycle passes ASan and UBSan in CI" }
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38681322946", "claim": "Post-merge main scalar Measurement lifecycle passes ASan and UBSan in CI" }
       ]
     },
     {
@@ -79,7 +79,7 @@
       "evidence": [
         { "path": "scripts/experiment-replay.mjs", "claim": "Executable R1/R2 replay gate discovers the registry" },
         { "path": "docs/design/26-efectos-cientificos.md", "claim": "Defines exact replay scope and per-metric cross-platform tolerance requirements" },
-        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38520134678", "claim": "Frozen-candidate Ostrin CI passes the registered experiment replay and R1/R2 contract tests" }
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38681256328", "claim": "Post-merge main Ostrin CI passes the registered experiment replay and R1/R2 contract tests" }
       ]
     },
     {
@@ -100,7 +100,7 @@
       "requires_ci_run_url": true,
       "evidence": [
         { "path": ".github/workflows/sanitizers.yml", "claim": "Required sanitizer workflows" },
-        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38520142898", "claim": "Frozen-candidate ASan and UBSan native suites pass" }
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38681322946", "claim": "Post-merge main ASan and UBSan native suites pass" }
       ]
     },
     {
@@ -122,7 +122,7 @@
         { "path": "tests/browser/visual.spec.mjs", "claim": "Chromium desktop/tablet/mobile visual regression and representative plot coverage" },
         { "path": "tests/browser/cross-browser.spec.mjs", "claim": "Firefox/WebKit responsive and keyboard smoke coverage" },
         { "path": ".github/workflows/browser-audit.yml", "claim": "Non-deploying pinned Ubuntu 24.04 browser audit" },
-        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38520134566", "claim": "Frozen-candidate Chromium, Firefox, WebKit, WASM, static and accessibility website checks pass" }
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38681256349", "claim": "Post-merge main Chromium, Firefox, WebKit, WASM, static and accessibility website checks pass" }
       ]
     },
     {
@@ -133,7 +133,7 @@
       "evidence": [
         { "path": ".github/workflows/install-check.yml", "claim": "Cross-platform clean-runner installation workflow; attach v0.2 candidate run links before release" },
         { "path": "validation/installation-local-2026-10-10.json", "claim": "Published 0.1.0 Windows installer checksum, version, check and hello smoke evidence" },
-        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38520144819", "claim": "Frozen-candidate archives were extracted, checksummed and smoke-tested on clean native Ubuntu, macOS and Windows runners; public install scripts remain on the published 0.1.0 release" }
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38681320600", "claim": "Post-merge main candidate archives were extracted, checksummed and smoke-tested on clean native Ubuntu, macOS and Windows runners; public install scripts remain on the published 0.1.0 release" }
       ]
     },
     {
@@ -153,9 +153,9 @@
       "evidence": [
         { "path": ".github/workflows/release.yml", "claim": "Cross-platform release build, checksum, extraction and smoke test" },
         { "path": ".github/workflows/wasi.yml", "claim": "Pinned WASI build, runtime smoke matrix and checksums" },
-        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38520144819", "claim": "Ostrin v0.2.0-rc.cb9a524 Linux x86_64, macOS ARM64 and Windows x64 archives pass tests, compiler smoke, checksum verification, extraction and packaged-project smoke on their native runners; publish job skipped because this is an untagged main-branch candidate" },
-        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38520140712", "claim": "Ostrin WASI compiler artifact for cb9a524 passes Node WASI smoke and its 28-program runtime matrix; internal SHA256SUMS covers the compiler plus 28 program modules and was independently verified locally" },
-        { "path": "validation/release-candidate-v0.2.0.json", "claim": "Frozen main source revision cb9a524, candidate archive names and SHA-256 hashes, current workflow run evidence, downloaded checksum/extraction and Windows smoke outcomes, and explicit no-tag/no-publication state" }
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38681320600", "claim": "Ostrin v0.2.0-rc.d0abbad Linux x86_64, macOS ARM64 and Windows x64 archives pass tests, compiler smoke, checksum verification, extraction and packaged-project smoke on their native runners; publish job skipped because this is an untagged main-branch candidate" },
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38681318079", "claim": "Ostrin WASI compiler artifact for d0abbad passes Node WASI smoke and its 28-program runtime matrix; internal SHA256SUMS covers the compiler plus 28 program modules and was independently verified locally" },
+        { "path": "validation/release-candidate-v0.2.0.json", "claim": "Frozen main source revision d0abbad, candidate archive names and SHA-256 hashes, current workflow run evidence, downloaded checksum/extraction and Windows smoke outcomes, and explicit no-tag/no-publication state" }
       ]
     }
   ]
