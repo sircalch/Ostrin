@@ -12159,9 +12159,23 @@ fn require_closed_effects_accepts_resolved_rows_and_rejects_open_boundaries() {
     let report: serde_json::Value = serde_json::from_str(&stdout(&out)).unwrap();
     assert_eq!(report["effect_closure"]["status"], "open");
     assert_eq!(report["effect_closure"]["symbolic_variables"], 1);
+
+    let ill_typed = temp_source(
+        "effects-ill-typed-gate.ostrin",
+        "fn main() -> Void { print(1 + true) }\n",
+    );
+    let out = run(&["--require-closed-effects", "--json", &ill_typed]);
+    assert!(
+        !out.status.success(),
+        "ill-typed source passed the effect gate"
+    );
+    let report: serde_json::Value = serde_json::from_str(&stdout(&out)).unwrap();
+    assert_eq!(report["effect_closure"]["status"], "open");
+    assert!(report["effect_closure"]["type_errors"].as_u64().unwrap() > 0);
     let _ = fs::remove_file(resolved);
     let _ = fs::remove_file(open);
     let _ = fs::remove_file(symbolic);
+    let _ = fs::remove_file(ill_typed);
 }
 
 #[test]

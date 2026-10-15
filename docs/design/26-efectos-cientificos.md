@@ -321,8 +321,9 @@ en una consola de logs.
    contra una función local ni contra una operación de host clasificada. Esta separación deja
    visible la deuda de cobertura para la futura inferencia estática de efectos. La opción
    experimental `--require-closed-effects` convierte esas fronteras en un gate de CI: requiere
-   que no haya llamadas irresueltas, indirectas ni variables simbólicas abiertas en las funciones
-   analizadas. Acepta filas con efectos conocidos como `io`; “cerrada” no equivale a “pura” y esta
+   que el programa no tenga errores de tipos ni llamadas irresueltas, indirectas o variables
+   simbólicas abiertas en las funciones analizadas. Acepta filas con efectos conocidos como `io`;
+   “cerrada” no equivale a “pura” y esta
    opción todavía no valida contratos públicos de efectos.
    `effect_coverage` resume esas cantidades (`known_calls`, `unresolved_calls` y `complete`). El
    campo `count_unit` usa `distinct_function_operation_edges`: cuenta pares únicos

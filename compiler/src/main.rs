@@ -338,7 +338,9 @@ fn real_main() -> ExitCode {
             .values()
             .map(std::collections::BTreeSet::len)
             .sum();
-        let effects_closed = unresolved_call_count == 0
+        let type_error_count = typed.errors.len();
+        let effects_closed = type_error_count == 0
+            && unresolved_call_count == 0
             && open_call_count == 0
             && indirect_call_count == 0
             && symbolic_variable_count == 0;
@@ -416,6 +418,7 @@ fn real_main() -> ExitCode {
                         "open_calls": open_call_count,
                         "indirect_calls": indirect_call_count,
                         "symbolic_variables": symbolic_variable_count,
+                        "type_errors": type_error_count,
                     },
                     "sites": sites,
                 })
@@ -483,8 +486,9 @@ fn real_main() -> ExitCode {
             }
             println!("note: this report is evidence for future effect checking; it is not a static guarantee");
             println!(
-                "effect closure: {} ({} open calls, {} indirect calls, {} symbolic variables)",
+                "effect closure: {} ({} type errors, {} open calls, {} indirect calls, {} symbolic variables)",
                 if effects_closed { "closed" } else { "open" },
+                type_error_count,
                 open_call_count,
                 indirect_call_count,
                 symbolic_variable_count
@@ -492,7 +496,7 @@ fn real_main() -> ExitCode {
         }
         return if require_closed_effects && !effects_closed {
             eprintln!(
-                "error: --require-closed-effects found unresolved or symbolic effect boundaries"
+                "error: --require-closed-effects found type errors or unresolved/symbolic effect boundaries"
             );
             ExitCode::FAILURE
         } else {
