@@ -319,7 +319,7 @@ fn real_main() -> ExitCode {
     }
 
     if effect_report {
-        let report = effects::analyze(&items);
+        let report = effects::analyze_with_call_sites(&items);
         if json {
             let sites: Vec<_> = report
                 .sites
@@ -358,6 +358,15 @@ fn real_main() -> ExitCode {
                         .collect::<Vec<_>>(),
                     "function_calls": report.function_calls,
                     "unresolved_calls": report.unresolved_calls,
+                    "unresolved_call_sites": report.unresolved_call_sites.iter().map(|site| {
+                        serde_json::json!({
+                            "operation": site.operation,
+                            "function": site.function,
+                            "file": site.file.as_deref().map(|file| file.replace('\\', "/")),
+                            "line": site.line,
+                            "col": site.col,
+                        })
+                    }).collect::<Vec<_>>(),
                     "effect_coverage": {
                         "known_calls": known_calls,
                         "unresolved_calls": unresolved_call_count,
@@ -427,7 +436,7 @@ fn real_main() -> ExitCode {
             }
         };
         let target = argument_value(&args, "--target").unwrap_or_else(|| "native".to_string());
-        let effects = effects::analyze(&items);
+        let effects = effects::analyze_with_call_sites(&items);
         let report = provenance::build_report(entry_path, &source, &target, &effects);
         if json {
             match serde_json::to_string_pretty(&report) {

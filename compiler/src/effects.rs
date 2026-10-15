@@ -63,6 +63,27 @@ pub struct EffectSite {
     pub col: usize,
 }
 
+/// A source occurrence whose operation was not matched by the syntactic
+/// effect inventory. This is a review aid, not evidence that name resolution
+/// failed in the type checker.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnresolvedCallSite {
+    pub operation: String,
+    pub function: String,
+    pub file: Option<String>,
+    pub line: usize,
+    pub col: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ObservedCallSite {
+    operation: String,
+    function: String,
+    file: Option<String>,
+    line: usize,
+    col: usize,
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct EffectReport {
     pub effects: BTreeSet<String>,
@@ -84,6 +105,11 @@ pub struct EffectReport {
     /// host operation. These make the conservative boundary explicit: a
     /// function with no known effect may still call one of these operations.
     pub unresolved_calls: BTreeMap<String, BTreeSet<String>>,
+    /// Source occurrences backing `unresolved_calls`, preserving duplicates
+    /// and locations for follow-up review.
+    pub unresolved_call_sites: Vec<UnresolvedCallSite>,
+    collect_call_sites: bool,
+    call_sites: Vec<ObservedCallSite>,
     pub sites: Vec<EffectSite>,
 }
 
@@ -116,7 +142,19 @@ impl EffectReport {
 }
 
 pub fn analyze(items: &[Item]) -> EffectReport {
+    analyze_internal(items, false)
+}
+
+/// Analyze effects and retain source locations for calls the syntactic
+/// inventory cannot classify. Use this only for explicit report generation;
+/// regular HIR lowering does not need the additional per-call storage.
+pub fn analyze_with_call_sites(items: &[Item]) -> EffectReport {
+    analyze_internal(items, true)
+}
+
+fn analyze_internal(items: &[Item], collect_call_sites: bool) -> EffectReport {
     let mut report = EffectReport::default();
+    report.collect_call_sites = collect_call_sites;
     for item in items {
         match item {
             Item::Function(function) => {
@@ -134,6 +172,7 @@ pub fn analyze(items: &[Item]) -> EffectReport {
 }
 
 fn classify_unresolved_calls(report: &mut EffectReport) {
+    let mut unresolved_call_sites = Vec::new();
     for (caller, calls) in &report.function_calls {
         for operation in calls {
             if classify(operation).is_none()
@@ -153,6 +192,30 @@ fn classify_unresolved_calls(report: &mut EffectReport) {
             }
         }
     }
+    for call in &report.call_sites {
+        if report
+            .unresolved_calls
+            .get(&call.function)
+            .is_some_and(|operations| operations.contains(&call.operation))
+        {
+            unresolved_call_sites.push(UnresolvedCallSite {
+                operation: call.operation.clone(),
+                function: call.function.clone(),
+                file: call.file.clone(),
+                line: call.line,
+                col: call.col,
+            });
+        }
+    }
+    unresolved_call_sites.sort_by(|left, right| {
+        left.file
+            .cmp(&right.file)
+            .then(left.line.cmp(&right.line))
+            .then(left.col.cmp(&right.col))
+            .then(left.function.cmp(&right.function))
+            .then(left.operation.cmp(&right.operation))
+    });
+    report.unresolved_call_sites = unresolved_call_sites;
 }
 
 fn walk_impl(implementation: &ImplDecl, report: &mut EffectReport) {
@@ -246,6 +309,15 @@ fn walk_expr(expr: &Expr, function: &str, file: Option<&str>, report: &mut Effec
                     .entry(function.to_string())
                     .or_default()
                     .insert(operation.clone());
+                if report.collect_call_sites {
+                    report.call_sites.push(ObservedCallSite {
+                        operation: operation.clone(),
+                        function: function.to_string(),
+                        file: file.map(str::to_string),
+                        line,
+                        col,
+                    });
+                }
                 if let Some(effect) = classify(&operation) {
                     add_effect(report, function, effect);
                     report.sites.push(EffectSite {

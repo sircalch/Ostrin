@@ -12093,7 +12093,7 @@ fn experimental_effect_report_propagates_through_qualified_impl_methods() {
 fn experimental_effect_report_keeps_unknown_calls_unresolved() {
     let file = temp_source(
         "effects-unknown.ostrin",
-        "fn main() -> Void {\n    mystery_host_operation()\n}\n",
+        "fn main() -> Void {\n    mystery_host_operation()\n    mystery_host_operation()\n}\n",
     );
     let out = run(&["--effect-report", "--json", &file]);
     let _ = fs::remove_file(&file);
@@ -12104,6 +12104,15 @@ fn experimental_effect_report_keeps_unknown_calls_unresolved() {
         artifact["unresolved_calls"]["main"],
         serde_json::json!(["mystery_host_operation"])
     );
+    let call_sites = artifact["unresolved_call_sites"]
+        .as_array()
+        .expect("unknown call occurrences must be available for review");
+    assert_eq!(call_sites.len(), 2);
+    assert_eq!(call_sites[0]["operation"], "mystery_host_operation");
+    assert_eq!(call_sites[0]["function"], "main");
+    assert_eq!(call_sites[0]["line"], 2);
+    assert_eq!(call_sites[0]["col"], 5);
+    assert_eq!(call_sites[1]["line"], 3);
     assert_eq!(
         artifact["effect_coverage"],
         serde_json::json!({"known_calls": 0, "unresolved_calls": 1, "complete": false})
@@ -12143,6 +12152,7 @@ fn experimental_provenance_report_contains_source_hash_and_effects() {
     assert!(artifact["activity"]["effects"]
         .as_array()
         .is_some_and(|effects| effects.iter().any(|effect| effect == "measurement")));
+    assert!(artifact["activity"]["unresolved_call_sites"].is_array());
     assert_eq!(artifact["reproducibility"]["level"], "unverified");
 
     let text = run(&[

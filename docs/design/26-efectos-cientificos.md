@@ -319,7 +319,11 @@ en una consola de logs.
    no funciones declaradas puras, porque una llamada no resuelta puede quedar fuera del análisis.
    El JSON también expone `unresolved_calls` por función: llamadas que no se pudieron resolver
    contra una función local ni contra una operación de host clasificada. Esta separación deja
-   visible la deuda de cobertura para la futura inferencia estática de efectos.
+   visible la deuda de cobertura para la futura inferencia estática de efectos. `unresolved_call_sites`
+   añade las ocurrencias fuente con función, operación y posición para poder auditarlas una por una;
+   puede contener varias ocurrencias aunque `unresolved_calls` deduplique un mismo nombre dentro de
+   una función. Son candidatas no clasificadas por este inventario sintáctico, no diagnósticos del
+   resolvedor tipado.
    `effect_coverage` resume esas cantidades (`known_calls`, `unresolved_calls` y `complete`);
    `complete` solo significa que el inventario resolvió todas las llamadas observadas, no que
    haya demostrado pureza.

@@ -131,6 +131,19 @@ pub fn build_report(path: &Path, source: &[u8], target: &str, effects: &EffectRe
             })
         })
         .collect();
+    let unresolved_call_sites: Vec<Value> = effects
+        .unresolved_call_sites
+        .iter()
+        .map(|site| {
+            json!({
+                "operation": site.operation,
+                "function": site.function,
+                "file": site.file.as_deref().map(|file| file.replace('\\', "/")),
+                "line": site.line,
+                "col": site.col,
+            })
+        })
+        .collect();
     let (known_calls, unresolved_call_count) = effects.call_coverage();
 
     let (level, reason) = if effect_names.is_empty() {
@@ -164,6 +177,7 @@ pub fn build_report(path: &Path, source: &[u8], target: &str, effects: &EffectRe
             "effects": effect_names,
             "functions_without_known_effects": functions_without_known_effects,
             "unresolved_calls": unresolved_calls,
+            "unresolved_call_sites": unresolved_call_sites,
             "effect_coverage": {
                 "known_calls": known_calls,
                 "unresolved_calls": unresolved_call_count,
