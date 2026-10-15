@@ -1,6 +1,6 @@
 {
   "schema": "ostrin.quality-scorecard/v1",
-  "sourceRevision": "c51b071aab243fdfa94dd4914e73ec0de6375d9e",
+  "sourceRevision": "f90128443d88d644497b5049aa16fa912e9d9f6a",
   "workingTreeDirty": false,
   "sources": {
     "native": "compiler/tests/differential.rs",
