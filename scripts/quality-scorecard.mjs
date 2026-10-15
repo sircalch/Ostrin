@@ -192,6 +192,8 @@ export async function buildScorecard() {
         extensionReadyCount: report.extensionReadyCount,
         readyCount: report.readyCount,
         openCount: report.openCount,
+        captureReadyCount: report.captureReadyCount,
+        captureOpenCount: report.captureOpenCount,
         incompleteEffectBundleCount: report.incompleteEffectBundleCount,
         unresolvedEffectCallCount: report.unresolvedEffectCallCount,
       };

@@ -9,6 +9,28 @@ export const requiredCriteria = [
   "sanitizers", "benchmarks", "website-audit", "installation", "changelog", "artifacts",
 ];
 
+function readJson(root, relativePath, errors) {
+  try {
+    return JSON.parse(readFileSync(path.join(root, relativePath), "utf8"));
+  } catch (error) {
+    errors.push(`cannot read ${relativePath}: ${error.message}`);
+    return undefined;
+  }
+}
+
+function readWebsiteStatus(root, errors) {
+  const relativePath = "website/status-data.js";
+  try {
+    const source = readFileSync(path.join(root, relativePath), "utf8");
+    const match = source.match(/globalThis\.OSTRIN_STATUS\s*=\s*Object\.freeze\((\{[\s\S]*\})\);/);
+    if (!match) throw new Error("cannot parse OSTRIN_STATUS object");
+    return JSON.parse(match[1]);
+  } catch (error) {
+    errors.push(`cannot read ${relativePath}: ${error.message}`);
+    return undefined;
+  }
+}
+
 export function validateV02Readiness(root = repositoryRoot, manifestPath = readinessPath) {
   const errors = [];
   let manifest;
@@ -19,6 +41,23 @@ export function validateV02Readiness(root = repositoryRoot, manifestPath = readi
   }
 
   if (manifest.release !== "0.2.0") errors.push("manifest release must be 0.2.0");
+
+  const provenanceFiles = [
+    [manifestPath, manifest.candidateProvenance],
+    ["validation/release-candidate-v0.2.0.json", readJson(root, "validation/release-candidate-v0.2.0.json", errors)],
+    ["validation/quality-scorecard.json", readJson(root, "validation/quality-scorecard.json", errors)],
+    ["website/status-data.js", readWebsiteStatus(root, errors)],
+  ];
+  for (const field of ["sourceRevision", "evidenceRevision", "releaseTag", "finalReleaseSourceRevision"]) {
+    const values = provenanceFiles.map(([file, value]) => [file, value?.[field]]);
+    const reference = values[0][1];
+    if (reference === undefined) errors.push(`${manifestPath}: candidateProvenance.${field} is missing`);
+    for (const [file, value] of values.slice(1)) {
+      if (value === undefined) errors.push(`${file}: ${field} is missing`);
+      else if (value !== reference) errors.push(`${file}: ${field} does not match ${manifestPath}`);
+    }
+  }
+
   if (!Array.isArray(manifest.criteria)) {
     return { ready: false, errors: [...errors, "criteria must be an array"] };
   }

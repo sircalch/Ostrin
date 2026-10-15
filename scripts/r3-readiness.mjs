@@ -34,14 +34,62 @@ function present(value) {
   return typeof value === "object" ? Object.keys(value).length > 0 : true;
 }
 
+function isObject(value) {
+  return value != null && typeof value === "object" && !Array.isArray(value);
+}
+
+function validFileReference(value) {
+  return isObject(value)
+    && typeof value.path === "string" && value.path.length > 0
+    && typeof value.sha256 === "string" && /^sha256:[a-f0-9]{64}$/.test(value.sha256);
+}
+
+function captureExtensionErrors(runtime) {
+  const errors = [];
+  if (!validFileReference(runtime?.compiler_lockfile)) {
+    errors.push("provenance.runtime.compiler_lockfile");
+  }
+  const host = runtime?.host;
+  if (!isObject(host)
+    || host.schema !== "ostrin.host/v1"
+    || typeof host.source !== "string" || host.source.length === 0
+    || typeof host.runner_os !== "string" || host.runner_os === "unknown"
+    || typeof host.runner_arch !== "string" || host.runner_arch === "unknown"
+    || typeof host.runner_environment !== "string" || host.runner_environment === "unknown"
+    || !isObject(host.image) || typeof host.image.os !== "string" || host.image.os === "unknown"
+    || typeof host.image.version !== "string" || host.image.version === "unknown"
+    || typeof host.node !== "string" || host.node.length === 0
+    || !isObject(host.hardware) || typeof host.hardware.arch !== "string"
+    || !Number.isInteger(host.hardware.cpu_count) || host.hardware.cpu_count < 1
+    || !["LE", "BE"].includes(host.hardware.endianness)
+    || host.wasi !== "preview1" || host.captured !== true) {
+    errors.push("provenance.runtime.host");
+  }
+
+  const dependencies = runtime?.dependencies;
+  if (!isObject(dependencies)
+    || !validFileReference(dependencies.compiler_lockfile)
+    || !validFileReference(dependencies.project_manifest)
+    || !validFileReference(dependencies.project_lockfile)) {
+    errors.push("provenance.runtime.dependencies");
+  }
+
+  const scheduler = runtime?.scheduler;
+  if (!isObject(scheduler)
+    || typeof scheduler.mode !== "string" || scheduler.mode.length === 0
+    || typeof scheduler.concurrency !== "string" || scheduler.concurrency.length === 0
+    || scheduler.status !== "declared") {
+    errors.push("provenance.runtime.scheduler");
+  }
+  return errors;
+}
+
 export function inspectBundle(bundle, file) {
   const missing = requiredPaths.filter((field) => !present(getPath(bundle, field)));
   const runtime = bundle?.provenance?.runtime;
   const missingR3Extensions = [];
   const incomplete = [];
-  if (!present(runtime?.host)) missingR3Extensions.push("provenance.runtime.host");
-  if (!present(runtime?.dependencies)) missingR3Extensions.push("provenance.runtime.dependencies");
-  if (!present(runtime?.scheduler)) missingR3Extensions.push("provenance.runtime.scheduler");
+  missingR3Extensions.push(...captureExtensionErrors(runtime));
   const effects = bundle?.provenance?.effects;
   if (!present(effects)) {
     missingR3Extensions.push("provenance.effects");
@@ -58,7 +106,9 @@ export function inspectBundle(bundle, file) {
     file,
     id: bundle?.id ?? null,
     currentLevel: bundle?.provenance?.level ?? bundle?.reproducibility?.level ?? null,
-    status: missing.length === 0 && missingR3Extensions.length === 0 ? "READY" : "OPEN",
+    status: missing.length === 0 && missingR3Extensions.length === 0 && incomplete.length === 0
+      ? "READY"
+      : "OPEN",
     requiredFields: { missing },
     r3Extensions: { missing: missingR3Extensions, incomplete },
     effectCoverage: effectCoverage && typeof effectCoverage === "object"
@@ -80,13 +130,31 @@ export function buildReadiness(root = repositoryRoot) {
     requiredFields: requiredPaths,
     bundleCount: entries.length,
     baseReadyCount: entries.filter((entry) => entry.requiredFields.missing.length === 0).length,
-    extensionReadyCount: entries.filter((entry) => entry.r3Extensions.missing.length === 0).length,
+    extensionReadyCount: entries.filter((entry) =>
+      entry.r3Extensions.missing.length === 0 && entry.r3Extensions.incomplete.length === 0).length,
     readyCount: entries.filter((entry) => entry.status === "READY").length,
     openCount: entries.filter((entry) => entry.status !== "READY").length,
+    captureReadyCount: entries.filter((entry) =>
+      entry.requiredFields.missing.length === 0 && entry.r3Extensions.missing.length === 0).length,
+    captureOpenCount: entries.filter((entry) =>
+      entry.requiredFields.missing.length > 0 || entry.r3Extensions.missing.length > 0).length,
     incompleteEffectBundleCount: entries.filter((entry) => entry.r3Extensions.incomplete.includes("provenance.effects.effect_coverage")).length,
     unresolvedEffectCallCount: entries.reduce((total, entry) => total + (entry.effectCoverage?.unresolved_calls ?? 0), 0),
     entries,
   };
+}
+
+export function requiredCaptureErrors(report) {
+  return report.entries.flatMap((entry) => {
+    const errors = [];
+    if (entry.requiredFields.missing.length > 0) {
+      errors.push(`${entry.file}: missing required fields: ${entry.requiredFields.missing.join(", ")}`);
+    }
+    if (entry.r3Extensions.missing.length > 0) {
+      errors.push(`${entry.file}: missing or invalid capture extensions: ${entry.r3Extensions.missing.join(", ")}`);
+    }
+    return errors;
+  });
 }
 
 async function main() {
@@ -95,6 +163,14 @@ async function main() {
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
   if (process.argv.includes("--require-ready") && report.status !== "READY") {
     process.exitCode = 1;
+  }
+  if (process.argv.includes("--require-capture")) {
+    const errors = requiredCaptureErrors(report);
+    if (errors.length > 0) {
+      console.error(`r3-readiness: capture contract failed (${errors.length} errors)`);
+      for (const error of errors) console.error(`- ${error}`);
+      process.exitCode = 1;
+    }
   }
 }
 

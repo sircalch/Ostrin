@@ -3,8 +3,8 @@
   "release": "0.2.0",
   "sourceRevision": "d0abbad0f674317c95c389b953507365f3fd1a59",
   "candidateIdentifier": "v0.2.0-rc.d0abbad",
-  "evidenceRevision": "8e3606d35282c9a8943db588edd6f21a4aa5a317",
-  "evidenceRevisionMeaning": "Fixed input commit containing source-backed candidate evidence and publication documentation; generated derivative metadata points here and is committed afterward, avoiding self-reference.",
+  "evidenceRevision": "08f11168a515ca20a1975d026d8dca661fb2dc3a",
+  "evidenceRevisionMeaning": "Fixed input commit containing the reviewed release evidence, honest R3 status semantics with strict structural capture validation, release workflow, notes and publication procedure; generated evidence derivatives point here and are committed afterward, avoiding self-reference.",
   "releaseTag": null,
   "finalReleaseSourceRevision": null,
   "releaseProvenancePolicy": "The RC artifacts below were built from sourceRevision only. A final release must be rebuilt from the exact authorized v0.2.0 tag; its artifacts and SHA-256 values must be recorded from that tag workflow and must not reuse these RC hashes.",
@@ -33,6 +33,24 @@
     { "target": "x86_64-pc-windows-msvc", "archive": "ostrinc-v0.2.0-rc.d0abbad-x86_64-pc-windows-msvc.zip", "sha256": "bb2bef00856fd0b5c9a53246d67de81d8e06af34a492f5d77fd22d7e06644722", "checksumSidecar": "verified against downloaded sidecar and local SHA-256", "runnerExtractionAndSmoke": "passed on Windows Actions runner; archive extracted locally", "localDownloadedExecutableVersionSmoke": "passed: ostrinc 0.2.0; hello output includes hola desde Ostrin; packaged project printed hola, Ostrin" },
     { "target": "wasm32-wasip1", "archive": "ostrinc-wasm32-wasip1.tar.gz", "sha256": "4977b597347173dc611bf580a4e5f88a8d5450de8c1223fee2905ee38f0d5e1c", "checksumSidecar": "contains SHA256SUMS; all 29 WASM modules independently verified locally", "runnerExtractionAndSmoke": "passed; 28 program matrix plus compiler runtime smoke" }
   ],
+  "releaseWorkflowRehearsal": {
+    "runId": 38688220232,
+    "url": "https://github.com/sircalch/Ostrin/actions/runs/38688220232",
+    "conclusion": "success",
+    "sourceRevision": "119d4b2186f3c53f78234cdabac0ffef6e50e50f",
+    "tag": null,
+    "publishJob": "skipped: workflow_dispatch ran on an untagged PR branch",
+    "nativeTargets": ["x86_64-unknown-linux-gnu", "aarch64-apple-darwin", "x86_64-pc-windows-msvc"],
+    "wasiRuntimeMatrixPrograms": 28,
+    "wasiManifestVerifiedModules": 29,
+    "artifacts": [
+      { "target": "x86_64-unknown-linux-gnu", "archive": "ostrinc-v0.2.0-rc.119d4b2-x86_64-unknown-linux-gnu.tar.gz", "sha256": "0a14f13d99858b2aafde7a4a5c8b4c954aa15df3cb77acdc18b1efb0abab7992", "sidecarVerifiedLocally": true, "runnerExtractionAndSmoke": "passed" },
+      { "target": "aarch64-apple-darwin", "archive": "ostrinc-v0.2.0-rc.119d4b2-aarch64-apple-darwin.tar.gz", "sha256": "d91dfc74e68844198130cb816c4fa930ed18b3fba4ee445469bab1cb3889cfd7", "sidecarVerifiedLocally": true, "runnerExtractionAndSmoke": "passed" },
+      { "target": "x86_64-pc-windows-msvc", "archive": "ostrinc-v0.2.0-rc.119d4b2-x86_64-pc-windows-msvc.zip", "sha256": "c7c7a04d510944891a2f378906e8ee3a7c49eafa817e886ae171033cd7f0e283", "sidecarVerifiedLocally": true, "runnerExtractionAndSmoke": "passed", "localDownloadedExecutableVersionSmoke": "passed: ostrinc 0.2.0; hello and packaged-project smoke passed" },
+      { "target": "wasm32-wasip1", "archive": "ostrinc-v0.2.0-rc.119d4b2-wasm32-wasip1.tar.gz", "sha256": "67603c4b190026be5e1ec3a5dd31fe918585cd3b93ed117bc04a618f25d074b1", "sidecarVerifiedLocally": true, "internalManifestVerification": "all 29 modules verified locally; 28-program matrix and compiler Node WASI smoke passed on runner" }
+    ],
+    "finalReleasePolicy": "These are branch rehearsal hashes from sourceRevision 119d4b2, not final release hashes. Rebuild every artifact from the exact authorized v0.2.0 tag and record its new hashes."
+  },
   "relatedChecks": {
     "ciRun": "https://github.com/sircalch/Ostrin/actions/runs/38681256328",
     "sanitizersRun": "https://github.com/sircalch/Ostrin/actions/runs/38681322946",

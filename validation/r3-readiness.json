@@ -19,6 +19,8 @@
   "extensionReadyCount": 0,
   "readyCount": 0,
   "openCount": 29,
+  "captureReadyCount": 0,
+  "captureOpenCount": 29,
   "incompleteEffectBundleCount": 29,
   "unresolvedEffectCallCount": 4266,
   "entries": [

@@ -36,6 +36,15 @@ function readyFixture() {
       writeFileSync(evidencePath, "fixture evidence\n");
     }
   }
+  for (const file of [
+    "validation/release-candidate-v0.2.0.json",
+    "validation/quality-scorecard.json",
+    "website/status-data.js",
+  ]) {
+    const target = path.join(root, file);
+    mkdirSync(path.dirname(target), { recursive: true });
+    copyFileSync(path.join(repositoryRoot, file), target);
+  }
   const manifestFile = path.join(root, readinessPath);
   mkdirSync(path.dirname(manifestFile), { recursive: true });
   writeFileSync(manifestFile, JSON.stringify(manifest, null, 2));
@@ -69,6 +78,18 @@ test("the gate requires real repository Actions run links for CI-backed criteria
     writeFileSync(path.join(root, readinessPath), JSON.stringify(manifest, null, 2));
     const result = validateV02Readiness(root);
     assert.ok(result.errors.some((error) => error.includes("successful GitHub Actions run URL")));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("the gate rejects contradictory source, evidence and release-tag revisions", () => {
+  const { root, manifest } = readyFixture();
+  try {
+    manifest.candidateProvenance.evidenceRevision = "a".repeat(40);
+    writeFileSync(path.join(root, readinessPath), JSON.stringify(manifest, null, 2));
+    const result = validateV02Readiness(root);
+    assert.ok(result.errors.some((error) => error.includes("evidenceRevision does not match")));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
