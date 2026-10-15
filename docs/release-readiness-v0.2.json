@@ -154,8 +154,8 @@
       "evidence": [
         { "path": ".github/workflows/release.yml", "claim": "Cross-platform release build, checksum, extraction and smoke test" },
         { "path": ".github/workflows/wasi.yml", "claim": "Pinned WASI build, runtime smoke matrix and checksums" },
-        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38517618635", "claim": "Ostrin v0.2.0-rc.d5defd5 Linux x86_64, macOS ARM64 and Windows x64 archives pass tests, compiler smoke, checksum verification, extraction and packaged-project smoke on their native runners; publish job skipped because this is an untagged main-branch candidate" },
-        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38517618724", "claim": "Ostrin v0.2.0 WASI compiler artifact passes Node WASI smoke, all 28 runtime matrix programs and internal checksum generation; downloaded artifact independently verified locally" },
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38520144819", "claim": "Ostrin v0.2.0-rc.cb9a524 Linux x86_64, macOS ARM64 and Windows x64 archives pass tests, compiler smoke, checksum verification, extraction and packaged-project smoke on their native runners; publish job skipped because this is an untagged main-branch candidate" },
+        { "url": "https://github.com/sircalch/Ostrin/actions/runs/38520140712", "claim": "Ostrin v0.2.0 WASI compiler artifact passes Node WASI smoke, all 28 runtime matrix programs and internal checksum generation; downloaded artifact independently verified locally" },
         { "path": "validation/release-candidate-v0.2.0.json", "claim": "Frozen source revision, candidate archive names and SHA-256 hashes, workflow run evidence, smoke outcomes and explicit no-tag/no-publication state" }
       ]
     }
