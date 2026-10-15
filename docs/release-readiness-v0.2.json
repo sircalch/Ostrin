@@ -3,7 +3,7 @@
   "status": "READY",
   "candidateProvenance": {
     "sourceRevision": "d0abbad0f674317c95c389b953507365f3fd1a59",
-    "evidenceRevision": "8e3606d35282c9a8943db588edd6f21a4aa5a317",
+    "evidenceRevision": "08f11168a515ca20a1975d026d8dca661fb2dc3a",
     "releaseTag": null,
     "finalReleaseSourceRevision": null,
     "meaning": "sourceRevision is the code used for the recorded RC binaries; evidenceRevision is the fixed input commit for evidence; releaseTag is unset until separately authorized. Final release artifacts must be newly built from that exact tag."
