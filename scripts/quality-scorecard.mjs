@@ -21,6 +21,10 @@ const generatedEvidencePath = (filePath) => {
   return normalized === "validation/r3-readiness.json"
     || normalized === "validation/quality-scorecard.json"
     || normalized === "website/status-data.js"
+    || normalized === "validation/release-candidate-v0.2.0.json"
+    || normalized === "docs/release-readiness-v0.2.json"
+    || normalized === "docs/review-map-v0.2.md"
+    || normalized === "validation/numeric/windows-local.json"
     || (normalized.startsWith("website/assets/experiments/") && normalized.endsWith(".ostrin-experiment.json"));
 };
 

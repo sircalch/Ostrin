@@ -3,7 +3,7 @@
   "release": "0.2.0",
   "sourceRevision": "d0abbad0f674317c95c389b953507365f3fd1a59",
   "candidateIdentifier": "v0.2.0-rc.d0abbad",
-  "evidenceRevision": null,
+  "evidenceRevision": "8e3606d35282c9a8943db588edd6f21a4aa5a317",
   "evidenceRevisionMeaning": "Fixed input commit containing source-backed candidate evidence and publication documentation; generated derivative metadata points here and is committed afterward, avoiding self-reference.",
   "releaseTag": null,
   "finalReleaseSourceRevision": null,
