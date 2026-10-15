@@ -1,11 +1,11 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-10-13 · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 333 de integración y 3 unitarias en verde.*
+*Corte: 2026-10-15 · `v0.1.0` sigue siendo la última release pública; candidato `v0.2.0` congelado en `cb9a524` · 6 pruebas diferenciales, 333 de integración y 3 unitarias en verde.*
 
-Validación remota: Pages, CI, CodeQL, sanitizers y auditoría de seguridad pasaron para el
-ciclo `4671b28` en Windows, Linux, macOS y web (Ostrin CI `38182030324`, Browser audit
-`38182030431`, CodeQL `38182030241`, Security audit `38182030358`, Native sanitizers
-`38182030421`). La compuerta oficial exige `cargo fmt --check`, Clippy con el lint `suspicious`, la suite del
+Validación remota del candidato `cb9a524`: CI `38520134678`, Browser audit `38520134566`,
+CodeQL `38520134640`, Security audit `38520134613`, Native sanitizers `38520142898`,
+WASI `38520140712`, release artifacts `38520144819` y benchmarks `38609662881` pasaron.
+La compuerta oficial exige `cargo fmt --check`, Clippy con el lint `suspicious`, la suite del
 compilador y las comprobaciones del sitio; los workflows de auditoría de dependencias,
 CodeQL, sanitizers nativos y cobertura quedan registrados para el ciclo P5.
 
@@ -594,9 +594,11 @@ covarianza, validación numérica, auditoría de accesibilidad/arquitectura web 
 validación analítica inicial de LU, Cholesky, QR, SVD y autovalores simétricos ya pasa localmente
 en intérprete y nativo con residuales independientes, tolerancias por caso y cero fugas; el criterio
 permanece abierto hasta obtener ejecución CI verde en todos los sistemas soportados y adjuntar su URL.
-El gate de publicación de [`v0.2.0`](docs/release-readiness-v0.2.json) tiene 12 criterios
-con evidencia y un límite inicial de ocho fallbacks AST; se mantiene **NOT_READY** hasta que
-todos estén validados. CI lo exige para la etiqueta `v0.2.x`.
+El gate de publicación de [`v0.2.0`](docs/release-readiness-v0.2.json) contiene 12 criterios
+marcados `READY` y la ratchet medida es 7.198 IR + 41 HIR, con cero fallbacks AST. El candidato
+está congelado en `cb9a524`; antes de solicitar aprobación final deben quedar sincronizados los
+documentos y scorecard con la evidencia de ese head y regenerarse los artifacts desde el head
+final de `main`. No se ha creado tag ni release `v0.2.0`; CI exige el gate para esa etiqueta.
 La clasificación de Ostrin por GitHub Linguist y el crecimiento del ecosistema dependen de
 evidencia de uso externo y validación upstream. GPU, autodiff inverso, registry público y red
 permanecen fuera de la etapa inmediata.
