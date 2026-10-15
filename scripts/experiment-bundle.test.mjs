@@ -241,7 +241,9 @@ test("effect evidence preserves unresolved calls and validates coverage consiste
     functions: { main: [] },
     function_calls: { main: ["known_call"] },
     unresolved_calls: {},
-    effect_coverage: { known_calls: 1, unresolved_calls: 0, complete: true },
+    function_effect_variables: {},
+    symbolic_effect_calls: {},
+    effect_coverage: { known_calls: 1, symbolic_calls: 0, unresolved_calls: 0, complete: true },
   };
   assert.deepEqual(validateEffectCapture(complete), []);
 
@@ -249,7 +251,7 @@ test("effect evidence preserves unresolved calls and validates coverage consiste
     ...complete,
     function_calls: { main: ["mystery_operation"] },
     unresolved_calls: { main: ["mystery_operation"] },
-    effect_coverage: { known_calls: 0, unresolved_calls: 1, complete: false },
+    effect_coverage: { known_calls: 0, symbolic_calls: 0, unresolved_calls: 1, complete: false },
   };
   assert.deepEqual(validateEffectCapture(incomplete), []);
 
@@ -259,9 +261,20 @@ test("effect evidence preserves unresolved calls and validates coverage consiste
 
   const overstated = {
     ...incomplete,
-    effect_coverage: { known_calls: 1, unresolved_calls: 0, complete: true },
+    effect_coverage: { known_calls: 1, symbolic_calls: 0, unresolved_calls: 0, complete: true },
   };
   assert.ok(validateEffectCapture(overstated).some((error) => error.includes("does not match")));
+
+  const symbolic = {
+    ...complete,
+    function_calls: { map_open: ["callback"] },
+    function_effect_variables: { map_open: ["ε_callback"] },
+    symbolic_effect_calls: { map_open: ["callback"] },
+    effect_coverage: { known_calls: 0, symbolic_calls: 1, unresolved_calls: 0, complete: true },
+  };
+  assert.deepEqual(validateEffectCapture(symbolic), []);
+  const unsupportedSymbolic = { ...symbolic, function_effect_variables: {} };
+  assert.ok(validateEffectCapture(unsupportedSymbolic).some((error) => error.includes("no effect variable")));
 });
 
 test("tampering with bundled content is rejected by the hash gate", () => {

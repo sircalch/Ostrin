@@ -84,6 +84,8 @@ export function buildReadiness(root = repositoryRoot) {
     readyCount: entries.filter((entry) => entry.status === "READY").length,
     openCount: entries.filter((entry) => entry.status !== "READY").length,
     incompleteEffectBundleCount: entries.filter((entry) => entry.r3Extensions.incomplete.includes("provenance.effects.effect_coverage")).length,
+    knownEffectCallCount: entries.reduce((total, entry) => total + (entry.effectCoverage?.known_calls ?? 0), 0),
+    symbolicEffectCallCount: entries.reduce((total, entry) => total + (entry.effectCoverage?.symbolic_calls ?? 0), 0),
     unresolvedEffectCallCount: entries.reduce((total, entry) => total + (entry.effectCoverage?.unresolved_calls ?? 0), 0),
     entries,
   };

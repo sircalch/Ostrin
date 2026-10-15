@@ -140,20 +140,19 @@ function numericalValidationStatus() {
   };
 }
 
-function effectCoverageStatus() {
-  const source = text("website/provenance-data.js");
-  const block = source.match(/"effect_coverage":\s*\{([\s\S]*?)\n\s*\}/)?.[1] ?? "";
-  const number = (name) => Number(block.match(new RegExp(`"${name}":\\s*(\\d+)`))?.[1] ?? 0);
-  const complete = block.match(/"complete":\s*(true|false)/)?.[1] === "true";
+function effectCoverageStatus(report) {
   return {
-    knownCalls: number("known_calls"),
-    unresolvedCalls: number("unresolved_calls"),
-    complete,
+    knownCalls: report.knownEffectCallCount,
+    symbolicCalls: report.symbolicEffectCallCount,
+    unresolvedCalls: report.unresolvedEffectCallCount,
+    complete: report.incompleteEffectBundleCount === 0,
+    scope: `${report.bundleCount} registered R3 experiment bundles`,
   };
 }
 
 export async function buildScorecard() {
   const native = nativeCounts();
+  const r3Readiness = buildR3Readiness();
   // Website CI intentionally rewrites these evidence outputs before publishing
   // host-bound R3 data. They are not source edits and must not make the public
   // source-integrity indicator permanently dirty.
@@ -173,21 +172,20 @@ export async function buildScorecard() {
     nativeBackend: native,
     ownership: ownershipCounts(),
     numericalValidation: numericalValidationStatus(),
-    effectCoverage: effectCoverageStatus(),
+    effectCoverage: effectCoverageStatus(r3Readiness),
     reproducibility: await reproducibilityCounts(),
-    r3: (() => {
-      const report = buildR3Readiness();
-      return {
-        status: report.status,
-        bundleCount: report.bundleCount,
-        baseReadyCount: report.baseReadyCount,
-        extensionReadyCount: report.extensionReadyCount,
-        readyCount: report.readyCount,
-        openCount: report.openCount,
-        incompleteEffectBundleCount: report.incompleteEffectBundleCount,
-        unresolvedEffectCallCount: report.unresolvedEffectCallCount,
-      };
-    })(),
+    r3: {
+      status: r3Readiness.status,
+      bundleCount: r3Readiness.bundleCount,
+      baseReadyCount: r3Readiness.baseReadyCount,
+      extensionReadyCount: r3Readiness.extensionReadyCount,
+      readyCount: r3Readiness.readyCount,
+      openCount: r3Readiness.openCount,
+      incompleteEffectBundleCount: r3Readiness.incompleteEffectBundleCount,
+      knownEffectCallCount: r3Readiness.knownEffectCallCount,
+      symbolicEffectCallCount: r3Readiness.symbolicEffectCallCount,
+      unresolvedEffectCallCount: r3Readiness.unresolvedEffectCallCount,
+    },
     linguist: linguistStatus(),
     releaseReadiness: readiness(),
     artifacts: {

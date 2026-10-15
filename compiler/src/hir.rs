@@ -8,10 +8,11 @@
 //! Fields no consumer reads yet are part of the contract, hence `dead_code` is allowed.
 #![allow(dead_code)]
 
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fmt::Write as _;
 
 use crate::ast::*;
+use crate::effects::{EffectKind, EffectSignature, EffectVariableSubstitution};
 use crate::typeck::{CallSubst, ExprKey, TypedProgram};
 use crate::types::{dim_mul, dim_pow, Dimension, Ty};
 
@@ -51,8 +52,22 @@ pub struct HirFunction {
     pub ret: Ty,
     pub body: HirBlock,
     pub source_file: Option<String>,
-    /// Conservative effect row propagated from the source inventory.
-    pub effects: BTreeSet<String>,
+    /// Name used by the source inventory (short method name for impl methods).
+    pub effect_source_key: String,
+    /// First-class internal effect-bearing signature, including symbolic variables.
+    pub effect_signature: EffectSignature,
+    /// Proven local substitutions from callee callback variables to caller variables.
+    pub effect_variable_substitutions: BTreeSet<EffectVariableSubstitution>,
+    /// Calls resolved to local functions during conservative effect analysis.
+    /// Kept separately from the row so the HIR verifier can check propagation.
+    pub effect_calls: BTreeSet<String>,
+    /// Calls through function-valued parameters/local bindings. Current function
+    /// types have no effect row, so a caller cannot claim these are closed.
+    pub indirect_effect_calls: BTreeSet<String>,
+    /// Resolved callback parameters at local callsites, keyed by callee effect
+    /// source key. Their open callback markers are substituted by the caller's
+    /// actual function value and must not be blindly inherited.
+    pub closed_callback_calls: BTreeMap<String, BTreeSet<String>>,
 }
 
 /// Gives impl methods a collision-free HIR name when a generic record/enum
@@ -710,7 +725,7 @@ fn normalize_variant(fields: &[Option<String>], args: Vec<HirArg>) -> Vec<HirArg
 
 /// Builds the HIR of every function, method and trait default body.
 pub fn lower<'a>(items: &'a [Item], typed: &'a TypedProgram) -> HirProgram {
-    let effect_report = crate::effects::analyze(items);
+    let effect_report = crate::effects::analyze_with_types(items, typed);
     let mut signatures = Signatures {
         functions: Default::default(),
         methods: Default::default(),
@@ -780,6 +795,7 @@ pub fn lower<'a>(items: &'a [Item], typed: &'a TypedProgram) -> HirProgram {
     let signatures = &signatures;
     let mut functions = Vec::new();
     let lower_fn = |name: String,
+                    effect_source_key: String,
                     params: &[Param],
                     generics: &[GenericParam],
                     return_type: &Type,
@@ -804,14 +820,35 @@ pub fn lower<'a>(items: &'a [Item], typed: &'a TypedProgram) -> HirProgram {
             lowerer.local_types.insert(p.name.clone(), ty);
         }
         let body = lowerer.block(body);
-        let effects = effect_report
-            .function_kinds
-            .get(&name)
+        let effect_signature = effect_report
+            .function_effect_signatures
+            .get(&effect_source_key)
+            .cloned()
+            .unwrap_or_default();
+        let effect_calls = effect_report
+            .resolved_function_calls
+            .get(&effect_source_key)
             .into_iter()
-            .flat_map(|kinds| kinds.iter().map(|kind| kind.label().to_string()))
+            .flat_map(|calls| calls.iter().cloned())
             .collect();
+        let effect_variable_substitutions = effect_report
+            .effect_variable_substitutions
+            .get(&effect_source_key)
+            .cloned()
+            .unwrap_or_default();
+        let indirect_effect_calls = effect_report
+            .indirect_calls
+            .get(&effect_source_key)
+            .cloned()
+            .unwrap_or_default();
+        let closed_callback_calls = effect_report
+            .closed_callback_parameters
+            .get(&effect_source_key)
+            .cloned()
+            .unwrap_or_default();
         HirFunction {
             name,
+            effect_source_key,
             generics: generics.iter().map(|g| g.name.clone()).collect(),
             params: params
                 .iter()
@@ -829,12 +866,17 @@ pub fn lower<'a>(items: &'a [Item], typed: &'a TypedProgram) -> HirProgram {
             ret: resolve_declared_type(return_type, owner_type),
             body,
             source_file,
-            effects,
+            effect_signature,
+            effect_variable_substitutions,
+            effect_calls,
+            indirect_effect_calls,
+            closed_callback_calls,
         }
     };
     for item in items {
         match item {
             Item::Function(f) => functions.push(lower_fn(
+                f.name.clone(),
                 f.name.clone(),
                 &f.params,
                 &f.generics,
@@ -873,6 +915,7 @@ pub fn lower<'a>(items: &'a [Item], typed: &'a TypedProgram) -> HirProgram {
                         .collect::<Vec<_>>();
                     functions.push(lower_fn(
                         impl_method_name(im, &m.name),
+                        crate::effects::impl_method_key(&im.type_name, &m.name),
                         &m.params,
                         &generics,
                         &m.return_type,
@@ -908,6 +951,7 @@ pub fn lower<'a>(items: &'a [Item], typed: &'a TypedProgram) -> HirProgram {
                                 .collect::<Vec<_>>();
                             functions.push(lower_fn(
                                 impl_method_name(im, &method.name),
+                                crate::effects::impl_method_key(&im.type_name, &method.name),
                                 &method.params,
                                 &generics,
                                 &method.return_type,
@@ -998,6 +1042,7 @@ fn iterator_type(ty: &Type, generic_names: &HashSet<String>) -> Ty {
 pub fn specialize_function(function: &HirFunction, subst: &HashMap<String, Ty>) -> HirFunction {
     HirFunction {
         name: function.name.clone(),
+        effect_source_key: function.effect_source_key.clone(),
         generics: Vec::new(),
         params: function
             .params
@@ -1007,7 +1052,11 @@ pub fn specialize_function(function: &HirFunction, subst: &HashMap<String, Ty>) 
         ret: specialize_ty(&function.ret, subst),
         body: specialize_block(&function.body, subst),
         source_file: function.source_file.clone(),
-        effects: function.effects.clone(),
+        effect_signature: function.effect_signature.clone(),
+        effect_variable_substitutions: function.effect_variable_substitutions.clone(),
+        effect_calls: function.effect_calls.clone(),
+        indirect_effect_calls: function.indirect_effect_calls.clone(),
+        closed_callback_calls: function.closed_callback_calls.clone(),
     }
 }
 
@@ -1497,6 +1546,12 @@ pub struct VerifyReport {
     pub nodes: usize,
     pub unknown: usize,
     pub violations: Vec<Violation>,
+    /// Number of local effect-call edges checked against their caller row.
+    pub effect_edges: usize,
+    /// Calls whose effects remain outside the conservative local inventory.
+    pub unresolved_effect_calls: usize,
+    /// Function-valued calls whose effects are absent from function types.
+    pub indirect_effect_calls: usize,
 }
 
 /// Checks the invariants: every node has a known type, and every call of a
@@ -1504,6 +1559,139 @@ pub struct VerifyReport {
 pub fn verify(program: &HirProgram, generic_functions: &HashSet<String>) -> VerifyReport {
     let mut report = VerifyReport::default();
     for f in &program.functions {
+        report.unresolved_effect_calls += f.effect_signature.open_calls.len();
+        report.indirect_effect_calls += f.indirect_effect_calls.len();
+        for variable in &f.effect_signature.variables {
+            if !f
+                .params
+                .iter()
+                .any(|(name, ty)| name == variable && matches!(ty, Ty::Fn(..)))
+            {
+                report.violations.push(Violation {
+                    function: f.name.clone(),
+                    message: format!(
+                        "effect variable ε_{variable} does not refer to a function-valued parameter"
+                    ),
+                });
+            }
+        }
+        for substitution in &f.effect_variable_substitutions {
+            let caller_is_variable = f
+                .effect_signature
+                .variables
+                .contains(&substitution.caller_parameter)
+                && f.params.iter().any(|(name, ty)| {
+                    name == &substitution.caller_parameter && matches!(ty, Ty::Fn(..))
+                });
+            let callee_is_variable = program.functions.iter().any(|target| {
+                target.effect_source_key == substitution.callee
+                    && target
+                        .effect_signature
+                        .variables
+                        .contains(&substitution.callee_parameter)
+                    && target.params.iter().any(|(name, ty)| {
+                        name == &substitution.callee_parameter && matches!(ty, Ty::Fn(..))
+                    })
+            });
+            if !caller_is_variable || !callee_is_variable {
+                report.violations.push(Violation {
+                    function: f.name.clone(),
+                    message: format!(
+                        "effect substitution ε_{} <- ε_{} via '{}' does not resolve to callback variables",
+                        substitution.callee_parameter,
+                        substitution.caller_parameter,
+                        substitution.callee
+                    ),
+                });
+            }
+        }
+        for callee in &f.effect_calls {
+            let targets: Vec<_> = program
+                .functions
+                .iter()
+                .filter(|candidate| candidate.effect_source_key == *callee)
+                .collect();
+            if targets.is_empty() {
+                report.violations.push(Violation {
+                    function: f.name.clone(),
+                    message: format!(
+                        "local effect call '{callee}' has no corresponding HIR function"
+                    ),
+                });
+                continue;
+            }
+            report.effect_edges += 1;
+            for target in targets {
+                for variable in &target.effect_signature.variables {
+                    let closed = f
+                        .closed_callback_calls
+                        .get(&target.effect_source_key)
+                        .is_some_and(|parameters| parameters.contains(variable));
+                    let substituted = f.effect_variable_substitutions.iter().any(|mapping| {
+                        mapping.callee == target.effect_source_key
+                            && mapping.callee_parameter == *variable
+                            && f.effect_signature
+                                .variables
+                                .contains(&mapping.caller_parameter)
+                    });
+                    let remains_open =
+                        f.effect_signature.open_calls.iter().any(|call| {
+                            call == variable || call.ends_with(&format!(".{variable}"))
+                        });
+                    if !closed && !substituted && !remains_open {
+                        report.violations.push(Violation {
+                            function: f.name.clone(),
+                            message: format!(
+                                "effect variable ε_{variable} from local call '{}' was neither substituted nor kept open",
+                                target.name
+                            ),
+                        });
+                    }
+                }
+                for effect in &target.effect_signature.effects {
+                    if !f.effect_signature.effects.contains(effect) {
+                        report.violations.push(Violation {
+                            function: f.name.clone(),
+                            message: format!(
+                                "effect row is missing '{}' propagated from local call '{}'",
+                                effect.label(),
+                                target.name
+                            ),
+                        });
+                    }
+                }
+                for call in &target.effect_signature.open_calls {
+                    let substituted = f
+                        .closed_callback_calls
+                        .get(&target.effect_source_key)
+                        .is_some_and(|parameters| parameters.contains(call));
+                    if !substituted && !f.effect_signature.open_calls.contains(call) {
+                        report.violations.push(Violation {
+                            function: f.name.clone(),
+                            message: format!(
+                                "open effect call '{call}' was not propagated from local call '{}'",
+                                target.name
+                            ),
+                        });
+                    }
+                }
+            }
+        }
+        for call in &f.indirect_effect_calls {
+            let symbolic = f
+                .effect_signature
+                .variables
+                .iter()
+                .any(|variable| call == variable || call.ends_with(&format!(".{variable}")));
+            if !f.effect_signature.open_calls.contains(call) && !symbolic {
+                report.violations.push(Violation {
+                    function: f.name.clone(),
+                    message: format!(
+                        "indirect function call '{call}' is missing its open effect marker"
+                    ),
+                });
+            }
+        }
         let mut ctx = (f.name.clone(), &mut report, &program.arities);
         verify_block(&f.body, generic_functions, &mut ctx);
     }
@@ -1704,12 +1892,44 @@ pub fn dump(program: &HirProgram) -> String {
             params.join(", "),
             f.ret.describe()
         );
-        if !f.effects.is_empty() {
+        if !f.effect_signature.effects.is_empty() {
             let _ = writeln!(
                 out,
                 "  effects: {}",
-                f.effects.iter().cloned().collect::<Vec<_>>().join(", ")
+                f.effect_signature
+                    .effects
+                    .iter()
+                    .map(EffectKind::label)
+                    .collect::<Vec<_>>()
+                    .join(", ")
             );
+        }
+        if !f.effect_signature.variables.is_empty() {
+            let variables = f
+                .effect_signature
+                .variables
+                .iter()
+                .map(|name| format!("ε_{name}"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let _ = writeln!(out, "  effect variables: {variables}");
+        }
+        for substitution in &f.effect_variable_substitutions {
+            let _ = writeln!(
+                out,
+                "  effect substitution: ε_{} <- ε_{} via {}",
+                substitution.callee_parameter, substitution.caller_parameter, substitution.callee
+            );
+        }
+        if !f.effect_signature.open_calls.is_empty() {
+            let calls = f
+                .effect_signature
+                .open_calls
+                .iter()
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(", ");
+            let _ = writeln!(out, "  unresolved effect calls: {calls}");
         }
         dump_block(&f.body, 1, &mut out);
         out.push('\n');
@@ -1914,4 +2134,163 @@ pub fn arrange_arguments<T>(
             },
         })
         .collect()
+}
+
+#[cfg(test)]
+mod effect_verifier_tests {
+    use super::{verify, HirBlock, HirFunction, HirProgram};
+    use crate::effects::{EffectSignature, EffectVariableSubstitution};
+    use std::collections::{BTreeSet, HashMap, HashSet};
+
+    fn function(name: &str, effects: &[&str], effect_calls: &[&str]) -> HirFunction {
+        let effects: BTreeSet<_> = effects
+            .iter()
+            .map(|effect| crate::effects::EffectKind::parse(effect))
+            .collect();
+        HirFunction {
+            name: name.to_string(),
+            effect_source_key: name.to_string(),
+            generics: Vec::new(),
+            params: Vec::new(),
+            ret: crate::types::Ty::Unknown,
+            body: HirBlock {
+                stmts: Vec::new(),
+                tail: None,
+            },
+            source_file: None,
+            effect_signature: EffectSignature {
+                effects,
+                ..EffectSignature::default()
+            },
+            effect_variable_substitutions: Default::default(),
+            effect_calls: effect_calls
+                .iter()
+                .map(|callee| (*callee).to_string())
+                .collect(),
+            indirect_effect_calls: BTreeSet::new(),
+            closed_callback_calls: Default::default(),
+        }
+    }
+
+    #[test]
+    fn verifier_rejects_a_local_call_with_a_missing_effect_row_entry() {
+        let program = HirProgram {
+            functions: vec![
+                function("caller", &[], &["callee"]),
+                function("callee", &["io"], &[]),
+            ],
+            arities: HashMap::new(),
+            iterator_items: HashMap::new(),
+            record_fields: HashMap::new(),
+            record_generics: HashMap::new(),
+            enum_variants: HashMap::new(),
+        };
+
+        let report = verify(&program, &HashSet::new());
+        assert_eq!(report.effect_edges, 1);
+        assert_eq!(report.violations.len(), 1);
+        assert!(report.violations[0].message.contains("missing 'io'"));
+    }
+
+    #[test]
+    fn verifier_rejects_a_local_call_with_a_missing_open_effect() {
+        let mut caller = function("caller", &[], &["callee"]);
+        let mut callee = function("callee", &[], &[]);
+        callee
+            .effect_signature
+            .open_calls
+            .insert("dynamic.emit".to_string());
+        let program = HirProgram {
+            functions: vec![caller.clone(), callee],
+            arities: HashMap::new(),
+            iterator_items: HashMap::new(),
+            record_fields: HashMap::new(),
+            record_generics: HashMap::new(),
+            enum_variants: HashMap::new(),
+        };
+
+        let report = verify(&program, &HashSet::new());
+        assert_eq!(report.violations.len(), 1);
+        assert!(report.violations[0].message.contains("open effect call"));
+
+        caller
+            .effect_signature
+            .open_calls
+            .insert("dynamic.emit".to_string());
+        let closed_program = HirProgram {
+            functions: vec![caller, program.functions[1].clone()],
+            arities: HashMap::new(),
+            iterator_items: HashMap::new(),
+            record_fields: HashMap::new(),
+            record_generics: HashMap::new(),
+            enum_variants: HashMap::new(),
+        };
+        let report = verify(&closed_program, &HashSet::new());
+        assert!(report.violations.is_empty(), "{:?}", report.violations);
+    }
+
+    #[test]
+    fn verifier_rejects_an_unresolved_effect_variable_substitution() {
+        let mut caller = function("caller", &[], &[]);
+        caller
+            .effect_signature
+            .variables
+            .insert("action".to_string());
+        caller
+            .effect_variable_substitutions
+            .insert(EffectVariableSubstitution {
+                callee: "callee".to_string(),
+                callee_parameter: "callback".to_string(),
+                caller_parameter: "action".to_string(),
+            });
+        let program = HirProgram {
+            functions: vec![caller, function("callee", &[], &[])],
+            arities: HashMap::new(),
+            iterator_items: HashMap::new(),
+            record_fields: HashMap::new(),
+            record_generics: HashMap::new(),
+            enum_variants: HashMap::new(),
+        };
+
+        let report = verify(&program, &HashSet::new());
+        assert!(report
+            .violations
+            .iter()
+            .any(|violation| violation.message.contains("effect substitution")));
+    }
+
+    #[test]
+    fn verifier_requires_forwarded_effect_variables_to_be_substituted_or_open() {
+        let mut caller = function("caller", &[], &["callee"]);
+        caller.params.push((
+            "action".to_string(),
+            crate::types::Ty::Fn(Vec::new(), Box::new(crate::types::Ty::Void)),
+        ));
+        caller
+            .effect_signature
+            .variables
+            .insert("action".to_string());
+        let mut callee = function("callee", &[], &[]);
+        callee.params.push((
+            "callback".to_string(),
+            crate::types::Ty::Fn(Vec::new(), Box::new(crate::types::Ty::Void)),
+        ));
+        callee
+            .effect_signature
+            .variables
+            .insert("callback".to_string());
+        let program = HirProgram {
+            functions: vec![caller, callee],
+            arities: HashMap::new(),
+            iterator_items: HashMap::new(),
+            record_fields: HashMap::new(),
+            record_generics: HashMap::new(),
+            enum_variants: HashMap::new(),
+        };
+
+        let report = verify(&program, &HashSet::new());
+        assert!(report.violations.iter().any(|violation| violation
+            .message
+            .contains("neither substituted nor kept open")));
+    }
 }

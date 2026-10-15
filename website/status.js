@@ -56,7 +56,8 @@ function render() {
   if (effects && status.effectCoverage) {
     const coverage = status.effectCoverage;
     effects.replaceChildren(
-      valueCard("Known calls", String(coverage.knownCalls ?? 0), "classified or local calls", "ready"),
+      valueCard("Known calls", String(coverage.knownCalls ?? 0), `classified across ${coverage.scope ?? "registered experiment bundles"}`, "ready"),
+      valueCard("Callback rows", String(coverage.symbolicCalls ?? 0), "modeled with effect variables", "neutral"),
       valueCard("Unresolved calls", String(coverage.unresolvedCalls ?? 0), "conservative boundary", coverage.unresolvedCalls === 0 ? "ready" : "open"),
       valueCard("Inventory", coverage.complete ? "COMPLETE" : "PARTIAL", "not a purity proof", coverage.complete ? "ready" : "open"),
     );

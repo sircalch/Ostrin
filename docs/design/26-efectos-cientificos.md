@@ -1,6 +1,6 @@
 # 26 — Efectos científicos, determinismo y procedencia
 
-**Estado:** propuesta de diseño con inventario experimental; `ostrinc --effect-report` ya expone
+**Estado:** diseño con inferencia tipada experimental y filas internas verificadas por HIR/IR; `ostrinc --effect-report` expone
 evidencia sintáctica conservadora, conserva etiquetas internas tipadas (`EffectKind`) y produce
 resúmenes por función con propagación conservadora a través de llamadas, ya transportados como
 filas internas de HIR/IR; todavía no modifica la sintaxis pública ni ofrece garantías de pureza.
@@ -399,3 +399,8 @@ correspondiente no exista.
   límites.
 - No se anuncia esta propuesta como capacidad disponible hasta que exista implementación, paridad,
   pruebas y una superficie web con evidencia.
+## Estado experimental del análisis tipado (2026-10-14)
+
+La rama de trabajo compone resúmenes de efectos a través de llamadas locales, ciclos recursivos y combinadores tipados. Los parámetros callback conservan variables simbólicas de efecto; los efectos desconocidos siguen abiertos y no se convierten en llamadas puras. HIR e IR transportan y verifican las aristas y filas inferidas. El reporte distingue efectos de filesystem, I/O, external y estado local cuando el tipo receptor permite clasificarlos.
+
+Este análisis aún no es un contrato de pureza ni una sintaxis pública estable. Llamadas indirectas sin firma conocida, métodos dinámicos y capacidades de host no modeladas permanecen abiertos; la completitud del inventario tampoco implica reproducibilidad R2/R3. Está cubierto por pruebas unitarias de inferencia, HIR/IR y reportes, además de paridad de los comportamientos existentes.

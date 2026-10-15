@@ -61,6 +61,11 @@
 
 ## Unreleased
 
+### Experimental typed effect inference
+
+- Compose inferred effects through local calls, recursive call cycles and typed collection callbacks. Preserve symbolic callback effect variables through HIR and IR, and leave unknown calls open. This remains an experimental inventory: a closed row is not a purity guarantee, and effect rows are not yet public function-type contracts.
+- The current working branch has a 302-example, 351-integration-test repository state; this count is not the frozen v0.2.0 candidate baseline.
+
 ### Native dynamic traits
 
 - Lowered the generic `Box<Int>` default-method case through typed IR/C:

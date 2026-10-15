@@ -11,7 +11,40 @@ use std::path::{Path, PathBuf};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
-use crate::effects::EffectReport;
+use crate::effects::{EffectKind, EffectReport, EffectSignature};
+
+fn reproducibility_requirements(
+    signature: &EffectSignature,
+) -> std::collections::BTreeSet<&'static str> {
+    let mut requirements = std::collections::BTreeSet::new();
+    for effect in &signature.effects {
+        requirements.insert(match effect {
+            EffectKind::RandomSeed => "seed_and_rng_algorithm",
+            EffectKind::Clock => "captured_clock_or_fixed_time",
+            EffectKind::Filesystem => "input_snapshots_and_hashes",
+            EffectKind::Network => "captured_responses_or_offline_replay",
+            EffectKind::External => "captured_environment_and_arguments",
+            EffectKind::Concurrency => "scheduler_policy_and_deterministic_order",
+            EffectKind::Io => "captured_outputs_and_hashes",
+            EffectKind::Unsafe => "trusted_unsafe_boundary_and_platform",
+            // Local mutation is represented in the effect row, but it does
+            // not by itself imply an external input that provenance must
+            // capture. Unknown and descriptive effects likewise add no
+            // specific evidence requirement until their contract is defined.
+            EffectKind::LocalState
+            | EffectKind::Measurement
+            | EffectKind::Provenance
+            | EffectKind::Unknown(_) => continue,
+        });
+    }
+    if !signature.variables.is_empty() {
+        requirements.insert("callback_effect_rows");
+    }
+    if !signature.open_calls.is_empty() {
+        requirements.insert("resolve_or_capture_unknown_calls");
+    }
+    requirements
+}
 
 fn sha256_bytes(bytes: &[u8]) -> String {
     let mut hasher = Sha256::new();
@@ -131,12 +164,90 @@ pub fn build_report(path: &Path, source: &[u8], target: &str, effects: &EffectRe
             })
         })
         .collect();
-    let (known_calls, unresolved_call_count) = effects.call_coverage();
+    let indirect_calls: Vec<Value> = effects
+        .indirect_calls
+        .iter()
+        .map(|(function, calls)| {
+            json!({
+                "function": function,
+                "calls": calls.iter().collect::<Vec<_>>(),
+            })
+        })
+        .collect();
+    let symbolic_effect_calls: Vec<Value> = effects
+        .symbolic_effect_calls
+        .iter()
+        .filter(|(_, calls)| !calls.is_empty())
+        .map(|(function, calls)| {
+            json!({
+                "function": function,
+                "calls": calls.iter().collect::<Vec<_>>(),
+            })
+        })
+        .collect();
+    let open_effect_calls: Vec<Value> = effects
+        .open_effect_calls
+        .iter()
+        .filter(|(_, calls)| !calls.is_empty())
+        .map(|(function, calls)| {
+            json!({
+                "function": function,
+                "calls": calls.iter().collect::<Vec<_>>(),
+            })
+        })
+        .collect();
+    let function_effect_signatures: serde_json::Map<String, Value> = effects
+        .function_effect_signatures
+        .iter()
+        .map(|(function, signature)| {
+            (
+                function.clone(),
+                json!({
+                    "effects": signature.effects.iter().map(|effect| effect.label()).collect::<Vec<_>>(),
+                    "variables": signature.variables.iter().map(|name| format!("ε_{name}")).collect::<Vec<_>>(),
+                    "open_calls": signature.open_calls,
+                    "row_closed": signature.is_closed(),
+                    "purity_proven": false,
+                }),
+            )
+        })
+        .collect();
+    let function_reproducibility_requirements = effects
+        .function_effect_signatures
+        .iter()
+        .filter_map(|(function, signature)| {
+            let requirements = reproducibility_requirements(signature);
+            (!requirements.is_empty()).then(|| (function.clone(), requirements))
+        })
+        .collect::<std::collections::BTreeMap<_, _>>();
+    let reproducibility_requirements = function_reproducibility_requirements
+        .values()
+        .flat_map(|requirements| requirements.iter().copied())
+        .collect::<std::collections::BTreeSet<_>>();
+    let (known_calls, symbolic_call_count, unresolved_call_count) = effects.call_coverage();
+    let effect_analysis_closed = effects
+        .function_effect_signatures
+        .values()
+        .all(EffectSignature::is_closed)
+        && effects
+            .open_effect_calls
+            .values()
+            .all(|calls| calls.is_empty())
+        && effects
+            .indirect_calls
+            .values()
+            .all(|calls| calls.is_empty())
+        && unresolved_call_count == 0;
 
-    let (level, reason) = if effect_names.is_empty() {
+    let (level, reason) = if effect_names.is_empty() && effect_analysis_closed {
         (
             "R0-candidate",
-            "no known effect sites were found; this inventory is not a purity proof",
+            "no known effects or open effect rows were found; this is not a purity or reproducibility proof",
+        )
+    } else if effect_names.is_empty() {
+        (
+            "unverified",
+            "the effect analysis contains open calls or callback variables, so no reproducibility candidate can be assessed",
         )
     } else {
         (
@@ -163,9 +274,14 @@ pub fn build_report(path: &Path, source: &[u8], target: &str, effects: &EffectRe
         "activity": {
             "effects": effect_names,
             "functions_without_known_effects": functions_without_known_effects,
+            "function_effect_signatures": function_effect_signatures,
             "unresolved_calls": unresolved_calls,
+            "symbolic_effect_calls": symbolic_effect_calls,
+            "indirect_calls": indirect_calls,
+            "open_effect_calls": open_effect_calls,
             "effect_coverage": {
                 "known_calls": known_calls,
+                "symbolic_calls": symbolic_call_count,
                 "unresolved_calls": unresolved_call_count,
                 "complete": unresolved_call_count == 0,
             },
@@ -176,10 +292,17 @@ pub fn build_report(path: &Path, source: &[u8], target: &str, effects: &EffectRe
         "reproducibility": {
             "level": level,
             "reason": reason,
+            "evidence_requirements": {
+                "model": "constraints-only",
+                "guarantee": false,
+                "requirements": reproducibility_requirements,
+                "functions": function_reproducibility_requirements,
+            },
         },
         "limitations": [
-            "This artifact is a conservative source inventory, not a static effect guarantee.",
-            "Unresolved calls are listed separately because an empty known-effect row does not imply purity.",
+            "This artifact includes experimental typed effect inference, not a static effect guarantee.",
+            "Unresolved and indirect calls are listed separately because an empty known-effect row does not imply purity.",
+            "Reproducibility evidence requirements are derived constraints only; they do not establish an R level.",
             "The runtime snapshot is partial; input snapshots, invocation output hashes and captured host metadata are still required for R2/R3.",
         ],
     })

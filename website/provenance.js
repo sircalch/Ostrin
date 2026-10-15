@@ -9,6 +9,16 @@ if (artifact) {
   setText("[data-provenance-schema]", artifact.schema ?? "unknown");
   setText("[data-provenance-source]", artifact.program?.source_hash ?? "unknown");
   setText("[data-provenance-effects]", (artifact.activity?.effects ?? []).join(", ") || "none known");
+  const signatures = Object.values(artifact.activity?.function_effect_signatures ?? {});
+  const callbackVariables = signatures.reduce(
+    (total, signature) => total + (Array.isArray(signature.variables) ? signature.variables.length : 0),
+    0,
+  );
+  const openRows = signatures.filter((signature) => signature.row_closed !== true).length;
+  setText("[data-provenance-callback-variables]", callbackVariables + " variables");
+  setText("[data-provenance-open-rows]", openRows + " functions");
+  const evidenceRequirements = artifact.reproducibility?.evidence_requirements?.requirements ?? [];
+  setText("[data-provenance-requirement-count]", evidenceRequirements.length + " requirements");
   const noKnownEffects = artifact.activity?.functions_without_known_effects ?? [];
   setText("[data-provenance-no-known-effects]", `${noKnownEffects.length} candidates`);
   const unresolvedCalls = artifact.activity?.unresolved_calls ?? [];
@@ -20,7 +30,7 @@ if (artifact) {
   const coverage = artifact.activity?.effect_coverage ?? {};
   setText(
     "[data-provenance-coverage]",
-    `${coverage.known_calls ?? 0} known · ${coverage.unresolved_calls ?? unresolvedCount} unresolved`,
+    `${coverage.known_calls ?? 0} concrete · ${coverage.symbolic_calls ?? 0} callback-symbolic · ${coverage.unresolved_calls ?? unresolvedCount} unresolved`,
   );
   const unresolvedList = document.querySelector("[data-provenance-unresolved-list]");
   if (unresolvedList) {
@@ -34,6 +44,21 @@ if (artifact) {
         const item = document.createElement("li");
         item.textContent = `${entry.function}: ${(entry.calls ?? []).join(", ")}`;
         unresolvedList.append(item);
+      }
+    }
+  }
+  const evidenceList = document.querySelector("[data-provenance-evidence-list]");
+  if (evidenceList) {
+    evidenceList.replaceChildren();
+    if (evidenceRequirements.length === 0) {
+      const item = document.createElement("li");
+      item.textContent = "No effect-specific evidence requirements were inferred.";
+      evidenceList.append(item);
+    } else {
+      for (const requirement of evidenceRequirements) {
+        const item = document.createElement("li");
+        item.textContent = requirement;
+        evidenceList.append(item);
       }
     }
   }

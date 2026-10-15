@@ -51,7 +51,7 @@ traits, pattern matching, quantities and two concurrency modes: deterministic
 cooperative scheduling by default, plus opt-in native threads for compiled
 programs.
 
-The compiler suite currently passes **333 integration tests, 3 unit tests and 6 differential
+The compiler suite currently passes **351 integration tests, 11 unit tests and 6 differential
 interpreter↔native tests**. Reproduction commands and evidence boundaries are documented in
 [`README-reproduce.md`](README-reproduce.md). Function calls
 support named/default arguments, scalar and `String` collection lookups preserve `Option<T>`
@@ -196,7 +196,7 @@ ostrinc --compile --native-threads file.ostrin # compile with OS threads and blo
 ostrinc --run --project path/to/project # use the entry declared by ostrin.toml
 ostrinc --fetch --run --project path/to/project # explicitly fetch Git dependencies
 ostrinc --locked --run --project path/to/project # require the existing lockfile/cache
-ostrinc --effect-report file.ostrin           # conservative effect inventory
+ostrinc --effect-report file.ostrin           # experimental typed effect inference
 ostrinc --provenance-report --json file.ostrin # source hash, target and replay limits
 ```
 

@@ -1,20 +1,30 @@
-//! Experimental, conservative effect inventory for the source program.
+//! Experimental, conservative effect inference for the source program.
 //!
-//! This is deliberately not the effect checker described in design document 26.
-//! It records syntactic evidence so the compiler can expose a first inventory
-//! before effect rows become part of HIR and function signatures.
+//! This is not yet the complete effect checker described in design document 26.
+//! It uses checker types to resolve calls, composes known rows and callback
+//! variables, and carries those signatures through HIR and IR without exposing
+//! public effect contracts. Unresolved operations remain open and an empty row
+//! is not a proof of purity.
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::ast::{Arg, Block, Expr, FunctionDecl, ImplDecl, Item, MatchArm, Pattern, Stmt};
+use crate::ast::{
+    Arg, Block, Expr, FunctionDecl, ImplDecl, Item, MatchArm, Pattern, Stmt, TraitDecl,
+    TraitMethodSig, Type,
+};
+use crate::typeck::TypedProgram;
+use crate::types::Ty;
 
-/// Typed internal effect labels. The public syntax remains intentionally unset;
-/// this enum gives later HIR/IR propagation a stable vocabulary.
+/// Typed internal effect labels carried through HIR and IR. Public syntax and
+/// effect contracts remain intentionally unset.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum EffectKind {
     Clock,
     Concurrency,
+    External,
+    Filesystem,
     Io,
+    LocalState,
     Measurement,
     Network,
     Provenance,
@@ -23,12 +33,31 @@ pub enum EffectKind {
     Unknown(String),
 }
 
+/// Internal effect-bearing function signature. `open_calls` means inference is
+/// still conservative; variables remain symbolic until a caller substitutes a
+/// concrete callback. This is not public type syntax.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct EffectSignature {
+    pub effects: BTreeSet<EffectKind>,
+    pub variables: BTreeSet<String>,
+    pub open_calls: BTreeSet<String>,
+}
+
+impl EffectSignature {
+    pub fn is_closed(&self) -> bool {
+        self.variables.is_empty() && self.open_calls.is_empty()
+    }
+}
+
 impl EffectKind {
     pub fn parse(label: &str) -> Self {
         match label {
             "clock" => Self::Clock,
             "concurrency" => Self::Concurrency,
+            "external" => Self::External,
+            "filesystem" => Self::Filesystem,
             "io" => Self::Io,
+            "state(local)" => Self::LocalState,
             "measurement" => Self::Measurement,
             "network" => Self::Network,
             "provenance" => Self::Provenance,
@@ -42,7 +71,10 @@ impl EffectKind {
         match self {
             Self::Clock => "clock",
             Self::Concurrency => "concurrency",
+            Self::External => "external",
+            Self::Filesystem => "filesystem",
             Self::Io => "io",
+            Self::LocalState => "state(local)",
             Self::Measurement => "measurement",
             Self::Network => "network",
             Self::Provenance => "provenance",
@@ -63,34 +95,109 @@ pub struct EffectSite {
     pub col: usize,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+/// A local callsite substitution from one callback effect variable to another.
+/// For a caller `wrapper(action) { invoke(action) }`, this records
+/// `invoke.callback <- wrapper.action`.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct EffectVariableSubstitution {
+    pub callee: String,
+    pub callee_parameter: String,
+    pub caller_parameter: String,
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct EffectReport {
     pub effects: BTreeSet<String>,
     /// Typed labels retained for the future HIR/IR effect row.
     pub kinds: BTreeSet<EffectKind>,
-    /// Direct per-function effect rows, kept separate from the global inventory.
+    /// Per-function effect rows after propagating effects across known local calls.
     pub function_kinds: BTreeMap<String, BTreeSet<EffectKind>>,
+    /// First-class internal signatures after callback and local-call inference.
+    pub function_effect_signatures: BTreeMap<String, EffectSignature>,
     /// Every function visited by the inventory, including rows with no known
     /// effect. An empty row is evidence for a candidate only; it is not a
     /// proof of purity because unresolved calls remain outside this report.
     pub function_names: BTreeSet<String>,
-    /// Top-level functions have exact call names. Impl methods are indexed by
-    /// their method name because the syntactic inventory does not type-check
-    /// the receiver expression.
     pub free_function_names: BTreeSet<String>,
-    pub impl_method_names: BTreeSet<String>,
+    /// Local callees resolved to a canonical function key, per caller.
+    pub resolved_function_calls: BTreeMap<String, BTreeSet<String>>,
+    /// Source spellings corresponding to the resolved edges, per caller.
+    pub resolved_call_operations: BTreeMap<String, BTreeSet<String>>,
+    /// Calls to typed compiler intrinsics with no host effect in the current
+    /// effect model. This does not establish referential transparency.
+    pub known_effect_free_calls: BTreeMap<String, BTreeSet<String>>,
+    /// Calls whose operation has a resolved effect classification, including
+    /// host effects. They are separate from locally resolved function edges.
+    pub classified_calls: BTreeMap<String, BTreeSet<String>>,
+    /// Impl methods available for a concrete receiver owner type.
+    pub impl_methods_by_type: BTreeMap<String, BTreeMap<String, String>>,
+    /// Receiver node types supplied by the type checker; absent in syntax-only reports.
+    pub receiver_types: BTreeMap<usize, String>,
+    /// Types of AST expressions, used to determine whether builtin destruction
+    /// recursively releases task/channel handles with observable scheduler effects.
+    pub expression_types: BTreeMap<usize, Ty>,
+    /// Source record/enum payloads used by the conservative drop-effect summary.
+    drop_type_definitions: BTreeMap<String, DropTypeDefinition>,
+    /// Receiver expression nodes known by the checker to be lists.
+    pub list_receiver_nodes: BTreeSet<usize>,
+    pub option_receiver_nodes: BTreeSet<usize>,
+    pub result_receiver_nodes: BTreeSet<usize>,
+    /// Function-valued identifiers supplied by the type checker.
+    pub function_value_nodes: BTreeSet<usize>,
+    /// Source parameter names and which of them accept function values.
+    pub function_parameters: BTreeMap<String, Vec<String>>,
+    pub callback_parameters: BTreeMap<String, BTreeSet<String>>,
+    /// Experimental internal effect variables for invoked callback parameters.
+    pub function_effect_variables: BTreeMap<String, BTreeSet<String>>,
+    /// Per-caller substitutions that preserve callback effect-variable identity
+    /// across resolved local calls.
+    pub effect_variable_substitutions: BTreeMap<String, BTreeSet<EffectVariableSubstitution>>,
+    /// Callback contracts whose effects are substituted at a callsite because
+    /// the actual function value has a known local body.
+    pub closed_callback_parameters: BTreeMap<String, BTreeMap<String, BTreeSet<String>>>,
     pub function_calls: BTreeMap<String, BTreeSet<String>>,
+    /// Compiler-known higher-order calls resolved from checked receiver types.
+    pub builtin_callback_calls: BTreeMap<String, BTreeSet<String>>,
     /// Calls that could not be matched to a local function or a classified
     /// host operation. These make the conservative boundary explicit: a
     /// function with no known effect may still call one of these operations.
     pub unresolved_calls: BTreeMap<String, BTreeSet<String>>,
+    /// Indirect invocations through function-valued bindings. Their effects
+    /// are not present in the current function type, so they stay open.
+    pub indirect_calls: BTreeMap<String, BTreeSet<String>>,
+    /// Exact indirect-call markers accounted for by a symbolic callback row.
+    pub symbolic_effect_calls: BTreeMap<String, BTreeSet<String>>,
+    /// Direct and transitively inherited unresolved calls for each function.
+    /// A non-empty set means the inferred row is open-world and cannot prove purity.
+    pub open_effect_calls: BTreeMap<String, BTreeSet<String>>,
     pub sites: Vec<EffectSite>,
 }
 
+#[derive(Debug, Clone, Default, PartialEq)]
+struct DropTypeDefinition {
+    generics: Vec<String>,
+    fields: Vec<Ty>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DropEffect {
+    NoHostEffect,
+    Concurrency,
+    Unknown,
+}
+
 impl EffectReport {
-    pub fn call_coverage(&self) -> (usize, usize) {
+    /// Return (concrete, symbolic, unresolved) callsite counts. A symbolic
+    /// callback invocation is accounted for by its effect-row variable; it
+    /// is not concrete/pure, but it is no longer an unmodeled call.
+    pub fn call_coverage(&self) -> (usize, usize, usize) {
         let total = self
             .function_calls
+            .values()
+            .map(BTreeSet::len)
+            .sum::<usize>();
+        let symbolic = self
+            .symbolic_effect_calls
             .values()
             .map(BTreeSet::len)
             .sum::<usize>();
@@ -99,7 +206,11 @@ impl EffectReport {
             .values()
             .map(BTreeSet::len)
             .sum::<usize>();
-        (total.saturating_sub(unresolved), unresolved)
+        (
+            total.saturating_sub(symbolic + unresolved),
+            symbolic,
+            unresolved,
+        )
     }
 
     pub fn sort_sites(&mut self) {
@@ -115,35 +226,398 @@ impl EffectReport {
     }
 }
 
-pub fn analyze(items: &[Item]) -> EffectReport {
-    let mut report = EffectReport::default();
+pub fn analyze_with_types(items: &[Item], typed: &TypedProgram) -> EffectReport {
+    let mut report = EffectReport {
+        expression_types: typed
+            .node_types
+            .iter()
+            .map(|(node, ty)| (*node, ty.clone()))
+            .collect(),
+        drop_type_definitions: collect_drop_type_definitions(items),
+        function_value_nodes: typed
+            .node_types
+            .iter()
+            .filter_map(|(node, ty)| matches!(ty, Ty::Fn(..)).then_some(*node))
+            .collect(),
+        receiver_types: typed
+            .node_types
+            .iter()
+            .filter_map(|(node, ty)| {
+                let owner = match ty {
+                    Ty::Named(name) => name.clone(),
+                    Ty::Int => "@Int".to_string(),
+                    Ty::Float => "@Float".to_string(),
+                    Ty::Float32 => "@Float32".to_string(),
+                    Ty::Bool => "@Bool".to_string(),
+                    Ty::Char => "@Char".to_string(),
+                    Ty::Sized(kind) => format!("@Sized({kind:?})"),
+                    Ty::Fn(..) => "@Function".to_string(),
+                    Ty::Applied(name, _)
+                        if matches!(name.as_str(), "Array" | "Option" | "Result") =>
+                    {
+                        format!("@{name}")
+                    }
+                    Ty::Applied(name, _) => name.clone(),
+                    Ty::List(_) => "@List".to_string(),
+                    Ty::Map(_, _) => "@Map".to_string(),
+                    Ty::Set(_) => "@Set".to_string(),
+                    Ty::String => "@String".to_string(),
+                    Ty::Quantity(_) => "@Quantity".to_string(),
+                    _ => return None,
+                };
+                Some((*node, owner))
+            })
+            .collect(),
+        list_receiver_nodes: typed
+            .node_types
+            .iter()
+            .filter_map(|(node, ty)| matches!(ty, Ty::List(_)).then_some(*node))
+            .collect(),
+        option_receiver_nodes: typed
+            .node_types
+            .iter()
+            .filter_map(|(node, ty)| {
+                matches!(ty, Ty::Named(name) | Ty::Applied(name, _) if name == "Option")
+                    .then_some(*node)
+            })
+            .collect(),
+        result_receiver_nodes: typed
+            .node_types
+            .iter()
+            .filter_map(|(node, ty)| {
+                matches!(ty, Ty::Named(name) | Ty::Applied(name, _) if name == "Result")
+                    .then_some(*node)
+            })
+            .collect(),
+        ..EffectReport::default()
+    };
+    // Index every declaration before walking any body so forward calls resolve
+    // the same way as backward calls.
     for item in items {
         match item {
             Item::Function(function) => {
                 report.free_function_names.insert(function.name.clone());
-                walk_function(function, &mut report);
             }
-            Item::Impl(implementation) => walk_impl(implementation, &mut report),
+            Item::Impl(implementation) => {
+                register_impl_methods(implementation, items, &mut report);
+            }
+            _ => {}
+        }
+    }
+    for item in items {
+        match item {
+            Item::Function(function) => walk_function(function, &function.name, &mut report),
+            Item::Impl(implementation) => walk_impl(implementation, items, &mut report),
             _ => {}
         }
     }
     classify_unresolved_calls(&mut report);
     propagate_function_effects(&mut report);
+    infer_callback_effects(items, &mut report);
+    propagate_function_effects(&mut report);
+    let mut signature_open_calls = BTreeMap::<String, BTreeSet<String>>::new();
+    for function in &report.function_names {
+        let mut calls = report
+            .unresolved_calls
+            .get(function)
+            .cloned()
+            .unwrap_or_default();
+        let variables = report
+            .function_effect_variables
+            .get(function)
+            .cloned()
+            .unwrap_or_default();
+        calls.retain(|call| !variables.contains(call));
+        for call in report.indirect_calls.get(function).into_iter().flatten() {
+            let represented_by_variable = report
+                .symbolic_effect_calls
+                .get(function)
+                .is_some_and(|symbolic| symbolic.contains(call));
+            if !represented_by_variable {
+                calls.insert(call.clone());
+            }
+        }
+        if !calls.is_empty() {
+            signature_open_calls.insert(function.clone(), calls);
+        }
+    }
+    loop {
+        let mut next = signature_open_calls.clone();
+        for (caller, callees) in &report.resolved_function_calls {
+            for callee in callees {
+                let Some(calls) = signature_open_calls.get(callee) else {
+                    continue;
+                };
+                let closed = report
+                    .closed_callback_parameters
+                    .get(caller)
+                    .and_then(|targets| targets.get(callee));
+                for call in calls {
+                    if !closed.is_some_and(|parameters| parameters.contains(call)) {
+                        next.entry(caller.clone()).or_default().insert(call.clone());
+                    }
+                }
+            }
+        }
+        if next == signature_open_calls {
+            break;
+        }
+        signature_open_calls = next;
+    }
+    report.function_effect_signatures = report
+        .function_names
+        .iter()
+        .map(|function| {
+            (
+                function.clone(),
+                EffectSignature {
+                    effects: report
+                        .function_kinds
+                        .get(function)
+                        .cloned()
+                        .unwrap_or_default(),
+                    variables: report
+                        .function_effect_variables
+                        .get(function)
+                        .cloned()
+                        .unwrap_or_default(),
+                    open_calls: signature_open_calls
+                        .get(function)
+                        .cloned()
+                        .unwrap_or_default(),
+                },
+            )
+        })
+        .collect();
     report.sort_sites();
     report
+}
+
+fn collect_drop_type_definitions(items: &[Item]) -> BTreeMap<String, DropTypeDefinition> {
+    let mut qualified = BTreeMap::new();
+    let mut unqualified = BTreeMap::<String, Vec<DropTypeDefinition>>::new();
+    for item in items {
+        let (name, module_path, generics, fields) = match item {
+            Item::Record(record) => (
+                &record.name,
+                &record.module_path,
+                &record.generics,
+                record
+                    .fields
+                    .iter()
+                    .map(|field| &field.ty)
+                    .collect::<Vec<_>>(),
+            ),
+            Item::Enum(enumeration) => (
+                &enumeration.name,
+                &enumeration.module_path,
+                &enumeration.generics,
+                enumeration
+                    .variants
+                    .iter()
+                    .flat_map(|variant| variant.fields.iter().map(|field| &field.ty))
+                    .collect::<Vec<_>>(),
+            ),
+            _ => continue,
+        };
+        let generic_parameters = generics
+            .iter()
+            .map(|parameter| parameter.name.clone())
+            .collect::<Vec<_>>();
+        let generic_names = generic_parameters.iter().cloned().collect::<BTreeSet<_>>();
+        let definition = DropTypeDefinition {
+            generics: generic_parameters,
+            fields: fields
+                .iter()
+                .map(|ty| declared_type_for_drop(ty, &generic_names))
+                .collect(),
+        };
+        let key = if module_path.is_empty() {
+            name.clone()
+        } else {
+            format!("{}::{name}", module_path.join("::"))
+        };
+        qualified.insert(key, definition.clone());
+        unqualified
+            .entry(name.clone())
+            .or_default()
+            .push(definition);
+    }
+    for (name, definitions) in unqualified {
+        if let [definition] = definitions.as_slice() {
+            qualified.insert(name, definition.clone());
+        }
+    }
+    qualified
+}
+
+fn declared_type_for_drop(ty: &Type, generic_names: &BTreeSet<String>) -> Ty {
+    match ty {
+        Type::Named(name, args) if args.is_empty() && generic_names.contains(name) => {
+            Ty::Generic(name.clone())
+        }
+        Type::Named(name, args) if args.is_empty() => match name.as_str() {
+            "Int" => Ty::Int,
+            "Float" => Ty::Float,
+            "Float32" => Ty::Float32,
+            "Bool" => Ty::Bool,
+            "Char" => Ty::Char,
+            "String" => Ty::String,
+            "Void" => Ty::Void,
+            name => Ty::Named(name.to_string()),
+        },
+        Type::Named(name, args) => Ty::Applied(
+            name.clone(),
+            args.iter()
+                .map(|arg| declared_type_for_drop(arg, generic_names))
+                .collect(),
+        ),
+        Type::Fn(params, result) => Ty::Fn(
+            params
+                .iter()
+                .map(|param| declared_type_for_drop(param, generic_names))
+                .collect(),
+            Box::new(declared_type_for_drop(result, generic_names)),
+        ),
+        Type::Dyn(traits) => Ty::Dyn(traits.first().cloned().unwrap_or_default()),
+        // Dimensional type expressions have scalar runtime representation and
+        // no user-defined destructor.
+        Type::Mul(_, _) | Type::Div(_, _) | Type::Pow(_, _) => Ty::Float,
+    }
+}
+
+fn drop_effect_for_type(
+    ty: &Ty,
+    report: &EffectReport,
+    visiting: &mut BTreeSet<String>,
+) -> DropEffect {
+    let key = ty.describe();
+    if !visiting.insert(key.clone()) {
+        // Recursive managed structures are safe to summarize once their
+        // already-visited fields are being traversed; sibling fields continue.
+        return DropEffect::NoHostEffect;
+    }
+    let effect = match ty {
+        Ty::List(element) | Ty::Set(element) => drop_effect_for_type(element, report, visiting),
+        Ty::Map(key, value) => combine_drop_effects(
+            drop_effect_for_type(key, report, visiting),
+            drop_effect_for_type(value, report, visiting),
+        ),
+        Ty::Applied(name, _args) if matches!(name.as_str(), "Task" | "Channel") => {
+            DropEffect::Concurrency
+        }
+        Ty::Applied(name, args)
+            if matches!(
+                name.as_str(),
+                "Array" | "List" | "Map" | "Set" | "Option" | "Result"
+            ) =>
+        {
+            args.iter().fold(DropEffect::NoHostEffect, |effect, arg| {
+                combine_drop_effects(effect, drop_effect_for_type(arg, report, visiting))
+            })
+        }
+        Ty::Applied(name, _) if name == "Quantity" => DropEffect::NoHostEffect,
+        Ty::Applied(name, args) => drop_effect_for_declared_type(name, args, report, visiting),
+        Ty::Named(name) if matches!(name.as_str(), "Task" | "Channel") => DropEffect::Concurrency,
+        Ty::Named(name) if name == "Rng" => DropEffect::NoHostEffect,
+        Ty::Named(name) => drop_effect_for_declared_type(name, &[], report, visiting),
+        Ty::Int
+        | Ty::Float
+        | Ty::Float32
+        | Ty::Bool
+        | Ty::Char
+        | Ty::String
+        | Ty::Void
+        | Ty::Quantity(_)
+        | Ty::Sized(_) => DropEffect::NoHostEffect,
+        Ty::Fn(..) | Ty::Generic(_) | Ty::Dyn(_) | Ty::Unknown => DropEffect::Unknown,
+    };
+    visiting.remove(&key);
+    effect
+}
+
+fn drop_effect_for_declared_type(
+    name: &str,
+    args: &[Ty],
+    report: &EffectReport,
+    visiting: &mut BTreeSet<String>,
+) -> DropEffect {
+    let Some(definition) = report.drop_type_definitions.get(name) else {
+        return DropEffect::Unknown;
+    };
+    if definition.generics.len() != args.len() {
+        return DropEffect::Unknown;
+    }
+    let substitutions = definition
+        .generics
+        .iter()
+        .cloned()
+        .zip(args.iter().cloned())
+        .collect::<BTreeMap<_, _>>();
+    definition
+        .fields
+        .iter()
+        .fold(DropEffect::NoHostEffect, |effect, field| {
+            combine_drop_effects(
+                effect,
+                drop_effect_for_type(
+                    &substitute_drop_generics(field, &substitutions),
+                    report,
+                    visiting,
+                ),
+            )
+        })
+}
+
+fn substitute_drop_generics(ty: &Ty, substitutions: &BTreeMap<String, Ty>) -> Ty {
+    match ty {
+        Ty::Generic(name) => substitutions
+            .get(name)
+            .cloned()
+            .unwrap_or_else(|| ty.clone()),
+        Ty::List(element) => Ty::List(Box::new(substitute_drop_generics(element, substitutions))),
+        Ty::Set(element) => Ty::Set(Box::new(substitute_drop_generics(element, substitutions))),
+        Ty::Map(key, value) => Ty::Map(
+            Box::new(substitute_drop_generics(key, substitutions)),
+            Box::new(substitute_drop_generics(value, substitutions)),
+        ),
+        Ty::Applied(name, args) => Ty::Applied(
+            name.clone(),
+            args.iter()
+                .map(|arg| substitute_drop_generics(arg, substitutions))
+                .collect(),
+        ),
+        _ => ty.clone(),
+    }
+}
+
+fn combine_drop_effects(left: DropEffect, right: DropEffect) -> DropEffect {
+    match (left, right) {
+        (DropEffect::Unknown, _) | (_, DropEffect::Unknown) => DropEffect::Unknown,
+        (DropEffect::Concurrency, _) | (_, DropEffect::Concurrency) => DropEffect::Concurrency,
+        _ => DropEffect::NoHostEffect,
+    }
 }
 
 fn classify_unresolved_calls(report: &mut EffectReport) {
     for (caller, calls) in &report.function_calls {
         for operation in calls {
-            if classify(operation).is_none()
-                && !is_known_pure_operation(operation)
-                && local_callee_key(
-                    operation,
-                    &report.free_function_names,
-                    &report.impl_method_names,
-                )
-                .is_none()
+            if !report
+                .classified_calls
+                .get(caller)
+                .is_some_and(|calls| calls.contains(operation))
+                && !report
+                    .known_effect_free_calls
+                    .get(caller)
+                    .is_some_and(|calls| calls.contains(operation))
+                && !report
+                    .resolved_call_operations
+                    .get(caller)
+                    .is_some_and(|resolved| resolved.contains(operation))
+                && !report
+                    .builtin_callback_calls
+                    .get(caller)
+                    .is_some_and(|calls| calls.contains(operation))
             {
                 report
                     .unresolved_calls
@@ -155,32 +629,104 @@ fn classify_unresolved_calls(report: &mut EffectReport) {
     }
 }
 
-fn walk_impl(implementation: &ImplDecl, report: &mut EffectReport) {
+fn walk_impl(implementation: &ImplDecl, items: &[Item], report: &mut EffectReport) {
     for method in &implementation.methods {
-        report.impl_method_names.insert(method.name.clone());
-        walk_function(method, report);
+        let key = impl_method_key(&implementation.type_name, &method.name);
+        walk_function(method, &key, report);
+    }
+    for (trait_decl, method) in default_methods(implementation, items) {
+        let function = trait_default_as_function(trait_decl, method, implementation);
+        let key = impl_method_key(&implementation.type_name, &method.name);
+        walk_function(&function, &key, report);
     }
 }
 
-fn local_callee_key<'a>(
-    operation: &'a str,
-    free_functions: &BTreeSet<String>,
-    impl_methods: &BTreeSet<String>,
-) -> Option<&'a str> {
-    if free_functions.contains(operation) {
-        return Some(operation);
+fn register_impl_methods(implementation: &ImplDecl, items: &[Item], report: &mut EffectReport) {
+    for method in &implementation.methods {
+        report
+            .impl_methods_by_type
+            .entry(implementation.type_name.clone())
+            .or_default()
+            .insert(
+                method.name.clone(),
+                impl_method_key(&implementation.type_name, &method.name),
+            );
     }
-    let (_, method) = operation.rsplit_once('.')?;
-    impl_methods.contains(method).then_some(method)
+    for (_, method) in default_methods(implementation, items) {
+        report
+            .impl_methods_by_type
+            .entry(implementation.type_name.clone())
+            .or_default()
+            .insert(
+                method.name.clone(),
+                impl_method_key(&implementation.type_name, &method.name),
+            );
+    }
 }
 
-fn walk_function(function: &FunctionDecl, report: &mut EffectReport) {
-    report.function_names.insert(function.name.clone());
+fn default_methods<'a>(
+    implementation: &ImplDecl,
+    items: &'a [Item],
+) -> Vec<(&'a TraitDecl, &'a TraitMethodSig)> {
+    let Some(trait_name) = &implementation.trait_name else {
+        return Vec::new();
+    };
+    let Some(trait_decl) = items.iter().find_map(|item| match item {
+        Item::Trait(decl) if &decl.name == trait_name => Some(decl),
+        _ => None,
+    }) else {
+        return Vec::new();
+    };
+    trait_decl
+        .methods
+        .iter()
+        .filter(|method| {
+            method.default_body.is_some()
+                && !implementation
+                    .methods
+                    .iter()
+                    .any(|overridden| overridden.name == method.name)
+        })
+        .map(|method| (trait_decl, method))
+        .collect()
+}
+
+fn trait_default_as_function(
+    trait_decl: &TraitDecl,
+    method: &TraitMethodSig,
+    implementation: &ImplDecl,
+) -> FunctionDecl {
+    let mut generics = trait_decl.generics.clone();
+    generics.extend(implementation.generics.clone());
+    generics.extend(method.generics.clone());
+    FunctionDecl {
+        name: impl_method_key(&implementation.type_name, &method.name),
+        is_pub: false,
+        generics,
+        params: method.params.clone(),
+        return_type: method.return_type.clone(),
+        body: method
+            .default_body
+            .as_ref()
+            .expect("default method selected above")
+            .clone(),
+        span: trait_decl.span,
+        source_file: trait_decl.source_file.clone(),
+    }
+}
+
+pub(crate) fn impl_method_key(owner: &str, method: &str) -> String {
+    format!("{owner}.{method}")
+}
+
+fn walk_function(function: &FunctionDecl, function_key: &str, report: &mut EffectReport) {
+    report.function_names.insert(function_key.to_string());
+    register_function_parameters(&function.params, function_key, report);
     for parameter in &function.params {
         if let Some(default) = &parameter.default {
             walk_expr(
                 default,
-                &function.name,
+                function_key,
                 function.source_file.as_deref(),
                 report,
             );
@@ -188,7 +734,7 @@ fn walk_function(function: &FunctionDecl, report: &mut EffectReport) {
     }
     walk_block(
         &function.body,
-        &function.name,
+        function_key,
         function.source_file.as_deref(),
         report,
     );
@@ -215,6 +761,15 @@ fn walk_block(block: &Block, function: &str, file: Option<&str>, report: &mut Ef
                 walk_block(body, function, file, report);
             }
             Stmt::FieldAssign { target, value } => {
+                record(
+                    report,
+                    "state(local)",
+                    "field_assignment",
+                    function,
+                    file,
+                    located.span.line,
+                    located.span.col,
+                );
                 walk_expr(target, function, file, report);
                 walk_expr(value, function, file, report);
             }
@@ -246,16 +801,99 @@ fn walk_expr(expr: &Expr, function: &str, file: Option<&str>, report: &mut Effec
                     .entry(function.to_string())
                     .or_default()
                     .insert(operation.clone());
-                if let Some(effect) = classify(&operation) {
+                if let Some(target) = resolve_local_target(callee, report) {
+                    report
+                        .resolved_function_calls
+                        .entry(function.to_string())
+                        .or_default()
+                        .insert(target);
+                    report
+                        .resolved_call_operations
+                        .entry(function.to_string())
+                        .or_default()
+                        .insert(operation.clone());
+                } else if builtin_callback_target(callee, report).is_some() {
+                    report
+                        .builtin_callback_calls
+                        .entry(function.to_string())
+                        .or_default()
+                        .insert(operation.clone());
+                }
+                if let Some(effect) = classify_effect_call(callee, &operation, report) {
+                    report
+                        .classified_calls
+                        .entry(function.to_string())
+                        .or_default()
+                        .insert(operation.clone());
                     add_effect(report, function, effect);
                     report.sites.push(EffectSite {
                         effect: effect.to_string(),
-                        operation,
+                        operation: operation.clone(),
                         function: function.to_string(),
                         file: file.map(str::to_string),
                         line,
                         col,
                     });
+                } else if let Some(drop_effect) = classify_drop_call(callee, args, report) {
+                    report
+                        .classified_calls
+                        .entry(function.to_string())
+                        .or_default()
+                        .insert(operation.clone());
+                    match drop_effect {
+                        DropEffect::NoHostEffect => {
+                            report
+                                .known_effect_free_calls
+                                .entry(function.to_string())
+                                .or_default()
+                                .insert(operation.clone());
+                        }
+                        DropEffect::Concurrency => {
+                            add_effect(report, function, "concurrency");
+                            report.sites.push(EffectSite {
+                                effect: "concurrency".to_string(),
+                                operation: operation.clone(),
+                                function: function.to_string(),
+                                file: file.map(str::to_string),
+                                line,
+                                col,
+                            });
+                        }
+                        DropEffect::Unknown => unreachable!("unknown drops remain unresolved"),
+                    }
+                } else if is_known_local_mutation_call(callee, report) {
+                    report
+                        .classified_calls
+                        .entry(function.to_string())
+                        .or_default()
+                        .insert(operation.clone());
+                    record(
+                        report,
+                        "state(local)",
+                        &operation,
+                        function,
+                        file,
+                        line,
+                        col,
+                    );
+                } else if is_known_effect_free_call(callee, report) {
+                    report
+                        .classified_calls
+                        .entry(function.to_string())
+                        .or_default()
+                        .insert(operation.clone());
+                    report
+                        .known_effect_free_calls
+                        .entry(function.to_string())
+                        .or_default()
+                        .insert(operation.clone());
+                }
+                if is_indirect_function_call(callee, report) {
+                    report
+                        .indirect_calls
+                        .entry(function.to_string())
+                        .or_default()
+                        .insert(operation.clone());
                 }
             }
             walk_expr(callee, function, file, report);
@@ -321,7 +959,15 @@ fn walk_expr(expr: &Expr, function: &str, file: Option<&str>, report: &mut Effec
             }
         }
         Expr::Block(block) | Expr::Loop(block) => walk_block(block, function, file, report),
-        Expr::Lambda(_, block) => walk_block(block, function, file, report),
+        // Creating a closure does not execute its body. The current function
+        // type omits effect rows, so keep the closure's own effects in a
+        // separate inventory entry instead of attributing them to its creator.
+        Expr::Lambda(params, block) => {
+            let lambda_key = format!("{function}::<lambda@{line}:{col}>");
+            report.function_names.insert(lambda_key.clone());
+            register_lambda_parameters(params, &lambda_key, report);
+            walk_block(block, &lambda_key, file, report);
+        }
         Expr::ListLiteral(values) | Expr::SetLiteral(values) => {
             for value in values {
                 walk_expr(value, function, file, report);
@@ -349,6 +995,882 @@ fn walk_expr(expr: &Expr, function: &str, file: Option<&str>, report: &mut Effec
                 walk_arm(arm, function, file, report);
             }
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum CallbackSource {
+    Function(String),
+    Parameter { function: String, name: String },
+    Unknown,
+}
+
+#[derive(Debug, Default)]
+struct CallbackScope {
+    names: BTreeSet<String>,
+    aliases: BTreeMap<String, CallbackSource>,
+}
+
+#[derive(Debug, Clone)]
+struct CallbackCallsite {
+    caller: String,
+    target: String,
+    target_parameter: String,
+    source: CallbackSource,
+    operation: String,
+    file: Option<String>,
+    line: usize,
+    col: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct CallbackParameter {
+    function: String,
+    name: String,
+}
+
+fn register_function_parameters(
+    params: &[crate::ast::Param],
+    function: &str,
+    report: &mut EffectReport,
+) {
+    report.function_parameters.insert(
+        function.to_string(),
+        params
+            .iter()
+            .map(|parameter| parameter.name.clone())
+            .collect(),
+    );
+    let callback_parameters = params
+        .iter()
+        .filter_map(|parameter| {
+            matches!(&parameter.ty, Type::Fn(_, _)).then(|| parameter.name.clone())
+        })
+        .collect::<BTreeSet<_>>();
+    if !callback_parameters.is_empty() {
+        report
+            .callback_parameters
+            .insert(function.to_string(), callback_parameters);
+    }
+}
+
+fn register_lambda_parameters(params: &[String], function: &str, report: &mut EffectReport) {
+    // Lambda parameters are contextually typed, so their declared function
+    // type is not retained in the AST. The checker validates each use before
+    // this analysis runs; only invocation/forwarding evidence below treats a
+    // parameter as a callback.
+    report
+        .function_parameters
+        .insert(function.to_string(), params.to_vec());
+    if !params.is_empty() {
+        report
+            .callback_parameters
+            .insert(function.to_string(), params.iter().cloned().collect());
+    }
+}
+
+fn infer_callback_effects(items: &[Item], report: &mut EffectReport) {
+    report.symbolic_effect_calls.clear();
+    let mut invoked = BTreeSet::<CallbackParameter>::new();
+    let mut forwarded = Vec::<(CallbackParameter, CallbackParameter)>::new();
+    let mut callsites = Vec::<CallbackCallsite>::new();
+    for item in items {
+        match item {
+            Item::Function(function) => collect_callback_block(
+                &function.body,
+                &function.name,
+                function.source_file.as_deref(),
+                report,
+                &mut Vec::new(),
+                &mut invoked,
+                &mut forwarded,
+                &mut callsites,
+            ),
+            Item::Impl(implementation) => {
+                for method in &implementation.methods {
+                    collect_callback_block(
+                        &method.body,
+                        &impl_method_key(&implementation.type_name, &method.name),
+                        method.source_file.as_deref(),
+                        report,
+                        &mut Vec::new(),
+                        &mut invoked,
+                        &mut forwarded,
+                        &mut callsites,
+                    );
+                }
+                for (trait_decl, method) in default_methods(implementation, items) {
+                    let function = trait_default_as_function(trait_decl, method, implementation);
+                    collect_callback_block(
+                        &function.body,
+                        &impl_method_key(&implementation.type_name, &method.name),
+                        function.source_file.as_deref(),
+                        report,
+                        &mut Vec::new(),
+                        &mut invoked,
+                        &mut forwarded,
+                        &mut callsites,
+                    );
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // A parameter is effectively invoked if the function calls it directly or
+    // forwards it to another callable parameter that is itself invoked. This
+    // fixed point handles wrappers and recursive forwarding without guessing
+    // from the call site's argument position alone.
+    loop {
+        let before = invoked.len();
+        for (source, target) in &forwarded {
+            if invoked.contains(target) {
+                invoked.insert(source.clone());
+            }
+        }
+        if invoked.len() == before {
+            break;
+        }
+    }
+
+    // Preserve callback parameter identity as an internal effect variable
+    // (conceptually ε_parameter), without defining public syntax.
+    report.function_effect_variables.clear();
+    for parameter in &invoked {
+        if report.function_names.contains(&parameter.function) {
+            report
+                .function_effect_variables
+                .entry(parameter.function.clone())
+                .or_default()
+                .insert(parameter.name.clone());
+        }
+    }
+
+    // A parameter may be substituted only when every observed callsite from
+    // this caller to this callee/formal supplies a known local function body.
+    // One known call must never mask a sibling callsite with an open callback.
+    let mut callback_callsite_resolution = BTreeMap::<(String, String, String), bool>::new();
+    for callsite in &callsites {
+        if invoked.contains(&CallbackParameter {
+            function: callsite.target.clone(),
+            name: callsite.target_parameter.clone(),
+        }) {
+            let key = (
+                callsite.caller.clone(),
+                callsite.target.clone(),
+                callsite.target_parameter.clone(),
+            );
+            let known = matches!(&callsite.source, CallbackSource::Function(_));
+            callback_callsite_resolution
+                .entry(key)
+                .and_modify(|all_known| *all_known &= known)
+                .or_insert(known);
+        }
+    }
+    report.closed_callback_parameters.clear();
+    for ((caller, target, parameter), all_known) in callback_callsite_resolution {
+        if all_known {
+            report
+                .closed_callback_parameters
+                .entry(caller)
+                .or_default()
+                .entry(target)
+                .or_default()
+                .insert(parameter);
+        }
+    }
+
+    report.effect_variable_substitutions.clear();
+    for callsite in &callsites {
+        let CallbackSource::Parameter { function, name } = &callsite.source else {
+            continue;
+        };
+        // Built-in combinators do not have standalone HIR/IR function bodies;
+        // their callback contract is validated by typed builtin-call analysis.
+        if callsite.target.starts_with("@builtin.")
+            || function != &callsite.caller
+            || !invoked.contains(&CallbackParameter {
+                function: callsite.target.clone(),
+                name: callsite.target_parameter.clone(),
+            })
+            || !invoked.contains(&CallbackParameter {
+                function: function.clone(),
+                name: name.clone(),
+            })
+        {
+            continue;
+        }
+        report
+            .effect_variable_substitutions
+            .entry(callsite.caller.clone())
+            .or_default()
+            .insert(EffectVariableSubstitution {
+                callee: callsite.target.clone(),
+                callee_parameter: callsite.target_parameter.clone(),
+                caller_parameter: name.clone(),
+            });
+    }
+
+    let mut recorded_sites = BTreeSet::<(String, usize, usize, String)>::new();
+    loop {
+        let rows_before = report.function_kinds.clone();
+        let open_before = report.open_effect_calls.clone();
+        for callsite in &callsites {
+            if !invoked.contains(&CallbackParameter {
+                function: callsite.target.clone(),
+                name: callsite.target_parameter.clone(),
+            }) {
+                continue;
+            }
+            match &callsite.source {
+                CallbackSource::Function(source) => {
+                    if let Some(effects) = report.function_kinds.get(source).cloned() {
+                        report
+                            .function_kinds
+                            .entry(callsite.caller.clone())
+                            .or_default()
+                            .extend(effects.iter().cloned());
+                        for effect in effects {
+                            let key = (
+                                callsite.caller.clone(),
+                                callsite.line,
+                                callsite.col,
+                                effect.label().to_string(),
+                            );
+                            if recorded_sites.insert(key) {
+                                report.sites.push(EffectSite {
+                                    effect: effect.label().to_string(),
+                                    operation: callsite.operation.clone(),
+                                    function: callsite.caller.clone(),
+                                    file: callsite.file.clone(),
+                                    line: callsite.line,
+                                    col: callsite.col,
+                                });
+                            }
+                        }
+                    }
+                    if let Some(open) = report.open_effect_calls.get(source).cloned() {
+                        report
+                            .indirect_calls
+                            .entry(callsite.caller.clone())
+                            .or_default()
+                            .extend(open);
+                    }
+                }
+                CallbackSource::Parameter { name, .. } => {
+                    if callsite.target.starts_with("@builtin.") {
+                        let marker = format!("{}.{}", callsite.operation, name);
+                        report
+                            .indirect_calls
+                            .entry(callsite.caller.clone())
+                            .or_default()
+                            .insert(marker.clone());
+                        if let CallbackSource::Parameter { function, .. } = &callsite.source {
+                            if function == &callsite.caller {
+                                report
+                                    .symbolic_effect_calls
+                                    .entry(callsite.caller.clone())
+                                    .or_default()
+                                    .insert(marker);
+                            }
+                        }
+                    }
+                }
+                CallbackSource::Unknown => {
+                    report
+                        .indirect_calls
+                        .entry(callsite.caller.clone())
+                        .or_default()
+                        .insert(format!(
+                            "{}.{}",
+                            callsite.operation, callsite.target_parameter
+                        ));
+                }
+            }
+        }
+        propagate_function_effects(report);
+        if report.function_kinds == rows_before && report.open_effect_calls == open_before {
+            break;
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn collect_callback_block(
+    block: &Block,
+    function: &str,
+    file: Option<&str>,
+    report: &mut EffectReport,
+    shadowed: &mut Vec<CallbackScope>,
+    invoked: &mut BTreeSet<CallbackParameter>,
+    forwarded: &mut Vec<(CallbackParameter, CallbackParameter)>,
+    callsites: &mut Vec<CallbackCallsite>,
+) {
+    shadowed.push(CallbackScope::default());
+    for located in &block.stmts {
+        match &located.stmt {
+            Stmt::Binding { name, value, .. } => {
+                let source = callback_source(value, function, shadowed, report);
+                collect_callback_expr(
+                    value, function, file, report, shadowed, invoked, forwarded, callsites,
+                );
+                shadowed
+                    .last_mut()
+                    .expect("scope exists")
+                    .names
+                    .insert(name.clone());
+                shadowed
+                    .last_mut()
+                    .expect("scope exists")
+                    .aliases
+                    .insert(name.clone(), source);
+            }
+            Stmt::Assign { name, value } => {
+                let source = callback_source(value, function, shadowed, report);
+                collect_callback_expr(
+                    value, function, file, report, shadowed, invoked, forwarded, callsites,
+                );
+                if let Some(index) = shadowed
+                    .iter_mut()
+                    .rposition(|scope| scope.names.contains(name))
+                {
+                    let current = index + 1 == shadowed.len();
+                    shadowed[index].aliases.insert(
+                        name.clone(),
+                        if current {
+                            source
+                        } else {
+                            CallbackSource::Unknown
+                        },
+                    );
+                } else {
+                    let scope = shadowed.last_mut().expect("scope exists");
+                    scope.names.insert(name.clone());
+                    scope.aliases.insert(name.clone(), CallbackSource::Unknown);
+                }
+            }
+            Stmt::Expr(value) => {
+                collect_callback_expr(
+                    value, function, file, report, shadowed, invoked, forwarded, callsites,
+                );
+            }
+            Stmt::Return(value) | Stmt::Break(value) => {
+                if let Some(value) = value {
+                    collect_callback_expr(
+                        value, function, file, report, shadowed, invoked, forwarded, callsites,
+                    );
+                }
+            }
+            Stmt::For {
+                pattern,
+                iter,
+                body,
+            } => {
+                collect_callback_expr(
+                    iter, function, file, report, shadowed, invoked, forwarded, callsites,
+                );
+                shadowed.push(CallbackScope {
+                    names: BTreeSet::from([pattern.clone()]),
+                    aliases: BTreeMap::from([(pattern.clone(), CallbackSource::Unknown)]),
+                });
+                collect_callback_block(
+                    body, function, file, report, shadowed, invoked, forwarded, callsites,
+                );
+                shadowed.pop();
+            }
+            Stmt::While { cond, body } => {
+                collect_callback_expr(
+                    cond, function, file, report, shadowed, invoked, forwarded, callsites,
+                );
+                collect_callback_block(
+                    body, function, file, report, shadowed, invoked, forwarded, callsites,
+                );
+            }
+            Stmt::FieldAssign { target, value } => {
+                collect_callback_expr(
+                    target, function, file, report, shadowed, invoked, forwarded, callsites,
+                );
+                collect_callback_expr(
+                    value, function, file, report, shadowed, invoked, forwarded, callsites,
+                );
+            }
+            Stmt::Continue => {}
+        }
+    }
+    if let Some(tail) = &block.tail {
+        collect_callback_expr(
+            tail, function, file, report, shadowed, invoked, forwarded, callsites,
+        );
+    }
+    shadowed.pop();
+}
+
+#[allow(clippy::too_many_arguments)]
+fn collect_callback_expr(
+    expr: &Expr,
+    function: &str,
+    file: Option<&str>,
+    report: &mut EffectReport,
+    shadowed: &mut Vec<CallbackScope>,
+    invoked: &mut BTreeSet<CallbackParameter>,
+    forwarded: &mut Vec<(CallbackParameter, CallbackParameter)>,
+    callsites: &mut Vec<CallbackCallsite>,
+) {
+    let (line, col) = expression_position(expr);
+    match expr.unlocated() {
+        Expr::Call(callee, args) | Expr::GenericCall(callee, _, args) => {
+            let callee_source = callback_source(callee, function, shadowed, report);
+            let callback_callee = match callee_source.clone() {
+                CallbackSource::Parameter {
+                    function: parameter_function,
+                    name,
+                } => {
+                    if parameter_function == function {
+                        let operation = expression_path(callee).unwrap_or_default();
+                        report
+                            .indirect_calls
+                            .entry(function.to_string())
+                            .or_default()
+                            .remove(&operation);
+                        report
+                            .unresolved_calls
+                            .entry(function.to_string())
+                            .or_default()
+                            .remove(&operation);
+                        report
+                            .indirect_calls
+                            .entry(function.to_string())
+                            .or_default()
+                            .insert(name.clone());
+                        report
+                            .symbolic_effect_calls
+                            .entry(function.to_string())
+                            .or_default()
+                            .insert(name.clone());
+                    }
+                    invoked.insert(CallbackParameter {
+                        function: parameter_function,
+                        name,
+                    });
+                    true
+                }
+                _ => false,
+            };
+            let target = if callback_callee {
+                None
+            } else {
+                resolve_local_target(callee, report)
+                    .or_else(|| builtin_callback_target(callee, report))
+            };
+            if let Some(target) = target {
+                if let Some(callback) = report
+                    .callback_parameters
+                    .get(&target)
+                    .and_then(|parameters| parameters.iter().next())
+                    .filter(|_| target.starts_with("@builtin."))
+                {
+                    invoked.insert(CallbackParameter {
+                        function: target.clone(),
+                        name: callback.clone(),
+                    });
+                }
+                let names = report.function_parameters.get(&target);
+                let callback_params = report.callback_parameters.get(&target);
+                let positional_offset =
+                    usize::from(matches!(callee.unlocated(), Expr::FieldAccess(_, _)));
+                let mut positional = positional_offset;
+                for argument in args {
+                    let (index, value) = match argument {
+                        Arg::Positional(value) => {
+                            let index = positional;
+                            positional += 1;
+                            (Some(index), value)
+                        }
+                        Arg::Named(name, value) => (
+                            names.and_then(|names| {
+                                names.iter().position(|parameter| parameter == name)
+                            }),
+                            value,
+                        ),
+                    };
+                    let Some(index) = index else { continue };
+                    let Some(parameter) = names.and_then(|names| names.get(index)) else {
+                        continue;
+                    };
+                    if !callback_params.is_some_and(|params| params.contains(parameter)) {
+                        continue;
+                    }
+                    let source = callback_source(value, function, shadowed, report);
+                    let target_parameter = CallbackParameter {
+                        function: target.clone(),
+                        name: parameter.clone(),
+                    };
+                    if let CallbackSource::Parameter {
+                        function: source_function,
+                        name: source_name,
+                    } = &source
+                    {
+                        forwarded.push((
+                            CallbackParameter {
+                                function: source_function.clone(),
+                                name: source_name.clone(),
+                            },
+                            target_parameter,
+                        ));
+                    }
+                    callsites.push(CallbackCallsite {
+                        caller: function.to_string(),
+                        target: target.clone(),
+                        target_parameter: parameter.clone(),
+                        source,
+                        operation: expression_path(callee).unwrap_or_else(|| "<call>".to_string()),
+                        file: file.map(str::to_string),
+                        line,
+                        col,
+                    });
+                }
+            } else if !callback_callee {
+                let operation = expression_path(callee).unwrap_or_else(|| "<call>".to_string());
+                let local_alias_target = match (&callee_source, is_callback_alias(callee, shadowed))
+                {
+                    (CallbackSource::Function(source), true)
+                        if report.function_names.contains(source)
+                            && !source.contains("::<lambda@") =>
+                    {
+                        Some(source.clone())
+                    }
+                    _ => None,
+                };
+                if let Some(target) = local_alias_target {
+                    report
+                        .resolved_function_calls
+                        .entry(function.to_string())
+                        .or_default()
+                        .insert(target);
+                    report
+                        .resolved_call_operations
+                        .entry(function.to_string())
+                        .or_default()
+                        .insert(operation.clone());
+                    report
+                        .unresolved_calls
+                        .entry(function.to_string())
+                        .or_default()
+                        .remove(&operation);
+                } else if is_function_value(callee, report) {
+                    report
+                        .indirect_calls
+                        .entry(function.to_string())
+                        .or_default()
+                        .insert(operation.clone());
+                }
+                if args.iter().any(|argument| match argument {
+                    Arg::Positional(value) | Arg::Named(_, value) => {
+                        is_function_value(value, report)
+                    }
+                }) {
+                    report
+                        .indirect_calls
+                        .entry(function.to_string())
+                        .or_default()
+                        .insert(format!("{operation}.callback"));
+                }
+            }
+            collect_callback_expr(
+                callee, function, file, report, shadowed, invoked, forwarded, callsites,
+            );
+            for argument in args {
+                match argument {
+                    Arg::Positional(value) | Arg::Named(_, value) => {
+                        collect_callback_expr(
+                            value, function, file, report, shadowed, invoked, forwarded, callsites,
+                        );
+                    }
+                }
+            }
+        }
+        Expr::Lambda(_params, body) => {
+            let lambda = format!("{function}::<lambda@{line}:{col}>");
+            let mut lambda_shadowed = Vec::new();
+            collect_callback_block(
+                body,
+                &lambda,
+                file,
+                report,
+                &mut lambda_shadowed,
+                invoked,
+                forwarded,
+                callsites,
+            );
+        }
+        Expr::Located(inner, _)
+        | Expr::Unary(_, inner)
+        | Expr::As(inner, _)
+        | Expr::UnitLiteral(inner, _) => {
+            collect_callback_expr(
+                inner, function, file, report, shadowed, invoked, forwarded, callsites,
+            );
+        }
+        Expr::Binary(_, left, right)
+        | Expr::Within(left, right)
+        | Expr::Approximately(left, right, _) => {
+            collect_callback_expr(
+                left, function, file, report, shadowed, invoked, forwarded, callsites,
+            );
+            collect_callback_expr(
+                right, function, file, report, shadowed, invoked, forwarded, callsites,
+            );
+        }
+        Expr::FieldAccess(receiver, _) | Expr::Index(receiver, _) => {
+            collect_callback_expr(
+                receiver, function, file, report, shadowed, invoked, forwarded, callsites,
+            );
+            if let Expr::Index(_, index) = expr.unlocated() {
+                collect_callback_expr(
+                    index, function, file, report, shadowed, invoked, forwarded, callsites,
+                );
+            }
+        }
+        Expr::If(condition, yes, no) => {
+            collect_callback_expr(
+                condition, function, file, report, shadowed, invoked, forwarded, callsites,
+            );
+            collect_callback_block(
+                yes, function, file, report, shadowed, invoked, forwarded, callsites,
+            );
+            if let Some(no) = no {
+                collect_callback_block(
+                    no, function, file, report, shadowed, invoked, forwarded, callsites,
+                );
+            }
+        }
+        Expr::Block(body) | Expr::Loop(body) | Expr::Spawn(body) | Expr::SpawnScope(body) => {
+            collect_callback_block(
+                body, function, file, report, shadowed, invoked, forwarded, callsites,
+            );
+        }
+        Expr::ListLiteral(values) | Expr::SetLiteral(values) => {
+            for value in values {
+                collect_callback_expr(
+                    value, function, file, report, shadowed, invoked, forwarded, callsites,
+                );
+            }
+        }
+        Expr::MapLiteral(values) => {
+            for (key, value) in values {
+                collect_callback_expr(
+                    key, function, file, report, shadowed, invoked, forwarded, callsites,
+                );
+                collect_callback_expr(
+                    value, function, file, report, shadowed, invoked, forwarded, callsites,
+                );
+            }
+        }
+        Expr::Try(value, handler) => {
+            collect_callback_expr(
+                value, function, file, report, shadowed, invoked, forwarded, callsites,
+            );
+            if let Some(handler) = handler {
+                collect_callback_expr(
+                    handler, function, file, report, shadowed, invoked, forwarded, callsites,
+                );
+            }
+        }
+        Expr::RecordLiteral(_, fields) | Expr::GenericRecordLiteral(_, _, fields) => {
+            for (_, value) in fields {
+                collect_callback_expr(
+                    value, function, file, report, shadowed, invoked, forwarded, callsites,
+                );
+            }
+        }
+        Expr::Match(value, arms) => {
+            collect_callback_expr(
+                value, function, file, report, shadowed, invoked, forwarded, callsites,
+            );
+            for arm in arms {
+                let mut arm_shadowed = BTreeSet::new();
+                collect_pattern_names(&arm.pattern, &mut arm_shadowed);
+                shadowed.push(CallbackScope {
+                    aliases: arm_shadowed
+                        .iter()
+                        .map(|name| (name.clone(), CallbackSource::Unknown))
+                        .collect(),
+                    names: arm_shadowed,
+                });
+                if let Some(guard) = &arm.guard {
+                    collect_callback_expr(
+                        guard, function, file, report, shadowed, invoked, forwarded, callsites,
+                    );
+                }
+                collect_callback_block(
+                    &arm.body, function, file, report, shadowed, invoked, forwarded, callsites,
+                );
+                shadowed.pop();
+            }
+        }
+        Expr::Range(start, _, end, step) => {
+            collect_callback_expr(
+                start, function, file, report, shadowed, invoked, forwarded, callsites,
+            );
+            collect_callback_expr(
+                end, function, file, report, shadowed, invoked, forwarded, callsites,
+            );
+            if let Some(step) = step {
+                collect_callback_expr(
+                    step, function, file, report, shadowed, invoked, forwarded, callsites,
+                );
+            }
+        }
+        Expr::Channel(_, capacity) => {
+            if let Some(capacity) = capacity {
+                collect_callback_expr(
+                    capacity, function, file, report, shadowed, invoked, forwarded, callsites,
+                );
+            }
+        }
+        Expr::IntLiteral(_)
+        | Expr::SizedIntLiteral(_, _)
+        | Expr::FloatLiteral(_)
+        | Expr::Float32Literal(_)
+        | Expr::StringLiteral(_)
+        | Expr::CharLiteral(_)
+        | Expr::BoolLiteral(_)
+        | Expr::Ident(_)
+        | Expr::EmptyCollection(_, _) => {}
+    }
+}
+
+fn callback_source(
+    expr: &Expr,
+    caller: &str,
+    shadowed: &[CallbackScope],
+    report: &EffectReport,
+) -> CallbackSource {
+    match expr.unlocated() {
+        Expr::Lambda(_, _) => CallbackSource::Function(lambda_function_key(expr, caller)),
+        Expr::Ident(name) => {
+            if let Some(source) = shadowed
+                .iter()
+                .rev()
+                .find_map(|scope| scope.aliases.get(name))
+            {
+                source.clone()
+            } else if is_shadowed(shadowed, name) {
+                CallbackSource::Unknown
+            } else if report
+                .callback_parameters
+                .get(caller)
+                .is_some_and(|params| params.contains(name))
+            {
+                CallbackSource::Parameter {
+                    function: caller.to_string(),
+                    name: name.clone(),
+                }
+            } else {
+                resolve_local_target(expr, report)
+                    .map(CallbackSource::Function)
+                    .unwrap_or(CallbackSource::Unknown)
+            }
+        }
+        _ => resolve_local_target(expr, report)
+            .map(CallbackSource::Function)
+            .unwrap_or(CallbackSource::Unknown),
+    }
+}
+
+fn is_callback_alias(expr: &Expr, scopes: &[CallbackScope]) -> bool {
+    let Expr::Ident(name) = expr.unlocated() else {
+        return false;
+    };
+    scopes
+        .iter()
+        .rev()
+        .any(|scope| scope.aliases.contains_key(name))
+}
+
+/// Collection/result combinators are compiler-known higher-order operations.
+/// Their callback positions are fixed by the typed receiver and native
+/// lowering contract; user-defined methods win because they resolve first.
+fn builtin_callback_target(callee: &Expr, report: &mut EffectReport) -> Option<String> {
+    let Expr::FieldAccess(receiver, method) = callee.unlocated() else {
+        return None;
+    };
+    let receiver_node = receiver.as_ref() as *const Expr as usize;
+    let receiver_unlocated = receiver.unlocated() as *const Expr as usize;
+    let list_receiver = report.list_receiver_nodes.contains(&receiver_node)
+        || report.list_receiver_nodes.contains(&receiver_unlocated);
+    let option_receiver = report.option_receiver_nodes.contains(&receiver_node)
+        || report.option_receiver_nodes.contains(&receiver_unlocated);
+    let result_receiver = report.result_receiver_nodes.contains(&receiver_node)
+        || report.result_receiver_nodes.contains(&receiver_unlocated);
+    let (container, parameters) = if list_receiver {
+        let parameters = match method.as_str() {
+            "map" | "filter" | "any" | "all" | "find" => vec!["self", "callback"],
+            "fold" => vec!["self", "initial", "callback"],
+            _ => return None,
+        };
+        ("List", parameters)
+    } else if option_receiver && matches!(method.as_str(), "map" | "then") {
+        ("Option", vec!["self", "callback"])
+    } else if result_receiver && matches!(method.as_str(), "map" | "map_err" | "then") {
+        ("Result", vec!["self", "callback"])
+    } else {
+        return None;
+    };
+    let target = format!("@builtin.{container}.{method}");
+    report
+        .function_parameters
+        .entry(target.clone())
+        .or_insert_with(|| parameters.iter().map(|name| (*name).to_string()).collect());
+    report
+        .callback_parameters
+        .entry(target.clone())
+        .or_default()
+        .insert("callback".to_string());
+    Some(target)
+}
+
+fn lambda_function_key(expr: &Expr, parent: &str) -> String {
+    let (line, col) = expression_position(expr);
+    format!("{parent}::<lambda@{line}:{col}>")
+}
+
+fn expression_position(expr: &Expr) -> (usize, usize) {
+    if let Expr::Located(_, range) = expr {
+        (range.start.line, range.start.col)
+    } else {
+        (0, 0)
+    }
+}
+
+fn is_function_value(expr: &Expr, report: &EffectReport) -> bool {
+    matches!(expr.unlocated(), Expr::Lambda(_, _))
+        || report
+            .function_value_nodes
+            .contains(&(expr as *const Expr as usize))
+        || report
+            .function_value_nodes
+            .contains(&(expr.unlocated() as *const Expr as usize))
+}
+
+fn is_shadowed(shadowed: &[CallbackScope], name: &str) -> bool {
+    shadowed
+        .iter()
+        .rev()
+        .any(|scope| scope.names.contains(name))
+}
+
+fn collect_pattern_names(pattern: &Pattern, names: &mut BTreeSet<String>) {
+    match pattern {
+        Pattern::Ident(name) => {
+            names.insert(name.clone());
+        }
+        Pattern::Variant(_, fields) => {
+            for (_, field) in fields {
+                collect_pattern_names(field, names);
+            }
+        }
+        Pattern::Wildcard | Pattern::Literal(_) | Pattern::Range(_, _, _) => {}
     }
 }
 
@@ -386,89 +1908,346 @@ fn expression_path(expr: &Expr) -> Option<String> {
     }
 }
 
-fn classify(operation: &str) -> Option<&'static str> {
-    let segments: Vec<&str> = operation.split('.').collect();
+fn resolve_local_target(callee: &Expr, report: &EffectReport) -> Option<String> {
+    match callee.unlocated() {
+        Expr::Ident(name) if report.free_function_names.contains(name) => Some(name.clone()),
+        Expr::FieldAccess(receiver, method) => {
+            let owner = report
+                .receiver_types
+                .get(&(receiver.as_ref() as *const Expr as usize))?;
+            report
+                .impl_methods_by_type
+                .get(owner.strip_prefix('@').unwrap_or(owner))
+                .and_then(|methods| methods.get(method))
+                .cloned()
+        }
+        _ => None,
+    }
+}
+
+fn is_indirect_function_call(callee: &Expr, report: &EffectReport) -> bool {
+    let Expr::Ident(name) = callee.unlocated() else {
+        return false;
+    };
+    // A named top-level function is resolved by the direct call graph. An
+    // identifier that is not one of those names may be a function-valued
+    // parameter or local, which the present effect-free Fn type cannot close.
+    !report.free_function_names.contains(name)
+        && report
+            .function_value_nodes
+            .contains(&(callee as *const Expr as usize))
+}
+
+fn classify_effect_call(
+    callee: &Expr,
+    operation: &str,
+    report: &EffectReport,
+) -> Option<&'static str> {
     let leaf = operation
         .rsplit(|character| character == '.' || character == ':')
         .find(|segment| !segment.is_empty())
         .unwrap_or(operation);
-    if segments.first() == Some(&"measurements") || operation.contains("measurements::") {
-        return Some("measurement");
+    match callee.unlocated() {
+        Expr::Ident(name) => {
+            if name.starts_with("std.measurements::") {
+                return Some("measurement");
+            }
+            if name.starts_with("std.viz::") && leaf == "provenance" {
+                return Some("provenance");
+            }
+            if !is_function_value(callee, report)
+                && matches!(
+                    name.as_str(),
+                    "args"
+                        | "env"
+                        | "cwd"
+                        | "file_exists"
+                        | "read_file"
+                        | "write_file"
+                        | "print"
+                        | "select"
+                        | "yield"
+                )
+            {
+                return classify_effectful_builtin(name);
+            }
+            if report.free_function_names.contains(name) || is_function_value(callee, report) {
+                return None;
+            }
+            classify_effectful_builtin(name)
+        }
+        Expr::FieldAccess(receiver, method) => {
+            let owner = report
+                .receiver_types
+                .get(&(receiver.as_ref() as *const Expr as usize))?;
+            match owner.as_str() {
+                "Rng"
+                    if matches!(
+                        method.as_str(),
+                        "rand" | "randn" | "normal" | "uniform" | "sample" | "choice"
+                    ) =>
+                {
+                    Some("random(seed)")
+                }
+                "Channel" if matches!(method.as_str(), "send" | "recv" | "close") => {
+                    Some("concurrency")
+                }
+                "Task" if matches!(method.as_str(), "join" | "cancel") => Some("concurrency"),
+                _ => None,
+            }
+        }
+        _ => None,
     }
-    if (segments.first() == Some(&"viz") || operation.contains("viz::")) && leaf == "provenance" {
-        return Some("provenance");
-    }
+}
+
+fn classify_effectful_builtin(operation: &str) -> Option<&'static str> {
     if matches!(
-        leaf,
+        operation,
         "rng" | "rand" | "randn" | "uniform" | "normal" | "sample" | "choice"
     ) {
         return Some("random(seed)");
     }
-    if matches!(leaf, "now" | "clock" | "today" | "sleep") {
+    if matches!(operation, "now" | "clock" | "today" | "sleep") {
         return Some("clock");
     }
-    if matches!(
-        leaf,
-        "print" | "println" | "read_file" | "write_file" | "args" | "env" | "save" | "load"
-    ) {
+    if matches!(operation, "read_file" | "write_file" | "file_exists") {
+        return Some("filesystem");
+    }
+    if matches!(operation, "args" | "env" | "cwd") {
+        return Some("external");
+    }
+    if matches!(operation, "print" | "println") {
         return Some("io");
     }
     if matches!(
-        leaf,
+        operation,
         "http" | "https" | "fetch" | "request" | "socket" | "tcp" | "udp"
     ) {
         return Some("network");
     }
     if matches!(
-        leaf,
-        "spawn" | "spawn_scope" | "channel" | "select" | "send" | "recv" | "join" | "cancel"
+        operation,
+        "spawn"
+            | "spawn_scope"
+            | "channel"
+            | "select"
+            | "send"
+            | "recv"
+            | "join"
+            | "cancel"
+            | "yield"
     ) {
         return Some("concurrency");
     }
     None
 }
 
-/// Operations in this list are local, deterministic transformations or
-/// collection accessors. They are known to the inventory without being
-/// effect rows: recognizing them only removes false `unresolved` markers and
-/// never proves that the surrounding function is pure.
-fn is_known_pure_operation(operation: &str) -> bool {
-    let leaf = operation
-        .rsplit(|character| character == '.' || character == ':')
-        .find(|segment| !segment.is_empty())
-        .unwrap_or(operation);
+/// Global compiler intrinsics known to have no host effect in the current
+/// model. Keep this exact: a qualified `host.sqrt()` is not the `sqrt` builtin.
+fn is_known_effect_free_global(operation: &str) -> bool {
     matches!(
-        leaf,
+        operation,
         "abs"
-            | "at"
-            | "char_at"
-            | "codepoint"
-            | "contains"
-            | "first"
-            | "format_float"
-            | "format_text"
-            | "get"
-            | "is_blank"
-            | "is_empty"
-            | "is_exact"
+            | "acos"
+            | "arange"
+            | "array"
+            | "asin"
+            | "atan"
+            | "atan2"
+            | "ceil"
+            | "char_from_codepoint"
+            | "clone"
+            | "cos"
+            | "cosh"
+            | "corr"
+            | "cov"
+            | "erf"
+            | "exp"
+            | "floor"
+            | "format_float_value"
+            | "full"
+            | "hash"
+            | "histogram"
+            | "det"
+            | "eigvals"
+            | "eye"
+            | "inv"
+            | "linfit"
             | "is_finite"
-            | "is_known"
-            | "last"
-            | "length"
-            | "lines"
-            | "pop"
-            | "push"
-            | "reverse"
-            | "slice"
-            | "source_count"
+            | "linspace"
+            | "ln"
+            | "log10"
+            | "norm"
+            | "norm_cdf"
+            | "norm_pdf"
+            | "ones"
+            | "pi"
+            | "polyfit"
+            | "polyval"
+            | "pow"
+            | "round"
+            | "solve"
+            | "sin"
+            | "sinh"
             | "sqrt"
-            | "to_string"
-            | "trim"
-            | "unit"
-            | "value"
+            | "tan"
+            | "tanh"
+            | "trace"
+            | "where"
+            | "zeros"
+            | "Some"
+            | "None"
             | "Ok"
             | "Err"
     )
+}
+
+/// Methods are known only when the type checker attached a built-in receiver
+/// type to this exact receiver node. User-defined or host receivers keep their
+/// methods open even when they share a familiar leaf name.
+fn is_known_effect_free_method(owner: &str, method: &str) -> bool {
+    if method == "to_string" {
+        // The checker reserves this conversion as a compiler operation for
+        // every concrete value type; dyn Trait receivers are not indexed here.
+        return true;
+    }
+    match owner {
+        "@Array" => matches!(
+            method,
+            "shape"
+                | "rank"
+                | "size"
+                | "length"
+                | "count"
+                | "sum"
+                | "min"
+                | "max"
+                | "mean"
+                | "to_list"
+                | "transpose"
+                | "var"
+                | "std"
+                | "sample_var"
+                | "sample_std"
+                | "median"
+                | "cumsum"
+                | "sort"
+                | "to_float"
+                | "any"
+                | "all"
+                | "count_true"
+                | "reshape"
+                | "sum_axis"
+                | "dot"
+                | "matmul"
+                | "percentile"
+                | "row"
+                | "col"
+                | "get"
+                | "unit"
+                | "values"
+        ),
+        "@List" => matches!(
+            method,
+            "length" | "count" | "join" | "map" | "filter" | "find" | "any" | "all" | "fold"
+        ),
+        "@Map" => matches!(method, "count" | "keys" | "contains_key" | "values" | "get"),
+        "@Set" => matches!(method, "count" | "contains"),
+        "@String" => matches!(
+            method,
+            "length"
+                | "is_empty"
+                | "char_at"
+                | "slice"
+                | "codepoint"
+                | "trim"
+                | "to_upper"
+                | "to_lower"
+                | "contains"
+                | "starts_with"
+                | "ends_with"
+                | "replace"
+                | "split"
+                | "lines"
+                | "to_int"
+                | "to_float"
+        ),
+        "@Option" => matches!(
+            method,
+            "is_some" | "is_none" | "unwrap" | "unwrap_or" | "ok_or" | "map" | "and_then"
+        ),
+        "@Result" => matches!(
+            method,
+            "is_ok" | "is_err" | "unwrap" | "unwrap_or" | "map" | "map_err" | "and_then"
+        ),
+        "@Quantity" => matches!(method, "value" | "unit" | "is_exact" | "is_known"),
+        _ => false,
+    }
+}
+
+fn is_known_effect_free_call(callee: &Expr, report: &EffectReport) -> bool {
+    match callee.unlocated() {
+        Expr::Ident(name) => {
+            !report.free_function_names.contains(name)
+                && !is_function_value(callee, report)
+                && is_known_effect_free_global(name)
+        }
+        Expr::FieldAccess(receiver, method) => report
+            .receiver_types
+            .get(&(receiver.as_ref() as *const Expr as usize))
+            .is_some_and(|owner| is_known_effect_free_method(owner, method)),
+        _ => false,
+    }
+}
+
+fn classify_drop_call(callee: &Expr, args: &[Arg], report: &EffectReport) -> Option<DropEffect> {
+    let Expr::Ident(name) = callee.unlocated() else {
+        return None;
+    };
+    if name != "drop"
+        || report.free_function_names.contains(name)
+        || is_function_value(callee, report)
+        || args.len() != 1
+    {
+        return None;
+    }
+    let value = match &args[0] {
+        Arg::Positional(value) | Arg::Named(_, value) => value,
+    };
+    let ty = expression_type(value, report)?;
+    match drop_effect_for_type(ty, report, &mut BTreeSet::new()) {
+        DropEffect::Unknown => None,
+        effect => Some(effect),
+    }
+}
+
+fn expression_type<'a>(expr: &'a Expr, report: &'a EffectReport) -> Option<&'a Ty> {
+    report
+        .expression_types
+        .get(&(expr as *const Expr as usize))
+        .or_else(|| match expr {
+            Expr::Located(inner, _) => expression_type(inner, report),
+            _ => None,
+        })
+}
+
+fn is_known_local_mutation_call(callee: &Expr, report: &EffectReport) -> bool {
+    let Expr::FieldAccess(receiver, method) = callee.unlocated() else {
+        return false;
+    };
+    let Some(owner) = report
+        .receiver_types
+        .get(&(receiver.as_ref() as *const Expr as usize))
+    else {
+        return false;
+    };
+    match owner.as_str() {
+        "@Array" => method == "set",
+        "@List" => matches!(method.as_str(), "push" | "remove_at"),
+        "@Map" => matches!(method.as_str(), "set" | "remove"),
+        "@Set" => matches!(method.as_str(), "add" | "remove"),
+        _ => false,
+    }
 }
 
 fn record(
@@ -503,43 +2282,74 @@ fn add_effect(report: &mut EffectReport, function: &str, effect: &str) {
 }
 
 fn propagate_function_effects(report: &mut EffectReport) {
+    // Snapshot direct rows first so the fixed-point pass can distinguish source
+    // evidence from inherited effects and remains deterministic for recursive SCCs.
+    let mut rows = report.function_kinds.clone();
     loop {
-        let mut changed = false;
-        let callers: Vec<(String, BTreeSet<String>)> = report
-            .function_calls
-            .iter()
-            .map(|(caller, callees)| (caller.clone(), callees.clone()))
-            .collect();
-        for (caller, callees) in callers {
-            let inherited: Vec<EffectKind> = callees
-                .iter()
-                .filter_map(|callee| {
-                    local_callee_key(
-                        callee,
-                        &report.free_function_names,
-                        &report.impl_method_names,
-                    )
-                })
-                .filter_map(|callee| report.function_kinds.get(callee))
-                .flat_map(|effects| effects.iter().cloned())
-                .collect();
-            let row = report.function_kinds.entry(caller).or_default();
-            for effect in inherited {
-                changed |= row.insert(effect.clone());
-                report.kinds.insert(effect.clone());
-                report.effects.insert(effect.label().to_string());
+        let mut next = rows.clone();
+        for (caller, callees) in &report.resolved_function_calls {
+            let row = next.entry(caller.clone()).or_default();
+            for callee in callees {
+                if let Some(inherited) = rows.get(callee) {
+                    row.extend(inherited.iter().cloned());
+                }
             }
         }
-        if !changed {
+        if next == rows {
             break;
         }
+        rows = next;
     }
+    for row in rows.values() {
+        for effect in row {
+            report.kinds.insert(effect.clone());
+            report.effects.insert(effect.label().to_string());
+        }
+    }
+    report.function_kinds = rows;
+
+    let mut open_calls = report.unresolved_calls.clone();
+    for (caller, calls) in &report.indirect_calls {
+        open_calls
+            .entry(caller.clone())
+            .or_default()
+            .extend(calls.iter().cloned());
+    }
+    loop {
+        let mut next = open_calls.clone();
+        for (caller, callees) in &report.resolved_function_calls {
+            let inherited = callees
+                .iter()
+                .filter_map(|callee| {
+                    open_calls.get(callee).map(|calls| {
+                        let closed = report
+                            .closed_callback_parameters
+                            .get(caller)
+                            .and_then(|targets| targets.get(callee));
+                        calls
+                            .iter()
+                            .filter(|call| !closed.is_some_and(|closed| closed.contains(*call)))
+                            .cloned()
+                            .collect::<Vec<_>>()
+                    })
+                })
+                .flatten();
+            next.entry(caller.clone()).or_default().extend(inherited);
+        }
+        if next == open_calls {
+            break;
+        }
+        open_calls = next;
+    }
+    report.open_effect_calls = open_calls;
 }
 
 pub fn effect_description(effect: &str) -> &'static str {
     match effect {
         "clock" => "observa reloj o tiempo",
         "concurrency" => "usa tareas, canales o scheduler",
+        "external" => "observa argumentos o variables del entorno del proceso",
+        "filesystem" => "lee o modifica el filesystem del host",
         "io" => "observa o modifica E/S del host",
         "measurement" => "propaga mediciones o incertidumbre",
         "network" => "contacta un recurso de red",
@@ -551,13 +2361,51 @@ pub fn effect_description(effect: &str) -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use super::is_known_pure_operation;
+    use super::{is_known_effect_free_global, is_known_effect_free_method};
+    use crate::ast::Expr;
 
     #[test]
-    fn pure_inventory_operations_are_known_without_becoming_effects() {
-        for operation in ["values.length", "std.strings::trim", "measurement.value"] {
-            assert!(is_known_pure_operation(operation), "{operation}");
+    fn known_intrinsics_are_exact_and_do_not_match_qualified_host_calls() {
+        for operation in [
+            "sin",
+            "array",
+            "sqrt",
+            "zeros",
+            "hash",
+            "histogram",
+            "clone",
+        ] {
+            assert!(is_known_effect_free_global(operation), "{operation}");
         }
-        assert!(!is_known_pure_operation("unknown_host_operation"));
+        for operation in [
+            "host.sqrt",
+            "std.strings::trim",
+            "unknown_host_operation",
+            "normal",
+        ] {
+            assert!(!is_known_effect_free_global(operation), "{operation}");
+        }
+    }
+
+    #[test]
+    fn known_methods_require_a_builtin_receiver_type_and_exclude_mutators() {
+        assert!(is_known_effect_free_method("@Array", "mean"));
+        assert!(is_known_effect_free_method("@String", "trim"));
+        assert!(is_known_effect_free_method("@Map", "get"));
+        assert!(is_known_effect_free_method("UserRecord", "to_string"));
+        assert!(!is_known_effect_free_method("Host", "get"));
+        assert!(!is_known_effect_free_method("@Array", "set"));
+        assert!(!is_known_effect_free_method("@List", "push"));
+    }
+
+    #[test]
+    fn indirect_function_invocation_requires_typed_function_value_evidence() {
+        let mut report = super::EffectReport::default();
+        let callee = Expr::Ident("action".to_string());
+        let key = &callee as *const Expr as usize;
+        report.function_value_nodes.insert(key);
+        assert!(super::is_indirect_function_call(&callee, &report));
+        report.function_value_nodes.clear();
+        assert!(!super::is_indirect_function_call(&callee, &report));
     }
 }

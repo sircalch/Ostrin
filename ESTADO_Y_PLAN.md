@@ -1,13 +1,19 @@
 # Ostrin — estado del proyecto y plan de avance
 
-*Corte: 2026-10-13 · release experimental `v0.1.0` publicada (2026-09-24) · 6 pruebas diferenciales, 333 de integración y 3 unitarias en verde.*
+*Corte: 2026-10-14 · baseline integrado `main`/`cb9a524` · release candidate v0.2.0 sin publicar · 6 pruebas diferenciales, 351 de integración y 11 unitarias en verde.*
 
-Validación remota: Pages, CI, CodeQL, sanitizers y auditoría de seguridad pasaron para el
-ciclo `4671b28` en Windows, Linux, macOS y web (Ostrin CI `38182030324`, Browser audit
-`38182030431`, CodeQL `38182030241`, Security audit `38182030358`, Native sanitizers
-`38182030421`). La compuerta oficial exige `cargo fmt --check`, Clippy con el lint `suspicious`, la suite del
-compilador y las comprobaciones del sitio; los workflows de auditoría de dependencias,
-CodeQL, sanitizers nativos y cobertura quedan registrados para el ciclo P5.
+Baseline remoto integrado: `main` en `cb9a52480f0d016921e4d0bccb195ad0faac958b` pasó CI
+([38520134678](https://github.com/sircalch/Ostrin/actions/runs/38520134678)), Browser audit
+([38520134566](https://github.com/sircalch/Ostrin/actions/runs/38520134566)), CodeQL
+([38520134640](https://github.com/sircalch/Ostrin/actions/runs/38520134640)), Security audit
+([38520134613](https://github.com/sircalch/Ostrin/actions/runs/38520134613)), Native sanitizers
+([38520142898](https://github.com/sircalch/Ostrin/actions/runs/38520142898)), WASI
+([38520140712](https://github.com/sircalch/Ostrin/actions/runs/38520140712)), empaquetado de release
+([38520144819](https://github.com/sircalch/Ostrin/actions/runs/38520144819)), auditoría web y despliegue.
+La matriz de ownership vigente está en [`docs/ownership-matrix.md`](docs/ownership-matrix.md). La rama local `codex/static-effect-row-verification` añade inferencia tipada experimental sin
+validación CI remota todavía. Su suite local pasó: 11 pruebas unitarias, 6 diferenciales y 351 de integración
+y 77 tests Node; también pasan fmt, el Clippy configurado por CI, `project-plan-check` y
+`website-check`.
 
 Este documento resume **qué existe hoy**, **qué no**, y **por dónde se puede avanzar**.
 Para la historia detallada, ver `CONTEXTO_PROYECTO.md` (secciones 1–266); para el diseño
@@ -26,8 +32,8 @@ checks del head final ni cierra gates por sí mismo.
 |---|---|
 | **Implementado** | Compilador + intérprete (referencia semántica), checker con cantidades físicas, records/enums/traits/genéricos, `Option`/`Result`, colecciones, `Array<T>`, módulos y paquetes con lockfile, concurrencia cooperativa determinista, `--native-threads`, backend C con `--leak-check`, build WASI, playground WASM, LSP/DAP y extensión VS Code (VSIX local) |
 | **En fallback** | El backend nativo emite desde IR las familias cubiertas (§5); records/enums genéricos aplicados, iteradores indirectos, scopes anidados, handlers no lineales y agregados/escapes complejos caen de forma verificada a HIR y después al AST |
-| **Experimental** | Todo el lenguaje (versión 0.x, sin garantía de estabilidad); `--native-threads`; `std.viz` (visualización 2D/3D en SVG); `std.measurements` (mediciones escalares con fuentes de sensibilidad, estados `Exact`/`Standard`/`Unknown`, validación de valores no finitos y referencias analíticas para productos correlacionados/independientes; paridad intérprete/nativo, WASI destructor check, `live_allocations=0` y suites ASan/UBSan verdes en CI `38182030421`); inventarios `--effect-report` y `--provenance-report` con artefacto público en `website/provenance.html`, target/WASI y snapshot parcial `ostrin.runtime/v1`; los efectos científicos ya tienen inventario experimental, propagación interna y bundles R0–R2; el checking estático completo y la reclamación R3 siguen en desarrollo (`docs/design/26-efectos-cientificos.md`); paquetes científicos de ejemplo `tables`, `plot`, `autodiff` (modo directo); dependencias Git con `--fetch` |
-| **Pendiente** | Retirar el fallback AST restante, completar ownership de agregados/escapes, Quantity/arrays/covarianza/Monte Carlo de `Measurement<T>`, checking estático y niveles R2/R3 de efectos/procedencia, red, registry público, GPU, autodiff inverso, canales de distribución (Homebrew, winget, Scoop, Chocolatey, AUR), extensión en Marketplace y reconocimiento upstream de Ostrin en GitHub Linguist; `Figure.unit_line`/`unit_scatter` ya usan IR/C con paridad nativa, emisión WASI y cero fugas, mientras los trazados basados en listas conservan su frontera propia; contrato de ownership en [`docs/design/27-ownership-de-quantity-escalar.md`](docs/design/27-ownership-de-quantity-escalar.md) |
+| **Experimental** | Todo el lenguaje (versión 0.x, sin garantía de estabilidad); `--native-threads`; `std.viz` (visualización 2D/3D en SVG); `std.measurements` (mediciones escalares con fuentes de sensibilidad, estados `Exact`/`Standard`/`Unknown`, validación de no finitos y propagación analítica); `--effect-report` con inferencia tipada local en la rama `codex/static-effect-row-verification`, filas y callbacks simbólicos verificados por HIR/IR, sin contratos públicos ni garantía de pureza; `--provenance-report` experimental con snapshot parcial `ostrin.runtime/v1`; R3 permanece abierto; paquetes científicos `tables`, `plot`, `autodiff` (modo directo); dependencias Git con `--fetch` |
+| **Pendiente** | Integrar y validar en CI la fase experimental de efectos; definir contratos de reproducibilidad R2/R3; implementar `Measurement<Quantity<D>>`, arrays/covarianza/Monte Carlo; red, registry público, GPU, autodiff inverso, canales de distribución, extensión en Marketplace y aceptación upstream en GitHub Linguist; `Figure.unit_line`/`unit_scatter` usan IR/C con paridad nativa, mientras otros trazados mantienen su frontera documentada; ownership de Quantity: [`docs/design/27-ownership-de-quantity-escalar.md`](docs/design/27-ownership-de-quantity-escalar.md) |
 | **Release** | [`v0.1.0`](https://github.com/sircalch/Ostrin/releases/tag/v0.1.0) publicada el 2026-09-24 con tres archivos (Linux x86_64, macOS ARM64, Windows x64) y sus `.sha256`; instaladores verificados contra ella en runners limpios (`install-check.yml`); workflows de CI, release y WASI en verde |
 | **Higiene del repositorio** | Auditoría del 2026-10-07: se retiraron 49 ramas remotas y 53 referencias locales ya integradas (24 sin worktree y 29 de worktrees limpios; estos checkouts quedaron en el mismo commit, detached y con sus archivos preservados). GitHub elimina ramas al fusionar. El auditor reproducible [`scripts/branch-hygiene-check.mjs`](scripts/branch-hygiene-check.mjs) confirma que `origin` solo conserva `main`, clasifica 4 ramas locales integradas y 7 con commits únicos; las integradas aún tienen worktrees con cambios locales, por lo que su eliminación queda pendiente hasta preservarlos. Política: [`CONTRIBUTING.md`](CONTRIBUTING.md) y [`docs/branch-hygiene.md`](docs/branch-hygiene.md) |
 
@@ -566,48 +572,22 @@ sustituye la adopción independiente; por eso el plan mantiene un frente explíc
 | **5** | E (WASM) + G (playground) | Difusión |
 | **6** | Definición upstream para GitHub Linguist, validación local y clasificación de `.ostrin` tras la aceptación | Ostrin visible como lenguaje en GitHub |
 
-Plan activo (2026-10-08): la fase actual es calidad, corrección científica, reproducibilidad y
-usabilidad externa. La auditoría de ramas está cerrada (§0): los refs remotos obsoletos y ramas
-locales limpias/fusionadas se retiraron; se preservaron los checkouts con cambios y los commits
-únicos aún no integrados. GitHub elimina nuevas ramas al fusionar. La matriz inicial de ownership
-por tipo y contexto está en [`docs/ownership-matrix.md`](docs/ownership-matrix.md). Se cerró una
-ruta HIR para enums gestionados dentro de `Result` y una primera ruta IR/C para `Message::Text(String)`
-seleccionado en un `Phi` de ramas. La regresión fuerza IR (`ir=3, hir=0, ast=0`), comprueba paridad,
-`live_allocations=0` y emite los dispatchers tipados para WASI. La captura de enum por closure
-también cruza IR con paridad, destructor del entorno, cero asignaciones vivas y emisión de C WASI;
-la captura diferida por tarea también cruza IR y pasa con scheduler cooperativo y `--native-threads`.
-Las pruebas focales de branch `Phi`, loop `Phi`, closure, captura y cancelación de tarea pasan bajo ASan y UBSan en WSL. El smoke
-matrix runtime de 23 programas compila y ejecuta con Node WASI y wasi-sdk 34 (run
-[38347316359](https://github.com/sircalch/Ostrin/actions/runs/38347316359)), incluyendo las
-capturas y cancelación de tareas con payload gestionado. Para ello, el driver WASI enlaza `libsetjmp` de wasi-libc, que
-resuelve los símbolos generados por SJLJ. La suite completa de 327 pruebas de integración pasa en Windows. El
-corte anterior de 282 ejemplos pasó completo bajo ASan y UBSan; las
-cuatro regresiones de enums gestionados pasan focalmente bajo ASan y UBSan. La prueba
-`native_ir_nested_wrappers_preserve_recursive_ownership` ahora fuerza una lista de
-`Result<Option<Result<Option<String>,String>>,String>` por IR, la modifica en un loop con errores
-en capas distintas y comprueba paridad, `live_allocations=0` y el destructor recursivo emitido para
-WASI. Su ejecución en ASan/UBSan queda incluida en los jobs de sanitizer; el run 38112752608 terminó correctamente. El siguiente bloque técnico sigue siendo cerrar otros riesgos altos en agregados, escapes, `Phi`, closures y
-tareas. Después se
-reduce el fallback AST de forma segura, sin sacrificar semántica ni memoria. Siguen
-reproducción R1/R2, inferencia estática de efectos, `Measurement<T>` con cantidades/arreglos/
-covarianza, validación numérica, auditoría de accesibilidad/arquitectura web y preparación de `v0.2`. La
-validación analítica inicial de LU, Cholesky, QR, SVD y autovalores simétricos ya pasa localmente
-en intérprete y nativo con residuales independientes, tolerancias por caso y cero fugas; el criterio
-permanece abierto hasta obtener ejecución CI verde en todos los sistemas soportados y adjuntar su URL.
-El gate de publicación de [`v0.2.0`](docs/release-readiness-v0.2.json) tiene 12 criterios
-con evidencia y un límite inicial de ocho fallbacks AST; se mantiene **NOT_READY** hasta que
-todos estén validados. CI lo exige para la etiqueta `v0.2.x`.
-La clasificación de Ostrin por GitHub Linguist y el crecimiento del ecosistema dependen de
-evidencia de uso externo y validación upstream. GPU, autodiff inverso, registry público y red
-permanecen fuera de la etapa inmediata.
-El scorecard verificable de calidad se genera con [`scripts/quality-scorecard.mjs`](scripts/quality-scorecard.mjs)
-y queda en [`validation/quality-scorecard.json`](validation/quality-scorecard.json); reúne pruebas marcadas,
-la frontera HIR/IR/AST, ownership, niveles R0–R3, readiness y presencia de artefactos de validación.
-La página pública [`website/status.html`](website/status.html) presenta esas dimensiones por separado,
-con `status-data.js` generado desde el scorecard y sin convertirlas en una calificación agregada.
-El snapshot externo de Linguist queda en [`validation/linguist-usage.json`](validation/linguist-usage.json):
-la preparación local está lista, pero la consulta actual encuentra 0 archivos públicos `.ostrin` y
-mantiene pendiente cualquier PR upstream.
+Plan activo (2026-10-14): el candidato de v0.2.0 está preparado desde el baseline limpio
+`cb9a52480f0d016921e4d0bccb195ad0faac958b`; sus 12 criterios, incluidos artifacts, están `READY`
+en `docs/release-readiness-v0.2.json`. El tag y la publicación siguen deliberadamente pendientes.
+
+La fase actual es inferencia tipada de efectos. En la rama local se componen filas a través de
+llamadas conocidas, ciclos recursivos y callbacks tipados; los efectos desconocidos permanecen
+abiertos y las variables callback sobreviven HIR e IR. La evidencia local incluye paridad de la
+suite, verificación HIR/IR y cobertura de scripts. Esta rama no tiene aún CI remoto y no se presenta
+como integrada en `main`.
+
+El scorecard y la página `website/status.html` se regeneran desde
+[`scripts/quality-scorecard.mjs`](scripts/quality-scorecard.mjs) y
+[`scripts/status-page.mjs`](scripts/status-page.mjs). La instantánea actual informa 18 bundles R0,
+11 R2 y ninguno R3 listo; la captura del host sigue siendo requisito abierto. La siguiente fase del
+plan, después de revisar e integrar efectos, es `Measurement<Quantity<D>>` según el documento fuente
+§31; después vienen covarianza, artefacto R3 y mediciones de rendimiento semántico.
 
 ---
 
@@ -615,7 +595,7 @@ mantiene pendiente cualquier PR upstream.
 
 ```powershell
 cd compiler
-    cargo test                                   # 6 diferenciales + 333 de integración + 3 unitarias
+    cargo test                                   # 6 diferenciales + 351 de integración + 11 unitarias
 cargo run -- --run ..\examples\physics.ostrin
 cargo run -- --compile ..\examples\collections.ostrin
 cd ..

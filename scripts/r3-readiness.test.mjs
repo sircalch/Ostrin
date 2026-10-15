@@ -38,7 +38,9 @@ test("R3 readiness requires host, dependencies, scheduler and effects", () => {
         functions: { main: [] },
         function_calls: { main: ["write_file"] },
         unresolved_calls: {},
-        effect_coverage: { known_calls: 1, unresolved_calls: 0, complete: true },
+        function_effect_variables: {},
+        symbolic_effect_calls: {},
+        effect_coverage: { known_calls: 1, symbolic_calls: 0, unresolved_calls: 0, complete: true },
       },
       level: "R0",
     },
@@ -58,7 +60,9 @@ test("R3 readiness uses the explicit CI host capture contract", () => {
     functions: { main: [] },
     function_calls: { main: [] },
     unresolved_calls: {},
-    effect_coverage: { known_calls: 0, unresolved_calls: 0, complete: true },
+    function_effect_variables: {},
+    symbolic_effect_calls: {},
+    effect_coverage: { known_calls: 0, symbolic_calls: 0, unresolved_calls: 0, complete: true },
   };
   const bundle = {
     provenance: {
@@ -88,7 +92,9 @@ test("R3 preserves valid incomplete effects as a visible limitation", () => {
     functions: { main: [] },
     function_calls: { main: ["mystery_operation"] },
     unresolved_calls: { main: ["mystery_operation"] },
-    effect_coverage: { known_calls: 0, unresolved_calls: 1, complete: false },
+    function_effect_variables: {},
+    symbolic_effect_calls: {},
+    effect_coverage: { known_calls: 0, symbolic_calls: 0, unresolved_calls: 1, complete: false },
   };
   const bundle = {
     provenance: {
@@ -125,8 +131,22 @@ test("R3 preserves valid incomplete effects as a visible limitation", () => {
 
 test("readiness totals unresolved effects across ready bundles", () => {
   const report = buildReadiness();
-  assert.equal(report.incompleteEffectBundleCount, report.bundleCount);
-  assert.ok(report.unresolvedEffectCallCount > 0);
+  assert.equal(report.incompleteEffectBundleCount,
+    report.entries.filter((entry) => entry.r3Extensions.incomplete.includes("provenance.effects.effect_coverage")).length);
+  assert.ok(report.symbolicEffectCallCount > 0, "callback invocations must be accounted for symbolically");
+  assert.equal(report.unresolvedEffectCallCount, 0);
+  assert.equal(
+    report.knownEffectCallCount,
+    report.entries.reduce((total, entry) => total + (entry.effectCoverage?.known_calls ?? 0), 0),
+  );
+  assert.equal(
+    report.symbolicEffectCallCount,
+    report.entries.reduce((total, entry) => total + (entry.effectCoverage?.symbolic_calls ?? 0), 0),
+  );
+  assert.equal(
+    report.unresolvedEffectCallCount,
+    report.entries.reduce((total, entry) => total + (entry.effectCoverage?.unresolved_calls ?? 0), 0),
+  );
 });
 
 test("readiness totals and status match the inspected bundles", () => {

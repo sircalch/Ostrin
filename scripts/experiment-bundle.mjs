@@ -335,16 +335,20 @@ export function validateEffectCapture(effects) {
   if (!isStringArrayMap(effects.functions)) errors.push("effects capture functions must map names to effect arrays");
   if (!isStringArrayMap(effects.function_calls)) errors.push("effects capture function_calls must map names to call arrays");
   if (!isStringArrayMap(effects.unresolved_calls)) errors.push("effects capture unresolved_calls must map names to call arrays");
+  if (!isStringArrayMap(effects.function_effect_variables)) errors.push("effects capture function_effect_variables must map names to effect-variable arrays");
+  if (!isStringArrayMap(effects.symbolic_effect_calls)) errors.push("effects capture symbolic_effect_calls must map names to callback arrays");
 
   const coverage = effects.effect_coverage;
   if (!coverage || typeof coverage !== "object" || Array.isArray(coverage)
     || !Number.isInteger(coverage.known_calls) || coverage.known_calls < 0
+    || !Number.isInteger(coverage.symbolic_calls) || coverage.symbolic_calls < 0
     || !Number.isInteger(coverage.unresolved_calls) || coverage.unresolved_calls < 0
     || typeof coverage.complete !== "boolean") {
     errors.push("effects capture effect_coverage is missing or malformed");
     return errors;
   }
-  if (!isStringArrayMap(effects.function_calls) || !isStringArrayMap(effects.unresolved_calls)) return errors;
+  if (!isStringArrayMap(effects.function_calls) || !isStringArrayMap(effects.unresolved_calls)
+    || !isStringArrayMap(effects.function_effect_variables) || !isStringArrayMap(effects.symbolic_effect_calls)) return errors;
 
   const callCount = Object.values(effects.function_calls).reduce((total, calls) => total + calls.length, 0);
   let unresolvedCount = 0;
@@ -355,11 +359,24 @@ export function validateEffectCapture(effects) {
       if (!recordedCalls.has(call)) errors.push(`unresolved call ${caller}.${call} is absent from function_calls`);
     }
   }
+  let symbolicCount = 0;
+  for (const [caller, calls] of Object.entries(effects.symbolic_effect_calls)) {
+    const recordedCalls = new Set(effects.function_calls[caller] ?? []);
+    const unresolvedCalls = new Set(effects.unresolved_calls[caller] ?? []);
+    const variables = new Set(effects.function_effect_variables[caller] ?? []);
+    for (const call of calls) {
+      symbolicCount++;
+      if (!recordedCalls.has(call)) errors.push(`symbolic callback ${caller}.${call} is absent from function_calls`);
+      if (!variables.has(call) && !variables.has(`ε_${call}`)) errors.push(`symbolic callback ${caller}.${call} has no effect variable`);
+      if (unresolvedCalls.has(call)) errors.push(`symbolic callback ${caller}.${call} is also marked unresolved`);
+    }
+  }
   if (unresolvedCount > callCount
-    || coverage.known_calls !== callCount - unresolvedCount
+    || coverage.known_calls + symbolicCount + unresolvedCount !== callCount
+    || coverage.symbolic_calls !== symbolicCount
     || coverage.unresolved_calls !== unresolvedCount
     || coverage.complete !== (unresolvedCount === 0)) {
-    errors.push("effects capture effect_coverage does not match function_calls/unresolved_calls");
+    errors.push("effects capture effect_coverage does not match concrete/symbolic/unresolved call categories");
   }
   return errors;
 }
@@ -495,6 +512,8 @@ function compilerEffectSummary(root, sourcePath) {
       .map(([name, kinds]) => [name, [...new Set(kinds)].sort()])),
     function_calls: report.function_calls,
     unresolved_calls: report.unresolved_calls,
+    function_effect_variables: report.function_effect_variables,
+    symbolic_effect_calls: report.symbolic_effect_calls,
     effect_coverage: report.effect_coverage,
     analyzer: ["compiler/src/effects.rs", "compiler/src/main.rs"].map((relativePath) => ({
       path: relativePath,
