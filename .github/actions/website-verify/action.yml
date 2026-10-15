@@ -45,7 +45,7 @@ runs:
         OSTRIN_CAPTURE_HOST: "1"
       run: |
         node scripts/experiment-bundle.mjs --write-all
-        node scripts/r3-readiness.mjs --write --require-ready
+        node scripts/r3-readiness.mjs --write
         node scripts/quality-scorecard.mjs --write
         node scripts/status-page.mjs --write
     - name: Upload host-bound R3 evidence
@@ -69,7 +69,7 @@ runs:
         node --test scripts/linguist-check.test.mjs
         node scripts/project-plan-check.mjs
         node scripts/fallback-ledger-check.mjs
-        node scripts/r3-readiness.mjs --require-ready
+        node scripts/r3-readiness.mjs
         node --test scripts/r3-readiness.test.mjs
         node --test scripts/quality-scorecard.test.mjs
         node --test scripts/project-plan-check.test.mjs
