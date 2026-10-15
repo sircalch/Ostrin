@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { after } from "node:test";
-import { buildReadiness, inspectBundle } from "./r3-readiness.mjs";
+import { buildReadiness, inspectBundle, requiredCaptureErrors } from "./r3-readiness.mjs";
 
 const originalCaptureHost = process.env.OSTRIN_CAPTURE_HOST;
 delete process.env.OSTRIN_CAPTURE_HOST;
@@ -44,8 +44,11 @@ test("R3 readiness requires host, dependencies, scheduler and effects", () => {
     },
   };
   assert.equal(inspectBundle(bundle, "fixture.json").status, "READY");
+  assert.deepEqual(requiredCaptureErrors({ entries: [inspectBundle(bundle, "fixture.json")] }), []);
   delete bundle.provenance.runtime.host;
-  assert.deepEqual(inspectBundle(bundle, "fixture.json").r3Extensions.missing, ["provenance.runtime.host"]);
+  const missingHost = inspectBundle(bundle, "fixture.json");
+  assert.deepEqual(missingHost.r3Extensions.missing, ["provenance.runtime.host"]);
+  assert.equal(requiredCaptureErrors({ entries: [missingHost] }).length, 1);
 });
 
 test("R3 readiness uses the explicit CI host capture contract", () => {
@@ -116,11 +119,13 @@ test("R3 stays open while valid captured effects are incomplete", () => {
   assert.equal(incomplete.status, "OPEN");
   assert.deepEqual(incomplete.r3Extensions.incomplete, ["provenance.effects.effect_coverage"]);
   assert.equal(incomplete.effectCoverage.unresolved_calls, 1);
+  assert.deepEqual(requiredCaptureErrors({ entries: [incomplete] }), []);
 
   delete bundle.provenance.effects.unresolved_calls;
   const malformed = inspectBundle(bundle, "fixture.json");
   assert.equal(malformed.status, "OPEN");
   assert.ok(malformed.r3Extensions.missing.includes("provenance.effects.effect_coverage"));
+  assert.equal(requiredCaptureErrors({ entries: [malformed] }).length, 1);
 });
 
 test("readiness totals unresolved effects across incomplete bundles", () => {
@@ -129,6 +134,8 @@ test("readiness totals unresolved effects across incomplete bundles", () => {
   assert.ok(report.unresolvedEffectCallCount > 0);
   assert.equal(report.readyCount, 0);
   assert.equal(report.status, "OPEN");
+  assert.equal(report.captureReadyCount, 0);
+  assert.equal(report.captureOpenCount, report.bundleCount);
 });
 
 test("readiness totals and status match the inspected bundles", () => {

@@ -86,10 +86,27 @@ export function buildReadiness(root = repositoryRoot) {
       entry.r3Extensions.missing.length === 0 && entry.r3Extensions.incomplete.length === 0).length,
     readyCount: entries.filter((entry) => entry.status === "READY").length,
     openCount: entries.filter((entry) => entry.status !== "READY").length,
+    captureReadyCount: entries.filter((entry) =>
+      entry.requiredFields.missing.length === 0 && entry.r3Extensions.missing.length === 0).length,
+    captureOpenCount: entries.filter((entry) =>
+      entry.requiredFields.missing.length > 0 || entry.r3Extensions.missing.length > 0).length,
     incompleteEffectBundleCount: entries.filter((entry) => entry.r3Extensions.incomplete.includes("provenance.effects.effect_coverage")).length,
     unresolvedEffectCallCount: entries.reduce((total, entry) => total + (entry.effectCoverage?.unresolved_calls ?? 0), 0),
     entries,
   };
+}
+
+export function requiredCaptureErrors(report) {
+  return report.entries.flatMap((entry) => {
+    const errors = [];
+    if (entry.requiredFields.missing.length > 0) {
+      errors.push(`${entry.file}: missing required fields: ${entry.requiredFields.missing.join(", ")}`);
+    }
+    if (entry.r3Extensions.missing.length > 0) {
+      errors.push(`${entry.file}: missing or invalid capture extensions: ${entry.r3Extensions.missing.join(", ")}`);
+    }
+    return errors;
+  });
 }
 
 async function main() {
@@ -98,6 +115,14 @@ async function main() {
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
   if (process.argv.includes("--require-ready") && report.status !== "READY") {
     process.exitCode = 1;
+  }
+  if (process.argv.includes("--require-capture")) {
+    const errors = requiredCaptureErrors(report);
+    if (errors.length > 0) {
+      console.error(`r3-readiness: capture contract failed (${errors.length} errors)`);
+      for (const error of errors) console.error(`- ${error}`);
+      process.exitCode = 1;
+    }
   }
 }
 
