@@ -58,7 +58,9 @@ export function inspectBundle(bundle, file) {
     file,
     id: bundle?.id ?? null,
     currentLevel: bundle?.provenance?.level ?? bundle?.reproducibility?.level ?? null,
-    status: missing.length === 0 && missingR3Extensions.length === 0 ? "READY" : "OPEN",
+    status: missing.length === 0 && missingR3Extensions.length === 0 && incomplete.length === 0
+      ? "READY"
+      : "OPEN",
     requiredFields: { missing },
     r3Extensions: { missing: missingR3Extensions, incomplete },
     effectCoverage: effectCoverage && typeof effectCoverage === "object"
@@ -80,7 +82,8 @@ export function buildReadiness(root = repositoryRoot) {
     requiredFields: requiredPaths,
     bundleCount: entries.length,
     baseReadyCount: entries.filter((entry) => entry.requiredFields.missing.length === 0).length,
-    extensionReadyCount: entries.filter((entry) => entry.r3Extensions.missing.length === 0).length,
+    extensionReadyCount: entries.filter((entry) =>
+      entry.r3Extensions.missing.length === 0 && entry.r3Extensions.incomplete.length === 0).length,
     readyCount: entries.filter((entry) => entry.status === "READY").length,
     openCount: entries.filter((entry) => entry.status !== "READY").length,
     incompleteEffectBundleCount: entries.filter((entry) => entry.r3Extensions.incomplete.includes("provenance.effects.effect_coverage")).length,

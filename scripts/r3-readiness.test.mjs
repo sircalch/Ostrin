@@ -78,7 +78,7 @@ test("R3 readiness uses the explicit CI host capture contract", () => {
   assert.equal(inspectBundle(bundle, "fixture.json").status, "OPEN");
 });
 
-test("R3 preserves valid incomplete effects as a visible limitation", () => {
+test("R3 stays open while valid captured effects are incomplete", () => {
   const effects = {
     schema: "ostrin.effect-report/v0",
     status: "captured",
@@ -113,7 +113,7 @@ test("R3 preserves valid incomplete effects as a visible limitation", () => {
   };
 
   const incomplete = inspectBundle(bundle, "fixture.json");
-  assert.equal(incomplete.status, "READY");
+  assert.equal(incomplete.status, "OPEN");
   assert.deepEqual(incomplete.r3Extensions.incomplete, ["provenance.effects.effect_coverage"]);
   assert.equal(incomplete.effectCoverage.unresolved_calls, 1);
 
@@ -123,10 +123,12 @@ test("R3 preserves valid incomplete effects as a visible limitation", () => {
   assert.ok(malformed.r3Extensions.missing.includes("provenance.effects.effect_coverage"));
 });
 
-test("readiness totals unresolved effects across ready bundles", () => {
+test("readiness totals unresolved effects across incomplete bundles", () => {
   const report = buildReadiness();
   assert.equal(report.incompleteEffectBundleCount, report.bundleCount);
   assert.ok(report.unresolvedEffectCallCount > 0);
+  assert.equal(report.readyCount, 0);
+  assert.equal(report.status, "OPEN");
 });
 
 test("readiness totals and status match the inspected bundles", () => {
@@ -134,5 +136,6 @@ test("readiness totals and status match the inspected bundles", () => {
   assert.equal(report.readyCount + report.openCount, report.bundleCount);
   assert.equal(report.status, report.openCount === 0 ? "READY" : "OPEN");
   assert.equal(report.extensionReadyCount,
-    report.entries.filter((entry) => entry.r3Extensions.missing.length === 0).length);
+    report.entries.filter((entry) =>
+      entry.r3Extensions.missing.length === 0 && entry.r3Extensions.incomplete.length === 0).length);
 });

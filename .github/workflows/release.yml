@@ -1,7 +1,7 @@
 name: Ostrin Release
 
-# Builds ostrinc for Linux, macOS and Windows when a version tag is pushed and
-# attaches the archives plus SHA-256 checksums to a GitHub release.
+# Builds ostrinc for Linux, macOS, Windows and WASI, then attaches the archives
+# and SHA-256 checksums to a GitHub release when a version tag is pushed.
 on:
   push:
     tags: ["v*"]
@@ -104,9 +104,107 @@ jobs:
             ${{ env.ARCHIVE }}
             ${{ env.ARCHIVE }}.sha256
 
+  build-wasi:
+    name: Build (wasm32-wasip1)
+    runs-on: ubuntu-latest
+    env:
+      WASI_SDK_VERSION: "34.0"
+      WASI_SDK_SHA256: "b761e3a0721dbae9c09a0059e5fdb2bf917d1b4a8a7b430fb3b5aafb0984b2c4"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install pinned WASI C toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="wasi-sdk-${WASI_SDK_VERSION}-x86_64-linux.tar.gz"
+          curl --fail --location --retry 3 --output "$archive" \
+            "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-${WASI_SDK_VERSION%%.*}/$archive"
+          printf '%s  %s\n' "$WASI_SDK_SHA256" "$archive" | sha256sum --check
+          tar -xzf "$archive"
+          sdk="$PWD/wasi-sdk-${WASI_SDK_VERSION}-x86_64-linux"
+          echo "OSTRIN_WASI_CC=$sdk/bin/clang" >> "$GITHUB_ENV"
+          echo "OSTRIN_WASI_SYSROOT=$sdk/share/wasi-sysroot" >> "$GITHUB_ENV"
+      - name: Build WASI compiler and host compiler
+        run: |
+          cargo build --manifest-path compiler/Cargo.toml --target wasm32-wasip1 --release
+          cargo build --manifest-path compiler/Cargo.toml --release
+      - name: Smoke-test compiler under Node WASI
+        shell: bash
+        env:
+          NODE_NO_WARNINGS: "1"
+        run: |
+          node --input-type=module <<'NODE'
+          import { WASI } from 'node:wasi';
+          import { readFileSync } from 'node:fs';
+          const wasi = new WASI({
+            version: 'preview1',
+            args: ['ostrinc', '--check', 'examples/hello.ostrin'],
+            preopens: { '.': process.cwd() },
+            returnOnExit: true,
+          });
+          const module = await WebAssembly.compile(
+            readFileSync('compiler/target/wasm32-wasip1/release/ostrinc.wasm'),
+          );
+          const instance = await WebAssembly.instantiate(module, wasi.getImportObject());
+          const exitCode = wasi.start(instance);
+          if (exitCode !== 0) process.exit(exitCode);
+          NODE
+      - name: Compile and smoke-test the WASI program matrix
+        env:
+          NODE_NO_WARNINGS: "1"
+        run: node scripts/wasi-program-check.mjs
+      - name: Package and verify WASI release asset
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(cargo metadata --no-deps --format-version 1 --manifest-path compiler/Cargo.toml | node -e 'let input=""; process.stdin.on("data", chunk => input += chunk).on("end", () => console.log(JSON.parse(input).packages.find(pkg => pkg.name === "ostrinc").version));')"
+          test "$version" = "${GITHUB_REF_NAME#v}" || test "$GITHUB_REF" != refs/tags/v*
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            package_ref="$GITHUB_REF_NAME"
+          else
+            package_ref="v${version}-rc.${GITHUB_SHA:0:7}"
+          fi
+          name="ostrinc-${package_ref}-wasm32-wasip1"
+          mkdir -p release-wasi
+          cp dist/*.wasm release-wasi/
+          cp compiler/target/wasm32-wasip1/release/ostrinc.wasm release-wasi/
+          printf '%s\n' \
+            'Ostrin WASI distribution' \
+            'Compiler = ostrinc.wasm' \
+            'Programs = 28-program WASI smoke matrix' \
+            'Target = wasm32-wasip1' \
+            'Host = WASI Preview 1 with WebAssembly exception handling' \
+            > release-wasi/README.txt
+          (
+            cd release-wasi
+            sha256sum ./*.wasm > SHA256SUMS
+            test "$(wc -l < SHA256SUMS)" -eq 29
+            sha256sum --check SHA256SUMS
+            tar -czf "../${name}.tar.gz" ./*.wasm SHA256SUMS README.txt
+          )
+          archive="${name}.tar.gz"
+          sha256sum "$archive" > "$archive.sha256"
+          sha256sum --check "$archive.sha256"
+          verify_dir="$(mktemp -d)"
+          tar -xzf "$archive" -C "$verify_dir"
+          (cd "$verify_dir" && sha256sum --check SHA256SUMS && test "$(wc -l < SHA256SUMS)" -eq 29)
+          echo "ARCHIVE=$archive" >> "$GITHUB_ENV"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wasm32-wasip1
+          path: |
+            ${{ env.ARCHIVE }}
+            ${{ env.ARCHIVE }}.sha256
+
   publish:
     name: Publish release
-    needs: build
+    needs: [build, build-wasi]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
@@ -126,7 +224,11 @@ jobs:
             test -f "dist/ostrinc-${GITHUB_REF_NAME}-${target}.tar.gz.sha256"
           done
           test -f "dist/ostrinc-${GITHUB_REF_NAME}-x86_64-pc-windows-msvc.zip.sha256"
-          test "$(ls dist | wc -l)" -eq 6
+          test -f "dist/ostrinc-${GITHUB_REF_NAME}-wasm32-wasip1.tar.gz.sha256"
+          test "$(ls dist | wc -l)" -eq 8
+          verify_dir="$(mktemp -d)"
+          tar -xzf "dist/ostrinc-${GITHUB_REF_NAME}-wasm32-wasip1.tar.gz" -C "$verify_dir"
+          (cd "$verify_dir" && sha256sum --check SHA256SUMS && test "$(wc -l < SHA256SUMS)" -eq 29)
       # Not marked as a prerelease: the installers resolve `releases/latest`, which
       # ignores prereleases. The notes themselves state that the release is experimental.
       - name: Create release
