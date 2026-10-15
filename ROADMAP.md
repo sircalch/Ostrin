@@ -5,11 +5,20 @@ listas de pendientes. Este índice separa el futuro del estado comprobado.
 
 ## Orden de prioridades
 
-El candidato `v0.2.0` está congelado en `cb9a52480f0d016921e4d0bccb195ad0faac958b`.
-El manifest [`docs/release-readiness-v0.2.json`](docs/release-readiness-v0.2.json) marca sus
-12 criterios como `READY`; la verificación de frontera todavía exige sincronizar toda la
-metadata/documentación y reconstruir los artifacts desde el head final que llegue a `main`.
-No existe tag ni release `v0.2.0`; la publicación requiere autorización explícita del propietario.
+El RC documentado en [`validation/release-candidate-v0.2.0.json`](validation/release-candidate-v0.2.0.json)
+se construyó desde la revisión fuente `d0abbad0f674317c95c389b953507365f3fd1a59`.
+Esa identidad describe únicamente los binarios RC con sus hashes registrados; no describe
+el commit posterior que consolida esta documentación y evidencia. La revisión de evidencia
+se fija aparte en el manifiesto y el scorecard, sin autorreferencias. El commit que se
+proponga para el tag final deberá ser el `main` posterior a la fusión del PR de evidencia,
+y sus binarios/checksums deberán reconstruirse desde el tag autorizado.
+
+El manifest [`docs/release-readiness-v0.2.json`](docs/release-readiness-v0.2.json) registra
+12 criterios como `READY` para la evidencia acotada del candidato; no significa que los
+artefactos RC de `d0abbad` se hayan construido desde el futuro commit de `main`. No existe
+tag ni release `v0.2.0`; publicar requiere autorización explícita del propietario. El
+procedimiento reproducible, instalación, compatibilidad, integridad y rollback están en
+[`docs/releases/v0.2.0-publication.md`](docs/releases/v0.2.0-publication.md).
 
 0. **Higiene del repositorio — auditoría automatizada y limpieza parcial:** se auditaron todas
    las referencias contra `main` y los heads de PR fusionados; se eliminaron

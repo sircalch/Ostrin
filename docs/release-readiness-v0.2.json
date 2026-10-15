@@ -1,6 +1,13 @@
 {
   "release": "0.2.0",
   "status": "READY",
+  "candidateProvenance": {
+    "sourceRevision": "d0abbad0f674317c95c389b953507365f3fd1a59",
+    "evidenceRevision": null,
+    "releaseTag": null,
+    "finalReleaseSourceRevision": null,
+    "meaning": "sourceRevision is the code used for the recorded RC binaries; evidenceRevision is the fixed input commit for evidence; releaseTag is unset until separately authorized. Final release artifacts must be newly built from that exact tag."
+  },
   "criteria": [
     {
       "id": "ast-fallback",
@@ -148,14 +155,14 @@
     {
       "id": "artifacts",
       "status": "READY",
-      "acceptance": "Linux, macOS, Windows and WASI v0.2.0 candidate artifacts are built from the frozen candidate source commit on main, checksummed, extracted and smoke-tested; the WASI runtime smoke matrix passes and candidate CI run links are attached. A final release tag and publication are intentionally deferred for explicit owner authorization.",
+      "acceptance": "The recorded Linux, macOS, Windows and WASI RC artifacts were built from candidateProvenance.sourceRevision, checksummed, extracted and smoke-tested; the WASI runtime smoke matrix passes and candidate CI run links are attached. These hashes identify only those RC artifacts. A final release tag and publication are intentionally deferred; final-release artifacts must be rebuilt from the exact authorized tag.",
       "requires_ci_run_url": true,
       "evidence": [
         { "path": ".github/workflows/release.yml", "claim": "Cross-platform release build, checksum, extraction and smoke test" },
         { "path": ".github/workflows/wasi.yml", "claim": "Pinned WASI build, runtime smoke matrix and checksums" },
         { "url": "https://github.com/sircalch/Ostrin/actions/runs/38681320600", "claim": "Ostrin v0.2.0-rc.d0abbad Linux x86_64, macOS ARM64 and Windows x64 archives pass tests, compiler smoke, checksum verification, extraction and packaged-project smoke on their native runners; publish job skipped because this is an untagged main-branch candidate" },
         { "url": "https://github.com/sircalch/Ostrin/actions/runs/38681318079", "claim": "Ostrin WASI compiler artifact for d0abbad passes Node WASI smoke and its 28-program runtime matrix; internal SHA256SUMS covers the compiler plus 28 program modules and was independently verified locally" },
-        { "path": "validation/release-candidate-v0.2.0.json", "claim": "Frozen main source revision d0abbad, candidate archive names and SHA-256 hashes, current workflow run evidence, downloaded checksum/extraction and Windows smoke outcomes, and explicit no-tag/no-publication state" }
+        { "path": "validation/release-candidate-v0.2.0.json", "claim": "RC source revision d0abbad, source-scoped archive names and SHA-256 hashes, workflow run evidence, downloaded checksum/extraction and smoke outcomes, and explicit unset final tag/source state" }
       ]
     }
   ]

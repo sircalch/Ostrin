@@ -3,6 +3,11 @@
   "release": "0.2.0",
   "sourceRevision": "d0abbad0f674317c95c389b953507365f3fd1a59",
   "candidateIdentifier": "v0.2.0-rc.d0abbad",
+  "evidenceRevision": null,
+  "evidenceRevisionMeaning": "Fixed input commit containing source-backed candidate evidence and publication documentation; generated derivative metadata points here and is committed afterward, avoiding self-reference.",
+  "releaseTag": null,
+  "finalReleaseSourceRevision": null,
+  "releaseProvenancePolicy": "The RC artifacts below were built from sourceRevision only. A final release must be rebuilt from the exact authorized v0.2.0 tag; its artifacts and SHA-256 values must be recorded from that tag workflow and must not reuse these RC hashes.",
   "preparedAt": "2026-10-15T04:33:49Z",
   "nativeWorkflow": {
     "runId": 38681320600,
