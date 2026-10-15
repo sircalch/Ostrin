@@ -114,6 +114,7 @@ if (notes.includes("release candidate") || notes.includes("-rc.")) {
 for (const marker of [
   "build-wasi:",
   'name="ostrinc-${package_ref}-wasm32-wasip1"',
+  'test "${GITHUB_REF_NAME#v}" = "$version"',
   'test "$(ls dist | wc -l)" -eq 8',
   "sha256sum --check SHA256SUMS",
 ]) {
