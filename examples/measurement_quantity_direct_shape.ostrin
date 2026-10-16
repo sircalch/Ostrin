@@ -29,6 +29,31 @@ fn main() -> Void {
         Err(_) => print("invalid quantity measurement"),
     }
 
+    shared_a = measurements.from_quantity_source(12 m, 20 cm, "shared-caliper", "caliper").unwrap()
+    shared_b = measurements.from_quantity_source(1200 cm, 0.2 m, "shared-caliper", "same caliper").unwrap()
+    summed = measurements.add_quantity(shared_a, shared_b).unwrap()
+    print(summed.value)
+    print(summed.sources[0].contribution)
+    print(summed.sources.length())
+
+    independent_a = measurements.from_quantity_source(12 m, 20 cm, "caliper-a", "same label").unwrap()
+    independent_b = measurements.from_quantity_source(12 m, 20 cm, "caliper-b", "same label").unwrap()
+    independent_sum = measurements.add_quantity(independent_a, independent_b).unwrap()
+    print(independent_sum.sources.length())
+
+    difference_a = measurements.from_quantity_source(12 m, 20 cm, "shared-caliper", "caliper").unwrap()
+    difference_b = measurements.from_quantity_source(1200 cm, 0.2 m, "shared-caliper", "same caliper").unwrap()
+    difference = measurements.sub_quantity(difference_a, difference_b).unwrap()
+    print(difference.value)
+    print(difference.sources[0].contribution)
+
+    mismatch_a = measurements.from_quantity_source(12 m, 20 cm, "shared-caliper", "caliper").unwrap()
+    mismatch_b = measurements.from_quantity_source(12 m, 25 cm, "shared-caliper", "changed calibration").unwrap()
+    match measurements.add_quantity(mismatch_a, mismatch_b) {
+        Ok(_) => print("changed dimensional source sigma accepted"),
+        Err(message) => print("changed dimensional source sigma = " + message),
+    }
+
     match measurements.from_quantity_source(12 m, -20 cm, "bad-sigma", "caliper") {
         Ok(_) => print("negative dimensional sigma accepted"),
         Err(message) => print("negative dimensional sigma = " + message),

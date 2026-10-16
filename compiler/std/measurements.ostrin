@@ -129,6 +129,143 @@ pub fn from_quantity_source<D: Dimension>(value: Quantity<D>, sigma: Quantity<D>
     })
 }
 
+fn merge_quantity_sources<D: Dimension>(
+    result: List<Sensitivity<Quantity<D>>>,
+    input: List<Sensitivity<Quantity<D>>>,
+    factor: Float
+) -> Result<List<Sensitivity<Quantity<D>>>, String> {
+    mut output: List<Sensitivity<Quantity<D>>> = result
+    for item in input {
+        mut validation_error = validate_quantity_source(item)
+        if validation_error != "" {
+            return Err(validation_error)
+        }
+        mut merged: List<Sensitivity<Quantity<D>>> = []
+        mut found = false
+        for current in output {
+            validation_error = validate_quantity_source(current)
+            if validation_error != "" {
+                return Err(validation_error)
+            }
+            if current.source_id == item.source_id {
+                if current.source_dimension != item.source_dimension
+                    or current.source_sigma != item.source_sigma
+                {
+                    return Err("measurement source id was reused with a different dimension or sigma")
+                }
+                combined = Sensitivity<Quantity<D>> {
+                    source_id: current.source_id,
+                    label: current.label,
+                    source_dimension: current.source_dimension,
+                    source_sigma: current.source_sigma,
+                    contribution: current.contribution + factor * item.contribution,
+                }
+                validation_error = validate_quantity_source(combined)
+                if validation_error != "" {
+                    return Err(validation_error)
+                }
+                merged.push(combined)
+                found = true
+            } else {
+                merged.push(current)
+            }
+        }
+        if not found {
+            scaled = Sensitivity<Quantity<D>> {
+                source_id: item.source_id,
+                label: item.label,
+                source_dimension: item.source_dimension,
+                source_sigma: item.source_sigma,
+                contribution: factor * item.contribution,
+            }
+            validation_error = validate_quantity_source(scaled)
+            if validation_error != "" {
+                return Err(validation_error)
+            }
+            merged.push(scaled)
+        }
+        output = merged
+    }
+    Ok(output)
+}
+
+fn validate_quantity_source<D: Dimension>(source: Sensitivity<Quantity<D>>) -> String {
+    if source.source_id.length() == 0 {
+        return "measurement source id must not be empty"
+    }
+    if source.source_dimension != source.contribution.dimension_key() {
+        return "measurement source dimension does not match its contribution"
+    }
+    if not is_finite(source.source_sigma) or source.source_sigma < 0.0 {
+        return "measurement source sigma must be finite and non-negative"
+    }
+    if not is_finite(source.contribution.value())
+        or not is_finite(source.contribution.value() * source.contribution.unit_scale())
+    {
+        return "measurement sensitivity contribution must be finite"
+    }
+    ""
+}
+
+fn unknown_quantity_from<D: Dimension>(operation: String, value: Quantity<D>) -> Measurement<Quantity<D>> {
+    Measurement<Quantity<D>> {
+        value: value,
+        sources: [],
+        known: false,
+        reason: operation + " received a measurement with unknown uncertainty",
+    }
+}
+
+pub fn add_quantity<D: Dimension>(
+    a: Measurement<Quantity<D>>,
+    b: Measurement<Quantity<D>>
+) -> Result<Measurement<Quantity<D>>, String> {
+    result = a.value + b.value
+    if not a.known or not b.known {
+        return Ok(unknown_quantity_from("add", result))
+    }
+    if not is_finite(result.value()) {
+        return Err("measurement value must be finite")
+    }
+    match merge_quantity_sources([], a.sources, 1.0) {
+        Ok(left) => match merge_quantity_sources(left, b.sources, 1.0) {
+            Ok(sources) => Ok(Measurement<Quantity<D>> {
+                value: result,
+                sources: sources,
+                known: true,
+                reason: "",
+            }),
+            Err(message) => Err(message),
+        },
+        Err(message) => Err(message),
+    }
+}
+
+pub fn sub_quantity<D: Dimension>(
+    a: Measurement<Quantity<D>>,
+    b: Measurement<Quantity<D>>
+) -> Result<Measurement<Quantity<D>>, String> {
+    result = a.value - b.value
+    if not a.known or not b.known {
+        return Ok(unknown_quantity_from("sub", result))
+    }
+    if not is_finite(result.value()) {
+        return Err("measurement value must be finite")
+    }
+    match merge_quantity_sources([], a.sources, 1.0) {
+        Ok(left) => match merge_quantity_sources(left, b.sources, -1.0) {
+            Ok(sources) => Ok(Measurement<Quantity<D>> {
+                value: result,
+                sources: sources,
+                known: true,
+                reason: "",
+            }),
+            Err(message) => Err(message),
+        },
+        Err(message) => Err(message),
+    }
+}
+
 pub fn unknown(value: Float, reason: String) -> Measurement<Float> {
     Measurement<Float> {
         value: value,
