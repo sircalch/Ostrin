@@ -848,6 +848,10 @@ pub enum Ty {
     String,
     Void,
     Quantity(Dimension),
+    /// Absolute temperature reading. This is an internal typed representation;
+    /// source construction remains disabled until runtime and backend lowering
+    /// preserve the role end to end.
+    TemperaturePoint,
     List(Box<Ty>),
     Map(Box<Ty>, Box<Ty>),
     Set(Box<Ty>),
@@ -890,6 +894,7 @@ impl Ty {
             Ty::String => "String".to_string(),
             Ty::Void => "Void".to_string(),
             Ty::Quantity(d) => format!("Quantity<{}>", dim_to_string(d)),
+            Ty::TemperaturePoint => "TemperaturePoint".to_string(),
             Ty::List(t) => format!("List<{}>", t.describe()),
             Ty::Map(k, v) => format!("Map<{}, {}>", k.describe(), v.describe()),
             Ty::Set(t) => format!("Set<{}>", t.describe()),

@@ -2156,6 +2156,13 @@ impl Checker {
                     UnaryOp::Not if array_elem(&t) == Some(Ty::Bool) => t,
                     UnaryOp::Not => Ty::Bool,
                     UnaryOp::Neg => {
+                        if t == Ty::TemperaturePoint {
+                            self.push(
+                                "E1041",
+                                "Cannot negate an absolute TemperaturePoint.".to_string(),
+                            );
+                            return Ty::Unknown;
+                        }
                         if let Ty::Sized(kind) = &t {
                             if !kind.is_signed() {
                                 self.push(
@@ -3072,6 +3079,9 @@ impl Checker {
                 }
             };
         }
+        if matches!(lt, Ty::TemperaturePoint) || matches!(rt, Ty::TemperaturePoint) {
+            return self.check_temperature_point_binary(op, &lt, &rt);
+        }
         // A user type with an operator method accepts other right-hand types (`v * 2.0`), and a scalar on
         // the left uses the type's reflected method (`2.0 * v` -> `rmul`).
         if matches!(op, Add | Sub | Mul | Div) {
@@ -3230,6 +3240,65 @@ impl Checker {
                 }
                 Ty::Bool
             }
+        }
+    }
+
+    fn check_temperature_point_binary(&mut self, op: BinOp, left: &Ty, right: &Ty) -> Ty {
+        use BinOp::*;
+        let temperature = dim_single("Temperature");
+        let invalid = |checker: &mut Self, message: String, result| {
+            checker.push("E1041", message);
+            result
+        };
+        match op {
+            Add | Sub => {
+                let role = |ty: &Ty| match ty {
+                    Ty::TemperaturePoint => Some(QuantityRole::Point("Temperature".to_string())),
+                    Ty::Quantity(dimension) if *dimension == temperature => {
+                        Some(QuantityRole::Linear)
+                    }
+                    _ => None,
+                };
+                let (Some(left_role), Some(right_role)) = (role(left), role(right)) else {
+                    return invalid(
+                        self,
+                        format!(
+                            "TemperaturePoint arithmetic only accepts another point or a linear Temperature interval; got '{}' and '{}'.",
+                            left.describe(), right.describe()
+                        ),
+                        Ty::Unknown,
+                    );
+                };
+                let operation = if op == Add {
+                    QuantityArithmetic::Add
+                } else {
+                    QuantityArithmetic::Subtract
+                };
+                match arithmetic_result_role(&left_role, &right_role, operation) {
+                    Ok(QuantityRole::Point(_)) => Ty::TemperaturePoint,
+                    Ok(QuantityRole::Linear) => Ty::Quantity(temperature),
+                    Err(message) => invalid(self, message, Ty::Unknown),
+                }
+            }
+            Eq | NotEq | Lt | Gt | LtEq | GtEq => {
+                if *left == Ty::TemperaturePoint && *right == Ty::TemperaturePoint {
+                    Ty::Bool
+                } else {
+                    invalid(
+                        self,
+                        format!(
+                            "TemperaturePoint comparisons require two absolute points; got '{}' and '{}'.",
+                            left.describe(), right.describe()
+                        ),
+                        Ty::Bool,
+                    )
+                }
+            }
+            _ => invalid(
+                self,
+                format!("Operator '{op:?}' is not defined for TemperaturePoint values."),
+                Ty::Unknown,
+            ),
         }
     }
 
@@ -6230,6 +6299,7 @@ fn type_from_ty(ty: &Ty) -> Type {
             "Quantity".to_string(),
             vec![Type::Named(dim_to_string(dimension), Vec::new())],
         ),
+        Ty::TemperaturePoint => Type::Named("TemperaturePoint".to_string(), Vec::new()),
         Ty::List(element) => Type::Named("List".to_string(), vec![type_from_ty(element)]),
         Ty::Map(key, value) => Type::Named(
             "Map".to_string(),
@@ -6719,5 +6789,64 @@ fn forget_node_types(expr: &Expr, node_types: &mut HashMap<usize, Ty>) {
             }
         }
         _ => {}
+    }
+}
+
+#[cfg(test)]
+mod temperature_point_checker_tests {
+    use super::Checker;
+    use crate::ast::{BinOp, Expr, UnaryOp};
+    use crate::types::{dim_single, Ty};
+
+    fn check(op: BinOp, left: Ty, right: Ty) -> (Ty, bool) {
+        let mut checker = Checker::new();
+        let result = checker.check_binary(op, left, right);
+        (result, checker.errors.is_empty())
+    }
+
+    #[test]
+    fn affine_temperature_operator_rules_keep_points_distinct_from_intervals() {
+        use BinOp::*;
+
+        let point = Ty::TemperaturePoint;
+        let interval = Ty::Quantity(dim_single("Temperature"));
+        assert_eq!(
+            check(Add, point.clone(), interval.clone()),
+            (point.clone(), true)
+        );
+        assert_eq!(
+            check(Add, interval.clone(), point.clone()),
+            (point.clone(), true)
+        );
+        assert_eq!(
+            check(Sub, point.clone(), interval.clone()),
+            (point.clone(), true)
+        );
+        assert_eq!(
+            check(Sub, point.clone(), point.clone()),
+            (interval.clone(), true)
+        );
+        assert_eq!(check(Lt, point.clone(), point.clone()), (Ty::Bool, true));
+
+        assert_eq!(check(Add, point.clone(), point.clone()).0, Ty::Unknown);
+        assert!(!check(Add, point.clone(), point.clone()).1);
+        assert_eq!(check(Sub, interval.clone(), point.clone()).0, Ty::Unknown);
+        assert_eq!(check(Mul, point.clone(), interval.clone()).0, Ty::Unknown);
+        assert_eq!(check(Eq, point.clone(), interval).0, Ty::Bool);
+        assert!(!check(Eq, point, Ty::Quantity(dim_single("Length"))).1);
+    }
+
+    #[test]
+    fn unary_negation_rejects_an_absolute_temperature_point() {
+        let mut checker = Checker::new();
+        let mut scope = std::collections::HashMap::from([(
+            "reading".to_string(),
+            (Ty::TemperaturePoint, false),
+        )]);
+        let expression = Expr::Unary(UnaryOp::Neg, Box::new(Expr::Ident("reading".to_string())));
+
+        assert_eq!(checker.infer_expr(&expression, &mut scope), Ty::Unknown);
+        assert_eq!(checker.errors.len(), 1);
+        assert!(checker.errors[0].message.contains("Cannot negate"));
     }
 }

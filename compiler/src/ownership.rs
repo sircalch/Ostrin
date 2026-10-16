@@ -1335,6 +1335,7 @@ pub(crate) fn requires_management(ty: &Ty) -> bool {
         | Ty::Sized(_)
         | Ty::Float32
         | Ty::Generic(_)
+        | Ty::TemperaturePoint
         | Ty::Unknown => false,
     }
 }

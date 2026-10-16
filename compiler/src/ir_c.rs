@@ -146,6 +146,7 @@ fn mangle_record_type(ty: &Ty, records: &RecordFields) -> String {
             mangle_record_type(ret, records)
         ),
         Ty::Quantity(_) => "Quantity".to_string(),
+        Ty::TemperaturePoint => "TemperaturePoint".to_string(),
         Ty::Dyn(name) => name.clone(),
         Ty::Generic(name) => name.clone(),
         Ty::Unknown => "Unknown".to_string(),
