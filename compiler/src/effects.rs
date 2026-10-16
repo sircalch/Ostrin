@@ -725,7 +725,7 @@ fn resolve_unresolved_call_site_spans(report: &mut EffectReport) {
             continue;
         };
         for (index, token) in tokens.iter().enumerate() {
-            let TokenKind::Ident(name) = &token.kind else {
+            let TokenKind::Ident(_) = &token.kind else {
                 continue;
             };
             if index > 0 && matches!(tokens[index - 1].kind, TokenKind::Fn) {
@@ -745,8 +745,12 @@ fn resolve_unresolved_call_site_spans(report: &mut EffectReport) {
                 start -= 2;
             }
             let first = &tokens[start];
+            let operation = tokens[start..=index]
+                .iter()
+                .map(|token| token.lexeme.as_str())
+                .collect::<String>();
             candidates
-                .entry((file.clone(), name.clone()))
+                .entry((file.clone(), operation))
                 .or_default()
                 .push((first.line, first.col));
         }
@@ -754,12 +758,11 @@ fn resolve_unresolved_call_site_spans(report: &mut EffectReport) {
 
     let mut groups = BTreeMap::<(String, String), Vec<usize>>::new();
     for (index, site) in report.unresolved_call_sites.iter().enumerate() {
-        let (Some(file), Some(leaf)) = (&site.file, site.operation.rsplit(['.', ':']).next())
-        else {
+        let Some(file) = &site.file else {
             continue;
         };
         groups
-            .entry((file.clone(), leaf.to_string()))
+            .entry((file.clone(), site.operation.clone()))
             .or_default()
             .push(index);
     }

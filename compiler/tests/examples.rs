@@ -12521,7 +12521,7 @@ fn experimental_effect_report_tracks_trait_defaults_and_excludes_overrides() {
 fn experimental_effect_report_keeps_unknown_calls_unresolved() {
     let file = temp_source(
         "effects-unknown.ostrin",
-        "fn main() -> Void {\n    value = 1 + mystery_host_operation()\n    value = nested_host_operation() + 1\n    - another_host_operation()\n    mystery_host_operation()\n    -minus_host_operation()\n}\n",
+        "fn main() -> Void {\n    value = 1 + mystery_host_operation()\n    value = nested_host_operation() + 1\n    - another_host_operation()\n    mystery_host_operation()\n    -minus_host_operation()\n    value = 1 + host.print()\n    print(\"known builtin\")\n}\n",
     );
     let out = run(&["--effect-report", "--json", &file]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
@@ -12531,6 +12531,7 @@ fn experimental_effect_report_keeps_unknown_calls_unresolved() {
         artifact["unresolved_calls"]["main"],
         serde_json::json!([
             "another_host_operation",
+            "host.print",
             "minus_host_operation",
             "mystery_host_operation",
             "nested_host_operation"
@@ -12539,13 +12540,14 @@ fn experimental_effect_report_keeps_unknown_calls_unresolved() {
     let unresolved_sites = artifact["unresolved_call_sites"]
         .as_array()
         .expect("unresolved callsites must be reported as an array");
-    assert_eq!(unresolved_sites.len(), 5);
+    assert_eq!(unresolved_sites.len(), 6);
     for (site, (operation, line, col)) in unresolved_sites.iter().zip([
         ("mystery_host_operation", 2, 17),
         ("nested_host_operation", 3, 13),
         ("another_host_operation", 4, 7),
         ("mystery_host_operation", 5, 5),
         ("minus_host_operation", 6, 6),
+        ("host.print", 7, 17),
     ]) {
         assert_eq!(site["function"], "main");
         assert_eq!(site["operation"], operation);
@@ -12557,17 +12559,18 @@ fn experimental_effect_report_keeps_unknown_calls_unresolved() {
     }
     assert_eq!(
         artifact["effect_coverage"],
-        serde_json::json!({"count_unit": "distinct_function_operation_edges", "known_calls": 0, "symbolic_calls": 0, "unresolved_calls": 4, "complete": false}),
+        serde_json::json!({"count_unit": "distinct_function_operation_edges", "known_calls": 1, "symbolic_calls": 0, "unresolved_calls": 5, "complete": false}),
         "coverage still counts distinct operation edges, not source occurrences"
     );
     let text = run(&["--effect-report", &file]);
     assert!(text.status.success(), "stderr: {}", stderr(&text));
-    assert!(stdout(&text).contains("unresolved call sites: 5"));
+    assert!(stdout(&text).contains("unresolved call sites: 6"));
     assert!(stdout(&text).contains(":2:17 main -> mystery_host_operation (effect unknown)"));
     assert!(stdout(&text).contains(":3:13 main -> nested_host_operation (effect unknown)"));
     assert!(stdout(&text).contains(":4:7 main -> another_host_operation (effect unknown)"));
     assert!(stdout(&text).contains(":5:5 main -> mystery_host_operation (effect unknown)"));
     assert!(stdout(&text).contains(":6:6 main -> minus_host_operation (effect unknown)"));
+    assert!(stdout(&text).contains(":7:17 main -> host.print (effect unknown)"));
     let _ = fs::remove_file(file);
 }
 
