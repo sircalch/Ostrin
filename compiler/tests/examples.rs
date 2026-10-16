@@ -16005,7 +16005,48 @@ fn unit_algebra_simplifies_and_converts_compound_units() {
             "0.0006666666666666666",
             "[0.0005, 0.001]",
             "2 m",
+            "0.2777777777777778",
+            "1.7018",
+            "3.4036",
         ]
+    );
+
+    let file = example_path("unit_algebra.ostrin");
+    let expected = format!("{}\n", lines.join("\n"));
+
+    let exe = temp_artifact("quantity-unit-scale-leak-check.exe");
+    let compile = run(&["--compile", "--leak-check", "--out", &exe, &file]);
+    if skip_if_no_c_compiler(&compile) {
+        return;
+    }
+    assert!(
+        compile.status.success(),
+        "compile failed: {}",
+        stderr(&compile)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("failed to run unit scale binary");
+    let _ = fs::remove_file(&exe);
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    assert!(
+        String::from_utf8_lossy(&native.stderr).contains("live_allocations=0"),
+        "unit scale leaked a generated quantity unit label: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file]);
+    assert!(
+        wasi.status.success(),
+        "WASI emission failed: {}",
+        stderr(&wasi)
+    );
+    assert!(
+        stdout(&wasi).contains("ostrin_unit_expr_factor"),
+        "WASI C is missing the coherent-unit scale helper"
     );
 }
 

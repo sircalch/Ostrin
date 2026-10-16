@@ -2867,6 +2867,8 @@ fn emit_instruction(
                         format!("ostrin_qty_to_string({receiver})")
                     } else if method == "value" && args.is_empty() && *ty == Ty::Float {
                         format!("({receiver}).v")
+                    } else if method == "unit_scale" && args.is_empty() && *ty == Ty::Float {
+                        format!("ostrin_unit_expr_factor(({receiver}).u)")
                     } else {
                         let key = mangle_quantity_type(&dimension);
                         let c_name = methods.get(&(key, method.clone())).ok_or(())?;

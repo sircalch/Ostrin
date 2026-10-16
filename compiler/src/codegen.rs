@@ -7698,7 +7698,7 @@ impl<'a> Codegen<'a> {
         }
         if matches!(obj_ty, CType::Quantity(_))
             && args.is_empty()
-            && (method_name == "value" || method_name == "unit")
+            && (method_name == "value" || method_name == "unit" || method_name == "unit_scale")
         {
             let temp = self.next_temp();
             return Ok(if method_name == "value" {
@@ -7706,12 +7706,25 @@ impl<'a> Codegen<'a> {
                     format!("({{ Qty {temp} = {obj_code}; {temp}.v; }})"),
                     CType::Float,
                 )
-            } else {
+            } else if method_name == "unit" {
                 (
                     format!(
                         "({{ Qty {temp} = {obj_code}; ostrin_unit_cat({temp}.u, \"\", \"\"); }})"
                     ),
                     CType::Str,
+                )
+            } else {
+                let release_receiver = owned_call_argument(obj, &obj_ty)
+                    || matches!(obj_ty, CType::Quantity(_))
+                        && matches!(obj.unlocated(), Expr::Binary(..));
+                let release = if release_receiver {
+                    format!(" ostrin_qty_release({temp});")
+                } else {
+                    String::new()
+                };
+                (
+                    format!("({{ Qty {temp} = {obj_code}; double __scale = ostrin_unit_expr_factor({temp}.u);{release} __scale; }})"),
+                    CType::Float,
                 )
             });
         }
