@@ -14061,6 +14061,40 @@ fn make(action: fn() -> Void) -> fn() -> Void {
 }
 
 #[test]
+fn experimental_effect_signatures_keep_ambiguous_returned_closures_open() {
+    let file = temp_source(
+        "effects-ambiguous-returned-closure.ostrin",
+        r#"fn choose(action: fn() -> Void, flag: Bool) -> fn() -> Void {
+    if flag { fn() { action() } } else { fn() { action() } }
+}
+fn io_action() -> Void { print("effect") }
+fn main() -> Void {
+    deferred: fn() -> Void = choose(io_action, true)
+    deferred()
+}
+"#,
+    );
+    let out = run(&["--effect-report", "--json", &file]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(
+        report["function_effect_signatures"]["main"]["effects"],
+        serde_json::json!(["io"]),
+        "the known callback effect may be retained as a safe over-approximation"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main"]["row_closed"], false,
+        "a conditional choice between closures is not assigned one precise identity"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main"]["open_calls"],
+        serde_json::json!(["deferred"]),
+        "invoking an ambiguous returned closure must remain explicitly open"
+    );
+    let _ = fs::remove_file(file);
+}
+
+#[test]
 fn experimental_effect_report_separates_lambda_creation_from_indirect_execution() {
     let file = temp_source(
         "effects-lambda-execution.ostrin",
