@@ -411,7 +411,11 @@ degraden la identidad del punto. Una prueba estática también verifica que par�
 `punto + intervalo` y `punto - punto` conservan sus roles en HIR y en instrucciones `Binary` de IR
 verificada. Aún no hay una expresión fuente que construya un punto; el intérprete no tiene un valor
 runtime para esta variante y los backends no la ejecutan. Estas pruebas validan tipos y lowering
-estático, no paridad de ejecución ni disponibilidad de la característica.
+estático, no paridad de ejecución ni disponibilidad de la característica. Una prueba del núcleo
+numérico recorre conversiones entre K/degC/degF y operaciones punto-intervalo en una cuadrícula
+finita de valores, comprobando invariantes en la escala coherente; la tolerancia de las restas usa
+la magnitud de los operandos para reflejar el redondeo `f64`. Esa prueba respalda las fórmulas
+internas, no el comportamiento integral del lenguaje ni sus backends.
 
 Los siguientes vectores son notación matemática para pruebas futuras; los identificadores `°C` y
 `°F` no están habilitados en el lexer ni en la tabla de unidades actual. No son ejemplos Ostrin

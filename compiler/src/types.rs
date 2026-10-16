@@ -1161,4 +1161,105 @@ mod affine_unit_tests {
         close(negated_interval.value, -4.0);
         assert_eq!(negated_interval.role, QuantityRole::Linear);
     }
+
+    #[test]
+    fn affine_temperature_operations_preserve_coherent_values_across_scales() {
+        let temperature = dim_single("Temperature");
+        let role = QuantityRole::Point("Temperature".to_string());
+        let kelvin = builtin_temperature_point_unit("K").unwrap();
+        let scales = [
+            builtin_temperature_point_unit("K").unwrap(),
+            builtin_temperature_point_unit("degC").unwrap(),
+            builtin_temperature_point_unit("degF").unwrap(),
+        ];
+        let close_with_roundoff = |actual: f64, expected: f64, magnitude: f64| {
+            let tolerance = 16.0 * f64::EPSILON * magnitude.abs().max(expected.abs()).max(1.0);
+            assert!(
+                (actual - expected).abs() <= tolerance,
+                "expected {expected} ± {tolerance}, got {actual}"
+            );
+        };
+
+        // Exercise every point-unit conversion pair across absolute zero,
+        // familiar reference points, and a large finite reading.
+        for from in &scales {
+            for to in &scales {
+                for value in [-273.15, -40.0, 0.0, 37.0, 100.0, 1.0e6] {
+                    let coherent = value * from.scale + from.offset;
+                    let converted = convert_value_with_role(value, from, to, &role).unwrap();
+                    close(converted * to.scale + to.offset, coherent);
+                    close(
+                        convert_value_with_role(converted, to, from, &role).unwrap(),
+                        value,
+                    );
+                }
+            }
+        }
+
+        // The same interval must move an absolute point by the same coherent
+        // amount regardless of which scale expresses either operand.
+        for point_unit in &scales {
+            for interval_scale in [1.0, 5.0 / 9.0] {
+                let interval_unit = UnitDefinition::linear(temperature.clone(), interval_scale);
+                for coherent_point in [0.0, 233.15, 273.15, 373.15, 1.0e6] {
+                    let point_value =
+                        convert_value_with_role(coherent_point, &kelvin, point_unit, &role)
+                            .unwrap();
+                    for coherent_delta in [-100.0, -1.0, 0.0, 1.0, 100.0] {
+                        let interval_value = coherent_delta / interval_unit.scale;
+                        let point = RoleAwareQuantity {
+                            value: point_value,
+                            unit: point_unit.clone(),
+                            role: role.clone(),
+                        };
+                        let interval = RoleAwareQuantity {
+                            value: interval_value,
+                            unit: interval_unit.clone(),
+                            role: QuantityRole::Linear,
+                        };
+
+                        for (operation, sign) in [
+                            (QuantityArithmetic::Add, 1.0),
+                            (QuantityArithmetic::Subtract, -1.0),
+                        ] {
+                            let result =
+                                combine_quantities_with_role(&point, &interval, operation).unwrap();
+                            assert_eq!(result.role, role);
+                            close(
+                                result.value * result.unit.scale + result.unit.offset,
+                                coherent_point + sign * coherent_delta,
+                            );
+                        }
+
+                        let other_point_value = convert_value_with_role(
+                            coherent_point + coherent_delta,
+                            &kelvin,
+                            point_unit,
+                            &role,
+                        )
+                        .unwrap();
+                        let difference = combine_quantities_with_role(
+                            &point,
+                            &RoleAwareQuantity {
+                                value: other_point_value,
+                                unit: point_unit.clone(),
+                                role: role.clone(),
+                            },
+                            QuantityArithmetic::Subtract,
+                        )
+                        .unwrap();
+                        assert_eq!(difference.role, QuantityRole::Linear);
+                        assert_eq!(difference.unit.offset, 0.0);
+                        assert_eq!(difference.unit.affine_space, None);
+                        close_with_roundoff(
+                            difference.value * difference.unit.scale,
+                            -coherent_delta,
+                            (point_value.abs() + other_point_value.abs()) * point_unit.scale
+                                + 2.0 * point_unit.offset.abs(),
+                        );
+                    }
+                }
+            }
+        }
+    }
 }

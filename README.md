@@ -51,7 +51,7 @@ traits, pattern matching, quantities and two concurrency modes: deterministic
 cooperative scheduling by default, plus opt-in native threads for compiled
 programs.
 
-The compiler suite currently passes **357 integration tests, 22 unit tests and 6 differential
+The compiler suite currently passes **357 integration tests, 23 unit tests and 6 differential
 interpreter↔native tests**. Reproduction commands and evidence boundaries are documented in
 [`README-reproduce.md`](README-reproduce.md). Function calls
 support named/default arguments, scalar and `String` collection lookups preserve `Option<T>`
