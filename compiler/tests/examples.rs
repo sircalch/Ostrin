@@ -11995,6 +11995,57 @@ fn experimental_effect_report_separates_filesystem_external_and_console_io() {
 }
 
 #[test]
+fn experimental_effect_report_respects_local_functions_shadowing_effectful_builtins() {
+    let file = temp_source(
+        "effects-local-builtin-shadowing.ostrin",
+        r#"fn read_file(path: String) -> String { println("local implementation")
+    path
+}
+fn print(value: String) -> Void { }
+fn main() -> Void {
+    contents = read_file("data")
+    print(contents)
+}
+"#,
+    );
+    let out = run(&["--effect-report", "--json", &file]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let report: serde_json::Value =
+        serde_json::from_str(&stdout(&out)).expect("effect report must be JSON");
+    assert_eq!(
+        report["function_effects"]["read_file"],
+        serde_json::json!(["io"]),
+        "the local read_file body should retain its actual println effect"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["print"]["effects"],
+        serde_json::json!([]),
+        "the local print function should not inherit the builtin's IO effect"
+    );
+    assert_eq!(
+        report["function_effects"]["main"],
+        serde_json::json!(["io"]),
+        "main should inherit only the local read_file implementation's IO row"
+    );
+    assert!(
+        !report["effect_kinds"]
+            .as_array()
+            .is_some_and(|effects| effects.iter().any(|effect| effect == "filesystem")),
+        "a locally resolved read_file call must not be classified as filesystem IO"
+    );
+
+    let hir = run(&["--hir", &file]);
+    assert!(hir.status.success(), "HIR stderr: {}", stderr(&hir));
+    assert!(stdout(&hir).contains("fn main() -> Void\n  effects: io"));
+    assert!(stdout(&hir).contains("hir violations: 0"));
+    let ir = run(&["--ir", &file]);
+    assert!(ir.status.success(), "IR stderr: {}", stderr(&ir));
+    assert!(stdout(&ir).contains("fn main() -> Void\n  effects: io"));
+    assert!(stdout(&ir).contains("ir violations: 0"));
+    let _ = fs::remove_file(file);
+}
+
+#[test]
 fn measurement_quantity_boundary_is_explicitly_rejected_natively() {
     let file = example_path("measurement_quantity_shape.ostrin");
     let interpreted = run(&["--run", &file]);

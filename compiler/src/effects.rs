@@ -1957,6 +1957,13 @@ fn classify_effect_call(
             if name.starts_with("std.viz::") && leaf == "provenance" {
                 return Some("provenance");
             }
+            // A declaration in the program shadows a same-named builtin. Its
+            // effects come from the resolved function body and call graph; do
+            // not also assign the host effect associated with the builtin
+            // spelling (for example, a local pure `read_file`).
+            if report.free_function_names.contains(name) {
+                return None;
+            }
             if !is_function_value(callee, report)
                 && matches!(
                     name.as_str(),
