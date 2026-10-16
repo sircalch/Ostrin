@@ -5,7 +5,7 @@ globalThis.OSTRIN_STATUS = Object.freeze({
   "evidenceRevision": "aaa9f16d7cc64fb4ab4b55edc5373d1c9ef1dde0",
   "releaseTag": null,
   "finalReleaseSourceRevision": null,
-  "workingTreeDirty": true,
+  "workingTreeDirty": false,
   "sources": {
     "native": "compiler/tests/differential.rs",
     "ownership": "docs/ownership-matrix.md",
