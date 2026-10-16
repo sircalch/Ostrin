@@ -1332,7 +1332,11 @@ fn register_directly_returned_closures(block: &Block, function: &str, report: &m
             }
             Expr::Match(_, arms) => {
                 let mut keys = BTreeSet::new();
-                let mut complete = !arms.is_empty();
+                let has_unguarded_catch_all = arms.iter().any(|arm| {
+                    arm.guard.is_none()
+                        && matches!(arm.pattern, Pattern::Wildcard | Pattern::Ident(_))
+                });
+                let mut complete = !arms.is_empty() && has_unguarded_catch_all;
                 for arm in arms {
                     let (arm_keys, arm_complete) =
                         closure_keys_from_block(&arm.body, function, aliases);

@@ -14012,6 +14012,10 @@ fn main_match_alias() -> Void {
     deferred: fn() -> Void = choose_match(io_action, Left)
     deferred()
 }
+fn main_guarded_match() -> Void {
+    deferred: fn() -> Void = choose_guarded(io_action, Left, true)
+    deferred()
+}
 fn open_alias() -> Void {
     deferred: fn() -> Void = make_alias(unknown_action)
     deferred()
@@ -14040,8 +14044,14 @@ enum Choice { Left Right }
 fn choose_match(action: fn() -> Void, choice: Choice) -> fn() -> Void {
     deferred = fn() { action() }
     match choice {
-        Left => deferred,
-        Right => deferred,
+        _ => deferred,
+    }
+}
+fn choose_guarded(action: fn() -> Void, choice: Choice, flag: Bool) -> fn() -> Void {
+    deferred = fn() { action() }
+    match choice {
+        Left if flag => deferred,
+        _ => deferred,
     }
 }
 "#,
@@ -14118,6 +14128,14 @@ fn choose_match(action: fn() -> Void, choice: Choice) -> fn() -> Void {
     assert_eq!(
         report["function_effect_signatures"]["main_match_alias"]["row_closed"],
         true
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main_guarded_match"]["row_closed"], false,
+        "a guarded match arm must leave closure identity unresolved"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main_guarded_match"]["open_calls"],
+        serde_json::json!(["deferred"])
     );
     assert_eq!(
         report["function_effect_signatures"]["open_alias"]["open_calls"],
@@ -14203,6 +14221,33 @@ fn mutating_main() -> Void {
         report["function_effect_signatures"]["mutating_main"]["open_calls"],
         serde_json::json!(["deferred"])
     );
+    let _ = fs::remove_file(file);
+}
+
+#[test]
+fn experimental_effect_report_keeps_type_invalid_partial_matches_open() {
+    let file = temp_source(
+        "effects-partial-returned-closure-match.ostrin",
+        r#"enum Choice { Left Right }
+fn choose(action: fn() -> Void, choice: Choice) -> fn() -> Void {
+    deferred = fn() { action() }
+    match choice { Left => deferred }
+}
+fn main() -> Void {
+    deferred: fn() -> Void = choose(io_action, Left)
+    deferred()
+}
+fn io_action() -> Void { print("effect") }
+"#,
+    );
+    let out = run(&["--effect-report", "--json", &file]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(
+        report["effect_closure"]["status"], "open",
+        "a type-invalid partial match cannot claim global effect closure"
+    );
+    assert!(report["effect_closure"]["type_errors"].as_u64().unwrap() > 0);
     let _ = fs::remove_file(file);
 }
 

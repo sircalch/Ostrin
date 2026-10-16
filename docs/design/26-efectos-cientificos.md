@@ -356,9 +356,10 @@ en una consola de logs.
    abiertas y se propagan al caller. También siguen abiertas las closures que escapan, se almacenan
    en agregados o cruzan una frontera sin cuerpo local resoluble. Un retorno directo o mediante un
    alias local lineal conserva sus capturas hasta una variable local y su invocación; una selección
-   `if` o `match` se cierra solo si todas las ramas sin guards resuelven a la misma identidad local.
-   Varias identidades posibles, rutas desconocidas, closures devueltas mediante agregados o pasadas
-   a otro callback quedan abiertos.
+   `if` se cierra solo si todas las ramas resuelven a la misma identidad local. Para `match`, el
+   análisis exige un patrón catch-all sin guard y que las ramas resuelvan a una identidad única;
+   arms con guards o sin catch-all quedan abiertos. Varias identidades posibles, rutas desconocidas,
+   closures devueltas mediante agregados o pasadas a otro callback también quedan abiertas.
    Las llamadas a métodos locales se propagan usando la clave del método que comparte el inventario;
    si no se puede asociar una llamada calificada con una función local, permanece en
    `unresolved_calls` en lugar de presentar una cobertura completa.
