@@ -317,5 +317,65 @@ Estado real del compilador, que concreta §3.1–§3.5:
   ambos lados. El runtime C recibe las unidades declaradas en una tabla generada. Ejemplo:
   `examples/user_units.ostrin`.
 
-Pendiente: unidades afines (°C, con desplazamiento) y prefijos automáticos (`kft`).
+### 3.6 Temperaturas absolutas e intervalos (diseño; aún no implementado)
+
+Las unidades Celsius y Fahrenheit no pueden entrar en la tabla multiplicativa existente. Esa tabla
+representa cada unidad con `(dimensión, factor)` y convierte como `valor * factor_origen /
+factor_destino`; esa regla es correcta para intervalos, pero no para temperaturas absolutas. En
+particular, un offset no puede formar parte de productos, cocientes, potencias, simplificación de
+unidades ni conversiones de `Array<Quantity<D>>`.
+
+La semántica futura distinguirá una **temperatura absoluta** de un **intervalo de temperatura**.
+Ambos comparten la dimensión física `Temperature`, pero tienen reglas algebraicas distintas:
+
+| Operación | Resultado | Estado propuesto |
+| --- | --- | --- |
+| absoluta − absoluta | intervalo | Permitida; convierte ambos valores a una escala común y descarta el offset del resultado. |
+| absoluta + intervalo, intervalo + absoluta | absoluta | Permitida; el intervalo usa solo el factor de escala. |
+| absoluta − intervalo | absoluta | Permitida; el intervalo usa solo el factor de escala. |
+| absoluta + absoluta | — | Error de tipos: sumar puntos absolutos no tiene interpretación definida. |
+| intervalo ± intervalo | intervalo | Permitida con conversiones de escala sin offset. |
+| absoluta ×/÷ magnitud, potencia o producto de unidades | — | Error de tipos hasta que exista una operación física explícita que defina su significado. |
+
+La transformación de una lectura absoluta al valor coherente será `base = scale * value + offset`;
+la conversión entre escalas será `value_to = (scale_from * value_from + offset_from -
+offset_to) / scale_to`. Para intervalos solo se aplicará `interval_to =
+scale_from / scale_to * interval_from`. Por tanto, una implementación no debe inferir si una
+cantidad es absoluta únicamente a partir de la dimensión `Quantity<Temperature>`: requiere una
+distinción representable por el sistema de tipos y preservada por HIR/IR, intérprete, backend
+nativo, arrays, formatters y serialización.
+
+Los siguientes vectores son notación matemática para pruebas futuras; los identificadores `°C` y
+`°F` no están habilitados en el lexer ni en la tabla de unidades actual. No son ejemplos Ostrin
+ejecutables. Los resultados se compararán con tolerancias explícitas de coma flotante:
+
+| Caso | Entrada | Resultado esperado |
+| --- | --- | --- |
+| Punto de congelación | `0 °C` absoluto a K | `273.15 K` |
+| Punto de ebullición | `212 °F` absoluto a °C | `100 °C` |
+| Intervalo Celsius | `1 °C` intervalo a K intervalo | `1 K` |
+| Intervalo Fahrenheit | `1 °F` intervalo a K intervalo | `5/9 K` |
+| Diferencia de absolutos | `20 °C − 10 °C` | `10 °C` de intervalo |
+
+No se aceptará el soporte de Celsius/Fahrenheit hasta que existan pruebas positivas y negativas de
+las reglas de tipos, paridad intérprete/nativo y WASI, casos de arrays, propagación de incertidumbre
+(solo la escala se aplica a una sigma), formatting/round-trip, y rechazo de productos o potencias
+afines. Las pruebas deben demostrar que los prefijos, unidades compuestas y unidades definidas por
+el usuario siguen siendo multiplicativos. No se añadirá una aproximación que trate el offset como
+factor ni se etiquetará como disponible mientras el código no cumpla estos criterios.
+
+Para `Measurement`, una incertidumbre estándar asociada a una temperatura absoluta transforma
+como un intervalo: la conversión de `sigma` solo multiplica por `abs(scale_from / scale_to)` y nunca
+suma el offset. Esto conserva una incertidumbre no negativa y separa el punto estimado de la
+dispersión alrededor de ese punto. El modelo de fuentes compartidas de incertidumbre y sus reglas de
+correlación se mantienen según el documento 25; esta sección no define ni habilita covarianza.
+
+Referencias normativas: [NIST, SI Units – Temperature](https://www.nist.gov/pml/owm/si-units-temperature)
+describe las conversiones exactas y la relación entre intervalos Celsius/Fahrenheit; [BIPM, SI
+Brochure, 9th edition](https://www.bipm.org/documents/20126/41483022/SI-Brochure-9-EN.pdf/2d2b50bf-f2b4-9661-f402-5f9d66e4b507?download=true&t=1671101192839&version=1.11)
+define la relación entre temperatura Celsius y termodinámica, y establece que un intervalo puede
+expresarse en K o °C con el mismo valor numérico.
+
+Los prefijos automáticos (por ejemplo, `kft`) continúan pendientes y son independientes de este
+diseño afín.
 
