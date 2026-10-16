@@ -368,9 +368,9 @@ pub fn convert_value_with_role(
 }
 
 /// Add or subtract quantities without erasing whether an affine value is a
-/// point or an interval. The result uses the left point's scale when the left
-/// operand is a point, otherwise it uses the right point's scale for
-/// `interval + point`. Invalid affine operations return an error.
+/// point or an interval. Point shifts preserve the point operand's scale;
+/// point differences return coherent linear units. Invalid affine operations
+/// return an error.
 #[allow(dead_code)] // Called by interpreter and backend lowering once point types are enabled.
 pub fn combine_quantities_with_role(
     left: &RoleAwareQuantity,
@@ -400,18 +400,14 @@ pub fn combine_quantities_with_role(
             Err("subtracting an absolute point from an interval is undefined".to_string())
         }
         (true, true, QuantityArithmetic::Subtract) => {
-            let QuantityRole::Point(space) = &left.role else {
+            let QuantityRole::Point(_) = &left.role else {
                 unreachable!()
             };
-            let right_value = convert_value_with_role(
-                right.value,
-                &right.unit,
-                &left.unit,
-                &QuantityRole::Point(space.clone()),
-            )?;
+            let left_coherent = left.value.mul_add(left.unit.scale, left.unit.offset);
+            let right_coherent = right.value.mul_add(right.unit.scale, right.unit.offset);
             Ok(RoleAwareQuantity {
-                value: left.value - right_value,
-                unit: UnitDefinition::linear(left.unit.dimension.clone(), left.unit.scale),
+                value: left_coherent - right_coherent,
+                unit: UnitDefinition::linear(left.unit.dimension.clone(), 1.0),
                 role: result_role.clone(),
             })
         }

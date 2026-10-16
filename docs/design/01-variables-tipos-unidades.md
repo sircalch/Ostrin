@@ -328,9 +328,10 @@ aplicar el offset elemento a elemento; los arrays de intervalos solo aplican el 
 El array deberá conservar el rol de sus elementos para seleccionar la transformación correcta.
 
 La semántica distingue ya estos roles en metadatos internos y el type checker distingue el tipo
-nominal `TemperaturePoint` de `Quantity<Temperature>`. La construcción de valores, la ejecución en
-el intérprete y el lowering nativo/WASI siguen sin estar implementados; por ello, la capacidad no
-está disponible para programas de usuario. El diseño completo separa una **temperatura absoluta**
+nominal `TemperaturePoint` de `Quantity<Temperature>`. El intérprete tiene una variante runtime
+interna y operaciones por rol cubiertas con pruebas unitarias, pero no existe un constructor fuente
+ni una ruta de ejecución de programas; el lowering nativo/WASI tampoco está implementado. Por ello,
+la capacidad no está disponible para programas de usuario. El diseño completo separa una **temperatura absoluta**
 de un **intervalo de temperatura**. Ambos comparten la dimensión física `Temperature`, pero tienen
 reglas algebraicas distintas:
 
@@ -412,9 +413,10 @@ El compilador ya contiene un núcleo interno de metadatos y operaciones por rol 
 al convertir entre `Ty` y los metadatos de tipo del AST, para que firmas tipadas y sustituciones no
 degraden la identidad del punto. Una prueba estática también verifica que parámetros, retornos,
 `punto + intervalo` y `punto - punto` conservan sus roles en HIR y en instrucciones `Binary` de IR
-verificada. Aún no hay una expresión fuente que construya un punto; el intérprete no tiene un valor
-runtime para esta variante y los backends no la ejecutan. Estas pruebas validan tipos y lowering
-estático, no paridad de ejecución ni disponibilidad de la característica. Una prueba del núcleo
+verificada. Aún no hay una expresión fuente que construya un punto; las pruebas del intérprete llaman
+directamente a la variante runtime interna, mientras los backends todavía no la ejecutan. Estas
+pruebas validan tipos, operaciones internas y lowering estático, no paridad de ejecución entre
+programas ni disponibilidad de la característica. Una prueba del núcleo
 numérico recorre conversiones entre K/degC/degF y operaciones punto-intervalo en una cuadrícula
 finita de valores, comprobando invariantes en la escala coherente; la tolerancia de las restas usa
 la magnitud de los operandos para reflejar el redondeo `f64`. Esa prueba respalda las fórmulas

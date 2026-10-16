@@ -18,8 +18,10 @@ mod regress;
 mod rng;
 mod strings;
 use crate::types::{
+    builtin_temperature_point_unit, combine_quantities_with_role, compare_quantities_with_role,
     convert_value_with_role, dim_div, dim_is_dimensionless, dim_mul, dim_pow, dim_to_string,
-    resolve_unit_expr, resolve_unit_factor, unit_combine, Dimension, QuantityRole, UnitDefinition,
+    resolve_unit_expr, resolve_unit_factor, unit_combine, Dimension, QuantityArithmetic,
+    QuantityRole, RoleAwareQuantity, UnitDefinition,
 };
 
 #[derive(Clone)]
@@ -173,6 +175,11 @@ pub enum Value {
     Char(char),
     String(String),
     Quantity(f64, Dimension, String),
+    /// An absolute temperature reading. It stays distinct from a linear
+    /// `Quantity<Temperature>` interval even though both share the dimension.
+    /// Source construction and backend lowering remain gated until parity is
+    /// implemented; this runtime variant is exercised by focused unit tests.
+    TemperaturePoint(f64, String),
     // Las listas tienen identidad de referencia porque sus operaciones
     // mutables (`push`/`remove_at`) deben ser visibles desde aliases del
     // mismo binding, igual que Map y Set.
@@ -291,6 +298,7 @@ impl fmt::Display for Value {
             Value::String(s) => write!(f, "{s}"),
             Value::Quantity(v, _, unit) if unit.is_empty() => write!(f, "{v}"),
             Value::Quantity(v, _, unit) => write!(f, "{v} {unit}"),
+            Value::TemperaturePoint(v, unit) => write!(f, "{v} {unit} (absolute)"),
             Value::List(state) => {
                 write!(f, "[")?;
                 for (i, item) in state.borrow().iter().enumerate() {
@@ -1616,6 +1624,7 @@ impl Interpreter {
             Value::Quantity(..) => {
                 Type::Named("Quantity".to_string(), self.runtime_type_args(value))
             }
+            Value::TemperaturePoint(..) => Type::Named("TemperaturePoint".to_string(), Vec::new()),
             Value::Closure(..) => Type::Named("Function".to_string(), Vec::new()),
             Value::Task(_) => Type::Named("Task".to_string(), Vec::new()),
             Value::Channel(_) => Type::Named("Channel".to_string(), Vec::new()),
@@ -2370,6 +2379,9 @@ impl Interpreter {
                     (UnaryOp::Neg, Value::Quantity(n, d, u)) => {
                         Ok(Value::Quantity(-n, d.clone(), u.clone()))
                     }
+                    (UnaryOp::Neg, Value::TemperaturePoint(..)) => Err(RuntimeError::Error(
+                        "negating an absolute TemperaturePoint is undefined".to_string(),
+                    )),
                     (UnaryOp::Not, Value::Bool(b)) => Ok(Value::Bool(!b)),
                     _ => Err(RuntimeError::Error(format!(
                         "cannot apply unary operator to '{v}'"
@@ -3696,6 +3708,7 @@ fn value_type_name(v: &Value) -> String {
         Value::Char(_) => "Char".to_string(),
         Value::String(_) => "String".to_string(),
         Value::Quantity(..) => "Quantity".to_string(),
+        Value::TemperaturePoint(..) => "TemperaturePoint".to_string(),
         Value::Closure(..) => "Function".to_string(),
         Value::Task(_) => "Task".to_string(),
         Value::Channel(_) => "Channel".to_string(),
@@ -4099,6 +4112,9 @@ fn f32_binary(op: BinOp, lv: Value, rv: Value) -> EvalResult {
 
 fn eval_binary_builtin(op: BinOp, lv: Value, rv: Value) -> EvalResult {
     use BinOp::*;
+    if matches!(lv, Value::TemperaturePoint(..)) || matches!(rv, Value::TemperaturePoint(..)) {
+        return affine_temperature_binary(op, &lv, &rv);
+    }
     if matches!(lv, Value::Array(_)) || matches!(rv, Value::Array(_)) {
         if let Some(result) = qarray::binary(op, &lv, &rv) {
             return result;
@@ -4213,8 +4229,103 @@ fn eval_binary_builtin(op: BinOp, lv: Value, rv: Value) -> EvalResult {
     }
 }
 
+fn role_aware_temperature(value: &Value) -> Result<RoleAwareQuantity, RuntimeError> {
+    let temperature = resolve_unit_expr("K").map_err(unit_error)?;
+    match value {
+        Value::TemperaturePoint(value, unit) => {
+            let definition = builtin_temperature_point_unit(unit).ok_or_else(|| {
+                RuntimeError::Error(format!("unknown absolute temperature scale '{unit}'"))
+            })?;
+            Ok(RoleAwareQuantity {
+                value: *value,
+                unit: definition,
+                role: QuantityRole::Point("Temperature".to_string()),
+            })
+        }
+        Value::Quantity(value, dimension, unit) if *dimension == temperature => {
+            let scale = resolve_unit_factor(unit).map_err(unit_error)?;
+            Ok(RoleAwareQuantity {
+                value: *value,
+                unit: UnitDefinition::linear(dimension.clone(), scale),
+                role: QuantityRole::Linear,
+            })
+        }
+        Value::Quantity(_, dimension, _) => Err(RuntimeError::Error(format!(
+            "TemperaturePoint arithmetic requires a Temperature interval, got {}",
+            dim_to_string(dimension)
+        ))),
+        other => Err(RuntimeError::Error(format!(
+            "TemperaturePoint arithmetic requires another point or a Temperature interval, got '{}'",
+            value_type_name(other)
+        ))),
+    }
+}
+
+fn affine_temperature_binary(op: BinOp, left: &Value, right: &Value) -> EvalResult {
+    use BinOp::*;
+    let left_value = role_aware_temperature(left)?;
+    let right_value = role_aware_temperature(right)?;
+    match op {
+        Add | Sub => {
+            let operation = if op == Add {
+                QuantityArithmetic::Add
+            } else {
+                QuantityArithmetic::Subtract
+            };
+            let result = combine_quantities_with_role(&left_value, &right_value, operation)
+                .map_err(RuntimeError::Error)?;
+            match result.role {
+                QuantityRole::Point(_) => {
+                    let unit = match (left, right) {
+                        (Value::TemperaturePoint(_, unit), _) => unit,
+                        (_, Value::TemperaturePoint(_, unit)) => unit,
+                        _ => unreachable!("point result must have a point operand"),
+                    };
+                    Ok(Value::TemperaturePoint(result.value, unit.clone()))
+                }
+                QuantityRole::Linear => {
+                    // Point differences are returned in coherent kelvins so
+                    // the ordinary linear Quantity runtime can represent them.
+                    Ok(Value::Quantity(
+                        result.value * result.unit.scale,
+                        result.unit.dimension,
+                        "K".to_string(),
+                    ))
+                }
+            }
+        }
+        Eq | NotEq | Lt | Gt | LtEq | GtEq => {
+            let ordering = compare_quantities_with_role(&left_value, &right_value)
+                .map_err(RuntimeError::Error)?;
+            Ok(Value::Bool(match op {
+                Eq => ordering == std::cmp::Ordering::Equal,
+                NotEq => ordering != std::cmp::Ordering::Equal,
+                Lt => ordering == std::cmp::Ordering::Less,
+                Gt => ordering == std::cmp::Ordering::Greater,
+                LtEq => ordering != std::cmp::Ordering::Greater,
+                GtEq => ordering != std::cmp::Ordering::Less,
+                _ => unreachable!(),
+            }))
+        }
+        _ => Err(RuntimeError::Error(format!(
+            "operator '{op:?}' is undefined for absolute TemperaturePoint values"
+        ))),
+    }
+}
+
 fn compare(lv: &Value, rv: &Value) -> Result<i32, RuntimeError> {
     match (lv, rv) {
+        (Value::TemperaturePoint(..), _) | (_, Value::TemperaturePoint(..)) => {
+            let left = role_aware_temperature(lv)?;
+            let right = role_aware_temperature(rv)?;
+            compare_quantities_with_role(&left, &right)
+                .map(|ordering| match ordering {
+                    std::cmp::Ordering::Less => -1,
+                    std::cmp::Ordering::Equal => 0,
+                    std::cmp::Ordering::Greater => 1,
+                })
+                .map_err(RuntimeError::Error)
+        }
         (Value::Quantity(a, d1, u1), Value::Quantity(b, d2, u2)) => {
             if d1 != d2 {
                 return Err(RuntimeError::Error(
@@ -4301,4 +4412,80 @@ fn convert(value: f64, from_unit: &str, to_unit: &str) -> Result<f64, RuntimeErr
         resolve_unit_factor(to_unit).map_err(unit_error)?,
     );
     convert_value_with_role(value, &from, &to, &QuantityRole::Linear).map_err(unit_error)
+}
+
+#[cfg(test)]
+mod affine_temperature_runtime_tests {
+    use super::*;
+
+    fn point(value: f64, unit: &str) -> Value {
+        Value::TemperaturePoint(value, unit.to_string())
+    }
+
+    fn interval(value: f64) -> Value {
+        Value::Quantity(value, resolve_unit_expr("K").unwrap(), "K".to_string())
+    }
+
+    fn runtime_value(result: EvalResult) -> Value {
+        result.unwrap_or_else(|error| match error {
+            RuntimeError::Error(message) => panic!("{message}"),
+            _ => panic!("unexpected control flow in affine runtime test"),
+        })
+    }
+
+    #[test]
+    fn interpreter_affine_points_shift_compare_and_subtract_as_intervals() {
+        let shifted = runtime_value(eval_binary_builtin(
+            BinOp::Add,
+            point(0.0, "degC"),
+            interval(10.0),
+        ));
+        assert!(
+            matches!(shifted, Value::TemperaturePoint(value, ref unit) if value == 10.0 && unit == "degC")
+        );
+
+        let shifted = runtime_value(eval_binary_builtin(
+            BinOp::Add,
+            interval(10.0),
+            point(0.0, "degC"),
+        ));
+        assert!(
+            matches!(shifted, Value::TemperaturePoint(value, ref unit) if value == 10.0 && unit == "degC")
+        );
+
+        let difference = runtime_value(eval_binary_builtin(
+            BinOp::Sub,
+            point(32.0, "degF"),
+            point(0.0, "degC"),
+        ));
+        assert!(
+            matches!(difference, Value::Quantity(value, _, ref unit) if value == 0.0 && unit == "K")
+        );
+
+        let equal = runtime_value(eval_binary_builtin(
+            BinOp::Eq,
+            point(0.0, "degC"),
+            point(32.0, "degF"),
+        ));
+        assert!(matches!(equal, Value::Bool(true)));
+        let less = runtime_value(eval_binary_builtin(
+            BinOp::Lt,
+            point(0.0, "degC"),
+            point(33.0, "degF"),
+        ));
+        assert!(matches!(less, Value::Bool(true)));
+    }
+
+    #[test]
+    fn interpreter_affine_points_reject_invalid_arithmetic_and_roles() {
+        assert!(eval_binary_builtin(BinOp::Add, point(0.0, "degC"), point(32.0, "degF")).is_err());
+        assert!(eval_binary_builtin(BinOp::Sub, interval(1.0), point(0.0, "degC")).is_err());
+        assert!(eval_binary_builtin(BinOp::Mul, point(0.0, "degC"), Value::Int(2)).is_err());
+        assert!(eval_binary_builtin(
+            BinOp::Eq,
+            point(0.0, "degC"),
+            Value::Quantity(0.0, resolve_unit_expr("m").unwrap(), "m".to_string())
+        )
+        .is_err());
+    }
 }
