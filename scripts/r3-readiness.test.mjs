@@ -214,6 +214,50 @@ test("R3 stays open while valid captured effects are incomplete", () => {
   assert.equal(requiredCaptureErrors({ entries: [malformed] }).length, 1);
 });
 
+test("R3 stays open while effect coverage includes symbolic callback calls", () => {
+  const effects = {
+    ...validEffects(),
+    symbolic_effect_calls: { main: ["callback"] },
+    effect_coverage: {
+      count_unit: "distinct_function_operation_edges",
+      known_calls: 0,
+      symbolic_calls: 1,
+      unresolved_calls: 0,
+      complete: true,
+    },
+  };
+  const bundle = {
+    provenance: {
+      commit: "fixture-commit",
+      compiler: "ostrinc fixture",
+      target: "wasm32-wasip1",
+      runtime: validRuntime(),
+      inputs: [{ id: "input" }],
+      outputs: [{ id: "output" }],
+      parameters: { scale: 1 },
+      execution: { mode: "recorded" },
+      figure_metadata: { source_hash: "fixture" },
+      effects,
+    },
+  };
+
+  const report = inspectBundle(bundle, "symbolic-callback.json");
+  assert.equal(report.effectCoverage.complete, true);
+  assert.equal(report.effectCoverage.symbolic_calls, 1);
+  assert.equal(report.status, "OPEN");
+  assert.deepEqual(report.r3Extensions.incomplete, ["provenance.effects.effect_coverage"]);
+
+  delete effects.effect_coverage.symbolic_calls;
+  const countOmitted = inspectBundle(bundle, "symbolic-callback.json");
+  assert.equal(countOmitted.status, "OPEN");
+  assert.deepEqual(countOmitted.r3Extensions.incomplete, ["provenance.effects.effect_coverage"]);
+
+  effects.effect_coverage.symbolic_calls = -1;
+  const malformed = inspectBundle(bundle, "symbolic-callback.json");
+  assert.equal(malformed.status, "OPEN");
+  assert.deepEqual(malformed.r3Extensions.missing, ["provenance.effects.effect_coverage"]);
+});
+
 test("readiness totals unresolved effects across incomplete bundles", () => {
   const report = buildReadiness();
   assert.ok(report.incompleteEffectBundleCount > 0);

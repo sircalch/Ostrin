@@ -95,9 +95,19 @@ export function inspectBundle(bundle, file) {
     missingR3Extensions.push("provenance.effects");
   } else {
     const effectErrors = validateEffectCapture(effects);
-    if (effectErrors.length > 0) {
+    const symbolicCallCount = effects.effect_coverage?.symbolic_calls;
+    const symbolicCalls = effects.symbolic_effect_calls;
+    const hasSymbolicCalls = symbolicCalls !== undefined;
+    const symbolicCallsMalformed = hasSymbolicCalls && (!isObject(symbolicCalls)
+      || Object.values(symbolicCalls).some((calls) => !Array.isArray(calls)
+        || !calls.every((call) => typeof call === "string")));
+    const symbolicCountMalformed = symbolicCallCount !== undefined
+      && (!Number.isInteger(symbolicCallCount) || symbolicCallCount < 0);
+    if (effectErrors.length > 0 || symbolicCallsMalformed || symbolicCountMalformed) {
       missingR3Extensions.push("provenance.effects.effect_coverage");
-    } else if (!effects.effect_coverage.complete) {
+    } else if (!effects.effect_coverage.complete
+      || (symbolicCallCount ?? 0) > 0
+      || Object.values(symbolicCalls ?? {}).some((calls) => calls.length > 0)) {
       incomplete.push("provenance.effects.effect_coverage");
     }
   }
