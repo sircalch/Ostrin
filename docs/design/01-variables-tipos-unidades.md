@@ -399,6 +399,13 @@ el nombre de la unidad ni por contexto. La primera implementación tampoco permi
 declaren unidades afines con `unit`/`define`; esa extensión necesitará validar ciclos, espacios de
 referencia y composición antes de exponerse.
 
+El compilador ya contiene un núcleo interno de metadatos y operaciones por rol (`UnitDefinition`,
+`QuantityRole` y el catálogo de escalas de punto K/degC/degF), probado directamente en Rust. Ese
+núcleo todavía no es consumido por expresiones del programa: el AST, el type checker, HIR/IR, el
+intérprete y los backends aún no conservan ni ejecutan `TemperaturePoint`. Por ello, sus pruebas
+verifican las fórmulas y las reglas aisladas, no paridad del lenguaje ni disponibilidad de la
+característica.
+
 Los siguientes vectores son notación matemática para pruebas futuras; los identificadores `°C` y
 `°F` no están habilitados en el lexer ni en la tabla de unidades actual. No son ejemplos Ostrin
 ejecutables. Los resultados se compararán con tolerancias explícitas de coma flotante:

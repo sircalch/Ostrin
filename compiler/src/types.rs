@@ -58,6 +58,21 @@ pub enum QuantityRole {
     Point(String),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)] // Used by source-level TemperaturePoint lowering.
+pub enum QuantityArithmetic {
+    Add,
+    Subtract,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+#[allow(dead_code)] // Values are constructed by the future typed expression path.
+pub struct RoleAwareQuantity {
+    pub value: f64,
+    pub unit: UnitDefinition,
+    pub role: QuantityRole,
+}
+
 pub fn dim_single(name: &str) -> Dimension {
     let mut d = HashMap::new();
     d.insert(name.to_string(), 1);
@@ -308,6 +323,151 @@ pub fn convert_value_with_role(
             let coherent = value * from.scale + from.offset;
             Ok((coherent - to.offset) / to.scale)
         }
+    }
+}
+
+/// Add or subtract quantities without erasing whether an affine value is a
+/// point or an interval. The result uses the left point's scale when the left
+/// operand is a point, otherwise it uses the right point's scale for
+/// `interval + point`. Invalid affine operations return an error.
+#[allow(dead_code)] // Called by interpreter and backend lowering once point types are enabled.
+pub fn combine_quantities_with_role(
+    left: &RoleAwareQuantity,
+    right: &RoleAwareQuantity,
+    operation: QuantityArithmetic,
+) -> Result<RoleAwareQuantity, String> {
+    for value in [left, right] {
+        if let QuantityRole::Point(space) = &value.role {
+            convert_value_with_role(
+                value.value,
+                &value.unit,
+                &value.unit,
+                &QuantityRole::Point(space.clone()),
+            )?;
+        }
+    }
+    if let (QuantityRole::Point(left_space), QuantityRole::Point(right_space)) =
+        (&left.role, &right.role)
+    {
+        if left_space != right_space {
+            return Err("cannot combine points from different affine spaces".to_string());
+        }
+    }
+    let (left_point, right_point) = (
+        matches!(&left.role, QuantityRole::Point(_)),
+        matches!(&right.role, QuantityRole::Point(_)),
+    );
+    match (left_point, right_point, operation) {
+        (true, true, QuantityArithmetic::Add) => {
+            Err("adding two absolute points is undefined".to_string())
+        }
+        (false, true, QuantityArithmetic::Subtract) => {
+            Err("subtracting an absolute point from an interval is undefined".to_string())
+        }
+        (true, true, QuantityArithmetic::Subtract) => {
+            let QuantityRole::Point(space) = &left.role else {
+                unreachable!()
+            };
+            let right_value = convert_value_with_role(
+                right.value,
+                &right.unit,
+                &left.unit,
+                &QuantityRole::Point(space.clone()),
+            )?;
+            Ok(RoleAwareQuantity {
+                value: left.value - right_value,
+                unit: UnitDefinition::linear(left.unit.dimension.clone(), left.unit.scale),
+                role: QuantityRole::Linear,
+            })
+        }
+        (true, false, operation) => {
+            let QuantityRole::Point(space) = &left.role else {
+                unreachable!()
+            };
+            let interval = convert_value_with_role(
+                right.value,
+                &right.unit,
+                &left.unit,
+                &QuantityRole::Linear,
+            )?;
+            Ok(RoleAwareQuantity {
+                value: match operation {
+                    QuantityArithmetic::Add => left.value + interval,
+                    QuantityArithmetic::Subtract => left.value - interval,
+                },
+                unit: left.unit.clone(),
+                role: QuantityRole::Point(space.clone()),
+            })
+        }
+        (false, true, QuantityArithmetic::Add) => {
+            let QuantityRole::Point(space) = &right.role else {
+                unreachable!()
+            };
+            let interval = convert_value_with_role(
+                left.value,
+                &left.unit,
+                &right.unit,
+                &QuantityRole::Linear,
+            )?;
+            Ok(RoleAwareQuantity {
+                value: interval + right.value,
+                unit: right.unit.clone(),
+                role: QuantityRole::Point(space.clone()),
+            })
+        }
+        (false, false, operation) => {
+            let right_value = convert_value_with_role(
+                right.value,
+                &right.unit,
+                &left.unit,
+                &QuantityRole::Linear,
+            )?;
+            Ok(RoleAwareQuantity {
+                value: match operation {
+                    QuantityArithmetic::Add => left.value + right_value,
+                    QuantityArithmetic::Subtract => left.value - right_value,
+                },
+                unit: UnitDefinition::linear(left.unit.dimension.clone(), left.unit.scale),
+                role: QuantityRole::Linear,
+            })
+        }
+    }
+}
+
+/// Compare two values only when both have the same semantic role. Absolute
+/// points are normalized with offsets; linear intervals use scale only.
+#[allow(dead_code)] // Called by interpreter and backend comparison lowering.
+pub fn compare_quantities_with_role(
+    left: &RoleAwareQuantity,
+    right: &RoleAwareQuantity,
+) -> Result<std::cmp::Ordering, String> {
+    let role = match (&left.role, &right.role) {
+        (QuantityRole::Linear, QuantityRole::Linear) => QuantityRole::Linear,
+        (QuantityRole::Point(left_space), QuantityRole::Point(right_space))
+            if left_space == right_space =>
+        {
+            QuantityRole::Point(left_space.clone())
+        }
+        (QuantityRole::Point(_), QuantityRole::Point(_)) => {
+            return Err("cannot compare points from different affine spaces".to_string())
+        }
+        _ => return Err("cannot compare an absolute point with a linear interval".to_string()),
+    };
+    let right_value = convert_value_with_role(right.value, &right.unit, &left.unit, &role)?;
+    left.value
+        .partial_cmp(&right_value)
+        .ok_or_else(|| "cannot order NaN quantities".to_string())
+}
+
+#[allow(dead_code)] // Called by the typed unary-expression lowering.
+pub fn negate_quantity_with_role(value: &RoleAwareQuantity) -> Result<RoleAwareQuantity, String> {
+    match &value.role {
+        QuantityRole::Linear => Ok(RoleAwareQuantity {
+            value: -value.value,
+            unit: UnitDefinition::linear(value.unit.dimension.clone(), value.unit.scale),
+            role: QuantityRole::Linear,
+        }),
+        QuantityRole::Point(_) => Err("negating an absolute point is undefined".to_string()),
     }
 }
 
@@ -733,8 +893,10 @@ impl Ty {
 #[cfg(test)]
 mod affine_unit_tests {
     use super::{
-        builtin_temperature_point_unit, convert_value_with_role, declare_unit, define_unit,
-        dim_single, reset_user_units, unit_definition, unit_info, QuantityRole, UnitDefinition,
+        builtin_temperature_point_unit, combine_quantities_with_role, compare_quantities_with_role,
+        convert_value_with_role, declare_unit, define_unit, dim_single, negate_quantity_with_role,
+        reset_user_units, unit_definition, unit_info, QuantityArithmetic, QuantityRole,
+        RoleAwareQuantity, UnitDefinition,
     };
 
     fn close(actual: f64, expected: f64) {
@@ -877,5 +1039,88 @@ mod affine_unit_tests {
         );
         assert!(UnitDefinition::affine(temperature, 1.0, f64::NAN, "Temperature").is_err());
         assert!(UnitDefinition::affine(dim_single("Temperature"), 1.0, 0.0, "").is_err());
+    }
+
+    #[test]
+    fn point_arithmetic_preserves_roles_and_rejects_invalid_affine_operations() {
+        let celsius = builtin_temperature_point_unit("degC").unwrap();
+        let fahrenheit = builtin_temperature_point_unit("degF").unwrap();
+        let celsius_interval = UnitDefinition::linear(dim_single("Temperature"), 1.0);
+        let fahrenheit_interval = UnitDefinition::linear(dim_single("Temperature"), 5.0 / 9.0);
+        let point = |value, unit| RoleAwareQuantity {
+            value,
+            unit,
+            role: QuantityRole::Point("Temperature".to_string()),
+        };
+        let interval = |value, unit| RoleAwareQuantity {
+            value,
+            unit,
+            role: QuantityRole::Linear,
+        };
+
+        let difference = combine_quantities_with_role(
+            &point(0.0, celsius.clone()),
+            &point(32.0, fahrenheit.clone()),
+            QuantityArithmetic::Subtract,
+        )
+        .unwrap();
+        close(difference.value, 0.0);
+        assert_eq!(difference.role, QuantityRole::Linear);
+        assert_eq!(difference.unit.offset, 0.0);
+        assert_eq!(difference.unit.affine_space, None);
+
+        let shifted = combine_quantities_with_role(
+            &point(20.0, celsius.clone()),
+            &interval(18.0, fahrenheit_interval.clone()),
+            QuantityArithmetic::Add,
+        )
+        .unwrap();
+        close(shifted.value, 30.0);
+        assert_eq!(shifted.role, QuantityRole::Point("Temperature".to_string()));
+
+        let shifted = combine_quantities_with_role(
+            &point(20.0, celsius.clone()),
+            &interval(18.0, fahrenheit_interval.clone()),
+            QuantityArithmetic::Subtract,
+        )
+        .unwrap();
+        close(shifted.value, 10.0);
+        assert_eq!(shifted.role, QuantityRole::Point("Temperature".to_string()));
+
+        let shifted = combine_quantities_with_role(
+            &interval(18.0, fahrenheit_interval),
+            &point(20.0, celsius.clone()),
+            QuantityArithmetic::Add,
+        )
+        .unwrap();
+        close(shifted.value, 30.0);
+        assert_eq!(shifted.role, QuantityRole::Point("Temperature".to_string()));
+
+        let left = point(20.0, celsius.clone());
+        let right = point(69.0, fahrenheit.clone());
+        assert_eq!(
+            compare_quantities_with_role(&left, &right).unwrap(),
+            std::cmp::Ordering::Less
+        );
+        assert_eq!(
+            compare_quantities_with_role(&left, &point(20.0, celsius.clone())).unwrap(),
+            std::cmp::Ordering::Equal
+        );
+        assert!(combine_quantities_with_role(&left, &right, QuantityArithmetic::Add).is_err());
+        assert!(combine_quantities_with_role(
+            &interval(2.0, celsius_interval.clone()),
+            &left,
+            QuantityArithmetic::Subtract
+        )
+        .is_err());
+        assert!(compare_quantities_with_role(&left, &interval(20.0, celsius_interval)).is_err());
+        assert!(negate_quantity_with_role(&left).is_err());
+        let negated_interval = negate_quantity_with_role(&interval(
+            4.0,
+            UnitDefinition::linear(dim_single("Temperature"), 1.0),
+        ))
+        .unwrap();
+        close(negated_interval.value, -4.0);
+        assert_eq!(negated_interval.role, QuantityRole::Linear);
     }
 }
