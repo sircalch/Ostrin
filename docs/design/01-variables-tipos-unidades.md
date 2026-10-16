@@ -389,12 +389,15 @@ backends y pruebas analíticas. Los casos de ownership gestionado, `Phi`, reempl
 destrucción deberán incluir `live_allocations=0` además de ASan/UBSan; los checks de tipo por sí
 solos no demuestran ese contrato.
 
-Queda abierta una decisión de compatibilidad y sintaxis: hoy `K` produce `Quantity<Temperature>`.
-Antes de habilitar Celsius/Fahrenheit habrá que decidir cómo expresar un punto Kelvin sin cambiar
-silenciosamente el significado del código existente y cómo escribir un intervalo Kelvin sin
-ambigüedad. No se inferirá el rol por contexto. La primera implementación tampoco permitirá que
-programas declaren unidades afines con `unit`/`define`; esa extensión necesitará validar ciclos,
-espacios de referencia y composición antes de exponerse.
+La base de compatibilidad para la implementación será conservar `n K` como el `Quantity<Temperature>`
+lineal que ya existe, con su aritmética y conversiones actuales. El catálogo puede marcar K como
+perteneciente al espacio afín Temperature para usarlo en una conversión de puntos **explícita**; esa
+marca no cambia por sí sola el rol de una cantidad. Por ejemplo, `TemperaturePoint(310 K)` es una
+notación candidata para el constructor, todavía sujeta a revisión de sintaxis. Los intervalos
+Kelvin siguen usando `Quantity<Temperature>` y `K`; el compilador no inferirá puntos absolutos por
+el nombre de la unidad ni por contexto. La primera implementación tampoco permitirá que programas
+declaren unidades afines con `unit`/`define`; esa extensión necesitará validar ciclos, espacios de
+referencia y composición antes de exponerse.
 
 Los siguientes vectores son notación matemática para pruebas futuras; los identificadores `°C` y
 `°F` no están habilitados en el lexer ni en la tabla de unidades actual. No son ejemplos Ostrin

@@ -2,6 +2,62 @@ use std::collections::HashMap;
 
 pub type Dimension = HashMap<String, i32>;
 
+/// Conversion metadata for a unit. `offset` maps an absolute point to
+/// its coherent value; linear quantities such as intervals ignore it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct UnitDefinition {
+    pub dimension: Dimension,
+    pub scale: f64,
+    pub offset: f64,
+    /// Affine space for units with an absolute-point origin, such as a
+    /// temperature scale. Kelvin carries a Temperature-space marker while
+    /// retaining zero offset and linear arithmetic for existing quantities.
+    pub affine_space: Option<String>,
+}
+
+impl UnitDefinition {
+    pub fn linear(dimension: Dimension, scale: f64) -> Self {
+        Self {
+            dimension,
+            scale,
+            offset: 0.0,
+            affine_space: None,
+        }
+    }
+
+    #[allow(dead_code)] // Activated when the parser and backends expose affine units.
+    pub fn affine(
+        dimension: Dimension,
+        scale: f64,
+        offset: f64,
+        affine_space: impl Into<String>,
+    ) -> Result<Self, String> {
+        let affine_space = affine_space.into();
+        if !scale.is_finite() || scale <= 0.0 || !offset.is_finite() || affine_space.is_empty() {
+            return Err(
+                "an affine unit needs a finite positive scale, finite offset and named space"
+                    .to_string(),
+            );
+        }
+        Ok(Self {
+            dimension,
+            scale,
+            offset,
+            affine_space: Some(affine_space),
+        })
+    }
+}
+
+/// Semantic role of a quantity during conversion. `Linear` also covers
+/// temperature intervals; `Point` is used only for explicitly typed absolute
+/// readings. This role is independent of the unit's dimension and spelling.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum QuantityRole {
+    Linear,
+    #[allow(dead_code)] // Constructed by typed absolute-temperature lowering.
+    Point(String),
+}
+
 pub fn dim_single(name: &str) -> Dimension {
     let mut d = HashMap::new();
     d.insert(name.to_string(), 1);
@@ -156,15 +212,78 @@ pub fn user_units() -> Vec<(String, Dimension, f64)> {
     USER_UNITS.with(|u| u.borrow().clone())
 }
 
-pub fn unit_info(symbol: &str) -> Option<(Dimension, f64)> {
-    builtin_unit_info(symbol).or_else(|| {
-        USER_UNITS.with(|u| {
-            u.borrow()
-                .iter()
-                .find(|(s, _, _)| s == symbol)
-                .map(|(_, d, f)| (d.clone(), *f))
+/// Full unit conversion metadata. Existing built-in and user-defined units
+/// remain linear; an affine unit must be registered with its offset and space
+/// before source syntax can expose it.
+pub fn unit_definition(symbol: &str) -> Option<UnitDefinition> {
+    builtin_unit_info(symbol)
+        .map(|(dimension, scale)| {
+            let mut definition = UnitDefinition::linear(dimension, scale);
+            if symbol == "K" {
+                definition.affine_space = Some("Temperature".to_string());
+            }
+            definition
         })
-    })
+        .or_else(|| {
+            USER_UNITS.with(|u| {
+                u.borrow()
+                    .iter()
+                    .find(|(s, _, _)| s == symbol)
+                    .map(|(_, dimension, scale)| UnitDefinition::linear(dimension.clone(), *scale))
+            })
+        })
+}
+
+pub fn unit_info(symbol: &str) -> Option<(Dimension, f64)> {
+    unit_definition(symbol).map(|unit| (unit.dimension, unit.scale))
+}
+
+/// Convert a numerical value while keeping its semantic role explicit.
+/// Linear values use only scales. Absolute points also apply origins, after
+/// confirming that both units belong to the requested affine space.
+pub fn convert_value_with_role(
+    value: f64,
+    from: &UnitDefinition,
+    to: &UnitDefinition,
+    role: &QuantityRole,
+) -> Result<f64, String> {
+    if from.dimension != to.dimension {
+        return Err(format!(
+            "cannot convert dimensions {} and {}",
+            dim_to_string(&from.dimension),
+            dim_to_string(&to.dimension)
+        ));
+    }
+    for unit in [from, to] {
+        if !unit.scale.is_finite() || unit.scale <= 0.0 || !unit.offset.is_finite() {
+            return Err(
+                "unit conversion metadata must have a finite positive scale and finite offset"
+                    .to_string(),
+            );
+        }
+    }
+    match role {
+        QuantityRole::Linear => Ok(value * from.scale / to.scale),
+        QuantityRole::Point(space) => {
+            let expected_dimension = dimension_from_name(space);
+            if from.dimension != expected_dimension {
+                return Err(format!(
+                    "affine space '{space}' does not match unit dimension {}",
+                    dim_to_string(&from.dimension)
+                ));
+            }
+            for unit in [from, to] {
+                if unit.affine_space.as_deref() != Some(space.as_str()) {
+                    return Err(format!(
+                        "unit affine space '{}' does not match '{space}'",
+                        unit.affine_space.as_deref().unwrap_or_default()
+                    ));
+                }
+            }
+            let coherent = value * from.scale + from.offset;
+            Ok((coherent - to.offset) / to.scale)
+        }
+    }
 }
 
 /// Catálogo de unidades conocidas por la stdlib (documento 01, §3.1/§3.5):
@@ -583,5 +702,124 @@ impl Ty {
             }
             Ty::Unknown => "?".to_string(),
         }
+    }
+}
+
+#[cfg(test)]
+mod affine_unit_tests {
+    use super::{
+        convert_value_with_role, declare_unit, define_unit, dim_single, reset_user_units,
+        unit_definition, QuantityRole, UnitDefinition,
+    };
+
+    fn close(actual: f64, expected: f64) {
+        assert!(
+            (actual - expected).abs() <= 1e-12 * expected.abs().max(1.0),
+            "expected {expected}, got {actual}"
+        );
+    }
+
+    #[test]
+    fn affine_point_and_linear_interval_conversions_use_distinct_rules() {
+        let temperature = dim_single("Temperature");
+        let celsius =
+            UnitDefinition::affine(temperature.clone(), 1.0, 273.15, "Temperature").unwrap();
+        let fahrenheit =
+            UnitDefinition::affine(temperature.clone(), 5.0 / 9.0, 459.67 / 1.8, "Temperature")
+                .unwrap();
+        let kelvin = unit_definition("K").unwrap();
+
+        close(
+            convert_value_with_role(
+                0.0,
+                &celsius,
+                &kelvin,
+                &QuantityRole::Point("Temperature".to_string()),
+            )
+            .unwrap(),
+            273.15,
+        );
+        close(
+            convert_value_with_role(
+                212.0,
+                &fahrenheit,
+                &celsius,
+                &QuantityRole::Point("Temperature".to_string()),
+            )
+            .unwrap(),
+            100.0,
+        );
+        close(
+            convert_value_with_role(1.0, &fahrenheit, &kelvin, &QuantityRole::Linear).unwrap(),
+            5.0 / 9.0,
+        );
+        close(
+            convert_value_with_role(1.0, &celsius, &kelvin, &QuantityRole::Linear).unwrap(),
+            1.0,
+        );
+    }
+
+    #[test]
+    fn affine_point_conversion_rejects_incompatible_spaces_and_dimensions() {
+        let temperature = dim_single("Temperature");
+        let pressure = dim_single("Pressure");
+        let celsius =
+            UnitDefinition::affine(temperature.clone(), 1.0, 273.15, "Temperature").unwrap();
+        let kelvin = unit_definition("K").unwrap();
+        let unmarked_linear = UnitDefinition::linear(dim_single("Temperature"), 1.0);
+        let pascal = UnitDefinition::affine(pressure, 1.0, 0.0, "Pressure").unwrap();
+
+        assert!(convert_value_with_role(
+            1.0,
+            &celsius,
+            &kelvin,
+            &QuantityRole::Point("Pressure".to_string()),
+        )
+        .is_err());
+        assert!(convert_value_with_role(
+            1.0,
+            &celsius,
+            &pascal,
+            &QuantityRole::Point("Temperature".to_string()),
+        )
+        .is_err());
+        assert!(convert_value_with_role(
+            1.0,
+            &unmarked_linear,
+            &kelvin,
+            &QuantityRole::Point("Temperature".to_string()),
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn existing_units_keep_their_scale_and_zero_offset() {
+        let kelvin = unit_definition("K").unwrap();
+        assert_eq!(kelvin.dimension, dim_single("Temperature"));
+        assert_eq!(kelvin.scale, 1.0);
+        assert_eq!(kelvin.offset, 0.0);
+        assert_eq!(kelvin.affine_space, Some("Temperature".to_string()));
+
+        reset_user_units();
+        declare_unit("affine_test_foot", dim_single("Length")).unwrap();
+        define_unit("affine_test_foot", 0.3048).unwrap();
+        let foot = unit_definition("affine_test_foot").unwrap();
+        assert_eq!(foot.dimension, dim_single("Length"));
+        assert_eq!(foot.scale, 0.3048);
+        assert_eq!(foot.offset, 0.0);
+        assert_eq!(foot.affine_space, None);
+        reset_user_units();
+    }
+
+    #[test]
+    fn affine_unit_metadata_requires_finite_positive_scale() {
+        let temperature = dim_single("Temperature");
+        assert!(UnitDefinition::affine(temperature.clone(), 0.0, 273.15, "Temperature").is_err());
+        assert!(
+            UnitDefinition::affine(temperature.clone(), f64::INFINITY, 273.15, "Temperature")
+                .is_err()
+        );
+        assert!(UnitDefinition::affine(temperature, 1.0, f64::NAN, "Temperature").is_err());
+        assert!(UnitDefinition::affine(dim_single("Temperature"), 1.0, 0.0, "").is_err());
     }
 }

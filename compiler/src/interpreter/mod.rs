@@ -18,8 +18,8 @@ mod regress;
 mod rng;
 mod strings;
 use crate::types::{
-    dim_div, dim_is_dimensionless, dim_mul, dim_pow, dim_to_string, resolve_unit_expr,
-    resolve_unit_factor, unit_combine, Dimension,
+    convert_value_with_role, dim_div, dim_is_dimensionless, dim_mul, dim_pow, dim_to_string,
+    resolve_unit_expr, resolve_unit_factor, unit_combine, Dimension, QuantityRole, UnitDefinition,
 };
 
 #[derive(Clone)]
@@ -4292,7 +4292,13 @@ fn convert(value: f64, from_unit: &str, to_unit: &str) -> Result<f64, RuntimeErr
     if from_unit == to_unit {
         return Ok(value);
     }
-    let f_from = resolve_unit_factor(from_unit).map_err(unit_error)?;
-    let f_to = resolve_unit_factor(to_unit).map_err(unit_error)?;
-    Ok(value * f_from / f_to)
+    let from = UnitDefinition::linear(
+        resolve_unit_expr(from_unit).map_err(unit_error)?,
+        resolve_unit_factor(from_unit).map_err(unit_error)?,
+    );
+    let to = UnitDefinition::linear(
+        resolve_unit_expr(to_unit).map_err(unit_error)?,
+        resolve_unit_factor(to_unit).map_err(unit_error)?,
+    );
+    convert_value_with_role(value, &from, &to, &QuantityRole::Linear).map_err(unit_error)
 }
