@@ -302,6 +302,7 @@ test("effect-gap diagnostics group operation syntax without inferring resolution
 test("entry closure diagnostics separate the root row from module-wide effect rows", () => {
   const closure = diagnoseEntryEffectClosure({
     entry: "main",
+    functions: { main: ["io"] },
     unresolved_calls: { main: [], library_helper: ["host_effect"] },
     symbolic_effect_calls: { main: [], generic_library_helper: ["callback"] },
   });
@@ -314,6 +315,7 @@ test("entry closure diagnostics separate the root row from module-wide effect ro
 
   const open = diagnoseEntryEffectClosure({
     entry: "main",
+    functions: { main: [] },
     unresolved_calls: { main: ["host_effect"] },
     symbolic_effect_calls: { main: ["callback"] },
   });
@@ -323,6 +325,7 @@ test("entry closure diagnostics separate the root row from module-wide effect ro
 
   const unavailable = diagnoseEntryEffectClosure({
     entry: "main",
+    functions: { main: [] },
     unresolved_calls: { main: [] },
   });
   assert.deepEqual(unavailable, {
@@ -331,6 +334,14 @@ test("entry closure diagnostics separate the root row from module-wide effect ro
     unresolvedCalls: null,
     symbolicCallbacks: null,
   });
+
+  const missingEntry = diagnoseEntryEffectClosure({
+    entry: "main",
+    functions: { helper: [] },
+    unresolved_calls: {},
+    symbolic_effect_calls: {},
+  });
+  assert.equal(missingEntry.status, "unavailable");
 });
 
 test("effect-gap diagnostics report symbolic callbacks separately from unresolved calls", () => {

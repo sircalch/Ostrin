@@ -132,9 +132,11 @@ export function diagnoseEntryEffectClosure(effects) {
   const entry = typeof effects?.entry === "string" && effects.entry.length > 0
     ? effects.entry
     : null;
+  const functions = effects?.functions;
   const unresolvedMap = effects?.unresolved_calls;
   const symbolicMap = effects?.symbolic_effect_calls;
-  if (!entry || !isObject(unresolvedMap) || !isObject(symbolicMap)) {
+  if (!entry || !isObject(functions) || !Object.hasOwn(functions, entry)
+    || !isObject(unresolvedMap) || !isObject(symbolicMap)) {
     return {
       entry,
       status: "unavailable",
