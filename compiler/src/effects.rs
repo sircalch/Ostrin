@@ -12,6 +12,7 @@ use crate::ast::{
     Arg, Block, Expr, FunctionDecl, ImplDecl, Item, MatchArm, Pattern, Stmt, TraitDecl,
     TraitMethodSig, Type,
 };
+use crate::lexer::{Lexer, Token, TokenKind};
 use crate::typeck::TypedProgram;
 use crate::types::Ty;
 
@@ -423,6 +424,7 @@ pub fn analyze_with_types(items: &[Item], typed: &TypedProgram) -> EffectReport 
         .collect();
     report.sort_sites();
     collect_unresolved_call_sites(&mut report);
+    resolve_unresolved_call_site_spans(&mut report);
     report
 }
 
@@ -682,6 +684,128 @@ fn collect_unresolved_call_sites(report: &mut EffectReport) {
             .then(left.function.cmp(&right.function))
             .then(left.operation.cmp(&right.operation))
     });
+}
+
+/// Recover the callee token location for unresolved calls nested inside a
+/// larger located expression. The parser currently attaches some source spans
+/// to the enclosing expression, which can otherwise leave these callsites at
+/// 0:0. We only replace a group when lexical and AST occurrence counts agree;
+/// ambiguous groups retain their original conservative locations.
+fn resolve_unresolved_call_site_spans(report: &mut EffectReport) {
+    let mut files = BTreeSet::new();
+    for site in &report.unresolved_call_sites {
+        if let Some(file) = &site.file {
+            files.insert(file.clone());
+        }
+    }
+
+    let mut candidates = BTreeMap::<(String, String), Vec<(usize, usize)>>::new();
+    for file in files {
+        let Ok(source) = std::fs::read_to_string(&file) else {
+            continue;
+        };
+        let Ok(tokens) = Lexer::new(&source).tokenize() else {
+            continue;
+        };
+        for (index, token) in tokens.iter().enumerate() {
+            let TokenKind::Ident(name) = &token.kind else {
+                continue;
+            };
+            if index > 0 && matches!(tokens[index - 1].kind, TokenKind::Fn) {
+                continue;
+            }
+            if !follows_call_arguments(&tokens, index + 1) {
+                continue;
+            }
+            let mut start = index;
+            while start >= 2
+                && matches!(
+                    tokens[start - 1].kind,
+                    TokenKind::Dot | TokenKind::ColonColon
+                )
+                && matches!(tokens[start - 2].kind, TokenKind::Ident(_))
+            {
+                start -= 2;
+            }
+            let first = &tokens[start];
+            candidates
+                .entry((file.clone(), name.clone()))
+                .or_default()
+                .push((first.line, first.col));
+        }
+    }
+
+    let mut groups = BTreeMap::<(String, String), Vec<usize>>::new();
+    for (index, site) in report.unresolved_call_sites.iter().enumerate() {
+        let (Some(file), Some(leaf)) = (&site.file, site.operation.rsplit(['.', ':']).next())
+        else {
+            continue;
+        };
+        groups
+            .entry((file.clone(), leaf.to_string()))
+            .or_default()
+            .push(index);
+    }
+
+    for (key, mut site_indices) in groups {
+        let Some(spans) = candidates.get(&key) else {
+            continue;
+        };
+        if spans.len() != site_indices.len() {
+            continue;
+        }
+        site_indices.sort_by_key(|index| {
+            let site = &report.unresolved_call_sites[*index];
+            (site.line, site.col)
+        });
+        for (site_index, (line, col)) in site_indices.into_iter().zip(spans) {
+            let site = &mut report.unresolved_call_sites[site_index];
+            site.line = *line;
+            site.col = *col;
+        }
+    }
+    report.unresolved_call_sites.sort_by(|left, right| {
+        left.file
+            .cmp(&right.file)
+            .then(left.line.cmp(&right.line))
+            .then(left.col.cmp(&right.col))
+            .then(left.function.cmp(&right.function))
+            .then(left.operation.cmp(&right.operation))
+    });
+}
+
+fn follows_call_arguments(tokens: &[Token], mut index: usize) -> bool {
+    if matches!(
+        tokens.get(index).map(|token| &token.kind),
+        Some(TokenKind::LParen)
+    ) {
+        return true;
+    }
+    if !matches!(
+        tokens.get(index).map(|token| &token.kind),
+        Some(TokenKind::Lt)
+    ) {
+        return false;
+    }
+    let mut depth = 0usize;
+    while let Some(token) = tokens.get(index) {
+        match token.kind {
+            TokenKind::Lt => depth += 1,
+            TokenKind::Gt => {
+                depth = depth.saturating_sub(1);
+                if depth == 0 {
+                    return matches!(
+                        tokens.get(index + 1).map(|token| &token.kind),
+                        Some(TokenKind::LParen)
+                    );
+                }
+            }
+            TokenKind::Eof | TokenKind::RBrace => return false,
+            _ => {}
+        }
+        index += 1;
+    }
+    false
 }
 
 fn walk_impl(implementation: &ImplDecl, items: &[Item], report: &mut EffectReport) {
