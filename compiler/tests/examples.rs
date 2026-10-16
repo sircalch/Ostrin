@@ -14000,6 +14000,14 @@ fn experimental_effect_signatures_follow_a_directly_returned_closure() {
     deferred: fn() -> Void = make(io_action)
     deferred()
 }
+fn main_alias() -> Void {
+    deferred: fn() -> Void = make_alias(io_action)
+    deferred()
+}
+fn open_alias() -> Void {
+    deferred: fn() -> Void = make_alias(unknown_action)
+    deferred()
+}
 fn open_main() -> Void {
     deferred: fn() -> Void = make(unknown_action)
     deferred()
@@ -14011,6 +14019,10 @@ fn io_action() -> Void { print("effect") }
 fn unknown_action() -> Void { host.callback() }
 fn make(action: fn() -> Void) -> fn() -> Void {
     return fn() { action() }
+}
+fn make_alias(action: fn() -> Void) -> fn() -> Void {
+    deferred = fn() { action() }
+    return deferred
 }
 "#,
     );
@@ -14044,6 +14056,25 @@ fn make(action: fn() -> Void) -> fn() -> Void {
     assert_eq!(
         report["function_effect_signatures"]["main"]["row_closed"],
         true
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["make_alias"]["effects"],
+        serde_json::json!([]),
+        "returning a local closure alias must not execute its callback"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main_alias"]["effects"],
+        serde_json::json!(["io"]),
+        "invoking a single returned local closure alias must propagate its captured callback effect"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main_alias"]["row_closed"],
+        true
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["open_alias"]["open_calls"],
+        serde_json::json!(["host.callback"]),
+        "unknown effects captured by an aliased returned closure must remain open"
     );
     assert_eq!(
         report["function_effect_signatures"]["open_main"]["open_calls"],

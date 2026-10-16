@@ -1300,25 +1300,51 @@ fn register_lambda_parameters(params: &[String], function: &str, report: &mut Ef
 }
 
 fn register_directly_returned_closures(block: &Block, function: &str, report: &mut EffectReport) {
-    fn record(expression: &Expr, function: &str, report: &mut EffectReport) {
-        if matches!(expression.unlocated(), Expr::Lambda(..)) {
-            let lambda = lambda_function_key(expression, function);
-            report.returned_closure_keys.insert(lambda.clone());
-            report
-                .returned_closures_by_function
-                .entry(function.to_string())
-                .or_default()
-                .insert(lambda);
+    fn closure_key(
+        expression: &Expr,
+        function: &str,
+        aliases: &BTreeMap<String, String>,
+    ) -> Option<String> {
+        match expression.unlocated() {
+            Expr::Lambda(..) => Some(lambda_function_key(expression, function)),
+            Expr::Ident(name) => aliases.get(name).cloned(),
+            _ => None,
         }
     }
 
+    let mut aliases = BTreeMap::<String, String>::new();
+    let mut returned = BTreeSet::<String>::new();
     for located in &block.stmts {
-        if let Stmt::Return(Some(value)) = &located.stmt {
-            record(value, function, report);
+        match &located.stmt {
+            Stmt::Binding { name, value, .. } | Stmt::Assign { name, value } => {
+                if let Some(closure) = closure_key(value, function, &aliases) {
+                    aliases.insert(name.clone(), closure);
+                } else {
+                    aliases.remove(name);
+                }
+            }
+            Stmt::Return(Some(value)) => {
+                if let Some(closure) = closure_key(value, function, &aliases) {
+                    returned.insert(closure);
+                }
+            }
+            _ => {}
         }
     }
-    if let Some(tail) = &block.tail {
-        record(tail, function, report);
+    if let Some(tail) = block
+        .tail
+        .as_ref()
+        .and_then(|tail| closure_key(tail, function, &aliases))
+    {
+        returned.insert(tail);
+    }
+    for lambda in returned {
+        report.returned_closure_keys.insert(lambda.clone());
+        report
+            .returned_closures_by_function
+            .entry(function.to_string())
+            .or_default()
+            .insert(lambda);
     }
 }
 
