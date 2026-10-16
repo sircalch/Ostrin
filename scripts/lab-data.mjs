@@ -154,7 +154,7 @@ export const LAB = [
     file: "examples/measurement_scalar.ostrin",
     render: "text",
     params: [],
-    how: "std.measurements keeps a value, explicit standard-deviation sources and an uncertainty-known state together. Reusing the same source preserves correlation (`x - x = 0 ± 0`); independent sources combine through the linearized variance rule. The browser runs the same module through ostrinc.wasm as the interpreter and native compiler.",
+    how: "std.measurements keeps a value, explicit source identities and an uncertainty-known state together. Reusing a source ID preserves correlation (`x - x = 0 ± 0`), while labels are descriptive; independent IDs combine through the linearized variance rule. The browser runs the same module through ostrinc.wasm as the interpreter and native compiler.",
     docs: { label: "measurement design", href: `${repository}/blob/main/docs/design/25-mediciones-e-incertidumbre.md` },
     limits: "This experimental API now projects a List<Measurement<Float>> into nominal values and standard uncertainties for std.viz.errorbars; Quantity integration, Array<Measurement>, covariance blocks, Monte Carlo and coverage intervals remain planned. Unknown uncertainty propagates explicitly and is never treated as zero.",
   },

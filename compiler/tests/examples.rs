@@ -17559,7 +17559,7 @@ fn std_measurements_scalar_task_capture_preserves_ownership() {
 #[test]
 fn std_measurements_scalar_matches_interpreter_and_native() {
     let file = example_path("measurement_scalar.ostrin");
-    let expected = "x = 12.3 ± 0.02\nx + x = 24.6 ± 0.04\nx - x = 0 ± 0\nx + y = 13.8 ± 0.03605551275463989\n2x = 24.6 ± 0.04\nx * x = 151.29000000000002 ± 0.49200000000000005\nx * y = 18.450000000000003 ± 0.3702175036380641\nx / x = 1 ± 0\nunknown = unknown: scale received a measurement with unknown uncertainty\ninvalid sigma = measurement sigma must be non-negative\nempty source = measurement source label must not be empty\nnon-finite value = measurement value must be finite\nnon-finite sigma = measurement sigma must be finite\ninfinite sigma = measurement sigma must be finite\nnon-finite exact = unknown: exact measurement value must be finite\nunknown series = series offline\n";
+    let expected = "x = 12.3 ± 0.02\nx + x = 24.6 ± 0.04\nx - x = 0 ± 0\nx + y = 13.8 ± 0.03605551275463989\n2x = 24.6 ± 0.04\nx * x = 151.29000000000002 ± 0.49200000000000005\nx * y = 18.450000000000003 ± 0.3702175036380641\nx / x = 1 ± 0\nunknown = unknown: scale received a measurement with unknown uncertainty\ninvalid sigma = measurement sigma must be non-negative\nempty source = measurement source label must not be empty\nnon-finite value = measurement value must be finite\nnon-finite sigma = measurement sigma must be finite\ninfinite sigma = measurement sigma must be finite\nnon-finite exact = unknown: exact measurement value must be finite\nsame id, different labels = -1 ± 0\ndifferent ids, same label = 7 ± 0.14142135623730953\nsource sigma mismatch = measurement source id was reused with a different sigma\nempty source id = measurement source id must not be empty\nlegacy and explicit id = -1 ± 0\nunknown series = series offline\n";
     assert_eq!(
         interpreter_and_native_agree("measurement_scalar.ostrin"),
         expected
@@ -17577,7 +17577,7 @@ fn std_measurements_scalar_matches_interpreter_and_native() {
         .find(|line| line.starts_with("native-source: <ostrin-std>/measurements.ostrin "))
         .unwrap_or_else(|| panic!("missing std.measurements source report: {report_text}"));
     assert!(
-        measurement_source.contains("ir=21")
+        measurement_source.contains("ir=22")
             && measurement_source.contains("hir=0")
             && measurement_source.contains("ast=0"),
         "measurement lowering regressed: {measurement_source}"
@@ -17597,6 +17597,7 @@ fn std_measurements_scalar_matches_interpreter_and_native() {
         "for (int64_t i = 0; i < list->length; i++)",
         "ostrin_release((void*)(value->sources))",
         "ostrin_release((void*)(value->reason))",
+        "ostrin_release((void*)(value->source_id))",
         "ostrin_release((void*)(value->label))",
     ] {
         assert!(
