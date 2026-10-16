@@ -14,7 +14,7 @@ globalThis.OSTRIN_STATUS = Object.freeze({
     "tests": "compiler/tests"
   },
   "tests": {
-    "rustMarkedTests": 339
+    "rustMarkedTests": 359
   },
   "nativeBackend": {
     "ir": 7198,
@@ -38,8 +38,13 @@ globalThis.OSTRIN_STATUS = Object.freeze({
     "ciRunUrl": "https://github.com/sircalch/Ostrin/actions/runs/38681256328"
   },
   "effectCoverage": {
-    "knownCalls": 68,
+    "knownCalls": 20589,
+    "symbolicCalls": 74,
     "unresolvedCalls": 0,
+    "countUnit": "distinct_function_operation_edges",
+    "aggregation": "sum_of_per_bundle_distinct_function_operation_edges",
+    "bundleCount": 29,
+    "scope": "registered experiment bundles (29)",
     "complete": true
   },
   "reproducibility": {
@@ -55,10 +60,11 @@ globalThis.OSTRIN_STATUS = Object.freeze({
     "extensionReadyCount": 0,
     "readyCount": 0,
     "openCount": 29,
-    "captureReadyCount": 29,
-    "captureOpenCount": 0,
-    "incompleteEffectBundleCount": 29,
-    "unresolvedEffectCallCount": 4266
+    "captureReadyCount": 0,
+    "captureOpenCount": 29,
+    "incompleteEffectBundleCount": 0,
+    "symbolicEffectCallCount": 74,
+    "unresolvedEffectCallCount": 0
   },
   "linguist": {
     "preparation": "READY",
