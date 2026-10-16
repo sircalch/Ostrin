@@ -13993,6 +13993,74 @@ fn open_main() -> Void { wrapper(unknown_action) }
 }
 
 #[test]
+fn experimental_effect_signatures_follow_a_directly_returned_closure() {
+    let file = temp_source(
+        "effects-returned-closure.ostrin",
+        r#"fn main() -> Void {
+    deferred: fn() -> Void = make(io_action)
+    deferred()
+}
+fn open_main() -> Void {
+    deferred: fn() -> Void = make(unknown_action)
+    deferred()
+}
+fn discard() -> Void {
+    deferred: fn() -> Void = make(io_action)
+}
+fn io_action() -> Void { print("effect") }
+fn unknown_action() -> Void { host.callback() }
+fn make(action: fn() -> Void) -> fn() -> Void {
+    return fn() { action() }
+}
+"#,
+    );
+    let out = run(&["--effect-report", "--json", &file]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(
+        report["function_effect_signatures"]["make"]["effects"],
+        serde_json::json!([]),
+        "creating and returning the closure must not execute its callback"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["make"]["variables"],
+        serde_json::json!([]),
+        "the factory's row must not inherit the deferred callback variable"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["make"]["purity_proven"], false,
+        "an empty factory row is not a proof of purity"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["discard"]["effects"],
+        serde_json::json!([]),
+        "constructing and discarding the closure must not attribute its deferred IO"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main"]["effects"],
+        serde_json::json!(["io"]),
+        "invoking the returned closure must propagate the actual callback's effect"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main"]["row_closed"],
+        true
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["open_main"]["open_calls"],
+        serde_json::json!(["host.callback"]),
+        "unknown effects in a returned closure must remain open at its invocation"
+    );
+
+    let hir = run(&["--hir", &file]);
+    assert!(hir.status.success(), "HIR stderr: {}", stderr(&hir));
+    assert!(stdout(&hir).contains("hir violations: 0"));
+    let ir = run(&["--ir", &file]);
+    assert!(ir.status.success(), "IR stderr: {}", stderr(&ir));
+    assert!(stdout(&ir).contains("ir violations: 0"));
+    let _ = fs::remove_file(file);
+}
+
+#[test]
 fn experimental_effect_report_separates_lambda_creation_from_indirect_execution() {
     let file = temp_source(
         "effects-lambda-execution.ostrin",
