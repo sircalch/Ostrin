@@ -62,7 +62,8 @@ globalThis.OSTRIN_STATUS = Object.freeze({
     "openCount": 29,
     "captureReadyCount": 0,
     "captureOpenCount": 29,
-    "incompleteEffectBundleCount": 29,
+    "incompleteEffectBundleCount": 0,
+    "closedEntryEffectBundleCount": 29,
     "symbolicEffectCallCount": 74,
     "unresolvedEffectCallCount": 0
   },
