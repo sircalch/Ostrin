@@ -21,6 +21,12 @@ pub record Measurement<T> {
     reason: String
 }
 
+// A standard uncertainty represented in the coherent unit of its static dimension.
+pub record CoherentUncertainty<D> {
+    dimension_key: String
+    value: Float
+}
+
 pub fn exact(value: Float) -> Measurement<Float> {
     if not is_finite(value) {
         return unknown(value, "exact measurement value must be finite")
@@ -264,6 +270,41 @@ pub fn sub_quantity<D: Dimension>(
         },
         Err(message) => Err(message),
     }
+}
+
+pub fn quantity_uncertainty<D: Dimension>(
+    measurement: Measurement<Quantity<D>>
+) -> Result<CoherentUncertainty<D>, String> {
+    if not measurement.known {
+        return Err(measurement.reason)
+    }
+    if not is_finite(measurement.value.value()) {
+        return Err("measurement value must be finite")
+    }
+    mut variance_value = 0.0
+    for source in measurement.sources {
+        validation_error = validate_quantity_source(source)
+        if validation_error != "" {
+            return Err(validation_error)
+        }
+        canonical_contribution = source.contribution.value() * source.contribution.unit_scale()
+        contribution_variance = canonical_contribution * canonical_contribution
+        if not is_finite(contribution_variance) {
+            return Err("measurement uncertainty overflowed")
+        }
+        variance_value = variance_value + contribution_variance
+        if not is_finite(variance_value) {
+            return Err("measurement uncertainty overflowed")
+        }
+    }
+    uncertainty_value = sqrt(variance_value)
+    if not is_finite(uncertainty_value) {
+        return Err("measurement uncertainty overflowed")
+    }
+    Ok(CoherentUncertainty<D> {
+        dimension_key: measurement.value.dimension_key(),
+        value: uncertainty_value,
+    })
 }
 
 pub fn unknown(value: Float, reason: String) -> Measurement<Float> {

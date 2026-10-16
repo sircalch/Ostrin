@@ -14,7 +14,31 @@ fn main() -> Void {
         reason: ""
     }
     print(x.value)
+    x_uncertainty = measurements.quantity_uncertainty(x).unwrap()
+    print(x_uncertainty.dimension_key)
+    print(x_uncertainty.value)
     drop(x)
+
+    exact_dimensional = Measurement<Quantity<Length>> {
+        value: 0 m,
+        sources: [],
+        known: true,
+        reason: ""
+    }
+    exact_uncertainty = measurements.quantity_uncertainty(exact_dimensional).unwrap()
+    print(exact_uncertainty.dimension_key)
+    print(exact_uncertainty.value)
+
+    unknown_dimensional = Measurement<Quantity<Length>> {
+        value: 12 m,
+        sources: [],
+        known: false,
+        reason: "sensor offline"
+    }
+    match measurements.quantity_uncertainty(unknown_dimensional) {
+        Ok(_) => print("unknown dimensional uncertainty accepted"),
+        Err(message) => print("unknown dimensional uncertainty = " + message),
+    }
 
     match measurements.from_quantity_source(12 m, 20 cm, "caliper-a", "caliper") {
         Ok(measured) => {
@@ -35,17 +59,30 @@ fn main() -> Void {
     print(summed.value)
     print(summed.sources[0].contribution)
     print(summed.sources.length())
+    summed_uncertainty = measurements.quantity_uncertainty(summed).unwrap()
+    print(summed_uncertainty.dimension_key)
+    print(summed_uncertainty.value)
 
     independent_a = measurements.from_quantity_source(12 m, 20 cm, "caliper-a", "same label").unwrap()
     independent_b = measurements.from_quantity_source(12 m, 20 cm, "caliper-b", "same label").unwrap()
     independent_sum = measurements.add_quantity(independent_a, independent_b).unwrap()
     print(independent_sum.sources.length())
+    independent_uncertainty = measurements.quantity_uncertainty(independent_sum).unwrap()
+    print(independent_uncertainty.value)
+
+    overflowing = measurements.from_quantity_source(1 m, 1e200 m, "large-sigma", "large").unwrap()
+    match measurements.quantity_uncertainty(overflowing) {
+        Ok(_) => print("overflowing dimensional uncertainty accepted"),
+        Err(message) => print("overflowing dimensional uncertainty = " + message),
+    }
 
     difference_a = measurements.from_quantity_source(12 m, 20 cm, "shared-caliper", "caliper").unwrap()
     difference_b = measurements.from_quantity_source(1200 cm, 0.2 m, "shared-caliper", "same caliper").unwrap()
     difference = measurements.sub_quantity(difference_a, difference_b).unwrap()
     print(difference.value)
     print(difference.sources[0].contribution)
+    difference_uncertainty = measurements.quantity_uncertainty(difference).unwrap()
+    print(difference_uncertainty.value)
 
     mismatch_a = measurements.from_quantity_source(12 m, 20 cm, "shared-caliper", "caliper").unwrap()
     mismatch_b = measurements.from_quantity_source(12 m, 25 cm, "shared-caliper", "changed calibration").unwrap()

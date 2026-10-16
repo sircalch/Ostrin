@@ -2,7 +2,8 @@
 
 **Estado:** propuesta en implementación experimental; `std.measurements` ofrece un API escalar
 funcional y una proyección de series `List<Measurement<Float>>` para valores e incertidumbres,
-mientras la sintaxis estable, `Quantity<T>`, `Array<Measurement<T>>` y Monte Carlo siguen pendientes.
+mientras `Measurement<Quantity<D>>` tiene una API parcial sólo en el intérprete; la sintaxis estable,
+`Array<Measurement<T>>` y Monte Carlo siguen pendientes.
 
 **Fecha:** 2026-09-29
 
@@ -28,9 +29,12 @@ para `Measurement<Float>`, propaga suma/resta/producto/cociente y representa inc
 desconocida sin convertirla en cero. `exact` y `standard` rechazan valores nominales y sigmas no
 finitos mediante el builtin tipado `is_finite` para `Float`/`Float32`; las sensibilidades y la varianza también se validan al consultar la incertidumbre. La
 superficie sigue siendo experimental y funcional; todavía no declara semántica de operadores ni
-integración completa con `Quantity<T>`.
+integración nativa completa con `Quantity<T>`. Para `Measurement<Quantity<D>>`, el intérprete ya
+ofrece construcción con fuentes explícitas, suma/resta con correlación por identidad y una proyección
+de incertidumbre estándar en la unidad coherente; esa API sigue siendo un prototipo y no tiene paridad
+nativa ni soporte de memoria verificado.
 
-### 1.1 Evidencia de la fase escalar
+### 1.1 Evidencia de las fases escalar y dimensional experimental
 
 `examples/measurement_scalar.ostrin` cubre construcciones `exact`, `standard` y `unknown`,
 validación de finitud, sigma y etiquetas, combinación de fuentes independientes, cancelación
@@ -63,8 +67,9 @@ del entorno de una tarea para `Measurement<Float>`.
 `Array<Measurement<Float>>`: el intérprete la rechaza por el contrato actual y
 el backend nativo da un diagnóstico específico que remite a `List`.
 `examples/measurement_quantity_direct_shape.ostrin` cubre también la forma
-concreta `Measurement<Quantity<Length>>`; el backend la rechaza antes de entrar
-en el fallback AST que todavía no demuestra ownership de sus campos gestionados.
+concreta `Measurement<Quantity<Length>>`, construcción dimensional, suma/resta de fuentes
+correlacionadas y proyección de incertidumbre estándar; el backend todavía la rechaza antes de entrar
+en el fallback AST que no demuestra ownership de sus campos gestionados.
 `examples/viz_bars.ostrin` añade una serie de
 cinco grupos y proyecta `values`/`uncertainties` hacia `std.viz.errorbars`, también con paridad
 intérprete/native y una figura SVG reproducible en la galería. El Scientific Lab ejecuta el
@@ -276,17 +281,21 @@ propagación de suma y resta también está disponible en el intérprete: `12 m 
 `1200 cm ± 0.2 m` con la misma identidad producen una contribución de `40 cm` al sumar y `0 cm`
 al restar. Reutilizar una identidad con otra sigma coherente produce un error; identificadores
 distintos permanecen como fuentes independientes aunque compartan etiqueta y sigma. Cada
-combinación valida la dimensión declarada y que el resultado siga siendo finito.
-Producto, cociente y proyección de incertidumbre todavía no están implementados para cantidades.
-El backend nativo mantiene el rechazo explícito hasta cerrar ownership, dimensión de incertidumbre
-y ABI.
+combinación valida la dimensión declarada y que el resultado siga siendo finito. `quantity_uncertainty`
+suma los cuadrados de las contribuciones una vez convertidas a la unidad coherente y devuelve
+`CoherentUncertainty<D>`; el valor numérico lleva la dimensión `D` en el tipo y el registro expone
+`dimension_key`. Una medición exacta devuelve cero; incertidumbre desconocida y overflow producen
+`Err`. La suma de dos fuentes independientes de `0.2 m` da `0.28284271247461906`, mientras que
+la misma fuente compartida al sumarse da `0.4`.
+Producto y cociente aún no están implementados para cantidades. El backend nativo mantiene el
+rechazo explícito hasta cerrar ownership, dimensión de incertidumbre y ABI.
 
-Este contrato no habilita todavía `Array<Measurement<T>>` ni covarianza. La propagación deberá
-mantener la dimensión del resultado en `contribution` y la sigma de fuente en su dimensión original.
-Antes de implementar cualquiera de ellas se requieren pruebas de alias explícito, independencia de
-etiquetas repetidas, reducciones con fuentes compartidas, validación de covarianza, conversiones de
-unidades y paridad intérprete/native/WASM. También se necesitan leak-check, ASan y UBSan para los
-buffers o grafos gestionados.
+Este prototipo no habilita todavía `Array<Measurement<T>>`, covarianza ni soporte nativo de
+`Measurement<Quantity<D>>`. La propagación deberá mantener la dimensión del resultado en
+`contribution` y la sigma de fuente en su dimensión original. Antes de habilitar soporte nativo se
+requieren pruebas de alias explícito, independencia de etiquetas repetidas, reducciones con fuentes
+compartidas, validación de covarianza, conversiones de unidades y paridad intérprete/native/WASM.
+También se necesitan leak-check, ASan y UBSan para los buffers o grafos gestionados.
 
 ## 6. Operaciones y reglas
 

@@ -101,6 +101,22 @@ test("the gate requires correlated dimensional sums and differences to merge by 
   }
 });
 
+test("the gate requires dimensional uncertainty to sum canonical contribution squares", () => {
+  const root = fixtureRoot();
+  try {
+    const file = path.join(root, "compiler/std/measurements.ostrin");
+    const source = readFileSync(file, "utf8").replace(
+      "contribution_variance = canonical_contribution * canonical_contribution",
+      "contribution_variance = 0.0",
+    );
+    writeFileSync(file, source);
+    const result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("quantity uncertainty must use coherent dimensioned contributions")));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("the gate rejects documentation that enables arrays prematurely", () => {
   const root = fixtureRoot();
   try {
