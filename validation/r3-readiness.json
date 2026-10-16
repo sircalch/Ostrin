@@ -21,7 +21,8 @@
   "openCount": 29,
   "captureReadyCount": 0,
   "captureOpenCount": 29,
-  "incompleteEffectBundleCount": 29,
+  "incompleteEffectBundleCount": 0,
+  "closedEntryEffectBundleCount": 29,
   "knownEffectCallCount": 20589,
   "symbolicEffectCallCount": 74,
   "unresolvedEffectCallCount": 0,
@@ -39,9 +40,18 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "io",
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
         "complete": true,
@@ -63,9 +73,21 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "filesystem",
+          "io",
+          "state(local)",
+          "measurement",
+          "random(seed)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
         "complete": true,
@@ -87,9 +109,20 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "filesystem",
+          "io",
+          "state(local)",
+          "random(seed)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
         "complete": true,
@@ -111,9 +144,18 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "io",
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
         "complete": true,
@@ -135,9 +177,20 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "filesystem",
+          "io",
+          "state(local)",
+          "random(seed)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
         "complete": true,
@@ -159,9 +212,18 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "io",
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
         "complete": true,
@@ -183,9 +245,20 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "filesystem",
+          "io",
+          "state(local)",
+          "random(seed)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
         "complete": true,
@@ -207,9 +280,18 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "io",
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
         "complete": true,
@@ -231,9 +313,20 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "filesystem",
+          "io",
+          "state(local)",
+          "random(seed)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
         "complete": true,
@@ -255,9 +348,20 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "filesystem",
+          "io",
+          "state(local)",
+          "random(seed)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
         "complete": true,
@@ -279,9 +383,18 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "io",
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
         "complete": true,
@@ -303,9 +416,19 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "filesystem",
+          "io",
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
         "complete": true,
@@ -327,9 +450,18 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "io",
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
         "complete": true,
@@ -351,9 +483,18 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "io",
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
         "complete": true,
@@ -375,9 +516,18 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "io",
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
         "complete": true,
@@ -399,9 +549,18 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "io",
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
         "complete": true,
@@ -423,9 +582,20 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "filesystem",
+          "io",
+          "state(local)",
+          "random(seed)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
         "complete": true,
@@ -447,9 +617,18 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "io",
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
         "complete": true,
@@ -471,9 +650,18 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "io",
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
         "complete": true,
@@ -495,9 +683,20 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "filesystem",
+          "io",
+          "state(local)",
+          "random(seed)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
         "complete": true,
@@ -519,9 +718,18 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "io",
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
         "complete": true,
@@ -543,9 +751,18 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "io",
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
         "complete": true,
@@ -567,9 +784,18 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "io",
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
         "complete": true,
@@ -591,9 +817,19 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "filesystem",
+          "io",
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
         "complete": true,
@@ -615,9 +851,17 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "io"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
         "complete": true,
@@ -639,9 +883,18 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "io",
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
         "complete": true,
@@ -663,9 +916,18 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "io",
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
         "complete": true,
@@ -687,9 +949,20 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "filesystem",
+          "io",
+          "state(local)",
+          "random(seed)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
         "complete": true,
@@ -711,9 +984,18 @@
         "missing": [
           "provenance.runtime.host"
         ],
-        "incomplete": [
-          "provenance.effects.effect_coverage"
-        ]
+        "incomplete": []
+      },
+      "entryEffectSignature": {
+        "function": "main",
+        "effects": [
+          "io",
+          "state(local)"
+        ],
+        "open_calls": [],
+        "purity_proven": false,
+        "row_closed": true,
+        "variables": []
       },
       "effectCoverage": {
         "complete": true,

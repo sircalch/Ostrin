@@ -3,7 +3,7 @@
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { validateEffectCapture } from "./experiment-bundle.mjs";
+import { validateEffectCapture, validateEntryEffectSignature } from "./experiment-bundle.mjs";
 
 export const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const bundlesDirectory = path.join(repositoryRoot, "website/assets/experiments");
@@ -91,14 +91,24 @@ export function inspectBundle(bundle, file) {
   const incomplete = [];
   missingR3Extensions.push(...captureExtensionErrors(runtime));
   const effects = bundle?.provenance?.effects;
+  let entryEffectSignature = null;
   if (!present(effects)) {
     missingR3Extensions.push("provenance.effects");
   } else {
     const effectErrors = validateEffectCapture(effects);
     if (effectErrors.length > 0) {
       missingR3Extensions.push("provenance.effects.effect_coverage");
-    } else if (!effects.effect_coverage.complete || effects.effect_coverage.symbolic_calls > 0) {
-      incomplete.push("provenance.effects.effect_coverage");
+    }
+    const signatureErrors = validateEntryEffectSignature(
+      effects.entry_effect_signature,
+      effects.entry,
+      effects,
+    );
+    if (signatureErrors.length > 0) {
+      missingR3Extensions.push("provenance.effects.entry_effect_signature");
+    } else {
+      entryEffectSignature = { ...effects.entry_effect_signature };
+      if (!entryEffectSignature.row_closed) incomplete.push("provenance.effects.entry_effect_signature");
     }
   }
   const effectCoverage = effects?.effect_coverage;
@@ -111,6 +121,7 @@ export function inspectBundle(bundle, file) {
       : "OPEN",
     requiredFields: { missing },
     r3Extensions: { missing: missingR3Extensions, incomplete },
+    entryEffectSignature,
     effectCoverage: effectCoverage && typeof effectCoverage === "object"
       ? { ...effectCoverage }
       : null,
@@ -138,7 +149,8 @@ export function buildReadiness(root = repositoryRoot) {
       entry.requiredFields.missing.length === 0 && entry.r3Extensions.missing.length === 0).length,
     captureOpenCount: entries.filter((entry) =>
       entry.requiredFields.missing.length > 0 || entry.r3Extensions.missing.length > 0).length,
-    incompleteEffectBundleCount: entries.filter((entry) => entry.r3Extensions.incomplete.includes("provenance.effects.effect_coverage")).length,
+    incompleteEffectBundleCount: entries.filter((entry) => entry.r3Extensions.incomplete.includes("provenance.effects.entry_effect_signature")).length,
+    closedEntryEffectBundleCount: entries.filter((entry) => entry.entryEffectSignature?.row_closed === true).length,
     knownEffectCallCount: entries.reduce((total, entry) => total + (entry.effectCoverage?.known_calls ?? 0), 0),
     symbolicEffectCallCount: entries.reduce((total, entry) => total + (entry.effectCoverage?.symbolic_calls ?? 0), 0),
     unresolvedEffectCallCount: entries.reduce((total, entry) => total + (entry.effectCoverage?.unresolved_calls ?? 0), 0),

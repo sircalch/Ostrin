@@ -197,6 +197,7 @@ export async function buildScorecard() {
         captureReadyCount: report.captureReadyCount,
         captureOpenCount: report.captureOpenCount,
         incompleteEffectBundleCount: report.incompleteEffectBundleCount,
+        closedEntryEffectBundleCount: report.closedEntryEffectBundleCount,
         symbolicEffectCallCount: report.symbolicEffectCallCount,
         unresolvedEffectCallCount: report.unresolvedEffectCallCount,
       };

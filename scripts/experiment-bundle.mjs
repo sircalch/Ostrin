@@ -385,6 +385,64 @@ export function validateEffectCapture(effects) {
   return errors;
 }
 
+export function validateEntryEffectSignature(signature, expectedFunction = "main", effectReport) {
+  if (!signature || typeof signature !== "object" || Array.isArray(signature)) {
+    return ["entry effect signature must be an object"];
+  }
+  const errors = [];
+  if (signature.function !== expectedFunction || typeof signature.function !== "string") {
+    errors.push("entry effect signature must name the recorded entry function");
+  }
+  if (effectReport != null && (!isStringArrayMap(effectReport.functions)
+    || !Object.hasOwn(effectReport.functions, expectedFunction))) {
+    errors.push("entry function must have a recorded effect inventory row");
+  }
+  for (const field of ["effects", "variables", "open_calls"]) {
+    if (!Array.isArray(signature[field]) || !signature[field].every((value) => typeof value === "string")) {
+      errors.push(`entry effect signature ${field} must be a string array`);
+    }
+  }
+  if (typeof signature.row_closed !== "boolean") {
+    errors.push("entry effect signature row_closed must be boolean");
+  }
+  if (signature.purity_proven !== false) {
+    errors.push("entry effect signature must not claim purity proof");
+  }
+  if (Array.isArray(signature.variables) && Array.isArray(signature.open_calls)
+    && typeof signature.row_closed === "boolean"
+    && signature.row_closed !== (signature.variables.length === 0 && signature.open_calls.length === 0)) {
+    errors.push("entry effect signature row_closed disagrees with its variables/open_calls");
+  }
+  if (effectReport != null && Array.isArray(signature.effects)
+    && isStringArrayMap(effectReport.functions)
+    && Object.hasOwn(effectReport.functions, expectedFunction)
+    && !sameStringSet(signature.effects, effectReport.functions[expectedFunction])) {
+    errors.push("entry effect signature effects disagree with the function effect row");
+  }
+  if (effectReport != null && Array.isArray(signature.variables)
+    && isStringArrayMap(effectReport.function_effect_variables)) {
+    const entryVariables = effectReport.function_effect_variables[expectedFunction] ?? [];
+    if (!Array.isArray(entryVariables) || !sameStringSet(signature.variables, entryVariables)) {
+      errors.push("entry effect signature variables disagree with the function effect variables");
+    }
+  }
+  if (effectReport != null && Array.isArray(signature.open_calls)
+    && isStringArrayMap(effectReport.unresolved_calls)) {
+    const openCalls = new Set(signature.open_calls);
+    for (const call of effectReport.unresolved_calls[expectedFunction] ?? []) {
+      if (!openCalls.has(call)) errors.push("entry effect signature omits a direct unresolved call");
+    }
+  }
+  return errors;
+}
+
+function sameStringSet(left, right) {
+  if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+  const sortedLeft = [...left].sort();
+  const sortedRight = [...right].sort();
+  return sortedLeft.every((value, index) => value === sortedRight[index]);
+}
+
 function bytes(value) {
   return Buffer.byteLength(value, "utf8");
 }
@@ -518,6 +576,10 @@ function compilerEffectSummary(root, sourcePath) {
     unresolved_calls: report.unresolved_calls,
     function_effect_variables: report.function_effect_variables,
     symbolic_effect_calls: report.symbolic_effect_calls,
+    entry_effect_signature: {
+      function: "main",
+      ...report.function_effect_signatures?.main,
+    },
     effect_coverage: report.effect_coverage,
     analyzer: ["compiler/src/effects.rs", "compiler/src/main.rs"].map((relativePath) => ({
       path: relativePath,
@@ -525,6 +587,7 @@ function compilerEffectSummary(root, sourcePath) {
     })),
   };
   const effectErrors = validateEffectCapture(summary);
+  effectErrors.push(...validateEntryEffectSignature(summary.entry_effect_signature, summary.entry, summary));
   if (effectErrors.length > 0) {
     throw new Error(`invalid compiler effect report for ${sourcePath}: ${effectErrors.join("; ")}`);
   }
@@ -833,6 +896,9 @@ export function verifyExperimentBundle(bundle, { expected, fixtureId } = {}) {
   if (JSON.stringify(bundle?.provenance) !== JSON.stringify(provenanceFile)) errors.push("provenance.json is not the embedded provenance object");
   const effects = bundle?.provenance?.effects;
   for (const error of validateEffectCapture(effects)) errors.push(`provenance ${error}`);
+  for (const error of validateEntryEffectSignature(effects?.entry_effect_signature, effects?.entry, effects)) {
+    errors.push(`provenance ${error}`);
+  }
   const replay = bundle?.provenance?.replay;
   const replayNote = maturity?.level === "R2"
     ? /embedded data\.json snapshot under its declared filesystem capability/.test(replay?.note ?? "")

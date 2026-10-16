@@ -50,6 +50,9 @@ const validEffects = () => ({
   unresolved_calls: {},
   function_effect_variables: {},
   symbolic_effect_calls: {},
+  entry_effect_signature: {
+    function: "main", effects: [], variables: [], open_calls: [], row_closed: true, purity_proven: false,
+  },
   effect_coverage: { count_unit: "distinct_function_operation_edges", known_calls: 0, symbolic_calls: 0, unresolved_calls: 0, complete: true },
 });
 
@@ -76,6 +79,9 @@ test("R3 readiness requires host, dependencies, scheduler and effects", () => {
         unresolved_calls: {},
         function_effect_variables: {},
         symbolic_effect_calls: {},
+        entry_effect_signature: {
+          function: "main", effects: [], variables: [], open_calls: [], row_closed: true, purity_proven: false,
+        },
         effect_coverage: { count_unit: "distinct_function_operation_edges", known_calls: 1, symbolic_calls: 0, unresolved_calls: 0, complete: true },
       },
       level: "R0",
@@ -101,6 +107,9 @@ test("R3 readiness uses the explicit CI host capture contract", () => {
     unresolved_calls: {},
     function_effect_variables: {},
     symbolic_effect_calls: {},
+    entry_effect_signature: {
+      function: "main", effects: [], variables: [], open_calls: [], row_closed: true, purity_proven: false,
+    },
     effect_coverage: { count_unit: "distinct_function_operation_edges", known_calls: 0, symbolic_calls: 0, unresolved_calls: 0, complete: true },
   };
   const bundle = {
@@ -180,7 +189,7 @@ test("R3 capture rejects invalid dependency hashes and unknown runner metadata",
   ]);
 });
 
-test("R3 stays open while valid captured effects are incomplete", () => {
+test("R3 stays open while the entry effect signature is open", () => {
   const effects = {
     schema: "ostrin.effect-report/v0",
     status: "captured",
@@ -192,6 +201,10 @@ test("R3 stays open while valid captured effects are incomplete", () => {
     unresolved_calls: { main: ["mystery_operation"] },
     function_effect_variables: {},
     symbolic_effect_calls: {},
+    entry_effect_signature: {
+      function: "main", effects: [], variables: [], open_calls: ["mystery_operation"],
+      row_closed: false, purity_proven: false,
+    },
     effect_coverage: { count_unit: "distinct_function_operation_edges", known_calls: 0, symbolic_calls: 0, unresolved_calls: 1, complete: false },
   };
   const bundle = {
@@ -211,7 +224,7 @@ test("R3 stays open while valid captured effects are incomplete", () => {
 
   const incomplete = inspectBundle(bundle, "fixture.json");
   assert.equal(incomplete.status, "OPEN");
-  assert.deepEqual(incomplete.r3Extensions.incomplete, ["provenance.effects.effect_coverage"]);
+  assert.deepEqual(incomplete.r3Extensions.incomplete, ["provenance.effects.entry_effect_signature"]);
   assert.equal(incomplete.effectCoverage.unresolved_calls, 1);
   assert.deepEqual(requiredCaptureErrors({ entries: [incomplete] }), []);
 
@@ -228,6 +241,10 @@ test("R3 stays open when an otherwise complete effect inventory has symbolic cal
     function_calls: { main: ["callback"] },
     function_effect_variables: { main: ["ε_callback"] },
     symbolic_effect_calls: { main: ["callback"] },
+    entry_effect_signature: {
+      function: "main", effects: [], variables: ["ε_callback"], open_calls: [],
+      row_closed: false, purity_proven: false,
+    },
     effect_coverage: {
       count_unit: "distinct_function_operation_edges",
       known_calls: 0,
@@ -255,12 +272,13 @@ test("R3 stays open when an otherwise complete effect inventory has symbolic cal
   assert.equal(report.effectCoverage.complete, true);
   assert.equal(report.effectCoverage.symbolic_calls, 1);
   assert.equal(report.status, "OPEN");
-  assert.deepEqual(report.r3Extensions.incomplete, ["provenance.effects.effect_coverage"]);
+  assert.deepEqual(report.r3Extensions.incomplete, ["provenance.effects.entry_effect_signature"]);
 });
 
-test("readiness keeps R3 open while any bundle has symbolic callbacks", () => {
+test("readiness reports module-wide callbacks separately from entry effect closure", () => {
   const report = buildReadiness();
-  assert.equal(report.incompleteEffectBundleCount, report.bundleCount);
+  assert.equal(report.closedEntryEffectBundleCount, report.bundleCount);
+  assert.equal(report.incompleteEffectBundleCount, 0);
   assert.ok(report.incompleteEffectBundleCount <= report.bundleCount);
   assert.equal(report.unresolvedEffectCallCount, 0);
   assert.ok(report.knownEffectCallCount > 0);
@@ -268,8 +286,29 @@ test("readiness keeps R3 open while any bundle has symbolic callbacks", () => {
   assert.equal(report.effectCoverageCountUnit, "distinct_function_operation_edges");
   assert.equal(report.readyCount, 0);
   assert.equal(report.status, "OPEN");
+  assert.ok(report.captureOpenCount > 0, "host capture remains independently required");
   assert.equal(report.captureReadyCount + report.captureOpenCount, report.bundleCount);
   assert.ok(report.captureReadyCount <= report.bundleCount);
+});
+
+test("R3 requires a structurally valid entry signature and does not infer purity", () => {
+  const effects = validEffects();
+  effects.entry_effect_signature.effects = ["io"];
+  effects.functions.main = ["io"];
+  const bundle = { provenance: {
+    commit: "fixture-commit", compiler: "ostrinc fixture", target: "wasm32-wasip1",
+    runtime: validRuntime(), inputs: [{ id: "input" }], outputs: [{ id: "output" }],
+    parameters: { scale: 1 }, execution: { mode: "recorded" },
+    figure_metadata: { source_hash: "fixture" }, effects,
+  } };
+  const nonPureButClosed = inspectBundle(bundle, "known-io.json");
+  assert.equal(nonPureButClosed.entryEffectSignature.row_closed, true);
+  assert.equal(nonPureButClosed.status, "READY");
+
+  delete effects.entry_effect_signature;
+  const missing = inspectBundle(bundle, "missing-entry-signature.json");
+  assert.ok(missing.r3Extensions.missing.includes("provenance.effects.entry_effect_signature"));
+  assert.equal(missing.status, "OPEN");
 });
 
 test("readiness totals and status match the inspected bundles", () => {

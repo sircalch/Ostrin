@@ -18,11 +18,12 @@ test("source edits and unrelated generated files remain visible as dirty", () =>
   assert.equal(hasDirtySourceChanges(["list_phi_probe.ostrin"]), true);
 });
 
-test("scorecard reports typed effect coverage without closing R3 readiness", async () => {
+test("scorecard separates closed entry rows from module-wide symbolic effect inventory", async () => {
   const scorecard = await buildScorecard();
   assert.equal(scorecard.r3.status, "OPEN");
   assert.equal(scorecard.r3.captureReadyCount + scorecard.r3.captureOpenCount, scorecard.r3.bundleCount);
-  assert.equal(scorecard.r3.incompleteEffectBundleCount, scorecard.r3.bundleCount);
+  assert.equal(scorecard.r3.closedEntryEffectBundleCount, scorecard.r3.bundleCount);
+  assert.equal(scorecard.r3.incompleteEffectBundleCount, 0);
   assert.equal(scorecard.r3.unresolvedEffectCallCount, 0);
   assert.ok(scorecard.r3.symbolicEffectCallCount > 0);
   assert.ok(scorecard.effectCoverage.knownCalls > 0);

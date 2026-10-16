@@ -66,7 +66,7 @@ function render() {
     valueCard("R0", String(status.reproducibility.R0), "recorded replay", "neutral"),
     valueCard("R1", String(status.reproducibility.R1), "seeded replay", status.reproducibility.R1 > 0 ? "ready" : "open"),
     valueCard("R2", String(status.reproducibility.R2), "input snapshot", status.reproducibility.R2 > 0 ? "ready" : "open"),
-    valueCard("R3", String(status.reproducibility.R3), `${status.r3.readyCount}/${status.r3.bundleCount} audited · ${status.r3.incompleteEffectBundleCount} partial · ${status.r3.symbolicEffectCallCount} symbolic · ${status.r3.unresolvedEffectCallCount} unresolved`, status.r3.readyCount === status.r3.bundleCount ? "ready" : "open"),
+    valueCard("R3", String(status.reproducibility.R3), `${status.r3.readyCount}/${status.r3.bundleCount} ready · ${status.r3.closedEntryEffectBundleCount}/${status.r3.bundleCount} entry rows closed · ${status.r3.symbolicEffectCallCount} module-wide symbolic · ${status.r3.unresolvedEffectCallCount} unresolved`, status.r3.readyCount === status.r3.bundleCount ? "ready" : "open"),
   );
   if (linguist) {
     const indexed = status.linguist.indexedPublicFiles == null ? "—" : status.linguist.indexedPublicFiles.toLocaleString();
