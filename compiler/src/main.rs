@@ -321,7 +321,11 @@ fn real_main() -> ExitCode {
 
     if effect_report || require_closed_effects {
         let typed = typeck::Checker::new().check_program_typed(&items);
-        let report = effects::analyze_with_types(&items, &typed);
+        let report = if effect_report {
+            effects::analyze_with_types_for_report(&items, &typed)
+        } else {
+            effects::analyze_with_types(&items, &typed)
+        };
         let (known_calls, symbolic_call_count, unresolved_call_count) = report.call_coverage();
         let open_call_count: usize = report
             .open_effect_calls
@@ -547,7 +551,7 @@ fn real_main() -> ExitCode {
         };
         let target = argument_value(&args, "--target").unwrap_or_else(|| "native".to_string());
         let typed = typeck::Checker::new().check_program_typed(&items);
-        let effects = effects::analyze_with_types(&items, &typed);
+        let effects = effects::analyze_with_types_for_report(&items, &typed);
         let report = provenance::build_report(entry_path, &source, &target, &effects);
         if json {
             match serde_json::to_string_pretty(&report) {

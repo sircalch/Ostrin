@@ -260,6 +260,21 @@ impl EffectReport {
 }
 
 pub fn analyze_with_types(items: &[Item], typed: &TypedProgram) -> EffectReport {
+    analyze_with_types_internal(items, typed, false)
+}
+
+/// Analyze typed effects and recover exact source callsite spans for reports.
+/// Normal compilation uses `analyze_with_types` and does not reread or lex the
+/// source files after parsing.
+pub fn analyze_with_types_for_report(items: &[Item], typed: &TypedProgram) -> EffectReport {
+    analyze_with_types_internal(items, typed, true)
+}
+
+fn analyze_with_types_internal(
+    items: &[Item],
+    typed: &TypedProgram,
+    resolve_report_spans: bool,
+) -> EffectReport {
     let mut report = EffectReport {
         expression_types: typed
             .node_types
@@ -424,7 +439,9 @@ pub fn analyze_with_types(items: &[Item], typed: &TypedProgram) -> EffectReport 
         .collect();
     report.sort_sites();
     collect_unresolved_call_sites(&mut report);
-    resolve_unresolved_call_site_spans(&mut report);
+    if resolve_report_spans {
+        resolve_unresolved_call_site_spans(&mut report);
+    }
     report
 }
 
