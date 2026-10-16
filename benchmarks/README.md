@@ -33,6 +33,15 @@ unmeasured and remain a future benchmark metric.
 | `numeric_svd.ostrin` | SVD, rank, condition number and least squares |
 | `numeric_complex_linear_algebra.ostrin` | dense split-complex solve and adjoint product |
 | `viz_scatter_fit.ostrin` | deterministic fit, band and SVG rendering |
+| `temperature-float.ostrin` | scalar `Float` addition control |
+| `temperature-interval.ostrin` | linear `Quantity<Temperature>` additions in K |
+| `temperature-point.ostrin` | absolute Celsius point shifted by Kelvin intervals |
+
+The temperature workloads use the same 50,000-iteration loop and let the
+report compare `Float`, linear interval and affine point costs on one host. The
+reported wall time includes process startup; it does not isolate per-operation
+latency or allocation counts, and it must not be generalized beyond the
+recorded platform and compiler configuration.
 
 Run a local report after building the release compiler:
 
