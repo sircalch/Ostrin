@@ -402,6 +402,13 @@ fn real_main() -> ExitCode {
                     "classified_calls": report.classified_calls,
                     "known_effect_free_calls": report.known_effect_free_calls,
                     "unresolved_calls": report.unresolved_calls,
+                    "unresolved_call_sites": report.unresolved_call_sites.iter().map(|site| serde_json::json!({
+                        "operation": site.operation,
+                        "function": site.function,
+                        "file": site.file,
+                        "line": site.line,
+                        "col": site.col,
+                    })).collect::<Vec<_>>(),
                     "symbolic_effect_calls": report.symbolic_effect_calls,
                     "indirect_calls": report.indirect_calls,
                     "open_effect_calls": report.open_effect_calls,
@@ -463,6 +470,17 @@ fn real_main() -> ExitCode {
             println!(
                 "unresolved operation edges: {unresolved_calls} (effect coverage is incomplete)"
             );
+            println!(
+                "unresolved call sites: {}",
+                report.unresolved_call_sites.len()
+            );
+            for site in &report.unresolved_call_sites {
+                let file = site.file.as_deref().unwrap_or("<unknown>");
+                println!(
+                    "  {file}:{}:{} {} -> {} (effect unknown)",
+                    site.line, site.col, site.function, site.operation
+                );
+            }
             let indirect_calls: usize = report
                 .indirect_calls
                 .values()

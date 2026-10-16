@@ -95,6 +95,17 @@ pub struct EffectSite {
     pub col: usize,
 }
 
+/// Source location for a call whose effect remains unresolved. Multiple
+/// entries may refer to the same distinct function-operation edge.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnresolvedCallSite {
+    pub operation: String,
+    pub function: String,
+    pub file: Option<String>,
+    pub line: usize,
+    pub col: usize,
+}
+
 /// A local callsite substitution from one callback effect variable to another.
 /// For a caller `wrapper(action) { invoke(action) }`, this records
 /// `invoke.callback <- wrapper.action`.
@@ -162,6 +173,10 @@ pub struct EffectReport {
     /// host operation. These make the conservative boundary explicit: a
     /// function with no known effect may still call one of these operations.
     pub unresolved_calls: BTreeMap<String, BTreeSet<String>>,
+    /// All source locations corresponding to unresolved operation edges.
+    /// Unlike `unresolved_calls`, this preserves duplicate callsites.
+    pub unresolved_call_sites: Vec<UnresolvedCallSite>,
+    unresolved_call_site_inventory: Vec<UnresolvedCallSite>,
     /// Indirect invocations through function-valued bindings. Their effects
     /// are not present in the current function type, so they stay open.
     pub indirect_calls: BTreeMap<String, BTreeSet<String>>,
@@ -392,6 +407,7 @@ pub fn analyze_with_types(items: &[Item], typed: &TypedProgram) -> EffectReport 
         })
         .collect();
     report.sort_sites();
+    collect_unresolved_call_sites(&mut report);
     report
 }
 
@@ -631,6 +647,28 @@ fn classify_unresolved_calls(report: &mut EffectReport) {
     }
 }
 
+fn collect_unresolved_call_sites(report: &mut EffectReport) {
+    report.unresolved_call_sites = report
+        .unresolved_call_site_inventory
+        .iter()
+        .filter(|site| {
+            report
+                .unresolved_calls
+                .get(&site.function)
+                .is_some_and(|calls| calls.contains(&site.operation))
+        })
+        .cloned()
+        .collect();
+    report.unresolved_call_sites.sort_by(|left, right| {
+        left.file
+            .cmp(&right.file)
+            .then(left.line.cmp(&right.line))
+            .then(left.col.cmp(&right.col))
+            .then(left.function.cmp(&right.function))
+            .then(left.operation.cmp(&right.operation))
+    });
+}
+
 fn walk_impl(implementation: &ImplDecl, items: &[Item], report: &mut EffectReport) {
     for method in &implementation.methods {
         let key = impl_method_key(&implementation.type_name, &method.name);
@@ -798,6 +836,15 @@ fn walk_expr(expr: &Expr, function: &str, file: Option<&str>, report: &mut Effec
         Expr::Located(inner, _) => walk_expr(inner, function, file, report),
         Expr::Call(callee, args) | Expr::GenericCall(callee, _, args) => {
             if let Some(operation) = expression_path(callee) {
+                report
+                    .unresolved_call_site_inventory
+                    .push(UnresolvedCallSite {
+                        operation: operation.clone(),
+                        function: function.to_string(),
+                        file: file.map(str::to_string),
+                        line,
+                        col,
+                    });
                 report
                     .function_calls
                     .entry(function.to_string())
