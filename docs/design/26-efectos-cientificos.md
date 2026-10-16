@@ -211,9 +211,14 @@ El informe debe guardar el peor residuo medido y las plataformas/bibliotecas pro
 no existe o alguna plataforma queda fuera de la matriz, el resultado se marca **no evaluado** y no como
 equivalente.
 
-Por tanto, las figuras actuales conservan el gate de hash exacto dentro del replay CI; el soporte de
-tolerancias cruzadas sigue abierto y la captura de host/hardware ya está implementada en Pages CI,
-pero R3 y el gate de `v0.2` esperan una ejecución CI real que produzca el artefacto host-bound.
+Por tanto, las figuras actuales conservan el gate de hash exacto dentro del replay CI y el soporte de
+tolerancias cruzadas sigue abierto. La ejecución CI `38860279280`, en el head
+`a1eb79bfde4782b82b96a1a1c7357332979a0893`, produjo evidencia host-bound con R3 `READY` para
+29/29 bundles: 29 capturas auténticas, 29 filas de entrada cerradas, 74 bordes simbólicos globales
+y cero bordes sin resolver ([artefacto](https://github.com/sircalch/Ostrin/actions/runs/38860279280/artifacts/12028498290)).
+Ese estado acredita la ejecución capturada. El reporte local versionado sigue `OPEN` porque no
+incluye metadatos de host, y no se afirma equivalencia numérica entre plataformas. La release
+`v0.2.0` ya fue publicada; su gate de release es distinto del nivel R3 de cada ejecución.
 
 ## 8. Inferencia y reglas del checker
 
@@ -357,9 +362,11 @@ en una consola de logs.
    ubicaciones locales. El snapshot parcial ostrin.runtime/v1 ya expone la política de
    plataforma; los bundles experimentales añaden snapshots de entradas cuando corresponden, hashes de salida,
    resumen de efectos y, bajo `OSTRIN_CAPTURE_HOST=1`, metadatos públicos de host/hardware. La ejecución local
-   no reclama R3; Pages CI usa `--require-capture` para exigir una captura host-bound estructuralmente válida,
-   sin declarar por ello R3 listo. Los once bundles input-driven ya constituyen cortes
-   R2: embeben `data.json`, declaran la capacidad `filesystem.read:data.json`, conservan el hash del
+   no reclama R3; Pages CI usa `--require-capture` para exigir una captura host-bound estructuralmente válida.
+   La captura no basta por sí sola: R3 queda listo solo cuando también se satisfacen el contrato completo
+   del bundle, la firma cerrada de efectos del entrypoint y las demás comprobaciones. Los once bundles
+   input-driven ya constituyen cortes R2: embeben `data.json`, declaran la capacidad
+   `filesystem.read:data.json`, conservan el hash del
    snapshot y verifican la sensibilidad de sus parámetros o semilla en WASI; los nueve casos seeded
    además conservan la evidencia algorítmica R1.
 6. **Frontera WASM:** conectar la tabla con permisos del Scientific Lab; denegar red/E/S no declaradas y
