@@ -351,7 +351,10 @@ en una consola de logs.
    en una orden CLI experimental. La primera superficie ya existe como `ostrinc --provenance-report` y
    [`website/provenance.html`](../../website/provenance.html): normaliza el hash de fuente, registra target,
    perfil WASI, hashes de lockfiles/manifiestos disponibles y sitios de efecto, y marca explícitamente la
-   salida como experimental/no verificada. El snapshot parcial ostrin.runtime/v1 ya expone la política de
+   salida como experimental/no verificada. También registra las ocurrencias de llamadas no resueltas en
+   `activity.unresolved_call_sites`. Las rutas que pueden representarse dentro del checkout se serializan
+   relativas a su raíz; las rutas absolutas externas o no resolubles se omiten (`null`) para evitar filtrar
+   ubicaciones locales. El snapshot parcial ostrin.runtime/v1 ya expone la política de
    plataforma; los bundles experimentales añaden snapshots de entradas cuando corresponden, hashes de salida,
    resumen de efectos y, bajo `OSTRIN_CAPTURE_HOST=1`, metadatos públicos de host/hardware. La ejecución local
    no reclama R3; Pages CI usa `--require-capture` para exigir una captura host-bound estructuralmente válida,

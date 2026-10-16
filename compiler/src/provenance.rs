@@ -58,6 +58,23 @@ fn normalized_file_hash(path: &Path) -> Option<String> {
     Some(sha256_bytes(normalized.as_bytes()))
 }
 
+/// Return a repository-relative path only when the resolved file is inside
+/// the current checkout. External absolute paths and relative paths that walk
+/// above the checkout are omitted from portable provenance artifacts.
+fn portable_path(path: &Path) -> Option<String> {
+    let repository_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent()?;
+    let repository_root = fs::canonicalize(repository_root).ok()?;
+    let current_dir = fs::canonicalize(std::env::current_dir().ok()?).ok()?;
+    let resolved = fs::canonicalize(if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        current_dir.join(path)
+    })
+    .ok()?;
+    let relative = resolved.strip_prefix(&repository_root).ok()?;
+    Some(relative.to_string_lossy().replace('\\', "/"))
+}
+
 fn ancestor_file(start: &Path, file_name: &str) -> Option<PathBuf> {
     let mut directory = if start.is_dir() {
         start.to_path_buf()
@@ -148,7 +165,7 @@ pub fn build_report(path: &Path, source: &[u8], target: &str, effects: &EffectRe
                 "effect": site.effect,
                 "operation": site.operation,
                 "function": site.function,
-                "file": site.file.as_deref().map(|file| file.replace('\\', "/")),
+                "file": site.file.as_deref().and_then(|file| portable_path(Path::new(file))),
                 "line": site.line,
                 "col": site.col,
             })
@@ -161,6 +178,19 @@ pub fn build_report(path: &Path, source: &[u8], target: &str, effects: &EffectRe
             json!({
                 "function": function,
                 "calls": calls.iter().collect::<Vec<_>>(),
+            })
+        })
+        .collect();
+    let unresolved_call_sites: Vec<Value> = effects
+        .unresolved_call_sites
+        .iter()
+        .map(|site| {
+            json!({
+                "operation": site.operation,
+                "function": site.function,
+                "file": site.file.as_deref().and_then(|file| portable_path(Path::new(file))),
+                "line": site.line,
+                "col": site.col,
             })
         })
         .collect();
@@ -261,7 +291,7 @@ pub fn build_report(path: &Path, source: &[u8], target: &str, effects: &EffectRe
         "experimental": true,
         "verified": false,
         "program": {
-            "entry": path.display().to_string(),
+            "entry": portable_path(path),
             "source_hash": source_hash,
         },
         "compiler": {
@@ -276,6 +306,7 @@ pub fn build_report(path: &Path, source: &[u8], target: &str, effects: &EffectRe
             "functions_without_known_effects": functions_without_known_effects,
             "function_effect_signatures": function_effect_signatures,
             "unresolved_calls": unresolved_calls,
+            "unresolved_call_sites": unresolved_call_sites,
             "symbolic_effect_calls": symbolic_effect_calls,
             "indirect_calls": indirect_calls,
             "open_effect_calls": open_effect_calls,

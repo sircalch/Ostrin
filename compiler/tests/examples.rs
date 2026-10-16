@@ -13411,6 +13411,21 @@ fn experimental_provenance_report_contains_source_hash_and_effects() {
     assert!(artifact["runtime"]["missing"]
         .as_array()
         .is_some_and(|missing| missing.iter().any(|item| item == "input snapshots")));
+    let entry = artifact["program"]["entry"]
+        .as_str()
+        .expect("repository entry should use a portable relative path");
+    assert!(!std::path::Path::new(entry).is_absolute());
+    assert!(
+        entry.ends_with("examples/measurement_scalar.ostrin")
+            || entry.ends_with("examples\\measurement_scalar.ostrin")
+    );
+    let repository_path = std::env::current_dir().expect("test working directory");
+    assert!(!artifact
+        .to_string()
+        .contains(&repository_path.display().to_string()));
+    assert!(!artifact
+        .to_string()
+        .contains(&repository_path.to_string_lossy().replace('\\', "/")));
     assert!(artifact["program"]["source_hash"]
         .as_str()
         .is_some_and(|hash| hash.starts_with("sha256:") && hash.len() == 71));
@@ -13435,13 +13450,17 @@ fn provenance_report_preserves_open_effects_and_callback_variables() {
         r#"fn invoke(callback: fn() -> Void) -> Void { callback() }
 fn host_callback() -> Void { host.callback() }
 fn caller() -> Void { invoke(host_callback) }
-fn main() -> Void { caller() }
+fn main() -> Void {
+    caller()
+    print("temporary input")
+}
 "#,
     );
     let out = run(&["--provenance-report", "--json", &file]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     let artifact: serde_json::Value =
         serde_json::from_str(&stdout(&out)).expect("provenance report must be JSON");
+    assert!(artifact["program"]["entry"].is_null());
     assert_eq!(
         artifact["activity"]["function_effect_signatures"]["invoke"]["variables"],
         serde_json::json!(["ε_callback"])
@@ -13455,6 +13474,22 @@ fn main() -> Void { caller() }
         "open callbacks and host calls must not be described as an R0 candidate"
     );
     assert_eq!(artifact["activity"]["effect_coverage"]["complete"], false);
+    let unresolved_sites = artifact["activity"]["unresolved_call_sites"]
+        .as_array()
+        .expect("provenance should retain unresolved callsite evidence");
+    assert_eq!(unresolved_sites.len(), 1);
+    assert!(unresolved_sites[0]["file"].is_null());
+    let effect_sites = artifact["activity"]["sites"]
+        .as_array()
+        .expect("classified effect sites should be present");
+    assert!(!effect_sites.is_empty());
+    assert!(effect_sites.iter().all(|site| site["file"].is_null()));
+    assert!(!artifact
+        .to_string()
+        .contains(&std::env::temp_dir().display().to_string()));
+    assert!(!artifact
+        .to_string()
+        .contains(&std::env::temp_dir().to_string_lossy().replace('\\', "/")));
     assert_eq!(
         artifact["reproducibility"]["evidence_requirements"]["model"],
         "constraints-only"
