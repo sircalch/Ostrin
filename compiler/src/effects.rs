@@ -1221,7 +1221,7 @@ pub(crate) enum CallbackSource {
     Unknown,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 struct CallbackScope {
     names: BTreeSet<String>,
     aliases: BTreeMap<String, CallbackSource>,
@@ -1641,18 +1641,18 @@ fn collect_callback_expr(
                     function: parameter_function,
                     name,
                 } => {
+                    let operation = expression_path(callee).unwrap_or_default();
+                    report
+                        .indirect_calls
+                        .entry(function.to_string())
+                        .or_default()
+                        .remove(&operation);
+                    report
+                        .unresolved_calls
+                        .entry(function.to_string())
+                        .or_default()
+                        .remove(&operation);
                     if parameter_function == function {
-                        let operation = expression_path(callee).unwrap_or_default();
-                        report
-                            .indirect_calls
-                            .entry(function.to_string())
-                            .or_default()
-                            .remove(&operation);
-                        report
-                            .unresolved_calls
-                            .entry(function.to_string())
-                            .or_default()
-                            .remove(&operation);
                         report
                             .indirect_calls
                             .entry(function.to_string())
@@ -1805,9 +1805,30 @@ fn collect_callback_expr(
                 }
             }
         }
-        Expr::Lambda(_params, body) => {
+        Expr::Lambda(params, body) => {
             let lambda = format!("{function}::<lambda@{line}:{col}>");
-            let mut lambda_shadowed = Vec::new();
+            let mut lambda_shadowed = vec![CallbackScope::default()];
+            if let Some(callbacks) = report.callback_parameters.get(function) {
+                for name in callbacks {
+                    lambda_shadowed[0].names.insert(name.clone());
+                    lambda_shadowed[0].aliases.insert(
+                        name.clone(),
+                        CallbackSource::Parameter {
+                            function: function.to_string(),
+                            name: name.clone(),
+                        },
+                    );
+                }
+            }
+            lambda_shadowed.extend(shadowed.iter().cloned());
+            let mut lambda_parameters = CallbackScope::default();
+            for name in params {
+                lambda_parameters.names.insert(name.clone());
+                lambda_parameters
+                    .aliases
+                    .insert(name.clone(), CallbackSource::Unknown);
+            }
+            lambda_shadowed.push(lambda_parameters);
             collect_callback_block(
                 body,
                 &lambda,

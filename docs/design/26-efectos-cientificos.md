@@ -347,6 +347,11 @@ en una consola de logs.
    matemáticas elementales— para no contar como deuda llamadas como `length`, `push`, `value`,
    `Ok` o `is_finite`. Esa whitelist mejora la cobertura del inventario, pero no autoriza
    optimizaciones de pureza ni sustituye las filas de efectos del HIR/IR.
+   Las invocaciones de parámetros callback capturados por una closure local conservan la variable
+   de efecto del parámetro exterior, por lo que la fila de un callback concreto puede propagarse a
+   sus callers. La llamada al alias de la closure permanece abierta mientras HIR/IR no modele esa
+   arista. También siguen abiertas las closures que escapan, se almacenan en agregados o cruzan una
+   frontera sin cuerpo local resoluble.
    Las llamadas a métodos locales se propagan usando la clave del método que comparte el inventario;
    si no se puede asociar una llamada calificada con una función local, permanece en
    `unresolved_calls` en lugar de presentar una cobertura completa.

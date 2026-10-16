@@ -13852,6 +13852,60 @@ fn main() -> Void { caller() }
 }
 
 #[test]
+fn experimental_effect_signatures_compose_through_closure_captured_callbacks() {
+    let file = temp_source(
+        "effects-closure-captured-callback.ostrin",
+        r#"fn wrapper(action: fn() -> Void) -> Void {
+    deferred: fn() -> Void = fn() { action() }
+    deferred()
+}
+fn io_action() -> Void { print("effect") }
+fn unknown_action() -> Void { host.callback() }
+fn main() -> Void { wrapper(io_action) }
+fn open_main() -> Void { wrapper(unknown_action) }
+"#,
+    );
+    let out = run(&["--effect-report", "--json", &file]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(
+        report["function_effect_signatures"]["wrapper"]["variables"],
+        serde_json::json!(["ε_action"]),
+        "the callback invoked by a captured closure remains a symbolic row variable"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["wrapper"]["open_calls"],
+        serde_json::json!(["deferred"]),
+        "the callback row is known, but closure calls remain open until HIR has a closure-call edge"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main"]["effects"],
+        serde_json::json!(["io"]),
+        "the concrete callback row must reach the caller through the closure"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main"]["row_closed"],
+        false
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["open_main"]["open_calls"],
+        serde_json::json!(["deferred", "host.callback"]),
+        "an unresolved effect in a captured callback must remain open"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["open_main"]["row_closed"],
+        false
+    );
+    let hir = run(&["--hir", &file]);
+    assert!(hir.status.success(), "HIR stderr: {}", stderr(&hir));
+    assert!(stdout(&hir).contains("hir violations: 0"));
+    let ir = run(&["--ir", &file]);
+    assert!(ir.status.success(), "IR stderr: {}", stderr(&ir));
+    assert!(stdout(&ir).contains("ir violations: 0"));
+    let _ = fs::remove_file(file);
+}
+
+#[test]
 fn experimental_effect_report_separates_lambda_creation_from_indirect_execution() {
     let file = temp_source(
         "effects-lambda-execution.ostrin",
