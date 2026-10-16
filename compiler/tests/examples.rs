@@ -12878,6 +12878,69 @@ fn main() -> Void { wrapper(fn() { print("run") }) }
 }
 
 #[test]
+fn experimental_effect_variables_compose_through_generic_callback_wrappers() {
+    let file = temp_source(
+        "effects-generic-callback-wrappers.ostrin",
+        r#"fn apply<T>(value: T, action: fn(T) -> Void) -> Void { action(value) }
+fn forward<U>(value: U, action: fn(U) -> Void) -> Void { apply(value, action) }
+fn output(value: Int) -> Void { print("effect") }
+fn main() -> Void { forward(2, output) }
+"#,
+    );
+
+    let out = run(&["--effect-report", "--json", &file]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let report: serde_json::Value = serde_json::from_str(&stdout(&out)).unwrap();
+    for function in ["apply", "forward"] {
+        assert_eq!(
+            report["function_effect_signatures"][function]["variables"],
+            serde_json::json!(["ε_action"]),
+            "{function} must preserve its generic callback effect variable"
+        );
+        assert_eq!(
+            report["function_effect_signatures"][function]["row_closed"],
+            serde_json::json!(false),
+            "a generic callback row remains symbolic until a caller supplies a callback"
+        );
+    }
+    assert_eq!(
+        report["effect_variable_substitutions"]["forward"],
+        serde_json::json!([{
+            "callee": "apply",
+            "callee_parameter": "action",
+            "caller_parameter": "action"
+        }])
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main"]["effects"],
+        serde_json::json!(["io"])
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main"]["row_closed"],
+        serde_json::json!(true)
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main"]["purity_proven"],
+        serde_json::json!(false)
+    );
+    assert_eq!(report["effect_coverage"]["symbolic_calls"], 1);
+    assert_eq!(report["effect_coverage"]["unresolved_calls"], 0);
+
+    let hir = run(&["--hir", &file]);
+    assert!(hir.status.success(), "HIR stderr: {}", stderr(&hir));
+    assert!(stdout(&hir).contains("effect substitution: ε_action <- ε_action via apply"));
+    assert!(stdout(&hir).contains("fn main() -> Void\n  effects: io"));
+    assert!(stdout(&hir).contains("hir violations: 0"));
+
+    let ir = run(&["--ir", &file]);
+    assert!(ir.status.success(), "IR stderr: {}", stderr(&ir));
+    assert!(stdout(&ir).contains("effect substitution: ε_action <- ε_action via apply"));
+    assert!(stdout(&ir).contains("ir fn main() -> Void\n  effects: io"));
+    assert!(stdout(&ir).contains("ir violations: 0"));
+    let _ = fs::remove_file(file);
+}
+
+#[test]
 fn experimental_effect_signatures_compose_through_callbacks_without_claiming_purity() {
     let file = temp_source(
         "effects-signature-composition.ostrin",
