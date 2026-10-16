@@ -56,7 +56,7 @@ function render() {
   if (effects && status.effectCoverage) {
     const coverage = status.effectCoverage;
     effects.replaceChildren(
-      valueCard("Known operation edges", String(coverage.knownCalls ?? 0), `distinct function-operation edges across ${coverage.scope ?? "registered experiment bundles"}`, "ready"),
+      valueCard("Known operation edges", String(coverage.knownCalls ?? 0), `sum of per-bundle distinct function-operation edges across ${coverage.bundleCount ?? "registered experiment bundles"}`, "ready"),
       valueCard("Symbolic callback edges", String(coverage.symbolicCalls ?? 0), "distinct edges modeled with effect variables", "neutral"),
       valueCard("Unresolved operation edges", String(coverage.unresolvedCalls ?? 0), "distinct conservative boundary edges", coverage.unresolvedCalls === 0 ? "ready" : "open"),
       valueCard("Inventory", coverage.complete ? "COMPLETE" : "PARTIAL", "not a purity proof", coverage.complete ? "ready" : "open"),

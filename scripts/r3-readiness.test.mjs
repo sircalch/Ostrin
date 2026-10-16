@@ -48,7 +48,9 @@ const validEffects = () => ({
   functions: { main: [] },
   function_calls: { main: [] },
   unresolved_calls: {},
-  effect_coverage: { known_calls: 0, unresolved_calls: 0, complete: true },
+  function_effect_variables: {},
+  symbolic_effect_calls: {},
+  effect_coverage: { count_unit: "distinct_function_operation_edges", known_calls: 0, symbolic_calls: 0, unresolved_calls: 0, complete: true },
 });
 
 test("R3 readiness requires host, dependencies, scheduler and effects", () => {
@@ -72,7 +74,9 @@ test("R3 readiness requires host, dependencies, scheduler and effects", () => {
         functions: { main: [] },
         function_calls: { main: ["write_file"] },
         unresolved_calls: {},
-        effect_coverage: { known_calls: 1, unresolved_calls: 0, complete: true },
+        function_effect_variables: {},
+        symbolic_effect_calls: {},
+        effect_coverage: { count_unit: "distinct_function_operation_edges", known_calls: 1, symbolic_calls: 0, unresolved_calls: 0, complete: true },
       },
       level: "R0",
     },
@@ -95,7 +99,9 @@ test("R3 readiness uses the explicit CI host capture contract", () => {
     functions: { main: [] },
     function_calls: { main: [] },
     unresolved_calls: {},
-    effect_coverage: { known_calls: 0, unresolved_calls: 0, complete: true },
+    function_effect_variables: {},
+    symbolic_effect_calls: {},
+    effect_coverage: { count_unit: "distinct_function_operation_edges", known_calls: 0, symbolic_calls: 0, unresolved_calls: 0, complete: true },
   };
   const bundle = {
     provenance: {
@@ -184,7 +190,9 @@ test("R3 stays open while valid captured effects are incomplete", () => {
     functions: { main: [] },
     function_calls: { main: ["mystery_operation"] },
     unresolved_calls: { main: ["mystery_operation"] },
-    effect_coverage: { known_calls: 0, unresolved_calls: 1, complete: false },
+    function_effect_variables: {},
+    symbolic_effect_calls: {},
+    effect_coverage: { count_unit: "distinct_function_operation_edges", known_calls: 0, symbolic_calls: 0, unresolved_calls: 1, complete: false },
   };
   const bundle = {
     provenance: {
@@ -216,9 +224,12 @@ test("R3 stays open while valid captured effects are incomplete", () => {
 
 test("readiness totals unresolved effects across incomplete bundles", () => {
   const report = buildReadiness();
-  assert.ok(report.incompleteEffectBundleCount > 0);
+  assert.equal(report.incompleteEffectBundleCount, 0);
   assert.ok(report.incompleteEffectBundleCount <= report.bundleCount);
-  assert.ok(report.unresolvedEffectCallCount > 0);
+  assert.equal(report.unresolvedEffectCallCount, 0);
+  assert.ok(report.knownEffectCallCount > 0);
+  assert.ok(report.symbolicEffectCallCount > 0);
+  assert.equal(report.effectCoverageCountUnit, "distinct_function_operation_edges");
   assert.equal(report.readyCount, 0);
   assert.equal(report.status, "OPEN");
   assert.equal(report.captureReadyCount + report.captureOpenCount, report.bundleCount);
