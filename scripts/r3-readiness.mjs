@@ -124,6 +124,42 @@ export function inspectBundle(bundle, file) {
     effectCoverage: effectCoverage && typeof effectCoverage === "object"
       ? { ...effectCoverage }
       : null,
+    entryEffectClosure: diagnoseEntryEffectClosure(effects),
+  };
+}
+
+export function diagnoseEntryEffectClosure(effects) {
+  const entry = typeof effects?.entry === "string" && effects.entry.length > 0
+    ? effects.entry
+    : null;
+  const unresolvedMap = effects?.unresolved_calls;
+  const symbolicMap = effects?.symbolic_effect_calls;
+  if (!entry || !isObject(unresolvedMap) || !isObject(symbolicMap)) {
+    return {
+      entry,
+      status: "unavailable",
+      unresolvedCalls: null,
+      symbolicCallbacks: null,
+    };
+  }
+
+  const unresolvedCalls = unresolvedMap[entry] ?? [];
+  const symbolicCallbacks = symbolicMap[entry] ?? [];
+  if (!Array.isArray(unresolvedCalls) || !unresolvedCalls.every((call) => typeof call === "string")
+    || !Array.isArray(symbolicCallbacks) || !symbolicCallbacks.every((call) => typeof call === "string")) {
+    return {
+      entry,
+      status: "unavailable",
+      unresolvedCalls: null,
+      symbolicCallbacks: null,
+    };
+  }
+
+  return {
+    entry,
+    status: unresolvedCalls.length === 0 && symbolicCallbacks.length === 0 ? "closed" : "open",
+    unresolvedCalls,
+    symbolicCallbacks,
   };
 }
 
@@ -137,7 +173,9 @@ function effectOperationSyntax(operation) {
 export function diagnoseEffectCalls(effects) {
   const bySyntax = { identifier: 0, memberPath: 0, qualifiedPath: 0, other: 0 };
   const operationReferences = new Map();
+  const symbolicCallbacks = new Map();
   const unresolved = isObject(effects?.unresolved_calls) ? effects.unresolved_calls : {};
+  const symbolic = isObject(effects?.symbolic_effect_calls) ? effects.symbolic_effect_calls : {};
   let referenceCount = 0;
   for (const calls of Object.values(unresolved)) {
     if (!Array.isArray(calls)) continue;
@@ -148,11 +186,24 @@ export function diagnoseEffectCalls(effects) {
       operationReferences.set(operation, (operationReferences.get(operation) ?? 0) + 1);
     }
   }
+  let symbolicCallbackReferenceCount = 0;
+  for (const [functionName, callbacks] of Object.entries(symbolic)) {
+    if (!Array.isArray(callbacks)) continue;
+    for (const callback of callbacks) {
+      if (typeof callback !== "string") continue;
+      symbolicCallbackReferenceCount++;
+      const operation = `${functionName}.${callback}`;
+      symbolicCallbacks.set(operation, (symbolicCallbacks.get(operation) ?? 0) + 1);
+    }
+  }
   return {
     referenceCount,
     uniqueOperationNames: operationReferences.size,
     bySyntax,
     operations: operationReferences,
+    symbolicCallbackReferenceCount,
+    uniqueSymbolicCallbacks: symbolicCallbacks.size,
+    symbolicCallbacks,
   };
 }
 
@@ -160,8 +211,11 @@ function buildGapDiagnostics(records) {
   const missingFields = new Map();
   const incompleteFields = new Map();
   const effectOperationReferences = new Map();
+  const symbolicCallbackReferences = new Map();
   const effectSyntaxCounts = { identifier: 0, memberPath: 0, qualifiedPath: 0, other: 0 };
   let effectOperationReferenceCount = 0;
+  let symbolicCallbackReferenceCount = 0;
+  const entrypointBundles = [];
 
   for (const { entry, effectCalls } of records) {
     const bundle = entry.id ?? entry.file;
@@ -174,6 +228,11 @@ function buildGapDiagnostics(records) {
       incompleteFields.get(field).add(bundle);
     }
     effectOperationReferenceCount += effectCalls.referenceCount;
+    symbolicCallbackReferenceCount += effectCalls.symbolicCallbackReferenceCount;
+    entrypointBundles.push({
+      bundle,
+      ...entry.entryEffectClosure,
+    });
     for (const [syntax, count] of Object.entries(effectCalls.bySyntax)) {
       effectSyntaxCounts[syntax] += count;
     }
@@ -182,6 +241,14 @@ function buildGapDiagnostics(records) {
         effectOperationReferences.set(operation, { references: 0, bundles: new Set() });
       }
       const current = effectOperationReferences.get(operation);
+      current.references += count;
+      current.bundles.add(bundle);
+    }
+    for (const [operation, count] of effectCalls.symbolicCallbacks) {
+      if (!symbolicCallbackReferences.has(operation)) {
+        symbolicCallbackReferences.set(operation, { references: 0, bundles: new Set() });
+      }
+      const current = symbolicCallbackReferences.get(operation);
       current.references += count;
       current.bundles.add(bundle);
     }
@@ -199,6 +266,27 @@ function buildGapDiagnostics(records) {
     }))
     .sort((left, right) => right.references - left.references || left.operation.localeCompare(right.operation))
     .slice(0, 12);
+  const entrypointEffects = {
+    countUnit: "one recorded entry function per experiment bundle",
+    availableBundleCount: entrypointBundles.filter((item) => item.status !== "unavailable").length,
+    closedBundleCount: entrypointBundles.filter((item) => item.status === "closed").length,
+    openBundleCount: entrypointBundles.filter((item) => item.status === "open").length,
+    unavailableBundleCount: entrypointBundles.filter((item) => item.status === "unavailable").length,
+    unresolvedCallReferences: entrypointBundles.reduce((total, item) =>
+      total + (item.unresolvedCalls?.length ?? 0), 0),
+    symbolicCallbackReferences: entrypointBundles.reduce((total, item) =>
+      total + (item.symbolicCallbacks?.length ?? 0), 0),
+    bundles: entrypointBundles.sort((left, right) => left.bundle.localeCompare(right.bundle)),
+    interpretation: "This reports the recorded entry function row separately from module-wide inventory. It is diagnostic only and does not prove complete runtime reachability, host capture or R3 readiness.",
+  };
+  const topSymbolicCallbacks = [...symbolicCallbackReferences]
+    .map(([operation, counts]) => ({
+      operation,
+      references: counts.references,
+      bundleCount: counts.bundles.size,
+    }))
+    .sort((left, right) => right.references - left.references || left.operation.localeCompare(right.operation))
+    .slice(0, 12);
 
   return {
     captureGaps: {
@@ -211,8 +299,12 @@ function buildGapDiagnostics(records) {
       uniqueOperationNames: effectOperationReferences.size,
       bySyntax: effectSyntaxCounts,
       topOperations,
+      symbolicCallbackReferences: symbolicCallbackReferenceCount,
+      uniqueSymbolicCallbacks: symbolicCallbackReferences.size,
+      topSymbolicCallbacks,
       interpretation: "Syntax groups are descriptive only. An identifier may be a builtin, local function or callback; a member path may be a method, field or host API. This report does not determine type resolution or prove purity.",
     },
+    entrypointEffects,
     notAssessed: [
       "Whether an operation resolves to a typed function or intrinsic",
       "Whether external inputs are fully captured and privacy-safe",

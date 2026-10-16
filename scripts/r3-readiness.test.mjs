@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { after } from "node:test";
 import { runtimeSnapshotFor } from "./experiment-bundle.mjs";
-import { buildReadiness, diagnoseEffectCalls, inspectBundle, requiredCaptureErrors } from "./r3-readiness.mjs";
+import { buildReadiness, diagnoseEffectCalls, diagnoseEntryEffectClosure, inspectBundle, requiredCaptureErrors } from "./r3-readiness.mjs";
 
 const originalCaptureHost = process.env.OSTRIN_CAPTURE_HOST;
 delete process.env.OSTRIN_CAPTURE_HOST;
@@ -295,6 +295,56 @@ test("effect-gap diagnostics group operation syntax without inferring resolution
     other: 1,
   });
   assert.equal(diagnostics.operations.get("array"), 2);
+  assert.equal(diagnostics.symbolicCallbackReferenceCount, 0);
+  assert.equal(diagnostics.uniqueSymbolicCallbacks, 0);
+});
+
+test("entry closure diagnostics separate the root row from module-wide effect rows", () => {
+  const closure = diagnoseEntryEffectClosure({
+    entry: "main",
+    unresolved_calls: { main: [], library_helper: ["host_effect"] },
+    symbolic_effect_calls: { main: [], generic_library_helper: ["callback"] },
+  });
+  assert.deepEqual(closure, {
+    entry: "main",
+    status: "closed",
+    unresolvedCalls: [],
+    symbolicCallbacks: [],
+  });
+
+  const open = diagnoseEntryEffectClosure({
+    entry: "main",
+    unresolved_calls: { main: ["host_effect"] },
+    symbolic_effect_calls: { main: ["callback"] },
+  });
+  assert.equal(open.status, "open");
+  assert.deepEqual(open.unresolvedCalls, ["host_effect"]);
+  assert.deepEqual(open.symbolicCallbacks, ["callback"]);
+
+  const unavailable = diagnoseEntryEffectClosure({
+    entry: "main",
+    unresolved_calls: { main: [] },
+  });
+  assert.deepEqual(unavailable, {
+    entry: "main",
+    status: "unavailable",
+    unresolvedCalls: null,
+    symbolicCallbacks: null,
+  });
+});
+
+test("effect-gap diagnostics report symbolic callbacks separately from unresolved calls", () => {
+  const diagnostics = diagnoseEffectCalls({
+    unresolved_calls: { main: [] },
+    symbolic_effect_calls: {
+      "std.viz::grid_of": ["f"],
+      "std.numeric::rk45": ["f", "jacobian"],
+    },
+  });
+  assert.equal(diagnostics.referenceCount, 0);
+  assert.equal(diagnostics.symbolicCallbackReferenceCount, 3);
+  assert.equal(diagnostics.uniqueSymbolicCallbacks, 3);
+  assert.equal(diagnostics.symbolicCallbacks.get("std.viz::grid_of.f"), 1);
 });
 
 test("effect-gap diagnostics recognize Unicode identifiers accepted by the Ostrin lexer", () => {
@@ -327,6 +377,14 @@ test("R3 gap summary reconciles with per-bundle missing fields and effect covera
     effectInventory.operationReferences);
   assert.equal(effectInventory.uniqueOperationNames > 0, report.unresolvedEffectCallCount > 0);
   assert.equal(effectInventory.topOperations.length > 0, report.unresolvedEffectCallCount > 0);
+  assert.equal(effectInventory.symbolicCallbackReferences,
+    report.entries.reduce((total, entry) => total + (entry.effectCoverage?.symbolic_calls ?? 0), 0));
+  const entrypoint = report.gapDiagnostics.entrypointEffects;
+  assert.equal(entrypoint.closedBundleCount + entrypoint.openBundleCount + entrypoint.unavailableBundleCount,
+    report.bundleCount);
+  assert.equal(entrypoint.closedBundleCount, report.entries.filter(({ entryEffectClosure }) => entryEffectClosure.status === "closed").length);
+  assert.equal(entrypoint.openBundleCount, report.entries.filter(({ entryEffectClosure }) => entryEffectClosure.status === "open").length);
+  assert.equal(entrypoint.unavailableBundleCount, report.entries.filter(({ entryEffectClosure }) => entryEffectClosure.status === "unavailable").length);
   assert.match(effectInventory.interpretation, /does not determine type resolution or prove purity/i);
   assert.ok(notAssessed.includes("Whether numerical tolerances are scientifically justified"));
 });
