@@ -416,7 +416,12 @@ degraden la identidad del punto. Una prueba estática también verifica que par�
 verificada. Aún no hay una expresión fuente que construya un punto; las pruebas del intérprete llaman
 directamente a la variante runtime interna, mientras los backends todavía no la ejecutan. Estas
 pruebas validan tipos, operaciones internas y lowering estático, no paridad de ejecución entre
-programas ni disponibilidad de la característica. Una prueba del núcleo
+programas ni disponibilidad de la característica. Las comparaciones runtime entre puntos normalizan
+ambas lecturas con `scale * value + offset` en la escala coherente antes de ordenar; así se evita que
+una conversión asimétrica entre Celsius y Fahrenheit haga distintos valores equivalentes por un bit
+de redondeo de coma flotante. Una cuadrícula de pruebas del intérprete recorre 324 pares de lecturas entre K/degC/degF
+para restas y comparaciones, incluyendo `-40 °C = -40 °F`; son llamadas internas de prueba, no
+programas Ostrin ejecutables. Una prueba del núcleo
 numérico recorre conversiones entre K/degC/degF y operaciones punto-intervalo en una cuadrícula
 finita de valores, comprobando invariantes en la escala coherente; la tolerancia de las restas usa
 la magnitud de los operandos para reflejar el redondeo `f64`. Esa prueba respalda las fórmulas

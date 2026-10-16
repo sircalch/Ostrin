@@ -466,20 +466,30 @@ pub fn compare_quantities_with_role(
     left: &RoleAwareQuantity,
     right: &RoleAwareQuantity,
 ) -> Result<std::cmp::Ordering, String> {
-    let role = match (&left.role, &right.role) {
-        (QuantityRole::Linear, QuantityRole::Linear) => QuantityRole::Linear,
+    let (left_value, right_value) = match (&left.role, &right.role) {
+        (QuantityRole::Linear, QuantityRole::Linear) => {
+            let right_value = convert_value_with_role(
+                right.value,
+                &right.unit,
+                &left.unit,
+                &QuantityRole::Linear,
+            )?;
+            (left.value, right_value)
+        }
         (QuantityRole::Point(left_space), QuantityRole::Point(right_space))
             if left_space == right_space =>
         {
-            QuantityRole::Point(left_space.clone())
+            (
+                left.value.mul_add(left.unit.scale, left.unit.offset),
+                right.value.mul_add(right.unit.scale, right.unit.offset),
+            )
         }
         (QuantityRole::Point(_), QuantityRole::Point(_)) => {
             return Err("cannot compare points from different affine spaces".to_string())
         }
         _ => return Err("cannot compare an absolute point with a linear interval".to_string()),
     };
-    let right_value = convert_value_with_role(right.value, &right.unit, &left.unit, &role)?;
-    left.value
+    left_value
         .partial_cmp(&right_value)
         .ok_or_else(|| "cannot order NaN quantities".to_string())
 }

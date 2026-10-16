@@ -4488,4 +4488,62 @@ mod affine_temperature_runtime_tests {
         )
         .is_err());
     }
+
+    #[test]
+    fn interpreter_affine_runtime_matches_coherent_temperature_equations() {
+        let scales = ["K", "degC", "degF"];
+        let readings = [-273.15_f64, -40.0, 0.0, 37.0, 100.0, 1.0e6];
+        let tolerance = |magnitude: f64| 16.0 * f64::EPSILON * magnitude.abs().max(1.0);
+
+        for left_unit in scales {
+            let left_definition = builtin_temperature_point_unit(left_unit).unwrap();
+            for right_unit in scales {
+                let right_definition = builtin_temperature_point_unit(right_unit).unwrap();
+                for left_value in readings {
+                    let left_coherent =
+                        left_value.mul_add(left_definition.scale, left_definition.offset);
+                    for right_value in readings {
+                        let right_coherent =
+                            right_value.mul_add(right_definition.scale, right_definition.offset);
+                        let difference = runtime_value(eval_binary_builtin(
+                            BinOp::Sub,
+                            point(left_value, left_unit),
+                            point(right_value, right_unit),
+                        ));
+                        match difference {
+                            Value::Quantity(actual, dimension, unit) => {
+                                assert_eq!(dimension, resolve_unit_expr("K").unwrap());
+                                assert_eq!(unit, "K");
+                                let expected = left_coherent - right_coherent;
+                                let roundoff_scale = left_coherent
+                                    .abs()
+                                    .max(right_coherent.abs())
+                                    .max(expected.abs());
+                                assert!(
+                                    (actual - expected).abs() <= tolerance(roundoff_scale),
+                                    "{left_value} {left_unit} - {right_value} {right_unit}: expected {expected} K, got {actual} K"
+                                );
+                            }
+                            other => panic!(
+                                "point difference returned {other}, expected a linear Quantity"
+                            ),
+                        }
+
+                        let equal = runtime_value(eval_binary_builtin(
+                            BinOp::Eq,
+                            point(left_value, left_unit),
+                            point(right_value, right_unit),
+                        ));
+                        let comparison_scale = left_coherent.abs().max(right_coherent.abs());
+                        let expected_equal =
+                            (left_coherent - right_coherent).abs() <= tolerance(comparison_scale);
+                        assert!(
+                            matches!(equal, Value::Bool(actual) if actual == expected_equal),
+                            "{left_value} {left_unit} == {right_value} {right_unit}: expected {expected_equal}, got {equal}"
+                        );
+                    }
+                }
+            }
+        }
+    }
 }
