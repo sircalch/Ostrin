@@ -13875,8 +13875,8 @@ fn open_main() -> Void { wrapper(unknown_action) }
     );
     assert_eq!(
         report["function_effect_signatures"]["wrapper"]["open_calls"],
-        serde_json::json!(["deferred"]),
-        "the callback row is known, but closure calls remain open until HIR has a closure-call edge"
+        serde_json::json!([]),
+        "a local closure call with a known captured callback has a verified effect edge"
     );
     assert_eq!(
         report["function_effect_signatures"]["main"]["effects"],
@@ -13885,12 +13885,12 @@ fn open_main() -> Void { wrapper(unknown_action) }
     );
     assert_eq!(
         report["function_effect_signatures"]["main"]["row_closed"],
-        false
+        true
     );
     assert_eq!(
         report["function_effect_signatures"]["open_main"]["open_calls"],
-        serde_json::json!(["deferred", "host.callback"]),
-        "an unresolved effect in a captured callback must remain open"
+        serde_json::json!(["host.callback"]),
+        "an unresolved effect in a captured callback must remain open without keeping the local closure call open"
     );
     assert_eq!(
         report["function_effect_signatures"]["open_main"]["row_closed"],
@@ -13898,10 +13898,23 @@ fn open_main() -> Void { wrapper(unknown_action) }
     );
     let hir = run(&["--hir", &file]);
     assert!(hir.status.success(), "HIR stderr: {}", stderr(&hir));
-    assert!(stdout(&hir).contains("hir violations: 0"));
+    let hir_text = stdout(&hir);
+    assert!(hir_text.contains("hir violations: 0"));
+    assert!(
+        hir_text.contains("[effect variables: ε_action]")
+            && hir_text.contains("effect substitution: ε_action <- ε_action via wrapper::<lambda@"),
+        "HIR must retain the captured callback row and its local closure edge: {hir_text}"
+    );
     let ir = run(&["--ir", &file]);
     assert!(ir.status.success(), "IR stderr: {}", stderr(&ir));
-    assert!(stdout(&ir).contains("ir violations: 0"));
+    let ir_text = stdout(&ir);
+    assert!(ir_text.contains("ir violations: 0"));
+    assert!(
+        ir_text.contains("closure wrapper$closure")
+            && ir_text.contains("(effect source: wrapper::<lambda@")
+            && ir_text.contains("effect variables: ε_action"),
+        "IR must retain the captured callback row on the synthesized closure: {ir_text}"
+    );
     let _ = fs::remove_file(file);
 }
 

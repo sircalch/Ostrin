@@ -179,6 +179,9 @@ pub struct EffectReport {
     /// Callback contracts whose effects are substituted at a callsite because
     /// the actual function value has a known local body.
     pub closed_callback_parameters: BTreeMap<String, BTreeMap<String, BTreeSet<String>>>,
+    /// Callback parameters captured by each lambda body, keyed by the lambda
+    /// source key and then by their lexical owner and binding name.
+    pub captured_callback_parameters: BTreeMap<String, BTreeSet<(String, String)>>,
     pub function_calls: BTreeMap<String, BTreeSet<String>>,
     /// Compiler-known higher-order calls resolved from checked receiver types.
     pub builtin_callback_calls: BTreeMap<String, BTreeSet<String>>,
@@ -1015,7 +1018,7 @@ fn walk_expr(expr: &Expr, function: &str, file: Option<&str>, report: &mut Effec
                         .resolved_function_calls
                         .entry(function.to_string())
                         .or_default()
-                        .insert(target);
+                        .insert(target.clone());
                     report
                         .resolved_call_operations
                         .entry(function.to_string())
@@ -1664,6 +1667,17 @@ fn collect_callback_expr(
                             .or_default()
                             .insert(name.clone());
                     }
+                    if parameter_function != function {
+                        invoked.insert(CallbackParameter {
+                            function: function.to_string(),
+                            name: name.clone(),
+                        });
+                        report
+                            .captured_callback_parameters
+                            .entry(function.to_string())
+                            .or_default()
+                            .insert((parameter_function.clone(), name.clone()));
+                    }
                     invoked.insert(CallbackParameter {
                         function: parameter_function,
                         name,
@@ -1751,7 +1765,9 @@ fn collect_callback_expr(
                 {
                     (CallbackSource::Function(source), true)
                         if report.function_names.contains(source)
-                            && !source.contains("::<lambda@") =>
+                            && report.captured_callback_parameters.get(source).is_none_or(
+                                |captures| captures.iter().all(|(owner, _)| owner == function),
+                            ) =>
                     {
                         Some(source.clone())
                     }
@@ -1762,17 +1778,46 @@ fn collect_callback_expr(
                         .resolved_function_calls
                         .entry(function.to_string())
                         .or_default()
-                        .insert(target);
+                        .insert(target.clone());
                     report
                         .resolved_call_operations
                         .entry(function.to_string())
                         .or_default()
                         .insert(operation.clone());
                     report
+                        .indirect_calls
+                        .entry(function.to_string())
+                        .or_default()
+                        .remove(&operation);
+                    report
                         .unresolved_calls
                         .entry(function.to_string())
                         .or_default()
                         .remove(&operation);
+                    if let Some(captures) = report.captured_callback_parameters.get(&target) {
+                        for (owner, parameter) in captures {
+                            if owner != function {
+                                continue;
+                            }
+                            invoked.insert(CallbackParameter {
+                                function: owner.clone(),
+                                name: parameter.clone(),
+                            });
+                            callsites.push(CallbackCallsite {
+                                caller: function.to_string(),
+                                target: target.clone(),
+                                target_parameter: parameter.clone(),
+                                source: CallbackSource::Parameter {
+                                    function: owner.clone(),
+                                    name: parameter.clone(),
+                                },
+                                operation: operation.clone(),
+                                file: file.map(str::to_string),
+                                line,
+                                col,
+                            });
+                        }
+                    }
                 } else if is_function_value(callee, report) {
                     report
                         .indirect_calls
