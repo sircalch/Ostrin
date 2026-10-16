@@ -4,9 +4,10 @@
 //! It records syntactic evidence so the compiler can expose a first inventory
 //! before effect rows become part of HIR and function signatures.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use crate::ast::{Arg, Block, Expr, FunctionDecl, ImplDecl, Item, MatchArm, Pattern, Stmt};
+use crate::lexer::{Lexer, Token, TokenKind};
 
 /// Typed internal effect labels. The public syntax remains intentionally unset;
 /// this enum gives later HIR/IR propagation a stable vocabulary.
@@ -165,10 +166,144 @@ fn analyze_internal(items: &[Item], collect_call_sites: bool) -> EffectReport {
             _ => {}
         }
     }
+    if collect_call_sites {
+        resolve_call_site_spans(&mut report);
+    }
     classify_unresolved_calls(&mut report);
     propagate_function_effects(&mut report);
     report.sort_sites();
     report
+}
+
+/// Recover exact callee locations for explicit reports without adding location
+/// wrappers or per-call state to the AST/type checker. The AST walk and lexer
+/// scan are grouped by source file and callee leaf; we update a group only
+/// when the occurrence counts agree, so ambiguous/dynamic syntax keeps its
+/// conservative outer-expression location.
+fn resolve_call_site_spans(report: &mut EffectReport) {
+    let mut files = BTreeSet::new();
+    for call in &report.call_sites {
+        if let Some(file) = &call.file {
+            files.insert(file.clone());
+        }
+    }
+
+    let mut candidates: HashMap<(String, String), Vec<(usize, usize)>> = HashMap::new();
+    for file in files {
+        let Ok(source) = std::fs::read_to_string(&file) else {
+            continue;
+        };
+        let Ok(tokens) = Lexer::new(&source).tokenize() else {
+            continue;
+        };
+        for (index, token) in tokens.iter().enumerate() {
+            let TokenKind::Ident(name) = &token.kind else {
+                continue;
+            };
+            if index > 0 && matches!(tokens[index - 1].kind, TokenKind::Fn) {
+                continue;
+            }
+            if !follows_call_arguments(&tokens, index + 1) {
+                continue;
+            }
+            let mut start = index;
+            while start >= 2
+                && matches!(
+                    tokens[start - 1].kind,
+                    TokenKind::Dot | TokenKind::ColonColon
+                )
+                && matches!(tokens[start - 2].kind, TokenKind::Ident(_))
+            {
+                start -= 2;
+            }
+            let first = &tokens[start];
+            candidates
+                .entry((file.clone(), name.clone()))
+                .or_default()
+                .push((first.line, first.col));
+        }
+    }
+
+    let mut groups: HashMap<(String, String), Vec<usize>> = HashMap::new();
+    for (index, call) in report.call_sites.iter().enumerate() {
+        let (Some(file), Some(leaf)) = (&call.file, call.operation.rsplit(['.', ':']).next())
+        else {
+            continue;
+        };
+        groups
+            .entry((file.clone(), leaf.to_string()))
+            .or_default()
+            .push(index);
+    }
+
+    let mut updated_sites = vec![false; report.sites.len()];
+    for (key, mut call_indices) in groups {
+        let Some(spans) = candidates.get(&key) else {
+            continue;
+        };
+        if spans.len() != call_indices.len() {
+            continue;
+        }
+        call_indices.sort_by_key(|index| {
+            let call = &report.call_sites[*index];
+            (call.line, call.col)
+        });
+        for (call_index, (line, col)) in call_indices.into_iter().zip(spans) {
+            let call = &mut report.call_sites[call_index];
+            let old_line = call.line;
+            let old_col = call.col;
+            call.line = *line;
+            call.col = *col;
+            if let Some((site_index, site)) =
+                report.sites.iter_mut().enumerate().find(|(index, site)| {
+                    !updated_sites[*index]
+                        && site.file == call.file
+                        && site.function == call.function
+                        && site.operation == call.operation
+                        && site.line == old_line
+                        && site.col == old_col
+                })
+            {
+                site.line = *line;
+                site.col = *col;
+                updated_sites[site_index] = true;
+            }
+        }
+    }
+}
+
+fn follows_call_arguments(tokens: &[Token], mut index: usize) -> bool {
+    if matches!(
+        tokens.get(index).map(|token| &token.kind),
+        Some(TokenKind::LParen)
+    ) {
+        return true;
+    }
+    if !matches!(
+        tokens.get(index).map(|token| &token.kind),
+        Some(TokenKind::Lt)
+    ) {
+        return false;
+    }
+    let mut depth = 0usize;
+    while let Some(token) = tokens.get(index) {
+        match token.kind {
+            TokenKind::Lt => depth += 1,
+            TokenKind::Gt => {
+                depth = depth.saturating_sub(1);
+                if depth == 0 {
+                    return matches!(
+                        tokens.get(index + 1).map(|token| &token.kind),
+                        Some(TokenKind::LParen)
+                    );
+                }
+            }
+            TokenKind::Eof | TokenKind::RBrace => return false,
+            _ => {}
+        }
+        index += 1;
+    }
+    false
 }
 
 fn classify_unresolved_calls(report: &mut EffectReport) {
