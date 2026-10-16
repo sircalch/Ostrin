@@ -338,6 +338,9 @@ Ambos comparten la dimensión física `Temperature`, pero tienen reglas algebrai
 | absoluta + absoluta | — | Error de tipos: sumar puntos absolutos no tiene interpretación definida. |
 | intervalo ± intervalo | intervalo | Permitida con conversiones de escala sin offset. |
 | absoluta ×/÷ magnitud, potencia o producto de unidades | — | Error de tipos hasta que exista una operación física explícita que defina su significado. |
+| comparación entre dos absolutas del mismo espacio | `Bool` | Permitida; convierte ambas lecturas a una base común antes de comparar. |
+| comparación absoluta con intervalo | — | Error de tipos: un punto no es una diferencia. |
+| negación unaria de una absoluta | — | Error de tipos: el opuesto aritmético de un punto absoluto no está definido. |
 
 La transformación de una lectura absoluta al valor coherente será `base = scale * value + offset`;
 la conversión entre escalas será `value_to = (scale_from * value_from + offset_from -
@@ -368,6 +371,23 @@ conservarán ese rol hasta el lowering; el runtime podrá compartir la represent
 si las operaciones generadas siguen distinguiendo puntos de intervalos. En arrays, el rol formará
 parte del tipo del array y no se permitirá mezclar puntos con intervalos dentro de un mismo array.
 Los genéricos existentes `Unit<D>` y `Quantity<D>` no aceptarán unidades afines implícitamente.
+
+La matriz de aceptación se organizará por frontera semántica; todos los renglones son requisitos de
+implementación, no capacidades actuales:
+
+| Frontera | Casos positivos | Casos que deben rechazarse |
+| --- | --- | --- |
+| Tipos y firmas | Parámetros, retornos, campos, arrays homogéneos y selección de ramas conservan el rol; una resta de puntos retorna un intervalo. | Mezcla de punto e intervalo en una firma, asignación o array; un genérico `Quantity<D>` no captura un punto. |
+| Operaciones | Punto − punto, punto ± intervalo, comparación de puntos del mismo espacio e intervalo ± intervalo. | Punto + punto, intervalo − punto, punto ×/÷, potencia, producto o negación de un punto; comparar punto con intervalo. |
+| Conversiones | Absoluta con offset; intervalo por escala; round-trip entre escalas con tolerancia declarada. | Conversión entre espacios incompatibles o aplicación de offset a un intervalo. |
+| Arrays y backends | Conversión elemento a elemento, paridad intérprete/nativo/WASI, campos, argumentos, retornos y `Phi` conservan el rol. | Array heterogéneo de puntos e intervalos o fallback que borre el rol sin diagnóstico. |
+| Medición y persistencia | La incertidumbre de una lectura absoluta se convierte como intervalo; formato y serialización preservan rol y unidad. | Sumar offset a `sigma`, perder el rol al serializar o asumir independencia de fuentes de incertidumbre. |
+
+La matriz no habilita `Measurement<TemperaturePoint>` automáticamente: ese tipo seguirá bloqueado
+hasta que el modelo de `Measurement` y sus fuentes de incertidumbre lo soporte en intérprete, IR,
+backends y pruebas analíticas. Los casos de ownership gestionado, `Phi`, reemplazo de campos y
+destrucción deberán incluir `live_allocations=0` además de ASan/UBSan; los checks de tipo por sí
+solos no demuestran ese contrato.
 
 Queda abierta una decisión de compatibilidad y sintaxis: hoy `K` produce `Quantity<Temperature>`.
 Antes de habilitar Celsius/Fahrenheit habrá que decidir cómo expresar un punto Kelvin sin cambiar
