@@ -62,6 +62,15 @@ fn normalized_file_hash(path: &Path) -> Option<String> {
 /// the current checkout. External absolute paths and relative paths that walk
 /// above the checkout are omitted from portable provenance artifacts.
 fn portable_path(path: &Path) -> Option<String> {
+    let display_path = path.to_string_lossy().replace('\\', "/");
+    if let Some(suffix) = display_path.strip_prefix("<ostrin-std>/") {
+        let safe_virtual_path = !suffix.is_empty()
+            && suffix
+                .split('/')
+                .all(|segment| !segment.is_empty() && segment != "." && segment != "..");
+        return safe_virtual_path.then(|| format!("<ostrin-std>/{suffix}"));
+    }
+
     let repository_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent()?;
     let repository_root = fs::canonicalize(repository_root).ok()?;
     let current_dir = fs::canonicalize(std::env::current_dir().ok()?).ok()?;
@@ -73,6 +82,37 @@ fn portable_path(path: &Path) -> Option<String> {
     .ok()?;
     let relative = resolved.strip_prefix(&repository_root).ok()?;
     Some(relative.to_string_lossy().replace('\\', "/"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::portable_path;
+    use std::path::Path;
+
+    #[test]
+    fn portable_path_preserves_safe_virtual_standard_library_paths() {
+        assert_eq!(
+            portable_path(Path::new("<ostrin-std>/measurements.ostrin")),
+            Some("<ostrin-std>/measurements.ostrin".to_string())
+        );
+        assert_eq!(
+            portable_path(Path::new(r"<ostrin-std>\measurements.ostrin")),
+            Some("<ostrin-std>/measurements.ostrin".to_string())
+        );
+    }
+
+    #[test]
+    fn portable_path_rejects_traversal_in_virtual_standard_library_paths() {
+        assert_eq!(
+            portable_path(Path::new("<ostrin-std>/../secret.ostrin")),
+            None
+        );
+        assert_eq!(
+            portable_path(Path::new("<ostrin-std>/module/../../secret.ostrin")),
+            None
+        );
+        assert_eq!(portable_path(Path::new("<ostrin-std>/")), None);
+    }
 }
 
 fn ancestor_file(start: &Path, file_name: &str) -> Option<PathBuf> {
