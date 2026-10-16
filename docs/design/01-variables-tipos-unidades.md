@@ -333,9 +333,10 @@ La semántica distingue estos roles en metadatos internos y el type checker dist
 `temperature_point(20.0, "degC")` es un punto absoluto, mientras que `20 K` sigue siendo un
 intervalo lineal. Los puntos se pueden comparar, desplazar por intervalos de temperatura y restar
 entre sí; la diferencia resultante es un intervalo Kelvin. El constructor rechaza escalas distintas
-de las tres permitidas y valores no finitos. La ejecución de puntos queda limitada al intérprete:
-el backend nativo/WASI todavía rechaza `TemperaturePoint`, y no hay soporte de arrays ni de
-`Measurement<TemperaturePoint>`. El diseño separa una **temperatura absoluta**
+de las tres permitidas y valores no finitos. El intérprete y los backends nativos IR y AST ejecutan
+el tipo escalar; WASI genera C para este contrato, pero todavía no se ha verificado su compilación y
+ejecución en un runtime WASI. No hay soporte de arrays ni de `Measurement<TemperaturePoint>`. El
+diseño separa una **temperatura absoluta**
 de un **intervalo de temperatura**. Ambos comparten la dimensión física `Temperature`, pero tienen
 reglas algebraicas distintas:
 
@@ -417,8 +418,9 @@ El compilador contiene un núcleo de metadatos y operaciones por rol (`UnitDefin
 al convertir entre `Ty` y los metadatos de tipo del AST, para que firmas tipadas y sustituciones no
 degraden la identidad del punto. Pruebas estáticas verifican que parámetros, retornos,
 `punto + intervalo` y `punto - punto` conservan sus roles en HIR e IR verificada. Una prueba de
-programa ejecuta `temperature_point` en el intérprete; los backends nativos/WASI aún rechazan ese
-tipo, por lo que no existe paridad de ejecución multiplataforma. Las comparaciones runtime entre
+paridad ejecuta `temperature_point` en el intérprete, backend nativo IR y fallback AST; también
+comprueba que WASI emite el tipo y sus operaciones en C, pero no ejecuta el resultado con un runtime
+WASI. Las comparaciones runtime entre
 puntos normalizan
 ambas lecturas con `scale * value + offset` en la escala coherente antes de ordenar; así se evita que
 una conversión asimétrica entre Celsius y Fahrenheit haga distintos valores equivalentes por un bit

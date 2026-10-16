@@ -98,6 +98,9 @@ enum CType {
     /// units behave identically in both backends without monomorphizing on
     /// units.
     Quantity(Dimension),
+    /// An absolute temperature point. Ordinary `K` quantities remain linear;
+    /// this value is only created through `temperature_point`.
+    TemperaturePoint,
     /// `Result<T, E>`: by-value `{ bool ok; T value; E error; }`, monomorphized per (T, E).
     Result(Box<CType>, Box<CType>),
     /// A function value: a closure `{ fn, env }` (`OstrinClosure`), by value. The environment holds
@@ -397,6 +400,7 @@ fn c_type_name(ty: &CType) -> String {
             "int".to_string()
         }
         CType::Quantity(_) => "Qty".to_string(),
+        CType::TemperaturePoint => "OstrinTemperaturePoint".to_string(),
         CType::Result(t, e) => format!("Result_{}_{}", mangle_ctype(t), mangle_ctype(e)),
         CType::Fn(..) => "OstrinClosure".to_string(),
     }
@@ -497,6 +501,7 @@ fn map_type_with_subst(
             "Bool" => Ok(CType::Bool),
             "String" => Ok(CType::Str),
             "Void" => Ok(CType::Void),
+            "TemperaturePoint" => Ok(CType::TemperaturePoint),
             other if types.records.contains(other) => Ok(CType::Record(other.to_string())),
             other if types.enums.contains(other) => Ok(CType::Enum(other.to_string())),
             _ => Err(format!(
@@ -713,6 +718,7 @@ const PRELUDE: &str = "/* The runtime only frees pointers it registered; releasi
 #include <math.h>\n\
 #include <setjmp.h>\n\
 #include <stdatomic.h>\n\
+typedef struct { double value; int scale; } OstrinTemperaturePoint;\n\
 #if defined(OSTRIN_NATIVE_THREADS) && defined(_WIN32)\n\
 #include <windows.h>\n\
 typedef CRITICAL_SECTION OstrinMutex;\n\
@@ -1903,6 +1909,7 @@ fn mangle_ctype(ty: &CType) -> String {
                 .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
                 .collect::<String>()
         ),
+        CType::TemperaturePoint => "TemperaturePoint".to_string(),
         CType::OkLit(t) => format!("Ok_{}", mangle_ctype(t)),
         CType::ErrLit(t) => format!("Err_{}", mangle_ctype(t)),
         CType::Result(t, e) => format!("Result_{}_{}", mangle_ctype(t), mangle_ctype(e)),
@@ -1949,6 +1956,7 @@ fn ctype_to_hir_ty(ty: &CType) -> Option<Ty> {
             Box::new(ctype_to_hir_ty(ret)?),
         ),
         CType::Quantity(dimension) => Ty::Quantity(dimension.clone()),
+        CType::TemperaturePoint => Ty::TemperaturePoint,
         CType::Sized(kind) => Ty::Sized(*kind),
         CType::Float32 => Ty::Float32,
         CType::Array(inner) => Ty::Applied("Array".to_string(), vec![ctype_to_hir_ty(inner)?]),
@@ -2003,6 +2011,7 @@ fn ctype_to_hir_ty_with_instances(
         ),
         CType::DynTrait(name) => Ty::Dyn(name.clone()),
         CType::Quantity(dimension) => Ty::Quantity(dimension.clone()),
+        CType::TemperaturePoint => Ty::TemperaturePoint,
         CType::Sized(kind) => Ty::Sized(*kind),
         CType::Float32 => Ty::Float32,
         CType::Array(inner) => Ty::Applied(
@@ -5733,6 +5742,7 @@ impl<'a> Codegen<'a> {
             }
             CType::Str => Ok(format!("(strcmp({a}, {b}) == 0)")),
             CType::Quantity(_) => Ok(format!("(ostrin_qty_cmp({a}, {b}) == 0)")),
+            CType::TemperaturePoint => Ok(format!("(ostrin_temperature_point_cmp({a}, {b}) == 0)")),
             CType::Record(n) | CType::Enum(n) => {
                 if let Some(info) = self.methods.get(n).and_then(|m| m.get("equals")) {
                     return Ok(format!("{}({a}, {b})", info.c_name));
@@ -5982,6 +5992,7 @@ impl<'a> Codegen<'a> {
             ),
             CType::Str => Ok(format!("strcmp({a}, {b})")),
             CType::Quantity(_) => Ok(format!("ostrin_qty_cmp({a}, {b})")),
+            CType::TemperaturePoint => Ok(format!("ostrin_temperature_point_cmp({a}, {b})")),
             CType::Record(n) if self.has_derive(n, "Ord") => {
                 if self.op_done.insert((true, n.clone())) {
                     self.op_queue.push_back((true, ty.clone()));
@@ -6471,6 +6482,59 @@ impl<'a> Codegen<'a> {
                 );
                 let arg = self.coerce(&lc, &lt, param_types.get(1).unwrap_or(&lt))?;
                 return Ok((format!("{c_name}({rc}, {arg})"), return_type));
+            }
+        }
+        if lt == CType::TemperaturePoint || rt == CType::TemperaturePoint {
+            let comparison = match op {
+                BinOp::Eq => Some("== 0"),
+                BinOp::NotEq => Some("!= 0"),
+                BinOp::Lt => Some("< 0"),
+                BinOp::Gt => Some("> 0"),
+                BinOp::LtEq => Some("<= 0"),
+                BinOp::GtEq => Some(">= 0"),
+                _ => None,
+            };
+            if let (Some(comparison), CType::TemperaturePoint, CType::TemperaturePoint) =
+                (comparison, &lt, &rt)
+            {
+                return Ok((
+                    format!("(ostrin_temperature_point_cmp({lc}, {rc}) {comparison})"),
+                    CType::Bool,
+                ));
+            }
+            match (&lt, &rt, op) {
+                (CType::TemperaturePoint, CType::TemperaturePoint, BinOp::Sub) => {
+                    return Ok((
+                        format!(
+                            "ostrin_qty_from_borrowed(ostrin_temperature_point_to_kelvin({lc}) - ostrin_temperature_point_to_kelvin({rc}), \"K\")"
+                        ),
+                        CType::Quantity(crate::types::dim_single("Temperature")),
+                    ));
+                }
+                (CType::TemperaturePoint, CType::Quantity(dimension), BinOp::Add | BinOp::Sub)
+                    if *dimension == crate::types::dim_single("Temperature") =>
+                {
+                    return Ok((
+                        format!(
+                            "ostrin_temperature_point_shift({lc}, {rc}, {})",
+                            if op == BinOp::Add { 1 } else { -1 }
+                        ),
+                        CType::TemperaturePoint,
+                    ));
+                }
+                (CType::Quantity(dimension), CType::TemperaturePoint, BinOp::Add)
+                    if *dimension == crate::types::dim_single("Temperature") =>
+                {
+                    return Ok((
+                        format!("ostrin_temperature_point_shift({rc}, {lc}, 1)"),
+                        CType::TemperaturePoint,
+                    ));
+                }
+                _ => {
+                    return Err(format!(
+                        "operator '{op:?}' is not defined for absolute TemperaturePoint values"
+                    ));
+                }
             }
         }
         let left_fresh = matches!(lt, CType::Array(_)) && fresh_array_expr(l);
@@ -8461,7 +8525,7 @@ impl<'a> Codegen<'a> {
             "file_exists" | "hash" => 1,
             "char_from_codepoint" => 1,
             "select" => 1,
-            "format" | "format_float_value" => 2,
+            "format" | "format_float_value" | "temperature_point" => 2,
             "clone" | "drop" => 1,
             "norm" | "eigvals" | "det" | "inv" | "trace" | "eye" | "read_file" | "parse_int"
             | "parse_csv" | "sum" | "panic" | "assert" | "array" | "zeros" | "ones" | "abs"
@@ -8497,6 +8561,23 @@ impl<'a> Codegen<'a> {
             self.next_temp(),
         );
         match name {
+            "temperature_point" => {
+                if !matches!(types[0], CType::Int | CType::Float)
+                    || types[1] != CType::Str
+                {
+                    return Err(
+                        "'temperature_point' expects a numeric value and a String scale"
+                            .to_string(),
+                    );
+                }
+                Ok(Some((
+                    format!(
+                        "ostrin_temperature_point_new((double)({}), {})",
+                        codes[0], codes[1]
+                    ),
+                    CType::TemperaturePoint,
+                )))
+            }
             "clone" => {
                 let ty = types.first().cloned().unwrap_or(CType::Void);
                 if is_reference_type(&ty) {
@@ -8957,6 +9038,12 @@ impl<'a> Codegen<'a> {
             }
             CType::Quantity(_) => {
                 return Ok((format!("ostrin_print_qty({})", arg_codes[0]), CType::Void))
+            }
+            CType::TemperaturePoint => {
+                return Ok((
+                    format!("ostrin_print_temperature_point({})", arg_codes[0]),
+                    CType::Void,
+                ))
             }
             CType::GenLit(..) => {
                 return Err("cannot infer the enum instance to print here".to_string())
@@ -11270,7 +11357,7 @@ fn generate_impl(
         out.push_str("    ostrin_mem_report();\n");
     }
     out.push_str("    return 0;\n}\n");
-    if out.contains("Qty") {
+    if out.contains("Qty") || out.contains("ostrin_temperature_point_") {
         // Declared units join the runtime's table; a simple one (one base dimension, exponent 1)
         // gets the same base code as the built-in units, so `ft * m` folds like `km * m`.
         let mut user = String::new();

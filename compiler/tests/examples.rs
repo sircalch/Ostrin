@@ -12093,30 +12093,142 @@ fn direct_measurement_quantity_boundary_is_explicitly_rejected_natively() {
 }
 
 #[test]
-fn temperature_point_boundary_is_explicitly_rejected_natively() {
+fn temperature_point_native_backend_matches_interpreter() {
     let file = std::env::temp_dir().join(format!(
         "ostrin_temperature_point_static_boundary_{}.ostrin",
         std::process::id()
     ));
     fs::write(
         &file,
-        "fn shift(point: TemperaturePoint, delta: Quantity<Temperature>) -> TemperaturePoint { point + delta }\n\
+        "fn make_point(value: Float, scale: String) -> TemperaturePoint {\n\
+         temperature_point(value, scale)\n\
+         }\n\
+         fn shift(point: TemperaturePoint, delta: Quantity<Temperature>) -> TemperaturePoint { point + delta }\n\
          fn difference(left: TemperaturePoint, right: TemperaturePoint) -> Quantity<Temperature> { left - right }\n\
-         fn main() -> Void {}\n",
+         fn main() -> Void {\n\
+             c = make_point(0.0, \"degC\")\n\
+             f = make_point(32.0, \"degF\")\n\
+             k = make_point(273.15, \"K\")\n\
+             cold_c = make_point(-40.0, \"degC\")\n\
+             cold_f = make_point(-40.0, \"degF\")\n\
+             assert(c == f)\n\
+             assert(c == k)\n\
+             assert(cold_c == cold_f)\n\
+             assert(c < shift(c, 0.1 K))\n\
+             moved = shift(c, 10.0 K)\n\
+             print(moved)\n\
+             print(difference(moved, c))\n\
+             print(difference(f, c))\n\
+             print(10.0 K + c)\n\
+             print(moved - (10.0 K))\n\
+             print(310 K)\n\
+         }\n",
     )
     .expect("write TemperaturePoint backend-boundary source");
     let file_arg = file.to_string_lossy().into_owned();
-    let native = run(&["--native-type-report", &file_arg]);
-    let _ = fs::remove_file(&file);
+    let interpreted = run(&["--run", &file_arg]);
     assert!(
-        !native.status.success(),
-        "TemperaturePoint was enabled without a native runtime representation"
+        interpreted.status.success(),
+        "TemperaturePoint interpreter failed: {}",
+        stderr(&interpreted)
+    );
+    let expected = stdout(&interpreted).replace("\r\n", "\n");
+
+    let exe = temp_artifact("temperature_point_native.exe");
+    let native = run(&["--compile", "--out", &exe, &file_arg]);
+    assert!(
+        native.status.success(),
+        "native TemperaturePoint compile failed: {}",
+        stderr(&native)
+    );
+    let native = Command::new(&exe)
+        .output()
+        .expect("run native TemperaturePoint program");
+    let _ = fs::remove_file(&exe);
+    assert!(
+        native.status.success(),
+        "native TemperaturePoint program failed: {}",
+        String::from_utf8_lossy(&native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+
+    let wasi = run(&["--emit-c", "--target", "wasm32-wasi", &file_arg]);
+    assert!(
+        wasi.status.success(),
+        "WASI TemperaturePoint C emission failed: {}",
+        stderr(&wasi)
+    );
+    let wasi_source = stdout(&wasi);
+    for marker in [
+        "typedef struct { double value; int scale; } OstrinTemperaturePoint;",
+        "ostrin_temperature_point_new",
+        "ostrin_temperature_point_cmp",
+        "ostrin_temperature_point_shift",
+        "ostrin_print_temperature_point",
+    ] {
+        assert!(
+            wasi_source.contains(marker),
+            "WASI TemperaturePoint C omitted `{marker}`"
+        );
+    }
+    assert!(
+        !wasi_source.contains("#define OSTRIN_NATIVE_THREADS"),
+        "WASI TemperaturePoint C enabled native threads"
+    );
+
+    let fallback_exe = temp_artifact("temperature_point_ast_fallback.exe");
+    let fallback_compile = run_with_env(
+        &["--compile", "--out", &fallback_exe, &file_arg],
+        "OSTRIN_NO_IR_CODEGEN",
+        "1",
     );
     assert!(
-        stderr(&native)
-            .contains("type 'TemperaturePoint' is not supported by the native backend yet"),
-        "native TemperaturePoint boundary diagnostic changed: {}",
-        stderr(&native)
+        fallback_compile.status.success(),
+        "AST fallback compilation of TemperaturePoint failed: {}",
+        stderr(&fallback_compile)
+    );
+    let fallback_native = Command::new(&fallback_exe)
+        .output()
+        .expect("run TemperaturePoint AST fallback binary");
+    let _ = fs::remove_file(&fallback_exe);
+    assert!(
+        fallback_native.status.success(),
+        "TemperaturePoint AST fallback binary failed: {}",
+        String::from_utf8_lossy(&fallback_native.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&fallback_native.stdout).replace("\r\n", "\n"),
+        expected
+    );
+    let _ = fs::remove_file(&file);
+
+    let bad_scale = temp_source(
+        "temperature_point_native_bad_scale",
+        "fn main() -> Void { print(temperature_point(20.0, \"degR\")) }\n",
+    );
+    let interpreted_bad_scale = run(&["--run", &bad_scale]);
+    assert!(!interpreted_bad_scale.status.success());
+    let bad_exe = temp_artifact("temperature_point_bad_scale.exe");
+    let bad_compile = run(&["--compile", "--out", &bad_exe, &bad_scale]);
+    assert!(
+        bad_compile.status.success(),
+        "native invalid-scale fixture failed to compile: {}",
+        stderr(&bad_compile)
+    );
+    let native_bad_scale = Command::new(&bad_exe)
+        .output()
+        .expect("run native invalid temperature scale case");
+    let _ = fs::remove_file(bad_exe);
+    let _ = fs::remove_file(bad_scale);
+    assert!(!native_bad_scale.status.success());
+    assert!(
+        String::from_utf8_lossy(&native_bad_scale.stderr)
+            .contains("scale must be 'K', 'degC' or 'degF'"),
+        "native invalid-scale diagnostic was unclear: {}",
+        String::from_utf8_lossy(&native_bad_scale.stderr)
     );
 }
 
