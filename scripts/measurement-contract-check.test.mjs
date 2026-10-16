@@ -117,6 +117,51 @@ test("the gate requires dimensional uncertainty to sum canonical contribution sq
   }
 });
 
+test("the gate rejects dimensional product propagation without both derivative factors", () => {
+  const root = fixtureRoot();
+  try {
+    const file = path.join(root, "compiler/std/measurements.ostrin");
+    const source = readFileSync(file, "utf8").replace(
+      "contribution: item.contribution * factor",
+      "contribution: item.contribution",
+    );
+    writeFileSync(file, source);
+    const result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("dimensional products and same-dimension ratios")));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("the gate rejects same-dimension quotient propagation without the numerator derivative", () => {
+  const root = fixtureRoot();
+  try {
+    const file = path.join(root, "compiler/std/measurements.ostrin");
+    const source = readFileSync(file, "utf8").replace("a_factor = 1.0 / b_value", "a_factor = 0.0");
+    writeFileSync(file, source);
+    const result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("dimensional products and same-dimension ratios")));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("the gate rejects equating a source dimension with a propagated product dimension", () => {
+  const root = fixtureRoot();
+  try {
+    const file = path.join(root, "compiler/std/measurements.ostrin");
+    const source = readFileSync(file, "utf8").replace(
+      'if source.source_dimension.length() == 0 {',
+      'if source.source_dimension != source.contribution.dimension_key() {',
+    );
+    writeFileSync(file, source);
+    const result = validateMeasurementContract(root);
+    assert.ok(result.errors.some((error) => error.includes("source dimension metadata must remain independent")));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("the gate rejects documentation that enables arrays prematurely", () => {
   const root = fixtureRoot();
   try {

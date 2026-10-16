@@ -76,6 +76,41 @@ fn main() -> Void {
         Err(message) => print("overflowing dimensional uncertainty = " + message),
     }
 
+    product_a = measurements.from_quantity_source(4 m, 10 cm, "shared-length", "ruler").unwrap()
+    product_b = measurements.from_quantity_source(4 m, 0.1 m, "shared-length", "same ruler").unwrap()
+    product = measurements.mul_quantity(product_a, product_b).unwrap()
+    print(product.value.dimension_key())
+    print(product.sources[0].source_dimension)
+    product_uncertainty = measurements.quantity_uncertainty(product).unwrap()
+    print(product_uncertainty.dimension_key)
+    print(product_uncertainty.value)
+
+    cross_product_a = measurements.from_quantity_source(3 m, 10 cm, "length-source", "ruler").unwrap()
+    cross_product_b = measurements.from_quantity_source(2 s, 0.2 s, "time-source", "clock").unwrap()
+    cross_product = measurements.mul_quantity(cross_product_a, cross_product_b).unwrap()
+    print(cross_product.value.dimension_key())
+    print(cross_product.sources[0].contribution.value() * cross_product.sources[0].contribution.unit_scale())
+    print(cross_product.sources[1].contribution.value() * cross_product.sources[1].contribution.unit_scale())
+    cross_product_uncertainty = measurements.quantity_uncertainty(cross_product).unwrap()
+    print(cross_product_uncertainty.value)
+
+    ratio_a = measurements.from_quantity_source(4 m, 10 cm, "shared-length", "ruler").unwrap()
+    ratio_b = measurements.from_quantity_source(400 cm, 0.1 m, "shared-length", "same ruler").unwrap()
+    ratio = measurements.div_quantity_same(ratio_a, ratio_b).unwrap()
+    print(ratio.value)
+    print(measurements.uncertainty(ratio).unwrap())
+
+    ratio_independent_a = measurements.from_quantity_source(4 m, 10 cm, "numerator", "ruler").unwrap()
+    ratio_independent_b = measurements.from_quantity_source(400 cm, 0.1 m, "denominator", "ruler").unwrap()
+    ratio_independent = measurements.div_quantity_same(ratio_independent_a, ratio_independent_b).unwrap()
+    print(measurements.uncertainty(ratio_independent).unwrap())
+
+    zero_denominator = measurements.from_quantity_source(0 m, 10 cm, "zero", "ruler").unwrap()
+    match measurements.div_quantity_same(ratio_a, zero_denominator) {
+        Ok(_) => print("zero dimensional denominator accepted"),
+        Err(message) => print("zero dimensional denominator = " + message),
+    }
+
     difference_a = measurements.from_quantity_source(12 m, 20 cm, "shared-caliper", "caliper").unwrap()
     difference_b = measurements.from_quantity_source(1200 cm, 0.2 m, "shared-caliper", "same caliper").unwrap()
     difference = measurements.sub_quantity(difference_a, difference_b).unwrap()

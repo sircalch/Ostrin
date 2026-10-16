@@ -281,14 +281,23 @@ propagación de suma y resta también está disponible en el intérprete: `12 m 
 `1200 cm ± 0.2 m` con la misma identidad producen una contribución de `40 cm` al sumar y `0 cm`
 al restar. Reutilizar una identidad con otra sigma coherente produce un error; identificadores
 distintos permanecen como fuentes independientes aunque compartan etiqueta y sigma. Cada
-combinación valida la dimensión declarada y que el resultado siga siendo finito. `quantity_uncertainty`
-suma los cuadrados de las contribuciones una vez convertidas a la unidad coherente y devuelve
+combinación valida que el resultado siga siendo finito. `mul_quantity` aplica la regla de producto
+para las sensibilidades, combina fuentes compartidas y conserva `source_dimension` de cada origen
+aunque la contribución pase a la dimensión del producto. Para dos lecturas `4 m ± 0.1 m` de la misma
+regla, el producto tiene dimensión `Length^2` y contribución `0.8 m²`. `div_quantity_same` cubre
+cocientes de cantidades de igual dimensión y convierte nominales y derivadas a unidades coherentes:
+dos lecturas iguales de la misma fuente se cancelan a `1 ± 0`, mientras fuentes independientes con
+`0.1 m` dan incertidumbre `0.03535533905932738`. El caso `3 m ± 0.1 m` por `2 s ± 0.2 s` verifica
+contribuciones de origen `Length` y `Time` al resultado `Length*Time`: `0.2` y `0.6000000000000001`,
+con incertidumbre combinada `0.632455532033676`. `quantity_uncertainty` suma los cuadrados de las contribuciones una vez convertidas a la unidad coherente y devuelve
 `CoherentUncertainty<D>`; el valor numérico lleva la dimensión `D` en el tipo y el registro expone
 `dimension_key`. Una medición exacta devuelve cero; incertidumbre desconocida y overflow producen
 `Err`. La suma de dos fuentes independientes de `0.2 m` da `0.28284271247461906`, mientras que
 la misma fuente compartida al sumarse da `0.4`.
-Producto y cociente aún no están implementados para cantidades. El backend nativo mantiene el
-rechazo explícito hasta cerrar ownership, dimensión de incertidumbre y ABI.
+El cociente entre magnitudes de dimensiones distintas aún no está disponible porque requiere
+representar el resultado adimensional como `Measurement<Float>` o el resultado dimensional como
+`Measurement<Quantity<A/B>>`. El backend nativo mantiene el rechazo explícito hasta cerrar ownership,
+dimensión de incertidumbre y ABI.
 
 Este prototipo no habilita todavía `Array<Measurement<T>>`, covarianza ni soporte nativo de
 `Measurement<Quantity<D>>`. La propagación deberá mantener la dimensión del resultado en
