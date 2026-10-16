@@ -323,7 +323,9 @@ Las unidades Celsius y Fahrenheit no pueden entrar en la tabla multiplicativa ex
 representa cada unidad con `(dimensión, factor)` y convierte como `valor * factor_origen /
 factor_destino`; esa regla es correcta para intervalos, pero no para temperaturas absolutas. En
 particular, un offset no puede formar parte de productos, cocientes, potencias, simplificación de
-unidades ni conversiones de `Array<Quantity<D>>`.
+unidades ni de una conversión de intervalos. La conversión de arrays de temperaturas absolutas debe
+aplicar el offset elemento a elemento; los arrays de intervalos solo aplican el factor de escala.
+El array deberá conservar el rol de sus elementos para seleccionar la transformación correcta.
 
 La semántica futura distinguirá una **temperatura absoluta** de un **intervalo de temperatura**.
 Ambos comparten la dimensión física `Temperature`, pero tienen reglas algebraicas distintas:
@@ -385,6 +387,8 @@ ejecutables. Los resultados se compararán con tolerancias explícitas de coma f
 | Intervalo Celsius | `1 °C` intervalo a K intervalo | `1 K` |
 | Intervalo Fahrenheit | `1 °F` intervalo a K intervalo | `5/9 K` |
 | Diferencia de absolutos | `20 °C − 10 °C` | `10 °C` de intervalo |
+| Array de puntos absolutos | `[0 °C]` absoluto a K | `[273.15 K]` |
+| Array de intervalos | `[1 °C]` intervalo a K | `[1 K]` |
 
 No se aceptará el soporte de Celsius/Fahrenheit hasta que existan pruebas positivas y negativas de
 las reglas de tipos, paridad intérprete/nativo y WASI, casos de arrays, propagación de incertidumbre
