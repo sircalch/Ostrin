@@ -386,16 +386,18 @@ si las operaciones generadas siguen distinguiendo puntos de intervalos. En array
 parte del tipo del array y no se permitirá mezclar puntos con intervalos dentro de un mismo array.
 Los genéricos existentes `Unit<D>` y `Quantity<D>` no aceptarán unidades afines implícitamente.
 
-La matriz de aceptación se organiza por frontera semántica. Describe el objetivo completo; varias
-fronteras, incluidas arrays y backends nativos/WASI, siguen pendientes:
+La matriz de aceptación se organiza por frontera semántica. El estado de cada frontera se limita a
+lo demostrado en el compilador y sus pruebas; la compatibilidad escalar no implica soporte de arrays
+ni de mediciones:
 
-| Frontera | Casos positivos | Casos que deben rechazarse |
+| Frontera | Estado comprobado | Pendiente o rechazado |
 | --- | --- | --- |
-| Tipos y firmas | Parámetros, retornos, campos, arrays homogéneos y selección de ramas conservan el rol; una resta de puntos retorna un intervalo. | Mezcla de punto e intervalo en una firma, asignación o array; un genérico `Quantity<D>` no captura un punto. |
-| Operaciones | Punto − punto, punto ± intervalo, comparación de puntos del mismo espacio e intervalo ± intervalo. | Punto + punto, intervalo − punto, punto ×/÷, potencia, producto o negación de un punto; comparar punto con intervalo. |
-| Conversiones | Absoluta con offset; intervalo por escala; round-trip entre escalas con tolerancia declarada. | Conversión entre espacios incompatibles o aplicación de offset a un intervalo. |
-| Arrays y backends | Conversión elemento a elemento, paridad intérprete/nativo/WASI, campos, argumentos, retornos y `Phi` conservan el rol. | Array heterogéneo de puntos e intervalos o fallback que borre el rol sin diagnóstico. |
-| Medición y persistencia | La incertidumbre de una lectura absoluta se convierte como intervalo; formato y serialización preservan rol y unidad. | Sumar offset a `sigma`, perder el rol al serializar o asumir independencia de fuentes de incertidumbre. |
+| Tipos escalares | `TemperaturePoint` nominal en parámetros, retornos y expresiones tipadas; el rol sobrevive en HIR/IR. | Mezclar un punto con `Quantity<D>` en una firma o sustitución genérica. |
+| Operaciones escalares | Punto − punto, punto ± intervalo, intervalo + punto y comparación entre puntos en escalas K/degC/degF. | Punto + punto, intervalo − punto, punto ×/÷, potencia, producto o negación; comparar punto con intervalo. |
+| Construcción y unidades | `temperature_point(valor, escala)` crea explícitamente un punto finito en K, degC o degF. `n K` continúa siendo un intervalo. | Conversión explícita de un punto ya construido a otra escala; no existe todavía una API de conversión de puntos. |
+| Backends escalares | Paridad de salida entre intérprete, backend nativo IR y fallback AST; el programa también se ejecuta en WASI Preview 1. | No se infiere a partir de estas pruebas la seguridad universal de memoria ni el soporte de otros tipos de payload. |
+| Arrays | La conversión actual de `Array<Quantity<Temperature>>` conserva la semántica lineal y aplica solo factores. | Los arrays de `TemperaturePoint`, conversión de offset elemento a elemento y preservación del rol en arrays aún no están implementados. |
+| Medición y persistencia | No habilitado para puntos absolutos. | `Measurement<TemperaturePoint>`, propagación de incertidumbre, serialización y persistencia de puntos requieren diseño y pruebas propios. |
 
 La matriz no habilita `Measurement<TemperaturePoint>` automáticamente: ese tipo seguirá bloqueado
 hasta que el modelo de `Measurement` y sus fuentes de incertidumbre lo soporte en intérprete, IR,
@@ -430,9 +432,11 @@ programas Ostrin ejecutables. Una prueba del núcleo
 numérico recorre conversiones entre K/degC/degF y operaciones punto-intervalo en una cuadrícula
 finita de valores, comprobando invariantes en la escala coherente; la tolerancia de las restas usa
 la magnitud de los operandos para reflejar el redondeo `f64`. Además, una prueba de programa ejecuta
-el constructor, conversiones equivalentes desde Celsius/Fahrenheit/K, desplazamiento por un
-intervalo Kelvin y diferencia entre puntos en el intérprete. Esto valida la API de intérprete, pero
-no establece paridad de ejecución con el backend nativo o WASI.
+el constructor, lecturas equivalentes desde Celsius/Fahrenheit/K, desplazamiento por un intervalo
+Kelvin y diferencia entre puntos. La fixture de integración compara bytes de salida entre intérprete,
+backend nativo IR y fallback AST; la matriz WASI compila y ejecuta la misma fixture en WASI Preview 1.
+Estas pruebas cubren el caso escalar; no demuestran soporte de arrays, mediciones ni conversión de
+un punto ya construido a otra escala.
 
 Los siguientes vectores son notación matemática para pruebas futuras; los identificadores `°C` y
 `°F` no están habilitados en el lexer ni en la tabla de unidades actual. No son ejemplos Ostrin
@@ -448,12 +452,14 @@ ejecutables. Los resultados se compararán con tolerancias explícitas de coma f
 | Array de puntos absolutos | `[0 °C]` absoluto a K | `[273.15 K]` |
 | Array de intervalos | `[1 °C]` intervalo a K | `[1 K]` |
 
-No se aceptará el soporte de Celsius/Fahrenheit hasta que existan pruebas positivas y negativas de
-las reglas de tipos, paridad intérprete/nativo y WASI, casos de arrays, propagación de incertidumbre
-(solo la escala se aplica a una sigma), formatting/round-trip, y rechazo de productos o potencias
-afines. Las pruebas deben demostrar que los prefijos, unidades compuestas y unidades definidas por
-el usuario siguen siendo multiplicativos. No se añadirá una aproximación que trate el offset como
-factor ni se etiquetará como disponible mientras el código no cumpla estos criterios.
+La implementación escalar de puntos Celsius/Fahrenheit está disponible de forma experimental bajo
+el constructor explícito y las operaciones enumeradas arriba. El soporte de arrays y mediciones no
+se considerará disponible hasta que existan pruebas positivas y negativas de preservación del rol,
+conversión elemento a elemento, propagación de incertidumbre (solo la escala se aplica a una sigma),
+formatting/round-trip, y rechazo de productos o potencias afines. Las pruebas deben demostrar que
+los prefijos, unidades compuestas y unidades definidas por el usuario siguen siendo multiplicativos.
+No se añadirá una aproximación que trate el offset como factor ni se etiquetarán como disponibles
+las fronteras que aún no cumplen estos criterios.
 
 Para `Measurement`, una incertidumbre estándar asociada a una temperatura absoluta transforma
 como un intervalo: la conversión de `sigma` solo multiplica por `abs(scale_from / scale_to)` y nunca
