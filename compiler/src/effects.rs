@@ -2315,6 +2315,7 @@ fn is_known_effect_free_global(operation: &str) -> bool {
             | "sqrt"
             | "tan"
             | "tanh"
+            | "temperature_point"
             | "trace"
             | "where"
             | "zeros"

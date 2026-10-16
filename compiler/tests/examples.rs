@@ -12121,6 +12121,54 @@ fn temperature_point_boundary_is_explicitly_rejected_natively() {
 }
 
 #[test]
+fn temperature_point_constructor_keeps_kelvin_intervals_linear() {
+    let file = temp_source(
+        "temperature_point_constructor",
+        "fn make_point(value: Float, scale: String) -> TemperaturePoint {\n\
+         temperature_point(value, scale)\n\
+         }\n\
+         fn main() -> Void {\n\
+             c = make_point(0.0, \"degC\")\n\
+             f = make_point(32.0, \"degF\")\n\
+             k = make_point(273.15, \"K\")\n\
+             assert(c == f)\n\
+             assert(c == k)\n\
+             shifted = c + (10.0 K)\n\
+             print(shifted)\n\
+             print(shifted - c)\n\
+             print(310 K)\n\
+         }\n",
+    );
+    let interpreted = run(&["--run", &file]);
+    let _ = fs::remove_file(&file);
+    assert!(
+        interpreted.status.success(),
+        "explicit temperature point constructor failed: {}",
+        stderr(&interpreted)
+    );
+    assert_eq!(
+        stdout(&interpreted).replace("\r\n", "\n"),
+        "10 degC (absolute)\n10 K\n310 K\n"
+    );
+
+    let invalid = temp_source(
+        "temperature_point_invalid_scale",
+        "fn main() -> Void { print(temperature_point(20.0, \"degR\")) }\n",
+    );
+    let rejected = run(&["--run", &invalid]);
+    let _ = fs::remove_file(invalid);
+    assert!(
+        !rejected.status.success(),
+        "unknown point scale was accepted"
+    );
+    assert!(
+        stderr(&rejected).contains("scale must be 'K', 'degC' or 'degF'"),
+        "invalid point scale should have an actionable runtime diagnostic: {}",
+        stderr(&rejected)
+    );
+}
+
+#[test]
 fn measurement_array_boundary_has_actionable_diagnostic() {
     let file = example_path("measurement_array_shape.ostrin");
     let interpreted = run(&["--run", &file]);

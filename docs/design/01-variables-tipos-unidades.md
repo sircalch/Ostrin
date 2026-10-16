@@ -317,7 +317,7 @@ Estado real del compilador, que concreta §3.1–§3.5:
   ambos lados. El runtime C recibe las unidades declaradas en una tabla generada. Ejemplo:
   `examples/user_units.ostrin`.
 
-### 3.6 Temperaturas absolutas e intervalos (modelo; implementación parcial)
+### 3.6 Temperaturas absolutas e intervalos (implementación parcial)
 
 Las unidades Celsius y Fahrenheit no pueden entrar en la tabla multiplicativa existente. Esa tabla
 representa cada unidad con `(dimensión, factor)` y convierte como `valor * factor_origen /
@@ -327,15 +327,19 @@ unidades ni de una conversión de intervalos. La conversión de arrays de temper
 aplicar el offset elemento a elemento; los arrays de intervalos solo aplican el factor de escala.
 El array deberá conservar el rol de sus elementos para seleccionar la transformación correcta.
 
-La semántica distingue ya estos roles en metadatos internos y el type checker distingue el tipo
-nominal `TemperaturePoint` de `Quantity<Temperature>`. El intérprete tiene una variante runtime
-interna y operaciones por rol cubiertas con pruebas unitarias, pero no existe un constructor fuente
-ni una ruta de ejecución de programas; el lowering nativo/WASI tampoco está implementado. Por ello,
-la capacidad no está disponible para programas de usuario. El diseño completo separa una **temperatura absoluta**
+La semántica distingue estos roles en metadatos internos y el type checker distingue el tipo nominal
+`TemperaturePoint` de `Quantity<Temperature>`. El intérprete expone el constructor explícito
+`temperature_point(valor, escala)` para crear puntos en `"K"`, `"degC"` o `"degF"`. Por ejemplo,
+`temperature_point(20.0, "degC")` es un punto absoluto, mientras que `20 K` sigue siendo un
+intervalo lineal. Los puntos se pueden comparar, desplazar por intervalos de temperatura y restar
+entre sí; la diferencia resultante es un intervalo Kelvin. El constructor rechaza escalas distintas
+de las tres permitidas y valores no finitos. La ejecución de puntos queda limitada al intérprete:
+el backend nativo/WASI todavía rechaza `TemperaturePoint`, y no hay soporte de arrays ni de
+`Measurement<TemperaturePoint>`. El diseño separa una **temperatura absoluta**
 de un **intervalo de temperatura**. Ambos comparten la dimensión física `Temperature`, pero tienen
 reglas algebraicas distintas:
 
-| Operación | Resultado | Estado propuesto |
+| Operación | Resultado | Regla |
 | --- | --- | --- |
 | absoluta − absoluta | intervalo | Permitida; convierte ambos valores a una escala común y descarta el offset del resultado. |
 | absoluta + intervalo, intervalo + absoluta | absoluta | Permitida; el intervalo usa solo el factor de escala. |
@@ -347,8 +351,8 @@ reglas algebraicas distintas:
 | comparación absoluta con intervalo | — | Error de tipos: un punto no es una diferencia. |
 | negación unaria de una absoluta | — | Error de tipos: el opuesto aritmético de un punto absoluto no está definido. |
 
-La transformación de una lectura absoluta al valor coherente será `base = scale * value + offset`;
-la conversión entre escalas será `value_to = (scale_from * value_from + offset_from -
+La transformación de una lectura absoluta al valor coherente es `base = scale * value + offset`;
+la conversión entre escalas es `value_to = (scale_from * value_from + offset_from -
 offset_to) / scale_to`. Para intervalos solo se aplicará `interval_to =
 scale_from / scale_to * interval_from`. La implementación interna usa una operación fused multiply-add
 para reducir el redondeo al normalizar puntos, y calcula el offset Fahrenheit desde el par de referencia
@@ -366,11 +370,11 @@ nombre de unidad; y `ostrin_convert` convierte únicamente mediante la razón de
 esas representaciones indica si el valor es un punto absoluto o un intervalo. Añadir un offset a la
 tabla por sí solo produciría resultados incorrectos en aritmética, arrays y unidades compuestas.
 
-El primer diseño de tipos preservará `Quantity<D>` como una cantidad **lineal** con la semántica
-multiplicativa existente. Para temperatura podrá representar intervalos, pero no puntos absolutos.
-Los puntos absolutos tendrán un tipo nominal distinto (por ejemplo, `TemperaturePoint`); la
-resta entre dos puntos producirá una cantidad lineal de dimensión `Temperature`, y sumar un punto a
-un intervalo lineal producirá otro punto. Este tipo nominal no se inferirá de una unidad ni se
+El diseño preserva `Quantity<D>` como una cantidad **lineal** con la semántica multiplicativa
+existente. Para temperatura representa intervalos, pero no puntos absolutos. Los puntos absolutos
+usan un tipo nominal distinto (`TemperaturePoint`); la resta entre dos puntos produce una cantidad
+lineal de dimensión `Temperature`, y sumar un punto a un intervalo lineal produce otro punto. Este
+tipo nominal no se infiere de una unidad ni se
 reducirá a `Quantity<Temperature>` durante la sustitución de genéricos.
 
 El descriptor de unidad afín deberá registrar dimensión, escala, desplazamiento y espacio afín.
@@ -380,8 +384,8 @@ si las operaciones generadas siguen distinguiendo puntos de intervalos. En array
 parte del tipo del array y no se permitirá mezclar puntos con intervalos dentro de un mismo array.
 Los genéricos existentes `Unit<D>` y `Quantity<D>` no aceptarán unidades afines implícitamente.
 
-La matriz de aceptación se organizará por frontera semántica; todos los renglones son requisitos de
-implementación, no capacidades actuales:
+La matriz de aceptación se organiza por frontera semántica. Describe el objetivo completo; varias
+fronteras, incluidas arrays y backends nativos/WASI, siguen pendientes:
 
 | Frontera | Casos positivos | Casos que deben rechazarse |
 | --- | --- | --- |
@@ -397,26 +401,25 @@ backends y pruebas analíticas. Los casos de ownership gestionado, `Phi`, reempl
 destrucción deberán incluir `live_allocations=0` además de ASan/UBSan; los checks de tipo por sí
 solos no demuestran ese contrato.
 
-La base de compatibilidad para la implementación será conservar `n K` como el `Quantity<Temperature>`
-lineal que ya existe, con su aritmética y conversiones actuales. El catálogo puede marcar K como
-perteneciente al espacio afín Temperature para usarlo en una conversión de puntos **explícita**; esa
-marca no cambia por sí sola el rol de una cantidad. Por ejemplo, `TemperaturePoint(310 K)` es una
-notación candidata para el constructor, todavía sujeta a revisión de sintaxis. Los intervalos
-Kelvin siguen usando `Quantity<Temperature>` y `K`; el compilador no inferirá puntos absolutos por
-el nombre de la unidad ni por contexto. La primera implementación tampoco permitirá que programas
-declaren unidades afines con `unit`/`define`; esa extensión necesitará validar ciclos, espacios de
-referencia y composición antes de exponerse.
+La compatibilidad conserva `n K` como el `Quantity<Temperature>` lineal que ya existe, con su
+aritmética y conversiones actuales. El catálogo marca K como perteneciente al espacio afín
+Temperature para usarlo en una conversión de puntos **explícita**; esa marca no cambia por sí sola
+el rol de una cantidad. La forma fuente es
+`temperature_point(valor, escala)`, por ejemplo `temperature_point(310.0, "K")`. Los intervalos
+Kelvin siguen usando `Quantity<Temperature>` y `K`; el compilador no infiere puntos absolutos por el
+nombre de la unidad ni por contexto. Los programas tampoco pueden declarar unidades afines con
+`unit`/`define`; esa extensión necesitará validar ciclos, espacios de referencia y composición antes
+de exponerse.
 
-El compilador ya contiene un núcleo interno de metadatos y operaciones por rol (`UnitDefinition`,
+El compilador contiene un núcleo de metadatos y operaciones por rol (`UnitDefinition`,
 `QuantityRole` y el catálogo de escalas de punto K/degC/degF), además de una variante
 `Ty::TemperaturePoint` con reglas de operadores en el type checker. El nombre también se conserva
 al convertir entre `Ty` y los metadatos de tipo del AST, para que firmas tipadas y sustituciones no
-degraden la identidad del punto. Una prueba estática también verifica que parámetros, retornos,
-`punto + intervalo` y `punto - punto` conservan sus roles en HIR y en instrucciones `Binary` de IR
-verificada. Aún no hay una expresión fuente que construya un punto; las pruebas del intérprete llaman
-directamente a la variante runtime interna, mientras los backends todavía no la ejecutan. Estas
-pruebas validan tipos, operaciones internas y lowering estático, no paridad de ejecución entre
-programas ni disponibilidad de la característica. Las comparaciones runtime entre puntos normalizan
+degraden la identidad del punto. Pruebas estáticas verifican que parámetros, retornos,
+`punto + intervalo` y `punto - punto` conservan sus roles en HIR e IR verificada. Una prueba de
+programa ejecuta `temperature_point` en el intérprete; los backends nativos/WASI aún rechazan ese
+tipo, por lo que no existe paridad de ejecución multiplataforma. Las comparaciones runtime entre
+puntos normalizan
 ambas lecturas con `scale * value + offset` en la escala coherente antes de ordenar; así se evita que
 una conversión asimétrica entre Celsius y Fahrenheit haga distintos valores equivalentes por un bit
 de redondeo de coma flotante. Una cuadrícula de pruebas del intérprete recorre 324 pares de lecturas entre K/degC/degF
@@ -424,8 +427,10 @@ para restas y comparaciones, incluyendo `-40 °C = -40 °F`; son llamadas intern
 programas Ostrin ejecutables. Una prueba del núcleo
 numérico recorre conversiones entre K/degC/degF y operaciones punto-intervalo en una cuadrícula
 finita de valores, comprobando invariantes en la escala coherente; la tolerancia de las restas usa
-la magnitud de los operandos para reflejar el redondeo `f64`. Esa prueba respalda las fórmulas
-internas, no el comportamiento integral del lenguaje ni sus backends.
+la magnitud de los operandos para reflejar el redondeo `f64`. Además, una prueba de programa ejecuta
+el constructor, conversiones equivalentes desde Celsius/Fahrenheit/K, desplazamiento por un
+intervalo Kelvin y diferencia entre puntos en el intérprete. Esto valida la API de intérprete, pero
+no establece paridad de ejecución con el backend nativo o WASI.
 
 Los siguientes vectores son notación matemática para pruebas futuras; los identificadores `°C` y
 `°F` no están habilitados en el lexer ni en la tabla de unidades actual. No son ejemplos Ostrin

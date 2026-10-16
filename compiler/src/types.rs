@@ -260,9 +260,9 @@ pub fn user_units() -> Vec<(String, Dimension, f64)> {
     USER_UNITS.with(|u| u.borrow().clone())
 }
 
-/// Full unit conversion metadata. Existing built-in and user-defined units
-/// remain linear; an affine unit must be registered with its offset and space
-/// before source syntax can expose it.
+/// Full unit conversion metadata. Existing quantities keep linear conversion
+/// semantics; the explicit absolute-temperature constructor opts into point
+/// offsets and affine-space validation.
 pub fn unit_definition(symbol: &str) -> Option<UnitDefinition> {
     builtin_unit_info(symbol)
         .map(|(dimension, scale)| {
@@ -286,12 +286,9 @@ pub fn unit_info(symbol: &str) -> Option<(Dimension, f64)> {
     unit_definition(symbol).map(|unit| (unit.dimension, unit.scale))
 }
 
-/// Internal point-scale catalog. These symbols intentionally do not enter
-/// `unit_info`: until the parser and type checker preserve point roles, making
-/// them ordinary source units would silently treat absolute readings as
-/// intervals. Interval conversions continue to use the existing linear unit
-/// catalog.
-#[allow(dead_code)] // Wired when source-level TemperaturePoint is lowered.
+/// Point-scale catalog. These symbols intentionally do not enter `unit_info`:
+/// unit suffixes such as `20 K` remain linear intervals. Absolute readings use
+/// the explicit `temperature_point(value, scale)` constructor.
 pub fn builtin_temperature_point_unit(symbol: &str) -> Option<UnitDefinition> {
     let temperature = dim_single("Temperature");
     match symbol {
@@ -371,7 +368,7 @@ pub fn convert_value_with_role(
 /// point or an interval. Point shifts preserve the point operand's scale;
 /// point differences return coherent linear units. Invalid affine operations
 /// return an error.
-#[allow(dead_code)] // Called by interpreter and backend lowering once point types are enabled.
+#[allow(dead_code)] // Called by the interpreter; native/WASI lowering is pending.
 pub fn combine_quantities_with_role(
     left: &RoleAwareQuantity,
     right: &RoleAwareQuantity,
@@ -461,7 +458,7 @@ pub fn combine_quantities_with_role(
 
 /// Compare two values only when both have the same semantic role. Absolute
 /// points are normalized with offsets; linear intervals use scale only.
-#[allow(dead_code)] // Called by interpreter and backend comparison lowering.
+#[allow(dead_code)] // Called by the interpreter; native/WASI comparison is pending.
 pub fn compare_quantities_with_role(
     left: &RoleAwareQuantity,
     right: &RoleAwareQuantity,

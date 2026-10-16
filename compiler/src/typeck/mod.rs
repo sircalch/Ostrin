@@ -5774,6 +5774,9 @@ fn check_builtin_call(
         "hash" => vec![Ty::Unknown],
         "format" => vec![Ty::String, Ty::List(Box::new(Ty::String))],
         "format_float_value" => vec![Ty::Float, Ty::Int],
+        // `K` remains the ordinary linear interval unit. Absolute readings
+        // require this explicit role-bearing constructor.
+        "temperature_point" => vec![Ty::Float, Ty::String],
         "select" => vec![Ty::Unknown],
         // Ownership primitives are intentionally generic. `clone` creates a
         // new native reference to the same identity-managed value; `drop`
@@ -5855,6 +5858,7 @@ fn check_builtin_call(
             "Result".to_string(),
             vec![Ty::String, Ty::String],
         )),
+        "temperature_point" => Some(Ty::TemperaturePoint),
         "select" => {
             let Some(Ty::List(channel_ty)) = arg_types.first() else {
                 errors.push(TypeError {

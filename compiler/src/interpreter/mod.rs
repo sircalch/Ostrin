@@ -2985,6 +2985,26 @@ impl Interpreter {
                         precision = digits as usize
                     ))));
                 }
+                "temperature_point" => {
+                    let value = as_f64(&self.eval_arg(&args[0], env)?)?;
+                    let Value::String(unit) = self.eval_arg(&args[1], env)? else {
+                        return Err(RuntimeError::Error(
+                            "'temperature_point' expects a numeric value and a String scale"
+                                .to_string(),
+                        ));
+                    };
+                    if !value.is_finite() {
+                        return Err(RuntimeError::Error(
+                            "'temperature_point' requires a finite value".to_string(),
+                        ));
+                    }
+                    if builtin_temperature_point_unit(&unit).is_none() {
+                        return Err(RuntimeError::Error(format!(
+                            "'temperature_point' scale must be 'K', 'degC' or 'degF', got '{unit}'"
+                        )));
+                    }
+                    return Ok(Value::TemperaturePoint(value, unit));
+                }
                 "select" => {
                     let channels = self.eval_arg(&args[0], env)?;
                     let Value::List(channels) = channels else {
