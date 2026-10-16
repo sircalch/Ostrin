@@ -14,7 +14,7 @@ globalThis.OSTRIN_STATUS = Object.freeze({
     "tests": "compiler/tests"
   },
   "tests": {
-    "rustMarkedTests": 360
+    "rustMarkedTests": 361
   },
   "nativeBackend": {
     "ir": 7198,
