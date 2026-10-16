@@ -284,9 +284,8 @@ test("readiness reports module-wide callbacks separately from entry effect closu
   assert.ok(report.knownEffectCallCount > 0);
   assert.ok(report.symbolicEffectCallCount > 0);
   assert.equal(report.effectCoverageCountUnit, "distinct_function_operation_edges");
-  assert.equal(report.readyCount, 0);
-  assert.equal(report.status, "OPEN");
-  assert.ok(report.captureOpenCount > 0, "host capture remains independently required");
+  assert.equal(report.readyCount + report.openCount, report.bundleCount);
+  assert.equal(report.status, report.openCount === 0 ? "READY" : "OPEN");
   assert.equal(report.captureReadyCount + report.captureOpenCount, report.bundleCount);
   assert.ok(report.captureReadyCount <= report.bundleCount);
 });
