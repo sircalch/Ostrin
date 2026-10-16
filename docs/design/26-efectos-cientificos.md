@@ -350,10 +350,11 @@ en una consola de logs.
    Las invocaciones de parámetros callback capturados por una closure local conservan la variable
    de efecto del parámetro exterior, por lo que la fila de un callback concreto puede propagarse a
    sus callers. HIR e IR conservan la fila propia de cada closure, pero el análisis todavía deja
-   cerrada la llamada al alias local cuando su closure captura callbacks locales conocidos; HIR
-   verifica esa arista contra la fila propia de la lambda. Las llamadas desconocidas que ocurren
-   dentro del callback siguen abiertas y se propagan al caller. También siguen abiertas las
-   closures que escapan, se almacenan en agregados o cruzan una frontera sin cuerpo local resoluble.
+   cerrada la llamada al alias local cuando su closure captura callbacks locales conocidos; la
+   sustitución se conserva a través de closures locales anidadas y HIR verifica cada arista contra
+   la fila propia de la lambda. Las llamadas desconocidas que ocurren dentro del callback siguen
+   abiertas y se propagan al caller. También siguen abiertas las closures que escapan, se almacenan
+   en agregados o cruzan una frontera sin cuerpo local resoluble.
    Las llamadas a métodos locales se propagan usando la clave del método que comparte el inventario;
    si no se puede asociar una llamada calificada con una función local, permanece en
    `unresolved_calls` en lugar de presentar una cobertura completa.

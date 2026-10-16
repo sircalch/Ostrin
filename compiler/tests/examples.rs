@@ -13919,6 +13919,80 @@ fn open_main() -> Void { wrapper(unknown_action) }
 }
 
 #[test]
+fn experimental_effect_signatures_compose_through_nested_captured_closures() {
+    let file = temp_source(
+        "effects-nested-closure-captured-callback.ostrin",
+        r#"fn wrapper(action: fn() -> Void) -> Void {
+    first: fn() -> Void = fn() {
+        deferred: fn() -> Void = fn() { action() }
+        deferred()
+    }
+    first()
+}
+fn io_action() -> Void { print("effect") }
+fn unknown_action() -> Void { host.callback() }
+fn main() -> Void { wrapper(io_action) }
+fn open_main() -> Void { wrapper(unknown_action) }
+"#,
+    );
+    let out = run(&["--effect-report", "--json", &file]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(
+        report["function_effect_signatures"]["main"]["effects"],
+        serde_json::json!(["io"]),
+        "the concrete callback row must pass through both local closures"
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["main"]["row_closed"],
+        true
+    );
+    assert_eq!(
+        report["function_effect_signatures"]["open_main"]["open_calls"],
+        serde_json::json!(["host.callback"]),
+        "an unknown effect inside the captured callback must remain open"
+    );
+    assert_eq!(
+        report["effect_variable_substitutions"]["wrapper"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1,
+        "the outer function must substitute its callback into the first closure"
+    );
+    let nested_lambda = report["effect_variable_substitutions"]
+        .as_object()
+        .unwrap()
+        .keys()
+        .find(|name| name.starts_with("wrapper::<lambda@"))
+        .expect("the first closure must forward its captured callback to the nested closure");
+    assert_eq!(
+        report["effect_variable_substitutions"][nested_lambda]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+
+    let hir = run(&["--hir", &file]);
+    assert!(hir.status.success(), "HIR stderr: {}", stderr(&hir));
+    let hir_text = stdout(&hir);
+    assert!(hir_text.contains("hir violations: 0"), "{hir_text}");
+    assert!(hir_text.contains("effect substitution: ε_action <- ε_action via wrapper::<lambda@"));
+
+    let ir = run(&["--ir", &file]);
+    assert!(ir.status.success(), "IR stderr: {}", stderr(&ir));
+    let ir_text = stdout(&ir);
+    assert!(ir_text.contains("ir violations: 0"), "{ir_text}");
+    assert!(
+        ir_text.contains("closure wrapper$closure0$closure0")
+            && ir_text.contains("effect variables: ε_action"),
+        "IR must preserve effect metadata on the nested closure: {ir_text}"
+    );
+    let _ = fs::remove_file(file);
+}
+
+#[test]
 fn experimental_effect_report_separates_lambda_creation_from_indirect_execution() {
     let file = temp_source(
         "effects-lambda-execution.ostrin",

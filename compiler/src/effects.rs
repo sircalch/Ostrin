@@ -1766,7 +1766,23 @@ fn collect_callback_expr(
                     (CallbackSource::Function(source), true)
                         if report.function_names.contains(source)
                             && report.captured_callback_parameters.get(source).is_none_or(
-                                |captures| captures.iter().all(|(owner, _)| owner == function),
+                                |captures| {
+                                    captures.iter().all(|(owner, parameter)| {
+                                        matches!(
+                                            callback_source(
+                                                &Expr::Ident(parameter.clone()),
+                                                function,
+                                                shadowed,
+                                                report,
+                                            ),
+                                            CallbackSource::Parameter {
+                                                function: visible_owner,
+                                                name: visible_parameter,
+                                            } if visible_owner == *owner
+                                                && visible_parameter == *parameter
+                                        )
+                                    })
+                                },
                             ) =>
                     {
                         Some(source.clone())
@@ -1794,13 +1810,34 @@ fn collect_callback_expr(
                         .entry(function.to_string())
                         .or_default()
                         .remove(&operation);
-                    if let Some(captures) = report.captured_callback_parameters.get(&target) {
+                    if let Some(captures) =
+                        report.captured_callback_parameters.get(&target).cloned()
+                    {
                         for (owner, parameter) in captures {
-                            if owner != function {
+                            let visible_source = callback_source(
+                                &Expr::Ident(parameter.clone()),
+                                function,
+                                shadowed,
+                                report,
+                            );
+                            if !matches!(
+                                visible_source,
+                                CallbackSource::Parameter {
+                                    function: visible_owner,
+                                    name: visible_parameter,
+                                } if visible_owner == *owner && visible_parameter == *parameter
+                            ) {
                                 continue;
                             }
+                            if owner != function {
+                                report
+                                    .captured_callback_parameters
+                                    .entry(function.to_string())
+                                    .or_default()
+                                    .insert((owner.clone(), parameter.clone()));
+                            }
                             invoked.insert(CallbackParameter {
-                                function: owner.clone(),
+                                function: function.to_string(),
                                 name: parameter.clone(),
                             });
                             callsites.push(CallbackCallsite {
@@ -1808,7 +1845,7 @@ fn collect_callback_expr(
                                 target: target.clone(),
                                 target_parameter: parameter.clone(),
                                 source: CallbackSource::Parameter {
-                                    function: owner.clone(),
+                                    function: function.to_string(),
                                     name: parameter.clone(),
                                 },
                                 operation: operation.clone(),
